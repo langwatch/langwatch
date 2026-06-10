@@ -33,7 +33,7 @@ describe("Feature: Suites REST API", () => {
   });
 
   beforeEach(async () => {
-    resetApp();
+    await resetApp();
     const mockGetActivePlan = vi.fn().mockResolvedValue(FREE_PLAN);
     globalForApp.__langwatch_app = createTestApp({
       planProvider: PlanProviderService.create({
@@ -60,11 +60,11 @@ describe("Feature: Suites REST API", () => {
       },
     });
 
-    testProject = projectFactory.build({ slug: nanoid() });
     testProject = await prisma.project.create({
       data: {
-        ...testProject,
+        ...projectFactory.build({ slug: nanoid() }),
         teamId: testTeam.id,
+        personalFeatures: {},
       },
     });
 
@@ -114,7 +114,7 @@ describe("Feature: Suites REST API", () => {
     await prisma.organization.delete({
       where: { id: testOrganization.id },
     });
-    resetApp();
+    await resetApp();
   });
 
   async function createScenario(name: string): Promise<Scenario> {
@@ -186,6 +186,7 @@ describe("Feature: Suites REST API", () => {
         expect(body[0].name).toBe("My Suite");
       });
 
+      /** @scenario Archived suite does not appear in sidebar search results */
       it("excludes archived suites", async () => {
         await createSuite({ archivedAt: new Date() });
 
@@ -290,6 +291,7 @@ describe("Feature: Suites REST API", () => {
   });
 
   describe("DELETE /api/suites/:id", () => {
+    /** @scenario Archived suite is hidden from the active list */
     it("archives the suite", async () => {
       const suite = await createSuite({ name: "To Archive" });
 
@@ -312,6 +314,7 @@ describe("Feature: Suites REST API", () => {
       expect(ids).not.toContain(suite.id);
     });
 
+    /** @scenario Archiving a non-existent suite returns not found */
     it("returns 404 for non-existent suite", async () => {
       const res = await helpers.api.delete("/api/suites/nonexistent-id");
 

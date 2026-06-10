@@ -38,7 +38,7 @@ export function OptimizationStudioLLMConfigField({
   showStructuredOutputs = false,
 }: OptimizationStudioLLMConfigFieldProps) {
   const model = llmConfig?.model ?? "";
-  const { modelOption } = useModelSelectionOptions(
+  const { modelOption, isEmpty } = useModelSelectionOptions(
     allModelOptions,
     model,
     "chat",
@@ -73,6 +73,7 @@ export function OptimizationStudioLLMConfigField({
       outputs={outputs}
       onOutputsChange={onOutputsChange}
       showStructuredOutputs={showStructuredOutputs}
+      noModelsConfigured={isEmpty}
     />
   );
 }

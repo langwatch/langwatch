@@ -3,6 +3,8 @@ packages:
   - "packages/*"
   - "../mcp-server"
 
+minimumReleaseAge: 10080
+
 overrides:
   pino: ^10.3.0
   pino-pretty: ^13.0.0
@@ -19,16 +21,34 @@ overrides:
   "@modelcontextprotocol/sdk@>=1.10.0 <=1.25.3": "1.26.0"
   # Security: langchain serialization injection (#223)
   "langchain@<0.3.37": "0.3.37"
+  # Security: langsmith SDK floor (from mcp-server)
+  "langsmith@<0.6.0": "0.6.0"
   # Security: merge prototype pollution (#194) via exec-sh
   "merge@<2.1.1": "2.1.1"
   # Security: validator incomplete filtering (#216) via class-validator
   "validator@<13.15.22": "13.15.22"
-  # Security: @remix-run/router XSS via open redirects (#227) via react-admin
-  "@remix-run/router@<=1.23.1": "1.23.2"
   # Security: express-rate-limit DoS (from mcp-server)
   "express-rate-limit@>=8.2.0 <8.2.2": "8.2.2"
   # Security: glob ReDoS (from mcp-server)
   "glob@>=10.2.0 <10.5.0": "10.5.0"
+  # Security: vite WebSocket file read + server.fs.deny bypass (#783/#784)
+  "vite@<7.3.2": "7.3.2"
+  "vite@>=8.0.0 <8.0.5": "8.0.5"
+  # Security: Next.js DoS with Server Components (#872)
+  # next is an unused optional peer dep of better-auth (this is a Vite app)
+  "next@>=13.0.0 <15.5.15": "15.5.15"
+  # Security: axios prototype pollution gadgets, header injection, loopback bypass (#982/#984/#987/#988)
+  "axios@>=1.0.0 <1.16.0": "1.16.0"
+  # Security: fast-xml-builder attribute value quote bypass (#1028)
+  "fast-xml-builder@<1.1.7": "1.1.7"
+  # Security: fast-uri path traversal + host confusion (#1031-#1042)
+  "fast-uri@<3.1.2": "3.1.2"
+  # Security: protobufjs code execution, DoS, code injection (CVE-2026-44289/44290/44291/44293)
+  "protobufjs@<7.5.6": "7.5.6"
+  "protobufjs@>=8.0.0 <8.0.2": "8.0.2"
+  # Security: OpenTelemetry Prometheus exporter crash via malformed HTTP (CVE-2026-44902)
+  "@opentelemetry/exporter-prometheus@<0.217.0": "0.217.0"
+  "@opentelemetry/sdk-node@<0.217.0": "0.217.0"
 
 packageExtensions:
   bullmq-otel:

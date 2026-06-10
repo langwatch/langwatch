@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ExperimentRunWithItems } from "~/server/evaluations-v3/services/types";
+import type { ExperimentRunWithItems } from "~/server/experiments-v3/services/types";
 import {
   buildCsvData,
   buildCsvHeaders,
@@ -38,6 +38,8 @@ const createTargetOutput = (
 
 describe("csvExport", () => {
   describe("buildCsvHeaders", () => {
+    /** @scenario Export results to CSV */
+    /** @scenario CSV contains all columns */
     it("returns index header for empty data", () => {
       const data = createMinimalData();
       const headers = buildCsvHeaders(data);
@@ -594,6 +596,7 @@ describe("csvExport", () => {
       expect(csv).toContain("hello");
     });
 
+    /** @scenario CSV handles special characters */
     it("escapes special characters in CSV", () => {
       const data = createMinimalData({
         datasetColumns: [{ name: "text", hasImages: false }],

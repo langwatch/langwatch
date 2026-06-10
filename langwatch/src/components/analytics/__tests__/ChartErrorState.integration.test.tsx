@@ -30,6 +30,8 @@ function renderChartErrorState({
 
 describe("<ChartErrorState />", () => {
   describe("when the query has failed", () => {
+    /** @scenario "Chart shows error state when analytics query fails" */
+    /** @scenario "Error state is visually distinct from empty data state" */
     it("displays an error heading and retry button (distinct from 'No data')", () => {
       renderChartErrorState();
 

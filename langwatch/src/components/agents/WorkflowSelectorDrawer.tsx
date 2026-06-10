@@ -127,7 +127,12 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
           icon: data.icon ?? defaultIcon,
           default_llm: {
             ...template.default_llm,
-            model: project.defaultModel ?? DEFAULT_MODEL,
+            // Project-level default-model column is gone; the workflow
+            // engine resolves the actual model via the cascade at run
+            // time. We seed the new workflow's default with the global
+            // DEFAULT_MODEL placeholder so the editor renders something
+            // sensible before the user picks.
+            model: DEFAULT_MODEL,
           },
         };
 
@@ -191,7 +196,7 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
         size="md"
         modal={false}
       >
-        <Drawer.Content>
+        <Drawer.Content bg="bg">
           <Drawer.CloseTrigger />
           <Drawer.Header>
             <HStack gap={2}>

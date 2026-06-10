@@ -4,6 +4,17 @@ Feature: Code Block Editor component
   I want a reusable CodeBlockEditor component
   So that code editing is consistent across agents, workflows, and other features
 
+  # The CodeBlockEditor component (langwatch/src/components/blocks/
+  # CodeBlockEditor.tsx) is implemented and used by AgentCodeEditorDrawer
+  # and CodePropertiesPanel. Both consumers have integration tests
+  # that *mock* CodeBlockEditor as a simple textarea
+  # (`AgentCodeEditorDrawer.integration.test.tsx`,
+  # `CodePropertiesPanel.test.tsx`), so the actual preview / hover
+  # overlay / Monaco modal flows are not exercised by any test today.
+  # Adding a JSDOM render test for CodeBlockEditor itself is the
+  # cheap follow-up — leaving all 12 scenarios `@unimplemented`
+  # until that fixture exists.
+
   # ============================================================================
   # Component structure
   # ============================================================================

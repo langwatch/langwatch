@@ -3,6 +3,17 @@ Feature: Python SDK Experiment.print_summary for CI/CD parity
   I want experiment.print_summary() on SDK-driven experiments (not only on ExperimentRunResult)
   So that SDK-defined experiments can fail CI builds the same way platform experiments do
 
+  # All `@unimplemented` scenarios in this file describe Python SDK
+  # behaviour. The check-feature-parity script only scans
+  # `*.test.ts/tsx` files (`TEST_FILE_RE` in
+  # langwatch/scripts/check-feature-parity.ts) under the configured
+  # test roots, so JSDoc `@scenario` markers in `python-sdk/tests/
+  # *.py` would not be discovered. Adding a `*.py` test scanner +
+  # docstring-tag parser is the structural fix; tracked separately.
+  # Python tests for `experiment.print_summary` exist in
+  # `python-sdk/tests/` (e.g. test_experiment.py / test_examples.py)
+  # and run in the python-sdk CI suite.
+
   Background:
     Given a LangWatch client initialized with a valid API key
     And an experiment instance created via langwatch.experiment.init("ci-quality-check")

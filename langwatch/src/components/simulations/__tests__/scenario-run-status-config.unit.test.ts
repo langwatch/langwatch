@@ -12,6 +12,7 @@ const allStatuses = Object.values(ScenarioRunStatus);
 describe("scenario-run-status-config", () => {
   describe("SCENARIO_RUN_STATUS_ICONS", () => {
     describe("when checking coverage of ScenarioRunStatus values", () => {
+      /** @scenario Lucide-react icon mapping is colocated with the status config */
       it("exports a lucide-react icon for every ScenarioRunStatus value", () => {
         for (const status of allStatuses) {
           expect(SCENARIO_RUN_STATUS_ICONS[status]).toBeDefined();
@@ -29,6 +30,7 @@ describe("scenario-run-status-config", () => {
 
   describe("SCENARIO_RUN_STATUS_CONFIG", () => {
     describe("when looking up config for each ScenarioRunStatus value", () => {
+      /** @scenario Config covers every ScenarioRunStatus value */
       it("covers every ScenarioRunStatus value", () => {
         for (const status of allStatuses) {
           expect(SCENARIO_RUN_STATUS_CONFIG[status]).toBeDefined();

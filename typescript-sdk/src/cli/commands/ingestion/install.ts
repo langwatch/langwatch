@@ -1,0 +1,255 @@
+import chalk from "chalk";
+
+import {
+  GovernanceCliError,
+  mintIngestionKey,
+} from "@/cli/utils/governance/cli-api";
+import { isLoggedIn, loadConfig } from "@/cli/utils/governance/config";
+import { writeCodexOtelBlock } from "@/cli/utils/codex-config-toml";
+
+/**
+ * `langwatch ingest install <tool>` — Path B activation flow.
+ *
+ * Distinct from the gateway-only `langwatch <tool>` wrapper (Path A).
+ * Mints the user's personal ingest key (sk-lw-*), prints the OTLP
+ * export block, and — for codex specifically — idempotently merges
+ * the [otel] activation block into ~/.codex/config.toml so the user
+ * pastes nothing manual.
+ *
+ * Tools handled today:
+ *   - codex      : toml merge + env exports
+ *   - claude_code: env exports (no toml needed)
+ *   - gemini     : env exports (no toml needed; envs are read directly)
+ *   - opencode   : env exports (no toml needed)
+ *
+ * Returning early when the slug isn't recognised keeps the surface
+ * forward-compatible — adding a new template is a one-line edit
+ * here once we know whether it needs an out-of-band activation step.
+ */
+
+const SUPPORTED_TOOLS = [
+  "codex",
+  "claude_code",
+  "gemini",
+  "opencode",
+] as const;
+type SupportedTool = (typeof SUPPORTED_TOOLS)[number];
+
+export interface InstallOptions {
+  json?: boolean;
+  /** Suppress the toml write; useful for previewing exports only. */
+  envOnly?: boolean;
+  /**
+   * Override the codex config.toml path. Test-only — exposed because
+   * the codex-config-toml helper accepts it but the CLI surface
+   * keeps the default unless explicitly threaded through.
+   */
+  codexConfigPath?: string;
+}
+
+interface InstallReport {
+  tool: SupportedTool;
+  source_type: string;
+  endpoint: string;
+  ingestion_token: string;
+  token_prefix: string;
+  codex_config_action?: "created" | "updated" | "unchanged";
+  codex_config_path?: string;
+  env_block: string[];
+}
+
+export async function installCommand(
+  toolArg: string,
+  options: InstallOptions = {},
+): Promise<void> {
+  const cfg = loadConfig();
+  if (!isLoggedIn(cfg)) {
+    process.stderr.write(
+      "Not logged in. Run `langwatch login --device` first.\n",
+    );
+    process.exit(1);
+    return;
+  }
+
+  const tool = normaliseTool(toolArg);
+  if (!tool) {
+    process.stderr.write(
+      `Unknown tool '${toolArg}'. Supported: ${SUPPORTED_TOOLS.join(", ")}.\n`,
+    );
+    process.exit(1);
+    return;
+  }
+
+  try {
+    const report = await runInstall(cfg, tool, options);
+    if (options.json) {
+      process.stdout.write(JSON.stringify(report, null, 2) + "\n");
+      return;
+    }
+    renderHumanReport(report);
+  } catch (err) {
+    const msg = err instanceof GovernanceCliError ? err.message : String(err);
+    process.stderr.write(`Error: ${msg}\n`);
+    process.exit(1);
+  }
+}
+
+function normaliseTool(raw: string): SupportedTool | null {
+  const slug = raw.trim().toLowerCase().replace(/-/g, "_");
+  return (SUPPORTED_TOOLS as readonly string[]).includes(slug)
+    ? (slug as SupportedTool)
+    : null;
+}
+
+async function runInstall(
+  cfg: ReturnType<typeof loadConfig>,
+  tool: SupportedTool,
+  options: InstallOptions,
+): Promise<InstallReport> {
+  // Mint a fresh personal ingest key (sk-lw-*) for this tool's
+  // source_type. The plaintext key is only ever visible at mint
+  // time, so re-running the install command always leaves the user
+  // with a working key written straight into the export block. The
+  // SupportedTool slug doubles as the source_type the mint route
+  // expects (claude_code / codex / gemini / opencode).
+  const { token, prefix, endpoint } = await mintIngestionKey(cfg, tool);
+  const envBlock = buildEnvBlock(tool, endpoint, token);
+
+  const report: InstallReport = {
+    tool,
+    source_type: tool,
+    endpoint,
+    ingestion_token: token,
+    token_prefix: prefix,
+    env_block: envBlock,
+  };
+
+  if (tool === "codex" && !options.envOnly) {
+    // codex's OTLP/HTTP exporter sends every signal to the configured
+    // endpoint verbatim — it does NOT append `/v1/traces` the way the
+    // OTel SDKs do. Spell the trace-signal suffix out (mirror of the
+    // wrapper-mode.ts behaviour) so the POST lands on the real handler.
+    const result = writeCodexOtelBlock(
+      {
+        endpoint: `${endpoint}/v1/traces`,
+        ingestionToken: token,
+        environment: cfg.organization?.slug ?? "langwatch",
+      },
+      { filePath: options.codexConfigPath },
+    );
+    report.codex_config_action = result.action;
+    report.codex_config_path = result.path;
+  }
+
+  return report;
+}
+
+function buildEnvBlock(
+  tool: SupportedTool,
+  endpoint: string,
+  token: string,
+): string[] {
+  const base = [
+    `export OTEL_EXPORTER_OTLP_ENDPOINT="${endpoint}"`,
+    `export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token}"`,
+  ];
+
+  switch (tool) {
+    case "codex":
+      return [
+        `export OTEL_TRACES_EXPORTER=otlp`,
+        `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
+        ...base,
+        `export OTEL_RESOURCE_ATTRIBUTES="service.name=codex"`,
+      ];
+    case "claude_code":
+      return [
+        `export CLAUDE_CODE_ENABLE_TELEMETRY=1`,
+        // Four claude-code OTel unlock knobs (all ON, collect-everything):
+        //   OTEL_LOG_USER_PROMPTS=1     lifts user prompt text onto user_prompt events
+        //   OTEL_LOG_TOOL_DETAILS=1     lifts tool metadata expansion onto tool_* events
+        //   OTEL_LOG_TOOL_CONTENT=1     lifts tool_input (Bash command, Edit diff, file
+        //                               paths) onto tool_decision + tool_result so the
+        //                               trace shows WHAT the tool did
+        //   OTEL_LOG_RAW_API_BODIES=1   emits api_request_body + api_response_body
+        //                               events carrying the FULL JSON of every claude
+        //                               API call: system prompts, rolling message
+        //                               history, assistant response text + reasoning,
+        //                               tool_use blocks. THIS is the only OTel surface
+        //                               that carries assistant text. May include PII /
+        //                               secrets a user pasted into a prompt; payloads
+        //                               can grow large turn-over-turn — the langwatch
+        //                               receiver caps oversized bodies before they
+        //                               reach storage to keep the CH merge ceiling safe.
+        `export OTEL_LOG_USER_PROMPTS=1`,
+        `export OTEL_LOG_TOOL_DETAILS=1`,
+        `export OTEL_LOG_TOOL_CONTENT=1`,
+        `export OTEL_LOG_RAW_API_BODIES=1`,
+        `export OTEL_TRACES_EXPORTER=otlp`,
+        `export OTEL_LOGS_EXPORTER=otlp`,
+        `export OTEL_METRICS_EXPORTER=otlp`,
+        `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
+        ...base,
+        `export OTEL_RESOURCE_ATTRIBUTES="service.name=claude-code"`,
+      ];
+    case "gemini":
+      return [
+        `export GEMINI_TELEMETRY_ENABLED=true`,
+        `export GEMINI_TELEMETRY_TARGET=local`,
+        `export GEMINI_TELEMETRY_USE_COLLECTOR=true`,
+        `export GEMINI_TELEMETRY_TRACES_ENABLED=true`,
+        `export GEMINI_TELEMETRY_OTLP_PROTOCOL=http`,
+        `export GEMINI_TELEMETRY_OTLP_ENDPOINT="${endpoint}"`,
+        `export GEMINI_TELEMETRY_LOG_PROMPTS=true`,
+        `export OTEL_TRACES_EXPORTER=otlp`,
+        `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
+        ...base,
+        `export OTEL_RESOURCE_ATTRIBUTES="service.name=gemini-cli"`,
+      ];
+    case "opencode":
+      return [
+        `export OTEL_TRACES_EXPORTER=otlp`,
+        `export OTEL_LOGS_EXPORTER=otlp`,
+        `export OTEL_METRICS_EXPORTER=otlp`,
+        `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
+        ...base,
+        `export OTEL_RESOURCE_ATTRIBUTES="service.name=opencode"`,
+      ];
+  }
+}
+
+function renderHumanReport(report: InstallReport): void {
+  process.stdout.write(
+    `${chalk.green("✓")} Minted ingestion key for ${chalk.bold(report.tool)}\n`,
+  );
+  process.stdout.write(`  endpoint: ${report.endpoint}\n`);
+  process.stdout.write(`  token:    ${report.ingestion_token}\n`);
+
+  if (report.codex_config_action) {
+    const verb2 =
+      report.codex_config_action === "created"
+        ? "created"
+        : report.codex_config_action === "updated"
+          ? "updated"
+          : "already up to date";
+    process.stdout.write(
+      `${chalk.green("✓")} ${report.codex_config_path} ${verb2}\n`,
+    );
+  }
+
+  process.stdout.write("\nAdd to your shell rc (or run in this shell):\n");
+  for (const line of report.env_block) {
+    process.stdout.write(`  ${line}\n`);
+  }
+
+  if (report.tool === "codex") {
+    process.stdout.write(
+      `\nThe [otel] activation block in your codex config.toml has been wired automatically.\n`,
+    );
+  } else if (report.tool === "opencode") {
+    process.stdout.write(
+      `\nNote: opencode 1.14 emits structural spans but no gen_ai.* attributes yet.\n` +
+        `Spans will land but per-call tokens/model/cost wait on upstream semconv support.\n`,
+    );
+  }
+}

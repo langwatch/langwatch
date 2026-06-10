@@ -20,8 +20,9 @@ import {
 import type { Unpacked } from "../../../utils/types";
 import { DatasetService } from "../../datasets/dataset.service";
 import { enforceLicenseLimit } from "../../license-enforcement";
+import { wrapAiCall } from "../../modelProviders/aiCallFailedError";
+import { featureByKey } from "../../modelProviders/featureRegistry";
 import { getVercelAIModel } from "../../modelProviders/utils";
-import { isNlpGoEnabled } from "../../nlpgo/nlpgoFetch";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { fireWorkflowCreatedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
@@ -33,19 +34,18 @@ const autoComputeLogger = createLogger("langwatch:workflows:auto-compute");
 
 export const workflowRouter = createTRPCRouter({
   // Returns which NLP engine is active for the current project. Used by the
-  // Studio UI to hide the (now-defunct) Optimize button when the project is
-  // routed to the Go engine: optimization was DSPy-only, and the Go engine
-  // does not include DSPy. The UI rendering the button is the only place
-  // that needs this; the studio websocket handlers also enforce the kill
-  // server-side. See specs/nlp-go/feature-flag.feature.
+  // Studio UI reads this to hide the (now-defunct) Optimize button.
+  // Optimization was DSPy-only and the Go engine never included DSPy, so
+  // with nlpgo the only engine the button is always hidden. Kept as a
+  // procedure (rather than a UI constant) so the studio handlers and the
+  // UI agree on one source of truth.
   engineMode: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("workflows:view"))
-    .query(async ({ input }) => {
-      const goEnabled = await isNlpGoEnabled({ projectId: input.projectId });
+    .query(() => {
       return {
-        engineMode: goEnabled ? ("go" as const) : ("python" as const),
-        optimizeEnabled: !goEnabled,
+        engineMode: "go" as const,
+        optimizeEnabled: false,
       };
     }),
 
@@ -1069,8 +1069,19 @@ export const workflowRouter = createTRPCRouter({
         "New Version",
       );
 
-      const commitMessage = await generateText({
-        model: await getVercelAIModel(input.projectId),
+      // ModelNotConfiguredError passes through untouched (its own
+      // toast surface); every other provider/SDK failure surfaces as
+      // AiCallFailedError so the frontend can render the "double-check
+      // your model configuration" hint toast instead of a raw 500.
+      const commitFeature = featureByKey("workflows.commit_message");
+      if (!commitFeature) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "workflows.commit_message feature is not registered",
+        });
+      }
+      const commitMessage = await wrapAiCall(commitFeature, async () => generateText({
+        model: await getVercelAIModel({ projectId: input.projectId, featureKey: "workflows.commit_message" }),
         providerOptions: {
           openai: {
             reasoningEffort: "low",
@@ -1122,7 +1133,7 @@ ${diff}
           type: "tool",
           toolName: "commitMessage",
         },
-      });
+      }));
 
       const result = commitMessage.toolResults?.find(
         (t) => t.toolName === "commitMessage",

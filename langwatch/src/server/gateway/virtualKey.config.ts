@@ -21,18 +21,24 @@ export const fallbackTriggerSchema = z.enum([
 ]);
 export type FallbackTrigger = z.infer<typeof fallbackTriggerSchema>;
 
-export const guardrailRefSchema = z.object({
-  id: z.string(),
-  evaluator: z.string(),
-});
+export const guardrailDirectionSchema = z.enum([
+  "pre",
+  "post",
+  "stream_chunk",
+]);
+export type GuardrailDirection = z.infer<typeof guardrailDirectionSchema>;
 
-export const policyRuleDimensionSchema = z.object({
-  deny: z.array(z.string()).default([]),
-  allow: z.array(z.string()).nullable().default(null),
+// VK opt-in / opt-out wiring to project guardrails. Each entry binds a
+// direction to N GatewayGuardrail row ids. The GatewayGuardrail row
+// itself owns evaluator + failure mode; the VK only declares the
+// reference. See specs/ai-gateway/governance/guardrails-project-scope.feature.
+export const guardrailAttachmentSchema = z.object({
+  direction: guardrailDirectionSchema,
+  guardrailIds: z.array(z.string()).default([]),
 });
+export type GuardrailAttachment = z.infer<typeof guardrailAttachmentSchema>;
 
 export const virtualKeyConfigSchema = z.object({
-  modelAliases: z.record(z.string(), z.string()).default({}),
   modelsAllowed: z.array(z.string()).nullable().default(null),
   cache: z
     .object({
@@ -51,41 +57,9 @@ export const virtualKeyConfigSchema = z.object({
       timeoutMs: 30000,
       maxAttempts: 3,
     }),
-  guardrails: z
-    .object({
-      pre: z.array(guardrailRefSchema).default([]),
-      post: z.array(guardrailRefSchema).default([]),
-      streamChunk: z.array(guardrailRefSchema).default([]),
-      // Fail-open flips from 503 guardrail_upstream_unavailable (default,
-      // fail-closed) to allow-with-warn-log when the evaluator backend is
-      // unreachable. Symmetric per direction — @sergey iter 11 landed the
-      // response side; request side mirrors the same semantic.
-      requestFailOpen: z.boolean().default(false),
-      responseFailOpen: z.boolean().default(false),
-    })
-    .default({
-      pre: [],
-      post: [],
-      streamChunk: [],
-      requestFailOpen: false,
-      responseFailOpen: false,
-    }),
-  policyRules: z
-    .object({
-      tools: policyRuleDimensionSchema.default({ deny: [], allow: null }),
-      mcp: policyRuleDimensionSchema.default({ deny: [], allow: null }),
-      urls: policyRuleDimensionSchema.default({ deny: [], allow: null }),
-      // §5 models dimension — RE2 regex policy distinct from
-      // `modelsAllowed` glob allowlist. Enforced by @sergey iter 8
-      // (internal/policy) before provider dispatch.
-      models: policyRuleDimensionSchema.default({ deny: [], allow: null }),
-    })
-    .default({
-      tools: { deny: [], allow: null },
-      mcp: { deny: [], allow: null },
-      urls: { deny: [], allow: null },
-      models: { deny: [], allow: null },
-    }),
+  // Attachments to project-scoped GatewayGuardrail rows.
+  // Empty array = VK opts out of every project guardrail.
+  guardrailAttachments: z.array(guardrailAttachmentSchema).default([]),
   rateLimits: z
     .object({
       rpm: z.number().int().nullable().default(null),

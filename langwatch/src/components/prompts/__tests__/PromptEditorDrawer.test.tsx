@@ -186,6 +186,14 @@ vi.mock("~/utils/api", () => ({
         isLoading: false,
       }),
     },
+    modelProvider: {
+      getResolvedDefault: {
+        useQuery: () => ({
+          data: { model: "openai/gpt-4", source: "test", scope: "PROJECT" },
+          isLoading: false,
+        }),
+      },
+    },
     prompts: {
       getByIdOrHandle: {
         useQuery: () => mockGetByIdOrHandle(),
@@ -375,6 +383,29 @@ describe("PromptEditorDrawer", () => {
     it("shows messages field", () => {
       renderWithProviders(<PromptEditorDrawer open={true} />);
       expect(screen.getByTestId("messages-field")).toBeInTheDocument();
+    });
+
+    /** @scenario The model selector header stays opaque above scrolling messages */
+    it("renders the model selector inside a sticky header with a solid background", () => {
+      renderWithProviders(<PromptEditorDrawer open={true} />);
+
+      const header = screen.getByTestId("prompt-editor-sticky-header");
+      // The model selector lives inside the sticky header, so it stays
+      // pinned while the messages below scroll.
+      expect(header).toContainElement(screen.getByTestId("model-select"));
+
+      const style = getComputedStyle(header);
+      expect(style.position).toBe("sticky");
+      // The fix is the `bg="bg"` prop on the sticky header — Chakra applies
+      // it as `background: var(--chakra-colors-bg)` (a solid app-surface
+      // color in a real browser). jsdom does not resolve CSS custom
+      // properties so `backgroundColor` falls back to rgba(0,0,0,0); we
+      // therefore assert the Chakra background token IS applied. A
+      // regression that deletes the prop would leave the rule unset, and
+      // this expectation would fail. The "solid in browser" check is
+      // covered by the QA dogfood screenshots embedded in the PR body.
+      const bg = (style.background || "").trim();
+      expect(bg).toMatch(/var\(--chakra-colors-/);
     });
 
     it("shows variables section", () => {

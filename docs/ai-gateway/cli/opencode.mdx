@@ -33,7 +33,7 @@ opencode reads `~/.config/opencode/opencode.json` (or the project-local `opencod
 Then set your virtual key and run opencode:
 
 ```bash
-export LANGWATCH_VK="lw_vk_live_01HZX..."
+export LANGWATCH_VK="vk-lw-01HZX..."
 opencode
 ```
 
@@ -82,11 +82,11 @@ opencode passes request-level headers through its provider config. To make gatew
 }
 ```
 
-If `OPENCODE_TRACEPARENT` is set by the shell wrapper, the gateway parents its span under that trace and the cost is attributed to the opencode session — no double counting. See [SDKs → trace propagation](/ai-gateway/sdks/python#trace-propagation) for the header shape.
+If `OPENCODE_TRACEPARENT` is set by the shell wrapper, the gateway parents its span under that trace and the cost is attributed to the opencode session, no double counting. See [SDKs → trace propagation](/ai-gateway/sdks/python#trace-propagation) for the header shape.
 
 ## Governance recipes
 
-### Hackday mode — disable cache, warn on spend
+### Hackday mode: disable cache, warn on spend
 
 ```json
 {
@@ -108,10 +108,10 @@ VK `policy_rules.tools: ["bash", "shell", "exec"]`. opencode requests a tool wit
 
 ## Troubleshooting
 
-- **Model picker shows only stock providers** — ensure `opencode.json` is in `~/.config/opencode/` or `$PWD`. opencode logs the loaded config path on startup.
-- **`401 invalid_api_key`** — `{env:LANGWATCH_VK}` didn't expand. Export the env var before launching opencode.
-- **Streaming hangs mid-response** — check `X-LangWatch-Request-Id` against the LangWatch trace; gateway emits a terminal `event: error` on mid-stream failures (it won't silently switch providers). See [Streaming](/ai-gateway/streaming).
-- **`opencode run` hangs indefinitely on custom provider (1.14.x)** — confirmed regression in opencode 1.14.22: `opencode models` correctly lists the custom provider's models, but `opencode run -m custom-provider/model` only emits the proxy-startup log line then hangs (no instance creation, no HTTP call to the gateway, exit 124 at any timeout). Reproduces across cwd `opencode.json` and global `~/.config/opencode/opencode.json`, with and without `npm: "@ai-sdk/openai-compatible"`, with and without the package pre-installed at `~/.config/opencode/node_modules/@ai-sdk/openai-compatible/`. Workarounds: pin opencode `1.13.x` (pre-bug); or run via `opencode --attach <server-url>` against a long-running `opencode serve` instance instead of `opencode run`. Track upstream `opencode-ai/opencode#5674` for fix.
+- **Model picker shows only stock providers**: ensure `opencode.json` is in `~/.config/opencode/` or `$PWD`. opencode logs the loaded config path on startup.
+- **`401 invalid_api_key`**, `{env:LANGWATCH_VK}` didn't expand. Export the env var before launching opencode.
+- **Streaming hangs mid-response**: check `X-LangWatch-Request-Id` against the LangWatch trace; gateway emits a terminal `event: error` on mid-stream failures (it won't silently switch providers). See [Streaming](/ai-gateway/streaming).
+- **`opencode run` hangs indefinitely on custom provider (1.14.x)**, confirmed regression in opencode 1.14.22: `opencode models` correctly lists the custom provider's models, but `opencode run -m custom-provider/model` only emits the proxy-startup log line then hangs (no instance creation, no HTTP call to the gateway, exit 124 at any timeout). Reproduces across cwd `opencode.json` and global `~/.config/opencode/opencode.json`, with and without `npm: "@ai-sdk/openai-compatible"`, with and without the package pre-installed at `~/.config/opencode/node_modules/@ai-sdk/openai-compatible/`. Workarounds: pin opencode `1.13.x` (pre-bug); or run via `opencode --attach <server-url>` against a long-running `opencode serve` instance instead of `opencode run`. Track upstream `opencode-ai/opencode#5674` for fix.
 
 ## Working configuration verified end-to-end
 
@@ -119,7 +119,7 @@ These steps were last validated against opencode `1.13.x` + LangWatch AI Gateway
 
 ```bash
 # 1. Mint a VK in LangWatch UI bound to your OpenAI provider credential
-export LANGWATCH_VK=lw_vk_live_…
+export LANGWATCH_VK=vk-lw-…
 
 # 2. Configure opencode (one-shot)
 mkdir -p ~/.config/opencode

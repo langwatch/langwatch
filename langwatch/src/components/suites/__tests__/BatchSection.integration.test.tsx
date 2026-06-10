@@ -45,6 +45,7 @@ describe("<BatchSection/>", () => {
   });
 
   describe("when rendered with a batch", () => {
+    /** @scenario "Suite batch entry displays the suite name" */
     it("renders the batch sub-header", () => {
       render(
         <BatchSection

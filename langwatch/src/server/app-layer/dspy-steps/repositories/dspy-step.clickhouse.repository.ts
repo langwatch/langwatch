@@ -1,11 +1,13 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
+import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
 import { createLogger } from "~/utils/logger/server";
 import type {
-  DspyStepData,
-  DspyStepSummaryData,
   DspyExampleData,
   DspyLlmCallData,
+  DspyStepData,
+  DspyStepSummaryData,
 } from "../types";
 import type { DspyStepRepository } from "./dspy-step.repository";
 
@@ -35,6 +37,7 @@ interface ClickHouseRecord {
   CreatedAt: number;
   InsertedAt: number;
   UpdatedAt: number;
+  _retention_days: number;
 }
 
 type ClickHouseWriteRecord = WithDateWrites<
@@ -87,7 +90,23 @@ function mergeByHash<T extends { hash: string }>(
 }
 
 export class DspyStepClickHouseRepository implements DspyStepRepository {
-  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
+  constructor(
+    private readonly resolveClient: ClickHouseClientResolver,
+    // dspy_steps is a traces-category retention table. Without a resolver the
+    // tenant's policy can't be read, so rows fall back to the platform default.
+    private readonly retentionResolver: RetentionPolicyResolver | null = null,
+  ) {}
+
+  /**
+   * The tenant's resolved traces retention, stamped on every write so DSPy
+   * rows age out under the same policy as the rest of the trace family.
+   * Retention is default-on, so a missing resolver or an unresolvable project
+   * falls back to the platform default rather than 0 (indefinite).
+   */
+  private async resolveTracesRetentionDays(tenantId: string): Promise<number> {
+    const resolved = await this.retentionResolver?.resolve(tenantId);
+    return resolved?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS;
+  }
 
   /**
    * Direct insert without read-merge-write. Use for migration where the
@@ -96,6 +115,7 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
   async insertStepDirect(data: DspyStepData): Promise<void> {
     const summary = computeLlmSummary(data.llmCalls);
     const id = `${data.tenantId}/${data.runId}/${data.stepIndex}`;
+    const retentionDays = await this.resolveTracesRetentionDays(data.tenantId);
 
     const record: ClickHouseWriteRecord = {
       Id: id,
@@ -117,6 +137,7 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
       CreatedAt: new Date(data.createdAt),
       InsertedAt: new Date(data.insertedAt),
       UpdatedAt: new Date(data.updatedAt),
+      _retention_days: retentionDays,
     };
 
     const client = await this.resolveClient(data.tenantId);
@@ -135,6 +156,9 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
         data.experimentId,
         data.runId,
         data.stepIndex,
+      );
+      const retentionDays = await this.resolveTracesRetentionDays(
+        data.tenantId,
       );
 
       let mergedExamples: DspyExampleData[];
@@ -171,6 +195,7 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
         CreatedAt: new Date(existing?.createdAt ?? data.createdAt),
         InsertedAt: new Date(existing?.insertedAt ?? data.insertedAt),
         UpdatedAt: new Date(data.updatedAt),
+        _retention_days: retentionDays,
       };
 
       const client = await this.resolveClient(data.tenantId);
@@ -262,34 +287,48 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
   ): Promise<DspyStepData | null> {
     try {
       const client = await this.resolveClient(tenantId);
+      // IN-tuple dedup over the ReplacingMergeTree (see
+      // dev/docs/best_practices/clickhouse-queries.md). Outer SELECT must
+      // reference UpdatedAt via a table alias because the column is also
+      // projected as `toString(...) AS UpdatedAt` — without the alias
+      // ClickHouse resolves UpdatedAt to the String projection in the WHERE
+      // clause and the type mismatch breaks the query.
       const result = await client.query({
         query: `
           SELECT
-            Id,
-            TenantId,
-            ExperimentId,
-            RunId,
-            StepIndex,
-            WorkflowVersionId,
-            Score,
-            Label,
-            OptimizerName,
-            OptimizerParameters,
-            Predictors,
-            Examples,
-            LlmCalls,
-            LlmCallsTotal,
-            toString(LlmCallsTotalTokens) AS LlmCallsTotalTokens,
-            LlmCallsTotalCost,
-            toString(toUnixTimestamp64Milli(CreatedAt)) AS CreatedAt,
-            toString(toUnixTimestamp64Milli(InsertedAt)) AS InsertedAt,
-            toString(toUnixTimestamp64Milli(UpdatedAt)) AS UpdatedAt
-          FROM ${TABLE_NAME}
-          WHERE TenantId = {tenantId:String}
-            AND ExperimentId = {experimentId:String}
-            AND RunId = {runId:String}
-            AND StepIndex = {stepIndex:String}
-          ORDER BY UpdatedAt DESC
+            t.Id AS Id,
+            t.TenantId AS TenantId,
+            t.ExperimentId AS ExperimentId,
+            t.RunId AS RunId,
+            t.StepIndex AS StepIndex,
+            t.WorkflowVersionId AS WorkflowVersionId,
+            t.Score AS Score,
+            t.Label AS Label,
+            t.OptimizerName AS OptimizerName,
+            t.OptimizerParameters AS OptimizerParameters,
+            t.Predictors AS Predictors,
+            t.Examples AS Examples,
+            t.LlmCalls AS LlmCalls,
+            t.LlmCallsTotal AS LlmCallsTotal,
+            toString(t.LlmCallsTotalTokens) AS LlmCallsTotalTokens,
+            t.LlmCallsTotalCost AS LlmCallsTotalCost,
+            toString(toUnixTimestamp64Milli(t.CreatedAt)) AS CreatedAt,
+            toString(toUnixTimestamp64Milli(t.InsertedAt)) AS InsertedAt,
+            toString(toUnixTimestamp64Milli(t.UpdatedAt)) AS UpdatedAt
+          FROM ${TABLE_NAME} AS t
+          WHERE t.TenantId = {tenantId:String}
+            AND t.ExperimentId = {experimentId:String}
+            AND t.RunId = {runId:String}
+            AND t.StepIndex = {stepIndex:String}
+            AND (t.TenantId, t.ExperimentId, t.RunId, t.StepIndex, t.UpdatedAt) IN (
+              SELECT TenantId, ExperimentId, RunId, StepIndex, max(UpdatedAt)
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                AND ExperimentId = {experimentId:String}
+                AND RunId = {runId:String}
+                AND StepIndex = {stepIndex:String}
+              GROUP BY TenantId, ExperimentId, RunId, StepIndex
+            )
           LIMIT 1
         `,
         query_params: { tenantId, experimentId, runId, stepIndex },

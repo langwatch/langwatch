@@ -20,6 +20,7 @@ describe("preconditionFieldUtils", () => {
   });
 
   describe("getFieldOptionsByCategory()", () => {
+    /** @scenario All filter fields plus input/output are available as precondition fields */
     it("returns fields grouped by category including Trace, Metadata, and Spans", () => {
       const groups = getFieldOptionsByCategory();
       const categoryNames = groups.map((g) => g.category);
@@ -148,6 +149,7 @@ describe("preconditionFieldUtils", () => {
       expect(isDefaultOnlyPrecondition([])).toBe(false);
     });
 
+    /** @scenario Multiple preconditions always show expanded form */
     it("returns false when multiple preconditions exist", () => {
       expect(
         isDefaultOnlyPrecondition([
@@ -175,6 +177,7 @@ describe("preconditionFieldUtils", () => {
   });
 
   describe("DEFAULT_PRECONDITION", () => {
+    /** @scenario New evaluator includes default origin precondition */
     it("has the expected shape", () => {
       expect(DEFAULT_PRECONDITION).toEqual({
         field: "traces.origin",

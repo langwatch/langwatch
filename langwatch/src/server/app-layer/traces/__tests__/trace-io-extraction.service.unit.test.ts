@@ -1,12 +1,10 @@
 import { describe, expect, it } from "vitest";
-import {
-  TraceIOExtractionService,
-} from "../trace-io-extraction.service";
 import type { NormalizedSpan } from "../../../event-sourcing/pipelines/trace-processing/schemas/spans";
 import {
   NormalizedSpanKind,
   NormalizedStatusCode,
 } from "../../../event-sourcing/pipelines/trace-processing/schemas/spans";
+import { TraceIOExtractionService } from "../trace-io-extraction.service";
 
 const service = new TraceIOExtractionService();
 
@@ -289,7 +287,9 @@ describe("TraceIOExtractionService", () => {
         const result = service.extractRichIOFromSpan(span, "input");
 
         expect(result).not.toBeNull();
-        expect(result!.text).toBe(JSON.stringify(payload));
+        expect(result!.text).toBe(
+          "I think you should have some options for me to easily select, like 1, 2, 3",
+        );
         expect(result!.source).toBe("langwatch");
       });
     });
@@ -310,7 +310,7 @@ describe("TraceIOExtractionService", () => {
     });
 
     describe("when langwatch.output is a JSON-encoded string with 'output' key", () => {
-      it("returns the raw string as-is (strings bypass heuristic extraction)", () => {
+      it("parses the JSON and extracts the output field", () => {
         const encoded = JSON.stringify({
           output: "The answer is 42",
           trace_id: "abc",
@@ -324,7 +324,7 @@ describe("TraceIOExtractionService", () => {
         const result = service.extractRichIOFromSpan(span, "output");
 
         expect(result).not.toBeNull();
-        expect(result!.text).toBe(encoded);
+        expect(result!.text).toBe("The answer is 42");
       });
     });
 
@@ -359,9 +359,7 @@ describe("TraceIOExtractionService", () => {
         // But the caller still gets a stringified fallback rather than null.
         const lastOutput = service.extractLastOutput([span]);
         expect(lastOutput).not.toBeNull();
-        expect(lastOutput!.text).toBe(
-          '{"customWrapper":"the actual answer"}',
-        );
+        expect(lastOutput!.text).toBe('{"customWrapper":"the actual answer"}');
       });
     });
 
@@ -446,6 +444,359 @@ describe("TraceIOExtractionService", () => {
         const fb = service.extractFallbackIOFromSpan(span, "output");
         expect(fb).not.toBeNull();
         expect(fb!.text).toBe('{"data":{"nested":"real"}}');
+      });
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Anthropic / Claude Code double-wrap normalization
+  //
+  // Some agent runtimes wrap every typed content block (thinking /
+  // tool_use / tool_result) inside a generic `{type:"text", text:"<JSON
+  // of the real block>"}` envelope. The extractor unwraps that shape at
+  // ingest time so we store proper Anthropic content arrays end-to-end.
+  // These tests pin both the unwrap behavior AND the conservative rules
+  // that prevent us from touching legitimate text blocks.
+  // ─────────────────────────────────────────────────────────────────────
+  describe("normalization of double-wrapped typed blocks", () => {
+    describe("when assistant content wraps a thinking block in a text envelope", () => {
+      it("unwraps the thinking block on the raw output", () => {
+        const span = createTestSpan({
+          spanAttributes: {
+            "langwatch.input": [
+              {
+                role: "assistant",
+                content: [
+                  {
+                    type: "text",
+                    text: '{"type":"thinking","thinking":"Let me think about this carefully."}',
+                  },
+                ],
+              },
+            ],
+          },
+        });
+
+        const result = service.extractRichIOFromSpan(span, "input");
+
+        expect(result).not.toBeNull();
+        const messages = result!.raw as Array<{
+          role: string;
+          content: Array<Record<string, unknown>>;
+        }>;
+        expect(messages[0]!.content[0]).toEqual({
+          type: "thinking",
+          thinking: "Let me think about this carefully.",
+        });
+      });
+    });
+
+    describe("when assistant content wraps a tool_use block in a text envelope", () => {
+      it("unwraps the tool_use block on the raw output", () => {
+        const span = createTestSpan({
+          spanAttributes: {
+            "langwatch.input": [
+              {
+                role: "assistant",
+                content: [
+                  {
+                    type: "text",
+                    text: '{"type":"tool_use","id":"toolu_01","name":"Read","input":{"file_path":"/tmp/x"}}',
+                  },
+                ],
+              },
+            ],
+          },
+        });
+
+        const result = service.extractRichIOFromSpan(span, "input");
+
+        expect(result).not.toBeNull();
+        const messages = result!.raw as Array<{
+          role: string;
+          content: Array<Record<string, unknown>>;
+        }>;
+        expect(messages[0]!.content[0]).toEqual({
+          type: "tool_use",
+          id: "toolu_01",
+          name: "Read",
+          input: { file_path: "/tmp/x" },
+        });
+      });
+    });
+
+    describe("when user content wraps a tool_result block in a text envelope", () => {
+      it("unwraps the tool_result block on the raw output", () => {
+        const span = createTestSpan({
+          spanAttributes: {
+            "langwatch.input": [
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "text",
+                    text: '{"tool_use_id":"toolu_01","type":"tool_result","content":"file contents here","is_error":false}',
+                  },
+                ],
+              },
+            ],
+          },
+        });
+
+        const result = service.extractRichIOFromSpan(span, "input");
+
+        expect(result).not.toBeNull();
+        const messages = result!.raw as Array<{
+          role: string;
+          content: Array<Record<string, unknown>>;
+        }>;
+        expect(messages[0]!.content[0]).toEqual({
+          tool_use_id: "toolu_01",
+          type: "tool_result",
+          content: "file contents here",
+          is_error: false,
+        });
+      });
+    });
+
+    describe("when text envelope wraps a JSON-encoded string of a typed block (langwatch.input as string)", () => {
+      it("parses the string and unwraps the inner block", () => {
+        const span = createTestSpan({
+          spanAttributes: {
+            "langwatch.input": JSON.stringify([
+              {
+                role: "assistant",
+                content: [
+                  {
+                    type: "text",
+                    text: '{"type":"thinking","thinking":"hmm"}',
+                  },
+                ],
+              },
+            ]),
+          },
+        });
+
+        const result = service.extractRichIOFromSpan(span, "input");
+
+        expect(result).not.toBeNull();
+        const messages = result!.raw as Array<{
+          role: string;
+          content: Array<Record<string, unknown>>;
+        }>;
+        expect(messages[0]!.content[0]).toEqual({
+          type: "thinking",
+          thinking: "hmm",
+        });
+      });
+    });
+
+    describe("when a regular text block is plain prose", () => {
+      it("leaves the text block untouched", () => {
+        const span = createTestSpan({
+          spanAttributes: {
+            "langwatch.input": [
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "text",
+                    text: "what is the weather like today?",
+                  },
+                ],
+              },
+            ],
+          },
+        });
+
+        const result = service.extractRichIOFromSpan(span, "input");
+
+        expect(result).not.toBeNull();
+        const messages = result!.raw as Array<{
+          role: string;
+          content: Array<Record<string, unknown>>;
+        }>;
+        expect(messages[0]!.content[0]).toEqual({
+          type: "text",
+          text: "what is the weather like today?",
+        });
+      });
+    });
+
+    describe("when a text block's text field is JSON-shaped but not a typed block", () => {
+      it("leaves the text block untouched (no `type` field on parsed object)", () => {
+        const span = createTestSpan({
+          spanAttributes: {
+            "langwatch.input": [
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "text",
+                    // Looks like JSON but isn't a typed-block envelope —
+                    // could be data the user pasted into chat. Don't unwrap.
+                    text: '{"order_id":"1234","amount":99.99}',
+                  },
+                ],
+              },
+            ],
+          },
+        });
+
+        const result = service.extractRichIOFromSpan(span, "input");
+
+        expect(result).not.toBeNull();
+        const messages = result!.raw as Array<{
+          role: string;
+          content: Array<Record<string, unknown>>;
+        }>;
+        expect(messages[0]!.content[0]).toEqual({
+          type: "text",
+          // Original text preserved verbatim.
+          text: '{"order_id":"1234","amount":99.99}',
+        });
+      });
+    });
+
+    describe("when a text block's text field is a JSON-shaped typed block of `type:text`", () => {
+      it("does NOT unwrap (would just produce another text block)", () => {
+        const span = createTestSpan({
+          spanAttributes: {
+            "langwatch.input": [
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "text",
+                    text: '{"type":"text","text":"nested but same kind"}',
+                  },
+                ],
+              },
+            ],
+          },
+        });
+
+        const result = service.extractRichIOFromSpan(span, "input");
+
+        expect(result).not.toBeNull();
+        const messages = result!.raw as Array<{
+          role: string;
+          content: Array<Record<string, unknown>>;
+        }>;
+        // We only unwrap when the inner type differs from "text" — preserves
+        // user-pasted JSON content that happens to look chat-shaped.
+        expect(messages[0]!.content[0]).toEqual({
+          type: "text",
+          text: '{"type":"text","text":"nested but same kind"}',
+        });
+      });
+    });
+
+    describe("when a text block's text field is broken JSON", () => {
+      it("leaves the text block as plain text (no exception thrown)", () => {
+        const span = createTestSpan({
+          spanAttributes: {
+            "langwatch.input": [
+              {
+                role: "assistant",
+                content: [
+                  {
+                    type: "text",
+                    text: '{"type":"thinking","thinking":"unterminated…',
+                  },
+                ],
+              },
+            ],
+          },
+        });
+
+        const result = service.extractRichIOFromSpan(span, "input");
+
+        expect(result).not.toBeNull();
+        const messages = result!.raw as Array<{
+          role: string;
+          content: Array<Record<string, unknown>>;
+        }>;
+        expect(messages[0]!.content[0]).toEqual({
+          type: "text",
+          text: '{"type":"thinking","thinking":"unterminated…',
+        });
+      });
+    });
+
+    describe("when content is a proper Anthropic mixed-block array (no envelope)", () => {
+      it("preserves every block exactly as authored", () => {
+        const span = createTestSpan({
+          spanAttributes: {
+            "langwatch.input": [
+              {
+                role: "assistant",
+                content: [
+                  { type: "thinking", thinking: "should I…" },
+                  { type: "text", text: "Sure, I can help." },
+                  {
+                    type: "tool_use",
+                    id: "toolu_02",
+                    name: "Bash",
+                    input: { command: "ls" },
+                  },
+                ],
+              },
+            ],
+          },
+        });
+
+        const result = service.extractRichIOFromSpan(span, "input");
+
+        expect(result).not.toBeNull();
+        const messages = result!.raw as Array<{
+          role: string;
+          content: Array<Record<string, unknown>>;
+        }>;
+        expect(messages[0]!.content).toEqual([
+          { type: "thinking", thinking: "should I…" },
+          { type: "text", text: "Sure, I can help." },
+          {
+            type: "tool_use",
+            id: "toolu_02",
+            name: "Bash",
+            input: { command: "ls" },
+          },
+        ]);
+      });
+    });
+
+    describe("when content is a plain string (no chat-array shape)", () => {
+      it("returns the plain string raw value untouched", () => {
+        const span = createTestSpan({
+          spanAttributes: {
+            "langwatch.input": "hey, can you help me with my order?",
+          },
+        });
+
+        const result = service.extractRichIOFromSpan(span, "input");
+
+        expect(result).not.toBeNull();
+        expect(result!.raw).toBe("hey, can you help me with my order?");
+      });
+    });
+
+    describe("when langwatch.input is a JSON object using a wrapper key", () => {
+      it("preserves the wrapper-key shape (still extracts text via existing path)", () => {
+        const span = createTestSpan({
+          spanAttributes: {
+            "langwatch.input": { question: "What is 2+2?" },
+          },
+        });
+
+        const result = service.extractRichIOFromSpan(span, "input");
+
+        expect(result).not.toBeNull();
+        // Wrapper-key extraction still works.
+        expect(result!.text).toBe("What is 2+2?");
+        // Raw is preserved (no normalization edge-case touches it because
+        // there's no `type:"text"` envelope to unwrap).
+        expect(result!.raw).toEqual({ question: "What is 2+2?" });
       });
     });
   });

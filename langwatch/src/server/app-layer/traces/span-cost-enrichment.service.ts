@@ -1,7 +1,12 @@
-import { matchModelCostWithFallbacks } from "~/server/background/workers/collector/cost";
 import type { PrismaClient } from "@prisma/client";
-import type { MaybeStoredLLMModelCost } from "~/server/modelProviders/llmModelCost";
+import { matchModelCostWithFallbacks } from "~/server/background/workers/collector/cost";
+import {
+  getCustomLLMModelCosts,
+  type MaybeStoredLLMModelCost,
+} from "~/server/modelProviders/llmModelCost";
 import type { OtlpSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
+import { extractModelName } from "./utils/spanModel";
 
 /**
  * Attribute keys that may contain model names (checked in priority order).
@@ -17,31 +22,25 @@ const MODEL_ATTRIBUTE_KEYS = [
  * Dependencies for OtlpSpanCostEnrichmentService that can be injected for testing.
  */
 export interface OtlpSpanCostEnrichmentServiceDependencies {
-  getCustomModelCosts: (projectId: string) => Promise<MaybeStoredLLMModelCost[]>;
+  getCustomModelCosts: (
+    projectId: string,
+  ) => Promise<MaybeStoredLLMModelCost[]>;
 }
 
 /**
  * Creates default dependencies from a Prisma client.
+ *
+ * Custom costs resolve through the PROJECT -> TEAM -> ORGANIZATION scope
+ * cascade, so a cost saved at any tier prices this project's spans. Org- and
+ * team-scoped rows carry a null legacy projectId column and are invisible to
+ * a plain { where: { projectId } } lookup.
  */
 export function createCostEnrichmentDeps(
   prisma: PrismaClient,
 ): OtlpSpanCostEnrichmentServiceDependencies {
   return {
-    getCustomModelCosts: async (projectId: string) => {
-      const records = await prisma.customLLMModelCost.findMany({
-        where: { projectId },
-      });
-      return records.map((r) => ({
-        id: r.id,
-        projectId,
-        model: r.model,
-        regex: r.regex,
-        inputCostPerToken: r.inputCostPerToken ?? undefined,
-        outputCostPerToken: r.outputCostPerToken ?? undefined,
-        updatedAt: r.updatedAt,
-        createdAt: r.createdAt,
-      }));
-    },
+    getCustomModelCosts: (projectId: string) =>
+      getCustomLLMModelCosts({ projectId, prismaClient: prisma }),
   };
 }
 
@@ -70,7 +69,7 @@ export class OtlpSpanCostEnrichmentService {
    * @param tenantId - The project ID to look up custom costs for
    */
   async enrichSpan(span: OtlpSpan, tenantId: string): Promise<void> {
-    const modelName = this.extractModelName(span);
+    const modelName = extractModelName(span, MODEL_ATTRIBUTE_KEYS);
     if (!modelName) return;
 
     const customCosts = await this.deps.getCustomModelCosts(tenantId);
@@ -81,28 +80,30 @@ export class OtlpSpanCostEnrichmentService {
 
     span.attributes.push(
       {
-        key: "langwatch.model.inputCostPerToken",
+        key: ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN,
         value: { doubleValue: matched.inputCostPerToken ?? 0 },
       },
       {
-        key: "langwatch.model.outputCostPerToken",
+        key: ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN,
         value: { doubleValue: matched.outputCostPerToken ?? 0 },
       },
     );
+
+    // Only emit cache-rate overrides when the custom cost defines them, so a
+    // model without an explicit cache rate keeps falling back to the input
+    // rate in the fold projection rather than being priced at zero.
+    if (matched.cacheReadCostPerToken != null) {
+      span.attributes.push({
+        key: ATTR_KEYS.LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN,
+        value: { doubleValue: matched.cacheReadCostPerToken },
+      });
+    }
+    if (matched.cacheCreationCostPerToken != null) {
+      span.attributes.push({
+        key: ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN,
+        value: { doubleValue: matched.cacheCreationCostPerToken },
+      });
+    }
   }
 
-  private extractModelName(span: OtlpSpan): string | null {
-    for (const key of MODEL_ATTRIBUTE_KEYS) {
-      for (const attr of span.attributes) {
-        if (
-          attr.key === key &&
-          typeof attr.value.stringValue === "string" &&
-          attr.value.stringValue.length > 0
-        ) {
-          return attr.value.stringValue;
-        }
-      }
-    }
-    return null;
-  }
 }

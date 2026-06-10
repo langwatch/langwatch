@@ -65,6 +65,7 @@ const projectScope: ScopeRef = {
 
 describe("checkRoleBindingPermission()", () => {
   describe("when checking built-in role permissions", () => {
+    /** @scenario Effective role maps to correct permission grants */
     it("grants team:manage to Admin", async () => {
       const prisma = makePrisma({
         directBindings: [
@@ -206,6 +207,54 @@ describe("checkRoleBindingPermission()", () => {
 
       expect(result).toBe(false);
     });
+
+    it("denies view permissions in CUSTOM baseline when custom role has explicit permissions", async () => {
+      const prisma = makePrisma({
+        directBindings: [
+          {
+            role: TeamUserRole.CUSTOM,
+            customRoleId: "cr1",
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: TEAM_ID,
+          },
+        ],
+        customRolePermissions: ["traces:view"],
+      });
+
+      const result = await checkRoleBindingPermission({
+        prisma,
+        userId: USER_ID,
+        organizationId: ORG_ID,
+        scope: teamScope,
+        permission: "secrets:view",
+      });
+
+      expect(result).toBe(false);
+    });
+
+    it("grants VIEWER baseline when custom role has empty permissions", async () => {
+      const prisma = makePrisma({
+        directBindings: [
+          {
+            role: TeamUserRole.CUSTOM,
+            customRoleId: "cr1",
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: TEAM_ID,
+          },
+        ],
+        customRolePermissions: [],
+      });
+
+      const result = await checkRoleBindingPermission({
+        prisma,
+        userId: USER_ID,
+        organizationId: ORG_ID,
+        scope: teamScope,
+        permission: "analytics:view",
+      });
+
+      expect(result).toBe(true);
+    });
   });
 
   describe("when user has no access", () => {
@@ -344,6 +393,104 @@ describe("checkRoleBindingPermission()", () => {
       });
 
       expect(result).toBe(false);
+    });
+  });
+
+  describe("when a custom role below the org tier lists an org-exclusive permission", () => {
+    it("does NOT grant governance:manage from a TEAM-scoped custom role", async () => {
+      const prisma = makePrisma({
+        directBindings: [
+          {
+            role: TeamUserRole.CUSTOM,
+            customRoleId: "cr1",
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: TEAM_ID,
+          },
+        ],
+        customRolePermissions: ["governance:manage", "datasets:manage"],
+      });
+
+      const result = await checkRoleBindingPermission({
+        prisma,
+        userId: USER_ID,
+        organizationId: ORG_ID,
+        scope: teamScope,
+        permission: "governance:manage",
+      });
+
+      expect(result).toBe(false);
+    });
+
+    it("does NOT grant organization:manage from a PROJECT-scoped custom role", async () => {
+      const prisma = makePrisma({
+        directBindings: [
+          {
+            role: TeamUserRole.CUSTOM,
+            customRoleId: "cr1",
+            scopeType: RoleBindingScopeType.PROJECT,
+            scopeId: PROJECT_ID,
+          },
+        ],
+        customRolePermissions: ["organization:manage"],
+      });
+
+      const result = await checkRoleBindingPermission({
+        prisma,
+        userId: USER_ID,
+        organizationId: ORG_ID,
+        scope: projectScope,
+        permission: "organization:manage",
+      });
+
+      expect(result).toBe(false);
+    });
+
+    it("still grants a team-tier permission from the same TEAM-scoped custom role", async () => {
+      const prisma = makePrisma({
+        directBindings: [
+          {
+            role: TeamUserRole.CUSTOM,
+            customRoleId: "cr1",
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: TEAM_ID,
+          },
+        ],
+        customRolePermissions: ["governance:manage", "datasets:manage"],
+      });
+
+      const result = await checkRoleBindingPermission({
+        prisma,
+        userId: USER_ID,
+        organizationId: ORG_ID,
+        scope: teamScope,
+        permission: "datasets:manage",
+      });
+
+      expect(result).toBe(true);
+    });
+
+    it("grants governance:manage when the custom role is ORGANIZATION-scoped", async () => {
+      const prisma = makePrisma({
+        directBindings: [
+          {
+            role: TeamUserRole.CUSTOM,
+            customRoleId: "cr1",
+            scopeType: RoleBindingScopeType.ORGANIZATION,
+            scopeId: ORG_ID,
+          },
+        ],
+        customRolePermissions: ["governance:manage"],
+      });
+
+      const result = await checkRoleBindingPermission({
+        prisma,
+        userId: USER_ID,
+        organizationId: ORG_ID,
+        scope: { type: "org", id: ORG_ID },
+        permission: "governance:manage",
+      });
+
+      expect(result).toBe(true);
     });
   });
 });

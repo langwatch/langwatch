@@ -1,19 +1,23 @@
+import type { PrismaClient } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-import type { MaybeStoredLLMModelCost } from "~/server/modelProviders/llmModelCost";
-import type { OtlpSpan } from "../../../event-sourcing/pipelines/trace-processing/schemas/otlp";
-import {
-  OtlpSpanCostEnrichmentService,
-  type OtlpSpanCostEnrichmentServiceDependencies,
-} from "../span-cost-enrichment.service";
 import {
   matchModelCostWithFallbacks,
   stripProviderSubtype,
 } from "~/server/background/workers/collector/cost";
+import type { MaybeStoredLLMModelCost } from "~/server/modelProviders/llmModelCost";
 import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
+import type { OtlpSpan } from "../../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import {
+  createCostEnrichmentDeps,
+  OtlpSpanCostEnrichmentService,
+  type OtlpSpanCostEnrichmentServiceDependencies,
+} from "../span-cost-enrichment.service";
 
 function createTestSpan(
-  attributes: Array<{ key: string; value: { stringValue?: string; doubleValue?: number } }> = [],
+  attributes: Array<{
+    key: string;
+    value: { stringValue?: string; doubleValue?: number };
+  }> = [],
 ): OtlpSpan {
   return {
     traceId: "trace-1",
@@ -70,6 +74,61 @@ describe("OtlpSpanCostEnrichmentService", () => {
       });
     });
 
+    describe("when custom pricing defines cache rates", () => {
+      it("sets cache read and write rate attributes on the span", async () => {
+        const customCost: MaybeStoredLLMModelCost = {
+          projectId: "project-1",
+          model: "gpt-4o",
+          regex: "^gpt-4o$",
+          inputCostPerToken: 0.000005,
+          outputCostPerToken: 0.000015,
+          cacheReadCostPerToken: 0.0000005,
+          cacheCreationCostPerToken: 0.00000625,
+        };
+        const deps = createMockDeps([customCost]);
+        const service = new OtlpSpanCostEnrichmentService(deps);
+        const span = createTestSpan([
+          { key: "gen_ai.request.model", value: { stringValue: "gpt-4o" } },
+        ]);
+
+        await service.enrichSpan(span, "project-1");
+
+        expect(span.attributes).toContainEqual({
+          key: "langwatch.model.cacheReadCostPerToken",
+          value: { doubleValue: 0.0000005 },
+        });
+        expect(span.attributes).toContainEqual({
+          key: "langwatch.model.cacheCreationCostPerToken",
+          value: { doubleValue: 0.00000625 },
+        });
+      });
+    });
+
+    describe("when custom pricing omits cache rates", () => {
+      it("does not set cache rate attributes so the input rate fallback applies", async () => {
+        const customCost: MaybeStoredLLMModelCost = {
+          projectId: "project-1",
+          model: "gpt-4o",
+          regex: "^gpt-4o$",
+          inputCostPerToken: 0.000005,
+          outputCostPerToken: 0.000015,
+        };
+        const deps = createMockDeps([customCost]);
+        const service = new OtlpSpanCostEnrichmentService(deps);
+        const span = createTestSpan([
+          { key: "gen_ai.request.model", value: { stringValue: "gpt-4o" } },
+        ]);
+
+        await service.enrichSpan(span, "project-1");
+
+        const cacheKeys = span.attributes.map((a) => a.key);
+        expect(cacheKeys).not.toContain("langwatch.model.cacheReadCostPerToken");
+        expect(cacheKeys).not.toContain(
+          "langwatch.model.cacheCreationCostPerToken",
+        );
+      });
+    });
+
     describe("when span has no model attribute", () => {
       it("returns without querying the database", async () => {
         const deps = createMockDeps();
@@ -97,7 +156,10 @@ describe("OtlpSpanCostEnrichmentService", () => {
         const deps = createMockDeps([customCost]);
         const service = new OtlpSpanCostEnrichmentService(deps);
         const span = createTestSpan([
-          { key: "gen_ai.request.model", value: { stringValue: "claude-3-5-sonnet" } },
+          {
+            key: "gen_ai.request.model",
+            value: { stringValue: "claude-3-5-sonnet" },
+          },
         ]);
 
         await service.enrichSpan(span, "project-1");
@@ -155,12 +217,15 @@ describe("OtlpSpanCostEnrichmentService", () => {
           model: "gpt-4o-2024-08-06",
           regex: "^gpt-4o-2024-08-06$",
           inputCostPerToken: 0.000003,
-          outputCostPerToken: 0.000010,
+          outputCostPerToken: 0.00001,
         };
         const deps = createMockDeps([customCost]);
         const service = new OtlpSpanCostEnrichmentService(deps);
         const span = createTestSpan([
-          { key: "gen_ai.response.model", value: { stringValue: "gpt-4o-2024-08-06" } },
+          {
+            key: "gen_ai.response.model",
+            value: { stringValue: "gpt-4o-2024-08-06" },
+          },
         ]);
 
         await service.enrichSpan(span, "project-1");
@@ -181,7 +246,10 @@ describe("OtlpSpanCostEnrichmentService", () => {
         const deps = createMockDeps([customCost]);
         const service = new OtlpSpanCostEnrichmentService(deps);
         const span = createTestSpan([
-          { key: "gen_ai.request.model", value: { stringValue: "openai.responses/gpt-5-mini" } },
+          {
+            key: "gen_ai.request.model",
+            value: { stringValue: "openai.responses/gpt-5-mini" },
+          },
         ]);
 
         await service.enrichSpan(span, "project-1");
@@ -205,7 +273,10 @@ describe("OtlpSpanCostEnrichmentService", () => {
         const deps = createMockDeps([customCost]);
         const service = new OtlpSpanCostEnrichmentService(deps);
         const span = createTestSpan([
-          { key: "gen_ai.request.model", value: { stringValue: "openai.responses/gpt-5-mini-2025-08-07" } },
+          {
+            key: "gen_ai.request.model",
+            value: { stringValue: "openai.responses/gpt-5-mini-2025-08-07" },
+          },
         ]);
 
         await service.enrichSpan(span, "project-1");
@@ -219,9 +290,159 @@ describe("OtlpSpanCostEnrichmentService", () => {
   });
 });
 
+describe("createCostEnrichmentDeps", () => {
+  const project = {
+    id: "project-1",
+    teamId: "team-1",
+    team: { organizationId: "org-1" },
+  };
+
+  const costRow = ({
+    scopeType,
+    scopeId,
+    projectId,
+    inputCostPerToken,
+    outputCostPerToken,
+  }: {
+    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+    scopeId: string;
+    projectId: string | null;
+    inputCostPerToken: number;
+    outputCostPerToken: number;
+  }) => ({
+    id: `llmcost_${scopeType}`,
+    organizationId: "org-1",
+    scopeType,
+    scopeId,
+    projectId,
+    model: "bedrock/eu.anthropic.claude-sonnet-4-6",
+    regex: "^bedrock\\/eu\\.anthropic\\.claude-sonnet-4-6$",
+    inputCostPerToken,
+    outputCostPerToken,
+    cacheReadCostPerToken: null,
+    cacheCreationCostPerToken: null,
+    createdAt: new Date("2026-06-04T21:36:54Z"),
+    updatedAt: new Date("2026-06-04T21:36:54Z"),
+  });
+
+  const createPrismaMock = (rows: unknown[]) => {
+    const findUnique = vi.fn().mockResolvedValue(project);
+    const findMany = vi.fn().mockResolvedValue(rows);
+    const prisma = {
+      project: { findUnique },
+      customLLMModelCost: { findMany },
+    } as unknown as PrismaClient;
+    return { prisma, findUnique, findMany };
+  };
+
+  describe("when the custom cost is organization-scoped (@regression)", () => {
+    /** @scenario An organization-level custom cost prices spans at ingestion */
+    it("enriches the span through the scope cascade, not the legacy projectId column", async () => {
+      const orgRow = costRow({
+        scopeType: "ORGANIZATION",
+        scopeId: "org-1",
+        projectId: null,
+        inputCostPerToken: 0.000003,
+        outputCostPerToken: 0.000015,
+      });
+      const { prisma, findMany } = createPrismaMock([orgRow]);
+      const service = new OtlpSpanCostEnrichmentService(
+        createCostEnrichmentDeps(prisma),
+      );
+      const span = createTestSpan([
+        {
+          key: "gen_ai.request.model",
+          value: { stringValue: "bedrock/eu.anthropic.claude-sonnet-4-6" },
+        },
+      ]);
+
+      await service.enrichSpan(span, "project-1");
+
+      expect(span.attributes).toContainEqual({
+        key: "langwatch.model.inputCostPerToken",
+        value: { doubleValue: 0.000003 },
+      });
+      expect(span.attributes).toContainEqual({
+        key: "langwatch.model.outputCostPerToken",
+        value: { doubleValue: 0.000015 },
+      });
+      // The lookup must target the org-anchored scope chain; an org- or
+      // team-scoped row carries a null legacy projectId and is invisible
+      // to a { where: { projectId } } query.
+      expect(findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ organizationId: "org-1" }),
+        }),
+      );
+    });
+  });
+
+  describe("when project- and organization-level rows both price the same model", () => {
+    /** @scenario A project-level custom cost beats the organization rate at ingestion */
+    it("applies the project-level rates", async () => {
+      const orgRow = costRow({
+        scopeType: "ORGANIZATION",
+        scopeId: "org-1",
+        projectId: null,
+        inputCostPerToken: 0.000003,
+        outputCostPerToken: 0.000015,
+      });
+      const projectRow = costRow({
+        scopeType: "PROJECT",
+        scopeId: "project-1",
+        projectId: "project-1",
+        inputCostPerToken: 0.000001,
+        outputCostPerToken: 0.000002,
+      });
+      // Org row first: tier sorting, not row order, must decide the winner.
+      const { prisma } = createPrismaMock([orgRow, projectRow]);
+      const service = new OtlpSpanCostEnrichmentService(
+        createCostEnrichmentDeps(prisma),
+      );
+      const span = createTestSpan([
+        {
+          key: "gen_ai.request.model",
+          value: { stringValue: "bedrock/eu.anthropic.claude-sonnet-4-6" },
+        },
+      ]);
+
+      await service.enrichSpan(span, "project-1");
+
+      expect(span.attributes).toContainEqual({
+        key: "langwatch.model.inputCostPerToken",
+        value: { doubleValue: 0.000001 },
+      });
+      expect(span.attributes).toContainEqual({
+        key: "langwatch.model.outputCostPerToken",
+        value: { doubleValue: 0.000002 },
+      });
+    });
+  });
+
+  describe("when the project does not exist", () => {
+    it("returns no custom costs and leaves the span untouched", async () => {
+      const { prisma, findUnique, findMany } = createPrismaMock([]);
+      findUnique.mockResolvedValue(null);
+      const service = new OtlpSpanCostEnrichmentService(
+        createCostEnrichmentDeps(prisma),
+      );
+      const span = createTestSpan([
+        { key: "gen_ai.request.model", value: { stringValue: "gpt-4o" } },
+      ]);
+
+      await service.enrichSpan(span, "project-unknown");
+
+      expect(findMany).not.toHaveBeenCalled();
+      expect(span.attributes).toHaveLength(1);
+    });
+  });
+});
+
 describe("stripProviderSubtype", () => {
   it("strips subtype from provider prefix", () => {
-    expect(stripProviderSubtype("openai.responses/gpt-5-mini")).toBe("openai/gpt-5-mini");
+    expect(stripProviderSubtype("openai.responses/gpt-5-mini")).toBe(
+      "openai/gpt-5-mini",
+    );
   });
 
   it("strips subtype from azure.chat prefix", () => {
@@ -319,7 +540,10 @@ describe("matchModelCostWithFallbacks", () => {
 
     describe("when model has non-standard date suffixes (@regression)", () => {
       it("matches gpt-5.2-20260315 (YYYYMMDD) to openai/gpt-5.2", () => {
-        const result = matchModelCostWithFallbacks("gpt-5.2-20260315", realCosts);
+        const result = matchModelCostWithFallbacks(
+          "gpt-5.2-20260315",
+          realCosts,
+        );
         expect(result?.model).toBe("openai/gpt-5.2");
       });
 
@@ -334,7 +558,10 @@ describe("matchModelCostWithFallbacks", () => {
       });
 
       it("matches mistral-small-2603 (YYMM) to mistralai/mistral-small-2603", () => {
-        const result = matchModelCostWithFallbacks("mistral-small-2603", realCosts);
+        const result = matchModelCostWithFallbacks(
+          "mistral-small-2603",
+          realCosts,
+        );
         expect(result?.model).toBe("mistralai/mistral-small-2603");
       });
     });
@@ -353,12 +580,18 @@ describe("matchModelCostWithFallbacks", () => {
 
     describe("when model has provider subtype and non-standard date suffix (@regression)", () => {
       it("matches openai.responses/gpt-5.2-0315 to openai/gpt-5.2", () => {
-        const result = matchModelCostWithFallbacks("openai.responses/gpt-5.2-0315", realCosts);
+        const result = matchModelCostWithFallbacks(
+          "openai.responses/gpt-5.2-0315",
+          realCosts,
+        );
         expect(result?.model).toBe("openai/gpt-5.2");
       });
 
       it("matches openai.responses/gpt-5.3-chat-latest to openai/gpt-5.3-chat", () => {
-        const result = matchModelCostWithFallbacks("openai.responses/gpt-5.3-chat-latest", realCosts);
+        const result = matchModelCostWithFallbacks(
+          "openai.responses/gpt-5.3-chat-latest",
+          realCosts,
+        );
         expect(result?.model).toBe("openai/gpt-5.3-chat");
       });
     });

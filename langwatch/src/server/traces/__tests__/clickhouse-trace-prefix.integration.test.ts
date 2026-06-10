@@ -217,6 +217,7 @@ describe("ClickHouseTraceService.resolveTraceIdByPrefix (integration)", () => {
       );
     });
 
+    /** @scenario Prefix match is scoped to the current project */
     it("does not return it for a different project", async () => {
       const result = await service.resolveTraceIdByPrefix({
         projectId: tenantId,

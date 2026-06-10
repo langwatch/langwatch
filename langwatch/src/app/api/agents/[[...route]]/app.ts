@@ -1,4 +1,3 @@
-import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { validator as zValidator } from "hono-openapi/zod";
 import { nanoid } from "nanoid";
@@ -8,17 +7,12 @@ import {
   agentTypeSchema,
 } from "../../../../server/agents/agent.repository";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
-import {
-  type AuthMiddlewareVariables,
-  authMiddleware,
-  resourceLimitMiddleware,
-} from "../../middleware";
+import { createProjectApp, requires } from "~/server/api/security";
+import { resourceLimitMiddleware } from "../../middleware";
 import {
   type AgentServiceMiddlewareVariables,
   agentServiceMiddleware,
 } from "../../middleware/agent-service";
-import { loggerMiddleware } from "../../middleware/logger";
-import { tracerMiddleware } from "../../middleware/tracer";
 import { NotFoundError, UnprocessableEntityError } from "../../shared/errors";
 import { platformUrl } from "../../shared/platform-url";
 
@@ -30,8 +24,6 @@ import { ZodError } from "zod";
 import { handleAgentError } from "./error-handler";
 
 patchZodOpenapi();
-
-type Variables = AuthMiddlewareVariables & AgentServiceMiddlewareVariables;
 
 // -- Validation schemas --
 
@@ -99,22 +91,21 @@ function mapConfigValidationError(error: unknown): never {
   throw error;
 }
 
-export const app = new Hono<{ Variables: Variables }>()
-  .basePath("/api/agents")
-  .use(tracerMiddleware({ name: "agents" }))
-  .use(loggerMiddleware())
-  .use(authMiddleware)
-  .use(agentServiceMiddleware)
-  .onError(handleAgentError)
+const secured = createProjectApp<AgentServiceMiddlewareVariables>({
+  basePath: "/api/agents",
+});
 
-  // ── List Agents (paginated) ──────────────────────────────────
-  .get(
-    "/",
-    describeRoute({
-      description: "List all non-archived agents for the project (paginated)",
-    }),
-    zValidator("query", paginationQuerySchema),
-    async (c) => {
+secured.hono.onError(handleAgentError);
+
+// ── List Agents (paginated) ──────────────────────────────────
+secured.access(requires("project:view")).get(
+  "/",
+  agentServiceMiddleware,
+  describeRoute({
+    description: "List all non-archived agents for the project (paginated)",
+  }),
+  zValidator("query", paginationQuerySchema),
+  async (c) => {
       const project = c.get("project");
       const { page, limit } = c.req.valid("query");
       const service = c.get("agentService");
@@ -133,17 +124,18 @@ export const app = new Hono<{ Variables: Variables }>()
         })),
       });
     },
-  )
+);
 
-  // ── Create Agent ─────────────────────────────────────────────
-  .post(
-    "/",
-    describeRoute({
-      description: "Create a new agent",
-    }),
-    resourceLimitMiddleware("agents"),
-    zValidator("json", createAgentSchema, validationHook),
-    async (c) => {
+// ── Create Agent ─────────────────────────────────────────────
+secured.access(requires("project:update")).post(
+  "/",
+  agentServiceMiddleware,
+  describeRoute({
+    description: "Create a new agent",
+  }),
+  resourceLimitMiddleware("agents"),
+  zValidator("json", createAgentSchema, validationHook),
+  async (c) => {
       const project = c.get("project");
       const { name, type, config, workflowId } = c.req.valid("json");
       const service = c.get("agentService");
@@ -175,15 +167,16 @@ export const app = new Hono<{ Variables: Variables }>()
         201,
       );
     },
-  )
+);
 
-  // ── Get Single Agent ─────────────────────────────────────────
-  .get(
-    "/:id",
-    describeRoute({
-      description: "Get an agent by its id",
-    }),
-    async (c) => {
+// ── Get Single Agent ─────────────────────────────────────────
+secured.access(requires("project:view")).get(
+  "/:id",
+  agentServiceMiddleware,
+  describeRoute({
+    description: "Get an agent by its id",
+  }),
+  async (c) => {
       const { id } = c.req.param();
       const project = c.get("project");
       const service = c.get("agentService");
@@ -211,16 +204,17 @@ export const app = new Hono<{ Variables: Variables }>()
         }),
       });
     },
-  )
+);
 
-  // ── Update Agent ─────────────────────────────────────────────
-  .patch(
-    "/:id",
-    describeRoute({
-      description: "Update an agent by its id",
-    }),
-    zValidator("json", updateAgentSchema, validationHook),
-    async (c) => {
+// ── Update Agent ─────────────────────────────────────────────
+secured.access(requires("project:update")).patch(
+  "/:id",
+  agentServiceMiddleware,
+  describeRoute({
+    description: "Update an agent by its id",
+  }),
+  zValidator("json", updateAgentSchema, validationHook),
+  async (c) => {
       const { id } = c.req.param();
       const project = c.get("project");
       const body = c.req.valid("json");
@@ -260,15 +254,16 @@ export const app = new Hono<{ Variables: Variables }>()
         }),
       });
     },
-  )
+);
 
-  // ── Delete (Archive) Agent ───────────────────────────────────
-  .delete(
-    "/:id",
-    describeRoute({
-      description: "Archive an agent (soft-delete)",
-    }),
-    async (c) => {
+// ── Delete (Archive) Agent ───────────────────────────────────
+secured.access(requires("project:delete")).delete(
+  "/:id",
+  agentServiceMiddleware,
+  describeRoute({
+    description: "Archive an agent (soft-delete)",
+  }),
+  async (c) => {
       const { id } = c.req.param();
       const project = c.get("project");
       const service = c.get("agentService");
@@ -288,4 +283,6 @@ export const app = new Hono<{ Variables: Variables }>()
         return mapAgentNotFoundError(error);
       }
     },
-  );
+);
+
+export const app = secured.hono;

@@ -21,7 +21,7 @@ export function RegenerateApiKeyDialog({
       placement="center"
     >
       {open && (
-        <Dialog.Content>
+        <Dialog.Content bg="bg">
           <Dialog.CloseTrigger />
           <Dialog.Header>
             <Dialog.Title>Regenerate API Key?</Dialog.Title>

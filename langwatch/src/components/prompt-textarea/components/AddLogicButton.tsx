@@ -17,12 +17,16 @@ export const AddLogicButton = forwardRef<
     <Button
       ref={ref}
       size="xs"
-      variant="ghost"
+      variant="outline"
       colorPalette="gray"
       onClick={onClick}
       onMouseDown={(e) => e.stopPropagation()}
-      opacity={0.7}
-      _hover={{ opacity: 1, background: "bg.muted" }}
+      // Solid (non-transparent) background + tight padding so the button
+      // reads as its own pill over the textarea text.
+      bg="bg.panel"
+      borderColor="border"
+      paddingX={2}
+      _hover={{ background: "bg.muted" }}
       {...props}
     >
       <Text fontSize="xs" marginRight={1} fontWeight="500">

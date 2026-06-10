@@ -24,7 +24,10 @@ import {
   recordValueType,
 } from "./_extraction";
 import { safeJsonParse } from "./_guards";
-import { extractSystemInstructionFromMessages, stripSystemMessages } from "./_messages";
+import {
+  extractSystemInstructionFromMessages,
+  stripSystemMessages,
+} from "./_messages";
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
 /**
@@ -153,10 +156,7 @@ export class StrandsExtractor implements CanonicalAttributesExtractor {
       for (const event of roleEvents) {
         // Infer role from event name (e.g., "gen_ai.user.message" → "user")
         const role = event.name.split(".")[1];
-        const eventAttrs = (event.attributes ?? {}) as Record<
-          string,
-          unknown
-        >;
+        const eventAttrs = (event.attributes ?? {}) as Record<string, unknown>;
 
         const content = extractStrandsContent(eventAttrs);
 
@@ -190,7 +190,11 @@ export class StrandsExtractor implements CanonicalAttributesExtractor {
         if (chatMessages.length > 0) {
           ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, chatMessages);
           ctx.recordRule(`${this.id}:events->gen_ai.input.messages`);
-          recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
+          recordValueType(
+            ctx,
+            ATTR_KEYS.GEN_AI_INPUT_MESSAGES,
+            "chat_messages",
+          );
         }
       }
     }

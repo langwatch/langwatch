@@ -1,14 +1,24 @@
 import { generate } from "@langwatch/ksuid";
+import { evaluatorLoopBlockedCounter } from "../../../../metrics";
 import type { MonitorService } from "~/server/app-layer/monitors/monitor.service";
 import type { QueueSendOptions } from "../../../queues";
 import { ExecuteEvaluationCommand } from "../../evaluation-processing/commands/executeEvaluation.command";
 import type { ExecuteEvaluationCommandData } from "../../evaluation-processing/schemas/commands";
 import { KSUID_RESOURCES } from "../../../../../utils/constants";
 import { createLogger } from "../../../../../utils/logger/server";
-import type { ReactorContext, ReactorDefinition } from "../../../reactors/reactor.types";
-import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
-import type { TraceProcessingEvent } from "../schemas/events";
+import type { ReactorDefinition } from "../../../reactors/reactor.types";
+import {
+  MAX_PROCESSED_SPANS,
+  type TraceSummaryData,
+} from "../projections/traceSummary.foldProjection";
+import { isSpanReceivedEvent, type TraceProcessingEvent } from "../schemas/events";
+import { defineOriginGuardedTraceReactor } from "./_originGuardedReactor";
+import { SYNTHETIC_SPAN_NAMES } from "~/server/tracer/constants";
 import { DEFERRED_CHECK_DELAY_MS } from "./originGate.reactor";
+import { featureFlagService } from "../../../../featureFlag";
+
+const CAUSALITY_LOOP_GUARD_DISABLED_FLAG =
+  "ops_es_causality_loop_guard_disabled";
 
 const logger = createLogger(
   "langwatch:trace-processing:evaluation-trigger-reactor",
@@ -30,36 +40,153 @@ export interface EvaluationTriggerReactorDeps {
 export function createEvaluationTriggerReactor(
   deps: EvaluationTriggerReactorDeps,
 ): ReactorDefinition<TraceProcessingEvent, TraceSummaryData> {
-  return {
+  return defineOriginGuardedTraceReactor({
     name: "evaluationTrigger",
-    options: {
-      makeJobId: (payload) =>
-        `eval-trigger:${payload.event.tenantId}:${payload.event.aggregateId}`,
-      ttl: 30_000,
-      delay: 30_000,
-    },
-
-    async handle(
-      event: TraceProcessingEvent,
-      context: ReactorContext<TraceSummaryData>,
-    ): Promise<void> {
+    jobIdPrefix: "eval-trigger",
+    async handle(event, context) {
+      // Bug 2 / #3875: synthetic event spans (e.g. thumbs-up/down feedback via /api/track_event)
+      // do not contribute to fold IO and must not re-trigger ON_MESSAGE evaluator runs. We
+      // share `SYNTHETIC_SPAN_NAMES` with the trace-summary fold (foldProjection.ts:88) so a
+      // future synthetic name updates both sites at once.
+      if (isSpanReceivedEvent(event) && SYNTHETIC_SPAN_NAMES.has(event.data.span.name)) {
+        return;
+      }
       const { tenantId, aggregateId: traceId, foldState } = context;
 
-      // Guard: skip old traces (resyncing)
-      if (event.occurredAt < Date.now() - 60 * 60 * 1000) return;
+      // Oversized-trace guard (2026-05-28 incident follow-up). Past the same
+      // processing cap the fold uses to stop deriving the summary
+      // (MAX_PROCESSED_SPANS), a trace is a runaway / reused trace_id and is too
+      // large to keep evaluating: re-running every ON_MESSAGE monitor per span
+      // on a 26k-span trace is pure amplification for no added signal. Skip the
+      // eval dispatch (lighter processing). The span itself is still stored and
+      // the trace stays fully queryable: we drop the WORK, never the DATA.
+      if (foldState.spanCount >= MAX_PROCESSED_SPANS) {
+        // Log once, on the first crossing only. This is a per-span hot path: a
+        // runaway trace would otherwise emit thousands of identical warns, the
+        // very per-span amplification we are skipping the eval to avoid.
+        if (foldState.spanCount === MAX_PROCESSED_SPANS) {
+          logger.warn(
+            {
+              tenantId,
+              observedTraceId: traceId,
+              spanCount: foldState.spanCount,
+              cap: MAX_PROCESSED_SPANS,
+            },
+            "Skipping evaluation dispatch: trace reached the processing cap (spans still stored)",
+          );
+        }
+        return;
+      }
 
-      // Guard: skip traces blocked by guardrail with no output
-      if (foldState.blockedByGuardrail && !foldState.computedOutput) return;
+      // Infinite-loop prevention (post-2026-05-11 incident). See
+      // specs/monitors/online-evaluator-loop-prevention.feature.
+      //
+      // Depth-only per-span check (origin remains a user-configurable
+      // precondition, not a hardcoded reactor rule): if the inbound
+      // span's own `langwatch.reserved.causality_depth` attribute is
+      // >= 1, it was emitted by an evaluator workflow (or downstream
+      // of one). Skip dispatch.
+      //
+      // A fresh app-origin span on the same trace (depth 0) still
+      // triggers normally — re-runs are allowed, only eval spans are
+      // blocked.
+      //
+      // The primary guarantee that every eval-emitted span carries the
+      // attribute is the nlpgo-side BaggageAttributeProcessor (stamps
+      // every span at OnStart from a single baggage entry on context).
+      //
+      // Kill-switch: SYSTEM flag `ops_es_causality_loop_guard_disabled`
+      // bypasses the check (emergency rollback without redeploy).
+      // Resolved through featureFlagService so operators can flip it
+      // from the Ops UI without restarting pods; the legacy
+      // `LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD=1` env var still works
+      // via the standard env-override path (uppercased flag key).
+      const guardDisabled = await featureFlagService.isEnabled(
+        CAUSALITY_LOOP_GUARD_DISABLED_FLAG,
+        { distinctId: tenantId, defaultValue: false },
+      );
 
-      const attrs = foldState.attributes ?? {};
-
-      // Guard: origin not yet resolved — originGate reactor handles deferred resolution
-      if (!attrs["langwatch.origin"]) return;
+      if (!guardDisabled && isSpanReceivedEvent(event)) {
+        const reason = detectCausalityLoop({
+          spanAttributes: event.data.span.attributes,
+        });
+        if (reason) {
+          recordLoopBlocked(reason);
+          logger.warn(
+            { tenantId, observedTraceId: traceId, reason },
+            "Skipping evaluation dispatch — causality loop guard fired",
+          );
+          return;
+        }
+      } else if (guardDisabled) {
+        logger.warn(
+          { tenantId, observedTraceId: traceId },
+          "ops_es_causality_loop_guard_disabled is on, loop guard bypassed",
+        );
+      }
 
       // Origin is known — dispatch to monitors, precondition matchers filter by origin.
-      await dispatchEvaluations({ deps, tenantId, traceId, foldState, occurredAt: event.occurredAt });
+      await dispatchEvaluations({
+        deps,
+        tenantId,
+        traceId,
+        foldState,
+        occurredAt: event.occurredAt,
+      });
     },
-  };
+  });
+}
+
+const CAUSALITY_DEPTH_ATTR = "langwatch.reserved.causality_depth";
+
+/**
+ * Causality-loop detection on a single incoming span_received event.
+ * Exported for unit testing.
+ */
+export function detectCausalityLoop(params: {
+  spanAttributes: Array<{ key: string; value: unknown }> | undefined | null;
+}): "depth_direct" | null {
+  const depth = extractCausalityDepthFromOtlpAttrs(params.spanAttributes);
+  if (depth >= 1) return "depth_direct";
+  return null;
+}
+
+/**
+ * OTLP spans deliver attributes as `[{key, value: AnyValue}]` arrays.
+ * AnyValue is a union — string/int/bool/double/array. We accept any
+ * encoding that parses to a positive finite integer.
+ */
+function extractCausalityDepthFromOtlpAttrs(
+  attrs: Array<{ key: string; value: unknown }> | undefined | null,
+): number {
+  if (!Array.isArray(attrs)) return 0;
+  for (const attr of attrs) {
+    if (attr?.key !== CAUSALITY_DEPTH_ATTR) continue;
+    const v = attr.value as Record<string, unknown> | number | string | null;
+    let raw: unknown = v;
+    if (v && typeof v === "object") {
+      // Handle OTLP AnyValue: { intValue?, stringValue?, doubleValue? }
+      raw =
+        (v as Record<string, unknown>).intValue ??
+        (v as Record<string, unknown>).stringValue ??
+        (v as Record<string, unknown>).doubleValue ??
+        v;
+    }
+    const n =
+      typeof raw === "number"
+        ? raw
+        : typeof raw === "string"
+          ? Number.parseInt(raw, 10)
+          : NaN;
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return 0;
+}
+
+function recordLoopBlocked(reason: string): void {
+  // tenant attribution lives in the structured log line, not the
+  // Prometheus label (cardinality control — see metrics.ts comment).
+  evaluatorLoopBlockedCounter.inc({ reason });
 }
 
 // ---------------------------------------------------------------------------

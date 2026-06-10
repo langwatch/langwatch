@@ -30,6 +30,8 @@ afterEach(() => {
 
 describe("<PlansComparisonPage/>", () => {
   describe("when a member opens the plans comparison page", () => {
+    /** @scenario 'Member compares plans on the plans page' */
+    /** @scenario 'Non-admin members can access plans comparison' */
     it("shows the plans comparison layout with three plan columns", () => {
       render(
         <PlansComparisonPage activePlan={{ type: "FREE", free: true }} />,
@@ -72,6 +74,7 @@ describe("<PlansComparisonPage/>", () => {
   });
 
   describe("when organization is on the Growth plan", () => {
+    /** @scenario 'Growth organizations see Growth as current' */
     it("marks the Growth column as current", () => {
       render(
         <PlansComparisonPage
@@ -129,6 +132,7 @@ describe("<PlansComparisonPage/>", () => {
   });
 
   describe("when organization is on a legacy tier plan", () => {
+    /** @scenario 'Legacy tier organizations show no current plan in comparison' */
     it("shows no current plan badge in comparison columns", () => {
       render(
         <PlansComparisonPage activePlan={{ type: "LAUNCH", free: false }} />,
@@ -148,6 +152,7 @@ describe("<PlansComparisonPage/>", () => {
       ).not.toBeInTheDocument();
     });
 
+    /** @scenario 'TIERED organizations see a discontinued plan migration notice' */
     it("shows discontinued pricing notice for TIERED organizations", () => {
       render(
         <PlansComparisonPage

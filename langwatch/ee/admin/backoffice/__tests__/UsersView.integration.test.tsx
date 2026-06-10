@@ -66,6 +66,18 @@ describe("Feature: Backoffice User Impersonation Reason", () => {
       expect(reason.tagName).toBe("INPUT");
     });
 
+    /** @scenario Impersonation dialog focuses the reason field on open */
+    it("focuses the reason field as soon as the dialog opens", async () => {
+      render(<ImpersonateDialog user={user} onClose={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
+
+      const reason = screen.getByLabelText("Reason");
+      await waitFor(() => {
+        expect(document.activeElement).toBe(reason);
+      });
+    });
+
     /** @scenario Enter submits a completed impersonation reason */
     it("submits the reason when Enter is pressed", async () => {
       const testingUser = userEvent.setup();

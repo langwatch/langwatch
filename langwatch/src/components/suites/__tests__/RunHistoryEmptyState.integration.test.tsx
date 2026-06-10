@@ -99,6 +99,7 @@ describe("<RunHistoryPanel/>", () => {
       });
     });
 
+    /** @scenario "Empty state displays when suite has no runs" */
     it("displays an empty state message indicating no runs exist", () => {
       render(
         <RunHistoryPanel
@@ -142,6 +143,7 @@ describe("<RunHistoryPanel/>", () => {
       });
     });
 
+    /** @scenario "Empty state disappears when runs exist" */
     it("does not display the empty state and shows run results", () => {
       render(
         <RunHistoryPanel
@@ -167,6 +169,7 @@ describe("<RunHistoryPanel/>", () => {
       });
     });
 
+    /** @scenario "Empty state does not appear when runs exist but are filtered out" */
     it("shows the empty state for current period", () => {
       const narrowPeriod = {
         startDate: new Date("2024-06-01T00:00:00Z"),

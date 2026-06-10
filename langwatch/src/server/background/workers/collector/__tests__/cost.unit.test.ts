@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   estimateCost,
   matchModelCostWithFallbacks,
+  normalizeBedrockModelId,
   normalizeModelName,
 } from "../cost";
 import { getStaticModelCosts } from "../../../../modelProviders/llmModelCost";
@@ -37,6 +38,97 @@ const fakeModelCosts: MaybeStoredLLMModelCost[] = [
     outputCostPerToken: 0.000001,
   },
 ];
+
+describe("estimateCost", () => {
+  const opusWithCache: MaybeStoredLLMModelCost = {
+    projectId: "",
+    model: "anthropic/claude-opus-4-7",
+    regex: "^(anthropic\\/)?claude-opus-4[.-]7$",
+    inputCostPerToken: 0.00003,
+    outputCostPerToken: 0.00015,
+    cacheReadCostPerToken: 0.000003,
+    cacheCreationCostPerToken: 0.0000375,
+  };
+
+  describe("when only input and output tokens are given", () => {
+    it("prices input and output at their respective rates", () => {
+      expect(
+        estimateCost({
+          llmModelCost: opusWithCache,
+          inputTokens: 1000,
+          outputTokens: 100,
+        }),
+      ).toBeCloseTo(1000 * 0.00003 + 100 * 0.00015, 10);
+    });
+  });
+
+  describe("when cache read and write tokens are given", () => {
+    it("prices each bucket at its own rate, on top of the non-cached input", () => {
+      const cost = estimateCost({
+        llmModelCost: opusWithCache,
+        inputTokens: 510,
+        outputTokens: 12,
+        cacheReadTokens: 37127,
+        cacheCreationTokens: 14,
+      });
+      expect(cost).toBeCloseTo(
+        510 * 0.00003 +
+          12 * 0.00015 +
+          37127 * 0.000003 +
+          14 * 0.0000375,
+        10,
+      );
+    });
+
+    it("costs a mostly-cached follow-up far below pricing the cache reads as full input", () => {
+      const cacheAware = estimateCost({
+        llmModelCost: opusWithCache,
+        inputTokens: 510,
+        outputTokens: 12,
+        cacheReadTokens: 37127,
+        cacheCreationTokens: 14,
+      })!;
+      const asIfFullInput = estimateCost({
+        llmModelCost: opusWithCache,
+        inputTokens: 510 + 37127 + 14,
+        outputTokens: 12,
+      })!;
+      expect(cacheAware).toBeLessThan(asIfFullInput);
+    });
+  });
+
+  describe("when a cache rate is missing", () => {
+    it("falls back to the input rate so cached tokens are never free", () => {
+      const noCacheRates: MaybeStoredLLMModelCost = {
+        projectId: "",
+        model: "x/y",
+        regex: "^x\\/y$",
+        inputCostPerToken: 0.00001,
+        outputCostPerToken: 0.00002,
+      };
+      expect(
+        estimateCost({
+          llmModelCost: noCacheRates,
+          inputTokens: 100,
+          cacheReadTokens: 50,
+          cacheCreationTokens: 10,
+        }),
+      ).toBeCloseTo((100 + 50 + 10) * 0.00001, 10);
+    });
+  });
+
+  describe("when the model has no rates at all", () => {
+    it("returns undefined", () => {
+      expect(
+        estimateCost({
+          llmModelCost: { projectId: "", model: "z", regex: "^z$" },
+          inputTokens: 100,
+          cacheReadTokens: 50,
+        }),
+      ).toBeUndefined();
+    });
+  });
+});
 
 describe("normalizeModelName", () => {
   describe("when given uppercase letters", () => {
@@ -100,6 +192,56 @@ describe("normalizeModelName", () => {
   describe("when given a normal model name", () => {
     it("returns it lowercase without changes", () => {
       expect(normalizeModelName("openai/gpt-4o")).toBe("openai/gpt-4o");
+    });
+  });
+});
+
+describe("normalizeBedrockModelId", () => {
+  describe("when given a regional Bedrock model id", () => {
+    it("strips the region and converts vendor-dot to vendor-slash", () => {
+      expect(normalizeBedrockModelId("eu.anthropic.claude-sonnet-4-6")).toBe(
+        "anthropic/claude-sonnet-4-6",
+      );
+    });
+  });
+
+  describe("when given a versioned Bedrock model id", () => {
+    it("strips the revision marker and version suffix", () => {
+      expect(
+        normalizeBedrockModelId("us.anthropic.claude-haiku-4-5-20251001-v1:0"),
+      ).toBe("anthropic/claude-haiku-4-5-20251001");
+    });
+  });
+
+  describe("when given a litellm-style bedrock/ prefixed id (@regression)", () => {
+    it("strips the bedrock/ envelope along with the region", () => {
+      expect(
+        normalizeBedrockModelId("bedrock/eu.anthropic.claude-sonnet-4-6"),
+      ).toBe("anthropic/claude-sonnet-4-6");
+    });
+
+    it("strips the bedrock/ envelope on versioned ids", () => {
+      expect(
+        normalizeBedrockModelId(
+          "bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0",
+        ),
+      ).toBe("anthropic/claude-haiku-4-5-20251001");
+    });
+
+    it("strips the bedrock/ envelope when no region prefix is present", () => {
+      expect(
+        normalizeBedrockModelId("bedrock/anthropic.claude-sonnet-4-6"),
+      ).toBe("anthropic/claude-sonnet-4-6");
+    });
+  });
+
+  describe("when given a non-Bedrock model id", () => {
+    it("leaves a vendor-slash model untouched", () => {
+      expect(normalizeBedrockModelId("openai/gpt-4o")).toBe("openai/gpt-4o");
+    });
+
+    it("leaves a bare model name untouched", () => {
+      expect(normalizeBedrockModelId("gpt-4o")).toBe("gpt-4o");
     });
   });
 });
@@ -244,16 +386,16 @@ describe("matchModelCostWithFallbacks", () => {
       );
     });
 
-    it("matches real anthropic/claude-opus-4.5 entry by hyphenated version", () => {
+    it("matches real anthropic/claude-opus-4-5 entry by dotted version", () => {
       expect(
-        matchModelCostWithFallbacks("claude-opus-4-5", realCosts)?.model
-      ).toBe("anthropic/claude-opus-4.5");
+        matchModelCostWithFallbacks("claude-opus-4.5", realCosts)?.model
+      ).toBe("anthropic/claude-opus-4-5");
     });
 
-    it("matches real anthropic/claude-opus-4.6 entry by hyphenated version", () => {
+    it("matches real anthropic/claude-opus-4-6 entry by dotted version", () => {
       expect(
-        matchModelCostWithFallbacks("claude-opus-4-6", realCosts)?.model
-      ).toBe("anthropic/claude-opus-4.6");
+        matchModelCostWithFallbacks("claude-opus-4.6", realCosts)?.model
+      ).toBe("anthropic/claude-opus-4-6");
     });
 
     it("matches real deepseek/deepseek-v3.2 via deepseek-ai/ alias", () => {
@@ -266,6 +408,55 @@ describe("matchModelCostWithFallbacks", () => {
       expect(
         matchModelCostWithFallbacks("minimaxai/minimax-m2.1", realCosts)?.model
       ).toBe("minimax/minimax-m2.1");
+    });
+  });
+
+  describe("when model id comes from Bedrock (@regression)", () => {
+    const realCosts = getStaticModelCosts();
+
+    /** @scenario A bare regional Bedrock model id keeps resolving registry pricing */
+    it("matches eu.anthropic.claude-sonnet-4-6 to anthropic/claude-sonnet-4-6", () => {
+      expect(
+        matchModelCostWithFallbacks("eu.anthropic.claude-sonnet-4-6", realCosts)
+          ?.model
+      ).toBe("anthropic/claude-sonnet-4-6");
+    });
+
+    /** @scenario A bedrock/-prefixed regional model id resolves registry pricing */
+    it("matches bedrock/eu.anthropic.claude-sonnet-4-6 to anthropic/claude-sonnet-4-6", () => {
+      expect(
+        matchModelCostWithFallbacks(
+          "bedrock/eu.anthropic.claude-sonnet-4-6",
+          realCosts
+        )?.model
+      ).toBe("anthropic/claude-sonnet-4-6");
+    });
+
+    /** @scenario A bedrock/-prefixed versioned model id resolves registry pricing */
+    it("matches bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0 to anthropic/claude-haiku-4-5", () => {
+      expect(
+        matchModelCostWithFallbacks(
+          "bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0",
+          realCosts
+        )?.model
+      ).toBe("anthropic/claude-haiku-4-5");
+    });
+
+    /** @scenario A custom cost regex written against the bedrock/-prefixed spelling still wins */
+    it("prefers a custom cost regex anchored on the bedrock/ spelling over the registry", () => {
+      const customCost: MaybeStoredLLMModelCost = {
+        projectId: "proj1",
+        model: "bedrock/eu.anthropic.claude-sonnet-4-6",
+        regex: "^bedrock\\/eu\\.anthropic\\.claude-sonnet-4-6$",
+        inputCostPerToken: 0.000003,
+        outputCostPerToken: 0.000015,
+      };
+      expect(
+        matchModelCostWithFallbacks("bedrock/eu.anthropic.claude-sonnet-4-6", [
+          customCost,
+          ...realCosts,
+        ])?.model
+      ).toBe("bedrock/eu.anthropic.claude-sonnet-4-6");
     });
   });
 

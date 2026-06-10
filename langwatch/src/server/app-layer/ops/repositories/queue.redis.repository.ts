@@ -7,12 +7,21 @@ import type {
   DlqGroupInfo,
   DrainPreview,
   JobEntry,
+  ReconcileResult,
 } from "./queue.repository";
 import { normalizeErrorMessage } from "../normalize-error-message";
+import { createLogger } from "~/utils/logger/server";
+import {
+  GROUP_QUEUE_REGISTRY_KEY,
+  TTL_HELPER_LUA,
+  PARK_HELPER_LUA,
+} from "~/server/event-sourcing/queues/groupQueue/scripts";
+
+const logger = createLogger("langwatch:ops:queue-redis-repository");
 
 // ── Lua Scripts ──────────────────────────────────────────────────────
 
-const UNBLOCK_LUA = `
+const UNBLOCK_LUA = TTL_HELPER_LUA + PARK_HELPER_LUA + `
 local blockedKey = KEYS[1]
 local activeKey  = KEYS[2]
 local jobsKey    = KEYS[3]
@@ -20,6 +29,7 @@ local readyKey   = KEYS[4]
 local signalKey  = KEYS[5]
 local errorKey   = KEYS[6]
 local groupId    = ARGV[1]
+local nowMs      = tonumber(ARGV[2])
 
 local wasBlocked = redis.call("SREM", blockedKey, groupId)
 
@@ -30,7 +40,16 @@ if wasBlocked > 0 then
   local pendingCount = redis.call("ZCARD", jobsKey)
   if pendingCount > 0 then
     local score = 1
-    redis.call("ZADD", readyKey, score, groupId)
+    -- Route through the parked-aware write so unblock can't clobber a parked
+    -- group back into the dispatch scan (TRAP 1). A blocked group is never
+    -- itself parked, so this normally writes straight to ready; if the tenant
+    -- is over cap, the next dispatch parks it again.
+    addToReadyOrParked(readyKey, groupId, score, false)
+    -- The block path PERSISTs the group keys; restore the safety-net TTL now
+    -- that the group is live again (dataKey = jobsKey with the ":jobs" suffix
+    -- swapped for ":data").
+    local dataKey = string.sub(jobsKey, 1, #jobsKey - 5) .. ":data"
+    refreshGroupKeyTtl(jobsKey, dataKey, nowMs)
   else
     redis.call("ZREM", readyKey, groupId)
   end
@@ -43,16 +62,24 @@ return wasBlocked
 `;
 
 const DRAIN_GROUP_LUA = `
-local jobsKey    = KEYS[1]
-local dataKey    = KEYS[2]
-local activeKey  = KEYS[3]
-local readyKey   = KEYS[4]
-local blockedKey = KEYS[5]
-local signalKey  = KEYS[6]
-local errorKey   = KEYS[7]
-local groupId    = ARGV[1]
+local jobsKey         = KEYS[1]
+local dataKey         = KEYS[2]
+local activeKey       = KEYS[3]
+local readyKey        = KEYS[4]
+local blockedKey      = KEYS[5]
+local signalKey       = KEYS[6]
+local errorKey        = KEYS[7]
+local totalPendingKey = KEYS[8]
+local groupId         = ARGV[1]
 
-local count = redis.call("ZCARD", jobsKey)
+-- Total dropped = staged jobs (ZCARD) only. Previously this also counted
+-- the active job (+hadActive), but since the counter DECR moved from
+-- COMPLETE_LUA to DISPATCH (PR #4181), the active job's INCR is already
+-- compensated at dispatch time. Counting it again here would double-DECR.
+-- Added post-2026-05-11 incident — bulk drain at 500K scale would
+-- otherwise leave the stat permanently overstated.
+local pendingCount = redis.call("ZCARD", jobsKey)
+local totalDropped = pendingCount
 
 redis.call("DEL", jobsKey)
 redis.call("DEL", dataKey)
@@ -63,7 +90,11 @@ redis.call("SREM", blockedKey, groupId)
 redis.call("LPUSH", signalKey, "1")
 redis.call("LTRIM", signalKey, 0, 999)
 
-return count
+if totalDropped > 0 then
+  redis.call("DECRBY", totalPendingKey, totalDropped)
+end
+
+return totalDropped
 `;
 
 const MOVE_TO_DLQ_LUA = `
@@ -119,7 +150,7 @@ redis.call("LTRIM", signalKey, 0, 999)
 return count
 `;
 
-const REPLAY_FROM_DLQ_LUA = `
+const REPLAY_FROM_DLQ_LUA = TTL_HELPER_LUA + PARK_HELPER_LUA + `
 local dlqJobsKey   = KEYS[1]
 local dlqDataKey   = KEYS[2]
 local dlqErrorKey  = KEYS[3]
@@ -129,6 +160,7 @@ local readyKey     = KEYS[6]
 local signalKey    = KEYS[7]
 local dlqIndexKey  = KEYS[8]
 local groupId      = ARGV[1]
+local nowMs        = tonumber(ARGV[2])
 
 local jobs = redis.call("ZRANGE", dlqJobsKey, 0, -1, "WITHSCORES")
 local count = #jobs / 2
@@ -149,7 +181,12 @@ redis.call("DEL", dlqErrorKey)
 redis.call("SREM", dlqIndexKey, groupId)
 
 if count > 0 then
-  redis.call("ZADD", readyKey, 1, groupId)
+  -- Route through the parked-aware write so a replay can't clobber a parked
+  -- group back into the dispatch scan (TRAP 1). A DLQ group is never itself
+  -- parked; if the tenant is over cap, the next dispatch parks it again.
+  addToReadyOrParked(readyKey, groupId, 1, false)
+  -- Restore the safety-net TTL on the revived group keys (DLQ keys carry none).
+  refreshGroupKeyTtl(dstJobsKey, dstDataKey, nowMs)
 end
 
 redis.call("LPUSH", signalKey, "1")
@@ -163,6 +200,7 @@ return count
 const SUMMARY_TOP_N = 200;
 const DLQ_TTL_SECONDS = 604800;
 const SSCAN_BATCH = 500;
+const PENDING_RECONCILE_SCAN_COUNT = 1000;
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -193,6 +231,24 @@ export class QueueRedisRepository implements QueueRepository {
   // ── Queue Discovery & Scanning ──────────────────────────────────
 
   async discoverQueueNames(): Promise<string[]> {
+    // Fast path: producers register their queue name on construction, so the
+    // registry set is the authoritative list and reads in O(1).
+    const registered = await this.redis.smembers(GROUP_QUEUE_REGISTRY_KEY);
+    if (registered.length > 0) {
+      return registered;
+    }
+
+    // Fallback for the window after deploy before any producer has registered
+    // (or a wiped registry): scan once, then backfill so the next call is O(1).
+    // Without this the dashboard would scan the full keyspace on every poll.
+    const names = await this.scanReadyKeyNames();
+    if (names.length > 0) {
+      await this.redis.sadd(GROUP_QUEUE_REGISTRY_KEY, ...names);
+    }
+    return names;
+  }
+
+  private async scanReadyKeyNames(): Promise<string[]> {
     const names = new Set<string>();
     let cursor = "0";
     do {
@@ -240,15 +296,39 @@ export class QueueRedisRepository implements QueueRepository {
     const blockedKey = `${prefix}blocked`;
     const dlqKey = `${prefix}dlq`;
     const totalPendingKey = `${prefix}stats:total-pending`;
+    const parkedTenantsKey = `${prefix}parked-tenants`;
 
-    const [readyCount, blockedCount, dlqCount, topReadyMembers, totalPendingRaw] =
-      await Promise.all([
-        this.redis.zcard(readyKey),
-        this.redis.scard(blockedKey),
-        this.redis.scard(dlqKey),
-        this.redis.zrevrange(readyKey, offset, offset + limit - 1, "WITHSCORES"),
-        this.redis.get(totalPendingKey),
-      ]);
+    const [
+      readyCount,
+      blockedCount,
+      dlqCount,
+      topReadyMembers,
+      totalPendingRaw,
+      parkedTenants,
+    ] = await Promise.all([
+      this.redis.zcard(readyKey),
+      this.redis.scard(blockedKey),
+      this.redis.scard(dlqKey),
+      this.redis.zrevrange(readyKey, offset, offset + limit - 1, "WITHSCORES"),
+      this.redis.get(totalPendingKey),
+      this.redis.smembers(parkedTenantsKey),
+    ]);
+
+    // Sum parked depth across the tenants currently over cap. The registry set
+    // is tiny (one entry per over-cap tenant), so this is a single SMEMBERS plus
+    // one ZCARD per parked tenant — effectively free in the cap=0 steady state
+    // where the registry is empty.
+    let parkedGroupCount = 0;
+    if (parkedTenants.length > 0) {
+      const parkedPipeline = this.redis.pipeline();
+      for (const tenantId of parkedTenants) {
+        parkedPipeline.zcard(`${prefix}parked:${tenantId}`);
+      }
+      const parkedResults = await parkedPipeline.exec();
+      for (const [err, val] of parkedResults ?? []) {
+        if (!err) parkedGroupCount += Number(val) || 0;
+      }
+    }
 
     const groupIds: string[] = [];
     const readyScores = new Map<string, number>();
@@ -418,6 +498,7 @@ export class QueueRedisRepository implements QueueRepository {
       activeGroupCount,
       totalPendingJobs,
       dlqCount,
+      parkedGroupCount,
       groups,
     };
   }
@@ -601,6 +682,7 @@ export class QueueRedisRepository implements QueueRepository {
       `${prefix}signal`,
       `${prefix}group:${params.groupId}:error`,
       params.groupId,
+      String(Date.now()),
     );
     return { wasBlocked: result === 1 };
   }
@@ -636,6 +718,7 @@ export class QueueRedisRepository implements QueueRepository {
           `${prefix}signal`,
           `${prefix}group:${groupId}:error`,
           groupId,
+          String(Date.now()),
         );
       }
       const results = await pipeline.exec();
@@ -656,7 +739,7 @@ export class QueueRedisRepository implements QueueRepository {
     const prefix = `${params.queueName}:gq:`;
     const result = await this.redis.eval(
       DRAIN_GROUP_LUA,
-      7,
+      8,
       `${prefix}group:${params.groupId}:jobs`,
       `${prefix}group:${params.groupId}:data`,
       `${prefix}group:${params.groupId}:active`,
@@ -664,6 +747,7 @@ export class QueueRedisRepository implements QueueRepository {
       `${prefix}blocked`,
       `${prefix}signal`,
       `${prefix}group:${params.groupId}:error`,
+      `${prefix}stats:total-pending`,
       params.groupId,
     );
     return { jobsRemoved: Number(result) };
@@ -699,6 +783,140 @@ export class QueueRedisRepository implements QueueRepository {
     queueName: string;
   }): Promise<string[]> {
     return this.redis.smembers(`${params.queueName}:gq:paused-jobs`);
+  }
+
+  // Tenant pause: encoded as a special "tenant:<id>" entry in the same
+  // paused-jobs SET that DISPATCH_LUA already consults. The Lua dispatcher
+  // extracts the tenantId from each groupId (everything before the first
+  // "/") and checks SISMEMBER for "tenant:<id>". Added post-2026-05-11
+  // incident so an operator can halt ALL processing for a runaway tenant
+  // without touching pipeline keys. See specs/queue-pausing/.
+  static readonly TENANT_PAUSE_PREFIX = "tenant:";
+
+  async pauseTenant(params: {
+    queueName: string;
+    tenantId: string;
+  }): Promise<void> {
+    await this.redis.sadd(
+      `${params.queueName}:gq:paused-jobs`,
+      `${QueueRedisRepository.TENANT_PAUSE_PREFIX}${params.tenantId}`,
+    );
+  }
+
+  async unpauseTenant(params: {
+    queueName: string;
+    tenantId: string;
+  }): Promise<void> {
+    await this.redis.srem(
+      `${params.queueName}:gq:paused-jobs`,
+      `${QueueRedisRepository.TENANT_PAUSE_PREFIX}${params.tenantId}`,
+    );
+    // Kick the dispatcher loop so paused work resumes within the next scan.
+    await this.redis.lpush(`${params.queueName}:gq:signal`, "1");
+  }
+
+  async listPausedTenants(params: {
+    queueName: string;
+  }): Promise<string[]> {
+    const all = await this.redis.smembers(
+      `${params.queueName}:gq:paused-jobs`,
+    );
+    const prefix = QueueRedisRepository.TENANT_PAUSE_PREFIX;
+    return all
+      .filter((k) => k.startsWith(prefix))
+      .map((k) => k.slice(prefix.length));
+  }
+
+  // Bulk-drain every group whose ID starts with "<tenantId>/" for the given
+  // queue, optionally narrowed by a substring filter on the groupId.
+  // Returns the total group count and total job count drained.
+  // Added post-2026-05-11 incident — clicking 500K Drain buttons by hand
+  // wasn't feasible.
+  //
+  // `groupIdContains`: optional plain-text fragment that the groupId
+  // must contain in addition to starting with `<tenantId>/`. Use this to
+  // scope a drain to part of a tenant's groups — for example:
+  //   - "/fold/projectDailySdkUsage/" → drop only that fold's groups
+  //   - "/reactor/customEvaluationSync/" → drop only this reactor's groups
+  //   - "/map/spanStorage/" → drop only the span-storage map groups
+  // Honest substring semantics (matches the operator's mental model of
+  // what they see in the Groups table): no fancy resolution to pipeline
+  // names — those live in job data which would require an HGET per group
+  // and dominate the latency. Document the groupId shape so operators
+  // know what to type.
+  //
+  // Performance: ZSCAN pages 1000 groupIds at a time, then ALL matching
+  // DRAIN_GROUP_LUA EVALs for that page are issued as a single Redis
+  // pipeline. At 500K groups → ~500 page round-trips instead of 500,000
+  // sequential ones. The PR-#3970 production drain of 507K groups took
+  // 4 min via a similar pipelined approach; the previous one-at-a-time
+  // shape would have been ~tens of minutes through TLS+ElastiCache.
+  async drainTenant(params: {
+    queueName: string;
+    tenantId: string;
+    groupIdContains?: string;
+  }): Promise<{ groupsDrained: number; jobsDrained: number }> {
+    const prefix = `${params.queueName}:gq:`;
+    const readyKey = `${prefix}ready`;
+    const totalPendingKey = `${prefix}stats:total-pending`;
+    const tenantPrefix = `${params.tenantId}/`;
+    const contains = params.groupIdContains ?? null;
+
+    let cursor = "0";
+    let groupsDrained = 0;
+    let jobsDrained = 0;
+    const SCAN_BATCH = 1000;
+
+    do {
+      const [next, members] = await this.redis.zscan(
+        readyKey,
+        cursor,
+        "COUNT",
+        SCAN_BATCH,
+      );
+      cursor = next;
+
+      // members alternates [groupId, score, groupId, score, ...] — collect
+      // just the groupIds that match our tenant prefix (and the optional
+      // groupIdContains fragment, if set).
+      const matched: string[] = [];
+      for (let i = 0; i < members.length; i += 2) {
+        const groupId = members[i]!;
+        if (!groupId.startsWith(tenantPrefix)) continue;
+        if (contains && !groupId.includes(contains)) continue;
+        matched.push(groupId);
+      }
+      if (matched.length === 0) continue;
+
+      // Pipeline all DRAIN_GROUP_LUA evals for this page into a single
+      // network round-trip. Each EVAL is independent; ioredis batches
+      // them and returns results in the same order.
+      const pipeline = this.redis.pipeline();
+      for (const groupId of matched) {
+        pipeline.eval(
+          DRAIN_GROUP_LUA,
+          8,
+          `${prefix}group:${groupId}:jobs`,
+          `${prefix}group:${groupId}:data`,
+          `${prefix}group:${groupId}:active`,
+          readyKey,
+          `${prefix}blocked`,
+          `${prefix}signal`,
+          `${prefix}group:${groupId}:error`,
+          totalPendingKey,
+          groupId,
+        );
+      }
+      const results = await pipeline.exec();
+      if (!results) continue;
+      for (const [err, value] of results) {
+        if (err) continue;
+        groupsDrained++;
+        jobsDrained += Number(value);
+      }
+    } while (cursor !== "0");
+
+    return { groupsDrained, jobsDrained };
   }
 
   // ── DLQ Operations ──────────────────────────────────────────────
@@ -816,6 +1034,7 @@ export class QueueRedisRepository implements QueueRepository {
       `${prefix}signal`,
       `${prefix}dlq`,
       params.groupId,
+      String(Date.now()),
     );
     return { jobsReplayed: Number(result) };
   }
@@ -868,6 +1087,7 @@ export class QueueRedisRepository implements QueueRepository {
           `${prefix}signal`,
           `${prefix}dlq`,
           groupId,
+          String(Date.now()),
         );
       }
       const results = await pipeline.exec();
@@ -939,6 +1159,7 @@ export class QueueRedisRepository implements QueueRepository {
         `${prefix}signal`,
         `${prefix}dlq`,
         groupId,
+        String(Date.now()),
       );
     }
     const results = await pipeline.exec();
@@ -1000,6 +1221,7 @@ export class QueueRedisRepository implements QueueRepository {
         `${prefix}signal`,
         `${prefix}group:${groupId}:error`,
         groupId,
+        String(Date.now()),
       );
     }
     const results = await unblockPipeline.exec();
@@ -1204,6 +1426,105 @@ export class QueueRedisRepository implements QueueRepository {
         .map(([message, count]) => ({ message, count }))
         .sort((a, b) => b.count - a.count),
     };
+  }
+
+  // ── Counter Reconciliation ──────────────────────────────────────
+
+  /**
+   * Reconcile the total-pending counter against the live ground truth.
+   *
+   * WHY: The `total-pending` counter is incremented at dispatch (INCR) and
+   * decremented at complete (DECR), but several paths leak without a DECR:
+   *   - worker death after dispatch but before complete
+   *   - the 6-hour `:jobs` TTL reaping a group without a DECR
+   *   - MOVE_TO_DLQ_LUA which deletes `:jobs` without decrementing the counter
+   * Over time the counter drifts upward. Since it is read-only ops metadata
+   * (drives the dashboard "pending" tile), overwriting it with the ZCARD-derived
+   * ground truth is safe and does not affect dispatch correctness.
+   *
+   * The ground truth is the authoritative Σ ZCARD over ALL `group:*:jobs` keys
+   * for this queue — intentionally the complete count, distinct from the top-N
+   * sampled per-group dashboard tile.
+   *
+   * A small re-drift from concurrent dispatch/complete INCR/DECR during the SET
+   * window is acceptable and self-corrects on the next scheduled cycle.
+   *
+   * The single-flight window default is shorter than the collector's reconcile
+   * interval so each scheduled cycle can acquire the marker while still guarding
+   * against multi-pod overlap.
+   *
+   * The reconcile is single-flighted per `singleFlightWindowMs` so only one
+   * pod recomputes per window. It is intentionally off the hot dispatch path.
+   *
+   * See issue #4683.
+   */
+  async reconcileTotalPending(
+    queueName: string,
+    singleFlightWindowMs = 55_000,
+  ): Promise<ReconcileResult | null> {
+    const prefix = `${queueName}:gq:`;
+    const counterKey = `${prefix}stats:total-pending`;
+    const markerKey = `${prefix}stats:pending-recon-ts`;
+
+    // Single-flight gate: only one pod/cycle runs per window.
+    const acquired = await this.redis.set(
+      markerKey,
+      String(Date.now()),
+      "PX",
+      singleFlightWindowMs,
+      "NX",
+    );
+    if (acquired !== "OK") return null;
+
+    // Read the pre-reconcile counter.
+    const raw = await this.redis.get(counterKey);
+    const counter = Math.max(0, parseInt(raw ?? "0", 10) || 0);
+
+    // Enumerate all group-jobs zsets via SCAN.
+    const jobsKeys: string[] = [];
+    const matchPattern = `${prefix}group:*:jobs`;
+    let cursor = "0";
+    do {
+      const [nextCursor, keys] = await this.redis.scan(
+        cursor,
+        "MATCH",
+        matchPattern,
+        "COUNT",
+        PENDING_RECONCILE_SCAN_COUNT,
+      );
+      cursor = nextCursor;
+      for (const key of keys) {
+        jobsKeys.push(key);
+      }
+    } while (cursor !== "0");
+
+    // Pipeline ZCARD for every collected key and sum the results.
+    // If ANY pipeline entry errors, abort — a flaky ZCARD must never write
+    // a partial under-count as ground truth; the next cycle retries.
+    let groundTruth = 0;
+    if (jobsKeys.length > 0) {
+      const pipeline = this.redis.pipeline();
+      for (const key of jobsKeys) {
+        pipeline.zcard(key);
+      }
+      const results = await pipeline.exec();
+      if (results) {
+        for (const [err, val] of results) {
+          if (err) {
+            logger.warn({ error: err }, "ZCARD pipeline error during pending reconcile — aborting to avoid under-count");
+            return null;
+          }
+          groundTruth += Number(val) || 0;
+        }
+      }
+    }
+
+    const drift = counter - groundTruth;
+
+    // Overwrite the counter with the ground truth.
+    await this.redis.set(counterKey, String(groundTruth));
+
+    return { counter, groundTruth, drift };
   }
 
   // ── Private Filter Helpers ──────────────────────────────────────

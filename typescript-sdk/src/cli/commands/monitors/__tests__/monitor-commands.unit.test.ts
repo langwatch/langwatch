@@ -58,7 +58,7 @@ describe("listMonitorsCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetch = vi.fn();
-    global.fetch = mockFetch;
+    global.fetch = mockFetch as unknown as typeof fetch;
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -101,7 +101,7 @@ describe("getMonitorCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetch = vi.fn();
-    global.fetch = mockFetch;
+    global.fetch = mockFetch as unknown as typeof fetch;
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -132,7 +132,7 @@ describe("createMonitorCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetch = vi.fn();
-    global.fetch = mockFetch;
+    global.fetch = mockFetch as unknown as typeof fetch;
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -167,7 +167,7 @@ describe("updateMonitorCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetch = vi.fn();
-    global.fetch = mockFetch;
+    global.fetch = mockFetch as unknown as typeof fetch;
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -200,7 +200,7 @@ describe("deleteMonitorCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetch = vi.fn();
-    global.fetch = mockFetch;
+    global.fetch = mockFetch as unknown as typeof fetch;
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();

@@ -60,11 +60,24 @@ export interface CustomersAndLabelsResult {
 
 /**
  * Result structure for getDistinctFieldNames.
- * Returns unique span names and metadata keys for a project.
+ * Returns unique span names, metadata keys and evaluator names for a project,
+ * so field-mapping dropdowns can offer every name the project produced (not
+ * just the ones on the currently loaded trace).
+ *
+ * Evaluation entries carry the evaluator id as `key` and its display name as
+ * `label`; the other arrays use the name for both.
+ *
+ * Event types are intentionally not included here: they live only inside the
+ * heavy `stored_spans.SpanAttributes` map (the trace_summaries event columns
+ * were dropped in migration 00025), so scanning them in this query would
+ * materialise that column — exactly the OOM/IO vector the memory-safety guard
+ * protects against. The events dropdown instead gets its project-wide options
+ * from the bounded analytics event-type filter query (see useProjectEventTypes).
  */
 export interface DistinctFieldNamesResult {
   spanNames: Array<{ key: string; label: string }>;
   metadataKeys: Array<{ key: string; label: string }>;
+  evaluationNames: Array<{ key: string; label: string }>;
 }
 
 /**

@@ -24,8 +24,16 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
+
+	otelapi "go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/baggage"
+	"go.opentelemetry.io/otel/propagation"
+
+	"github.com/langwatch/langwatch/pkg/otelsetup"
+	"github.com/langwatch/langwatch/services/nlpgo/adapters/httpapi"
 )
 
 // Executor runs a single evaluator block invocation.
@@ -93,14 +101,14 @@ type Request struct {
 // Result is the executor's parsed output. Mirrors the Python
 // EvaluationResultWithMetadata shape so engine output is consumer-stable.
 type Result struct {
-	Status   string         // "processed" | "skipped" | "error"
-	Score    *float64       // nil when not produced
-	Passed   *bool          // nil when not produced
-	Details  string         // free-text explanation; non-empty on skipped/error
-	Label    string         // optional category label
-	Cost     *Money         // nil when not produced
-	Inputs   map[string]any // echo of Data, useful for trace surfacing
-	Duration time.Duration  // wall-clock; sender-side measurement
+	Status   string          // "processed" | "skipped" | "error"
+	Score    *float64        // nil when not produced
+	Passed   *bool           // nil when not produced
+	Details  string          // free-text explanation; non-empty on skipped/error
+	Label    string          // optional category label
+	Cost     *Money          // nil when not produced
+	Inputs   map[string]any  // echo of Data, useful for trace surfacing
+	Duration time.Duration   // wall-clock; sender-side measurement
 	Raw      json.RawMessage // full upstream body for diagnostics
 }
 
@@ -150,8 +158,21 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 		return nil, err
 	}
 
+	// Coercion is scoped to the default langevals/* string-input path,
+	// where the receiving Pydantic schema declares every field as `str`
+	// and would reject a raw bool/number with "Expected string, received
+	// boolean". Saved (`evaluators/*`) and workflow (`custom/*`)
+	// evaluators carry their own typed field definitions
+	// (bool/float/int/dict/json_schema) and the app side resolves them
+	// against the evaluator's declared inputs, so the data payload must
+	// stay pass-through here — coercing would silently convert typed
+	// fields to strings before the receiving evaluator can validate them.
+	data := req.Data
+	if strings.HasPrefix(req.EvaluatorSlug, "langevals/") {
+		data = coerceData(req.Data)
+	}
 	body := map[string]any{
-		"data": req.Data,
+		"data": data,
 	}
 	if req.Name != "" {
 		body["name"] = req.Name
@@ -186,6 +207,18 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	}
 	if req.ThreadID != "" {
 		httpReq.Header.Set("X-LangWatch-Thread-Id", req.ThreadID)
+	}
+
+	// Propagate W3C trace context + baggage on the outbound call so the
+	// receiving service sees us as the parent span and inherits our
+	// causality_depth. The reactor in langwatch/app uses this to skip
+	// re-dispatching evaluations on spans we emit. See
+	// specs/monitors/online-evaluator-loop-prevention.feature.
+	otelapi.GetTextMapPropagator().Inject(reqCtx, propagation.HeaderCarrier(httpReq.Header))
+	if depth := currentCausalityDepthFromBaggage(reqCtx); depth > 0 {
+		// Also surface as a plain header for non-OTel consumers (eg.
+		// langwatch app's collector reads this directly).
+		httpReq.Header.Set(httpapi.CausalityDepthHeader, strconv.Itoa(depth))
 	}
 
 	start := time.Now()
@@ -283,6 +316,22 @@ func parseResult(body []byte) (*Result, error) {
 		Label:   u.Label,
 		Cost:    u.Cost,
 	}, nil
+}
+
+// currentCausalityDepthFromBaggage reads the depth set by the httpapi
+// inbound handler (applyInboundCausality). Returns 0 when absent so
+// callers outside an evaluator request (eg. direct invocations) don't
+// emit a spurious header.
+func currentCausalityDepthFromBaggage(ctx context.Context) int {
+	m := baggage.FromContext(ctx).Member(otelsetup.BaggageKeyCausalityDepth)
+	if m.Key() == "" {
+		return 0
+	}
+	v, err := strconv.Atoi(m.Value())
+	if err != nil || v < 0 {
+		return 0
+	}
+	return v
 }
 
 func truncate(b []byte, n int) string {

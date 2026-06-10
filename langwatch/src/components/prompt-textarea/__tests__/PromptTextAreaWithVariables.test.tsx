@@ -8,6 +8,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { forwardRef } from "react";
@@ -192,6 +193,21 @@ describe("PromptTextAreaWithVariables", () => {
       await user.hover(textareaContainer);
 
       expect(screen.queryByText("Add variable")).not.toBeInTheDocument();
+    });
+
+    /** @scenario The add-variable and add-logic buttons sit on a solid background */
+    it("renders Add logic and Add variable inside a single solid pill wrapper", async () => {
+      const user = userEvent.setup();
+      const { container } = renderComponent({ showAddContextButton: true });
+
+      const textareaContainer = container.firstChild as HTMLElement;
+      await user.hover(textareaContainer);
+
+      const pill = await screen.findByTestId("add-context-buttons");
+      // Both buttons share the same solid background wrapper so the message
+      // text behind them cannot bleed through the labels.
+      expect(within(pill).getByText("Add logic")).toBeInTheDocument();
+      expect(within(pill).getByText("Add variable")).toBeInTheDocument();
     });
   });
 

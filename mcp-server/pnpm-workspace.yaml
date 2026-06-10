@@ -1,2 +1,19 @@
+minimumReleaseAge: 10080
+
+overrides:
+  # Security: protobufjs code execution + prototype-pollution + DoS
+  # (GHSA-xq3m-2v4x-88gg, GHSA-66ff-xgx4-vchm, GHSA-75px-5xx7-5xc7,
+  # GHSA-jvwf-75h9-cwgg, GHSA-685m-2w69-288q)
+  "protobufjs": ">=7.5.6 <8.0.0 || >=8.0.2"
+  # Security: langsmith untrusted manifest deserialization (GHSA-3644-q5cj-c5c7).
+  # langsmith is only a transitive of the @langwatch/scenario devDependency
+  # (via langchain / @langchain/core); pinned to a known-safe version.
+  "langsmith": "0.6.0"
+  # Security: fast-uri path traversal + host confusion
+  "fast-uri@<3.1.2": "3.1.2"
+  liquidjs: ">=10.26.0"
+  # Security: uuid missing buffer bounds check in v3/v5/v6 (GHSA-w5hq-g745-h8pq)
+  "uuid@<11.1.1": ">=11.1.1 <12"
+
 onlyBuiltDependencies:
   - node-pty

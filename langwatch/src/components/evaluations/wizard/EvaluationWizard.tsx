@@ -55,7 +55,7 @@ export function EvaluationWizard({ isLoading }: { isLoading: boolean }) {
     <ReactFlowProvider>
       <WizardProvider isInsideWizard={true}>
         <PostEventProvider>
-          <Dialog.Content width="full" height="full" minHeight="fit-content">
+          <Dialog.Content bg="bg" width="full" height="full" minHeight="fit-content">
             <Dialog.CloseTrigger />
             <Dialog.Header
               background="bg.surface"

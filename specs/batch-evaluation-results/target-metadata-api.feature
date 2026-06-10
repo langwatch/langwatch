@@ -3,6 +3,15 @@ Feature: Python SDK Target Metadata API
   I want to log evaluation metrics with target metadata
   So that I can compare different models, prompts, and configurations
 
+  # All `@unimplemented` scenarios in this file describe Python SDK
+  # behaviour. The `check-feature-parity` script's TEST_FILE_RE only
+  # matches `*.test.ts/tsx`, so the existing pytest suite under
+  # `python-sdk/tests/experiment/test_target_registration.py` and
+  # `test_with_target.py` cannot bind via JSDoc today. See the
+  # AUDIT_MANIFEST.md for the per-scenario test mapping.
+  # Cheap structural fix: extend the parity scanner to read pytest
+  # docstring tags. Tracked alongside the python-sdk domain.
+
   Background:
     Given I have initialized an evaluation with langwatch.evaluation.init("my-experiment")
     And I am iterating over a dataset with evaluation.loop()

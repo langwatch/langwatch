@@ -11,11 +11,14 @@ import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
  * - `activePlan`: full plan object (or undefined if loading)
  */
 export function useActivePlan() {
-  const { organization } = useOrganizationTeamProject();
+  const { organization, hasPermission } = useOrganizationTeamProject();
 
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization?.id ?? "" },
-    { enabled: !!organization?.id },
+    {
+      enabled: !!organization?.id && hasPermission("organization:view"),
+      retry: false,
+    },
   );
 
   return {

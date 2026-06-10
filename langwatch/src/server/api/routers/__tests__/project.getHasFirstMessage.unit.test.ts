@@ -80,6 +80,7 @@ describe("project.getHasFirstMessage", () => {
   });
 
   describe("when project has received traces", () => {
+    /** @scenario Shows Integration configured alert when firstMessage exists */
     it("returns firstMessage as true", async () => {
       mockGetById.mockResolvedValueOnce({ firstMessage: true });
 
@@ -93,6 +94,7 @@ describe("project.getHasFirstMessage", () => {
   });
 
   describe("when project has not received traces", () => {
+    /** @scenario Shows Waiting for messages when no firstMessage */
     it("returns firstMessage as false", async () => {
       mockGetById.mockResolvedValueOnce({ firstMessage: false });
 

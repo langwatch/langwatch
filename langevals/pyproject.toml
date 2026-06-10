@@ -9,12 +9,13 @@ dependencies = [
     "pytest>=8.1.2",
     "fastapi>=0.115.11",
     "pydantic>=2.4.0",
-    "python-dotenv==1.0.1",
+    "python-dotenv==1.2.2",
     "mangum>=0.17.0",
     "pandas>=2.2.2",
     "markdown>=3.6",
     "uvicorn>=0.29.0",
     "gunicorn>=23.0.0",
+    "httpx>=0.27.0",
     "nest-asyncio>=1.6.0",
     "pip-licenses>=5.5.0",
     "langevals-core",
@@ -64,6 +65,18 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["langevals"]
+
+[tool.uv]
+exclude-newer = "7 days"
+override-dependencies = [
+    "langchain>=0.3.30",
+    "langsmith>=0.8.0",
+    # Force a patched strawberry-graphql (GHSA-fr49-mhgj-crfc, GHSA-qfwv-87qj-98xq,
+    # GHSA-x97m-qp5c-w9xj). arize-phoenix 14.6.0 pins it to 0.314.3; the patched
+    # 0.316.0 is API-compatible with Phoenix and is the version Phoenix itself moved
+    # to in 16.4.0.
+    "strawberry-graphql>=0.316.0",
+]
 
 [tool.uv.workspace]
 members = [

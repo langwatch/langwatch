@@ -130,6 +130,7 @@ describe("assertMemberTypeLimitNotExceeded", () => {
   });
 
   describe("when changeType is lite-to-full", () => {
+    /** @scenario Allows upgrade from Lite Member to full member when under limit */
     it("allows change when under limit", async () => {
       const mockRepo = createMockRepo(3); // 3 members, limit is 5
       const limits = createLimits(5);
@@ -160,6 +161,7 @@ describe("assertMemberTypeLimitNotExceeded", () => {
       expect(mockNotifyResourceLimitReached).not.toHaveBeenCalled();
     });
 
+    /** @scenario Blocks upgrade from Lite Member to full member when at member limit */
     it("throws when at limit", async () => {
       const mockRepo = createMockRepo(5); // 5 members, limit is 5
       const limits = createLimits(5);

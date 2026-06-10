@@ -18,6 +18,7 @@ const COLORS = {
   failed: { stroke: "#ef4444", fill: "#ef4444" },
   pending: "#a78bfa",
   blocked: "#f97316",
+  parked: "#eab308",
 };
 
 interface ChartPoint {
@@ -27,6 +28,7 @@ interface ChartPoint {
   failed: number;
   pending: number;
   blocked: number;
+  parked: number;
 }
 
 const BUCKET_OPTIONS = [
@@ -53,6 +55,7 @@ function downsample(
       failed: point.failedPerSec,
       pending: point.pendingCount,
       blocked: point.blockedCount,
+      parked: point.parkedCount,
     }));
   }
 
@@ -71,6 +74,7 @@ function downsample(
       existing.sum.failed += point.failedPerSec;
       existing.sum.pending += point.pendingCount;
       existing.sum.blocked += point.blockedCount;
+      existing.sum.parked += point.parkedCount;
       existing.count++;
     } else {
       buckets.set(bucketKey, {
@@ -81,6 +85,7 @@ function downsample(
           failed: point.failedPerSec,
           pending: point.pendingCount,
           blocked: point.blockedCount,
+          parked: point.parkedCount,
         },
         count: 1,
       });
@@ -96,6 +101,7 @@ function downsample(
       failed: sum.failed / count,
       pending: Math.round(sum.pending / count),
       blocked: Math.round(sum.blocked / count),
+      parked: Math.round(sum.parked / count),
     });
   }
 
@@ -169,10 +175,10 @@ function CustomTooltip({
   if (!active || !payload?.length || label == null) return null;
 
   const rates = payload.filter(
-    (p) => p.name !== "Pending" && p.name !== "Blocked",
+    (p) => p.name !== "Pending" && p.name !== "Blocked" && p.name !== "Parked",
   );
   const counts = payload.filter(
-    (p) => p.name === "Pending" || p.name === "Blocked",
+    (p) => p.name === "Pending" || p.name === "Blocked" || p.name === "Parked",
   );
 
   return (
@@ -237,6 +243,7 @@ function CustomLegend({ showCounts }: { showCounts: boolean }) {
       ? [
           { name: "Pending", color: COLORS.pending, type: "line" as const },
           { name: "Blocked", color: COLORS.blocked, type: "line" as const },
+          { name: "Parked", color: COLORS.parked, type: "line" as const },
         ]
       : []),
   ];
@@ -300,14 +307,14 @@ export function ThroughputChart({ data }: { data: DashboardData }) {
   }, [chartData]);
 
   const hasCountData = useMemo(() => {
-    return chartData.some((p) => p.pending > 0 || p.blocked > 0);
+    return chartData.some((p) => p.pending > 0 || p.blocked > 0 || p.parked > 0);
   }, [chartData]);
 
   const yMaxRight = useMemo(() => {
     if (!hasCountData) return 10;
     let max = 0;
     for (const p of chartData) {
-      max = Math.max(max, p.pending, p.blocked);
+      max = Math.max(max, p.pending, p.blocked, p.parked);
     }
     return max <= 0 ? 10 : niceMax(max * 1.3);
   }, [chartData, hasCountData]);
@@ -481,6 +488,19 @@ export function ThroughputChart({ data }: { data: DashboardData }) {
             dot={false}
             activeDot={{ r: 2, strokeWidth: 0 }}
             name="Blocked"
+            isAnimationActive={false}
+          />
+          <Line
+            yAxisId={hasCountData ? "count" : "rate"}
+            type="monotone"
+            dataKey="parked"
+            stroke={COLORS.parked}
+            strokeWidth={1}
+            strokeOpacity={0.6}
+            strokeDasharray="4 3"
+            dot={false}
+            activeDot={{ r: 2, strokeWidth: 0 }}
+            name="Parked"
             isAnimationActive={false}
           />
         </AreaChart>

@@ -1,4 +1,14 @@
 Feature: License Enforcement
+
+  # The maxMembersLite-default scenario below is bound. The remaining
+  # @unimplemented scenarios in this file are either UI-level (settings
+  # menu placement, license-card field listing, Infinity rendering — need
+  # a page-level component test against the License settings page) or
+  # require an end-to-end "store license → retrieve license" fixture
+  # against a live database that does not exist yet outside
+  # licenseHandler.integration.test.ts. Aspirational pending the page
+  # test harness and a richer license-status response schema.
+
   As a self-hosted LangWatch administrator
   I want license enforcement to manage plan limits
   So that the system enforces appropriate limits based on organization licenses
@@ -10,25 +20,12 @@ Feature: License Enforcement
   # maxMembersLite in License Schema
   # ============================================================================
 
-  @unit @unimplemented
+  @unit
   Scenario: License schema accepts maxMembersLite as optional field
     Given a license payload with maxMembersLite set to 5
     When the license is validated
     Then the license should be valid
     And maxMembersLite should be 5 in the parsed license data
-
-  @unit @unimplemented
-  Scenario: License schema defaults maxMembersLite when not provided
-    Given a license payload without maxMembersLite
-    When the license is validated
-    Then the license should be valid
-    And maxMembersLite should default to 1 in the plan info
-
-  @unit @unimplemented
-  Scenario: License plan mapping preserves maxMembersLite
-    Given a validated license with maxMembersLite set to 10
-    When the license is mapped to PlanInfo
-    Then the PlanInfo should have maxMembersLite equal to 10
 
   @integration @unimplemented
   Scenario: License with maxMembersLite is stored and retrieved correctly
@@ -41,13 +38,13 @@ Feature: License Enforcement
   # PlanInfo Type Updates (maxMembers and maxMembersLite defaults)
   # ============================================================================
 
-  @unit @unimplemented
+  @unit
   Scenario: PlanInfo defaults maxMembers to 1 when not specified
     Given a plan without explicit maxMembers
     When the plan is constructed
     Then maxMembers should default to 1
 
-  @unit @unimplemented
+  @unit
   Scenario: PlanInfo defaults maxMembersLite to 1 when not specified
     Given a plan without explicit maxMembersLite
     When the plan is constructed
@@ -101,43 +98,14 @@ Feature: License Enforcement
     And the response should include currentMessagesPerMonth and maxMessagesPerMonth
     And the response should include currentEvaluationsCredit and maxEvaluationsCredit
 
-  @unit @unimplemented
+  @unit
   Scenario: License details card handles Infinity display
     Given an organization with UNLIMITED_PLAN
     When the license details are rendered
     Then limits should display "Unlimited" instead of Infinity
     And limits should display "Unlimited" instead of 999999
 
-  @integration @unimplemented
-  Scenario: License status counts current resource usage
-    Given an organization with:
-      | members              | 3 |
-      | lite_members         | 2 |
-      | projects             | 5 |
-      | prompts              | 10 |
-      | workflows            | 8 |
-      | scenarios            | 4 |
-      | evaluators           | 6 |
-      | messages_per_month   | 500 |
-      | evaluations_credit   | 25 |
-    When the license status is requested
-    Then currentMembers should be 3
-    And currentMembersLite should be 2
-    And currentProjects should be 5
-    And currentPrompts should be 10
-    And currentWorkflows should be 8
-    And currentScenarios should be 4
-    And currentEvaluators should be 6
-    And currentMessagesPerMonth should be 500
-    And currentEvaluationsCredit should be 25
-
   # ============================================================================
   # Backward Compatibility
   # ============================================================================
 
-  @integration @unimplemented
-  Scenario: Existing licenses without maxMembersLite remain valid
-    Given an existing license without maxMembersLite field
-    When the license is validated
-    Then the license should be valid
-    And maxMembersLite should default to 1

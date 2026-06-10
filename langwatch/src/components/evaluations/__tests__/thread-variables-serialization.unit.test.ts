@@ -2,7 +2,7 @@
  * @vitest-environment node
  *
  * Unit tests for thread variable serialization/deserialization.
- * Feature: specs/features/evaluations-v3/thread-variables-in-trace-evaluator.feature
+ * Feature: specs/features/experiments-v3/thread-variables-in-trace-evaluator.feature
  *
  * Tests the real serializeMappingsToMappingState and deserializeMappingStateToUI
  * functions from the shared mappingSerialization module.
@@ -18,12 +18,10 @@ import { deserializeMappingStateToUI } from "../utils/deserializeMappingStateToU
 // ---------------------------------------------------------------------------
 
 describe("Feature: Thread variables available in trace-level evaluator input mapping", () => {
-  // -------------------------------------------------------------------------
-  // @unit Scenario: Serialization marks thread sources with type "thread" including SERVER_ONLY_THREAD_SOURCES
-  // -------------------------------------------------------------------------
   describe("serializeMappingsToMappingState()", () => {
     describe("given a trace-level evaluator with 'conversation' mapped to 'thread.formatted_traces'", () => {
       describe("when the mapping is serialized to MappingState", () => {
+        /** @scenario 'Serialization marks thread sources with type "thread" including SERVER_ONLY_THREAD_SOURCES' */
         it("marks the 'conversation' entry with type 'thread' and source 'formatted_traces'", () => {
           const uiMappings: Record<string, UIFieldMapping> = {
             conversation: {
@@ -81,12 +79,10 @@ describe("Feature: Thread variables available in trace-level evaluator input map
     });
   });
 
-  // -------------------------------------------------------------------------
-  // @unit Scenario: Deserialization assigns sourceId "thread" for thread-typed mappings at trace level
-  // -------------------------------------------------------------------------
   describe("deserializeMappingStateToUI()", () => {
     describe("given a saved trace-level monitor with a thread-typed mapping for 'conversation'", () => {
       describe("when the mapping is deserialized for the UI", () => {
+        /** @scenario 'Deserialization assigns sourceId "thread" for thread-typed mappings at trace level' */
         it("assigns sourceId 'thread' to the 'conversation' field", () => {
           const savedMappings: MappingState = {
             mapping: {

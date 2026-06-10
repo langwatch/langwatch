@@ -45,6 +45,8 @@ vi.mock("~/utils/api", () => ({
               targets: [],
               repeatCount: 1,
               labels: [],
+              simulatorModel: null,
+              judgeModel: null,
               archivedAt: null,
               createdAt: new Date(),
               updatedAt: new Date(),
@@ -163,6 +165,9 @@ describe("All Runs default selection (Issue #1771)", () => {
   });
 
   describe("when the page loads with no suite param in URL", () => {
+    /** @scenario "All Runs is selected when page loads" */
+    /** @scenario "Run rows are expanded by default" */
+    /** @scenario "All runs panel rows are expanded by default" */
     it("selects 'All Runs' as the default sidebar item and displays the All Runs panel", async () => {
       mockRouterQuery = { project: "my-project" };
 
@@ -179,6 +184,7 @@ describe("All Runs default selection (Issue #1771)", () => {
   });
 
   describe("when the user archives the selected suite", () => {
+    /** @scenario "All Runs is selected after deleting the current suite" */
     it("navigates to all-runs after archiving", async () => {
       // Start with a suite selected in the URL (catch-all path)
       mockRouterQuery = { project: "my-project", path: ["run-plans", "my-suite"] };

@@ -266,8 +266,8 @@ describe("memory-safety integration", () => {
   describe("when executing generated analytics queries against ClickHouse", () => {
     for (const { label, series } of REPRESENTATIVE_METRICS) {
       // Skipped: requires live ClickHouse. Run with testcontainers or make dev-full to enable.
-      const itFn = label === "events.event_details (cardinality)" ? it.skip : it;
-      itFn(`executes valid SQL for ${label}`, async () => {
+      const skip = label === "events.event_details (cardinality)";
+      const body = async () => {
         const { sql, params } = buildQuery(series);
 
         // Execute the query — ClickHouse will throw on syntax/schema errors
@@ -279,7 +279,13 @@ describe("memory-safety integration", () => {
 
         // Drain the result to ensure full execution
         await result.json();
-      });
+      };
+      if (skip) {
+        it.skip(`executes valid SQL for ${label}`, body);
+      } else {
+        /** @scenario All generated analytics queries are valid ClickHouse SQL */
+        it(`executes valid SQL for ${label}`, body);
+      }
     }
   });
 
@@ -310,8 +316,8 @@ describe("memory-safety integration", () => {
 
     for (const { label, series } of REPRESENTATIVE_METRICS) {
       // Skipped: requires live ClickHouse. Run with testcontainers or make dev-full to enable.
-      const itFn = label === "events.event_details (cardinality)" ? it.skip : it;
-      itFn(`completes ${label} within 50MB memory budget`, async () => {
+      const skip = label === "events.event_details (cardinality)";
+      const body = async () => {
         resetParamCounter();
         const { sql, params } = buildTimeseriesQuery({
           ...baseInput,
@@ -342,7 +348,13 @@ describe("memory-safety integration", () => {
           // Re-throw non-memory errors (these are real bugs)
           throw error;
         }
-      });
+      };
+      if (skip) {
+        it.skip(`completes ${label} within 50MB memory budget`, body);
+      } else {
+        /** @scenario Analytics queries complete within a tight memory budget */
+        it(`completes ${label} within 50MB memory budget`, body);
+      }
     }
   });
 
@@ -351,8 +363,8 @@ describe("memory-safety integration", () => {
 
     for (const { label, series } of REPRESENTATIVE_METRICS) {
       // Skipped: requires live ClickHouse. Run with testcontainers or make dev-full to enable.
-      const itFn = label === "events.event_details (cardinality)" ? it.skip : it;
-      itFn(`completes ${label} within ${TIME_BUDGET_MS}ms`, async () => {
+      const skip = label === "events.event_details (cardinality)";
+      const body = async () => {
         const { sql, params } = buildQuery(series);
 
         const start = performance.now();
@@ -365,7 +377,13 @@ describe("memory-safety integration", () => {
         const elapsed = performance.now() - start;
 
         expect(elapsed).toBeLessThan(TIME_BUDGET_MS);
-      });
+      };
+      if (skip) {
+        it.skip(`completes ${label} within ${TIME_BUDGET_MS}ms`, body);
+      } else {
+        /** @scenario Analytics queries complete within time budget on seeded data */
+        it(`completes ${label} within ${TIME_BUDGET_MS}ms`, body);
+      }
     }
   });
 
@@ -415,6 +433,7 @@ describe("memory-safety integration", () => {
       expect(sql).not.toContain("SpanAttributes");
     });
 
+    /** @scenario "Analytics queries complete within a tight memory budget" */
     it("completes total_cost query within 50MB on wide-attribute data", async () => {
       resetParamCounter();
       const { sql, params } = buildTimeseriesQuery({
@@ -535,6 +554,7 @@ describe("memory-safety integration", () => {
   });
 
   describe("when verifying query result correctness on seeded data", () => {
+    /** @scenario Analytics query results are correct on seeded data */
     it("returns expected trace_count for cardinality of metadata.trace_id", async () => {
       // Use "full" timeScale to get a single aggregation across all time
       resetParamCounter();

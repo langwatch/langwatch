@@ -1,4 +1,12 @@
 Feature: Gateway auth cache — hot path is zero RTT after first hit
+
+  # All scenarios in this file describe auth-cache behaviour in the Go
+  # gateway data plane (services/aigateway/). Three-tier cache, JWT
+  # refresh, stale-on-failure fallback — none of this lives in the
+  # TypeScript control plane. The parity check only scans TS test roots,
+  # so these are aspirational at this layer; verified end-to-end via
+  # Go integration tests in services/aigateway/.
+
   The gateway is in the hot path of every LLM request. Auth cannot add
   measurable latency. We keep a three-tier cache (in-mem LRU → optional
   Redis L2 → background refresh + optional bootstrap-pull) and verify the
@@ -16,7 +24,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
     @integration @unimplemented
     Scenario: cold cache -> control plane -> cached for next request
       Given the auth cache is empty
-      And the control plane will sign a JWT for "lw_vk_live_01HZX9K3M000000000000001" with revision 42
+      And the control plane will sign a JWT for "vk-lw-01HZX9K3M000000000000001" with revision 42
       When I send an authenticated request with that key
       Then the gateway calls POST /internal/gateway/resolve-key exactly once
       And the request is authorized
@@ -27,7 +35,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
 
     @integration @unimplemented
     Scenario: control plane down, cached JWT still valid -> request succeeds
-      Given the cache holds a JWT with exp = now + 10 minutes for "lw_vk_live_..."
+      Given the cache holds a JWT with exp = now + 10 minutes for "vk-lw-..."
       And the control plane returns 503 on all endpoints
       When I send a request with that VK
       Then the gateway verifies the JWT locally (signature + exp)
@@ -145,7 +153,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
 
     @integration @unimplemented
     Scenario: revoked VK stops working within 60s without restart
-      Given "lw_vk_live_01HZX9K3M000000000000002" is cached with a valid JWT
+      Given "vk-lw-01HZX9K3M000000000000002" is cached with a valid JWT
       When the platform revokes that VK
       Then the next /changes long-poll returns an event {vk_id, kind: "vk_revoked"}
       And the gateway invalidates every L1 entry matching that vk_id
@@ -176,7 +184,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
 
     @integration @unimplemented
     Scenario: new gateway pod reads a cached bundle from Redis instead of calling /resolve-key
-      Given Redis is configured and pod A has cached VK "lw_vk_live_..." for 3 minutes
+      Given Redis is configured and pod A has cached VK "vk-lw-..." for 3 minutes
       When pod B receives its first request with that VK
       Then pod B finds the bundle in Redis (L2 hit)
       And pod B populates its own L1
@@ -199,7 +207,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
 
     @unit @unimplemented
     Scenario: cache keys are SHA-256 hashes, not raw VK bytes
-      Given a VK "lw_vk_live_01HZX9K3M000000000000001" is resolved
+      Given a VK "vk-lw-01HZX9K3M000000000000001" is resolved
       When I inspect the cache keyset
       Then the key is the 64-char hex SHA-256 of the raw VK
       And the raw VK value is not stored anywhere in the cache entries

@@ -85,7 +85,7 @@ function RolesSettings() {
   );
 }
 
-export default withPermissionGuard("organization:view", {
+export default withPermissionGuard("organization:manage", {
   layoutComponent: SettingsLayout,
 })(RolesSettings);
 
@@ -455,7 +455,7 @@ function RolesManagement({
         open={viewOpen}
         onOpenChange={({ open }) => !open && onViewClose()}
       >
-        <Dialog.Content maxWidth="600px" maxHeight="80vh" overflowY="auto">
+        <Dialog.Content bg="bg" maxWidth="600px" maxHeight="80vh" overflowY="auto">
           <Dialog.Header>
             <Dialog.Title>View Permissions - {viewingRole?.name}</Dialog.Title>
           </Dialog.Header>
@@ -494,7 +494,7 @@ function RolesManagement({
         open={defaultViewOpen}
         onOpenChange={({ open }) => !open && onDefaultViewClose()}
       >
-        <Dialog.Content maxWidth="600px" maxHeight="80vh" overflowY="auto">
+        <Dialog.Content bg="bg" maxWidth="600px" maxHeight="80vh" overflowY="auto">
           <Dialog.Header>
             <Dialog.Title>
               View Permissions - {viewingDefaultRole?.name}

@@ -3,7 +3,7 @@ import ora from "ora";
 import { VirtualKeysApiService } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
-import { virtualKeyDetailUrl } from "./_shared";
+import { formatScope, virtualKeyDetailUrl } from "./_shared";
 
 export const getVirtualKeyCommand = async (id: string, options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -31,7 +31,8 @@ export const getVirtualKeyCommand = async (id: string, options?: { format?: stri
     console.log(`${chalk.bold("Status:")}       ${vk.status === "ACTIVE" ? chalk.green("active") : chalk.red("revoked")}`);
     console.log(`${chalk.bold("Prefix:")}       ${vk.prefix}...${vk.last_four}`);
     console.log(`${chalk.bold("Principal:")}    ${vk.principal_user_id ?? chalk.gray("—")}`);
-    console.log(`${chalk.bold("Providers:")}    ${vk.provider_credential_ids.join(", ") || chalk.gray("—")}`);
+    console.log(`${chalk.bold("Scopes:")}       ${vk.scopes.map(formatScope).join(", ") || chalk.gray("—")}`);
+    console.log(`${chalk.bold("Routing pol.:")} ${vk.routing_policy_id ?? chalk.gray("(default)")}`);
     console.log(`${chalk.bold("Created:")}      ${new Date(vk.created_at).toLocaleString()}`);
     if (vk.last_used_at) {
       console.log(`${chalk.bold("Last used:")}    ${new Date(vk.last_used_at).toLocaleString()}`);
@@ -39,7 +40,7 @@ export const getVirtualKeyCommand = async (id: string, options?: { format?: stri
     if (vk.revoked_at) {
       console.log(`${chalk.bold("Revoked:")}      ${chalk.red(new Date(vk.revoked_at).toLocaleString())}`);
     }
-    const detailUrl = virtualKeyDetailUrl(vk.project_id, vk.id);
+    const detailUrl = virtualKeyDetailUrl(vk.id);
     if (detailUrl) {
       console.log(`${chalk.bold("View in UI:")}  ${chalk.cyan(detailUrl)}`);
     }

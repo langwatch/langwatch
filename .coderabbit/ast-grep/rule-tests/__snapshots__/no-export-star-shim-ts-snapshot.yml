@@ -1,0 +1,14 @@
+id: no-export-star-shim-ts
+snapshots:
+  export * from "../legacy/shim";:
+    labels:
+    - source: export * from "../legacy/shim";
+      style: primary
+      start: 0
+      end: 31
+  export * from "./module";:
+    labels:
+    - source: export * from "./module";
+      style: primary
+      start: 0
+      end: 25

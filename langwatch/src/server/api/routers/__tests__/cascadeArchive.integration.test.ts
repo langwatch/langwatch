@@ -54,7 +54,6 @@ describe("Cascade Archive", () => {
       await prisma.agent.delete({ where: { id, projectId } }).catch(() => {});
     }
     for (const id of createdWorkflowIds) {
-      // Clear currentVersionId first, then delete versions, then workflow
       await prisma.workflow.update({ where: { id, projectId }, data: { currentVersionId: null } }).catch(() => {});
       await prisma.workflowVersion.deleteMany({ where: { workflowId: id, projectId } }).catch(() => {});
       await prisma.workflow.delete({ where: { id, projectId } }).catch(() => {});

@@ -3,6 +3,20 @@ Feature: SDK Prompt Tag Support
   I want to fetch prompts by tag and manage tag assignments
   So that I can pin my code to tagged versions and promote versions across environments
 
+  # Several SDK-level scenarios are bound below to existing unit
+  # tests (prompts.facade / prompt-tag-crud / prompt-tags). The
+  # remaining `@unimplemented` scenarios cover:
+  #   * `prompts.create` / `prompts.update` request-body shape with
+  #     a tags list — the OpenAPI-generated client sends them
+  #     through, but the assertion lives behind the existing client
+  #     factory tests; cheap follow-up adds a focused assertion.
+  #   * E2E flows under `typescript-sdk/e2e/prompts/prompt-tags.
+  #     e2e.test.ts` — that test file IS in `typescript-sdk/src` /
+  #     test scan reach via DEFAULT_TEST_ROOTS, but the suite is
+  #     `it.skipIf(!process.env.LANGWATCH_TEST_API_KEY)` and not
+  #     classified by the audit manifest as bindable. Cheap follow-
+  #     up: add `@scenario` markers to those `it.skipIf` cases.
+
   Background:
     Given a LangWatch client initialized with a valid API key
 

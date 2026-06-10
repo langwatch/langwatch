@@ -1,8 +1,8 @@
+import { generate } from "@langwatch/ksuid";
 import { SpanStatusCode } from "@opentelemetry/api";
 import { ESpanKind } from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types";
 import type { PIIRedactionLevel } from "@prisma/client";
 import { createHash } from "crypto";
-import { generate } from "@langwatch/ksuid";
 import { z } from "zod";
 
 import { getApp } from "~/server/app-layer/app";
@@ -14,18 +14,14 @@ const thumbsUpDownSchema = z.object({
   trace_id: z.string(),
   event_type: z.literal("thumbs_up_down"),
   metrics: z.object({ vote: z.number().min(-1).max(1) }),
-  event_details: z
-    .object({ feedback: z.string().nullish() })
-    .optional(),
+  event_details: z.object({ feedback: z.string().nullish() }).optional(),
 });
 
 const selectedTextSchema = z.object({
   trace_id: z.string(),
   event_type: z.literal("selected_text"),
   metrics: z.object({ text_length: z.number().positive() }),
-  event_details: z
-    .object({ selected_text: z.string().optional() })
-    .optional(),
+  event_details: z.object({ selected_text: z.string().optional() }).optional(),
 });
 
 const waitedToFinishSchema = z.object({
@@ -108,7 +104,7 @@ export async function recordTrackedEventSpan(params: {
     }
   }
 
-  await getApp().traces.recordSpan({
+  await getApp().traces.collection.ingestNormalizedSpan({
     tenantId: project.id,
     span: {
       traceId: body.trace_id,
@@ -136,7 +132,6 @@ export async function recordTrackedEventSpan(params: {
     resource: { attributes: [] },
     instrumentationScope: { name: TRACK_EVENT_SPAN_NAME },
     piiRedactionLevel: project.piiRedactionLevel,
-    occurredAt: Date.now(),
   });
 }
 

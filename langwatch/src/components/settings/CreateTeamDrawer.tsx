@@ -87,7 +87,7 @@ export function CreateTeamDrawer({ open = true }: { open?: boolean }): React.Rea
         if (!isOpen) closeDrawer();
       }}
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.Header>
           <Drawer.CloseTrigger onClick={closeDrawer} />
         </Drawer.Header>

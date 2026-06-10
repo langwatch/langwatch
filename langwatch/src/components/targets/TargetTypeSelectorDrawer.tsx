@@ -3,7 +3,7 @@ import { Bot, CheckCircle, FileText } from "lucide-react";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
-import type { TargetType } from "~/evaluations-v3/types";
+import type { TargetType } from "~/experiments-v3/types";
 import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
 
 // Re-export for backward compatibility
@@ -79,7 +79,7 @@ export function TargetTypeSelectorDrawer(props: TargetTypeSelectorDrawerProps) {
       size="md"
       modal={false}
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.CloseTrigger />
         <Drawer.Header>
           <HStack gap={2}>

@@ -3,6 +3,22 @@ Feature: URL routing for direct suite access
   I want each suite to have its own URL
   So that I can bookmark, share, and navigate directly to specific suites
 
+  # Parity status: 0 of 9 scenarios bound to existing tests.
+  # Remaining @unimplemented scenarios (#3458):
+  #   3 NO_TEST: shipped behavior, no integration test yet
+  #   5 UPDATE: implementation diverged from spec wording
+  # UPDATE divergences:
+  #   - "Selecting a suite updates the URL to include the suite slug" (path-based, not query-param)
+  #   - "Selecting \"All Runs\" removes the suite query param" (path segment removal, not query param)
+  #   - "Navigating directly to a suite URL opens that suite" (/run-plans/:slug not ?suite=)
+  #   - "Navigating to base suites URL shows all runs view" (base is /simulations not /simulations/suites)
+  #   - "Navigating to a non-existent suite slug shows empty state" (URL pattern diverged)
+  #   - "User shares a direct link to a suite" (URL format diverged)
+  # NO_TEST gaps:
+  #   - "Archiving the current suite navigates to base path"
+  #   - "Browser back button returns to previous suite"
+  #   - "Browser forward button navigates to next suite"
+
   Background:
     Given a project with slug "my-project"
     And the project has suites "Suite A" (slug "suite-a") and "Suite B" (slug "suite-b")

@@ -1,4 +1,11 @@
 Feature: AI Gateway — model disambiguation when a VK has multiple providers
+
+  # All scenarios in this file describe gateway model-resolution
+  # behaviour (bare model name on multi-provider VK → 400, prefix
+  # resolution, ambiguity logging, Prometheus counters). Implemented in
+  # the Go gateway service (services/aigateway/adapters/modelresolver),
+  # out of scope for the TS parity check.
+
   As a developer calling the LangWatch AI Gateway with a multi-provider virtual key
   I want a clear 400 error when my model name could match multiple providers
   So that the gateway doesn't silently route my request to the wrong provider slot

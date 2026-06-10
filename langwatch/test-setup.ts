@@ -1,8 +1,98 @@
 import "@testing-library/jest-dom/vitest";
 import dotenv from "dotenv";
-import { vi } from "vitest";
+import { afterAll, vi } from "vitest";
 import { TEST_PUBLIC_KEY } from "./ee/licensing/__tests__/fixtures/testKeys";
 dotenv.config({ path: ".env" });
+
+// Any test that evaluates a PostHog-backed PRODUCT flag (e.g. resolveHome ->
+// featureFlagService.isEnabled) constructs the posthog-node client, whose
+// local-evaluation poller is a setInterval that posthog-node does not unref.
+// That timer keeps the worker's event loop alive, so under --coverage (where
+// vitest awaits a graceful worker exit instead of force-killing the pool) the
+// shard hangs after every test has already passed. Shutting the client down
+// per file clears the interval; it no-ops when nothing constructed a client.
+//
+// The module is loaded lazily inside the hook, NOT via a top-level import: a
+// static import here would pull the real posthog module into every test
+// file's graph at setup time, before that file's own `vi.mock("posthog-node")`
+// hoist applies, breaking posthog.unit.test.ts. Loading it after the tests run
+// keeps each file's mocks intact.
+//
+// The flush is wrapped because posthog-node's shutdown clears the local-eval
+// poller (the hang fix) FIRST, then does a final network flush that builds a
+// `new URL(...)`. In a jsdom suite this hook runs as the env globals are being
+// torn down, so `URL` may already be gone and the flush throws — by which
+// point the interval is already cleared, so the error is safe to ignore.
+afterAll(async () => {
+  try {
+    const { shutdownPostHog } = await import("./src/server/posthog");
+    await shutdownPostHog();
+  } catch {
+    // Teardown-phase flush can throw once test env globals (URL/fetch) are
+    // gone; the poller is already cleared by then, so swallow it.
+  }
+
+  // Diagnostic: dump active event-loop handles AFTER the normal afterAll chain
+  // has run. Anything still here is what's keeping the fork from exiting and
+  // ultimately wedging the shard. The CI artifact stays small but surfaces
+  // the actual remote endpoint for each socket so the leaking connection can
+  // be identified by name (clickhouse host, redis host, postgres host, ...).
+  // Opt-out via DEBUG_OPEN_HANDLES=0 if needed.
+  if (process.env.DEBUG_OPEN_HANDLES !== "0") {
+    try {
+      // @ts-expect-error -- internal API, intentional
+      const handles = process._getActiveHandles?.() ?? [];
+      // @ts-expect-error -- internal API, intentional
+      const requests = process._getActiveRequests?.() ?? [];
+      if (handles.length > 0 || requests.length > 0) {
+        const describeSocket = (s: any): string => {
+          try {
+            const remote =
+              s.remoteAddress && s.remotePort
+                ? `${s.remoteAddress}:${s.remotePort}`
+                : undefined;
+            const local =
+              s.localAddress && s.localPort
+                ? `${s.localAddress}:${s.localPort}`
+                : undefined;
+            const fd = typeof s.fd === "number" ? s.fd : undefined;
+            const meta = [
+              remote ? `r=${remote}` : null,
+              local ? `l=${local}` : null,
+              fd != null ? `fd=${fd}` : null,
+            ]
+              .filter(Boolean)
+              .join(",");
+            return meta || "?";
+          } catch {
+            return "?";
+          }
+        };
+        const socketDetails: string[] = [];
+        const otherCounts: Record<string, number> = {};
+        for (const h of handles) {
+          const k = h?.constructor?.name ?? typeof h;
+          if (k === "Socket" || k === "TLSSocket") {
+            socketDetails.push(`${k}(${describeSocket(h)})`);
+          } else {
+            otherCounts[k] = (otherCounts[k] ?? 0) + 1;
+          }
+        }
+        const requestCounts: Record<string, number> = {};
+        for (const r of requests) {
+          const k = r?.constructor?.name ?? typeof r;
+          requestCounts[k] = (requestCounts[k] ?? 0) + 1;
+        }
+        // eslint-disable-next-line no-console
+        console.log(
+          `[open-handles] handles=${handles.length} requests=${requests.length} | sockets=${JSON.stringify(socketDetails)} other=${JSON.stringify(otherCounts)} requests=${JSON.stringify(requestCounts)}`,
+        );
+      }
+    } catch {
+      // ignore
+    }
+  }
+});
 
 // Mock recharts to avoid ESM/CJS compatibility issues with @reduxjs/toolkit in vmThreads pool.
 // Tests don't need actual chart rendering - we're testing our logic, not recharts itself.
@@ -181,6 +271,10 @@ if (typeof window !== "undefined" && typeof window.matchMedia !== "function") {
 
 // Mock ResizeObserver for tests using floating-ui/popper (Chakra menus, tooltips, etc.)
 globalThis.ResizeObserver = class ResizeObserver {
+  // Match the real one-argument constructor signature so callers like
+  // `new ResizeObserver(cb)` aren't flagged as passing a superfluous arg.
+  // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-op for test mock
+  constructor(_callback?: ResizeObserverCallback) {}
   // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-op for test mock
   observe() {}
   // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-op for test mock

@@ -187,7 +187,7 @@ describe("cacheRule.form", () => {
       it("accepts vk_prefix alone", () => {
         expect(
           validateForm(
-            buildState({ name: "x", matchVkPrefix: "lw_vk_live_" }),
+            buildState({ name: "x", matchVkPrefix: "vk-lw-" }),
           ),
         ).toBeNull();
       });

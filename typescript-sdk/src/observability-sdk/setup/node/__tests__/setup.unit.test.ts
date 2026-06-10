@@ -5,12 +5,12 @@ import { resetObservabilitySdkConfig } from "../../../config.js";
 import { shouldCaptureInput, shouldCaptureOutput } from "../../../config.js";
 import { DataCapturePresets } from "../../../features/data-capture/presets.js";
 
-const MockLogger = vi.fn().mockImplementation(() => ({
+const MockLogger = vi.fn().mockImplementation(function () { return ({
   debug: vi.fn(),
   info: vi.fn(),
   error: vi.fn(),
   warn: vi.fn(),
-}));
+}); });
 
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { trace } from "@opentelemetry/api";
@@ -18,19 +18,20 @@ import { trace } from "@opentelemetry/api";
 // Mocks
 vi.mock("../../utils", () => ({
   isConcreteProvider: vi.fn(() => false),
+  getConcreteProvider: vi.fn(() => undefined),
   createMergedResource: vi.fn(() => resourceFromAttributes({})),
 }));
 vi.mock("../../../exporters", () => ({
-  LangWatchTraceExporter: vi.fn().mockImplementation(() => ({ shutdown: vi.fn() })),
+  LangWatchTraceExporter: vi.fn().mockImplementation(function () { return ({ shutdown: vi.fn() }); }),
   LangWatchLogsExporter: vi
     .fn()
-    .mockImplementation(() => ({ shutdown: vi.fn() })),
+    .mockImplementation(function () { return ({ shutdown: vi.fn() }); }),
 }));
 vi.mock("@opentelemetry/sdk-node", () => ({
-  NodeSDK: vi.fn().mockImplementation(() => ({
+  NodeSDK: vi.fn().mockImplementation(function () { return ({
     start: vi.fn(),
     shutdown: vi.fn().mockResolvedValue(undefined),
-  })),
+  }); }),
 }));
 vi.mock("../../../logger", () => ({
   setLangWatchLoggerProvider: vi.fn(),

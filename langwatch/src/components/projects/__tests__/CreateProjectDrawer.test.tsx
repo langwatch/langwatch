@@ -140,6 +140,8 @@ describe("<CreateProjectDrawer/>", () => {
   });
 
   describe("when organizationId prop is provided", () => {
+    /** @scenario Drawer receives correct organization when opened from different org */
+    /** @scenario Project creation calls correct API endpoint */
     it("uses provided organizationId for project creation instead of context", async () => {
       const user = userEvent.setup();
 

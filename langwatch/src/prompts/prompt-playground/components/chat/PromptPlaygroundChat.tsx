@@ -27,6 +27,22 @@ interface PromptPlaygroundChatProps extends BoxProps {
 }
 
 /**
+ * Stable dedup key over the messages-to-persist projection. Encodes
+ * each entry's id, role, and content length so streaming content
+ * deltas trigger a re-persist (only ID-based dedup short-circuited
+ * the latest assistant's chunks and left it stuck at empty content
+ * across refreshes — see the effect comment in PromptPlaygroundChatInner).
+ * Exported for unit testing.
+ */
+export function persistedMessagesKey(
+  persisted: { id: string; role: ChatMessage["role"]; content: string }[],
+): string {
+  return persisted
+    .map((m) => `${m.id}:${m.role}:${m.content.length}`)
+    .join("|");
+}
+
+/**
  * PromptPlaygroundChatRef
  * Single Responsibility: Exposes imperative methods to control the chat instance (e.g., reset, focus).
  */
@@ -118,14 +134,35 @@ const PromptPlaygroundChatInner = forwardRef<PromptPlaygroundChatRef, object>(
     }, [setMessages, tabId, getTabById]);
 
     /**
-     * Sync the visible messages to the tab data.
+     * Sync the visible messages to the tab data so a browser refresh
+     * restores the running conversation. Deduping by message ID alone
+     * dropped the latest assistant reply: the assistant message gets a
+     * stable ID the moment streaming starts (when content is still
+     * empty), the ID-set never changes again for that turn, so the
+     * effect skipped every content delta. The persisted snapshot ended
+     * up with the most recent assistant message stuck at empty content
+     * — which `convertScenarioMessagesToCopilotKit` then dropped on
+     * reload via its `if (message.content && message.content !== "None")`
+     * guard. Keying on a content snapshot too means each streaming
+     * chunk re-persists the latest message; the per-turn writes are a
+     * few dozen small localStorage updates which is fine.
      */
-    const prevMessageIdsRef = useRef("");
+    const prevMessagesKeyRef = useRef("");
     useEffect(() => {
       if (!visibleMessages) return;
-      const messageIds = visibleMessages.map((m) => m.id).join(",");
-      if (messageIds === prevMessageIdsRef.current) return;
-      prevMessageIdsRef.current = messageIds;
+      const persisted = visibleMessages
+        .filter((message) => message.isTextMessage())
+        .map((message) => {
+          const textMessage = message as any; // Type assertion after isTextMessage() filter
+          return {
+            id: message.id,
+            role: textMessage.role as ChatMessage["role"],
+            content: textMessage.content?.toString() || "",
+          };
+        });
+      const messagesKey = persistedMessagesKey(persisted);
+      if (messagesKey === prevMessagesKeyRef.current) return;
+      prevMessagesKeyRef.current = messagesKey;
 
       const tab = getTabById(tabId);
       if (tab) {
@@ -135,16 +172,7 @@ const PromptPlaygroundChatInner = forwardRef<PromptPlaygroundChatRef, object>(
             ...(data || {}),
             chat: {
               ...(data?.chat || {}),
-              initialMessagesFromSpanData: visibleMessages
-                .filter((message) => message.isTextMessage())
-                .map((message) => {
-                  const textMessage = message as any; // Type assertion after isTextMessage() filter
-                  return {
-                    id: message.id,
-                    role: textMessage.role as ChatMessage["role"],
-                    content: textMessage.content?.toString() || "",
-                  };
-                }),
+              initialMessagesFromSpanData: persisted,
             },
           }),
         });

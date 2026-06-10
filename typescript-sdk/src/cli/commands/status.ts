@@ -4,15 +4,16 @@ import { checkApiKey } from "../utils/apiKey";
 import {
   createLangWatchApiClient,
 } from "@/internal/api/client";
-import { buildAuthHeaders } from "@/internal/api/auth";
+import { buildAuthHeaders, isPersonalAccessToken } from "@/internal/api/auth";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 
 export const statusCommand = async (options?: { format?: string }): Promise<void> => {
   checkApiKey();
 
   const apiClient = createLangWatchApiClient();
   const apiKey = process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint = process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai";
+  const endpoint = resolveControlPlaneUrl();
   const spinner = ora("Fetching project status...").start();
 
   const results: Record<string, { count: number; error?: string; status?: number }> = {};
@@ -107,7 +108,11 @@ export const statusCommand = async (options?: { format?: string }): Promise<void
     console.log(chalk.red("  ✗ Could not fetch any project resources."));
     console.log(chalk.gray(`    Reason: ${sampleError}`));
     console.log();
-    if (allUnauthorized) {
+    if (allUnauthorized && isPersonalAccessToken(apiKey) && !process.env.LANGWATCH_PROJECT_ID) {
+      console.log(chalk.gray(`    Your PAT requires ${chalk.cyan("LANGWATCH_PROJECT_ID")} to be set.`));
+      console.log(chalk.gray(`    Set it via: ${chalk.cyan("export LANGWATCH_PROJECT_ID=<your-project-id>")}`));
+      console.log(chalk.gray(`    Or add to .env: ${chalk.cyan("LANGWATCH_PROJECT_ID=<your-project-id>")}`));
+    } else if (allUnauthorized) {
       console.log(chalk.gray(`    Your API key appears to be invalid or revoked. Re-run ${chalk.cyan("langwatch login")} or check ${chalk.cyan("LANGWATCH_API_KEY")}.`));
     } else {
       console.log(chalk.gray(`    Check ${chalk.cyan("LANGWATCH_API_KEY")} (current endpoint: ${chalk.cyan(endpoint)}).`));
@@ -141,7 +146,7 @@ export const statusCommand = async (options?: { format?: string }): Promise<void
   console.log(chalk.gray("    langwatch annotation list   langwatch model-provider list"));
   console.log();
   console.log(chalk.gray("  Execution:"));
-  console.log(chalk.gray("    langwatch evaluation run <slug> [--wait]"));
+  console.log(chalk.gray("    langwatch experiment run <slug> [--wait]"));
   console.log(chalk.gray("    langwatch suite run <id> [--wait]"));
   console.log(chalk.gray("    langwatch scenario run <id> --target <type>:<ref>"));
   console.log(chalk.gray("    langwatch agent run <id> --input <json>"));

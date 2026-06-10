@@ -30,6 +30,8 @@ export function useCommandBarItems(
   searchInDocsItem: ListItem | null;
   easterEggItem: ListItem | null;
 } {
+  const availableTopLevelNav = topLevelNavigationCommands;
+
   // Get top recent items across all time groups
   const recentItemsLimited = useMemo(() => {
     const allRecent = [
@@ -105,7 +107,7 @@ export function useCommandBarItems(
       }
 
       // Show only top-level navigation commands by default
-      for (const cmd of topLevelNavigationCommands) {
+      for (const cmd of availableTopLevelNav) {
         items.push({ type: "command", data: cmd });
       }
     } else {
@@ -152,6 +154,7 @@ export function useCommandBarItems(
   }, [
     query,
     recentItemsLimited,
+    availableTopLevelNav,
     easterEggItem,
     idResult,
     filteredCommands,

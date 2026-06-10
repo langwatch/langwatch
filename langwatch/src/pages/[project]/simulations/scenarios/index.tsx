@@ -11,7 +11,6 @@ import { BatchActionBar } from "~/components/scenarios/BatchActionBar";
 import { ScenarioArchiveDialog } from "~/components/scenarios/ScenarioArchiveDialog";
 import { ScenarioCreateModal } from "~/components/scenarios/ScenarioCreateModal";
 import { ScenarioEmptyState } from "~/components/scenarios/ScenarioEmptyState";
-import { ScenarioFormDrawerFromUrl } from "~/components/scenarios/ScenarioFormDrawer";
 import { ScenarioTable } from "~/components/scenarios/ScenarioTable";
 import { ScenarioWelcomeModal, ScenarioWelcomeScreen } from "~/components/scenarios/ScenarioWelcomeScreen";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -26,7 +25,7 @@ import { api } from "~/utils/api";
 
 function ScenarioLibraryPage() {
   const { project } = useOrganizationTeamProject();
-  const { openDrawer, drawerOpen } = useDrawer();
+  const { openDrawer } = useDrawer();
   const {
     rowSelection,
     onRowSelectionChange,
@@ -219,7 +218,10 @@ function ScenarioLibraryPage() {
         )}
       </PageLayout.Container>
 
-      <ScenarioFormDrawerFromUrl open={drawerOpen("scenarioEditor")} />
+      {/* ScenarioFormDrawerFromUrl is mounted globally by CurrentDrawer via
+          the drawer registry (#3194). Rendering it explicitly here as well
+          duplicates the role="dialog" element in the DOM and breaks
+          accessible selectors / Playwright targeting. */}
       <ScenarioWelcomeModal
         open={showWelcomeModal}
         onOpenChange={handleWelcomeModalOpenChange}

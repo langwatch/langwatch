@@ -26,7 +26,7 @@ import type {
   EvaluatorTypes,
 } from "../../server/evaluations/evaluators.generated";
 import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
-import { DEFAULT_EMBEDDINGS_MODEL, DEFAULT_MODEL } from "../../utils/constants";
+import { api } from "../../utils/api";
 import { camelCaseToTitleCase, titleCase } from "../../utils/stringCasing";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import {
@@ -209,6 +209,19 @@ const DynamicZodForm = ({
   const { control, register } = useFormContext();
   const { project } = useOrganizationTeamProject();
 
+  // Cascade-resolved defaults for evaluator model + embeddings fields.
+  const resolvedDefaultModel = api.modelProvider.getResolvedDefault.useQuery(
+    { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
+    { enabled: !!project?.id },
+  );
+  const resolvedDefaultEmbeddings = api.modelProvider.getResolvedDefault.useQuery(
+    {
+      projectId: project?.id ?? "",
+      featureKey: "analytics.topic_clustering_embeddings",
+    },
+    { enabled: !!project?.id },
+  );
+
   const renderField = <T extends EvaluatorTypes>(
     fieldSchema: ZodType,
     fieldName: string,
@@ -220,11 +233,10 @@ const DynamicZodForm = ({
         ?.default;
 
     if (fieldName === "model") {
-      defaultValue = (project?.defaultModel ?? DEFAULT_MODEL) as any;
+      defaultValue = (resolvedDefaultModel.data?.model ?? "") as any;
     }
     if (fieldName === "embeddings_model") {
-      defaultValue = (project?.embeddingsModel ??
-        DEFAULT_EMBEDDINGS_MODEL) as any;
+      defaultValue = (resolvedDefaultEmbeddings.data?.model ?? "") as any;
     }
 
     const fieldSchema_ =

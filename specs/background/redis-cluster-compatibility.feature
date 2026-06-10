@@ -11,14 +11,14 @@ Feature: BullMQ Redis Cluster Compatibility
   # Wrapping queue names in {braces} forces Redis to hash only the braced
   # portion, guaranteeing all keys for a queue land on the same slot.
 
-  @integration @unimplemented
+  @integration
   Scenario: Adding a job to a queue without a hash tag fails on Redis Cluster
     Given a Redis Cluster is running
     And a BullMQ queue named "no-hash-tag"
     When a job is added to the queue
     Then the operation fails with a CROSSSLOT error
 
-  @integration @unimplemented
+  @integration
   Scenario: Adding and processing a job succeeds when the queue name has a hash tag
     Given a Redis Cluster is running
     And a BullMQ queue named "{with_hash_tag}"
@@ -26,13 +26,20 @@ Feature: BullMQ Redis Cluster Compatibility
     When a job is added to the queue
     Then the job is processed successfully without errors
 
-  @integration @unimplemented
+  @integration
   Scenario: Background worker queues operate on Redis Cluster
     Given a Redis Cluster is running
     And the background worker queue names are loaded from configuration
     Then every background worker queue name contains a hash tag
     And adding a job to each queue succeeds on the cluster
 
+  # The two `@unimplemented` scenarios below describe live-cluster
+  # behaviour for queues that are created *dynamically* inside the
+  # event-sourcing service (`eventSourcingService` / pipeline factory)
+  # rather than from a static constant. Asserting their names contain
+  # a hash tag would require constructing the service with mocks and
+  # inspecting each registered queue — feasible but not yet wired up.
+  # Static queue constants are covered by the bound scenarios above.
   @integration @unimplemented
   Scenario: Event sourcing maintenance worker queue operates on Redis Cluster
     Given a Redis Cluster is running
@@ -47,7 +54,7 @@ Feature: BullMQ Redis Cluster Compatibility
     Then every pipeline queue name contains a hash tag
     And adding a job to each pipeline queue succeeds on the cluster
 
-  @unit @unimplemented
+  @unit
   Scenario: Every queue name produced by the system contains a hash tag
     Given all queue name sources in the codebase
     When each source produces its queue name

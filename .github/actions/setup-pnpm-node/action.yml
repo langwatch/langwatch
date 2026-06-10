@@ -23,7 +23,7 @@ runs:
   using: composite
   steps:
     - name: Setup pnpm
-      uses: pnpm/action-setup@eae0cfeb286e66ffb5155f1a79b90583a127a68b # v2
+      uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
       with:
         version: 10.24.0
 
@@ -33,6 +33,15 @@ runs:
         node-version: 24
         cache: "pnpm"
         cache-dependency-path: ${{ inputs.cache-dependency-path }}
+
+    # node-gyp is no longer bundled on PATH under Node-24 + npm-11, so any
+    # native-module install lifecycle script (e.g. node-pty's prebuild fallback
+    # in mcp-server) ELIFECYCLEs with "sh: 1: node-gyp: not found". Install it
+    # globally so spawned scripts can resolve it via PATH.
+    - name: Install node-gyp
+      if: inputs.install-dir != ''
+      shell: bash
+      run: npm install -g node-gyp@latest
 
     - name: Install dependencies
       if: inputs.install-dir != ''

@@ -79,6 +79,7 @@ describe("handleListScenarios()", () => {
       expect(result).toContain("scen_def456");
     });
 
+    /** @scenario Agent lists all scenarios in a project */
     it("includes the total count header", () => {
       expect(result).toContain("# Scenarios (2 total)");
     });
@@ -92,6 +93,7 @@ describe("handleListScenarios()", () => {
       result = await handleListScenarios({});
     });
 
+    /** @scenario Agent lists scenarios when none exist */
     it("returns a no-scenarios message", () => {
       expect(result).toContain("No scenarios found");
     });
@@ -130,6 +132,7 @@ describe("handleGetScenario()", () => {
       result = await handleGetScenario({ scenarioId: "scen_abc123" });
     });
 
+    /** @scenario Agent gets full details of a scenario */
     it("includes the scenario name in the heading", () => {
       expect(result).toContain("# Scenario: Login Flow Happy Path");
     });

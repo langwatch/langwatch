@@ -35,6 +35,7 @@ class PostApiPromptsBody:
         outputs (list[PostApiPromptsBodyOutputsItem] | Unset):
         schema_version (PostApiPromptsBodySchemaVersion | Unset):
         tags (list[str] | Unset):
+        parameters (dict[str, Any] | Unset):
     """
 
     handle: str
@@ -50,6 +51,7 @@ class PostApiPromptsBody:
     outputs: list[PostApiPromptsBodyOutputsItem] | Unset = UNSET
     schema_version: PostApiPromptsBodySchemaVersion | Unset = UNSET
     tags: list[str] | Unset = UNSET
+    parameters: dict[str, Any] | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         handle = self.handle
@@ -99,6 +101,8 @@ class PostApiPromptsBody:
         if not isinstance(self.tags, Unset):
             tags = self.tags
 
+        parameters = self.parameters
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -130,6 +134,8 @@ class PostApiPromptsBody:
             field_dict["schemaVersion"] = schema_version
         if tags is not UNSET:
             field_dict["tags"] = tags
+        if parameters is not UNSET:
+            field_dict["parameters"] = parameters
 
         return field_dict
 
@@ -197,6 +203,8 @@ class PostApiPromptsBody:
 
         tags = cast(list[str], d.pop("tags", UNSET))
 
+        parameters = cast(dict[str, Any], d.pop("parameters", UNSET))
+
         post_api_prompts_body = cls(
             handle=handle,
             scope=scope,
@@ -211,6 +219,7 @@ class PostApiPromptsBody:
             outputs=outputs,
             schema_version=schema_version,
             tags=tags,
+            parameters=parameters,
         )
 
         return post_api_prompts_body

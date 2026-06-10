@@ -9,9 +9,9 @@ import { useRouter } from "~/utils/compat/next-router";
  * referencing #3247 and #3245). This redirect preserves existing bookmarks
  * for at least one release.
  *
- * react-admin's singular resource names (/admin/user, /admin/subscription,
- * etc.) are mapped to the new Chakra Backoffice routes so deep links stay
- * working.
+ * The legacy singular resource paths (/admin/user, /admin/subscription,
+ * etc.) are mapped to the new Chakra Backoffice routes so old deep links
+ * stay working.
  */
 const RESOURCE_REDIRECTS: Record<string, string> = {
   user: "users",
@@ -22,8 +22,6 @@ const RESOURCE_REDIRECTS: Record<string, string> = {
   projects: "projects",
   subscription: "subscriptions",
   subscriptions: "subscriptions",
-  organizationfeature: "organization-features",
-  organizationfeatures: "organization-features",
 };
 
 export default function AdminRedirect() {

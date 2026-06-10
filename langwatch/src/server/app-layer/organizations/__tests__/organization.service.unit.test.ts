@@ -13,8 +13,9 @@ vi.mock("../../tracing", () => ({
 describe("OrganizationService", () => {
   const mockRepo: OrganizationRepository = {
     getOrganizationIdByTeamId: vi.fn(),
+    getUserOrgRole: vi.fn(),
+    getUserOrgRoleByTeamId: vi.fn(),
     getProjectIds: vi.fn(),
-    getFeature: vi.fn(),
     findWithAdmins: vi.fn(),
     updateSentPlanLimitAlert: vi.fn(),
     findProjectsWithName: vi.fn(),
@@ -88,78 +89,6 @@ describe("OrganizationService", () => {
 
       expect(result).toEqual(["proj-1", "proj-2"]);
       expect(mockRepo.getProjectIds).toHaveBeenCalledWith("org-123");
-    });
-  });
-
-  describe("isFeatureEnabled", () => {
-    describe("when feature row exists and is not expired", () => {
-      it("returns true", async () => {
-        vi.mocked(mockRepo.getFeature).mockResolvedValue({
-          feature: "billable_events_usage",
-          organizationId: "org-123",
-          trialEndDate: null,
-        });
-
-        const result = await service.isFeatureEnabled(
-          "org-123",
-          "billable_events_usage",
-        );
-
-        expect(result).toBe(true);
-      });
-    });
-
-    describe("when feature row exists with future trial end date", () => {
-      it("returns true", async () => {
-        const futureDate = new Date();
-        futureDate.setFullYear(futureDate.getFullYear() + 1);
-
-        vi.mocked(mockRepo.getFeature).mockResolvedValue({
-          feature: "billable_events_usage",
-          organizationId: "org-123",
-          trialEndDate: futureDate,
-        });
-
-        const result = await service.isFeatureEnabled(
-          "org-123",
-          "billable_events_usage",
-        );
-
-        expect(result).toBe(true);
-      });
-    });
-
-    describe("when no feature row exists", () => {
-      it("returns false", async () => {
-        vi.mocked(mockRepo.getFeature).mockResolvedValue(null);
-
-        const result = await service.isFeatureEnabled(
-          "org-123",
-          "billable_events_usage",
-        );
-
-        expect(result).toBe(false);
-      });
-    });
-
-    describe("when feature trial has expired", () => {
-      it("returns false", async () => {
-        const pastDate = new Date();
-        pastDate.setFullYear(pastDate.getFullYear() - 1);
-
-        vi.mocked(mockRepo.getFeature).mockResolvedValue({
-          feature: "billable_events_usage",
-          organizationId: "org-123",
-          trialEndDate: pastDate,
-        });
-
-        const result = await service.isFeatureEnabled(
-          "org-123",
-          "billable_events_usage",
-        );
-
-        expect(result).toBe(false);
-      });
     });
   });
 

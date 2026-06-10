@@ -20,10 +20,10 @@ graph LR
     Pause["1. Pause"] --> Drain["2. Drain"] --> Replay["3. Replay"] --> Unpause["4. Unpause"]
 ```
 
-1. **Pause** — Freeze the selected projections so new events don't interfere
-2. **Drain** — Wait for in-flight jobs to complete
-3. **Replay** — Reread events from ClickHouse and reprocess them through the projections
-4. **Unpause** — Resume normal processing
+1. **Pause**: Freeze the selected projections so new events don't interfere
+2. **Drain**: Wait for in-flight jobs to complete
+3. **Replay**: Reread events from ClickHouse and reprocess them through the projections
+4. **Unpause**: Resume normal processing
 
 ## Bulk Replay Wizard
 
@@ -37,15 +37,15 @@ Choose which tenants (projects) to replay:
 
 ### Step 2: Choose Date Range
 
-Set the **"Replay events since"** date — only events after this date are reprocessed. Quick-select buttons are available for common ranges (1, 2, 3, or 6 months).
+Set the **"Replay events since"** date, only events after this date are reprocessed. Quick-select buttons are available for common ranges (1, 2, 3, or 6 months).
 
-Once tenants and date are selected, the system automatically **discovers aggregates** — querying ClickHouse to find how many aggregates match each projection.
+Once tenants and date are selected, the system automatically **discovers aggregates**: querying ClickHouse to find how many aggregates match each projection.
 
 ### Step 3: Select Projections
 
 A table shows all available projections with:
 - **Projection name** and **pipeline**
-- **Aggregate count** — how many aggregates have data in the selected range
+- **Aggregate count**: how many aggregates have data in the selected range
 - Projections with no matching data are disabled
 
 Select individual projections or use **"Select all with data"** to check everything.
@@ -57,8 +57,8 @@ Before starting, a summary shows:
 - A description field for audit logging
 
 Two action options:
-- **Start Full Replay** — runs the four-phase replay process
-- **Dry Run** — processes 5 sample aggregates in memory without writing, to verify the projection logic is correct
+- **Start Full Replay**: runs the four-phase replay process
+- **Dry Run**: processes 5 sample aggregates in memory without writing, to verify the projection logic is correct
 
 ## Monitoring Progress
 
@@ -66,11 +66,11 @@ When a replay starts, a **progress drawer** slides open showing real-time metric
 
 - **Current phase** (pause, drain, replay, unpause)
 - **Current projection** being processed
-- **Aggregates processed** — progress bar with count and percentage
-- **Events processed** — total events replayed
-- **Throughput** — events per second
-- **Elapsed time** — wall clock since start
-- **Projection badges** — highlighting the currently active projection
+- **Aggregates processed**: progress bar with count and percentage
+- **Events processed**: total events replayed
+- **Throughput**: events per second
+- **Elapsed time**: wall clock since start
+- **Projection badges**: highlighting the currently active projection
 
 ## Replay History
 
@@ -116,11 +116,11 @@ This is useful when a single aggregate's projection state is incorrect and you w
 2. Select the affected projection(s)
 3. Set the date to when the bug was introduced (or earlier to be safe)
 4. Select affected tenants (or all)
-5. Start replay — the fixed projection code reprocesses all events
+5. Start replay, the fixed projection code reprocesses all events
 
 ### Debugging a single trace
 
 1. Expand the **Advanced: Single Aggregate Replay** section
 2. Enter the aggregate ID and tenant ID
 3. Select the projection you're investigating
-4. Replay — then check [Deja View](/self-hosting/ops/dejaview) to inspect the result
+4. Replay, then check [Deja View](/self-hosting/ops/dejaview) to inspect the result

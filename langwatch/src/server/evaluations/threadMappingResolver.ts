@@ -21,7 +21,10 @@ import type { Trace } from "~/server/tracer/types";
 export function hasThreadMappings(
   mappingState: MappingState | null,
 ): boolean {
-  if (!mappingState) return false;
+  // The `?.mapping` check defends against historical malformed rows persisted
+  // before write-side coercion existed (#3875). The MappingState type says
+  // `.mapping` is required, but legacy `{}` payloads in the DB violate that.
+  if (!mappingState?.mapping) return false;
   return Object.values(mappingState.mapping).some(
     (mapping) => "type" in mapping && mapping.type === "thread",
   );

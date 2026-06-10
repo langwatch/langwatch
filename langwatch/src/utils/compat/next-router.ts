@@ -39,11 +39,31 @@ const ROUTE_PATTERNS = [
   "/onboarding/product",
   "/onboarding/welcome",
   "/settings",
+  "/settings/governance",
+  "/settings/governance/ingestion-sources/:id",
+  "/settings/governance/ingestion-sources",
+  "/settings/governance/anomaly-rules",
+  // Literal patterns for high-traffic /settings/* leafs that use
+  // `router.push({ pathname: router.pathname, query: ... })` to update
+  // their own filter state. Without these, the wildcard `/settings/*`
+  // wins → resolves to `/settings/[[...path]]` → push leaves `path`
+  // unresolved → URL bounces to `/settings/` (caught on /settings/audit-log
+  // Filter-by-Action input during γ post-dogfood UI bug-bash).
+  "/settings/audit-log",
   "/settings/*",
+  // Personal-scope governance routes — must precede the "/:project/*" patterns
+  // so the auto-detection in components/useWorkspaceCurrent doesn't classify
+  // /me as a project page (which collapses the WorkspaceSwitcher to project
+  // context and breaks the personal nav).
+  "/me",
+  "/me/configure",
+  "/cli/auth",
+  "/governance",
   "/:project/messages/:trace/:openTab/:span",
   "/:project/messages/:trace/:openTab",
   "/:project/messages/:trace",
   "/:project/messages",
+  "/:project/traces",
   "/:project/analytics/custom/:id",
   "/:project/analytics/custom",
   "/:project/analytics/evaluations",

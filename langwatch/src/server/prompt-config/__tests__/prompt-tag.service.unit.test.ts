@@ -40,6 +40,7 @@ function makeRepo(overrides: Partial<PromptTagRepository> = {}): PromptTagReposi
 
 describe("validateTagName()", () => {
   describe("when name is valid", () => {
+    /** @scenario Accepts valid non-numeric tag during creation */
     it("does not throw for a lowercase slug", () => {
       expect(() => validateTagName("canary")).not.toThrow();
     });
@@ -56,6 +57,7 @@ describe("validateTagName()", () => {
   });
 
   describe("when name is purely numeric", () => {
+    /** @scenario Rejects zero as a tag name during creation */
     it("throws PromptTagValidationError mentioning numeric", () => {
       expect(() => validateTagName("42")).toThrow(
         expect.objectContaining({ name: "PromptTagValidationError", message: expect.stringMatching(/numeric/i) }),

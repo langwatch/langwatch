@@ -29,19 +29,31 @@ function createFoldState(
     errorMessage: null,
     models: [],
     totalCost: null,
+    nonBilledCost: null,
     tokensEstimated: false,
     totalPromptTokenCount: null,
     totalCompletionTokenCount: null,
     outputFromRootSpan: false,
     outputSpanEndTimeMs: 0,
     blockedByGuardrail: false,
+    rootSpanType: null,
+    containsAi: false,
     topicId: null,
     subTopicId: null,
     annotationIds: [],
+    containsPrompt: false,
+    selectedPromptId: null,
+    selectedPromptSpanId: null,
+    selectedPromptStartTimeMs: null,
+    lastUsedPromptId: null,
+    lastUsedPromptVersionNumber: null,
+    lastUsedPromptVersionId: null,
+    lastUsedPromptSpanId: null,
+    lastUsedPromptStartTimeMs: null,
     occurredAt: Date.now(),
     createdAt: Date.now(),
     updatedAt: Date.now(),
-    lastEventOccurredAt: Date.now(),
+    LastEventOccurredAt: Date.now(),
     attributes: {},
     ...overrides,
   };
@@ -100,7 +112,7 @@ describe("originGate reactor", () => {
       const reactor = createOriginGateReactor(deps);
 
       expect(reactor.options?.delay).toBe(5_000);
-      expect(reactor.options?.ttl).toBe(5_000);
+      expect(reactor.options?.ttl).toBe(15_000);
     });
 
     it("generates dedup key from tenant and trace", () => {

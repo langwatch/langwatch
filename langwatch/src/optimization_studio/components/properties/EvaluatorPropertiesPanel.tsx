@@ -12,9 +12,9 @@ import { useAvailableEvaluators } from "../../../hooks/useAvailableEvaluators";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import {
   AVAILABLE_EVALUATORS,
+  evaluatorsSchema,
   type EvaluatorTypes,
 } from "../../../server/evaluations/evaluators.generated";
-import { evaluatorsSchema } from "../../../server/evaluations/evaluators.zod.generated";
 import { getEvaluatorDefaultSettings } from "../../../server/evaluations/getEvaluator";
 import { api } from "../../../utils/api";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
@@ -363,6 +363,21 @@ function DbEvaluatorPanel({
 function InlineEvaluatorPanel({ node }: { node: Node<Evaluator> }) {
   const { project } = useOrganizationTeamProject();
   const { setNode } = useWorkflowStore(({ setNode }) => ({ setNode }));
+  // Cascade-resolved defaults so the inline evaluator form mirrors
+  // the project's configured providers (claude-opus, gemini-pro…)
+  // instead of falling back to the DEFAULT_MODEL literal.
+  const resolvedDefaultModel = api.modelProvider.getResolvedDefault.useQuery(
+    { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
+    { enabled: !!project?.id },
+  );
+  const resolvedDefaultEmbeddings =
+    api.modelProvider.getResolvedDefault.useQuery(
+      {
+        projectId: project?.id ?? "",
+        featureKey: "analytics.topic_clustering_embeddings",
+      },
+      { enabled: !!project?.id },
+    );
 
   const settingsFromParameters = Object.fromEntries(
     (node.data.parameters ?? []).map(({ identifier, value }) => [
@@ -418,11 +433,18 @@ function InlineEvaluatorPanel({ node }: { node: Node<Evaluator> }) {
     };
 
     setDefaultSettings(
-      getEvaluatorDefaultSettings(evaluatorDefinition, project),
+      getEvaluatorDefaultSettings(evaluatorDefinition, {
+        defaultModel: resolvedDefaultModel.data?.model ?? null,
+        embeddingsModel: resolvedDefaultEmbeddings.data?.model ?? null,
+      }),
       "settings",
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [evaluator]);
+  }, [
+    evaluator,
+    resolvedDefaultModel.data?.model,
+    resolvedDefaultEmbeddings.data?.model,
+  ]);
 
   const onSubmit = useCallback(
     (data: { settings: Record<string, any> }) => {

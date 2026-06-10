@@ -1,15 +1,22 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import fs, {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  unlinkSync,
+  writeFileSync,
+} from "fs";
 import { createServer, request as httpRequest, type Server } from "http";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "fs";
+import type { AddressInfo } from "net";
 import { tmpdir } from "os";
 import { join } from "path";
-import type { AddressInfo } from "net";
+import { Readable } from "stream";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { serveStaticOrFallback } from "../static-handler";
 
 function rawRequest(
   port: number,
-  rawPath: string
+  rawPath: string,
 ): Promise<{ status: number; body: string }> {
   return new Promise((resolve, reject) => {
     const req = httpRequest(
@@ -21,9 +28,9 @@ function rawRequest(
           resolve({
             status: res.statusCode ?? 0,
             body: Buffer.concat(chunks).toString("utf8"),
-          })
+          }),
         );
-      }
+      },
     );
     req.on("error", reject);
     req.end();
@@ -40,15 +47,15 @@ describe("serveStaticOrFallback", () => {
     mkdirSync(join(clientDistDir, "assets"), { recursive: true });
     writeFileSync(
       join(clientDistDir, "assets", "index-abc123.js"),
-      "console.log('hello from index-abc123');\n"
+      "console.log('hello from index-abc123');\n",
     );
     writeFileSync(
       join(clientDistDir, "assets", "main-deadbeef.css"),
-      "body { color: red; }\n"
+      "body { color: red; }\n",
     );
     writeFileSync(
       join(clientDistDir, "index.html"),
-      "<!doctype html><html><body><div id=root></div></body></html>"
+      "<!doctype html><html><body><div id=root></div></body></html>",
     );
 
     server = createServer((req, res) => {
@@ -78,7 +85,7 @@ describe("serveStaticOrFallback", () => {
       expect(res.status).toBe(200);
       expect(res.headers.get("content-type")).toBe("application/javascript");
       expect(res.headers.get("cache-control")).toBe(
-        "public, max-age=31536000, immutable"
+        "public, max-age=31536000, immutable",
       );
       expect(await res.text()).toContain("hello from index-abc123");
     });
@@ -88,7 +95,7 @@ describe("serveStaticOrFallback", () => {
       expect(res.status).toBe(200);
       expect(res.headers.get("content-type")).toBe("text/css");
       expect(res.headers.get("cache-control")).toBe(
-        "public, max-age=31536000, immutable"
+        "public, max-age=31536000, immutable",
       );
     });
   });
@@ -132,6 +139,24 @@ describe("serveStaticOrFallback", () => {
       expect(res.status).toBe(200);
       expect(res.headers.get("content-type")).toBe("text/html");
     });
+
+    it("serves the SPA shell with a revalidate Cache-Control so reloads pick up new chunks", async () => {
+      const res = await fetch(`${baseUrl}/projects/foo/traces`);
+      const cacheControl = res.headers.get("cache-control") ?? "";
+      expect(cacheControl).toMatch(/no-cache|no-store/);
+      expect(cacheControl).not.toMatch(/immutable/);
+    });
+  });
+
+  describe("when index.html is requested directly", () => {
+    it("serves it with a revalidate Cache-Control, not immutable", async () => {
+      const res = await fetch(`${baseUrl}/index.html`);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toBe("text/html");
+      const cacheControl = res.headers.get("cache-control") ?? "";
+      expect(cacheControl).toMatch(/no-cache|no-store/);
+      expect(cacheControl).not.toMatch(/immutable/);
+    });
   });
 
   describe("when an asset path attempts traversal", () => {
@@ -139,6 +164,71 @@ describe("serveStaticOrFallback", () => {
       const port = (server.address() as AddressInfo).port;
       const res = await rawRequest(port, "/assets/../../etc/passwd");
       expect(res.status).toBe(400);
+    });
+  });
+
+  describe("given an asset that existed at deploy time", () => {
+    const ephemeralName = "ephemeral-abc123.js";
+    let ephemeralPath: string;
+
+    beforeAll(() => {
+      ephemeralPath = join(clientDistDir, "assets", ephemeralName);
+      writeFileSync(ephemeralPath, "console.log('ephemeral');\n");
+    });
+
+    it("serves the file normally", async () => {
+      const res = await fetch(`${baseUrl}/assets/${ephemeralName}`);
+      expect(res.status).toBe(200);
+      expect(await res.text()).toContain("ephemeral");
+    });
+
+    describe("when the file is deleted mid-deploy before the next request", () => {
+      beforeAll(() => {
+        unlinkSync(ephemeralPath);
+      });
+
+      it("returns 404 — openSync fails cleanly, no crash", async () => {
+        const res = await fetch(`${baseUrl}/assets/${ephemeralName}`);
+        expect(res.status).toBe(404);
+      });
+    });
+  });
+
+  describe("given a file whose read stream errors after it opens", () => {
+    describe("when the stream emits 'error' before any bytes are sent", () => {
+      it("responds 500 without crashing the server", async () => {
+        // The atomic openSync+fd design makes a mid-stream error all but
+        // impossible from a deleted file (the held fd keeps the inode alive),
+        // but pipeWithErrorHandling still guards every other I/O error (EIO
+        // etc). Force one to prove it becomes a clean 500 rather than an
+        // unhandled 'error' that would crash the process.
+        const spy = vi.spyOn(fs, "createReadStream").mockImplementationOnce(((
+          _path: fs.PathLike,
+          options?: unknown,
+        ) => {
+          // Release the real fd the handler opened so the test leaks nothing.
+          const fd = (options as { fd?: number } | undefined)?.fd;
+          if (typeof fd === "number") {
+            try {
+              fs.closeSync(fd);
+            } catch {
+              // already closed
+            }
+          }
+          const stream = new Readable({ read() {} });
+          // Emit after the handler attaches its 'error' listener and pipes.
+          queueMicrotask(() =>
+            stream.emit("error", new Error("forced stream error")),
+          );
+          return stream as unknown as ReturnType<typeof fs.createReadStream>;
+        }) as typeof fs.createReadStream);
+
+        const res = await fetch(`${baseUrl}/assets/index-abc123.js`);
+
+        expect(res.status).toBe(500);
+        expect(await res.text()).toContain("Internal Server Error");
+        spy.mockRestore();
+      });
     });
   });
 });

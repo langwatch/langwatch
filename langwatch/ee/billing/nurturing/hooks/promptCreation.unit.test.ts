@@ -38,6 +38,7 @@ describe("firePromptCreatedNurturing()", () => {
 
   describe("given an organization with no prompts", () => {
     describe("when a user creates their first prompt", () => {
+      /** @scenario 'First prompt creation identifies user with has_prompts true' */
       it("identifies user with has_prompts true and prompt_count 1", async () => {
         firePromptCreatedNurturing({
           userId: "user-1",
@@ -51,6 +52,7 @@ describe("firePromptCreatedNurturing()", () => {
         });
       });
 
+      /** @scenario 'First prompt creation fires first_prompt_created event' */
       it("tracks first_prompt_created event with project_id", async () => {
         firePromptCreatedNurturing({
           userId: "user-1",
@@ -69,6 +71,7 @@ describe("firePromptCreatedNurturing()", () => {
 
   describe("given an organization that already has prompts", () => {
     describe("when a user creates another prompt", () => {
+      /** @scenario 'Subsequent prompt creation updates org-wide prompt_count without firing first event' */
       it("identifies user with has_prompts true and updated prompt_count", async () => {
         firePromptCreatedNurturing({
           userId: "user-1",
@@ -95,6 +98,7 @@ describe("firePromptCreatedNurturing()", () => {
   });
 
   describe("when Customer.io API is unavailable", () => {
+    /** @scenario 'Prompt creation hook failure does not break the prompt mutation' */
     it("does not throw (fire-and-forget)", async () => {
       const { captureException } = await import(
         "../../../../src/utils/posthogErrorCapture"

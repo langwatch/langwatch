@@ -12,6 +12,16 @@ Feature: All Runs rows display scenario names
     - Long individual names are truncated via CSS (text-overflow: ellipsis)
     - Pass rate percentage and status icon are right-aligned (layout concern, not tested)
 
+  # Parity status: 0 of 5 scenarios bound to existing tests.
+  # Remaining @unimplemented scenarios (#3458):
+  #   5 NO_TEST: shipped behavior, no integration test yet
+  # NO_TEST gaps:
+  #   - "Run row displays scenario names in the collapsed header"
+  #   - "Run row displays single scenario name without separator"
+  #   - "Run row truncates long scenario name lists"
+  #   - "Extracts unique sorted scenario names from batch run data"
+  #   - "Falls back to scenario ID when name is null or undefined"
+
   Background:
     Given a batch run with scenario runs
 

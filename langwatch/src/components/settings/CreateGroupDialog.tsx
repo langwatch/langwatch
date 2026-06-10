@@ -102,7 +102,7 @@ export function CreateGroupDialog({
       }}
       size="lg"
     >
-      <Dialog.Content maxHeight="90vh" overflowY="auto">
+      <Dialog.Content bg="bg" maxHeight="90vh" overflowY="auto">
         <Dialog.Header>
           <Dialog.Title>Create group</Dialog.Title>
         </Dialog.Header>

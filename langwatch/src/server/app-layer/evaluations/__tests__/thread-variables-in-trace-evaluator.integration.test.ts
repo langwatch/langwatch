@@ -2,7 +2,7 @@
  * @vitest-environment node
  *
  * Integration tests for thread variables in trace-level evaluator input mapping.
- * Feature: specs/features/evaluations-v3/thread-variables-in-trace-evaluator.feature
+ * Feature: specs/features/experiments-v3/thread-variables-in-trace-evaluator.feature
  *
  * Tests the backend resolution of mixed trace + thread source mappings.
  * All I/O deps are injected via constructor — zero vi.mock calls.
@@ -99,9 +99,6 @@ function createTestService(overrides: TestOverrides = {}) {
 // ---------------------------------------------------------------------------
 
 describe("Feature: Thread variables available in trace-level evaluator input mapping", () => {
-  // -------------------------------------------------------------------------
-  // @integration Scenario: Trace-level evaluation resolves a thread source mapping
-  // -------------------------------------------------------------------------
   describe("buildDataForEvaluation (via executeForTrace)", () => {
     describe("given a trace-level evaluator with an input mapped to 'thread.traces'", () => {
       const threadTraces = [
@@ -115,6 +112,7 @@ describe("Feature: Thread variables available in trace-level evaluator input map
       ];
 
       describe("when buildDataForEvaluation runs for a trace with thread_id 'abc'", () => {
+        /** @scenario 'Trace-level evaluation resolves a thread source mapping' */
         it("fetches all traces in thread 'abc' and the evaluator input contains the thread traces data", async () => {
           const trace = buildTrace({ metadata: { thread_id: "abc" } });
           const { service, mockTraceService } = createTestService({
@@ -165,11 +163,9 @@ describe("Feature: Thread variables available in trace-level evaluator input map
     });
   });
 
-  // -------------------------------------------------------------------------
-  // @integration Scenario: Trace-level evaluation resolves mixed trace and thread source mappings
-  // -------------------------------------------------------------------------
   describe("given a trace-level evaluator with mixed trace and thread mappings", () => {
     describe("when buildDataForEvaluation runs for a trace with thread_id 'abc'", () => {
+      /** @scenario 'Trace-level evaluation resolves mixed trace and thread source mappings' */
       it("resolves 'input' from trace and 'conversation' from thread formatted_traces", async () => {
         const trace = buildTrace({
           input: { value: "user message" },
@@ -258,11 +254,9 @@ describe("Feature: Thread variables available in trace-level evaluator input map
     });
   });
 
-  // -------------------------------------------------------------------------
-  // @integration Scenario: Trace-level evaluation with thread source but trace has no thread_id
-  // -------------------------------------------------------------------------
   describe("given a trace-level evaluator with thread source but trace has no thread_id", () => {
     describe("when buildDataForEvaluation runs for a trace without thread_id", () => {
+      /** @scenario 'Trace-level evaluation with thread source but trace has no thread_id' */
       it("resolves thread-sourced field to empty value and trace-sourced fields still resolve normally", async () => {
         const trace = buildTrace({
           input: { value: "hello there" },
@@ -306,12 +300,9 @@ describe("Feature: Thread variables available in trace-level evaluator input map
     });
   });
 
-  // -------------------------------------------------------------------------
-  // @integration Scenario: Background worker resolves mixed trace and thread mappings
-  // (tested via EvaluationExecutionService which shares the same resolution logic)
-  // -------------------------------------------------------------------------
   describe("given a trace-level monitor with mixed trace and thread mappings", () => {
     describe("when the evaluations worker processes a trace with thread_id 'xyz'", () => {
+      /** @scenario 'Background worker resolves mixed trace and thread mappings' */
       it("resolves both trace and thread fields correctly", async () => {
         const trace = buildTrace({
           input: { value: "worker input" },

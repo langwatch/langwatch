@@ -102,6 +102,7 @@ describe("isViewOnlyCustomRole", () => {
 
 describe("classifyMemberType", () => {
   describe("role-based classification", () => {
+    /** @scenario ADMIN role users count as Full Member */
     it("returns FullMember for ADMIN role", () => {
       expect(classifyMemberType(OrganizationUserRole.ADMIN, undefined)).toBe(
         "FullMember"
@@ -114,6 +115,7 @@ describe("classifyMemberType", () => {
       ).toBe("FullMember");
     });
 
+    /** @scenario MEMBER role users count as Full Member */
     it("returns FullMember for MEMBER role", () => {
       expect(classifyMemberType(OrganizationUserRole.MEMBER, undefined)).toBe(
         "FullMember"
@@ -134,6 +136,7 @@ describe("classifyMemberType", () => {
   });
 
   describe("EXTERNAL role (Lite Member) with custom permissions", () => {
+    /** @scenario Custom role with only view permissions counts as Lite Member */
     it("returns LiteMember for view-only permissions", () => {
       expect(
         classifyMemberType(OrganizationUserRole.EXTERNAL, ["project:view"])
@@ -150,6 +153,7 @@ describe("classifyMemberType", () => {
       ).toBe("LiteMember");
     });
 
+    /** @scenario Custom role with manage permission counts as Full Member */
     it("returns FullMember for manage permission", () => {
       expect(
         classifyMemberType(OrganizationUserRole.EXTERNAL, [
@@ -159,6 +163,7 @@ describe("classifyMemberType", () => {
       ).toBe("FullMember");
     });
 
+    /** @scenario Custom role with create permission counts as Full Member */
     it("returns FullMember for create permission", () => {
       expect(
         classifyMemberType(OrganizationUserRole.EXTERNAL, [
@@ -168,6 +173,7 @@ describe("classifyMemberType", () => {
       ).toBe("FullMember");
     });
 
+    /** @scenario Custom role with update permission counts as Full Member */
     it("returns FullMember for update permission", () => {
       expect(
         classifyMemberType(OrganizationUserRole.EXTERNAL, [
@@ -177,6 +183,7 @@ describe("classifyMemberType", () => {
       ).toBe("FullMember");
     });
 
+    /** @scenario Custom role with delete permission counts as Full Member */
     it("returns FullMember for delete permission", () => {
       expect(
         classifyMemberType(OrganizationUserRole.EXTERNAL, [
@@ -186,6 +193,7 @@ describe("classifyMemberType", () => {
       ).toBe("FullMember");
     });
 
+    /** @scenario Custom role with share permission counts as Full Member */
     it("returns FullMember for share permission", () => {
       expect(
         classifyMemberType(OrganizationUserRole.EXTERNAL, [

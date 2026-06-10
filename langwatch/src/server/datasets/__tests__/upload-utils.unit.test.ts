@@ -14,24 +14,28 @@ describe("Feature: Dataset File Upload - Upload Utils", () => {
 
   describe("detectFileFormat()", () => {
     describe("when given a .csv extension", () => {
+      /** @scenario "Detect CSV format from .csv extension" */
       it("detects CSV format", () => {
         expect(detectFileFormat("data.csv")).toBe("csv");
       });
     });
 
     describe("when given a .json extension", () => {
+      /** @scenario "Detect JSON format from .json extension" */
       it("detects JSON format", () => {
         expect(detectFileFormat("data.json")).toBe("json");
       });
     });
 
     describe("when given a .jsonl extension", () => {
+      /** @scenario "Detect JSONL format from .jsonl extension" */
       it("detects JSONL format", () => {
         expect(detectFileFormat("data.jsonl")).toBe("jsonl");
       });
     });
 
     describe("when given an unsupported extension", () => {
+      /** @scenario "Reject unknown file extension" */
       it("throws an error for .parquet", () => {
         expect(() => detectFileFormat("data.parquet")).toThrow(
           /unsupported file format/i,
@@ -56,6 +60,7 @@ describe("Feature: Dataset File Upload - Upload Utils", () => {
 
   describe("parseCSV()", () => {
     describe("when given a CSV with headers and 2 data rows", () => {
+      /** @scenario "Parse CSV with first row as headers" */
       it("returns 2 records with correct keys", () => {
         const csv = "a,b\n1,2\n3,4";
         const result = parseCSV(csv);
@@ -67,6 +72,7 @@ describe("Feature: Dataset File Upload - Upload Utils", () => {
     });
 
     describe("when a value contains a comma inside quotes", () => {
+      /** @scenario "Parse CSV handles quoted values with commas" */
       it("preserves the quoted value as a single field", () => {
         const csv = 'name,description\nAlice,"Hello, World"\nBob,Simple';
         const result = parseCSV(csv);
@@ -91,6 +97,7 @@ describe("Feature: Dataset File Upload - Upload Utils", () => {
 
   describe("parseJSON()", () => {
     describe("when given a JSON array of 2 objects", () => {
+      /** @scenario "Parse JSON array file" */
       it("returns 2 records", () => {
         const json = '[{"name": "Alice"}, {"name": "Bob"}]';
         const result = parseJSON(json);
@@ -119,6 +126,7 @@ describe("Feature: Dataset File Upload - Upload Utils", () => {
 
   describe("parseJSONL()", () => {
     describe("when given 3 lines of JSONL", () => {
+      /** @scenario "Parse JSONL with one object per line" */
       it("returns 3 records", () => {
         const jsonl =
           '{"a": 1}\n{"a": 2}\n{"a": 3}';
@@ -128,6 +136,7 @@ describe("Feature: Dataset File Upload - Upload Utils", () => {
     });
 
     describe("when blank lines exist between objects", () => {
+      /** @scenario "Parse JSONL ignores blank lines" */
       it("skips blank lines and returns only valid objects", () => {
         const jsonl = '{"a": 1}\n\n{"a": 2}\n\n';
         const result = parseJSONL(jsonl);
@@ -145,6 +154,7 @@ describe("Feature: Dataset File Upload - Upload Utils", () => {
     });
 
     describe("when content is not valid JSON but is valid JSONL", () => {
+      /** @scenario "Parse JSON falls back to JSONL when array parse fails" */
       it("successfully parses as JSONL", () => {
         const content = '{"a": 1}\n{"a": 2}';
         const result = parseJSONL(content);
@@ -157,6 +167,7 @@ describe("Feature: Dataset File Upload - Upload Utils", () => {
 
   describe("renameReservedColumns()", () => {
     describe("when columns include 'id'", () => {
+      /** @scenario 'Rename "id" column to "id_"' */
       it("renames 'id' to 'id_'", () => {
         const result = renameReservedColumns(["id", "name"]);
         expect(result).toEqual(["id_", "name"]);
@@ -164,6 +175,7 @@ describe("Feature: Dataset File Upload - Upload Utils", () => {
     });
 
     describe("when columns include 'selected'", () => {
+      /** @scenario 'Rename "selected" column to "selected_"' */
       it("renames 'selected' to 'selected_'", () => {
         const result = renameReservedColumns(["selected", "value"]);
         expect(result).toEqual(["selected_", "value"]);
@@ -171,6 +183,7 @@ describe("Feature: Dataset File Upload - Upload Utils", () => {
     });
 
     describe("when columns have no reserved names", () => {
+      /** @scenario "Non-reserved columns are unchanged" */
       it("returns columns unchanged", () => {
         const result = renameReservedColumns(["input", "output"]);
         expect(result).toEqual(["input", "output"]);

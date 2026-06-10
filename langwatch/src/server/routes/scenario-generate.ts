@@ -7,10 +7,8 @@
  * (name, situation, criteria) from a user prompt.
  */
 import { generateObject } from "ai";
-import { Hono } from "hono";
 import { z } from "zod";
-import { loggerMiddleware } from "~/app/api/middleware/logger";
-import { tracerMiddleware } from "~/app/api/middleware/tracer";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { hasProjectPermission } from "~/server/api/rbac";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
@@ -76,11 +74,11 @@ Given a description of an agent and desired scenario, generate:
 
 When refining an existing scenario, incorporate the user's feedback while preserving the overall structure and any parts they haven't asked to change.`;
 
-export const app = new Hono().basePath("/api/scenario");
-app.use(tracerMiddleware({ name: "scenario-generate" }));
-app.use(loggerMiddleware());
+const secured = createServiceApp({ basePath: "/api/scenario" });
 
-app.post("/generate", async (c) => {
+secured.access(
+  handlerManagedAuth("user session validated in-handler via getServerAuthSession"),
+).post("/generate", async (c) => {
   const session = await getServerAuthSession({ req: c.req.raw as any });
   if (!session) {
     return c.json(
@@ -112,7 +110,7 @@ app.post("/generate", async (c) => {
   }
 
   try {
-    const model = await getVercelAIModel(projectId);
+    const model = await getVercelAIModel({ projectId, featureKey: "scenarios.generator" });
 
     const userPrompt = currentScenario
       ? `Current scenario:\n${JSON.stringify(currentScenario, null, 2)}\n\nUser request: ${prompt}`
@@ -135,3 +133,5 @@ app.post("/generate", async (c) => {
     return c.json({ error: errorMessage }, { status: 500 });
   }
 });
+
+export const app = secured.hono;

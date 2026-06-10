@@ -5,6 +5,7 @@ import { groupItemsByType } from "../RecentItemsSection";
 describe("RecentItemsSection", () => {
   describe("groupItemsByType", () => {
     describe("when items have different types", () => {
+      /** @scenario By type tab groups items by entity type */
       it("groups items by their type", () => {
         const items: RecentItem[] = [
           {

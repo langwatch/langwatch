@@ -1,5 +1,14 @@
-import type { LocalPromptConfig, MaterializedPrompt } from "../types";
+import type {
+  LocalPromptConfig,
+  MaterializedPrompt,
+  RuntimeParameters,
+} from "../types";
 import { type PromptResponse, type UpdatePromptBody } from "@/client-sdk/services/prompts/types";
+import {
+  type CliOutput,
+  type LocalResponseFormat,
+  outputsToResponseFormat,
+} from "./responseFormat";
 
 /**
  * Converter utility for transforming between YAML prompt format and API service format.
@@ -28,6 +37,7 @@ export class PromptConverter {
       maxTokens: prompt.maxTokens,
       inputs: prompt.inputs,
       outputs: prompt.outputs,
+      parameters: prompt.parameters ?? {},
       updatedAt: prompt.updatedAt,
     };
   }
@@ -46,13 +56,22 @@ export class PromptConverter {
       role: "system" | "user" | "assistant";
       content: string;
     }>;
+    response_format?: LocalResponseFormat;
+    parameters?: RuntimeParameters;
   } {
     const result: any = {
       model: prompt.model,
       messages: prompt.messages,
     };
 
-    // Add modelParameters if temperature or maxTokens exist
+    if (Object.keys(prompt.parameters ?? {}).length > 0) {
+      result.parameters = prompt.parameters;
+    }
+
+    // Add modelParameters if temperature or maxTokens exist. The server is the
+    // source of truth for which sampling parameters a model accepts and omits
+    // the ones it would reject (e.g. temperature on the gpt-5 family), so we
+    // simply mirror what the API returned — never inject a default here.
     if (prompt.temperature !== undefined || prompt.maxTokens !== undefined) {
       result.modelParameters = {};
       if (prompt.temperature !== undefined) {
@@ -63,6 +82,17 @@ export class PromptConverter {
       }
     }
 
+    // Reconstruct the structured-output block from the platform outputs so a
+    // pull never drops a response_format the user configured. Inverse of the
+    // push direction in pushPrompts.
+    const responseFormat = outputsToResponseFormat(
+      prompt.outputs as CliOutput[] | undefined,
+      prompt.name,
+    );
+    if (responseFormat) {
+      result.response_format = responseFormat;
+    }
+
     return result;
   }
 
@@ -70,13 +100,16 @@ export class PromptConverter {
    * Converts a LocalPromptConfig (loaded from YAML) to the format
    * expected by the API service for upserting.
    */
-  static fromLocalToApiFormat(config: LocalPromptConfig): Omit<UpdatePromptBody, "commitMessage">
+  static fromLocalToApiFormat(
+    config: LocalPromptConfig,
+  ): Omit<UpdatePromptBody, "commitMessage"> & { parameters?: RuntimeParameters }
   {
     return {
       model: config.model,
       temperature: config.modelParameters?.temperature,
       maxTokens: config.modelParameters?.max_tokens,
       messages: config.messages,
+      parameters: config.parameters ?? {},
     };
   }
 

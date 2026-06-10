@@ -2,14 +2,25 @@
 #
 # Setup:
 #   cp langwatch/.env.example langwatch/.env        # Add your keys
-#   cp langwatch_nlp/.env.example langwatch_nlp/.env  # Add OPENAI_API_KEY for NLP
 #
-# Usage:
-#   docker compose -f compose.dev.yml up                     # minimal: postgres + redis + clickhouse + app
-#   docker compose -f compose.dev.yml --profile nlp up       # + NLP + langevals
-#   docker compose -f compose.dev.yml --profile scenarios up # + scenario worker + bullboard + NLP
-#   docker compose -f compose.dev.yml --profile test up      # + AI test server
-#   docker compose -f compose.dev.yml --profile full up      # everything
+# **Use `make quickstart` — not direct compose.** ADR-004 (2026-05, #3860)
+# established `make quickstart` as the single entry point for local dev. It
+# sets VOLUME_PREFIX via scripts/dev.sh so per-worktree volumes (goose_bin,
+# app_modules, bullboard_modules, see line ~360) get isolated names; running
+# `docker compose -f compose.dev.yml up` directly collapses every worktree
+# onto the same volumes.
+#
+# Recommended:
+#   make quickstart                # interactive: asks what you're working on
+#   make quickstart frontend-only  # no compose, fastest
+#   make quickstart backend-shared # postgres + redis + clickhouse + app
+#   make quickstart nlp            # + NLP + langevals
+#   make quickstart full-local     # everything
+#   make quickstart-help           # full mode reference (non-interactive)
+#
+# Legacy targets `make dev`, `make dev-up`, `make dev-down`, `make dev-logs`
+# still work for one release with a deprecation warning — they shim onto the
+# new modes.
 #
 # Per-worktree ports (create .env.dev in your worktree):
 #   APP_PORT=5560
@@ -19,10 +30,7 @@
 # Debug logging (set in shell or .env.dev):
 #   PINO_LOG_LEVEL=debug    # For verbose worker/app logs
 #
-# Resource limits:
-#   minimal (dev):     ~10.3GB (postgres 256 + redis 64 + clickhouse 2048 + app 8192)
-#   scenarios:         ~13.6GB (+ workers 1536 + nlp 1024 + bullboard 512 + ai-server 256)
-#   full:              ~13.8GB (+ langevals 256)
+# Per-service memory limits are configured below on each service.
 #
 # AI Gateway (Go data plane) — NOT in this compose:
 #   The Go gateway runs on the host via `make service svc=aigateway`,
@@ -36,11 +44,14 @@ x-common-env: &common-env
   COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
   NODE_ENV: development
   SKIP_TIKTOKEN: 'true'
-  DATABASE_URL: postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
-  REDIS_URL: redis://redis:6379
-  CLICKHOUSE_URL: http://default:langwatch@clickhouse:8123/langwatch
-  LANGWATCH_NLP_SERVICE: http://langwatch_nlp:5561
-  LANGEVALS_ENDPOINT: http://langevals:5562
+  # Prod-like dev: IS_SAAS=true (from langwatch/.env) requires SSRF blocking.
+  BLOCK_LOCAL_HTTP_CALLS: "true"
+  # NOTE: infrastructure URLs (DATABASE_URL, REDIS_URL, CLICKHOUSE_URL,
+  # LANGWATCH_NLP_SERVICE, LANGEVALS_ENDPOINT) are NOT set here. The
+  # contributor's `langwatch/.env` is the source of truth — `quickstart`
+  # writes a per-mode overlay at `langwatch/.env.dev-up` that overrides
+  # only the URLs whose services are starting locally for that mode
+  # (#3860 AC#2 / AC#6).
 
 services:
   # =============================================================================
@@ -68,9 +79,19 @@ services:
           memory: 256m
           cpus: "0.5"
 
+  # Singleton across worktrees (#3860 AC#5). Exposed on a fixed host port so
+  # parallel worktrees reuse the same container instead of spinning up their
+  # own. Compose treats this as belonging to the first project that brings it
+  # up; subsequent `quickstart`s detect the running container and reuse it.
+  #
+  # Prerequisite: no host-side redis-server may be holding 6379. `make
+  # quickstart` calls `check_host_redis_collision` (scripts/dev.sh) which
+  # detects this case and prints a clear hint. On macOS:
+  # `brew services stop redis`. On Linux: `sudo systemctl stop redis-server`.
   redis:
     image: redis:alpine
-    # No host port - accessed via docker network as "redis:6379"
+    ports:
+      - "6379:6379"
     volumes:
       - redis-data:/data
     healthcheck:
@@ -81,7 +102,11 @@ services:
     deploy:
       resources:
         limits:
-          memory: 64m
+          # Bulk-trace seeding piles 25–30k queue / event keys into
+          # Redis; the 64m ceiling was triggering an OOM kill during
+          # BGSAVE fork. 512m gives the dev stack headroom while still
+          # being a fraction of what prod would use.
+          memory: 512m
           cpus: "0.25"
 
   clickhouse:
@@ -100,7 +125,12 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2g
+          # Eval-rich seed loads (1–4 evaluation_runs per trace, async
+          # inserts queued up via the customEvaluationSync reactor) were
+          # pushing CH past the 2g ceiling during BGSAVE / merges and
+          # the OvercommitTracker started killing inserts. 4g keeps the
+          # dev stack stable under the worst seed we've thrown at it.
+          memory: 4g
           cpus: "1.0"
 
   # =============================================================================
@@ -112,6 +142,8 @@ services:
     working_dir: /app
     volumes:
       - ./langwatch:/app
+      - ./pnpm-workspace.yaml:/pnpm-workspace.yaml:ro
+      - ./package.json:/package.json:ro
       - ./mcp-server:/mcp-server
       - ./langevals:/langevals
       - ./typescript-sdk:/typescript-sdk:ro
@@ -136,8 +168,7 @@ services:
         fi &&
         (cd /mcp-server && pnpm install --ignore-scripts && pnpm run build) &&
         pnpm -w install &&
-        pnpm -w exec prisma generate &&
-        pnpm run types:zod:generate
+        pnpm -w exec prisma generate
       "
     environment:
       COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
@@ -153,6 +184,8 @@ services:
     working_dir: /app
     volumes:
       - ./langwatch:/app
+      - ./pnpm-workspace.yaml:/pnpm-workspace.yaml:ro
+      - ./package.json:/package.json:ro
       - ./mcp-server:/mcp-server
       - ./langevals:/langevals
       - ./typescript-sdk:/typescript-sdk:ro
@@ -164,7 +197,6 @@ services:
         export PATH=/opt/goose-bin:$$PATH &&
         corepack enable &&
         pnpm -w exec prisma generate &&
-        pnpm run types:zod:generate &&
         pnpm run start:prepare:db &&
         pnpm run dev
       "
@@ -202,12 +234,17 @@ services:
     deploy:
       resources:
         limits:
-          memory: 8g
+          memory: 4g
           cpus: "2.0"
 
   # =============================================================================
   # WORKERS (profile: workers)
   # =============================================================================
+  # Started by quickstart presets: all-local, all-local-nlp, dev-storage, dev-infra, full-local.
+  # Skipped by: frontend-only (which uses `pnpm dev` on the host with
+  # START_WORKERS=true so workers run in-process there).
+  # migration is a short-lived host-port stack for prisma/clickhouse migrate;
+  # it never runs the app, so no workers.
 
   workers:
     image: node:24
@@ -215,6 +252,8 @@ services:
     profiles: [workers, scenarios, full]
     volumes:
       - ./langwatch:/app
+      - ./pnpm-workspace.yaml:/pnpm-workspace.yaml:ro
+      - ./package.json:/package.json:ro
       - ./mcp-server:/mcp-server
       - ./langevals:/langevals
       - ./typescript-sdk:/typescript-sdk:ro
@@ -227,10 +266,14 @@ services:
       # Override BASE_HOST for Docker networking - scenario child processes post events here
       BASE_HOST: http://app:5560
       LANGWATCH_ENDPOINT: http://app:5560
+      # Override REDIS_URL: host app uses localhost:6379, workers must use compose service name
+      REDIS_URL: redis://redis:6379
       PINO_LOG_LEVEL: ${PINO_LOG_LEVEL:-info}
       # To enable verbose scenario SDK logging, add: SCENARIO_VERBOSE: "true"
     env_file:
       - langwatch/.env
+      - path: langwatch/.env.dev-up
+        required: false
     depends_on:
       init:
         condition: service_completed_successfully
@@ -243,14 +286,19 @@ services:
   # =============================================================================
   # NLP SERVICE (profile: nlp)
   # =============================================================================
+  # nlpgo — the Go NLP engine (services/nlpgo, run as the `nlpgo` subcommand of
+  # the cmd/service monobinary). Dockerfile.langwatch_nlp builds a static Go
+  # binary; there is no Python uvicorn/litellm service anymore. The image still
+  # publishes as langwatch/langwatch_nlp and binds :5561, so the app/workers
+  # dial http://langwatch_nlp:5561 (LANGWATCH_NLP_SERVICE) unchanged.
 
   langwatch_nlp:
     image: langwatch/langwatch_nlp:latest
     profiles: [nlp, scenarios, full]
-    env_file:
-      - langwatch_nlp/.env
     # No host port - accessed via docker network as "langwatch_nlp:5561"
     environment:
+      # nlpgo reads LANGWATCH_ENDPOINT for evaluator + agent-workflow callbacks
+      # (falls back to it when NLPGO_ENGINE_LANGWATCH_BASE_URL is unset).
       LANGWATCH_ENDPOINT: http://app:5560
     deploy:
       resources:
@@ -306,6 +354,8 @@ services:
     profiles: [test, scenarios, full]
     volumes:
       - ./langwatch:/app
+      - ./pnpm-workspace.yaml:/pnpm-workspace.yaml:ro
+      - ./package.json:/package.json:ro
       - ./mcp-server:/mcp-server
       - ./langevals:/langevals
       - ./typescript-sdk:/typescript-sdk:ro
@@ -322,6 +372,8 @@ services:
       LOG_LEVEL: "debug"
     env_file:
       - langwatch/.env
+      - path: langwatch/.env.dev-up
+        required: false
     depends_on:
       init:
         condition: service_completed_successfully
@@ -332,17 +384,25 @@ services:
           cpus: "0.25"
 
 volumes:
+  # Stateful — shared across worktrees (#3860 AC#4 / AC#5).
+  # Sign-up persists when switching worktrees; ClickHouse traces survive too.
+  # Two worktrees can't have the same stateful container `up` simultaneously
+  # (postgres locks the volume) — `scripts/dev.sh` detects and warns.
   db-data:
-    name: ${VOLUME_PREFIX:-langwatch}-db-data
+    name: langwatch-db-data
   redis-data:
-    name: ${VOLUME_PREFIX:-langwatch}-redis-data
+    name: langwatch-redis-data
   clickhouse-data:
-    name: ${VOLUME_PREFIX:-langwatch}-clickhouse-data
+    name: langwatch-clickhouse-data
+  # Per-worktree — Linux-vs-host platform isolation per ADR-004.
+  # node_modules differs across branches with different lockfiles, so these
+  # stay namespaced.
   goose_bin:
     name: ${VOLUME_PREFIX:-langwatch}-goose-bin
   app_modules:
     name: ${VOLUME_PREFIX:-langwatch}-app-modules
-  pnpm_store:
-    name: langwatch-pnpm-store # Always shared (cache only)
   bullboard_modules:
     name: ${VOLUME_PREFIX:-langwatch}-bullboard-modules
+  # Always shared (cache only).
+  pnpm_store:
+    name: langwatch-pnpm-store

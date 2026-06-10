@@ -256,7 +256,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
       }}
       preventScroll={true}
     >
-      <Drawer.Content
+      <Drawer.Content bg="bg"
         maxWidth="1400px"
         overflow="auto"
         ref={scrollRef}

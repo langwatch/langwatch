@@ -17,11 +17,11 @@ When using the Helm chart, you rarely need to set environment variables directly
 
 | Variable | Description | Required | Default |
 |----------|-------------|----------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | Yes | — |
-| `CLICKHOUSE_URL` | ClickHouse HTTP connection string (e.g. `http://user:pass@host:8123/langwatch`) | Yes | — |
-| `REDIS_URL` | Redis connection string | Yes | — |
+| `DATABASE_URL` | PostgreSQL connection string | Yes |, |
+| `CLICKHOUSE_URL` | ClickHouse HTTP connection string (e.g. `http://user:pass@host:8123/langwatch`) | Yes |, |
+| `REDIS_URL` | Redis connection string | Yes |, |
 | `NODE_ENV` | Environment (`production`, `development`) | No | `production` |
-| `BASE_HOST` | Internal base URL for the application | Yes | — |
+| `BASE_HOST` | Internal base URL for the application | Yes |, |
 | `NEXTAUTH_URL` | Public URL for authentication callbacks | Yes | Same as `BASE_HOST` |
 | `START_WORKERS` | Run workers in-process (`true`/`false`) | No | `false` |
 
@@ -110,19 +110,29 @@ Each SSO provider requires specific variables. See [SSO Configuration](/self-hos
 
 ## Object Storage (S3)
 
+The dataplane S3 bucket is the general file-storage layer for all externalized byte content. Current consumers:
+
+- **Stored objects** — externalized byte content (audio, image, video, document) extracted from incoming events and dataset uploads. Bytes are content-addressed under `{projectId}/{sha256}` and served back via `GET /api/files/:id`.
+- **Dataset uploads** — persists rows uploaded through the dataset UI. Shares the same `S3_BUCKET_NAME` bucket.
+
+When `S3_BUCKET_NAME` is set, all consumers use that bucket. When it is not set, stored-objects fall back to the local filesystem at `LANGWATCH_LOCAL_STORAGE_PATH` — fine for single-replica installs, **not** for horizontally-scaled deployments (see warning below).
+
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `DATASET_OBJECT_STORAGE_ENABLED` | Enable S3 for dataset storage | `false` |
-| `DATASET_OBJECT_STORAGE_PROVIDER` | Storage provider (`awsS3`) | `awsS3` |
-| `DATASET_OBJECT_STORAGE_BUCKET` | S3 bucket name | `langwatch-dataset` |
+| `S3_BUCKET_NAME` | Dataplane bucket shared by datasets + stored-objects | — |
 | `S3_ENDPOINT` | Custom S3 endpoint (for MinIO, etc.) | — |
 | `S3_ACCESS_KEY_ID` | S3 access key ID | — |
 | `S3_SECRET_ACCESS_KEY` | S3 secret access key | — |
 | `S3_KEY_SALT` | Optional key salt for S3 object keys | — |
+| `LANGWATCH_LOCAL_STORAGE_PATH` | Filesystem root used for stored-objects when no S3 is configured | `/var/lib/langwatch/objects` |
 
 <Note>
 When running on AWS with IRSA (IAM Roles for Service Accounts), you don't need to set S3 access keys. The pod's service account will assume the IAM role automatically.
 </Note>
+
+<Warning>
+`LANGWATCH_LOCAL_STORAGE_PATH` is **single-replica only**. Multi-pod Kubernetes deployments must NOT rely on it: pods do not share a local filesystem, so a write from pod A is invisible to pod B and bytes vanish on every pod restart. Single-replica self-host installs (small footprints, hobbyist / air-gapped / pre-pilot deployments) can use it safely — the Helm chart refuses to render `localFilesystem.enabled=true` together with `replicaCount > 1` so the misconfiguration can't reach a cluster. Use `S3_BUCKET_NAME` (or the equivalent Helm `app.dataplane.enabled` toggle) for any horizontally-scaled deployment.
+</Warning>
 
 ## Email
 
@@ -130,18 +140,18 @@ When running on AWS with IRSA (IAM Roles for Service Accounts), you don't need t
 |----------|-------------|---------|
 | `EMAIL_ENABLED` | Enable email notifications | `false` |
 | `EMAIL_PROVIDER` | Email provider (`sendgrid`) | `sendgrid` |
-| `SENDGRID_API_KEY` | SendGrid API key | — |
-| `EMAIL_DEFAULT_FROM` | Default "from" address | — |
+| `SENDGRID_API_KEY` | SendGrid API key |, |
+| `EMAIL_DEFAULT_FROM` | Default "from" address |, |
 
 ## Evaluator Providers
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `AZURE_OPENAI_EVALUATOR_ENABLED` | Enable Azure OpenAI for evaluations | `false` |
-| `AZURE_OPENAI_EVALUATOR_ENDPOINT` | Azure OpenAI endpoint URL | — |
-| `AZURE_OPENAI_EVALUATOR_API_KEY` | Azure OpenAI API key | — |
+| `AZURE_OPENAI_EVALUATOR_ENDPOINT` | Azure OpenAI endpoint URL |, |
+| `AZURE_OPENAI_EVALUATOR_API_KEY` | Azure OpenAI API key |, |
 | `GOOGLE_EVALUATOR_ENABLED` | Enable Google AI for evaluations (PII detection) | `false` |
-| `GOOGLE_CREDENTIALS_JSON` | Google service account credentials JSON | — |
+| `GOOGLE_CREDENTIALS_JSON` | Google service account credentials JSON |, |
 
 ## Feature Flags
 
@@ -156,8 +166,8 @@ When running on AWS with IRSA (IAM Roles for Service Accounts), you don't need t
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `DISABLE_USAGE_STATS` | Disable anonymous usage analytics | `false` |
-| `SENTRY_DSN` | Sentry DSN for error tracking | — |
-| `METRICS_API_KEY` | API key for metrics collection | — |
+| `SENTRY_DSN` | Sentry DSN for error tracking |, |
+| `METRICS_API_KEY` | API key for metrics collection |, |
 
 ## Helm Chart Mapping
 
@@ -182,8 +192,8 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `app.evaluators.google.enabled` | `GOOGLE_EVALUATOR_ENABLED` |
 | `app.evaluators.google.credentials.value` | `GOOGLE_CREDENTIALS_JSON` |
 | `app.telemetry.usage.enabled` | Inverse of `DISABLE_USAGE_STATS` |
-| `app.datasetObjectStorage.enabled` | `DATASET_OBJECT_STORAGE_ENABLED` |
-| `app.datasetObjectStorage.bucket` | `DATASET_OBJECT_STORAGE_BUCKET` |
+| `app.dataplane.enabled` | `USE_S3_STORAGE` |
+| `app.dataplane.bucket` | `S3_BUCKET_NAME` |
 | `postgresql.external.connectionString.value` | `DATABASE_URL` |
 | `redis.external.connectionString.value` | `REDIS_URL` |
 | `workers.enabled` | Inverse of `START_WORKERS` |

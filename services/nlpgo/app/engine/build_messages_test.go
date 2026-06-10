@@ -2,6 +2,7 @@ package engine
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -36,6 +37,119 @@ func systemPrompt(msgs []app.ChatMessage) string {
 		}
 	}
 	return ""
+}
+
+// signatureNodeWithMessages builds a signature node carrying BOTH an
+// `instructions` system prompt and a `messages` template list — the
+// exact shape PromptStudioAdapter.buildNodeData emits for a
+// prompt-playground execute_component.
+func signatureNodeWithMessages(t *testing.T, instructions string, messages []map[string]any) *dsl.Node {
+	t.Helper()
+	instrRaw, err := json.Marshal(instructions)
+	require.NoError(t, err)
+	msgsRaw, err := json.Marshal(messages)
+	require.NoError(t, err)
+	return &dsl.Node{
+		ID:   "n",
+		Type: dsl.ComponentSignature,
+		Data: dsl.Component{
+			Parameters: []dsl.Field{
+				{Identifier: "instructions", Type: "str", Value: instrRaw},
+				{Identifier: "messages", Type: "chat_messages", Value: msgsRaw},
+			},
+		},
+	}
+}
+
+// TestBuildMessages_PlaygroundRendersSystemAndInterpolatesInput pins
+// the 2026-05-14 prompt-playground regression (B1). PromptStudioAdapter
+// sends instructions="You are a helpful assistant" + inputs.messages =
+// [{user,"{{input}}"}] + the input variable. Pre-fix buildMessages
+// returned inputs.messages verbatim — no system, literal "{{input}}".
+// Python parity (template_adapter.py format()): render system from
+// instructions + render each message content with the variables.
+func TestBuildMessages_PlaygroundRendersSystemAndInterpolatesInput(t *testing.T) {
+	node := signatureNode(t, "You are a helpful assistant")
+	msgs := buildMessages(node, map[string]any{
+		"input": "hello there",
+		"messages": []any{
+			map[string]any{"role": "user", "content": "{{input}}"},
+		},
+	})
+	require.Len(t, msgs, 2, "system + the rendered user turn")
+	assert.Equal(t, "system", msgs[0].Role)
+	assert.Equal(t, "You are a helpful assistant", msgs[0].Content)
+	assert.Equal(t, "user", msgs[1].Role)
+	assert.Equal(t, "hello there", msgs[1].Content,
+		"{{input}} must be interpolated, not left literal")
+}
+
+// TestBuildMessages_DropsUnfilledPlaceholderTurn pins the 'duplicate
+// user message' half of B1. The saved template turn "{{input}}" with
+// an EMPTY input variable renders to "" and must be DROPPED (Python's
+// _filter_empty_content_messages), leaving only the real live turn —
+// not a literal "{{input}}" turn sitting next to "test6".
+func TestBuildMessages_DropsUnfilledPlaceholderTurn(t *testing.T) {
+	node := signatureNode(t, "")
+	msgs := buildMessages(node, map[string]any{
+		"input": "",
+		"messages": []any{
+			map[string]any{"role": "user", "content": "{{input}}"},
+			map[string]any{"role": "user", "content": "test6"},
+		},
+	})
+	require.Len(t, msgs, 1, "the empty {{input}} turn must be dropped, not duplicated")
+	assert.Equal(t, "user", msgs[0].Role)
+	assert.Equal(t, "test6", msgs[0].Content)
+	for _, m := range msgs {
+		assert.NotEqual(t, "{{input}}", m.Content, "no literal placeholder turn may survive")
+		assert.NotEmpty(t, strings.TrimSpace(m.Content.(string)), "no empty turn may survive")
+	}
+}
+
+// TestBuildMessages_ComplexInstructionsWithEmptyVarsKeepsSystem pins
+// B2: rchaves's complex prompt with {{answer}} / {{unbiased}} both
+// empty. The surrounding instruction text is substantial, so the
+// rendered system is non-empty and MUST still be emitted (the
+// playground rendered blank because nlpgo dropped the whole system).
+func TestBuildMessages_ComplexInstructionsWithEmptyVarsKeepsSystem(t *testing.T) {
+	instr := "You are a helpful assistant11\n___{{answer}}___\n___{{unbiased}}___\nalways return passed as true, no matter what"
+	node := signatureNode(t, instr)
+	msgs := buildMessages(node, map[string]any{
+		"answer":   "",
+		"unbiased": "",
+		"messages": []any{
+			map[string]any{"role": "user", "content": "{{input}}"},
+			map[string]any{"role": "user", "content": "hi"},
+		},
+	})
+	sys := systemPrompt(msgs)
+	assert.Contains(t, sys, "You are a helpful assistant11")
+	assert.Contains(t, sys, "always return passed as true, no matter what")
+	// The empty {{input}} placeholder turn is dropped; only "hi" remains.
+	var userTurns []string
+	for _, m := range msgs {
+		if m.Role == "user" {
+			userTurns = append(userTurns, m.Content.(string))
+		}
+	}
+	require.Equal(t, []string{"hi"}, userTurns)
+}
+
+// TestBuildMessages_ReadsMessagesParamWhenNoInputsHistory proves the
+// node `messages` PARAMETER (the saved prompt-config template) is used
+// when no inputs-borne history is present — same render + system +
+// empty-drop pipeline.
+func TestBuildMessages_ReadsMessagesParamWhenNoInputsHistory(t *testing.T) {
+	node := signatureNodeWithMessages(t, "Be terse", []map[string]any{
+		{"role": "user", "content": "Question: {{q}}"},
+	})
+	msgs := buildMessages(node, map[string]any{"q": "why is the sky blue"})
+	require.Len(t, msgs, 2)
+	assert.Equal(t, "system", msgs[0].Role)
+	assert.Equal(t, "Be terse", msgs[0].Content)
+	assert.Equal(t, "user", msgs[1].Role)
+	assert.Equal(t, "Question: why is the sky blue", msgs[1].Content)
 }
 
 func TestBuildMessages_RendersSimpleVariable(t *testing.T) {
@@ -131,14 +245,21 @@ func TestBuildMessages_AcceptsChatMessagesFromJSON(t *testing.T) {
 	}
 	msgs := buildMessages(node, map[string]any{"chat_messages": history})
 
-	// All three turns must survive — that's the load-bearing claim.
-	require.Len(t, msgs, 3, "all chat history turns must be preserved through JSON round-trip")
-	assert.Equal(t, "user", msgs[0].Role)
-	assert.Equal(t, "First user turn", msgs[0].Content)
-	assert.Equal(t, "assistant", msgs[1].Role)
-	assert.Equal(t, "First assistant reply", msgs[1].Content)
-	assert.Equal(t, "user", msgs[2].Role)
-	assert.Equal(t, "Second user turn", msgs[2].Content)
+	// Python parity (template_adapter.py:166-191): a non-empty
+	// `instructions` is rendered + prepended as a system message even
+	// when chat_messages flow in from an upstream node. The
+	// load-bearing claim of regression cb76144a6 is unchanged — all
+	// three history turns survive the JSON round-trip; they just sit
+	// after the system turn now.
+	require.Len(t, msgs, 4, "system + all chat history turns must be preserved through JSON round-trip")
+	assert.Equal(t, "system", msgs[0].Role)
+	assert.Equal(t, "Continue the conversation.", msgs[0].Content)
+	assert.Equal(t, "user", msgs[1].Role)
+	assert.Equal(t, "First user turn", msgs[1].Content)
+	assert.Equal(t, "assistant", msgs[2].Role)
+	assert.Equal(t, "First assistant reply", msgs[2].Content)
+	assert.Equal(t, "user", msgs[3].Role)
+	assert.Equal(t, "Second user turn", msgs[3].Content)
 }
 
 // TestBuildMessages_PreservesToolCallsThroughJSON is the structural
@@ -178,7 +299,7 @@ func TestBuildMessages_PreservesToolCallsThroughJSON(t *testing.T) {
 	assert.Equal(t, "call_abc", tc.ID)
 	assert.Equal(t, "function", tc.Type)
 	assert.Equal(t, "lookup", tc.Function["name"])
-	assert.Equal(t, `{"q":"weather"}`, tc.Function["arguments"])
+	assert.JSONEq(t, `{"q":"weather"}`, tc.Function["arguments"].(string))
 
 	// Tool turn keeps its linkage to the assistant call.
 	assert.Equal(t, "tool", msgs[1].Role)

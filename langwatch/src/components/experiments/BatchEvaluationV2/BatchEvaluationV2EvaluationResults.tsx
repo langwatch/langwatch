@@ -15,7 +15,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Download, ExternalLink, MoreVertical } from "react-feather";
 import { Menu } from "../../../components/ui/menu";
 import { toaster } from "../../../components/ui/toaster";
-import type { ExperimentRunWithItems } from "../../../server/evaluations-v3/services/types";
+import type { ExperimentRunWithItems } from "../../../server/experiments-v3/services/types";
 import { api } from "../../../utils/api";
 import { BatchEvaluationV2EvaluationResult } from "./BatchEvaluationV2EvaluationResult";
 import { getEvaluationColumns } from "./utils";

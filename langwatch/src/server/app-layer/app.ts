@@ -2,7 +2,7 @@ import { createLogger } from "~/utils/logger/server";
 import { EventSourcing } from "../event-sourcing/eventSourcing";
 import type { AppCommands } from "../event-sourcing/pipelineRegistry";
 import type { AppConfig } from "./config";
-import type { AppDependencies, OpsDependencies } from "./dependencies";
+import type { AppDependencies, DataRetentionDependencies, OpsDependencies } from "./dependencies";
 
 const logger = createLogger("langwatch:app");
 
@@ -10,6 +10,7 @@ export class App {
   readonly config: AppConfig;
 
   readonly broadcast: AppDependencies["broadcast"];
+  readonly presence: AppDependencies["presence"];
   readonly traces: AppDependencies["traces"] & AppCommands["traces"];
   readonly evaluations: AppDependencies["evaluations"] &
     AppCommands["evaluations"];
@@ -18,6 +19,7 @@ export class App {
   readonly simulations: AppDependencies["simulations"] & AppCommands["simulations"];
   readonly suiteRuns: AppDependencies["suiteRuns"] & AppCommands["suiteRuns"];
   readonly experiments: AppDependencies["experiments"];
+  readonly triggers: AppDependencies["triggers"];
   readonly organizations: AppDependencies["organizations"];
   readonly projects: AppDependencies["projects"];
   readonly tokenizer: AppDependencies["tokenizer"];
@@ -30,6 +32,9 @@ export class App {
   readonly nurturing?: AppDependencies["nurturing"];
   readonly usageLimits: AppDependencies["usageLimits"];
   readonly ops?: OpsDependencies;
+  readonly retentionPolicyCache: AppDependencies["retentionPolicyCache"];
+  readonly dataRetention: DataRetentionDependencies;
+  readonly share: AppDependencies["share"];
 
   /** Keeps EventSourcing infrastructure safe from the greedy garbage men */
   private readonly _eventSourcing?: EventSourcing;
@@ -45,6 +50,7 @@ export class App {
   constructor(deps: AppDependencies) {
     this.config = deps.config;
     this.experiments = deps.experiments;
+    this.triggers = deps.triggers;
     this.organizations = deps.organizations;
     this.projects = deps.projects;
     this.tokenizer = deps.tokenizer;
@@ -57,6 +63,7 @@ export class App {
     this.nurturing = deps.nurturing;
     this.usageLimits = deps.usageLimits;
     this.broadcast = deps.broadcast;
+    this.presence = deps.presence;
     this.traces = { ...deps.traces, ...deps.commands.traces };
     this.evaluations = { ...deps.evaluations, ...deps.commands.evaluations };
     this.experimentRuns = deps.commands.experimentRuns;
@@ -64,6 +71,9 @@ export class App {
     this.simulations = { ...deps.simulations, ...deps.commands.simulations };
     this.suiteRuns = { ...deps.suiteRuns, ...deps.commands.suiteRuns };
     this.ops = deps.ops;
+    this.retentionPolicyCache = deps.retentionPolicyCache;
+    this.dataRetention = deps.dataRetention;
+    this.share = deps.share;
     this._eventSourcing = deps._eventSourcing;
     this._gracefulCloseables = deps._gracefulCloseables ?? [];
   }
@@ -110,6 +120,14 @@ export function getApp(): App {
   return globalForApp.__langwatch_app;
 }
 
-export function resetApp(): void {
+export async function resetApp(): Promise<void> {
+  // Close the previous App before dropping the singleton so its EventSourcing
+  // and graceful-closeable handles (Redis, BullMQ workers, etc.) don't leak
+  // into the next test. Without this the prior App is orphaned and its open
+  // handles keep vitest's single fork worker from exiting between files.
+  const existing = globalForApp.__langwatch_app;
   globalForApp.__langwatch_app = null;
+  if (existing) {
+    await existing.close();
+  }
 }

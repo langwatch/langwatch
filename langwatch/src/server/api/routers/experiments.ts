@@ -1,4 +1,3 @@
-import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 import { generate } from "@langwatch/ksuid";
 import {
   EvaluationExecutionMode,
@@ -16,7 +15,7 @@ import {
   type WizardState,
   workbenchStateSchema,
 } from "../../../components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
-import { persistedEvaluationsV3StateSchema } from "../../../evaluations-v3/types/persistence";
+import { persistedEvaluationsV3StateSchema } from "../../../experiments-v3/types/persistence";
 import {
   type Entry,
   type Evaluator,
@@ -24,17 +23,14 @@ import {
   workflowJsonSchema,
 } from "../../../optimization_studio/types/dsl";
 import { slugify } from "../../../utils/slugify";
-import { getClickHouseClientForProject } from "../../clickhouse/clickhouseClient";
+import { coerceMonitorMappings } from "../../tracer/tracesMapping";
 import { DatasetService } from "../../datasets/dataset.service";
 import { prisma } from "../../db";
-import {
-  BATCH_EVALUATION_INDEX,
-  esClient,
-} from "../../elasticsearch";
+import { ExperimentService } from "../../experiments/experiment.service";
 import { getApp } from "../../app-layer/app";
 import { DspyStepNotFoundError } from "../../app-layer/dspy-steps/errors";
-import { ExperimentRunService } from "../../evaluations-v3/services/experiment-run.service";
-import { getVersionMap } from "../../evaluations-v3/services/getVersionMap";
+import { ExperimentRunService } from "../../experiments-v3/services/experiment-run.service";
+import { getVersionMap } from "../../experiments-v3/services/getVersionMap";
 import type {
   DSPyRunsSummary,
   DSPyStep,
@@ -102,11 +98,9 @@ export const experimentsRouter = createTRPCRouter({
       });
 
       if (input.experimentId) {
-        const currentExperiment = await prisma.experiment.findUnique({
-          where: {
-            id: input.experimentId,
-            projectId: input.projectId,
-          },
+        const currentExperiment = await experimentService().findById({
+          projectId: input.projectId,
+          id: input.experimentId,
         });
 
         if (!currentExperiment) {
@@ -217,11 +211,9 @@ export const experimentsRouter = createTRPCRouter({
       });
 
       // For some reason, prisma upsert sometimes return not an experiment but {count: 0}, so we need to refetch it
-      const updatedExperiment = await prisma.experiment.findUnique({
-        where: {
-          id: experimentId,
-          projectId: input.projectId,
-        },
+      const updatedExperiment = await experimentService().findById({
+        projectId: input.projectId,
+        id: experimentId,
       });
 
       if (!updatedExperiment) {
@@ -248,12 +240,17 @@ export const experimentsRouter = createTRPCRouter({
       const experimentId =
         input.experimentId ?? generate(KSUID_RESOURCES.EXPERIMENT).toString();
 
-      // Check if experiment actually exists in DB to determine if this is a create or update
-      const existing = await prisma.experiment.findUnique({
-        where: { id: experimentId, projectId: input.projectId },
-        select: { slug: true },
-      });
-      const isNewExperiment = !existing;
+      // Check if experiment actually exists in DB to determine if this is a
+      // create or update. The service rejects archived rows with NOT_FOUND so
+      // a stale client autosaving an archived experiment cannot silently
+      // resurrect or mutate it through `prisma.upsert`.
+      const existingSlug = await experiments
+        .getExistingSlugForUpsert({
+          projectId: input.projectId,
+          id: experimentId,
+        })
+        .catch(mapExperimentError);
+      const isNewExperiment = existingSlug === null;
 
       // Enforce experiment limit only when creating new experiments
       if (isNewExperiment) {
@@ -276,7 +273,7 @@ export const experimentsRouter = createTRPCRouter({
           projectId: input.projectId,
         });
       } else {
-        slug = existing.slug;
+        slug = existingSlug;
       }
 
       // Convert to plain JSON for Prisma storage
@@ -305,11 +302,9 @@ export const experimentsRouter = createTRPCRouter({
           }),
       });
 
-      const updatedExperiment = await prisma.experiment.findUnique({
-        where: {
-          id: experimentId,
-          projectId: input.projectId,
-        },
+      const updatedExperiment = await experiments.findById({
+        projectId: input.projectId,
+        id: experimentId,
       });
 
       if (!updatedExperiment) {
@@ -329,7 +324,7 @@ export const experimentsRouter = createTRPCRouter({
         experimentSlug: z.string(),
       }),
     )
-    .use(checkProjectPermission("workflows:view"))
+    .use(checkProjectPermission("experiments:view"))
     .query(async ({ input }) => {
       const experiment = await experimentService()
         .getBySlug({
@@ -362,18 +357,9 @@ export const experimentsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("workflows:create"))
     .mutation(async ({ input }) => {
-      const experiment = await prisma.experiment.findUnique({
-        where: {
-          id: input.experimentId,
-          projectId: input.projectId,
-        },
-        include: {
-          workflow: {
-            include: {
-              currentVersion: true,
-            },
-          },
-        },
+      const experiment = await experimentService().findByIdWithWorkflowCurrentVersion({
+        projectId: input.projectId,
+        id: input.experimentId,
       });
 
       if (!experiment) {
@@ -411,7 +397,7 @@ export const experimentsRouter = createTRPCRouter({
             param.value,
           ]),
         ) as Record<string, any>,
-        mappings: workbenchState.realTimeTraceMappings ?? {},
+        mappings: coerceMonitorMappings(workbenchState.realTimeTraceMappings),
         sample: workbenchState.realTimeExecution?.sample ?? 1,
         enabled: true,
         executionMode: EvaluationExecutionMode.ON_MESSAGE,
@@ -442,7 +428,7 @@ export const experimentsRouter = createTRPCRouter({
         experimentSlug: z.string().optional(),
       }),
     )
-    .use(checkProjectPermission("workflows:view"))
+    .use(checkProjectPermission("experiments:view"))
     .query(async ({ input }) => {
       if (input.experimentId) {
         return await experimentService()
@@ -474,7 +460,7 @@ export const experimentsRouter = createTRPCRouter({
         randomSeed: z.number().optional(),
       }),
     )
-    .use(checkProjectPermission("workflows:view"))
+    .use(checkProjectPermission("experiments:view"))
     .query(async ({ input }) => {
       const experiment = await experimentService()
         .getBySlug({
@@ -503,7 +489,7 @@ export const experimentsRouter = createTRPCRouter({
 
   getAllByProjectId: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("workflows:view"))
+    .use(checkProjectPermission("experiments:view"))
     .query(async ({ input }) => {
       return await experimentService().getAll({
         projectId: input.projectId,
@@ -518,14 +504,10 @@ export const experimentsRouter = createTRPCRouter({
         pageSize: z.number().optional(),
       }),
     )
-    .use(checkProjectPermission("workflows:view"))
+    .use(checkProjectPermission("experiments:view"))
     .query(async ({ input }) => {
       const pageOffset = input.pageOffset ?? 0;
       const pageSize = input.pageSize ?? 25;
-
-      const baseWhereClause: Prisma.ExperimentWhereInput = {
-        projectId: input.projectId,
-      };
 
       // Helper to check if an experiment is a real_time evaluation (old wizard)
       const isRealTimeEvaluation = (workbenchState: JsonValue | null) => {
@@ -533,30 +515,17 @@ export const experimentsRouter = createTRPCRouter({
         return (workbenchState as Record<string, unknown>).task === "real_time";
       };
 
-      // Get total count for pagination (excluding real_time evaluations)
-      const allExperimentsCount = await prisma.experiment.findMany({
-        where: baseWhereClause,
-        select: { workbenchState: true },
-      });
-      const totalHits = allExperimentsCount.filter(
+      // Fetch every active experiment with its workflow+currentVersion join,
+      // then filter/paginate in JS. Prisma JSON-path filtering is unreliable
+      // for the `task` field inside `workbenchState`, so the count and the
+      // page slice both run off the same in-memory array.
+      const allExperiments =
+        await experimentService().listForEvaluationsBoard({
+          projectId: input.projectId,
+        });
+      const totalHits = allExperiments.filter(
         (e) => !isRealTimeEvaluation(e.workbenchState),
       ).length;
-
-      // Fetch all experiments and filter/paginate in JS
-      // (Prisma JSON path filtering is unreliable for nested fields)
-      const allExperiments = await prisma.experiment.findMany({
-        where: baseWhereClause,
-        include: {
-          workflow: {
-            include: {
-              currentVersion: true,
-            },
-          },
-        },
-        orderBy: {
-          updatedAt: "desc",
-        },
-      });
 
       // Filter out real_time evaluations and apply pagination
       const experiments = allExperiments
@@ -636,7 +605,7 @@ export const experimentsRouter = createTRPCRouter({
 
   getExperimentDSPyRuns: protectedProcedure
     .input(z.object({ projectId: z.string(), experimentSlug: z.string() }))
-    .use(checkProjectPermission("workflows:view"))
+    .use(checkProjectPermission("experiments:view"))
     .query(async ({ input }) => {
       const experiment = await experimentService()
         .getBySlug({
@@ -705,7 +674,7 @@ export const experimentsRouter = createTRPCRouter({
         index: z.string(),
       }),
     )
-    .use(checkProjectPermission("workflows:view"))
+    .use(checkProjectPermission("experiments:view"))
     .query(async ({ input }) => {
       const experiment = await experimentService()
         .getBySlug({
@@ -759,7 +728,7 @@ export const experimentsRouter = createTRPCRouter({
 
   getExperimentBatchEvaluationRuns: protectedProcedure
     .input(z.object({ projectId: z.string(), experimentId: z.string() }))
-    .use(checkProjectPermission("workflows:view"))
+    .use(checkProjectPermission("experiments:view"))
     .query(async ({ input }) => {
       const experiment = await experimentService()
         .getById({
@@ -785,7 +754,7 @@ export const experimentsRouter = createTRPCRouter({
         runId: z.string(),
       }),
     )
-    .use(checkProjectPermission("workflows:view"))
+    .use(checkProjectPermission("experiments:view"))
     .query(async ({ input }) => {
       const experiment = await experimentService()
         .getById({
@@ -802,6 +771,29 @@ export const experimentsRouter = createTRPCRouter({
       });
     }),
 
+  /**
+   * Archives an experiment (and cascades archive to its workflow + monitor).
+   *
+   * Previously this procedure hard-deleted the Postgres rows AND issued
+   * DELETE FROM on `experiment_runs`, `experiment_run_items`, `dspy_steps`
+   * in ClickHouse plus a deleteByQuery against the Elasticsearch
+   * `batch_evaluation` index. Every such delete writes a lightweight-delete
+   * mask onto every cold-tier S3 part containing matching rows, then the
+   * background merges rewrite those parts to actually purge. At ~3-45 user
+   * deletes/day across prod, that workload was costing ~$200/mo in S3
+   * requests alone and tripping AWS Cost Anomaly Detection on heavy days
+   * (e.g. May 27 2026: 42 deletes -> 14,725 part rewrites).
+   *
+   * The Experiment model now matches the pattern used everywhere else in
+   * this schema (Workflow, Monitor, Dataset, Evaluator, Agent, Project,
+   * Team, etc.): archive via `archivedAt`, hide from list queries, leave
+   * the historical data in place. Once retention TTL ships, archived rows
+   * age out of ClickHouse naturally without a per-click S3 burst.
+   *
+   * The tRPC name remains `deleteExperiment` so the UI does not need to
+   * change; the user-visible behaviour is identical (item disappears from
+   * the list) but the platform cost drops to zero per click.
+   */
   deleteExperiment: protectedProcedure
     .input(
       z.object({
@@ -811,143 +803,9 @@ export const experimentsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("workflows:delete"))
     .mutation(async ({ input }) => {
-      // Verify the experiment exists and belongs to the project
-      const experiment = await prisma.experiment.findUnique({
-        where: {
-          id: input.experimentId,
-          projectId: input.projectId,
-        },
-      });
-
-      if (!experiment) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Experiment not found",
-        });
-      }
-
-      // Perform the Prisma deletion in a transaction to ensure consistency
-      await prisma.$transaction(async (tx) => {
-        // Delete workflow versions if a workflow exists
-        if (experiment.workflowId) {
-          // First, update the workflow to null out the reference fields
-          await tx.workflow.update({
-            where: {
-              id: experiment.workflowId,
-              projectId: input.projectId,
-            },
-            data: {
-              currentVersionId: null,
-              latestVersionId: null,
-            },
-          });
-
-          // Then we update all workflow versions to null out the parent field
-          await tx.workflowVersion.updateMany({
-            where: {
-              workflowId: experiment.workflowId,
-              projectId: input.projectId,
-            },
-            data: {
-              parentId: null,
-            },
-          });
-
-          // Now we can safely delete the workflow versions
-          await tx.workflowVersion.deleteMany({
-            where: {
-              workflowId: experiment.workflowId,
-              projectId: input.projectId,
-            },
-          });
-
-          // Delete the workflow itself
-          await tx.workflow.delete({
-            where: {
-              id: experiment.workflowId,
-              projectId: input.projectId,
-            },
-          });
-        }
-
-        // Delete the monitor if it exists
-        const monitor = await tx.monitor.findFirst({
-          where: {
-            experimentId: input.experimentId,
-            projectId: input.projectId,
-          },
-        });
-
-        if (monitor) {
-          await tx.monitor.delete({
-            where: {
-              experimentId: input.experimentId,
-              projectId: input.projectId,
-            },
-          });
-        }
-
-        // Finally, delete the experiment
-        await tx.experiment.delete({
-          where: {
-            id: input.experimentId,
-            projectId: input.projectId,
-          },
-        });
-      });
-
-      // Best-effort cleanup of ES and CH data outside the transaction
-      // (these are not atomic with Prisma and should not cause rollback)
-      const esCleanup = esClient({ projectId: input.projectId }).then(async (client) => {
-        await client.deleteByQuery({
-          index: BATCH_EVALUATION_INDEX.alias,
-          body: {
-            query: {
-              bool: {
-                must: [
-                  { term: { experiment_id: input.experimentId } },
-                  { term: { project_id: input.projectId } },
-                ] as QueryDslBoolQuery["must"],
-              } as QueryDslBoolQuery,
-            },
-          },
-        });
-      }).catch((err) => {
-        console.error("Best-effort ES cleanup failed for experiment deletion", { experimentId: input.experimentId, err });
-      });
-
-      const chCleanup = Promise.resolve().then(async () => {
-        const chClient = await getClickHouseClientForProject(input.projectId);
-        if (!chClient) return;
-        await Promise.all([
-          chClient.command({
-            query: `DELETE FROM experiment_runs WHERE TenantId = {tenantId:String} AND ExperimentId = {experimentId:String}`,
-            query_params: {
-              tenantId: input.projectId,
-              experimentId: input.experimentId,
-            },
-          }),
-          chClient.command({
-            query: `DELETE FROM experiment_run_items WHERE TenantId = {tenantId:String} AND ExperimentId = {experimentId:String}`,
-            query_params: {
-              tenantId: input.projectId,
-              experimentId: input.experimentId,
-            },
-          }),
-        ]);
-      }).catch((err) => {
-        console.error("Best-effort CH cleanup failed for experiment deletion", { experimentId: input.experimentId, err });
-      });
-
-      const dspyCleanup = getApp().dspySteps.steps
-        .deleteByExperiment({ tenantId: input.projectId, experimentId: input.experimentId })
-        .catch((err) => {
-          console.error("Best-effort DSPy step cleanup failed for experiment deletion", { experimentId: input.experimentId, err });
-        });
-
-      await Promise.allSettled([esCleanup, chCleanup, dspyCleanup]);
-
-      return { success: true };
+      return await experimentService()
+        .archive({ projectId: input.projectId, id: input.experimentId })
+        .catch(mapExperimentError);
     }),
 
   copy: protectedProcedure
@@ -979,19 +837,11 @@ export const experimentsRouter = createTRPCRouter({
         });
       }
 
-      const experiment = await ctx.prisma.experiment.findUnique({
-        where: {
-          id: input.experimentId,
+      const experiment = await ExperimentService.create(ctx.prisma)
+        .findByIdWithWorkflowLatestVersion({
           projectId: input.sourceProjectId,
-        },
-        include: {
-          workflow: {
-            include: {
-              latestVersion: true,
-            },
-          },
-        },
-      });
+          id: input.experimentId,
+        });
 
       if (!experiment) {
         throw new TRPCError({
@@ -1102,7 +952,7 @@ export const experimentsRouter = createTRPCRouter({
    */
   getLastExperiment: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("workflows:view"))
+    .use(checkProjectPermission("experiments:view"))
     .query(async ({ input }) => {
       return await experimentService().getLatest({
         projectId: input.projectId,

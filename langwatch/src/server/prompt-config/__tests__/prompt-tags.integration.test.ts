@@ -12,6 +12,7 @@ describe("Feature: Prompt version tags", () => {
   let testProject: Project;
   let otherProject: Project;
   let service: PromptService;
+  let testDefaultConfigId: string;
 
   beforeEach(async () => {
     testOrganization = await prisma.organization.create({
@@ -33,6 +34,7 @@ describe("Feature: Prompt version tags", () => {
       data: {
         ...projectFactory.build({ slug: nanoid() }),
         teamId: testTeam.id,
+        personalFeatures: {},
       },
     });
 
@@ -40,8 +42,27 @@ describe("Feature: Prompt version tags", () => {
       data: {
         ...projectFactory.build({ slug: nanoid() }),
         teamId: testTeam.id,
+        personalFeatures: {},
       },
     });
+
+    // Seed an org-scope DEFAULT model so prompt creation does not throw
+    // ModelNotConfiguredError. The cascade resolver requires a value at
+    // some scope; covering the org tier is the cheapest setup that
+    // applies to both testProject and otherProject.
+    const seededDefault = await prisma.modelDefaultConfig.create({
+      data: {
+        config: { DEFAULT: "openai/gpt-4o-mini" },
+        organizationId: testOrganization.id,
+        scopes: {
+          create: [
+            { scopeType: "ORGANIZATION", scopeId: testOrganization.id },
+          ],
+        },
+      },
+      select: { id: true },
+    });
+    testDefaultConfigId = seededDefault.id;
 
     // Seed production and staging tags for the test org
     await prisma.promptTag.createMany({
@@ -70,6 +91,14 @@ describe("Feature: Prompt version tags", () => {
     await prisma.promptTag.deleteMany({
       where: { organizationId: testOrganization.id },
     });
+    await prisma.modelDefaultConfigScope.deleteMany({
+      where: { scopeType: "ORGANIZATION", scopeId: testOrganization.id },
+    });
+    if (testDefaultConfigId) {
+      await prisma.modelDefaultConfig.deleteMany({
+        where: { id: testDefaultConfigId },
+      });
+    }
     await prisma.project.deleteMany({
       where: { id: { in: [testProject.id, otherProject.id] } },
     });
@@ -115,6 +144,8 @@ describe("Feature: Prompt version tags", () => {
   }
 
   describe("when assigning a tag to a specific version", () => {
+    /** @scenario "Assigning a tag that exists in the DB succeeds" */
+    /** @scenario "Assigning a tag to a specific version" */
     it("creates a PromptTagAssignment record with configId, tag, and versionId", async () => {
       const { allVersions } = await createPromptWithVersions({
         handle: `pizza-prompt-${nanoid()}`,
@@ -141,6 +172,7 @@ describe("Feature: Prompt version tags", () => {
   });
 
   describe("when reassigning a tag to a different version", () => {
+    /** @scenario "Assigning a recreated tag succeeds" */
     it("returns the new version when fetching by tag", async () => {
       const { allVersions } = await createPromptWithVersions({
         handle: `pizza-prompt-${nanoid()}`,
@@ -234,6 +266,9 @@ describe("Feature: Prompt version tags", () => {
   });
 
   describe("when fetching a prompt via service with a tag parameter", () => {
+    /** @scenario 'New org gets "production" and "staging" seeded' */
+    /** @scenario "Full lifecycle of a custom tag" */
+    /** @scenario "Delete and recreate a seeded tag" */
     it("returns the version pointed to by the tag", async () => {
       const { allVersions } = await createPromptWithVersions({
         handle: `pizza-prompt-${nanoid()}`,

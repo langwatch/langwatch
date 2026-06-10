@@ -61,7 +61,7 @@ export function SaveAsViewButton() {
         onOpenChange={(e) => setIsOpen(e.open)}
         size="sm"
       >
-        <Dialog.Content>
+        <Dialog.Content bg="bg">
           <Dialog.Header>
             <Dialog.Title>Save as view</Dialog.Title>
           </Dialog.Header>

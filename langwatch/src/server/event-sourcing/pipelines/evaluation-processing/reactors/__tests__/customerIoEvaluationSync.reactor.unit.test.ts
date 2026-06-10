@@ -145,6 +145,7 @@ describe("customerIoEvaluationSync reactor", () => {
 
   describe("given an organization with no prior evaluations", () => {
     describe("when the first evaluation is processed", () => {
+      /** @scenario 'First evaluation identifies user with evaluation milestones' */
       it("identifies user with has_evaluations true and evaluation_count 1", async () => {
         const deps = createDeps({
           evaluationCountFn: vi.fn().mockResolvedValue(1),
@@ -166,6 +167,7 @@ describe("customerIoEvaluationSync reactor", () => {
         });
       });
 
+      /** @scenario 'First evaluation fires first_evaluation_created event' */
       it("tracks first_evaluation_created event", async () => {
         const deps = createDeps({
           evaluationCountFn: vi.fn().mockResolvedValue(1),
@@ -191,6 +193,8 @@ describe("customerIoEvaluationSync reactor", () => {
 
   describe("given an organization that already has evaluations", () => {
     describe("when a new evaluation is processed", () => {
+      /** @scenario 'Subsequent evaluations update identify with evaluation count' */
+      /** @scenario 'Subsequent evaluation updates are debounced per project' */
       it("identifies user with updated evaluation_count and last_evaluation_at", async () => {
         const deps = createDeps({
           evaluationCountFn: vi.fn().mockResolvedValue(6),
@@ -211,6 +215,7 @@ describe("customerIoEvaluationSync reactor", () => {
         });
       });
 
+      /** @scenario 'Subsequent evaluations fire evaluation_ran event' */
       it("tracks evaluation_ran event", async () => {
         const deps = createDeps({
           evaluationCountFn: vi.fn().mockResolvedValue(6),

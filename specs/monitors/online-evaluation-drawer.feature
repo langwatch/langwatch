@@ -4,6 +4,32 @@ Feature: Online Evaluation Drawer
   I want to create and configure online evaluations in a drawer
   So that I can monitor traces and threads with evaluators
 
+  # All 15 @unimplemented scenarios remain unbound — per AUDIT_MANIFEST.md
+  # all are DUPLICATE / DELETE / UPDATE classifications:
+  # - "Open drawer from menu": DUPLICATE of NewIssues "shows New Online Evaluation header".
+  # - "Default state is trace level": DELETE — impl changed to "no level selected by default".
+  # - "Select trace level evaluation" / "Select thread level evaluation": KEEP per manifest
+  #   for trace-level mapping sources (only partially covered).
+  # - "Open evaluator list from selection box": DUPLICATE of "opens evaluator list when
+  #   clicking Select Evaluator".
+  # - "Select evaluator with auto-mapped fields": DUPLICATE of online-evaluation-drawer-flow
+  #   "Create trace-level online evaluation with auto-mappings".
+  # - "Select evaluator with pending mappings": DUPLICATE of flow.feature
+  #   "Create with pending mappings that need configuration".
+  # - "Name field defaults to evaluator name": DUPLICATE of test
+  #   "pre-fills name with evaluator name when name is empty".
+  # - "Configure sampling": UPDATE — default is 1.0 not 0.5; needs UI semantics rewrite.
+  # - "Configure preconditions" / "Preconditions filter trace execution": DUPLICATE of
+  #   online-evaluation-preconditions feature scenarios.
+  # - "Save online evaluation": DUPLICATE of EditSave "Save functionality - Create mode" suite.
+  # - "Cannot save without evaluator": DUPLICATE of NewIssues "Create button is disabled when
+  #   no evaluator selected".
+  # - "Cannot save without name": DUPLICATE of NewIssues "Create button is disabled when
+  #   name is empty".
+  # - "Clear selected evaluator": DUPLICATE of "clears evaluator selection when clicking
+  #   Remove Selection".
+  # Aspirational pending DELETE/UPDATE rewrites + KEEP test additions tracked in PR #3458.
+
   Background:
     Given I am logged in to a project
     And I have at least one evaluator created

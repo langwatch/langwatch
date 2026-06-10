@@ -18,6 +18,14 @@ export const SIMULATION_RUN_EVENT_TYPES = {
   CANCEL_REQUESTED: "lw.simulation_run.cancel_requested",
 } as const;
 
+/**
+ * Set-scoped events. The set is the aggregate; payloads reference the
+ * runs the action applies to. See lw#3636.
+ */
+export const SIMULATION_SET_EVENT_TYPES = {
+  ARCHIVED: "lw.simulation_set.archived",
+} as const;
+
 export const SIMULATION_PROCESSING_EVENT_TYPES = [
   SIMULATION_RUN_EVENT_TYPES.QUEUED,
   SIMULATION_RUN_EVENT_TYPES.STARTED,
@@ -28,6 +36,7 @@ export const SIMULATION_PROCESSING_EVENT_TYPES = [
   SIMULATION_RUN_EVENT_TYPES.DELETED,
   SIMULATION_RUN_EVENT_TYPES.METRICS_COMPUTED,
   SIMULATION_RUN_EVENT_TYPES.CANCEL_REQUESTED,
+  SIMULATION_SET_EVENT_TYPES.ARCHIVED,
 ] as const;
 
 export type SimulationProcessingEventType =
@@ -49,6 +58,10 @@ export const SIMULATION_RUN_COMMAND_TYPES = {
   CANCEL: "lw.simulation_run.cancel",
 } as const;
 
+export const SIMULATION_SET_COMMAND_TYPES = {
+  ARCHIVE: "lw.simulation_set.archive",
+} as const;
+
 export const SIMULATION_RUN_PROCESSING_COMMAND_TYPES = [
   SIMULATION_RUN_COMMAND_TYPES.QUEUE,
   SIMULATION_RUN_COMMAND_TYPES.START,
@@ -59,6 +72,7 @@ export const SIMULATION_RUN_PROCESSING_COMMAND_TYPES = [
   SIMULATION_RUN_COMMAND_TYPES.DELETE,
   SIMULATION_RUN_COMMAND_TYPES.COMPUTE_METRICS,
   SIMULATION_RUN_COMMAND_TYPES.CANCEL,
+  SIMULATION_SET_COMMAND_TYPES.ARCHIVE,
 ] as const;
 
 export type SimulationProcessingCommandType =
@@ -77,6 +91,7 @@ export const SIMULATION_EVENT_VERSIONS = {
   DELETED: "2026-02-01",
   METRICS_COMPUTED: "2026-03-27",
   CANCEL_REQUESTED: "2026-04-06",
+  SET_ARCHIVED: "2026-05-04",
 } as const;
 
 /**

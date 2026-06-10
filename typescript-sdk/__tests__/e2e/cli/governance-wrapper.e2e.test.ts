@@ -1,0 +1,798 @@
+// @vitest-environment node
+
+/**
+ * CLI wrapper e2e suite.
+ *
+ * Pure-Node harness — no Docker, no live LLM, no langwatch-server.
+ * Spins up a fake control-plane + fake gateway in-process, drops
+ * shell-script "tool stubs" (claude/codex/opencode/cursor/gemini)
+ * on a tmp PATH, spawns the compiled langwatch CLI as a child, and
+ * asserts on:
+ *
+ *   1. Login config write — `langwatch login` ceremony lands a
+ *      GovernanceConfig the wrapper can read on next invocation.
+ *   2. Env injection — `langwatch <tool>` spawns the underlying tool
+ *      with the right per-provider env vars set to gateway-base-url
+ *      + personal-VK secret.
+ *   3. Routing — when a tool stub actually issues an HTTP request
+ *      using its injected env vars, the request lands at the fake
+ *      gateway with the expected path + Authorization header.
+ *   4. Budget pre-check — if the control-plane returns 402 on the
+ *      pre-flight check, the wrapper exits 2 BEFORE spawning the
+ *      tool; under-limit case spawns normally.
+ *   5. Tool-not-found — clear error + exit 127 when the binary
+ *      isn't on PATH.
+ *   6. Exit-code propagation — wrapper transparently returns the
+ *      child's exit code.
+ *
+ * Spec: specs/ai-governance/cli-wrappers/wrap-login-routing.feature
+ */
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import * as http from "node:http";
+import { spawn } from "node:child_process";
+
+// ─────────────────────────────────────────────────────────────────
+// Harness state
+// ─────────────────────────────────────────────────────────────────
+let cpServer: http.Server;
+let gwServer: http.Server;
+let cpUrl: string;
+let gwUrl: string;
+let recordedGwRequests: Array<{
+  path: string;
+  method: string;
+  authorization: string;
+  body: string;
+}> = [];
+let cpBudgetResponse: { status: number; body: unknown } = {
+  status: 200,
+  body: { ok: true },
+};
+let tmpRoot: string;
+let toolStubsDir: string;
+let configPath: string;
+const cliPath = path.resolve(__dirname, "../../../dist/cli/index.js");
+
+const TEST_VK = "vk-lw-test_xyz_phase11";
+const TEST_ACCESS_TOKEN = "lw_at_test_phase11";
+
+// ─────────────────────────────────────────────────────────────────
+// Fake servers
+// ─────────────────────────────────────────────────────────────────
+async function startFakeGateway(): Promise<{ server: http.Server; url: string }> {
+  const server = http.createServer((req, res) => {
+    let body = "";
+    req.on("data", (chunk) => (body += chunk));
+    req.on("end", () => {
+      recordedGwRequests.push({
+        path: req.url ?? "",
+        method: req.method ?? "",
+        authorization: req.headers.authorization ?? "",
+        body,
+      });
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ id: "fake-gw-resp", choices: [], usage: {} }));
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const port = (server.address() as { port: number }).port;
+  return { server, url: `http://127.0.0.1:${port}` };
+}
+
+// Fake device-flow state — the auto-login path drives /api/auth/cli/device-code
+// then poll/exchange. Tests can flip this off (deviceFlowEnabled=false) to
+// simulate a control-plane that doesn't support the endpoint.
+let deviceFlowEnabled = true;
+let recordedDeviceCodeRequests = 0;
+
+async function startFakeControlPlane(): Promise<{
+  server: http.Server;
+  url: string;
+}> {
+  const server = http.createServer((req, res) => {
+    if (req.url === "/api/auth/cli/budget/status") {
+      res.writeHead(cpBudgetResponse.status, {
+        "content-type": "application/json",
+      });
+      res.end(JSON.stringify(cpBudgetResponse.body));
+      return;
+    }
+    if (req.url === "/api/auth/cli/device-code" && req.method === "POST") {
+      recordedDeviceCodeRequests += 1;
+      if (!deviceFlowEnabled) {
+        res.writeHead(404, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error: "not_supported" }));
+        return;
+      }
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          device_code: "test-device-code",
+          user_code: "TEST-CODE",
+          verification_uri: `${cpUrl}/auth/cli/verify`,
+          verification_uri_complete: `${cpUrl}/auth/cli/verify?user_code=TEST-CODE`,
+          expires_in: 300,
+          interval: 1,
+        }),
+      );
+      return;
+    }
+    if (req.url === "/api/auth/cli/exchange" && req.method === "POST") {
+      // Resolve the auto-login flow on first poll — no need to delay.
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          access_token: TEST_ACCESS_TOKEN,
+          refresh_token: "lw_rt_auto_login",
+          expires_in: 3600,
+          user: {
+            id: "user_auto_login",
+            email: "auto-login@acme.test",
+            name: "Auto Login",
+          },
+          organization: {
+            id: "org_auto_login",
+            slug: "acme",
+            name: "ACME",
+          },
+          default_personal_vk: {
+            id: "vk_auto_login",
+            secret: TEST_VK,
+            prefix: "vk-lw-t",
+          },
+        }),
+      );
+      return;
+    }
+    if (req.url === "/api/auth/cli/bootstrap" && req.method === "GET") {
+      res.writeHead(200, { "content-type": "application/json" });
+      // Wrapper preflight checks that the org has at least one provider
+      // from the tool's TOOL_PROVIDER_FAMILIES table (claude → anthropic,
+      // codex → openai, gemini → google|gemini, cursor + opencode → any
+      // of anthropic|openai). The fake CP advertises the full union so
+      // every wrapped-tool test sees its required family available and
+      // the preflight returns ok; tests that need to exercise the
+      // "no provider configured" branch should mount a narrower
+      // bootstrap from inside the test body.
+      res.end(
+        JSON.stringify({
+          providers: [
+            { name: "anthropic" },
+            { name: "openai" },
+            { name: "google" },
+            { name: "gemini" },
+          ],
+          budget: {},
+        }),
+      );
+      return;
+    }
+    res.writeHead(404, { "content-type": "application/json" });
+    res.end(JSON.stringify({ error: "not_found", path: req.url }));
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const port = (server.address() as { port: number }).port;
+  return { server, url: `http://127.0.0.1:${port}` };
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Tool stubs (shell scripts that echo env or POST to gateway)
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Writes a shell-script "stub" for a wrapped tool. Modes:
+ *   - "echo-env": prints every governance-relevant env var the
+ *     wrapper might inject, one per line, then exits 0.
+ *   - "post-anthropic": POSTs to ${ANTHROPIC_BASE_URL}/v1/messages
+ *     with header `Authorization: Bearer ${ANTHROPIC_AUTH_TOKEN}`.
+ *   - "post-openai": POSTs to ${OPENAI_BASE_URL}/v1/chat/completions
+ *     with header `Authorization: Bearer ${OPENAI_API_KEY}`.
+ *   - "post-openai-no-v1": POSTs to ${OPENAI_BASE_URL}/chat/completions
+ *     (no `/v1` prepended). Mimics the Vercel AI SDK used by opencode,
+ *     which expects the base URL to already include `/v1`. The wrapper
+ *     supplies `OPENAI_BASE_URL=${gw}/v1` for opencode so the gateway
+ *     still sees the request at `/v1/chat/completions`.
+ *   - "exit-code:<n>": exits with code n (transparency check).
+ */
+function writeToolStub(name: string, mode: string): void {
+  const scriptPath = path.join(toolStubsDir, name);
+  let body = "#!/bin/bash\nset -e\n";
+  if (mode === "echo-env") {
+    body +=
+      'for var in ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN ANTHROPIC_API_KEY OPENAI_BASE_URL OPENAI_API_KEY GOOGLE_GEMINI_BASE_URL GOOGLE_API_KEY GEMINI_API_KEY; do\n' +
+      '  printf "%s=%s\\n" "$var" "${!var:-}"\n' +
+      'done\n';
+  } else if (mode === "post-anthropic") {
+    body +=
+      'curl -s -X POST -H "Authorization: Bearer ${ANTHROPIC_AUTH_TOKEN}" ' +
+      '-H "content-type: application/json" ' +
+      '-d \'{"model":"claude-test","messages":[]}\' ' +
+      '"${ANTHROPIC_BASE_URL}/v1/messages" > /dev/null\n';
+  } else if (mode === "post-openai") {
+    body +=
+      'curl -s -X POST -H "Authorization: Bearer ${OPENAI_API_KEY}" ' +
+      '-H "content-type: application/json" ' +
+      '-d \'{"model":"gpt-test","messages":[]}\' ' +
+      '"${OPENAI_BASE_URL}/v1/chat/completions" > /dev/null\n';
+  } else if (mode === "post-openai-no-v1") {
+    body +=
+      'curl -s -X POST -H "Authorization: Bearer ${OPENAI_API_KEY}" ' +
+      '-H "content-type: application/json" ' +
+      '-d \'{"model":"gpt-test","messages":[]}\' ' +
+      '"${OPENAI_BASE_URL}/chat/completions" > /dev/null\n';
+  } else if (mode.startsWith("exit-code:")) {
+    const code = mode.slice("exit-code:".length);
+    body += `exit ${code}\n`;
+  } else if (mode === "echo-argv") {
+    // One arg per line so we can split on newlines and assert exact
+    // count + ordering. Exits 0.
+    body +=
+      'idx=0\n' +
+      'for arg in "$@"; do\n' +
+      '  printf "ARG[%d]=%s\\n" "$idx" "$arg"\n' +
+      '  idx=$((idx + 1))\n' +
+      'done\n' +
+      'printf "ARGC=%d\\n" "$#"\n';
+  } else {
+    throw new Error(`unknown stub mode: ${mode}`);
+  }
+  fs.writeFileSync(scriptPath, body, { mode: 0o755 });
+}
+
+function clearToolStubs(): void {
+  for (const f of fs.readdirSync(toolStubsDir)) {
+    fs.unlinkSync(path.join(toolStubsDir, f));
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// CLI runner
+// ─────────────────────────────────────────────────────────────────
+interface RunOpts {
+  /** Whether to include toolStubsDir on PATH (off → simulates "binary not installed"). */
+  includeToolStubs?: boolean;
+  /** Optional extra env-vars to inject (e.g. LANGWATCH_AUTO_LOGIN=1). */
+  extraEnv?: Record<string, string>;
+}
+
+interface RunResult {
+  status: number | null;
+  signal: NodeJS.Signals | null;
+  stdout: string;
+  stderr: string;
+}
+
+/**
+ * Spawn the CLI as an ASYNC child process. This is critical: when the
+ * test harness hosts the fake control-plane / fake gateway in the same
+ * vitest worker, a synchronous `spawnSync` blocks the worker's event
+ * loop, so the in-process HTTP server never responds to the child's
+ * fetch — the child waits forever, spawnSync times out. Using async
+ * `spawn` keeps the worker's event loop free to serve the fake
+ * servers while the child runs.
+ */
+function runCli(args: string[], opts: RunOpts = {}): Promise<RunResult> {
+  const includeStubs = opts.includeToolStubs ?? true;
+  // PATH composition is delicate:
+  //  - When stubs are included, prepend toolStubsDir so our shell-script
+  //    stubs win over any real binaries on the dev machine (the wrapper
+  //    routes through `claude`/`codex`/etc., and the developer running
+  //    these tests likely has the real binaries installed).
+  //  - When stubs are EXCLUDED (the "tool-not-found" scenario), we need
+  //    a PATH that does NOT contain the real binaries at all — otherwise
+  //    spawn() finds the real `claude` and exec's it, and the test
+  //    asserts the wrong outcome. We strip user-installed-tool paths
+  //    (~/.nvm/.../bin, ~/.local/bin, /usr/local/bin) and keep only
+  //    the bash/curl essentials at /usr/bin:/bin.
+  const inheritedPath = process.env.PATH ?? "/usr/bin:/bin";
+  const pathValue = includeStubs
+    ? `${toolStubsDir}:${inheritedPath}`
+    : "/usr/bin:/bin";
+  // Build a minimal env: keep PATH + HOME + a small allowlist; drop
+  // every VITEST_*/NODE_* variable that vitest's worker injects (some
+  // of them — e.g. NODE_V8_COVERAGE — cause the spawned child to
+  // mis-interact with vitest's IPC channel and hang on exit).
+  const allowKeys = new Set([
+    "HOME",
+    "TMPDIR",
+    "USER",
+    "LOGNAME",
+    "LANG",
+    "LC_ALL",
+    "SHELL",
+    "TERM",
+  ]);
+  const env: Record<string, string> = {};
+  for (const k of allowKeys) {
+    const v = process.env[k];
+    if (v !== undefined) env[k] = v;
+  }
+  env.PATH = pathValue;
+  env.LANGWATCH_CLI_CONFIG = configPath;
+  env.LANGWATCH_ENDPOINT = cpUrl;
+  env.LANGWATCH_GATEWAY_URL = gwUrl;
+  // Default OFF so the existing scenarios still get the
+  // "Not logged in — exit 1" path under the test harness's non-TTY stdin.
+  // Individual tests opt in via opts.extraEnv to verify the auto-login path.
+  env.LANGWATCH_AUTO_LOGIN = "0";
+  // Always suppress the OS browser open() side-effect from the device-flow
+  // login so tests don't pop a real browser tab on the dev machine.
+  env.LANGWATCH_BROWSER = "none";
+  if (opts.extraEnv) {
+    for (const [k, v] of Object.entries(opts.extraEnv)) env[k] = v;
+  }
+  // Detach stdin from the vitest worker — passing "ignore" means the
+  // child gets /dev/null on fd 0, which prevents any inherited stdio
+  // from blocking exit. stdout/stderr are pipes so we can capture
+  // them. cwd is forced to a clean tmp dir so dotenv.config() doesn't
+  // pick up the typescript-sdk's own .env.
+  return new Promise<RunResult>((resolve) => {
+    // Use process.execPath (absolute path to running node binary)
+    // instead of bare "node" so the tool-not-found scenario can use a
+    // minimal PATH (/usr/bin:/bin) without losing the ability to launch
+    // the CLI.
+    const child = spawn(process.execPath, [cliPath, ...args], {
+      env,
+      cwd: tmpRoot,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => (stdout += chunk));
+    child.stderr.on("data", (chunk: string) => (stderr += chunk));
+    const killer = setTimeout(() => {
+      child.kill("SIGKILL");
+    }, 20_000);
+    child.on("close", (code, signal) => {
+      clearTimeout(killer);
+      resolve({ status: code, signal: signal, stdout, stderr });
+    });
+  });
+}
+
+function writeLoggedInConfig(): void {
+  const cfg = {
+    gateway_url: gwUrl,
+    control_plane_url: cpUrl,
+    access_token: TEST_ACCESS_TOKEN,
+    refresh_token: "lw_rt_test_phase11",
+    expires_at: Math.floor(Date.now() / 1000) + 3600,
+    user: { id: "user_phase11", email: "phase11@acme.test" },
+    organization: { id: "org_phase11", slug: "acme", name: "ACME" },
+    default_personal_vk: {
+      id: "vk_phase11",
+      secret: TEST_VK,
+      prefix: "vk-lw-t",
+    },
+  };
+  fs.mkdirSync(path.dirname(configPath), { recursive: true });
+  fs.writeFileSync(configPath, JSON.stringify(cfg, null, 2), { mode: 0o600 });
+}
+
+function writeLoggedOutConfig(): void {
+  // No file at all — loadConfig returns defaults() which has no access_token.
+  if (fs.existsSync(configPath)) fs.unlinkSync(configPath);
+}
+
+function readConfig(): Record<string, unknown> {
+  return JSON.parse(fs.readFileSync(configPath, "utf8")) as Record<
+    string,
+    unknown
+  >;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Lifecycle
+// ─────────────────────────────────────────────────────────────────
+beforeAll(async () => {
+  if (!fs.existsSync(cliPath)) {
+    throw new Error(
+      `CLI not built at ${cliPath} — run \`pnpm build\` in typescript-sdk/ before this suite`,
+    );
+  }
+  tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "lw-gov-e2e-"));
+  toolStubsDir = path.join(tmpRoot, "stubs");
+  fs.mkdirSync(toolStubsDir, { recursive: true });
+  configPath = path.join(tmpRoot, "config.json");
+
+  const gw = await startFakeGateway();
+  gwServer = gw.server;
+  gwUrl = gw.url;
+
+  const cp = await startFakeControlPlane();
+  cpServer = cp.server;
+  cpUrl = cp.url;
+});
+
+afterAll(async () => {
+  await new Promise<void>((r) => gwServer.close(() => r()));
+  await new Promise<void>((r) => cpServer.close(() => r()));
+  fs.rmSync(tmpRoot, { recursive: true, force: true });
+});
+
+beforeEach(() => {
+  recordedGwRequests = [];
+  cpBudgetResponse = { status: 200, body: { ok: true } };
+  deviceFlowEnabled = true;
+  recordedDeviceCodeRequests = 0;
+  if (fs.existsSync(toolStubsDir)) clearToolStubs();
+  if (fs.existsSync(configPath)) fs.unlinkSync(configPath);
+});
+
+afterEach(() => {
+  if (fs.existsSync(toolStubsDir)) clearToolStubs();
+});
+
+// ─────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────
+function envFromStub(stdout: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const line of stdout.split("\n")) {
+    const eq = line.indexOf("=");
+    if (eq <= 0) continue;
+    out[line.slice(0, eq)] = line.slice(eq + 1).trim();
+  }
+  return out;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Tests
+// ─────────────────────────────────────────────────────────────────
+describe("governance CLI wrappers — e2e", () => {
+  describe("login state gating", () => {
+    describe("when not logged in and auto-login is disabled (non-TTY default)", () => {
+      it("exits 1 with `Not logged in` on `langwatch claude` and never spawns the tool", async () => {
+        writeLoggedOutConfig();
+        writeToolStub("claude", "echo-env");
+        const res = await runCli(["claude"]);
+        expect(res.status).toBe(1);
+        const combined = (res.stdout ?? "") + (res.stderr ?? "");
+        expect(combined).toMatch(/Not logged in/);
+        expect(combined).toMatch(/langwatch login --device/);
+        // tool stub never wrote any env-line to stdout
+        expect(res.stdout ?? "").not.toMatch(/^ANTHROPIC_BASE_URL=/m);
+      });
+    });
+
+    describe("when not logged in and auto-login is forced via env", () => {
+      it("runs the device-flow login inline, persists the config, then spawns the wrapped tool", async () => {
+        writeLoggedOutConfig();
+        writeToolStub("claude", "echo-env");
+        const res = await runCli(["claude"], {
+          extraEnv: { LANGWATCH_AUTO_LOGIN: "1" },
+        });
+        expect(res.status).toBe(0);
+        expect(recordedDeviceCodeRequests).toBeGreaterThanOrEqual(1);
+        const env = envFromStub(res.stdout ?? "");
+        expect(env.ANTHROPIC_BASE_URL).toBe(gwUrl);
+        expect(env.ANTHROPIC_AUTH_TOKEN).toBe(TEST_VK);
+        // Config got persisted by the auto-login path
+        const cfg = readConfig();
+        expect(cfg.access_token).toBe(TEST_ACCESS_TOKEN);
+        expect((cfg.default_personal_vk as { secret?: string })?.secret).toBe(
+          TEST_VK,
+        );
+      });
+    });
+  });
+
+  describe("env injection — per-tool standard env vars", () => {
+    // Provider base-URLs are set to the bare gateway URL. The Go aigateway
+    // routes OpenAI- and Anthropic-shaped requests at root (`/v1/chat/completions`,
+    // `/v1/messages`); per-provider sub-paths like `/api/v1/anthropic`
+    // were the Phase 11 design and were folded away when the Go dispatcher
+    // landed (see services/aigateway/adapters/httpapi/router*). Each SDK
+    // appends its own canonical suffix to the base URL.
+    //   "url" → expect bare gateway URL (no suffix)
+    //   string literal → expect that exact value (used for VK auth tokens)
+    // `"url"` is a sentinel meaning "expect bare gateway URL (no suffix)";
+    // any other string is a literal expected value. The `& {}` brand keeps
+    // TypeScript from collapsing the union into plain `string`.
+    // "url" = exact match against `gwUrl`.
+    // "url+v1" = `${gwUrl}/v1` (opencode's Vercel AI SDK doesn't prepend /v1 itself).
+    type ExpectedValue = "url" | "url+v1" | (string & {});
+    describe.each([
+      {
+        tool: "claude",
+        expected: {
+          ANTHROPIC_BASE_URL: "url" as ExpectedValue,
+          ANTHROPIC_AUTH_TOKEN: TEST_VK,
+        },
+        mustNotInject: ["OPENAI_BASE_URL", "GOOGLE_GEMINI_BASE_URL"],
+      },
+      {
+        tool: "codex",
+        expected: {
+          OPENAI_BASE_URL: "url" as ExpectedValue,
+          OPENAI_API_KEY: TEST_VK,
+        },
+        mustNotInject: ["ANTHROPIC_BASE_URL", "GOOGLE_GEMINI_BASE_URL"],
+      },
+      {
+        tool: "opencode",
+        expected: {
+          OPENAI_BASE_URL: "url+v1" as ExpectedValue,
+          OPENAI_API_KEY: TEST_VK,
+          ANTHROPIC_BASE_URL: "url+v1" as ExpectedValue,
+          ANTHROPIC_AUTH_TOKEN: TEST_VK,
+          ANTHROPIC_API_KEY: TEST_VK,
+        },
+        mustNotInject: ["GOOGLE_GEMINI_BASE_URL", "GEMINI_API_KEY"],
+      },
+      {
+        tool: "cursor",
+        expected: {
+          OPENAI_BASE_URL: "url" as ExpectedValue,
+          OPENAI_API_KEY: TEST_VK,
+          ANTHROPIC_BASE_URL: "url" as ExpectedValue,
+          ANTHROPIC_AUTH_TOKEN: TEST_VK,
+        },
+        mustNotInject: ["GOOGLE_GEMINI_BASE_URL", "GEMINI_API_KEY"],
+      },
+      {
+        // gemini-cli 0.46 appends `/v1beta/models/...` itself, so the
+        // base must be bare (gwUrl) — appending /v1beta in the wrapper
+        // would double the prefix and the gateway 404s the routing call.
+        tool: "gemini",
+        expected: {
+          GOOGLE_GEMINI_BASE_URL: "url" as ExpectedValue,
+          GOOGLE_API_KEY: TEST_VK,
+          GEMINI_API_KEY: TEST_VK,
+        },
+        mustNotInject: ["ANTHROPIC_BASE_URL", "OPENAI_BASE_URL"],
+      },
+    ])(
+      "when running `langwatch $tool`",
+      ({ tool, expected, mustNotInject }) => {
+        it(`spawns ${tool} with the documented provider env vars and no unrelated ones`, async () => {
+          writeLoggedInConfig();
+          writeToolStub(tool, "echo-env");
+          const res = await runCli([tool]);
+          expect(res.status).toBe(0);
+          const env = envFromStub(res.stdout ?? "");
+          for (const [k, want] of Object.entries(expected)) {
+            if (want === "url") {
+              expect(env[k]).toBe(gwUrl);
+            } else if (want === "url+v1") {
+              expect(env[k]).toBe(`${gwUrl}/v1`);
+            } else {
+              expect(env[k]).toBe(want);
+            }
+          }
+          for (const k of mustNotInject) {
+            expect(env[k] ?? "").toBe("");
+          }
+        });
+      },
+    );
+  });
+
+  describe("routing — wrapped tool's HTTP traffic lands at the gateway with the VK", async () => {
+    describe("when wrapped claude POSTs to ${ANTHROPIC_BASE_URL}/v1/messages", () => {
+      it("the fake gateway records the request at /v1/messages with Bearer VK", async () => {
+        writeLoggedInConfig();
+        writeToolStub("claude", "post-anthropic");
+        const res = await runCli(["claude"]);
+        expect(res.status).toBe(0);
+        // Filter out the wrapper's preflight GET /healthz probe; assert
+        // on the wrapped tool's POST landing only.
+        const posts = recordedGwRequests.filter((r) => r.method === "POST");
+        expect(posts).toHaveLength(1);
+        expect(posts[0]!.path).toBe("/v1/messages");
+        expect(posts[0]!.authorization).toBe(`Bearer ${TEST_VK}`);
+      });
+    });
+
+    describe("when wrapped codex POSTs to ${OPENAI_BASE_URL}/v1/chat/completions", () => {
+      it("the fake gateway records the request at /v1/chat/completions with Bearer VK", async () => {
+        writeLoggedInConfig();
+        writeToolStub("codex", "post-openai");
+        const res = await runCli(["codex"]);
+        expect(res.status).toBe(0);
+        const posts = recordedGwRequests.filter((r) => r.method === "POST");
+        expect(posts).toHaveLength(1);
+        expect(posts[0]!.path).toBe("/v1/chat/completions");
+        expect(posts[0]!.authorization).toBe(`Bearer ${TEST_VK}`);
+      });
+    });
+
+    describe("when wrapped opencode POSTs through OpenAI-compatible env vars", () => {
+      // The wrapper supplies OPENAI_BASE_URL=${gw}/v1 for opencode because
+      // the Vercel AI SDK opencode uses does NOT prepend /v1 itself (unlike
+      // codex). The stub mode mirrors that — it posts to ${OPENAI_BASE_URL}
+      // /chat/completions, so the gateway still sees /v1/chat/completions.
+      it("the fake gateway records the request at /v1/chat/completions with Bearer VK", async () => {
+        writeLoggedInConfig();
+        writeToolStub("opencode", "post-openai-no-v1");
+        const res = await runCli(["opencode"]);
+        expect(res.status).toBe(0);
+        const posts = recordedGwRequests.filter((r) => r.method === "POST");
+        expect(posts).toHaveLength(1);
+        expect(posts[0]!.path).toBe("/v1/chat/completions");
+        expect(posts[0]!.authorization).toBe(`Bearer ${TEST_VK}`);
+      });
+    });
+  });
+
+  describe("budget pre-check", () => {
+    describe("when the control-plane returns 402 budget_exceeded", () => {
+      it("exits 2 BEFORE spawning the tool and stamps last_request_increase_url", async () => {
+        writeLoggedInConfig();
+        writeToolStub("claude", "echo-env");
+        cpBudgetResponse = {
+          status: 402,
+          body: {
+            error: {
+              type: "budget_exceeded",
+              scope: "user",
+              limit_usd: "10.00",
+              spent_usd: "10.50",
+              period: "month",
+              request_increase_url:
+                "http://app.test/orgs/acme/governance/personal-portal?token=abc",
+              admin_email: "admin@acme.test",
+            },
+          },
+        };
+        const res = await runCli(["claude"]);
+        expect(res.status).toBe(2);
+        const combined = (res.stdout ?? "") + (res.stderr ?? "");
+        expect(combined).toMatch(/Budget limit reached/);
+        expect(combined).toMatch(/\$10\.50.*\$10\.00.*monthly/);
+        expect(combined).toMatch(/langwatch request-increase/);
+        // tool stub did NOT run (no env line in stdout)
+        expect(res.stdout ?? "").not.toMatch(/^ANTHROPIC_BASE_URL=/m);
+        // last_request_increase_url persisted
+        const cfg = readConfig();
+        expect(cfg.last_request_increase_url).toBe(
+          "http://app.test/orgs/acme/governance/personal-portal?token=abc",
+        );
+      });
+    });
+
+    describe("when the control-plane returns 200 (under-limit)", () => {
+      it("spawns the tool with normal env injection", async () => {
+        writeLoggedInConfig();
+        writeToolStub("claude", "echo-env");
+        cpBudgetResponse = { status: 200, body: { ok: true } };
+        const res = await runCli(["claude"]);
+        expect(res.status).toBe(0);
+        const env = envFromStub(res.stdout ?? "");
+        expect(env.ANTHROPIC_BASE_URL).toBe(gwUrl);
+      });
+    });
+
+    describe("when the control-plane is unreachable / 5xx", () => {
+      it("does NOT block the user (passes through to the wrapped tool)", async () => {
+        writeLoggedInConfig();
+        writeToolStub("claude", "echo-env");
+        cpBudgetResponse = { status: 500, body: { error: "down" } };
+        const res = await runCli(["claude"]);
+        expect(res.status).toBe(0);
+        const env = envFromStub(res.stdout ?? "");
+        expect(env.ANTHROPIC_BASE_URL).toBe(gwUrl);
+      });
+    });
+  });
+
+  describe("tool-not-found handling", () => {
+    describe("when the underlying binary is not on PATH", () => {
+      it("exits 127 with a clear actionable error", async () => {
+        writeLoggedInConfig();
+        // intentionally do NOT writeToolStub — and exclude stubs from PATH
+        const res = await runCli(["claude"], { includeToolStubs: false });
+        expect(res.status).toBe(127);
+        const combined = (res.stdout ?? "") + (res.stderr ?? "");
+        expect(combined).toMatch(/claude not found in PATH/);
+        expect(combined).toMatch(/install it first/);
+      });
+    });
+  });
+
+  describe("arg forwarding — wrapper passes every CLI arg verbatim to the tool", () => {
+    function parseArgv(stdout: string): { argc: number; argv: string[] } {
+      const argv: string[] = [];
+      let argc = 0;
+      for (const line of stdout.split("\n")) {
+        const argMatch = /^ARG\[(\d+)\]=(.*)$/.exec(line);
+        if (argMatch) {
+          argv[Number(argMatch[1])] = argMatch[2] ?? "";
+          continue;
+        }
+        const argcMatch = /^ARGC=(\d+)$/.exec(line);
+        if (argcMatch) argc = Number(argcMatch[1]);
+      }
+      return { argc, argv };
+    }
+
+    describe("when the user runs `langwatch claude` with no extra args", () => {
+      it("spawns claude with zero argv (plain invocation works)", async () => {
+        writeLoggedInConfig();
+        writeToolStub("claude", "echo-argv");
+        const res = await runCli(["claude"]);
+        expect(res.status).toBe(0);
+        const parsed = parseArgv(res.stdout ?? "");
+        expect(parsed.argc).toBe(0);
+        expect(parsed.argv).toEqual([]);
+      });
+    });
+
+    describe("when the user runs `langwatch claude --dangerously-skip-permissions`", () => {
+      it("forwards the flag verbatim to the claude child process", async () => {
+        writeLoggedInConfig();
+        writeToolStub("claude", "echo-argv");
+        const res = await runCli(["claude", "--dangerously-skip-permissions"]);
+        expect(res.status).toBe(0);
+        const parsed = parseArgv(res.stdout ?? "");
+        expect(parsed.argc).toBe(1);
+        expect(parsed.argv).toEqual(["--dangerously-skip-permissions"]);
+      });
+    });
+
+    describe("when the user runs `langwatch claude` with mixed flags + a quoted prompt", () => {
+      it("preserves the count, ordering, and value of every arg (including the quoted one)", async () => {
+        writeLoggedInConfig();
+        writeToolStub("claude", "echo-argv");
+        const res = await runCli([
+          "claude",
+          "--dangerously-skip-permissions",
+          "--print",
+          "say hi from the wrapper",
+        ]);
+        expect(res.status).toBe(0);
+        const parsed = parseArgv(res.stdout ?? "");
+        expect(parsed.argc).toBe(3);
+        expect(parsed.argv).toEqual([
+          "--dangerously-skip-permissions",
+          "--print",
+          "say hi from the wrapper",
+        ]);
+      });
+    });
+
+    describe.each(["codex", "cursor", "gemini", "opencode"])(
+      "when the user runs `langwatch %s` with extra args",
+      (tool) => {
+        it("forwards every user arg to the wrapped tool's child process (codex also gets the gateway `--profile` flag prepended)", async () => {
+          writeLoggedInConfig();
+          writeToolStub(tool, "echo-argv");
+          const res = await runCli([tool, "--foo", "bar baz"]);
+          expect(res.status).toBe(0);
+          const parsed = parseArgv(res.stdout ?? "");
+          // codex Path A gateway routing requires a `--profile
+          // langwatch-gateway` prepend so codex 0.134+ honors the
+          // [model_providers.langwatch] block we wrote to
+          // ~/.codex/config.toml. Other tools forward args verbatim.
+          if (tool === "codex") {
+            expect(parsed.argv.slice(-2)).toEqual(["--foo", "bar baz"]);
+            expect(parsed.argv).toContain("--profile");
+            expect(parsed.argv).toContain("langwatch-gateway");
+          } else {
+            expect(parsed.argv).toEqual(["--foo", "bar baz"]);
+          }
+        });
+      },
+    );
+  });
+
+  describe("exit-code propagation", () => {
+    describe.each([
+      { tool: "claude", code: 0 },
+      { tool: "codex", code: 1 },
+      { tool: "claude", code: 42 },
+    ])("when wrapped $tool exits with $code", ({ tool, code }) => {
+      it("the wrapper exits with the same code", async () => {
+        writeLoggedInConfig();
+        writeToolStub(tool, `exit-code:${code}`);
+        const res = await runCli([tool]);
+        expect(res.status).toBe(code);
+      });
+    });
+  });
+});

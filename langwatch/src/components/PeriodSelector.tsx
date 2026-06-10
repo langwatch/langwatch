@@ -9,7 +9,6 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import {
-  addDays,
   differenceInCalendarDays,
   format,
   startOfDay,
@@ -24,6 +23,38 @@ import { Popover } from "./ui/popover";
 /** Date range used for time-based filtering across the app. */
 export type Period = { startDate: Date; endDate: Date };
 
+/**
+ * Relative range presets. The key is what gets serialised into the URL as
+ * `?period=<key>`. `minutes` is the lookback window from "now".
+ *
+ * `days` is the equivalent inclusive day count exposed to consumers via
+ * `daysDifference`. For sub-day windows it clamps to 1 — analytics queries
+ * already do their own `Math.max` so this stays compatible.
+ */
+const RELATIVE_PRESETS = [
+  { key: "15m", label: "Last 15 minutes", minutes: 15, days: 1 },
+  { key: "1h", label: "Last 1 hour", minutes: 60, days: 1 },
+  { key: "6h", label: "Last 6 hours", minutes: 60 * 6, days: 1 },
+  { key: "24h", label: "Last 24 hours", minutes: 60 * 24, days: 1 },
+  { key: "today", label: "Today", minutes: null, days: 1 },
+  { key: "7d", label: "Last 7 days", minutes: null, days: 7 },
+  { key: "15d", label: "Last 15 days", minutes: null, days: 15 },
+  { key: "30d", label: "Last 30 days", minutes: null, days: 30 },
+  { key: "90d", label: "Last 90 days", minutes: null, days: 90 },
+  { key: "6mo", label: "Last 6 months", minutes: null, days: 180 },
+  { key: "1y", label: "Last 1 year", minutes: null, days: 365 },
+] as const;
+
+export type RelativePresetKey = (typeof RELATIVE_PRESETS)[number]["key"];
+
+const RELATIVE_PRESETS_BY_KEY = new Map(
+  RELATIVE_PRESETS.map((preset) => [preset.key, preset]),
+);
+
+const isRelativePresetKey = (value: unknown): value is RelativePresetKey =>
+  typeof value === "string" &&
+  RELATIVE_PRESETS_BY_KEY.has(value as RelativePresetKey);
+
 const getDaysDifference = (startDate: Date, endDate: Date) =>
   differenceInCalendarDays(endDate, startDate) + 1;
 
@@ -32,38 +63,77 @@ const isValidDateString = (dateString: string) => {
   return d instanceof Date && !isNaN(d as any);
 };
 
+/**
+ * Compute the [start, end] window for a relative preset, anchored to `now`.
+ * Day-based presets snap the start to start-of-day to match the historical
+ * behaviour of the day quick selectors.
+ */
+const computeRelativeWindow = (
+  presetKey: RelativePresetKey,
+  now: Date,
+): Period => {
+  const preset = RELATIVE_PRESETS_BY_KEY.get(presetKey);
+  if (!preset) {
+    return { startDate: startOfDay(subDays(now, 29)), endDate: now };
+  }
+
+  if (preset.minutes !== null) {
+    const startDate = new Date(now.getTime() - preset.minutes * 60 * 1000);
+    return { startDate, endDate: now };
+  }
+
+  const startDate = startOfDay(subDays(now, preset.days - 1));
+  return { startDate, endDate: now };
+};
+
+const defaultPresetForDays = (defaultNDays: number): RelativePresetKey => {
+  const match = RELATIVE_PRESETS.find(
+    (preset) => preset.minutes === null && preset.days === defaultNDays,
+  );
+  return match?.key ?? "30d";
+};
+
+export type PeriodMode = "relative" | "absolute";
+
 export const usePeriodSelector = (defaultNDays = 30) => {
   const router = useRouter();
 
-  const now = useMemo(() => new Date(), []);
-  const thisHour = useMemo(
-    () =>
-      new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate(),
-        now.getHours(),
-      ),
-    [now],
-  );
+  // Recompute on every render so relative windows stay anchored to "now".
+  // The useMemo below excludes `now` from its deps, so the returned `period`
+  // stays referentially stable across renders unless query params change.
+  // Page re-mounts (refresh, route change) get a fresh `now` for free.
+  const now = new Date();
 
-  const startDate = useMemo(
-    () =>
-      typeof router.query.startDate === "string" &&
-      isValidDateString(router.query.startDate)
-        ? new Date(router.query.startDate)
-        : startOfDay(addDays(thisHour, -(defaultNDays - 1))),
-    [defaultNDays, router.query.startDate, thisHour],
-  );
-  const endDate = useMemo(
-    () =>
-      typeof router.query.endDate === "string" &&
-      isValidDateString(router.query.endDate)
-        ? new Date(router.query.endDate)
-        : now,
+  const queryPeriod = router.query.period;
+  const queryStartDate = router.query.startDate;
+  const queryEndDate = router.query.endDate;
+
+  const { period, mode } = useMemo<{ period: Period; mode: PeriodMode }>(() => {
+    if (
+      typeof queryStartDate === "string" &&
+      typeof queryEndDate === "string" &&
+      isValidDateString(queryStartDate) &&
+      isValidDateString(queryEndDate)
+    ) {
+      const startDate = new Date(queryStartDate);
+      const endDate = new Date(queryEndDate);
+      const safeStart = startDate > endDate ? endDate : startDate;
+      return {
+        period: { startDate: safeStart, endDate },
+        mode: "absolute",
+      };
+    }
+
+    const presetKey = isRelativePresetKey(queryPeriod)
+      ? queryPeriod
+      : defaultPresetForDays(defaultNDays);
+
+    return {
+      period: computeRelativeWindow(presetKey, now),
+      mode: "relative",
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [router.query.endDate, thisHour],
-  );
+  }, [queryPeriod, queryStartDate, queryEndDate, defaultNDays]);
 
   const setPeriod = useCallback(
     (startDate: Date, endDate: Date) => {
@@ -77,15 +147,15 @@ export const usePeriodSelector = (defaultNDays = 30) => {
           ? startDate
           : new Date();
 
-      // Prevent inverted date ranges — clamp start to end if inverted
       if (validStartDate > validEndDate) {
         validStartDate = validEndDate;
       }
 
+      const { period: _omitPeriod, ...rest } = router.query;
       void router.push(
         {
           query: {
-            ...router.query,
+            ...rest,
             startDate: validStartDate.toISOString(),
             endDate: validEndDate.toISOString(),
           },
@@ -97,60 +167,81 @@ export const usePeriodSelector = (defaultNDays = 30) => {
     [router],
   );
 
-  // Guard against inverted date ranges from query params
-  const safeStartDate = startDate > endDate ? endDate : startDate;
-  const daysDifference = getDaysDifference(safeStartDate, endDate);
+  const setRelativePeriod = useCallback(
+    (presetKey: RelativePresetKey) => {
+      const { startDate: _s, endDate: _e, ...rest } = router.query;
+      void router.push(
+        {
+          query: {
+            ...rest,
+            period: presetKey,
+          },
+        },
+        undefined,
+        { shallow: true },
+      );
+    },
+    [router],
+  );
+
+  const daysDifference = getDaysDifference(period.startDate, period.endDate);
 
   return {
-    period: { startDate: safeStartDate, endDate },
+    period,
+    mode,
     setPeriod,
+    setRelativePeriod,
     daysDifference,
   };
 };
 
+const getPresetForRange = (
+  startDate: Date,
+  endDate: Date,
+  now: Date,
+): (typeof RELATIVE_PRESETS)[number] | undefined => {
+  const daysDifference = getDaysDifference(startDate, endDate);
+  const daysFromToday = getDaysDifference(endDate, now);
+  if (daysFromToday > 1) return undefined;
+
+  return RELATIVE_PRESETS.find(
+    (preset) => preset.minutes === null && preset.days === daysDifference,
+  );
+};
+
 export function PeriodSelector({
   period: { startDate, endDate },
+  mode,
   setPeriod,
+  setRelativePeriod,
 }: {
-  period: {
-    startDate: Date;
-    endDate: Date;
-  };
+  period: Period;
+  mode: PeriodMode;
   setPeriod: (startDate: Date, endDate: Date) => void;
+  setRelativePeriod: (presetKey: RelativePresetKey) => void;
 }) {
   const { open, onOpen, onClose, setOpen } = useDisclosure();
 
-  const daysDifference = getDaysDifference(startDate, endDate);
-  const daysDifferenceFromToday = getDaysDifference(endDate, new Date());
-
-  const quickSelectors = [
-    { label: "Today", days: 1 },
-    { label: "Last 7 days", days: 7 },
-    { label: "Last 15 days", days: 15 },
-    { label: "Last 30 days", days: 30 },
-    { label: "Last 90 days", days: 90 },
-    { label: "Last 6 months", days: 180 },
-    { label: "Last 1 year", days: 365 },
-  ];
-
-  const handleQuickSelect = (days: number) => {
-    const newEndDate = new Date();
-    const newStartDate = startOfDay(subDays(newEndDate, days - 1));
-    setPeriod(newStartDate, newEndDate);
+  const handleQuickSelect = (presetKey: RelativePresetKey) => {
+    setRelativePeriod(presetKey);
     onClose();
   };
 
   const getDateRangeLabel = () => {
-    const quickSelect = quickSelectors.find(
-      (selector) =>
-        selector.days === daysDifference && daysDifferenceFromToday <= 1,
-    );
-    return quickSelect
-      ? quickSelect.label
-      : `${format(new Date(startDate), "MMM d")} - ${format(
-          new Date(endDate),
-          "MMM d",
-        )}`;
+    if (mode === "relative") {
+      const matchedByDays = getPresetForRange(startDate, endDate, new Date());
+      if (matchedByDays) return matchedByDays.label;
+
+      const minutes = Math.round(
+        (endDate.getTime() - startDate.getTime()) / 60000,
+      );
+      const subDay = RELATIVE_PRESETS.find(
+        (preset) => preset.minutes === minutes,
+      );
+      if (subDay) return subDay.label;
+    }
+
+    return `${format(startDate, "MMM d")} - ${format(endDate, "MMM d")}`;
   };
 
   return (
@@ -203,13 +294,13 @@ export function PeriodSelector({
               </Field.Root>
             </VStack>
             <VStack>
-              {quickSelectors.map((selector) => (
+              {RELATIVE_PRESETS.map((preset) => (
                 <Button
                   width="full"
-                  key={selector.label}
-                  onClick={() => handleQuickSelect(selector.days)}
+                  key={preset.key}
+                  onClick={() => handleQuickSelect(preset.key)}
                 >
-                  {selector.label}
+                  {preset.label}
                 </Button>
               ))}
             </VStack>

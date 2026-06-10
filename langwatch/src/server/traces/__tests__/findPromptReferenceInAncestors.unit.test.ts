@@ -35,6 +35,7 @@ describe("findPromptReferenceInAncestors()", () => {
         promptHandle: "team/sample-prompt",
         promptVersionNumber: 3,
         promptTag: null,
+        promptVersionId: null,
         promptVariables: { name: "Alice" },
       });
     });
@@ -74,6 +75,7 @@ describe("findPromptReferenceInAncestors()", () => {
         promptHandle: "org/deep-prompt",
         promptVersionNumber: 7,
         promptTag: null,
+        promptVersionId: null,
         promptVariables: null,
       });
     });
@@ -113,6 +115,7 @@ describe("findPromptReferenceInAncestors()", () => {
         promptHandle: "team/sibling-prompt",
         promptVersionNumber: 1,
         promptTag: null,
+        promptVersionId: null,
         promptVariables: null,
       });
     });
@@ -179,7 +182,161 @@ describe("findPromptReferenceInAncestors()", () => {
         promptHandle: "team/compiled-prompt",
         promptVersionNumber: 2,
         promptTag: null,
+        promptVersionId: null,
         promptVariables: null,
+      });
+    });
+  });
+
+  describe("when the python-sdk get+compile sibling pair share a millisecond", () => {
+    it("merges variables across both, picking compile's identity", () => {
+      // Real-world surface from the prompt-spans rollout: the SDK
+      // emits PromptApiService.get + Prompt.compile as a same-parent
+      // sibling pair. ClickHouse stores StartTime at millisecond
+      // resolution, so the two spans collapse onto the same startTime
+      // for the trace UI ancestor walk. Pre-fix, strict greater-than
+      // tie-breaking made get win on iteration order — losing every
+      // user-facing variable that lives on compile and leaving the
+      // playground Variables panel empty.
+      const spans = [
+        {
+          spanId: "parent-span",
+          parentSpanId: null,
+          startTime: 100,
+          attributes: {},
+        },
+        {
+          spanId: "get-span",
+          parentSpanId: "parent-span",
+          startTime: 200,
+          attributes: {
+            // Combined "<handle>:<version>" form is the get-span stamp.
+            "langwatch.prompt.id": "support-router:6",
+            // Get carries the internal dispatch arg as a variable.
+            "langwatch.prompt.variables": JSON.stringify({
+              type: "json",
+              value: { prompt_id: "prompt_supportrouter_xyz" },
+            }),
+          },
+        },
+        {
+          spanId: "compile-span",
+          parentSpanId: "parent-span",
+          // Same millisecond as get — the post-CH round-trip reality.
+          startTime: 200,
+          attributes: {
+            "langwatch.prompt.id": "prompt_supportrouter_xyz",
+            "langwatch.prompt.handle": "support-router",
+            "langwatch.prompt.version.number": 6,
+            // Compile carries the user's actual template variables.
+            "langwatch.prompt.variables": JSON.stringify({
+              type: "json",
+              value: { example: "foobar", input: "how big is mars?" },
+            }),
+          },
+        },
+        {
+          spanId: "llm-span",
+          parentSpanId: "parent-span",
+          startTime: 200,
+          attributes: {},
+        },
+      ];
+
+      const result = findPromptReferenceInAncestors({
+        targetSpanId: "llm-span",
+        spans,
+      });
+
+      // User-facing variables from compile survive the merge.
+      // prompt_id (from get's dispatch envelope) is dropped by the
+      // merger's INTERNAL_PROMPT_VARIABLE_KEYS filter — see paired
+      // bug #3 fix; the panel never surfaces SDK call args as
+      // template variables.
+      expect(result?.promptVariables).toEqual({
+        example: "foobar",
+        input: "how big is mars?",
+      });
+    });
+  });
+
+  describe("when get-span carries only dispatch internals and compile is missing", () => {
+    it("returns null variables instead of surfacing prompt_id as a user var", () => {
+      // 2026-05-17 prod report (bug #3 from the merged #4094 dogfood):
+      // when the trace has *only* the get span (e.g. compile failed to
+      // emit, or wasn't recorded), the merger previously returned the
+      // get's variables map verbatim — which only contains prompt_id.
+      // The playground then rendered a Variables panel with a single
+      // "prompt_id = prompt_…" row, which is meaningless to the user.
+      // After the filter, the merger drops the internal-only map and
+      // returns null so the panel falls back to the prompt's declared
+      // inputs without injected noise.
+      const spans = [
+        { spanId: "parent-span", parentSpanId: null, startTime: 100, attributes: {} },
+        {
+          spanId: "get-span",
+          parentSpanId: "parent-span",
+          startTime: 200,
+          attributes: {
+            "langwatch.prompt.id": "support-router:6",
+            "langwatch.prompt.variables": JSON.stringify({
+              type: "json",
+              value: { prompt_id: "prompt_gg9YhtFllFNrMixRXXslv", tag: "production" },
+            }),
+          },
+        },
+        { spanId: "llm-span", parentSpanId: "parent-span", startTime: 200, attributes: {} },
+      ];
+
+      const result = findPromptReferenceInAncestors({
+        targetSpanId: "llm-span",
+        spans,
+      });
+
+      expect(result?.promptHandle).toBe("support-router");
+      expect(result?.promptVariables).toBeNull();
+    });
+  });
+
+  describe("when compile carries a leaked 'messages' field alongside user vars", () => {
+    it("strips 'messages' but preserves the user variables", () => {
+      // Defense-in-depth for traces emitted before nlpgo's emit-side
+      // filter landed. The compile span's variables map carries the
+      // dispatch envelope's `messages` array (the chat history the
+      // engine injects). The Variables panel must show only the
+      // user-declared template vars.
+      const spans = [
+        { spanId: "parent-span", parentSpanId: null, startTime: 100, attributes: {} },
+        {
+          spanId: "compile-span",
+          parentSpanId: "parent-span",
+          startTime: 200,
+          attributes: {
+            "langwatch.prompt.id": "prompt_x",
+            "langwatch.prompt.handle": "my-prompt",
+            "langwatch.prompt.version.number": 2,
+            "langwatch.prompt.variables": JSON.stringify({
+              type: "json",
+              value: {
+                input: "hello",
+                example: "foobar",
+                messages: [{ role: "user", content: "{{input}}" }],
+                chat_messages: [{ role: "assistant", content: "hi" }],
+              },
+            }),
+          },
+        },
+        { spanId: "llm-span", parentSpanId: "parent-span", startTime: 200, attributes: {} },
+      ];
+
+      const result = findPromptReferenceInAncestors({
+        targetSpanId: "llm-span",
+        spans,
+      });
+
+      expect(result?.promptVariables).toEqual({
+        input: "hello",
+        example: "foobar",
       });
     });
   });
@@ -226,6 +383,7 @@ describe("findPromptReferenceInAncestors()", () => {
         promptHandle: "team/late-prompt",
         promptVersionNumber: 2,
         promptTag: null,
+        promptVersionId: null,
         promptVariables: null,
       });
     });
@@ -305,6 +463,7 @@ describe("findPromptReferenceInAncestors()", () => {
         promptHandle: "team/sibling-prompt",
         promptVersionNumber: 1,
         promptTag: null,
+        promptVersionId: null,
         promptVariables: null,
       });
     });
@@ -387,6 +546,7 @@ describe("findPromptReferenceInAncestors()", () => {
         promptHandle: "team/old-prompt",
         promptVersionNumber: 2,
         promptTag: null,
+        promptVersionId: null,
         promptVariables: null,
       });
     });
@@ -428,6 +588,7 @@ describe("findPromptReferenceInAncestors()", () => {
         promptHandle: "team/nearest",
         promptVersionNumber: 2,
         promptTag: null,
+        promptVersionId: null,
         promptVariables: null,
       });
     });
@@ -548,6 +709,7 @@ describe("findPromptReferenceInAncestors()", () => {
       expect(result).toEqual({
         promptHandle: "team/same-time-prompt",
         promptTag: null,
+        promptVersionId: null,
         promptVersionNumber: 1,
         promptVariables: null,
       });
@@ -591,6 +753,7 @@ describe("findPromptReferenceInAncestors()", () => {
       expect(result).toEqual({
         promptHandle: "tea-prompt",
         promptTag: null,
+        promptVersionId: null,
         promptVersionNumber: 4,
         promptVariables: null,
       });
@@ -646,6 +809,7 @@ describe("findPromptReferenceInAncestors()", () => {
       expect(result).toEqual({
         promptHandle: "tea-prompt",
         promptTag: null,
+        promptVersionId: null,
         promptVersionNumber: 4,
         promptVariables: null,
       });
@@ -702,6 +866,7 @@ describe("findPromptReferenceInAncestors()", () => {
         promptHandle: "tea-prompt",
         promptVersionNumber: 4,
         promptTag: null,
+        promptVersionId: null,
         promptVariables: null,
       });
     });
@@ -749,6 +914,7 @@ describe("findPromptReferenceInAncestors()", () => {
         promptHandle: "team/nested-prompt",
         promptVersionNumber: 5,
         promptTag: null,
+        promptVersionId: null,
         promptVariables: null,
       });
     });

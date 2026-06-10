@@ -215,7 +215,7 @@ func TestRoundTripFullWorkflow(t *testing.T) {
 	original, err := dsl.ParseWorkflow([]byte(fullWorkflowJSON))
 	require.NoError(t, err)
 
-	encoded, err := json.Marshal(original)
+	encoded, err := json.Marshal(original) //nolint:gosec // test fixture; "k" placeholder api_key, not a real secret
 	require.NoError(t, err)
 
 	roundTripped, err := dsl.ParseWorkflow(encoded)
@@ -223,9 +223,9 @@ func TestRoundTripFullWorkflow(t *testing.T) {
 
 	// Marshaling both and comparing the bytes catches any field
 	// ordering or nullability drift.
-	originalBytes, err := json.Marshal(original)
+	originalBytes, err := json.Marshal(original) //nolint:gosec // test fixture; "k" placeholder api_key, not a real secret
 	require.NoError(t, err)
-	rtBytes, err := json.Marshal(roundTripped)
+	rtBytes, err := json.Marshal(roundTripped) //nolint:gosec // test fixture; "k" placeholder api_key, not a real secret
 	require.NoError(t, err)
 	assert.JSONEq(t, string(originalBytes), string(rtBytes))
 }
@@ -258,4 +258,64 @@ func TestUnknownNodeKindParses(t *testing.T) {
 	assert.Equal(t, dsl.ComponentType("agent"), w.Nodes[0].Type)
 	require.NotNil(t, w.Nodes[0].Data.Agent)
 	assert.Equal(t, "agents/foo", *w.Nodes[0].Data.Agent)
+}
+
+// Prompt-config fields land on the Component struct exactly as the TS
+// signatureComponentSchema (langwatch/src/optimization_studio/types/
+// dsl.ts:414-428) ships them: flat configId/handle on data, nested
+// versionMetadata sub-object. nlpgo's engine reads these to stamp the
+// PromptApiService.get + Prompt.compile span identity attributes.
+func TestComponentPromptConfigFieldsRoundTrip(t *testing.T) {
+	src := `{
+		"configId": "prompt_4RXLJtB9Cj-OA1BaLpxWc",
+		"handle": "pizza-prompt",
+		"versionMetadata": {
+			"versionId": "prompt_version_I21kDsHKtr5wQm9k1Dap2",
+			"versionNumber": 6,
+			"versionCreatedAt": "2026-05-01T12:00:00Z"
+		},
+		"promptDraft": true
+	}`
+	var c dsl.Component
+	require.NoError(t, json.Unmarshal([]byte(src), &c))
+
+	require.NotNil(t, c.PromptConfigID)
+	assert.Equal(t, "prompt_4RXLJtB9Cj-OA1BaLpxWc", *c.PromptConfigID)
+	require.NotNil(t, c.PromptHandle)
+	assert.Equal(t, "pizza-prompt", *c.PromptHandle)
+	require.NotNil(t, c.VersionMetadata)
+	assert.Equal(t, "prompt_version_I21kDsHKtr5wQm9k1Dap2", c.VersionMetadata.VersionID)
+	assert.Equal(t, 6, c.VersionMetadata.VersionNumber)
+	assert.Equal(t, "2026-05-01T12:00:00Z", c.VersionMetadata.VersionCreatedAt)
+	require.NotNil(t, c.PromptDraft)
+	assert.True(t, *c.PromptDraft)
+
+	// Marshal back out and assert key parity with the input — this is
+	// the byte-equivalence guard that fails the moment a field gets
+	// dropped, renamed, or coerced.
+	encoded, err := json.Marshal(c)
+	require.NoError(t, err)
+	assert.JSONEq(t, src, string(encoded))
+}
+
+// A component without any prompt-config fields must omit every
+// prompt-* key from the marshaled output — Component is a permissive
+// union and silently emitting null/zero values would change the
+// wire-format hash that the engine planner sees.
+func TestComponentPromptConfigFieldsOmittedWhenUnset(t *testing.T) {
+	src := `{"name":"plain","cls":"Signature"}`
+	var c dsl.Component
+	require.NoError(t, json.Unmarshal([]byte(src), &c))
+
+	assert.Nil(t, c.PromptConfigID)
+	assert.Nil(t, c.PromptHandle)
+	assert.Nil(t, c.VersionMetadata)
+	assert.Nil(t, c.PromptDraft)
+
+	encoded, err := json.Marshal(c)
+	require.NoError(t, err)
+	assert.NotContains(t, string(encoded), "configId")
+	assert.NotContains(t, string(encoded), "handle")
+	assert.NotContains(t, string(encoded), "versionMetadata")
+	assert.NotContains(t, string(encoded), "promptDraft")
 }

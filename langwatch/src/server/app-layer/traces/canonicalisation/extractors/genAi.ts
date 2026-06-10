@@ -35,6 +35,7 @@
 
 import { ATTR_KEYS } from "./_constants";
 import {
+  coerceStringNumberAttrs,
   extractInputMessages,
   extractModelToBoth,
   extractOutputMessages,
@@ -47,7 +48,11 @@ import {
   extractSystemInstructionFromMessages,
   stripSystemMessages,
 } from "./_messages";
-import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
+import type {
+  CanonicalAttributesExtractor,
+  ExtractorContext,
+  LogExtractorContext,
+} from "./_types";
 
 export class GenAIExtractor implements CanonicalAttributesExtractor {
   readonly id = "genai";
@@ -143,7 +148,10 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
     );
     if (rawSystemInstructions !== undefined) {
       if (typeof rawSystemInstructions === "string") {
-        ctx.setAttr(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, rawSystemInstructions);
+        ctx.setAttr(
+          ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS,
+          rawSystemInstructions,
+        );
         ctx.recordRule(`${this.id}:system_instructions(string)`);
       } else if (Array.isArray(rawSystemInstructions)) {
         // Array of content blocks: [{ type: "text", content: "..." }]
@@ -180,10 +188,7 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
       if (Array.isArray(existing)) {
         const sysInstruction = extractSystemInstructionFromMessages(existing);
         if (sysInstruction !== null) {
-          ctx.setAttr(
-            ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS,
-            sysInstruction,
-          );
+          ctx.setAttr(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, sysInstruction);
           // Strip system messages and re-set
           const stripped = stripSystemMessages(existing);
           attrs.take(ATTR_KEYS.GEN_AI_INPUT_MESSAGES);
@@ -193,8 +198,15 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
           ctx.recordRule(`${this.id}:system_instruction(existing)`);
         }
         // Annotate existing messages as chat_messages type (only if messages remain)
-        if (ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] !== undefined || attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES)) {
-          recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
+        if (
+          ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] !== undefined ||
+          attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES)
+        ) {
+          recordValueType(
+            ctx,
+            ATTR_KEYS.GEN_AI_INPUT_MESSAGES,
+            "chat_messages",
+          );
         }
       }
     }
@@ -247,49 +259,25 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
     // Coerce string→number for reasoning tokens and cache tokens
     // (Mastra sends these as strings, e.g. "720")
     // ─────────────────────────────────────────────────────────────────────────
-    const extendedTokenKeys = [
+    coerceStringNumberAttrs(ctx, this.id, [
       ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS,
       ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
       ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
-    ] as const;
-
-    for (const key of extendedTokenKeys) {
-      const raw = attrs.get(key);
-      if (typeof raw === "string") {
-        const n = asNumber(raw);
-        if (n !== null) {
-          attrs.take(key);
-          ctx.setAttr(key, n);
-          ctx.recordRule(`${this.id}:coerce(${key})`);
-        }
-      }
-    }
+    ]);
 
     // ─────────────────────────────────────────────────────────────────────────
     // Request Parameter Coercion
     // Coerce string→number for request parameters that arrive as strings
     // (e.g. Mastra sends temperature as "1" instead of 1)
     // ─────────────────────────────────────────────────────────────────────────
-    const requestParamKeys = [
+    coerceStringNumberAttrs(ctx, this.id, [
       ATTR_KEYS.GEN_AI_REQUEST_TEMPERATURE,
       ATTR_KEYS.GEN_AI_REQUEST_MAX_TOKENS,
       ATTR_KEYS.GEN_AI_REQUEST_TOP_P,
       ATTR_KEYS.GEN_AI_REQUEST_FREQUENCY_PENALTY,
       ATTR_KEYS.GEN_AI_REQUEST_PRESENCE_PENALTY,
       ATTR_KEYS.GEN_AI_REQUEST_SEED,
-    ] as const;
-
-    for (const key of requestParamKeys) {
-      const raw = attrs.get(key);
-      if (typeof raw === "string") {
-        const n = asNumber(raw);
-        if (n !== null) {
-          attrs.take(key);
-          ctx.setAttr(key, n);
-          ctx.recordRule(`${this.id}:coerce(${key})`);
-        }
-      }
-    }
+    ]);
 
     // ─────────────────────────────────────────────────────────────────────────
     // Request Parameters (from legacy llm.invocation_parameters)
@@ -348,5 +336,98 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
       ctx.recordRule(`${this.id}:params`);
       ctx.bag.attrs.delete(ATTR_KEYS.LLM_INVOCATION_PARAMETERS);
     }
+  }
+
+  /**
+   * Defensive lift of gen_ai.* canonical attributes on log records
+   * (gemini CLI 0.32+, any @opentelemetry/semantic-conventions-genai
+   * emitter, custom in-house emitters). Gated on field PRESENCE
+   * rather than scope/event.name so it benefits every caller that
+   * emits OTel GenAI semconv on logs.
+   *
+   * Replaces the bespoke extractGenAiLogMetrics that lived in
+   * trace-io-accumulation.service.ts. The lifted keys mirror that
+   * function exactly — model + tokens + cache_read + thread.id +
+   * input/output messages — so the fold projection swap is
+   * behaviour-preserving.
+   *
+   * cacheReadTokens reads gen_ai.usage.cache_read_tokens (OTel
+   * semconv) first, then falls back to cached_content_token_count
+   * (vertex-style emitter). Both are first-class on the wire.
+   */
+  applyLog(ctx: LogExtractorContext): void {
+    const { attrs } = ctx.bag;
+
+    const asNumberFrom = (key: string): number | null => {
+      const raw = attrs.get(key);
+      if (raw === undefined || raw === null || raw === "") return null;
+      const n =
+        typeof raw === "number"
+          ? raw
+          : typeof raw === "string"
+            ? Number(raw)
+            : NaN;
+      return Number.isFinite(n) ? n : null;
+    };
+    const asStringFrom = (key: string): string | null => {
+      const raw = attrs.get(key);
+      return typeof raw === "string" && raw.length > 0 ? raw : null;
+    };
+    const asJsonStringFrom = (key: string): string | null => {
+      const raw = attrs.get(key);
+      if (raw === undefined || raw === null) return null;
+      if (typeof raw === "string") {
+        return raw.length > 0 ? raw : null;
+      }
+      if (typeof raw === "object") {
+        try {
+          return JSON.stringify(raw);
+        } catch {
+          return null;
+        }
+      }
+      return null;
+    };
+
+    const model = asStringFrom(ATTR_KEYS.GEN_AI_REQUEST_MODEL);
+    const inputTokens = asNumberFrom(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS);
+    const outputTokens = asNumberFrom(ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS);
+    const cacheReadTokens =
+      asNumberFrom("gen_ai.usage.cache_read_tokens") ??
+      asNumberFrom("cached_content_token_count");
+    const threadId = asStringFrom(ATTR_KEYS.GEN_AI_CONVERSATION_ID);
+    const inputMessages = asJsonStringFrom(ATTR_KEYS.GEN_AI_INPUT_MESSAGES);
+    const outputMessages = asJsonStringFrom(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES);
+
+    let fired = false;
+    if (model !== null) {
+      ctx.setAttr("langwatch.model", model);
+      fired = true;
+    }
+    if (inputTokens !== null) {
+      ctx.setAttr("langwatch.input_tokens", String(inputTokens));
+      fired = true;
+    }
+    if (outputTokens !== null) {
+      ctx.setAttr("langwatch.output_tokens", String(outputTokens));
+      fired = true;
+    }
+    if (cacheReadTokens !== null) {
+      ctx.setAttr("langwatch.cache_read_tokens", String(cacheReadTokens));
+      fired = true;
+    }
+    if (threadId !== null) {
+      ctx.setAttr("langwatch.thread.id", threadId);
+      fired = true;
+    }
+    if (inputMessages !== null) {
+      ctx.setAttr("langwatch.input", inputMessages);
+      fired = true;
+    }
+    if (outputMessages !== null) {
+      ctx.setAttr("langwatch.output", outputMessages);
+      fired = true;
+    }
+    if (fired) ctx.recordRule(`${this.id}:log`);
   }
 }

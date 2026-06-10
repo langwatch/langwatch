@@ -185,6 +185,10 @@ describe("ClickHouse routing via env vars", () => {
   }, 60_000);
 
   describe("when org has no private ClickHouse env var", () => {
+    /** @scenario No private ClickHouse env vars results in empty map */
+    /** @scenario Org without private ClickHouse gets the shared client */
+    /** @scenario Project in a standard org routes to the shared instance */
+    /** @scenario Data written for a standard org does not appear in private */
     it("returns the shared (default) client", async () => {
       const { getClickHouseClientForProject } = await import("../clickhouseClient");
 
@@ -212,6 +216,11 @@ describe("ClickHouse routing via env vars", () => {
   });
 
   describe("when org has a private ClickHouse env var configured", () => {
+    /** @scenario Parse private ClickHouse URL from env var */
+    /** @scenario Multiple private ClickHouse env vars are parsed */
+    /** @scenario Org with private ClickHouse gets a dedicated client */
+    /** @scenario Project in a private-CH org routes to the private instance */
+    /** @scenario Data written for a private-CH org does not appear in shared */
     it("returns a client connected to the private instance", async () => {
       const { getClickHouseClientForProject } = await import("../clickhouseClient");
 
@@ -239,6 +248,7 @@ describe("ClickHouse routing via env vars", () => {
   });
 
   describe("when called twice for the same organization", () => {
+    /** @scenario Private clients are cached per organization */
     it("returns the same cached client instance", async () => {
       const { getClickHouseClientForOrganization, clearCustomClientCache } =
         await import("../clickhouseClient");
@@ -265,6 +275,7 @@ describe("ClickHouse routing via env vars", () => {
   });
 
   describe("when getAllClickHouseInstances is called", () => {
+    /** @scenario getAllClickHouseInstances returns shared and all private instances */
     it("returns both shared and private instances", async () => {
       const { getAllClickHouseInstances } = await import("../clickhouseClient");
 

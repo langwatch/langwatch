@@ -1,26 +1,18 @@
-import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
-import {
-  type AuthMiddlewareVariables,
-  authMiddleware,
-  resourceLimitMiddleware,
-} from "../../middleware";
+import { createProjectApp, requires } from "~/server/api/security";
+import { resourceLimitMiddleware } from "../../middleware";
 import {
   type DashboardServiceMiddlewareVariables,
   dashboardServiceMiddleware,
 } from "../../middleware/dashboard-service";
-import { loggerMiddleware } from "../../middleware/logger";
-import { tracerMiddleware } from "../../middleware/tracer";
 import { BadRequestError, NotFoundError } from "../../shared/errors";
 import { platformUrl } from "../../shared/platform-url";
 import { handleDashboardError } from "./error-handler";
 
 patchZodOpenapi();
-
-type Variables = AuthMiddlewareVariables & DashboardServiceMiddlewareVariables;
 
 // -- Validation schemas --
 
@@ -75,21 +67,20 @@ function mapDashboardReorderError(error: unknown): never {
   throw error;
 }
 
-export const app = new Hono<{ Variables: Variables }>()
-  .basePath("/api/dashboards")
-  .use(tracerMiddleware({ name: "dashboards" }))
-  .use(loggerMiddleware())
-  .use(authMiddleware)
-  .use(dashboardServiceMiddleware)
-  .onError(handleDashboardError)
+const secured = createProjectApp<DashboardServiceMiddlewareVariables>({
+  basePath: "/api/dashboards",
+});
 
-  // ── List Dashboards ───────────────────────────────────────────
-  .get(
-    "/",
-    describeRoute({
-      description: "List all dashboards for the project with graph counts",
-    }),
-    async (c) => {
+secured.hono.onError(handleDashboardError);
+
+// ── List Dashboards ───────────────────────────────────────────
+secured.access(requires("analytics:view")).get(
+  "/",
+  dashboardServiceMiddleware,
+  describeRoute({
+    description: "List all dashboards for the project with graph counts",
+  }),
+  async (c) => {
       const project = c.get("project");
       const service = c.get("dashboardService");
 
@@ -110,17 +101,18 @@ export const app = new Hono<{ Variables: Variables }>()
         })),
       });
     },
-  )
+);
 
-  // ── Create Dashboard ──────────────────────────────────────────
-  .post(
-    "/",
-    describeRoute({
-      description: "Create a new dashboard",
-    }),
-    resourceLimitMiddleware("dashboards"),
-    zValidator("json", createDashboardSchema, validationHook),
-    async (c) => {
+// ── Create Dashboard ──────────────────────────────────────────
+secured.access(requires("analytics:manage")).post(
+  "/",
+  dashboardServiceMiddleware,
+  describeRoute({
+    description: "Create a new dashboard",
+  }),
+  resourceLimitMiddleware("dashboards"),
+  zValidator("json", createDashboardSchema, validationHook),
+  async (c) => {
       const project = c.get("project");
       const { name } = c.req.valid("json");
       const service = c.get("dashboardService");
@@ -142,17 +134,18 @@ export const app = new Hono<{ Variables: Variables }>()
         201,
       );
     },
-  )
+);
 
-  // ── Reorder Dashboards ────────────────────────────────────────
-  // Placed before /:id to avoid route conflict with "reorder" being treated as an id
-  .put(
-    "/reorder",
-    describeRoute({
-      description: "Reorder dashboards by providing an ordered list of IDs",
-    }),
-    zValidator("json", reorderDashboardsSchema, validationHook),
-    async (c) => {
+// ── Reorder Dashboards ────────────────────────────────────────
+// Placed before /:id to avoid route conflict with "reorder" being treated as an id
+secured.access(requires("analytics:manage")).put(
+  "/reorder",
+  dashboardServiceMiddleware,
+  describeRoute({
+    description: "Reorder dashboards by providing an ordered list of IDs",
+  }),
+  zValidator("json", reorderDashboardsSchema, validationHook),
+  async (c) => {
       const project = c.get("project");
       const { dashboardIds } = c.req.valid("json");
       const service = c.get("dashboardService");
@@ -164,15 +157,16 @@ export const app = new Hono<{ Variables: Variables }>()
         mapDashboardReorderError(error);
       }
     },
-  )
+);
 
-  // ── Get Single Dashboard ──────────────────────────────────────
-  .get(
-    "/:id",
-    describeRoute({
-      description: "Get a dashboard by its id, including its graphs",
-    }),
-    async (c) => {
+// ── Get Single Dashboard ──────────────────────────────────────
+secured.access(requires("analytics:view")).get(
+  "/:id",
+  dashboardServiceMiddleware,
+  describeRoute({
+    description: "Get a dashboard by its id, including its graphs",
+  }),
+  async (c) => {
       const { id } = c.req.param();
       const project = c.get("project");
       const service = c.get("dashboardService");
@@ -195,16 +189,17 @@ export const app = new Hono<{ Variables: Variables }>()
         return mapDashboardNotFoundError(error);
       }
     },
-  )
+);
 
-  // ── Rename Dashboard ──────────────────────────────────────────
-  .patch(
-    "/:id",
-    describeRoute({
-      description: "Rename a dashboard",
-    }),
-    zValidator("json", renameDashboardSchema, validationHook),
-    async (c) => {
+// ── Rename Dashboard ──────────────────────────────────────────
+secured.access(requires("analytics:manage")).patch(
+  "/:id",
+  dashboardServiceMiddleware,
+  describeRoute({
+    description: "Rename a dashboard",
+  }),
+  zValidator("json", renameDashboardSchema, validationHook),
+  async (c) => {
       const { id } = c.req.param();
       const project = c.get("project");
       const { name } = c.req.valid("json");
@@ -227,15 +222,16 @@ export const app = new Hono<{ Variables: Variables }>()
         return mapDashboardNotFoundError(error);
       }
     },
-  )
+);
 
-  // ── Delete Dashboard ──────────────────────────────────────────
-  .delete(
-    "/:id",
-    describeRoute({
-      description: "Delete a dashboard and its graphs (hard delete, cascade)",
-    }),
-    async (c) => {
+// ── Delete Dashboard ──────────────────────────────────────────
+secured.access(requires("analytics:manage")).delete(
+  "/:id",
+  dashboardServiceMiddleware,
+  describeRoute({
+    description: "Delete a dashboard and its graphs (hard delete, cascade)",
+  }),
+  async (c) => {
       const { id } = c.req.param();
       const project = c.get("project");
       const service = c.get("dashboardService");
@@ -250,4 +246,6 @@ export const app = new Hono<{ Variables: Variables }>()
         return mapDashboardNotFoundError(error);
       }
     },
-  );
+);
+
+export const app = secured.hono;

@@ -69,12 +69,12 @@ describe("listEvaluatorsCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetAll = vi.fn();
-    vi.mocked(EvaluatorsApiService).mockImplementation(() => ({
+    vi.mocked(EvaluatorsApiService).mockImplementation(function () { return ({
       getAll: mockGetAll,
       get: vi.fn(),
       create: vi.fn(),
       delete: vi.fn(),
-    }) as unknown as EvaluatorsApiService);
+    }) as unknown as EvaluatorsApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -118,12 +118,12 @@ describe("getEvaluatorCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGet = vi.fn();
-    vi.mocked(EvaluatorsApiService).mockImplementation(() => ({
+    vi.mocked(EvaluatorsApiService).mockImplementation(function () { return ({
       getAll: vi.fn(),
       get: mockGet,
       create: vi.fn(),
       delete: vi.fn(),
-    }) as unknown as EvaluatorsApiService);
+    }) as unknown as EvaluatorsApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -156,12 +156,12 @@ describe("createEvaluatorCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCreate = vi.fn();
-    vi.mocked(EvaluatorsApiService).mockImplementation(() => ({
+    vi.mocked(EvaluatorsApiService).mockImplementation(function () { return ({
       getAll: vi.fn(),
       get: vi.fn(),
       create: mockCreate,
       delete: vi.fn(),
-    }) as unknown as EvaluatorsApiService);
+    }) as unknown as EvaluatorsApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -201,12 +201,12 @@ describe("deleteEvaluatorCommand()", () => {
     vi.clearAllMocks();
     mockGet = vi.fn();
     mockDelete = vi.fn();
-    vi.mocked(EvaluatorsApiService).mockImplementation(() => ({
+    vi.mocked(EvaluatorsApiService).mockImplementation(function () { return ({
       getAll: vi.fn(),
       get: mockGet,
       create: vi.fn(),
       delete: mockDelete,
-    }) as unknown as EvaluatorsApiService);
+    }) as unknown as EvaluatorsApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();

@@ -67,7 +67,7 @@ describe("CLI E2E", () => {
 
   afterAll(async () => {
     const apiHelpers = new ApiHelpers(langwatch);
-    await apiHelpers.cleapUpTestPrompts();
+    await apiHelpers.cleanUpTestPrompts();
   });
 
   describe("push", () => {
@@ -91,7 +91,9 @@ describe("CLI E2E", () => {
         // Verify remote prompt was created
         const remotePrompt = await langwatch.prompts.get(promptHandle);
         expect(remotePrompt).not.toBeNull();
-        expect(remotePrompt?.model).toBe("openai/gpt-5");
+        // Tracks the CLI default template model; bumped alongside
+        // DEFAULT_PROMPT_MODEL when the registry flagship advances.
+        expect(remotePrompt?.model).toBe("openai/gpt-5.5");
 
         // Verify lock file was updated
         const lock = lockFileManager.readLockFile();

@@ -25,6 +25,7 @@ describe("<ScenarioWelcomeScreen/>", () => {
     vi.restoreAllMocks();
   });
 
+  /** @scenario 'Scenario welcome screen content' */
   it("displays a title mentioning scenarios", () => {
     render(<ScenarioWelcomeScreen onProceed={vi.fn()} />, { wrapper: Wrapper });
 

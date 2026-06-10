@@ -59,9 +59,7 @@ langwatch prompt add agent/customer-service
 Your newly created or fetched prompt will be on a yaml file in the `prompts/` directory, and look like this:
 
 ```yaml
-model: openai/gpt-5
-modelParameters:
-  temperature: 1.0
+model: openai/gpt-5.5
 messages:
   - role: system
     content: You are a helpful assistant.
@@ -266,9 +264,8 @@ The CLI uses two configuration files:
 Prompts files end with `.prompt.yaml` extension and follow this format:
 
 ```yaml
-model: openai/gpt-5
+model: openai/gpt-5.5
 modelParameters:
-  temperature: 0.7
   max_tokens: 1000
 messages:
   - role: system
@@ -555,3 +552,21 @@ alwaysApply: true
 ### Cloud Code Integration
 
 Include prompt content in cloud development environments by referencing the YAML files in the `prompts/.materialized` directory.
+
+## Reference: structured outputs
+
+For prompts that must return strict JSON, add a `response_format` block alongside `messages` in the `.prompt.yaml`:
+
+```yaml
+response_format:
+  name: product_category
+  schema:
+    type: object
+    properties:
+      category: { type: string }
+      reasoning: { type: string }
+    required: [category, reasoning]
+    additionalProperties: false
+```
+
+`response_format` round-trips through `push` and `pull`: the schema you author locally comes back identical after editing on the platform.

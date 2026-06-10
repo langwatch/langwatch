@@ -1,5 +1,119 @@
 # Changelog
 
+## [0.10.1](https://github.com/langwatch/langwatch/compare/mcp-server@v0.10.0...mcp-server@v0.10.1) (2026-05-31)
+
+
+### Bug Fixes
+
+* **mcp-server:** resolve critical/high dependency vulnerabilities (protobufjs, langsmith) ([#4428](https://github.com/langwatch/langwatch/issues/4428)) ([25c0307](https://github.com/langwatch/langwatch/commit/25c0307747e01e3ed81c122ce13d0d57423cbab0))
+* **mcp-server:** resolve critical/high deps vulns (protobufjs, langsmith) ([25c0307](https://github.com/langwatch/langwatch/commit/25c0307747e01e3ed81c122ce13d0d57423cbab0))
+
+## [0.10.0](https://github.com/langwatch/langwatch/compare/mcp-server@v0.9.0...mcp-server@v0.10.0) (2026-05-29)
+
+
+### Features
+
+* **governance:** the LangWatch AI Governance Platform ([#3524](https://github.com/langwatch/langwatch/issues/3524)) ([7dcaa89](https://github.com/langwatch/langwatch/commit/7dcaa895e29f6f2cce8d1e9160ef857520af340a))
+
+
+### Bug Fixes
+
+* **deps:** move mcp-server pnpm.overrides to workspace root ([#4187](https://github.com/langwatch/langwatch/issues/4187)) ([89e45ce](https://github.com/langwatch/langwatch/commit/89e45cefa3c16ef1c11e1d74c24219b182c0d716))
+* **mcp:** serve partial experiment results and fix status for SDK runs ([#4276](https://github.com/langwatch/langwatch/issues/4276)) ([d21997a](https://github.com/langwatch/langwatch/commit/d21997a3c65146b0f52026dccf0907e2abeb8bb9))
+
+
+### Miscellaneous
+
+* **deps:** bump liquidjs to &gt;=10.26.0 (RCE GHSA-gf2q-c269-pqgc) in typescript-sdk, skills, mcp-server ([#4340](https://github.com/langwatch/langwatch/issues/4340)) ([697e07e](https://github.com/langwatch/langwatch/commit/697e07e82241dc837afb414458e67f539d23fb54))
+* **deps:** bump liquidjs to &gt;=10.26.0 in typescript-sdk, skills, mcp-server (GHSA-gf2q-c269-pqgc) ([697e07e](https://github.com/langwatch/langwatch/commit/697e07e82241dc837afb414458e67f539d23fb54))
+
+## [0.9.0](https://github.com/langwatch/langwatch/compare/mcp-server@v0.8.0...mcp-server@v0.9.0) (2026-05-22)
+
+
+### Features
+
+* **api-keys:** scope-based permissions with fine-grained categories + docs ([#4117](https://github.com/langwatch/langwatch/issues/4117)) ([3dca0f6](https://github.com/langwatch/langwatch/commit/3dca0f685f8df8333d22117581510b0f6e13442d))
+* **dev-env:** boxd Makefile + quickstart rework ([#3891](https://github.com/langwatch/langwatch/issues/3891) + [#3860](https://github.com/langwatch/langwatch/issues/3860)) ([#3901](https://github.com/langwatch/langwatch/issues/3901)) ([06e294e](https://github.com/langwatch/langwatch/commit/06e294e590b733c19147a027c432a9b68080a276))
+* **experiments:** list + per-row results across SDK / CLI / MCP, plus evaluations-v3 → experiments rename ([#3893](https://github.com/langwatch/langwatch/issues/3893)) ([895cda8](https://github.com/langwatch/langwatch/commit/895cda80565c0c69da64affde501c5f159ce283f))
+
+
+### Bug Fixes
+
+* **deps:** upgrade langsmith sdk security floors ([2e18927](https://github.com/langwatch/langwatch/commit/2e18927c0c1c1fdec24c2bba17e5f094e56a9deb))
+* **deps:** upgrade LangSmith SDK security floors ([#4041](https://github.com/langwatch/langwatch/issues/4041)) ([2e18927](https://github.com/langwatch/langwatch/commit/2e18927c0c1c1fdec24c2bba17e5f094e56a9deb))
+
+
+### Miscellaneous
+
+* relicense langwatch from BSL 1.1 to Apache 2.0 (+ ee/ for enterprise modules) ([#4085](https://github.com/langwatch/langwatch/issues/4085)) ([23b9dcd](https://github.com/langwatch/langwatch/commit/23b9dcd051806e0d2162b377a7e1b4c3fecb3ed5))
+* **security:** add dependency age gates ([#3523](https://github.com/langwatch/langwatch/issues/3523)) ([78f5b20](https://github.com/langwatch/langwatch/commit/78f5b2059228748d19fb4bf74118c9bee6c474f9))
+
+## [0.8.0](https://github.com/langwatch/langwatch/compare/mcp-server@v0.7.0...mcp-server@v0.8.0) (2026-05-13)
+
+
+### Features
+
+* **api-key:** unified API Keys page with service keys, audit logging, and edit permissions ([#3386](https://github.com/langwatch/langwatch/issues/3386)) ([61a306c](https://github.com/langwatch/langwatch/commit/61a306c22f86af096c2f4651810bef2a7de486d6))
+* **npx-server:** npx @langwatch/server — single-command local LangWatch ([#3486](https://github.com/langwatch/langwatch/issues/3486)) ([0884d31](https://github.com/langwatch/langwatch/commit/0884d3145cd910fcd199e1e70f82f805c9d1c972))
+
+
+### Bug Fixes
+
+* **deps:** bump protobufjs to clear CVE-2026-41242 across JS workspaces ([#3612](https://github.com/langwatch/langwatch/issues/3612)) ([f2f2c37](https://github.com/langwatch/langwatch/commit/f2f2c37a4dc2011e7463752e952172b6225c2b6d))
+* **deps:** patch high-severity npm vulnerabilities (fast-xml-builder, fast-uri) ([#3928](https://github.com/langwatch/langwatch/issues/3928)) ([2eb205b](https://github.com/langwatch/langwatch/commit/2eb205ba86e1ebd4c7f078c8dba746dd9f50b919))
+* **deps:** upgrade [@opentelemetry](https://github.com/opentelemetry) packages — Prometheus exporter crash ([#3988](https://github.com/langwatch/langwatch/issues/3988)) ([4826054](https://github.com/langwatch/langwatch/commit/4826054f760a1e519233a586657f849cb11ea1b4))
+* **deps:** upgrade [@opentelemetry](https://github.com/opentelemetry) packages — Prometheus exporter crash (alerts [#1058](https://github.com/langwatch/langwatch/issues/1058)-[#1095](https://github.com/langwatch/langwatch/issues/1095)) ([4826054](https://github.com/langwatch/langwatch/commit/4826054f760a1e519233a586657f849cb11ea1b4))
+* **deps:** upgrade aiohttp, starlette, pillow, lxml ([#3564](https://github.com/langwatch/langwatch/issues/3564)) ([498847e](https://github.com/langwatch/langwatch/commit/498847e43c3088ef68b357c6b04d02d1005a5f9a))
+* **deps:** upgrade aiohttp, starlette, pillow, lxml (Python heavy) ([498847e](https://github.com/langwatch/langwatch/commit/498847e43c3088ef68b357c6b04d02d1005a5f9a))
+* **deps:** upgrade cryptography to 47.0.0 in mcp-server (alerts [#854](https://github.com/langwatch/langwatch/issues/854), [#697](https://github.com/langwatch/langwatch/issues/697)) ([#3799](https://github.com/langwatch/langwatch/issues/3799)) ([0e3de7a](https://github.com/langwatch/langwatch/commit/0e3de7af9d0e9fe48f42a9ae2ea3b23e877f9bdd))
+* **deps:** upgrade nltk, authlib (Dependabot [#612](https://github.com/langwatch/langwatch/issues/612), [#522](https://github.com/langwatch/langwatch/issues/522), [#592](https://github.com/langwatch/langwatch/issues/592), [#593](https://github.com/langwatch/langwatch/issues/593), [#594](https://github.com/langwatch/langwatch/issues/594)) ([#3659](https://github.com/langwatch/langwatch/issues/3659)) ([0576cc0](https://github.com/langwatch/langwatch/commit/0576cc0bafa041bb83dd938e7d5c8f6df6d236ce))
+* **deps:** upgrade nltk, authlib to resolve security alerts ([0576cc0](https://github.com/langwatch/langwatch/commit/0576cc0bafa041bb83dd938e7d5c8f6df6d236ce))
+* **deps:** upgrade pyasn1, filelock, Pygments, nltk (Python patches) ([#3561](https://github.com/langwatch/langwatch/issues/3561)) ([27152ca](https://github.com/langwatch/langwatch/commit/27152ca723b2e31aa3ac760847b17d8e3dfc3714))
+* **deps:** upgrade PyJWT, pillow, onnx (Dependabot) ([#3656](https://github.com/langwatch/langwatch/issues/3656)) ([5eb44a3](https://github.com/langwatch/langwatch/commit/5eb44a3618930847a38abb38345a8d424b6c3021))
+* **deps:** upgrade PyJWT, pillow, onnx to resolve security alerts ([5eb44a3](https://github.com/langwatch/langwatch/commit/5eb44a3618930847a38abb38345a8d424b6c3021))
+* **deps:** upgrade python-liquid to 2.2.0 — filesystem loader path escape ([#3986](https://github.com/langwatch/langwatch/issues/3986)) ([6c390e3](https://github.com/langwatch/langwatch/commit/6c390e301185c81afd59cd64ed7c489789b6b86c))
+* **deps:** upgrade python-liquid to 2.2.0 — filesystem loader path escape (alerts [#1066](https://github.com/langwatch/langwatch/issues/1066)-[#1068](https://github.com/langwatch/langwatch/issues/1068)) ([6c390e3](https://github.com/langwatch/langwatch/commit/6c390e301185c81afd59cd64ed7c489789b6b86c))
+* **deps:** upgrade tornado, urllib3, cryptography (Dependabot) ([#3657](https://github.com/langwatch/langwatch/issues/3657)) ([f8a2e9a](https://github.com/langwatch/langwatch/commit/f8a2e9a5cf6b836524bc2a170d589e1a01ad3921))
+* **deps:** upgrade tornado, urllib3, cryptography to resolve security alerts ([f8a2e9a](https://github.com/langwatch/langwatch/commit/f8a2e9a5cf6b836524bc2a170d589e1a01ad3921))
+* **deps:** upgrade urllib3 to 2.7.0 — decompression-bomb bypass, header forwarding ([#3985](https://github.com/langwatch/langwatch/issues/3985)) ([071cea7](https://github.com/langwatch/langwatch/commit/071cea7c0a4fb094bc6f5a911eefbdc1bb8766c4))
+* **deps:** upgrade urllib3 to 2.7.0 — decompression-bomb bypass, header forwarding (alerts [#1071](https://github.com/langwatch/langwatch/issues/1071)-[#1082](https://github.com/langwatch/langwatch/issues/1082)) ([071cea7](https://github.com/langwatch/langwatch/commit/071cea7c0a4fb094bc6f5a911eefbdc1bb8766c4))
+* **release:** path-routed Release-As shadows for 6 polluted components ([#3627](https://github.com/langwatch/langwatch/issues/3627)) ([b39d59e](https://github.com/langwatch/langwatch/commit/b39d59e87ed6d87224d580271175650c1d4159a7))
+* **release:** scope Release-As to langwatch, restore other components ([#3618](https://github.com/langwatch/langwatch/issues/3618)) ([e259e79](https://github.com/langwatch/langwatch/commit/e259e796b50e4d060e5c7f42cad1927f1da8a83d))
+* **security:** bump protobufjs overrides to 7.5.6/8.0.2 for 28 high-severity CVEs ([#4004](https://github.com/langwatch/langwatch/issues/4004)) ([6083473](https://github.com/langwatch/langwatch/commit/608347380c28f4c691d2e415fdc096a533c41e75))
+* **security:** upgrade high-severity pip dependencies (excluding langchain-core) ([#3929](https://github.com/langwatch/langwatch/issues/3929)) ([f2d5de6](https://github.com/langwatch/langwatch/commit/f2d5de6bf619d188c46947f76812a2c3b3ecf39a))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump @ai-sdk/anthropic from 3.0.58 to 3.0.72 in /mcp-server ([#3498](https://github.com/langwatch/langwatch/issues/3498)) ([cf0531d](https://github.com/langwatch/langwatch/commit/cf0531dbc69a326feb75c3780e7a20abf8774991))
+* **deps-dev:** bump @ai-sdk/anthropic from 3.0.72 to 3.0.74 in /mcp-server ([#3730](https://github.com/langwatch/langwatch/issues/3730)) ([18bc29b](https://github.com/langwatch/langwatch/commit/18bc29b478bffee27482c6fb8eaba53765bc1ec4))
+* **deps-dev:** bump @ai-sdk/anthropic in /mcp-server ([18bc29b](https://github.com/langwatch/langwatch/commit/18bc29b478bffee27482c6fb8eaba53765bc1ec4))
+* **deps-dev:** bump @ai-sdk/anthropic in /mcp-server ([cf0531d](https://github.com/langwatch/langwatch/commit/cf0531dbc69a326feb75c3780e7a20abf8774991))
+* **deps-dev:** bump @anthropic-ai/claude-code from 2.1.72 to 2.1.76 in /mcp-server ([#2365](https://github.com/langwatch/langwatch/issues/2365)) ([6ade0cc](https://github.com/langwatch/langwatch/commit/6ade0ccb96bf646b2a3fa4ecbb4243632713d1a0))
+* **deps-dev:** bump @anthropic-ai/claude-code from 2.1.76 to 2.1.119 in /mcp-server ([#3508](https://github.com/langwatch/langwatch/issues/3508)) ([afc67fa](https://github.com/langwatch/langwatch/commit/afc67fa0bafc661aa65f31e9cb6bda670848f7fc))
+* **deps-dev:** bump @anthropic-ai/claude-code in /mcp-server ([6ade0cc](https://github.com/langwatch/langwatch/commit/6ade0ccb96bf646b2a3fa4ecbb4243632713d1a0))
+* **deps-dev:** bump @eslint/js from 9.39.2 to 10.0.1 in /mcp-server ([#3496](https://github.com/langwatch/langwatch/issues/3496)) ([2840220](https://github.com/langwatch/langwatch/commit/284022014935b5c0610e1bef91dc5e52273efa98))
+* **deps-dev:** bump @langwatch/scenario from 0.4.6 to 0.4.8 in /mcp-server ([#2367](https://github.com/langwatch/langwatch/issues/2367)) ([587a366](https://github.com/langwatch/langwatch/commit/587a3667921a961e77f1e568e9a303efb60be023))
+* **deps-dev:** bump @langwatch/scenario in /mcp-server ([587a366](https://github.com/langwatch/langwatch/commit/587a3667921a961e77f1e568e9a303efb60be023))
+* **deps-dev:** bump @types/debug from 4.1.12 to 4.1.13 in /mcp-server ([#3502](https://github.com/langwatch/langwatch/issues/3502)) ([3de6456](https://github.com/langwatch/langwatch/commit/3de645679f4027fcaf5075baa66c50b05455b485))
+* **deps-dev:** bump @types/node from 16.18.126 to 25.6.0 in /mcp-server ([#3733](https://github.com/langwatch/langwatch/issues/3733)) ([1e8b9b7](https://github.com/langwatch/langwatch/commit/1e8b9b79cf467be4140ea3379cc783e316f90f29))
+* **deps-dev:** bump @types/node in /mcp-server ([1e8b9b7](https://github.com/langwatch/langwatch/commit/1e8b9b79cf467be4140ea3379cc783e316f90f29))
+* **deps-dev:** bump ai from 6.0.116 to 6.0.174 in /mcp-server ([#3724](https://github.com/langwatch/langwatch/issues/3724)) ([5d6fa3c](https://github.com/langwatch/langwatch/commit/5d6fa3c907ce33c5ecb10aabedb9259b4981e4ee))
+* **deps-dev:** bump dotenv from 17.2.2 to 17.4.2 in /mcp-server ([#3500](https://github.com/langwatch/langwatch/issues/3500)) ([9b06333](https://github.com/langwatch/langwatch/commit/9b0633380e09518fcc91d3cd86117310dfaf120d))
+* **deps-dev:** bump eslint from 8.57.1 to 10.0.3 in /mcp-server ([#2097](https://github.com/langwatch/langwatch/issues/2097)) ([d0c78a4](https://github.com/langwatch/langwatch/commit/d0c78a45bd42f61284e8836c84764b3970be9099))
+* **deps:** bump @opentelemetry/sdk-node from 0.204.0 to 0.213.0 in /mcp-server ([#2088](https://github.com/langwatch/langwatch/issues/2088)) ([06019b7](https://github.com/langwatch/langwatch/commit/06019b78947d4b15212d9d5a353a471e2faf3531))
+* **deps:** bump @opentelemetry/sdk-node in /mcp-server ([06019b7](https://github.com/langwatch/langwatch/commit/06019b78947d4b15212d9d5a353a471e2faf3531))
+* **deps:** bump hono ([3c32c62](https://github.com/langwatch/langwatch/commit/3c32c62798a6311bdb458dda99e617c63d7be907))
+* **deps:** bump hono from 4.12.5 to 4.12.7 in /mcp-server in the npm_and_yarn group across 1 directory ([#2235](https://github.com/langwatch/langwatch/issues/2235)) ([3c32c62](https://github.com/langwatch/langwatch/commit/3c32c62798a6311bdb458dda99e617c63d7be907))
+* **deps:** bump langsmith from 0.7.1 to 0.7.31 in /mcp-server ([#3281](https://github.com/langwatch/langwatch/issues/3281)) ([60877d8](https://github.com/langwatch/langwatch/commit/60877d831c805c0f41ac8a7e6d84128fe80da238))
+* **deps:** bump postcss ([9f3e50d](https://github.com/langwatch/langwatch/commit/9f3e50d55dc83afc34ce70f136a0aca2aa1f7b25))
+* **deps:** bump postcss from 8.5.6 to 8.5.13 in /mcp-server in the npm_and_yarn group across 1 directory ([#3757](https://github.com/langwatch/langwatch/issues/3757)) ([9f3e50d](https://github.com/langwatch/langwatch/commit/9f3e50d55dc83afc34ce70f136a0aca2aa1f7b25))
+* **deps:** bump the npm_and_yarn group across 1 directory with 5 updates ([#3410](https://github.com/langwatch/langwatch/issues/3410)) ([2d29949](https://github.com/langwatch/langwatch/commit/2d29949b5693359ffdc20351d761aa2d1db9c659))
+* **mcp-server:** single-footer shadow Release-As 0.8.0 ([fc1153f](https://github.com/langwatch/langwatch/commit/fc1153f5fc0e9d364236a12910182c17bf46f510))
+* release as 3.2.1 ([ca9d7a9](https://github.com/langwatch/langwatch/commit/ca9d7a9231a7b3d9d8cf9a28a48fa494b1daeb4b))
+* release as 3.2.1 (override release-please from 3.3.0) ([#3615](https://github.com/langwatch/langwatch/issues/3615)) ([ca9d7a9](https://github.com/langwatch/langwatch/commit/ca9d7a9231a7b3d9d8cf9a28a48fa494b1daeb4b))
+* scope Release-As to langwatch, restore other components ([e259e79](https://github.com/langwatch/langwatch/commit/e259e796b50e4d060e5c7f42cad1927f1da8a83d))
+
 ## [0.7.0](https://github.com/langwatch/langwatch/compare/mcp-server@v0.6.1...mcp-server@v0.7.0) (2026-04-16)
 
 

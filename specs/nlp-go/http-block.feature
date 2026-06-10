@@ -7,6 +7,14 @@ Feature: HTTP block — call an external endpoint with templated body and JSONPa
 
   See _shared/contract.md §5; Python parity: langwatch_nlp/langwatch_nlp/studio/execute/http_node.py
 
+  # All scenarios are @unimplemented because the TS feature-parity checker only
+  # scans TS test roots, so Go-side HTTP block scenarios in services/nlpgo/
+  # cannot be bound via @scenario JSDoc until the checker grows Go-side support
+  # (or a parallel Go-side binder ships). services/nlpgo/ exists; the gap is
+  # tooling/binding, not service stand-up. Python parity tests:
+  # langwatch_nlp/tests/studio/test_http_node_integration.py.
+  # Aspirational pending parity-binder coverage.
+
   Background:
     Given nlpgo is listening on :5562
 
@@ -98,6 +106,9 @@ Feature: HTTP block — call an external endpoint with templated body and JSONPa
       When the engine invokes the node
       Then the upstream observed header matching `^Authorization: Basic dTpw$`
 
+    # Covered by services/nlpgo/tests/integration/http_block_secrets_test.go,
+    # but kept @unimplemented because the TS feature-parity checker only scans
+    # TS test roots and cannot bind Go-side tests yet (see file header).
     @integration @unimplemented
     Scenario: secret references resolve at request time, not at parse time
       Given an HTTP node with auth {"type": "bearer", "token": "{{ secrets.UPSTREAM_TOKEN }}"}
@@ -116,11 +127,13 @@ Feature: HTTP block — call an external endpoint with templated body and JSONPa
       Then within 700ms the node's status is "error"
       And the error.message contains "timeout"
 
-  Rule: SSRF protection blocks loopback, link-local, and metadata endpoints by default
+  Rule: SSRF protection is governed by BLOCK_LOCAL_HTTP_CALLS (cloud metadata always blocked)
+    See specs/security/ssrf-blocking.feature for the cross-service contract.
 
     @unit @unimplemented
-    Scenario Outline: blocked destinations return ssrf_blocked before any connection
-      Given an HTTP node with url=<url>
+    Scenario Outline: blocked destinations return ssrf_blocked when BLOCK_LOCAL_HTTP_CALLS is "true"
+      Given BLOCK_LOCAL_HTTP_CALLS is "true"
+      And an HTTP node with url=<url>
       And ALLOWED_PROXY_HOSTS is empty
       When the engine invokes the node
       Then no outbound connection is attempted
@@ -138,8 +151,24 @@ Feature: HTTP block — call an external endpoint with templated body and JSONPa
         | http://[::1]/                                    |
 
     @unit @unimplemented
+    Scenario: BLOCK_LOCAL_HTTP_CALLS unset allows local destinations (default permissive)
+      Given BLOCK_LOCAL_HTTP_CALLS is unset
+      And an HTTP node with url=http://127.0.0.1:9001/echo
+      When the engine invokes the node
+      Then the outbound connection is attempted
+
+    @unit @unimplemented
+    Scenario: cloud metadata is blocked even when BLOCK_LOCAL_HTTP_CALLS is "false"
+      Given BLOCK_LOCAL_HTTP_CALLS is "false"
+      And an HTTP node with url=http://169.254.169.254/latest/meta-data/
+      When the engine invokes the node
+      Then the node's status is "error"
+      And the error.message contains "ssrf_blocked"
+
+    @unit @unimplemented
     Scenario: ALLOWED_PROXY_HOSTS allowlist permits explicitly-allowed hosts
-      Given ALLOWED_PROXY_HOSTS contains "127.0.0.1,internal-mock.test"
+      Given BLOCK_LOCAL_HTTP_CALLS is "true"
+      And ALLOWED_PROXY_HOSTS contains "127.0.0.1,internal-mock.test"
       And an HTTP node with url=http://127.0.0.1:9001/echo
       When the engine invokes the node
       Then the outbound connection is attempted

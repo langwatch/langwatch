@@ -73,8 +73,9 @@ const createMockOrganizationRepository = (): {
   [K in keyof OrganizationRepository]: ReturnType<typeof vi.fn>;
 } => ({
   getOrganizationIdByTeamId: vi.fn(),
+  getUserOrgRole: vi.fn(),
+  getUserOrgRoleByTeamId: vi.fn(),
   getProjectIds: vi.fn(),
-  getFeature: vi.fn(),
   findWithAdmins: vi.fn(),
   updateSentPlanLimitAlert: vi.fn(),
   findProjectsWithName: vi.fn(),
@@ -156,6 +157,7 @@ describe("EESubscriptionService", () => {
 
   describe("updateSubscriptionItems()", () => {
     describe("when active subscription exists", () => {
+      /** @scenario EESubscriptionService updates subscription items via Stripe */
       it("updates subscription items via Stripe", async () => {
         repository.findLastNonCancelled.mockResolvedValue({
           id: "sub_db_1",
@@ -272,6 +274,7 @@ describe("EESubscriptionService", () => {
 
   describe("createOrUpdateSubscription()", () => {
     describe("when cancelling to FREE with existing subscription", () => {
+      /** @scenario EESubscriptionService cancels subscription when downgrading to free */
       it("cancels Stripe subscription and updates status via repository", async () => {
         repository.findLastNonCancelled.mockResolvedValue({
           id: "sub_db_1",
@@ -329,6 +332,7 @@ describe("EESubscriptionService", () => {
     });
 
     describe("when creating new subscription", () => {
+      /** @scenario EESubscriptionService creates checkout for new subscription */
       it("creates checkout session for new plan", async () => {
         repository.findLastNonCancelled.mockResolvedValue(null);
         repository.createPending.mockResolvedValue({ id: "sub_new" });
@@ -463,6 +467,7 @@ describe("EESubscriptionService", () => {
 
   describe("createBillingPortalSession()", () => {
     describe("when called with valid customer and base URL", () => {
+      /** @scenario EESubscriptionService creates billing portal session */
       it("creates portal session with return URL", async () => {
         stripe.billingPortal.sessions.create.mockResolvedValue({
           url: "https://billing.stripe.com/session",
@@ -500,6 +505,7 @@ describe("EESubscriptionService", () => {
 
   describe("notifyProspective()", () => {
     describe("when organization exists", () => {
+      /** @scenario EESubscriptionService notifies for prospective subscription */
       it("dispatches prospective notification", async () => {
         organizationRepository.findNameById.mockResolvedValue({
           id: "org_123",

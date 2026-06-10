@@ -3,10 +3,8 @@ package nlpgo
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/oklog/ulid/v2"
 	"go.uber.org/zap"
@@ -15,8 +13,6 @@ import (
 	"github.com/langwatch/langwatch/pkg/contexts"
 	"github.com/langwatch/langwatch/pkg/health"
 	"github.com/langwatch/langwatch/pkg/otelsetup"
-	"github.com/langwatch/langwatch/services/nlpgo/adapters/proxypass"
-	"github.com/langwatch/langwatch/services/nlpgo/adapters/uvicornchild"
 )
 
 // configureNLPGoOTel installs nlpgo's OTel provider in multi-tenant
@@ -40,22 +36,31 @@ func configureNLPGoOTel(ctx context.Context, cfg Config, nodeID string) (*otelse
 			endpoint = strings.TrimRight(endpoint, "/") + "/v1/traces"
 		}
 	}
+	// NLPGO_SPAN_SYNC=1 swaps the per-tenant BatchSpanProcessor for a
+	// SimpleSpanProcessor — every span.End() blocks on the OTLP
+	// roundtrip. The integration test
+	// langwatch/src/server/nlpgo/__tests__/traceparent-roundtrip.integration.test.ts
+	// flips this on so it can assert on persisted spans without
+	// chasing async BSP-flush windows under saturated-CI scheduler
+	// contention. Production deployments must leave this off — async
+	// batching is what keeps the request hot path independent of
+	// collector RTT.
+	syncExport := strings.TrimSpace(os.Getenv("NLPGO_SPAN_SYNC")) == "1"
 	return otelsetup.New(ctx, otelsetup.Options{
 		NodeID:       nodeID,
 		OTLPEndpoint: endpoint,
 		SampleRatio:  cfg.OTel.SampleRatio,
 		MultiTenant:  true,
+		SyncExport:   syncExport,
 	})
 }
 
 // Deps holds nlpgo's infrastructure adapters.
 type Deps struct {
-	Logger     *zap.Logger
-	NodeID     string
-	OTel       *otelsetup.Provider
-	Health     *health.Registry
-	Child      *uvicornchild.Manager
-	ChildProxy http.Handler
+	Logger *zap.Logger
+	NodeID string
+	OTel   *otelsetup.Provider
+	Health *health.Registry
 }
 
 // NewDeps wires every adapter from the validated Config.
@@ -73,74 +78,14 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 	}
 
 	probes := health.New(contexts.MustGetServiceInfo(ctx).Environment)
-
-	child := uvicornchild.New(uvicornchild.Options{
-		Command:   cfg.Child.Command,
-		Args:      splitArgs(cfg.Child.ArgsRaw),
-		HealthURL: cfg.Child.HealthURL,
-		Disabled:  cfg.Child.Bypass,
-		Logger:    logger,
-		// StartTimeout is the wall-clock budget for the python child to
-		// respond 200 to /health from spawn. The default Manager value
-		// (30s) is fine on dev hardware but too tight on AWS Lambda
-		// 1024MB (≈1 vCPU): empirical lw-dev probes show the child
-		// being SIGKILL'd at 30s with the litellm + langwatch_nlp
-		// imports still in flight, leaving the proxy with no upstream
-		// to dial. Bumping to 120s covers Lambda's slower CPU plus any
-		// freeze-during-init interaction; well under the 900s function
-		// timeout. Once the child is healthy this knob is not on the
-		// hot path — it's a one-time cold-start budget.
-		StartTimeout: 120 * time.Second,
-	})
-
-	probes.RegisterReadiness("uvicorn_child", func() (bool, string) {
-		hctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		if err := child.Healthy(hctx); err != nil {
-			return false, err.Error()
-		}
-		return true, ""
-	})
 	probes.MarkStarted()
 
-	var proxy http.Handler
-	if cfg.Child.UpstreamURL != "" {
-		p, err := proxypass.New(proxypass.Options{
-			UpstreamURL: cfg.Child.UpstreamURL,
-			Logger:      logger,
-		})
-		if err != nil {
-			return ctx, nil, fmt.Errorf("proxypass init: %w", err)
-		}
-		proxy = p
-	}
-
 	return ctx, &Deps{
-		Logger:     logger,
-		NodeID:     nodeID,
-		OTel:       otelProvider,
-		Health:     probes,
-		Child:      child,
-		ChildProxy: proxy,
+		Logger: logger,
+		NodeID: nodeID,
+		OTel:   otelProvider,
+		Health: probes,
 	}, nil
-}
-
-// splitArgs tokenizes a space-separated args string from env into a
-// []string for exec.Command. Quoted args aren't supported (operator
-// passes simple flag lists in practice; if quoting is needed, add a
-// shell-style splitter behind a feature flag).
-func splitArgs(s string) []string {
-	var out []string
-	start := 0
-	for i := 0; i <= len(s); i++ {
-		if i == len(s) || s[i] == ' ' || s[i] == '\t' {
-			if i > start {
-				out = append(out, s[start:i])
-			}
-			start = i + 1
-		}
-	}
-	return out
 }
 
 func resolveNodeID(ctx context.Context, logger *zap.Logger) string {

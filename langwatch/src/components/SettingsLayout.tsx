@@ -70,7 +70,8 @@ export default function SettingsLayout({
   });
   const publicEnv = usePublicEnv();
   const isSaaS = publicEnv.data?.IS_SAAS ?? false;
-  const { isEnterprise } = useActivePlan();
+  const { isEnterprise, isLoading: isPlanLoading } = useActivePlan();
+  const showEnterpriseNav = isPlanLoading || isEnterprise;
   const { isLiteMember } = useLiteMemberGuard();
   const { hasAccess: hasOpsAccess } = useOpsPermission();
   // Backoffice is admin-only. Kept decoupled from `hasOpsAccess` so that if
@@ -118,8 +119,8 @@ export default function SettingsLayout({
               "/settings/secrets",
             ]}
           >
-            <MenuLink href="/settings/model-costs">Model Costs</MenuLink>
             <MenuLink href="/settings/model-providers">Model Providers</MenuLink>
+            <MenuLink href="/settings/model-costs">Model Costs</MenuLink>
             {!isLiteMember && (
               <MenuLink href="/settings/secrets">Secrets</MenuLink>
             )}
@@ -132,7 +133,7 @@ export default function SettingsLayout({
               "/settings/members",
               "/settings/groups",
               "/settings/roles",
-              "/settings/access-audit",
+              "/settings/role-bindings",
               "/settings/authentication",
               "/settings/scim",
               "/settings/audit-log",
@@ -140,28 +141,29 @@ export default function SettingsLayout({
           >
             <MenuLink href="/settings/members" includePath="members">Members</MenuLink>
             <MenuLink href="/settings/teams">Teams & Projects</MenuLink>
-            {isEnterprise && !isLiteMember && (
+            {showEnterpriseNav && !isLiteMember && (
               <MenuLink href="/settings/groups">Groups</MenuLink>
             )}
-            {isEnterprise && !isLiteMember && (
+            {showEnterpriseNav && !isLiteMember && (
               <MenuLink href="/settings/roles">Roles & Permissions</MenuLink>
             )}
             <MenuLink href="/settings/authentication">Authentication</MenuLink>
-            {isEnterprise && !isLiteMember && (
+            {showEnterpriseNav && !isLiteMember && (
               <MenuLink href="/settings/scim">SCIM Provisioning</MenuLink>
             )}
-            {isEnterprise && !isLiteMember && (
-              <MenuLink href="/settings/access-audit">Access Audit</MenuLink>
+            {showEnterpriseNav && !isLiteMember && (
+              <MenuLink href="/settings/role-bindings">Role Bindings</MenuLink>
             )}
-            {isEnterprise && !isLiteMember && hasPermission("auditLog:view") && (
+            {showEnterpriseNav && !isLiteMember && hasPermission("auditLog:view") && (
               <MenuLink href="/settings/audit-log">Audit Log</MenuLink>
             )}
           </NavSection>
 
           <NavSection
             label="Features"
-            paths={["/settings/annotation-scores", "/settings/topic-clustering"]}
+            paths={["/settings/annotation-scores", "/settings/topic-clustering", "/settings/data-retention"]}
           >
+            <MenuLink href="/settings/data-retention">Data Retention</MenuLink>
             <MenuLink href="/settings/annotation-scores">Annotation Scores</MenuLink>
             {!isLiteMember && project?.slug && (
               <MenuLink href={`/${project.slug}/automations`}>Automations</MenuLink>
@@ -201,6 +203,12 @@ export default function SettingsLayout({
               <MenuLink href="/ops/dejaview" includePath="/ops/dejaview">
                 Deja View
               </MenuLink>
+              <MenuLink
+                href="/ops/feature-flags"
+                includePath="/ops/feature-flags"
+              >
+                Feature Flags
+              </MenuLink>
             </NavSection>
           )}
 
@@ -229,12 +237,6 @@ export default function SettingsLayout({
                 includePath="/ops/backoffice/subscriptions"
               >
                 Subscriptions
-              </MenuLink>
-              <MenuLink
-                href="/ops/backoffice/organization-features"
-                includePath="/ops/backoffice/organization-features"
-              >
-                Organization Features
               </MenuLink>
             </NavSection>
           )}

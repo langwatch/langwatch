@@ -4,6 +4,21 @@ Feature: Guardrails API Backward Compatibility
   I want the guardrails API to support both slug and raw settings
   So that existing integrations continue to work
 
+  # All 12 @unimplemented scenarios remain unbound — no integration test file exists
+  # for evaluations-legacy.ts. Per AUDIT_MANIFEST.md classifications:
+  # KEEP (9): "Execute with evaluator slug" (legacy:617-658), "Legacy raw settings"
+  # (legacy:665-680), "Name is injected from evaluator" (legacy:657,892), "Slug
+  # lookup fails gracefully" (legacy:659-663), "Legacy API without prefix"
+  # (legacy:665-680), "Project scoping for slug lookup" (legacy:621), "Archived
+  # evaluator slug" (legacy:623), "Response format consistency" (legacy:925-944),
+  # "Evaluation cost tracking with slug" (legacy:857-872) — need integration test
+  # added against the legacy router.
+  # DELETE (3): "Name can be overridden even with slug" (line 893 precedence
+  # always picks evaluator.name first), "Slug with special characters" (vacuous —
+  # plain Prisma string lookup), "API rate limiting" (no rate-limit middleware
+  # exists on /guardrails route).
+  # KEEP scenarios pending integration test in PR #3458.
+
   Background:
     Given the guardrails API is available
     And I have a valid API key

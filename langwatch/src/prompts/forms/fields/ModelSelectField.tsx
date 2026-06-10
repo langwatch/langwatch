@@ -20,7 +20,7 @@ export function ModelSelectField() {
   const currentModel = currentLLMConfig?.model ?? "";
 
   // Check if the current model is disabled
-  const { modelOption } = useModelSelectionOptions(
+  const { modelOption, isEmpty } = useModelSelectionOptions(
     allModelOptions,
     currentModel,
     "chat",
@@ -48,6 +48,7 @@ export function ModelSelectField() {
                   void trigger?.("version.configData.llm");
                 }}
                 requiresCustomKey={false}
+                noModelsConfigured={isEmpty}
               />
             );
           }}

@@ -36,7 +36,6 @@ describe("servicePaths", () => {
   describe("when deriving venv paths", () => {
     it("returns one venv per python service under <root>/venvs", () => {
       const sp = servicePaths(fakePaths);
-      expect(sp.venv("langwatch_nlp")).toBe("/tmp/.langwatch-test/venvs/langwatch_nlp");
       expect(sp.venv("langevals")).toBe("/tmp/.langwatch-test/venvs/langevals");
     });
   });

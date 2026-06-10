@@ -3,6 +3,13 @@ Feature: Credential Validation
   I want my API keys to be validated
   So that I know they work before saving
 
+  # Most scenarios describe the model provider configuration drawer UI flow
+  # (open drawer → enter key → click Save → see validation error or success).
+  # Need a JSDOM render of `ModelProviderForm` + integration test against the
+  # `validateProviderApiKey` server action. Service-level masking/preservation
+  # logic is covered by `modelProvider.service.unit.test.ts` (mergeCustomKeys).
+  # Aspirational pending the form harness.
+
   Background:
     Given I am logged in
     And I have access to a project

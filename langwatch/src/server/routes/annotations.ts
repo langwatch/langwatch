@@ -8,24 +8,27 @@
  */
 import { nanoid } from "nanoid";
 import type { Context } from "hono";
-import { Hono } from "hono";
 import { prisma } from "~/server/db";
 import { createLogger } from "~/utils/logger/server";
 import type { Permission } from "~/server/api/rbac";
 import {
-  enforcePatCeiling,
+  enforceApiKeyCeiling,
   extractCredentials,
-  patCeilingDenialResponse,
-} from "~/server/pat/auth-middleware";
-import { TokenResolver } from "~/server/pat/token-resolver";
+  apiKeyCeilingDenialResponse,
+} from "~/server/api-key/auth-middleware";
+import { TokenResolver } from "~/server/api-key/token-resolver";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 
 const logger = createLogger("langwatch:annotations");
 const tokenResolver = TokenResolver.create(prisma);
 
-export const app = new Hono().basePath("/api");
+const AUTH_REASON =
+  "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling";
+
+const secured = createServiceApp({ basePath: "/api" });
 
 /**
- * Authenticates via the unified PAT + legacy-key path and enforces the given
+ * Authenticates via the unified API-key + legacy-key path and enforces the given
  * permission ceiling. Returns either a `{ project, markUsed }` context or an
  * error descriptor the caller surfaces via c.json(...). `markUsed` is
  * fire-and-forget and a no-op for legacy keys.
@@ -52,15 +55,15 @@ async function authenticateRequest(
   }
 
   try {
-    await enforcePatCeiling({ prisma, resolved, permission });
+    await enforceApiKeyCeiling({ prisma, resolved, permission });
   } catch (error) {
-    const denial = patCeilingDenialResponse(error);
+    const denial = apiKeyCeilingDenialResponse(error);
     return { error: denial.message, status: denial.status };
   }
 
   const markUsed = () => {
-    if (resolved.type === "pat") {
-      tokenResolver.markUsed({ patId: resolved.patId });
+    if (resolved.type === "apiKey") {
+      tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
     }
   };
 
@@ -68,26 +71,20 @@ async function authenticateRequest(
 }
 
 // ---------- GET /api/annotations ----------
-app.get("/annotations", async (c) => {
+secured.access(handlerManagedAuth(AUTH_REASON)).get("/annotations", async (c) => {
   const auth = await authenticateRequest(c, "annotations:view");
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
   }
-  const { project } = auth;
+  const { project, markUsed } = auth;
 
   try {
     const annotations = await prisma.annotation.findMany({
       where: { projectId: project.id },
     });
 
-    if (!annotations || annotations.length === 0) {
-      return c.json(
-        { status: "error", message: "No annotations found." },
-        404,
-      );
-    }
-
-    return c.json({ data: annotations });
+    markUsed();
+    return c.json({ data: annotations ?? [] });
   } catch (e) {
     logger.error(
       { error: e, projectId: project.id },
@@ -104,12 +101,12 @@ app.get("/annotations", async (c) => {
 });
 
 // ---------- GET|DELETE|PATCH /api/annotations/:id ----------
-app.get("/annotations/:id", async (c) => {
+secured.access(handlerManagedAuth(AUTH_REASON)).get("/annotations/:id", async (c) => {
   const auth = await authenticateRequest(c, "annotations:view");
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
   }
-  const { project } = auth;
+  const { project, markUsed } = auth;
 
   try {
     const annotationId = c.req.param("id");
@@ -122,6 +119,7 @@ app.get("/annotations/:id", async (c) => {
         404,
       );
     }
+    markUsed();
     return c.json({ data: annotation });
   } catch (e) {
     logger.error(
@@ -138,18 +136,19 @@ app.get("/annotations/:id", async (c) => {
   }
 });
 
-app.delete("/annotations/:id", async (c) => {
+secured.access(handlerManagedAuth(AUTH_REASON)).delete("/annotations/:id", async (c) => {
   const auth = await authenticateRequest(c, "annotations:manage");
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
   }
-  const { project } = auth;
+  const { project, markUsed } = auth;
 
   try {
     const annotationId = c.req.param("id");
     await prisma.annotation.delete({
       where: { id: annotationId, projectId: project.id },
     });
+    markUsed();
     return c.json({ status: "success", message: "Annotation deleted." });
   } catch (e) {
     logger.error(
@@ -166,12 +165,12 @@ app.delete("/annotations/:id", async (c) => {
   }
 });
 
-app.patch("/annotations/:id", async (c) => {
+secured.access(handlerManagedAuth(AUTH_REASON)).patch("/annotations/:id", async (c) => {
   const auth = await authenticateRequest(c, "annotations:manage");
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
   }
-  const { project } = auth;
+  const { project, markUsed } = auth;
 
   try {
     const body = await c.req.json();
@@ -210,6 +209,7 @@ app.patch("/annotations/:id", async (c) => {
       },
     });
 
+    markUsed();
     return c.json({ data: patchAnnotation });
   } catch (e) {
     logger.error(
@@ -227,12 +227,12 @@ app.patch("/annotations/:id", async (c) => {
 });
 
 // ---------- GET|POST /api/annotations/trace/:trace ----------
-app.get("/annotations/trace/:trace", async (c) => {
+secured.access(handlerManagedAuth(AUTH_REASON)).get("/annotations/trace/:trace", async (c) => {
   const auth = await authenticateRequest(c, "annotations:view");
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
   }
-  const { project } = auth;
+  const { project, markUsed } = auth;
 
   try {
     const trace = c.req.param("trace");
@@ -240,14 +240,8 @@ app.get("/annotations/trace/:trace", async (c) => {
       where: { traceId: trace, projectId: project.id },
     });
 
-    if (!annotationsByTrace || annotationsByTrace.length === 0) {
-      return c.json(
-        { status: "error", message: "No annotations found." },
-        404,
-      );
-    }
-
-    return c.json({ data: annotationsByTrace });
+    markUsed();
+    return c.json({ data: annotationsByTrace ?? [] });
   } catch (e) {
     logger.error(
       { error: e, trace: c.req.param("trace"), projectId: project.id },
@@ -263,12 +257,12 @@ app.get("/annotations/trace/:trace", async (c) => {
   }
 });
 
-app.post("/annotations/trace/:trace", async (c) => {
+secured.access(handlerManagedAuth(AUTH_REASON)).post("/annotations/trace/:trace", async (c) => {
   const auth = await authenticateRequest(c, "annotations:manage");
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
   }
-  const { project } = auth;
+  const { project, markUsed } = auth;
 
   try {
     const body = await c.req.json();
@@ -318,6 +312,7 @@ app.post("/annotations/trace/:trace", async (c) => {
       },
     });
 
+    markUsed();
     return c.json({ data: addAnnotation });
   } catch (e) {
     logger.error(
@@ -333,3 +328,5 @@ app.post("/annotations/trace/:trace", async (c) => {
     );
   }
 });
+
+export const app = secured.hono;

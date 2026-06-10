@@ -36,8 +36,8 @@ describe("getStaticModelCosts", () => {
     it("known models exist in the registry", () => {
       const expectedModels = [
         "openai/gpt-4o",
-        "anthropic/claude-opus-4.5",
-        "anthropic/claude-opus-4.6",
+        "anthropic/claude-opus-4-5",
+        "anthropic/claude-opus-4-6",
         "deepseek/deepseek-v3.2",
         "minimax/minimax-m2.1",
       ];
@@ -59,14 +59,14 @@ describe("getStaticModelCosts", () => {
       expect(matches("openai/gpt-4o", "gpt-4o")).toBe(true);
     });
 
-    it("matches anthropic/claude-opus-4.5 with the vendor prefix", () => {
+    it("matches anthropic/claude-opus-4-5 with the vendor prefix", () => {
       expect(
-        matches("anthropic/claude-opus-4.5", "anthropic/claude-opus-4.5")
+        matches("anthropic/claude-opus-4-5", "anthropic/claude-opus-4-5")
       ).toBe(true);
     });
 
-    it("matches anthropic/claude-opus-4.5 without the vendor prefix", () => {
-      expect(matches("anthropic/claude-opus-4.5", "claude-opus-4.5")).toBe(
+    it("matches anthropic/claude-opus-4-5 without the vendor prefix", () => {
+      expect(matches("anthropic/claude-opus-4-5", "claude-opus-4-5")).toBe(
         true
       );
     });
@@ -77,14 +77,14 @@ describe("getStaticModelCosts", () => {
   });
 
   describe("dot/hyphen interchangeability in version numbers", () => {
-    it("matches claude-opus-4.5 when sent with a hyphen separator", () => {
-      expect(matches("anthropic/claude-opus-4.5", "claude-opus-4-5")).toBe(
+    it("matches claude-opus-4-5 when sent with a dot separator", () => {
+      expect(matches("anthropic/claude-opus-4-5", "claude-opus-4.5")).toBe(
         true
       );
     });
 
-    it("matches claude-opus-4.6 when sent with a hyphen separator", () => {
-      expect(matches("anthropic/claude-opus-4.6", "claude-opus-4-6")).toBe(
+    it("matches claude-opus-4-6 when sent with a dot separator", () => {
+      expect(matches("anthropic/claude-opus-4-6", "claude-opus-4.6")).toBe(
         true
       );
     });
@@ -110,15 +110,17 @@ describe("getStaticModelCosts", () => {
 
   describe("given model entries whose vendor-prefixed key length hides the matched suffix length", () => {
     afterEach(() => {
-      vi.doUnmock("../llmModels.json");
+      vi.doUnmock("../loadModelCatalog");
       vi.resetModules();
     });
 
     describe("when static model costs are built", () => {
       it("orders entries by matched model suffix, not vendor-prefixed key length", async () => {
         vi.resetModules();
-        vi.doMock("../llmModels.json", () => ({
-          default: {
+        vi.doMock("../loadModelCatalog", () => ({
+          llmModels: {
+            updatedAt: "test",
+            modelCount: 2,
             models: {
               "verylongvendor/abc": {
                 pricing: {

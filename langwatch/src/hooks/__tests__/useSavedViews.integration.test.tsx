@@ -7,7 +7,7 @@
  * - Full restore flow on page load
  * - View click applies filters correctly
  *
- * Uses mutable mockRouterQuery + rerender() pattern from evaluations-v3 tests.
+ * Uses mutable mockRouterQuery + rerender() pattern from experiments-v3 tests.
  */
 import {
   renderHook,

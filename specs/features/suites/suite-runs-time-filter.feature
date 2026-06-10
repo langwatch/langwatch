@@ -3,6 +3,16 @@ Feature: Time filter for suite runs
   I want to filter suite runs by time range
   So that I can focus on relevant runs without scrolling through old data
 
+  # Parity status: 2 of 7 scenarios bound to existing tests.
+  # Remaining @unimplemented scenarios (#3458):
+  #   5 NO_TEST: shipped behavior, no integration test yet
+  # NO_TEST gaps:
+  #   - "User filters All Runs by a preset time range"
+  #   - "Time filter updates displayed runs when period changes"
+  #   - "Suite detail panel filters runs by selected time range"
+  #   - "Changing the time filter resets pagination"
+  #   - "Batch runs are included or excluded atomically"
+
   Background:
     Given a project with suite runs spanning multiple days
 
@@ -31,7 +41,7 @@ Feature: Time filter for suite runs
     Then pagination resets to the first page
     And only the first page of filtered results is shown
 
-  @unit @unimplemented
+  @unit
   Scenario: Selected date range limits displayed run data
     Given a date range is selected
     When run data is requested
@@ -44,7 +54,7 @@ Feature: Time filter for suite runs
     When the time filter range excludes the batch's earliest runs but includes the latest
     Then the entire batch is shown
 
-  @unit @unimplemented
+  @unit
   Scenario: Default time range is applied on initial load
     Given no time range has been selected
     When the suites page loads

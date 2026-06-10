@@ -3,6 +3,14 @@ Feature: Streamlined worktree creation
   I want a single command to create git worktrees from issue numbers or feature names
   So that I get consistent branch naming and directory layout without manual steps
 
+  # Parity status: 0 of 17 scenarios bound to existing tests.
+  # Remaining @unimplemented scenarios (#3458):
+  #   16 HARNESS_GAP: scenarios describe shell script behavior (scripts/worktree.sh)
+  #     covered by worktree.unit.bats and worktree.integration.bats — the TS-only
+  #     parity checker cannot bind Bash test files
+  #   1 UPDATE: "Truncates slug to 40 characters at word boundary"
+  #     (implementation truncates at 50 chars, spec says 40)
+
   # --- Slug generation (pure logic) ---
 
   @unit @unimplemented

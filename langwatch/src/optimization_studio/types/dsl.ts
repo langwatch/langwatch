@@ -1,7 +1,7 @@
 import type { Edge, Node } from "@xyflow/react";
 import { z } from "zod";
 
-import type { LocalPromptConfig } from "~/evaluations-v3/types";
+import type { LocalPromptConfig } from "~/experiments-v3/types";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
 import { FieldMappingSchema } from "~/server/scenarios/execution/types";
@@ -126,6 +126,17 @@ export type Signature = BaseComponent & {
   promptId?: string;
   /** Specific version reference */
   promptVersionId?: string;
+  /**
+   * Set to `true` when the dispatched config diverges from the saved
+   * version (e.g. user edited inline via localPromptConfig without
+   * persisting). Stamped onto the Prompt.compile span as
+   * `langwatch.prompt.draft = true` so the trace-UI can surface
+   * "Open <handle>:<version> (unsaved edits)" while keeping the base
+   * id / handle / versionMetadata reference for resume. Omitted (not
+   * `false`) on saved-version executions, matching python-sdk's
+   * `_set_attribute_if_not_none` convention.
+   */
+  promptDraft?: boolean;
 };
 
 type StronglyTypedFieldBase = Omit<Field, "value" | "type" | "identifier">;
@@ -425,6 +436,11 @@ export const signatureComponentSchema = baseComponentSchema.extend({
   llm: llmConfigSchema.optional(),
   prompt: z.string().optional(),
   messages: z.array(chatMessageSchema).optional(),
+  // True when the dispatched config diverges from the saved version
+  // (set by mergeLocalConfigsIntoDsl when a localPromptConfig is
+  // present). nlpgo stamps it onto Prompt.compile as
+  // langwatch.prompt.draft for the trace-UI's "(unsaved edits)" label.
+  promptDraft: z.boolean().optional(),
 });
 
 /**

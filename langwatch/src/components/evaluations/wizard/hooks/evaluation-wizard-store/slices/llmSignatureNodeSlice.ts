@@ -12,15 +12,15 @@ import { buildEntryToTargetEdges } from "./utils/edge.util";
 import { calculateNextPosition } from "./utils/node.util";
 
 export interface LlmSignatureNodeSlice {
-  createNewLlmSignatureNode: ({
-    project,
-  }: {
-    project?: { defaultModel?: string | null };
+  createNewLlmSignatureNode: (args: {
+    /** Cascade-resolved default model from
+     *  `api.modelProvider.getResolvedDefault` at the React caller. Empty
+     *  string is a valid value — the LLM-node UI surfaces the missing
+     *  default at first run via the MissingModelToast interceptor. */
+    defaultModel?: string;
   }) => Node<Signature>;
-  addNewSignatureNodeToWorkflow: ({
-    project,
-  }: {
-    project?: { defaultModel?: string | null };
+  addNewSignatureNodeToWorkflow: (args: {
+    defaultModel?: string;
   }) => string;
   updateSignatureNodeLLMConfigValue: (
     nodeId: string,
@@ -38,7 +38,7 @@ export const createLlmSignatureNodeSlice: StateCreator<
     get().getNodesByType("entry")[0] as Node<Entry> | undefined;
 
   return {
-    createNewLlmSignatureNode: ({ project }): Node<Signature> => {
+    createNewLlmSignatureNode: ({ defaultModel }): Node<Signature> => {
       const entryNode = getEntryNode();
       const position = entryNode
         ? calculateNextPosition(entryNode.position)
@@ -48,14 +48,14 @@ export const createLlmSignatureNodeSlice: StateCreator<
         {
           position,
         },
-        project,
+        defaultModel,
       );
 
       return get().createNewNode(newNode);
     },
 
-    addNewSignatureNodeToWorkflow: ({ project }): string => {
-      const node = get().createNewLlmSignatureNode({ project });
+    addNewSignatureNodeToWorkflow: ({ defaultModel }): string => {
+      const node = get().createNewLlmSignatureNode({ defaultModel });
       const entryNode = getEntryNode();
       const newEdges: Edge[] = entryNode
         ? buildEntryToTargetEdges(entryNode, node)

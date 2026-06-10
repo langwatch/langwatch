@@ -12,12 +12,10 @@ import { ScenarioAIGeneration } from "../ScenarioAIGeneration";
 
 const mockUseOrganizationTeamProject = vi.fn();
 
-// Mock useOrganizationTeamProject
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => mockUseOrganizationTeamProject(),
 }));
 
-// Mock useDrawer
 vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({
     openDrawer: vi.fn(),
@@ -30,25 +28,41 @@ vi.mock("~/hooks/useDrawer", () => ({
 
 const mockUseModelProvidersSettings = vi.fn();
 
-// Mock useModelProvidersSettings
 vi.mock("~/hooks/useModelProvidersSettings", () => ({
   useModelProvidersSettings: () => mockUseModelProvidersSettings(),
 }));
 
-// Mock toaster
 vi.mock("../../ui/toaster", () => ({
   toaster: {
     create: vi.fn(),
   },
 }));
 
+const mockResolvedDefault = vi.fn();
+
+vi.mock("~/utils/api", () => ({
+  api: {
+    modelProvider: {
+      getResolvedDefault: {
+        useQuery: () => mockResolvedDefault(),
+      },
+    },
+  },
+}));
+
+const setResolved = (model: string | null) =>
+  mockResolvedDefault.mockReturnValue({
+    data: model ? { model, source: "test", scope: "PROJECT" } : null,
+    isLoading: false,
+  });
+
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-// Clean up after each test to avoid interference
 afterEach(() => {
   cleanup();
+  mockResolvedDefault.mockReset();
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -58,35 +72,36 @@ afterEach(() => {
 describe("<ScenarioAIGeneration/>", () => {
   beforeEach(() => {
     mockUseOrganizationTeamProject.mockReturnValue({
-      project: { id: "project-123", defaultModel: "openai/gpt-4" },
+      project: { id: "project-123" },
     });
     mockUseModelProvidersSettings.mockReturnValue({
       providers: { openai: { enabled: true } },
       hasEnabledProviders: true,
       isLoading: false,
     });
+    setResolved("openai/gpt-4");
   });
 
   it("shows prompt view by default", () => {
     render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
 
-    // Should show the "Need Help?" prompt card
     expect(screen.getByText("Need Help?")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /generate with ai/i })).toBeInTheDocument();
   });
 });
 
-describe("when default model is Azure deployment not in registry", () => {
+describe("when resolved default is an Azure deployment not in registry", () => {
   describe("when azure provider IS enabled", () => {
     beforeEach(() => {
       mockUseOrganizationTeamProject.mockReturnValue({
-        project: { id: "project-123", defaultModel: "azure/my-gpt4-deployment" },
+        project: { id: "project-123" },
       });
       mockUseModelProvidersSettings.mockReturnValue({
         providers: { azure: { enabled: true } },
         hasEnabledProviders: true,
         isLoading: false,
       });
+      setResolved("azure/my-gpt4-deployment");
     });
 
     it("does not show Model Provider Required warning", () => {
@@ -98,7 +113,6 @@ describe("when default model is Azure deployment not in registry", () => {
     it("does not disable the textarea when switching to input view", () => {
       render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
 
-      // Switch from prompt view to input view
       fireEvent.click(screen.getByRole("button", { name: /generate with ai/i }));
 
       const textarea = screen.getByRole("textbox");
@@ -108,23 +122,20 @@ describe("when default model is Azure deployment not in registry", () => {
 
   describe("when azure provider is NOT enabled but another provider is", () => {
     beforeEach(() => {
-      // hasEnabledProviders=true simulates: OpenAI is configured
-      // but the project's default model is azure/my-gpt4-deployment and Azure is NOT configured
       mockUseOrganizationTeamProject.mockReturnValue({
-        project: { id: "project-123", defaultModel: "azure/my-gpt4-deployment" },
+        project: { id: "project-123" },
       });
       mockUseModelProvidersSettings.mockReturnValue({
-        // OpenAI is enabled, but Azure is not — yet the default model is Azure
         providers: { openai: { enabled: true } },
         hasEnabledProviders: true,
         isLoading: false,
       });
+      setResolved("azure/my-gpt4-deployment");
     });
 
     it("treats model as disabled by disabling the textarea in input view", () => {
       render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
 
-      // Switch from prompt view to input view
       fireEvent.click(screen.getByRole("button", { name: /generate with ai/i }));
 
       const textarea = screen.getByRole("textbox");
@@ -136,13 +147,14 @@ describe("when default model is Azure deployment not in registry", () => {
 describe("when no model providers are configured", () => {
   beforeEach(() => {
     mockUseOrganizationTeamProject.mockReturnValue({
-      project: { id: "project-123", defaultModel: "azure/my-gpt4-deployment" },
+      project: { id: "project-123" },
     });
     mockUseModelProvidersSettings.mockReturnValue({
       providers: {},
       hasEnabledProviders: false,
       isLoading: false,
     });
+    setResolved(null);
   });
 
   it("shows Model Provider Required warning", () => {
@@ -177,16 +189,17 @@ describe("when no model providers are configured", () => {
 // Regression tests for issue #2919 — misleading "API keys" error in AI gen
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("given azure is the only enabled provider and project.defaultModel is azure/my-gpt4", () => {
+describe("given azure is the only enabled provider and resolved default is azure/my-gpt4", () => {
   beforeEach(() => {
     mockUseOrganizationTeamProject.mockReturnValue({
-      project: { id: "p1", defaultModel: "azure/my-gpt4" },
+      project: { id: "p1" },
     });
     mockUseModelProvidersSettings.mockReturnValue({
       providers: { azure: { enabled: true }, openai: { enabled: false } },
       hasEnabledProviders: true,
       isLoading: false,
     });
+    setResolved("azure/my-gpt4");
   });
 
   describe("when user switches to input view", () => {
@@ -209,17 +222,17 @@ describe("given azure is the only enabled provider and project.defaultModel is a
   });
 });
 
-describe("given azure is the only enabled provider and project.defaultModel is null", () => {
+describe("given azure is the only enabled provider and resolved default is null", () => {
   beforeEach(() => {
     mockUseOrganizationTeamProject.mockReturnValue({
-      // null defaultModel → getDefaultModelState returns { ok: false, reason: "no-default" }
-      project: { id: "p1", defaultModel: null },
+      project: { id: "p1" },
     });
     mockUseModelProvidersSettings.mockReturnValue({
       providers: { azure: { enabled: true }, openai: { enabled: false } },
       hasEnabledProviders: true,
       isLoading: false,
     });
+    setResolved(null);
   });
 
   describe("when user switches to input view", () => {
@@ -256,17 +269,17 @@ describe("given azure is the only enabled provider and project.defaultModel is n
   });
 });
 
-describe("given azure is the only enabled provider and project.defaultModel is openai/gpt-5.2 (stale)", () => {
+describe("given azure is the only enabled provider and resolved default is openai/gpt-5.2 (stale)", () => {
   beforeEach(() => {
     mockUseOrganizationTeamProject.mockReturnValue({
-      project: { id: "p1", defaultModel: "openai/gpt-5.2" },
+      project: { id: "p1" },
     });
-    // openai provider is disabled → getDefaultModelState returns { ok: false, reason: "stale-default" }
     mockUseModelProvidersSettings.mockReturnValue({
       providers: { azure: { enabled: true }, openai: { enabled: false } },
       hasEnabledProviders: true,
       isLoading: false,
     });
+    setResolved("openai/gpt-5.2");
   });
 
   describe("when user switches to input view", () => {
@@ -306,14 +319,14 @@ describe("given azure is the only enabled provider and project.defaultModel is o
 describe("given providers are still loading", () => {
   beforeEach(() => {
     mockUseOrganizationTeamProject.mockReturnValue({
-      project: { id: "p1", defaultModel: "openai/gpt-5.2" },
+      project: { id: "p1" },
     });
-    // providers: undefined → getDefaultModelState returns { ok: true } (no-flash during load)
     mockUseModelProvidersSettings.mockReturnValue({
       providers: undefined,
       hasEnabledProviders: true,
       isLoading: true,
     });
+    setResolved("openai/gpt-5.2");
   });
 
   describe("when the component renders in prompt view", () => {

@@ -48,7 +48,11 @@ export interface SimulationRepository {
     cursor?: string;
     startDate?: number;
     endDate?: number;
-  }): Promise<{ runs: ScenarioRunData[]; nextCursor?: string; hasMore: boolean }>;
+  }): Promise<{
+    runs: ScenarioRunData[];
+    nextCursor?: string;
+    hasMore: boolean;
+  }>;
 
   getAllRunDataForScenarioSet(params: {
     projectId: string;
@@ -86,8 +90,16 @@ export interface SimulationRepository {
     sinceTimestamp?: number;
   }): Promise<AllSuitesRunDataResult>;
 
-  getAllRunIdsForProject(params: {
+  /**
+   * Returns the run ids for a SPECIFIC scope — a batch run and/or a scenario
+   * set — never the whole project. At least one of `batchRunId` /
+   * `scenarioSetId` must be provided; callers must not be able to address
+   * every run in a tenant with one unqualified request.
+   */
+  getRunIdsForScope(params: {
     projectId: string;
+    batchRunId?: string;
+    scenarioSetId?: string;
   }): Promise<string[]>;
 
   /**
@@ -116,7 +128,11 @@ export class NullSimulationRepository implements SimulationRepository {
     return { changed: true, lastUpdatedAt: 0, runs: [] };
   }
 
-  async getRunDataForScenarioSet(): Promise<{ runs: ScenarioRunData[]; nextCursor?: string; hasMore: boolean }> {
+  async getRunDataForScenarioSet(): Promise<{
+    runs: ScenarioRunData[];
+    nextCursor?: string;
+    hasMore: boolean;
+  }> {
     return { runs: [], hasMore: false };
   }
 
@@ -141,10 +157,16 @@ export class NullSimulationRepository implements SimulationRepository {
   }
 
   async getRunDataForAllSuites(): Promise<AllSuitesRunDataResult> {
-    return { changed: true, lastUpdatedAt: 0, runs: [], scenarioSetIds: {}, hasMore: false };
+    return {
+      changed: true,
+      lastUpdatedAt: 0,
+      runs: [],
+      scenarioSetIds: {},
+      hasMore: false,
+    };
   }
 
-  async getAllRunIdsForProject(): Promise<string[]> {
+  async getRunIdsForScope(): Promise<string[]> {
     return [];
   }
 

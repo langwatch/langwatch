@@ -11,10 +11,14 @@ type configWire struct {
 	ModelAliases     map[string]string  `json:"model_aliases"`
 	ModelsAllowed    []string           `json:"models_allowed"`
 	RateLimits       rateLimitsWire     `json:"rate_limits"`
-	Guardrails       guardrailsWire     `json:"guardrails"`
-	PolicyRules      policyRulesWire    `json:"policy_rules"`
-	Budgets          []budgetWire       `json:"budgets"`
-	CacheRules       []cacheRuleWire    `json:"cache_rules"`
+	// Guardrails is the flat per-project catalog every VK in the project
+	// may reference; GuardrailAttachments is this VK's opt-in tuples
+	// (control-plane materialiser config.materialiser.ts, bug-7 step vd).
+	Guardrails           []guardrailWire           `json:"guardrails"`
+	GuardrailAttachments []guardrailAttachmentWire `json:"guardrail_attachments"`
+	PolicyRules          policyRulesWire           `json:"policy_rules"`
+	Budgets              []budgetWire              `json:"budgets"`
+	CacheRules           []cacheRuleWire           `json:"cache_rules"`
 }
 
 type providerSlotWire struct {
@@ -41,17 +45,23 @@ type rateLimitsWire struct {
 	RPD *int `json:"rpd"`
 }
 
-type guardrailsWire struct {
-	Pre              []guardrailEntryWire `json:"pre"`
-	Post             []guardrailEntryWire `json:"post"`
-	StreamChunk      []guardrailEntryWire `json:"stream_chunk"`
-	RequestFailOpen  bool                 `json:"request_fail_open"`
-	ResponseFailOpen bool                 `json:"response_fail_open"`
+// guardrailWire is one row of the project guardrail catalog
+// (bundle.guardrails[]). evaluator_slug is preferred for invocation;
+// evaluator_id is the stable fallback.
+type guardrailWire struct {
+	ID            string `json:"id"`
+	Name          string `json:"name"`
+	EvaluatorID   string `json:"evaluator_id"`
+	EvaluatorSlug string `json:"evaluator_slug"`
+	Direction     string `json:"direction"`
+	FailureMode   string `json:"failure_mode"`
 }
 
-type guardrailEntryWire struct {
-	ID        string `json:"id"`
-	Evaluator string `json:"evaluator"`
+// guardrailAttachmentWire is the VK's per-direction opt-in
+// (bundle.guardrail_attachments[]).
+type guardrailAttachmentWire struct {
+	Direction    string   `json:"direction"`
+	GuardrailIDs []string `json:"guardrail_ids"`
 }
 
 type policyRulesWire struct {
@@ -87,11 +97,8 @@ type cacheRuleWire struct {
 // cacheMatchersWire mirrors the matchers shape emitted by the control-plane
 // materialiser (langwatch/src/server/gateway/config.materialiser.ts:121-128).
 // Every recognized matcher must have an explicit field — silently dropping a
-// matcher at unmarshal collapses the rule's effective scope to "match all"
-// and was the iter-110 root cause of the matrix anthropic/bedrock cache cells
-// returning cache_creation=0 / cache_read=0 (the seed's `disable-cache-evals`
-// rule, gated on `vk_prefix=lw_vk_eval_`, fell through to matching every VK
-// including matrix-* ones, stripping `cache_control` from the system block).
+// matcher at unmarshal collapses the rule's effective scope to "match all",
+// which has caused stripped `cache_control` on system blocks in matrix tests.
 type cacheMatchersWire struct {
 	Model           string            `json:"model"`
 	PrincipalID     string            `json:"principal_id"`
@@ -121,13 +128,7 @@ func (w *configWire) toDomain() domain.BundleConfig {
 			MaxAttempts: w.Fallback.MaxAttempts,
 			On:          w.Fallback.On,
 		},
-		Guardrails: domain.GuardrailsConfig{
-			Pre:              mapGuardrailEntries(w.Guardrails.Pre),
-			Post:             mapGuardrailEntries(w.Guardrails.Post),
-			StreamChunk:      mapGuardrailEntries(w.Guardrails.StreamChunk),
-			RequestFailOpen:  w.Guardrails.RequestFailOpen,
-			ResponseFailOpen: w.Guardrails.ResponseFailOpen,
-		},
+		Guardrails: buildGuardrails(w.Guardrails, w.GuardrailAttachments),
 	}
 
 	if w.RateLimits.RPM != nil {
@@ -161,12 +162,46 @@ func (w *configWire) toDomain() domain.BundleConfig {
 	return cfg
 }
 
-func mapGuardrailEntries(entries []guardrailEntryWire) []domain.GuardrailEntry {
-	out := make([]domain.GuardrailEntry, len(entries))
-	for i, e := range entries {
-		out[i] = domain.GuardrailEntry{ID: e.ID, Evaluator: e.Evaluator}
+// buildGuardrails reconstructs the per-direction domain.GuardrailsConfig
+// from the flat project catalog + the VK's attachment tuples. The VK
+// invokes a guardrail in the direction declared on its attachment;
+// the evaluator is resolved from the catalog (slug preferred, id
+// fallback). Catalog entries the VK did not attach are dropped — the
+// gateway only runs what the VK opted into.
+func buildGuardrails(
+	catalog []guardrailWire,
+	attachments []guardrailAttachmentWire,
+) domain.GuardrailsConfig {
+	byID := make(map[string]guardrailWire, len(catalog))
+	for _, g := range catalog {
+		byID[g.ID] = g
 	}
-	return out
+	cfg := domain.GuardrailsConfig{}
+	for _, att := range attachments {
+		for _, id := range att.GuardrailIDs {
+			g, ok := byID[id]
+			if !ok {
+				// Dangling reference — the control plane already filters
+				// these, but stay defensive so a stale id never injects an
+				// empty-evaluator entry.
+				continue
+			}
+			evaluator := g.EvaluatorSlug
+			if evaluator == "" {
+				evaluator = g.EvaluatorID
+			}
+			entry := domain.GuardrailEntry{ID: g.ID, Evaluator: evaluator}
+			switch att.Direction {
+			case "pre", "request":
+				cfg.Pre = append(cfg.Pre, entry)
+			case "post", "response":
+				cfg.Post = append(cfg.Post, entry)
+			case "stream_chunk":
+				cfg.StreamChunk = append(cfg.StreamChunk, entry)
+			}
+		}
+	}
+	return cfg
 }
 
 func buildPolicyRules(pr policyRulesWire) []domain.PolicyRule {
@@ -188,6 +223,12 @@ func buildPolicyRules(pr policyRulesWire) []domain.PolicyRule {
 	}
 	for _, a := range pr.URLs.Allow {
 		rules = append(rules, domain.PolicyRule{Pattern: a, Type: domain.PolicyAllow, Target: domain.PolicyTargetURL})
+	}
+	for _, d := range pr.Models.Deny {
+		rules = append(rules, domain.PolicyRule{Pattern: d, Type: domain.PolicyDeny, Target: domain.PolicyTargetModel})
+	}
+	for _, a := range pr.Models.Allow {
+		rules = append(rules, domain.PolicyRule{Pattern: a, Type: domain.PolicyAllow, Target: domain.PolicyTargetModel})
 	}
 	return rules
 }

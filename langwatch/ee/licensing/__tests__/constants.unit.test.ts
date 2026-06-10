@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  CONTACT_SALES_URL,
+  FREE_PLAN,
   LICENSE_ERRORS,
   LICENSE_ERROR_MESSAGES,
+  UNLIMITED_PLAN,
   getUserFriendlyLicenseError,
 } from "../constants";
 
@@ -52,5 +55,42 @@ describe("getUserFriendlyLicenseError", () => {
   it("returns original error for unknown error messages", () => {
     const unknownError = "Some unknown error";
     expect(getUserFriendlyLicenseError(unknownError)).toBe(unknownError);
+  });
+});
+
+describe("UNLIMITED_PLAN", () => {
+  /** @scenario UNLIMITED_PLAN has correct structure for backward compatibility */
+  it("has the expected structural shape for self-hosted backward compatibility", () => {
+    expect(UNLIMITED_PLAN.type).toBe("OPEN_SOURCE");
+    expect(UNLIMITED_PLAN.name).toBe("Open Source");
+    expect(UNLIMITED_PLAN.free).toBe(true);
+    expect(UNLIMITED_PLAN.overrideAddingLimitations).toBe(true);
+    expect(UNLIMITED_PLAN.maxMembers).toBe(Number.MAX_SAFE_INTEGER);
+    expect(UNLIMITED_PLAN.maxProjects).toBe(Number.MAX_SAFE_INTEGER);
+    expect(UNLIMITED_PLAN.maxMessagesPerMonth).toBe(Number.MAX_SAFE_INTEGER);
+    expect(UNLIMITED_PLAN.maxWorkflows).toBe(Number.MAX_SAFE_INTEGER);
+    expect(UNLIMITED_PLAN.canPublish).toBe(true);
+  });
+});
+
+describe("CONTACT_SALES_URL", () => {
+  /** @scenario CONTACT_SALES_URL resolves to the public demo form */
+  it("equals the public LangWatch demo form URL", () => {
+    expect(CONTACT_SALES_URL).toBe("https://langwatch.ai/get-a-demo");
+  });
+});
+
+describe("FREE_PLAN", () => {
+  /** @scenario FREE_PLAN has correct limits for expired/invalid licenses */
+  /** @scenario PlanInfo defaults maxMembers to 1 when not specified */
+  it("has the expected fallback limits for expired/invalid licenses", () => {
+    expect(FREE_PLAN.type).toBe("FREE");
+    expect(FREE_PLAN.name).toBe("Free");
+    expect(FREE_PLAN.free).toBe(true);
+    expect(FREE_PLAN.maxMembers).toBe(1);
+    expect(FREE_PLAN.maxProjects).toBe(2);
+    expect(FREE_PLAN.maxMessagesPerMonth).toBe(1000);
+    expect(FREE_PLAN.maxWorkflows).toBe(3);
+    expect(FREE_PLAN.canPublish).toBe(false);
   });
 });

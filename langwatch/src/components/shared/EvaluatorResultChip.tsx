@@ -6,7 +6,7 @@
  * - Batch evaluation results page (read-only display)
  *
  * For the interactive version with edit/remove menu, see:
- * evaluations-v3/components/TargetSection/EvaluatorChip.tsx
+ * experiments-v3/components/TargetSection/EvaluatorChip.tsx
  */
 import {
   Box,

@@ -21,6 +21,15 @@ export function useUrlParamToOpenNewTab() {
   const { selectedPromptId } = usePromptIdQueryParam();
   const trpc = api.useContext();
 
+  // Cascade-resolved model for new prompts. The query subscribes lazily
+  // so the effect can read the cached value without firing a second
+  // request when the URL changes.
+  const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
+    { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
+    { enabled: !!project?.id },
+  );
+  const resolvedDefaultModel = resolvedDefault.data?.model;
+
   useEffect(() => {
     /**
      * openNewTab
@@ -37,15 +46,9 @@ export function useUrlParamToOpenNewTab() {
 
       if (!prompt) return;
 
-      const projectDefaultModel = project?.defaultModel;
-      const normalizedDefaultModel =
-        typeof projectDefaultModel === "string"
-          ? projectDefaultModel
-          : undefined;
-
       const defaultValues = computeInitialFormValuesForPrompt({
         prompt: prompt,
-        defaultModel: normalizedDefaultModel,
+        defaultModel: resolvedDefaultModel,
         useSystemMessage: true,
       });
 
@@ -72,7 +75,7 @@ export function useUrlParamToOpenNewTab() {
     );
   }, [
     addTab,
-    project?.defaultModel,
+    resolvedDefaultModel,
     project?.id,
     selectedPromptId,
     trpc.prompts.getByIdOrHandle,

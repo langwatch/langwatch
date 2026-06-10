@@ -1,19 +1,21 @@
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { DomainError } from "../app-layer/domain-error";
+import { Actions, Resources } from "../api/rbac";
 
-/**
- * Shape validator for the `CustomRole.permissions` JSON column.
- *
- * Mirrors the write-path regex used by the tRPC `roleRouter` (see
- * `src/server/api/routers/role.ts`): `^[a-z]+:[a-z]+$`. This is deliberately
- * shape-only, not an allow-list of known `Permission` literals — so rolling
- * deploys that add a new `Resource` or `Action` don't retro-break existing
- * CustomRoles that were written against the older typed union.
- */
-export const CustomRolePermissionsSchema = z.array(
-  z.string().regex(/^[a-z]+:[a-z]+$/),
+const VALID_PERMISSIONS: Set<string> = new Set(
+  Object.values(Resources).flatMap((r) =>
+    Object.values(Actions).map((a) => `${r}:${a}`),
+  ),
 );
+
+export const permissionFormatSchema = z
+  .string()
+  .refine((val) => VALID_PERMISSIONS.has(val), {
+    message: "must be a valid resource:action permission",
+  });
+
+export const CustomRolePermissionsSchema = z.array(permissionFormatSchema);
 
 /**
  * Thrown when a `CustomRole.permissions` JSON value cannot be parsed as an
@@ -57,8 +59,8 @@ export class MalformedCustomRolePermissionsError extends DomainError {
  * `MalformedCustomRolePermissionsError` if the value does not conform.
  *
  * Shared across:
- *   - `PatService.assertCustomRoleWithinCeiling` — lets the throw bubble so
- *     PAT creation rejects with 403 (wrapped as `PatScopeViolationError`)
+ *   - `ApiKeyService.assertCustomRoleWithinCeiling` — lets the throw bubble so
+ *     API key creation rejects with 403 (wrapped as `ApiKeyScopeViolationError`)
  *   - `checkRoleBindingPermission` — catches and returns `false` (denied)
  *
  * The caller is responsible for mapping the throw to the right outcome for

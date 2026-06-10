@@ -27,6 +27,7 @@ function renderBetaPill({
 
 describe("<BetaPill />", () => {
   describe("when the page renders", () => {
+    /** @scenario 'Beta pill badge renders with default message' */
     it("displays a Beta pill badge alongside the wrapped content", () => {
       renderBetaPill();
 
@@ -36,6 +37,7 @@ describe("<BetaPill />", () => {
   });
 
   describe("when the user hovers over the beta pill", () => {
+    /** @scenario 'Beta pill badge renders with custom message' */
     it("shows a popover with the custom message content", async () => {
       const user = userEvent.setup();
       renderBetaPill({
@@ -53,6 +55,7 @@ describe("<BetaPill />", () => {
   });
 
   describe("when the message contains styled text", () => {
+    /** @scenario 'Popover renders styled text' */
     it("renders the styled text in the popover", async () => {
       const user = userEvent.setup();
       renderBetaPill({
@@ -73,6 +76,7 @@ describe("<BetaPill />", () => {
   });
 
   describe("when the message contains a link", () => {
+    /** @scenario 'Popover renders clickable links' */
     it("renders the link as clickable inside the popover", async () => {
       const user = userEvent.setup();
       renderBetaPill({
@@ -131,6 +135,7 @@ describe("<BetaPill />", () => {
   });
 
   describe("when the user focuses the beta pill with the keyboard", () => {
+    /** @scenario 'Keyboard focus shows the popover' */
     it("shows the popover with the message content", async () => {
       const user = userEvent.setup();
       renderBetaPill({

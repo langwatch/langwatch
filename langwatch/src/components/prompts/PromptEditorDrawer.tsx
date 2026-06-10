@@ -21,8 +21,8 @@ import {
   type FieldMapping,
   FormVariablesSection,
 } from "~/components/variables";
-import { useEvaluationMappings } from "~/evaluations-v3/hooks/useEvaluationMappings";
-import type { LocalPromptConfig } from "~/evaluations-v3/types";
+import { useEvaluationMappings } from "~/experiments-v3/hooks/useEvaluationMappings";
+import type { LocalPromptConfig } from "~/experiments-v3/types";
 import {
   getComplexProps,
   getFlowCallbacks,
@@ -54,7 +54,6 @@ import {
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import type { LlmConfigInputType } from "~/types";
 import { api } from "~/utils/api";
-import { DEFAULT_MODEL } from "~/utils/constants";
 import { useUpgradeModalStore } from "~/stores/upgradeModalStore";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { getMaxTokenLimit } from "~/components/llmPromptConfigs/utils/tokenUtils";
@@ -165,6 +164,13 @@ const extractLocalConfig = (
 export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   const { project, hasPermission } = useOrganizationTeamProject();
   const { modelMetadata } = useModelProvidersSettings({ projectId: project?.id });
+
+  // Cascade-resolved model for new prompts created in this drawer.
+  const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
+    { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
+    { enabled: !!project?.id },
+  );
+  const resolvedDefaultModel = resolvedDefault.data?.model;
   const { closeDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
   const flowCallbacks = getFlowCallbacks("promptEditor");
@@ -406,8 +412,10 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       // New prompt OR prompt referenced by ID but not found in DB (e.g. after
       // importing a workflow from another project). Use defaults with model's
       // max tokens, merging initialLocalConfig if available.
-      const defaultModel = project?.defaultModel ?? DEFAULT_MODEL;
-      const defaultModelMetadata = modelMetadata[defaultModel];
+      const defaultModel = resolvedDefaultModel ?? "";
+      const defaultModelMetadata = defaultModel
+        ? modelMetadata[defaultModel]
+        : undefined;
       const maxTokens = getMaxTokenLimit(defaultModelMetadata);
 
       const defaults = buildDefaultFormValues({
@@ -504,7 +512,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     availableSources,
     _onMappingsChangeProp,
     modelMetadata,
-    project?.defaultModel,
+    resolvedDefaultModel,
   ]);
 
   // Reset when drawer closes
@@ -1093,7 +1101,11 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
           paddingY={3}
           position="sticky"
           top={0}
-          zIndex={1}
+          zIndex={2}
+          // Solid background matching the drawer surface so messages
+          // scrolling underneath never show through or over the header.
+          bg="bg"
+          data-testid="prompt-editor-sticky-header"
         >
           <PromptEditorHeader
             onSave={() => void handleSave()}
@@ -1184,7 +1196,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       size="sm"
       modal={false}
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.CloseTrigger />
         <Drawer.Header>
           <HStack gap={2}>

@@ -3,11 +3,17 @@ Feature: Run Scenario target selector does not close the modal
   I want to select a target from the dropdown inside the Run Scenario modal
   So that I can choose a prompt or agent and then click Run without the modal closing
 
+  # Parity status: 4 of 5 scenarios bound to existing tests.
+  # Remaining @unimplemented scenarios (#3458):
+  #   1 NO_TEST: shipped behavior, no integration test yet
+  # NO_TEST gaps:
+  #   - "Clicking outside the modal still closes the modal"
+
   Background:
     Given the Run Scenario modal is open
     And there is at least one prompt and one agent available
 
-  @integration @unimplemented
+  @integration
   Scenario: Selecting a prompt keeps the modal open
     When I open the target selector dropdown
     And I click a prompt in the dropdown
@@ -15,7 +21,7 @@ Feature: Run Scenario target selector does not close the modal
     And the selected prompt is shown in the target selector trigger
     And the Run Scenario modal remains open
 
-  @integration @unimplemented
+  @integration
   Scenario: Selecting an agent keeps the modal open
     When I open the target selector dropdown
     And I click an agent in the dropdown
@@ -23,7 +29,7 @@ Feature: Run Scenario target selector does not close the modal
     And the selected agent is shown in the target selector trigger
     And the Run Scenario modal remains open
 
-  @integration @unimplemented
+  @integration
   Scenario: Clicking outside the dropdown closes only the dropdown
     When I open the target selector dropdown
     And I click inside the modal body but outside the dropdown
@@ -35,7 +41,7 @@ Feature: Run Scenario target selector does not close the modal
     When I click outside the Run Scenario modal
     Then the Run Scenario modal closes
 
-  @integration @unimplemented
+  @integration
   Scenario: Completing the full run flow after selecting a target
     When I open the target selector dropdown
     And I click a prompt in the dropdown

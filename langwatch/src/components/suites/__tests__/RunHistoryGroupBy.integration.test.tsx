@@ -42,6 +42,7 @@ describe("Group-by selector", () => {
   });
 
   describe("when the run history list renders", () => {
+    /** @scenario "Group-by selector renders with correct options" */
     it("renders a group-by selector with correct options", () => {
       render(
         <RunHistoryFilters

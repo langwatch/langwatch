@@ -1,11 +1,5 @@
 import { getProviderModelOptions } from "../server/modelProviders/registry";
-import {
-  DEFAULT_EMBEDDINGS_MODEL,
-  DEFAULT_MODEL,
-  DEFAULT_TOPIC_CLUSTERING_MODEL,
-  KEY_CHECK,
-  MASKED_KEY_PLACEHOLDER,
-} from "./constants";
+import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "./constants";
 
 /** Extracts provider key from model string (e.g., "openai/gpt-4" -> "openai") */
 export function getProviderFromModel(model: string): string {
@@ -30,90 +24,6 @@ export function isModelDisabledForProvider({
   if (modelOption) return modelOption.isDisabled;
   const providerKey = getProviderFromModel(model);
   return !(providers?.[providerKey]?.enabled ?? false);
-}
-
-export type EffectiveDefaults = {
-  defaultModel: string;
-  topicClusteringModel: string;
-  embeddingsModel: string;
-};
-
-/** Returns project defaults with fallbacks to DEFAULT_* constants */
-export function getEffectiveDefaults(
-  project:
-    | {
-        defaultModel?: string | null;
-        topicClusteringModel?: string | null;
-        embeddingsModel?: string | null;
-      }
-    | null
-    | undefined,
-): EffectiveDefaults {
-  return {
-    defaultModel: project?.defaultModel ?? DEFAULT_MODEL,
-    topicClusteringModel:
-      project?.topicClusteringModel ?? DEFAULT_TOPIC_CLUSTERING_MODEL,
-    embeddingsModel: project?.embeddingsModel ?? DEFAULT_EMBEDDINGS_MODEL,
-  };
-}
-
-/** Checks if provider is used for ANY effective default (used for delete prevention) */
-export function isProviderEffectiveDefault(
-  providerKey: string,
-  project:
-    | {
-        defaultModel?: string | null;
-        topicClusteringModel?: string | null;
-        embeddingsModel?: string | null;
-      }
-    | null
-    | undefined,
-): boolean {
-  const effectiveDefaults = getEffectiveDefaults(project);
-  return isProviderUsedForDefaultModels(
-    providerKey,
-    effectiveDefaults.defaultModel,
-    effectiveDefaults.topicClusteringModel,
-    effectiveDefaults.embeddingsModel,
-  );
-}
-
-/** Checks if provider is used for the Default Model only (used for badge and toggle logic) */
-export function isProviderDefaultModel(
-  providerKey: string,
-  project:
-    | {
-        defaultModel?: string | null;
-      }
-    | null
-    | undefined,
-): boolean {
-  const effectiveDefault = project?.defaultModel ?? DEFAULT_MODEL;
-  return getProviderFromModel(effectiveDefault) === providerKey;
-}
-
-/** Checks if provider matches any of the given model strings (used in delete dialog) */
-export function isProviderUsedForDefaultModels(
-  providerKey: string,
-  defaultModel: string | null,
-  topicClusteringModel: string | null,
-  embeddingsModel: string | null,
-): boolean {
-  const defaultProvider = defaultModel
-    ? getProviderFromModel(defaultModel)
-    : null;
-  const topicClusteringProvider = topicClusteringModel
-    ? getProviderFromModel(topicClusteringModel)
-    : null;
-  const embeddingsProvider = embeddingsModel
-    ? getProviderFromModel(embeddingsModel)
-    : null;
-
-  return (
-    providerKey === defaultProvider ||
-    providerKey === topicClusteringProvider ||
-    providerKey === embeddingsProvider
-  );
 }
 
 /** Extracts shape from Zod schema for credential keys */
@@ -286,28 +196,15 @@ export function resolveModelForProvider({
 }
 
 /**
- * Determines whether the "Use as Default Provider" toggle should be auto-enabled.
- * Returns true when the provider is already the project's default model provider,
- * or when this is the only enabled provider (first-provider setup).
- *
- * @param params.providerKey - The provider key (e.g., "openai")
- * @param params.project - The project object containing default model info
- * @param params.enabledProvidersCount - Number of currently enabled providers
+ * Determines whether the "Use as Default Provider" toggle should be
+ * auto-enabled when opening the drawer. With the legacy default-model
+ * scalar columns gone, only the "first provider in the project" case
+ * remains: any further provider added needs an explicit opt-in.
  */
 export function shouldAutoEnableAsDefault({
-  providerKey,
-  project,
   enabledProvidersCount,
 }: {
-  providerKey: string;
-  project:
-    | { defaultModel?: string | null }
-    | null
-    | undefined;
   enabledProvidersCount: number;
 }): boolean {
-  return (
-    isProviderDefaultModel(providerKey, project) ||
-    enabledProvidersCount <= 1
-  );
+  return enabledProvidersCount <= 1;
 }

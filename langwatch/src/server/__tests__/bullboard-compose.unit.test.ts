@@ -39,6 +39,7 @@ describe("compose.dev.yml bullboard service", () => {
   const bullboardBlock = extractBullboardBlock(composeText);
 
   describe("when parsing the bullboard service definition", () => {
+    /** @scenario 'bullboard service is included in scenarios profile' */
     it("belongs to the scenarios profile", () => {
       expect(bullboardBlock).toMatch(/profiles:.*scenarios/);
     });

@@ -1,5 +1,6 @@
 import { HStack, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
+import type { IconData } from "../../../regions/shared/types";
 import {
   type FrameworkKey,
   LARGE_FRAMEWORK_ICON_KEYS,
@@ -8,18 +9,30 @@ import {
 import { FRAMEWORKS_BY_PLATFORM } from "../../../regions/observability/ui-options";
 import { SelectableIconCard } from "../shared/SelectableIconCard";
 
+type FrameworksByPlatform = Record<
+  PlatformKey,
+  readonly { key: FrameworkKey; label: string; icon?: IconData }[]
+>;
+
 interface FrameworkGridProps {
   language: PlatformKey;
   selectedFramework: FrameworkKey | null;
   onSelectFramework: (framework: FrameworkKey) => void;
+  /**
+   * Override the platform-to-frameworks map. The traces-v2 empty-state
+   * onboarding passes a category-filtered map; the original onboarding flow
+   * falls through to the full FRAMEWORKS_BY_PLATFORM.
+   */
+  frameworksByPlatform?: FrameworksByPlatform;
 }
 
 export function FrameworkGrid({
   language,
   selectedFramework,
   onSelectFramework,
+  frameworksByPlatform = FRAMEWORKS_BY_PLATFORM,
 }: FrameworkGridProps): React.ReactElement | null {
-  const frameworks = FRAMEWORKS_BY_PLATFORM[language];
+  const frameworks = frameworksByPlatform[language];
   if (!frameworks || frameworks.length === 0) return null;
 
   // If no framework is selected, default to the first available framework

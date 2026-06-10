@@ -5,6 +5,7 @@ import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import { getLangWatchTracer } from "langwatch";
 import type { ProcessRole } from "~/server/app-layer/config";
+import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
 import { makeQueueName } from "~/server/background/queues/makeQueueName";
 import { createLogger } from "~/utils/logger/server";
 import { DisabledPipeline } from "./disabledPipeline";
@@ -49,6 +50,7 @@ export interface EventSourcingOptions {
   enabled?: boolean; // defaults to true
   isSaas?: boolean; // defaults to false
   processRole?: ProcessRole;
+  retentionPolicyResolver?: RetentionPolicyResolver;
 }
 
 /**
@@ -104,12 +106,14 @@ export class EventSourcing {
   private readonly _clickhouse?: ClickHouseClientResolver | null;
   private readonly _redis?: IORedis | Cluster | null;
   private readonly _processRole?: ProcessRole;
+  private readonly _retentionPolicyResolver?: RetentionPolicyResolver;
 
   constructor(options: EventSourcingOptions = {}) {
     this._enabled = options.enabled ?? true;
     this._clickhouse = options.clickhouse;
     this._redis = options.redis;
     this._processRole = options.processRole;
+    this._retentionPolicyResolver = options.retentionPolicyResolver;
 
     // Create projection registry and register SaaS-only projections
     this.projectionRegistry = new ProjectionRegistry<Event>();
@@ -296,6 +300,7 @@ export class EventSourcing {
           replayMarkerChecker: this._redis
             ? new RedisReplayMarkerChecker(this._redis)
             : undefined,
+          retentionPolicyResolver: this._retentionPolicyResolver,
         });
 
         // Get command dispatchers
@@ -394,6 +399,7 @@ export class EventSourcing {
     if (clickHouseEnabled) {
       this._eventStore = new EventStoreClickHouse(
         new EventRepositoryClickHouse(this._clickhouse!),
+        this._retentionPolicyResolver,
       );
       logger.debug("Using ClickHouse event store");
     } else if (!isProduction) {
@@ -456,6 +462,30 @@ export class EventSourcing {
         }
         await result.entry.process(result.clean);
       },
+      coalesceMaxBatch: (payload: Record<string, unknown>) => {
+        const result = this.lookupEntry(payload);
+        return result?.entry.coalesceMaxBatch ?? 1;
+      },
+      processBatch: async (payloads: Record<string, unknown>[]) => {
+        if (payloads.length === 0) return;
+        // A coalesced batch is always one group → one registry entry. Resolve
+        // every payload and guard against a mixed/unknown batch (should never
+        // happen — the GroupQueue only coalesces same-group jobs — but a stray
+        // payload must never be misrouted to the wrong handler). On any mismatch
+        // fall back to per-item processing.
+        const first = this.lookupEntry(payloads[0]!);
+        const resolved = payloads.map((payload) => this.lookupEntry(payload));
+        const homogeneous =
+          !!first?.entry.processBatch &&
+          resolved.every((r) => r?.entry === first.entry);
+        if (!homogeneous) {
+          for (const result of resolved) {
+            if (result) await result.entry.process(result.clean);
+          }
+          return;
+        }
+        await first.entry.processBatch!(resolved.map((r) => r!.clean));
+      },
     };
 
     const effectiveRedis = this._redis;
@@ -511,12 +541,14 @@ export class EventSourcing {
     clickhouse?: ClickHouseClientResolver;
     redis?: IORedis | Cluster;
     processRole?: ProcessRole;
+    retentionPolicyResolver?: RetentionPolicyResolver;
   }): EventSourcing {
     const es = new EventSourcing({
       enabled: true,
       clickhouse: options.clickhouse,
       redis: options.redis,
       processRole: options.processRole,
+      retentionPolicyResolver: options.retentionPolicyResolver,
     });
 
     es._initialized = true;

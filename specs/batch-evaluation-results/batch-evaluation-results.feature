@@ -4,6 +4,27 @@ Feature: Batch Evaluation Results Visualization
   I want to see a clear visualization of my evaluation runs
   So that I can understand how my targets performed across the dataset
 
+  # Many scenarios in this file are bound below to existing JSDOM
+  # render tests under
+  # `langwatch/src/components/batch-evaluation-results/__tests__/`:
+  #   * BatchEvaluationResultsTable.test.tsx — table rendering +
+  #     loading skeleton + empty state + dataset/target columns.
+  #   * BatchTargetCell.test.tsx — output display + cost/duration,
+  #     error state, truncation, evaluator chips (pass/fail/error).
+  #   * BatchSummaryFooter.test.tsx — run summary + cost.
+  #   * BatchRunsSidebar.integration.test.tsx — list of runs.
+  #   * isRunFinished.test.ts — running / stopped indicator.
+  #   * csvExport.test.ts — CSV export + special characters.
+  #
+  # Remaining scenarios that stay `@unimplemented` describe page-
+  # level integration flows (image rendering in cells, evaluator
+  # chip hover tooltip, "View Trace" link conditional render,
+  # Studio panel "Open full experiment" button, comparison-mode
+  # toggles, V2-vs-V3 page wiring) that need either a top-level
+  # render fixture for the experiment page or a Playwright suite.
+  # See specs/batch-evaluation-results/AUDIT_MANIFEST.md for the
+  # full classification.
+
   Background:
     Given I am on the experiment results page
     And an evaluation run has completed
@@ -59,6 +80,19 @@ Feature: Batch Evaluation Results Visualization
     When the results table renders
     Then the target cell shows an error indicator
     And the error message "Rate limit exceeded" is visible
+
+  Scenario: Reveal full error message on hover
+    Given a target execution failed with an error longer than two lines
+    When the results table renders
+    Then the error cell clamps the message to two lines
+    When I hover over the error cell
+    Then a tooltip shows the full error message
+
+  Scenario: Expand full error message on click
+    Given a target execution failed with an error longer than two lines
+    When I click on the error cell
+    Then the error expands into an overlay showing the full message
+    And I can dismiss the expanded view by clicking outside
 
   @unimplemented
   Scenario: Expand long target output

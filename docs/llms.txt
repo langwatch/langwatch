@@ -10,7 +10,7 @@ Always navigate to docs links using the .md extension for better readability.
 ## Overview
 
 - [Self-Hosting Overview](https://langwatch.ai/docs/self-hosting/overview.md): Deploy LangWatch on your own infrastructure for full data control
-- [Hybrid Setup](https://langwatch.ai/docs/hybrid-setup/overview.md): Use LangWatch Cloud with your own data plane — keep full data ownership while leveraging LangWatch's managed control plane.
+- [Hybrid Setup](https://langwatch.ai/docs/hybrid-setup/overview.md): Use LangWatch Cloud with your own data plane, keep full data ownership while leveraging LangWatch's managed control plane.
 - [Troubleshooting & FAQ](https://langwatch.ai/docs/self-hosting/troubleshooting.md): Common issues and solutions for LangWatch self-hosting
 
 ## Configuration
@@ -25,17 +25,19 @@ Always navigate to docs links using the .md extension for better readability.
 ## Deployment
 
 - [Docker Compose](https://langwatch.ai/docs/self-hosting/deployment/docker-compose.md): Get LangWatch running locally in minutes with Docker Compose
-- [Docker Images](https://langwatch.ai/docs/self-hosting/deployment/docker-images.md): LangWatch Docker image reference — what each container does and how they communicate
+- [Docker Images](https://langwatch.ai/docs/self-hosting/deployment/docker-images.md): LangWatch Docker image reference, what each container does and how they communicate
 - [Kubernetes (Helm)](https://langwatch.ai/docs/self-hosting/deployment/kubernetes-helm.md): Production Kubernetes deployment with the LangWatch Helm chart
 - [Local Kubernetes (Kind + Helm)](https://langwatch.ai/docs/self-hosting/deployment/kubernetes-local.md): Run LangWatch locally on Kind for development and testing
+- [ArgoCD](https://langwatch.ai/docs/self-hosting/deployment/argocd.md): Deploy the LangWatch Helm chart via ArgoCD with operator-managed secrets and no GitOps-specific workarounds
 
 ## Infrastructure
 
-- [Architecture & Infrastructure](https://langwatch.ai/docs/self-hosting/infrastructure/architecture.md): How LangWatch components fit together — what you're deploying and how data flows through the system
+- [Architecture & Infrastructure](https://langwatch.ai/docs/self-hosting/infrastructure/architecture.md): How LangWatch components fit together, what you're deploying and how data flows through the system
 
 ## Operations
 
 - [Security](https://langwatch.ai/docs/self-hosting/security.md): Security model, encryption, secrets management, and hardening for LangWatch
+- [Self-hosting compliance](https://langwatch.ai/docs/self-hosting/compliance.md): What works in self-hosted LangWatch under the Apache 2.0 license vs what requires an Enterprise license. Persona-aware coverage map across SOC 2, ISO 27001, GDPR, HIPAA, EU AI Act, plus the substrate primitives behind each.
 - [Upgrade Guide](https://langwatch.ai/docs/self-hosting/upgrade.md): How to upgrade LangWatch to the latest version
 - [Migrate to v3](https://langwatch.ai/docs/self-hosting/upgrade-v3.md): Step-by-step guide to upgrade LangWatch from v1.x or v2.x to v3.0
 
@@ -53,59 +55,62 @@ Always navigate to docs links using the .md extension for better readability.
 ## Traces
 
 - [Overview](https://langwatch.ai/docs/api-reference/traces/overview.md): Search, retrieve, and share LangWatch traces via the REST API. Traces capture the full execution of your LLM pipelines including all spans, evaluations, and metadata.
-- [Get trace details](https://langwatch.ai/docs/api-reference/traces/get-trace.md)
-- [Get thread details](https://langwatch.ai/docs/api-reference/traces/get-thread-details.md)
 - [Search traces](https://langwatch.ai/docs/api-reference/traces/search.md)
+- [Get trace details](https://langwatch.ai/docs/api-reference/traces/get-trace.md)
+- [Update trace metadata](https://langwatch.ai/docs/api-reference/traces/update-metadata.md): Update metadata on an existing trace by trace ID. Injects a synthetic span through the standard ingestion pipeline carrying the new attributes.
 - [Create public path for single trace](https://langwatch.ai/docs/api-reference/traces/create-public-trace-path.md)
 - [Delete an existing public path for a trace](https://langwatch.ai/docs/api-reference/traces/delete-public-trace-path.md)
 
-## Prompts
-
-- [Overview](https://langwatch.ai/docs/api-reference/prompts/overview.md): Prompts are used to manage and version your prompts
-- [Get prompts](https://langwatch.ai/docs/api-reference/prompts/get-prompts.md)
-- [Create prompt](https://langwatch.ai/docs/api-reference/prompts/create-prompt.md)
-- [Get prompt](https://langwatch.ai/docs/api-reference/prompts/get-prompt.md)
-- [Update prompt](https://langwatch.ai/docs/api-reference/prompts/update-prompt.md)
-- [Delete prompt](https://langwatch.ai/docs/api-reference/prompts/delete-prompt.md)
-- [Get prompt versions](https://langwatch.ai/docs/api-reference/prompts/get-prompt-versions.md)
-- [Create prompt version](https://langwatch.ai/docs/api-reference/prompts/create-prompt-version.md)
-
-## Annotations
-
-- [Overview](https://langwatch.ai/docs/api-reference/annotations/overview.md): Learn how annotations enhance trace review, labeling, and evaluation workflows for more reliable AI agent testing.
-- [Get annotations](https://langwatch.ai/docs/api-reference/annotations/get-annotation.md)
-- [Get single annotation](https://langwatch.ai/docs/api-reference/annotations/get-single-annotation.md)
-- [Delete single annotation](https://langwatch.ai/docs/api-reference/annotations/delete-annotation.md)
-- [Patch single annotation](https://langwatch.ai/docs/api-reference/annotations/patch-annotation.md)
-- [Get annotationa for single trace](https://langwatch.ai/docs/api-reference/annotations/get-all-annotations-trace.md)
-- [Create annotation for single trace](https://langwatch.ai/docs/api-reference/annotations/create-annotation-trace.md)
-
 ## Datasets
 
+- [Overview](https://langwatch.ai/docs/api-reference/datasets/overview.md): Manage datasets for evaluations, experiments, and fine-tuning. Create, update, upload, and manage records programmatically.
+- [List all non-archived datasets for the project](https://langwatch.ai/docs/api-reference/datasets/list-dataset.md)
+- [Create a new dataset](https://langwatch.ai/docs/api-reference/datasets/create-dataset.md)
+- [Create a new dataset from an uploaded file](https://langwatch.ai/docs/api-reference/datasets/create-upload.md)
+- [Get a dataset by its slug or id](https://langwatch.ai/docs/api-reference/datasets/get-dataset.md)
+- [List records for a dataset](https://langwatch.ai/docs/api-reference/datasets/get-records.md)
+- [Update a dataset by its slug or id](https://langwatch.ai/docs/api-reference/datasets/update-dataset.md)
+- [Update or create a record in a dataset](https://langwatch.ai/docs/api-reference/datasets/update-records.md)
 - [Add dataset entries programmatically using the LangWatch API to build evaluation sets for LLM testing and agent validation.](https://langwatch.ai/docs/api-reference/datasets/post-dataset-entries.md)
-
-## Automations
-
-- [Create Slack automation](https://langwatch.ai/docs/api-reference/automations/create-slack-automation.md)
-
-## Scenarios
-
-- [Overview](https://langwatch.ai/docs/api-reference/scenarios/overview.md)
-- [Create Event](https://langwatch.ai/docs/api-reference/scenarios/create-event.md)
+- [Create records in a dataset in batch](https://langwatch.ai/docs/api-reference/datasets/action-records.md)
+- [Upload a file](https://langwatch.ai/docs/api-reference/datasets/action-upload.md)
+- [Archive a dataset](https://langwatch.ai/docs/api-reference/datasets/delete-dataset.md)
+- [Delete records from a dataset by IDs](https://langwatch.ai/docs/api-reference/datasets/delete-records.md)
 
 ## Evaluators
 
+- [Overview](https://langwatch.ai/docs/api-reference/evaluators-config/overview.md): Manage evaluator configurations for your project. Create, update, and organize evaluators used for online evaluations, guardrails, and experiments.
+- [Get all evaluators for a project](https://langwatch.ai/docs/api-reference/evaluators-config/list-evaluators.md)
+- [Create a new evaluator](https://langwatch.ai/docs/api-reference/evaluators-config/create-evaluators.md)
+- [Get a specific evaluator by ID or slug](https://langwatch.ai/docs/api-reference/evaluators-config/get-evaluators.md)
+- [Update an existing evaluator](https://langwatch.ai/docs/api-reference/evaluators-config/update-evaluators.md)
+- [Archive an evaluator](https://langwatch.ai/docs/api-reference/evaluators-config/delete-evaluators.md)
+
+## Built-in Evaluators
+
 - [Overview](https://langwatch.ai/docs/api-reference/evaluators/overview.md): Browse all available evaluators in LangWatch to find the right scoring method for your AI agent evaluation use case.
+
+### Expected Answer
+
 - [Exact Match Evaluator](https://langwatch.ai/docs/api-reference/evaluators/exact-match-evaluator.md)
 - [Llm Answer Match](https://langwatch.ai/docs/api-reference/evaluators/llm-answer-match.md)
-- [Bleu Score](https://langwatch.ai/docs/api-reference/evaluators/bleu-score.md)
 - [Llm Factual Match](https://langwatch.ai/docs/api-reference/evaluators/llm-factual-match.md)
+- [Bleu Score](https://langwatch.ai/docs/api-reference/evaluators/bleu-score.md)
 - [Rouge Score](https://langwatch.ai/docs/api-reference/evaluators/rouge-score.md)
 - [Sql Query Equivalence](https://langwatch.ai/docs/api-reference/evaluators/sql-query-equivalence.md)
+- [Semantic Similarity Evaluator](https://langwatch.ai/docs/api-reference/evaluators/semantic-similarity-evaluator.md)
+
+### LLM as Judge
+
 - [Llm As A Judge Boolean Evaluator](https://langwatch.ai/docs/api-reference/evaluators/llm-as-a-judge-boolean-evaluator.md)
 - [Llm As A Judge Category Evaluator](https://langwatch.ai/docs/api-reference/evaluators/llm-as-a-judge-category-evaluator.md)
 - [Llm As A Judge Score Evaluator](https://langwatch.ai/docs/api-reference/evaluators/llm-as-a-judge-score-evaluator.md)
 - [Rubrics Based Scoring](https://langwatch.ai/docs/api-reference/evaluators/rubrics-based-scoring.md)
+- [Custom Basic Evaluator](https://langwatch.ai/docs/api-reference/evaluators/custom-basic-evaluator.md)
+- [Summarization Score](https://langwatch.ai/docs/api-reference/evaluators/summarization-score.md)
+
+### RAG Quality
+
 - [Ragas Answer Correctness](https://langwatch.ai/docs/api-reference/evaluators/ragas-answer-correctness.md)
 - [Ragas Answer Relevancy](https://langwatch.ai/docs/api-reference/evaluators/ragas-answer-relevancy.md)
 - [Ragas Context Precision](https://langwatch.ai/docs/api-reference/evaluators/ragas-context-precision.md)
@@ -120,25 +125,243 @@ Always navigate to docs links using the .md extension for better readability.
 - [Context F1](https://langwatch.ai/docs/api-reference/evaluators/context-f1.md)
 - [Context Precision](https://langwatch.ai/docs/api-reference/evaluators/context-precision.md)
 - [Context Recall](https://langwatch.ai/docs/api-reference/evaluators/context-recall.md)
+
+### Quality Aspects
+
+- [Lingua Language Detection](https://langwatch.ai/docs/api-reference/evaluators/lingua-language-detection.md)
+- [Valid Format Evaluator](https://langwatch.ai/docs/api-reference/evaluators/valid-format-evaluator.md)
+- [Off Topic Evaluator](https://langwatch.ai/docs/api-reference/evaluators/off-topic-evaluator.md)
+- [Query Resolution](https://langwatch.ai/docs/api-reference/evaluators/query-resolution.md)
+
+### Safety
+
 - [Azure Content Safety](https://langwatch.ai/docs/api-reference/evaluators/azure-content-safety.md)
 - [Azure Jailbreak Detection](https://langwatch.ai/docs/api-reference/evaluators/azure-jailbreak-detection.md)
 - [Azure Prompt Shield](https://langwatch.ai/docs/api-reference/evaluators/azure-prompt-shield.md)
 - [Openai Moderation](https://langwatch.ai/docs/api-reference/evaluators/openai-moderation.md)
 - [Presidio Pii Detection](https://langwatch.ai/docs/api-reference/evaluators/presidio-pii-detection.md)
-- [Custom Basic Evaluator](https://langwatch.ai/docs/api-reference/evaluators/custom-basic-evaluator.md)
 - [Competitor Blocklist](https://langwatch.ai/docs/api-reference/evaluators/competitor-blocklist.md)
 - [Competitor Allowlist Check](https://langwatch.ai/docs/api-reference/evaluators/competitor-allowlist-check.md)
 - [Competitor Llm Check](https://langwatch.ai/docs/api-reference/evaluators/competitor-llm-check.md)
-- [Off Topic Evaluator](https://langwatch.ai/docs/api-reference/evaluators/off-topic-evaluator.md)
-- [Query Resolution](https://langwatch.ai/docs/api-reference/evaluators/query-resolution.md)
-- [Semantic Similarity Evaluator](https://langwatch.ai/docs/api-reference/evaluators/semantic-similarity-evaluator.md)
-- [Summarization Score](https://langwatch.ai/docs/api-reference/evaluators/summarization-score.md)
-- [Valid Format Evaluator](https://langwatch.ai/docs/api-reference/evaluators/valid-format-evaluator.md)
-- [Lingua Language Detection](https://langwatch.ai/docs/api-reference/evaluators/lingua-language-detection.md)
 
-## Saved Evaluators
+## Evaluations v3
 
-- [Overview](https://langwatch.ai/docs/api-reference/saved-evaluators/overview.md): Manage saved evaluator configurations for your project
-- [List evaluators](https://langwatch.ai/docs/api-reference/saved-evaluators/get-evaluators.md)
-- [Get evaluator](https://langwatch.ai/docs/api-reference/saved-evaluators/get-evaluator.md)
-- [Create evaluator](https://langwatch.ai/docs/api-reference/saved-evaluators/create-evaluator.md)
+- [Overview](https://langwatch.ai/docs/api-reference/evaluations/overview.md): Run and monitor evaluation experiments. Start evaluation runs and poll for progress and results.
+- [Get evaluation run status](https://langwatch.ai/docs/api-reference/evaluations/get-runs.md)
+- [Create Run](https://langwatch.ai/docs/api-reference/evaluations/action-run.md)
+
+## Monitors
+
+- [Overview](https://langwatch.ai/docs/api-reference/monitors/overview.md): Manage online evaluation monitors that automatically evaluate traces as they arrive. Create, update, enable/disable, and delete monitors.
+- [List Monitors](https://langwatch.ai/docs/api-reference/monitors/list-monitors.md)
+- [Create a new online evaluation monitor](https://langwatch.ai/docs/api-reference/monitors/create-monitors.md)
+- [Get a monitor by its ID](https://langwatch.ai/docs/api-reference/monitors/get-monitors.md)
+- [Update a monitor](https://langwatch.ai/docs/api-reference/monitors/update-monitors.md)
+- [Enable or disable a monitor](https://langwatch.ai/docs/api-reference/monitors/action-toggle.md)
+- [Delete a monitor](https://langwatch.ai/docs/api-reference/monitors/delete-monitors.md)
+
+## Prompts
+
+- [Overview](https://langwatch.ai/docs/api-reference/prompts/overview.md): Prompts are used to manage and version your prompts
+- [Get prompts](https://langwatch.ai/docs/api-reference/prompts/get-prompts.md)
+- [List Tags](https://langwatch.ai/docs/api-reference/prompts/list-tags.md)
+- [Create prompt](https://langwatch.ai/docs/api-reference/prompts/create-prompt.md)
+- [Create Tags](https://langwatch.ai/docs/api-reference/prompts/create-tags.md)
+- [Get prompt](https://langwatch.ai/docs/api-reference/prompts/get-prompt.md)
+- [Get prompt versions](https://langwatch.ai/docs/api-reference/prompts/get-prompt-versions.md)
+- [Update prompt](https://langwatch.ai/docs/api-reference/prompts/update-prompt.md)
+- [Assign a tag](https://langwatch.ai/docs/api-reference/prompts/update-tags.md)
+- [Rename a prompt tag definition](https://langwatch.ai/docs/api-reference/prompts/put-update-tags.md)
+- [Sync/upsert a prompt with local content](https://langwatch.ai/docs/api-reference/prompts/action-sync.md)
+- [Restore a prompt to a previous version](https://langwatch.ai/docs/api-reference/prompts/action-restore.md)
+- [Delete prompt](https://langwatch.ai/docs/api-reference/prompts/delete-prompt.md)
+- [Delete Tags](https://langwatch.ai/docs/api-reference/prompts/delete-tags.md)
+
+## Annotations
+
+- [Overview](https://langwatch.ai/docs/api-reference/annotations/overview.md): Learn how annotations enhance trace review, labeling, and evaluation workflows for more reliable AI agent testing.
+- [Get annotations](https://langwatch.ai/docs/api-reference/annotations/get-annotation.md)
+- [Get single annotation](https://langwatch.ai/docs/api-reference/annotations/get-single-annotation.md)
+- [Get annotations for a trace](https://langwatch.ai/docs/api-reference/annotations/get-all-annotations-trace.md)
+- [Patch single annotation](https://langwatch.ai/docs/api-reference/annotations/patch-annotation.md)
+- [Create annotation for single trace](https://langwatch.ai/docs/api-reference/annotations/create-annotation-trace.md)
+- [Delete single annotation](https://langwatch.ai/docs/api-reference/annotations/delete-annotation.md)
+
+## Scenarios
+
+- [Overview](https://langwatch.ai/docs/api-reference/scenarios/overview.md): Manage test scenarios for agent simulations. Create, update, and organize scenarios that define test cases for your AI agents.
+- [Get all scenarios for a project](https://langwatch.ai/docs/api-reference/scenarios/list-scenarios.md)
+- [Create a new scenario](https://langwatch.ai/docs/api-reference/scenarios/create-scenarios.md)
+- [Get a specific scenario by ID](https://langwatch.ai/docs/api-reference/scenarios/get-scenarios.md)
+- [Update an existing scenario](https://langwatch.ai/docs/api-reference/scenarios/update-scenarios.md)
+- [Archive a scenario](https://langwatch.ai/docs/api-reference/scenarios/delete-scenarios.md)
+
+## Scenario Events
+
+- [Overview](https://langwatch.ai/docs/api-reference/scenario-events/overview.md): Create and manage scenario execution events to power the Simulations visualizer.
+- [Create a new scenario event](https://langwatch.ai/docs/api-reference/scenario-events/create-scenario-events.md)
+- [Delete all events](https://langwatch.ai/docs/api-reference/scenario-events/delete-scenario-events.md)
+
+## Simulation Runs
+
+- [Overview](https://langwatch.ai/docs/api-reference/simulation-runs/overview.md): Query simulation run results. List runs, get batch summaries, and retrieve individual run details.
+- [List Simulation Runs](https://langwatch.ai/docs/api-reference/simulation-runs/list-simulation-runs.md)
+- [List batch summaries for a scenario set](https://langwatch.ai/docs/api-reference/simulation-runs/list-list.md)
+- [Get a single simulation run by its ID](https://langwatch.ai/docs/api-reference/simulation-runs/get-simulation-runs.md)
+
+## Suites
+
+- [Overview](https://langwatch.ai/docs/api-reference/suites/overview.md): Manage test suites (run plans) that group scenarios for batch execution. Create, update, duplicate, and trigger suite runs.
+- [List all non-archived suites](https://langwatch.ai/docs/api-reference/suites/list-suites.md)
+- [Create a new suite](https://langwatch.ai/docs/api-reference/suites/create-suites.md)
+- [Get a suite](https://langwatch.ai/docs/api-reference/suites/get-suites.md)
+- [Update a suite](https://langwatch.ai/docs/api-reference/suites/update-suites.md)
+- [Duplicate a suite](https://langwatch.ai/docs/api-reference/suites/action-duplicate.md)
+- [Trigger a suite run](https://langwatch.ai/docs/api-reference/suites/action-run.md)
+- [Archive a suite](https://langwatch.ai/docs/api-reference/suites/delete-suites.md)
+
+## Agents
+
+- [Overview](https://langwatch.ai/docs/api-reference/agents/overview.md): Manage AI agent configurations. Create, update, and organize agents that are tracked and evaluated in LangWatch.
+- [List all non-archived agents for the project](https://langwatch.ai/docs/api-reference/agents/list-agents.md)
+- [Create a new agent](https://langwatch.ai/docs/api-reference/agents/create-agents.md)
+- [Get an agent by its id](https://langwatch.ai/docs/api-reference/agents/get-agents.md)
+- [Update an agent by its id](https://langwatch.ai/docs/api-reference/agents/update-agents.md)
+- [Archive an agent](https://langwatch.ai/docs/api-reference/agents/delete-agents.md)
+
+## Triggers
+
+- [Overview](https://langwatch.ai/docs/api-reference/triggers/overview.md): Manage automation triggers that fire actions based on trace events. Create Slack notifications, webhooks, and other automated responses.
+- [List all active triggers](https://langwatch.ai/docs/api-reference/triggers/list-triggers.md)
+- [Create a new trigger](https://langwatch.ai/docs/api-reference/triggers/create-triggers.md)
+- [Get a trigger by its ID](https://langwatch.ai/docs/api-reference/triggers/get-triggers.md)
+- [Update a trigger](https://langwatch.ai/docs/api-reference/triggers/update-triggers.md)
+- [Delete a trigger](https://langwatch.ai/docs/api-reference/triggers/delete-triggers.md)
+
+## Workflows
+
+- [Overview](https://langwatch.ai/docs/api-reference/workflows/overview.md): Manage Optimization Studio workflows. List, update, and archive workflows used for prompt optimization and agent design.
+- [List all non-archived workflows for the project](https://langwatch.ai/docs/api-reference/workflows/list-workflows.md)
+- [Get a workflow by its ID](https://langwatch.ai/docs/api-reference/workflows/get-workflows.md)
+- [Update a workflow's metadata](https://langwatch.ai/docs/api-reference/workflows/update-workflows.md)
+- [Archive a workflow](https://langwatch.ai/docs/api-reference/workflows/delete-workflows.md)
+
+## Dashboards
+
+- [Overview](https://langwatch.ai/docs/api-reference/dashboards/overview.md): Manage custom analytics dashboards. Create, reorder, and organize dashboards with custom graphs.
+- [List Dashboards](https://langwatch.ai/docs/api-reference/dashboards/list-dashboards.md)
+- [Create a new dashboard](https://langwatch.ai/docs/api-reference/dashboards/create-dashboards.md)
+- [Get a dashboard by its id, including its graphs](https://langwatch.ai/docs/api-reference/dashboards/get-dashboards.md)
+- [Reorder dashboards](https://langwatch.ai/docs/api-reference/dashboards/update-reorder.md)
+- [Rename a dashboard](https://langwatch.ai/docs/api-reference/dashboards/update-dashboards.md)
+- [Delete a dashboard and its graphs](https://langwatch.ai/docs/api-reference/dashboards/delete-dashboards.md)
+
+## Graphs
+
+- [Overview](https://langwatch.ai/docs/api-reference/graphs/overview.md): Manage custom analytics graphs within dashboards. Create, update, and configure graph visualizations.
+- [List Graphs](https://langwatch.ai/docs/api-reference/graphs/list-graphs.md)
+- [Create a custom graph on a dashboard](https://langwatch.ai/docs/api-reference/graphs/create-graphs.md)
+- [Get a custom graph by its ID](https://langwatch.ai/docs/api-reference/graphs/get-graphs.md)
+- [Update Graphs](https://langwatch.ai/docs/api-reference/graphs/update-graphs.md)
+- [Delete a custom graph](https://langwatch.ai/docs/api-reference/graphs/delete-graphs.md)
+
+## Analytics
+
+- [Overview](https://langwatch.ai/docs/api-reference/analytics/overview.md): Query analytics timeseries data with metrics, aggregations, and filters.
+- [Create Timeseries](https://langwatch.ai/docs/api-reference/analytics/create-timeseries.md)
+
+## Secrets
+
+- [Overview](https://langwatch.ai/docs/api-reference/secrets/overview.md): Manage project secrets used for external integrations. Values are encrypted at rest and never returned in API responses.
+- [List all secrets for the project](https://langwatch.ai/docs/api-reference/secrets/list-secrets.md)
+- [Create a new project secret](https://langwatch.ai/docs/api-reference/secrets/create-secrets.md)
+- [Get a secret by its ID](https://langwatch.ai/docs/api-reference/secrets/get-secrets.md)
+- [Update a secret's value](https://langwatch.ai/docs/api-reference/secrets/update-secrets.md)
+- [Delete a secret](https://langwatch.ai/docs/api-reference/secrets/delete-secrets.md)
+
+## Model Providers
+
+- [Overview](https://langwatch.ai/docs/api-reference/model-providers/overview.md): Manage model provider configurations (API keys for OpenAI, Anthropic, etc.) used across the platform.
+- [List Model Providers](https://langwatch.ai/docs/api-reference/model-providers/list-model-providers.md)
+- [Create or update a model provider](https://langwatch.ai/docs/api-reference/model-providers/update-model-providers.md)
+
+## Projects
+
+- [Overview](https://langwatch.ai/docs/api-reference/projects/overview.md): Create, list, update, and archive LangWatch projects programmatically. Designed for automated scaffolding and CI/CD pipelines.
+- [List projects](https://langwatch.ai/docs/api-reference/projects/list-projects.md)
+- [Create project](https://langwatch.ai/docs/api-reference/projects/create-project.md)
+- [Get project](https://langwatch.ai/docs/api-reference/projects/get-project.md)
+- [Update project](https://langwatch.ai/docs/api-reference/projects/update-project.md)
+- [Archive project](https://langwatch.ai/docs/api-reference/projects/archive-project.md)
+- [Get project API key](https://langwatch.ai/docs/api-reference/projects/get-api-key.md)
+- [Regenerate project API key](https://langwatch.ai/docs/api-reference/projects/regenerate-api-key.md)
+
+## Teams
+
+- [Overview](https://langwatch.ai/docs/api-reference/teams/overview.md): Create, list, update, and archive LangWatch teams programmatically. Designed for automated provisioning and cleanup of team structures.
+- [List teams](https://langwatch.ai/docs/api-reference/teams/list-teams.md)
+- [Create team](https://langwatch.ai/docs/api-reference/teams/create-team.md)
+- [Get team](https://langwatch.ai/docs/api-reference/teams/get-team.md)
+- [Update team](https://langwatch.ai/docs/api-reference/teams/update-team.md)
+- [Archive team](https://langwatch.ai/docs/api-reference/teams/archive-team.md)
+- [List team members](https://langwatch.ai/docs/api-reference/teams/list-members.md)
+- [Add team member](https://langwatch.ai/docs/api-reference/teams/add-member.md)
+- [Remove team member](https://langwatch.ai/docs/api-reference/teams/remove-member.md)
+- [List team projects](https://langwatch.ai/docs/api-reference/teams/list-projects.md)
+
+## Groups
+
+- [Overview](https://langwatch.ai/docs/api-reference/groups/overview.md): Create and manage access groups, their members, and role bindings via the REST API. Enterprise feature.
+- [List groups](https://langwatch.ai/docs/api-reference/groups/list-groups.md)
+- [Create group](https://langwatch.ai/docs/api-reference/groups/create-group.md)
+- [Get group](https://langwatch.ai/docs/api-reference/groups/get-group.md)
+- [Rename group](https://langwatch.ai/docs/api-reference/groups/rename-group.md)
+- [Delete group](https://langwatch.ai/docs/api-reference/groups/delete-group.md)
+- [List group members](https://langwatch.ai/docs/api-reference/groups/list-members.md)
+- [Add group member](https://langwatch.ai/docs/api-reference/groups/add-member.md)
+- [Remove group member](https://langwatch.ai/docs/api-reference/groups/remove-member.md)
+- [List group bindings](https://langwatch.ai/docs/api-reference/groups/list-bindings.md)
+- [Add group binding](https://langwatch.ai/docs/api-reference/groups/add-binding.md)
+- [Remove group binding](https://langwatch.ai/docs/api-reference/groups/remove-binding.md)
+
+## API Keys
+
+- [Overview](https://langwatch.ai/docs/api-reference/api-keys/overview.md): Create and manage API keys programmatically. Supports personal keys (user-scoped) and service keys (project-scoped, for automation).
+- [List API keys](https://langwatch.ai/docs/api-reference/api-keys/list-api-keys.md)
+- [Create API key](https://langwatch.ai/docs/api-reference/api-keys/create-api-key.md)
+- [Revoke API key](https://langwatch.ai/docs/api-reference/api-keys/revoke-api-key.md)
+
+## Gateway: Virtual Keys
+
+- [Overview](https://langwatch.ai/docs/api-reference/gateway-virtual-keys/overview.md): Manage virtual keys for the AI Gateway. Virtual keys abstract provider credentials and enable usage tracking, rate limiting, and access control.
+- [List virtual keys](https://langwatch.ai/docs/api-reference/gateway-virtual-keys/list-virtual-keys.md)
+- [Create virtual key](https://langwatch.ai/docs/api-reference/gateway-virtual-keys/create-virtual-key.md)
+- [Get virtual key](https://langwatch.ai/docs/api-reference/gateway-virtual-keys/get-virtual-key.md)
+- [Update virtual key](https://langwatch.ai/docs/api-reference/gateway-virtual-keys/update-virtual-key.md)
+- [Revoke virtual key](https://langwatch.ai/docs/api-reference/gateway-virtual-keys/revoke-virtual-key.md)
+- [Rotate virtual key secret](https://langwatch.ai/docs/api-reference/gateway-virtual-keys/rotate-virtual-key-secret.md)
+
+## Gateway: Provider Bindings
+
+- [Overview](https://langwatch.ai/docs/api-reference/gateway-providers/overview.md): Manage provider credential bindings for the AI Gateway. Bind model providers (OpenAI, Anthropic, etc.) to enable routing through the gateway.
+- [List provider bindings](https://langwatch.ai/docs/api-reference/gateway-providers/list-provider-bindings.md)
+- [Bind a model provider to the gateway](https://langwatch.ai/docs/api-reference/gateway-providers/bind-a-model-provider-to-the-gateway.md)
+- [Update provider binding](https://langwatch.ai/docs/api-reference/gateway-providers/update-provider-binding.md)
+- [Disable provider binding](https://langwatch.ai/docs/api-reference/gateway-providers/disable-provider-binding.md)
+
+## Gateway: Budgets
+
+- [Overview](https://langwatch.ai/docs/api-reference/gateway-budgets/overview.md): Manage spending budgets for the AI Gateway. Set cost limits per project, team, or virtual key with configurable time windows.
+- [List budgets applicable to the project](https://langwatch.ai/docs/api-reference/gateway-budgets/list-budgets-applicable-to-the-project.md)
+- [Create budget](https://langwatch.ai/docs/api-reference/gateway-budgets/create-budget.md)
+- [Update budget](https://langwatch.ai/docs/api-reference/gateway-budgets/update-budget.md)
+- [Archive budget](https://langwatch.ai/docs/api-reference/gateway-budgets/archive-budget.md)
+
+## Gateway: Cache Rules
+
+- [Overview](https://langwatch.ai/docs/api-reference/gateway-cache-rules/overview.md): Manage cache-control rules for the AI Gateway. Configure semantic caching to reduce latency and costs for repeated queries.
+- [List cache-control rules](https://langwatch.ai/docs/api-reference/gateway-cache-rules/list-cache-control-rules.md)
+- [Create a cache rule](https://langwatch.ai/docs/api-reference/gateway-cache-rules/create-a-cache-rule.md)
+- [Get a cache rule](https://langwatch.ai/docs/api-reference/gateway-cache-rules/get-a-cache-rule.md)
+- [Update a cache rule](https://langwatch.ai/docs/api-reference/gateway-cache-rules/update-a-cache-rule.md)
+- [Archive a cache rule](https://langwatch.ai/docs/api-reference/gateway-cache-rules/archive-a-cache-rule.md)

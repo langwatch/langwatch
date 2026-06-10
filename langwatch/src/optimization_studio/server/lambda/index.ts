@@ -12,11 +12,26 @@ import {
   UpdateFunctionCodeCommand,
 } from "@aws-sdk/client-lambda";
 import { env } from "../../../env.mjs";
+import { TtlCache } from "../../../server/utils/ttlCache";
+import {
+  STAGED_PAYLOAD_HEADER,
+  deleteStagedObject,
+  stagePayloadToS3,
+  type StagedObject,
+} from "../../../server/s3/stagePayload";
 import { createLogger } from "../../../utils/logger/server";
 import { captureException } from "../../../utils/posthogErrorCapture";
 import type { StudioClientEvent } from "../../types/events";
 
 const logger = createLogger("langwatch:langwatch-nlp-lambda");
+
+/** S3 key prefix for staged studio invoke payloads (separate from the
+ *  langevals-staging prefix so bucket lifecycle rules can target each). */
+const STUDIO_STAGING_PREFIX = "studio-staging";
+
+/** Fallback staging threshold when LANGEVALS_STAGING_THRESHOLD_BYTES is unset.
+ *  Sits below the 6 MB Lambda invoke cap with margin for the invoke envelope. */
+const STUDIO_INVOKE_STAGING_THRESHOLD_BYTES = 5 * 1024 * 1024;
 
 /**
  * Strip secrets from a studio event before passing to error reporters.
@@ -327,12 +342,101 @@ const updateProjectLambdaImage = async (
   return response;
 };
 
+// Cluster-wide ARN cache, plus per-pod single-flight.
+//
+// Why this exists: getProjectLambdaArn() issues 2-N AWS Lambda control-plane
+// calls (GetFunction + poll loop) per invocation. Under a single tenant's
+// event burst, langwatch-workers fans this out across the pod's fastq slots
+// (GLOBAL_QUEUE_CONCURRENCY=100), each call hitting the same per-project
+// function. AWS Lambda's GetFunction quota is *regional* and shared across
+// every pod in the cluster, so one chatty project can exhaust it and trigger
+// CallerRateLimitExceeded for every worker in the region. Each retried call
+// then burns 4-12s of fastq budget against a 429, pinning all 100 slots and
+// stalling every other group on the pod — including unrelated fold groups
+// like projectDailySdkUsage/<date>:other:. See
+// specs/nlp-go/studio-lambda-cache.feature.
+//
+// Two layers:
+//
+//   1. Redis-backed cache via TtlCache (cluster-wide; first miss anywhere
+//      in the fleet warms every other pod). Falls back to per-pod memory
+//      automatically when Redis is unavailable.
+//
+//   2. In-process single-flight on cache misses (per-pod). Without this, a
+//      100-event burst from one project on one pod produces 100 parallel
+//      GetFunction calls before any of them populates the shared cache.
+//
+// The cache key is projectId, and the cached payload includes image_uri so
+// a deploy (which bumps image_uri) auto-invalidates without any extra
+// plumbing — readers compare to the current config.image_uri and treat a
+// mismatch as a miss, re-running the UpdateFunctionCode path.
+//
+// Failures are NOT cached: a TooManyRequestsException must self-heal on
+// the next call so we don't pin a stale rejection cluster-wide.
+//
+// TTL: 10 min is long enough to absorb minute-scale bursts and short
+// enough that any out-of-band drift (manual console edit, rebuilt image)
+// self-heals within the window.
+export const LAMBDA_ARN_CACHE_TTL_MS = 10 * 60 * 1000;
+
+type LambdaArnCacheEntry = { arn: string; imageUri: string };
+
+const lambdaArnCache = new TtlCache<LambdaArnCacheEntry>(
+  LAMBDA_ARN_CACHE_TTL_MS,
+  "lambda_arn:",
+);
+const inFlightLambdaArn = new Map<string, Promise<string>>();
+// Tracks the projectIds we've written to lambdaArnCache so clear() (test/ops)
+// can wipe them without needing a SCAN. Only grows on cache writes.
+const trackedProjectIds = new Set<string>();
+
+/** Test/ops helper: drop all cached ARNs (e.g. on config rotation). */
+export const clearLambdaArnCache = async (): Promise<void> => {
+  inFlightLambdaArn.clear();
+  const ids = [...trackedProjectIds];
+  trackedProjectIds.clear();
+  await Promise.all(ids.map((id) => lambdaArnCache.delete(id)));
+};
+
 export const getProjectLambdaArn = async (
   projectId: string,
 ): Promise<string> => {
   const config = parseLambdaConfig();
-  const lambda = createLambdaClient();
   const functionName = `langwatch_nlp-${projectId}`;
+
+  const cached = await lambdaArnCache.get(projectId);
+  if (cached && cached.imageUri === config.image_uri) {
+    return cached.arn;
+  }
+
+  // Single-flight: collapse concurrent misses on this pod for the same
+  // projectId onto one in-flight resolution. The Redis cache is shared,
+  // but a cold burst can still race before the first writer lands; this
+  // closes that per-pod window.
+  const existing = inFlightLambdaArn.get(projectId);
+  if (existing) return existing;
+
+  const resolution = (async () => {
+    try {
+      const arn = await resolveProjectLambdaArn(projectId, config, functionName);
+      trackedProjectIds.add(projectId);
+      await lambdaArnCache.set(projectId, { arn, imageUri: config.image_uri });
+      return arn;
+    } finally {
+      inFlightLambdaArn.delete(projectId);
+    }
+  })();
+
+  inFlightLambdaArn.set(projectId, resolution);
+  return resolution;
+};
+
+const resolveProjectLambdaArn = async (
+  projectId: string,
+  config: LangWatchLambdaConfig,
+  functionName: string,
+): Promise<string> => {
+  const lambda = createLambdaClient();
 
   // Check if Lambda exists
   let lambdaConfig = await checkLambdaExists(lambda, functionName).catch(
@@ -425,16 +529,23 @@ export const invokeLambda = async (
     path?: string;
     /** Extra headers merged after the defaults (e.g. X-LangWatch-Origin). */
     headers?: Record<string, string>;
+    /** When true, an oversized invoke body is offloaded to S3 and replaced
+     *  with an X-Payload-S3-URL header so it doesn't hit the 6 MB Lambda
+     *  invoke cap. Only set this for receivers that fetch the header (the Go
+     *  engine — services/nlpgo/adapters/httpapi/staged_payload.go). The legacy
+     *  Python handler does not, so leave it false there. */
+    supportsStaging?: boolean;
   } = {},
 ): Promise<ReadableStreamDefaultReader<Uint8Array>> => {
   const path = options.path ?? "/studio/execute";
-  const payload = {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(s3CacheKey ? { "X-S3-Cache-Key": s3CacheKey } : {}),
+    ...(options.headers ?? {}),
+  };
+  const payload: { body: string; headers: Record<string, string> } = {
     body: JSON.stringify(event),
-    headers: {
-      "Content-Type": "application/json",
-      ...(s3CacheKey ? { "X-S3-Cache-Key": s3CacheKey } : {}),
-      ...(options.headers ?? {}),
-    },
+    headers,
   };
 
   // Check if we should use the new dynamic Lambda approach
@@ -444,23 +555,66 @@ export const invokeLambda = async (
     // Get the project-specific Lambda ARN
     const functionArn = await getProjectLambdaArn(projectId);
 
+    // Build the full Lambda invoke Payload. The 6 MB synchronous-invoke cap
+    // applies to THIS serialized envelope — where `body` is embedded as a
+    // JSON-escaped string (quotes/backslashes doubled) plus the rawPath /
+    // requestContext / headers overhead — not to the raw event body. So a
+    // heavy dataset row fails before our code runs with "Request must be
+    // smaller than 6291456 bytes".
+    const buildInvokeBody = (p: {
+      body: string;
+      headers: Record<string, string>;
+    }) =>
+      JSON.stringify({
+        rawPath: path,
+        requestContext: { http: { method: "POST" } },
+        ...p,
+      });
+
+    // When the receiver can fetch a presigned URL, offload the body to S3 and
+    // invoke with an empty body + the staged header instead. The object is
+    // deleted once the response stream completes. The staging decision is made
+    // against the ACTUAL invoke-envelope size (post-escaping), so a body that
+    // only crosses the cap after escaping is still offloaded.
+    let stagedInvoke: StagedObject | null = null;
+    let invokeBody = buildInvokeBody(payload);
+    if (options.supportsStaging) {
+      const invokeBytes = Buffer.byteLength(invokeBody, "utf-8");
+      const threshold =
+        env.LANGEVALS_STAGING_THRESHOLD_BYTES ?? STUDIO_INVOKE_STAGING_THRESHOLD_BYTES;
+      if (invokeBytes > threshold) {
+        stagedInvoke = await stagePayloadToS3({
+          projectId,
+          keyPrefix: `${STUDIO_STAGING_PREFIX}/${projectId}`,
+          serialized: Buffer.from(payload.body, "utf-8"),
+          ttlSeconds: env.LANGEVALS_STAGING_TTL_SECONDS,
+        });
+        logger.info(
+          { projectId, path, invokeBytes, thresholdBytes: threshold },
+          "staged oversized studio invoke payload via presigned S3 URL",
+        );
+        invokeBody = buildInvokeBody({
+          body: "",
+          headers: {
+            ...payload.headers,
+            [STAGED_PAYLOAD_HEADER]: stagedInvoke.stagedUrl,
+          },
+        });
+      }
+    }
+
     const command = new InvokeWithResponseStreamCommand({
       FunctionName: functionArn,
       InvocationType: "RequestResponse",
-      Payload: JSON.stringify({
-        rawPath: path,
-        requestContext: {
-          http: {
-            method: "POST",
-          },
-        },
-        ...payload,
-      }),
+      Payload: invokeBody,
     });
 
     const { EventStream } = await lambda.send(command);
 
     if (!EventStream) {
+      if (stagedInvoke) {
+        await deleteStagedObject({ ...stagedInvoke, projectId });
+      }
       throw new Error("No payload received from Lambda");
     }
 
@@ -557,6 +711,15 @@ export const invokeLambda = async (
         } catch (error) {
           logger.error({ error }, "failed to run workflow stream");
           controller.error(error);
+        } finally {
+          // The Go engine has fetched the staged payload during request
+          // handling by the time the stream completes, so the object is no
+          // longer needed. Staged bodies carry customer trace data and
+          // provider credentials, so delete promptly rather than relying on
+          // the bucket lifecycle rule (the orphan/crash fallback).
+          if (stagedInvoke) {
+            await deleteStagedObject({ ...stagedInvoke, projectId });
+          }
         }
       },
     });

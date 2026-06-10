@@ -1,0 +1,134 @@
+---
+title: Governance CLI
+description: langwatch governance <resource> <verb>, a thin shell over the governance REST API for agentic workflows. Same auth as the rest of the CLI, same RBAC, same audit-row emission. Tagged with surface=cli for incident response.
+sidebarTitle: CLI
+---
+
+<Info>**Pairs with:** [Governance REST API](/ai-governance/api) (the CLI is a thin shell over it; both call into the same service-layer functions) and [Governance MCP server](/ai-governance/mcp) (same surface for agent invocation). Distinct from [`langwatch ingest …`](/ai-governance/cli-debug): that namespace is for debugging ingestion sources; `langwatch governance …` is for managing every governance resource.</Info>
+
+<Note>**Agentic-first by design.** Per `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`, every governance feature exposes the full CRUD verb set under `langwatch governance <resource> <verb>`. The CLI is built so a customer can fully set up governance via an agent (Claude Code, Codex, Cursor) without ever opening the dashboard, useful for self-hosted onboarding scripts, CI/CD pipelines, and runbook automations.</Note>
+
+## Why a `langwatch governance …` namespace
+
+LangWatch already has top-level CLI commands for trace ingestion (`langwatch ingest …`), projects (`langwatch projects …`), and login (`langwatch login`). Governance gets its own namespace because:
+
+- **Discoverability**: `langwatch governance --help` lists every governance resource as a sub-command, so an agent (or a human) can enumerate the surface without prior knowledge.
+- **No collision**: top-level resource names like `members`, `invites`, `sessions` would overlap with non-governance concepts in a flat layout. Namespacing keeps them unambiguous.
+- **One mental model**: every governance verb sits under one prefix; once you know `langwatch governance anomaly-rules list`, you know the shape of every command in the namespace.
+
+## Availability
+
+Once you install the CLI, the `governance` subcommand is available out of the box, no env flag needed. Per-account governance entitlement is enforced server-side: if your account doesn't have governance enabled, the server returns a clear error pointing you at your admin.
+
+```bash
+langwatch governance --help
+```
+
+## Help discovery
+
+```bash
+langwatch governance --help
+# Manage governance resources (ingestion templates, ingestion keys)
+# from the CLI. Mirrors the public REST surface at /api/governance/*, every
+# mutating call lands an audit row with metadata.surface='cli'.
+#
+# Commands:
+#   status               Show the org's governance setup-state OR-of-flags.
+#   ingestion-templates  CRUD on IngestionTemplate rows.
+#   ingestion-keys       Manage ingestion keys (project-scoped ingest-only ApiKeys).
+
+langwatch governance ingestion-templates --help
+# Verbs:
+#   list                Read enabled templates visible to the caller's org.
+#   admin-list          Read includes ottl_rules and disabled rows (admin shape).
+#   get <id>            Get one template by id.
+#   create              Create a new org-authored template.
+#   update-ottl-rules   Replace ottl_rules on an org-authored template.
+#   archive <id>        Soft-archive an org-authored template.
+#   clone-from-platform Clone a platform template into the caller's org.
+```
+
+The actual help-text strings + command tree land in `typescript-sdk/src/cli/commands/governance/` and `typescript-sdk/src/cli/index.ts` (Lane-B at `ed51b0ea1`).
+
+## Authentication
+
+The CLI uses the same `apiKey` resolution as `langwatch projects list`, once you've signed in via `langwatch login` your session lives at `~/.langwatch/sessions/<endpoint>.json`, and every governance command authenticates with that session's apiKey automatically.
+
+```bash
+langwatch login
+# Browser opens, you sign in, session persisted at ~/.langwatch/sessions/<endpoint>.json
+
+langwatch governance virtual-keys list
+# Authenticates with the session apiKey; per-record filter applied at the
+# service layer based on the apiKey's RBAC scopes.
+```
+
+If your apiKey is scoped narrowly (e.g. `governance:read` only), `list` succeeds but `create`, `update`, `delete` exits non-zero with a `FORBIDDEN` error message naming the missing scope.
+
+## Output formats
+
+```bash
+langwatch governance ingestion-templates list
+# Default: human-readable table
+
+langwatch governance ingestion-templates list --json
+# One JSON object per record on stdout, suitable for piping through jq:
+langwatch governance ingestion-templates list --json | jq '.[] | select(.source_type=="claude_code")'
+```
+
+Use `--json` in scripts and CI; the human table is for interactive exploration.
+
+## Resource × verb matrix (v1 preview)
+
+The first preview ships with the two governance resources Sergey wired through Hono REST + service-layer + repository (Ask B-1 through B-7). Additional resources fold into the same `langwatch governance <resource> <verb>` namespace as the umbrella spec's coverage extends.
+
+| Resource | Verbs (shipped in preview) | RBAC |
+|---|---|---|
+| `status` | `status` (top-level, no verb tree, prints setup-state OR-of-flags) | `aiTools:view` |
+| `ingestion-templates` | `list` `admin-list` `get` `create` `update-ottl-rules` `archive` `clone-from-platform` | `aiTools:view` (reads), `aiTools:manage` (writes) |
+| `ingestion-keys` | `list` `mint` `rotate` (project-scoped ingest-only ApiKeys, `sk-lw-` token returned once at mint) | `aiTools:manage` |
+
+Resources expected to fold into the same namespace as their REST surfaces ship: `anomaly-rules`, `audit-log`, `gateway-budgets`, `ingestion-sources`, `members`, `invites`, `role-bindings`, `ai-tool-entries`, `sessions`, `virtual-keys`. The CLI is built so adding a new resource is a `commands/governance/<resource>.ts` file plus a `governanceCmd.command(...)` wiring in `typescript-sdk/src/cli/index.ts`.
+
+## Audit emission
+
+Every state-changing CLI invocation emits an audit row with `AuditLog.metadata.surface = "cli"`. The CLI is a REST shell, it calls `/api/governance/*` and sends the `X-LangWatch-Surface: cli` request header. The Hono backend's `resolveSurfaceFromRequest` helper reads the header, validates it against the `GovernanceCallSurface` enum (in-process spoofing of `trpc`, `mcp` is rejected at the enum filter), and threads the value into the service-layer `surface` parameter Sergey wired at `fc6d54100`. The payload shape is identical to a Hono REST audit row apart from the surface field.
+
+The header-validating Hono helper + the 7 mutation call-sites switching from hardcoded `'hono'` to `resolveSurfaceFromRequest(req)` ship in Lane-B's CLI scaffold at `ed51b0ea1`. The `X-LangWatch-Surface: cli` constant lives at `typescript-sdk/src/cli/utils/governance/surface.ts`.
+
+```bash
+langwatch governance audit-log query --filter 'surface=cli' --since '24h ago'
+```
+
+## Setup-from-scratch via agent (v1 preview)
+
+The end-state, what the umbrella spec calls the "agentic dogfood gate", is that an agent can fully configure governance for a fresh org by chaining CLI commands. The v1 preview ships the IngestionTemplate authoring + ingestion-key mint slice; budgets, anomaly-rules, audit-log fold in as their CLI surfaces ship.
+
+```bash
+# 1. List existing platform templates (admin shape, includes ottl_rules)
+langwatch governance ingestion-templates admin-list --json
+
+# 2. Clone the claude_code template into the org for customisation
+#    (POST /api/governance/ingestion-templates/clone, auto-derives org from the apiKey's project)
+langwatch governance ingestion-templates clone-from-platform \
+    --source-template-id <platform-claude-code-id> \
+    --json
+
+# 3. Refine the cloned template's OTTL rules (admin only)
+langwatch governance ingestion-templates update-ottl-rules <new-template-id> \
+    --rules-file ./acme-claude-code.ottl --json
+
+# 4. Verify the org-authored row is now live
+langwatch governance ingestion-templates list --json | jq '.[] | select(.organization_id != null)'
+```
+
+The same script runs against SaaS or self-hosted deployments, the CLI's `~/.langwatch/sessions/<endpoint>.json` per-endpoint session resolution handles both transparently.
+
+## Cross-references
+
+- [Governance REST API](/ai-governance/api): the API the CLI shells over
+- [Governance MCP server](/ai-governance/mcp): same surface for agent, MCP-client invocation
+- [`langwatch ingest …`](/ai-governance/cli-debug): separate namespace for ingestion-source debugging
+- [Roles and permissions](/ai-governance/roles-and-permissions): RBAC scopes the CLI enforces
+- [Audit log](/ai-governance/audit-log): where state-change rows land
+- Spec, `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`

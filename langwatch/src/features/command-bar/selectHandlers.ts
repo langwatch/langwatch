@@ -71,6 +71,14 @@ export function handleCommandSelect(
     return;
   }
 
+  // Generic action callback. Used by dynamically synthesized commands that
+  // own their own behavior (e.g. dev-mode feature flag toggles). The bar
+  // stays open so a user can fire several toggles in a row.
+  if (cmd.action) {
+    cmd.action();
+    return;
+  }
+
   switch (cmd.id) {
     case "action-new-agent":
       ctx.close();
@@ -98,6 +106,10 @@ export function handleCommandSelect(
     case "action-send-trace":
       ctx.close();
       openDrawer("foundry");
+      break;
+    case "action-feature-flags":
+      ctx.close();
+      openDrawer("featureFlags");
       break;
   }
 }

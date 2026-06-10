@@ -16,12 +16,12 @@ import (
 // captureCall is a one-shot httptest fixture that records the inbound
 // request and replies with whatever the test wants.
 type captureCall struct {
-	method        string
-	path          string
-	authToken     string
-	traceID       string
-	origin        string
-	requestBody   map[string]any
+	method      string
+	path        string
+	authToken   string
+	traceID     string
+	origin      string
+	requestBody map[string]any
 }
 
 func newServer(t *testing.T, status int, response any, capture *captureCall) *httptest.Server {
@@ -184,7 +184,7 @@ func TestExecute_ErrorResultStatusErrorAndDetails(t *testing.T) {
 
 func TestExecute_NonJSONErrorBodyPropagatesAsHTTPError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte("internal server error"))
 	}))
 	defer srv.Close()
@@ -203,11 +203,99 @@ func TestExecute_NonJSONErrorBodyPropagatesAsHTTPError(t *testing.T) {
 	if !errors.As(err, &httpErr) {
 		t.Fatalf("Execute: error = %v, want *HTTPError", err)
 	}
-	if httpErr.StatusCode != 500 {
+	if httpErr.StatusCode != http.StatusInternalServerError {
 		t.Errorf("StatusCode = %d, want 500", httpErr.StatusCode)
 	}
 	if !strings.Contains(httpErr.Body, "internal server error") {
 		t.Errorf("Body = %q, want body preview", httpErr.Body)
+	}
+}
+
+// Saved + workflow evaluators own their input typing (bool, float, int,
+// dict, json_schema) and the app resolves them against the evaluator's
+// declared inputs. The langevals/* coercion path stringifies non-strings
+// so the receiving Pydantic schema accepts them — applying the same
+// stringification to a workflow evaluator would silently destroy the
+// caller's declared types. This test pins the boundary.
+func TestExecute_CustomAndSavedSlugsPassDataThroughUnchanged(t *testing.T) {
+	cases := []struct {
+		name string
+		slug string
+	}{
+		{"saved evaluator slug", "evaluators/saved-eval-id"},
+		{"custom workflow evaluator slug", "custom/workflow-id-abc"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			capture := &captureCall{}
+			srv := newServer(t, 200, map[string]any{"status": "processed"}, capture)
+
+			exec := evaluatorblock.New(evaluatorblock.Options{})
+			_, err := exec.Execute(context.Background(), evaluatorblock.Request{
+				BaseURL:       srv.URL,
+				APIKey:        "k",
+				EvaluatorSlug: tc.slug,
+				Data: map[string]any{
+					"flag":      true,
+					"threshold": 0.5,
+					"limit":     42,
+					"shape":     map[string]any{"a": 1},
+				},
+			})
+			if err != nil {
+				t.Fatalf("Execute: %v", err)
+			}
+			data, ok := capture.requestBody["data"].(map[string]any)
+			if !ok {
+				t.Fatalf("body.data missing or wrong shape: %v", capture.requestBody["data"])
+			}
+			// JSON round-trip turns the bool into true (not "true"), int
+			// into float64 42 (not "42"), and the map stays a map.
+			if got, ok := data["flag"].(bool); !ok || got != true {
+				t.Errorf("flag = %v (%T), want true (bool, unchanged)", data["flag"], data["flag"])
+			}
+			if got, ok := data["threshold"].(float64); !ok || got != 0.5 {
+				t.Errorf("threshold = %v (%T), want 0.5 (float64, unchanged)", data["threshold"], data["threshold"])
+			}
+			if got, ok := data["limit"].(float64); !ok || got != 42 {
+				t.Errorf("limit = %v (%T), want 42 (float64, unchanged)", data["limit"], data["limit"])
+			}
+			if shape, ok := data["shape"].(map[string]any); !ok || shape["a"] != float64(1) {
+				t.Errorf("shape = %v, want map preserved unchanged", data["shape"])
+			}
+		})
+	}
+}
+
+// Langevals/* slugs MUST still be coerced — the receiving Pydantic schema
+// types every field as `str`. This pairs with the pass-through test above
+// to pin the boundary from both sides.
+func TestExecute_LangevalsSlugStillCoercesData(t *testing.T) {
+	capture := &captureCall{}
+	srv := newServer(t, 200, map[string]any{"status": "processed"}, capture)
+
+	exec := evaluatorblock.New(evaluatorblock.Options{})
+	_, err := exec.Execute(context.Background(), evaluatorblock.Request{
+		BaseURL:       srv.URL,
+		APIKey:        "k",
+		EvaluatorSlug: "langevals/exact_match",
+		Data: map[string]any{
+			"output":          true,
+			"expected_output": "1",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	data, ok := capture.requestBody["data"].(map[string]any)
+	if !ok {
+		t.Fatalf("body.data missing or wrong shape: %v", capture.requestBody["data"])
+	}
+	if got, ok := data["output"].(string); !ok || got != "true" {
+		t.Errorf("output = %v (%T), want \"true\" (string, coerced)", data["output"], data["output"])
+	}
+	if got, ok := data["expected_output"].(string); !ok || got != "1" {
+		t.Errorf("expected_output = %v (%T), want \"1\" (string passthrough)", data["expected_output"], data["expected_output"])
 	}
 }
 

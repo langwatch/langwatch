@@ -19,6 +19,7 @@ export type SideMenuItemProps = {
   showLabel?: boolean;
   rightElement?: React.ReactNode;
   beta?: string | boolean;
+  betaLabel?: string;
 };
 
 const DEFAULT_BETA_MESSAGE = "This feature is in beta";
@@ -32,9 +33,11 @@ export const SideMenuItem = ({
   showLabel = true,
   rightElement,
   beta,
+  betaLabel,
 }: SideMenuItemProps) => {
   const betaPill = beta ? (
     <BetaPill
+      label={betaLabel}
       message={
         <Text fontSize="sm">
           {typeof beta === "string" ? beta : DEFAULT_BETA_MESSAGE}
@@ -136,6 +139,7 @@ export const SideMenuLink = ({
   onClick,
   showLabel = true,
   beta,
+  betaLabel,
 }: SideMenuLinkProps) => {
   return (
     <Link
@@ -158,6 +162,7 @@ export const SideMenuLink = ({
         badgeNumber={badgeNumber}
         showLabel={showLabel}
         beta={beta}
+        betaLabel={betaLabel}
       />
     </Link>
   );

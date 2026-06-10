@@ -7,9 +7,9 @@ import type {
   OtlpSpan,
 } from "../../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import {
+  type BatchClearPIIFunction,
   DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH,
   OtlpSpanPiiRedactionService,
-  type BatchClearPIIFunction,
 } from "../span-pii-redaction.service";
 
 vi.mock("~/server/background/workers/collector/piiCheck", () => ({
@@ -118,18 +118,18 @@ describe("OtlpSpanPiiRedactionService", () => {
     });
 
     describe("when piiRedactionLevel is ESSENTIAL or STRICT", () => {
-      it.each(["ESSENTIAL", "STRICT"] as PIIRedactionLevel[])(
-        "redacts gen_ai.prompt attribute when level is %s",
-        async (level) => {
-          const span = createMockOtlpSpan([
-            { key: "gen_ai.prompt", value: { stringValue: "user@email.com" } },
-          ]);
+      it.each([
+        "ESSENTIAL",
+        "STRICT",
+      ] as PIIRedactionLevel[])("redacts gen_ai.prompt attribute when level is %s", async (level) => {
+        const span = createMockOtlpSpan([
+          { key: "gen_ai.prompt", value: { stringValue: "user@email.com" } },
+        ]);
 
-          await service.redactSpan(span, null, level);
+        await service.redactSpan(span, null, level);
 
-          expect(span.attributes[0]!.value.stringValue).toBe("[REDACTED]");
-        },
-      );
+        expect(span.attributes[0]!.value.stringValue).toBe("[REDACTED]");
+      });
 
       it("redacts gen_ai.completion attribute", async () => {
         const span = createMockOtlpSpan([

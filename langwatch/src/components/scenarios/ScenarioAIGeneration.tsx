@@ -1,4 +1,5 @@
 import {
+  Alert,
   Box,
   Button,
   Card,
@@ -15,6 +16,7 @@ import { useCallback, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { useModelProvidersSettings } from "../../hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { api } from "../../utils/api";
 import { createLogger } from "../../utils/logger";
 import { toaster } from "../ui/toaster";
 import type { ScenarioFormData } from "./ScenarioForm";
@@ -126,10 +128,16 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
     projectId: project?.id,
   });
 
+  // Cascade-resolved model for scenario generation.
+  const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
+    { projectId: project?.id ?? "", featureKey: "scenarios.generator" },
+    { enabled: !!project?.id },
+  );
+
   const defaultModelState = getDefaultModelState({
     hasEnabledProviders,
     providers,
-    defaultModel: project?.defaultModel,
+    defaultModel: resolvedDefault.data?.model,
   });
 
   const isDefaultModelDisabled = !defaultModelState.ok;
@@ -410,29 +418,29 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
 
 function DefaultModelErrorBanner({ children }: { children: React.ReactNode }) {
   return (
-    <VStack
-      gap={2}
-      padding={2}
-      bg="orange.50"
-      borderRadius="md"
-      fontSize="xs"
-      color="orange.700"
-      align="flex-start"
-    >
-      <HStack gap={2} align="flex-start">
-        <Icon as={AlertTriangle} boxSize={3} flexShrink={0} mt="1px" />
-        <Text>{children}</Text>
-      </HStack>
-      <Button colorPalette="blue" asChild size="sm">
-        <a
-          data-testid="scenario-ai-configure-default-model-button"
-          href="/settings/model-providers"
-          target="_blank"
-          rel="noopener noreferrer"
+    <Alert.Root status="warning" fontSize="xs" alignItems="flex-start">
+      <Alert.Indicator>
+        <Icon as={AlertTriangle} boxSize={3} />
+      </Alert.Indicator>
+      <Alert.Content gap={2}>
+        <Alert.Description>{children}</Alert.Description>
+        <Button
+          colorPalette="blue"
+          color="white"
+          asChild
+          size="sm"
+          alignSelf="flex-start"
         >
-          Configure default model
-        </a>
-      </Button>
-    </VStack>
+          <a
+            data-testid="scenario-ai-configure-default-model-button"
+            href="/settings/model-providers"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Configure default model
+          </a>
+        </Button>
+      </Alert.Content>
+    </Alert.Root>
   );
 }

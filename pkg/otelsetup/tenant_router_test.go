@@ -227,3 +227,24 @@ func TestTenantRouter_ShutdownFansOut(t *testing.T) {
 func apiKeyForIdx(i int) string {
 	return "key-tenant-" + string(rune('A'+i))
 }
+
+// TestNewSyncTenantProcessor_BuildsSimpleProcessor verifies the sync
+// processor constructor returns a SpanProcessor backed by the OTLP
+// exporter. Failure mode it pins: a regression that accidentally
+// reverts the SyncExport path to BatchSpanProcessor would silently
+// reintroduce the 5s scheduled-delay flake window in the integration
+// test that opts into NLPGO_SPAN_SYNC.
+func TestNewSyncTenantProcessor_BuildsSimpleProcessor(t *testing.T) {
+	proc, err := newSyncTenantProcessor(
+		"http://127.0.0.1:0/api/otel/v1/traces",
+		"unit-test-key",
+	)
+	require.NoError(t, err)
+	require.NotNil(t, proc)
+	// SimpleSpanProcessor doesn't expose its type publicly, so we
+	// assert the behavioral contract: Shutdown on a SimpleSpanProcessor
+	// returns nil for a never-used exporter.
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	assert.NoError(t, proc.Shutdown(ctx))
+}

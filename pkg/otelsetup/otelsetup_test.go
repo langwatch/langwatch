@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	otelapi "go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
@@ -62,6 +63,44 @@ func TestStartupErrorHandler_PassesAuthErrorsAfterGraceWindowElapses(t *testing.
 
 	if len(captured.errs) != 1 || !errors.Is(captured.errs[0], authErr) {
 		t.Fatalf("expected post-grace auth error to surface, got: %v", captured.errs)
+	}
+}
+
+// TestNew_StartupErrorHandlerHasConcreteDelegate pins the fix for the
+// 2026-05-18 incident. Previous code captured otelapi.GetErrorHandler()
+// as the filter's delegate, then registered the filter as the global
+// handler. GetErrorHandler() returns the singleton *ErrDelegator which
+// forwards to whichever handler is currently registered — so the
+// delegate pointed back to the filter itself, and every dispatched OTel
+// error recursed (filter → delegator → filter → …) until the goroutine
+// stack overflowed at 1 GiB and the process exited with code 2. With a
+// flapping OTLP collector this took the gateway down within seconds.
+//
+// The fix in New() uses a concrete slogErrorHandler{} as the fallback,
+// so the recursion is impossible by construction. This test asserts the
+// wiring intent — the registered filter's delegate must be a leaf
+// handler that does not call back into OTel globals. Asserting on the
+// concrete type is the right granularity because the bug was a
+// structural mistake at construction time, not a behavioral mistake in
+// the filter's Handle code.
+//
+/** @scenario dispatched OTel error invokes the registered handler exactly once */
+func TestNew_StartupErrorHandlerHasConcreteDelegate(t *testing.T) {
+	ctx := context.Background()
+	// Endpoint just needs to parse — otlptracehttp.New is lazy and does
+	// not connect at construction time, so an unreachable host is fine.
+	p, err := New(ctx, Options{OTLPEndpoint: "http://localhost:1/v1/traces"})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	t.Cleanup(func() { _ = p.Shutdown(ctx) })
+
+	h, ok := otelapi.GetErrorHandler().(*startupErrorHandler)
+	if !ok {
+		t.Fatalf("expected global handler to be *startupErrorHandler, got %T", otelapi.GetErrorHandler())
+	}
+	if _, ok := h.delegate.(slogErrorHandler); !ok {
+		t.Fatalf("startupErrorHandler.delegate must be the concrete slogErrorHandler{} to avoid the self-loop recursion bug, got %T", h.delegate)
 	}
 }
 

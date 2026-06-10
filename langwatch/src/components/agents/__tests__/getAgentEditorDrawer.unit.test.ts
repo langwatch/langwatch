@@ -4,6 +4,7 @@ import { getAgentEditorDrawer } from "../getAgentEditorDrawer";
 
 describe("getAgentEditorDrawer", () => {
   describe("when editing a code agent", () => {
+    /** @scenario Agents page routes each agent type to its matching editor drawer */
     it("returns agentCodeEditor", () => {
       expect(getAgentEditorDrawer("code")).toBe("agentCodeEditor");
     });

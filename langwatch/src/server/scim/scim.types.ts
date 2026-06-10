@@ -50,26 +50,43 @@ export const scimPatchRequestSchema = z.object({
 
 export type ScimPatchRequest = z.infer<typeof scimPatchRequestSchema>;
 
-export const scimCreateUserRequestSchema = z.object({
-  schemas: z.array(z.string()),
-  userName: z.string().email(),
-  name: z
-    .object({
-      givenName: z.string().optional(),
-      familyName: z.string().optional(),
-    })
-    .optional(),
-  emails: z
-    .array(
-      z.object({
-        primary: z.boolean().optional(),
-        value: z.string(),
-        type: z.string().optional(),
+/**
+ * SCIM 2.0 Enterprise User extension (RFC 7643 §4.3). The IdP carries
+ * org-chart attributes here; we read `costCenter` to drive department
+ * assignment, mirroring how it drives department/division elsewhere.
+ */
+export const SCIM_ENTERPRISE_USER_SCHEMA =
+  "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User";
+
+const scimEnterpriseUserSchema = z
+  .object({
+    costCenter: z.string().nullish(),
+  })
+  .passthrough();
+
+export const scimCreateUserRequestSchema = z
+  .object({
+    schemas: z.array(z.string()),
+    userName: z.string().email(),
+    name: z
+      .object({
+        givenName: z.string().optional(),
+        familyName: z.string().optional(),
       })
-    )
-    .optional(),
-  active: z.boolean().optional(),
-});
+      .optional(),
+    emails: z
+      .array(
+        z.object({
+          primary: z.boolean().optional(),
+          value: z.string(),
+          type: z.string().optional(),
+        })
+      )
+      .optional(),
+    active: z.boolean().optional(),
+    [SCIM_ENTERPRISE_USER_SCHEMA]: scimEnterpriseUserSchema.optional(),
+  })
+  .passthrough();
 
 export type ScimCreateUserRequest = z.infer<typeof scimCreateUserRequestSchema>;
 

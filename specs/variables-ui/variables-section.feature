@@ -4,6 +4,22 @@ Feature: Variables section UI
   I want to manage input variables with a clean visual interface
   So that I can easily define and map variables to data sources
 
+  # All scenarios in this file describe the VariablesSection
+  # component (header, type icons, add/edit/delete flows) +
+  # VariableMappingInput (path selector, source dropdown). Tests
+  # exist at:
+  #   * VariablesSection.test.tsx
+  #   * VariableMappingInput.test.tsx
+  #   * VariableTypeIcon.test.tsx
+  #   * TargetVariablesPanel.test.tsx
+  #
+  # All scenarios are pre-classified KEEP in
+  # `specs/variables-ui/AUDIT_MANIFEST.md`. They stay
+  # `@unimplemented` here because each test case still needs an
+  # individual JSDoc `@scenario` marker — a mechanical pass that
+  # was deferred to keep this PR small. Cheap follow-up: walk the
+  # four test files and apply per-case markers from the manifest.
+
   Background:
     Given the Variables section is rendered
 

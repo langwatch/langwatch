@@ -5,7 +5,7 @@ import {
   type FieldMapping as UIFieldMapping,
   VariablesSection,
 } from "~/components/variables";
-import { validateEvaluatorMappingsWithFields } from "~/evaluations-v3/utils/mappingValidation";
+import { validateEvaluatorMappingsWithFields } from "~/experiments-v3/utils/mappingValidation";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useProjectSpanNames } from "~/hooks/useProjectSpanNames";
 import {
@@ -67,9 +67,9 @@ export function EvaluatorMappingsSection({
 
   // Fetch span names and metadata keys for level-based mode
   // Only used when providedSources is not given
-  const { spanNames, metadataKeys } = useProjectSpanNames(
-    providedSources ? undefined : project?.id
-  );
+  const { spanNames, metadataKeys } = useProjectSpanNames({
+    projectId: providedSources ? undefined : project?.id,
+  });
 
   // Build availableSources - use providedSources if given, otherwise fetch based on level
   const availableSources = useMemo(() => {

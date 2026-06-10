@@ -202,6 +202,7 @@ describe("License Router Integration", () => {
   // ==========================================================================
 
   describe("getStatus", () => {
+    /** @scenario Gets license status for organization without license */
     it("returns hasLicense=false when org has no license", async () => {
       const status = await adminCaller.license.getStatus({ organizationId });
 
@@ -232,6 +233,7 @@ describe("License Router Integration", () => {
       expect(status.hasLicense).toBe(false);
     });
 
+    /** @scenario Rejects request for unauthorized organization */
     it("throws UNAUTHORIZED for non-existent organization", async () => {
       // User is not a member of non-existent org, so permission check fails before NOT_FOUND can be thrown
       await expect(

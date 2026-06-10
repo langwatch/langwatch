@@ -1,28 +1,16 @@
 import { describe, expect, it } from "vitest";
-import type { NormalizedSpan } from "../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
 import { CanonicalizeSpanAttributesService } from "../canonicalizeSpanAttributesService";
+import { makeStubSpan } from "./_helpers";
 
 const service = new CanonicalizeSpanAttributesService();
 
-const stubSpan: Pick<
-  NormalizedSpan,
-  "name" | "kind" | "instrumentationScope" | "statusMessage" | "statusCode"
-> = {
-  name: "test",
-  kind: "CLIENT",
-  instrumentationScope: { name: "test", version: "1.0" },
-  statusMessage: null,
-  statusCode: null,
-} as any;
+const stubSpan = makeStubSpan();
 
 /** Vercel AI SDK spans require instrumentationScope.name === "ai" */
-const vercelSpan: typeof stubSpan = {
+const vercelSpan = makeStubSpan({
   name: "ai.generateText",
-  kind: "CLIENT",
   instrumentationScope: { name: "ai", version: "3.0" },
-  statusMessage: null,
-  statusCode: null,
-} as any;
+});
 
 describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
   describe("when messages are standard {role, content} format", () => {
@@ -34,7 +22,7 @@ describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
       const result = service.canonicalize(
         { "gen_ai.input.messages": messages },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["gen_ai.input.messages"]).toEqual(messages);
@@ -75,7 +63,7 @@ describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
       const result = service.canonicalize(
         { "gen_ai.input.messages": messages },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       // Anthropic content blocks must survive the pipeline unchanged
@@ -99,7 +87,7 @@ describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
       const result = service.canonicalize(
         { "gen_ai.input.messages": messages },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       // System messages stripped; only non-system messages preserved
@@ -122,7 +110,7 @@ describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
       const result = service.canonicalize(
         { "gen_ai.prompt": "Tell me a joke" },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["gen_ai.input.messages"]).toEqual([
@@ -133,15 +121,13 @@ describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
 
   describe("when input is wrapped in {messages: [...]} object", () => {
     it("unwraps and sets gen_ai.input.messages", () => {
-      const innerMessages = [
-        { role: "user", content: "What time is it?" },
-      ];
+      const innerMessages = [{ role: "user", content: "What time is it?" }];
       const wrapped = JSON.stringify({ messages: innerMessages });
 
       const result = service.canonicalize(
         { "gen_ai.prompt": wrapped },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["gen_ai.input.messages"]).toEqual(innerMessages);
@@ -158,7 +144,7 @@ describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
       const result = service.canonicalize(
         { "gen_ai.prompt": JSON.stringify(wrappedMessages) },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["gen_ai.input.messages"]).toEqual([
@@ -176,7 +162,7 @@ describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
       const result = service.canonicalize(
         { "gen_ai.prompt": JSON.stringify(mixedMessages) },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       // First is unwrapped, second stays as-is
@@ -192,7 +178,7 @@ describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
       const result = service.canonicalize(
         { "gen_ai.completion": "Here is a joke about cats." },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["gen_ai.output.messages"]).toEqual([
@@ -211,7 +197,7 @@ describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
       const result = service.canonicalize(
         { "gen_ai.input.messages": JSON.stringify(messages) },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["gen_ai.system_instructions"]).toBe(
@@ -234,7 +220,7 @@ describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
       const result = service.canonicalize(
         { "gen_ai.input.messages": JSON.stringify(messages) },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["gen_ai.system_instructions"]).toBe(
@@ -254,7 +240,7 @@ describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
       const result = service.canonicalize(
         { "gen_ai.input.messages": JSON.stringify(messages) },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["gen_ai.system_instructions"]).toBe(
@@ -271,12 +257,10 @@ describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
       const result = service.canonicalize(
         { "gen_ai.input.messages": JSON.stringify(messages) },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
-      expect(
-        result.attributes["gen_ai.system_instructions"],
-      ).toBeUndefined();
+      expect(result.attributes["gen_ai.system_instructions"]).toBeUndefined();
     });
   });
 
@@ -297,7 +281,7 @@ describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
           "gen_ai.prompt": "This should be ignored",
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       // LangWatch runs first, sets gen_ai.input.messages from langwatch.input
@@ -311,12 +295,8 @@ describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
     });
 
     it("gen_ai.input.messages already set blocks llm.input_messages extraction", () => {
-      const existingMessages = [
-        { role: "user", content: "Already set" },
-      ];
-      const legacyMessages = [
-        { role: "user", content: "Legacy fallback" },
-      ];
+      const existingMessages = [{ role: "user", content: "Already set" }];
+      const legacyMessages = [{ role: "user", content: "Legacy fallback" }];
 
       const result = service.canonicalize(
         {
@@ -324,11 +304,13 @@ describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
           "llm.input_messages": legacyMessages,
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       // gen_ai.input.messages was already present, llm.input_messages should not overwrite
-      expect(result.attributes["gen_ai.input.messages"]).toEqual(existingMessages);
+      expect(result.attributes["gen_ai.input.messages"]).toEqual(
+        existingMessages,
+      );
     });
   });
 });

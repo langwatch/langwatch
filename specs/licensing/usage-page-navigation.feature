@@ -1,4 +1,11 @@
 Feature: Plan Management Navigation
+
+  # All scenarios in this file describe deployment-mode-conditional
+  # navigation on the Usage page and from limit-reached banners (SaaS →
+  # /subscription, self-hosted → /license). Need a page-level integration
+  # test (or Playwright E2E) against the rendered Usage page in both
+  # deployment modes — no such harness exists yet.
+
   As a user
   I want plan management links to redirect me based on deployment type
   So that I can manage my plan or license appropriately
@@ -71,14 +78,6 @@ Feature: Plan Management Navigation
       | Subscription | false   |
       | License      | true    |
 
-  @integration @unimplemented
-  Scenario: Platform provides hook for determining plan management URL
-    Given a component needs to link to plan management
-    When it calls the getPlanManagementUrl helper
-    Then in SaaS mode it returns "/settings/subscription"
-    And in self-hosted mode it returns "/settings/license"
-
-  # Resource limits display on Usage page
   @e2e @unimplemented
   Scenario: Usage page shows resource limits in self-hosted mode with license
     Given the platform is deployed in self-hosted mode

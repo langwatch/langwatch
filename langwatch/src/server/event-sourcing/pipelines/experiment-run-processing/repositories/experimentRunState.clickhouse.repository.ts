@@ -1,24 +1,25 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import {
 	classifyClickHouseError,
 	SecurityError,
 	StoreError,
 	ValidationError,
 } from "~/server/event-sourcing/services/errorHandling";
+import { createLogger } from "../../../../../utils/logger";
 import type {
 	Projection,
 	ProjectionStoreReadContext,
 	ProjectionStoreWriteContext,
 } from "../../../";
 import { createTenantId, EventUtils } from "../../../";
-import { createLogger } from "../../../../../utils/logger";
 import type {
 	ExperimentRunState,
 	ExperimentRunStateData,
 } from "../projections/experimentRunState.foldProjection";
-import type { ExperimentRunStateRepository } from "./experimentRunState.repository";
 import { makeExperimentRunKey, parseExperimentRunKey } from "../utils/compositeKey";
+import type { ExperimentRunStateRepository } from "./experimentRunState.repository";
 
 const TABLE_NAME = "experiment_runs" as const;
 
@@ -53,6 +54,7 @@ interface ClickHouseExperimentRunRecord {
   PassedCount: number;
   GradedCount: number;
   LastEventOccurredAt: number;
+  _retention_days: number;
 }
 
 type ClickHouseExperimentRunWriteRecord = WithDateWrites<
@@ -133,6 +135,9 @@ export class ExperimentRunStateRepositoryClickHouse<
       PassedCount: data.PassedCount,
       GradedCount: data.GradedCount,
       LastEventOccurredAt: data.LastEventOccurredAt ? new Date(data.LastEventOccurredAt) : new Date(0),
+      // Placeholder; storeProjection / storeProjectionBatch overwrite this with
+      // the resolved retention (platform default when the tenant has none).
+      _retention_days: PLATFORM_DEFAULT_RETENTION_DAYS,
     };
   }
 
@@ -150,26 +155,45 @@ export class ExperimentRunStateRepositoryClickHouse<
 
     try {
       const client = await this.resolveClient(context.tenantId);
+      // IN-tuple dedup over the ReplacingMergeTree (see
+      // dev/docs/best_practices/clickhouse-queries.md). UpdatedAt is
+      // referenced via table alias because it's also projected as
+      // `toUnixTimestamp64Milli(...) AS UpdatedAt` — without the alias the
+      // IN-tuple comparison resolves to the projected UInt64 instead of the
+      // raw DateTime64.
       const result = await client.query({
         query: `
           SELECT
-            ProjectionId, TenantId, RunId, ExperimentId, WorkflowVersionId, Version,
-            Total, Progress, CompletedCount, FailedCount, TotalCost,
-            toString(TotalDurationMs) AS TotalDurationMs,
-            AvgScoreBps, PassRateBps, Targets,
-            toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
-            toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
-            toUnixTimestamp64Milli(StartedAt) AS StartedAt,
-            toUnixTimestamp64Milli(FinishedAt) AS FinishedAt,
-            toUnixTimestamp64Milli(StoppedAt) AS StoppedAt,
-            LastProcessedEventId,
-            TotalScoreSum, ScoreCount, PassedCount, GradedCount,
-            toUnixTimestamp64Milli(LastEventOccurredAt) AS LastEventOccurredAt
-          FROM ${TABLE_NAME}
-          WHERE TenantId = {tenantId:String}
-            AND RunId = {runId:String}
-            AND ExperimentId = {experimentId:String}
-          ORDER BY UpdatedAt DESC
+            t.ProjectionId AS ProjectionId, t.TenantId AS TenantId,
+            t.RunId AS RunId, t.ExperimentId AS ExperimentId,
+            t.WorkflowVersionId AS WorkflowVersionId, t.Version AS Version,
+            t.Total AS Total, t.Progress AS Progress,
+            t.CompletedCount AS CompletedCount, t.FailedCount AS FailedCount,
+            t.TotalCost AS TotalCost,
+            toString(t.TotalDurationMs) AS TotalDurationMs,
+            t.AvgScoreBps AS AvgScoreBps, t.PassRateBps AS PassRateBps,
+            t.Targets AS Targets,
+            toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
+            toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
+            toUnixTimestamp64Milli(t.StartedAt) AS StartedAt,
+            toUnixTimestamp64Milli(t.FinishedAt) AS FinishedAt,
+            toUnixTimestamp64Milli(t.StoppedAt) AS StoppedAt,
+            t.LastProcessedEventId AS LastProcessedEventId,
+            t.TotalScoreSum AS TotalScoreSum, t.ScoreCount AS ScoreCount,
+            t.PassedCount AS PassedCount, t.GradedCount AS GradedCount,
+            toUnixTimestamp64Milli(t.LastEventOccurredAt) AS LastEventOccurredAt
+          FROM ${TABLE_NAME} AS t
+          WHERE t.TenantId = {tenantId:String}
+            AND t.RunId = {runId:String}
+            AND t.ExperimentId = {experimentId:String}
+            AND (t.TenantId, t.RunId, t.ExperimentId, t.UpdatedAt) IN (
+              SELECT TenantId, RunId, ExperimentId, max(UpdatedAt)
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                AND RunId = {runId:String}
+                AND ExperimentId = {experimentId:String}
+              GROUP BY TenantId, RunId, ExperimentId
+            )
           LIMIT 1
         `,
         query_params: { tenantId: context.tenantId, runId, experimentId },
@@ -243,6 +267,10 @@ export class ExperimentRunStateRepositoryClickHouse<
         runId,
       );
 
+      const retentionPolicy = context.metadata?.retentionPolicy as { experiments?: number | null } | undefined;
+      projectionRecord._retention_days =
+        retentionPolicy?.experiments ?? PLATFORM_DEFAULT_RETENTION_DAYS;
+
       await client.insert({
         table: TABLE_NAME,
         values: [projectionRecord],
@@ -293,9 +321,12 @@ export class ExperimentRunStateRepositoryClickHouse<
     }
 
     try {
+      const retentionPolicy = context.metadata?.retentionPolicy as { experiments?: number | null } | undefined;
+      const retentionDays =
+        retentionPolicy?.experiments ?? PLATFORM_DEFAULT_RETENTION_DAYS;
       const records = projections.map((projection) => {
         const { runId } = parseExperimentRunKey(String(projection.aggregateId));
-        return this.mapProjectionDataToClickHouseRecord(
+        const record = this.mapProjectionDataToClickHouseRecord(
           projection.data as ExperimentRunStateData,
           String(context.tenantId),
           projection.id,
@@ -303,6 +334,8 @@ export class ExperimentRunStateRepositoryClickHouse<
           projection.id,
           runId,
         );
+        record._retention_days = retentionDays;
+        return record;
       });
 
       const client = await this.resolveClient(context.tenantId);

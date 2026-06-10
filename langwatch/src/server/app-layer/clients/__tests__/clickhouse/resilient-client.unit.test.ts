@@ -49,6 +49,7 @@ describe("createResilientClickHouseClient()", () => {
   });
 
   describe("when insert fails with transient error then succeeds", () => {
+    /** @scenario Transient insert errors are retried with exponential backoff */
     it("retries and returns the result", async () => {
       const transientError = new Error("MEMORY_LIMIT_EXCEEDED");
       const result = { executed: true };
@@ -107,6 +108,7 @@ describe("createResilientClickHouseClient()", () => {
   });
 
   describe("when insert fails with non-transient error", () => {
+    /** @scenario Non-transient insert errors fail immediately */
     it("throws immediately without retrying", async () => {
       const schemaError = new Error("Table does_not_exist doesn't exist");
       const mock = makeMockClient({
@@ -160,6 +162,7 @@ describe("createResilientClickHouseClient()", () => {
       expect(mock.query).toHaveBeenCalledTimes(1);
     });
 
+    /** @scenario Query successes are logged at debug level */
     it("logs structured debug fields", async () => {
       const queryResult = { data: [] };
       const mock = makeMockClient({
@@ -182,9 +185,10 @@ describe("createResilientClickHouseClient()", () => {
     });
   });
 
-  describe("when query fails", () => {
-    it("throws without retrying", async () => {
-      const err = new Error("MEMORY_LIMIT_EXCEEDED");
+  describe("when query fails with a non-transient error", () => {
+    /** @scenario A read failing with a non-transient error fails fast */
+    it("throws immediately without retrying", async () => {
+      const err = new Error("Syntax error in query");
       const mock = makeMockClient({
         query: vi.fn().mockRejectedValue(err),
       });
@@ -195,12 +199,13 @@ describe("createResilientClickHouseClient()", () => {
 
       await expect(
         client.query({ query: "SELECT 1" })
-      ).rejects.toThrow("MEMORY_LIMIT_EXCEEDED");
+      ).rejects.toThrow("Syntax error in query");
       expect(mock.query).toHaveBeenCalledTimes(1);
     });
 
+    /** @scenario Query failures are logged with structured metadata */
     it("logs structured error fields", async () => {
-      const err = new Error("MEMORY_LIMIT_EXCEEDED");
+      const err = new Error("Syntax error in query");
       const mock = makeMockClient({
         query: vi.fn().mockRejectedValue(err),
       });
@@ -211,7 +216,7 @@ describe("createResilientClickHouseClient()", () => {
 
       await expect(
         client.query({ query: "SELECT 1" })
-      ).rejects.toThrow("MEMORY_LIMIT_EXCEEDED");
+      ).rejects.toThrow("Syntax error in query");
 
       expect(mockQueryLogger.error).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -223,7 +228,7 @@ describe("createResilientClickHouseClient()", () => {
     });
 
     it("passes the raw error object for Pino serializer", async () => {
-      const err = new Error("MEMORY_LIMIT_EXCEEDED");
+      const err = new Error("Syntax error in query");
       const mock = makeMockClient({
         query: vi.fn().mockRejectedValue(err),
       });
@@ -234,13 +239,58 @@ describe("createResilientClickHouseClient()", () => {
 
       await expect(
         client.query({ query: "SELECT 1" })
-      ).rejects.toThrow("MEMORY_LIMIT_EXCEEDED");
+      ).rejects.toThrow("Syntax error in query");
 
       const loggedObj = mockQueryLogger.error.mock.calls[0]![0] as Record<
         string,
         unknown
       >;
       expect(loggedObj.error).toBe(err);
+    });
+  });
+
+  describe("when query fails with a transient overload error", () => {
+    const fastRetryClient = (mock: ClickHouseClient) =>
+      createResilientClickHouseClient({
+        client: mock,
+        maxRetries: 2,
+        baseDelayMs: 1,
+        maxDelayMs: 2,
+      });
+
+    /** @scenario A read rejected for transient overload is retried and succeeds */
+    it("retries and returns the result once a slot frees", async () => {
+      const overload = new Error(
+        "Code: 202. DB::Exception: Too many simultaneous queries. Maximum: 100. ",
+      );
+      const result = { data: [{ ok: 1 }] };
+      const mock = makeMockClient({
+        query: vi
+          .fn()
+          .mockRejectedValueOnce(overload)
+          .mockResolvedValueOnce(result),
+      });
+
+      const client = fastRetryClient(mock);
+      await expect(client.query({ query: "SELECT 1" })).resolves.toBe(result);
+      expect(mock.query).toHaveBeenCalledTimes(2);
+    });
+
+    /** @scenario A read that keeps failing transiently eventually surfaces the error */
+    it("surfaces the error only after retries are exhausted", async () => {
+      const overload = new Error(
+        "Too many simultaneous queries. Maximum: 100. ",
+      );
+      const mock = makeMockClient({
+        query: vi.fn().mockRejectedValue(overload),
+      });
+
+      const client = fastRetryClient(mock);
+      await expect(client.query({ query: "SELECT 1" })).rejects.toThrow(
+        "Too many simultaneous queries",
+      );
+      // maxRetries: 2 -> 1 initial attempt + 2 retries = 3 total
+      expect(mock.query).toHaveBeenCalledTimes(3);
     });
   });
 
@@ -268,8 +318,9 @@ describe("createResilientClickHouseClient()", () => {
   });
 
   describe("when logging throws during query failure", () => {
+    /** @scenario Logging crashes do not affect query results */
     it("still propagates the original ClickHouse error", async () => {
-      const chError = new Error("MEMORY_LIMIT_EXCEEDED");
+      const chError = new Error("Syntax error in query");
       const mock = makeMockClient({
         query: vi.fn().mockRejectedValue(chError),
       });
@@ -284,7 +335,7 @@ describe("createResilientClickHouseClient()", () => {
 
       await expect(
         client.query({ query: "SELECT 1" })
-      ).rejects.toThrow("MEMORY_LIMIT_EXCEEDED");
+      ).rejects.toThrow("Syntax error in query");
     });
   });
 
@@ -484,6 +535,7 @@ describe("createResilientClickHouseClient()", () => {
   });
 
   describe("when command or close is called", () => {
+    /** @scenario Non-query operations pass through to the underlying client */
     it("passes through to the underlying client", async () => {
       const mock = makeMockClient({
         command: vi.fn().mockResolvedValue(undefined),

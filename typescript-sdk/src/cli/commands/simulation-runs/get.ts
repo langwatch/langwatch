@@ -5,6 +5,7 @@ import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
+import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 /**
  * Flattens Anthropic-style content (string OR array of {type:text|tool_use|tool_result|thinking})
  * into a readable single-line string. Thinking blocks are dropped; tool_use shows the tool name;
@@ -59,7 +60,7 @@ export const getSimulationRunCommand = async (
   checkApiKey();
 
   const apiKey = process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint = process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai";
+  const endpoint = resolveControlPlaneUrl();
 
   const spinner = ora(`Fetching simulation run "${runId}"...`).start();
 

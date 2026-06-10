@@ -11,8 +11,15 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
   # from the workflow's `litellm_params`. There is no second HTTP hop and no HMAC.
   # See _shared/contract.md §4 (no application-layer auth) and §8 (library, not HTTP).
 
+  # All scenarios are @unimplemented because services/nlpgo/ does not yet exist.
+  # The TS feature-parity checker only scans TS test roots, so Go-side signature
+  # node scenarios cannot be bound via @scenario JSDoc. Python-side parity:
+  # langwatch_nlp/langwatch_nlp/studio/execute/signature_node.py + dspy adapters.
+  # Go-side test coverage will live under services/nlpgo/. Aspirational pending
+  # nlpgo service stand-up.
+
   Background:
-    Given the nlpgo service is running on port 5562 with NLPGO_BYPASS unset
+    Given the nlpgo service is running on its configured port
     And nlpgo imports the AI Gateway dispatcher in-process (no second HTTP hop)
     And a project "acme-api" exists with no VirtualKey configured
 
@@ -210,6 +217,30 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
     Then the assistant message content parses as JSON
     And the JSON validates against the declared json_schema
 
+  # Customer dogfood 2026-05-30: a Studio Prompt with Structured Outputs
+  # ON (output:bool + reason:str) bound to a Bedrock Anthropic Haiku 4.5
+  # inference profile returned raw prose (`TRUE\n\nReason: ...`) instead
+  # of parsed JSON. Bifrost v1.4.22 routes response_format on anthropic-
+  # family Bedrock models through Anthropic's native output_config.format
+  # extension which has rolling per-region / per-model-version support;
+  # when the combination doesn't line up the field is silently ignored
+  # and the model returns prose. Python langwatch_nlp doesn't hit this
+  # because LiteLLM translates response_format → forced tool_use, which
+  # is the oldest + most universally supported Anthropic structured-
+  # output path. nlpgo must do the same translation in its executor so
+  # the Go path has python parity + the same robustness profile.
+  @integration @v1
+  Scenario: bedrock + anthropic response_format rewrites to forced tool_use
+    Given a workflow whose signature node targets a bedrock anthropic-family model
+    And the signature node sets response_format = json_schema with {output:bool, reason:str}
+    When nlpgo builds the gateway request body
+    Then the body has no response_format field
+    And the body has a tools array with one synthesized tool whose function name starts with "lw_so_"
+    And the body has tool_choice forcing that tool
+    When the model returns its JSON payload as the tool_call arguments
+    Then the response Content carries that JSON string lifted from the tool_call
+    And the engine extracts each declared output field from the JSON
+
   # ============================================================================
   # Multi-turn chat history preserved across signature nodes
   # ============================================================================
@@ -221,6 +252,47 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
     When the workflow runs
     Then the second signature node's prompt contains all 4 prior messages plus the first node's assistant turn
     And tool_calls in the history are forwarded role-correct (tool messages keep tool_call_id)
+
+  # ============================================================================
+  # Prompt-playground message assembly (system + variable interpolation)
+  #
+  # The prompt playground sends an execute_component event whose signature
+  # node carries an `instructions` parameter (the system prompt the user
+  # typed) plus a `messages` history (the saved template messages, which
+  # may contain {{var}} placeholders, followed by the live conversation
+  # turns). Regression 2026-05-14: nlpgo returned the messages array
+  # verbatim — dropping the system prompt, never interpolating the
+  # placeholders, and leaving an empty {{input}} template turn duplicated
+  # alongside the real user turn. Python parity is template_adapter.py
+  # format(): render the system from instructions, render each message's
+  # content with the input variables, then drop messages whose content is
+  # empty after rendering (this is what removes the unfilled {{input}}
+  # placeholder turn).
+  # ============================================================================
+
+  @integration @v1 @unimplemented
+  Scenario: prompt-playground signature node renders the system prompt from instructions
+    Given a signature node whose instructions are "You are a helpful assistant" and whose messages history is a single user turn "{{input}}"
+    And the input variable "input" is "hello there"
+    When the workflow runs
+    Then the assembled prompt starts with a system message containing "You are a helpful assistant"
+    And the user turn content is "hello there" with no literal "{{input}}" remaining
+
+  @integration @v1 @unimplemented
+  Scenario: an unfilled template placeholder turn is dropped, not duplicated
+    Given a signature node whose messages history is "{{input}}" followed by a live user turn "test6"
+    And the input variable "input" is empty
+    When the workflow runs
+    Then the assembled prompt has exactly one user turn with content "test6"
+    And there is no user turn whose content is empty or the literal "{{input}}"
+
+  @integration @v1 @unimplemented
+  Scenario: instructions with empty variables still produce a non-empty system prompt
+    Given a signature node whose instructions are "You are a helpful assistant\n___{{answer}}___\n___{{unbiased}}___\nalways return passed as true"
+    And the input variables "answer" and "unbiased" are empty
+    When the workflow runs
+    Then the assembled prompt has a system message containing "You are a helpful assistant"
+    And the system message contains "always return passed as true"
 
   # ============================================================================
   # Streaming — SSE pass-through

@@ -96,7 +96,7 @@ func (a executorAdapter) ExecuteStream(ctx context.Context, req app.WorkflowRequ
 		ch := make(chan app.WorkflowStreamEvent, 1)
 		ch <- app.WorkflowStreamEvent{Type: "error", Payload: map[string]any{"message": err.Error()}}
 		close(ch)
-		return ch, nil
+		return ch, nil //nolint:nilerr // error is surfaced via the channel/result payload, not the function error return
 	}
 	in, err := a.eng.ExecuteStream(ctx, engine.ExecuteRequest{
 		Workflow:          wf,
@@ -116,7 +116,7 @@ func (a executorAdapter) ExecuteStream(ctx context.Context, req app.WorkflowRequ
 		ch := make(chan app.WorkflowStreamEvent, 1)
 		ch <- app.WorkflowStreamEvent{Type: "error", Payload: map[string]any{"message": err.Error()}}
 		close(ch)
-		return ch, nil
+		return ch, nil //nolint:nilerr // error is surfaced via the channel/result payload, not the function error return
 	}
 	out := make(chan app.WorkflowStreamEvent, 16)
 	go func() {
@@ -131,7 +131,7 @@ func (a executorAdapter) ExecuteStream(ctx context.Context, req app.WorkflowRequ
 func (a executorAdapter) Execute(ctx context.Context, req app.WorkflowRequest) (*app.WorkflowResult, error) {
 	wf, err := dsl.ParseWorkflow(req.WorkflowJSON)
 	if err != nil {
-		return &app.WorkflowResult{
+		return &app.WorkflowResult{ //nolint:nilerr // error is surfaced via the channel/result payload, not the function error return
 			Status: "error",
 			Error:  &app.WorkflowError{Type: "invalid_workflow", Message: err.Error()},
 		}, nil
@@ -151,7 +151,7 @@ func (a executorAdapter) Execute(ctx context.Context, req app.WorkflowRequest) (
 		DatasetEntry:      req.DatasetEntry,
 	})
 	if err != nil {
-		return &app.WorkflowResult{
+		return &app.WorkflowResult{ //nolint:nilerr // error is surfaced via the channel/result payload, not the function error return
 			Status: "error",
 			Error:  &app.WorkflowError{Type: "engine_error", Message: err.Error()},
 		}, nil
@@ -179,7 +179,7 @@ func (a executorAdapter) Execute(ctx context.Context, req app.WorkflowRequest) (
 
 func postSync(t *testing.T, stack *stack, body string) *app.WorkflowResult {
 	t.Helper()
-	req, err := http.NewRequest("POST", stack.url+"/go/studio/execute_sync", bytes.NewBufferString(body))
+	req, err := http.NewRequest(http.MethodPost, stack.url+"/go/studio/execute_sync", bytes.NewBufferString(body))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-LangWatch-Origin", "workflow")
@@ -317,7 +317,7 @@ func TestSync_CodeBlockEndToEnd(t *testing.T) {
 	}`
 	res := postSync(t, stack, body)
 	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
-	assert.Equal(t, float64(5), res.Result["sum"])
+	assert.InDelta(t, 5.0, res.Result["sum"], 1e-9)
 }
 
 // TestSync_RejectsUnsupportedNodeKind exercises the planner →

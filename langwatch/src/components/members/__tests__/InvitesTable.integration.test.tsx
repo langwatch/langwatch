@@ -171,6 +171,7 @@ describe("<InvitesTable/>", () => {
   });
 
   describe("when pending approval invites are shown", () => {
+    /** @scenario Member creates an invitation request that requires approval */
     it("displays a pending approval badge", () => {
       render(
         <InvitesTable
@@ -198,6 +199,7 @@ describe("<InvitesTable/>", () => {
   });
 
   describe("when sent invites are shown", () => {
+    /** @scenario Admin creates an immediate invite */
     it("displays an invited badge", () => {
       render(
         <InvitesTable

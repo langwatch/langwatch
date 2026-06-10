@@ -20,12 +20,12 @@ import { Drawer } from "../components/ui/drawer";
 import { toaster } from "../components/ui/toaster";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { tryToMapPreviousColumnsToNewColumns } from "../optimization_studio/utils/datasetUtils";
-import type {
-  DatasetColumns,
-  DatasetRecordForm,
-  DatasetRecordInput,
+import {
+  datasetRecordFormSchema,
+  type DatasetColumns,
+  type DatasetRecordForm,
+  type DatasetRecordInput,
 } from "../server/datasets/types";
-import { datasetRecordFormSchema } from "../server/datasets/types.generated";
 import { api } from "../utils/api";
 import { isHandledByGlobalHandler } from "../utils/trpcError";
 import { DatasetSlugDisplay } from "./datasets/DatasetSlugDisplay";
@@ -268,7 +268,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
       onOpenChange={({ open }) => !open && onClose()}
       size="xl"
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.CloseTrigger />
         <Drawer.Header>
           <HStack>

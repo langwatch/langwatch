@@ -5,9 +5,10 @@ import {
   Field,
   HStack,
   Input,
+  Skeleton,
   Text,
 } from "@chakra-ui/react";
-import { Search, Settings } from "lucide-react";
+import { AlertTriangle, Search } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { modelProviderIcons } from "../server/modelProviders/iconsMap";
@@ -22,7 +23,9 @@ import {
 import { InputGroup } from "./ui/input-group";
 import { Link } from "./ui/link";
 import { Select } from "./ui/select";
+import { Tooltip } from "./ui/tooltip";
 import { LuSettings2 } from "react-icons/lu";
+import { NoModelsConfiguredCallout } from "./NoModelsConfiguredCallout";
 
 export type ModelOption = {
   label: string;
@@ -63,22 +66,49 @@ export const useModelSelectionOptions = (
   mode: "chat" | "embedding" = "chat",
 ) => {
   const { project } = useOrganizationTeamProject();
-  const modelProviders = api.modelProvider.getAllForProject.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project?.id, refetchOnMount: false },
-  );
+  // `listAllForProjectForFrontend` returns the providers actually
+  // stored against any scope reachable from this project. The legacy
+  // `getAllForProject` merged env-fed defaults (every registry
+  // provider whose API key is present in the server's process env),
+  // which made unrelated providers like Gemini show up in the picker
+  // for a project that only stored Anthropic/OpenAI.
+  const modelProviders =
+    api.modelProvider.listAllForProjectForFrontend.useQuery(
+      { projectId: project?.id ?? "" },
+      { enabled: !!project?.id },
+    );
 
-  const allModels = getCustomModels(
-    modelProviders.data ?? {},
-    options,
-    mode,
-  );
+  // Adapt the array shape (one row per provider+scope) into the
+  // legacy `Record<provider, config>` shape that getCustomModels +
+  // the custom-model dedup loop below expect. Multiple rows for the
+  // same provider (multi-scope) are merged: the provider counts as
+  // enabled if any row is enabled, customModels lists union.
+  const providersByKey: Record<string, MaybeStoredModelProvider> = {};
+  for (const row of modelProviders.data?.providers ?? []) {
+    const existing = providersByKey[row.provider];
+    if (!existing) {
+      providersByKey[row.provider] = row;
+      continue;
+    }
+    providersByKey[row.provider] = {
+      ...existing,
+      enabled: existing.enabled || row.enabled,
+      customModels: [
+        ...(existing.customModels ?? []),
+        ...(row.customModels ?? []),
+      ],
+      customEmbeddingsModels: [
+        ...(existing.customEmbeddingsModels ?? []),
+        ...(row.customEmbeddingsModels ?? []),
+      ],
+    };
+  }
+
+  const allModels = getCustomModels(providersByKey, options, mode);
 
   // Build a set of custom model IDs for quick lookup
   const customModelIdSet = new Set<string>();
-  for (const [providerKey, config] of Object.entries(
-    modelProviders.data ?? {},
-  )) {
+  for (const [providerKey, config] of Object.entries(providersByKey)) {
     const customList =
       mode === "chat" ? config.customModels : config.customEmbeddingsModels;
     if (customList) {
@@ -127,7 +157,29 @@ export const useModelSelectionOptions = (
 
   const modelOption = selectOptions.find((opt) => opt.value === model);
 
-  return { modelOption, selectOptions, groupedByProvider };
+  // Local dev escape hatch so the no-models UX is visually testable
+  // without wiping the project's env-var-backed providers. URL toggle
+  // only fires in dev builds.
+  const forceEmpty =
+    !import.meta.env.PROD &&
+    typeof window !== "undefined" &&
+    window.location.search.includes("__no_models=1");
+
+  return {
+    modelOption,
+    selectOptions,
+    groupedByProvider,
+    /** True while the providers query is in flight. Callers that
+     *  render their own trigger should show a skeleton instead of the
+     *  empty-state callout so the user doesn't see a "No models
+     *  configured" flash before the data resolves. */
+    isLoading: modelProviders.isLoading,
+    /** True when the project has zero models of the requested mode
+     *  available. Lets callers that render their own trigger (e.g.
+     *  LLMConfigField) swap to the empty-state callout instead of
+     *  echoing back the stale persisted value. */
+    isEmpty: selectOptions.length === 0 || forceEmpty,
+  };
 };
 
 export const ModelSelector = React.memo(function ModelSelector({
@@ -137,6 +189,7 @@ export const ModelSelector = React.memo(function ModelSelector({
   size = "md",
   mode,
   showConfigureAction = false,
+  forFeatureLabel,
 }: {
   model: string;
   options: string[];
@@ -145,13 +198,17 @@ export const ModelSelector = React.memo(function ModelSelector({
   mode?: "chat" | "embedding";
   /** When true, shows a "Configure available models" link at the bottom of the dropdown */
   showConfigureAction?: boolean;
+  /** Surface-specific label used in the empty-state callout when no
+   *  models are available — e.g. "for AI search", "for evaluators".
+   *  Optional; the callout falls back to a generic message. */
+  forFeatureLabel?: string;
 }) {
-  const { selectOptions, groupedByProvider } = useModelSelectionOptions(
-    options,
-    model,
-    mode,
-  );
+  const { selectOptions, groupedByProvider, isEmpty, isLoading } =
+    useModelSelectionOptions(options, model, mode);
 
+  // ALL hooks must run unconditionally — keep the empty-state early
+  // return *after* every hook below so we don't violate React's rules
+  // of hooks when isEmpty flips between renders.
   const [modelSearch, setModelSearch] = useState("");
 
   // Filter models by search and group by provider
@@ -178,6 +235,16 @@ export const ModelSelector = React.memo(function ModelSelector({
   // Model might not be in the list if it's a custom model or unknown
   const isUnknown = !selectedItem;
 
+  // Provider gone (deleted or never configured at any reachable
+  // scope) — the value is still persisted on the form but the user
+  // needs to update it before the evaluation can run. Same chip
+  // treatment ModelChip renders in the Default Models table.
+  const providerKey = model.split("/")[0] ?? "";
+  const isProviderMissing =
+    !!model &&
+    !!providerKey &&
+    !groupedByProvider.some((group) => group.provider === providerKey);
+
   const selectValueText = (
     <HStack overflow="hidden" gap={2} align="center">
       {selectedItem?.icon && (
@@ -190,10 +257,32 @@ export const ModelSelector = React.memo(function ModelSelector({
         fontFamily="mono"
         lineClamp={1}
         wordBreak="break-all"
-        color={isUnknown ? "gray.500" : undefined}
+        color={
+          isProviderMissing ? "red.600" : isUnknown ? "gray.500" : undefined
+        }
+        textDecoration={isProviderMissing ? "line-through" : undefined}
       >
         {selectedItem?.label ?? model}
       </Box>
+      {isProviderMissing && (
+        <Tooltip
+          content={`${providerKey} provider isn't enabled here. Re-add the provider or pick a different model to use it.`}
+          positioning={{ placement: "top" }}
+          showArrow
+        >
+          <HStack gap={1} color="red.600" flexShrink={0}>
+            <AlertTriangle size={size === "sm" ? 12 : 14} aria-hidden />
+            <Text
+              fontSize={size === "sm" ? "2xs" : "xs"}
+              fontWeight="medium"
+              textTransform="uppercase"
+              letterSpacing="wide"
+            >
+              Update needed
+            </Text>
+          </HStack>
+        </Tooltip>
+      )}
     </HStack>
   );
 
@@ -213,6 +302,32 @@ export const ModelSelector = React.memo(function ModelSelector({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modelSearch]);
+
+  // Skeleton while the providers query is in flight so the empty
+  // state doesn't flash before the data resolves.
+  if (isLoading) {
+    return (
+      <Skeleton
+        width={size === "full" ? "full" : size === "sm" ? "180px" : "240px"}
+        height={size === "sm" ? "28px" : "40px"}
+        borderRadius="md"
+      />
+    );
+  }
+
+  // Honest empty state: when the project has zero enabled providers
+  // (or zero models of the requested mode), render a guided callout
+  // instead of the dropdown. The prior behaviour was to render the
+  // System fallback string ("openai/gpt-5.2") in gray, which looked
+  // like a real selection but errored at runtime.
+  if (isEmpty) {
+    return (
+      <NoModelsConfiguredCallout
+        size={size}
+        forFeatureLabel={forFeatureLabel}
+      />
+    );
+  }
 
   return (
     <Select.Root

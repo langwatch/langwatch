@@ -33,24 +33,14 @@ async function loadRuntime(): Promise<RuntimeApi> {
 }
 
 function ensureEnvFile(ctx: RuntimeContext): { written: boolean; path: string } {
-  return scaffoldEnvFile({ ports: ctx.ports, path: ctx.paths.envFile, nlpMode: ctx.nlpMode });
-}
-
-function parseNlpMode(raw: unknown): "python" | "go" {
-  // Default ('go') is wired via commander's third arg, so undefined would
-  // only occur if a programmatic caller skipped it. Be defensive anyway —
-  // an invalid value would otherwise quietly mis-route NLP traffic.
-  if (raw === undefined || raw === null || raw === "go") return "go";
-  if (raw === "python") return "python";
-  console.error(chalk.red(`✗ --nlp must be 'python' or 'go' (got: ${String(raw)})`));
-  process.exit(2);
+  return scaffoldEnvFile({ ports: ctx.ports, path: ctx.paths.envFile });
 }
 
 const program = new Command();
 
 program
   .name("langwatch-server")
-  .description("Run LangWatch locally — postgres, redis, clickhouse, langwatch app, langwatch_nlp, langevals, ai-gateway")
+  .description("Run LangWatch locally — postgres, redis, clickhouse, langwatch app, langevals, ai-gateway")
   .version(VERSION, "-v, --version");
 
 program
@@ -60,17 +50,10 @@ program
   .option("-y, --yes", "skip every confirmation prompt", false)
   .option("--no-open", "do not auto-open the browser when ready")
   .option("--bullboard", "expose the BullMQ dashboard on the bullboard infra slot", false)
-  .option(
-    "--nlp <runtime>",
-    "NLP backend: 'go' (default, bundled monobinary) or 'python' (legacy langwatch_nlp via uv)",
-    "go",
-  )
   .option("--dry-run", "print what would be done and exit (no installs, no env, no services)", false)
   .action(async (opts) => {
     detectPlatform();
     printBanner(VERSION);
-
-    const nlpMode = parseNlpMode(opts.nlp);
 
     if (opts.dryRun) {
       const base = Number.parseInt(opts.portBase, 10);
@@ -117,7 +100,6 @@ program
       envFile: paths.envFile,
       version: VERSION,
       bullboard: Boolean(opts.bullboard),
-      nlpMode,
       userEnv: captureUserEnv(),
     };
 
@@ -221,15 +203,9 @@ program
   .command("install")
   .description("install missing predeps and services without starting anything")
   .option("-y, --yes", "skip confirmation", false)
-  .option(
-    "--nlp <runtime>",
-    "NLP backend: 'go' (default, bundled monobinary) or 'python' (legacy langwatch_nlp via uv)",
-    "go",
-  )
   .action(async (opts) => {
     detectPlatform();
     printBanner(VERSION);
-    const nlpMode = parseNlpMode(opts.nlp);
     await runPredeps({ yes: opts.yes, version: VERSION });
     const runtime = await loadRuntime();
     const base = PORT_BASE_DEFAULT;
@@ -241,7 +217,6 @@ program
       envFile: paths.envFile,
       version: VERSION,
       bullboard: false,
-      nlpMode,
       userEnv: captureUserEnv(),
     };
     ensureEnvFile(ctx);

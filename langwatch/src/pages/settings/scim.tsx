@@ -146,7 +146,7 @@ function ScimSettingsContent({
         </HStack>
 
         <Card.Root width="full" overflow="hidden">
-          <Card.Body paddingY={0} paddingX={0}>
+          <Card.Body paddingY={0} paddingX={0} overflowX="auto">
             <Table.Root variant="line" size="md" width="full">
               <Table.Header>
                 <Table.Row>
@@ -214,7 +214,7 @@ function ScimSettingsContent({
           }
         }}
       >
-        <Dialog.Content>
+        <Dialog.Content bg="bg">
           <Dialog.Header>
             <Dialog.Title>
               <Heading size="md">Generate SCIM Token</Heading>
@@ -259,7 +259,7 @@ function ScimSettingsContent({
           }
         }}
       >
-        <Dialog.Content>
+        <Dialog.Content bg="bg">
           <Dialog.Header>
             <Dialog.Title>
               <Heading size="md">Token Generated</Heading>
@@ -286,7 +286,7 @@ function ScimSettingsContent({
           if (!open) setTokenToRevoke(null);
         }}
       >
-        <Dialog.Content>
+        <Dialog.Content bg="bg">
           <Dialog.Header>
             <Dialog.Title>
               <Heading size="md">Revoke Token</Heading>

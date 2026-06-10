@@ -1,28 +1,17 @@
-import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
+import { createProjectApp, requires } from "~/server/api/security";
 import { prisma } from "~/server/db";
-import { encrypt } from "~/utils/encryption";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
-import {
-  type AuthMiddlewareVariables,
-  authMiddleware,
-  handleError,
-} from "../../middleware";
-import { loggerMiddleware } from "../../middleware/logger";
-import { tracerMiddleware } from "../../middleware/tracer";
 import { baseResponses } from "../../shared/base-responses";
 import { badRequestSchema } from "../../shared/schemas";
+import { SecretsService } from "../secrets.service";
 
 patchZodOpenapi();
 
 const logger = createLogger("langwatch:api:secrets");
-
-type Variables = AuthMiddlewareVariables;
-
-const MAX_SECRETS_PER_PROJECT = 50;
 
 const SECRET_NAME_REGEX = /^[A-Z][A-Z0-9_]*$/;
 
@@ -55,15 +44,11 @@ const updateSecretSchema = z.object({
     .max(10_000, "value is too long"),
 });
 
-export const app = new Hono<{ Variables: Variables }>()
-  .basePath("/api/secrets")
-  .use(tracerMiddleware({ name: "secrets" }))
-  .use(loggerMiddleware())
-  .use(authMiddleware)
-  .onError(handleError)
+const secretsService = new SecretsService(prisma);
 
-  // ── List Secrets ────────────────────────────────────────────
-  .get(
+const secured = createProjectApp({ basePath: "/api/secrets" });
+
+secured.access(requires("secrets:view")).get(
     "/",
     describeRoute({
       description:
@@ -84,32 +69,12 @@ export const app = new Hono<{ Variables: Variables }>()
       const project = c.get("project");
       logger.info({ projectId: project.id }, "Listing secrets");
 
-      const secrets = await prisma.projectSecret.findMany({
-        where: { projectId: project.id },
-        select: {
-          id: true,
-          projectId: true,
-          name: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-        orderBy: { name: "asc" },
-      });
-
-      return c.json(
-        secrets.map((s) => ({
-          id: s.id,
-          projectId: s.projectId,
-          name: s.name,
-          createdAt: s.createdAt.toISOString(),
-          updatedAt: s.updatedAt.toISOString(),
-        }))
-      );
+      const secrets = await secretsService.getAll({ projectId: project.id });
+      return c.json(secrets);
     }
-  )
+  );
 
-  // ── Get Secret ──────────────────────────────────────────────
-  .get(
+secured.access(requires("secrets:view")).get(
     "/:id",
     describeRoute({
       description: "Get a secret by its ID (value is never returned)",
@@ -136,33 +101,15 @@ export const app = new Hono<{ Variables: Variables }>()
       const { id } = c.req.param();
       logger.info({ projectId: project.id, secretId: id }, "Getting secret");
 
-      const secret = await prisma.projectSecret.findFirst({
-        where: { id, projectId: project.id },
-        select: {
-          id: true,
-          projectId: true,
-          name: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      });
-
+      const secret = await secretsService.getById({ id, projectId: project.id });
       if (!secret) {
         return c.json({ error: "Secret not found" }, 404);
       }
-
-      return c.json({
-        id: secret.id,
-        projectId: secret.projectId,
-        name: secret.name,
-        createdAt: secret.createdAt.toISOString(),
-        updatedAt: secret.updatedAt.toISOString(),
-      });
+      return c.json(secret);
     }
-  )
+  );
 
-  // ── Create Secret ───────────────────────────────────────────
-  .post(
+secured.access(requires("secrets:manage")).post(
     "/",
     describeRoute({
       description:
@@ -191,72 +138,22 @@ export const app = new Hono<{ Variables: Variables }>()
       const body = c.req.valid("json");
       logger.info({ projectId: project.id }, "Creating secret");
 
-      const count = await prisma.projectSecret.count({
-        where: { projectId: project.id },
+      const result = await secretsService.create({
+        projectId: project.id,
+        teamId: project.teamId,
+        name: body.name,
+        value: body.value,
       });
 
-      if (count >= MAX_SECRETS_PER_PROJECT) {
-        return c.json(
-          {
-            error: `Maximum of ${MAX_SECRETS_PER_PROJECT} secrets per project reached`,
-          },
-          422
-        );
+      if ("error" in result) {
+        return c.json({ error: result.error }, result.status);
       }
 
-      const existing = await prisma.projectSecret.findFirst({
-        where: { projectId: project.id, name: body.name },
-        select: { id: true },
-      });
-
-      if (existing) {
-        return c.json(
-          { error: `A secret with the name "${body.name}" already exists` },
-          409
-        );
-      }
-
-      const encryptedValue = encrypt(body.value);
-
-      // API key auth has no user context — use first team member as owner
-      const teamUser = await prisma.teamUser.findFirst({
-        where: { teamId: project.teamId },
-        select: { userId: true },
-      });
-      const userId = teamUser?.userId ?? "system";
-
-      const secret = await prisma.projectSecret.create({
-        data: {
-          projectId: project.id,
-          name: body.name,
-          encryptedValue,
-          createdById: userId,
-          updatedById: userId,
-        },
-        select: {
-          id: true,
-          projectId: true,
-          name: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      });
-
-      return c.json(
-        {
-          id: secret.id,
-          projectId: secret.projectId,
-          name: secret.name,
-          createdAt: secret.createdAt.toISOString(),
-          updatedAt: secret.updatedAt.toISOString(),
-        },
-        201
-      );
+      return c.json(result.secret, 201);
     }
-  )
+  );
 
-  // ── Update Secret ───────────────────────────────────────────
-  .put(
+secured.access(requires("secrets:manage")).put(
     "/:id",
     describeRoute({
       description: "Update a secret's value",
@@ -285,41 +182,20 @@ export const app = new Hono<{ Variables: Variables }>()
       const body = c.req.valid("json");
       logger.info({ projectId: project.id, secretId: id }, "Updating secret");
 
-      const existing = await prisma.projectSecret.findFirst({
-        where: { id, projectId: project.id },
-        select: { id: true },
+      const secret = await secretsService.update({
+        id,
+        projectId: project.id,
+        value: body.value,
       });
 
-      if (!existing) {
+      if (!secret) {
         return c.json({ error: "Secret not found" }, 404);
       }
-
-      const encryptedValue = encrypt(body.value);
-
-      const secret = await prisma.projectSecret.update({
-        where: { id, projectId: project.id },
-        data: { encryptedValue },
-        select: {
-          id: true,
-          projectId: true,
-          name: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      });
-
-      return c.json({
-        id: secret.id,
-        projectId: secret.projectId,
-        name: secret.name,
-        createdAt: secret.createdAt.toISOString(),
-        updatedAt: secret.updatedAt.toISOString(),
-      });
+      return c.json(secret);
     }
-  )
+  );
 
-  // ── Delete Secret ───────────────────────────────────────────
-  .delete(
+secured.access(requires("secrets:manage")).delete(
     "/:id",
     describeRoute({
       description: "Delete a secret",
@@ -348,19 +224,12 @@ export const app = new Hono<{ Variables: Variables }>()
       const { id } = c.req.param();
       logger.info({ projectId: project.id, secretId: id }, "Deleting secret");
 
-      const existing = await prisma.projectSecret.findFirst({
-        where: { id, projectId: project.id },
-        select: { id: true },
-      });
-
-      if (!existing) {
+      const deleted = await secretsService.delete({ id, projectId: project.id });
+      if (!deleted) {
         return c.json({ error: "Secret not found" }, 404);
       }
-
-      await prisma.projectSecret.delete({
-        where: { id, projectId: project.id },
-      });
-
       return c.json({ id, deleted: true });
     }
   );
+
+export const app = secured.hono;

@@ -4,6 +4,10 @@ Feature: Traces tab pagination controls
   I want working pagination controls on the Traces tab
   So that I can browse through all my traces beyond the first page
 
+  # All scenarios describe pagination UI on the Traces tab. Need a
+  # JSDOM render of the pagination controls component or page-level
+  # integration test against the traces tab.
+
   # ─── Design Context ────────────────────────────────────────────────
   #
   # The Traces tab supports two pagination modes:

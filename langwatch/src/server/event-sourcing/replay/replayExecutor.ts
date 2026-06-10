@@ -2,6 +2,8 @@ import type { TenantId } from "../domain/tenantId";
 import type { FoldProjectionDefinition } from "../projections/foldProjection.types";
 import type { ProjectionStoreContext } from "../projections/projectionStoreContext";
 import type { ReplayEvent } from "./replayEventLoader";
+import type { Event } from "../domain/types";
+import { leanForProjection } from "~/server/app-layer/traces/lean-for-projection";
 
 /** Default number of projection entries per ClickHouse INSERT batch. */
 const DEFAULT_WRITE_BATCH_SIZE = 5000;
@@ -39,8 +41,13 @@ export class FoldAccumulator {
     const projectionKey = this.projection.key?.(event) ?? event.aggregateId;
     const scopedKey = tenantScopedKey(event.tenantId, projectionKey);
 
+    // ADR-022: Apply leanForProjection before the projection handler — same utility
+    // as the live dispatch interposition, ensuring replay and live produce
+    // byte-identical projection state.
+    const leanedEvent = leanForProjection(event as unknown as Event) as unknown as ReplayEvent;
+
     const state = this.keyStates.get(scopedKey) ?? this.projection.init();
-    const newState = this.projection.apply(state, event);
+    const newState = this.projection.apply(state, leanedEvent);
     this.keyStates.set(scopedKey, newState);
     this.keyAggregateIds.set(scopedKey, event.aggregateId);
     this.keyTenantIds.set(scopedKey, event.tenantId);

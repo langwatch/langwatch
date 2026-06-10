@@ -12,7 +12,6 @@ import { AddModelProviderKey } from "../../../../../optimization_studio/componen
 import type { DatasetColumns } from "../../../../../server/datasets/types";
 import { api } from "../../../../../utils/api";
 import { isHandledByGlobalHandler } from "../../../../../utils/trpcError";
-import { DEFAULT_MODEL } from "../../../../../utils/constants";
 import { datasetValueToGridValue } from "../../../../datasets/DatasetGrid";
 import { AISparklesLoader } from "../../../../icons/AISparklesLoader";
 import { Markdown } from "../../../../Markdown";
@@ -32,8 +31,14 @@ export function DatasetGeneration() {
     })),
   );
 
+  // Cascade-resolved model for evaluator dataset generation.
+  const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
+    { projectId: project?.id ?? "", featureKey: "evaluator.create_default" },
+    { enabled: !!project?.id },
+  );
+
   // Check if the default model is enabled
-  const defaultModel = project?.defaultModel ?? DEFAULT_MODEL;
+  const defaultModel = resolvedDefault.data?.model ?? "";
   const { modelOption } = useModelSelectionOptions(
     allModelOptions,
     defaultModel,

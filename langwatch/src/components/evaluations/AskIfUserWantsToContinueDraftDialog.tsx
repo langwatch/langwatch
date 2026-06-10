@@ -14,7 +14,7 @@ export function AskIfUserWantsToContinueDraftDialog({
 }: AskIfUserWantsToContinueDraftDialogProps) {
   return (
     <Dialog.Root {...dialogProps}>
-      <Dialog.Content>
+      <Dialog.Content bg="bg">
         <Dialog.Header>
           <Dialog.Title>Continue with Draft?</Dialog.Title>
           <Dialog.CloseTrigger />

@@ -6,7 +6,10 @@ import {
   KILL_SWITCH_CACHE_TTL_MS,
 } from "./constants";
 import { StaleWhileRevalidateCache } from "./staleWhileRevalidateCache.redis";
-import type { FeatureFlagOptions, FeatureFlagServiceInterface } from "./types";
+import type {
+  FeatureFlagEvaluateOptions,
+  FeatureFlagServiceInterface,
+} from "./types";
 
 /**
  * PostHog-based feature flag service with hybrid Redis/in-memory caching.
@@ -67,10 +70,15 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
    */
   async isEnabled(
     flagKey: string,
-    distinctId: string,
-    defaultValue = true,
-    options?: FeatureFlagOptions,
+    opts: FeatureFlagEvaluateOptions,
   ): Promise<boolean> {
+    const {
+      distinctId,
+      defaultValue = true,
+      projectId,
+      organizationId: orgId,
+      cacheTtlMs,
+    } = opts;
     return await this.tracer.withActiveSpan(
       "FeatureFlagServicePostHog.isEnabled",
       {
@@ -78,9 +86,9 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
           "feature.flag.key": flagKey,
           "feature.flag.distinct_id": distinctId,
           "feature.flag.default": defaultValue,
-          "feature.flag.project_id": options?.projectId ?? "",
-          "feature.flag.organization_id": options?.organizationId ?? "",
-          "tenant.id": options?.projectId ?? "",
+          "feature.flag.project_id": projectId ?? "",
+          "feature.flag.organization_id": orgId ?? "",
+          "tenant.id": projectId ?? "",
           "cache.backend": "redis",
         },
       },
@@ -90,13 +98,11 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
           return defaultValue;
         }
 
-        const projectId = options?.projectId;
-        const orgId = options?.organizationId;
         const cacheKey = `${flagKey}:${distinctId}:${projectId ?? ""}:${orgId ?? ""}`;
 
         // Check hybrid cache first. Hot-path callers may pass a longer
         // cacheTtlMs to extend the staleness window without hitting PostHog.
-        const cachedResult = await this.cache.get(cacheKey, options?.cacheTtlMs);
+        const cachedResult = await this.cache.get(cacheKey, cacheTtlMs);
         if (cachedResult !== undefined) {
           span.setAttribute("feature.flag.source", "posthog-cached");
           span.setAttribute("feature.flag.enabled", cachedResult.value);

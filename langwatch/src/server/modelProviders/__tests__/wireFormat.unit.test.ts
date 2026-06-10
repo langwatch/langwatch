@@ -99,11 +99,13 @@ describe("resolveWireValue", () => {
   });
 
   describe("when the wire value is legacy provider-keyed", () => {
+    /** @scenario Legacy "provider/model" wire value resolves when exactly one MP matches */
     it("resolves unambiguously when exactly one MP matches the provider", () => {
       const result = resolveWireValue("openai/gpt-5", [openaiShared, anthropic]);
       expect(result).toEqual({ ok: true, mp: openaiShared, model: "gpt-5" });
     });
 
+    /** @scenario Legacy wire value errors when no MPs match */
     it("reports not_found when no accessible MP has that provider", () => {
       const result = resolveWireValue("cohere/command-r", [
         openaiShared,
@@ -117,6 +119,7 @@ describe("resolveWireValue", () => {
       });
     });
 
+    /** @scenario Legacy wire value errors when multiple MPs match */
     it("reports ambiguous when multiple accessible MPs share the provider", () => {
       const result = resolveWireValue("openai/gpt-5", [
         openaiShared,

@@ -17,7 +17,7 @@ Feature: HTTP Agent Test Tracing
   # Trace creation - happy path
   # ============================================================================
 
-  @e2e @unimplemented
+  @e2e
   Scenario: Test execution creates a trace visible on the Traces page
     Given I am viewing the HTTP agent in the agent drawer
     When I click "Test"
@@ -28,28 +28,34 @@ Feature: HTTP Agent Test Tracing
   # Trace metadata
   # ============================================================================
 
-  @unit @unimplemented
+  @unit
   Scenario: Trace includes agent_test type
     When I execute an HTTP agent test
     Then the trace has type "agent_test"
 
-  @unit @unimplemented
+  @unit
   Scenario: Trace includes agent ID
     When I execute an HTTP agent test for agent "My API Agent"
     Then the trace metadata includes the agent ID
 
-  @unit @unimplemented
+  @unit
   Scenario: Trace includes project ID
     When I execute an HTTP agent test
     Then the trace metadata includes the project ID
 
-  @unit @unimplemented
+  @unit
   Scenario: Trace includes user ID
     When I execute an HTTP agent test
     Then the trace metadata includes the user ID
 
   # ============================================================================
   # Request details captured in trace
+  #
+  # The remaining @unimplemented "request details" scenarios assert on
+  # `test_context` shape — needs an integration test that snapshots the
+  # full trace_context object, not the per-field assertions in
+  # `httpProxyTracing.integration.test.ts`. Cheap to add when someone
+  # touches the request-context capture path.
   # ============================================================================
 
   @unit @unimplemented
@@ -73,22 +79,22 @@ Feature: HTTP Agent Test Tracing
   # Response details captured in trace
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: Trace captures response status code
     When I execute an HTTP agent test against a working endpoint
     Then the trace captures the response status code
 
-  @integration @unimplemented
+  @integration
   Scenario: Trace captures response duration
     When I execute an HTTP agent test
     Then the trace captures the request duration in milliseconds
 
-  @integration @unimplemented
+  @integration
   Scenario: Trace captures response body
     When I execute an HTTP agent test against a working endpoint
     Then the trace captures the response body
 
-  @integration @unimplemented
+  @integration
   Scenario: Trace captures extracted output
     Given the agent has an output extraction path configured
     When I execute an HTTP agent test against a working endpoint
@@ -98,13 +104,13 @@ Feature: HTTP Agent Test Tracing
   # Error tracing
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: Trace captures HTTP error responses
     Given the endpoint returns an error status
     When I execute an HTTP agent test
     Then the trace captures the error response
 
-  @integration @unimplemented
+  @integration
   Scenario: Trace captures connection failures
     Given the endpoint is unreachable
     When I execute an HTTP agent test
@@ -114,34 +120,34 @@ Feature: HTTP Agent Test Tracing
   # Auth credential sanitization
   # ============================================================================
 
-  @unit @unimplemented
+  @unit
   Scenario: Bearer token credentials are redacted from trace
     Given the agent uses bearer token authentication
     When I execute an HTTP agent test
     Then the trace test_context includes has_auth as true
     And the trace does not contain the bearer token value
 
-  @unit @unimplemented
+  @unit
   Scenario: API key credentials are redacted from trace
     Given the agent uses API key authentication
     When I execute an HTTP agent test
     Then the trace test_context includes has_auth as true
     And the trace does not contain the API key value
 
-  @unit @unimplemented
+  @unit
   Scenario: Basic auth credentials are redacted from trace
     Given the agent uses basic authentication
     When I execute an HTTP agent test
     Then the trace test_context includes has_auth as true
     And the trace does not contain the username or password
 
-  @unit @unimplemented
+  @unit
   Scenario: Authorization headers are redacted in captured request headers
     Given the agent uses bearer token authentication
     When I execute an HTTP agent test
     Then any Authorization header in the trace is redacted
 
-  @unit @unimplemented
+  @unit
   Scenario: Custom auth headers are redacted in captured request headers
     Given the agent uses API key authentication with a custom header
     When I execute an HTTP agent test
@@ -149,6 +155,11 @@ Feature: HTTP Agent Test Tracing
 
   # ============================================================================
   # Filtering
+  #
+  # @unimplemented: needs an end-to-end test that POSTs traces, then queries
+  # the traces API with a `type=agent_test` filter and asserts the result
+  # set. The httpProxyTracing.integration.test.ts focuses on trace-creation
+  # mechanics rather than the read/filter side.
   # ============================================================================
 
   @integration @unimplemented

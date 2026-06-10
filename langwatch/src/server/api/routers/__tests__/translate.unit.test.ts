@@ -95,7 +95,10 @@ describe("translateRouter.translate()", () => {
         textToTranslate: "Hola",
       });
 
-      expect(mockGetVercelAIModel).toHaveBeenCalledWith(projectId);
+      expect(mockGetVercelAIModel).toHaveBeenCalledWith({
+        projectId,
+        featureKey: "translate.text",
+      });
     });
 
     it("returns the translated text", async () => {

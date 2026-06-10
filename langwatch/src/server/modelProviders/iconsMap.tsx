@@ -10,6 +10,7 @@ import { Gemini } from "../../components/icons/Gemini";
 import { GoogleCloud } from "../../components/icons/GoogleCloud";
 import { Groq } from "../../components/icons/Groq";
 import { OpenAI } from "../../components/icons/OpenAI";
+import { Voyage } from "../../components/icons/Voyage";
 import { Xai } from "../../components/icons/Xai";
 import type { modelProviders } from "./registry";
 
@@ -28,5 +29,6 @@ export const modelProviderIcons: Record<
   custom: <Custom />,
   xai: <Xai />,
   cerebras: <Cerebras />,
+  voyage: <Voyage />,
   azure_safety: <Azure />,
 };

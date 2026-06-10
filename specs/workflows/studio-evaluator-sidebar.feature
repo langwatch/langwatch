@@ -3,6 +3,11 @@ Feature: Studio Evaluator Sidebar Migration
   I want a simplified evaluator sidebar that uses the evaluator creation drawer
   So that I follow the same "create and name evaluators" pattern used everywhere else
 
+  # All scenarios describe sidebar UI on the optimization studio. Need
+  # a Node Selection Panel component test or Playwright E2E to drive
+  # the drag-and-drop + drawer-open flows. Aspirational pending that
+  # harness.
+
   Background:
     Given I am on the optimization studio workflow editor
     And the left sidebar (Node Selection Panel) is visible

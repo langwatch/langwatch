@@ -11,6 +11,9 @@ import {
   ORIGIN_RESOLVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
   TOPIC_ASSIGNED_EVENT_TYPE,
+  TRACE_NAME_CHANGED_EVENT_TYPE,
+  TRACE_NAME_MAX_LENGTH,
+  TRACE_NAME_MIN_LENGTH,
 } from "./constants";
 import { instrumentationScopeSchema, resourceSchema, spanSchema } from "./otlp";
 
@@ -335,6 +338,54 @@ export function isAnnotationsBulkSyncedEvent(
 }
 
 /**
+ * Zod schema for TraceNameChangedEvent metadata.
+ */
+export const traceNameChangedEventMetadataSchema = z
+  .object({
+    processingTraceparent: z.string().optional(),
+  })
+  .passthrough();
+
+/**
+ * Zod schema for TraceNameChangedEvent data.
+ *
+ * The trim+length bounds are domain rules — the same shape the
+ * ChangeTraceName command's input schema enforces. Encoding them on the
+ * event itself means a replay against bad historical data still rejects
+ * via Zod instead of silently overriding with a 4 KB blob.
+ */
+export const traceNameChangedEventDataSchema = z.object({
+  traceId: z.string(),
+  /** New name. Trim happens at the command boundary; the event stores the canonical form. */
+  newName: z
+    .string()
+    .min(TRACE_NAME_MIN_LENGTH)
+    .max(TRACE_NAME_MAX_LENGTH),
+  /** User who made the change, if available — for audit + UI attribution. */
+  changedByUserId: z.string().nullable(),
+});
+
+export const traceNameChangedEventSchema = EventSchema.extend({
+  type: z.literal(TRACE_NAME_CHANGED_EVENT_TYPE),
+  data: traceNameChangedEventDataSchema,
+  metadata: traceNameChangedEventMetadataSchema,
+});
+
+export type TraceNameChangedEventData = z.infer<
+  typeof traceNameChangedEventDataSchema
+>;
+export type TraceNameChangedEvent = z.infer<typeof traceNameChangedEventSchema>;
+
+/**
+ * Type guard for TraceNameChangedEvent.
+ */
+export function isTraceNameChangedEvent(
+  event: TraceProcessingEvent,
+): event is TraceNameChangedEvent {
+  return event.type === TRACE_NAME_CHANGED_EVENT_TYPE;
+}
+
+/**
  * Union of all trace processing event types.
  */
 export type TraceProcessingEvent =
@@ -345,4 +396,5 @@ export type TraceProcessingEvent =
   | OriginResolvedEvent
   | AnnotationAddedEvent
   | AnnotationRemovedEvent
-  | AnnotationsBulkSyncedEvent;
+  | AnnotationsBulkSyncedEvent
+  | TraceNameChangedEvent;

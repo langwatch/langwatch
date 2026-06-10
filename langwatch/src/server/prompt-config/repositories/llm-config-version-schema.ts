@@ -12,6 +12,7 @@ import {
 import { nodeDatasetSchema } from "../../../optimization_studio/types/dsl";
 import { SchemaVersion } from "../enums";
 import type { LlmConfigVersionDTO } from "./llm-config-versions.repository";
+import { sortKeysDeep } from "./sortKeysDeep";
 
 export const LATEST_SCHEMA_VERSION = SchemaVersion.V1_0 as const;
 
@@ -126,6 +127,22 @@ export function parseLlmConfigVersion(
   }
 
   return validator.parse(llmConfigVersion);
+}
+
+export type RuntimeParameters = Record<string, unknown>;
+
+export function parseRuntimeParameters(value: unknown): RuntimeParameters {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as RuntimeParameters;
+  }
+  return {};
+}
+
+export function runtimeParametersEqual(a: unknown, b: unknown): boolean {
+  return (
+    JSON.stringify(sortKeysDeep(a ?? {})) ===
+    JSON.stringify(sortKeysDeep(b ?? {}))
+  );
 }
 
 export function isValidHandle(handle: string): boolean {

@@ -63,6 +63,7 @@ vi.mock("~/utils/api", () => ({
   api: {
     traces: { getEvaluations: { useQuery: () => ({ data: [], isLoading: false }) } },
     annotation: { createQueueItem: { useMutation: () => ({ mutate: vi.fn() }) } },
+    pinnedTrace: { getPin: { useQuery: () => ({ data: null, isLoading: false }) } },
     ops: { getScope: { useQuery: () => ({ data: null, isLoading: false, isSuccess: false }) } },
     useContext: () => ({
       annotation: {
@@ -81,6 +82,7 @@ vi.mock("~/components/traces/SequenceDiagram", () => ({ SequenceDiagramContainer
 vi.mock("~/components/traces/SpanTree", () => ({ SpanTree: () => <div>SpanTree</div> }));
 vi.mock("~/components/traces/Summary", () => ({ TraceSummary: () => <div>Summary</div> }));
 vi.mock("~/components/traces/ShareButton", () => ({ ShareButton: NullStub }));
+vi.mock("~/components/traces/PinButton", () => ({ PinButton: NullStub }));
 vi.mock("~/components/traces/AddParticipants", () => ({ AddParticipants: NullStub }));
 vi.mock("~/components/AddAnnotationQueueDrawer", () => ({ AddAnnotationQueueDrawer: NullStub }));
 vi.mock("~/components/ui/drawer", () => ({ Drawer: { CloseTrigger: NullStub } }));
@@ -128,6 +130,8 @@ describe("TraceDetails tabs", () => {
   });
 
   describe("when user is a lite member", () => {
+    /** @scenario Lite member opens trace details drawer from the messages page */
+    /** @scenario Lite member does not see "Trace Details" or "Sequence" tabs */
     it("hides Trace Details and Sequence tabs but shows Thread, Evaluations, User Events", () => {
       const tabs = renderTabs({ isLiteMember: true });
 

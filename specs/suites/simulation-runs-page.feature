@@ -4,6 +4,11 @@ Feature: Runs Page — Unified Navigation & URL Routing
   So that I can access run history through clean URLs, navigate directly to specific batch runs,
   and manage both external sets and run plans from one place
 
+  # All scenarios in this file describe URL routing + page-level UI on
+  # the Runs page (sidebar nav, query params, batch-run drilldown).
+  # Need a Next.js page-level integration harness or Playwright E2E
+  # to drive end-to-end. Aspirational pending that harness.
+
   Background:
     Given I am logged into project "my-project"
 

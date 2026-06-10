@@ -1,5 +1,4 @@
 import type { CustomGraph, Prisma } from "@prisma/client";
-import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { nanoid } from "nanoid";
@@ -8,21 +7,13 @@ import { badRequestSchema } from "~/app/api/shared/schemas";
 import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
-import {
-  type AuthMiddlewareVariables,
-  authMiddleware,
-  resourceLimitMiddleware,
-} from "../../middleware";
-import { loggerMiddleware } from "../../middleware/logger";
-import { tracerMiddleware } from "../../middleware/tracer";
+import { createProjectApp, requires } from "~/server/api/security";
+import { resourceLimitMiddleware } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
-import { handleError } from "../../middleware";
 
 patchZodOpenapi();
 
 const logger = createLogger("langwatch:api:graphs");
-
-type Variables = AuthMiddlewareVariables;
 
 const graphResponseSchema = z.object({
   id: z.string(),
@@ -71,17 +62,14 @@ function toGraphResponse(graph: CustomGraph) {
   };
 }
 
-export const app = new Hono<{ Variables: Variables }>()
-  .basePath("/api/graphs")
-  .use(tracerMiddleware({ name: "graphs" }))
-  .use(loggerMiddleware())
-  .use(authMiddleware)
-  .onError(handleError)
+const secured = createProjectApp({
+  basePath: "/api/graphs",
+});
 
-  // ── List Graphs ────────────────────────────────────────────
-  .get(
-    "/",
-    describeRoute({
+// ── List Graphs ────────────────────────────────────────────
+secured.access(requires("analytics:view")).get(
+  "/",
+  describeRoute({
       description: "List all custom graphs, optionally filtered by dashboard",
       responses: {
         ...baseResponses,
@@ -115,12 +103,12 @@ export const app = new Hono<{ Variables: Variables }>()
 
       return c.json(graphs.map(toGraphResponse));
     },
-  )
+);
 
-  // ── Get Graph ──────────────────────────────────────────────
-  .get(
-    "/:id",
-    describeRoute({
+// ── Get Graph ──────────────────────────────────────────────
+secured.access(requires("analytics:view")).get(
+  "/:id",
+  describeRoute({
       description: "Get a custom graph by its ID",
       responses: {
         ...baseResponses,
@@ -154,13 +142,13 @@ export const app = new Hono<{ Variables: Variables }>()
 
       return c.json(toGraphResponse(graph));
     },
-  )
+);
 
-  // ── Create Graph ───────────────────────────────────────────
-  .post(
-    "/",
-    resourceLimitMiddleware("customGraphs"),
-    describeRoute({
+// ── Create Graph ───────────────────────────────────────────
+secured.access(requires("analytics:manage")).post(
+  "/",
+  resourceLimitMiddleware("customGraphs"),
+  describeRoute({
       description: "Create a custom graph on a dashboard",
       responses: {
         ...baseResponses,
@@ -206,12 +194,12 @@ export const app = new Hono<{ Variables: Variables }>()
 
       return c.json(toGraphResponse(graph), 201);
     },
-  )
+);
 
-  // ── Update Graph ───────────────────────────────────────────
-  .patch(
-    "/:id",
-    describeRoute({
+// ── Update Graph ───────────────────────────────────────────
+secured.access(requires("analytics:manage")).patch(
+  "/:id",
+  describeRoute({
       description: "Update a custom graph's name, definition, or filters",
       responses: {
         ...baseResponses,
@@ -256,12 +244,12 @@ export const app = new Hono<{ Variables: Variables }>()
 
       return c.json(toGraphResponse(updated));
     },
-  )
+);
 
-  // ── Delete Graph ───────────────────────────────────────────
-  .delete(
-    "/:id",
-    describeRoute({
+// ── Delete Graph ───────────────────────────────────────────
+secured.access(requires("analytics:manage")).delete(
+  "/:id",
+  describeRoute({
       description: "Delete a custom graph",
       responses: {
         ...baseResponses,
@@ -299,4 +287,6 @@ export const app = new Hono<{ Variables: Variables }>()
 
       return c.json({ id, deleted: true });
     },
-  );
+);
+
+export const app = secured.hono;

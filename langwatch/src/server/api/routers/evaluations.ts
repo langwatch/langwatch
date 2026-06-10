@@ -9,15 +9,15 @@ import { trackServerEvent } from "~/server/posthog";
 import { createLogger } from "~/utils/logger/server";
 import {
   AZURE_SAFETY_ENV_VARS,
-  getAzureSafetyEnvFromProject,
   isAzureEvaluatorType,
 } from "../../app-layer/evaluations/azure-safety-env";
+import { getAzureSafetyEnvFromProject } from "../../app-layer/evaluations/azure-safety-env.server";
 import { runEvaluationForTrace } from "../../background/workers/evaluationsWorker";
 import {
   AVAILABLE_EVALUATORS,
+  evaluatorsSchema,
   type EvaluatorTypes,
 } from "../../evaluations/evaluators.generated";
-import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
 import { mappingStateSchema } from "../../tracer/tracesMapping";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -86,7 +86,7 @@ export const evaluationsRouter = createTRPCRouter({
         traceId: input.traceId,
         evaluatorType: input.evaluatorType as EvaluatorTypes,
         settings: input.settings,
-        mappings: input.mappings ?? {},
+        mappings: input.mappings ?? null,
         protections,
       });
 

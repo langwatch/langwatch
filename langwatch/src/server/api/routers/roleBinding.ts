@@ -4,6 +4,7 @@ import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { RoleBindingService } from "~/server/role-bindings/role-binding.service";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
+import { RoleService } from "~/server/role/role.service";
 
 const scopeTypeSchema = z.nativeEnum(RoleBindingScopeType);
 const roleSchema = z.nativeEnum(TeamUserRole);
@@ -21,7 +22,8 @@ export const roleBindingRouter = createTRPCRouter({
     .use(checkOrganizationPermission("organization:manage"))
     .query(async ({ ctx, input }) => {
       const repo = new PrismaRoleBindingRepository(ctx.prisma);
-      const service = new RoleBindingService(ctx.prisma, repo);
+      const roleService = new RoleService(ctx.prisma);
+      const service = new RoleBindingService(ctx.prisma, repo, roleService);
       return service.listForOrg({ organizationId: input.organizationId });
     }),
 
@@ -34,7 +36,8 @@ export const roleBindingRouter = createTRPCRouter({
     .use(checkOrganizationPermission("organization:manage"))
     .query(async ({ ctx, input }) => {
       const repo = new PrismaRoleBindingRepository(ctx.prisma);
-      const service = new RoleBindingService(ctx.prisma, repo);
+      const roleService = new RoleService(ctx.prisma);
+      const service = new RoleBindingService(ctx.prisma, repo, roleService);
       return service.listForUser({ organizationId: input.organizationId, userId: input.userId });
     }),
 
@@ -47,7 +50,8 @@ export const roleBindingRouter = createTRPCRouter({
     .use(checkOrganizationPermission("organization:view"))
     .query(async ({ ctx, input }) => {
       const repo = new PrismaRoleBindingRepository(ctx.prisma);
-      const service = new RoleBindingService(ctx.prisma, repo);
+      const roleService = new RoleService(ctx.prisma);
+      const service = new RoleBindingService(ctx.prisma, repo, roleService);
       return service.getMyAccessBreakdown({
         organizationId: input.organizationId,
         userId: ctx.session.user.id,
@@ -77,7 +81,8 @@ export const roleBindingRouter = createTRPCRouter({
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ ctx, input }) => {
       const repo = new PrismaRoleBindingRepository(ctx.prisma);
-      const service = new RoleBindingService(ctx.prisma, repo);
+      const roleService = new RoleService(ctx.prisma);
+      const service = new RoleBindingService(ctx.prisma, repo, roleService);
       return service.create({
         organizationId: input.organizationId,
         userId: input.userId,
@@ -104,7 +109,8 @@ export const roleBindingRouter = createTRPCRouter({
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ ctx, input }) => {
       const repo = new PrismaRoleBindingRepository(ctx.prisma);
-      const service = new RoleBindingService(ctx.prisma, repo);
+      const roleService = new RoleService(ctx.prisma);
+      const service = new RoleBindingService(ctx.prisma, repo, roleService);
       return service.update({
         organizationId: input.organizationId,
         bindingId: input.bindingId,
@@ -126,7 +132,8 @@ export const roleBindingRouter = createTRPCRouter({
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ ctx, input }) => {
       const repo = new PrismaRoleBindingRepository(ctx.prisma);
-      const service = new RoleBindingService(ctx.prisma, repo);
+      const roleService = new RoleService(ctx.prisma);
+      const service = new RoleBindingService(ctx.prisma, repo, roleService);
       return service.delete({
         organizationId: input.organizationId,
         bindingId: input.bindingId,
@@ -157,7 +164,8 @@ export const roleBindingRouter = createTRPCRouter({
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ ctx, input }) => {
       const repo = new PrismaRoleBindingRepository(ctx.prisma);
-      const service = new RoleBindingService(ctx.prisma, repo);
+      const roleService = new RoleService(ctx.prisma);
+      const service = new RoleBindingService(ctx.prisma, repo, roleService);
       return service.applyMemberBindings({
         organizationId: input.organizationId,
         userId: input.userId,

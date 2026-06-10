@@ -97,6 +97,7 @@ describe("AuditLog consolidation — gateway writes land in platform AuditLog", 
   }, 60_000);
 
   describe("when GatewayAuditLog table is dropped", () => {
+    /** @scenario Migration drops GatewayAuditLog cleanly */
     it("drops gatewayAuditLog from the prisma client", () => {
       // Post-consolidation `prisma.gatewayAuditLog` is undefined — would
       // throw at runtime. Since the Prisma client is generated from
@@ -112,6 +113,7 @@ describe("AuditLog consolidation — gateway writes land in platform AuditLog", 
   });
 
   describe("when the gateway audit adapter writes a VK row", () => {
+    /** @scenario Virtual Key creation writes a unified AuditLog row */
     it("creates an AuditLog row in gateway shape (targetKind + before/after)", async () => {
       const before = await prisma.auditLog.count({
         where: { organizationId: ORG_ID, action: "gateway.virtual_key.created" },
@@ -156,6 +158,8 @@ describe("AuditLog consolidation — gateway writes land in platform AuditLog", 
       expect(after).toBe(before + 1);
     });
 
+    /** @scenario Virtual Key update captures before/after diff */
+    /** @scenario Budget mutation writes targetKind=budget */
     it("captures before/after diff on update events", async () => {
       await auditLog.append({
         organizationId: ORG_ID,
@@ -185,6 +189,7 @@ describe("AuditLog consolidation — gateway writes land in platform AuditLog", 
   });
 
   describe("when getAuditLogs is queried for the org", () => {
+    /** @scenario Settings → Audit log surfaces all gateway events */
     it("returns gateway rows with source='gateway'", async () => {
       const result = await organizations.getAuditLogs({
         organizationId: ORG_ID,
@@ -202,6 +207,7 @@ describe("AuditLog consolidation — gateway writes land in platform AuditLog", 
       expect(sample.user?.id).toBe(ACTOR_USER_ID);
     });
 
+    /** @scenario Filter by target kind narrows to gateway events only */
     it("filters to gateway-only when targetKind is set (deep-link path)", async () => {
       const result = await organizations.getAuditLogs({
         organizationId: ORG_ID,
@@ -219,6 +225,8 @@ describe("AuditLog consolidation — gateway writes land in platform AuditLog", 
       }
     });
 
+    /** @scenario Deep-link from VK detail page lands pre-filtered */
+    /** @scenario Deep-link from Budget detail page lands pre-filtered */
     it("filters to a specific resource when targetId is set", async () => {
       const result = await organizations.getAuditLogs({
         organizationId: ORG_ID,

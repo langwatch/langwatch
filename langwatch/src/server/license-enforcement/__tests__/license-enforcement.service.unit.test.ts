@@ -176,6 +176,7 @@ describe("LicenseEnforcementService", () => {
   });
 
   describe("enforceLimit", () => {
+    /** @scenario Allows workflow creation when under limit */
     it("does not throw when limit is not exceeded", async () => {
       vi.mocked(mockRepository.getWorkflowCount).mockResolvedValue(2);
 
@@ -184,6 +185,7 @@ describe("LicenseEnforcementService", () => {
       ).resolves.toBeUndefined();
     });
 
+    /** @scenario Blocks workflow creation when at limit */
     it("throws LimitExceededError when limit is reached", async () => {
       vi.mocked(mockRepository.getWorkflowCount).mockResolvedValue(3);
 
@@ -192,7 +194,8 @@ describe("LicenseEnforcementService", () => {
       );
     });
 
-    it("includes current and max in LimitExceededError", async () => {
+    /** @scenario Blocks prompt creation when at limit */
+    it("includes current, max, and prompts label in LimitExceededError", async () => {
       vi.mocked(mockRepository.getPromptCount).mockResolvedValue(5);
 
       try {
@@ -204,6 +207,7 @@ describe("LicenseEnforcementService", () => {
         expect(limitError.limitType).toBe("prompts");
         expect(limitError.current).toBe(5);
         expect(limitError.max).toBe(5);
+        expect(limitError.message).toContain("maximum number of prompts");
       }
     });
 
@@ -248,7 +252,8 @@ describe("LicenseEnforcementService", () => {
       expect(mockRepository.getProjectCount).toHaveBeenCalledWith("org-456");
     });
 
-    it("throws LimitExceededError when limit is reached", async () => {
+    /** @scenario Blocks team creation when at limit */
+    it("throws LimitExceededError mentioning teams when team limit is reached", async () => {
       vi.mocked(mockRepository.getTeamCount).mockResolvedValue(5);
 
       await expect(
@@ -256,10 +261,11 @@ describe("LicenseEnforcementService", () => {
           organizationId: "org-123",
           limitType: "teams",
         })
-      ).rejects.toThrow(LimitExceededError);
+      ).rejects.toThrow(/maximum number of teams/);
     });
 
-    it("does not throw when limit is not exceeded", async () => {
+    /** @scenario Allows project creation when under limit */
+    it("does not throw when project count is below project limit", async () => {
       vi.mocked(mockRepository.getProjectCount).mockResolvedValue(2);
 
       await expect(
@@ -268,6 +274,18 @@ describe("LicenseEnforcementService", () => {
           limitType: "projects",
         })
       ).resolves.toBeUndefined();
+    });
+
+    /** @scenario Blocks project creation when over limit */
+    it("throws LimitExceededError when project count exceeds project limit", async () => {
+      vi.mocked(mockRepository.getProjectCount).mockResolvedValue(11);
+
+      await expect(
+        service.enforceLimitByOrganization({
+          organizationId: "org-123",
+          limitType: "projects",
+        })
+      ).rejects.toThrow(LimitExceededError);
     });
 
     it("does not require user parameter", async () => {

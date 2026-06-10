@@ -5,12 +5,27 @@ import { createLogger } from "~/utils/logger/server";
 import { BroadcasterNotActiveError } from "./errors";
 import { TenantRateLimiter } from "./tenant-rate-limiter";
 
-export type BroadcastEventType = "trace_updated" | "simulation_updated" | "export_progress";
+export type BroadcastEventType =
+  | "trace_updated"
+  | "simulation_updated"
+  | "export_progress"
+  | "presence_updated"
+  | "presence_cursor"
+  // Fires when a tenant's facet `discover` payload finishes background
+  // refresh and a newer snapshot is now warm in the shared cache. The
+  // sidebar client subscribes to this and invalidates its TanStack
+  // Query cache for the discover endpoint — the next read pulls the
+  // freshly-warmed value from Redis without paying the ClickHouse
+  // cost. Payload is empty: the client refetches via tRPC.
+  | "discover_updated";
 
 const ALL_EVENT_TYPES: BroadcastEventType[] = [
   "trace_updated",
   "simulation_updated",
   "export_progress",
+  "presence_updated",
+  "presence_cursor",
+  "discover_updated",
 ];
 
 function redisChannel(eventType: BroadcastEventType): string {

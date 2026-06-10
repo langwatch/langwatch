@@ -12,7 +12,7 @@ description: "Resource requirements, size profiles, and scaling recommendations 
 
 ### Kubernetes (production)
 
-- Minimum 3 nodes with 4 CPU / 16 GB each
+- Minimum 3 nodes with 4 CPU, 16 GB each
 - StorageClass that supports dynamic provisioning
 - See size profiles below for detailed per-component requirements
 
@@ -24,7 +24,7 @@ These are the default resource requests and limits from the Helm chart (`values.
 |-----------|-------------|-----------|----------------|--------------|---------|
 | LangWatch App | 250m | 1000m | 2Gi | 4Gi | --- |
 | LangWatch Workers | 250m | 1000m | 2Gi | 4Gi | --- |
-| LangWatch NLP | 1000m | 2000m | 2Gi | 4Gi | --- |
+| LangWatch NLP | 250m | 1000m | 256Mi | 1Gi | --- |
 | LangEvals | 1000m | 2000m | 6Gi | 8Gi | --- |
 | PostgreSQL | 250m | 1000m | 512Mi | 1Gi | 20Gi |
 | ClickHouse | 2 cores | 2 cores | 4Gi | 4Gi | 50Gi |
@@ -63,7 +63,7 @@ For production with single-node ClickHouse.
 
 - LangWatch App: 2 replicas, 500m/2 CPU, 2Gi/4Gi memory, PDB minAvailable 1
 - LangWatch Workers: 2 replicas, 500m/2 CPU, 2Gi/4Gi memory
-- LangWatch NLP: 1 replica, 1/2 CPU, 2Gi/4Gi memory
+- LangWatch NLP: 1 replica, 250m/1 CPU, 256Mi/1Gi memory
 - LangEvals: 1 replica, 1/2 CPU, 4Gi/8Gi memory
 - ClickHouse: 4 CPU, 8Gi memory, 100Gi storage
 - PostgreSQL: 20Gi storage
@@ -83,7 +83,7 @@ For production with replicated ClickHouse.
 
 - LangWatch App: 3 replicas, 1/2 CPU, 4Gi/4Gi memory, PDB minAvailable 2
 - LangWatch Workers: 3 replicas, 1/2 CPU, 4Gi/4Gi memory, PDB minAvailable 2
-- LangWatch NLP: 2 replicas, 1/2 CPU, 2Gi/4Gi memory
+- LangWatch NLP: 2 replicas, 250m/1 CPU, 256Mi/1Gi memory
 - LangEvals: 2 replicas, 1/2 CPU, 4Gi/8Gi memory
 - ClickHouse: 3 nodes, 4 CPU, 16Gi memory, 300Gi storage each
 - PostgreSQL: 50Gi storage
@@ -104,11 +104,11 @@ helm install langwatch langwatch/langwatch \
 
 | Bottleneck | Component to Scale | How |
 |---|---|---|
-| Trace ingestion is slow / queue backlog | LangWatch Workers | Increase `workers.replicaCount` |
-| UI is slow / many concurrent users | LangWatch App | Increase `app.replicaCount` |
+| Trace ingestion is slow, queue backlog | LangWatch Workers | Increase `workers.replicaCount` |
+| UI is slow, many concurrent users | LangWatch App | Increase `app.replicaCount` |
 | ClickHouse queries are slow | ClickHouse | Increase `clickhouse.cpu` and `clickhouse.memory` |
 | Evaluations are slow | LangEvals | Increase `langevals.replicaCount` |
-| Topic clustering is slow | LangWatch NLP | Increase `langwatch_nlp.replicaCount` |
+| Topic clustering is slow | LangEvals | Increase `langevals.replicaCount` |
 
 ### Horizontal Pod Autoscaler (HPA)
 

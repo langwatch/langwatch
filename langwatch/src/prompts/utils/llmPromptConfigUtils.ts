@@ -2,7 +2,7 @@ import { PromptScope } from "@prisma/client";
 import type { Node } from "@xyflow/react";
 import type { DeepPartial } from "react-hook-form";
 
-import type { LocalPromptConfig } from "~/evaluations-v3/types";
+import type { LocalPromptConfig } from "~/experiments-v3/types";
 import type {
   Component,
   LlmConfigParameter,
@@ -137,6 +137,7 @@ export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
     handle: llmNode.handle ?? null,
     scope: scope ?? PromptScope.PROJECT,
     version: {
+      parameters: {},
       configData: {
         inputs,
         outputs,
@@ -537,6 +538,7 @@ export function formValuesToTriggerSaveVersionParams(
     verbosity: llm.verbosity,
     promptingTechnique: formValues.version.configData.promptingTechnique,
     demonstrations: formValues.version.configData.demonstrations,
+    parameters: formValues.version.parameters,
   };
 }
 
@@ -610,6 +612,7 @@ export function versionedPromptToPromptConfigFormValues(
     handle: isHandleValid ? shortHandle : null,
     scope: prompt.scope,
     version: {
+      parameters: prompt.parameters ?? {},
       configData: {
         prompt: prompt.prompt,
         // The system message should be stored in the prompt field in the DB,
@@ -676,6 +679,7 @@ export function versionedPromptToOptimizationStudioNodeData(
     | "localPromptConfig"
     | "promptId"
     | "promptVersionId"
+    | "promptDraft"
   >
 > {
   return {

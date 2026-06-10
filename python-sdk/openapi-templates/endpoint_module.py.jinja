@@ -1,0 +1,166 @@
+{# LangWatch fork of openapi-python-client v0.28.4 endpoint_module.py.jinja.
+   The only change vs upstream is the safe_http_status wrapper used in
+   _build_response (see below).
+
+   Revisit this override when bumping openapi-python-client (pinned in
+   Makefile). Upstream tracking:
+     https://github.com/openapi-generators/openapi-python-client/issues/1442
+     https://github.com/openapi-generators/openapi-python-client/pull/1407
+   If a non-crashing path lands (opt-in flag or new default), switch to
+   it and drop this template. #}
+from typing import Any, cast
+from urllib.parse import quote
+
+import httpx
+
+from ...client import AuthenticatedClient, Client
+from ...types import Response, UNSET, safe_http_status
+from ... import errors
+
+{% for relative in endpoint.relative_imports | sort %}
+{{ relative }}
+{% endfor %}
+
+{% from "endpoint_macros.py.jinja" import header_params, cookie_params, query_params,
+    arguments, client, kwargs, parse_response, docstring, body_to_kwarg %}
+
+{% set return_string = endpoint.response_type() %}
+{% set parsed_responses = (endpoint.responses | length > 0) and return_string != "Any" %}
+
+def _get_kwargs(
+    {{ arguments(endpoint, include_client=False) | indent(4) }}
+) -> dict[str, Any]:
+    {{ header_params(endpoint) | indent(4) }}
+
+    {{ cookie_params(endpoint) | indent(4) }}
+
+    {{ query_params(endpoint) | indent(4) }}
+
+    _kwargs: dict[str, Any] = {
+        "method": "{{ endpoint.method }}",
+        {% if endpoint.path_parameters %}
+        "url": "{{ endpoint.path }}".format(
+        {%- for parameter in endpoint.path_parameters -%}
+        {{parameter.python_name}}=quote(str({{parameter.python_name}}), safe=""),
+        {%- endfor -%}
+        ),
+        {% else %}
+        "url": "{{ endpoint.path }}",
+        {% endif %}
+        {% if endpoint.query_parameters %}
+        "params": params,
+        {% endif %}
+        {% if endpoint.cookie_parameters %}
+        "cookies": cookies,
+        {% endif %}
+    }
+
+{% if endpoint.bodies | length > 1 %}
+{% for body in endpoint.bodies %}
+    if isinstance(body, {{body.prop.get_type_string(no_optional=True) }}):
+        {{ body_to_kwarg(body) | indent(8) }}
+        headers["Content-Type"] = "{{ body.content_type }}"
+{% endfor %}
+{% elif endpoint.bodies | length == 1 %}
+{% set body = endpoint.bodies[0] %}
+    {{ body_to_kwarg(body) | indent(4) }}
+    {% if body.content_type != "multipart/form-data" %}{# Need httpx to set the boundary automatically #}
+    headers["Content-Type"] = "{{ body.content_type }}"
+    {% endif %}
+{% endif %}
+
+{% if endpoint.header_parameters or endpoint.bodies | length > 0 %}
+    _kwargs["headers"] = headers
+{% endif %}
+    return _kwargs
+
+{% if endpoint.responses.default %}
+    {% set return_type = return_string %}
+{% else %}
+    {% set return_type = return_string + " | None" %}
+{% endif %}
+
+
+def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> {{return_type}}:
+    {% for response in endpoint.responses.patterns %}
+    {% set code_range = response.status_code.range %}
+    {% if code_range[0] == code_range[1] %}
+    if response.status_code == {{ code_range[0] }}:
+    {% else %}
+    if {{ code_range[0] }} <= response.status_code <= {{ code_range[1] }}:
+    {% endif %}
+        {{ parse_response(parsed_responses, response) | indent(8) }}
+    {% endfor %}
+    {% if endpoint.responses.default %}
+    {{ parse_response(parsed_responses, endpoint.responses.default) | indent(4) }}
+    {% else %}
+    if client.raise_on_unexpected_status:
+        raise errors.UnexpectedStatus(response.status_code, response.content)
+    else:
+        return None
+    {% endif %}
+
+
+def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Response[{{ return_string }}]:
+    # LangWatch override: use safe_http_status to tolerate non-IANA status codes
+    # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
+    # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
+    return Response(
+        status_code=safe_http_status(response.status_code),
+        content=response.content,
+        headers=response.headers,
+        parsed=_parse_response(client=client, response=response),
+    )
+
+
+def sync_detailed(
+    {{ arguments(endpoint) | indent(4) }}
+) -> Response[{{ return_string }}]:
+    {{ docstring(endpoint, return_string, is_detailed=true) | indent(4) }}
+
+    kwargs = _get_kwargs(
+        {{ kwargs(endpoint, include_client=False) }}
+    )
+
+    response = client.get_httpx_client().request(
+        **kwargs,
+    )
+
+    return _build_response(client=client, response=response)
+
+{% if parsed_responses %}
+def sync(
+    {{ arguments(endpoint) | indent(4) }}
+) -> {{ return_string }} | None:
+    {{ docstring(endpoint, return_string, is_detailed=false) | indent(4) }}
+
+    return sync_detailed(
+        {{ kwargs(endpoint) }}
+    ).parsed
+{% endif %}
+
+async def asyncio_detailed(
+    {{ arguments(endpoint) | indent(4) }}
+) -> Response[{{ return_string }}]:
+    {{ docstring(endpoint, return_string, is_detailed=true) | indent(4) }}
+
+    kwargs = _get_kwargs(
+        {{ kwargs(endpoint, include_client=False) }}
+    )
+
+    response = await client.get_async_httpx_client().request(
+        **kwargs
+    )
+
+    return _build_response(client=client, response=response)
+
+{% if parsed_responses %}
+async def asyncio(
+    {{ arguments(endpoint) | indent(4) }}
+) -> {{ return_string }} | None:
+    {{ docstring(endpoint, return_string, is_detailed=false) | indent(4) }}
+
+    return (await asyncio_detailed(
+        {{ kwargs(endpoint) }}
+    )).parsed
+{% endif %}

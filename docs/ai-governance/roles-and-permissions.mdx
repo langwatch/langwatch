@@ -1,0 +1,119 @@
+---
+title: Roles & permissions
+description: The org-role, team-role, permission catalog and how role bindings stitch them together. Pre-built ADMIN, MEMBER, EXTERNAL, VIEWER roles plus custom roles via the CustomRolePermissions JSON column. Lives at /settings/roles + /settings/role-bindings.
+sidebarTitle: Roles & permissions
+---
+
+LangWatch RBAC has two layers, two surfaces, and one stitching mechanism:
+
+- **Two layers**: *organization roles* (org-wide capabilities, e.g. `ADMIN`, `MEMBER`, `EXTERNAL`) and *team roles* (per-team capabilities, e.g. `ADMIN`, `MEMBER`, `VIEWER`).
+- **Two surfaces**: `/settings/roles` (the role catalog: pre-built + custom) and `/settings/role-bindings` (who is bound to what role at what scope).
+- **One stitching mechanism**: a `RoleBinding` row glues a *user* to a *role* at a *scope* (organization, team, project, or governance subscope).
+
+Most orgs never touch this page. The pre-built roles cover the common cases. You only land here when you need to delegate `aiTools:manage` without granting full `organization:manage`, or when an audit asks "who can read the audit log" and you want a screen instead of a Slack thread.
+
+<Info>**Pairs with:** [Members & invites](/ai-governance/members-and-invites) (assigning roles when inviting), [Audit log](/ai-governance/audit-log) (every role binding mutation records a row), and [AI Gateway → RBAC](/ai-gateway/rbac) (the gateway-side enforcement of permissions).</Info>
+
+## Organization roles
+
+The three pre-built org roles. Each user in the org has exactly one.
+
+| Org role | Defaults | What it grants by default |
+|---|---|---|
+| **ADMIN** | First user to sign in becomes admin | `organization:view`, `organization:manage`, `organization:delete`; the full governance surface (`governance:view`, `governance:manage`, `ingestionSources:*`, `anomalyRules:*`, `complianceExport:view`, `activityMonitor:view`); `aiTools:view` + `aiTools:manage`. |
+| **MEMBER** | Default for invitees | `organization:view`, `aiTools:view`. **No** governance permissions, **no** member-list reads, **no** audit log access by default. The team-role (below) is what gives them anything beyond `/me`. |
+| **EXTERNAL** | Lite-member shape, opt-in via the invite drawer | Same as MEMBER. EXTERNAL also has stricter team-level defaults: even when on a team they default to view-only on most resources. |
+
+The minimum-privilege default is intentional: an `ORGANIZATION` role binding for a MEMBER does **not** grant team-level access. Team-level permissions come from team-role bindings (next).
+
+## Team roles
+
+The four pre-built team roles. A user can have **different** team roles on different teams (`ADMIN` on Engineering, `VIEWER` on Marketing).
+
+| Team role | What it grants by default |
+|---|---|
+| **ADMIN** | The full team-scoped permission set: `project:create/update`, `analytics:manage`, `traces:create`, `virtualKeys:create/update/rotate/manage`, `gatewayBudgets:view/manage`, `gatewayProviders:view/update/manage`, `routingPolicies:view/manage`, `gatewayGuardrails:view/attach/detach/manage`, `gatewayLogs:view`, `auditLog:view`, `gatewayUsage:view`, `gatewayCacheRules:*`. |
+| **MEMBER** | Same shape minus the `*:manage` permissions. Read + create + update on most resources; can't delete or reconfigure providers, policies. |
+| **VIEWER** | View-only across the team. No create, update, delete on anything. The right shape for stakeholders who need read access to a team's traces but should never reconfigure anything. |
+| **CUSTOM** | Empty by default. Permissions come from the `CustomRolePermissions` JSON column on the `RoleBinding` row, see [Custom roles](#custom-roles) below. |
+
+A user's effective permissions on a resource are the **union** of every binding that applies, org-level baseline + team-level baseline + any custom-role overrides.
+
+## Permission catalog
+
+Every gate in the codebase is a string of the shape `<resource>:<verb>`. The full catalog (abridged):
+
+- **Organization**: `organization:view`, `organization:manage`, `organization:delete`.
+- **Governance**: `governance:view`, `governance:manage`, `ingestionSources:*`, `anomalyRules:*`, `complianceExport:view`, `activityMonitor:view`.
+- **AI Tools Portal**: `aiTools:view` (everyone), `aiTools:manage` (admin).
+- **Audit log**: `auditLog:view` (team-level by default; **note** the audit log UI page is gated to `organization:manage`, the underlying procedure is on `auditLog:view`).
+- **Per-team resources**: `project:*`, `analytics:*`, `traces:*`, `virtualKeys:*`, `gatewayBudgets:*`, `gatewayProviders:*`, `routingPolicies:*`, `gatewayGuardrails:*`, `gatewayLogs:*`, `gatewayUsage:*`, `gatewayCacheRules:*`, `evaluations:*`, `datasets:*`, `workflows:*`, `prompts:*`, `scenarios:*`, `secrets:*`.
+
+## What `organization:manage` gates today
+
+After this PR's RBAC defense-in-depth pass, the legacy `/settings/{audit-log, teams, members, roles, groups}` pages all require `organization:manage` (admins only). Underlying tRPC procedures match, `role.getAll`, `organization.getAllOrganizationMembers`, `organization.getOrganizationPendingInvites`, `team.getTeamsWithRoleBindings`, `organization.getMemberById`, `group.getById`, `group.listForMember`, `group.listAll`, `limits.checkAndSendUsageLimitNotification` are all gated to `organization:manage` server-side.
+
+Picker procedures (`team.getTeamsWithMembers`, `team.getTeamWithMembers`, `organization.getOrganizationWithMembersAndTheirTeams`) intentionally stay on `organization:view` so non-admin pickers (the AddAutomationDrawer, GroupBindingInputRow, project pickers, onboarding flows) continue working, but they redact other members' email addresses to `null` for non-admin callers and strip other users' [Personal Workspaces](/ai-governance/workspaces#personal-workspace-privacy) from the result entirely.
+
+## The role catalog at `/settings/roles`
+
+The catalog page lists every role available in the org:
+
+- 4 pre-built org roles (ADMIN, MEMBER, EXTERNAL, VIEWER).
+- 4 pre-built team roles (ADMIN, MEMBER, VIEWER, CUSTOM).
+- Any custom roles your admin has authored (see below).
+
+Pre-built rows are **read-only**: you can't change what `MEMBER` does, because the gateway and the control plane both encode those defaults. Custom rows are editable.
+
+## Custom roles
+
+Custom roles are how you say "let `bob@acme.test` manage the AI Tools Portal but not the rest of the org." They're a `RoleBinding` row whose `role = "CUSTOM"` and whose `customRoleId` references a `CustomRole` row whose `permissions` JSON column lists exactly the gates that role grants.
+
+To create one:
+
+1. Open `/settings/roles` → **+ New custom role**.
+2. Name the role (e.g. `aitools-curator`).
+3. Tick the permissions to grant. Permissions are scope-aware, granting `aiTools:manage` at organization scope is different from granting it at team scope.
+4. Save.
+
+To **bind** the role to a user:
+
+1. Open `/settings/role-bindings` → **+ New binding**.
+2. Pick the user, pick the role (`aitools-curator` from the catalog), pick the scope (`Organization`, a specific team, a specific project, a governance subscope).
+3. Save.
+
+The binding is now active. The user's effective permissions are the union of:
+
+- Their org-role defaults (e.g. MEMBER → `organization:view` + `aiTools:view`).
+- Their team-role defaults for every team they're on.
+- The new custom binding (`aiTools:manage` at org scope).
+
+## Role bindings at `/settings/role-bindings`
+
+The bindings page is a **deep table**: every active `RoleBinding` row in the org. Filter by user, role, scope, or scope target. The most common admin questions:
+
+| Question | Filter |
+|---|---|
+| Who can manage the AI Tools Portal? | Role = `aiTools-curator` (or any custom role granting `aiTools:manage`). |
+| Who has admin on the Marketing team? | Role = `ADMIN`, Scope = `Team`, Scope target = Marketing. |
+| What does `bob@acme.test` actually have access to? | User = bob. Cross-reference with the [permission catalog](#permission-catalog) for what each role grants. |
+| Has anyone been bound at `Organization` scope to `MEMBER`? | Role = `MEMBER`, Scope = `Organization`. (Note: org-scoped MEMBER bindings do NOT imply team- or project-level access, the resolver is hierarchical.) |
+
+The page is the answer to "who can do what in this org." Every change records an audit log row.
+
+## How permissions resolve at request time
+
+A request hitting any `*:manage`-gated procedure flows through `checkOrganizationPermission` (or `checkTeamPermission` for team-scoped procs), which:
+
+1. Walks the user's role bindings.
+2. Builds the effective permission set as the union of: org-role defaults + every team-role default the user has + every custom-role permission via active bindings.
+3. Returns `true` if the requested permission is in the set.
+
+The resolver is **per-request**. Permission changes take effect on the next request from the user, there's no session-level cache. JWT TTL (1h) is the upper bound on how long a stale grant can leak via existing tokens.
+
+## Where to next
+
+- **Invite someone with a specific role**: [Members & invites](/ai-governance/members-and-invites).
+- **Audit who did what**: [Audit log](/ai-governance/audit-log).
+- **Gateway-side enforcement**: [AI Gateway → RBAC](/ai-gateway/rbac).
+- **Workspace scoping**: [Workspaces](/ai-governance/workspaces) (where org, team, project sit relative to each other).

@@ -26,15 +26,15 @@ import (
 // Header names — case-insensitive on the wire (Go canonicalizes via
 // http.Header.Get / textproto.CanonicalMIMEHeaderKey).
 const (
-	headerPrefix          = "x-litellm-"
-	headerModel           = "x-litellm-model"
+	headerPrefix            = "x-litellm-"
+	headerModel             = "x-litellm-model"
 	headerCustomLLMProvider = "x-litellm-custom_llm_provider"
 
 	// Provider-specific
-	headerAPIKey          = "x-litellm-api_key"
-	headerAPIBase         = "x-litellm-api_base"
-	headerOrganization    = "x-litellm-organization"
-	headerAPIVersion      = "x-litellm-api_version"
+	headerAPIKey       = "x-litellm-api_key"
+	headerAPIBase      = "x-litellm-api_base"
+	headerOrganization = "x-litellm-organization"
+	headerAPIVersion   = "x-litellm-api_version"
 
 	headerAWSAccessKeyID     = "x-litellm-aws_access_key_id"
 	headerAWSSecretAccessKey = "x-litellm-aws_secret_access_key"
@@ -46,8 +46,8 @@ const (
 	headerVertexProject     = "x-litellm-vertex_project"
 	headerVertexLocation    = "x-litellm-vertex_location"
 
-	headerExtraHeaders   = "x-litellm-extra_headers"
-	headerUseAzureGW     = "x-litellm-use_azure_gateway"
+	headerExtraHeaders = "x-litellm-extra_headers"
+	headerUseAzureGW   = "x-litellm-use_azure_gateway"
 )
 
 // ParseCredentialFromHeaders builds a domain.Credential from the
@@ -72,6 +72,7 @@ func ParseCredentialFromHeaders(h http.Header) (domain.Credential, error) {
 		Extra:      make(map[string]string),
 	}
 
+	//nolint:exhaustive // playground credential header extraction only models the provider shapes that ship credentials inline today; unmapped providers (e.g. ProviderVoyage) fall through with empty Extra.
 	switch provider {
 	case domain.ProviderOpenAI, domain.ProviderAnthropic, domain.ProviderGemini:
 		cred.APIKey = h.Get(headerAPIKey)

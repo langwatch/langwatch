@@ -62,6 +62,16 @@ Feature: Child drawers open as nested overlays instead of navigating
   # Case 3: Scenario run detail -> View Trace (regression guard)
   # Already works via local state - these verify no regression.
   # ---------------------------------------------------------------------------
+  #
+  # The two scenarios below describe the trace-details child drawer
+  # opened from inside the scenario run detail drawer. The component
+  # composition is exercised by `ScenarioRunDetailDrawer.integration
+  # .test.tsx` and the goBack() helper is covered in
+  # `TraceDetailsDrawer.integration.test.tsx` (test
+  # "calls goBack() to handle both nested and root drawer cases"),
+  # but no single test asserts the "Open Thread → child drawer
+  # mounts → close → parent visible" flow end-to-end. Cheap follow-
+  # up.
 
   @integration @unimplemented
   Scenario: Viewing a trace from scenario run detail opens as a child drawer
@@ -80,6 +90,11 @@ Feature: Child drawers open as nested overlays instead of navigating
   # ---------------------------------------------------------------------------
   # Non-drawer contexts remain unaffected
   # ---------------------------------------------------------------------------
+  #
+  # Root-level drawer behaviour is implicit in every drawer test
+  # that runs without a parent (e.g. `SuiteFormDrawer` standalone
+  # tests). No dedicated assertion exists for the "no parent
+  # drawer" branch.
 
   @integration @unimplemented
   Scenario: Opening a drawer from a page (non-drawer context) works normally
@@ -105,6 +120,12 @@ Feature: Child drawers open as nested overlays instead of navigating
   # ---------------------------------------------------------------------------
   # Keyboard interaction with stacked drawers
   # ---------------------------------------------------------------------------
+  #
+  # `NestedDrawerTyping.integration.test.tsx` covers keyboard input
+  # in nested drawers but does not specifically assert Escape-only-
+  # closes-topmost behaviour. The semantics are baked into the
+  # underlying Chakra Drawer overlay stack — adding an explicit
+  # assertion is cheap follow-up.
 
   @integration @unimplemented
   Scenario: Pressing Escape closes only the topmost child drawer

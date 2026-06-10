@@ -35,7 +35,7 @@ export function RunScenarioModal({
 
   return (
     <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()}>
-      <Dialog.Content overflow="visible">
+      <Dialog.Content bg="bg" overflow="visible">
         <Dialog.Header>
           <Dialog.Title>Run Scenario</Dialog.Title>
         </Dialog.Header>

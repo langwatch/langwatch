@@ -138,7 +138,9 @@ export const traceConfigJsonSchema = {
       type: "object",
       properties: {
         promptId: { type: "string" },
+        version: { type: "integer", minimum: 1 },
         versionId: { type: "string" },
+        selectedId: { type: "string" },
         variables: {
           type: "object",
           additionalProperties: { type: "string" },

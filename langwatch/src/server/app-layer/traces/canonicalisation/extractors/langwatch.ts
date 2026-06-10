@@ -65,6 +65,33 @@ const isLangWatchStructuredValue = (
   typeof v.type === "string" &&
   v.value !== void 0;
 
+/**
+ * Strips trailing `assistant` messages from a chat_messages array.
+ *
+ * Per OTel GenAI spec, `gen_ai.input.messages` is the prompt array sent to
+ * the model — the final message is always `user`, `system`, or `tool`,
+ * never `assistant`. Some SDKs capture span attributes after the model has
+ * returned, and at that point the response message has been appended to
+ * the conversation state, so it leaks into `input` (where it then
+ * duplicates `output`).
+ *
+ * Drop any tail of `assistant` messages so input reflects what was actually
+ * sent to the model. Multi-turn history with prior `assistant` messages
+ * earlier in the array is preserved.
+ */
+function stripTrailingAssistantMessages(messages: unknown[]): unknown[] {
+  let end = messages.length;
+  while (end > 0) {
+    const last = messages[end - 1];
+    if (isRecord(last) && (last as { role?: unknown }).role === "assistant") {
+      end--;
+    } else {
+      break;
+    }
+  }
+  return end === messages.length ? messages : messages.slice(0, end);
+}
+
 export class LangWatchExtractor implements CanonicalAttributesExtractor {
   readonly id = "langwatch";
 
@@ -159,72 +186,68 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
     // metadata JSON object. Consume the blob with take() and hoist every
     // field so downstream code uses canonical keys only.
     // ─────────────────────────────────────────────────────────────────────────
-    const metadata = attrs.take("metadata") ?? attrs.take("langwatch.metadata")
-      ?? attrs.take("langwatch.trace");
+    const metadata =
+      attrs.take("metadata") ??
+      attrs.take("langwatch.metadata") ??
+      attrs.take("langwatch.trace");
     if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
-        const parsedObj = metadata as Record<string, unknown>;
-        // Extract labels if not already set
-        if (Array.isArray(parsedObj.labels)) {
+      const parsedObj = metadata as Record<string, unknown>;
+      // Extract labels if not already set
+      if (Array.isArray(parsedObj.labels)) {
+        ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_LABELS, [...parsedObj.labels]);
+        ctx.recordRule(`${this.id}:metadata.labels`);
+      }
+
+      // Promote reserved metadata fields to canonical attributes.
+      // Python SDK embeds user_id/thread_id/customer_id inside the JSON
+      // blob rather than setting them as separate OTEL attributes.
+      // Uses setAttrIfAbsent so explicit attributes take precedence.
+      const metaUserId = parsedObj.user_id ?? parsedObj.userId;
+      if (typeof metaUserId === "string" && metaUserId.length > 0) {
+        ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_USER_ID, metaUserId);
+        ctx.recordRule(`${this.id}:metadata.user_id`);
+      }
+
+      const metaThreadId = parsedObj.thread_id ?? parsedObj.threadId;
+      if (typeof metaThreadId === "string" && metaThreadId.length > 0) {
+        ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_CONVERSATION_ID, metaThreadId);
+        ctx.recordRule(`${this.id}:metadata.thread_id`);
+      }
+
+      const metaCustomerId = parsedObj.customer_id ?? parsedObj.customerId;
+      if (typeof metaCustomerId === "string" && metaCustomerId.length > 0) {
+        ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_CUSTOMER_ID, metaCustomerId);
+        ctx.recordRule(`${this.id}:metadata.customer_id`);
+      }
+
+      // Hoist remaining custom metadata fields as metadata.{key} canonical
+      // attributes so they are available as first-class trace summary attrs.
+      const RESERVED_METADATA_KEYS = new Set([
+        "labels",
+        "user_id",
+        "userId",
+        "thread_id",
+        "threadId",
+        "customer_id",
+        "customerId",
+      ]);
+      for (const [key, value] of Object.entries(parsedObj)) {
+        if (RESERVED_METADATA_KEYS.has(key)) continue;
+        if (value !== null && value !== undefined) {
           ctx.setAttrIfAbsent(
-            ATTR_KEYS.LANGWATCH_LABELS,
-            [...parsedObj.labels],
+            `metadata.${key}`,
+            typeof value === "string" ? value : safeStringify(value),
           );
-          ctx.recordRule(`${this.id}:metadata.labels`);
         }
-
-        // Promote reserved metadata fields to canonical attributes.
-        // Python SDK embeds user_id/thread_id/customer_id inside the JSON
-        // blob rather than setting them as separate OTEL attributes.
-        // Uses setAttrIfAbsent so explicit attributes take precedence.
-        const metaUserId = parsedObj.user_id ?? parsedObj.userId;
-        if (typeof metaUserId === "string" && metaUserId.length > 0) {
-          ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_USER_ID, metaUserId);
-          ctx.recordRule(`${this.id}:metadata.user_id`);
-        }
-
-        const metaThreadId = parsedObj.thread_id ?? parsedObj.threadId;
-        if (typeof metaThreadId === "string" && metaThreadId.length > 0) {
-          ctx.setAttrIfAbsent(
-            ATTR_KEYS.GEN_AI_CONVERSATION_ID,
-            metaThreadId,
-          );
-          ctx.recordRule(`${this.id}:metadata.thread_id`);
-        }
-
-        const metaCustomerId = parsedObj.customer_id ?? parsedObj.customerId;
-        if (typeof metaCustomerId === "string" && metaCustomerId.length > 0) {
-          ctx.setAttrIfAbsent(
-            ATTR_KEYS.LANGWATCH_CUSTOMER_ID,
-            metaCustomerId,
-          );
-          ctx.recordRule(`${this.id}:metadata.customer_id`);
-        }
-
-        // Hoist remaining custom metadata fields as metadata.{key} canonical
-        // attributes so they are available as first-class trace summary attrs.
-        const RESERVED_METADATA_KEYS = new Set([
-          "labels",
-          "user_id", "userId",
-          "thread_id", "threadId",
-          "customer_id", "customerId",
-        ]);
-        for (const [key, value] of Object.entries(parsedObj)) {
-          if (RESERVED_METADATA_KEYS.has(key)) continue;
-          if (value !== null && value !== undefined) {
-            ctx.setAttrIfAbsent(
-              `metadata.${key}`,
-              typeof value === "string" ? value : safeStringify(value),
-            );
-          }
-        }
-        ctx.recordRule(`${this.id}:metadata.hoisted`);
+      }
+      ctx.recordRule(`${this.id}:metadata.hoisted`);
     } else if (metadata !== undefined && metadata !== null) {
-        // Invalid metadata (string, array, number) — store as metadata._raw
-        ctx.setAttrIfAbsent(
-          "metadata._raw",
-          typeof metadata === "string" ? metadata : safeStringify(metadata),
-        );
-        ctx.recordRule(`${this.id}:metadata._raw`);
+      // Invalid metadata (string, array, number) — store as metadata._raw
+      ctx.setAttrIfAbsent(
+        "metadata._raw",
+        typeof metadata === "string" ? metadata : safeStringify(metadata),
+      );
+      ctx.recordRule(`${this.id}:metadata._raw`);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -269,15 +292,17 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
     const rawInput = attrs.take(ATTR_KEYS.LANGWATCH_INPUT);
     if (rawInput !== void 0) {
       if (isLangWatchStructuredValue(rawInput)) {
-        reservedTypes.push(
-          `${ATTR_KEYS.LANGWATCH_INPUT}=${rawInput.type}`,
-        );
+        reservedTypes.push(`${ATTR_KEYS.LANGWATCH_INPUT}=${rawInput.type}`);
 
         if (
           rawInput.type === "chat_messages" &&
           Array.isArray(rawInput.value)
         ) {
-          const messages = normalizeToMessages(rawInput.value, "user");
+          // Strip trailing assistant messages — these are the model's
+          // response leaking back into input from post-call attribute
+          // capture, not part of what was actually sent.
+          const cleanedValue = stripTrailingAssistantMessages(rawInput.value);
+          const messages = normalizeToMessages(cleanedValue, "user");
 
           if (messages) {
             const systemInstruction =
@@ -301,8 +326,11 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
             );
           }
 
-          // Always preserve the raw input — even when normalization fails
-          ctx.setAttr(ATTR_KEYS.LANGWATCH_INPUT, rawInput);
+          // Preserve the (cleaned) raw input
+          ctx.setAttr(ATTR_KEYS.LANGWATCH_INPUT, {
+            ...rawInput,
+            value: cleanedValue,
+          });
           ctx.recordRule(`${this.id}:input`);
         } else {
           // text, json, raw, list — unwrap value, don't coerce to gen_ai
@@ -323,9 +351,7 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
     const rawOutput = attrs.take(ATTR_KEYS.LANGWATCH_OUTPUT);
     if (rawOutput !== undefined) {
       if (isLangWatchStructuredValue(rawOutput)) {
-        reservedTypes.push(
-          `${ATTR_KEYS.LANGWATCH_OUTPUT}=${rawOutput.type}`,
-        );
+        reservedTypes.push(`${ATTR_KEYS.LANGWATCH_OUTPUT}=${rawOutput.type}`);
 
         if (
           rawOutput.type === "chat_messages" &&
@@ -390,7 +416,10 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
     // ─────────────────────────────────────────────────────────────────────────
     const rawMetrics = attrs.take(ATTR_KEYS.LANGWATCH_METRICS);
     if (rawMetrics !== undefined) {
-      if (isLangWatchStructuredValue(rawMetrics) && isRecord(rawMetrics.value)) {
+      if (
+        isLangWatchStructuredValue(rawMetrics) &&
+        isRecord(rawMetrics.value)
+      ) {
         const metricsValue = rawMetrics.value as Record<string, unknown>;
 
         // Extract token counts (setAttrIfAbsent — GenAI extractor may have set these)

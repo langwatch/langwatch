@@ -4,6 +4,7 @@ import importlib
 import random
 import inspect
 from typing import Optional, Sequence, cast
+import httpx
 import pytest
 import asyncio
 
@@ -218,7 +219,10 @@ async def test_example(example_file: str):
                 elif any(
                     error_indicator in str(e)
                     for error_indicator in [
-                        "The server had an error processing your request. Sorry about that!",  # OpenAI
+                        # Provider-side 5xx (OpenAI and Azure both tag these with a
+                        # "server_error" type, regardless of the human-readable message).
+                        "server_error",
+                        "The server had an error",  # OpenAI 500 prose variant
                         # "Error code: 404",
                         # "This is a chat model and not supported in the v1/completions endpoint",
                         "Rate limit",
@@ -241,5 +245,8 @@ async def test_example(example_file: str):
             # which may fail if the trace hasn't been ingested yet)
             trace_urls[example_file] = trace.trace_id or "unknown"
         else:
-            trace_urls[example_file] = trace.share()
+            try:
+                trace_urls[example_file] = trace.share()
+            except (httpx.TimeoutException, httpx.ConnectError):
+                trace_urls[example_file] = trace.trace_id or "share-failed"
         print(json.dumps(trace_urls, indent=2))

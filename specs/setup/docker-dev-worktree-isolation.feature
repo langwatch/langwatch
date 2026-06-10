@@ -3,6 +3,19 @@ Feature: Docker dev environment worktree isolation and startup speed
   I want each worktree to have isolated Docker containers and dependencies
   So that parallel development work doesn't interfere
 
+  # The dev-environment scripts live in `scripts/dev.sh` (bash) +
+  # `compose.dev.yml` and a TypeScript port allocator at
+  # `packages/server/src/shared/ports.ts`. Tests exist for the
+  # TypeScript pieces (`packages/server/test/ports.test.ts`,
+  # `env.test.ts`, `cli-doctor.test.ts`) and bash worktree helpers
+  # (`scripts/__tests__/worktree.unit.bats`,
+  # `worktree.integration.bats`). The parity check's
+  # DEFAULT_TEST_ROOTS doesn't scan `packages/server/test/` or
+  # `scripts/__tests__/.bats` files, so JSDoc-bound scenarios there
+  # would not be discovered. Leaving `@unimplemented` — extending
+  # DEFAULT_TEST_ROOTS to cover packages/server is the right
+  # structural fix.
+
   Background:
     Given the Docker dev environment is configured via compose.dev.yml
     And scripts/dev.sh provides an interactive launcher

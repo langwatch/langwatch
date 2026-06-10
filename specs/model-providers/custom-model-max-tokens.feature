@@ -4,6 +4,11 @@ Feature: Max Tokens is universal for chat models
   models, regardless of what supportedParameters the model entry declares. There
   is no opt-out at the model-registration level.
 
+  # All scenarios describe the LLM Config popover and the Add Custom Model
+  # dialog (slider visibility, parameter checkboxes). Need a JSDOM render of
+  # `LLMConfigPopover` + `AddCustomModelDialog`. Aspirational pending those
+  # popover harnesses.
+
   This contract was tightened after a managed-Bedrock customer registered a
   custom chat model whose supportedParameters list did not include max_tokens
   (the previous default). The popover then hid the slider after the model

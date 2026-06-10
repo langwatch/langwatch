@@ -345,7 +345,7 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
   if (graphQuery.isLoading) {
     return (
       <Drawer.Root open={true} placement="end" size="xl">
-        <Drawer.Content>
+        <Drawer.Content bg="bg">
           <Drawer.CloseTrigger />
           <Drawer.Header>
             <Heading>Configure Alert</Heading>
@@ -369,7 +369,7 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
       placement="end"
       size="xl"
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.CloseTrigger />
         <Drawer.Header>
           <Heading>Configure Alert</Heading>

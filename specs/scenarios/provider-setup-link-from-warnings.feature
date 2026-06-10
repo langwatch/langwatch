@@ -3,6 +3,12 @@ Feature: Provider setup links from "provider not set up" warnings in Scenario su
   I want a prominent action button that takes me to the model provider settings page
   So that I can configure a provider without losing my in-progress scenario form or run context
 
+  # All 12 @unimplemented scenarios are aspirational and span 4 surfaces
+  # (AICreateModal footer, scenario editor sidebar no-providers/no-default/stale-default
+  # cards, useRunScenario toast). The "Configure model provider" primary button
+  # pattern + toaster action slot work is tracked in PR #3458; tests will be
+  # added once the primary-button + toast-action-slot redesign lands.
+
   Background:
     Given I am logged into project "my-project"
 

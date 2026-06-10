@@ -117,7 +117,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
   });
 
   describe("when the adapter receives a message from the simulator", () => {
-    it("sends an execute_flow event to /studio/execute_sync", async () => {
+    it("sends an execute_flow event to /go/studio/execute_sync", async () => {
       const adapter = new SerializedWorkflowAgentAdapter(
         defaultConfig,
         nlpServiceUrl,
@@ -127,7 +127,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
       await adapter.call(defaultInput);
 
       expect(mockFetch).toHaveBeenCalledWith(
-        `${nlpServiceUrl}/studio/execute_sync`,
+        `${nlpServiceUrl}/go/studio/execute_sync`,
         expect.objectContaining({
           method: "POST",
           headers: { "Content-Type": "application/json" },

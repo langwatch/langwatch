@@ -105,18 +105,26 @@ export function mapClickHouseRowToScenarioRunData(
 
   const verdictEnum = mapVerdict(row.Verdict);
 
-  // Reconstruct messages from parallel Nested arrays; parse `Rest` back into fields
+  // Reconstruct messages from parallel Nested arrays; parse `Rest` back into fields.
+  // If `restFields.content` is an array, the message had structured AG-UI parts
+  // (e.g. inline media that was externalized by the stored-objects pipeline)
+  // and the flat Messages.Content column is empty — surface the parts array
+  // to the renderer instead.
   const roles = row["Messages.Role"] ?? [];
   const messages = roles.map((role, i) => {
     const restStr = row["Messages.Rest"]?.[i];
     const restFields = restStr
       ? (() => { try { return JSON.parse(restStr) as Record<string, unknown>; } catch { return {}; } })()
       : {};
+    const { content: restContent, ...restWithoutContent } = restFields;
+    const content = Array.isArray(restContent)
+      ? restContent
+      : (row["Messages.Content"]?.[i] ?? null);
     return {
-      ...restFields,
+      ...restWithoutContent,
       id: row["Messages.Id"]?.[i] || undefined,
       role,
-      content: row["Messages.Content"]?.[i] ?? null,
+      content,
       trace_id: row["Messages.TraceId"]?.[i] || undefined,
     };
   }) as ScenarioMessages;

@@ -136,6 +136,33 @@ func TestSync_RealWorkflowEndToEnd_Bedrock(t *testing.T) {
 	}
 	stack := setupStackWithLLM_bedrock(t)
 
+	// litellm_params carry the AWS creds the dispatcheradapter translates onto
+	// the Bifrost-canonical key shape. When BEDROCK_VPCE_ENDPOINT is set, also
+	// pass the runtime endpoint so this full-stack e2e (HTTP router →
+	// dispatcheradapter → dispatcher → gateway VPCE intercept → SDK Converse)
+	// exercises the managed-Bedrock VPCE path end to end rather than the public
+	// bifrost path. Point it at the public regional endpoint for a baseline, or
+	// at the customer http VPCE :80 for the real path.
+	litellmParams := map[string]any{
+		"aws_access_key_id":     accessKey,
+		"aws_secret_access_key": secretKey,
+		"aws_region_name":       region,
+	}
+	// Managed-Bedrock customers authenticate with STS-temporary credentials,
+	// which require the session token to be threaded through alongside the
+	// access/secret keys. Without it the harness can only exercise long-lived
+	// keys, not the managed customer path. The session token flows through the
+	// dispatcheradapter onto cred.Extra["session_token"] like the other creds.
+	if st := os.Getenv("AWS_SESSION_TOKEN"); st != "" {
+		litellmParams["aws_session_token"] = st
+	}
+	if ep := os.Getenv("BEDROCK_VPCE_ENDPOINT"); ep != "" {
+		litellmParams["aws_bedrock_runtime_endpoint"] = ep
+		t.Logf("routing through VPCE intercept via endpoint %s", ep)
+	} else {
+		t.Log("BEDROCK_VPCE_ENDPOINT unset; exercising the public bifrost bedrock path")
+	}
+
 	// Build the workflow body via encoding/json so a malformed env var
 	// (accidental quote / newline / surrounding whitespace) fails as a
 	// credential error rather than producing invalid JSON. Mirrors the
@@ -172,12 +199,8 @@ func TestSync_RealWorkflowEndToEnd_Bedrock(t *testing.T) {
 					"parameters": []any{map[string]any{
 						"identifier": "llm", "type": "llm",
 						"value": map[string]any{
-							"model": "bedrock/" + model,
-							"litellm_params": map[string]any{
-								"aws_access_key_id":     accessKey,
-								"aws_secret_access_key": secretKey,
-								"aws_region_name":       region,
-							},
+							"model":          "bedrock/" + model,
+							"litellm_params": litellmParams,
 						},
 					}},
 					"inputs":  []any{map[string]any{"identifier": "question", "type": "str"}},

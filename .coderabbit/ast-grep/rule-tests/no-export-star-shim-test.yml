@@ -1,0 +1,8 @@
+id: no-export-star-shim-ts
+valid:
+  - 'export { foo, bar } from "./module";'
+  - 'import { foo } from "./module";'
+  - 'export const foo = 1;'
+invalid:
+  - 'export * from "./module";'
+  - 'export * from "../legacy/shim";'

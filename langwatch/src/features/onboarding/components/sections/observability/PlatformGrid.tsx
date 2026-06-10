@@ -4,14 +4,23 @@ import type { PlatformKey } from "../../../regions/observability/types";
 import { PLATFORM_OPTIONS } from "../../../regions/observability/ui-options";
 import { SelectableIconCard } from "../shared/SelectableIconCard";
 
+type PlatformOption = (typeof PLATFORM_OPTIONS)[number];
+
 interface PlatformGridProps {
   selectedLanguage: PlatformKey;
   onSelectLanguage: (language: PlatformKey) => void;
+  /**
+   * Override the platform list. The traces-v2 empty-state onboarding passes
+   * a category-filtered subset; the original onboarding flow falls through
+   * to the full PLATFORM_OPTIONS.
+   */
+  platforms?: readonly PlatformOption[];
 }
 
 export const PlatformGrid: React.FC<PlatformGridProps> = ({
   selectedLanguage,
   onSelectLanguage,
+  platforms = PLATFORM_OPTIONS,
 }) => {
   return (
     <VStack align="stretch" gap={3}>
@@ -25,7 +34,7 @@ export const PlatformGrid: React.FC<PlatformGridProps> = ({
         </Text>
       </VStack>
       <HStack gap={3} rowGap={4} wrap="wrap" pb={1}>
-        {PLATFORM_OPTIONS.map((lang) => (
+        {platforms.map((lang) => (
           <SelectableIconCard
             key={lang.key}
             label={lang.label}

@@ -305,6 +305,7 @@ describe("MCP dataset tools integration", () => {
 
   describe("platform_list_datasets", () => {
     describe("when the project has datasets", () => {
+      /** @scenario "List datasets returns a formatted summary of all datasets" */
       it("returns a formatted list showing both datasets with their names, slugs, and record counts", async () => {
         const { handleListDatasets } = await import(
           "../tools/list-datasets.js"
@@ -320,6 +321,7 @@ describe("MCP dataset tools integration", () => {
     });
 
     describe("when the project has no datasets", () => {
+      /** @scenario "List datasets returns a helpful message when none exist" */
       it("returns a helpful message indicating no datasets were found", async () => {
         emptyListMode = true;
         const { handleListDatasets } = await import(
@@ -356,6 +358,7 @@ describe("MCP dataset tools integration", () => {
 
   describe("platform_get_dataset", () => {
     describe("when the dataset exists", () => {
+      /** @scenario "Get dataset by slug returns metadata and a preview of records" */
       it("returns the dataset name, slug, and column definitions", async () => {
         const { handleGetDataset } = await import(
           "../tools/get-dataset.js"
@@ -388,6 +391,7 @@ describe("MCP dataset tools integration", () => {
     });
 
     describe("when the dataset does not exist", () => {
+      /** @scenario "Get dataset with non-existent slug returns an error" */
       it("propagates the 404 error", async () => {
         const { handleGetDataset } = await import(
           "../tools/get-dataset.js"
@@ -403,6 +407,7 @@ describe("MCP dataset tools integration", () => {
 
   describe("platform_create_dataset", () => {
     describe("when creating with name and columns", () => {
+      /** @scenario "Create a dataset with name and columns" */
       it("returns confirmation including the generated slug", async () => {
         const { handleCreateDataset } = await import(
           "../tools/create-dataset.js"
@@ -420,6 +425,7 @@ describe("MCP dataset tools integration", () => {
     });
 
     describe("when creating with only a name", () => {
+      /** @scenario "Create a dataset with only a name and no columns" */
       it("returns confirmation including the slug", async () => {
         const { handleCreateDataset } = await import(
           "../tools/create-dataset.js"
@@ -437,6 +443,7 @@ describe("MCP dataset tools integration", () => {
 
   describe("platform_update_dataset", () => {
     describe("when updating the dataset name", () => {
+      /** @scenario "Update a dataset name" */
       it("returns confirmation reflecting the new name", async () => {
         const { handleUpdateDataset } = await import(
           "../tools/update-dataset.js"
@@ -451,6 +458,7 @@ describe("MCP dataset tools integration", () => {
     });
 
     describe("when updating dataset column types", () => {
+      /** @scenario "Update a dataset column types" */
       it("returns confirmation reflecting the new columns", async () => {
         const { handleUpdateDataset } = await import(
           "../tools/update-dataset.js"
@@ -465,6 +473,7 @@ describe("MCP dataset tools integration", () => {
     });
 
     describe("when the dataset does not exist", () => {
+      /** @scenario "Update a non-existent dataset returns an error" */
       it("propagates the 404 error", async () => {
         const { handleUpdateDataset } = await import(
           "../tools/update-dataset.js"
@@ -480,6 +489,7 @@ describe("MCP dataset tools integration", () => {
 
   describe("platform_delete_dataset", () => {
     describe("when the dataset exists", () => {
+      /** @scenario "Delete a dataset archives it" */
       it("returns confirmation that the dataset was deleted", async () => {
         const { handleDeleteDataset } = await import(
           "../tools/delete-dataset.js"
@@ -490,6 +500,7 @@ describe("MCP dataset tools integration", () => {
     });
 
     describe("when the dataset does not exist", () => {
+      /** @scenario "Delete a non-existent dataset returns an error" */
       it("propagates the 404 error", async () => {
         const { handleDeleteDataset } = await import(
           "../tools/delete-dataset.js"
@@ -505,6 +516,7 @@ describe("MCP dataset tools integration", () => {
 
   describe("platform_create_dataset_records", () => {
     describe("when the dataset exists", () => {
+      /** @scenario "Add records to a dataset" */
       it("returns confirmation with the count of records created", async () => {
         const { handleCreateDatasetRecords } = await import(
           "../tools/create-dataset-records.js"
@@ -522,6 +534,7 @@ describe("MCP dataset tools integration", () => {
     });
 
     describe("when the dataset does not exist", () => {
+      /** @scenario "Add records to a non-existent dataset returns an error" */
       it("propagates the 404 error", async () => {
         const { handleCreateDatasetRecords } = await import(
           "../tools/create-dataset-records.js"
@@ -540,6 +553,7 @@ describe("MCP dataset tools integration", () => {
 
   describe("platform_update_dataset_record", () => {
     describe("when the record exists", () => {
+      /** @scenario "Update a single record entry" */
       it("returns confirmation that the record was updated", async () => {
         const { handleUpdateDatasetRecord } = await import(
           "../tools/update-dataset-record.js"
@@ -554,6 +568,7 @@ describe("MCP dataset tools integration", () => {
     });
 
     describe("when the dataset does not exist", () => {
+      /** @scenario "Update a record in a non-existent dataset returns an error" */
       it("propagates the 404 error", async () => {
         const { handleUpdateDatasetRecord } = await import(
           "../tools/update-dataset-record.js"
@@ -573,6 +588,7 @@ describe("MCP dataset tools integration", () => {
 
   describe("platform_delete_dataset_records", () => {
     describe("when the dataset exists", () => {
+      /** @scenario "Delete records by IDs" */
       it("returns confirmation with the count of records deleted", async () => {
         const { handleDeleteDatasetRecords } = await import(
           "../tools/delete-dataset-records.js"
@@ -587,6 +603,7 @@ describe("MCP dataset tools integration", () => {
     });
 
     describe("when the dataset does not exist", () => {
+      /** @scenario "Delete records from a non-existent dataset returns an error" */
       it("propagates the 404 error", async () => {
         const { handleDeleteDatasetRecords } = await import(
           "../tools/delete-dataset-records.js"

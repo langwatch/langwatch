@@ -4,6 +4,15 @@ Feature: Simplified Setup Page
   I want a focused setup page
   So that I can configure my API connection without distraction
 
+  # The Setup page itself (langwatch/src/pages/[project]/setup.tsx,
+  # composed from welcome/* cards) has no JSDOM render fixture
+  # today — only the underlying `getHasFirstMessage` tRPC procedure
+  # has unit coverage (bound below for the firstMessage-driven alert
+  # scenarios). UI-rendering scenarios (API key visibility, copy-
+  # button behaviour, endpoint section, SDK guides links, "section X
+  # is NOT shown" assertions, copy-tracking event) all need a
+  # JSDOM render of the setup page to bind. Cheap follow-up.
+
   Background:
     Given I am on the setup page
     And I have access to project "test-project"

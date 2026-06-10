@@ -3,6 +3,15 @@ Feature: Bull Board queue dashboard
   I want a Bull Board UI for visualizing and managing BullMQ job queues
   So that I can inspect queue state, retry failed jobs, and debug processing issues
 
+  # Parity status: 1 of 5 scenarios bound to existing tests.
+  # Remaining @unimplemented scenarios (#3458):
+  #   2 NO_TEST: shipped behavior, no integration test yet
+  #     - "bullboard server starts and connects to Redis"
+  #     - "bullboard server fails gracefully without Redis"
+  #   2 NO_TEST: e2e behavior, no automated test
+  #     - "Bull Board UI loads via dev-scenarios"
+  #     - "Bull Board displays configured BullMQ queues"
+
   # --- Server startup and Redis connection ---
 
   @integration @unimplemented
@@ -21,7 +30,7 @@ Feature: Bull Board queue dashboard
 
   # --- Docker compose integration ---
 
-  @unit @unimplemented
+  @unit
   Scenario: bullboard service is included in scenarios profile
     Given the compose.dev.yml configuration
     Then the bullboard service belongs to the "scenarios" profile

@@ -20,6 +20,11 @@ import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
+import { DepartmentPicker } from "../../components/settings/DepartmentPicker";
+import {
+  useDepartmentColumn,
+  type DepartmentOption,
+} from "../../components/settings/useDepartmentColumn";
 import SettingsLayout from "../../components/SettingsLayout";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useDrawer } from "../../hooks/useDrawer";
@@ -161,7 +166,7 @@ function AddToTeamDialog({
 
   return (
     <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()}>
-      <Dialog.Content maxWidth="440px">
+      <Dialog.Content bg="bg" maxWidth="440px">
         <Dialog.Header>
           <Dialog.Title>Add member to {teamName}</Dialog.Title>
         </Dialog.Header>
@@ -299,7 +304,7 @@ function AddToProjectDialog({
 
   return (
     <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()}>
-      <Dialog.Content maxWidth="440px">
+      <Dialog.Content bg="bg" maxWidth="440px">
         <Dialog.Header>
           <Dialog.Title>Add access to {projectName}</Dialog.Title>
         </Dialog.Header>
@@ -390,17 +395,22 @@ function AddToProjectDialog({
 
 function ProjectSection({
   project,
+  teamId,
   access,
   organizationId,
   canManage,
+  department,
 }: {
   project: { id: string; name: string };
+  teamId: string;
   access: ProjectAccessEntry[];
   organizationId: string;
   canManage: boolean;
+  department: ReturnType<typeof useDepartmentColumn>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [addingPerson, setAddingPerson] = useState(false);
+  const { openDrawer } = useDrawer();
   const queryClient = api.useContext();
 
   const deleteBinding = api.roleBinding.delete.useMutation({
@@ -446,6 +456,34 @@ function ProjectSection({
           <Text fontSize="xs" color="gray.500">
             {access.length} with access
           </Text>
+          {canManage && (
+            <Button
+              size="xs"
+              variant="ghost"
+              color="gray.400"
+              onClick={(e) => {
+                e.stopPropagation();
+                openDrawer("editProject", {
+                  projectId: project.id,
+                  projectName: project.name,
+                  currentTeamId: teamId,
+                });
+              }}
+            >
+              <Pencil size={13} />
+              Edit
+            </Button>
+          )}
+          {department.show && canManage && (
+            <InlineDepartment
+              organizationId={organizationId}
+              kind="project"
+              entityId={project.id}
+              value={department.byProject.get(project.id) ?? null}
+              departments={department.departments}
+              onAssigned={department.refetch}
+            />
+          )}
         </HStack>
 
         {expanded && (
@@ -605,6 +643,47 @@ function ProjectSection({
 
 // ── Team card ─────────────────────────────────────────────────────────────────
 
+// Inline department picker for team and project rows. Reads as one more meta
+// item next to "N projects · M members": a leading dot, a normal-case
+// "Department" caption, then a compact select.
+function InlineDepartment({
+  organizationId,
+  kind,
+  entityId,
+  value,
+  departments,
+  onAssigned,
+}: {
+  organizationId: string;
+  kind: "team" | "project";
+  entityId: string;
+  value: string | null;
+  departments: DepartmentOption[];
+  onAssigned: () => Promise<unknown> | void;
+}) {
+  return (
+    <HStack
+      gap={2}
+      pl={2}
+      color="gray.500"
+      fontSize="sm"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <Text>·</Text>
+      <Text>Department</Text>
+      <DepartmentPicker
+        organizationId={organizationId}
+        kind={kind}
+        entityId={entityId}
+        value={value}
+        departments={departments}
+        onAssigned={onAssigned}
+        width="130px"
+      />
+    </HStack>
+  );
+}
+
 function TeamCard({
   team,
   organizationId,
@@ -619,6 +698,7 @@ function TeamCard({
   const { openDrawer } = useDrawer();
   const { hasPermission } = useOrganizationTeamProject();
   const queryClient = api.useContext();
+  const department = useDepartmentColumn(organizationId);
 
   const deleteBinding = api.roleBinding.delete.useMutation({
     onSuccess: () => {
@@ -663,6 +743,16 @@ function TeamCard({
             {team.projectOnlyAccess.length > 0 &&
               ` · ${team.projectOnlyAccess.length} via projects`}
           </Text>
+          {department.show && canManage && (
+            <InlineDepartment
+              organizationId={organizationId}
+              kind="team"
+              entityId={team.id}
+              value={department.byTeam.get(team.id) ?? null}
+              departments={department.departments}
+              onAssigned={department.refetch}
+            />
+          )}
           {canManage && (
             <Link
               href={`/settings/teams/${team.slug}`}
@@ -850,7 +940,9 @@ function TeamCard({
                     variant="outline"
                     onClick={(e) => {
                       e.stopPropagation();
-                      openDrawer("createProject");
+                      openDrawer("createProject", {
+                        defaultTeamId: team.id,
+                      });
                     }}
                   >
                     <Plus size={12} />
@@ -867,9 +959,11 @@ function TeamCard({
                   <ProjectSection
                     key={proj.id}
                     project={proj}
+                    teamId={team.id}
                     access={team.projectAccess[proj.id] ?? []}
                     organizationId={organizationId}
                     canManage={canManage}
+                    department={department}
                   />
                 ))
               )}
@@ -954,6 +1048,6 @@ function TeamsAndProjects() {
   );
 }
 
-export default withPermissionGuard("team:view", {
+export default withPermissionGuard("organization:manage", {
   layoutComponent: SettingsLayout,
 })(TeamsAndProjects);

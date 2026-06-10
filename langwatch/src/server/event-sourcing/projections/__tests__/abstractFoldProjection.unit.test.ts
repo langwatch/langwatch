@@ -66,7 +66,7 @@ interface CamelState {
   name: string;
   createdAt: number;
   updatedAt: number;
-  lastEventOccurredAt: number;
+  LastEventOccurredAt: number;
 }
 
 const CamelEventSchema = z.object({
@@ -82,7 +82,7 @@ class CamelFoldProjection
     typeof camelEvents,
     "createdAt",
     "updatedAt",
-    "lastEventOccurredAt"
+    "LastEventOccurredAt"
   >
   implements FoldEventHandlers<typeof camelEvents, CamelState>
 {
@@ -96,7 +96,7 @@ class CamelFoldProjection
   protected readonly events = camelEvents;
 
   constructor() {
-    super({ createdAtKey: "createdAt", updatedAtKey: "updatedAt", lastEventOccurredAtKey: "lastEventOccurredAt" });
+    super({ createdAtKey: "createdAt", updatedAtKey: "updatedAt", LastEventOccurredAtKey: "LastEventOccurredAt" });
   }
 
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   EVALUATION_STATUS_COLORS,
+  getEvalChipDisplay,
   getStatusLabel,
   parseEvaluationResult,
 } from "../evaluationResults";
@@ -322,12 +323,15 @@ describe("EVALUATION_STATUS_COLORS", () => {
     expect(EVALUATION_STATUS_COLORS.processed).toBe("blue.500");
   });
 
-  it("has correct color for error (red)", () => {
-    expect(EVALUATION_STATUS_COLORS.error).toBe("red.500");
+  it("uses a deeper red for error than for fail so the two states stay distinct", () => {
+    expect(EVALUATION_STATUS_COLORS.error).toBe("red.600");
+    expect(EVALUATION_STATUS_COLORS.error).not.toBe(
+      EVALUATION_STATUS_COLORS.failed,
+    );
   });
 
-  it("has correct color for skipped (yellow)", () => {
-    expect(EVALUATION_STATUS_COLORS.skipped).toBe("yellow.500");
+  it("renders skipped as a light bg-style gray — it's a setup state, not a verdict, so it shouldn't compete with real pass/fail", () => {
+    expect(EVALUATION_STATUS_COLORS.skipped).toBe("gray.300");
   });
 });
 
@@ -358,5 +362,143 @@ describe("getStatusLabel", () => {
 
   it("returns 'Skipped' for skipped", () => {
     expect(getStatusLabel("skipped")).toBe("Skipped");
+  });
+});
+
+describe("getEvalChipDisplay", () => {
+  describe("when adapting the trace-list status enum", () => {
+    it("normalizes processed + passed=true to passed", () => {
+      const d = getEvalChipDisplay({
+        status: "processed",
+        passed: true,
+        score: null,
+      });
+      expect(d.status).toBe("passed");
+      expect(d.color).toBe(EVALUATION_STATUS_COLORS.passed);
+      expect(d.passLabel).toEqual({ text: "Pass", color: "green.fg" });
+    });
+
+    it("normalizes processed + passed=false to failed", () => {
+      const d = getEvalChipDisplay({
+        status: "processed",
+        passed: false,
+        score: null,
+      });
+      expect(d.status).toBe("failed");
+      expect(d.passLabel).toEqual({ text: "Fail", color: "red.fg" });
+    });
+
+    it("normalizes the v1 'pass' / 'fail' tokens", () => {
+      
+        
+      expect(getEvalChipDisplay({ status: "pass" }).status).toBe("passed");
+      expect(getEvalChipDisplay({ status: "fail" }).status).toBe("failed");
+    });
+
+    it("normalizes the trace-list 'in_progress' / 'scheduled' tokens", () => {
+      
+        
+      expect(getEvalChipDisplay({ status: "in_progress" }).status).toBe(
+        "running",
+      );
+      expect(getEvalChipDisplay({ status: "scheduled" }).status).toBe(
+        "pending",
+      );
+    });
+
+    it("maps the legacy 'warning' status to failed so the chip turns red", () => {
+      
+        
+      expect(getEvalChipDisplay({ status: "warning" }).status).toBe("failed");
+    });
+  });
+
+  describe("when rendering trailing verdict slot", () => {
+    it("yields numeric scoreText for numeric verdicts (<= 1)", () => {
+      
+        
+      expect(getEvalChipDisplay({ status: "processed", score: 0.75 }).scoreText).toBe(
+        "0.75",
+      );
+    });
+
+    it("yields one-decimal scoreText for verdicts > 1", () => {
+      
+        
+      expect(getEvalChipDisplay({ status: "processed", score: 5 }).scoreText).toBe(
+        "5.0",
+      );
+    });
+
+    it("suppresses the boolean Pass/Fail label when a numeric score exists", () => {
+      
+        
+      const d = getEvalChipDisplay({ status: "passed", score: 0.9 });
+      expect(d.scoreText).toBe("0.90");
+      expect(d.passLabel).toBeNull();
+    });
+
+    it("marks skipped + error as no-verdict so the dot is dropped", () => {
+      
+        
+      expect(getEvalChipDisplay({ status: "skipped" }).noVerdict).toBe(true);
+      expect(getEvalChipDisplay({ status: "error" }).noVerdict).toBe(true);
+    });
+  });
+
+  describe("when picking a display name", () => {
+    it("prefers explicit name over evaluatorId", () => {
+      
+        
+      expect(
+        getEvalChipDisplay({ name: "Safety", evaluatorId: "azure_safety" })
+          .displayName,
+      ).toBe("Safety");
+    });
+
+    it("falls back to evaluatorId when name missing", () => {
+
+
+      expect(getEvalChipDisplay({ evaluatorId: "azure_safety" }).displayName).toBe(
+        "azure_safety",
+      );
+    });
+
+    it("accepts the trace-list shape (evaluatorName) as an alias for name", () => {
+      // The trace-list `TraceEvalResult` uses `evaluatorName` (matches the
+      // ClickHouse column) while the drawer header chip passes `name`.
+      // Both shapes need to resolve to the same displayName — otherwise the
+      // trace-list EVALS column falls back to the monitor's KSUID and
+      // operators see `monitor_xxxx…` instead of the real evaluator name.
+      // Regression for the customer report on the v2 trace list.
+      expect(
+        getEvalChipDisplay({
+          evaluatorName: "User frustration by input",
+          evaluatorId: "monitor_ZAnGKUxsvjLf6PnAFzvws",
+        }).displayName,
+      ).toBe("User frustration by input");
+    });
+
+    it("prefers `name` over `evaluatorName` when both are present", () => {
+      // `name` wins so callers can explicitly override the persisted name
+      // without us having to chase down every adapter.
+      expect(
+        getEvalChipDisplay({
+          name: "Safety",
+          evaluatorName: "azure/content_safety",
+          evaluatorId: "monitor_x",
+        }).displayName,
+      ).toBe("Safety");
+    });
+  });
+
+  it("color tokens stay in lockstep with EVALUATION_STATUS_COLORS for every status", () => {
+    
+      
+    for (const [status, color] of Object.entries(EVALUATION_STATUS_COLORS)) {
+      const d = getEvalChipDisplay({ status });
+      expect(d.color).toBe(color);
+      expect(d.statusLabel).toBe(getStatusLabel(d.status));
+    }
   });
 });

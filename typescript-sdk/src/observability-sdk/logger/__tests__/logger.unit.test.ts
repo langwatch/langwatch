@@ -8,11 +8,13 @@ vi.mock("@opentelemetry/api-logs", () => ({
   logs: {
     getLoggerProvider: vi.fn(),
   },
-  NoopLoggerProvider: vi.fn().mockImplementation(() => ({
-    getLogger: vi.fn().mockReturnValue({
-      emit: vi.fn(),
-    }),
-  })),
+  NoopLoggerProvider: vi.fn().mockImplementation(function () {
+    return {
+      getLogger: vi.fn().mockReturnValue({
+        emit: vi.fn(),
+      }),
+    };
+  }),
 }));
 
 

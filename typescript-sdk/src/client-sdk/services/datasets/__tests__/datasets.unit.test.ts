@@ -30,6 +30,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
 
   describe("DatasetsFacade", () => {
     describe("when inspecting langwatch.datasets", () => {
+      /** @scenario "Facade exposes all dataset CRUD methods" */
       it("exposes get, list, create, update, delete, createRecords, updateRecord, deleteRecords, upload, and listRecords methods", () => {
         const langwatch = new LangWatch({
           apiKey: "test-key",
@@ -55,6 +56,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
   describe("DatasetService", () => {
     describe("listDatasets()", () => {
       describe("when called with page and limit", () => {
+        /** @scenario "List datasets passes pagination parameters" */
         it("forwards pagination parameters to the API client", async () => {
           const mockClient = createMockApiClient();
           mockClient.GET.mockResolvedValue({
@@ -88,6 +90,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
 
     describe("createDataset()", () => {
       describe("when called without columnTypes", () => {
+        /** @scenario "Create a dataset without column types defaults to empty array" */
         it("sends columnTypes as an empty array", async () => {
           const mockClient = createMockApiClient();
           mockClient.POST.mockResolvedValue({
@@ -127,6 +130,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
 
     describe("updateDataset()", () => {
       describe("when called with columnTypes", () => {
+        /** @scenario "Update a dataset column types" */
         it("includes the new columnTypes in the request body", async () => {
           const mockClient = createMockApiClient();
           mockClient.PATCH.mockResolvedValue({
@@ -180,6 +184,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
       });
 
       describe("when the API responds with status 404", () => {
+        /** @scenario "SDK maps 404 responses to DatasetNotFoundError" */
         it("throws a DatasetNotFoundError with the slug in the message", async () => {
           mockClient.GET.mockResolvedValue({
             data: null,
@@ -194,6 +199,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
       });
 
       describe("when the API responds with status 409", () => {
+        /** @scenario "SDK maps 409 responses to DatasetApiError with status" */
         it("throws a DatasetApiError with status 409 and the conflict message", async () => {
           mockClient.POST.mockResolvedValue({
             data: null,
@@ -212,6 +218,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
       });
 
       describe("when the API responds with status 403 (plan limit)", () => {
+        /** @scenario "SDK maps 403 responses to DatasetPlanLimitError with upgrade message" */
         it("throws a DatasetPlanLimitError with the server message", async () => {
           mockClient.GET.mockResolvedValue({
             data: null,
@@ -234,6 +241,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
       });
 
       describe("when the API responds with status 500", () => {
+        /** @scenario "SDK maps unexpected errors to DatasetApiError with status code" */
         it("throws a DatasetApiError with status 500", async () => {
           mockClient.GET.mockResolvedValue({
             data: null,
@@ -258,6 +266,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
     });
 
     describe("when creating a dataset with empty name", () => {
+      /** @scenario "Create a dataset with empty name throws validation error" */
       it("throws a DatasetValidationError indicating name is required", () => {
         expect(() => langwatch.datasets.create({ name: "" })).toThrow(DatasetValidationError);
         expect(() => langwatch.datasets.create({ name: "   " })).toThrow(
@@ -267,12 +276,14 @@ describe("Feature: Dataset TypeScript SDK", () => {
     });
 
     describe("when updating a dataset with no fields", () => {
+      /** @scenario "Update a dataset with no fields throws validation error" */
       it("throws a DatasetValidationError indicating at least one field is required", () => {
         expect(() => langwatch.datasets.update("my-data", {})).toThrow(DatasetValidationError);
       });
     });
 
     describe("when creating records with empty entries", () => {
+      /** @scenario "Batch create records with empty entries throws validation error" */
       it("throws a DatasetValidationError indicating entries must not be empty", () => {
         expect(() => langwatch.datasets.createRecords("my-data", [])).toThrow(DatasetValidationError);
       });

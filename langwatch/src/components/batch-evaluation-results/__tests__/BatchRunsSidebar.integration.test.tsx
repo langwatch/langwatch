@@ -65,6 +65,8 @@ describe("BatchRunsSidebar", () => {
       createRun({ runId: "run-new", createdAt: 3_000_000 }),
     ];
 
+    /** @scenario Display list of evaluation runs */
+    /** @scenario Select a different run */
     it("displays runs newest-first", () => {
       render(
         <Wrapper>
@@ -134,6 +136,7 @@ describe("BatchRunsSidebar", () => {
       createRun({ runId: "run-new", createdAt: 2_000_000 }),
     ];
 
+    /** @scenario A run with a commit message still shows the commit message */
     it("uses commit message instead of Run # when available", () => {
       render(
         <Wrapper>
@@ -149,6 +152,44 @@ describe("BatchRunsSidebar", () => {
       expect(items[0]).toHaveTextContent("Run #2");
       // Oldest run uses commit message
       expect(items[1]).toHaveTextContent("Initial baseline");
+      // Commit-message runs carry no generated id suffix
+      expect(items[1]).not.toHaveTextContent("·");
+      expect(items[1]).not.toHaveTextContent("run-old");
+    });
+  });
+
+  describe("when a run has no commit message", () => {
+    const runs = [
+      createRun({ runId: "snobbish-otter-1f2a3b9c4d", createdAt: 1_000_000 }),
+    ];
+
+    /** @scenario A run without a commit message shows index then a middle-dot separator */
+    it("renders 'Run #N · runId' with a middle-dot separator and no parentheses", () => {
+      render(
+        <Wrapper>
+          <BatchRunsSidebar runs={runs} onSelectRun={noop} />
+        </Wrapper>,
+      );
+
+      const item = screen.getByTestId("run-item-snobbish-otter-1f2a3b9c4d");
+      expect(item).toHaveTextContent("Run #1 · snobbish-otter-1f2a3b9c4d");
+      expect(item.textContent).not.toContain("(");
+      expect(item.textContent).not.toContain(")");
+    });
+
+    /** @scenario The run id uses the available width instead of an early hard truncation */
+    it("keeps the full run id without truncating it to eight characters", () => {
+      render(
+        <Wrapper>
+          <BatchRunsSidebar runs={runs} onSelectRun={noop} />
+        </Wrapper>,
+      );
+
+      const item = screen.getByTestId("run-item-snobbish-otter-1f2a3b9c4d");
+      // Full id present in the DOM (layout clips overflow visually, the
+      // string itself is never pre-truncated with an ellipsis character).
+      expect(item).toHaveTextContent("snobbish-otter-1f2a3b9c4d");
+      expect(item.textContent).not.toContain("…");
     });
   });
 });

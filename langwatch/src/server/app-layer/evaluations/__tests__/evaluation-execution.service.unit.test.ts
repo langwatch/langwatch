@@ -13,12 +13,13 @@ import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.gen
 import type { Trace } from "~/server/tracer/types";
 import type { LangEvalsClient } from "../../clients/langevals/langevals.client";
 import {
-  EvaluatorConfigError,
   EvaluatorNotFoundError,
   TraceNotEvaluatableError,
 } from "../errors";
 import {
   EvaluationExecutionService,
+  extractParentTraceForNlpgo,
+  maxCausalityDepthOfSpans,
   type EvaluationExecutionDeps,
   type ModelEnvResolver,
   type WorkflowExecutor,
@@ -109,6 +110,170 @@ function createTestService(overrides: TestOverrides = {}) {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+describe("extractParentTraceForNlpgo", () => {
+  // Returns the traceparent context (traceId + rootSpan.span_id) that
+  // gets propagated as a W3C `traceparent` header from TS to nlpgo so
+  // eval workflow spans land as children of the parent trace. Returning
+  // undefined makes nlpgo fall back to body-supplied trace_id (no
+  // parent linkage) — preferable to a fake parent_span_id that would
+  // render under a non-existent span in Studio's waterfall.
+  const VALID_TRACE_ID = "0af7651916cd43dd8448eb211c80319c";
+  const VALID_ROOT_SPAN_ID = "b7ad6b7169203331";
+
+  /** @scenario extractParentTraceForNlpgo returns context for valid OTel trace */
+  it("returns {traceId, parentSpanId} when trace_id is 32-hex and root span is 16-hex", () => {
+    const trace = buildTrace({
+      trace_id: VALID_TRACE_ID,
+      spans: [
+        {
+          span_id: VALID_ROOT_SPAN_ID,
+          parent_id: null,
+          trace_id: VALID_TRACE_ID,
+          type: "span",
+          timestamps: { started_at: 0, finished_at: 0 },
+        } as any,
+      ],
+    });
+    expect(extractParentTraceForNlpgo(trace)).toEqual({
+      traceId: VALID_TRACE_ID,
+      parentSpanId: VALID_ROOT_SPAN_ID,
+    });
+  });
+
+  it("lowercases the IDs so callers pass either case", () => {
+    const trace = buildTrace({
+      trace_id: VALID_TRACE_ID.toUpperCase(),
+      spans: [
+        {
+          span_id: VALID_ROOT_SPAN_ID.toUpperCase(),
+          parent_id: null,
+          trace_id: VALID_TRACE_ID.toUpperCase(),
+          type: "span",
+          timestamps: { started_at: 0, finished_at: 0 },
+        } as any,
+      ],
+    });
+    const result = extractParentTraceForNlpgo(trace);
+    expect(result?.traceId).toBe(VALID_TRACE_ID);
+    expect(result?.parentSpanId).toBe(VALID_ROOT_SPAN_ID);
+  });
+
+  /** @scenario extractParentTraceForNlpgo returns undefined for legacy trace_id shapes */
+  it("returns undefined when trace_id is the legacy trace_<nanoid> shape", () => {
+    const trace = buildTrace({
+      trace_id: "trace_abc123xyz",
+      spans: [
+        {
+          span_id: VALID_ROOT_SPAN_ID,
+          parent_id: null,
+          trace_id: "trace_abc123xyz",
+          type: "span",
+          timestamps: { started_at: 0, finished_at: 0 },
+        } as any,
+      ],
+    });
+    expect(extractParentTraceForNlpgo(trace)).toBeUndefined();
+  });
+
+  it("returns undefined when there is no root span", () => {
+    const trace = buildTrace({
+      trace_id: VALID_TRACE_ID,
+      spans: [
+        {
+          span_id: "0000000000000001",
+          // Not a root — has a parent_id.
+          parent_id: "0000000000000099",
+          trace_id: VALID_TRACE_ID,
+          type: "span",
+          timestamps: { started_at: 0, finished_at: 0 },
+        } as any,
+      ],
+    });
+    expect(extractParentTraceForNlpgo(trace)).toBeUndefined();
+  });
+
+  it("returns undefined when trace is undefined", () => {
+    expect(extractParentTraceForNlpgo(undefined)).toBeUndefined();
+  });
+
+  it("returns undefined when the root span_id is malformed (not 16-hex)", () => {
+    const trace = buildTrace({
+      trace_id: VALID_TRACE_ID,
+      spans: [
+        {
+          span_id: "span_legacy_format",
+          parent_id: null,
+          trace_id: VALID_TRACE_ID,
+          type: "span",
+          timestamps: { started_at: 0, finished_at: 0 },
+        } as any,
+      ],
+    });
+    expect(extractParentTraceForNlpgo(trace)).toBeUndefined();
+  });
+
+  describe("when the trace has multiple parent-less spans", () => {
+    // Broken / multi-source instrumentation can leave more than one
+    // root. find() would pick whichever happened to land first in the
+    // array — non-deterministic across re-runs. We pin the choice on
+    // earliest started_at (with span_id tie-break) so two consecutive
+    // eval runs against the same trace produce identical traceparent
+    // linkage.
+    const EARLIER_SPAN = "1111111111111111";
+    const LATER_SPAN = "9999999999999999";
+
+    it("picks the earliest started_at root deterministically", () => {
+      const trace = buildTrace({
+        trace_id: VALID_TRACE_ID,
+        spans: [
+          {
+            span_id: LATER_SPAN,
+            parent_id: null,
+            trace_id: VALID_TRACE_ID,
+            type: "span",
+            timestamps: { started_at: 200, finished_at: 300 },
+          } as any,
+          {
+            span_id: EARLIER_SPAN,
+            parent_id: null,
+            trace_id: VALID_TRACE_ID,
+            type: "span",
+            timestamps: { started_at: 100, finished_at: 150 },
+          } as any,
+        ],
+      });
+      expect(extractParentTraceForNlpgo(trace)?.parentSpanId).toBe(
+        EARLIER_SPAN,
+      );
+    });
+
+    it("falls back to span_id ordering when started_at ties", () => {
+      const trace = buildTrace({
+        trace_id: VALID_TRACE_ID,
+        spans: [
+          {
+            span_id: LATER_SPAN,
+            parent_id: null,
+            trace_id: VALID_TRACE_ID,
+            type: "span",
+            timestamps: { started_at: 100, finished_at: 150 },
+          } as any,
+          {
+            span_id: EARLIER_SPAN,
+            parent_id: null,
+            trace_id: VALID_TRACE_ID,
+            type: "span",
+            timestamps: { started_at: 100, finished_at: 150 },
+          } as any,
+        ],
+      });
+      expect(extractParentTraceForNlpgo(trace)?.parentSpanId).toBe(
+        EARLIER_SPAN,
+      );
+    });
+  });
+});
 
 describe("EvaluationExecutionService", () => {
   describe("executeForTrace()", () => {
@@ -220,6 +385,14 @@ describe("EvaluationExecutionService", () => {
             trace_id: "trace-1",
             do_not_trace: true,
           }),
+          undefined,
+          expect.any(Number),
+          // parentTrace: defaultTrace's trace_id is "trace-1" (not
+          // 32-hex), so extractParentTraceForNlpgo returns undefined.
+          // Adapter-level OTel trace_ids would set this to a real
+          // {traceId, parentSpanId} — separately covered by
+          // extractParentTraceForNlpgo's own tests.
+          undefined,
         );
       });
 
@@ -293,6 +466,7 @@ describe("EvaluationExecutionService", () => {
           );
         });
 
+        /** @scenario a thread-based monitor still runs for a trace with a thread_id */
         it("includes evaluationThreadId in result", async () => {
           const { service } = createTestService({
             trace: threadTrace,
@@ -314,23 +488,30 @@ describe("EvaluationExecutionService", () => {
       });
 
       describe("when trace has no thread_id", () => {
-        it("throws EvaluatorConfigError", async () => {
-          const { service } = createTestService({
+        /** @scenario a thread-based monitor skips a trace without a thread_id */
+        it("returns skipped without calling the evaluator", async () => {
+          const { service, mockTraceService, mockClient } = createTestService({
             trace: buildTrace({ metadata: {} }),
           });
 
-          await expect(
-            service.executeForTrace({
-              ...defaultParams,
-              evaluatorType: "custom/thread-eval",
-              level: "thread",
-              mappings: {
-                mapping: {
-                  conversation: { source: "formatted_traces", type: "thread" },
-                },
-              } as any,
-            }),
-          ).rejects.toThrow(EvaluatorConfigError);
+          const result = await service.executeForTrace({
+            ...defaultParams,
+            evaluatorType: "custom/thread-eval",
+            level: "thread",
+            mappings: {
+              mapping: {
+                conversation: { source: "formatted_traces", type: "thread" },
+              },
+            } as any,
+          });
+
+          expect(result.status).toBe("skipped");
+          expect(result.details).toContain("thread_id");
+          // short-circuits before building thread data or calling the evaluator
+          expect(
+            mockTraceService.getTracesWithSpansByThreadIds,
+          ).not.toHaveBeenCalled();
+          expect(mockClient.evaluate).not.toHaveBeenCalled();
         });
       });
     });
@@ -351,5 +532,73 @@ describe("EvaluationExecutionService", () => {
         );
       });
     });
+  });
+});
+
+describe("maxCausalityDepthOfSpans", () => {
+  it("returns 0 for empty / null / undefined spans", () => {
+    expect(maxCausalityDepthOfSpans([])).toBe(0);
+    expect(maxCausalityDepthOfSpans(undefined)).toBe(0);
+    expect(maxCausalityDepthOfSpans(null)).toBe(0);
+  });
+
+  it("returns 0 when no span has the attribute", () => {
+    expect(
+      maxCausalityDepthOfSpans([
+        { attributes: { "service.name": "x" } },
+        { attributes: null },
+      ]),
+    ).toBe(0);
+  });
+
+  it("returns the max numeric depth across spans", () => {
+    expect(
+      maxCausalityDepthOfSpans([
+        { attributes: { "langwatch.causality_depth": 0 } },
+        { attributes: { "langwatch.causality_depth": 2 } },
+        { attributes: { "langwatch.causality_depth": 1 } },
+      ]),
+    ).toBe(2);
+  });
+
+  it("parses string-encoded depth values", () => {
+    expect(
+      maxCausalityDepthOfSpans([
+        { attributes: { "langwatch.causality_depth": "1" } },
+        { attributes: { "langwatch.causality_depth": "3" } },
+      ]),
+    ).toBe(3);
+  });
+
+  it("ignores malformed values without crashing", () => {
+    expect(
+      maxCausalityDepthOfSpans([
+        { attributes: { "langwatch.causality_depth": "not-a-number" } },
+        { attributes: { "langwatch.causality_depth": NaN } },
+        { attributes: { "langwatch.causality_depth": 2 } },
+      ]),
+    ).toBe(2);
+  });
+
+  // Real production path: spans come from mapNormalizedSpanToSpan which
+  // unflattens OTLP dot-notation into nested objects under params. The
+  // old helper signature only inspected `attributes` and silently
+  // returned 0 for production-shaped spans.
+  it("reads depth from unflattened params.langwatch.causality_depth (real Span shape)", () => {
+    expect(
+      maxCausalityDepthOfSpans([
+        { params: { langwatch: { causality_depth: 1 } } },
+        { params: { langwatch: { causality_depth: 3 } } },
+        { params: { service: { name: "x" } } },
+      ]),
+    ).toBe(3);
+  });
+
+  it("falls back to dot-notation key when nested ns is absent", () => {
+    expect(
+      maxCausalityDepthOfSpans([
+        { params: { "langwatch.causality_depth": "2" } },
+      ]),
+    ).toBe(2);
   });
 });

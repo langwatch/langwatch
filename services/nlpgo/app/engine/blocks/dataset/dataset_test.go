@@ -1,7 +1,6 @@
 package dataset_test
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -41,7 +40,7 @@ func TestMaterialize_RejectsColumnLengthMismatch(t *testing.T) {
 	_, err := dataset.Materialize(ds)
 	require.Error(t, err)
 	var mm *dataset.ColumnMismatchError
-	require.True(t, errors.As(err, &mm))
+	require.ErrorAs(t, err, &mm)
 }
 
 func TestMaterialize_EmptyDataset(t *testing.T) {
@@ -76,7 +75,7 @@ func TestSplitRecords_RejectsOversize(t *testing.T) {
 	_, err := dataset.SplitRecords(rows, 0.8, 0.5, 1)
 	require.Error(t, err)
 	var bad *dataset.SplitInvalidError
-	require.True(t, errors.As(err, &bad))
+	require.ErrorAs(t, err, &bad)
 }
 
 func TestSelectByEntry_Int(t *testing.T) {
@@ -93,7 +92,7 @@ func TestSelectByEntry_OutOfRange(t *testing.T) {
 	_, err := dataset.SelectByEntry(rows, sel, nil)
 	require.Error(t, err)
 	var bad *dataset.EntrySelectionInvalidError
-	require.True(t, errors.As(err, &bad))
+	require.ErrorAs(t, err, &bad)
 	assert.Equal(t, "entry_selection_out_of_range", bad.Reason)
 }
 
@@ -119,7 +118,7 @@ func TestSelectByEntry_StringWithoutLookup(t *testing.T) {
 	_, err := dataset.SelectByEntry(rows, sel, nil)
 	require.Error(t, err)
 	var bad *dataset.EntrySelectionInvalidError
-	require.True(t, errors.As(err, &bad))
+	require.ErrorAs(t, err, &bad)
 	assert.Equal(t, "string_selection_lookup_not_provided", bad.Reason)
 }
 
@@ -181,7 +180,7 @@ func TestSelectByEntry_ModeKeyword_EmptyDataset(t *testing.T) {
 			_, err := dataset.SelectByEntry(nil, sel, nil)
 			require.Error(t, err)
 			var bad *dataset.EntrySelectionInvalidError
-			require.True(t, errors.As(err, &bad))
+			require.ErrorAs(t, err, &bad)
 			assert.Equal(t, "entry_selection_empty_dataset", bad.Reason)
 		})
 	}

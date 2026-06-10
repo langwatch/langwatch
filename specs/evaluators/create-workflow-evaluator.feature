@@ -4,6 +4,11 @@ Feature: Create workflow evaluator via new workflow
   I want to create a new workflow with the evaluator template
   So that I can build my evaluation logic from scratch
 
+  # All scenarios in this file describe a UI flow on the evaluators page —
+  # category selector → New Workflow modal → studio redirect. Need a
+  # Next.js page-level integration harness or Playwright E2E to drive
+  # end-to-end. Aspirational pending that harness.
+
   Background:
     Given I am logged in to a project
 

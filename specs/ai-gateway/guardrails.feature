@@ -1,4 +1,10 @@
 Feature: Guardrails wrap every gateway dispatch
+
+  # All scenarios in this file describe gateway data-plane guardrail
+  # invocation (pre-request block/modify, post-response block/modify,
+  # per-chunk streaming guardrails, fail-open/closed config). Implemented
+  # in Go (services/aigateway/) — out of scope for the TS parity check.
+
   The gateway calls LangWatch's guardrail service before dispatch (`request`),
   after response (`response`), and optionally per-chunk on streams
   (`stream_chunk`). Verdicts are allow | block | modify. A blocked request

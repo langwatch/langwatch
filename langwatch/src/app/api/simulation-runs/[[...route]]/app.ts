@@ -1,26 +1,17 @@
-import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
+import { createProjectApp, requires } from "~/server/api/security";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
-import {
-  type AuthMiddlewareVariables,
-  authMiddleware,
-} from "../../middleware";
-import { loggerMiddleware } from "../../middleware/logger";
-import { tracerMiddleware } from "../../middleware/tracer";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
-import { handleError } from "../../middleware";
 import { SimulationFacade } from "~/server/simulations/simulation.facade";
 
 patchZodOpenapi();
 
 const logger = createLogger("langwatch:api:simulation-runs");
-
-type Variables = AuthMiddlewareVariables;
 
 const scenarioRunResponseSchema = z.object({
   scenarioId: z.string(),
@@ -80,15 +71,10 @@ function createFacade() {
   return SimulationFacade.create();
 }
 
-export const app = new Hono<{ Variables: Variables }>()
-  .basePath("/api/simulation-runs")
-  .use(tracerMiddleware({ name: "simulation-runs" }))
-  .use(loggerMiddleware())
-  .use(authMiddleware)
-  .onError(handleError)
+const secured = createProjectApp({ basePath: "/api/simulation-runs" });
 
-  // ── List Runs ──────────────────────────────────────────────
-  .get(
+// ── List Runs ──────────────────────────────────────────────
+secured.access(requires("scenarios:view")).get(
     "/",
     describeRoute({
       description: "List simulation runs, optionally filtered by scenarioSetId or batchRunId",
@@ -186,10 +172,10 @@ export const app = new Hono<{ Variables: Variables }>()
         nextCursor: result.nextCursor,
       });
     },
-  )
+  );
 
-  // ── Get Single Run ────────────────────────────────────────
-  .get(
+// ── Get Single Run ────────────────────────────────────────
+secured.access(requires("scenarios:view")).get(
     "/:scenarioRunId",
     describeRoute({
       description: "Get a single simulation run by its ID",
@@ -234,10 +220,10 @@ export const app = new Hono<{ Variables: Variables }>()
         }),
       });
     },
-  )
+  );
 
-  // ── List Batches ──────────────────────────────────────────
-  .get(
+// ── List Batches ──────────────────────────────────────────
+secured.access(requires("scenarios:view")).get(
     "/batches/list",
     describeRoute({
       description: "List batch summaries for a scenario set (pass/fail counts per batch)",
@@ -289,3 +275,5 @@ export const app = new Hono<{ Variables: Variables }>()
       });
     },
   );
+
+export const app = secured.hono;

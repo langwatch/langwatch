@@ -1,20 +1,15 @@
-import { Badge, Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Text, VStack } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import {
   Activity,
   Anvil,
   Film,
-  Gauge,
+  Flag,
   History,
-  KeyRound,
-  LineChart,
-  Plug,
   Shield,
-  Zap,
 } from "lucide-react";
 import { useRouter } from "~/utils/compat/next-router";
 import React, { useState } from "react";
-import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useOpsPermission } from "../hooks/useOpsPermission";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../hooks/usePublicEnv";
@@ -23,6 +18,7 @@ import { featureIcons } from "../utils/featureIcons";
 import { projectRoutes } from "../utils/routes";
 import { useTableView } from "./messages/HeaderButtons";
 import { CollapsibleMenuGroup } from "./sidebar/CollapsibleMenuGroup";
+import { GovernSection } from "./sidebar/GovernSection";
 import { SideMenuLink } from "./sidebar/SideMenuLink";
 import { SupportMenu } from "./sidebar/SupportMenu";
 import { ThemeToggle } from "./sidebar/ThemeToggle";
@@ -47,15 +43,6 @@ export const MainMenu = React.memo(function MainMenu({
   const pendingItemsCount = api.annotation.getPendingItemsCount.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id },
-  );
-
-  // AI Gateway menu is feature-flagged pre-GA. Flip it on for internal
-  // dogfooding by setting FEATURE_FLAG_FORCE_ENABLE=release_ui_ai_gateway_menu_enabled
-  // on the server (see featureFlagService.posthog.ts). Otherwise targeting
-  // is driven by PostHog release conditions.
-  const { enabled: gatewayMenuEnabled } = useFeatureFlag(
-    "release_ui_ai_gateway_menu_enabled",
-    { projectId: project?.id, enabled: !!project },
   );
 
   // In compact mode, show expanded view on hover
@@ -93,7 +80,24 @@ export const MainMenu = React.memo(function MainMenu({
           width={MENU_WIDTH_EXPANDED}
           justifyContent="space-between"
         >
-          <VStack width="full" gap={0.5} align="start">
+          <VStack
+            width="full"
+            gap={0.5}
+            align="start"
+            flex={1}
+            minHeight={0}
+            overflowY="auto"
+            overflowX="hidden"
+            css={{
+              scrollbarWidth: "thin",
+              "&::-webkit-scrollbar": { width: "4px" },
+              "&::-webkit-scrollbar-thumb": {
+                background: "var(--chakra-colors-border-emphasized)",
+                borderRadius: "2px",
+              },
+              "&::-webkit-scrollbar-track": { background: "transparent" },
+            }}
+          >
             <PageMenuLink
               path={projectRoutes.home.path}
               icon={featureIcons.home.icon}
@@ -134,6 +138,16 @@ export const MainMenu = React.memo(function MainMenu({
               isActive={router.pathname.includes("/messages")}
               showLabel={showExpanded}
             />
+            <PageMenuLink
+              path={projectRoutes.traces_v2.path}
+              icon={featureIcons.traces_v2.icon}
+              label={projectRoutes.traces_v2.title}
+              project={project}
+              isActive={router.pathname.includes("/traces")}
+              showLabel={showExpanded}
+              beta="Trace Explorer is in beta. Expect rough edges; share feedback or report issues on Slack, or open one at https://github.com/langwatch/langwatch/issues/new/choose."
+              betaLabel="Beta"
+            />
 
             <Text
               fontSize="11px"
@@ -144,7 +158,7 @@ export const MainMenu = React.memo(function MainMenu({
               paddingTop={3}
               paddingBottom={1}
             >
-              {showExpanded ? "Evaluate" : <div>&nbsp;</div>}
+              {showExpanded ? "Evaluate" : <>&nbsp;</>}
             </Text>
 
             <CollapsibleMenuGroup
@@ -211,7 +225,7 @@ export const MainMenu = React.memo(function MainMenu({
               paddingTop={3}
               paddingBottom={1}
             >
-              {showExpanded ? "Library" : <div>&nbsp;</div>}
+              {showExpanded ? "Library" : <>&nbsp;</>}
             </Text>
 
             <PageMenuLink
@@ -259,118 +273,7 @@ export const MainMenu = React.memo(function MainMenu({
               showLabel={showExpanded}
             />
 
-            {gatewayMenuEnabled && hasPermission("virtualKeys:view") && project && (
-              <>
-                {" "}
-                <HStack
-                  paddingX={2}
-                  paddingTop={3}
-                  paddingBottom={1}
-                  gap={1}
-                  align="center"
-                >
-                  <Text
-                    fontSize="11px"
-                    fontWeight="medium"
-                    textTransform="uppercase"
-                    color="gray.500"
-                  >
-                    {showExpanded ? "Gateway" : <div>&nbsp;</div>}
-                  </Text>
-                  {showExpanded && (
-                    <Badge
-                      colorPalette="blue"
-                      variant="subtle"
-                      fontSize="2xs"
-                      paddingX={1.5}
-                      lineHeight={1.2}
-                    >
-                      Beta
-                    </Badge>
-                  )}
-                </HStack>
-                <CollapsibleMenuGroup
-                  icon={featureIcons.gateway.icon}
-                  label={projectRoutes.gateway.title}
-                  project={project}
-                  showLabel={showExpanded}
-                  children={[
-                    {
-                      icon: KeyRound,
-                      label: projectRoutes.gateway_virtual_keys.title,
-                      href: projectRoutes.gateway_virtual_keys.path.replace(
-                        "[project]",
-                        project.slug,
-                      ),
-                      isActive: router.pathname.includes(
-                        "/gateway/virtual-keys",
-                      ),
-                    },
-                    ...(hasPermission("gatewayBudgets:view")
-                      ? [
-                          {
-                            icon: Gauge,
-                            label: projectRoutes.gateway_budgets.title,
-                            href: projectRoutes.gateway_budgets.path.replace(
-                              "[project]",
-                              project.slug,
-                            ),
-                            isActive:
-                              router.pathname.includes("/gateway/budgets"),
-                          },
-                        ]
-                      : []),
-                    ...(hasPermission("gatewayProviders:view")
-                      ? [
-                          {
-                            icon: Plug,
-                            label: projectRoutes.gateway_providers.title,
-                            href: projectRoutes.gateway_providers.path.replace(
-                              "[project]",
-                              project.slug,
-                            ),
-                            isActive:
-                              router.pathname.includes("/gateway/providers"),
-                          },
-                        ]
-                      : []),
-                    ...(hasPermission("gatewayCacheRules:view")
-                      ? [
-                          {
-                            icon: Zap,
-                            label: projectRoutes.gateway_cache_rules.title,
-                            href: projectRoutes.gateway_cache_rules.path.replace(
-                              "[project]",
-                              project.slug,
-                            ),
-                            isActive: router.pathname.includes(
-                              "/gateway/cache-rules",
-                            ),
-                          },
-                        ]
-                      : []),
-                    ...(hasPermission("gatewayUsage:view")
-                      ? [
-                          {
-                            icon: LineChart,
-                            label: projectRoutes.gateway_usage.title,
-                            href: projectRoutes.gateway_usage.path.replace(
-                              "[project]",
-                              project.slug,
-                            ),
-                            isActive:
-                              router.pathname.endsWith("/gateway/usage"),
-                          },
-                        ]
-                      : []),
-                    // Audit log entry removed — gateway audit rows are now
-                    // surfaced under /settings/audit-log alongside platform
-                    // governance events. Deep-links from VK / Budget detail
-                    // pages target /settings/audit-log directly.
-                  ]}
-                />
-              </>
-            )}
+            <GovernSection showExpanded={showExpanded} />
 
             <OpsSection showExpanded={showExpanded} />
           </VStack>
@@ -404,8 +307,20 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
   const isOnOpsRoute = router.pathname.startsWith("/ops");
   const shouldShow = hasAccess && (alwaysShow || isOnOpsRoute);
 
+  // Two-tier polling so the always-on global badge doesn't drag the full
+  // dashboard aggregation into every tRPC batch. tRPC's `httpBatchLink`
+  // bundles multiple queries that fire in the same ~10ms window into one
+  // HTTP request and waits on every procedure before responding — so a
+  // slow `getDashboardSnapshot` call running in the background here would
+  // stall every page-level query batched alongside it. Off-route we ask
+  // only for the two integers the badge renders; on-route we lift to the
+  // full snapshot since the user actually wants the data.
+  const opsBadge = api.ops.getBadgeCounts.useQuery(undefined, {
+    enabled: shouldShow && !isOnOpsRoute,
+    refetchInterval: 60000,
+  });
   const opsData = api.ops.getDashboardSnapshot.useQuery(undefined, {
-    enabled: shouldShow,
+    enabled: shouldShow && isOnOpsRoute,
     refetchInterval: 10000,
   });
 
@@ -422,10 +337,15 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
 
   if (!shouldShow) return null;
 
-  const blockedCount =
-    opsData.data?.queues.reduce((sum, q) => sum + q.blockedGroupCount, 0) ?? 0;
-  const dlqCount =
-    opsData.data?.queues.reduce((sum, q) => sum + q.dlqCount, 0) ?? 0;
+  // On-route: derive from the full snapshot the dashboard already loaded.
+  // Off-route: read from the lightweight badge counts. Either way the
+  // badge stays in sync.
+  const blockedCount = isOnOpsRoute
+    ? opsData.data?.queues.reduce((sum, q) => sum + q.blockedGroupCount, 0) ?? 0
+    : opsBadge.data?.blockedCount ?? 0;
+  const dlqCount = isOnOpsRoute
+    ? opsData.data?.queues.reduce((sum, q) => sum + q.dlqCount, 0) ?? 0
+    : opsBadge.data?.dlqCount ?? 0;
 
   return (
     <>
@@ -438,7 +358,7 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
         paddingTop={3}
         paddingBottom={1}
       >
-        {showExpanded ? "Ops" : <div>&nbsp;</div>}
+        {showExpanded ? "Ops" : <>&nbsp;</>}
       </Text>
       <SideMenuLink
         icon={Activity}
@@ -472,6 +392,13 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
         isActive={router.pathname.startsWith("/ops/dejaview")}
         showLabel={showExpanded}
       />
+      <SideMenuLink
+        icon={Flag}
+        label="Feature Flags"
+        href="/ops/feature-flags"
+        isActive={router.pathname.startsWith("/ops/feature-flags")}
+        showLabel={showExpanded}
+      />
       {isAdminUser && (
         <SideMenuLink
           icon={Shield}
@@ -493,6 +420,8 @@ type PageMenuLinkProps = {
   badgeNumber?: number;
   isActive: boolean;
   showLabel?: boolean;
+  beta?: string | boolean;
+  betaLabel?: string;
 };
 
 const PageMenuLink = ({
@@ -503,6 +432,8 @@ const PageMenuLink = ({
   badgeNumber,
   isActive,
   showLabel = true,
+  beta,
+  betaLabel,
 }: PageMenuLinkProps) => {
   const { isTableView } = useTableView();
 
@@ -524,6 +455,8 @@ const PageMenuLink = ({
       isActive={isActive}
       badgeNumber={badgeNumber}
       showLabel={showLabel}
+      beta={beta}
+      betaLabel={betaLabel}
     />
   );
 };

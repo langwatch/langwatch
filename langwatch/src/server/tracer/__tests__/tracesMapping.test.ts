@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildMetadataFieldChildren,
   buildSpanFieldChildren,
+  coerceMonitorMappings,
   extractTracesFields,
   getThreadAvailableSources,
   getTraceAvailableSources,
@@ -10,6 +11,7 @@ import {
   SPAN_SUBFIELDS,
   THREAD_MAPPINGS,
   TRACE_MAPPINGS,
+  tryAndConvertTo,
 } from "../tracesMapping";
 import { formatSpansDigest } from "../spanToReadableSpan";
 
@@ -258,6 +260,52 @@ describe("TRACE_MAPPINGS.spans.mapping", () => {
   });
 });
 
+describe("mapTraceToDatasetEntry span expansion", () => {
+  // Locks the "One row per span" behaviour: saved automations persist these
+  // expansion keys, so a flip here would silently corrupt customer datasets.
+  const threeSpanTrace = {
+    trace_id: "trace-1",
+    timestamps: { started_at: Date.now() },
+    spans: [
+      { span_id: "s1", name: "a", type: "span", input: { type: "text", value: "1" } },
+      { span_id: "s2", name: "b", type: "span", input: { type: "text", value: "2" } },
+      { span_id: "s3", name: "c", type: "span", input: { type: "text", value: "3" } },
+    ],
+  };
+  const spansMapping = {
+    spans: { source: "spans", key: "", subkey: "" },
+  };
+
+  describe("when the all-spans expansion is enabled", () => {
+    /** @scenario Expanding spans produces one dataset row per span */
+    it("produces one dataset row per span", () => {
+      const rows = mapTraceToDatasetEntry(
+        threeSpanTrace as any,
+        spansMapping,
+        new Set(["spans.all.span_id"]) as any,
+      );
+
+      expect(rows).toHaveLength(3);
+    });
+  });
+
+  describe("when no expansion is enabled", () => {
+    /** @scenario Without the span expansion the trace stays a single row */
+    it("produces a single row whose spans field holds all spans", () => {
+      const rows = mapTraceToDatasetEntry(
+        threeSpanTrace as any,
+        spansMapping,
+        new Set() as any,
+      );
+
+      expect(rows).toHaveLength(1);
+      // The spans column is serialized as JSON; it should contain all 3 spans.
+      const spansValue = JSON.parse(rows[0]!.spans as string);
+      expect(spansValue).toHaveLength(3);
+    });
+  });
+});
+
 describe("TRACE_MAPPINGS.metadata.mapping", () => {
   const mockTrace = {
     trace_id: "trace-1",
@@ -389,6 +437,8 @@ describe("THREAD_MAPPINGS", () => {
 });
 
 describe("formatSpansDigest", () => {
+  /** @scenario Formatted trace produces a span hierarchy digest */
+  /** @scenario Formatted trace includes inputs and outputs */
   it("produces a string digest from spans", async () => {
     const spans = [
       {
@@ -438,6 +488,7 @@ describe("formatSpansDigest", () => {
     expect(result).toBe("No spans recorded.");
   });
 
+  /** @scenario Formatted trace includes errors */
   it("includes error information in the digest", async () => {
     const spans = [
       {
@@ -465,6 +516,7 @@ describe("formatSpansDigest", () => {
     expect(result).toContain("ERROR");
   });
 
+  /** @scenario Thread-level formatted traces joins multiple traces */
   it("joins multiple trace digests with separator for thread use", async () => {
     const trace1Spans = [
       {
@@ -509,6 +561,7 @@ describe("formatSpansDigest", () => {
 });
 
 describe("getTraceAvailableSources", () => {
+  /** @scenario Trace-level formatted trace source is available */
   it("includes formatted_trace with label 'Full Trace (AI-Readable)'", () => {
     const sources = getTraceAvailableSources([], []);
     const traceSource = sources[0]!;
@@ -830,6 +883,102 @@ describe("mappingStateSchema", () => {
       const result = mappingStateSchema.parse(input);
 
       expect(result.mapping.my_column).toHaveProperty("source", "input");
+    });
+  });
+});
+
+describe("tryAndConvertTo", () => {
+  describe("when given an OTel typed-object wrapper", () => {
+    it("returns the bare value when the wrapper type is 'text'", () => {
+      // Bug: currently returns '{"type":"text","value":"stockout"}' instead of "stockout"
+      expect(tryAndConvertTo({ type: "text", value: "stockout" }, "string")).toBe(
+        "stockout",
+      );
+    });
+
+    it("returns the bare value stringified when the wrapper type is 'json' and value is a number", () => {
+      // Any `type` discriminator should trigger unwrap
+      expect(tryAndConvertTo({ type: "json", value: 42 }, "string")).toBe("42");
+    });
+  });
+
+  describe("when given an array of OTel typed-object wrappers", () => {
+    it("unwraps each element and returns a string array", () => {
+      expect(
+        tryAndConvertTo(
+          [
+            { type: "text", value: "a" },
+            { type: "text", value: "b" },
+          ],
+          "string[]",
+        ),
+      ).toEqual(["a", "b"]);
+    });
+  });
+
+  describe("when given a plain object that is not a typed-object wrapper", () => {
+    it("stringifies the object as JSON", () => {
+      // Guard: non-wrapper objects must NOT be unwrapped
+      expect(tryAndConvertTo({ foo: "bar" }, "string")).toBe('{"foo":"bar"}');
+    });
+  });
+
+  describe("when given a bare string", () => {
+    it("returns the string unchanged", () => {
+      expect(tryAndConvertTo("stockout", "string")).toBe("stockout");
+    });
+  });
+
+  describe("when given null", () => {
+    it("returns undefined", () => {
+      expect(tryAndConvertTo(null, "string")).toBeUndefined();
+    });
+  });
+
+  describe("when given undefined", () => {
+    it("returns undefined", () => {
+      expect(tryAndConvertTo(undefined, "string")).toBeUndefined();
+    });
+  });
+});
+
+describe("coerceMonitorMappings (runtime write-path coercion for non-Zod callers)", () => {
+  describe("when value is null", () => {
+    it("coerces to canonical empty MappingState", () => {
+      expect(coerceMonitorMappings(null)).toEqual({
+        mapping: {},
+        expansions: [],
+      });
+    });
+  });
+
+  describe("when value is undefined", () => {
+    it("coerces to canonical empty MappingState", () => {
+      expect(coerceMonitorMappings(undefined)).toEqual({
+        mapping: {},
+        expansions: [],
+      });
+    });
+  });
+
+  describe("when value is the legacy `{}` shape that caused issue #3875", () => {
+    it("coerces to canonical empty MappingState", () => {
+      expect(coerceMonitorMappings({})).toEqual({
+        mapping: {},
+        expansions: [],
+      });
+    });
+  });
+
+  describe("when value is a properly shaped MappingState", () => {
+    it("preserves the value", () => {
+      const valid = {
+        mapping: {
+          input: { source: "input", key: undefined, subkey: undefined },
+        },
+        expansions: [],
+      };
+      expect(coerceMonitorMappings(valid)).toEqual(valid);
     });
   });
 });

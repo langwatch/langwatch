@@ -1,0 +1,94 @@
+---
+title: 'Overview'
+description: 'Create and manage access groups, their members, and role bindings via the REST API. Enterprise feature.'
+---
+
+## Intro
+
+The Groups API lets you manage LangWatch access groups via REST. Groups are collections of users that share the same role bindings — when you assign a role to a group, every member inherits that access.
+
+Groups can be created manually via the API or provisioned automatically from your identity provider via [SCIM](/platform/scim).
+
+<Info>
+Groups are an **Enterprise** feature. Contact your account team to enable them.
+</Info>
+
+## Authentication
+
+The Groups API requires an **organization-level API key** with `organization:manage` permission (created in Settings > API Keys). Pass it as a Bearer token:
+
+```
+Authorization: Bearer sk-lw-<id>_<secret>
+```
+
+## Endpoints
+
+### Groups
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/groups` | List all groups in the organization |
+| `POST` | `/api/groups` | Create a new group (with optional members and bindings) |
+| `GET` | `/api/groups/{id}` | Get group details with members and bindings |
+| `PATCH` | `/api/groups/{id}` | Rename a group |
+| `DELETE` | `/api/groups/{id}` | Delete a group and all its memberships/bindings |
+
+### Members
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/groups/{id}/members` | List members of a group |
+| `POST` | `/api/groups/{id}/members` | Add a member to a group |
+| `DELETE` | `/api/groups/{id}/members/{userId}` | Remove a member from a group |
+
+### Role Bindings
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/groups/{id}/bindings` | List role bindings for a group |
+| `POST` | `/api/groups/{id}/bindings` | Add a role binding to a group |
+| `DELETE` | `/api/groups/{id}/bindings/{bindingId}` | Remove a role binding from a group |
+
+## SCIM-Managed Groups
+
+Groups provisioned from an identity provider via SCIM are marked with a `scimSource` field (e.g. `"azure-ad"`, `"okta"`). SCIM-managed groups have restrictions:
+
+- **Cannot be renamed** via this API (the IdP is the source of truth)
+- **Cannot have members added or removed** manually (membership is managed by the IdP)
+- Role bindings can still be managed via this API
+
+## Typical Flow
+
+1. Create an admin API key in Settings > API Keys with `organization:manage` permission
+2. Create a group with initial members and role bindings:
+
+```bash
+curl -X POST https://app.langwatch.ai/api/groups \
+  -H "Authorization: Bearer sk-lw-..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Backend Engineers",
+    "memberIds": ["user_abc", "user_def"],
+    "bindings": [
+      {
+        "role": "MEMBER",
+        "scopeType": "TEAM",
+        "scopeId": "<team_id>"
+      }
+    ]
+  }'
+```
+
+3. All members inherit the MEMBER role on the specified team and all its projects.
+
+## Role Binding Scopes
+
+Bindings can target three scope levels:
+
+| Scope Type | Description |
+|------------|-------------|
+| `ORGANIZATION` | Access to all teams and projects in the org |
+| `TEAM` | Access to a specific team and all its projects |
+| `PROJECT` | Access to a specific project only |
+
+Available roles: `ADMIN`, `MEMBER`, `VIEWER`, `CUSTOM` (requires `customRoleId`).

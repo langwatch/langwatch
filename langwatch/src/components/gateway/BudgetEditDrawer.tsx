@@ -107,7 +107,7 @@ export function BudgetEditDrawer({
       placement="end"
       size="md"
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.Header>
           <Drawer.Title>Edit budget</Drawer.Title>
           <Drawer.CloseTrigger />

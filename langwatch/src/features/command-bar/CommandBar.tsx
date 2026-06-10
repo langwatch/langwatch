@@ -167,7 +167,12 @@ export function CommandBar() {
     navigator.platform.toUpperCase().indexOf("MAC") >= 0;
 
   // Extract filtered commands and projects using hooks
-  const filteredCommands = useFilteredCommands(query, publicEnv.data?.IS_SAAS);
+  const filteredCommands = useFilteredCommands(
+    query,
+    publicEnv.data?.IS_SAAS,
+    project?.id,
+    publicEnv.data?.NODE_ENV === "development",
+  );
   const filteredProjects = useFilteredProjects(
     query,
     organizations,
@@ -338,7 +343,7 @@ export function CommandBar() {
       placement="top"
       motionPreset="slide-in-top"
     >
-      <Dialog.Content
+      <Dialog.Content bg="bg"
         width={COMMAND_BAR_MAX_WIDTH}
         maxWidth="90vw"
         marginTop={COMMAND_BAR_TOP_MARGIN}

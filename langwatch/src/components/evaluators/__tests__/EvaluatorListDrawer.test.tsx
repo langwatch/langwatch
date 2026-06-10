@@ -146,6 +146,7 @@ describe("EvaluatorListDrawer", () => {
       });
     });
 
+    /** @scenario EvaluatorListDrawer shows available evaluators */
     it("shows evaluator list with all evaluators", async () => {
       renderDrawer();
       await waitFor(() => {
@@ -170,6 +171,7 @@ describe("EvaluatorListDrawer", () => {
   });
 
   describe("Selection", () => {
+    /** @scenario Select evaluator from drawer */
     it("calls onSelect when clicking an evaluator", async () => {
       const user = userEvent.setup();
       renderDrawer();
@@ -196,6 +198,7 @@ describe("EvaluatorListDrawer", () => {
   });
 
   describe("Create new evaluator", () => {
+    /** @scenario Create new evaluator from drawer flow */
     it("calls onCreateNew when clicking New Evaluator button", async () => {
       const user = userEvent.setup();
       renderDrawer();
@@ -227,6 +230,7 @@ describe("EvaluatorListDrawer", () => {
   });
 
   describe("Empty state", () => {
+    /** @scenario EvaluatorListDrawer empty state */
     it("shows empty message when no evaluators", async () => {
       vi.mocked(api.evaluators.getAll.useQuery).mockReturnValue({
         data: [],

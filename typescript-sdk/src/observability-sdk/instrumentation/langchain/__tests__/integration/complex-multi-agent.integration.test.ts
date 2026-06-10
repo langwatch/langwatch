@@ -14,15 +14,17 @@ import { setupObservability } from "../../../../setup/node";
 import { getLangWatchTracer } from "../../../../tracer";
 import { NoOpLogger } from "../../../../../logger";
 
+const RUN_EXTERNAL = process.env.RUN_EXTERNAL_LLM_TESTS === "true";
+
+if (RUN_EXTERNAL && !process.env.OPENAI_API_KEY) {
+  throw new Error(
+    "RUN_EXTERNAL_LLM_TESTS is true but OPENAI_API_KEY is not set"
+  );
+}
+
 /**
  * Integration tests for complex multi-agent LangChain workflows.
- *
- * These tests verify:
- * - Multi-agent collaboration patterns
- * - Tool chaining and nested execution
- * - Complex conversation flows
- * - Error propagation in agent hierarchies
- * - Span correlation across agent boundaries
+ * Requires RUN_EXTERNAL_LLM_TESTS=true and OPENAI_API_KEY to run.
  */
 
 function validateSpanDataIntegrity(spans: any[], expectedTypes: string[]) {
@@ -58,7 +60,7 @@ function validateSpanDataIntegrity(spans: any[], expectedTypes: string[]) {
   });
 }
 
-describe("LangChain Multi-Agent Integration Tests", () => {
+describe.skipIf(!RUN_EXTERNAL)("LangChain Multi-Agent Integration Tests", () => {
   let spanExporter: InMemorySpanExporter;
   let spanProcessor: SimpleSpanProcessor;
   let observabilityHandle: Awaited<ReturnType<typeof setupObservability>>;

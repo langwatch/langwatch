@@ -1,0 +1,45 @@
+{
+  "_comment": "Hand-curated model entries for direct-API providers that the upstream model-catalog source does not carry (Voyage AI's direct API today, others later). Merged into llmModels at module load — see loadModelCatalog.ts. The base llmModels.json is regenerated periodically and overwriting hand-added entries would silently drop these providers; the overlay file is never touched by the regen task. Add entries here when integrating a provider whose models aren't reachable via the upstream catalog.",
+  "models": {
+    "voyage/voyage-3.5": {
+      "id": "voyage/voyage-3.5",
+      "name": "Voyage AI: Voyage 3.5",
+      "provider": "voyage",
+      "pricing": {
+        "inputCostPerToken": 6e-8,
+        "outputCostPerToken": 0
+      },
+      "contextLength": 32000,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "text->embeddings",
+      "mode": "embedding",
+      "description": "Voyage AI's flagship general-purpose embedding model with strong retrieval quality across domains.",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "voyage/voyage-3.5-lite": {
+      "id": "voyage/voyage-3.5-lite",
+      "name": "Voyage AI: Voyage 3.5 Lite",
+      "provider": "voyage",
+      "pricing": {
+        "inputCostPerToken": 2e-8,
+        "outputCostPerToken": 0
+      },
+      "contextLength": 32000,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "text->embeddings",
+      "mode": "embedding",
+      "description": "Voyage AI's smaller, faster embedding model. Lower cost per token at a modest quality tradeoff, useful for high-volume topic-clustering workloads.",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    }
+  }
+}

@@ -27,6 +27,7 @@ describe("Prompt Tags", () => {
         } as InternalConfig);
       });
 
+      /** @scenario Assign tag to existing version */
       it("calls PUT /api/prompts/{id}/tags/{tag} with versionId", async () => {
         mockPut.mockResolvedValue({
           data: {
@@ -55,6 +56,7 @@ describe("Prompt Tags", () => {
         );
       });
 
+      /** @scenario Assign tag returns confirmation */
       it("returns the assignment result with configId, versionId, tag, updatedAt", async () => {
         const expectedResult = {
           configId: "config_abc",

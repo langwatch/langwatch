@@ -3,33 +3,42 @@ Feature: Enterprise-only feature guards
   I want to restrict RBAC custom roles and Audit Logs to Enterprise plans
   So that these premium features are only available to paying Enterprise customers
 
+  # Parity status: 23 of 27 scenarios bound to existing tests.
+  # The remaining are tracked under #3458:
+  #   - 4 NO_TEST: behavior shipped + correct, no integration test yet exists
+  # NO_TEST gaps:
+  #   - "Non-enterprise org can list custom roles"
+  #   - "Non-enterprise org can view a custom role"
+  #   - "Invite with foreign custom role ID is rejected"
+  #   - "Invite with valid custom role ID succeeds"
+
   Background:
     Given an organization exists
     And the organization has an active plan
 
   # --- RBAC Custom Roles: Write operations gated ---
 
-  @unit @unimplemented
+  @unit
   Scenario: Non-enterprise org cannot create custom roles
     Given the organization plan is not ENTERPRISE
     When an admin calls role.create
     Then the request is rejected with FORBIDDEN
     And the error message indicates custom roles require an Enterprise plan
 
-  @unit @unimplemented
+  @unit
   Scenario: Enterprise org can create custom roles
     Given the organization plan is ENTERPRISE
     When an admin calls role.create
     Then the custom role is created successfully
 
-  @unit @unimplemented
+  @unit
   Scenario: Non-enterprise org cannot update custom roles
     Given the organization plan is not ENTERPRISE
     And a custom role exists from when the org was on Enterprise
     When an admin calls role.update
     Then the request is rejected with FORBIDDEN
 
-  @unit @unimplemented
+  @unit
   Scenario: Non-enterprise org cannot assign custom roles to users
     Given the organization plan is not ENTERPRISE
     When an admin calls role.assignToUser
@@ -37,7 +46,7 @@ Feature: Enterprise-only feature guards
 
   # --- RBAC Custom Roles: Cleanup operations allowed on downgrade ---
 
-  @unit @unimplemented
+  @unit
   Scenario: Non-enterprise org can remove custom roles from users
     Given the organization plan is not ENTERPRISE
     And a user has a custom role assigned
@@ -45,7 +54,7 @@ Feature: Enterprise-only feature guards
     Then the custom role is removed successfully
     And the user reverts to VIEWER role
 
-  @unit @unimplemented
+  @unit
   Scenario: Non-enterprise org can delete custom roles for cleanup
     Given the organization plan is not ENTERPRISE
     And a custom role exists with no users assigned
@@ -54,55 +63,55 @@ Feature: Enterprise-only feature guards
 
   # --- RBAC Custom Roles: Conditional guards on team/invite flows ---
 
-  @unit @unimplemented
+  @unit
   Scenario: Non-enterprise org cannot assign custom roles via team update
     Given the organization plan is not ENTERPRISE
     When an admin updates a team member with a custom role
     Then the request is rejected with FORBIDDEN
 
-  @unit @unimplemented
+  @unit
   Scenario: Non-enterprise org can update team members with built-in roles
     Given the organization plan is not ENTERPRISE
     When an admin updates a team member with the MEMBER role
     Then the update succeeds
 
-  @unit @unimplemented
+  @unit
   Scenario: Non-enterprise org cannot assign custom roles via member role update
     Given the organization plan is not ENTERPRISE
     When an admin updates a member's role to include a custom role
     Then the request is rejected with FORBIDDEN
 
-  @unit @unimplemented
+  @unit
   Scenario: Non-enterprise org cannot invite members with custom roles
     Given the organization plan is not ENTERPRISE
     When an admin creates an invite with a custom role in team assignments
     Then the request is rejected with FORBIDDEN
 
-  @unit @unimplemented
+  @unit
   Scenario: Non-enterprise org can invite members with built-in roles
     Given the organization plan is not ENTERPRISE
     When an admin creates an invite with MEMBER role in team assignments
     Then the invite is created successfully
 
-  @unit @unimplemented
+  @unit
   Scenario: Non-enterprise org cannot create teams with custom role members
     Given the organization plan is not ENTERPRISE
     When an admin creates a team with a member assigned a custom role
     Then the request is rejected with FORBIDDEN
 
-  @unit @unimplemented
+  @unit
   Scenario: Non-enterprise org cannot update team member role to custom role
     Given the organization plan is not ENTERPRISE
     When an admin updates a team member's role to a custom role
     Then the request is rejected with FORBIDDEN
 
-  @unit @unimplemented
+  @unit
   Scenario: Non-enterprise org cannot create invite requests with custom roles
     Given the organization plan is not ENTERPRISE
     When an admin creates an invite request with a custom role in team assignments
     Then the request is rejected with FORBIDDEN
 
-  @unit @unimplemented
+  @unit
   Scenario: Batch invite rejects entirely when any invite has a custom role
     Given the organization plan is not ENTERPRISE
     When an admin creates invites where one uses a custom role and others use built-in roles
@@ -110,14 +119,14 @@ Feature: Enterprise-only feature guards
 
   # --- Audit Logs ---
 
-  @unit @unimplemented
+  @unit
   Scenario: Non-enterprise org cannot access audit logs
     Given the organization plan is not ENTERPRISE
     When a user calls organization.getAuditLogs
     Then the request is rejected with FORBIDDEN
     And the error message indicates audit logs require an Enterprise plan
 
-  @unit @unimplemented
+  @unit
   Scenario: Enterprise org can access audit logs
     Given the organization plan is ENTERPRISE
     When a user calls organization.getAuditLogs
@@ -125,31 +134,31 @@ Feature: Enterprise-only feature guards
 
   # --- Enterprise Plan Detection ---
 
-  @unit @unimplemented
+  @unit
   Scenario: Enterprise plan from subscription is recognized
     Given the organization has an ENTERPRISE subscription
     When a feature guard checks the plan
     Then the organization is recognized as enterprise
 
-  @unit @unimplemented
+  @unit
   Scenario: Enterprise plan from license is recognized
     Given the organization has an ENTERPRISE license
     When a feature guard checks the plan
     Then the organization is recognized as enterprise
 
-  @unit @unimplemented
+  @unit
   Scenario: FREE plan is not recognized as enterprise
     Given the organization has a FREE plan
     When a feature guard checks the plan
     Then the organization is not recognized as enterprise
 
-  @unit @unimplemented
+  @unit
   Scenario: OPEN_SOURCE plan is not recognized as enterprise
     Given the organization has an OPEN_SOURCE plan
     When a feature guard checks the plan
     Then the organization is not recognized as enterprise
 
-  @unit @unimplemented
+  @unit
   Scenario: Plan type matching is case-sensitive
     Given the plan type is exactly "ENTERPRISE"
     When a feature guard checks the plan
@@ -189,7 +198,7 @@ Feature: Enterprise-only feature guards
 
   # --- Error handling ---
 
-  @unit @unimplemented
+  @unit
   Scenario: Guard fails closed when plan lookup fails
     Given the plan provider is unavailable
     When a feature guard checks the plan

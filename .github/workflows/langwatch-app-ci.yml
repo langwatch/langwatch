@@ -83,11 +83,14 @@ jobs:
       NEXTAUTH_SECRET: "nextauth-secret-for-ci-testing"
       NEXTAUTH_URL: "http://localhost:3000"
       API_TOKEN_JWT_SECRET: "api-jwt-secret-for-ci-testing"
-      ELASTICSEARCH_NODE_URL: "http://localhost:9200"
       REDIS_URL: "redis://localhost:6379"
       BUILD_TIME: "true"
 
     runs-on: ubuntu-latest
+    # Same fail-fast cap as test-integration: a worker that wedges post-test
+    # (open handle, coverage finalize, etc.) should fail in ~25 min instead of
+    # burning the 6h default.
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -124,7 +127,7 @@ jobs:
         run: bash ../.github/scripts/notify-slack-test-failure.sh test-unit
 
       - name: Upload unit test coverage to Codecov
-        if: always()
+        if: always() && hashFiles('langwatch/coverage/lcov.info') != ''
         uses: codecov/codecov-action@1af58845a975a7985b0beb0cbe6fbbb71a41dbad # v5
         with:
           files: langwatch/coverage/lcov.info
@@ -138,7 +141,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6]
     env:
       VITEST_MAX_WORKERS: "4" # physical core count on GitHub-hosted ubuntu runners
       # Required environment variables for integration tests
@@ -147,7 +150,6 @@ jobs:
       NEXTAUTH_SECRET: "nextauth-secret-for-ci-testing"
       NEXTAUTH_URL: "http://localhost:3000"
       API_TOKEN_JWT_SECRET: "api-jwt-secret-for-ci-testing"
-      ELASTICSEARCH_NODE_URL: "http://localhost:9200"
       CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/test_langwatch"
       CI_REDIS_URL: "redis://localhost:6379"
       CI_CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/test_langwatch"
@@ -155,6 +157,10 @@ jobs:
       CI: "true"
 
     runs-on: ubuntu-latest
+    # Belt-and-suspenders: per-shard coverage accumulation in the single fork
+    # worker can wedge post-test (worker fails to exit). Cap the per-job wait
+    # so a wedge fails fast in ~25 min instead of burning the 6h default.
+    timeout-minutes: 25
 
     services:
       redis:
@@ -165,23 +171,6 @@ jobs:
           --health-cmd "redis-cli ping"
           --health-interval 10s
           --health-timeout 5s
-          --health-retries 5
-
-      # ClickHouse is started manually via docker run (after checkout) to mount storage policy config
-      # See "Start ClickHouse with storage policy" step below
-
-      elasticsearch:
-        image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
-        ports:
-          - 9200:9200
-        env:
-          discovery.type: single-node
-          xpack.security.enabled: false
-          ES_JAVA_OPTS: "-Xms512m -Xmx512m"
-        options: >-
-          --health-cmd "curl -f http://localhost:9200/_cluster/health || exit 1"
-          --health-interval 30s
-          --health-timeout 10s
           --health-retries 5
 
       postgres:
@@ -215,10 +204,6 @@ jobs:
         working-directory: langwatch
         run: pnpm prisma:migrate
 
-      - name: Setup Elasticsearch
-        working-directory: langwatch
-        run: pnpm elastic:migrate
-
       - name: Install Goose migration tool
         run: bash .github/scripts/install-goose.sh
 
@@ -246,11 +231,20 @@ jobs:
           done
           exit 1
 
-      - name: Run integration tests with coverage (shard ${{ matrix.shard }}/4)
+      - name: Run integration tests with coverage (shard ${{ matrix.shard }}/6)
         id: integration-tests
         working-directory: langwatch
+        # Integration files run sequentially in a single long-lived fork worker
+        # (fileParallelism:false, for Redis contention), so v8 coverage data
+        # accumulates across every file in the shard. Two levers keep that
+        # accumulation manageable: the shard count bounds files-per-worker, and
+        # the raised --max-old-space-size gives the worker enough headroom to
+        # finalize coverage and exit. NODE_OPTIONS is inherited by the fork
+        # worker (execArgv is not), so it raises the heap where it's needed.
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
         run: |
-          pnpm test:integration --shard=${{ matrix.shard }}/4 \
+          pnpm test:integration --shard=${{ matrix.shard }}/6 \
             --coverage --coverage.reporter=lcov --coverage.reporter=text \
             --reporter=default --reporter=json --outputFile=test-results.json
 
@@ -268,7 +262,7 @@ jobs:
         run: bash ../.github/scripts/notify-slack-test-failure.sh test-integration
 
       - name: Upload integration test coverage to Codecov
-        if: always()
+        if: always() && hashFiles('langwatch/coverage/lcov.info') != ''
         uses: codecov/codecov-action@1af58845a975a7985b0beb0cbe6fbbb71a41dbad # v5
         with:
           files: langwatch/coverage/lcov.info
@@ -336,7 +330,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@eae0cfeb286e66ffb5155f1a79b90583a127a68b # v2
+        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
         with:
           version: 10.24.0
 
@@ -386,6 +380,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-turbo-
 
+      # node-pty@1.1.0 only ships prebuilds for darwin/win32, so on Linux
+      # its postinstall always falls back to `node-gyp rebuild`. With
+      # pnpm/action-setup v6's npm-bootstrap path, node-gyp isn't on PATH
+      # by default — install it globally before any install that hits
+      # mcp-server's onlyBuiltDependencies allowlist.
+      - name: Install node-gyp (for node-pty postinstall)
+        run: npm install -g node-gyp@12.3.0
+
       - name: Build mcp-server
         working-directory: mcp-server
         run: pnpm install --frozen-lockfile && pnpm run build
@@ -397,6 +399,26 @@ jobs:
       - name: Build
         working-directory: langwatch
         run: pnpm build
+
+      # A successful `vite build` only proves the bundle compiles, not that it
+      # boots. Serve the built output and load it in a headless browser to
+      # catch runtime boot failures (white screens from chunk-init errors).
+      # Uses the runner's preinstalled Google Chrome (no browser download).
+      - name: Boot smoke test
+        working-directory: langwatch
+        env:
+          SMOKE_BROWSER_CHANNEL: chrome
+        run: |
+          pnpm exec vite preview --port 4173 --outDir dist/client &
+          PREVIEW_PID=$!
+          trap 'kill $PREVIEW_PID 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            curl -sf -o /dev/null http://localhost:4173/ && break
+            sleep 1
+          done
+          # Under the runner's `bash -e`, a non-zero exit here fails the step
+          # (the gate we want); the EXIT trap still stops the preview server.
+          node scripts/smoke-boot.mjs
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'

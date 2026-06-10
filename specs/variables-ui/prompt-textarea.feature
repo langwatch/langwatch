@@ -4,6 +4,19 @@ Feature: Prompt textarea with variable chips
   I want variables to render as visual chips in the textarea
   So that I can easily identify and work with template variables
 
+  # All scenarios describe the PromptTextAreaWithVariables /
+  # ContentEditable component (variable extraction, chip rendering,
+  # caret navigation, paste handling). Tests exist at:
+  #   * PromptTextAreaWithVariables.test.tsx
+  #   * liquidVariableExtraction.unit.test.ts
+  #
+  # All scenarios are pre-classified KEEP in
+  # `specs/variables-ui/AUDIT_MANIFEST.md`. They stay
+  # `@unimplemented` here because each `it(...)` case still needs an
+  # individual @scenario marker — a mechanical pass that was
+  # deferred to keep this PR small. Cheap follow-up: walk the two
+  # test files and apply per-case markers from the manifest.
+
   Background:
     Given the prompt textarea is rendered
     And variables "input" and "context" exist

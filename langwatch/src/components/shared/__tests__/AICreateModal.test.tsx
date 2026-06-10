@@ -508,13 +508,22 @@ describe("<AICreateModal/>", () => {
         within(dialog).getByRole("button", { name: /generate with ai/i })
       );
 
+      // Wait for the error state to render the Try again button. Re-resolve
+      // the dialog node afterwards because Chakra's portal can leave the
+      // original `dialog` reference pointing at a stale element across the
+      // idle → generating → error state transition (CI-only flake; locally
+      // the portal stays stable but on CI the timing exposes the swap).
       await waitFor(() => {
         expect(
-          within(dialog).getByRole("button", { name: /try again/i })
+          within(getDialogContent()).getByRole("button", {
+            name: /try again/i,
+          })
         ).toBeInTheDocument();
       });
 
-      fireEvent.click(within(dialog).getByRole("button", { name: /try again/i }));
+      fireEvent.click(
+        within(getDialogContent()).getByRole("button", { name: /try again/i })
+      );
 
       await waitFor(() => {
         expect(onGenerate).toHaveBeenCalledTimes(2);

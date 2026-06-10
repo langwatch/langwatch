@@ -4,6 +4,9 @@ Feature: Model Selector UX Improvements
   I want a compact and intuitive model selector
   So that I can quickly choose and configure the right model for my task
 
+  # All scenarios describe model-selector UI rendering. Need a JSDOM
+  # render of the selector component — no test fixture exists yet.
+
   Background:
     Given I am on a page with the model selector
     And model providers are loaded for my project
@@ -76,24 +79,6 @@ Feature: Model Selector UX Improvements
     Then I should see a settings icon/button
     When I click the settings button
     Then it should open model provider settings in a new tab
-
-  # Keyboard Navigation
-  # no test - handled by Chakra UI Select component
-  @visual @unimplemented
-  Scenario: Supports keyboard navigation in dropdown
-    When I open the model selector dropdown
-    And I press the down arrow key
-    Then the next model option should be highlighted
-    When I press Enter
-    Then that model should be selected
-
-  # no test - handled by Chakra UI Select component
-  @visual @unimplemented
-  Scenario: Escape closes the dropdown
-    When I open the model selector dropdown
-    And I press Escape
-    Then the dropdown should close
-    And no model change should occur
 
   # Loading States
   @unimplemented

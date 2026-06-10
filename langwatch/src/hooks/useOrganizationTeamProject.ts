@@ -13,6 +13,29 @@ import { api } from "../utils/api";
 import { usePublicEnv } from "./usePublicEnv";
 import { noOrgBouncerRoutes, publicRoutes, useRequiredSession } from "./useRequiredSession";
 
+/**
+ * Whether a permission is org-scoped: it lives in ORGANIZATION_ROLE_PERMISSIONS
+ * and must be resolved against the user's organization role, not any team-role
+ * bag. Covers `organization:` itself plus the AI Governance resource family
+ * (governance / ingestionSources / anomalyRules / complianceExport /
+ * activityMonitor / aiTools). Team admins do NOT inherit these automatically;
+ * delegation flows through the CustomRolePermissions JSON column at the team
+ * level (matching the rest of the RBAC catalog).
+ *
+ * @internal Exported for testing only
+ */
+export function isOrgScopedPermission(permission: Permission): boolean {
+  return (
+    permission.startsWith("organization:") ||
+    permission.startsWith("governance:") ||
+    permission.startsWith("ingestionSources:") ||
+    permission.startsWith("anomalyRules:") ||
+    permission.startsWith("complianceExport:") ||
+    permission.startsWith("activityMonitor:") ||
+    permission.startsWith("aiTools:")
+  );
+}
+
 /** @internal Exported for testing only */
 export function resolveProjectRedirectSubPath({
   pathname,
@@ -86,6 +109,12 @@ export const useOrganizationTeamProject = (
       staleTime: keepFetching ? 0 : 30_000,
       refetchOnWindowFocus: true,
       refetchInterval: keepFetching ? 5_000 : undefined,
+      // Skip the HTTP batch link: this query is mounted at the app shell and
+      // refetches on focus/route change, so left in the batch it would drag
+      // the drawer-open burst (organization.getAll + 7 trace procedures —
+      // measured at ~2.5s, blocked by the slowest). On its own connection it
+      // runs in parallel without affecting the trace fan-out.
+      trpc: { context: { skipBatch: true } },
     },
   );
 
@@ -97,6 +126,10 @@ export const useOrganizationTeamProject = (
   );
   const [localStorageProjectSlug, setLocalStorageProjectSlug] =
     useLocalStorage<string>("selectedProjectSlug", "");
+  const [, setLastVisitedHomeKind] = useLocalStorage<"" | "project" | "personal">(
+    "lastVisitedHomeKind",
+    "",
+  );
 
   const reservedProjectSlugs = useMemo(
     () => ["analytics", "datasets", "evaluations", "experiments", "messages"],
@@ -220,6 +253,16 @@ export const useOrganizationTeamProject = (
     if (project && project.slug !== localStorageProjectSlug) {
       setLocalStorageProjectSlug(project.slug);
     }
+    // Visiting an actual /[project]/* page marks the implicit home preference
+    // as "project". Pairs with MyLayout's "personal" marker so the `/` index
+    // resolver can fall through to whichever home was visited last when the
+    // user has no explicit pin. Gate on the URL actually carrying a project
+    // slug: `project` also resolves from the persisted selectedProjectSlug on
+    // non-project routes (e.g. /me), and marking "project" there would clobber
+    // MyLayout's "personal" and wrongly bounce `/` back to the project.
+    if (project && typeof router.query.project === "string") {
+      setLastVisitedHomeKind("project");
+    }
     // We want to update localstorage values only once, forward, doesn't matter if localstorage
     // itself changes. This is because the user might have two tabs open in different projects,
     // and we don't want them fighting each other on who keeps localstorage in sync.
@@ -318,24 +361,12 @@ export const useOrganizationTeamProject = (
       hasOrgPermission: () => false,
       hasAnyPermission: () => false,
       isPublicRoute,
-      isOrganizationFeatureEnabled: () => false,
       isDemo,
       organizationRole: undefined,
     };
   }
 
   const organizationRole = organization?.members?.[0]?.role;
-
-  const isOrganizationFeatureEnabled = (feature: string): boolean => {
-    if (!organization?.features) return false;
-    const trialFeature = organization.features.find(
-      (f) => f.feature === feature,
-    );
-    if (!trialFeature) return false;
-
-    if (!trialFeature.trialEndDate) return true;
-    return new Date(trialFeature.trialEndDate) > new Date();
-  };
 
   // ============================================================================
   // NEW RBAC SYSTEM - Preferred API going forward
@@ -348,10 +379,9 @@ export const useOrganizationTeamProject = (
    * @example hasPermission("organization:manage")
    */
   const hasPermission = (permission: Permission) => {
-    // Check if this is an organization permission
-    const isOrgPermission = permission.startsWith("organization:");
-
-    if (isOrgPermission) {
+    // Org-scoped resources resolve against the org role only (see
+    // isOrgScopedPermission); team admins do not inherit them automatically.
+    if (isOrgScopedPermission(permission)) {
       // Only check organization role - team admins do NOT get automatic organization permissions
       if (organizationRole) {
         const orgResult = organizationRoleHasPermission(
@@ -440,7 +470,6 @@ export const useOrganizationTeamProject = (
     hasAnyPermission,
     isPublicRoute,
     modelProviders: modelProviders.data,
-    isOrganizationFeatureEnabled,
     isDemo,
     organizationRole,
   };

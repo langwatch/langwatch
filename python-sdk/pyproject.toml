@@ -1,6 +1,6 @@
 [project]
 name = "langwatch"
-version = "0.22.0" # remember to also update it in src/langwatch/__version__.py
+version = "0.24.0" # remember to also update it in src/langwatch/__version__.py
 description = "LangWatch Python SDK, for monitoring your LLMs"
 authors = [{ name = "Langwatch Engineers", email = "engineering@langwatch.ai" }]
 requires-python = ">=3.10,<3.14"
@@ -36,7 +36,7 @@ dependencies = [
     "tenacity>=8.0.0",
     "termcolor>=3.0.1",
     "deprecated>=1.2.18",
-    "python-liquid>=2.0.2",
+    "python-liquid>=2.2.0",
     "pydantic>=2",
     "attrs>=24",
     "pksuid>=1.1.2",
@@ -72,10 +72,10 @@ markers = [
 ]
 
 [dependency-groups]
-dev = ["black>=25.1.0"]
+dev = ["black>=26.3.1"]
 examples = [
     "anthropic>=0.36.0,<0.37.0",
-    "chainlit>=2.8.3,<3",
+    "chainlit>=2.11.1,<3",
     "cloudpickle>=3.1.1",
     "dspy-ai>=3.0.3,<4",
     "faiss-cpu>=1.8.0,<2.0.0",
@@ -92,9 +92,9 @@ examples = [
     "opentelemetry-instrumentation-fastapi>=0.53b1",
     "langgraph>=1.0.0,<2.0.0",
     "openai>=1.68.2,<2.8.0", # 2.8+ calls model_dump(by_alias=None) which pydantic-core rejects
-    "pydantic>=1,<2.10.2", # v2.10.2 is broken for chainlit
+    "pydantic>=2.11.0", # chainlit <2.11.1 was broken with pydantic >=2.10.2; fixed in chainlit 2.11.1
     "pytest>=7.4.2,<8.0.0",
-    "python-dotenv==1.2.1",
+    "python-dotenv==1.2.2",
     "streamlit>=1.37.1,<2.0.0",
     "uvicorn>=0.38.0,<0.41.0",
     "json-repair>=0.42.0",
@@ -104,7 +104,7 @@ examples = [
     "pandas>=2.2.3",
     "fonttools>=4.62.0",  # security: CVE-2025-66034 (#328)
     "jupyterlab>=4.5.6",  # security: CVE-2025-59842 (#319)
-    "langsmith>=0.6.3",  # security: CVE-2026-25528 (#394)
+    "langsmith>=0.8.0",  # security: CVE-2026-45134 (#1175)
     "pypdf>=6.8.0",  # security: CVE-2026-31826 (#543)
     "strands-agents[otel]>=1.14.0,<2.0.0",
     "nltk>=3.9.4",
@@ -113,5 +113,8 @@ examples = [
 tests = [
     "factory-boy>=3.3.3",
     "pytest-asyncio>=0.21.2",
-    "python-dotenv==1.2.1"
+    "python-dotenv==1.2.2"
 ]
+
+[tool.uv]
+exclude-newer = "7 days"

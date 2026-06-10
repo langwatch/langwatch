@@ -5,10 +5,8 @@ import {
 } from "~/server/api/routers/modelProviders.utils";
 import { resolveMaxTokensCeiling } from "~/server/modelProviders/resolveMaxTokensCeiling";
 import { clampMaxTokens } from "~/utils/clampMaxTokens";
-import {
-  getAzureSafetyEnvFromProject,
-  isAzureEvaluatorType,
-} from "./azure-safety-env";
+import { isAzureEvaluatorType } from "./azure-safety-env";
+import { getAzureSafetyEnvFromProject } from "./azure-safety-env.server";
 import { EvaluatorConfigError } from "./errors";
 import type { ModelEnvResolver } from "./evaluation-execution.service";
 
@@ -63,7 +61,16 @@ export function createDefaultModelEnvResolver(): ModelEnvResolver {
   };
 }
 
-async function setupModelEnv(
+/**
+ * Builds the X_LITELLM_* env block for an evaluator that needs to call a
+ * specific model. Validates the provider is configured + enabled, projects
+ * litellm params, and overlays whitelisted generation params (temperature,
+ * max_tokens, etc.) from the evaluator settings.
+ *
+ * Throws `EvaluatorConfigError` for misconfigured providers — callers who
+ * need a per-worker error class should catch and rewrap.
+ */
+export async function setupModelEnv(
   model: string,
   embeddings: boolean,
   projectId: string,
@@ -85,7 +92,17 @@ async function setupModelEnv(
     ? modelProvider.embeddingsModels
     : modelProvider.models;
 
-  if (modelList && modelList.length > 0 && !modelList.includes(modelName)) {
+  const customModelList = embeddings
+    ? modelProvider.customEmbeddingsModels
+    : modelProvider.customModels;
+  const isCustomModel = customModelList?.some((m) => m.modelId === modelName);
+
+  if (
+    modelList &&
+    modelList.length > 0 &&
+    !modelList.includes(modelName) &&
+    !isCustomModel
+  ) {
     throw new EvaluatorConfigError(
       `Model ${modelName} is not in the ${
         embeddings ? "embedding models" : "models"

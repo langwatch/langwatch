@@ -95,14 +95,13 @@ describe("isBlockedCloudDomain", () => {
 });
 
 describe("validateUrlForSSRF", () => {
-  // Use injected SaaS config for deterministic behavior regardless of env
-  const saasValidator = createSSRFValidator({
-    isDevelopment: false,
-    allowedDevHosts: [],
-    isSaaS: true,
+  // Use injected blocking config for deterministic behavior regardless of env
+  const blockingValidator = createSSRFValidator({
+    blockLocal: true,
+    allowedHosts: [],
   });
 
-  // [url, expectedError] - urls that should be blocked in SaaS mode
+  // [url, expectedError] - urls that should be blocked when blockLocal is on
   const blockedCases: [string, string][] = [
     ["not-a-url", "Invalid URL format"],
     ["http://169.254.169.254/latest/meta-data/", "cloud metadata endpoints"],
@@ -116,7 +115,7 @@ describe("validateUrlForSSRF", () => {
   ];
 
   it.each(blockedCases)("blocks %s", async (url, expectedError) => {
-    await expect(saasValidator(url)).rejects.toThrow(expectedError);
+    await expect(blockingValidator(url)).rejects.toThrow(expectedError);
   });
 
   // URLs that should be blocked but error message varies (IPv6 edge cases)
@@ -124,11 +123,11 @@ describe("validateUrlForSSRF", () => {
     "http://[fd00:ec2::254]/latest/meta-data/",
     "http://[::1]:8080/api",
   ])("blocks %s (any error)", async (url) => {
-    await expect(saasValidator(url)).rejects.toThrow();
+    await expect(blockingValidator(url)).rejects.toThrow();
   });
 
   it("allows public IP and returns resolved result", async () => {
-    const result = await saasValidator("http://8.8.8.8/dns");
+    const result = await blockingValidator("http://8.8.8.8/dns");
     expect(result.type).toBe("resolved");
     if (result.type === "resolved") {
       expect(result.resolvedIp).toBe("8.8.8.8");
@@ -137,65 +136,67 @@ describe("validateUrlForSSRF", () => {
   });
 
   it("allows googleapis.com (not blocked in AWS-only config)", async () => {
-    const result = await saasValidator(
+    const result = await blockingValidator(
       "http://storage.googleapis.com/bucket",
     );
     expect(result.hostname).toBe("storage.googleapis.com");
   });
 
-  it("returns discriminated union with correct type for development bypass", async () => {
-    const devValidator = createSSRFValidator({
-      isDevelopment: true,
-      allowedDevHosts: [],
-      isSaaS: true,
+  it("returns unresolved type when DNS fails and blockLocal is off", async () => {
+    const permissiveValidator = createSSRFValidator({
+      blockLocal: false,
+      allowedHosts: [],
     });
-    // In development mode without allowlist, unresolvable hostnames return development-bypass
-    const result = await devValidator(
+    const result = await permissiveValidator(
       "http://nonexistent-host-12345.invalid/path",
     );
-    expect(result.type).toBe("development-bypass");
-    if (result.type === "development-bypass") {
+    expect(result.type).toBe("unresolved");
+    if (result.type === "unresolved") {
       expect(["dns-failed", "no-records"]).toContain(result.reason);
     }
   });
 });
 
 describe("createSSRFValidator (dependency injection)", () => {
-  it("allows injecting custom configuration without process.env", async () => {
+  it("blocks private IPs when blockLocal is true", async () => {
     const validator = createSSRFValidator({
-      isDevelopment: false,
-      allowedDevHosts: [],
-      isSaaS: true,
+      blockLocal: true,
+      allowedHosts: [],
     });
 
-    // Should block private IPs in production config
     await expect(validator("http://127.0.0.1/api")).rejects.toThrow(
       "private or localhost IP addresses",
     );
   });
 
-  it("respects injected development mode with allowlist", async () => {
+  it("allowlisted host bypasses private-IP block (works in any environment)", async () => {
     const validator = createSSRFValidator({
-      isDevelopment: true,
-      allowedDevHosts: ["myhost.local"],
-      isSaaS: true,
+      blockLocal: true,
+      allowedHosts: ["10.0.5.3"],
     });
 
-    // myhost.local is in the allowlist, but it's also a cloud domain pattern
-    // Cloud domains are always blocked regardless of allowlist
+    const result = await validator("http://10.0.5.3/api");
+    expect(result.type).toBe("allowlisted");
+  });
+
+  it("allowlisted host that is also a cloud domain pattern is still blocked", async () => {
+    const validator = createSSRFValidator({
+      blockLocal: true,
+      allowedHosts: ["myhost.local"],
+    });
+
+    // myhost.local matches the .local cloud-domain block — that ALWAYS wins.
     await expect(validator("http://myhost.local/api")).rejects.toThrow(
       "cloud provider internal domains",
     );
   });
 
-  it("respects injected development mode without allowlist", async () => {
+  it("permissive mode allows private IPs without an allowlist", async () => {
     const validator = createSSRFValidator({
-      isDevelopment: true,
-      allowedDevHosts: [],
-      isSaaS: true,
+      blockLocal: false,
+      allowedHosts: [],
     });
 
-    // In dev mode without allowlist, private IPs are allowed
     const result = await validator("http://127.0.0.1/api");
     expect(result.type).toBe("resolved");
     if (result.type === "resolved") {
@@ -205,9 +206,8 @@ describe("createSSRFValidator (dependency injection)", () => {
 
   it("always blocks metadata endpoints regardless of config", async () => {
     const validator = createSSRFValidator({
-      isDevelopment: true,
-      allowedDevHosts: ["169.254.169.254"],
-      isSaaS: true,
+      blockLocal: true,
+      allowedHosts: ["169.254.169.254"],
     });
 
     // Metadata endpoints are always blocked, even if allowlisted

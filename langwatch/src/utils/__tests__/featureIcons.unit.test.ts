@@ -6,6 +6,7 @@ import { featureIcons } from "../featureIcons";
 
 describe("featureIcons", () => {
   describe("when the suites feature icon configuration is read", () => {
+    /** @scenario 'Feature icon label for suites is "Run Plans"' */
     it("has label 'Run Plans'", () => {
       expect(featureIcons.suites.label).toBe("Run Plans");
     });

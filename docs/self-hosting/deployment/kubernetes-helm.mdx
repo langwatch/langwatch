@@ -44,7 +44,7 @@ kubectl -n langwatch port-forward svc/langwatch-app 5560:5560
 ```
 
 <Warning>
-`autogen.enabled=true` generates random secrets on each install. This is fine for testing but not for production — secrets will change on reinstall and invalidate sessions. See [Production Deployment](#production-deployment) below.
+`autogen.enabled=true` generates random secrets on each install. This is fine for testing but not for production, secrets will change on reinstall and invalidate sessions. See [Production Deployment](#production-deployment) below.
 </Warning>
 
 ## Low-Resources Deployment
@@ -71,19 +71,23 @@ For production, you should:
 3. Expose via Ingress with TLS
 4. Disable auto-generation
 
-### 1. Create Secrets
+### 1. Create the app Secret
 
-Create a Kubernetes Secret with your application secrets:
+One Secret holds every chart-required value (app keys + AI gateway shared-auth keys when the gateway sub-chart is enabled). Both `langwatch-app` and the gateway pod mount it.
 
 ```bash
 kubectl create namespace langwatch
 
-kubectl create secret generic langwatch-secrets \
-  --namespace langwatch \
-  --from-literal=credentialsEncryptionKey=$(openssl rand -hex 32) \
-  --from-literal=nextAuthSecret=$(openssl rand -hex 32) \
-  --from-literal=cronApiKey=$(openssl rand -hex 32)
+kubectl -n langwatch create secret generic langwatch-app-secrets \
+  --from-literal=credentialsEncryptionKey="$(openssl rand -hex 32)" \
+  --from-literal=cronApiKey="$(openssl rand -hex 32)" \
+  --from-literal=nextAuthSecret="$(openssl rand -hex 32)" \
+  --from-literal=virtualKeyPepper="$(openssl rand -hex 32)" \
+  --from-literal=LW_GATEWAY_INTERNAL_SECRET="$(openssl rand -hex 32)" \
+  --from-literal=LW_GATEWAY_JWT_SECRET="$(openssl rand -hex 32)"
 ```
+
+If you run with `gateway.chartManaged: false` (no AI gateway proxy), skip the two `LW_GATEWAY_*` lines.
 
 For external databases, create additional secrets:
 
@@ -110,7 +114,7 @@ autogen:
   enabled: false
 
 secrets:
-  existingSecret: langwatch-secrets
+  existingSecret: langwatch-app-secrets
 
 app:
   replicaCount: 2
@@ -314,7 +318,7 @@ The chart ships with composable overlay files in `examples/overlays/`. Combine t
 
 ### Composing Overlays
 
-Overlays are composable — later files override earlier ones:
+Overlays are composable, later files override earlier ones:
 
 ```bash
 # Production with external DBs and S3 cold storage
@@ -367,11 +371,11 @@ clickhouse:
   memory: "8Gi" # Tunes memory limits, cache sizes, per-query limits
 ```
 
-You only need to set these two values — the subchart computes optimal settings for query limits, merge threads, insert batching, and S3 download parallelism.
+You only need to set these two values, the subchart computes optimal settings for query limits, merge threads, insert batching, and S3 download parallelism.
 
 ### AI Gateway sub-chart (optional)
 
-The umbrella chart bundles the AI Gateway as an opt-in sub-chart that runs alongside the core LangWatch app. Enabling it gives you virtual keys, hierarchical budgets, multi-provider routing via Bifrost, guardrails, and prompt caching — all governed by the same control plane.
+The umbrella chart bundles the AI Gateway as an opt-in sub-chart that runs alongside the core LangWatch app. Enabling it gives you virtual keys, hierarchical budgets, multi-provider routing via Bifrost, guardrails, and prompt caching, all governed by the same control plane.
 
 Minimum viable opt-in:
 
@@ -384,8 +388,8 @@ That ships sane defaults (2 replicas, ClusterIP service, no ingress). For per-en
 
 Three things to know before flipping it on:
 
-1. **Shared secrets must exist before install.** The gateway and the LangWatch app both mount `LW_GATEWAY_INTERNAL_SECRET` + `LW_GATEWAY_JWT_SECRET` (and the app additionally reads `LW_VIRTUAL_KEY_PEPPER`) — same byte-for-byte values. Pre-create the `gateway-runtime-secrets` Kubernetes Secret (the chart's `secrets.existingSecretName` default) holding all three keys before `helm install`, otherwise the gateway pod loops on `secret not found` until the install timeout. Override the name via `secrets.existingSecretName` if your platform conventions differ. See [AI Gateway → Self-hosting → Config → Secrets](/ai-gateway/self-hosting/config#secrets) for the recipe.
-2. **Public ingress needs DNS + TLS.** The gateway is what your LLM clients hit, so it usually wants its own hostname (e.g. `gateway.your-corp.com`) — separate cert, separate ingress rule. See [AI Gateway → Self-hosting → DNS & TLS](/ai-gateway/self-hosting/dns-and-tls).
+1. **One Secret holds everything** (or use `autogen.enabled=true` and let the chart materialise it). Both `langwatch-app` and the AI gateway pod mount `LW_GATEWAY_INTERNAL_SECRET` + `LW_GATEWAY_JWT_SECRET` from the same `secrets.existingSecret` Secret (default `langwatch-app-secrets`) that also holds the app keys (`credentialsEncryptionKey`, `cronApiKey`, `nextAuthSecret`, `virtualKeyPepper`). The [Production Deployment](#production-deployment) section above shows the single `kubectl create secret generic` command. With `autogen.enabled=false` and any required key missing, the preflight Job aborts the install with a clear list of what is missing; under `autogen.enabled=true` the chart materialises the Secret on first install via lookup-or-rand.
+2. **Public ingress needs DNS + TLS.** The gateway is what your LLM clients hit, so it usually wants its own hostname (e.g. `gateway.your-corp.com`), separate cert, separate ingress rule. See [AI Gateway → Self-hosting → DNS & TLS](/ai-gateway/self-hosting/dns-and-tls).
 3. **Worker pods must be running.** Budget enforcement reads from a ClickHouse rollup that the trace-processing reactor folds into. If you deploy with `workers.enabled=false`, budgets stop accumulating spend and breach enforcement silently degrades. The default `workers.enabled=true` is correct for production.
 
 ## Upgrade
@@ -418,7 +422,7 @@ kubectl -n langwatch delete pvc --all
 
 ## FAQ
 
-### Istio / Service Mesh
+### Istio, Service Mesh
 
 If you're using Istio or another service mesh with automatic sidecar injection, the CronJob pods may fail because the sidecar keeps the pod alive after the job completes.
 

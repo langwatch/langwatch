@@ -12,6 +12,10 @@ import { getProjectModelProviders } from "../api/routers/modelProviders.utils";
 import { prisma } from "../db";
 import type { SingleEvaluationResult } from "../evaluations/evaluators.generated";
 import type { MaybeStoredModelProvider } from "../modelProviders/registry";
+import { createLogger } from "../../utils/logger";
+import { stripUnsupportedLLMParamsFromWorkflow } from "./stripUnsupportedLLMParams";
+
+const logger = createLogger("langwatch:workflows:runWorkflow");
 
 const getWorkFlow = (state: Workflow) => {
   return {
@@ -105,6 +109,8 @@ export async function runEvaluationWorkflow(
   projectId: string,
   inputs: Record<string, string>,
   versionId?: string,
+  causalityDepth?: number,
+  parentTrace?: { traceId: string; parentSpanId: string },
 ): Promise<{
   result: SingleEvaluationResult;
   status: ExecutionStatus;
@@ -115,9 +121,24 @@ export async function runEvaluationWorkflow(
       projectId,
       inputs,
       versionId,
-      true, // do_not_trace
+      // do_not_trace=false: we WANT the evaluator's spans to land on
+      // the parent trace so they show in Studio's waterfall as a
+      // child sub-tree. This was historically `true` to avoid an
+      // eval-of-eval loop (pre-2026-05-11 fix), but loop prevention
+      // now lives in the depth-attribute reactor — the do_not_trace
+      // path is now actively harmful: it skips parent-context setup
+      // in nlpgo's startStudioSpan so eval child spans (LLM calls,
+      // execute_component) get a fresh trace_id and land as a
+      // separate orphan trace. See the 2026-05-14 prod regression
+      // reported by rchaves.
+      false, // do_not_trace
       false, // run_evaluations - disable evaluators inside the workflow when running as an online evaluation
       "evaluation",
+      // Always pass a concrete depth (default 0) so the downstream
+      // header gate in nlpgoFetch sees this as an evaluator-chain call
+      // even when the parent had no depth attribute yet.
+      causalityDepth ?? 0,
+      parentTrace,
     );
 
     // Process the result
@@ -162,6 +183,8 @@ export async function runWorkflow(
   do_not_trace?: boolean,
   run_evaluations?: boolean,
   origin: NLPOrigin = "workflow",
+  causalityDepth?: number,
+  parentTrace?: { traceId: string; parentSpanId: string },
 ) {
   const workflow = await prisma.workflow.findUnique({
     where: { id: workflowId, projectId },
@@ -214,6 +237,33 @@ export async function runWorkflow(
     },
   };
 
+  // Strip every sampling parameter from each LLM block that the resolved
+  // model does not list as supported. The Studio path (POST
+  // /api/workflows/post_event) already does this; this is the parallel
+  // chokepoint for every server-driven dispatch (online evaluators,
+  // evaluator-as-evaluator chains, scheduled runs). Without it, a
+  // published workflow that carries a stale top_p from before the
+  // operator disabled it on their custom-model config still ships the
+  // field to the gateway, and Bedrock newer-Claude rejects the combo
+  // with `temperature and top_p cannot both be specified`. Customer
+  // dogfood 2026-05-31 surfaced exactly this path on
+  // us.anthropic.claude-haiku-4-5-* as an online evaluator. Best-effort
+  // so a registry-lookup miss never blocks the run.
+  try {
+    await stripUnsupportedLLMParamsFromWorkflow({
+      prisma,
+      projectId,
+      workflow: messageWithoutEnvs.payload.workflow as Parameters<
+        typeof stripUnsupportedLLMParamsFromWorkflow
+      >[0]["workflow"],
+    });
+  } catch (filterError) {
+    logger.warn(
+      { err: filterError, projectId, workflowId },
+      "stripUnsupportedLLMParamsFromWorkflow failed; forwarding original payload",
+    );
+  }
+
   const event = await addEnvs(messageWithoutEnvs, projectId);
 
   const response = await nlpgoFetch<{
@@ -224,6 +274,8 @@ export async function runWorkflow(
     path: "/studio/execute_sync",
     body: event,
     origin,
+    causalityDepth,
+    parentTrace,
   });
 
   if (!response.ok) {

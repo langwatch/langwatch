@@ -38,7 +38,7 @@ export function SeriesFiltersDrawer({
       size="lg"
       onOpenChange={() => closeDrawer()}
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.Header>
           <Heading>Edit Series Filter</Heading>
           <Drawer.CloseTrigger />

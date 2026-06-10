@@ -79,6 +79,7 @@ describe("<ExpandedTextDialog/>", () => {
     // CSS rules from stylesheets, so style properties set via Chakra/CSS classes
     // (e.g. overflow: auto, maxHeight) always return empty strings. These tests
     // can only be verified in a real browser or with a Playwright-based test.
+    /** @scenario Full content is accessible when it exceeds the dialog viewport */
     it.skip("makes large JSON content accessible within the dialog body", () => {
       const { baseElement } = renderDialog({ text: LARGE_JSON });
 
@@ -115,6 +116,7 @@ describe("<ExpandedTextDialog/>", () => {
 
   describe("when content fits within the dialog viewport", () => {
     // Skipped: Same jsdom limitation — getComputedStyle does not resolve CSS class styles.
+    /** @scenario Small content does not trigger unnecessary scrolling */
     it.skip("does not force scrolling for small content", () => {
       const { baseElement } = renderDialog({ text: SMALL_JSON });
 
@@ -132,6 +134,7 @@ describe("<ExpandedTextDialog/>", () => {
     // Skipped: The local next/dynamic test mock resolves loader() asynchronously but does
     // not trigger a re-render when the module arrives, so the copy-button subtree may never
     // mount in this test environment.
+    /** @scenario JSON content renders with interactive viewer and copy button */
     it.skip("renders the copy button within the dialog", () => {
       const { baseElement } = renderDialog({
         text: JSON.stringify({ nested: { key: "value" } }),
@@ -145,6 +148,7 @@ describe("<ExpandedTextDialog/>", () => {
 
   describe("when toggling the formatted switch off", () => {
     // Skipped: Same jsdom limitation — getComputedStyle does not resolve CSS class styles.
+    /** @scenario Scrollability persists after toggling formatted mode */
     it.skip("keeps the dialog body scrollable after toggling", () => {
       const { baseElement } = render(
         <ExpandedTextDialog

@@ -6,28 +6,30 @@ sidebarTitle: Cursor
 
 Cursor supports "Custom OpenAI API" endpoints under **Settings → Models → OpenAI API Key**. Point it at the LangWatch AI Gateway to apply VK budgets, per-team governance, and fallback to every Cursor request.
 
+<Note>**Why the GUI paste, not a wrapper?** Cursor is a GUI app whose AI configuration lives in `~/Library/Application Support/Cursor/User/settings.json`, not env vars. The `langwatch cursor` wrapper exists and exec's Cursor with `OPENAI_BASE_URL`, `OPENAI_API_KEY` set, which is useful for inheriting governance config in some shell-launched flows, but Cursor's own AI panel still reads its `settings.json` first. The canonical and reliable setup for governance is the in-app paste described below.</Note>
+
 ## Setup
 
 1. Open **Settings** (⌘,).
 2. Navigate to **Models → OpenAI API Key**.
 3. Paste your virtual key as the "OpenAI API Key":
    ```
-   lw_vk_live_01HZX...
+   vk-lw-01HZX...
    ```
 4. Expand **OpenAI Base URL** and enter:
    ```
    https://gateway.langwatch.ai/v1
    ```
 5. Toggle on **Override OpenAI Base URL**.
-6. Click **Verify** — Cursor hits `/v1/models` on the gateway and lists the models your VK exposes.
+6. Click **Verify**: Cursor hits `/v1/models` on the gateway and lists the models your VK exposes.
 
-Your VK's model list populates the Cursor model picker. `model_aliases` on the VK control what appears — e.g. alias `gpt-4o` → `anthropic/claude-sonnet-4-6` if you want Cursor's `gpt-4o` shortcut to route to Claude via the gateway.
+Your VK's model list populates the Cursor model picker. `model_aliases` on the VK control what appears, e.g. alias `gpt-4o` → `anthropic/claude-sonnet-4-6` if you want Cursor's `gpt-4o` shortcut to route to Claude via the gateway.
 
 ## Anthropic-shaped models
 
-Cursor's "OpenAI API" integration speaks Chat Completions. The gateway translates the OpenAI-shape request into Anthropic-shape upstream transparently — any Claude model your VK exposes shows up in Cursor's picker and works without special handling.
+Cursor's "OpenAI API" integration speaks Chat Completions. The gateway translates the OpenAI-shape request into Anthropic-shape upstream transparently, any Claude model your VK exposes shows up in Cursor's picker and works without special handling.
 
-Caveat: Anthropic's 90% cache discount only applies when `cache_control` is preserved, and Cursor doesn't emit `cache_control` blocks itself. The gateway inserts cache breakpoints heuristically on long system prompts — see [Caching Passthrough](/ai-gateway/caching-passthrough) for the limits.
+Caveat: Anthropic's 90% cache discount only applies when `cache_control` is preserved, and Cursor doesn't emit `cache_control` blocks itself. The gateway inserts cache breakpoints heuristically on long system prompts, see [Caching Passthrough](/ai-gateway/caching-passthrough) for the limits.
 
 ## Self-hosted gateway
 
@@ -47,7 +49,7 @@ Because Cursor stores the base URL + API key per-workstation, the scalable patte
 2. Attach the VK to a `principal` budget scoped to that engineer.
 3. Email the VK + base URL in the onboarding note. Rotation lands in the UI; engineers rotate their VK in-place in Cursor Settings.
 
-With this setup every Cursor request from `alice@corp.com` shows up in LangWatch traces under her principal id, counting against her budget, auditable by org admins — no Cursor account federation needed.
+With this setup every Cursor request from `alice@corp.com` shows up in LangWatch traces under her principal id, counting against her budget, auditable by org admins, no Cursor account federation needed.
 
 ## Governance recipes
 
@@ -55,16 +57,16 @@ With this setup every Cursor request from `alice@corp.com` shows up in LangWatch
 
 VK `models_allowed`: `["gpt-5-mini", "gpt-5", "claude-haiku-4-5-20251001"]`.
 
-Cursor shows every model in the picker (from `/v1/models`) but calling a non-listed model returns `403 model_not_allowed`. Consider this defence-in-depth — the engineer sees `gpt-4o` in Cursor but can't actually use it.
+Cursor shows every model in the picker (from `/v1/models`) but calling a non-listed model returns `403 model_not_allowed`. Consider this defence-in-depth, the engineer sees `gpt-4o` in Cursor but can't actually use it.
 
 ### Cheap-by-default for autocomplete
 
-Cursor separates **Chat** and **cmd-K / tab completion**. The tab completion runs orders of magnitude more requests and should use a cheap model. Configure:
+Cursor separates **Chat** and **cmd-K, tab completion**. The tab completion runs orders of magnitude more requests and should use a cheap model. Configure:
 
 - **Chat** model: `gpt-5` (or `claude-sonnet-4-6`).
 - **Fast completion** model: `gpt-5-mini` via VK alias.
 
-Per-model cost shows up in LangWatch observability — you'll typically see 100× more `gpt-5-mini` completions than `gpt-5` chats.
+Per-model cost shows up in LangWatch observability, you'll typically see 100× more `gpt-5-mini` completions than `gpt-5` chats.
 
 ### Weekly per-engineer budget
 
@@ -72,7 +74,7 @@ Budget: scope `principal`, window `week`, limit `$50`, `on_breach: warn at 80%, 
 
 ## Troubleshooting
 
-- **"Connection failed"** on Verify — verify the base URL ends in `/v1` (no trailing slash).
-- **Empty model list** — your VK has no providers attached. Open **Gateway → Virtual Keys → edit**, attach at least one provider credential.
-- **Tab completion suddenly slow** — check LangWatch traces for `X-LangWatch-Fallback-Count > 0`; your primary provider is degrading and requests are falling back. See [Fallback Chains](/ai-gateway/providers/fallback-chains).
-- **`402 budget_exceeded` mid-day** — your principal budget hit its limit. Ask an org admin to raise it or switch to a team VK with headroom.
+- **"Connection failed"** on Verify, verify the base URL ends in `/v1` (no trailing slash).
+- **Empty model list**: your VK has no providers attached. Open **Gateway → Virtual Keys → edit**, attach at least one provider credential.
+- **Tab completion suddenly slow**: check LangWatch traces for `X-LangWatch-Fallback-Count > 0`; your primary provider is degrading and requests are falling back. See [Fallback Chains](/ai-gateway/providers/fallback-chains).
+- **`402 budget_exceeded` mid-day**, your principal budget hit its limit. Ask an org admin to raise it or switch to a team VK with headroom.

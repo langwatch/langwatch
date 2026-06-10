@@ -40,6 +40,7 @@ import {
   toExternalSetSelection,
 } from "./useSuiteRouting";
 import { SearchInput } from "../ui/SearchInput";
+import { VoiceAgentsCallout } from "./VoiceAgentsCallout";
 
 export const SUITE_SIDEBAR_COLLAPSED_KEY = "suite-sidebar-collapsed" as const;
 
@@ -322,6 +323,14 @@ export function SuiteSidebar({
         )}
       </VStack>
 
+      {/*
+       * Voice agents announcement card — pinned just above the collapse
+       * toggle so it sits at the bottom of the sets/runs sidebar without
+       * stealing space from the list itself. Hidden when the sidebar is
+       * collapsed (no room for the copy at icon-rail width).
+       */}
+      {!isCollapsed && <VoiceAgentsCallout />}
+
       {/* Toggle button — always the same DOM node */}
       <ShadowDivider />
       <HStack paddingX={isCollapsed ? 6 : 3} paddingY={1.5} justify="flex-start">
@@ -403,7 +412,7 @@ function RunSummaryLine({
       <Text fontSize="xs" color={getPassRateGradientColor(passRate)} fontWeight="medium">
         {passRate === null ? "-" : `${Math.round(passRate)}%`}
       </Text>
-      <Text fontSize="xs" color="gray.350">·</Text>
+      <Text fontSize="xs" color="gray.400">·</Text>
       <Text fontSize="xs" color="fg.subtle">
         {passedCount} passed
       </Text>

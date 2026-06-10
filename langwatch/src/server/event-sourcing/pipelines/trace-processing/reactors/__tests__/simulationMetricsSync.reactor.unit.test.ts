@@ -35,20 +35,29 @@ function createTraceSummaryState(overrides: Partial<TraceSummaryData> = {}): Tra
     errorMessage: null,
     models: ["gpt-5-mini"],
     totalCost: 0.001,
+    nonBilledCost: null,
     tokensEstimated: false,
     totalPromptTokenCount: 100,
     totalCompletionTokenCount: 50,
     outputFromRootSpan: true,
     outputSpanEndTimeMs: 1000,
     blockedByGuardrail: false,
+    rootSpanType: null,
+    containsAi: false,
     topicId: null,
     subTopicId: null,
     annotationIds: [],
+    containsPrompt: false,
+    selectedPromptId: null,
+    selectedPromptSpanId: null,
+    selectedPromptStartTimeMs: null,
+    lastUsedPromptId: null,
+    lastUsedPromptVersionNumber: null,
+    lastUsedPromptVersionId: null,
+    lastUsedPromptSpanId: null,
+    lastUsedPromptStartTimeMs: null,
     attributes: {},
-    scenarioRoleCosts: { Agent: 0.001 },
-    scenarioRoleLatencies: { Agent: 500 },
-    scenarioRoleSpans: {},
-    lastEventOccurredAt: 0,
+    LastEventOccurredAt: 0,
     occurredAt: 1000,
     createdAt: 1000,
     updatedAt: 2000,
@@ -79,7 +88,7 @@ function createSpanReceivedEvent(): SpanReceivedEvent {
   };
 }
 
-describe("simulationMetricsSync reactor (trace-side ECST publisher)", () => {
+describe("simulationMetricsSync reactor (trace-side metrics publisher)", () => {
   describe("when reactor is created", () => {
     it("has dedup options with makeJobId, ttl, and delay", () => {
       const deps = createDeps();
@@ -93,14 +102,12 @@ describe("simulationMetricsSync reactor (trace-side ECST publisher)", () => {
   });
 
   describe("when trace has scenario.run_id attribute", () => {
-    it("dispatches computeRunMetrics with ECST payload", async () => {
+    it("dispatches computeRunMetrics in pull mode (role costs derived downstream)", async () => {
       const deps = createDeps();
       const reactor = createSimulationMetricsSyncReactor(deps);
 
       const foldState = createTraceSummaryState({
         attributes: { "scenario.run_id": "run-1" },
-        scenarioRoleCosts: { Agent: 0.001 },
-        scenarioRoleLatencies: { Agent: 500 },
         totalCost: 0.001,
       });
 
@@ -110,15 +117,12 @@ describe("simulationMetricsSync reactor (trace-side ECST publisher)", () => {
         foldState,
       });
 
+      // No metrics carried: computeRunMetrics derives role cost/latency from
+      // stored_spans, so the reactor only identifies the trace to compute.
       expect(deps.computeRunMetrics).toHaveBeenCalledWith({
         tenantId: TEST_TENANT_ID,
         scenarioRunId: "run-1",
         traceId: "trace-1",
-        metrics: {
-          totalCost: 0.001,
-          roleCosts: { Agent: 0.001 },
-          roleLatencies: { Agent: 500 },
-        },
         retryCount: 0,
         occurredAt: expect.any(Number),
       });
@@ -144,15 +148,14 @@ describe("simulationMetricsSync reactor (trace-side ECST publisher)", () => {
     });
   });
 
-  describe("when trace has no role costs or total cost", () => {
+  describe("when trace has no spans and no cost", () => {
     it("skips without dispatching", async () => {
       const deps = createDeps();
       const reactor = createSimulationMetricsSyncReactor(deps);
 
       const foldState = createTraceSummaryState({
         attributes: { "scenario.run_id": "run-1" },
-        scenarioRoleCosts: {},
-        scenarioRoleLatencies: {},
+        spanCount: 0,
         totalCost: null,
       });
 
@@ -174,7 +177,6 @@ describe("simulationMetricsSync reactor (trace-side ECST publisher)", () => {
 
       const foldState = createTraceSummaryState({
         attributes: { "scenario.run_id": "run-1" },
-        scenarioRoleCosts: { Agent: 0.001 },
         totalCost: 0.001,
       });
 
@@ -188,15 +190,14 @@ describe("simulationMetricsSync reactor (trace-side ECST publisher)", () => {
     });
   });
 
-  describe("when totalCost is zero but scenarioRoleCosts exist", () => {
+  describe("when totalCost is zero but the trace has spans", () => {
     it("dispatches computeRunMetrics", async () => {
       const deps = createDeps();
       const reactor = createSimulationMetricsSyncReactor(deps);
 
       const foldState = createTraceSummaryState({
         attributes: { "scenario.run_id": "run-1" },
-        scenarioRoleCosts: { Agent: 0.0 },
-        scenarioRoleLatencies: { Agent: 500 },
+        spanCount: 2,
         totalCost: 0,
       });
 
@@ -206,7 +207,6 @@ describe("simulationMetricsSync reactor (trace-side ECST publisher)", () => {
         foldState,
       });
 
-      // scenarioRoleCosts has an entry, even though value is 0, so dispatch happens
       expect(deps.computeRunMetrics).toHaveBeenCalledTimes(1);
     });
   });

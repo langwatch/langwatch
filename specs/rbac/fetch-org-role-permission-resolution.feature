@@ -4,6 +4,17 @@ Feature: Organization role awareness across the platform
   I need to know each user's organization role (admin, member, or lite member)
   So that features can tailor access and experience based on role
 
+  # The role-recognition + permission-grant scenarios below are
+  # bound to the corresponding cases in
+  # `langwatch/src/server/api/__tests__/rbac.test.ts` (Org Role
+  # Permissions, Team Role Permissions, Custom Role Scenarios).
+  #
+  # The "non-member denied", "demo project access", "frontend knows
+  # role" scenarios need: (1) a TRPC procedure-level integration
+  # test asserting the access denial, (2) the demo-project bypass
+  # path, and (3) a JSDOM page render asserting the user-context
+  # hook surfaces the role. None exist today.
+
   Background:
     Given an organization "acme" with a project "chatbot"
 

@@ -1,50 +1,37 @@
-import type { Project } from "@prisma/client";
-import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
+import { z } from "zod";
+import { createProjectApp, requires } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
+import { DEFAULT_SET_ID } from "~/server/scenarios/internal-set-id";
 import { ScenarioEventType } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioEvent } from "~/server/scenarios/scenario-event.types";
-import { DEFAULT_SET_ID } from "~/server/scenarios/internal-set-id";
-import { responseSchemas, scenarioEventSchema } from "~/server/scenarios/schemas";
+import {
+  responseSchemas,
+  scenarioEventSchema,
+} from "~/server/scenarios/schemas";
+import { extractInlineMediaFromEvent } from "~/server/stored-objects/content-extractor";
+import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import { createLogger } from "~/utils/logger/server";
 import {
   encodeContent,
   encodeEnd,
   encodeStart,
 } from "~/utils/streaming-event-codec";
-import {
-  authMiddleware,
-  blockTraceUsageExceededMiddleware,
-  handleError,
-  loggerMiddleware,
-  tracerMiddleware,
-} from "../../middleware";
+import { blockTraceUsageExceededMiddleware } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 import { checkScenarioSetLimitForRunStarted } from "./scenario-set-limit";
 
 const logger = createLogger("langwatch:api:scenario-events");
 
-// Define types for our Hono context variables
-type Variables = {
-  project: Project;
-};
-
-// Define the Hono app
-export const app = new Hono<{
-  Variables: Variables;
-}>().basePath("/api/scenario-events");
-
-// Middleware
-app.use(tracerMiddleware({ name: "scenario-events" }));
-app.use(loggerMiddleware());
-app.use("/*", authMiddleware);
-app.use("/*", blockTraceUsageExceededMiddleware);
-app.onError(handleError);
+const secured = createProjectApp({ basePath: "/api/scenario-events" });
 
 // POST /api/scenario-events - Create a new scenario event
-app.post(
+secured.access(requires("scenarios:manage")).post(
   "/",
+  blockTraceUsageExceededMiddleware,
+  bodyLimit({ maxSize: 50 * 1024 * 1024 }), // 50MB — accommodates inline media payloads
   describeRoute({
     description: "Create a new scenario event",
     responses: {
@@ -66,18 +53,47 @@ app.post(
   zValidator("json", scenarioEventSchema),
   async (c) => {
     const { project } = c.var;
-    const event = c.req.valid("json");
+    const validatedEvent = c.req.valid("json");
 
     logger.info(
       {
         projectId: project.id,
-        eventType: event.type,
-        scenarioId: event.scenarioId,
-        scenarioRunId: event.scenarioRunId,
-        scenarioSetId: event.scenarioSetId,
+        eventType: validatedEvent.type,
+        scenarioId: validatedEvent.scenarioId,
+        scenarioRunId: validatedEvent.scenarioRunId,
+        scenarioSetId: validatedEvent.scenarioSetId,
       },
       "Received scenario event",
     );
+
+    // Extract inline media bytes, externalize to stored objects, and rewrite
+    // the event payload to reference them by URL before dispatch.
+    const service = createStoredObjectsService({ projectId: project.id });
+    const { rewrittenEvent: rawRewritten, refs } =
+      await extractInlineMediaFromEvent({
+        event: validatedEvent,
+        projectId: project.id,
+        ownerKind: "scenario_run",
+        ownerId: validatedEvent.scenarioRunId,
+        purpose: "scenario_event",
+        service,
+      });
+
+    // Cast back to the typed ScenarioEvent — the rewrite only touches content
+    // arrays inside message objects; all discriminant fields are preserved.
+    const event = rawRewritten as ScenarioEvent;
+
+    if (refs.length > 0) {
+      logger.info(
+        {
+          stored_object_ids: refs.map((r) => r.id),
+          projectId: project.id,
+          scenarioRunId: validatedEvent.scenarioRunId,
+          count: refs.length,
+        },
+        `scenario event extracted ${refs.length} stored object(s)`,
+      );
+    }
 
     // Enforce scenario set limit on RUN_STARTED events.
     // ScenarioSetLimitExceededError (DomainError with httpStatus 403)
@@ -121,31 +137,65 @@ app.post(
   },
 );
 
-// DELETE /api/scenario-events - Delete all events for a project
-export const route = app.delete(
+// DELETE /api/scenario-events - Archive the simulation runs for a specific
+// batch run and/or scenario set. A scope is MANDATORY: an unqualified request
+// is rejected so a single call can never archive every run in the project.
+const deleteScenarioEventsQuerySchema = z.object({
+  batchRunId: z.string().min(1).optional(),
+  scenarioSetId: z.string().min(1).optional(),
+});
+
+export const route = secured.access(requires("scenarios:manage")).delete(
   "/",
+  blockTraceUsageExceededMiddleware,
   describeRoute({
-    description: "Delete all events",
+    description:
+      "Archive the simulation runs for a batch run and/or scenario set. Requires at least one of batchRunId or scenarioSetId — archiving every run in the project in one call is not supported.",
     responses: {
       ...baseResponses,
       200: {
-        description: "Events deleted successfully",
+        description: "Matching runs archived successfully",
         content: {
           "application/json": { schema: resolver(responseSchemas.success) },
         },
       },
+      400: {
+        description:
+          "No scope provided — a batchRunId or scenarioSetId is required",
+        content: {
+          "application/json": { schema: resolver(responseSchemas.error) },
+        },
+      },
     },
   }),
+  zValidator("query", deleteScenarioEventsQuerySchema),
   async (c) => {
     const { project } = c.var;
+    const { batchRunId, scenarioSetId } = c.req.valid("query");
 
-    await archiveAllSimulationRuns(project.id);
+    if (!batchRunId && !scenarioSetId) {
+      return c.json(
+        {
+          error:
+            "A batchRunId or scenarioSetId must be specified. Archiving every simulation run for the project in one request is not supported.",
+        },
+        400,
+      );
+    }
+
+    await archiveSimulationRunsForScope({
+      projectId: project.id,
+      batchRunId,
+      scenarioSetId,
+    });
 
     return c.json({ success: true }, 200);
   },
 );
 
 export type ScenarioEventsAppType = typeof route;
+
+export const app = secured.hono;
 
 async function dispatchSimulationEvent(
   projectId: string,
@@ -171,7 +221,10 @@ async function dispatchSimulationEvent(
     const messages = event.messages ?? [];
     await getApp().simulations.messageSnapshot({
       ...basePayload,
-      messages: messages as Array<{ trace_id?: string; [key: string]: unknown }>,
+      messages: messages as Array<{
+        trace_id?: string;
+        [key: string]: unknown;
+      }>,
       traceIds: messages
         .map((m: { trace_id?: string }) => m.trace_id)
         .filter((id): id is string => typeof id === "string"),
@@ -220,9 +273,21 @@ function isStreamingEvent(type: string): boolean {
   );
 }
 
-async function archiveAllSimulationRuns(projectId: string): Promise<void> {
+async function archiveSimulationRunsForScope({
+  projectId,
+  batchRunId,
+  scenarioSetId,
+}: {
+  projectId: string;
+  batchRunId?: string;
+  scenarioSetId?: string;
+}): Promise<void> {
   const app = getApp();
-  const runIds = await app.simulations.runs.getAllRunIdsForProject({ projectId });
+  const runIds = await app.simulations.runs.getRunIdsForScope({
+    projectId,
+    batchRunId,
+    scenarioSetId,
+  });
 
   const now = Date.now();
   await Promise.all(
@@ -235,7 +300,10 @@ async function archiveAllSimulationRuns(projectId: string): Promise<void> {
     ),
   );
 
-  logger.info({ projectId, count: runIds.length }, "Dispatched archive commands for all simulation runs");
+  logger.info(
+    { projectId, batchRunId, scenarioSetId, count: runIds.length },
+    "Dispatched archive commands for scoped simulation runs",
+  );
 }
 
 async function broadcastStreamingEvent(

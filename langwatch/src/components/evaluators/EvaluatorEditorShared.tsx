@@ -25,7 +25,7 @@ import {
   type AvailableSource,
   type FieldMapping as UIFieldMapping,
 } from "~/components/variables";
-import type { LocalEvaluatorConfig } from "~/evaluations-v3/types";
+import type { LocalEvaluatorConfig } from "~/experiments-v3/types";
 import {
   getComplexProps,
   getDrawerStack,
@@ -37,9 +37,9 @@ import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   AVAILABLE_EVALUATORS,
+  evaluatorsSchema,
   type EvaluatorTypes,
 } from "~/server/evaluations/evaluators.generated";
-import { evaluatorsSchema } from "~/server/evaluations/evaluators.zod.generated";
 import { getEvaluatorDefaultSettings } from "~/server/evaluations/getEvaluator";
 import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
@@ -208,10 +208,37 @@ export function useEvaluatorEditorController(
       ?.settings;
   }, [evaluatorType]);
 
+  // Pull the cascade-resolved defaults so the form's initial model /
+  // embeddings_model values reflect what this project actually has
+  // configured (claude-opus, gemini-pro, etc.) instead of the generic
+  // DEFAULT_MODEL constant baked into the evaluator zod schemas.
+  const resolvedDefaultModel = api.modelProvider.getResolvedDefault.useQuery(
+    { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
+    { enabled: !!project?.id && isOpen },
+  );
+  const resolvedDefaultEmbeddings =
+    api.modelProvider.getResolvedDefault.useQuery(
+      {
+        projectId: project?.id ?? "",
+        featureKey: "analytics.topic_clustering_embeddings",
+      },
+      { enabled: !!project?.id && isOpen },
+    );
+
   const defaultSettings = useMemo(() => {
     if (!evaluatorDef || !project) return {};
-    return getEvaluatorDefaultSettings(evaluatorDef, project) ?? {};
-  }, [evaluatorDef, project]);
+    return (
+      getEvaluatorDefaultSettings(evaluatorDef, {
+        defaultModel: resolvedDefaultModel.data?.model ?? null,
+        embeddingsModel: resolvedDefaultEmbeddings.data?.model ?? null,
+      }) ?? {}
+    );
+  }, [
+    evaluatorDef,
+    project,
+    resolvedDefaultModel.data?.model,
+    resolvedDefaultEmbeddings.data?.model,
+  ]);
 
   const forceUserToDecideAName =
     evaluatorType?.startsWith("langevals/llm_") &&

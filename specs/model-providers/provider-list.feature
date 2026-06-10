@@ -3,6 +3,11 @@ Feature: Model Provider List Management
   I want to see a list of enabled providers with clear indicators
   So that I can understand which providers are available and configured
 
+  # All scenarios describe the Model Providers settings page UI (table render,
+  # "Default Model" badge, "Add Model Provider" menu). Need a JSDOM render of
+  # `ModelProviderList` + project-default badge logic. Aspirational pending the
+  # list-page harness; scope-aware listing is covered by repository tests.
+
   Background:
     Given I am logged in
     And I have access to a project

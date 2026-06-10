@@ -54,13 +54,14 @@ export class ScenarioExecutionOrchestrator {
         return this.notFound("Project", context.projectId);
       }
 
-      if (!project.defaultModel) {
+      const defaultModel = await this.resolveDefaultModel(context.projectId);
+      if (!defaultModel) {
         return this.failure("Project default model is not configured");
       }
 
       const modelParamsResult = await this.prepareModelParams(
         context.projectId,
-        project.defaultModel,
+        defaultModel,
       );
       if (!modelParamsResult.success) {
         logger.warn(
@@ -104,6 +105,18 @@ export class ScenarioExecutionOrchestrator {
 
   private async fetchProject(projectId: string) {
     return this.deps.projectRepository.getProject(projectId);
+  }
+
+  private async resolveDefaultModel(projectId: string): Promise<string | null> {
+    try {
+      const resolved = await this.deps.modelResolver.resolve(
+        "scenarios.generator",
+        projectId,
+      );
+      return resolved;
+    } catch {
+      return null;
+    }
   }
 
   private async prepareModelParams(projectId: string, model: string) {

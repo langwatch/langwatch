@@ -13,7 +13,10 @@ import {
   validateEventAggregateType,
   validateEventTenant,
 } from "./eventStoreUtils";
-import type { EventRepository } from "./repositories/eventRepository.types";
+import type {
+  EventRecord,
+  EventRepository,
+} from "./repositories/eventRepository.types";
 
 /**
  * Abstract base class for EventStore implementations using the Template Method pattern.
@@ -85,6 +88,22 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
     _events: readonly EventType[],
   ): void {
     // no-op by default
+  }
+
+  /**
+   * Per-batch enrichment hook applied to records after `eventToRecord` and
+   * before `repository.insertEventRecords`. Default: identity.
+   *
+   * ClickHouse override stamps `_retention_days` from the active tenant
+   * retention policy so `event_log` rows match the trace category retention
+   * (otherwise the source-of-truth event log outlives its derived projections,
+   * breaking re-projection — see `misc/langwatch-specs.md:107-113`).
+   */
+  protected async enrichRecordsForStorage(
+    records: EventRecord[],
+    _context: EventStoreReadContext<EventType>,
+  ): Promise<EventRecord[]> {
+    return records;
   }
 
   // ---------------------------------------------------------------------------
@@ -271,8 +290,13 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
             }
           }
 
-          // Transform events to records
-          const records = events.map((event) => eventToRecord(event));
+          // Transform events to records, then apply optional per-batch
+          // enrichment (e.g. retention stamping) before handing to the repo.
+          const baseRecords = events.map((event) => eventToRecord(event));
+          const records = await this.enrichRecordsForStorage(
+            baseRecords,
+            context,
+          );
 
           // Delegate to repository
           await this.repository.insertEventRecords(records);

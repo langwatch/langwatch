@@ -317,6 +317,7 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
   // ==========================================================================
 
   describe("when selecting a construct", () => {
+    /** @scenario Selecting "if" inserts if/endif block */
     it("inserts if/endif block when selecting 'if'", async () => {
       const onChange = vi.fn();
       renderComponent({ value: "Hello ", onChange });
@@ -355,6 +356,7 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
       );
     });
 
+    /** @scenario Selecting "for" inserts for/endfor block */
     it("inserts for/endfor block when selecting 'for'", async () => {
       const onChange = vi.fn();
       renderComponent({ onChange });

@@ -28,7 +28,10 @@ export function useTargetNameMap(): Map<string, string> {
     }
     if (prompts) {
       for (const prompt of prompts) {
-        map.set(prompt.id, prompt.handle ?? prompt.id);
+        // Prefer the globally-unique handle, then the plain name (always
+        // present), then the id as last resort. This keeps placeholder
+        // prompts (no handle yet) from collapsing to their raw cuid.
+        map.set(prompt.id, prompt.handle ?? prompt.name ?? prompt.id);
       }
     }
     return map;

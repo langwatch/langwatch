@@ -12,6 +12,14 @@ export type CreateSavedViewInput = {
   query?: string;
   period?: Prisma.InputJsonValue;
   order: number;
+  /**
+   * Storage shape discriminator. Omit to keep the SavedView default
+   * ("v1-traces-filter"), which is what the legacy /messages page
+   * writes. The new traces v2 lens system sends "v2-traces-lens" so
+   * the two clients can share this table without seeing each other's
+   * rows.
+   */
+  kind?: string;
 };
 
 export type UpdateSavedViewInput = {
@@ -33,10 +41,15 @@ export class SavedViewRepository {
    * Finds all saved views visible to a user: project-level views (userId IS NULL)
    * plus the specified user's personal views.
    */
-  async findAll(input: { projectId: string; userId?: string }): Promise<SavedView[]> {
+  async findAll(input: {
+    projectId: string;
+    userId?: string;
+    kind?: string;
+  }): Promise<SavedView[]> {
     return await this.prisma.savedView.findMany({
       where: {
         projectId: input.projectId,
+        ...(input.kind ? { kind: input.kind } : {}),
         OR: [
           { userId: null },
           ...(input.userId ? [{ userId: input.userId }] : []),
@@ -64,9 +77,15 @@ export class SavedViewRepository {
   /**
    * Finds the last saved view by order for a project.
    */
-  async findLast(input: { projectId: string }): Promise<SavedView | null> {
+  async findLast(input: {
+    projectId: string;
+    kind?: string;
+  }): Promise<SavedView | null> {
     return await this.prisma.savedView.findFirst({
-      where: { projectId: input.projectId },
+      where: {
+        projectId: input.projectId,
+        ...(input.kind ? { kind: input.kind } : {}),
+      },
       orderBy: { order: "desc" },
     });
   }
@@ -101,6 +120,7 @@ export class SavedViewRepository {
         query: input.query,
         period: input.period ?? undefined,
         order: input.order,
+        ...(input.kind ? { kind: input.kind } : {}),
       },
     });
   }
@@ -120,6 +140,7 @@ export class SavedViewRepository {
         query: v.query,
         period: v.period ?? undefined,
         order: v.order,
+        ...(v.kind ? { kind: v.kind } : {}),
       })),
       skipDuplicates: true,
     });
@@ -171,10 +192,15 @@ export class SavedViewRepository {
    * Counts saved views visible to a user: project-level views (userId IS NULL)
    * plus the specified user's personal views.
    */
-  async count(input: { projectId: string; userId?: string }): Promise<number> {
+  async count(input: {
+    projectId: string;
+    userId?: string;
+    kind?: string;
+  }): Promise<number> {
     return await this.prisma.savedView.count({
       where: {
         projectId: input.projectId,
+        ...(input.kind ? { kind: input.kind } : {}),
         OR: [
           { userId: null },
           ...(input.userId ? [{ userId: input.userId }] : []),

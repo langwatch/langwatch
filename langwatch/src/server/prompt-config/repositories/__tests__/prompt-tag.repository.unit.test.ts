@@ -166,6 +166,7 @@ describe("PromptTagRepository", () => {
 
 describe("validateTagName()", () => {
   describe("when name is a valid custom tag", () => {
+    /** @scenario "Validation accepts well-formed custom tag names" */
     it("does not throw for 'canary'", () => {
       expect(() => validateTagName("canary")).not.toThrow();
     });
@@ -196,12 +197,14 @@ describe("validateTagName()", () => {
   });
 
   describe("when name is empty", () => {
+    /** @scenario "Validation rejects empty tag names" */
     it("throws PromptTagValidationError", () => {
       expect(() => validateTagName("")).toThrow(PromptTagValidationError);
     });
   });
 
   describe("when name is purely numeric", () => {
+    /** @scenario "Validation rejects purely numeric tag names" */
     it("throws with message mentioning numeric", () => {
       expect(() => validateTagName("42")).toThrow(
         expect.objectContaining({
@@ -229,6 +232,7 @@ describe("validateTagName()", () => {
       );
     });
 
+    /** @scenario "Validation rejects uppercase tag names" */
     it("throws for uppercase names", () => {
       expect(() => validateTagName("CANARY")).toThrow(
         PromptTagValidationError,
@@ -250,6 +254,8 @@ describe("validateTagName()", () => {
 
   describe("when name is a protected tag", () => {
     for (const protected_ of PROTECTED_TAGS) {
+      /** @scenario 'Only "latest" is a protected tag' */
+      /** @scenario 'Validation rejects creating a tag named "latest"' */
       it(`throws for '${protected_}' with message mentioning protected`, () => {
         expect(() => validateTagName(protected_)).toThrow(
           expect.objectContaining({
@@ -260,10 +266,12 @@ describe("validateTagName()", () => {
       });
     }
 
+    /** @scenario 'Validation accepts "production" as a tag name' */
     it("does not throw for 'production' (seeded tag, not protected)", () => {
       expect(() => validateTagName("production")).not.toThrow();
     });
 
+    /** @scenario 'Validation accepts "staging" as a tag name' */
     it("does not throw for 'staging' (seeded tag, not protected)", () => {
       expect(() => validateTagName("staging")).not.toThrow();
     });

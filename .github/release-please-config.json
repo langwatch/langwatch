@@ -262,7 +262,9 @@
         "sdk-go",
         "mcp-server",
         "langevals",
-        "clickhouse-serverless",
+        "charts/clickhouse-serverless",
+        "python-sdk",
+        "skills",
         ".github",
         ".cursor",
         "assets"

@@ -160,6 +160,7 @@ describe("GuardrailsDrawer + CurrentDrawer Integration (REGRESSION)", () => {
     vi.useRealTimers();
   });
 
+  /** @scenario Select existing evaluator for guardrail */
   it("REGRESSION: selecting evaluator in list returns to guardrails drawer", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
@@ -488,6 +489,7 @@ describe("GuardrailsDrawer", () => {
       });
     });
 
+    /** @scenario Python code shows async by default */
     it("shows Python (async) selected by default in language dropdown", async () => {
       await selectEvaluator();
 
@@ -507,6 +509,7 @@ describe("GuardrailsDrawer", () => {
       });
     });
 
+    /** @scenario API key placeholder in code */
     it("shows API key instructions with link", async () => {
       await selectEvaluator();
 
@@ -580,6 +583,7 @@ describe("GuardrailsDrawer", () => {
   });
 
   describe("Copy functionality", () => {
+    /** @scenario Copy code to clipboard */
     it("has copy button in code block", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
@@ -634,6 +638,7 @@ describe("GuardrailsDrawer", () => {
   });
 
   describe("Close behavior", () => {
+    /** @scenario Close without saving */
     it("calls onClose when clicking Close button", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       const mockOnClose = vi.fn();

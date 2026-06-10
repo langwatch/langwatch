@@ -13,6 +13,7 @@ import {
   type TabData,
 } from "../../../prompt-playground-store/DraggableTabsBrowserStore";
 import { TabIdProvider } from "../../prompt-browser/ui/TabContext";
+import { persistedMessagesKey } from "../PromptPlaygroundChat";
 import { PromptPlaygroundChatProvider } from "../PromptPlaygroundChatContext";
 import { SyncedChatInput } from "../SyncedChatInput";
 
@@ -124,6 +125,50 @@ describe("PromptPlaygroundChat ref methods", () => {
 
       // This should not throw
       expect(() => foundTextarea?.focus()).not.toThrow();
+    });
+  });
+
+  // Regression: prior dedup keyed only on message IDs. The latest
+  // assistant message kept its ID stable across streaming chunks, so
+  // the persistence effect skipped every content delta and the snapshot
+  // saved to the tab store had its content stuck at empty. On refresh,
+  // `convertScenarioMessagesToCopilotKit` dropped empty-content rows
+  // and the latest assistant reply vanished from the chat. Key must
+  // include content length so streaming deltas re-trigger persistence.
+  describe("persistedMessagesKey (refresh persistence)", () => {
+    it("changes when a message's content grows even if IDs are unchanged", () => {
+      const placeholder = persistedMessagesKey([
+        { id: "u-1", role: "user", content: "hey there" },
+        { id: "a-1", role: "assistant", content: "" },
+      ]);
+      const streamed = persistedMessagesKey([
+        { id: "u-1", role: "user", content: "hey there" },
+        { id: "a-1", role: "assistant", content: "Your name is Bob." },
+      ]);
+      expect(placeholder).not.toBe(streamed);
+    });
+
+    it("is stable when nothing has changed", () => {
+      const messages = [
+        { id: "u-1", role: "user" as const, content: "hey" },
+        { id: "a-1", role: "assistant" as const, content: "hi" },
+      ];
+      expect(persistedMessagesKey(messages)).toBe(
+        persistedMessagesKey(messages),
+      );
+    });
+
+    it("changes when a new message is appended", () => {
+      const before = persistedMessagesKey([
+        { id: "u-1", role: "user", content: "hey" },
+        { id: "a-1", role: "assistant", content: "hi" },
+      ]);
+      const after = persistedMessagesKey([
+        { id: "u-1", role: "user", content: "hey" },
+        { id: "a-1", role: "assistant", content: "hi" },
+        { id: "u-2", role: "user", content: "ok" },
+      ]);
+      expect(before).not.toBe(after);
     });
   });
 

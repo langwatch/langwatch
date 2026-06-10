@@ -1,6 +1,4 @@
-import { describe, expect, it } from "vitest";
-
-import { vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { NormalizedAttributes } from "../../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
 import { SpanDataBag } from "../../spanDataBag";
 import { toAttrValue } from "../../utils";
@@ -24,10 +22,7 @@ function createStrandsContext(
     timeUnixMs: 0,
   }));
 
-  const bag = new SpanDataBag(
-    attrs as NormalizedAttributes,
-    normalizedEvents,
-  );
+  const bag = new SpanDataBag(attrs as NormalizedAttributes, normalizedEvents);
   const out: NormalizedAttributes = {};
 
   const setAttr = vi.fn((key: string, value: unknown) => {
@@ -152,7 +147,9 @@ describe("StrandsExtractor", () => {
       extractor.apply(ctx);
 
       // System message promoted to system_instruction, stripped from input
-      expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBe("System prompt");
+      expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBe(
+        "System prompt",
+      );
       expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toBeUndefined();
     });
 
@@ -261,9 +258,7 @@ describe("StrandsExtractor", () => {
       extractor.apply(ctx);
 
       expect(ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES]).toEqual(
-        JSON.stringify([
-          { role: "assistant", content: "Response text" },
-        ]),
+        JSON.stringify([{ role: "assistant", content: "Response text" }]),
       );
     });
   });

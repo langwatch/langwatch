@@ -88,7 +88,13 @@ class LangWatchTrace:
         expected_output: Optional[str] = None,
         api_key: Optional[str] = None,
         disable_sending: bool = False,
-        max_string_length: Optional[int] = 5000,
+        # No client-side truncation by default. Full input/output reaches the
+        # backend, which owns sizing (ADR-022: event_log is the source of truth,
+        # with the edge spool + server-side caps handling oversize). This keeps
+        # the Python SDK consistent with the TS/Go SDKs and stock OpenTelemetry —
+        # none of which truncate span content client-side (#4215). Set to an int
+        # (>= 100) to opt into a client-side per-field byte cap.
+        max_string_length: Optional[int] = None,
         # Root span parameters
         span_id: Optional[str] = None,
         capture_input: bool = True,
@@ -130,14 +136,18 @@ class LangWatchTrace:
             )
             self.metadata["deprecated.trace_id"] = str(trace_id)
 
-        if disable_sending:
-            client = get_instance()
-            if client:
-                client.disable_sending = True
+        # Per-trace request. Refcounted on the client during __enter__ and
+        # released during _cleanup so a `disable_sending=True` block cannot
+        # poison subsequent traces (issue #3981 — silent span loss for offline
+        # experiment cells when worker processes are reused across event
+        # types) AND remains correct under overlapping concurrent traces.
+        self._disable_sending_request = disable_sending
+        self._disable_sending_acquired = False
 
-        # Use the global tracer provider
-        self._tracer_provider = tracer_provider
-        self.tracer = (tracer_provider or trace_api).get_tracer(
+        from langwatch.client import Client
+
+        self._tracer_provider = tracer_provider or Client._tracer_provider
+        self.tracer = (self._tracer_provider or trace_api).get_tracer(
             instrumenting_module_name="langwatch",
             instrumenting_library_version=__version__,
         )
@@ -186,7 +196,7 @@ class LangWatchTrace:
             metadata=self.metadata,
             expected_output=self._expected_output,
             api_key=self.api_key,
-            disable_sending=self.disable_sending,
+            disable_sending=self._disable_sending_request,
             max_string_length=self.max_string_length,
             tracer_provider=self._tracer_provider,
             span_id=root_span_params.get("span_id", None),
@@ -250,6 +260,36 @@ class LangWatchTrace:
                 self._trace_id = context.trace_id
             return self.root_span
 
+    def _apply_disable_sending(self) -> None:
+        """Acquire a refcount on the client's disable_sending gate if this
+        trace requested it. Idempotent: the matching `_release_disable_sending`
+        in `_cleanup` will only release if we actually acquired.
+        """
+        if not self._disable_sending_request or self._disable_sending_acquired:
+            return
+        client = get_instance()
+        if client is None or not hasattr(client, "acquire_disable_sending"):
+            return
+        client.acquire_disable_sending()
+        self._disable_sending_acquired = True
+
+    def _release_disable_sending(self) -> None:
+        """Release the refcount acquired by `_apply_disable_sending`, if any.
+
+        Concurrency-safe (issue #3981): the refcount on the client means an
+        overlapping default-sending trace cannot flip the flag back on while
+        another trace still holds the disable refcount, and a `disable_sending`
+        block restores the user-set baseline only when the last holder exits.
+        """
+        if not self._disable_sending_acquired:
+            return
+        client = get_instance()
+        try:
+            if client is not None and hasattr(client, "release_disable_sending"):
+                client.release_disable_sending()
+        finally:
+            self._disable_sending_acquired = False
+
     def _cleanup(
         self,
         exc_type: Optional[type],
@@ -270,6 +310,8 @@ class LangWatchTrace:
             if self._context_token is not None:
                 langwatch.telemetry.context._reset_current_trace(self._context_token)
                 self._context_token = None
+
+            self._release_disable_sending()
 
             self._cleaned_up = True
 
@@ -580,6 +622,7 @@ class LangWatchTrace:
     def __enter__(self) -> "LangWatchTrace":
         """Makes the trace usable as a context manager."""
         self._reset()
+        self._apply_disable_sending()
 
         # Store the old token and set the new one
         self._context_token = langwatch.telemetry.context._set_current_trace(self)
@@ -608,6 +651,7 @@ class LangWatchTrace:
     async def __aenter__(self) -> "LangWatchTrace":
         """Makes the trace usable as an async context manager."""
         self._reset()
+        self._apply_disable_sending()
 
         # Store the old token and set the new one
         self._context_token = langwatch.telemetry.context._set_current_trace(self)
@@ -740,7 +784,11 @@ def trace(
     expected_output: Optional[str] = None,
     api_key: Optional[str] = None,
     disable_sending: bool = False,
-    max_string_length: Optional[int] = 5000,
+    # No client-side truncation by default — must stay in lockstep with the
+    # LangWatchTrace constructor default. The backend owns sizing (ADR-022); the
+    # SDK stays consistent with the TS/Go SDKs and stock OpenTelemetry. Set to an
+    # int (>= 100) to opt into a client-side per-field byte cap.
+    max_string_length: Optional[int] = None,
     # Root span parameters
     span_id: Optional[str] = None,
     capture_input: bool = True,

@@ -322,7 +322,9 @@ function AnalyticsCustomGraphContent({
   });
   const {
     period: { startDate, endDate },
+    mode,
     setPeriod,
+    setRelativePeriod,
   } = usePeriodSelector();
   const { showFilters } = useFilterToggle();
 
@@ -358,7 +360,12 @@ function AnalyticsCustomGraphContent({
         <PageLayout.Heading>Custom Graph</PageLayout.Heading>
         <Spacer />
         <FilterToggle />
-        <PeriodSelector period={{ startDate, endDate }} setPeriod={setPeriod} />
+        <PeriodSelector
+          period={{ startDate, endDate }}
+          mode={mode}
+          setPeriod={setPeriod}
+          setRelativePeriod={setRelativePeriod}
+        />
       </PageLayout.Header>
       <Container maxWidth="1600" padding={6}>
         <VStack width="full" align="start" gap={6}>
@@ -454,7 +461,7 @@ function AnalyticsCustomGraphContent({
         onOpenChange={({ open }) => jsonModal.setOpen(open)}
         size="lg"
       >
-        <Dialog.Content>
+        <Dialog.Content bg="bg">
           <Dialog.Header>
             <Dialog.Title>Graph JSON</Dialog.Title>
             <Dialog.CloseTrigger />
@@ -471,7 +478,7 @@ function AnalyticsCustomGraphContent({
         onOpenChange={({ open }) => apiModal.setOpen(open)}
         size="lg"
       >
-        <Dialog.Content>
+        <Dialog.Content bg="bg">
           <Dialog.Header>
             <Dialog.Title>JSON API</Dialog.Title>
             <Dialog.CloseTrigger />

@@ -4,7 +4,7 @@ description: Liveness, readiness, and startup probes for the LangWatch AI Gatewa
 sidebarTitle: Health Checks
 ---
 
-The gateway exposes three HTTP endpoints for Kubernetes probes, all on the same port the API listens on (`5563` by default — referenced as the named container port `http` in the chart). Each is deliberately scoped — `/readyz` flipping to 503 must mean "this replica should not serve customer traffic right now", and nothing more.
+The gateway exposes three HTTP endpoints for Kubernetes probes, all on the same port the API listens on (`5563` by default, referenced as the named container port `http` in the chart). Each is deliberately scoped, `/readyz` flipping to 503 must mean "this replica should not serve customer traffic right now", and nothing more.
 
 ## Endpoint summary
 
@@ -13,7 +13,7 @@ The gateway exposes three HTTP endpoints for Kubernetes probes, all on the same 
 | `/healthz` | Kubernetes `livenessProbe`             | The Go process is responsive (no registered checks fail)            |
 | `/readyz`  | Kubernetes `readinessProbe` + LB       | The pod is not draining and all readiness checks pass               |
 | `/startupz`| Kubernetes `startupProbe`              | Bootstrap (auth-cache warm-up) has completed, then mirrors `/readyz`|
-| `/metrics` | Prometheus                              | Always — counter + histogram surface (see [Observability](/ai-gateway/observability)) |
+| `/metrics` | Prometheus                              | Always, counter + histogram surface (see [Observability](/ai-gateway/observability)) |
 
 All three return the same JSON shape:
 
@@ -26,7 +26,7 @@ All three return the same JSON shape:
 }
 ```
 
-`checks` is omitted when there are no registered checks AND the status is `ok`. Today the gateway registers `MarkStarted` (after the auth-cache bootstrap completes) and `MarkDraining` (on `SIGTERM`), but no per-dependency liveness or readiness checks — the probes are intentionally lightweight signals about process state and lifecycle, not external-dependency health. Dependency health is reported via per-request error codes and the OTel trace surface, not the probes.
+`checks` is omitted when there are no registered checks AND the status is `ok`. Today the gateway registers `MarkStarted` (after the auth-cache bootstrap completes) and `MarkDraining` (on `SIGTERM`), but no per-dependency liveness or readiness checks, the probes are intentionally lightweight signals about process state and lifecycle, not external-dependency health. Dependency health is reported via per-request error codes and the OTel trace surface, not the probes.
 
 ## `/healthz` (liveness)
 
@@ -61,7 +61,7 @@ When the pod has received `SIGTERM`:
 { "status": "draining", "version": "git-a1412a4", "uptime_s": 1812.74 }
 ```
 
-The loadbalancer drops a draining replica from rotation within seconds; in-flight requests on that replica continue to completion (graceful shutdown is described below). **Do not weaken this probe** — a replica flipping to draining must mean "stop sending new traffic here", and the gateway only flips it on `SIGTERM` or via an explicit administrative call.
+The loadbalancer drops a draining replica from rotation within seconds; in-flight requests on that replica continue to completion (graceful shutdown is described below). **Do not weaken this probe**: a replica flipping to draining must mean "stop sending new traffic here", and the gateway only flips it on `SIGTERM` or via an explicit administrative call.
 
 Chart default:
 
@@ -108,7 +108,7 @@ Once `/startupz` first returns 200, Kubernetes stops calling it; readiness + liv
 
 ## Graceful shutdown
 
-`SIGTERM` triggers (the chart's `shutdown.preDrainWait` and `shutdown.timeout` knobs are not currently wired into the gateway code; the gateway uses `Server.GracefulSeconds` from `pkg/config/server.go`, default `5` — bump via `SERVER_GRACEFUL_SECONDS` if you need a longer window):
+`SIGTERM` triggers (the chart's `shutdown.preDrainWait` and `shutdown.timeout` knobs are not currently wired into the gateway code; the gateway uses `Server.GracefulSeconds` from `pkg/config/server.go`, default `5`, bump via `SERVER_GRACEFUL_SECONDS` if you need a longer window):
 
 1. **Immediately**: `MarkDraining()` flips `/readyz` to 503 with `status:"draining"`. The Service's endpoint controller and the LB observe and stop routing new traffic.
 2. **Drain window**: existing in-flight requests continue. SSE streams continue until the upstream provider closes them or the request finishes naturally.
@@ -121,7 +121,7 @@ Match your `terminationGracePeriodSeconds` to the drain window plus a few second
 terminationGracePeriodSeconds: 30  # chart default
 ```
 
-Without giving the LB time to notice `/readyz=503` before the listener closes, a small fraction of in-flight requests during rolling deploys hits a replica that has already shut down — the LB returns 502. If you observe this on rollout, add a `preStop` sleep so the pod stays around long enough for the LB to remove it:
+Without giving the LB time to notice `/readyz=503` before the listener closes, a small fraction of in-flight requests during rolling deploys hits a replica that has already shut down, the LB returns 502. If you observe this on rollout, add a `preStop` sleep so the pod stays around long enough for the LB to remove it:
 
 ```yaml
 lifecycle:
@@ -146,13 +146,13 @@ On alert:
 1. Capture the `X-LangWatch-Request-Id` header from the response.
 2. Look up the request's trace in the LangWatch UI under Origin = `gateway`.
 3. If the gateway returned 5xx, pull the gateway pod logs filtered by pod name (`GATEWAY_NODE_ID` is unused; the gateway derives `node_id` from `os.Hostname()` which inside a Kubernetes pod is the pod name).
-4. If the gateway returned the upstream provider's error verbatim, the gateway is healthy — the provider is degraded.
+4. If the gateway returned the upstream provider's error verbatim, the gateway is healthy, the provider is degraded.
 
 ## Common failures
 
 | Symptom                                                         | Likely cause                                           | First step                                                         |
 |-----------------------------------------------------------------|--------------------------------------------------------|--------------------------------------------------------------------|
-| `/healthz` 200, `/v1/chat/completions` returns 500 `auth_upstream_unavailable` | Gateway can't reach control plane (`LW_GATEWAY_BASE_URL` wrong/missing) | Check the env var on the pod; confirm Service / DNS resolves       |
+| `/healthz` 200, `/v1/chat/completions` returns 500 `auth_upstream_unavailable` | Gateway can't reach control plane (`LW_GATEWAY_BASE_URL` wrong/missing) | Check the env var on the pod; confirm Service, DNS resolves       |
 | `/startupz` fails 30× in a row, pod CrashLoopBackOff             | Control plane unreachable on boot, or auth secret mismatch | Compare `LW_GATEWAY_INTERNAL_SECRET` byte-for-byte between gateway and control-plane pods |
 | `/readyz` flips to 503 mid-life                                  | Pod received `SIGTERM` (rolling deploy, eviction, OOMKill) | `kubectl describe pod` for the termination reason                   |
 | 502 from LB for a small window during rolling deploy             | LB hasn't yet removed the draining replica             | Add a `preStop: sleep 3` lifecycle hook (see Graceful shutdown above) |

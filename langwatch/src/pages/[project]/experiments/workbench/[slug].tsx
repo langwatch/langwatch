@@ -4,18 +4,18 @@ import { useEffect } from "react";
 
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { LoadingScreen } from "~/components/LoadingScreen";
-import { AutosaveStatus } from "~/evaluations-v3/components/AutosaveStatus";
-import { EditableHeading } from "~/evaluations-v3/components/EditableHeading";
-import { EvaluationsV3Table } from "~/evaluations-v3/components/EvaluationsV3Table";
-import { HistoryButton } from "~/evaluations-v3/components/HistoryButton";
-import { RunEvaluationButton } from "~/evaluations-v3/components/RunEvaluationButton";
-import { SavedDatasetLoaders } from "~/evaluations-v3/components/SavedDatasetLoaders";
-import { TableSettingsMenu } from "~/evaluations-v3/components/TableSettingsMenu";
-import { UndoRedo } from "~/evaluations-v3/components/UndoRedo";
-import { useAutosaveEvaluationsV3 } from "~/evaluations-v3/hooks/useAutosaveEvaluationsV3";
-import { useEvaluationsV3Store } from "~/evaluations-v3/hooks/useEvaluationsV3Store";
-import { useLambdaWarmup } from "~/evaluations-v3/hooks/useLambdaWarmup";
-import { useSavedDatasetLoader } from "~/evaluations-v3/hooks/useSavedDatasetLoader";
+import { AutosaveStatus } from "~/experiments-v3/components/AutosaveStatus";
+import { EditableHeading } from "~/experiments-v3/components/EditableHeading";
+import { EvaluationsV3Table } from "~/experiments-v3/components/EvaluationsV3Table";
+import { HistoryButton } from "~/experiments-v3/components/HistoryButton";
+import { RunEvaluationButton } from "~/experiments-v3/components/RunEvaluationButton";
+import { SavedDatasetLoaders } from "~/experiments-v3/components/SavedDatasetLoaders";
+import { TableSettingsMenu } from "~/experiments-v3/components/TableSettingsMenu";
+import { UndoRedo } from "~/experiments-v3/components/UndoRedo";
+import { useAutosaveEvaluationsV3 } from "~/experiments-v3/hooks/useAutosaveEvaluationsV3";
+import { useEvaluationsV3Store } from "~/experiments-v3/hooks/useEvaluationsV3Store";
+import { useLambdaWarmup } from "~/experiments-v3/hooks/useLambdaWarmup";
+import { useSavedDatasetLoader } from "~/experiments-v3/hooks/useSavedDatasetLoader";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 /**

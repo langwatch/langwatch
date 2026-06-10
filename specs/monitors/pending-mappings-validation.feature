@@ -4,6 +4,29 @@ Feature: Pending Mappings Validation
   I want clear feedback when mappings are incomplete
   So that I can complete them before saving my online evaluation
 
+  # All 13 @unimplemented scenarios remain unbound — per AUDIT_MANIFEST.md mostly
+  # KEEP-need-test-added against OnlineEvaluationDrawer.tsx + EvaluatorMappingsSection.tsx:
+  # - "All fields auto-mapped - can save immediately": KEEP (autoInferMappings +
+  #   canSave + no warning banner all implemented at OnlineEvaluationDrawer.tsx:111,1150,1468).
+  # - "Some fields cannot be auto-mapped - editor opens": UPDATE per manifest
+  #   (pending highlight + "Required" placeholder exist; editor-auto-open not verified).
+  # - "User closes editor without completing mappings": KEEP (warning banner at
+  #   OnlineEvaluationDrawer.tsx:1150-1158).
+  # - "Click warning banner to re-open editor": KEEP (onClick handler at line 1167).
+  # - "Thread level always opens editor": DELETE per manifest (contradicts code:
+  #   AUTO_INFER_MAPPINGS auto-maps input→traces at thread level).
+  # - "Cannot save with pending mappings": KEEP (canSave disables Save line 1468).
+  # - "Save button enables after completing mappings": KEEP (reactive missingMappingIds
+  #   via useMemo).
+  # - "Multiple pending fields": KEEP (pluralization at OnlineEvaluationDrawer.tsx:1156-1158).
+  # - "Remove evaluator clears pending state": KEEP (selectedEvaluator===null short-circuits).
+  # - "Change evaluator resets mappings": KEEP (autoInferMappings re-runs on evaluator change).
+  # - "Evaluator with no required fields": KEEP (mappingValidation returns isValid:true line 366).
+  # - "Optional fields not required for save": KEEP (mappingValidation.ts:194 excludes optional).
+  # - "Visual distinction between required and optional pending fields": UPDATE per manifest
+  #   (optional fields aren't tracked in missingMappings at all; spec premise doesn't match impl).
+  # Aspirational pending DELETE/UPDATE rewrites + KEEP test additions tracked in PR #3458.
+
   Background:
     Given I am creating an online evaluation
     And trace level is selected

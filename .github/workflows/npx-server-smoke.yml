@@ -1,8 +1,8 @@
 # Smoke job for `npx @langwatch/server`. Builds the workspace package as a
 # tarball, then runs it from a fresh sandbox dir on every supported platform.
-# Asserts the full stack (postgres + redis + clickhouse + langwatch_nlp +
-# langevals + ai-gateway + langwatch app) reaches healthy state and that the
-# critical user paths — workflow execution, evaluator run — return 200.
+# Asserts the full stack (postgres + redis + clickhouse + nlpgo + langevals
+# + ai-gateway + langwatch app) reaches healthy state and that the critical
+# user paths — workflow execution, evaluator run — return 200.
 #
 # Trigger policy:
 # - workflow_dispatch (manual, with optional `port_base` input)
@@ -32,8 +32,6 @@ on:
       - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"
       - "packages/server/**"
-      - "langwatch_nlp/pyproject.toml"
-      - "langwatch_nlp/uv.lock"
       - "langevals/pyproject.toml"
       - "langevals/uv.lock"
       - "services/aigateway/**"
@@ -81,7 +79,7 @@ jobs:
           node-version: "24"
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4
+        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
         with:
           run_install: false
 
@@ -135,7 +133,7 @@ jobs:
       - name: Run npx @langwatch/server in a sandbox
         id: start
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY_CI }}
+          OPENAI_API_KEY: ${{ secrets.NPX_SERVER_OPENAI_API_KEY }}
         run: |
           set -e
           mkdir -p "$LANGWATCH_HOME"
@@ -155,7 +153,7 @@ jobs:
           base=${PORT_BASE}
           # CI runners have nothing cached — predep download (postgres ~80MB,
           # clickhouse ~100MB, redis tarball, uv installer) + uv venv install
-          # for langwatch_nlp + langevals + Go aigateway local-build + pnpm
+          # for langevals + aigateway/nlpgo monobinary download + pnpm
           # install + vite build of the langwatch app together can take 8-12
           # minutes on a cold runner. Be generous so the smoke isn't flaky on
           # the initial provisioning window. Subsequent runs hit the cached
@@ -184,12 +182,42 @@ jobs:
 
       - name: Probe service health endpoints
         run: |
-          set -e
+          # pipefail catches curl exit codes when piped through tee —
+          # without it, `curl … | tee` always exits 0 because tee
+          # always succeeds, masking real probe failures (the original
+          # /health vs /healthz misnomer slipped past CI for weeks
+          # because of this).
+          set -eo pipefail
           base=${RESOLVED_BASE}
-          curl -fsS "http://127.0.0.1:$base/api/health"            | tee /tmp/health-app.json
-          curl -fsS "http://127.0.0.1:$((base + 1))/health"        | tee /tmp/health-nlp.json
-          curl -fsS "http://127.0.0.1:$((base + 2))/"              | tee /tmp/health-langevals.json
-          curl -fsS "http://127.0.0.1:$((base + 3))/healthz"       | tee /tmp/health-gateway.json
+          # The Wait step only gates on langwatch /api/health (~13s on a
+          # cold runner), but langevals normally finishes its fastapi boot
+          # + evaluator discovery ~1-2s later (~14-15s). One-shot probes
+          # raced langevals and intermittently failed on all runners.
+          # Retry each endpoint for up to 60s — same pattern the CLI
+          # orchestrator uses internally.
+          probe() {
+            local name="$1" url="$2" out="$3"
+            for i in $(seq 1 60); do
+              # --connect-timeout caps TCP setup so a single network hang
+              # can't eat the whole 60s budget; --max-time caps the full
+              # request so a slow-bodied response can't either.
+              if curl -fsS --connect-timeout 2 --max-time 5 "$url" > "$out" 2>/dev/null; then
+                echo "✓ $name healthy after ${i}s"
+                cat "$out"; echo
+                return 0
+              fi
+              sleep 1
+            done
+            echo "✗ $name never responded at $url"
+            return 1
+          }
+          probe app       "http://127.0.0.1:$base/api/health"      /tmp/health-app.json
+          # nlpgo only serves /healthz (chi-routed liveness). /health
+          # falls through to goOnlyModeFallback OR the proxypass
+          # 502-after-hang loop and is not a valid probe.
+          probe nlpgo     "http://127.0.0.1:$((base + 1))/healthz" /tmp/health-nlp.json
+          probe langevals "http://127.0.0.1:$((base + 2))/"        /tmp/health-langevals.json
+          probe gateway   "http://127.0.0.1:$((base + 3))/healthz" /tmp/health-gateway.json
 
       # Belt-and-suspenders for the beta.8 → beta.9 regression: the smoke
       # matrix happily passed for weeks while aigateway was being silently
@@ -246,21 +274,26 @@ jobs:
           fi
 
       - name: Probe a workflow execution end-to-end
-        # Read the secret directly in the if-check. Step-level `env:` is
-        # populated AFTER the if-check is evaluated, so `env.OPENAI_API_KEY_CI`
-        # in the condition was always empty → the step was always skipped.
-        if: ${{ secrets.OPENAI_API_KEY_CI != '' }}
+        # `secrets.*` is not available in step-level `if:` expressions
+        # (only `env`, `inputs`, `github`, `runner`, etc. are valid there).
+        # We expose the secret as a step-env var, then short-circuit inside
+        # the script when it's empty. Net effect matches the original
+        # "skip if no key" intent without invalid YAML.
         env:
-          OPENAI_API_KEY_CI: ${{ secrets.OPENAI_API_KEY_CI }}
+          OPENAI_API_KEY: ${{ secrets.NPX_SERVER_OPENAI_API_KEY }}
         run: |
-          # Posts a minimal workflow execution that hits langwatch_nlp.
-          # If OPENAI_API_KEY_CI isn't set, this step is skipped and the
-          # smoke flow stays gateable on infrastructure alone.
           set -e
+          if [[ -z "$OPENAI_API_KEY" ]]; then
+            echo "NPX_SERVER_OPENAI_API_KEY not set — skipping workflow execution probe."
+            exit 0
+          fi
+          # Placeholder until the real workflow-execution fixture lands.
+          # We hit nlpgo's /healthz (chi-routed liveness) — the only path
+          # that is actually wired. Earlier drafts hit /health and either
+          # 502'd (POST) or hung 5+min (GET → proxypass self-loop).
           base=${RESOLVED_BASE}
-          # TODO: replace with a real workflow execution once the smoke fixture lands.
-          curl -fsS -X POST "http://127.0.0.1:$((base + 1))/health"
-          echo "(placeholder workflow probe — full fixture follows browser-QA)"
+          curl -fsS --max-time 10 "http://127.0.0.1:$((base + 1))/healthz" >/dev/null
+          echo "(placeholder workflow probe — real fixture pending)"
 
       - name: Tear down
         if: always()
@@ -291,7 +324,7 @@ jobs:
         # widen to `!success()` — that catches both genuine failures and
         # 35-minute-job-cap cancellations, which is when we most want logs.
         if: ${{ !success() }}
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: npx-server-smoke-logs-${{ matrix.runner }}-${{ github.sha }}
           path: _logs

@@ -1,4 +1,7 @@
-import { describe, it, expect } from "vitest";
+/**
+ * @vitest-environment jsdom
+ */
+import { describe, it, expect, afterEach } from "vitest";
 import { detectEntityId } from "../useCommandSearch";
 
 /**
@@ -8,12 +11,16 @@ import { detectEntityId } from "../useCommandSearch";
 describe("detectEntityId", () => {
   const PROJECT_SLUG = "test-project";
 
+  afterEach(() => {
+    window.localStorage.removeItem("langwatch:traces-v2-preferred");
+  });
+
   /**
    * Helper to extract the type from detectEntityId result.
    * Returns "entity" for KSUID-prefixed items, or the actual type for traces/spans.
    */
   function detectIdType(query: string): "entity" | "trace" | "span" | null {
-    const result = detectEntityId(query, PROJECT_SLUG);
+    const result = detectEntityId({ query, projectSlug: PROJECT_SLUG });
     if (!result) return null;
 
     // KSUID-prefixed entities have id starting with "id-"
@@ -42,19 +49,28 @@ describe("detectEntityId", () => {
     });
 
     it("builds correct path for agent", () => {
-      const result = detectEntityId("agent_abc123", PROJECT_SLUG);
+      const result = detectEntityId({
+        query: "agent_abc123",
+        projectSlug: PROJECT_SLUG,
+      });
       expect(result?.path).toBe(
         "/test-project/agents?drawer.open=agentViewer&drawer.agentId=agent_abc123"
       );
     });
 
     it("builds correct path for dataset", () => {
-      const result = detectEntityId("dataset_xyz789", PROJECT_SLUG);
+      const result = detectEntityId({
+        query: "dataset_xyz789",
+        projectSlug: PROJECT_SLUG,
+      });
       expect(result?.path).toBe("/test-project/datasets/dataset_xyz789");
     });
 
     it("returns correct label format", () => {
-      const result = detectEntityId("agent_abc123", PROJECT_SLUG);
+      const result = detectEntityId({
+        query: "agent_abc123",
+        projectSlug: PROJECT_SLUG,
+      });
       expect(result?.label).toBe("Go to Agent");
     });
   });
@@ -72,17 +88,27 @@ describe("detectEntityId", () => {
       expect(detectIdType("0123456789ABCDEF0123456789ABCDEF")).toBe("trace");
     });
 
-    it("includes drawerAction for traces", () => {
-      const result = detectEntityId("trace_abc123", PROJECT_SLUG);
-      expect(result?.drawerAction).toEqual({
-        drawer: "traceDetails",
-        params: { traceId: "trace_abc123" },
+    it("navigates to v1 /messages when v2 preference is off", () => {
+      const result = detectEntityId({
+        query: "trace_abc123",
+        projectSlug: PROJECT_SLUG,
       });
+      expect(result?.path).toBe(
+        "/test-project/messages?drawer.open=traceDetails&drawer.traceId=trace_abc123"
+      );
+      expect(result?.drawerAction).toBeUndefined();
     });
 
-    it("builds correct path for trace", () => {
-      const result = detectEntityId("trace_abc123", PROJECT_SLUG);
-      expect(result?.path).toBe("/test-project/messages/trace_abc123");
+    it("navigates to v2 /traces when v2 preference is on", () => {
+      window.localStorage.setItem("langwatch:traces-v2-preferred", "1");
+      const result = detectEntityId({
+        query: "trace_abc123",
+        projectSlug: PROJECT_SLUG,
+      });
+      expect(result?.path).toBe(
+        "/test-project/traces?drawer.open=traceV2Details&drawer.traceId=trace_abc123"
+      );
+      expect(result?.drawerAction).toBeUndefined();
     });
   });
 
@@ -99,38 +125,53 @@ describe("detectEntityId", () => {
       expect(detectIdType("0123456789ABCDEF")).toBe("span");
     });
 
-    it("builds correct path for span (search query)", () => {
-      const result = detectEntityId("span_abc123", PROJECT_SLUG);
+    it("builds v2 /traces fragment path with spanId query-language clause", () => {
+      const result = detectEntityId({
+        query: "span_abc123",
+        projectSlug: PROJECT_SLUG,
+      });
       expect(result?.path).toBe(
-        "/test-project/messages?query=span_abc123"
+        "/test-project/traces#all-traces?q=spanId%3Aspan_abc123"
       );
-    });
-
-    it("does not include drawerAction for spans", () => {
-      const result = detectEntityId("span_abc123", PROJECT_SLUG);
       expect(result?.drawerAction).toBeUndefined();
     });
   });
 
   describe("non-ID queries", () => {
     it("returns null for regular search queries", () => {
-      expect(detectEntityId("my prompt", PROJECT_SLUG)).toBeNull();
-      expect(detectEntityId("test agent", PROJECT_SLUG)).toBeNull();
-      expect(detectEntityId("foo", PROJECT_SLUG)).toBeNull();
+      expect(
+        detectEntityId({ query: "my prompt", projectSlug: PROJECT_SLUG })
+      ).toBeNull();
+      expect(
+        detectEntityId({ query: "test agent", projectSlug: PROJECT_SLUG })
+      ).toBeNull();
+      expect(
+        detectEntityId({ query: "foo", projectSlug: PROJECT_SLUG })
+      ).toBeNull();
     });
 
     it("returns null for empty or whitespace", () => {
-      expect(detectEntityId("", PROJECT_SLUG)).toBeNull();
-      expect(detectEntityId("   ", PROJECT_SLUG)).toBeNull();
+      expect(
+        detectEntityId({ query: "", projectSlug: PROJECT_SLUG })
+      ).toBeNull();
+      expect(
+        detectEntityId({ query: "   ", projectSlug: PROJECT_SLUG })
+      ).toBeNull();
     });
 
     it("returns null for partial prefixes", () => {
-      expect(detectEntityId("agent", PROJECT_SLUG)).toBeNull();
-      expect(detectEntityId("trace", PROJECT_SLUG)).toBeNull();
+      expect(
+        detectEntityId({ query: "agent", projectSlug: PROJECT_SLUG })
+      ).toBeNull();
+      expect(
+        detectEntityId({ query: "trace", projectSlug: PROJECT_SLUG })
+      ).toBeNull();
     });
 
     it("returns null when projectSlug is empty", () => {
-      expect(detectEntityId("agent_abc123", "")).toBeNull();
+      expect(
+        detectEntityId({ query: "agent_abc123", projectSlug: "" })
+      ).toBeNull();
     });
   });
 });

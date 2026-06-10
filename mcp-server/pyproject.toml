@@ -13,5 +13,8 @@ dependencies = [
     "tenacity>=9.1.2",
 ]
 
+[tool.uv]
+exclude-newer = "7 days"
+
 [tool.uv.sources]
 langwatch = { path = "../python-sdk", editable = true }

@@ -77,9 +77,9 @@ describe("GenAIExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toEqual(
-        [{ role: "user", content: "What is 2+2?" }],
-      );
+      expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toEqual([
+        { role: "user", content: "What is 2+2?" },
+      ]);
     });
 
     it("extracts system instruction from first system message", () => {
@@ -146,9 +146,9 @@ describe("GenAIExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES]).toEqual(
-        [{ role: "assistant", content: "The answer is 4." }],
-      );
+      expect(ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES]).toEqual([
+        { role: "assistant", content: "The answer is 4." },
+      ]);
     });
   });
 
@@ -310,9 +310,7 @@ describe("GenAIExtractor", () => {
       extractor.apply(ctx);
 
       // Numeric values stay in the bag and pass through remaining()
-      expect(ctx.bag.attrs.get(ATTR_KEYS.GEN_AI_REQUEST_TEMPERATURE)).toBe(
-        0.7,
-      );
+      expect(ctx.bag.attrs.get(ATTR_KEYS.GEN_AI_REQUEST_TEMPERATURE)).toBe(0.7);
     });
   });
 

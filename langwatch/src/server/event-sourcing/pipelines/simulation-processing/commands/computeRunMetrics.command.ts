@@ -29,6 +29,21 @@ export const COMPUTE_METRICS_RETRY_DELAY_MS = 10_000;
 export interface ComputeRunMetricsDeps {
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
   scheduleRetry: (payload: ComputeRunMetricsCommandData) => Promise<void>;
+  /**
+   * Derives per-role cost/latency for a trace from stored_spans. Replaces the
+   * old per-span fold accumulation: role costs are no longer carried on the
+   * trace summary, so they are computed here (once per trace, when its metrics
+   * are needed) instead of on the hot fold path for every span of every trace.
+   */
+  deriveScenarioRoleMetrics: (params: {
+    tenantId: string;
+    traceId: string;
+    occurredAtMs?: number;
+    foldVersion?: number;
+  }) => Promise<{
+    scenarioRoleCosts: Record<string, number>;
+    scenarioRoleLatencies: Record<string, number>;
+  }>;
 }
 
 const SCHEMA = defineCommandSchema(
@@ -103,12 +118,26 @@ export class ComputeRunMetricsCommand
         return [];
       }
 
-      const roleCosts = traceSummary.scenarioRoleCosts ?? {};
-      const roleLatencies = traceSummary.scenarioRoleLatencies ?? {};
+      // Role cost/latency are derived from stored_spans (not carried on the
+      // summary anymore); totalCost is still a summary scalar.
+      const { scenarioRoleCosts: roleCosts, scenarioRoleLatencies: roleLatencies } =
+        await this.deps.deriveScenarioRoleMetrics({
+          tenantId: tenantIdStr,
+          traceId,
+          occurredAtMs: traceSummary.occurredAt,
+          foldVersion: traceSummary.spanCount,
+        });
 
       // Summary exists but not yet populated (cost enrichment still in progress).
       // Treat like missing summary — schedule retry so we pick it up later.
-      if (Object.keys(roleCosts).length === 0 && traceSummary.totalCost === null) {
+      // Role latency is enough on its own: a scenario trace can have
+      // role-bearing spans with latency but no cost (totalCost null, roleCosts
+      // empty), and those metrics are still worth emitting.
+      if (
+        Object.keys(roleCosts).length === 0 &&
+        Object.keys(roleLatencies).length === 0 &&
+        traceSummary.totalCost === null
+      ) {
         logger.debug(
           { tenantId, scenarioRunId, traceId, retryCount: data.retryCount },
           "Trace summary exists but has no metrics yet",

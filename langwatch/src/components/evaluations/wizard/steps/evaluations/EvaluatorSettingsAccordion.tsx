@@ -3,17 +3,32 @@ import { useCallback, useEffect, useRef } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { z } from "zod";
 import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
-import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
+import {
+  evaluatorsSchema,
+  type EvaluatorTypes,
+} from "~/server/evaluations/evaluators.generated";
 import { useAvailableEvaluators } from "../../../../../hooks/useAvailableEvaluators";
 import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
 import type { Field } from "../../../../../optimization_studio/types/dsl";
-import { evaluatorsSchema } from "../../../../../server/evaluations/evaluators.zod.generated";
 import { getEvaluatorDefaultSettings } from "../../../../../server/evaluations/getEvaluator";
+import { api } from "../../../../../utils/api";
 import DynamicZodForm from "../../../../checks/DynamicZodForm";
 import { StepAccordion } from "../../components/StepAccordion";
 
 export const EvaluatorSettingsAccordion = () => {
   const { project } = useOrganizationTeamProject();
+  const resolvedDefaultModel = api.modelProvider.getResolvedDefault.useQuery(
+    { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
+    { enabled: !!project?.id },
+  );
+  const resolvedDefaultEmbeddings =
+    api.modelProvider.getResolvedDefault.useQuery(
+      {
+        projectId: project?.id ?? "",
+        featureKey: "analytics.topic_clustering_embeddings",
+      },
+      { enabled: !!project?.id },
+    );
   const { workbenchState, getFirstEvaluatorNode, setFirstEvaluator } =
     useEvaluationWizardStore();
 
@@ -47,7 +62,10 @@ export const EvaluatorSettingsAccordion = () => {
       : evaluatorType && availableEvaluators
         ? getEvaluatorDefaultSettings(
             availableEvaluators[evaluatorType as EvaluatorTypes],
-            project,
+            {
+              defaultModel: resolvedDefaultModel.data?.model ?? null,
+              embeddingsModel: resolvedDefaultEmbeddings.data?.model ?? null,
+            },
           )
         : undefined;
 

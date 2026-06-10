@@ -7,7 +7,8 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { LuListTree, LuRefreshCw } from "react-icons/lu";
-import { useDrawer } from "~/hooks/useDrawer";
+import { TracePreviewHoverCard } from "~/features/traces-v2/components/TraceIdPeek";
+import { useTraceDetailsDrawer } from "~/hooks/useTraceDetailsDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { easyCatchToast } from "../../utils/easyCatchToast";
@@ -49,33 +50,28 @@ function TraceSuccessState({
   traceId,
   ...props
 }: { traceId: string } & StackProps) {
-  const { openDrawer, drawerOpen } = useDrawer();
+  // useTraceDetailsDrawer routes to v1 or v2 based on the operator's
+  // localStorage opt-in (see `useTracesV2Preference`). The hover-peek
+  // popover is the same in both worlds.
+  const { openTraceDetailsDrawer } = useTraceDetailsDrawer();
 
   return (
     <HStack paddingBottom={4} {...props}>
-      <Button
-        colorPalette="gray"
-        onClick={() => {
-          if (drawerOpen("traceDetails")) {
-            openDrawer(
-              "traceDetails",
-              {
-                traceId: traceId ?? "",
-                selectedTab: "traceDetails",
-              },
-              { replace: true },
-            );
-          } else {
-            openDrawer("traceDetails", {
-              traceId: traceId ?? "",
-              selectedTab: "traceDetails",
-            });
+      {/* Hover-peek now wraps the button itself — the standalone eye
+          icon was visually orphaned and the affordance was unclear.
+          Click still opens the trace drawer; hover shows the same
+          compact summary popover. */}
+      <TracePreviewHoverCard traceId={traceId}>
+        <Button
+          colorPalette="gray"
+          onClick={() =>
+            openTraceDetailsDrawer({ traceId, selectedTab: "traceDetails" })
           }
-        }}
-      >
-        <LuListTree />
-        View Trace
-      </Button>
+        >
+          <LuListTree />
+          View Trace
+        </Button>
+      </TracePreviewHoverCard>
     </HStack>
   );
 }

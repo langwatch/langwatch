@@ -1,4 +1,9 @@
-export const DEFAULT_MODEL = "openai/gpt-5.2";
+import { getLatestOpenAIChatFlagship } from "../server/modelProviders/getLatestFlagship";
+
+// Auto-derived from the LLM model registry (llmModels.json) — always the
+// newest plain `openai/gpt-<major>.<minor>` flagship. Hard fallback only
+// for the unreachable case where the registry has no plain flagship.
+export const DEFAULT_MODEL = getLatestOpenAIChatFlagship() ?? "openai/gpt-5";
 
 export const DEFAULT_EMBEDDINGS_MODEL = "openai/text-embedding-3-small";
 
@@ -23,7 +28,10 @@ export const KSUID_RESOURCES = {
   EVENT: "event",
   EXPERIMENT: "experiment",
   EXPERIMENT_RUN_RESULT: "exprunresult",
+  MODEL_DEFAULT_CONFIG: "mdcfg",
+  MODEL_DEFAULT_CONFIG_SCOPE: "mdcs",
   MODEL_PROVIDER: "provider",
+  MODEL_PROVIDER_SCOPE: "mpscope",
   MONITOR: "monitor",
   ORGANIZATION: "organization",
   PROJECT: "project",
@@ -41,4 +49,5 @@ export const KSUID_RESOURCES = {
   DATASET_RECORD: "dsrecord",
   GROUP: "group",
   ROLE_BINDING: "rolebinding",
+  API_KEY_ROLE: "apikeyrole",
 } as const;

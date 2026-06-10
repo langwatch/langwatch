@@ -40,7 +40,7 @@
 //      "evaluator with langevals/llm_judge slug + structured-output
 //      signature upstream + liquid-templated system prompt".
 //   2. Build the smallest fixture that exercises that exact shape. Use
-//      generic concept names (math, weather, dialogue, fiction).
+//      generic concept names (math, weather, dialog, fiction).
 //   3. Run it through the existing setupEvaluatorStack harness so the
 //      LangWatch endpoint is faked end-to-end, no real network calls.
 //   4. Assert on the *engine outputs* (workflow result, node states,
@@ -189,16 +189,16 @@ func setupPatternStack(t *testing.T, llm *fakeLLMClient, langwatch http.HandlerF
 // What this proves end-to-end through the engine (not through unit
 // tests of any single component):
 //
-//   1. The signature node's `instructions` parameter is liquid-rendered
-//      against upstream inputs before reaching the LLM (verified by
-//      inspecting what the fake LLM was actually called with — not just
-//      what buildMessages produced in isolation).
-//   2. The signature node's output flows down the edge into the
-//      evaluator node's `data` payload to the LangWatch evaluator API.
-//   3. The evaluator's score/passed/details propagate to the end node
-//      and surface in the workflow result.
-//   4. Per-node state for all four nodes is "success" and present in
-//      result.nodes.
+//  1. The signature node's `instructions` parameter is liquid-rendered
+//     against upstream inputs before reaching the LLM (verified by
+//     inspecting what the fake LLM was actually called with — not just
+//     what buildMessages produced in isolation).
+//  2. The signature node's output flows down the edge into the
+//     evaluator node's `data` payload to the LangWatch evaluator API.
+//  3. The evaluator's score/passed/details propagate to the end node
+//     and surface in the workflow result.
+//  4. Per-node state for all four nodes is "success" and present in
+//     result.nodes.
 //
 // Concept is intentionally generic (math Q&A judge); zero customer
 // domain or copy.
@@ -333,15 +333,15 @@ func TestPattern001_LinearChain_SignatureWithTemplateThenEvaluator(t *testing.T)
 //
 // What this proves:
 //
-//   1. The planner places the two signatures in the SAME layer (they
-//      share inputs, no dependency on each other) — verified by the
-//      fact that both LLM calls are observed and both end-node fields
-//      populate.
-//   2. The engine's per-layer concurrency (one goroutine per node)
-//      does not corrupt the per-node Inputs/Outputs maps when two
-//      signature nodes run side-by-side. Each fake LLM call sees the
-//      shared input and produces an independent output.
-//   3. End node merges both signature outputs into result.
+//  1. The planner places the two signatures in the SAME layer (they
+//     share inputs, no dependency on each other) — verified by the
+//     fact that both LLM calls are observed and both end-node fields
+//     populate.
+//  2. The engine's per-layer concurrency (one goroutine per node)
+//     does not corrupt the per-node Inputs/Outputs maps when two
+//     signature nodes run side-by-side. Each fake LLM call sees the
+//     shared input and produces an independent output.
+//  3. End node merges both signature outputs into result.
 func TestPattern002_BranchingParallelSignatures(t *testing.T) {
 	llm := &fakeLLMClient{
 		respond: func(req app.LLMRequest) (*app.LLMResponse, error) {
@@ -526,14 +526,14 @@ func TestPattern003_HeavyLiquidTemplating(t *testing.T) {
 //
 // What this proves:
 //
-//   1. The planner orders the two signatures in distinct layers
-//      (refine depends on draft); both LLM calls happen and the second
-//      sees the first's output as input.
-//   2. The signature output → next signature input edge resolves
-//      correctly (no DSL parser regression on chained signature-only
-//      paths).
-//   3. The evaluator at the tail reads the final refined answer and
-//      grades it.
+//  1. The planner orders the two signatures in distinct layers
+//     (refine depends on draft); both LLM calls happen and the second
+//     sees the first's output as input.
+//  2. The signature output → next signature input edge resolves
+//     correctly (no DSL parser regression on chained signature-only
+//     paths).
+//  3. The evaluator at the tail reads the final refined answer and
+//     grades it.
 func TestPattern004_SignatureChainThenEvaluator(t *testing.T) {
 	llm := &fakeLLMClient{
 		respond: func(req app.LLMRequest) (*app.LLMResponse, error) {
@@ -666,15 +666,15 @@ func TestPattern004_SignatureChainThenEvaluator(t *testing.T) {
 //
 // What this proves:
 //
-//   1. The signature node detects 2+ outputs and wires
-//      response_format = json_schema in the LLMRequest. Verified by
-//      inspecting the captured request at the LLM boundary.
-//   2. The composed JSON Schema lists both outputs as required and
-//      maps each to its appropriate JSON Schema type.
-//   3. The engine parses the LLM's JSON response and splits the
-//      properties into the corresponding outputs (label → str,
-//      confidence → number) — no longer assigning the same Content
-//      to every declared output.
+//  1. The signature node detects 2+ outputs and wires
+//     response_format = json_schema in the LLMRequest. Verified by
+//     inspecting the captured request at the LLM boundary.
+//  2. The composed JSON Schema lists both outputs as required and
+//     maps each to its appropriate JSON Schema type.
+//  3. The engine parses the LLM's JSON response and splits the
+//     properties into the corresponding outputs (label → str,
+//     confidence → number) — no longer assigning the same Content
+//     to every declared output.
 func TestPattern007_MultiOutputSignatureParseAndSplit(t *testing.T) {
 	llm := &fakeLLMClient{
 		respond: func(req app.LLMRequest) (*app.LLMResponse, error) {
@@ -761,6 +761,117 @@ func TestPattern007_MultiOutputSignatureParseAndSplit(t *testing.T) {
 	assert.InDelta(t, 0.93, res.Result["confidence"], 1e-9)
 }
 
+// TestPattern_StructuredOutput_SingleBool is the B5 regression pin.
+// A prompt-playground-style signature node with a single `passed: bool`
+// output must trigger structured response_format on the LLM request and
+// parse the JSON reply back into a Go bool — exactly Python's
+// `_use_text_only_completion` parity at langwatch_nlp/.../template_adapter
+// .py:228-232.
+//
+// Pre-fix this slipped through: signatureNeedsStructuredOutput only
+// fired for json_schema-typed or 2+ outputs, so a single-bool signature
+// sent no response_format, the LLM returned prose, and the engine
+// shoved that prose into the typed bool slot as a raw string. In the
+// playground that surfaced as a blank chat bubble because the TS
+// output-formatter silently rejects type-mismatched values (rchaves
+// dogfood 2026-05-16, three tabs of `customer-care-prompt` with
+// Structured Outputs ON).
+//
+// What this test proves end-to-end:
+//
+//  1. The signature node with a single `bool` output sends
+//     response_format = json_schema in the LLMRequest (was nil
+//     pre-fix). Verified at the LLM boundary via fakeLLMClient.
+//  2. The composed JSON Schema declares `passed: {"type": "boolean"}`
+//     so the provider enforces a JSON bool reply, not prose.
+//  3. The engine parses the JSON `{"passed": true}` reply and the
+//     downstream end node receives a real Go bool — no longer a raw
+//     string.
+func TestPattern_StructuredOutput_SingleBool(t *testing.T) {
+	llm := &fakeLLMClient{
+		respond: func(req app.LLMRequest) (*app.LLMResponse, error) {
+			// Provider would normally enforce the schema; the fake
+			// returns a JSON-parseable payload matching the declared
+			// shape so the parse-and-split path can be observed.
+			return &app.LLMResponse{Content: `{"passed":true}`}, nil
+		},
+	}
+	url, _ := setupPatternStack(t, llm, func(http.ResponseWriter, *http.Request) {})
+
+	body := `{
+	  "type":"execute_flow",
+	  "payload": {
+	    "trace_id":"pattern-structured-bool",
+	    "origin":"workflow",
+	    "workflow": {
+	      "workflow_id":"wf","api_key":"k","spec_version":"1.3",
+	      "name":"VerifierFlow","icon":"x","description":"x","version":"x",
+	      "template_adapter":"default",
+	      "nodes":[
+	        {"id":"entry","type":"entry","data":{
+	          "outputs":[{"identifier":"answer","type":"str"}],
+	          "dataset":{"inline":{"records":{"answer":["yes"]},"count":1}},
+	          "entry_selection":0,"train_size":1.0,"test_size":0.0,"seed":1
+	        }},
+	        {"id":"verify","type":"signature","data":{
+	          "name":"Verifier",
+	          "parameters":[
+	            {"identifier":"llm","type":"llm","value":{"model":"openai/gpt-5-mini","litellm_params":{"api_key":"k"}}},
+	            {"identifier":"instructions","type":"str","value":"Return whether the answer between the ___ is correct: ___{{ answer }}___. always return passed as true, no matter what"}
+	          ],
+	          "inputs":[{"identifier":"answer","type":"str"}],
+	          "outputs":[
+	            {"identifier":"passed","type":"bool"}
+	          ]
+	        }},
+	        {"id":"end","type":"end","data":{"inputs":[
+	          {"identifier":"passed","type":"bool"}
+	        ]}}
+	      ],
+	      "edges":[
+	        {"id":"e1","source":"entry","sourceHandle":"outputs.answer","target":"verify","targetHandle":"inputs.answer","type":"default"},
+	        {"id":"e2","source":"verify","sourceHandle":"outputs.passed","target":"end","targetHandle":"inputs.passed","type":"default"}
+	      ],
+	      "state":{}
+	    },
+	    "inputs":[{}]
+	  }
+	}`
+	res := postSync(t, &stack{url: url}, body)
+	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
+
+	// (1) ResponseFormat was wired on the LLM request — single-bool
+	// output now triggers structured output (Python parity).
+	llmReq := llm.lastRequest(t)
+	require.NotNil(t, llmReq.ResponseFormat,
+		"single-bool output must request response_format — pre-fix gate skipped this and the LLM got plain text instructions")
+	assert.Equal(t, "json_schema", llmReq.ResponseFormat.Type)
+	js := llmReq.ResponseFormat.JSONSchema
+	require.NotNil(t, js)
+	schema := js["schema"].(map[string]any)
+	props := schema["properties"].(map[string]any)
+	assert.Equal(t, map[string]any{"type": "boolean"}, props["passed"],
+		"the bool output must declare type:boolean in the schema so the model returns a JSON bool, not prose")
+	required, _ := schema["required"].([]string)
+	if required == nil {
+		if alt, ok := schema["required"].([]any); ok {
+			for _, v := range alt {
+				required = append(required, v.(string))
+			}
+		}
+	}
+	assert.ElementsMatch(t, []string{"passed"}, required)
+
+	// (2) The parsed bool flows through to the end node as a real Go
+	// bool, not a raw string. Pre-fix this would have been e.g. "Yes,
+	// it passed." (raw LLM prose) and the TS output-formatter would
+	// have silently rejected the type mismatch upstream of the
+	// playground render.
+	require.NotNil(t, res.Result)
+	assert.Equal(t, true, res.Result["passed"],
+		"end node must receive a Go bool — proves parse-and-split happened, not the pre-fix 'shove raw content into typed slot' bug")
+}
+
 // stringContains is a tiny case-sensitive substring helper to avoid
 // pulling strings just for these branch discriminators.
 func stringContains(s, sub string) bool {
@@ -831,14 +942,14 @@ func setupPatternStackWithUpstream(t *testing.T, llm *fakeLLMClient, langwatch h
 //
 // What this proves:
 //
-//   1. The http block's response body lands in the engine state under
-//      the configured output name.
-//   2. The signature node receives the http output as an upstream
-//      input AND the engine renders {{ <input_name> }} from it inside
-//      `instructions`. (Catches both the edge-routing path AND the
-//      Liquid render path in one shot.)
-//   3. The composed system prompt observed at the LLM boundary
-//      contains the http payload — not the raw {{ }} marker.
+//  1. The http block's response body lands in the engine state under
+//     the configured output name.
+//  2. The signature node receives the http output as an upstream
+//     input AND the engine renders {{ <input_name> }} from it inside
+//     `instructions`. (Catches both the edge-routing path AND the
+//     Liquid render path in one shot.)
+//  3. The composed system prompt observed at the LLM boundary
+//     contains the http payload — not the raw {{ }} marker.
 func TestPattern005_HTTPThenSignatureWithLiquidUse(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -889,6 +1000,7 @@ func TestPattern005_HTTPThenSignatureWithLiquidUse(t *testing.T) {
 	        {"id":"end","type":"end","data":{"inputs":[{"identifier":"narration","type":"str"}]}}
 	      ],
 	      "edges":[
+	        {"id":"e0","source":"entry","sourceHandle":"outputs.city","target":"fetch","targetHandle":"inputs.city","type":"default"},
 	        {"id":"e1","source":"fetch","sourceHandle":"outputs.forecast","target":"narrate","targetHandle":"inputs.forecast","type":"default"},
 	        {"id":"e2","source":"narrate","sourceHandle":"outputs.narration","target":"end","targetHandle":"inputs.narration","type":"default"}
 	      ],
@@ -930,12 +1042,12 @@ func TestPattern005_HTTPThenSignatureWithLiquidUse(t *testing.T) {
 //
 // What this proves:
 //
-//   1. The code block accepts both signature outputs as inputs (named
-//      kwargs `summary` and `sentiment`) — proves the engine wires
-//      multiple upstream signature outputs into one downstream code
-//      block correctly.
-//   2. The code block's structured return propagates to the end node.
-//   3. All five nodes report "success".
+//  1. The code block accepts both signature outputs as inputs (named
+//     kwargs `summary` and `sentiment`) — proves the engine wires
+//     multiple upstream signature outputs into one downstream code
+//     block correctly.
+//  2. The code block's structured return propagates to the end node.
+//  3. All five nodes report "success".
 func TestPattern006_TwoSignaturesIntoCodeAggregator(t *testing.T) {
 	llm := &fakeLLMClient{
 		respond: func(req app.LLMRequest) (*app.LLMResponse, error) {
@@ -1096,18 +1208,18 @@ func TestPattern010_CustomNodeMissingWorkflowIDFailsActionably(t *testing.T) {
 //
 // What this proves:
 //
-//   1. The evaluator dispatch builds the right URL — slug embeds the
-//      langevals/ namespace and path-joins onto /api/evaluations/.
-//   2. The full `settings` dict — model, max_tokens, prompt — is sent
-//      verbatim to the langevals service. In particular the `{{ var }}`
-//      markers in the prompt body are preserved on the wire (they are
-//      rendered downstream by langevals, not by us).
-//   3. The `data` dict carries upstream signature output + entry-side
-//      expected, so the evaluator has both surfaces for its boolean
-//      judgement.
-//   4. Result.score / Result.passed / Result.details propagate through
-//      the engine to the workflow result — the boolean shape callers
-//      expect from llm_boolean.
+//  1. The evaluator dispatch builds the right URL — slug embeds the
+//     langevals/ namespace and path-joins onto /api/evaluations/.
+//  2. The full `settings` dict — model, max_tokens, prompt — is sent
+//     verbatim to the langevals service. In particular the `{{ var }}`
+//     markers in the prompt body are preserved on the wire (they are
+//     rendered downstream by langevals, not by us).
+//  3. The `data` dict carries upstream signature output + entry-side
+//     expected, so the evaluator has both surfaces for its boolean
+//     judgement.
+//  4. Result.score / Result.passed / Result.details propagate through
+//     the engine to the workflow result — the boolean shape callers
+//     expect from llm_boolean.
 //
 // Generic concept (math fact judge); zero customer content.
 func TestPattern008_LLMBooleanEvaluator(t *testing.T) {
@@ -1239,13 +1351,13 @@ func TestPattern008_LLMBooleanEvaluator(t *testing.T) {
 //
 // What this proves on top of pattern_008:
 //
-//   1. settings.categories survives the JSON boundary as a list of
-//      objects with `name` and `description` keys preserved (no
-//      flattening to bare strings).
-//   2. The evaluator returns a `label` (which category matched) and the
-//      engine surfaces it to result.label — the field shape that
-//      langevals/llm_category callers depend on, distinct from the
-//      score/passed shape of llm_boolean.
+//  1. settings.categories survives the JSON boundary as a list of
+//     objects with `name` and `description` keys preserved (no
+//     flattening to bare strings).
+//  2. The evaluator returns a `label` (which category matched) and the
+//     engine surfaces it to result.label — the field shape that
+//     langevals/llm_category callers depend on, distinct from the
+//     score/passed shape of llm_boolean.
 //
 // Generic concept (weather severity classifier judge); zero customer
 // content.
@@ -1371,17 +1483,17 @@ func TestPattern009_LLMCategoryEvaluator(t *testing.T) {
 //
 // What this proves:
 //
-//   1. The DSL parser binds the inline `json_schema` object on the
-//      output Field.JSONSchema map.
-//   2. composeSignatureResponseFormat wraps the user's schema as a
-//      property on the wrapper object — `properties.<id>` is the
-//      verbatim user schema, not flattened.
-//   3. On the LLM boundary, response_format.type=json_schema and the
-//      schema's `properties.<id>` is the exact user schema — proves no
-//      flattening, no clobbering.
-//   4. extractSignatureOutputs unwraps the LLM's `{"<id>": <obj>}`
-//      reply and binds the inner object to the declared output, so the
-//      workflow result carries the structured payload verbatim.
+//  1. The DSL parser binds the inline `json_schema` object on the
+//     output Field.JSONSchema map.
+//  2. composeSignatureResponseFormat wraps the user's schema as a
+//     property on the wrapper object — `properties.<id>` is the
+//     verbatim user schema, not flattened.
+//  3. On the LLM boundary, response_format.type=json_schema and the
+//     schema's `properties.<id>` is the exact user schema — proves no
+//     flattening, no clobbering.
+//  4. extractSignatureOutputs unwraps the LLM's `{"<id>": <obj>}`
+//     reply and binds the inner object to the declared output, so the
+//     workflow result carries the structured payload verbatim.
 //
 // Generic concept (book metadata extractor); zero customer content.
 func TestPattern012_SingleJSONSchemaOutput(t *testing.T) {
@@ -1620,7 +1732,7 @@ func TestPattern013_FalsyEvaluatorSettingsPreserved(t *testing.T) {
 	assert.InDelta(t, 0.0, settings["max_tokens"], 1e-9, "max_tokens must round-trip as 0, not be missing")
 
 	require.Contains(t, settings, "prompt", "prompt=\"\" must NOT be filtered out")
-	assert.Equal(t, "", settings["prompt"])
+	assert.Empty(t, settings["prompt"])
 
 	require.Contains(t, settings, "remove_punctuation", "remove_punctuation=false must NOT be filtered out")
 	assert.Equal(t, false, settings["remove_punctuation"])
@@ -1650,20 +1762,20 @@ func TestPattern013_FalsyEvaluatorSettingsPreserved(t *testing.T) {
 //
 // What this proves end-to-end:
 //
-//   1. The engine routes `agent` nodes through the agent dispatcher,
-//      and `agent_type=workflow` selects the WorkflowRunner — not the
-//      http or code branch.
-//   2. The HTTP request hits /api/workflows/<workflow_id>/run with the
-//      project apiKey on X-Auth-Token (matches the langevals dispatch
-//      style, since this is the same control-plane surface).
-//   3. Upstream signature output flows into the sub-workflow's request
-//      body verbatim, AND the runner injects `do_not_trace=true` to
-//      avoid double-counted spans (parity with CustomNode.forward).
-//   4. The X-LangWatch-Trace-Id parent trace propagates so Studio can
-//      stitch the sub-run as a child span.
-//   5. The wrapper response shape `{"result": <value>}` is unwrapped
-//      and bound to declared agent outputs (a single declared output
-//      receives the unwrapped value directly).
+//  1. The engine routes `agent` nodes through the agent dispatcher,
+//     and `agent_type=workflow` selects the WorkflowRunner — not the
+//     http or code branch.
+//  2. The HTTP request hits /api/workflows/<workflow_id>/run with the
+//     project apiKey on X-Auth-Token (matches the langevals dispatch
+//     style, since this is the same control-plane surface).
+//  3. Upstream signature output flows into the sub-workflow's request
+//     body verbatim, AND the runner injects `do_not_trace=true` to
+//     avoid double-counted spans (parity with CustomNode.forward).
+//  4. The X-LangWatch-Trace-Id parent trace propagates so Studio can
+//     stitch the sub-run as a child span.
+//  5. The wrapper response shape `{"result": <value>}` is unwrapped
+//     and bound to declared agent outputs (a single declared output
+//     receives the unwrapped value directly).
 //
 // Generic concept (claim → fact-check sub-workflow); zero customer
 // content.
@@ -1790,14 +1902,14 @@ func TestPattern011_WorkflowAsEvaluatorChain(t *testing.T) {
 //
 // On the Go path this test pins three things end-to-end:
 //
-//   1. The handler decodes `thread_id` from the inbound payload
-//      (top-level field, not nested in metadata).
-//   2. The engine plumbs it through `ExecuteRequest.ThreadID` to the
-//      block executors that make outbound calls.
-//   3. Outbound HTTP calls (evaluator + agent-workflow) carry the
-//      `X-LangWatch-Thread-Id` header so the receiving services can
-//      stamp it onto the spans they emit. Mirrors the existing
-//      `X-LangWatch-Trace-Id` and `X-LangWatch-Origin` propagation.
+//  1. The handler decodes `thread_id` from the inbound payload
+//     (top-level field, not nested in metadata).
+//  2. The engine plumbs it through `ExecuteRequest.ThreadID` to the
+//     block executors that make outbound calls.
+//  3. Outbound HTTP calls (evaluator + agent-workflow) carry the
+//     `X-LangWatch-Thread-Id` header so the receiving services can
+//     stamp it onto the spans they emit. Mirrors the existing
+//     `X-LangWatch-Trace-Id` and `X-LangWatch-Origin` propagation.
 //
 // The fixture chains a signature → evaluator → agent-workflow shape
 // so we hit BOTH outbound surfaces in one run. Generic concept; zero
@@ -2011,12 +2123,12 @@ func TestPattern014_SignatureFallsBackToWorkflowDefaultLLM(t *testing.T) {
 // (data.workflow_id, data.version_id) rather than data.parameters[].
 //
 // What this proves end-to-end:
-//   1. Planner accepts `type: custom` and builds a layer for it.
-//   2. Engine dispatches it through agentblock.WorkflowRunner.
-//   3. The HTTP request carries the same shape Python's CustomNode.
-//      forward emits: POST /api/workflows/<id>[/<version>]/run with
-//      X-Auth-Token + body containing inputs + do_not_trace=true.
-//   4. The wrapper response unwraps and binds to declared outputs.
+//  1. Planner accepts `type: custom` and builds a layer for it.
+//  2. Engine dispatches it through agentblock.WorkflowRunner.
+//  3. The HTTP request carries the same shape Python's CustomNode.
+//     forward emits: POST /api/workflows/<id>[/<version>]/run with
+//     X-Auth-Token + body containing inputs + do_not_trace=true.
+//  4. The wrapper response unwraps and binds to declared outputs.
 func TestPattern016_CustomNodeKindRoutesToWorkflowRunner(t *testing.T) {
 	url, lwRequests := setupPatternStack(t, nil, func(w http.ResponseWriter, r *http.Request) {
 		if !stringContains(r.URL.Path, "/api/workflows/") || !stringContains(r.URL.Path, "/run") {
@@ -2101,7 +2213,7 @@ func TestPattern016_CustomNodeKindRoutesToWorkflowRunner(t *testing.T) {
 	check, ok := res.Result["check"].(map[string]any)
 	require.True(t, ok, "check output must be a map (unwrapped result envelope)")
 	assert.Equal(t, true, check["passed"])
-	assert.Equal(t, 0.9, check["score"])
+	assert.InDelta(t, 0.9, check["score"], 1e-9)
 
 	// (5) All three nodes succeeded.
 	require.NotNil(t, res.Nodes)

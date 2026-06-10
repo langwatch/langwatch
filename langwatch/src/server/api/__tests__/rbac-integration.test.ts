@@ -319,6 +319,48 @@ describe("RBAC Integration Tests", () => {
       expect(result).toBe(true);
     });
 
+    it("returns true for a bare org-member with no team and no RoleBinding (base org-role permissions)", async () => {
+      // Regression: a fresh MEMBER added to an org without any team or
+      // custom RoleBinding has zero TeamUser rows AND zero RoleBindings;
+      // before the fix, every personal-context tRPC procedure
+      // (user.personalContext / personalUsage / personalBudget /
+      // governance.resolveHome / aiTools.list) gated on
+      // `organization:view` rejected them silently. Caught when MEMBER
+      // `rogerio@…` was added to an org for the Claude Code OTLP
+      // dogfood — /me rendered as if no data existed instead of "no
+      // access". Base org-role permissions
+      // (`ORGANIZATION_ROLE_PERMISSIONS[MEMBER]`) must be consulted as
+      // the floor, with bindings + team memberships layered on top.
+      mockPrisma.organizationUser.findFirst.mockResolvedValue({
+        role: OrganizationUserRole.MEMBER,
+      });
+      mockPrisma.roleBinding.findMany.mockResolvedValue([]);
+      mockPrisma.teamUser.findMany.mockResolvedValue([]);
+
+      const viewResult = await hasOrganizationPermission(
+        { prisma: mockPrisma, session: mockSession },
+        "org-123",
+        "organization:view" as Permission,
+      );
+      expect(viewResult).toBe(true);
+
+      const aiToolsResult = await hasOrganizationPermission(
+        { prisma: mockPrisma, session: mockSession },
+        "org-123",
+        "aiTools:view" as Permission,
+      );
+      expect(aiToolsResult).toBe(true);
+
+      // Manage stays gated — the floor is the role's documented bag,
+      // nothing more.
+      const manageResult = await hasOrganizationPermission(
+        { prisma: mockPrisma, session: mockSession },
+        "org-123",
+        "organization:manage" as Permission,
+      );
+      expect(manageResult).toBe(false);
+    });
+
     it("should return false for organization member with manage permission", async () => {
       mockPrisma.organizationUser.findFirst.mockResolvedValue({
         role: OrganizationUserRole.MEMBER,
@@ -1847,6 +1889,7 @@ describe("RBAC Integration Tests", () => {
           "evaluations:view",
           "datasets:view",
           "workflows:view",
+          "experiments:view",
           "prompts:view",
           "scenarios:view",
           "secrets:view",

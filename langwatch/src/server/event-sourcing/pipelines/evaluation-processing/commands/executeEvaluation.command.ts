@@ -1,4 +1,3 @@
-import { generate } from "@langwatch/ksuid";
 import type { Command, CommandHandler } from "../../../";
 import {
   createTenantId,
@@ -6,13 +5,12 @@ import {
   EventUtils,
 } from "../../../";
 import { extractErrorMessage } from "../../../../../utils/captureError";
-import { KSUID_RESOURCES } from "../../../../../utils/constants";
 import { createLogger } from "../../../../../utils/logger/server";
 import {
   AZURE_SAFETY_NOT_CONFIGURED_MESSAGE,
-  getAzureSafetyEnvFromProject,
   isAzureEvaluatorType,
 } from "../../../../app-layer/evaluations/azure-safety-env";
+import { getAzureSafetyEnvFromProject } from "../../../../app-layer/evaluations/azure-safety-env.server";
 import type { EvaluationCostRecorder } from "../../../../app-layer/evaluations/evaluation-cost.recorder";
 import type { EvaluationExecutionService } from "../../../../app-layer/evaluations/evaluation-execution.service";
 import type { MonitorService } from "../../../../app-layer/monitors/monitor.service";
@@ -44,7 +42,7 @@ const logger = createLogger(
 
 export interface ExecuteEvaluationCommandDeps {
   monitors: MonitorService;
-  spanStorage: { getSpansByTraceId(params: { tenantId: string; traceId: string }): Promise<Span[]> };
+  spanStorage: { getSpansByTraceId(params: { tenantId: string; traceId: string; occurredAtMs?: number }): Promise<Span[]> };
   traceEvents: { getEventsByTraceId(params: { tenantId: string; traceId: string }): Promise<ElasticSearchEvent[]> };
   evaluationExecution: EvaluationExecutionService;
   costRecorder: EvaluationCostRecorder;
@@ -176,8 +174,15 @@ export class ExecuteEvaluationCommand implements CommandHandler<
       return [];
     }
 
-    // 3. Read spans from CH, check evaluator required fields + preconditions
-    const spans = await this.deps.spanStorage.getSpansByTraceId({ tenantId, traceId: data.traceId });
+    // 3. Read spans from CH, check evaluator required fields + preconditions.
+    // Pass the event's occurredAt so the span read can prune stored_spans to the
+    // trace's weekly partition instead of cold-scanning every partition on S3
+    // (the read falls back to an unconstrained scan if the window misses).
+    const spans = await this.deps.spanStorage.getSpansByTraceId({
+      tenantId,
+      traceId: data.traceId,
+      occurredAtMs: data.occurredAt,
+    });
 
     // Check evaluator required fields first
     const requiredFieldsMet = checkEvaluatorRequiredFields({
@@ -252,6 +257,27 @@ export class ExecuteEvaluationCommand implements CommandHandler<
         level: monitor.level as "trace" | "thread",
         workflowId,
       });
+
+      // A trace the service could not evaluate (no thread_id for a thread-based
+      // monitor, errored trace with no I/O, etc.) comes back as "skipped". Drop
+      // it with no event, like an unmet precondition: a skipped run has no
+      // score to fold, and a bulk re-evaluation over non-evaluatable traces
+      // would otherwise emit thousands of results, each paying the heavy
+      // evaluation-projection read. Config skips (monitor not found, provider
+      // not configured) are emitted earlier via their own path and still
+      // surface in the UI.
+      if (result.status === "skipped") {
+        logger.debug(
+          {
+            tenantId,
+            evaluatorId: data.evaluatorId,
+            traceId: data.traceId,
+            details: result.details,
+          },
+          "Trace not evaluatable — skipping with no result event",
+        );
+        return [];
+      }
 
       // 5. Record cost via service
       let costId: string | null = null;

@@ -57,7 +57,7 @@ jobs:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
-      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4
+      - uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
         with:
           run_install: false
 
@@ -106,7 +106,7 @@ jobs:
       - name: Install pnpm dependencies (workspace)
         run: pnpm install --frozen-lockfile
 
-      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+      - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.4.0
         with:
           go-version-file: "go.mod"
           cache: true
@@ -182,12 +182,8 @@ jobs:
         env:
           NODE_ENV: production
 
-      - name: Pack the npm tarball (with Apache-2.0 LICENSE swapped in)
+      - name: Pack the npm tarball
         id: pack
-        # scripts/pack-npm.sh swaps /LICENSE.md (BSL — for GitHub repo
-        # display) with /LICENSE-NPM.txt (Apache-2.0 — for the npm tarball)
-        # for the duration of `pnpm pack`, then restores. See the script
-        # for details.
         run: |
           mkdir -p _pack
           bash scripts/pack-npm.sh --pack-destination "$GITHUB_WORKSPACE/_pack"
@@ -207,9 +203,8 @@ jobs:
             "package/langwatch/package.json"
             "package/langwatch/dist/client/index.html"
             "package/langwatch/dist/scenario-child-process.js"
-            "package/langwatch_nlp/pyproject.toml"
             "package/langevals/pyproject.toml"
-            # langwatch_nlp pins the python SDK via `editable = "../python-sdk"`
+            # langevals resolves the python SDK as a local path dependency,
             # so the tarball must ship python-sdk/pyproject.toml + src/.
             "package/python-sdk/pyproject.toml"
             "package/python-sdk/src"
@@ -221,7 +216,6 @@ jobs:
           )
           forbidden=(
             "package/langwatch/node_modules"
-            "package/langwatch_nlp/.venv"
             "package/langwatch/.next/cache"
             "package/.env"
           )
@@ -244,19 +238,13 @@ jobs:
             echo "✗ tarball too large (>300 MB)"; exit 1
           fi
 
-          # The license swap should have produced an Apache-2.0 LICENSE in
-          # the tarball, NOT the BSL one. Catch a regression where someone
-          # bypasses scripts/pack-npm.sh and runs pnpm pack directly.
+          # Sanity check: the tarball must ship the Apache-2.0 LICENSE.md.
           extract_dir="$(mktemp -d)"
           tar -xzf "$tarball" -C "$extract_dir" package/LICENSE.md
           if grep -q "Apache License" "$extract_dir/package/LICENSE.md"; then
             echo "✓ tarball ships Apache-2.0 LICENSE.md"
-          elif grep -q "Business Source License" "$extract_dir/package/LICENSE.md"; then
-            echo "✗ tarball ships BSL LICENSE.md — license swap was not applied"
-            echo "  (use scripts/pack-npm.sh, not pnpm pack directly)"
-            exit 1
           else
-            echo "✗ tarball LICENSE.md is unrecognized — neither Apache-2.0 nor BSL"
+            echo "✗ tarball LICENSE.md is not Apache-2.0"
             head -5 "$extract_dir/package/LICENSE.md"
             exit 1
           fi

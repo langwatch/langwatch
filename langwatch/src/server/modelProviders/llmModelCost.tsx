@@ -1,11 +1,12 @@
+import type { PrismaClient } from "@prisma/client";
 import escapeStringRegexp from "escape-string-regexp";
 import { prisma } from "../db";
-import llmModels from "./llmModels.json";
-import type { LLMModelRegistry } from "./llmModels.types";
+import { resolveScopeChain } from "../scopes/resolveScopeChain";
+import type { ScopeTier } from "../scopes/scope.types";
+import { llmModels } from "./loadModelCatalog";
 
 const getImportedModelCosts = () => {
-  const registry = llmModels as LLMModelRegistry;
-  const models = registry.models;
+  const models = llmModels.models;
 
   // Convert models to cost entries with regex patterns
   const tokenModels: Record<
@@ -14,6 +15,8 @@ const getImportedModelCosts = () => {
       regex: string;
       inputCostPerToken: number;
       outputCostPerToken: number;
+      cacheReadCostPerToken?: number;
+      cacheCreationCostPerToken?: number;
     }
   > = {};
 
@@ -34,7 +37,8 @@ const getImportedModelCosts = () => {
         // Fix for langchain using vertexai while litellm uses vertex_ai
         .replace("vertex_ai", "(vertex_ai|vertexai)")
         // Allow version numbers to use either dots or hyphens (e.g., "4.6" or "4-6")
-        .replaceAll("\\.", "[.-]");
+        .replaceAll("\\.", "[.-]")
+        .replace(/(\d)-(\d)/g, "$1[.-]$2");
 
       const escapedVendorPrefix = hasVendorPrefix
         ? escapeStringRegexp(vendorPrefix!)
@@ -50,6 +54,8 @@ const getImportedModelCosts = () => {
         regex,
         inputCostPerToken: model.pricing.inputCostPerToken ?? 0,
         outputCostPerToken: model.pricing.outputCostPerToken ?? 0,
+        cacheReadCostPerToken: model.pricing.inputCacheReadPerToken,
+        cacheCreationCostPerToken: model.pricing.inputCacheWritePerToken,
       };
     }
   }
@@ -71,6 +77,8 @@ const getImportedModelCosts = () => {
         regex: model.regex,
         inputCostPerToken: model.inputCostPerToken,
         outputCostPerToken: model.outputCostPerToken,
+        cacheReadCostPerToken: model.cacheReadCostPerToken,
+        cacheCreationCostPerToken: model.cacheCreationCostPerToken,
       };
     });
 
@@ -93,10 +101,19 @@ const getImportedModelCosts = () => {
 export type MaybeStoredLLMModelCost = {
   id?: string;
   projectId: string;
+  scopeType?: ScopeTier;
+  scopeId?: string;
   model: string;
   regex: string;
   inputCostPerToken?: number;
   outputCostPerToken?: number;
+  // Per-token rates for prompt-cache tokens. Read tokens are billed far
+  // below the input rate (~0.1x); write tokens above it (~1.25x/2x). The
+  // static registry sources these from the catalog's inputCacheReadPerToken /
+  // inputCacheWritePerToken; custom overrides may set them too. When absent,
+  // cache tokens fall back to the input rate (counted, just not discounted).
+  cacheReadCostPerToken?: number;
+  cacheCreationCostPerToken?: number;
   updatedAt?: Date;
   createdAt?: Date;
 };
@@ -120,6 +137,8 @@ export const getStaticModelCosts = (): MaybeStoredLLMModelCost[] => {
         regex: value.regex,
         inputCostPerToken: value.inputCostPerToken,
         outputCostPerToken: value.outputCostPerToken,
+        cacheReadCostPerToken: value.cacheReadCostPerToken,
+        cacheCreationCostPerToken: value.cacheCreationCostPerToken,
       }))
       // Sort by the matched model suffix, not raw registry key length,
       // because vendor prefixes are optional in the generated regex.
@@ -136,30 +155,94 @@ export const getStaticModelCosts = (): MaybeStoredLLMModelCost[] => {
   return cachedStaticModelCosts;
 };
 
-export const getLLMModelCosts = async ({
+// Most-specific tier wins: a PROJECT override shadows a TEAM override, which
+// shadows an ORGANIZATION override, which shadows the static default. Within a
+// tier the newest row wins.
+const SCOPE_TIER_RANK: Record<ScopeTier, number> = {
+  PROJECT: 0,
+  TEAM: 1,
+  ORGANIZATION: 2,
+};
+
+/**
+ * Resolves the custom cost overrides that apply to a project, most specific
+ * first (PROJECT, then TEAM, then ORGANIZATION; newest first within a tier).
+ * Static catalog entries are NOT included — callers that want the full
+ * cascade with platform defaults use getLLMModelCosts.
+ *
+ * Accepts an injectable Prisma client so ingestion-side services can pass
+ * their own instance.
+ */
+export const getCustomLLMModelCosts = async ({
   projectId,
+  prismaClient = prisma,
 }: {
   projectId: string;
+  prismaClient?: PrismaClient;
 }): Promise<MaybeStoredLLMModelCost[]> => {
-  const llmModelCostsCustomData = await prisma.customLLMModelCost.findMany({
-    where: { projectId },
+  const project = await prismaClient.project.findUnique({
+    where: { id: projectId },
+    select: {
+      id: true,
+      teamId: true,
+      team: { select: { organizationId: true } },
+    },
   });
 
-  const customCosts = llmModelCostsCustomData
+  // No project context means no custom overrides apply; never fall back to
+  // an unscoped read that could leak another tenant's costs.
+  if (!project) return [];
+
+  const organizationId = project.team.organizationId;
+  const chain = resolveScopeChain({
+    organizationId,
+    teamId: project.teamId,
+    projectId,
+  });
+
+  const llmModelCostsCustomData = await prismaClient.customLLMModelCost.findMany(
+    {
+      where: {
+        organizationId,
+        OR: chain.map((scope) => ({
+          scopeType: scope.scopeType,
+          scopeId: scope.scopeId,
+        })),
+      },
+    },
+  );
+
+  return llmModelCostsCustomData
     .map(
       (record) =>
         ({
           id: record.id,
           projectId,
+          scopeType: record.scopeType,
+          scopeId: record.scopeId,
           model: record.model,
           regex: record.regex,
           inputCostPerToken: record.inputCostPerToken ?? undefined,
           outputCostPerToken: record.outputCostPerToken ?? undefined,
+          cacheReadCostPerToken: record.cacheReadCostPerToken ?? undefined,
+          cacheCreationCostPerToken:
+            record.cacheCreationCostPerToken ?? undefined,
           updatedAt: record.updatedAt,
           createdAt: record.createdAt,
         }) as MaybeStoredLLMModelCost,
     )
-    .sort((a, b) => b.createdAt!.getTime() - a.createdAt!.getTime());
+    .sort(
+      (a, b) =>
+        SCOPE_TIER_RANK[a.scopeType!] - SCOPE_TIER_RANK[b.scopeType!] ||
+        b.createdAt!.getTime() - a.createdAt!.getTime(),
+    );
+};
 
+export const getLLMModelCosts = async ({
+  projectId,
+}: {
+  projectId: string;
+}): Promise<MaybeStoredLLMModelCost[]> => {
+  const customCosts = await getCustomLLMModelCosts({ projectId });
   return [...customCosts, ...getStaticModelCosts()];
 };

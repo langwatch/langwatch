@@ -26,7 +26,7 @@ export type AnyEventSchema = z.ZodObject<
 // ---------------------------------------------------------------------------
 
 /** All possible timestamp keys. Forbidden in `initState()` return type. */
-type AllTimestampKeys = "CreatedAt" | "UpdatedAt" | "createdAt" | "updatedAt" | "LastEventOccurredAt" | "lastEventOccurredAt";
+type AllTimestampKeys = "CreatedAt" | "UpdatedAt" | "createdAt" | "updatedAt" | "LastEventOccurredAt" | "LastEventOccurredAt";
 
 /** Full derivation: `"lw.suite_run.started"` → `"handleSuiteRunStarted"` */
 type HandlerName<EventTypeStr extends string> =
@@ -105,16 +105,16 @@ export abstract class AbstractFoldProjection<
 
   readonly createdAtKey: CK;
   readonly updatedAtKey: UK;
-  readonly lastEventOccurredAtKey: LEOAK;
+  readonly LastEventOccurredAtKey: LEOAK;
 
   constructor({
     createdAtKey,
     updatedAtKey,
-    lastEventOccurredAtKey,
-  }: { createdAtKey?: CK; updatedAtKey?: UK; lastEventOccurredAtKey?: LEOAK } = {}) {
+    LastEventOccurredAtKey,
+  }: { createdAtKey?: CK; updatedAtKey?: UK; LastEventOccurredAtKey?: LEOAK } = {}) {
     this.createdAtKey = createdAtKey ?? ("CreatedAt" as CK);
     this.updatedAtKey = updatedAtKey ?? ("UpdatedAt" as UK);
-    this.lastEventOccurredAtKey = lastEventOccurredAtKey ?? ("LastEventOccurredAt" as LEOAK);
+    this.LastEventOccurredAtKey = LastEventOccurredAtKey ?? ("LastEventOccurredAt" as LEOAK);
   }
 
   /**
@@ -180,7 +180,7 @@ export abstract class AbstractFoldProjection<
       ...this.initState(),
       [this.createdAtKey]: now,
       [this.updatedAtKey]: now,
-      [this.lastEventOccurredAtKey]: 0,
+      [this.LastEventOccurredAtKey]: 0,
     } as State;
   }
 
@@ -203,14 +203,14 @@ export abstract class AbstractFoldProjection<
     const prevUpdatedAt: number = state[this.updatedAtKey];
     const nextUpdatedAt = Math.max(Date.now(), prevUpdatedAt + 1);
     const eventOccurredAt = (event as Record<string, unknown>).occurredAt;
-    const prevLastOccurred: number = state[this.lastEventOccurredAtKey];
+    const prevLastOccurred: number = state[this.LastEventOccurredAtKey];
     const nextLastOccurred = typeof eventOccurredAt === "number"
       ? Math.max(prevLastOccurred, eventOccurredAt)
       : prevLastOccurred;
     return {
       ...newState,
       [this.updatedAtKey]: nextUpdatedAt,
-      [this.lastEventOccurredAtKey]: nextLastOccurred,
+      [this.LastEventOccurredAtKey]: nextLastOccurred,
     } as State;
   }
 }

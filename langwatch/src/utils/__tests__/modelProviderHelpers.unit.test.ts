@@ -1,10 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  DEFAULT_EMBEDDINGS_MODEL,
-  DEFAULT_MODEL,
-  DEFAULT_TOPIC_CLUSTERING_MODEL,
-  MASKED_KEY_PLACEHOLDER,
-} from "../constants";
+import { MASKED_KEY_PLACEHOLDER } from "../constants";
 
 // Mock the registry module so we can control getProviderModelOptions
 vi.mock("../../server/modelProviders/registry", () => ({
@@ -15,13 +10,9 @@ import { getProviderModelOptions } from "../../server/modelProviders/registry";
 import {
   buildCustomKeyState,
   getDisplayKeysForProvider,
-  getEffectiveDefaults,
   getProviderFromModel,
   getSchemaShape,
   hasUserEnteredNewApiKey,
-  isProviderDefaultModel,
-  isProviderEffectiveDefault,
-  isProviderUsedForDefaultModels,
   resolveModelForProvider,
   shouldAutoEnableAsDefault,
 } from "../modelProviderHelpers";
@@ -51,183 +42,7 @@ describe("modelProviderHelpers", () => {
     });
   });
 
-  describe("getEffectiveDefaults()", () => {
-    it("returns project defaults when all are set", () => {
-      const project = {
-        defaultModel: "openai/gpt-4o",
-        topicClusteringModel: "openai/gpt-4o-mini",
-        embeddingsModel: "openai/text-embedding-3-small",
-      };
 
-      const result = getEffectiveDefaults(project);
-
-      expect(result.defaultModel).toBe("openai/gpt-4o");
-      expect(result.topicClusteringModel).toBe("openai/gpt-4o-mini");
-      expect(result.embeddingsModel).toBe("openai/text-embedding-3-small");
-    });
-
-    it("returns DEFAULT_* constants when project values are null", () => {
-      const project = {
-        defaultModel: null,
-        topicClusteringModel: null,
-        embeddingsModel: null,
-      };
-
-      const result = getEffectiveDefaults(project);
-
-      expect(result.defaultModel).toBe(DEFAULT_MODEL);
-      expect(result.topicClusteringModel).toBe(DEFAULT_TOPIC_CLUSTERING_MODEL);
-      expect(result.embeddingsModel).toBe(DEFAULT_EMBEDDINGS_MODEL);
-    });
-
-    it("returns DEFAULT_* constants when project is null", () => {
-      const result = getEffectiveDefaults(null);
-
-      expect(result.defaultModel).toBe(DEFAULT_MODEL);
-      expect(result.topicClusteringModel).toBe(DEFAULT_TOPIC_CLUSTERING_MODEL);
-      expect(result.embeddingsModel).toBe(DEFAULT_EMBEDDINGS_MODEL);
-    });
-
-    it("returns DEFAULT_* constants when project is undefined", () => {
-      const result = getEffectiveDefaults(undefined);
-
-      expect(result.defaultModel).toBe(DEFAULT_MODEL);
-      expect(result.topicClusteringModel).toBe(DEFAULT_TOPIC_CLUSTERING_MODEL);
-      expect(result.embeddingsModel).toBe(DEFAULT_EMBEDDINGS_MODEL);
-    });
-
-    it("mixes project values and defaults", () => {
-      const project = {
-        defaultModel: "anthropic/claude-sonnet-4",
-        topicClusteringModel: null,
-        embeddingsModel: undefined,
-      };
-
-      const result = getEffectiveDefaults(project);
-
-      expect(result.defaultModel).toBe("anthropic/claude-sonnet-4");
-      expect(result.topicClusteringModel).toBe(DEFAULT_TOPIC_CLUSTERING_MODEL);
-      expect(result.embeddingsModel).toBe(DEFAULT_EMBEDDINGS_MODEL);
-    });
-  });
-
-  describe("isProviderDefaultModel()", () => {
-    it("returns true when provider matches default model", () => {
-      const project = { defaultModel: "openai/gpt-4o" };
-      expect(isProviderDefaultModel("openai", project)).toBe(true);
-    });
-
-    it("returns false when provider does not match default model", () => {
-      const project = { defaultModel: "anthropic/claude-sonnet-4" };
-      expect(isProviderDefaultModel("openai", project)).toBe(false);
-    });
-
-    it("uses DEFAULT_MODEL when project default is null", () => {
-      const project = { defaultModel: null };
-      const expectedProvider = DEFAULT_MODEL.split("/")[0];
-      expect(isProviderDefaultModel(expectedProvider!, project)).toBe(true);
-    });
-
-    it("uses DEFAULT_MODEL when project is null", () => {
-      const expectedProvider = DEFAULT_MODEL.split("/")[0];
-      expect(isProviderDefaultModel(expectedProvider!, null)).toBe(true);
-    });
-  });
-
-  describe("isProviderEffectiveDefault()", () => {
-    it("returns true when provider is used for default model", () => {
-      const project = {
-        defaultModel: "openai/gpt-4o",
-        topicClusteringModel: "anthropic/claude-sonnet-4",
-        embeddingsModel: "anthropic/text-embedding",
-      };
-      expect(isProviderEffectiveDefault("openai", project)).toBe(true);
-    });
-
-    it("returns true when provider is used for topic clustering model", () => {
-      const project = {
-        defaultModel: "anthropic/claude-sonnet-4",
-        topicClusteringModel: "openai/gpt-4o-mini",
-        embeddingsModel: "anthropic/text-embedding",
-      };
-      expect(isProviderEffectiveDefault("openai", project)).toBe(true);
-    });
-
-    it("returns true when provider is used for embeddings model", () => {
-      const project = {
-        defaultModel: "anthropic/claude-sonnet-4",
-        topicClusteringModel: "anthropic/claude-sonnet-4",
-        embeddingsModel: "openai/text-embedding-3-small",
-      };
-      expect(isProviderEffectiveDefault("openai", project)).toBe(true);
-    });
-
-    it("returns false when provider is not used for any default", () => {
-      const project = {
-        defaultModel: "anthropic/claude-sonnet-4",
-        topicClusteringModel: "anthropic/claude-sonnet-4",
-        embeddingsModel: "anthropic/text-embedding",
-      };
-      expect(isProviderEffectiveDefault("openai", project)).toBe(false);
-    });
-
-    it("uses DEFAULT_* constants when project values are null", () => {
-      const project = {
-        defaultModel: null,
-        topicClusteringModel: null,
-        embeddingsModel: null,
-      };
-      const expectedProvider = DEFAULT_MODEL.split("/")[0];
-      expect(isProviderEffectiveDefault(expectedProvider!, project)).toBe(true);
-    });
-  });
-
-  describe("isProviderUsedForDefaultModels()", () => {
-    it("returns true when provider matches default model", () => {
-      expect(
-        isProviderUsedForDefaultModels("openai", "openai/gpt-4o", null, null),
-      ).toBe(true);
-    });
-
-    it("returns true when provider matches topic clustering model", () => {
-      expect(
-        isProviderUsedForDefaultModels(
-          "openai",
-          null,
-          "openai/gpt-4o-mini",
-          null,
-        ),
-      ).toBe(true);
-    });
-
-    it("returns true when provider matches embeddings model", () => {
-      expect(
-        isProviderUsedForDefaultModels(
-          "openai",
-          null,
-          null,
-          "openai/text-embedding-3-small",
-        ),
-      ).toBe(true);
-    });
-
-    it("returns false when provider does not match any model", () => {
-      expect(
-        isProviderUsedForDefaultModels(
-          "azure",
-          "openai/gpt-4o",
-          "anthropic/claude-sonnet-4",
-          "openai/text-embedding-3-small",
-        ),
-      ).toBe(false);
-    });
-
-    it("returns false when all models are null", () => {
-      expect(isProviderUsedForDefaultModels("openai", null, null, null)).toBe(
-        false,
-      );
-    });
-  });
 
   describe("getSchemaShape()", () => {
     it("returns shape from schema with shape property", () => {
@@ -540,83 +355,25 @@ describe("modelProviderHelpers", () => {
   });
 
   describe("shouldAutoEnableAsDefault()", () => {
-    describe("when provider is the default model provider", () => {
-      it("returns true", () => {
-        const project = { defaultModel: "openai/gpt-4o" };
+    describe("when enabledProvidersCount is 0 or 1", () => {
+      it("returns true for the first-provider case (0)", () => {
+        expect(
+          shouldAutoEnableAsDefault({ enabledProvidersCount: 0 }),
+        ).toBe(true);
+      });
 
-        const result = shouldAutoEnableAsDefault({
-          providerKey: "openai",
-          project,
-          enabledProvidersCount: 5,
-        });
-
-        expect(result).toBe(true);
+      it("returns true when there is exactly one provider", () => {
+        expect(
+          shouldAutoEnableAsDefault({ enabledProvidersCount: 1 }),
+        ).toBe(true);
       });
     });
 
-    describe("when enabledProvidersCount is 1", () => {
-      it("returns true regardless of default model", () => {
-        const project = { defaultModel: "openai/gpt-5.2" };
-
-        const result = shouldAutoEnableAsDefault({
-          providerKey: "azure",
-          project,
-          enabledProvidersCount: 1,
-        });
-
-        expect(result).toBe(true);
-      });
-    });
-
-    describe("when enabledProvidersCount is 0", () => {
-      it("returns true for first-provider setup", () => {
-        const project = { defaultModel: "openai/gpt-5.2" };
-
-        const result = shouldAutoEnableAsDefault({
-          providerKey: "azure",
-          project,
-          enabledProvidersCount: 0,
-        });
-
-        expect(result).toBe(true);
-      });
-    });
-
-    describe("when provider is not default and enabledProvidersCount > 1", () => {
-      it("returns false", () => {
-        const project = { defaultModel: "openai/gpt-5.2" };
-
-        const result = shouldAutoEnableAsDefault({
-          providerKey: "azure",
-          project,
-          enabledProvidersCount: 2,
-        });
-
-        expect(result).toBe(false);
-      });
-    });
-
-    describe("when project is null", () => {
-      it("returns true when provider matches DEFAULT_MODEL", () => {
-        const expectedProvider = DEFAULT_MODEL.split("/")[0]!;
-
-        const result = shouldAutoEnableAsDefault({
-          providerKey: expectedProvider,
-          project: null,
-          enabledProvidersCount: 3,
-        });
-
-        expect(result).toBe(true);
-      });
-
-      it("returns true when enabledProvidersCount is 1", () => {
-        const result = shouldAutoEnableAsDefault({
-          providerKey: "azure",
-          project: null,
-          enabledProvidersCount: 1,
-        });
-
-        expect(result).toBe(true);
+    describe("when enabledProvidersCount is greater than 1", () => {
+      it("returns false; the user must opt in explicitly", () => {
+        expect(
+          shouldAutoEnableAsDefault({ enabledProvidersCount: 2 }),
+        ).toBe(false);
       });
     });
   });

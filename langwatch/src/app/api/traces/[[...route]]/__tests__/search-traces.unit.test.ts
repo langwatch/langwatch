@@ -33,6 +33,7 @@ vi.mock("~/server/traces/trace-formatting", () => ({
 
 vi.mock("~/utils/logger/server", () => ({
   createLogger: () => ({
+    debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
@@ -51,7 +52,26 @@ vi.mock("~/server/api/routers/traces.schemas", () => {
   };
 });
 
-const { app: v1App } = await import("../app.v1");
+// The routes are registered through the SecuredApp builder, whose project
+// strategy runs the real authMiddleware. Mock it to a passthrough so these
+// unit tests exercise the handler logic with an injected project, not real auth.
+vi.mock("~/app/api/middleware/auth", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("~/app/api/middleware/auth")>();
+  return {
+    ...actual,
+    authMiddleware: async (c: { set: (k: string, v: unknown) => void }, next: () => Promise<void>) => {
+      c.set("project", { id: "project-123", apiKey: "key-123" });
+      await next();
+    },
+    requirePermission: () => async (_c: unknown, next: () => Promise<void>) => next(),
+  };
+});
+
+const { registerTracesRoutes } = await import("../app.v1");
+const { createProjectApp } = await import("~/server/api/security");
+const securedTest = createProjectApp({ basePath: "/" });
+registerTracesRoutes(securedTest);
+const v1App = securedTest.hono;
 
 const testApp = new Hono();
 testApp.use("*", async (c, next) => {
@@ -230,6 +250,56 @@ describe("POST /search", () => {
         expect.objectContaining({ evaluation_id: "eval-1", score: 0.95 }),
       ]);
       expect(body.traces[1].evaluations).toEqual([]);
+    });
+  });
+
+  describe("when result set is large", () => {
+    it("serializes many traces with correct comma separation", async () => {
+      const manyTraces = Array.from({ length: 50 }, (_, i) => ({
+        trace_id: `trace-${i}`,
+        project_id: "project-123",
+        input: { value: `input-${i}` },
+        output: { value: `output-${i}` },
+        timestamps: { started_at: i * 100, inserted_at: i * 100, updated_at: i * 100 },
+        metadata: {},
+        spans: [],
+      }));
+
+      mockGetAllTracesForProject.mockResolvedValue({
+        groups: [manyTraces],
+        totalHits: 50,
+        traceChecks: Object.fromEntries(manyTraces.map((t) => [t.trace_id, []])),
+        scrollId: "next-page-token",
+      });
+
+      const res = await searchRequest({
+        startDate: 0,
+        endDate: 10000,
+      });
+
+      const body = await res.json();
+      expect(body.traces).toHaveLength(50);
+      expect(body.traces[0].trace_id).toBe("trace-0");
+      expect(body.traces[49].trace_id).toBe("trace-49");
+      expect(body.pagination.scrollId).toBe("next-page-token");
+    });
+
+    it("returns valid JSON for empty result set", async () => {
+      mockGetAllTracesForProject.mockResolvedValue({
+        groups: [[]],
+        totalHits: 0,
+        traceChecks: {},
+        scrollId: undefined,
+      });
+
+      const res = await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+      });
+
+      const body = await res.json();
+      expect(body.traces).toHaveLength(0);
+      expect(body.pagination.totalHits).toBe(0);
     });
   });
 });

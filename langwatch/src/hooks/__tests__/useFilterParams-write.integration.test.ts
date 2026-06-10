@@ -36,6 +36,10 @@ vi.mock("../../components/PeriodSelector", () => ({
       startDate: new Date("2025-01-01"),
       endDate: new Date("2025-01-31"),
     },
+    mode: "absolute",
+    setPeriod: vi.fn(),
+    setRelativePeriod: vi.fn(),
+    daysDifference: 31,
   }),
 }));
 

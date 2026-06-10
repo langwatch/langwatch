@@ -6,7 +6,7 @@ import {
   Icon,
   IconButton,
 } from "@chakra-ui/react";
-import { Eye, EyeOff, WandSparkles } from "lucide-react";
+import { Check, Copy, Eye, EyeOff, WandSparkles } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
 import type { HighlighterGeneric } from "shiki";
@@ -25,6 +25,15 @@ interface CodePreviewProps {
   isVisible?: boolean;
   onToggleVisibility?: () => void;
   llmPrompt?: string;
+  /**
+   * When true, the header action buttons (copy / eye / llm-prompt) are
+   * suppressed. Used by empty-state surfaces where the rendered code
+   * still includes a placeholder value (e.g. `sk-lw-xxxxx...`) and
+   * letting the user copy it would just create a broken curl that
+   * silently fails. The canonical mint CTA lives in the surrounding
+   * surface (banner / panel) instead.
+   */
+  disableActions?: boolean;
 }
 
 export function CodePreview({
@@ -38,6 +47,7 @@ export function CodePreview({
   isVisible: controlledIsVisible,
   onToggleVisibility,
   llmPrompt,
+  disableActions,
 }: CodePreviewProps): React.ReactElement | null {
   const { colorMode } = useColorMode();
   const [internalIsVisible, setInternalIsVisible] = useState(false);
@@ -50,7 +60,7 @@ export function CodePreview({
       async load() {
         const { createHighlighter } = await import("shiki");
         return createHighlighter({
-          langs: ["typescript", "python", "go", "yaml", "bash"],
+          langs: ["typescript", "python", "go", "yaml", "bash", "json"],
           themes: ["github-dark", "github-light"],
         });
       },
@@ -111,13 +121,14 @@ export function CodePreview({
         {() => (
           <CodeBlock.Root
             size="sm"
+            colorPalette="orange"
             code={displayCode}
             language={chakraLanguage}
             meta={{ highlightLines, colorScheme: colorMode }}
             transition="all 0.3s ease"
             borderRadius="xl"
             border="1px solid"
-            borderColor="gray.200"
+            borderColor="border.emphasized"
             bg="bg.panel/60"
             backdropFilter="blur(20px) saturate(1.3)"
             boxShadow="0 4px 30px rgba(0,0,0,0.06)"
@@ -135,7 +146,13 @@ export function CodePreview({
               </CodeBlock.Title>
 
               <HStack gap="0" mr="-3px">
-                {enableVisibilityToggle && (
+                {/* `disableActions` is set by empty-state surfaces where
+                    the rendered code still includes a placeholder value
+                    (e.g. `sk-lw-xxxxx...`). Showing copy / eye / llm
+                    prompt would just let the user export a broken
+                    snippet — the canonical mint CTA lives in the
+                    surrounding banner instead. */}
+                {!disableActions && enableVisibilityToggle && (
                   <Tooltip
                     content={
                       isVisible
@@ -159,7 +176,7 @@ export function CodePreview({
                     </IconButton>
                   </Tooltip>
                 )}
-                {llmPrompt && (
+                {!disableActions && llmPrompt && (
                   <Tooltip
                     content="Copy LLM-optimized integration prompt"
                     openDelay={0}
@@ -175,11 +192,15 @@ export function CodePreview({
                     </IconButton>
                   </Tooltip>
                 )}
-                <CodeBlock.CopyTrigger asChild>
-                  <IconButton variant="ghost" size="2xs">
-                    <CodeBlock.CopyIndicator copied={code} />
-                  </IconButton>
-                </CodeBlock.CopyTrigger>
+                {!disableActions && (
+                  <CodeBlock.CopyTrigger asChild>
+                    <IconButton variant="ghost" size="2xs" aria-label="Copy">
+                      <CodeBlock.CopyIndicator copied={<Check size={14} />}>
+                        <Copy size={14} />
+                      </CodeBlock.CopyIndicator>
+                    </IconButton>
+                  </CodeBlock.CopyTrigger>
+                )}
               </HStack>
             </CodeBlock.Header>
             <CodeBlock.Content

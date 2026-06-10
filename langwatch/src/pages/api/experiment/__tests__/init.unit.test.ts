@@ -11,6 +11,7 @@ vi.mock("~/server/db", () => ({
     },
     experiment: {
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
     },
@@ -125,7 +126,7 @@ describe("POST /api/experiment/init", () => {
 
   describe("when slug already exists", () => {
     beforeEach(() => {
-      (prisma.experiment.findUnique as Mock).mockResolvedValue(
+      (prisma.experiment.findFirst as Mock).mockResolvedValue(
         existingExperiment,
       );
     });
@@ -155,7 +156,7 @@ describe("POST /api/experiment/init", () => {
 
   describe("when slug does not exist", () => {
     beforeEach(() => {
-      (prisma.experiment.findUnique as Mock).mockResolvedValue(null);
+      (prisma.experiment.findFirst as Mock).mockResolvedValue(null);
       (prisma.experiment.create as Mock).mockResolvedValue(createdExperiment);
     });
 

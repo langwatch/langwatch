@@ -63,7 +63,11 @@ vi.mock("../../../optimization_studio/server/lambda", () => ({
 }));
 
 const NLPGO_PORT = 5562;
-const REPO_ROOT = path.resolve(__dirname, "../../../../../..");
+// /langwatch/src/server/nlpgo/__tests__  → up 5 = repo root.
+// Was 6 historically (landed at worktrees/ instead of the repo) which
+// silently broke `go run ./cmd/service` with "directory not found"
+// any time OPENAI_API_KEY was set in the env that the test ran in.
+const REPO_ROOT = path.resolve(__dirname, "../../../../..");
 
 let nlpgoProcess: ChildProcess | null = null;
 

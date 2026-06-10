@@ -183,7 +183,7 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
         size="md"
         modal={false}
       >
-        <Drawer.Content>
+        <Drawer.Content bg="bg">
           <Drawer.CloseTrigger />
           <Drawer.Header>
             <HStack gap={2} justify="space-between" width="full">

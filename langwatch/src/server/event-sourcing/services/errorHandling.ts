@@ -404,9 +404,12 @@ export function categorizeError(error: unknown): ErrorCategory {
 }
 
 /**
- * ClickHouse error codes that indicate transient/overload conditions.
- * These should be retried rather than treated as fatal.
+ * ClickHouse error codes that indicate transient/overload conditions
+ * (server still healthy, just busy) OR cluster-recovery conditions
+ * (server going through ZooKeeper reconnect / replica failover / graceful
+ * shutdown). Both should be retried by the group queue.
  *
+ * Overload / connectivity:
  * - 159: TIMEOUT_EXCEEDED
  * - 160: TOO_SLOW
  * - 202: TOO_MANY_SIMULTANEOUS_QUERIES
@@ -415,16 +418,50 @@ export function categorizeError(error: unknown): ErrorCategory {
  * - 210: NETWORK_ERROR
  * - 241: MEMORY_LIMIT_EXCEEDED
  * - 252: TOO_MANY_PARTS
+ *
+ * Cluster-recovery (replica shutting down, ZK session lost, table readonly):
+ * - 33:  CANNOT_READ_ALL_DATA (truncated read during socket close)
+ * - 236: ABORTED (write buffer cancelled mid-flush)
+ * - 242: TABLE_IS_READ_ONLY (ZK lost, replica cannot accept writes)
+ * - 394: QUERY_WAS_CANCELLED (server cancelled query, e.g. during shutdown)
+ * - 999: KEEPER_EXCEPTION (ZooKeeper / ClickHouse Keeper coordination error)
  */
 const CLICKHOUSE_TRANSIENT_CODES = new Set([
-  "159", "160", "202", "203", "209", "210", "241", "252",
+  "33", "159", "160", "202", "203", "209", "210", "236", "241", "242", "252", "394", "999",
 ]);
+
+/**
+ * Message-fragment matchers for the same conditions as
+ * CLICKHOUSE_TRANSIENT_CODES, used when the error object surfaced from
+ * `@clickhouse/client` embeds the code inside `error.message` rather than
+ * as a separate `code` property (typical for HTTP responses).
+ */
+export const CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS = [
+  "Too many simultaneous queries",
+  "TIMEOUT_EXCEEDED",
+  "SOCKET_TIMEOUT",
+  "NETWORK_ERROR",
+  "MEMORY_LIMIT_EXCEEDED",
+  "connect ECONNREFUSED",
+  "connect ETIMEDOUT",
+  "QUERY_WAS_CANCELLED",
+  "Query was cancelled",
+  "TABLE_IS_READ_ONLY",
+  "Table is in readonly mode",
+  "KEEPER_EXCEPTION",
+  "Coordination::Exception",
+  "Session expired",
+  "Connection loss",
+  "CANNOT_READ_ALL_DATA",
+  "Write buffer has been canceled",
+] as const;
 
 /**
  * Classifies a ClickHouse error as RECOVERABLE (transient) or CRITICAL.
  *
- * Transient errors (overload, timeouts, connection issues) should be retried
- * by the group queue. Only true data-integrity errors are CRITICAL.
+ * Transient errors (overload, timeouts, connection issues, ZK / cluster
+ * recovery) should be retried by the group queue. Only true data-integrity
+ * errors are CRITICAL.
  */
 export function classifyClickHouseError(error: unknown): ErrorCategory {
   if (
@@ -437,15 +474,10 @@ export function classifyClickHouseError(error: unknown): ErrorCategory {
   }
 
   const message = error instanceof Error ? error.message : String(error);
-  if (
-    message.includes("Too many simultaneous queries") ||
-    message.includes("TIMEOUT_EXCEEDED") ||
-    message.includes("SOCKET_TIMEOUT") ||
-    message.includes("NETWORK_ERROR") ||
-    message.includes("connect ECONNREFUSED") ||
-    message.includes("connect ETIMEDOUT")
-  ) {
-    return ErrorCategory.RECOVERABLE;
+  for (const fragment of CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS) {
+    if (message.includes(fragment)) {
+      return ErrorCategory.RECOVERABLE;
+    }
   }
 
   return ErrorCategory.CRITICAL;

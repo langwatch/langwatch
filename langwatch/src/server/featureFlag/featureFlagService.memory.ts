@@ -1,6 +1,9 @@
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "~/utils/logger/server";
-import type { FeatureFlagOptions, FeatureFlagServiceInterface } from "./types";
+import type {
+  FeatureFlagEvaluateOptions,
+  FeatureFlagServiceInterface,
+} from "./types";
 
 /**
  * In-memory feature flag service with default values.
@@ -29,14 +32,14 @@ export class FeatureFlagServiceMemory implements FeatureFlagServiceInterface {
 
   /**
    * Check if a feature flag is enabled.
-   * Note: options parameter is accepted for interface compatibility but ignored.
+   * Note: extra fields on opts (projectId, organizationId, cacheTtlMs)
+   * are accepted for interface compatibility but ignored.
    */
   async isEnabled(
     flagKey: string,
-    distinctId: string,
-    defaultValue = true,
-    _options?: FeatureFlagOptions,
+    opts: FeatureFlagEvaluateOptions,
   ): Promise<boolean> {
+    const { distinctId, defaultValue = true } = opts;
     return await this.tracer.withActiveSpan(
       "FeatureFlagServiceMemory.isEnabled",
       {
@@ -117,7 +120,6 @@ export class FeatureFlagServiceMemory implements FeatureFlagServiceInterface {
   private initializeFlags(): void {
     // Flags that should default to enabled in local dev (no PostHog)
     this.flags["release_ui_sdk_radar_banner_card_enabled"] = true;
-    this.flags["release_ui_dark_mode_enabled"] = true;
 
     this.logger.debug("Initialized in-memory feature flags");
   }

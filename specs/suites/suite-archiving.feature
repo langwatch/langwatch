@@ -3,6 +3,14 @@ Feature: Suite Archiving
   I want to archive suites instead of permanently deleting them
   So that historical test results are preserved and accidental deletions are recoverable
 
+  # The remaining @unimplemented scenarios in this file describe sidebar
+  # context-menu UI flows + cross-project authorization paths. They need
+  # a Next.js page-level integration harness or a dedicated context-menu
+  # component test (no such test file exists today). The backend service
+  # / repository / REST archive paths ARE bound via existing
+  # `suite.repository.unit.test.ts`, `suite.service.unit.test.ts`, and
+  # `suites-api.integration.test.ts`.
+
   Background:
     Given I am logged into project "my-project"
     And the following suites exist:
@@ -65,7 +73,7 @@ Feature: Suite Archiving
   # Integration: Archived Suites Hidden from Default Views
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: Archived suite does not appear in sidebar search results
     Given "Edge Case Suite" has been archived
     When I search for "Edge Case" in the sidebar
@@ -75,7 +83,7 @@ Feature: Suite Archiving
   # Integration: Soft Archive Backend Behavior
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: Archived suite is hidden from the active list
     Given I am authenticated in project "test-project"
     And suite "To Archive" exists
@@ -89,7 +97,7 @@ Feature: Suite Archiving
     When I archive "To Archive"
     Then I can still see all 3 runs for "To Archive" in the runs list
 
-  @integration @unimplemented
+  @integration
   Scenario: Archiving frees up the suite name for reuse
     Given I am authenticated in project "test-project"
     And suite "My Suite" exists
@@ -100,7 +108,7 @@ Feature: Suite Archiving
   # Integration: Negative Paths
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: Archiving an already-archived suite succeeds without error
     Given I am authenticated in project "test-project"
     And suite "Already Archived" has been archived
@@ -114,7 +122,7 @@ Feature: Suite Archiving
     When I archive "Foreign Suite"
     Then I receive a not found error
 
-  @integration @unimplemented
+  @integration
   Scenario: Archiving a non-existent suite returns not found
     Given I am authenticated in project "test-project"
     When I archive "nonexistent-id"

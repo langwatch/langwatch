@@ -1,11 +1,10 @@
-import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { prisma } from "~/server/db";
-import type { Span, Trace } from "~/server/tracer/types";
+import type { Trace } from "~/server/tracer/types";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
 import { generateAsciiTree, formatTraceSummaryDigest } from "~/server/traces/trace-formatting";
 import { enrichTracesWithEvaluations } from "~/server/traces/enrich-evaluations";
@@ -13,7 +12,11 @@ import {
   AmbiguousTraceIdPrefixError,
   TraceService,
 } from "~/server/traces/trace.service";
+import { getApp } from "~/server/app-layer/app";
+import { CollectorSpanUtils } from "~/server/traces/collectorSpan.utils";
+import type { ReservedTraceMetadata, CustomMetadata } from "~/server/tracer/types";
 import { createLogger } from "~/utils/logger/server";
+import { type SecuredApp, requires } from "~/server/api/security";
 import type { AuthMiddlewareVariables } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
@@ -21,14 +24,6 @@ import { coerceToEpoch, flexibleDateSchema } from "../../shared/schemas";
 import { getAllForProjectInput } from "~/server/api/routers/traces.schemas";
 
 const logger = createLogger("langwatch:api:traces");
-
-// Define types for our Hono context variables
-type Variables = AuthMiddlewareVariables;
-
-// Define the Hono app
-export const app = new Hono<{
-  Variables: Variables;
-}>().basePath("/");
 
 // Body schema for the search endpoint: reuses getAllForProjectInput but adjusts
 // startDate/endDate to accept ISO strings alongside epoch numbers, and adds
@@ -58,8 +53,11 @@ const traceSearchBodySchema = getAllForProjectInput
     llmMode: z.boolean().optional(),
   });
 
-// POST /search - Search traces for a project
-app.post(
+export function registerTracesRoutes(
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
+): void {
+  // POST /search - Search traces for a project
+  secured.access(requires("traces:view")).post(
   "/search",
   describeRoute({
     description: "Search traces for a project",
@@ -125,44 +123,74 @@ app.post(
       traceChecks: results.traceChecks,
     });
 
-    let traces: unknown[];
-    if (format === "digest") {
-      traces = enrichedTraces.map((trace) => ({
-        trace_id: trace.trace_id,
-        formatted_trace: formatTraceSummaryDigest(trace),
-        input: trace.input,
-        output: trace.output,
-        timestamps: trace.timestamps,
-        metadata: trace.metadata,
-        error: trace.error,
-        evaluations: trace.evaluations,
-        platformUrl: platformUrl({
-          projectSlug: project.slug,
-          path: `/messages/${trace.trace_id}`,
-        }),
-      }));
-    } else {
-      traces = enrichedTraces.map((trace) => ({
+    const formatTrace = (trace: Trace) => {
+      if (format === "digest") {
+        return {
+          trace_id: trace.trace_id,
+          formatted_trace: formatTraceSummaryDigest(trace),
+          input: trace.input,
+          output: trace.output,
+          timestamps: trace.timestamps,
+          metadata: trace.metadata,
+          error: trace.error,
+          evaluations: trace.evaluations,
+          platformUrl: platformUrl({
+            projectSlug: project.slug,
+            path: `/messages/${trace.trace_id}`,
+          }),
+        };
+      }
+      return {
         ...trace,
         platformUrl: platformUrl({
           projectSlug: project.slug,
           path: `/messages/${trace.trace_id}`,
         }),
-      }));
+      };
+    };
+
+    const pagination = JSON.stringify({
+      totalHits: results.totalHits,
+      scrollId: results.scrollId,
+    });
+
+    const serializedTraces: string[] = [];
+    for (const trace of enrichedTraces) {
+      try {
+        serializedTraces.push(JSON.stringify(formatTrace(trace)));
+      } catch (err) {
+        logger.error(
+          { traceId: trace.trace_id, error: err instanceof Error ? err.message : err },
+          "Failed to serialize trace, skipping",
+        );
+      }
     }
 
-    return c.json({
-      traces,
-      pagination: {
-        totalHits: results.totalHits,
-        scrollId: results.scrollId,
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode('{"traces":['));
+
+        for (let i = 0; i < serializedTraces.length; i++) {
+          const prefix = i > 0 ? "," : "";
+          controller.enqueue(encoder.encode(prefix + serializedTraces[i]!));
+        }
+
+        controller.enqueue(
+          encoder.encode(`],"pagination":${pagination}}`)
+        );
+        controller.close();
       },
+    });
+
+    return new Response(stream, {
+      headers: { "Content-Type": "application/json" },
     });
   },
 );
 
-// GET /:traceId - Get a single trace by ID
-app.get(
+  // GET /:traceId - Get a single trace by ID
+  secured.access(requires("traces:view")).get(
   "/:traceId",
   describeRoute({
     description: "Get a single trace by ID.",
@@ -305,4 +333,122 @@ app.get(
       }),
     });
   },
-);
+  );
+
+  // PATCH /:traceId/metadata - Update trace metadata via synthetic span
+  const metadataValueSchema = z.union([
+    z.string().max(4096),
+    z.number(),
+    z.boolean(),
+    z.array(z.string()),
+    z.record(z.unknown()),
+  ]);
+
+  const metadataInputSchema = z
+    .record(metadataValueSchema)
+    .refine((obj) => Object.keys(obj).length > 0, {
+      message: "metadata must contain at least one key",
+    })
+    .refine((obj) => JSON.stringify(obj).length <= 32768, {
+      message: "total metadata payload must not exceed 32KB",
+    });
+
+  const RESERVED_METADATA_KEYS = new Set([
+    "user_id",
+    "customer_id",
+    "thread_id",
+    "labels",
+  ]);
+
+  function splitMetadata(metadata: Record<string, unknown>): {
+    reserved: ReservedTraceMetadata;
+    custom: CustomMetadata;
+  } {
+    const reserved: ReservedTraceMetadata = {};
+    const custom: CustomMetadata = {};
+
+    for (const [key, value] of Object.entries(metadata)) {
+      if (RESERVED_METADATA_KEYS.has(key)) {
+        (reserved as Record<string, unknown>)[key] = value;
+      } else {
+        custom[key] = value as CustomMetadata[string];
+      }
+    }
+
+    return { reserved, custom };
+  }
+
+  secured.access(requires("traces:update")).patch(
+    "/:traceId/metadata",
+    describeRoute({
+      tags: ["Traces"],
+      summary: "Update trace metadata",
+      description:
+        "Update metadata on a trace after creation. Inserts a synthetic span carrying the new attributes through the standard ingestion pipeline. New keys are added, existing keys are updated, missing keys are preserved. Labels replace entirely.",
+      responses: {
+        200: {
+          description: "Metadata updated successfully",
+          content: {
+            "application/json": {
+              schema: resolver(z.object({ traceId: z.string() })),
+            },
+          },
+        },
+        ...baseResponses,
+      },
+    }),
+    zValidator(
+      "json",
+      z.object({
+        metadata: metadataInputSchema,
+      }),
+    ),
+    async (c) => {
+      const project = c.get("project");
+      const traceId = c.req.param("traceId");
+      const body = c.req.valid("json");
+
+      const { reserved, custom } = splitMetadata(body.metadata);
+      const resource = CollectorSpanUtils.buildResource({
+        reservedTraceMetadata: reserved,
+        customMetadata: custom,
+      });
+
+      const now = Date.now();
+      const nowNano = String(now * 1_000_000);
+      const spanId = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+
+      await getApp().traces.recordSpan({
+        tenantId: project.id,
+        span: {
+          traceId,
+          spanId,
+          traceState: null,
+          parentSpanId: null,
+          name: "langwatch.metadata_update",
+          kind: 1,
+          startTimeUnixNano: nowNano,
+          endTimeUnixNano: nowNano,
+          attributes: [
+            {
+              key: "langwatch.span.type",
+              value: { stringValue: "span" },
+            },
+          ],
+          events: [],
+          links: [],
+          status: { code: 1 },
+          droppedAttributesCount: 0,
+          droppedEventsCount: 0,
+          droppedLinksCount: 0,
+        },
+        resource,
+        instrumentationScope: { name: "langwatch.api.metadata_update" },
+        piiRedactionLevel: project.piiRedactionLevel,
+        occurredAt: now,
+      });
+
+      return c.json({ traceId });
+    },
+  );
+}

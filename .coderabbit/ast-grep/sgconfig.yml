@@ -1,0 +1,12 @@
+# ast-grep project config for the committed CodeRabbit rules.
+#
+# Purpose: `ast-grep test` (run locally and in CI) proves every rule in rules/
+# actually matches the fixtures in rule-tests/ — so no rule can silently go
+# dead again (see #3754; no-form-watch-in-child was found firing on nothing).
+#
+# CodeRabbit itself loads these rules via reviews.tools.ast-grep.rule_dirs in
+# /.coderabbit.yaml and does NOT read this file or rule-tests/.
+ruleDirs:
+  - rules
+testConfigurations:
+  - testDir: rule-tests

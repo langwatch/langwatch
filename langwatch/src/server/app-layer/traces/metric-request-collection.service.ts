@@ -5,12 +5,12 @@ import { createLogger } from "~/utils/logger/server";
 import type { DeepPartial } from "~/utils/types";
 import {
   type MetricType,
-  type RecordMetricCommandData,
   piiRedactionLevelSchema,
+  type RecordMetricCommandData,
 } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
 import {
-  TraceRequestUtils,
   normalizeOtlpAttributeMap,
+  TraceRequestUtils,
 } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
 import { decodeBase64OpenTelemetryId } from "../../tracer/utils";
 export interface MetricRequestCollectionDeps {
@@ -84,16 +84,20 @@ export class MetricRequestCollectionService {
               }
 
               for (const dp of results) {
-                if (!dp.traceId || !dp.spanId) {
-                  droppedCount++;
-                  continue;
-                }
+                // OTLP metric data points have no trace context unless
+                // emitted inside an active span. Most exporters (incl.
+                // Claude Code with OTEL_METRICS_EXPORTER=otlp) emit
+                // standalone metrics. Dropping on missing IDs eats
+                // legitimate telemetry silently — see the matching note
+                // in LogRequestCollectionService.
+                const traceId = dp.traceId ?? "";
+                const spanId = dp.spanId ?? "";
 
                 try {
                   await this.deps.recordMetric({
                     tenantId,
-                    traceId: dp.traceId,
-                    spanId: dp.spanId,
+                    traceId,
+                    spanId,
                     metricName,
                     metricUnit,
                     metricType: dp.metricType,
@@ -101,7 +105,8 @@ export class MetricRequestCollectionService {
                     timeUnixMs: dp.timeUnixMs,
                     attributes: dp.attributes,
                     resourceAttributes: resourceAttrs,
-                    piiRedactionLevel: piiRedactionLevelSchema.parse(piiRedactionLevel),
+                    piiRedactionLevel:
+                      piiRedactionLevelSchema.parse(piiRedactionLevel),
                     occurredAt: Date.now(),
                   });
 
@@ -113,8 +118,8 @@ export class MetricRequestCollectionService {
                       error,
                       tenantId,
                       metricName,
-                      traceId: dp.traceId,
-                      spanId: dp.spanId,
+                      traceId,
+                      spanId,
                     },
                     "Error recording metric data point",
                   );
@@ -130,7 +135,6 @@ export class MetricRequestCollectionService {
       },
     );
   }
-
 }
 
 /**
@@ -163,7 +167,13 @@ function extractDataPoints({
     attributes: Record<string, string>;
   }> = [];
 
-  // Histogram data points with exemplars
+  // Histogram data points. Two paths:
+  //   - When the emitter recorded the histogram inside an active span,
+  //     exemplars carry the trace correlation; emit one trace-correlated
+  //     row per exemplar.
+  //   - Otherwise (the common standalone-exporter case), still keep the
+  //     data point: emit a single trace-less row using the dp's sum or
+  //     count as the value so the histogram bucket isn't silently lost.
   const histogram = metric.histogram as
     | { dataPoints?: Array<Record<string, unknown>> }
     | undefined;
@@ -173,38 +183,70 @@ function extractDataPoints({
       const exemplars = dp?.exemplars as
         | Array<Record<string, unknown>>
         | undefined;
-      if (!exemplars) continue;
 
-      for (const exemplar of exemplars) {
-        if (!exemplar) continue;
-        const traceId = decodeBase64OpenTelemetryId(exemplar.traceId);
-        const spanId = decodeBase64OpenTelemetryId(exemplar.spanId);
-        const value =
-          typeof exemplar.asDouble === "number"
-            ? exemplar.asDouble
-            : typeof exemplar.asInt === "number"
-              ? exemplar.asInt
-              : 0;
-        const timeUnixMs = exemplar.timeUnixNano
-          ? TraceRequestUtils.convertUnixNanoToUnixMs(
-              TraceRequestUtils.normalizeOtlpUnixNano(
-                exemplar.timeUnixNano as
-                  | string
-                  | number
-                  | { low: number; high: number },
-              ),
-            )
-          : Date.now();
+      if (exemplars?.length) {
+        for (const exemplar of exemplars) {
+          if (!exemplar) continue;
+          const traceId = decodeBase64OpenTelemetryId(exemplar.traceId);
+          const spanId = decodeBase64OpenTelemetryId(exemplar.spanId);
+          const value =
+            typeof exemplar.asDouble === "number"
+              ? exemplar.asDouble
+              : typeof exemplar.asInt === "number"
+                ? exemplar.asInt
+                : 0;
+          const timeUnixMs = exemplar.timeUnixNano
+            ? TraceRequestUtils.convertUnixNanoToUnixMs(
+                TraceRequestUtils.normalizeOtlpUnixNano(
+                  exemplar.timeUnixNano as
+                    | string
+                    | number
+                    | { low: number; high: number },
+                ),
+              )
+            : Date.now();
 
-        results.push({
-          traceId,
-          spanId,
-          metricType: "histogram",
-          value,
-          timeUnixMs,
-          attributes: dpAttrs,
-        });
+          results.push({
+            traceId,
+            spanId,
+            metricType: "histogram",
+            value,
+            timeUnixMs,
+            attributes: dpAttrs,
+          });
+        }
+        continue;
       }
+
+      // Exemplar-less histogram. Prefer sum for a meaningful scalar;
+      // fall back to count when only the count is present.
+      const sumVal =
+        typeof dp?.sum === "number"
+          ? (dp.sum as number)
+          : typeof dp?.count === "number"
+            ? (dp.count as number)
+            : typeof dp?.count === "string"
+              ? Number(dp.count)
+              : 0;
+      const timeUnixMs = dp?.timeUnixNano
+        ? TraceRequestUtils.convertUnixNanoToUnixMs(
+            TraceRequestUtils.normalizeOtlpUnixNano(
+              dp.timeUnixNano as
+                | string
+                | number
+                | { low: number; high: number },
+            ),
+          )
+        : Date.now();
+
+      results.push({
+        traceId: null,
+        spanId: null,
+        metricType: "histogram",
+        value: Number.isFinite(sumVal) ? sumVal : 0,
+        timeUnixMs,
+        attributes: dpAttrs,
+      });
     }
   }
 
@@ -255,44 +297,51 @@ function extractSimpleDataPoint({
 } | null {
   if (!dp) return null;
 
-  // Simple data points may have exemplars with traceId/spanId
-  const exemplars = dp.exemplars as
-    | Array<Record<string, unknown>>
-    | undefined;
+  // Trace context on a metric data point comes from exemplars when the
+  // emitter recorded the metric inside an active span. Most standalone
+  // metric exporters (incl. Claude Code's OTEL_METRICS_EXPORTER) emit
+  // gauges/sums with no exemplars. Returning null in that case eats the
+  // data point entirely; the value, timestamp and attributes are still
+  // meaningful telemetry without a correlated span.
+  const exemplars = dp.exemplars as Array<Record<string, unknown>> | undefined;
+  let traceId: string | null = null;
+  let spanId: string | null = null;
   if (exemplars?.length) {
     for (const exemplar of exemplars) {
       if (!exemplar) continue;
-      const traceId = decodeBase64OpenTelemetryId(exemplar.traceId);
-      const spanId = decodeBase64OpenTelemetryId(exemplar.spanId);
-      if (traceId && spanId) {
-        const value =
-          typeof dp.asDouble === "number"
-            ? dp.asDouble
-            : typeof dp.asInt === "number"
-              ? dp.asInt
-              : 0;
-        const timeUnixMs = dp.timeUnixNano
-          ? TraceRequestUtils.convertUnixNanoToUnixMs(
-              TraceRequestUtils.normalizeOtlpUnixNano(
-                dp.timeUnixNano as
-                  | string
-                  | number
-                  | { low: number; high: number },
-              ),
-            )
-          : Date.now();
-
-        return {
-          traceId,
-          spanId,
-          metricType,
-          value,
-          timeUnixMs,
-          attributes: normalizeOtlpAttributeMap(dp.attributes),
-        };
+      const exTrace = decodeBase64OpenTelemetryId(exemplar.traceId);
+      const exSpan = decodeBase64OpenTelemetryId(exemplar.spanId);
+      if (exTrace && exSpan) {
+        traceId = exTrace;
+        spanId = exSpan;
+        break;
       }
     }
   }
 
-  return null;
+  const value =
+    typeof dp.asDouble === "number"
+      ? dp.asDouble
+      : typeof dp.asInt === "number"
+        ? dp.asInt
+        : 0;
+  const timeUnixMs = dp.timeUnixNano
+    ? TraceRequestUtils.convertUnixNanoToUnixMs(
+        TraceRequestUtils.normalizeOtlpUnixNano(
+          dp.timeUnixNano as
+            | string
+            | number
+            | { low: number; high: number },
+        ),
+      )
+    : Date.now();
+
+  return {
+    traceId,
+    spanId,
+    metricType,
+    value,
+    timeUnixMs,
+    attributes: normalizeOtlpAttributeMap(dp.attributes),
+  };
 }

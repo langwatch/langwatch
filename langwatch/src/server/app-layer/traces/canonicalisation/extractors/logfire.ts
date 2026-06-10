@@ -36,11 +36,13 @@ export class LogfireExtractor implements CanonicalAttributesExtractor {
     // Input Messages (from raw_input)
     // raw_input often contains chat messages (typically JSON string)
     // ─────────────────────────────────────────────────────────────────────────
-    if (extractInputMessages(
-      ctx,
-      [{ type: "attr", keys: [ATTR_KEYS.RAW_INPUT] }],
-      `${this.id}:raw_input->gen_ai.input.messages`,
-    )) {
+    if (
+      extractInputMessages(
+        ctx,
+        [{ type: "attr", keys: [ATTR_KEYS.RAW_INPUT] }],
+        `${this.id}:raw_input->gen_ai.input.messages`,
+      )
+    ) {
       recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
     }
 
@@ -48,26 +50,28 @@ export class LogfireExtractor implements CanonicalAttributesExtractor {
     // Output Messages (from gen_ai.choice events)
     // Logfire uses gen_ai.choice events with message/content/text attributes
     // ─────────────────────────────────────────────────────────────────────────
-    if (extractOutputMessages(
-      ctx,
-      [
-        {
-          type: "event",
-          name: "gen_ai.choice",
-          extractor: (event: NormalizedEvent) => {
-            const eventAttrs = event.attributes as Record<string, unknown>;
-            const message =
-              eventAttrs.message ?? eventAttrs.content ?? eventAttrs.text;
+    if (
+      extractOutputMessages(
+        ctx,
+        [
+          {
+            type: "event",
+            name: "gen_ai.choice",
+            extractor: (event: NormalizedEvent) => {
+              const eventAttrs = event.attributes as Record<string, unknown>;
+              const message =
+                eventAttrs.message ?? eventAttrs.content ?? eventAttrs.text;
 
-            if (message !== undefined) {
-              return { role: "assistant", content: safeJsonParse(message) };
-            }
-            return undefined;
+              if (message !== undefined) {
+                return { role: "assistant", content: safeJsonParse(message) };
+              }
+              return undefined;
+            },
           },
-        },
-      ],
-      `${this.id}:event(gen_ai.choice)->gen_ai.output.messages`,
-    )) {
+        ],
+        `${this.id}:event(gen_ai.choice)->gen_ai.output.messages`,
+      )
+    ) {
       recordValueType(ctx, ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, "chat_messages");
     }
 

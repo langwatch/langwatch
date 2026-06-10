@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Badge,
   Box,
@@ -17,11 +17,15 @@ import type { GroupInfo } from "~/server/app-layer/ops/types";
 import { toaster } from "~/components/ui/toaster";
 import { ConfirmDialog } from "~/components/ops/shared/ConfirmDialog";
 import { formatTimeAgo } from "~/components/ops/shared/formatters";
+import { VirtualizedTableRows } from "~/components/ops/shared/VirtualizedTableRows";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { api } from "~/utils/api";
 import { isOverdue, matchesStatusFilter } from "./pipelineUtils";
 import { GroupDetailDialog } from "./GroupDetailDialog";
 import type { StatusFilter } from "./types";
+
+const GROUPS_VIEWPORT_HEIGHT = 480;
+const GROUPS_ROW_HEIGHT = 36;
 
 export function GroupsCard({ queueNames }: { queueNames: string[] }) {
   const { hasAccess } = useOpsPermission();
@@ -29,6 +33,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Use the first queue name for the groups query (most setups have a single queue)
   const primaryQueue = queueNames[0];
@@ -70,10 +75,19 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
     return { all: allGroups.length, ok, blocked, stale, active };
   }, [allGroups]);
 
+  // Filter changes shrink the visible row count without re-mounting the
+  // scroll container, so the virtualizer's total height drops while
+  // scrollTop holds its old value — leaving blank space below the rows
+  // until the user scrolls. Snap back to the top on every filter change.
+  useEffect(() => {
+    if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
+  }, [statusFilter, search]);
+
   const isLoading = !!primaryQueue && groupsQuery.isLoading;
 
   const [selectedGroup, setSelectedGroup] = useState<{ queueName: string; groupId: string } | null>(null);
   const [drainTarget, setDrainTarget] = useState<{ queueName: string; groupId: string } | null>(null);
+  const [drainTenantTarget, setDrainTenantTarget] = useState<string | null>(null);
   const drainGroupMutation = api.ops.drainGroup.useMutation({
     onSuccess: (data) => { toaster.create({ title: `Drained, removed ${data.jobsRemoved} jobs`, type: "success" }); setDrainTarget(null); void utils.ops.invalidate(); },
     onError: (error) => { toaster.create({ title: "Failed to drain", description: error.message, type: "error" }); },
@@ -81,6 +95,45 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
   const unblockMutation = api.ops.unblockGroup.useMutation({
     onSuccess: () => { toaster.create({ title: "Group unblocked", type: "success" }); void utils.ops.invalidate(); },
     onError: (error) => { toaster.create({ title: "Failed to unblock", description: error.message, type: "error" }); },
+  });
+
+  // Tenant-scoped controls. Activated when the search box is a single
+  // tenant prefix (no slash) — typically `project_…`. Reuses the same
+  // search input the operator was already typing for filter scope.
+  const tenantScope = useMemo(() => {
+    const s = search.trim();
+    if (!s || s.includes("/") || s.includes(" ")) return null;
+    if (!s.startsWith("project_")) return null;
+    return s;
+  }, [search]);
+
+  const pausedTenantsQuery = api.ops.listPausedTenants.useQuery(
+    { queueName: primaryQueue ?? "" },
+    { enabled: !!primaryQueue, refetchInterval: 10000 },
+  );
+  const isTenantPaused = !!(
+    tenantScope &&
+    pausedTenantsQuery.data?.includes(tenantScope)
+  );
+
+  const pauseTenantMutation = api.ops.pauseTenant.useMutation({
+    onSuccess: (_, vars) => { toaster.create({ title: `Paused tenant ${vars.tenantId}`, type: "success" }); void utils.ops.invalidate(); },
+    onError: (error) => { toaster.create({ title: "Failed to pause tenant", description: error.message, type: "error" }); },
+  });
+  const unpauseTenantMutation = api.ops.unpauseTenant.useMutation({
+    onSuccess: (_, vars) => { toaster.create({ title: `Unpaused tenant ${vars.tenantId}`, type: "success" }); void utils.ops.invalidate(); },
+    onError: (error) => { toaster.create({ title: "Failed to unpause tenant", description: error.message, type: "error" }); },
+  });
+  const drainTenantMutation = api.ops.drainTenant.useMutation({
+    onSuccess: (data, vars) => {
+      toaster.create({
+        title: `Drained ${data.groupsDrained} groups (${data.jobsDrained} jobs) for ${vars.tenantId}`,
+        type: "success",
+      });
+      setDrainTenantTarget(null);
+      void utils.ops.invalidate();
+    },
+    onError: (error) => { toaster.create({ title: "Failed to drain tenant", description: error.message, type: "error" }); setDrainTenantTarget(null); },
   });
 
   const statusButtons: Array<{ value: StatusFilter; label: string; count: number; color: string }> = [
@@ -95,6 +148,28 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
     <>
       <Card.Root>
         <Card.Body padding={0}>
+          {/* Paused-tenants banner: always visible when at least one tenant is paused so
+              operators don't accidentally assume a tenant's silence means it's healthy. */}
+          {hasAccess && pausedTenantsQuery.data && pausedTenantsQuery.data.length > 0 && (
+            <HStack paddingX={4} paddingY={2} borderBottom="1px solid" borderBottomColor="border" bg="yellow.subtle" gap={2} flexWrap="wrap">
+              <Text textStyle="xs" fontWeight="medium">Paused tenants:</Text>
+              {pausedTenantsQuery.data.map((tid) => (
+                <HStack key={tid} gap={1}>
+                  <Badge size="xs" colorPalette="yellow" variant="solid" fontFamily="mono">{tid}</Badge>
+                  <Button
+                    size="2xs"
+                    variant="outline"
+                    colorPalette="green"
+                    onClick={() => primaryQueue && unpauseTenantMutation.mutate({ queueName: primaryQueue, tenantId: tid })}
+                    loading={unpauseTenantMutation.isPending && unpauseTenantMutation.variables?.tenantId === tid}
+                  >
+                    Unpause
+                  </Button>
+                </HStack>
+              ))}
+            </HStack>
+          )}
+
           <HStack paddingX={4} paddingY={2.5} borderBottom="1px solid" borderBottomColor="border" gap={2} flexWrap="wrap">
             <Text textStyle="sm" fontWeight="medium">Groups</Text>
             <Spacer />
@@ -123,6 +198,47 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
             )}
           </HStack>
 
+          {/* Tenant-scoped action bar: visible when the operator searches for an
+              exact tenant id (e.g. project_W_7kPya...). Lets them pause/unpause
+              ALL processing for that tenant or bulk-drain every group. Added
+              post-2026-05-11 incident — clicking 500K Drain buttons by hand
+              was the actual blocker that day. */}
+          {hasAccess && tenantScope && primaryQueue && (
+            <HStack paddingX={4} paddingY={2} borderBottom="1px solid" borderBottomColor="border" gap={2} flexWrap="wrap" bg="bg.subtle">
+              <Text textStyle="xs" fontWeight="medium">Tenant actions:</Text>
+              <Badge size="xs" variant="subtle" fontFamily="mono">{tenantScope}</Badge>
+              {isTenantPaused ? (
+                <Button
+                  size="2xs"
+                  variant="outline"
+                  colorPalette="green"
+                  onClick={() => { pauseTenantMutation.reset(); unpauseTenantMutation.mutate({ queueName: primaryQueue, tenantId: tenantScope }); }}
+                  loading={unpauseTenantMutation.isPending}
+                >
+                  Unpause Tenant
+                </Button>
+              ) : (
+                <Button
+                  size="2xs"
+                  variant="outline"
+                  colorPalette="yellow"
+                  onClick={() => { unpauseTenantMutation.reset(); pauseTenantMutation.mutate({ queueName: primaryQueue, tenantId: tenantScope }); }}
+                  loading={pauseTenantMutation.isPending}
+                >
+                  Pause Tenant
+                </Button>
+              )}
+              <Button
+                size="2xs"
+                variant="outline"
+                colorPalette="red"
+                onClick={() => setDrainTenantTarget(tenantScope)}
+              >
+                Drain All Tenant Groups
+              </Button>
+            </HStack>
+          )}
+
           {isLoading ? (
             <Center paddingY={6}><Spinner size="sm" /></Center>
           ) : allGroups.length === 0 ? (
@@ -134,88 +250,96 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
               <Text textStyle="xs" color="fg.muted">No groups match current filters.</Text>
             </Box>
           ) : (
-            <>
-              <Table.ScrollArea>
-                <Table.Root size="sm" variant="line" css={{ "& tr:last-child td": { borderBottom: "none" } }}>
-                  <Table.Header>
-                    <Table.Row>
-                      <Table.ColumnHeader>Group ID</Table.ColumnHeader>
-                      <Table.ColumnHeader width="140px">Pipeline</Table.ColumnHeader>
-                      <Table.ColumnHeader textAlign="end" width="50px">Pend.</Table.ColumnHeader>
-                      <Table.ColumnHeader textAlign="end" width="45px">Retry</Table.ColumnHeader>
-                      <Table.ColumnHeader width="75px">Oldest</Table.ColumnHeader>
-                      <Table.ColumnHeader width="65px">Status</Table.ColumnHeader>
-                      {hasAccess && <Table.ColumnHeader width="100px">Actions</Table.ColumnHeader>}
-                    </Table.Row>
-                  </Table.Header>
-                  <Table.Body>
-                    {filteredGroups.slice(0, 100).map((group) => {
+            <Box
+              ref={scrollContainerRef}
+              maxHeight={`${GROUPS_VIEWPORT_HEIGHT}px`}
+              overflowY="auto"
+            >
+              <Table.Root size="sm" variant="line" css={{ "& tr:last-child td": { borderBottom: "none" } }}>
+                <Table.Header position="sticky" top={0} zIndex={1} bg="bg">
+                  <Table.Row>
+                    <Table.ColumnHeader>Group ID</Table.ColumnHeader>
+                    <Table.ColumnHeader width="140px">Pipeline</Table.ColumnHeader>
+                    <Table.ColumnHeader textAlign="end" width="50px">Pend.</Table.ColumnHeader>
+                    <Table.ColumnHeader textAlign="end" width="45px">Retry</Table.ColumnHeader>
+                    <Table.ColumnHeader width="75px">Oldest</Table.ColumnHeader>
+                    <Table.ColumnHeader width="65px">Status</Table.ColumnHeader>
+                    {hasAccess && <Table.ColumnHeader width="100px">Actions</Table.ColumnHeader>}
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  <VirtualizedTableRows
+                    count={filteredGroups.length}
+                    rowHeight={GROUPS_ROW_HEIGHT}
+                    columnCount={hasAccess ? 7 : 6}
+                    scrollContainerRef={scrollContainerRef}
+                    getItemKey={(i) => {
+                      const g = filteredGroups[i]!;
+                      return `${g.queueName}:${g.groupId}`;
+                    }}
+                    renderRow={(i) => {
+                      const group = filteredGroups[i]!;
                       const overdue = !group.isBlocked && isOverdue(group.oldestJobMs);
                       return (
-                      <Table.Row
-                        key={`${group.queueName}:${group.groupId}`}
-                        cursor="pointer"
-                        _hover={{ bg: "bg.subtle" }}
-                        onClick={() => setSelectedGroup({ queueName: group.queueName, groupId: group.groupId })}
-                      >
-                        <Table.Cell>
-                          <Text textStyle="xs" fontFamily="mono" truncate title={group.groupId}>{group.groupId}</Text>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Text textStyle="xs" color="fg.muted" truncate>{group.pipelineName ?? "\u2014"}</Text>
-                        </Table.Cell>
-                        <Table.Cell textAlign="end">
-                          <Text textStyle="xs" fontFamily="mono">{group.pendingJobs}</Text>
-                        </Table.Cell>
-                        <Table.Cell textAlign="end">
-                          {(group.retryCount ?? 0) > 0 ? (
-                            <Text textStyle="xs" fontFamily="mono" color="orange.500">{group.retryCount}</Text>
-                          ) : (
-                            <Text textStyle="xs" fontFamily="mono" color="fg.muted">{"\u2014"}</Text>
-                          )}
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Text textStyle="xs" color={overdue ? "orange.500" : "fg.muted"} fontWeight={overdue ? "medium" : undefined}>
-                            {formatTimeAgo(group.oldestJobMs)}{overdue ? " ⚠" : ""}
-                          </Text>
-                        </Table.Cell>
-                        <Table.Cell>
-                          {group.isStaleBlock ? (
-                            <Badge size="xs" colorPalette="orange" variant="subtle">Stale</Badge>
-                          ) : group.isBlocked ? (
-                            <Badge size="xs" colorPalette="red" variant="subtle">Blocked</Badge>
-                          ) : group.hasActiveJob ? (
-                            <Badge size="xs" colorPalette="green" variant="subtle">Active</Badge>
-                          ) : (
-                            <Badge size="xs" colorPalette="gray" variant="subtle">OK</Badge>
-                          )}
-                        </Table.Cell>
-                        {hasAccess && (
-                          <Table.Cell onClick={(e) => e.stopPropagation()}>
-                            <HStack gap={1}>
-                              {group.isBlocked && (
-                                <Button variant="outline" size="2xs" colorPalette="green" onClick={() => unblockMutation.mutate({ queueName: group.queueName, groupId: group.groupId })} loading={unblockMutation.isPending}>
-                                  Retry
-                                </Button>
-                              )}
-                              <Button variant="outline" size="2xs" colorPalette="red" onClick={() => setDrainTarget({ queueName: group.queueName, groupId: group.groupId })}>
-                                Drain
-                              </Button>
-                            </HStack>
+                        <Table.Row
+                          key={`${group.queueName}:${group.groupId}`}
+                          cursor="pointer"
+                          _hover={{ bg: "bg.subtle" }}
+                          onClick={() => setSelectedGroup({ queueName: group.queueName, groupId: group.groupId })}
+                        >
+                          <Table.Cell>
+                            <Text textStyle="xs" fontFamily="mono" truncate title={group.groupId}>{group.groupId}</Text>
                           </Table.Cell>
-                        )}
-                      </Table.Row>
+                          <Table.Cell>
+                            <Text textStyle="xs" color="fg.muted" truncate>{group.pipelineName ?? "—"}</Text>
+                          </Table.Cell>
+                          <Table.Cell textAlign="end">
+                            <Text textStyle="xs" fontFamily="mono">{group.pendingJobs}</Text>
+                          </Table.Cell>
+                          <Table.Cell textAlign="end">
+                            {(group.retryCount ?? 0) > 0 ? (
+                              <Text textStyle="xs" fontFamily="mono" color="orange.500">{group.retryCount}</Text>
+                            ) : (
+                              <Text textStyle="xs" fontFamily="mono" color="fg.muted">{"—"}</Text>
+                            )}
+                          </Table.Cell>
+                          <Table.Cell>
+                            <Text textStyle="xs" color={overdue ? "orange.500" : "fg.muted"} fontWeight={overdue ? "medium" : undefined}>
+                              {formatTimeAgo(group.oldestJobMs)}{overdue ? " ⚠" : ""}
+                            </Text>
+                          </Table.Cell>
+                          <Table.Cell>
+                            {group.isStaleBlock ? (
+                              <Badge size="xs" colorPalette="orange" variant="subtle">Stale</Badge>
+                            ) : group.isBlocked ? (
+                              <Badge size="xs" colorPalette="red" variant="subtle">Blocked</Badge>
+                            ) : group.hasActiveJob ? (
+                              <Badge size="xs" colorPalette="green" variant="subtle">Active</Badge>
+                            ) : (
+                              <Badge size="xs" colorPalette="gray" variant="subtle">OK</Badge>
+                            )}
+                          </Table.Cell>
+                          {hasAccess && (
+                            <Table.Cell onClick={(e) => e.stopPropagation()}>
+                              <HStack gap={1}>
+                                {group.isBlocked && (
+                                  <Button variant="outline" size="2xs" colorPalette="green" onClick={() => unblockMutation.mutate({ queueName: group.queueName, groupId: group.groupId })} loading={unblockMutation.isPending}>
+                                    Retry
+                                  </Button>
+                                )}
+                                <Button variant="outline" size="2xs" colorPalette="red" onClick={() => setDrainTarget({ queueName: group.queueName, groupId: group.groupId })}>
+                                  Drain
+                                </Button>
+                              </HStack>
+                            </Table.Cell>
+                          )}
+                        </Table.Row>
                       );
-                    })}
-                  </Table.Body>
-                </Table.Root>
-              </Table.ScrollArea>
-              {filteredGroups.length > 100 && (
-                <Box padding={3} borderTop="1px solid" borderTopColor="border">
-                  <Text textStyle="xs" color="fg.muted" textAlign="center">Showing 100 of {filteredGroups.length}</Text>
-                </Box>
-              )}
-            </>
+                    }}
+                  />
+                </Table.Body>
+              </Table.Root>
+            </Box>
           )}
         </Card.Body>
       </Card.Root>
@@ -229,6 +353,19 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
         title="Drain Group"
         description={`Permanently remove all jobs from "${drainTarget?.groupId}". Cannot be undone.`}
         isLoading={drainGroupMutation.isPending}
+      />
+
+      <ConfirmDialog
+        open={!!drainTenantTarget}
+        onClose={() => setDrainTenantTarget(null)}
+        onConfirm={() => {
+          if (drainTenantTarget && primaryQueue) {
+            drainTenantMutation.mutate({ queueName: primaryQueue, tenantId: drainTenantTarget });
+          }
+        }}
+        title="Drain All Tenant Groups"
+        description={`Permanently remove ALL pending groups for tenant "${drainTenantTarget}" across every pipeline. Cannot be undone. The event log in ClickHouse is preserved; you can replay later if needed.`}
+        isLoading={drainTenantMutation.isPending}
       />
     </>
   );

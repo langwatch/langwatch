@@ -9,6 +9,7 @@ import {
   type PlanProvider,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { DatasetService } from "~/server/datasets/dataset.service";
 import type { DatasetColumns } from "~/server/datasets/types";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
@@ -22,7 +23,7 @@ describe("Feature: Dataset File Upload REST API", () => {
   let mockGetActivePlan: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
-    resetApp();
+    await resetApp();
     mockGetActivePlan = vi.fn().mockResolvedValue(FREE_PLAN);
     globalForApp.__langwatch_app = createTestApp({
       planProvider: PlanProviderService.create({
@@ -49,11 +50,11 @@ describe("Feature: Dataset File Upload REST API", () => {
       },
     });
 
-    testProject = projectFactory.build({ slug: nanoid() });
     testProject = await prisma.project.create({
       data: {
-        ...testProject,
+        ...projectFactory.build({ slug: nanoid() }),
         teamId: testTeam.id,
+        personalFeatures: {},
       },
     });
 
@@ -79,7 +80,7 @@ describe("Feature: Dataset File Upload REST API", () => {
     await prisma.organization.delete({
       where: { id: testOrganization.id },
     });
-    resetApp();
+    await resetApp();
   });
 
   // Helper: create a dataset directly via Prisma
@@ -157,6 +158,7 @@ describe("Feature: Dataset File Upload REST API", () => {
         });
       });
 
+      /** @scenario "Upload a CSV file to an existing dataset" */
       it("creates records and returns 200", async () => {
         const csv = "input,output\nhello,Hi there!\ngoodbye,See you later!";
         const form = buildFormData({
@@ -198,6 +200,7 @@ describe("Feature: Dataset File Upload REST API", () => {
         });
       });
 
+      /** @scenario "Upload a JSONL file to an existing dataset" */
       it("creates records and returns 200", async () => {
         const jsonl =
           '{"message": "started", "level": "info"}\n{"message": "crashed", "level": "error"}';
@@ -224,6 +227,7 @@ describe("Feature: Dataset File Upload REST API", () => {
         });
       });
 
+      /** @scenario "Upload a JSON array file to an existing dataset" */
       it("creates records and returns 200", async () => {
         const json =
           '[{"name": "Widget", "price": "9.99"}, {"name": "Gadget", "price": "19.99"}, {"name": "Doohickey", "price": "4.50"}]';
@@ -251,6 +255,7 @@ describe("Feature: Dataset File Upload REST API", () => {
         });
       });
 
+      /** @scenario "Upload converts values to match column types" */
       it("coerces string values to numbers, booleans, and dates", async () => {
         const csv = "count,active,created\n42,true,2024-01-15";
         const form = buildFormData({
@@ -286,6 +291,7 @@ describe("Feature: Dataset File Upload REST API", () => {
         });
       });
 
+      /** @scenario "Upload to dataset referenced by ID" */
       it("adds records to the dataset", async () => {
         const csv = "input,output\nhello,world";
         const form = buildFormData({
@@ -308,6 +314,7 @@ describe("Feature: Dataset File Upload REST API", () => {
         });
       });
 
+      /** @scenario "Upload fails when file columns do not match dataset columns" */
       it("returns 400 Bad Request", async () => {
         const csv = "question,answer\nWhat?,42";
         const form = buildFormData({
@@ -322,6 +329,7 @@ describe("Feature: Dataset File Upload REST API", () => {
     });
 
     describe("when uploading to a non-existent dataset", () => {
+      /** @scenario "Upload to a non-existent dataset returns 404" */
       it("returns 404 Not Found", async () => {
         const csv = "input,output\nhello,world";
         const form = buildFormData({
@@ -338,6 +346,7 @@ describe("Feature: Dataset File Upload REST API", () => {
         await createDataset({ name: "Empty", slug: "empty" });
       });
 
+      /** @scenario "Upload without a file field returns 422" */
       it("returns 422 Unprocessable Entity", async () => {
         const form = new FormData();
         const res = await uploadToExisting("empty", form);
@@ -358,6 +367,7 @@ describe("Feature: Dataset File Upload REST API", () => {
         });
       });
 
+      /** @scenario "Upload an empty file returns 422" */
       it("returns 422 Unprocessable Entity", async () => {
         const csv = "input,output\n";
         const form = buildFormData({
@@ -380,6 +390,7 @@ describe("Feature: Dataset File Upload REST API", () => {
         });
       });
 
+      /** @scenario "Upload exceeding row limit is rejected" */
       it("returns 400 Bad Request", async () => {
         const header = "value";
         const rows = Array.from({ length: 10_001 }, (_, i) => `row${i}`);
@@ -404,6 +415,7 @@ describe("Feature: Dataset File Upload REST API", () => {
         });
       });
 
+      /** @scenario "Upload exceeding file size limit is rejected" */
       it("returns 400 Bad Request", async () => {
         // Create content larger than 25MB
         const bigContent = "value\n" + "x".repeat(26 * 1024 * 1024);
@@ -423,6 +435,7 @@ describe("Feature: Dataset File Upload REST API", () => {
         await createDataset({ name: "Any", slug: "any" });
       });
 
+      /** @scenario "Upload with unsupported file format is rejected" */
       it("returns 422 Unprocessable Entity", async () => {
         const form = buildFormData({
           file: { content: "some binary data", filename: "data.xlsx" },
@@ -440,6 +453,7 @@ describe("Feature: Dataset File Upload REST API", () => {
 
   describe("POST /api/dataset/upload", () => {
     describe("when creating a new dataset from a CSV file", () => {
+      /** @scenario "Create a new dataset from an uploaded CSV file" */
       it("creates the dataset with inferred columns and returns 201", async () => {
         const csv = "question,answer\nWhat is 2+2?,4\nCapital of UK?,London";
         const form = buildFormData({
@@ -461,6 +475,7 @@ describe("Feature: Dataset File Upload REST API", () => {
     });
 
     describe("when creating a new dataset from a JSONL file", () => {
+      /** @scenario "Create a new dataset from a JSONL file" */
       it("creates the dataset with inferred columns", async () => {
         const jsonl =
           '{"message": "started", "level": "info"}\n{"message": "crashed", "level": "error"}';
@@ -481,6 +496,7 @@ describe("Feature: Dataset File Upload REST API", () => {
     });
 
     describe("when creating infers column types as string by default", () => {
+      /** @scenario "Create + upload infers column types as string by default" */
       it("creates all columns with type 'string'", async () => {
         const csv = "age,active,notes\n25,true,hello";
         const form = buildFormData({
@@ -500,6 +516,7 @@ describe("Feature: Dataset File Upload REST API", () => {
     });
 
     describe("when creating renames reserved column names", () => {
+      /** @scenario "Create + upload renames reserved column names" */
       it("renames 'id' to 'id_' and 'selected' to 'selected_'", async () => {
         const csv = "id,input,selected\n1,hello,true";
         const form = buildFormData({
@@ -531,6 +548,7 @@ describe("Feature: Dataset File Upload REST API", () => {
     });
 
     describe("when name field is missing", () => {
+      /** @scenario "Create + upload requires a name field" */
       it("returns 422 Unprocessable Entity", async () => {
         const csv = "col1,col2\na,b";
         const form = buildFormData({
@@ -543,6 +561,7 @@ describe("Feature: Dataset File Upload REST API", () => {
     });
 
     describe("when file field is missing", () => {
+      /** @scenario "Create + upload requires a file field" */
       it("returns 422 Unprocessable Entity", async () => {
         const form = new FormData();
         form.append("name", "No File");
@@ -562,6 +581,7 @@ describe("Feature: Dataset File Upload REST API", () => {
         });
       });
 
+      /** @scenario "Create + upload enforces dataset plan limits" */
       it("returns 403 Forbidden", async () => {
         const csv = "input\nhello";
         const form = buildFormData({
@@ -581,6 +601,7 @@ describe("Feature: Dataset File Upload REST API", () => {
         await createDataset({ name: "Duplicate", slug: "duplicate" });
       });
 
+      /** @scenario "Create + upload fails when slug conflicts with existing dataset" */
       it("returns 409 Conflict", async () => {
         const csv = "input\nhello";
         const form = buildFormData({
@@ -594,6 +615,7 @@ describe("Feature: Dataset File Upload REST API", () => {
     });
 
     describe("when file exceeds row limit", () => {
+      /** @scenario "Create + upload rejects file exceeding row limit" */
       it("returns 400 Bad Request", async () => {
         const header = "value";
         const rows = Array.from({ length: 10_001 }, (_, i) => `row${i}`);
@@ -615,6 +637,7 @@ describe("Feature: Dataset File Upload REST API", () => {
 
   describe("Authentication", () => {
     describe("when uploading without X-Auth-Token header", () => {
+      /** @scenario "Upload without API key returns 401" */
       it("returns 401 for create+upload", async () => {
         const form = buildFormData({
           file: { content: "input\nhello", filename: "data.csv" },
@@ -627,6 +650,7 @@ describe("Feature: Dataset File Upload REST API", () => {
         expect(res.status).toBe(401);
       });
 
+      /** @scenario "Upload to existing without API key returns 401" */
       it("returns 401 for upload to existing", async () => {
         const form = buildFormData({
           file: { content: "input\nhello", filename: "data.csv" },
@@ -637,6 +661,230 @@ describe("Feature: Dataset File Upload REST API", () => {
         });
         expect(res.status).toBe(401);
       });
+    });
+  });
+
+  // ── Postgres null-byte safety + atomicity ──────────────────────
+  // Customer report: JSONL upload produced a Postgres 22P05 error
+  // ("\u0000 cannot be converted to text"), the dataset row was created
+  // anyway, and retrying with the same name failed with "already exists".
+  // We must (a) sanitise null bytes from user-supplied strings and
+  // (b) roll back the dataset row when record insertion fails.
+  describe("when uploaded payload contains a U+0000 null byte", () => {
+    describe("via JSONL create+upload", () => {
+      /** @scenario Create + upload accepts a JSONL file containing a null byte in a string field */
+      it("strips the null byte and persists all records", async () => {
+        const NUL = String.fromCharCode(0);
+        const jsonl =
+          `{"input": "before${NUL}after"}\n` +
+          `{"input": "clean"}\n`;
+        const form = buildFormData({
+          file: { content: jsonl, filename: "data.jsonl" },
+          name: "Nulls JSONL",
+        });
+        const res = await createAndUpload(form);
+
+        expect(res.status).toBe(201);
+
+        const dataset = await prisma.dataset.findFirst({
+          where: { slug: "nulls-jsonl", projectId: testProjectId },
+        });
+        expect(dataset).not.toBeNull();
+
+        const records = await prisma.datasetRecord.findMany({
+          where: { datasetId: dataset!.id, projectId: testProjectId },
+          orderBy: { id: "asc" },
+        });
+        expect(records).toHaveLength(2);
+
+        const entries = records.map((r) => r.entry as Record<string, string>);
+        const inputs = entries.map((e) => e.input).sort();
+        expect(inputs).toContain("beforeafter");
+        expect(inputs).toContain("clean");
+        // Sanity: stored values must not contain a null byte.
+        for (const entry of entries) {
+          expect(entry.input).not.toContain(NUL);
+        }
+      });
+    });
+
+    describe("via CSV upload to existing dataset", () => {
+      beforeEach(async () => {
+        await createDataset({
+          name: "Feedback",
+          slug: "feedback",
+          columnTypes: [{ name: "input", type: "string" }],
+        });
+      });
+
+      /** @scenario Upload to existing dataset accepts a CSV containing null bytes */
+      it("strips the null byte and persists the new record", async () => {
+        const NUL = String.fromCharCode(0);
+        // CSV with a quoted value containing a null byte.
+        const csv = `input\n"hello${NUL}world"\n`;
+        const form = buildFormData({
+          file: { content: csv, filename: "rows.csv" },
+        });
+        const res = await uploadToExisting("feedback", form);
+
+        expect(res.status).toBe(200);
+
+        const dataset = await prisma.dataset.findFirst({
+          where: { slug: "feedback", projectId: testProjectId },
+        });
+        const records = await prisma.datasetRecord.findMany({
+          where: { datasetId: dataset!.id, projectId: testProjectId },
+        });
+        expect(records).toHaveLength(1);
+        const entry = records[0]!.entry as Record<string, string>;
+        expect(entry.input).toBe("helloworld");
+      });
+    });
+  });
+
+  describe("when REST batch-create records carry a U+0000 null byte", () => {
+    beforeEach(async () => {
+      await createDataset({
+        name: "Batched",
+        slug: "batched",
+        columnTypes: [{ name: "input", type: "string" }],
+      });
+    });
+
+    /** @scenario Batch create records via REST sanitises null bytes */
+    it("strips the null byte and persists the new record", async () => {
+      const NUL = String.fromCharCode(0);
+      const res = await app.request("/api/dataset/batched/records", {
+        method: "POST",
+        headers: {
+          "X-Auth-Token": testApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          entries: [{ input: `hello${NUL}world` }],
+        }),
+      });
+
+      expect(res.status).toBe(201);
+
+      const dataset = await prisma.dataset.findFirst({
+        where: { slug: "batched", projectId: testProjectId },
+      });
+      const records = await prisma.datasetRecord.findMany({
+        where: { datasetId: dataset!.id, projectId: testProjectId },
+      });
+      expect(records).toHaveLength(1);
+      const entry = records[0]!.entry as Record<string, string>;
+      expect(entry.input).toBe("helloworld");
+    });
+  });
+
+  describe("when REST single-record update carries a U+0000 null byte", () => {
+    let datasetId: string;
+    let recordId: string;
+    beforeEach(async () => {
+      const dataset = await createDataset({
+        name: "Editable",
+        slug: "editable",
+        columnTypes: [{ name: "input", type: "string" }],
+      });
+      datasetId = dataset.id;
+      recordId = `rec-${nanoid()}`;
+      await prisma.datasetRecord.create({
+        data: {
+          id: recordId,
+          datasetId,
+          projectId: testProjectId,
+          entry: { input: "old" } as any,
+        },
+      });
+    });
+
+    /** @scenario Update record via REST sanitises null bytes */
+    it("strips the null byte from the updated entry", async () => {
+      const NUL = String.fromCharCode(0);
+      const res = await app.request(
+        `/api/dataset/editable/records/${recordId}`,
+        {
+          method: "PATCH",
+          headers: {
+            "X-Auth-Token": testApiKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ entry: { input: `new${NUL}value` } }),
+        },
+      );
+
+      expect(res.status).toBe(200);
+
+      const updated = await prisma.datasetRecord.findFirst({
+        where: { id: recordId, datasetId, projectId: testProjectId },
+      });
+      const entry = updated!.entry as Record<string, string>;
+      expect(entry.input).toBe("newvalue");
+    });
+  });
+
+  describe("when record insertion fails after the dataset row is created", () => {
+    /** @scenario Create + upload rolls back the dataset row when record insertion fails */
+    /** @scenario Retrying after a failed create + upload reuses the same name */
+    it("rolls back the dataset row so retries with the same name succeed", async () => {
+      // We supply a record id guaranteed to collide with a pre-existing
+      // record, so datasetRecord.createMany inside the transaction throws
+      // a Postgres unique-constraint error after the dataset row has
+      // already been INSERTed within the same transaction. The fix wraps
+      // both writes in $transaction so the dataset row rolls back.
+
+      // Pre-create a sibling dataset + a record whose id we will collide on.
+      const sibling = await prisma.dataset.create({
+        data: {
+          id: `dataset_${nanoid()}`,
+          name: "Sibling",
+          slug: `sibling-${nanoid()}`,
+          projectId: testProjectId,
+          columnTypes: [{ name: "input", type: "string" }],
+        },
+      });
+      const collidingId = `record-collide-${nanoid()}`;
+      await prisma.datasetRecord.create({
+        data: {
+          id: collidingId,
+          datasetId: sibling.id,
+          projectId: testProjectId,
+          entry: { input: "existing" } as any,
+        },
+      });
+
+      const service = DatasetService.create(prisma);
+
+      await expect(
+        service.upsertDataset({
+          projectId: testProjectId,
+          name: "Atomic Test",
+          columnTypes: [{ name: "input", type: "string" }],
+          datasetRecords: [
+            { id: collidingId, input: "would crash on insert" },
+          ],
+        }),
+      ).rejects.toThrow();
+
+      // The dataset row for "Atomic Test" must NOT exist — the failure
+      // inside the transaction should have rolled it back.
+      const orphan = await prisma.dataset.findFirst({
+        where: { slug: "atomic-test", projectId: testProjectId },
+      });
+      expect(orphan).toBeNull();
+
+      // And the next attempt with the same name (after the user fixes
+      // their data) must succeed — proving the customer's "already exists"
+      // wedge is gone.
+      const followUp = await service.upsertDataset({
+        projectId: testProjectId,
+        name: "Atomic Test",
+        columnTypes: [{ name: "input", type: "string" }],
+        datasetRecords: [{ input: "now valid" }],
+      });
+      expect(followUp.slug).toBe("atomic-test");
     });
   });
 });

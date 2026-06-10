@@ -5,6 +5,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
+import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { generateScenarioWithAI } from "./services/scenarioGeneration";
 import type { ScenarioFormData, ScenarioInitialData } from "./ScenarioForm";
@@ -65,10 +66,16 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
     projectId: project?.id,
   });
 
+  // Cascade-resolved model for scenario generation.
+  const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
+    { projectId: project?.id ?? "", featureKey: "scenarios.generator" },
+    { enabled: !!project?.id },
+  );
+
   const defaultModelState = getDefaultModelState({
     hasEnabledProviders,
     providers,
-    defaultModel: project?.defaultModel,
+    defaultModel: resolvedDefault.data?.model,
   });
 
   const openEditorWithData = useCallback(

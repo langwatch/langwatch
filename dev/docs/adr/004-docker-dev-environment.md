@@ -121,3 +121,53 @@ We considered switching node_modules to bind mounts for automatic per-worktree i
 - Collapses the host/container node_modules separation (Linux ELF binaries would appear on host, breaking IDE tooling)
 
 Instead, we use per-worktree named volumes via `VOLUME_PREFIX`, which gives the same isolation without these downsides.
+
+## Amendment: Stateful volumes + intent-based modes (2026-05, #3860)
+
+### Context
+
+The 2026-03 worktree-isolation amendment treated **every** volume as per-worktree, and the compose profile names (`dev`, `nlp`, `scenarios`, `full`) named *which services exist*, not *what the developer is doing*. Two side effects:
+
+1. Sign-up state didn't persist across worktrees. Sign up `browser-test@langwatch.ai` in worktree A; switch to worktree B; the account is gone.
+2. Profiles conflated "what services exist" with "what URLs the app should use". The `x-common-env` anchor hard-set `DATABASE_URL` / `REDIS_URL` / etc. to local Docker network names regardless of profile, so a contributor's `.env` URLs never won — even when their intent was "I'm doing UI work, just leave my .env alone."
+
+### Decision
+
+**The contributor's `langwatch/.env` is the source of truth.** A new `langwatch/.env.dev-up` overlay is loaded as `env_file` AFTER `.env` and contains only the URLs whose services are starting locally for the chosen mode. `x-common-env` no longer sets infrastructure URLs.
+
+**`make quickstart` is the single entry point** with five intent-based modes:
+
+| Mode | Compose services | URLs overridden in `.env.dev-up` |
+|---|---|---|
+| `frontend-only` | (none) | (none — pure `.env`) |
+| `backend-shared` | postgres + redis + clickhouse + app + init | `DATABASE_URL`, `REDIS_URL`, `CLICKHOUSE_URL` |
+| `migration` | postgres + clickhouse on host ports (5432, 8123) | `DATABASE_URL` and `CLICKHOUSE_URL` (localhost forms) |
+| `nlp` | + langwatch_nlp + langevals | + `LANGWATCH_NLP_SERVICE`, `LANGEVALS_ENDPOINT` |
+| `full-local` | `--profile full` (workers, scenarios, bullboard, ai-server) | all five infrastructure URLs |
+
+Migration mode uses `compose.dev.migration.yml` to expose host ports so the contributor can run `pnpm prisma migrate dev` and `pnpm clickhouse:migrate` from their host shell.
+
+`make quickstart` accepts a positional mode arg (`make quickstart frontend-only`) for non-interactive runs. `make quickstart-help` (or `./scripts/dev.sh help`) prints the mode reference.
+
+**Stateful services share volumes across worktrees.** `db-data`, `clickhouse-data`, and `redis-data` use stable names (`langwatch-db-data`, `langwatch-clickhouse-data`, `langwatch-redis-data`) — they no longer interpolate `VOLUME_PREFIX`. Sign up once, persist forever.
+
+Trade-off: only one worktree can have the same stateful container `up` at a time (postgres locks `/var/lib/postgresql/data`). `scripts/dev.sh` detects this (`check_stateful_collision`) and fails fast with a clear message pointing at the other compose project.
+
+**Redis is a singleton with a fixed host port.** `redis:alpine` exposes `:6379` on the host and uses the shared `langwatch-redis-data` volume. Parallel worktrees reuse the same redis instance.
+
+**Per-worktree volumes still apply to:** `app_modules`, `bullboard_modules`, `goose_bin`. These hold Linux-platform dependencies that vary by branch lockfile and must stay isolated.
+
+**Deprecated targets** (`make dev`, `dev-nlp`, `dev-scenarios`, `dev-test`, `dev-full`, and `dev-up` / `dev-down` / `dev-logs`) print a deprecation warning and forward to the corresponding `quickstart` mode for one release before being removed.
+
+**Fail-fast SSRF guard.** `scripts/dev.sh` errors if `langwatch/.env` has `IS_SAAS=true` with `BLOCK_LOCAL_HTTP_CALLS=false`. (Compose's runtime always sets `BLOCK_LOCAL_HTTP_CALLS=true` via `x-common-env`, but workers running outside compose / lambdas would inherit the broken combo.)
+
+### Migration
+
+Existing worktrees have stale `lw-<hash>-db-data` / `lw-<hash>-clickhouse-data` / `lw-<hash>-redis-data` volumes from the previous scheme. The first `make quickstart` after upgrading creates the new shared volumes (`langwatch-*-data`) — old volumes are not deleted automatically. To recover space:
+
+```
+docker volume ls | grep -E '^local +lw-[0-9a-f]{8}-(db|redis|clickhouse)-data'
+docker volume rm <volume-name>   # one per worktree, after confirming you don't need the data
+```
+
+If you previously relied on `x-common-env`'s implicit `DATABASE_URL` / `REDIS_URL` / `CLICKHOUSE_URL` overrides, those moved to `langwatch/.env.dev-up` written by `quickstart`. Running `make dev` (deprecated alias for `quickstart backend-shared`) keeps the same effective behavior.

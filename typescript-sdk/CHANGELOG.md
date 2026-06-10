@@ -1,5 +1,185 @@
 # Changelog
 
+## [0.32.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.31.0...typescript-sdk@v0.32.0) (2026-06-08)
+
+
+### Features
+
+* **cli:** unify langwatch claude (gateway + OTLP ingest) ([#4544](https://github.com/langwatch/langwatch/issues/4544)) ([9bfc844](https://github.com/langwatch/langwatch/commit/9bfc844c93ccab9945e00f641420e568b2c7ef4d))
+
+
+### Bug Fixes
+
+* **deps:** bump vitest to &gt;=4.1.0 across the monorepo (closes 9 CRITICAL alerts) ([#4495](https://github.com/langwatch/langwatch/issues/4495)) ([6f90ef4](https://github.com/langwatch/langwatch/commit/6f90ef48ae5b9436742bbda5d4bef21ea904db82))
+* **deps:** consolidated npm security overrides across the monorepo (closes 18 alerts) ([#4650](https://github.com/langwatch/langwatch/issues/4650)) ([3a56a88](https://github.com/langwatch/langwatch/commit/3a56a884826d493c2d9690ae9359068c193a4725))
+* **governance:** SaaS CLI gateway default points at parked .com host ([#4625](https://github.com/langwatch/langwatch/issues/4625)) ([c123c40](https://github.com/langwatch/langwatch/commit/c123c40d0ff2860fc8558e480dccb61c1da2c9d6))
+
+
+### Code Refactoring
+
+* **types:** make zod the single source of truth, remove ts-to-zod ([#4651](https://github.com/langwatch/langwatch/issues/4651)) ([d583fbe](https://github.com/langwatch/langwatch/commit/d583fbe2ed2ca2ef320695323c17f6c362ea4efa))
+
+## [0.31.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.30.0...typescript-sdk@v0.31.0) (2026-06-01)
+
+
+### Features
+
+* **cli:** make experiment results/status slug-first, defaulting to latest run ([#4411](https://github.com/langwatch/langwatch/issues/4411)) ([791ddc7](https://github.com/langwatch/langwatch/commit/791ddc7f53ba817cffc6673c5c8a86ffe7b99976))
+
+
+### Bug Fixes
+
+* **deps:** bump uuid to &gt;=11.1.1 across the monorepo (closes 7 alerts) ([#4470](https://github.com/langwatch/langwatch/issues/4470)) ([f22706b](https://github.com/langwatch/langwatch/commit/f22706b523526875ecd639d54c1e392d27cbcfae))
+* **typescript-sdk:** re-enable cli-sync.e2e.test.ts ([#4000](https://github.com/langwatch/langwatch/issues/4000)) ([40dd49d](https://github.com/langwatch/langwatch/commit/40dd49d5787df4c0eb524813863bc5fe3282a700))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump typescript from 5.9.2 to 5.9.3 in /typescript-sdk ([#4341](https://github.com/langwatch/langwatch/issues/4341)) ([e71df89](https://github.com/langwatch/langwatch/commit/e71df894883a53a4aa5dda628c44c34fb0277c54))
+* **deps:** bump @opentelemetry/instrumentation from 0.212.0 to 0.218.0 in /typescript-sdk ([#4345](https://github.com/langwatch/langwatch/issues/4345)) ([fdf519c](https://github.com/langwatch/langwatch/commit/fdf519c58e57de8f2272407532c99c5dfc2b6c23))
+* **deps:** bump @opentelemetry/instrumentation in /typescript-sdk ([fdf519c](https://github.com/langwatch/langwatch/commit/fdf519c58e57de8f2272407532c99c5dfc2b6c23))
+
+## [0.30.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.29.1...typescript-sdk@v0.30.0) (2026-05-29)
+
+
+### Features
+
+* **governance:** post-merge follow-ups for the AI Governance Platform ([#4238](https://github.com/langwatch/langwatch/issues/4238)) ([e79f85f](https://github.com/langwatch/langwatch/commit/e79f85f5b00aee32f359720915c8dcb7996438c1))
+* **governance:** the LangWatch AI Governance Platform ([#3524](https://github.com/langwatch/langwatch/issues/3524)) ([7dcaa89](https://github.com/langwatch/langwatch/commit/7dcaa895e29f6f2cce8d1e9160ef857520af340a))
+
+
+### Bug Fixes
+
+* **mcp:** serve partial experiment results and fix status for SDK runs ([#4276](https://github.com/langwatch/langwatch/issues/4276)) ([d21997a](https://github.com/langwatch/langwatch/commit/d21997a3c65146b0f52026dccf0907e2abeb8bb9))
+
+
+### Miscellaneous
+
+* **deps:** bump liquidjs to &gt;=10.26.0 (RCE GHSA-gf2q-c269-pqgc) in typescript-sdk, skills, mcp-server ([#4340](https://github.com/langwatch/langwatch/issues/4340)) ([697e07e](https://github.com/langwatch/langwatch/commit/697e07e82241dc837afb414458e67f539d23fb54))
+* **deps:** bump liquidjs to &gt;=10.26.0 in typescript-sdk, skills, mcp-server (GHSA-gf2q-c269-pqgc) ([697e07e](https://github.com/langwatch/langwatch/commit/697e07e82241dc837afb414458e67f539d23fb54))
+* **deps:** bump the npm_and_yarn group across 2 directories with 4 updates ([#4279](https://github.com/langwatch/langwatch/issues/4279)) ([e84354c](https://github.com/langwatch/langwatch/commit/e84354cc9e8a5d8e096a5762dda31b3258a36062))
+
+## [0.29.1](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.29.0...typescript-sdk@v0.29.1) (2026-05-27)
+
+
+### Bug Fixes
+
+* **sdk:** dedicated TracerProvider isolation for coexistence with other OTel SDKs ([#4204](https://github.com/langwatch/langwatch/issues/4204)) ([d5c9cfd](https://github.com/langwatch/langwatch/commit/d5c9cfd0ca55b7d31f08207970fb446ddda4fe85))
+
+## [0.29.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.28.0...typescript-sdk@v0.29.0) (2026-05-22)
+
+
+### Features
+
+* **api-keys:** scope-based permissions with fine-grained categories + docs ([#4117](https://github.com/langwatch/langwatch/issues/4117)) ([3dca0f6](https://github.com/langwatch/langwatch/commit/3dca0f685f8df8333d22117581510b0f6e13442d))
+* **experiments:** list + per-row results across SDK / CLI / MCP, plus evaluations-v3 → experiments rename ([#3893](https://github.com/langwatch/langwatch/issues/3893)) ([895cda8](https://github.com/langwatch/langwatch/commit/895cda80565c0c69da64affde501c5f159ce283f))
+* **model-providers:** role-based default models + missing-model popup + multi-instance providers ([#4073](https://github.com/langwatch/langwatch/issues/4073)) ([a5364e6](https://github.com/langwatch/langwatch/commit/a5364e685488866bce4175cdb79b2a46c79f7c83))
+
+
+### Bug Fixes
+
+* **deps:** upgrade langsmith sdk security floors ([2e18927](https://github.com/langwatch/langwatch/commit/2e18927c0c1c1fdec24c2bba17e5f094e56a9deb))
+* **deps:** upgrade LangSmith SDK security floors ([#4041](https://github.com/langwatch/langwatch/issues/4041)) ([2e18927](https://github.com/langwatch/langwatch/commit/2e18927c0c1c1fdec24c2bba17e5f094e56a9deb))
+* **prompts:** lossless structured-output and parameter sync between platform and local yaml ([#4068](https://github.com/langwatch/langwatch/issues/4068)) ([c3c5941](https://github.com/langwatch/langwatch/commit/c3c59417c916e4aaaba453723cb9f527834efbb8))
+
+
+### Miscellaneous
+
+* **ci:** bump all Node-20 actions to Node-24 ([#4050](https://github.com/langwatch/langwatch/issues/4050)) ([df3b0a1](https://github.com/langwatch/langwatch/commit/df3b0a1f76744e94741c9240c4489390434b7231))
+* **security:** add dependency age gates ([#3523](https://github.com/langwatch/langwatch/issues/3523)) ([78f5b20](https://github.com/langwatch/langwatch/commit/78f5b2059228748d19fb4bf74118c9bee6c474f9))
+
+## [0.28.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.27.0...typescript-sdk@v0.28.0) (2026-05-13)
+
+
+### Features
+
+* **api-key:** unified API Keys page with service keys, audit logging, and edit permissions ([#3386](https://github.com/langwatch/langwatch/issues/3386)) ([61a306c](https://github.com/langwatch/langwatch/commit/61a306c22f86af096c2f4651810bef2a7de486d6))
+
+
+### Bug Fixes
+
+* **deps:** align mastra protobufjs override to exclude 8.0.0-8.0.1 ([#4016](https://github.com/langwatch/langwatch/issues/4016)) ([90406b1](https://github.com/langwatch/langwatch/commit/90406b1fb17186d63d5b284fcf98583939901902))
+* **deps:** align mastra protobufjs override to explicitly exclude 8.0.0-8.0.1 ([90406b1](https://github.com/langwatch/langwatch/commit/90406b1fb17186d63d5b284fcf98583939901902))
+* **deps:** bump protobufjs to &gt;=7.5.6 in skills and mastra example ([#4014](https://github.com/langwatch/langwatch/issues/4014)) ([bf4908c](https://github.com/langwatch/langwatch/commit/bf4908cc12dda98bf039be684265f36e9bda1742))
+* **deps:** patch high-severity npm vulnerabilities (fast-xml-builder, fast-uri) ([#3928](https://github.com/langwatch/langwatch/issues/3928)) ([2eb205b](https://github.com/langwatch/langwatch/commit/2eb205ba86e1ebd4c7f078c8dba746dd9f50b919))
+* **deps:** upgrade [@opentelemetry](https://github.com/opentelemetry) packages — Prometheus exporter crash ([#3988](https://github.com/langwatch/langwatch/issues/3988)) ([4826054](https://github.com/langwatch/langwatch/commit/4826054f760a1e519233a586657f849cb11ea1b4))
+* **deps:** upgrade [@opentelemetry](https://github.com/opentelemetry) packages — Prometheus exporter crash (alerts [#1058](https://github.com/langwatch/langwatch/issues/1058)-[#1095](https://github.com/langwatch/langwatch/issues/1095)) ([4826054](https://github.com/langwatch/langwatch/commit/4826054f760a1e519233a586657f849cb11ea1b4))
+* **deps:** upgrade axios to 1.16.0 in langgraph example (Dependabot [#884](https://github.com/langwatch/langwatch/issues/884)) ([#3768](https://github.com/langwatch/langwatch/issues/3768)) ([ea712f0](https://github.com/langwatch/langwatch/commit/ea712f002e87b2b44f78c548f19ac699b0a452fa))
+* **deps:** upgrade langchain and @langchain/core in TS SDK examples ([#3704](https://github.com/langwatch/langwatch/issues/3704)) ([ba3843a](https://github.com/langwatch/langwatch/commit/ba3843ae506a4c8fafee9f591af2d462584dad2a))
+* **release:** path-routed Release-As shadows for 6 polluted components ([#3627](https://github.com/langwatch/langwatch/issues/3627)) ([b39d59e](https://github.com/langwatch/langwatch/commit/b39d59e87ed6d87224d580271175650c1d4159a7))
+* **release:** scope Release-As to langwatch, restore other components ([#3618](https://github.com/langwatch/langwatch/issues/3618)) ([e259e79](https://github.com/langwatch/langwatch/commit/e259e796b50e4d060e5c7f42cad1927f1da8a83d))
+* **security:** bump protobufjs overrides to 7.5.6/8.0.2 for 28 high-severity CVEs ([#4004](https://github.com/langwatch/langwatch/issues/4004)) ([6083473](https://github.com/langwatch/langwatch/commit/608347380c28f4c691d2e415fdc096a533c41e75))
+* **typescript-sdk:** unstick release-please from duplicate 0.27.0 tag ([1930ca5](https://github.com/langwatch/langwatch/commit/1930ca5ef8b4ca0f634c6f8e127e3dcbe5b7e057))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump @opentelemetry/sdk-node from 0.205.0 to 0.216.0 in /typescript-sdk ([#3735](https://github.com/langwatch/langwatch/issues/3735)) ([80f80e2](https://github.com/langwatch/langwatch/commit/80f80e231640febd4dab815d8e6edf2917be5ed0))
+* **deps-dev:** bump @opentelemetry/sdk-node in /typescript-sdk ([80f80e2](https://github.com/langwatch/langwatch/commit/80f80e231640febd4dab815d8e6edf2917be5ed0))
+* **deps-dev:** bump @typescript/native-preview from 7.0.0-dev.20250804.1 to 7.0.0-dev.20260426.1 in /typescript-sdk ([#3505](https://github.com/langwatch/langwatch/issues/3505)) ([e21487a](https://github.com/langwatch/langwatch/commit/e21487a13e89f7b3ce393bb6171a24eb60e4ceeb))
+* **deps-dev:** bump @typescript/native-preview in /typescript-sdk ([e21487a](https://github.com/langwatch/langwatch/commit/e21487a13e89f7b3ce393bb6171a24eb60e4ceeb))
+* **deps-dev:** bump fets from 0.8.5 to 0.8.6 in /typescript-sdk ([#3731](https://github.com/langwatch/langwatch/issues/3731)) ([6854966](https://github.com/langwatch/langwatch/commit/6854966141b96d02bfad479055769a60e4586ed3))
+* **deps-dev:** bump fishery from 2.3.1 to 2.4.0 in /typescript-sdk ([#3725](https://github.com/langwatch/langwatch/issues/3725)) ([dd6b778](https://github.com/langwatch/langwatch/commit/dd6b778697cc3291122291c9771723ae5a0eb0e5))
+* **deps-dev:** bump vitest-mock-extended from 3.1.0 to 3.1.1 in /typescript-sdk ([#3734](https://github.com/langwatch/langwatch/issues/3734)) ([7d5186f](https://github.com/langwatch/langwatch/commit/7d5186f5a873bfad8cc51d0c1ccc6f423fcaa638))
+* **deps-dev:** bump vitest-mock-extended in /typescript-sdk ([7d5186f](https://github.com/langwatch/langwatch/commit/7d5186f5a873bfad8cc51d0c1ccc6f423fcaa638))
+* **deps:** bump @opentelemetry/exporter-logs-otlp-http ([a0f7b43](https://github.com/langwatch/langwatch/commit/a0f7b43ae07e3b0bbae87bd56345bec348074681))
+* **deps:** bump @opentelemetry/exporter-logs-otlp-http from 0.205.0 to 0.216.0 in /typescript-sdk ([#3495](https://github.com/langwatch/langwatch/issues/3495)) ([a0f7b43](https://github.com/langwatch/langwatch/commit/a0f7b43ae07e3b0bbae87bd56345bec348074681))
+* **deps:** bump @opentelemetry/sdk-trace-base from 2.1.0 to 2.7.1 in /typescript-sdk ([#3738](https://github.com/langwatch/langwatch/issues/3738)) ([4e725e6](https://github.com/langwatch/langwatch/commit/4e725e662b2366c6e7d87fc80a8e95990703aba5))
+* **deps:** bump @opentelemetry/sdk-trace-base in /typescript-sdk ([4e725e6](https://github.com/langwatch/langwatch/commit/4e725e662b2366c6e7d87fc80a8e95990703aba5))
+* **deps:** bump ora from 9.3.0 to 9.4.0 in /typescript-sdk ([#3728](https://github.com/langwatch/langwatch/issues/3728)) ([7e0fec2](https://github.com/langwatch/langwatch/commit/7e0fec295f51e72149911acd54fa6828732d211a))
+* **deps:** bump the npm_and_yarn group across 1 directory with 4 updates ([#3609](https://github.com/langwatch/langwatch/issues/3609)) ([8c609a8](https://github.com/langwatch/langwatch/commit/8c609a899b884534a9fe6914aed250381547f824))
+* **main:** release typescript-sdk 0.27.0 ([#3624](https://github.com/langwatch/langwatch/issues/3624)) ([00abe7e](https://github.com/langwatch/langwatch/commit/00abe7e9ca1d5139e403ea2a73b0f4ce9f7512e6))
+* release as 3.2.1 ([ca9d7a9](https://github.com/langwatch/langwatch/commit/ca9d7a9231a7b3d9d8cf9a28a48fa494b1daeb4b))
+* release as 3.2.1 (override release-please from 3.3.0) ([#3615](https://github.com/langwatch/langwatch/issues/3615)) ([ca9d7a9](https://github.com/langwatch/langwatch/commit/ca9d7a9231a7b3d9d8cf9a28a48fa494b1daeb4b))
+* scope Release-As to langwatch, restore other components ([e259e79](https://github.com/langwatch/langwatch/commit/e259e796b50e4d060e5c7f42cad1927f1da8a83d))
+* **typescript-sdk:** bind 2 SDK-level [@unimplemented](https://github.com/unimplemented) prompt-tag scenarios ([#3458](https://github.com/langwatch/langwatch/issues/3458)) ([#3696](https://github.com/langwatch/langwatch/issues/3696)) ([73b9afa](https://github.com/langwatch/langwatch/commit/73b9afa9ce01fd202b0e93aa4e36f552e386d11c))
+* **typescript-sdk:** single-footer shadow Release-As 0.27.0 ([a48b3eb](https://github.com/langwatch/langwatch/commit/a48b3eb2cdf7d355b56136a11f5092484b7ab169))
+
+## [0.27.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.27.0...typescript-sdk@v0.27.0) (2026-05-13)
+
+
+### Features
+
+* **api-key:** unified API Keys page with service keys, audit logging, and edit permissions ([#3386](https://github.com/langwatch/langwatch/issues/3386)) ([61a306c](https://github.com/langwatch/langwatch/commit/61a306c22f86af096c2f4651810bef2a7de486d6))
+
+
+### Bug Fixes
+
+* **deps:** align mastra protobufjs override to exclude 8.0.0-8.0.1 ([#4016](https://github.com/langwatch/langwatch/issues/4016)) ([90406b1](https://github.com/langwatch/langwatch/commit/90406b1fb17186d63d5b284fcf98583939901902))
+* **deps:** align mastra protobufjs override to explicitly exclude 8.0.0-8.0.1 ([90406b1](https://github.com/langwatch/langwatch/commit/90406b1fb17186d63d5b284fcf98583939901902))
+* **deps:** bump protobufjs to &gt;=7.5.6 in skills and mastra example ([#4014](https://github.com/langwatch/langwatch/issues/4014)) ([bf4908c](https://github.com/langwatch/langwatch/commit/bf4908cc12dda98bf039be684265f36e9bda1742))
+* **deps:** patch high-severity npm vulnerabilities (fast-xml-builder, fast-uri) ([#3928](https://github.com/langwatch/langwatch/issues/3928)) ([2eb205b](https://github.com/langwatch/langwatch/commit/2eb205ba86e1ebd4c7f078c8dba746dd9f50b919))
+* **deps:** upgrade [@opentelemetry](https://github.com/opentelemetry) packages — Prometheus exporter crash ([#3988](https://github.com/langwatch/langwatch/issues/3988)) ([4826054](https://github.com/langwatch/langwatch/commit/4826054f760a1e519233a586657f849cb11ea1b4))
+* **deps:** upgrade [@opentelemetry](https://github.com/opentelemetry) packages — Prometheus exporter crash (alerts [#1058](https://github.com/langwatch/langwatch/issues/1058)-[#1095](https://github.com/langwatch/langwatch/issues/1095)) ([4826054](https://github.com/langwatch/langwatch/commit/4826054f760a1e519233a586657f849cb11ea1b4))
+* **deps:** upgrade axios to 1.16.0 in langgraph example (Dependabot [#884](https://github.com/langwatch/langwatch/issues/884)) ([#3768](https://github.com/langwatch/langwatch/issues/3768)) ([ea712f0](https://github.com/langwatch/langwatch/commit/ea712f002e87b2b44f78c548f19ac699b0a452fa))
+* **deps:** upgrade langchain and @langchain/core in TS SDK examples ([#3704](https://github.com/langwatch/langwatch/issues/3704)) ([ba3843a](https://github.com/langwatch/langwatch/commit/ba3843ae506a4c8fafee9f591af2d462584dad2a))
+* **release:** path-routed Release-As shadows for 6 polluted components ([#3627](https://github.com/langwatch/langwatch/issues/3627)) ([b39d59e](https://github.com/langwatch/langwatch/commit/b39d59e87ed6d87224d580271175650c1d4159a7))
+* **release:** scope Release-As to langwatch, restore other components ([#3618](https://github.com/langwatch/langwatch/issues/3618)) ([e259e79](https://github.com/langwatch/langwatch/commit/e259e796b50e4d060e5c7f42cad1927f1da8a83d))
+* **security:** bump protobufjs overrides to 7.5.6/8.0.2 for 28 high-severity CVEs ([#4004](https://github.com/langwatch/langwatch/issues/4004)) ([6083473](https://github.com/langwatch/langwatch/commit/608347380c28f4c691d2e415fdc096a533c41e75))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump @opentelemetry/sdk-node from 0.205.0 to 0.216.0 in /typescript-sdk ([#3735](https://github.com/langwatch/langwatch/issues/3735)) ([80f80e2](https://github.com/langwatch/langwatch/commit/80f80e231640febd4dab815d8e6edf2917be5ed0))
+* **deps-dev:** bump @opentelemetry/sdk-node in /typescript-sdk ([80f80e2](https://github.com/langwatch/langwatch/commit/80f80e231640febd4dab815d8e6edf2917be5ed0))
+* **deps-dev:** bump @typescript/native-preview from 7.0.0-dev.20250804.1 to 7.0.0-dev.20260426.1 in /typescript-sdk ([#3505](https://github.com/langwatch/langwatch/issues/3505)) ([e21487a](https://github.com/langwatch/langwatch/commit/e21487a13e89f7b3ce393bb6171a24eb60e4ceeb))
+* **deps-dev:** bump @typescript/native-preview in /typescript-sdk ([e21487a](https://github.com/langwatch/langwatch/commit/e21487a13e89f7b3ce393bb6171a24eb60e4ceeb))
+* **deps-dev:** bump fets from 0.8.5 to 0.8.6 in /typescript-sdk ([#3731](https://github.com/langwatch/langwatch/issues/3731)) ([6854966](https://github.com/langwatch/langwatch/commit/6854966141b96d02bfad479055769a60e4586ed3))
+* **deps-dev:** bump fishery from 2.3.1 to 2.4.0 in /typescript-sdk ([#3725](https://github.com/langwatch/langwatch/issues/3725)) ([dd6b778](https://github.com/langwatch/langwatch/commit/dd6b778697cc3291122291c9771723ae5a0eb0e5))
+* **deps-dev:** bump vitest-mock-extended from 3.1.0 to 3.1.1 in /typescript-sdk ([#3734](https://github.com/langwatch/langwatch/issues/3734)) ([7d5186f](https://github.com/langwatch/langwatch/commit/7d5186f5a873bfad8cc51d0c1ccc6f423fcaa638))
+* **deps-dev:** bump vitest-mock-extended in /typescript-sdk ([7d5186f](https://github.com/langwatch/langwatch/commit/7d5186f5a873bfad8cc51d0c1ccc6f423fcaa638))
+* **deps:** bump @opentelemetry/exporter-logs-otlp-http ([a0f7b43](https://github.com/langwatch/langwatch/commit/a0f7b43ae07e3b0bbae87bd56345bec348074681))
+* **deps:** bump @opentelemetry/exporter-logs-otlp-http from 0.205.0 to 0.216.0 in /typescript-sdk ([#3495](https://github.com/langwatch/langwatch/issues/3495)) ([a0f7b43](https://github.com/langwatch/langwatch/commit/a0f7b43ae07e3b0bbae87bd56345bec348074681))
+* **deps:** bump @opentelemetry/sdk-trace-base from 2.1.0 to 2.7.1 in /typescript-sdk ([#3738](https://github.com/langwatch/langwatch/issues/3738)) ([4e725e6](https://github.com/langwatch/langwatch/commit/4e725e662b2366c6e7d87fc80a8e95990703aba5))
+* **deps:** bump @opentelemetry/sdk-trace-base in /typescript-sdk ([4e725e6](https://github.com/langwatch/langwatch/commit/4e725e662b2366c6e7d87fc80a8e95990703aba5))
+* **deps:** bump ora from 9.3.0 to 9.4.0 in /typescript-sdk ([#3728](https://github.com/langwatch/langwatch/issues/3728)) ([7e0fec2](https://github.com/langwatch/langwatch/commit/7e0fec295f51e72149911acd54fa6828732d211a))
+* **deps:** bump the npm_and_yarn group across 1 directory with 4 updates ([#3609](https://github.com/langwatch/langwatch/issues/3609)) ([8c609a8](https://github.com/langwatch/langwatch/commit/8c609a899b884534a9fe6914aed250381547f824))
+* release as 3.2.1 ([ca9d7a9](https://github.com/langwatch/langwatch/commit/ca9d7a9231a7b3d9d8cf9a28a48fa494b1daeb4b))
+* release as 3.2.1 (override release-please from 3.3.0) ([#3615](https://github.com/langwatch/langwatch/issues/3615)) ([ca9d7a9](https://github.com/langwatch/langwatch/commit/ca9d7a9231a7b3d9d8cf9a28a48fa494b1daeb4b))
+* scope Release-As to langwatch, restore other components ([e259e79](https://github.com/langwatch/langwatch/commit/e259e796b50e4d060e5c7f42cad1927f1da8a83d))
+* **typescript-sdk:** bind 2 SDK-level [@unimplemented](https://github.com/unimplemented) prompt-tag scenarios ([#3458](https://github.com/langwatch/langwatch/issues/3458)) ([#3696](https://github.com/langwatch/langwatch/issues/3696)) ([73b9afa](https://github.com/langwatch/langwatch/commit/73b9afa9ce01fd202b0e93aa4e36f552e386d11c))
+* **typescript-sdk:** single-footer shadow Release-As 0.27.0 ([a48b3eb](https://github.com/langwatch/langwatch/commit/a48b3eb2cdf7d355b56136a11f5092484b7ab169))
+
 ## [0.27.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.26.0...typescript-sdk@v0.27.0) (2026-04-30)
 
 

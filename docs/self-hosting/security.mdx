@@ -38,7 +38,7 @@ The `CREDENTIALS_SECRET` environment variable is used to encrypt API keys and cr
 
 | Path | Encryption |
 |------|-----------|
-| Client to App | TLS at Ingress / Load Balancer |
+| Client to App | TLS at Ingress, Load Balancer |
 | App to PostgreSQL | TLS (configure via connection string: `?sslmode=require`) |
 | App to ClickHouse | HTTPS (configure ClickHouse with TLS certificates) |
 | App to Redis | TLS (configure via connection string: `rediss://...`) |
@@ -52,7 +52,7 @@ For inter-service encryption, deploy a service mesh like Istio or Linkerd. This 
 
 ### Development (Auto-Generated)
 
-For development, enable `autogen.enabled: true` in the Helm chart. This generates random secrets automatically. Not suitable for production — secrets change on reinstall.
+For development, enable `autogen.enabled: true` in the Helm chart. This generates random secrets automatically. Not suitable for production, secrets change on reinstall.
 
 ### Production (Kubernetes Secrets)
 
@@ -77,9 +77,9 @@ secrets:
 
 For tighter security, use an external secrets operator to sync secrets from your cloud provider:
 
-- **AWS Secrets Manager** — via [External Secrets Operator](https://external-secrets.io/)
-- **HashiCorp Vault** — via [Vault Secrets Operator](https://developer.hashicorp.com/vault/docs/platform/k8s/vso)
-- **Azure Key Vault** — via [Azure Key Vault Provider](https://azure.github.io/secrets-store-csi-driver-provider-azure/)
+- **AWS Secrets Manager**: via [External Secrets Operator](https://external-secrets.io/)
+- **HashiCorp Vault**: via [Vault Secrets Operator](https://developer.hashicorp.com/vault/docs/platform/k8s/vso)
+- **Azure Key Vault**: via [Azure Key Vault Provider](https://azure.github.io/secrets-store-csi-driver-provider-azure/)
 
 The Helm chart's `secretKeyRef` pattern works with any Kubernetes Secret, regardless of how it was created.
 
@@ -90,7 +90,7 @@ The Helm chart's `secretKeyRef` pattern works with any Kubernetes Secret, regard
 - **Only the LangWatch App should be exposed externally** via Ingress or Load Balancer
 - All other components (Workers, NLP, LangEvals, PostgreSQL, ClickHouse, Redis) should be on internal networks only (ClusterIP services)
 - Place databases in private subnets with no internet access
-- Use VPC endpoints / PrivateLink for S3 access
+- Use VPC endpoints, PrivateLink for S3 access
 
 ### Kubernetes Network Policies
 
@@ -123,7 +123,7 @@ spec:
 
 | Source | Destination | Port | Protocol |
 |--------|-------------|------|----------|
-| Internet / VPN | App (Ingress) | 443 | HTTPS |
+| Internet, VPN | App (Ingress) | 443 | HTTPS |
 | App | PostgreSQL | 5432 | TCP |
 | App, Workers | ClickHouse | 8123 | HTTP |
 | App, Workers | Redis | 6379 | TCP |
@@ -173,9 +173,41 @@ LangWatch enforces tenant isolation at the application level:
 - API tokens are scoped to a specific project
 - Cross-tenant data access is prevented at the query layer
 
+## Supply Chain
+
+LangWatch container images and CLI packages are published with verifiable supply-chain attestations so operators can confirm an artifact was built by LangWatch CI from a specific source commit.
+
+### Container images (Docker Hub)
+
+Every release of `langwatch/langwatch`, `langwatch/langwatch_nlp`, `langwatch/langevals`, and `langwatch/ai-gateway` is signed with [Sigstore](https://www.sigstore.dev/) cosign using keyless OIDC. Both the multi-arch index manifest and each per-platform manifest (linux/amd64, linux/arm64) are signed by digest. A CycloneDX SBOM is generated per platform and attached as a cosign attestation against the matching platform manifest digest, so the SBOM you verify always corresponds to the architecture you actually pulled.
+
+Verify a signature with [cosign](https://github.com/sigstore/cosign):
+
+```bash
+cosign verify langwatch/langwatch:<tag> \
+  --certificate-identity-regexp '^https://github\.com/langwatch/langwatch/' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+Inspect the attached SBOM for the platform you pulled (cosign resolves the right per-platform manifest digest automatically when you pass a tag):
+
+```bash
+cosign download attestation \
+  --predicate-type https://cyclonedx.org/bom \
+  langwatch/langwatch:<tag> \
+  | jq -r '.payload | @base64d | fromjson | .predicate' \
+  > langwatch.cdx.json
+```
+
+The per-platform `*.cdx.json` files (e.g. `langwatch-linux-amd64.cdx.json`, `langwatch-linux-arm64.cdx.json`) are also attached to each `langwatch@vX.Y.Z` [GitHub release](https://github.com/langwatch/langwatch/releases).
+
+### npm CLI
+
+The `langwatch` npm package is published with [npm provenance attestations](https://docs.npmjs.com/generating-provenance-statements) via GitHub Actions OIDC, also backed by Sigstore. The provenance link is visible on the [package page](https://www.npmjs.com/package/langwatch) and can be verified with `npm audit signatures`.
+
 ## Production Hardening Checklist
 
-- [ ] `autogen.enabled: false` — use manually created secrets
+- [ ] `autogen.enabled: false`, use manually created secrets
 - [ ] All secrets stored in a secrets manager (not inline in values.yaml)
 - [ ] TLS enabled on Ingress (HTTPS only)
 - [ ] Database connections use TLS (`?sslmode=require`)
@@ -188,3 +220,4 @@ LangWatch enforces tenant isolation at the application level:
 - [ ] Pod security contexts verified (non-root, read-only filesystem)
 - [ ] Ingress rate limiting configured
 - [ ] Audit logs enabled (Enterprise)
+- [ ] Image signatures verified at pull time (admission controller or `cosign verify` in CI)

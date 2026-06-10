@@ -4,23 +4,28 @@ Feature: MCP Scenario Management Tools
   I want to manage scenarios via the MCP server
   So that I can author and refine test scenarios for AI agents
 
+  # Most list/get scenarios bound via existing
+  # `mcp-server/src/__tests__/scenario-tools.unit.test.ts`. The remaining
+  # @unimplemented scenarios describe create/update/delete tool calls that
+  # are exercised in `all-tools.integration.test.ts` but with cases the
+  # MCP API surfaces (e.g. error paths, criteria-array handling) that
+  # need their own targeted integration cases. Cheap to add when the
+  # scenario tools API stabilizes.
+
   Background:
     Given the MCP server is configured with a valid API key
 
-  @unimplemented
   Scenario: Agent lists all scenarios in a project
     Given the project has scenarios configured
     When the agent calls list_scenarios
     Then the response contains a list of scenarios
 
-  @unimplemented
   Scenario: Agent lists scenarios when none exist
     Given the project has no scenarios
     When the agent calls list_scenarios
     Then the response contains a message "No scenarios found"
     And the response includes a tip to use create_scenario
 
-  @unimplemented
   Scenario: Agent gets full details of a scenario
     Given a scenario exists with id "scen_abc123"
     When the agent calls get_scenario with scenarioId "scen_abc123"

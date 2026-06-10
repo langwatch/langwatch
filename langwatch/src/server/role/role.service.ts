@@ -1,31 +1,30 @@
-import type { PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import {
   RoleDuplicateNameError,
   RoleInUseError,
+  RoleNotAssignableError,
   RoleNotFoundError,
   RoleOrganizationMismatchError,
+  RoleReservedNameError,
   TeamNotFoundError,
   UserNotTeamMemberError,
 } from "./errors";
 import {
+  CUSTOM_ROLE_KIND,
   type CreateRoleParams,
   RoleRepository,
   type UpdateRoleParams,
 } from "./repositories/role.repository";
 
-/**
- * Service layer for custom role management
- * Single Responsibility: Handle business logic for custom roles
- */
 export class RoleService {
   private readonly repository: RoleRepository;
 
-  constructor(private readonly prisma: PrismaClient) {
+  constructor(prisma: PrismaClient | Prisma.TransactionClient) {
     this.repository = new RoleRepository(prisma);
   }
 
   async getAllRoles(organizationId: string) {
-    const roles = await this.repository.findAllByOrganization(organizationId);
+    const roles = await this.repository.findUserCreatedByOrganization(organizationId);
     return roles.map((role) => ({
       ...role,
       permissions: role.permissions as string[],
@@ -35,7 +34,7 @@ export class RoleService {
   async getRoleById(roleId: string) {
     const role = await this.repository.findById(roleId);
 
-    if (!role) {
+    if (!role || role.kind !== CUSTOM_ROLE_KIND.CUSTOM) {
       throw new RoleNotFoundError();
     }
 
@@ -45,8 +44,17 @@ export class RoleService {
     };
   }
 
+  async getRoleByIdOrNull(roleId: string) {
+    const role = await this.repository.findById(roleId);
+    if (!role || role.kind !== CUSTOM_ROLE_KIND.CUSTOM) return null;
+    return { ...role, permissions: role.permissions as string[] };
+  }
+
   async createRole(params: CreateRoleParams) {
-    // Business rule: Check for duplicate names
+    if (params.name.startsWith("apikey:")) {
+      throw new RoleReservedNameError();
+    }
+
     const existing = await this.repository.findByNameAndOrganization(
       params.name,
       params.organizationId,
@@ -65,9 +73,12 @@ export class RoleService {
   }
 
   async updateRole(roleId: string, params: UpdateRoleParams) {
-    // Business rule: Verify role exists
+    if (params.name?.startsWith("apikey:")) {
+      throw new RoleReservedNameError();
+    }
+
     const existing = await this.repository.findById(roleId);
-    if (!existing) {
+    if (!existing || existing.kind !== CUSTOM_ROLE_KIND.CUSTOM) {
       throw new RoleNotFoundError();
     }
 
@@ -80,10 +91,9 @@ export class RoleService {
   }
 
   async deleteRole(roleId: string) {
-    // Business rule: Check if role is in use
     const role = await this.repository.findByIdWithUsers(roleId);
 
-    if (!role) {
+    if (!role || role.kind !== CUSTOM_ROLE_KIND.CUSTOM) {
       throw new RoleNotFoundError();
     }
 
@@ -96,24 +106,12 @@ export class RoleService {
   }
 
   async assignRoleToUser(userId: string, teamId: string, customRoleId: string) {
-    // Business rule: Validate all entities exist and belong together
-    const [customRole, team, teamUser] = await Promise.all([
+    const [customRole, team] = await Promise.all([
       this.repository.findById(customRoleId),
-      this.prisma.team.findUnique({
-        where: { id: teamId },
-        select: { organizationId: true },
-      }),
-      this.prisma.teamUser.findUnique({
-        where: {
-          userId_teamId: {
-            userId,
-            teamId,
-          },
-        },
-      }),
+      this.repository.findTeamById(teamId),
     ]);
 
-    if (!customRole) {
+    if (!customRole || customRole.kind !== CUSTOM_ROLE_KIND.CUSTOM) {
       throw new RoleNotFoundError("Custom role not found");
     }
 
@@ -125,7 +123,13 @@ export class RoleService {
       throw new RoleOrganizationMismatchError();
     }
 
-    if (!teamUser) {
+    const binding = await this.repository.findUserTeamBinding({
+      userId,
+      organizationId: team.organizationId,
+      teamId,
+    });
+
+    if (!binding) {
       throw new UserNotTeamMemberError();
     }
 
@@ -139,10 +143,59 @@ export class RoleService {
     return { success: true };
   }
 
-  /**
-   * Get role with assigned users (used for business rule checks)
-   */
   async getRoleWithUsers(roleId: string) {
     return this.repository.findByIdWithUsers(roleId);
+  }
+
+  async getTeamMembersWithUsers({
+    organizationId,
+    teamId,
+  }: {
+    organizationId: string;
+    teamId: string;
+  }) {
+    return this.repository.findTeamMembersWithUsers({ organizationId, teamId });
+  }
+
+  async getUserCustomRoleBinding({
+    userId,
+    organizationId,
+    teamId,
+  }: {
+    userId: string;
+    organizationId: string;
+    teamId: string;
+  }) {
+    return this.repository.findUserCustomRoleBinding({ userId, organizationId, teamId });
+  }
+
+  async validateRolesAssignable({
+    roleIds,
+    organizationId,
+  }: {
+    roleIds: string[];
+    organizationId: string;
+  }) {
+    if (roleIds.length === 0) return;
+
+    const validRoles = await this.repository.findAssignableByIds(roleIds, organizationId);
+    const validIds = new Set(validRoles.map((r) => r.id));
+    const invalid = roleIds.filter((id) => !validIds.has(id));
+
+    if (invalid.length > 0) {
+      throw new RoleNotAssignableError();
+    }
+  }
+
+  async filterAssignableRoleIds({
+    roleIds,
+    organizationId,
+  }: {
+    roleIds: string[];
+    organizationId: string;
+  }): Promise<string[]> {
+    if (roleIds.length === 0) return [];
+    const validRoles = await this.repository.findAssignableByIds(roleIds, organizationId);
+    return validRoles.map((r) => r.id);
   }
 }

@@ -7,6 +7,17 @@ Feature: Sidebar summary shows latest batch status correctly
 
   # Pass rate = passed / total (all runs count in denominator)
 
+  # Parity status: 0 of 6 scenarios bound to existing tests.
+  # Remaining @unimplemented scenarios (#3458):
+  #   6 NO_TEST: shipped behavior, no integration test yet
+  # NO_TEST gaps:
+  #   - "Sidebar shows stats from the latest batch only"
+  #   - "All runs in latest batch are stalled"
+  #   - "Latest batch has mix of passed and stalled"
+  #   - "All runs cancelled"
+  #   - "All runs failed"
+  #   - "Mix of passed, failed, stalled, cancelled"
+
   Scenario: Sidebar shows stats from the latest batch only
     Given an external set "my-set" with two batches
     And the latest batch has 2 passed and 1 failed

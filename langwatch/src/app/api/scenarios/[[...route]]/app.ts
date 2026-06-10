@@ -1,17 +1,11 @@
-import { Hono } from "hono";
-import { type AuthMiddlewareVariables, authMiddleware, handleError } from "../../middleware";
-import { loggerMiddleware } from "../../middleware/logger";
-import { tracerMiddleware } from "../../middleware/tracer";
+import { createProjectApp } from "~/server/api/security";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { app as appV1 } from "./app.v1";
+import { registerScenarioRoutes } from "./app.v1";
 
 patchZodOpenapi();
 
-export const app = new Hono<{ Variables: AuthMiddlewareVariables }>().basePath("/api/scenarios");
+const secured = createProjectApp({ basePath: "/api/scenarios" });
 
-app.use(tracerMiddleware({ name: "scenarios" }));
-app.use(loggerMiddleware());
-app.use(authMiddleware);
-app.onError(handleError);
+registerScenarioRoutes(secured);
 
-app.route("/", appV1);
+export const app = secured.hono;

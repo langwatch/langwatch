@@ -11,6 +11,7 @@
  *
  * @see specs/scenarios/scenario-deferred-persistence.feature
  */
+import * as React from "react";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -56,6 +57,23 @@ vi.mock("../SaveAndRunMenu", () => ({
 }));
 vi.mock("../ScenarioEditorSidebar", () => ({
   ScenarioEditorSidebar: () => null,
+}));
+// The run-model dialog is covered in ScenarioRunModelDialog.integration.test.tsx.
+// Here it auto-confirms once on open so these flow tests exercise the
+// save → run → navigate path without driving the picker UI.
+vi.mock("../ScenarioRunModelDialog", () => ({
+  ScenarioRunModelDialog: ({
+    open,
+    onConfirm,
+  }: {
+    open?: boolean;
+    onConfirm?: () => void;
+  }) => {
+    React.useEffect(() => {
+      if (open) onConfirm?.();
+    }, [open]);
+    return null;
+  },
 }));
 
 import { ScenarioFormDrawer } from "../ScenarioFormDrawer";
@@ -429,43 +447,140 @@ describe("<ScenarioFormDrawer/>", () => {
   });
 
   describe("when user clicks save-and-run", () => {
-    beforeEach(() => {
-      mocks.mockDrawerParams = { scenarioId: "existing-scenario-id" };
-      mocks.mockGetByIdData = {
-        id: "existing-scenario-id",
-        name: "Refund Flow",
-        situation: "User requests a refund",
-        criteria: ["Agent acknowledges the issue"],
-        labels: [],
-      };
-      mocks.mockUpdateMutateAsync.mockResolvedValue({
-        id: "existing-scenario-id",
-        name: "Refund Flow",
-        situation: "User requests a refund",
-        criteria: ["Agent acknowledges the issue"],
-        labels: [],
+    describe("from edit mode (existing scenario)", () => {
+      beforeEach(() => {
+        mocks.mockDrawerParams = { scenarioId: "existing-scenario-id" };
+        mocks.mockGetByIdData = {
+          id: "existing-scenario-id",
+          name: "Refund Flow",
+          situation: "User requests a refund",
+          criteria: ["Agent acknowledges the issue"],
+          labels: [],
+        };
+        mocks.mockUpdateMutateAsync.mockResolvedValue({
+          id: "existing-scenario-id",
+          name: "Refund Flow",
+          situation: "User requests a refund",
+          criteria: ["Agent acknowledges the issue"],
+          labels: [],
+        });
+        mocks.mockRunScenario.mockResolvedValue(undefined);
       });
-      mocks.mockRunScenario.mockResolvedValue(undefined);
+
+      /** @scenario save-and-run navigates to /simulations from edit mode */
+      it("navigates to /simulations with the new pendingBatch query param", async () => {
+        const user = userEvent.setup();
+        const onClose = vi.fn();
+
+        render(<ScenarioFormDrawer open={true} onClose={onClose} />, { wrapper: Wrapper });
+
+        const saveAndRunButton = screen.getByTestId("save-and-run-button");
+        await user.click(saveAndRunButton);
+
+        await waitFor(() => {
+          expect(mocks.mockUpdateMutateAsync).toHaveBeenCalledTimes(1);
+        });
+
+        await waitFor(() => {
+          expect(mocks.mockRouterPush).toHaveBeenCalledWith(
+            expect.stringMatching(/^\/my-project\/simulations\?pendingBatch=/),
+          );
+        });
+      });
+
+      /** @scenario save-and-run does not call onClose so closeDrawer's router.push can't race the redirect */
+      it("does NOT call onClose (lw#3586 — closeDrawer's router.push would race the redirect)", async () => {
+        const user = userEvent.setup();
+        const onClose = vi.fn();
+
+        render(<ScenarioFormDrawer open={true} onClose={onClose} />, { wrapper: Wrapper });
+
+        const saveAndRunButton = screen.getByTestId("save-and-run-button");
+        await user.click(saveAndRunButton);
+
+        await waitFor(() => {
+          expect(mocks.mockRouterPush).toHaveBeenCalled();
+        });
+        expect(onClose).not.toHaveBeenCalled();
+      });
+
+      /** @scenario save-and-run fires exactly one router.push (the simulations redirect) */
+      it("fires exactly one router.push (the simulations redirect)", async () => {
+        const user = userEvent.setup();
+        const onClose = vi.fn();
+
+        render(<ScenarioFormDrawer open={true} onClose={onClose} />, { wrapper: Wrapper });
+
+        await user.click(screen.getByTestId("save-and-run-button"));
+
+        await waitFor(() => {
+          expect(mocks.mockRouterPush).toHaveBeenCalled();
+        });
+        expect(mocks.mockRouterPush).toHaveBeenCalledTimes(1);
+        const arg = mocks.mockRouterPush.mock.calls[0]![0] as string;
+        expect(arg).toMatch(/^\/my-project\/simulations\?pendingBatch=/);
+      });
     });
 
-    it("closes the drawer and navigates to simulations page", async () => {
-      const user = userEvent.setup();
-      const onClose = vi.fn();
-
-      render(<ScenarioFormDrawer open={true} onClose={onClose} />, { wrapper: Wrapper });
-
-      const saveAndRunButton = screen.getByTestId("save-and-run-button");
-      await user.click(saveAndRunButton);
-
-      await waitFor(() => {
-        expect(mocks.mockUpdateMutateAsync).toHaveBeenCalledTimes(1);
+    describe("from create mode (new scenario)", () => {
+      beforeEach(() => {
+        mocks.mockDrawerParams = {};
+        mocks.mockGetByIdData = null;
+        mocks.mockComplexProps = {
+          initialFormData: {
+            name: "Refund Request Test",
+            situation: "User requests a refund",
+            criteria: ["Agent acknowledges the issue"],
+            labels: [],
+          },
+        };
+        mocks.mockCreateMutateAsync.mockResolvedValue({
+          id: "new-scenario-id",
+          name: "Refund Request Test",
+          situation: "User requests a refund",
+          criteria: ["Agent acknowledges the issue"],
+          labels: [],
+        });
+        mocks.mockRunScenario.mockResolvedValue(undefined);
       });
 
-      // Drawer closes and navigates to simulations page with pending batch
-      expect(onClose).toHaveBeenCalled();
-      expect(mocks.mockRouterPush).toHaveBeenCalledWith(
-        expect.stringMatching(/^\/my-project\/simulations\?pendingBatch=/),
-      );
+      /** @scenario save-and-run navigates to /simulations from create mode */
+      it("navigates to /simulations with the new pendingBatch query param", async () => {
+        const user = userEvent.setup();
+
+        render(<ScenarioFormDrawer open={true} />, { wrapper: Wrapper });
+
+        const saveAndRunButton = screen.getByTestId("save-and-run-button");
+        await user.click(saveAndRunButton);
+
+        await waitFor(() => {
+          expect(mocks.mockCreateMutateAsync).toHaveBeenCalledTimes(1);
+        });
+
+        await waitFor(() => {
+          expect(mocks.mockRouterPush).toHaveBeenCalledWith(
+            expect.stringMatching(/^\/my-project\/simulations\?pendingBatch=/),
+          );
+        });
+      });
+
+      /** @scenario save-and-run from create mode does not transition to edit-mode URL */
+      it("does NOT transition the URL to /scenarios/<id> mid-save (lw#3586 F11 — would race the redirect)", async () => {
+        const user = userEvent.setup();
+
+        render(<ScenarioFormDrawer open={true} />, { wrapper: Wrapper });
+
+        await user.click(screen.getByTestId("save-and-run-button"));
+
+        await waitFor(() => {
+          expect(mocks.mockRouterPush).toHaveBeenCalled();
+        });
+        // Only the simulations redirect — no edit-mode transition push.
+        expect(mocks.mockRouterPush).toHaveBeenCalledTimes(1);
+        expect(mocks.mockRouterPush.mock.calls[0]![0]).toMatch(
+          /^\/my-project\/simulations\?pendingBatch=/,
+        );
+      });
     });
   });
 

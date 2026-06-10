@@ -1,8 +1,8 @@
-import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
+import { type SecuredApp, requires } from "~/server/api/security";
 import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";
 import {
   commitMessageSchema,
@@ -52,23 +52,23 @@ const logger = createLogger("langwatch:api:prompts");
 patchZodOpenapi();
 
 // Define types for our Hono context variables
-type Variables = PromptServiceMiddlewareVariables &
+export type PromptAppVariables = PromptServiceMiddlewareVariables &
   AuthMiddlewareVariables &
   OrganizationMiddlewareVariables;
 
-// Define the Hono app
-export const app = new Hono<{
-  Variables: Variables;
-}>().basePath("/");
+export function registerPromptRoutes(
+  secured: SecuredApp<{ Variables: PromptAppVariables }>,
+): void {
+  // organizationMiddleware + promptServiceMiddleware run AFTER the access chain
+  // (which authenticates and sets `project`), so they are applied per-route
+  // rather than app-wide.
 
-// Middleware
-app.use("/*", organizationMiddleware);
-app.use("/*", promptServiceMiddleware);
-
-// Get all prompts
-app.get(
-  "/",
-  describeRoute({
+  // Get all prompts
+  secured.access(requires("prompts:view")).get(
+    "/",
+    organizationMiddleware,
+    promptServiceMiddleware,
+    describeRoute({
     description: "Get all prompts for a project",
     responses: {
       ...baseResponses,
@@ -115,8 +115,10 @@ const assignTagResponseSchema = z.object({
   updatedAt: z.date(),
 });
 
-app.put(
+  secured.access(requires("prompts:manage")).put(
   "/:id{.+?}/tags/:tag",
+  organizationMiddleware,
+  promptServiceMiddleware,
   describeRoute({
     description:
       'Assign a tag (e.g. "production", "staging") to a specific prompt version',
@@ -207,8 +209,10 @@ app.put(
 // --- Tag definition CRUD (org-level) ---
 
 // List all tag definitions for the org
-app.get(
+  secured.access(requires("prompts:view")).get(
   "/tags",
+  organizationMiddleware,
+  promptServiceMiddleware,
   describeRoute({
     description: "List all prompt tag definitions for the organization",
     responses: {
@@ -247,8 +251,10 @@ app.get(
 );
 
 // Create a tag definition
-app.post(
+  secured.access(requires("prompts:manage")).post(
   "/tags",
+  organizationMiddleware,
+  promptServiceMiddleware,
   describeRoute({
     description: "Create a custom prompt tag definition for the organization",
     responses: {
@@ -300,8 +306,10 @@ app.post(
 );
 
 // Rename a tag definition
-app.put(
+  secured.access(requires("prompts:manage")).put(
   "/tags/:tag",
+  organizationMiddleware,
+  promptServiceMiddleware,
   describeRoute({
     description: "Rename a prompt tag definition",
     responses: {
@@ -361,8 +369,10 @@ app.put(
 );
 
 // Delete a tag definition
-app.delete(
+  secured.access(requires("prompts:manage")).delete(
   "/tags/:tag",
+  organizationMiddleware,
+  promptServiceMiddleware,
   describeRoute({
     description: "Delete a prompt tag definition and cascade to assignments",
     responses: {
@@ -403,8 +413,10 @@ app.delete(
 );
 
 // Get versions
-app.get(
+  secured.access(requires("prompts:view")).get(
   "/:id{.+?}/versions",
+  organizationMiddleware,
+  promptServiceMiddleware,
   describeRoute({
     description:
       "Get all versions for a prompt. Does not include base prompt data, only versioned data.",
@@ -456,8 +468,10 @@ app.get(
 );
 
 // Restore (rollback to) a specific version
-app.post(
+  secured.access(requires("prompts:manage")).post(
   "/:id{.+?}/versions/:versionId/restore",
+  organizationMiddleware,
+  promptServiceMiddleware,
   describeRoute({
     description:
       "Restore a prompt to a previous version. Creates a new version with the same config data as the specified version.",
@@ -514,8 +528,10 @@ app.post(
 );
 
 // Get prompt by ID
-app.get(
+  secured.access(requires("prompts:view")).get(
   "/:id{.+}",
+  organizationMiddleware,
+  promptServiceMiddleware,
   describeRoute({
     description:
       "Get a specific prompt by slug, with optional shorthand syntax for tags and versions. " +
@@ -644,8 +660,10 @@ app.get(
 );
 
 // Create prompt with initial version
-app.post(
+  secured.access(requires("prompts:manage")).post(
   "/",
+  organizationMiddleware,
+  promptServiceMiddleware,
   resourceLimitMiddleware("prompts"),
   describeRoute({
     description: "Create a new prompt with default initial version",
@@ -743,8 +761,10 @@ app.post(
 );
 
 // Sync endpoint for upsert operations
-app.post(
+  secured.access(requires("prompts:manage")).post(
   "/:id{.+?}/sync",
+  organizationMiddleware,
+  promptServiceMiddleware,
   describeRoute({
     description: "Sync/upsert a prompt with local content",
     responses: {
@@ -769,6 +789,7 @@ app.post(
                     differences: z.array(z.string()),
                     remoteConfigData:
                       getLatestConfigVersionSchema().shape.configData,
+                    remoteParameters: z.record(z.string(), z.unknown()).optional(),
                   })
                   .optional(),
               }),
@@ -782,6 +803,7 @@ app.post(
     "json",
     z.object({
       configData: getLatestConfigVersionSchema().shape.configData,
+      parameters: z.record(z.string(), z.unknown()).optional(),
       localVersion: versionSchema.optional(),
       commitMessage: commitMessageSchema.optional(),
     }),
@@ -806,6 +828,7 @@ app.post(
         projectId: project.id,
         organizationId: organization.id,
         commitMessage: data.commitMessage,
+        parameters: data.parameters,
       });
 
       const response: any = {
@@ -866,8 +889,10 @@ app.post(
 );
 
 // Update prompt
-app.put(
+  secured.access(requires("prompts:manage")).put(
   "/:id{.+}",
+  organizationMiddleware,
+  promptServiceMiddleware,
   describeRoute({
     description: "Update a prompt",
     responses: {
@@ -988,9 +1013,11 @@ app.put(
     }
   },
 );
-// Delete prompt
-app.delete(
+  // Delete prompt
+  secured.access(requires("prompts:manage")).delete(
   "/:id{.+}",
+  organizationMiddleware,
+  promptServiceMiddleware,
   describeRoute({
     description: "Delete a prompt",
     responses: {
@@ -1026,3 +1053,4 @@ app.delete(
     return c.json(successSchema.parse(result));
   },
 );
+}

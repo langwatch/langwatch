@@ -1,6 +1,16 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import type fs from "fs";
+import * as yaml from "js-yaml";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { PromptsConfig, PromptsLock, SyncResult } from "../../types";
 import type { PromptsApiService } from "@/client-sdk/services/prompts";
+
+const { mockWriteFileSync } = vi.hoisted(() => ({
+  mockWriteFileSync: vi.fn(),
+}));
+vi.mock("fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof fs>();
+  return { ...actual, writeFileSync: mockWriteFileSync };
+});
 
 // Mock FileManager before importing push
 vi.mock("../../utils/fileManager", () => ({
@@ -36,6 +46,10 @@ describe("pushPrompts", () => {
       sync: mockSync,
       update: mockUpdate,
     } as unknown as PromptsApiService;
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
   });
 
   describe("when local config has response_format with schema", () => {
@@ -148,7 +162,16 @@ describe("pushPrompts", () => {
         model: "openai/gpt-4o",
         messages: [{ role: "system", content: "test" }],
         response_format: {
-          schema: { type: "object", properties: { value: { type: "string" } } },
+          // A rich (non-flat) schema stays a single json_schema output, so the
+          // identifier-fallback path is what's under test here. Flat object
+          // schemas intentionally expand into flat fields instead (see the
+          // dedicated round-trip suite).
+          schema: {
+            type: "object",
+            properties: {
+              value: { type: "string", enum: ["a", "b"] },
+            },
+          },
         },
       } as any);
 
@@ -253,6 +276,136 @@ describe("pushPrompts", () => {
 
       // No response_format sent
       expect(syncCall.configData.response_format).toBeUndefined();
+    });
+  });
+
+  describe("when local config has no modelParameters temperature", () => {
+    /** @scenario Pushing a prompt with no temperature sends no temperature */
+    it("sends no temperature, so removing it from YAML clears it", async () => {
+      vi.mocked(FileManager.loadLocalPrompt).mockReturnValue({
+        model: "openai/gpt-5.5",
+        messages: [{ role: "system", content: "You are a helpful assistant." }],
+      } as any);
+
+      mockSync.mockResolvedValue({
+        action: "created",
+        prompt: { version: 1, versionId: "v1" },
+      });
+
+      const config: PromptsConfig = {
+        prompts: { "no-temp": "file:prompts/no-temp.prompt.yaml" },
+      };
+      const lock: PromptsLock = { lockfileVersion: 1, prompts: {} };
+      const result: SyncResult = {
+        fetched: [],
+        pushed: [],
+        unchanged: [],
+        cleaned: [],
+        errors: [],
+      };
+
+      await pushPrompts({ config, lock, promptsApiService, result });
+
+      const syncCall = mockSync.mock.calls[0]![0];
+      expect(syncCall.configData.temperature).toBeUndefined();
+    });
+  });
+
+  describe("when local config has runtime parameters", () => {
+    it("sends config to prompt sync", async () => {
+      /**
+       * @scenario TypeScript local prompt files preserve runtime parameters
+       */
+      vi.mocked(FileManager.loadLocalPrompt).mockReturnValue({
+        model: "openai/gpt-4o",
+        messages: [{ role: "system", content: "test" }],
+        parameters: { cli: true },
+      } as any);
+
+      mockSync.mockResolvedValue({
+        action: "created",
+        prompt: { version: 1, versionId: "v1" },
+      });
+
+      const config: PromptsConfig = {
+        prompts: { "runtime-config": "file:prompts/runtime.prompt.yaml" },
+      };
+      const lock: PromptsLock = { lockfileVersion: 1, prompts: {} };
+      const result: SyncResult = {
+        fetched: [],
+        pushed: [],
+        unchanged: [],
+        cleaned: [],
+        errors: [],
+      };
+
+      await pushPrompts({ config, lock, promptsApiService, result });
+
+      expect(mockSync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          parameters: { cli: true },
+        }),
+      );
+    });
+
+    it("writes remote config when resolving a conflict with remote", async () => {
+      /**
+       * @scenario Syncing a local prompt detects runtime parameters conflicts
+       */
+      vi.mocked(FileManager.loadLocalPrompt).mockReturnValue({
+        model: "openai/gpt-4o",
+        messages: [{ role: "system", content: "local" }],
+        parameters: { local: true },
+      } as any);
+
+      mockSync.mockResolvedValue({
+        action: "conflict",
+        conflictInfo: {
+          localVersion: 1,
+          remoteVersion: 1,
+          differences: ["parameters changed"],
+          remoteConfigData: {
+            model: "openai/gpt-4o",
+            prompt: "remote",
+            messages: [],
+          },
+          remoteParameters: { remote: true },
+        },
+      });
+
+      const config: PromptsConfig = {
+        prompts: { "runtime-config": "file:prompts/runtime.prompt.yaml" },
+      };
+      const lock: PromptsLock = {
+        lockfileVersion: 1,
+        prompts: {
+          "runtime-config": {
+            version: 1,
+            versionId: "v1",
+            materialized: "prompts/runtime.prompt.yaml",
+          },
+        },
+      };
+      const result: SyncResult = {
+        fetched: [],
+        pushed: [],
+        unchanged: [],
+        cleaned: [],
+        errors: [],
+      };
+
+      await pushPrompts({
+        config,
+        lock,
+        promptsApiService,
+        result,
+        forceResolution: "remote",
+      });
+
+      const writtenYaml = mockWriteFileSync.mock.calls[0]?.[1] as string;
+      expect(yaml.load(writtenYaml)).toMatchObject({
+        parameters: { remote: true },
+      });
     });
   });
 });

@@ -20,6 +20,19 @@ export const LAST_TOKEN_EVENTS = new Set([
 ]);
 
 /**
+ * Marker stamped by the receiver (resource-level) on traces whose LLM usage
+ * is covered by a flat subscription rather than billed per token, or set
+ * directly on a span by an instrumentation that knows a single call is
+ * bundled. A span-level value overrides the resource-level default, so a
+ * trace can mix billed and bundled spans.
+ */
+export const NON_BILLABLE_ATTR = "langwatch.cost.non_billable";
+
+function markerIsTrue(value: unknown): boolean {
+  return value === true || value === "true";
+}
+
+/**
  * Computes per-span cost, token metrics, and token timing, then
  * accumulates them into trace-level totals.
  */
@@ -43,6 +56,15 @@ export class SpanCostService {
     const promptTokens = Math.max(0, coerceToNumber(inputTokens) ?? 0);
     const completionTokens = Math.max(0, coerceToNumber(outputTokens) ?? 0);
 
+    // If both gen_ai semconv token counts are present, treat the values as
+    // authoritative — we surface them as exact numbers so the UI shouldn't
+    // also apologise with an "estimated" caveat. Only honour the
+    // `langwatch.tokens.estimated` flag when one or both counts were missing
+    // from the semconv attrs (and so were derived elsewhere).
+    const hasFullSemconv =
+      coerceToNumber(inputTokens) !== null &&
+      coerceToNumber(outputTokens) !== null;
+
     return {
       promptTokens,
       completionTokens,
@@ -53,9 +75,67 @@ export class SpanCostService {
         completionTokens,
       }),
       estimated:
-        attrs[ATTR_KEYS.LANGWATCH_TOKENS_ESTIMATED] === true ||
-        attrs[ATTR_KEYS.LANGWATCH_TOKENS_ESTIMATED] === "true",
+        !hasFullSemconv &&
+        (attrs[ATTR_KEYS.LANGWATCH_TOKENS_ESTIMATED] === true ||
+          attrs[ATTR_KEYS.LANGWATCH_TOKENS_ESTIMATED] === "true"),
     };
+  }
+
+  /**
+   * Per-span cache + reasoning token counts, read from the same canonical
+   * keys the drawer popover looks at. These are summed across the trace's
+   * spans by the fold (the raw keys never reach the trace attribute map),
+   * so "Cache write" and "Cache read" reflect the whole turn rather than
+   * the last span — where, for Anthropic, the cache write is always zero.
+   */
+  extractCacheTokens(span: NormalizedSpan): {
+    cacheReadTokens: number;
+    cacheCreationTokens: number;
+    reasoningTokens: number;
+  } {
+    const attrs = span.spanAttributes;
+    const firstPositive = (...keys: string[]): number => {
+      for (const key of keys) {
+        const n = coerceToNumber(attrs[key]);
+        if (n !== null && n > 0) return n;
+      }
+      return 0;
+    };
+    return {
+      cacheReadTokens: firstPositive(
+        ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+        "gen_ai.usage.cached_tokens",
+      ),
+      cacheCreationTokens: firstPositive(
+        ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+      ),
+      reasoningTokens: firstPositive(ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS),
+    };
+  }
+
+  /**
+   * Whether this span's cost is bundled (not billed per token). A span-level
+   * marker wins over the resource-level default the receiver stamps, so a
+   * single trace can carry a mix of billed and bundled spans.
+   */
+  isSpanCostNonBillable(span: NormalizedSpan): boolean {
+    const spanLevel = span.spanAttributes[NON_BILLABLE_ATTR];
+    if (spanLevel !== undefined) return markerIsTrue(spanLevel);
+    return markerIsTrue(span.resourceAttributes[NON_BILLABLE_ATTR]);
+  }
+
+  /**
+   * Whether this span's token usage is a redundant copy of another span's
+   * and must be excluded from the trace-level token/cost/cache totals. An
+   * extractor sets the marker when an emitter reports the same usage on two
+   * spans (e.g. codex's lower-level response span repeats the turn rollup's
+   * counts). The per-span detail is untouched — only the fold's
+   * accumulation skips it, so the trace total counts the usage once.
+   */
+  isTokenAccumulationSkipped(span: NormalizedSpan): boolean {
+    return markerIsTrue(
+      span.spanAttributes[ATTR_KEYS.LANGWATCH_RESERVED_SKIP_TOKEN_ACCUMULATION],
+    );
   }
 
   extractTokenTiming(span: NormalizedSpan): {
@@ -106,17 +186,27 @@ export class SpanCostService {
     totalPromptTokenCount: number | null;
     totalCompletionTokenCount: number | null;
     totalCost: number | null;
+    nonBilledCost: number | null;
     tokensEstimated: boolean;
     timeToFirstTokenMs: number | null;
     timeToLastTokenMs: number | null;
     tokensPerSecond: number | null;
   } {
-    const metrics = this.extractTokenMetrics(span);
+    // A span flagged as a redundant usage copy (e.g. codex's lower-level
+    // response span echoing the turn rollup) contributes nothing to the
+    // trace totals, so its tokens/cost are counted exactly once.
+    const metrics = this.isTokenAccumulationSkipped(span)
+      ? { promptTokens: 0, completionTokens: 0, cost: 0, estimated: false }
+      : this.extractTokenMetrics(span);
     const totalPromptTokenCount =
       (state.totalPromptTokenCount ?? 0) + metrics.promptTokens;
     const totalCompletionTokenCount =
       (state.totalCompletionTokenCount ?? 0) + metrics.completionTokens;
     const totalCost = (state.totalCost ?? 0) + metrics.cost;
+    // Bundled portion: only this span's cost when the span is non-billable.
+    const nonBilledCost =
+      (state.nonBilledCost ?? 0) +
+      (this.isSpanCostNonBillable(span) ? metrics.cost : 0);
 
     const timing = this.extractTokenTiming(span);
     let timeToFirstTokenMs = state.timeToFirstTokenMs;
@@ -145,6 +235,8 @@ export class SpanCostService {
       totalCompletionTokenCount:
         totalCompletionTokenCount > 0 ? totalCompletionTokenCount : null,
       totalCost: totalCost > 0 ? Number(totalCost.toFixed(6)) : null,
+      nonBilledCost:
+        nonBilledCost > 0 ? Number(nonBilledCost.toFixed(6)) : null,
       tokensEstimated: state.tokensEstimated || metrics.estimated,
       timeToFirstTokenMs,
       timeToLastTokenMs,

@@ -353,7 +353,7 @@ export function EvaluateModalContent({
 
   return (
     <FormProvider {...form}>
-    <Dialog.Content
+    <Dialog.Content bg="bg"
       as="form"
       // eslint-disable-next-line @typescript-eslint/no-misused-promises
       onSubmit={form.handleSubmit(onSubmit)}

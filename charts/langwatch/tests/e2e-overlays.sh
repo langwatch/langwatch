@@ -257,12 +257,15 @@ test_infra_overlays() {
 test_overlay_stacking() {
   sep; info "Suite: overlay stacking (last -f wins)"
 
-  # size-dev sets 1 replica, then we override to 3 via --set
+  # size-dev sets 1 replica, then we override to 3 via --set. Multi-replica
+  # also disables localFilesystem (validation refuses local-FS + replicas>1
+  # because pods don't share filesystems — operators should use app.dataplane).
   local out
   out=$(tmpl --set autogen.enabled=true \
     -f "${OVERLAYS}/size-dev.yaml" \
     -f "${OVERLAYS}/access-nodeport.yaml" \
-    --set app.replicaCount=3)
+    --set app.replicaCount=3 \
+    --set app.storedObjects.localFilesystem.enabled=false)
   assert_contains "stacking: --set overrides overlay" "$out" "replicas: 3"
 
   # size-dev + access-nodeport, then access-ingress overrides
@@ -272,6 +275,29 @@ test_overlay_stacking() {
     -f "${OVERLAYS}/access-nodeport.yaml" \
     -f "${OVERLAYS}/access-ingress.yaml")
   assert_contains "stacking: ingress overrides nodeport" "$stacked" "kind: Ingress"
+
+  # Regression for Sergio's P1 #3: when dataplane is enabled, the local-FS PVC
+  # MUST NOT render even though localFilesystem.enabled defaults to true.
+  # Pre-fix this combo would have created an RWO PVC and mounted it into all
+  # three replicas.
+  local dp
+  dp=$(tmpl --set autogen.enabled=true \
+    -f "${OVERLAYS}/size-dev.yaml" \
+    --set app.replicaCount=3 \
+    --set app.dataplane.enabled=true \
+    --set app.dataplane.provider=awsS3 \
+    --set app.dataplane.providers.awsS3.bucket=test-bucket)
+  if grep -qF "stored-objects" <<< "$dp" && grep -qF "kind: PersistentVolumeClaim" <<< "$dp"; then
+    # The PVC string appears — check it's NOT the stored-objects PVC
+    # (other PVCs in the chart are fine; only the stored-objects one is RWO).
+    if grep -B1 "name: ${RELEASE}-stored-objects" <<< "$dp" | grep -qF "kind: PersistentVolumeClaim"; then
+      fail "dataplane gates local-FS PVC: PVC should NOT render with dataplane.enabled=true"
+    else
+      pass "dataplane gates local-FS PVC: no stored-objects PVC with dataplane on"
+    fi
+  else
+    pass "dataplane gates local-FS PVC: no stored-objects PVC with dataplane on"
+  fi
 }
 
 # ─────────────────────────────────────────────────────────────────────────────

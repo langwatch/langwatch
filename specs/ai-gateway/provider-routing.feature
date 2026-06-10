@@ -1,4 +1,10 @@
 Feature: Model → provider routing via VK config
+
+  # All scenarios in this file describe gateway routing decisions —
+  # alias resolution, allowlist enforcement, MCP allow-list, deny-list
+  # tool name. Implemented in the Go gateway service, out of scope for
+  # the TS parity check. The /v1/models endpoint scenarios are also Go.
+
   Every request carries a `model` field. The gateway resolves that into a
   specific provider credential via (a) VK model_aliases, (b) explicit
   `provider/model` form, or (c) single-provider default.

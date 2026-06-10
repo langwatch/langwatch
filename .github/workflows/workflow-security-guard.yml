@@ -1,0 +1,80 @@
+name: workflow-security-guard
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/*.yml"
+      - ".github/workflows/*.yaml"
+      - ".github/actions/**"
+      - ".github/scripts/guard-pull-request-target*.ts"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/*.yml"
+      - ".github/workflows/*.yaml"
+      - ".github/actions/**"
+      - ".github/scripts/guard-pull-request-target*.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pull-request-target-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR head for scanning
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: pr
+          persist-credentials: false
+
+      - name: Checkout trusted guard script
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+          persist-credentials: false
+
+      # The base branch has no guard script during the initial rollout.
+      # After merge, future workflow PRs use the trusted base copy.
+      - name: Resolve guard script path
+        if: github.event_name == 'pull_request'
+        id: guard-script
+        run: |
+          if [ -f base/.github/scripts/guard-pull-request-target.ts ]; then
+            echo "path=base/.github/scripts/guard-pull-request-target.ts" >> "$GITHUB_OUTPUT"
+          else
+            echo "path=pr/.github/scripts/guard-pull-request-target.ts" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 24
+
+      - name: Check privileged workflow gates on PR
+        if: github.event_name == 'pull_request'
+        run: node --experimental-strip-types "${{ steps.guard-script.outputs.path }}" pr
+
+      - name: Check guard tests on PR
+        if: github.event_name == 'pull_request'
+        run: node --test --experimental-strip-types pr/.github/scripts/guard-pull-request-target.test.ts
+
+      - name: Checkout repository
+        if: github.event_name != 'pull_request'
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Check privileged workflow gates
+        if: github.event_name != 'pull_request'
+        run: node --experimental-strip-types .github/scripts/guard-pull-request-target.ts
+
+      - name: Check guard tests
+        if: github.event_name != 'pull_request'
+        run: node --test --experimental-strip-types .github/scripts/guard-pull-request-target.test.ts

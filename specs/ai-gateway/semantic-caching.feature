@@ -1,4 +1,11 @@
 Feature: Semantic caching — fuzzy-match prompts to cached responses
+
+  # All scenarios in this file describe the gateway's semantic-cache
+  # backend (embedding similarity match, Redis storage, TTL handling,
+  # collision avoidance). Will live in the Go gateway service plus an
+  # external Redis dependency — out of scope for the TS parity check.
+  # v1.1 feature; not yet shipped.
+
   As an enterprise customer running high-volume chat traffic
   I want the gateway to recognize semantically-similar prompts and serve
   cached responses without re-hitting the upstream provider
@@ -12,7 +19,7 @@ Feature: Semantic caching — fuzzy-match prompts to cached responses
   separate primitive:
 
     - Embeds the incoming prompt.
-    - Searches a vector index scoped to {vk_id, model, routing.slot}.
+    - Searches a vector index scoped to {vk_id, model, routing.modelProvider}.
     - On a hit above the similarity threshold, returns the cached
       response WITHOUT calling the upstream.
     - On a miss, dispatches normally and writes the {embedding, response}
@@ -24,12 +31,12 @@ Feature: Semantic caching — fuzzy-match prompts to cached responses
 
   Scope for v1.1:
     - Opt-in per VK via `config.semantic_cache`.
-    - Embedding via a customer-provided `gpc_*` credential (OpenAI
+    - Embedding via a customer-provided ModelProvider row (OpenAI
       text-embedding-3-small by default).
     - Similarity threshold in [0.80, 1.00], default 0.95.
     - TTL in [60, 86400] seconds, default 3600.
     - Cache backend: Redis (shared across gateway replicas).
-    - Scoping key: `(vk_id, model, routing_slot, tenant_partition)`.
+    - Scoping key: `(vk_id, model, model_provider_id, tenant_partition)`.
     - Align with the existing `X-LangWatch-Cache: respect|disable` header
       surface — clients can bypass the semantic cache identically to the
       upstream cache.
@@ -53,7 +60,7 @@ Feature: Semantic caching — fuzzy-match prompts to cached responses
       {
         "semantic_cache": {
           "enabled": true,
-          "embedding_credential_id": "gpc_openai_embed",
+          "embedding_model_provider_id": "mp_openai_embed",
           "embedding_model": "text-embedding-3-small",
           "similarity_threshold": 0.95,
           "ttl_seconds": 3600
@@ -257,7 +264,7 @@ Feature: Semantic caching — fuzzy-match prompts to cached responses
 
   @contract @semantic_cache @compat
   Scenario: Embedding provider unavailable fails OPEN
-    Given "vk_faq" has semantic caching enabled with `gpc_openai_embed`
+    Given "vk_faq" has semantic caching enabled with `mp_openai_embed`
     When the embedding provider returns 503
     Then the gateway skips the semantic cache for this request
     And dispatches the original request to the upstream normally

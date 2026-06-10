@@ -3,6 +3,12 @@ Feature: Studio Drawer Migration (Properties Panels to Drawers)
   I want to use drawers instead of right-sidebar properties panels
   So that the editing experience is consistent with evaluations-v3 and allows more space for content
 
+  # All scenarios in this file describe a UI migration on the workflow
+  # studio canvas (right-sidebar → drawer system). Need page-level
+  # workflow-studio component tests or Playwright E2E. No drawer-system
+  # studio test fixtures exist yet — all aspirational pending that
+  # harness.
+
   # Context:
   # Currently, selecting a node opens a right-sidebar properties panel with play/expand/close buttons.
   # The panel uses Framer Motion to animate between collapsed (right sidebar) and expanded (centered).

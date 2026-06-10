@@ -39,7 +39,7 @@ func TestCodeBlock_HappyPath(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Nil(t, res.Error, "expected no error, got %+v", res.Error)
-	assert.Equal(t, float64(5), res.Outputs["sum"])
+	assert.InDelta(t, 5.0, res.Outputs["sum"], 1e-9)
 }
 
 func TestCodeBlock_StdoutCaptured(t *testing.T) {
@@ -78,7 +78,7 @@ func TestCodeBlock_ExtraOutputKeysPreserved(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Nil(t, res.Error)
-	assert.Equal(t, float64(5), res.Outputs["sum"])
+	assert.InDelta(t, 5.0, res.Outputs["sum"], 1e-9)
 	scratch, hasScratch := res.Outputs["scratch"]
 	assert.True(t, hasScratch, "undeclared output keys must be preserved (legacy parity)")
 	assert.Equal(t, []any{float64(1), float64(2), float64(3)}, scratch)
@@ -155,7 +155,7 @@ class Code(dspy.Module):
 	})
 	require.NoError(t, err)
 	require.Nil(t, res.Error, "expected no error, got %+v", res.Error)
-	assert.Equal(t, float64(15), res.Outputs["sum"])
+	assert.InDelta(t, 15.0, res.Outputs["sum"], 1e-9)
 }
 
 // TestCodeBlock_PlainClassWithForward covers the new default template:
@@ -174,7 +174,7 @@ func TestCodeBlock_PlainClassWithForward(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Nil(t, res.Error, "expected no error, got %+v", res.Error)
-	assert.Equal(t, float64(42), res.Outputs["doubled"])
+	assert.InDelta(t, 42.0, res.Outputs["doubled"], 1e-9)
 }
 
 // TestCodeBlock_PlainClassWithCallable pins the idiomatic-Python
@@ -202,7 +202,7 @@ func TestCodeBlock_PlainClassWithCallable(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Nil(t, res.Error, "expected no error, got %+v", res.Error)
-	assert.Equal(t, float64(42), res.Outputs["doubled"])
+	assert.InDelta(t, 42.0, res.Outputs["doubled"], 1e-9)
 }
 
 // TestCodeBlock_CallableTakesPriorityOverForward pins the resolution
@@ -253,7 +253,7 @@ class Code(dspy.Module):
 	require.NoError(t, err)
 	require.Nil(t, res.Error, "expected no error, got %+v", res.Error)
 	assert.Equal(t, "42", res.Outputs["answer"])
-	assert.Equal(t, 0.9, res.Outputs["confidence"])
+	assert.InDelta(t, 0.9, res.Outputs["confidence"], 1e-9)
 }
 
 // TestCodeBlock_DspyMarkerImportsAreInert covers the marker-only
@@ -341,6 +341,72 @@ class Code(dspy.Module):
 	assert.Contains(t, res.Error.Message, "Example")
 }
 
+// TestCodeBlock_SecretsExposedAsNamespace pins the customer-reported
+// fix: a configured project secret rides on the request and the runner
+// exposes it as `secrets.NAME` attribute access — matching the Studio
+// code-editor hint and the Python executor's build_secrets_preamble.
+func TestCodeBlock_SecretsExposedAsNamespace(t *testing.T) {
+	requirePython(t)
+	res, err := newExec(t).Execute(context.Background(), codeblock.Request{
+		Code:            "def execute():\n    return {'token': secrets.CLOUDFLARE_ACCESS_CLIENT_ID}\n",
+		Secrets:         map[string]string{"CLOUDFLARE_ACCESS_CLIENT_ID": "id-123"},
+		DeclaredOutputs: []string{"token"},
+	})
+	require.NoError(t, err)
+	require.Nil(t, res.Error, "expected no error, got %+v", res.Error)
+	assert.Equal(t, "id-123", res.Outputs["token"])
+}
+
+// TestCodeBlock_SecretsValueWithSpecialChars guards the escaping path:
+// SimpleNamespace(**secrets) takes values verbatim (no string-literal
+// interpolation), so quotes/newlines/backslashes in a secret survive
+// intact — a regression the old regex-replacement approach was prone to.
+func TestCodeBlock_SecretsValueWithSpecialChars(t *testing.T) {
+	requirePython(t)
+	tricky := "v'al\"ue\nwith\\chars"
+	res, err := newExec(t).Execute(context.Background(), codeblock.Request{
+		Code:            "def execute():\n    return {'s': secrets.WEIRD}\n",
+		Secrets:         map[string]string{"WEIRD": tricky},
+		DeclaredOutputs: []string{"s"},
+	})
+	require.NoError(t, err)
+	require.Nil(t, res.Error, "expected no error, got %+v", res.Error)
+	assert.Equal(t, tricky, res.Outputs["s"])
+}
+
+// TestCodeBlock_UndefinedSecretRaisesAttributeError pins that a
+// reference to a secret that isn't configured fails as AttributeError
+// (the namespace exists but the attr doesn't), not a silent empty value.
+func TestCodeBlock_UndefinedSecretRaisesAttributeError(t *testing.T) {
+	requirePython(t)
+	res, err := newExec(t).Execute(context.Background(), codeblock.Request{
+		Code:            "def execute():\n    return {'x': secrets.ABSENT}\n",
+		Secrets:         map[string]string{"PRESENT": "yes"},
+		DeclaredOutputs: []string{"x"},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, res.Error)
+	assert.Equal(t, "AttributeError", res.Error.Type)
+	assert.Contains(t, res.Error.Message, "ABSENT")
+}
+
+// TestCodeBlock_NoSecretsLeavesNamespaceUndefined pins Python parity:
+// with no secrets configured, `secrets` is undefined (NameError),
+// matching build_secrets_preamble's no-op on an empty/None map. This is
+// deliberate — we don't inject an empty namespace, so behavior is
+// identical across the Go and Python engines.
+func TestCodeBlock_NoSecretsLeavesNamespaceUndefined(t *testing.T) {
+	requirePython(t)
+	res, err := newExec(t).Execute(context.Background(), codeblock.Request{
+		Code:            "def execute():\n    return {'x': secrets.ANYTHING}\n",
+		DeclaredOutputs: []string{"x"},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, res.Error)
+	assert.Equal(t, "NameError", res.Error.Type)
+	assert.Contains(t, res.Error.Message, "secrets")
+}
+
 func TestCodeBlock_InvocationsAreIsolated(t *testing.T) {
 	requirePython(t)
 	exec := newExec(t)
@@ -353,6 +419,6 @@ func TestCodeBlock_InvocationsAreIsolated(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Nil(t, res.Error, "iter %d", i)
-		assert.Equal(t, float64(1), res.Outputs["x"], "no global state leak between invocations")
+		assert.InDelta(t, 1.0, res.Outputs["x"], 1e-9, "no global state leak between invocations")
 	}
 }

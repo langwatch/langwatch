@@ -5,7 +5,7 @@
  * Includes run color assignments for visual differentiation.
  */
 import { useMemo } from "react";
-import type { ExperimentRunWithItems } from "~/server/evaluations-v3/services/types";
+import type { ExperimentRunWithItems } from "~/server/experiments-v3/services/types";
 import { api } from "~/utils/api";
 
 // Run colors for comparison mode - distinct, accessible colors

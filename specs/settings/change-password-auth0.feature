@@ -98,6 +98,19 @@ Feature: Change password from /settings/authentication
     And the server does NOT call the Management API
     And the tRPC mutation throws UNAUTHORIZED with message "Current password is incorrect"
 
+  # The two `@unimplemented` scenarios below describe behaviour that is
+  # implemented in the source but has no asserting test:
+  #   * AUTH0_CLIENT_ID/SECRET fallback path:
+  #     `passwordService.ts` reads
+  #     `env.AUTH0_MGMT_CLIENT_ID ?? env.AUTH0_CLIENT_ID` (and the secret
+  #     mirror), but the existing
+  #     `passwordService.integration.test.ts` only mocks
+  #     `AUTH0_CLIENT_ID/SECRET` and does not assert which env var the
+  #     service picked. A binding test would need to vary the env
+  #     surface between two test runs.
+  #   * Rate limit (5/15min) — implemented in the `user.changePassword`
+  #     tRPC mutation against a Redis-backed limiter; no router-level
+  #     integration test exercises the limiter today.
   @integration @unimplemented
   Scenario: Auth0 backend falls back to AUTH0_CLIENT_ID/SECRET when the M2M vars are absent
     Given AUTH0_MGMT_CLIENT_ID and AUTH0_MGMT_CLIENT_SECRET are not set
@@ -128,6 +141,14 @@ Feature: Change password from /settings/authentication
     And the server logs the grant-misconfig error
     And I see an error toast telling an administrator to enable the Password grant
 
+  # The email-mode end-to-end flow (router-level test that wires
+  # together password verification + Prisma update + session revoke)
+  # has no integration test today. The pieces are tested individually:
+  #   * `revokeOtherSessionsForUser` — `revokeSessions.test.ts`
+  #   * BetterAuth credential update — covered by `auth.test.ts` paths
+  # but no test exercises the `user.changePassword` mutation in email
+  # mode end-to-end. Leaving `@unimplemented` until the router test
+  # exists.
   @regression @integration @unimplemented
   Scenario: Email-provider mode continues to verify the current password and revoke other sessions
     Given the tenant runs on NEXTAUTH_PROVIDER="email"

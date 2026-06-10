@@ -3,6 +3,13 @@ Feature: Studio Evaluator Node Drawer
   I want evaluator nodes to use the evaluator editor drawer with local state
   So that I can edit evaluator settings without immediately affecting the global evaluator record
 
+  # All scenarios describe evaluator-node behavior on the workflow studio
+  # canvas (evaluator editor drawer, localConfig, Apply/Save/Discard).
+  # Need a studio-canvas component test against the evaluator drawer
+  # flow. The standalone EvaluatorEditorDrawer already has its own
+  # tests (`langwatch/src/components/evaluators/__tests__/`) but not
+  # in the workflow-studio context where localConfig diverges from DB.
+
   # Context:
   # After PR #1589, dragging an evaluator opens the evaluator list drawer to select/create.
   # The node then references evaluators/<id>.

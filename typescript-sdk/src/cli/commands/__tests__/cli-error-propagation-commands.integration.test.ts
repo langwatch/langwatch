@@ -133,6 +133,7 @@ function makeTestDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-cli-cmd-err-"));
 }
 
+/** @scenario Common error conditions map to actionable messages for every CLI command */
 describe("CLI error propagation across commands", () => {
   let testDir: string;
 

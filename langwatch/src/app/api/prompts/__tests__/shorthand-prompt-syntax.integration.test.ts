@@ -23,6 +23,7 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
   let testOrganization: Organization;
   let testTeam: Team;
   let testProject: Project;
+  let testDefaultConfigId: string;
 
   const makeRequest = (path: string, options?: RequestInit) =>
     app.request(path, {
@@ -31,7 +32,7 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
     });
 
   beforeEach(async () => {
-    resetApp();
+    await resetApp();
     globalForApp.__langwatch_app = createTestApp({
       planProvider: PlanProviderService.create({
         getActivePlan: vi
@@ -56,13 +57,28 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
       },
     });
 
-    testProject = projectFactory.build({ slug: nanoid() });
     testProject = await prisma.project.create({
-      data: { ...testProject, teamId: testTeam.id },
+      data: { ...projectFactory.build({ slug: nanoid() }), teamId: testTeam.id },
     });
 
     testApiKey = testProject.apiKey;
     testProjectId = testProject.id;
+
+    // Cascade resolver requires a DEFAULT model at some scope to create
+    // a prompt; seed an org-scope row.
+    const seededDefault = await prisma.modelDefaultConfig.create({
+      data: {
+        config: { DEFAULT: "openai/gpt-4o-mini" },
+        organizationId: testOrganization.id,
+        scopes: {
+          create: [
+            { scopeType: "ORGANIZATION", scopeId: testOrganization.id },
+          ],
+        },
+      },
+      select: { id: true },
+    });
+    testDefaultConfigId = seededDefault.id;
 
     await prisma.promptTag.createMany({
       data: [
@@ -76,6 +92,14 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
     await prisma.promptTagAssignment.deleteMany({ where: { projectId: testProjectId } });
     await prisma.llmPromptConfigVersion.deleteMany({ where: { projectId: testProjectId } });
     await prisma.llmPromptConfig.deleteMany({ where: { projectId: testProjectId } });
+    await prisma.modelDefaultConfigScope.deleteMany({
+      where: { scopeType: "ORGANIZATION", scopeId: testOrganization.id },
+    });
+    if (testDefaultConfigId) {
+      await prisma.modelDefaultConfig.deleteMany({
+        where: { id: testDefaultConfigId },
+      });
+    }
     await prisma.project.delete({ where: { id: testProjectId } });
     await prisma.team.delete({ where: { id: testTeam.id } });
     await prisma.promptTag.deleteMany({ where: { organizationId: testOrganization.id } });

@@ -13,6 +13,11 @@
 
 app:
   replicaCount: 3
+  # Multi-pod: local-FS is unsafe (pods don't share filesystems). Combine
+  # with cold-storage-s3.yaml or set app.dataplane.enabled=true.
+  storedObjects:
+    localFilesystem:
+      enabled: false
   resources:
     requests: { cpu: 1, memory: 4Gi }
     limits:   { cpu: 2, memory: 4Gi }
@@ -31,8 +36,8 @@ workers:
 langwatch_nlp:
   replicaCount: 2
   resources:
-    requests: { cpu: 1, memory: 2Gi }
-    limits:   { cpu: 2, memory: 4Gi }
+    requests: { cpu: 250m, memory: 256Mi }
+    limits:   { cpu: 1, memory: 1Gi }
 
 langevals:
   replicaCount: 2

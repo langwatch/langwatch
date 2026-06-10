@@ -169,7 +169,7 @@ func TestRouter_AuthMiddleware_MissingToken(t *testing.T) {
 func TestRouter_AuthMiddleware_ValidToken(t *testing.T) {
 	auth := &mockAuth{
 		resolveFn: func(_ context.Context, token string) (*domain.Bundle, error) {
-			if token == "lw_vk_test" {
+			if token == "vk-lw-test" {
 				return testBundle(), nil
 			}
 			return nil, herr.New(context.Background(), domain.ErrInvalidAPIKey, nil)
@@ -189,7 +189,7 @@ func TestRouter_AuthMiddleware_ValidToken(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(chatBody()))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer lw_vk_test")
+	req.Header.Set("Authorization", "Bearer vk-lw-test")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -208,7 +208,7 @@ func TestRouter_AuthMiddleware_ValidToken(t *testing.T) {
 func TestRouter_AuthMiddleware_XGoogApiKey(t *testing.T) {
 	auth := &mockAuth{
 		resolveFn: func(_ context.Context, token string) (*domain.Bundle, error) {
-			if token == "lw_vk_test" {
+			if token == "vk-lw-test" {
 				return testBundle(), nil
 			}
 			return nil, herr.New(context.Background(), domain.ErrInvalidAPIKey, nil)
@@ -228,7 +228,7 @@ func TestRouter_AuthMiddleware_XGoogApiKey(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(chatBody()))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Goog-Api-Key", "lw_vk_test")
+	req.Header.Set("X-Goog-Api-Key", "vk-lw-test")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -238,7 +238,7 @@ func TestRouter_AuthMiddleware_XGoogApiKey(t *testing.T) {
 func TestRouter_AuthMiddleware_XApiKey(t *testing.T) {
 	auth := &mockAuth{
 		resolveFn: func(_ context.Context, token string) (*domain.Bundle, error) {
-			if token == "lw_vk_test" {
+			if token == "vk-lw-test" {
 				return testBundle(), nil
 			}
 			return nil, herr.New(context.Background(), domain.ErrInvalidAPIKey, nil)
@@ -258,7 +258,7 @@ func TestRouter_AuthMiddleware_XApiKey(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(chatBody()))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-api-key", "lw_vk_test")
+	req.Header.Set("x-api-key", "vk-lw-test")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -290,7 +290,7 @@ func TestRouter_DispatchError_RateLimited(t *testing.T) {
 	)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(chatBody()))
-	req.Header.Set("Authorization", "Bearer lw_vk_test")
+	req.Header.Set("Authorization", "Bearer vk-lw-test")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -326,7 +326,7 @@ func TestRouter_DispatchError_BudgetExceeded(t *testing.T) {
 	)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(chatBody()))
-	req.Header.Set("Authorization", "Bearer lw_vk_test")
+	req.Header.Set("Authorization", "Bearer vk-lw-test")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -356,7 +356,7 @@ func TestRouter_MetaHeaders(t *testing.T) {
 	)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(chatBody()))
-	req.Header.Set("Authorization", "Bearer lw_vk_test")
+	req.Header.Set("Authorization", "Bearer vk-lw-test")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -364,12 +364,12 @@ func TestRouter_MetaHeaders(t *testing.T) {
 	assert.NotEmpty(t, rec.Header().Get("X-LangWatch-Gateway-Request-Id"))
 }
 
-// TestRouter_BodySizeCap_DefaultsTo32MiB pins the contract: a request
+// TestRouter_BodySizeCap_RejectsOverLimit pins the contract: a request
 // strictly over the explicit cap is rejected with 413, a request below is
 // accepted. Uses a small-ish 1 KiB cap so the test can fit a giant-enough
 // body in memory without dominating the test suite. Zero-cap fallback is
 // exercised implicitly by every other test in this file (buildRouter leaves
-// MaxRequestBodyBytes unset → fallback to 32 MiB).
+// MaxRequestBodyBytes unset → fallback to the default cap).
 func TestRouter_BodySizeCap_RejectsOverLimit(t *testing.T) {
 	auth := &mockAuth{
 		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
@@ -405,7 +405,7 @@ func TestRouter_BodySizeCap_RejectsOverLimit(t *testing.T) {
 	body = append(body, []byte(`"}]}`)...)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
-	req.Header.Set("Authorization", "Bearer lw_vk_test")
+	req.Header.Set("Authorization", "Bearer vk-lw-test")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -433,7 +433,7 @@ func TestRouter_VersionHeader(t *testing.T) {
 	)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(chatBody()))
-	req.Header.Set("Authorization", "Bearer lw_vk_test")
+	req.Header.Set("Authorization", "Bearer vk-lw-test")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -485,12 +485,68 @@ func TestRouter_Responses_LargeBody_PicksStreamHandler(t *testing.T) {
 	require.Greater(t, len(body), 40*1024)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/responses", bytes.NewReader(body))
-	req.Header.Set("Authorization", "Bearer lw_vk_test")
+	req.Header.Set("Authorization", "Bearer vk-lw-test")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
 	require.False(t, syncCalled, "Responses handler routed large body with stream:true through non-streaming Dispatch")
 	require.True(t, streamCalled, "Responses handler did not pick streaming path for stream:true beyond default peek window")
+}
+
+// Regression for bug 32: Claude Code sends 100 KiB+ /v1/messages bodies
+// with the top-level `stream` flag dead last (after the unbounded
+// messages array), and its offset grows with every conversation turn. A
+// fixed-size peek window — even the 256 KiB large variant — misses it
+// past that point, routing the streaming request through the
+// non-streaming handler: Anthropic answers 200+SSE, Bifrost can't
+// unmarshal the SSE frames as one JSON object, and the client gets a 502
+// with the SSE as the error body (claude then retries forever). Padding
+// the body past 256 KiB proves stream detection is size-independent
+// (full-body read), not merely a larger fixed peek.
+func TestRouter_Messages_HugeBody_PicksStreamHandler(t *testing.T) {
+	auth := &mockAuth{
+		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
+			return testBundle(), nil
+		},
+	}
+
+	syncCalled := false
+	streamCalled := false
+	provider := &mockStreamProvider{
+		mockProvider: mockProvider{
+			dispatchFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (*domain.Response, error) {
+				syncCalled = true
+				return successResponse(), nil
+			},
+		},
+		dispatchStreamFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (domain.StreamIterator, error) {
+			streamCalled = true
+			return &emptyStreamIter{}, nil
+		},
+	}
+
+	router := buildRouter(
+		app.WithAuth(auth),
+		app.WithProviders(provider),
+		app.WithLogger(zap.NewNop()),
+	)
+
+	// ~1 MiB body — well past the 256 KiB large-peek — with `stream:true`
+	// at the very tail, mirroring how Claude Code serializes the field
+	// after a large messages/system payload.
+	padding := bytes.Repeat([]byte("x"), 1024*1024)
+	body := []byte(`{"model":"claude-opus-4-7","messages":[{"role":"user","content":"`)
+	body = append(body, padding...)
+	body = append(body, []byte(`"}],"stream":true}`)...)
+	require.Greater(t, len(body), 256*1024)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/messages", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer vk-lw-test")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.False(t, syncCalled, "messages handler routed huge stream:true body through non-streaming Dispatch")
+	require.True(t, streamCalled, "messages handler did not pick streaming path for stream:true beyond any fixed peek window")
 }
 
 type mockStreamProvider struct {
@@ -566,7 +622,7 @@ func TestRouter_GeminiPassthrough_NonStreaming(t *testing.T) {
 
 	geminiBody := []byte(`{"contents":[{"role":"user","parts":[{"text":"hi"}]}]}`)
 	req := httptest.NewRequest(http.MethodPost, "/v1beta/models/gemini-2.5-flash:generateContent", bytes.NewReader(geminiBody))
-	req.Header.Set("X-Goog-Api-Key", "lw_vk_test")
+	req.Header.Set("X-Goog-Api-Key", "vk-lw-test")
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -621,7 +677,7 @@ func TestRouter_GeminiPassthrough_Streaming_PicksStream(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost,
 		"/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse",
 		bytes.NewReader([]byte(`{"contents":[{"role":"user","parts":[{"text":"hi"}]}]}`)))
-	req.Header.Set("X-Goog-Api-Key", "lw_vk_test")
+	req.Header.Set("X-Goog-Api-Key", "vk-lw-test")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 

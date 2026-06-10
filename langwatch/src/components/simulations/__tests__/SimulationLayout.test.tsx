@@ -61,7 +61,12 @@ describe("<SimulationLayout/>", () => {
         });
 
         render(
-          <SimulationLayout period={defaultPeriod} setPeriod={noop}>
+          <SimulationLayout
+            period={defaultPeriod}
+            mode="relative"
+            setPeriod={noop}
+            setRelativePeriod={noop}
+          >
             <div>content</div>
           </SimulationLayout>,
           { wrapper: Wrapper }
@@ -83,7 +88,12 @@ describe("<SimulationLayout/>", () => {
         });
 
         render(
-          <SimulationLayout period={defaultPeriod} setPeriod={noop}>
+          <SimulationLayout
+            period={defaultPeriod}
+            mode="relative"
+            setPeriod={noop}
+            setRelativePeriod={noop}
+          >
             <div>content</div>
           </SimulationLayout>,
           { wrapper: Wrapper }
@@ -102,7 +112,12 @@ describe("<SimulationLayout/>", () => {
         });
 
         render(
-          <SimulationLayout period={defaultPeriod} setPeriod={noop}>
+          <SimulationLayout
+            period={defaultPeriod}
+            mode="relative"
+            setPeriod={noop}
+            setRelativePeriod={noop}
+          >
             <div>content</div>
           </SimulationLayout>,
           { wrapper: Wrapper }

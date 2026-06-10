@@ -23,8 +23,8 @@ jobs:
       run:
         working-directory: charts/clickhouse-serverless
     steps:
-      - uses: actions/checkout@v4
-      - uses: azure/setup-helm@v5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5
         with:
           version: v3.12.0
       - run: make template
@@ -37,14 +37,14 @@ jobs:
       run:
         working-directory: charts/clickhouse-serverless
     steps:
-      - uses: actions/checkout@v4
-      - uses: azure/setup-helm@v5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5
         with:
           version: v3.12.0
       - name: Build Docker image for Kind
         run: |
           docker build -t langwatch/clickhouse-serverless:next ../../clickhouse-serverless/
-      - uses: helm/kind-action@v1
+      - uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1
         with:
           cluster_name: ch-test
       - name: Load image into Kind

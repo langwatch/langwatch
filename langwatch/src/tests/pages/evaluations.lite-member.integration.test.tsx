@@ -293,6 +293,7 @@ describe("Evaluations page permission visibility", () => {
         permission !== "evaluations:manage";
     });
 
+    /** @scenario Lite member clicks edit or delete on an evaluation and sees restriction modal */
     it("hides the delete menu item", () => {
       renderPage();
 

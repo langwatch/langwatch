@@ -7,20 +7,22 @@
  * - `DrawerProps<T>`: Props type for a specific drawer
  * - `DrawerCallbacks<T>`: Callback props (functions) for a specific drawer
  */
-import { lazy, type ComponentProps } from "react";
+import { lazy, type ComponentProps, type FC } from "react";
 
 import { AddAnnotationQueueDrawer } from "./AddAnnotationQueueDrawer";
 import { AddDatasetRecordDrawerV2 } from "./AddDatasetRecordDrawer";
 import { AddOrEditAnnotationScoreDrawer } from "./AddOrEditAnnotationScoreDrawer";
 import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
 import { AutomationDrawer } from "./AddAutomationDrawer";
-import { AgentCodeEditorDrawer } from "./agents/AgentCodeEditorDrawer";
 import { AgentHistoryDrawer } from "./agents/AgentHistoryDrawer";
-import { AgentHttpEditorDrawer } from "./agents/AgentHttpEditorDrawer";
 import { AgentListDrawer } from "./agents/AgentListDrawer";
 import { AgentTypeSelectorDrawer } from "./agents/AgentTypeSelectorDrawer";
 import { AgentWorkflowEditorDrawer } from "./agents/AgentWorkflowEditorDrawer";
-import { WorkflowSelectorDrawer } from "./agents/WorkflowSelectorDrawer";
+import {
+  AgentCodeEditorDrawerFromUrl,
+  AgentHttpEditorDrawerFromUrl,
+  WorkflowSelectorDrawerFromUrl,
+} from "./agents/drawerFromUrl";
 import { AlertDrawer } from "./analytics/AlertDrawer";
 import { DashboardNameDrawer } from "./analytics/DashboardNameDrawer";
 import { BatchEvaluationDrawer } from "./BatchEvaluationDrawer";
@@ -37,6 +39,7 @@ import { EvaluatorHistoryDrawer } from "./evaluators/EvaluatorHistoryDrawer";
 import { EvaluatorListDrawer } from "./evaluators/EvaluatorListDrawer";
 import { EvaluatorTypeSelectorDrawer } from "./evaluators/EvaluatorTypeSelectorDrawer";
 import { WorkflowSelectorForEvaluatorDrawer } from "./evaluators/WorkflowSelectorForEvaluatorDrawer";
+import { FeatureFlagsDrawer } from "./drawers/FeatureFlagsDrawer";
 import { SdkRadarDrawer } from "./drawers/SdkRadarDrawer";
 // Lazy-loaded: FoundryDrawer transitively imports the OTel SDK which has
 // side effects that break React if evaluated eagerly at app startup.
@@ -44,15 +47,29 @@ const FoundryDrawer = lazy(
   () => import("./ops/foundry/FoundryDrawer").then((m) => ({ default: m.FoundryDrawer })),
 );
 import { CreateProjectDrawer } from "./projects/CreateProjectDrawer";
+import { EditProjectDrawer } from "./projects/EditProjectDrawer";
 import { PromptEditorDrawer } from "./prompts/PromptEditorDrawer";
 import { PromptListDrawer } from "./prompts/PromptListDrawer";
 import { SeriesFiltersDrawer } from "./SeriesFilterDrawer";
 import { ScenarioFormDrawerFromUrl } from "./scenarios/ScenarioFormDrawer";
 import { CreateTeamDrawer } from "./settings/CreateTeamDrawer";
+import { DefaultModelOverrideDrawer } from "./settings/DefaultModelOverrideDrawer";
 import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
 import { ScenarioRunDetailDrawer } from "./simulations/ScenarioRunDetailDrawer";
 import { SuiteFormDrawer } from "./suites/SuiteFormDrawer";
 import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
+// Traces V2 drawers — the real shell is mounted from `TracesPage` based
+// on the drawer store (so a click → drawer-open is synchronous, no
+// round-trip through the URL). The registry entry stays as a noop so
+// the `DrawerType` union still contains `"traceV2Details"` and every
+// `openDrawer("traceV2Details", …)` call still typechecks; CurrentDrawer
+// rendering it would just double-mount on top of the page-level mount.
+// The prop shape mirrors `TraceV2DrawerShellProps` exactly so
+// `openDrawer("traceV2Details", { traceId, t, ... })` still typechecks
+// at every call site.
+import type { TraceV2DrawerShellProps } from "../features/traces-v2/components/TraceDrawer";
+
+const TraceV2DrawerNoop: FC<TraceV2DrawerShellProps> = () => null;
 // Evaluations V3 drawers
 import { TargetTypeSelectorDrawer } from "./targets/TargetTypeSelectorDrawer";
 
@@ -62,9 +79,11 @@ import { TargetTypeSelectorDrawer } from "./targets/TargetTypeSelectorDrawer";
  */
 export const drawers = {
   traceDetails: TraceDetailsDrawer,
+  traceV2Details: TraceV2DrawerNoop,
   batchEvaluation: BatchEvaluationDrawer,
   automation: AutomationDrawer,
   editModelProvider: EditModelProviderDrawer,
+  defaultModelOverride: DefaultModelOverrideDrawer,
   addOrEditAnnotationScore: AddOrEditAnnotationScoreDrawer,
   addAnnotationQueue: AddAnnotationQueueDrawer,
   addDatasetRecord: AddDatasetRecordDrawerV2,
@@ -83,10 +102,10 @@ export const drawers = {
   agentList: AgentListDrawer,
   agentHistory: AgentHistoryDrawer,
   agentTypeSelector: AgentTypeSelectorDrawer,
-  agentCodeEditor: AgentCodeEditorDrawer,
-  agentHttpEditor: AgentHttpEditorDrawer,
+  agentCodeEditor: AgentCodeEditorDrawerFromUrl,
+  agentHttpEditor: AgentHttpEditorDrawerFromUrl,
   agentWorkflowEditor: AgentWorkflowEditorDrawer,
-  workflowSelector: WorkflowSelectorDrawer,
+  workflowSelector: WorkflowSelectorDrawerFromUrl,
   evaluatorHistory: EvaluatorHistoryDrawer,
   evaluatorList: EvaluatorListDrawer,
   evaluatorCategorySelector: EvaluatorCategorySelectorDrawer,
@@ -101,12 +120,15 @@ export const drawers = {
   suiteEditor: SuiteFormDrawer,
   // Project management
   createProject: CreateProjectDrawer,
+  editProject: EditProjectDrawer,
   createTeam: CreateTeamDrawer,
   // Online Evaluations (Monitors)
   onlineEvaluation: OnlineEvaluationDrawer,
   guardrails: GuardrailsDrawer,
   // SDK Radar
   sdkRadar: SdkRadarDrawer,
+  // Dev tools
+  featureFlags: FeatureFlagsDrawer,
   // Ops
   foundry: FoundryDrawer,
 } satisfies Record<string, React.FC<any>>;

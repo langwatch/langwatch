@@ -3,6 +3,13 @@ Feature: Custom Models Management
   I want to manage custom models through a structured interface
   So that I can add models with proper metadata and see them alongside registry models
 
+  # All scenarios describe the Custom Models section of the provider drawer
+  # (Add Model dialog, Add Embeddings Model dialog, See All Models modal,
+  # ModelSelector integration). Need a JSDOM render of `CustomModelsSection`
+  # + the Add Model dialog. Schema-level pieces (CustomModelEntry validation,
+  # legacy-string conversion, registry-vs-custom typing) are already covered
+  # by `customModel.schema.unit.test.ts`. Aspirational pending the dialog harness.
+
   Background:
     Given I am logged in
     And I have access to a project

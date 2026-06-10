@@ -6,6 +6,11 @@ Feature: Scenario Library
   Background:
     Given I am logged into project "my-project"
 
+  # Per AUDIT_MANIFEST.md: 5 scenarios → 2 DUPLICATE (already covered elsewhere
+  # and removed) + 3 KEEP. The 3 KEEP scenarios remain @unimplemented pending
+  # integration test coverage for list-page wrapper, row-click navigation, and
+  # empty state CTA — tracked in PR #3458.
+
   # ============================================================================
   # Navigation
   # ============================================================================
@@ -19,17 +24,6 @@ Feature: Scenario Library
   # ============================================================================
   # List View
   # ============================================================================
-
-  @e2e @unimplemented
-  Scenario: View scenarios in list
-    Given scenarios exist in the project:
-      | name          | labels              |
-      | Refund Flow   | ["support"]         |
-      | Billing Check | ["billing", "edge"] |
-    When I am on the scenarios list page
-    Then I see a list with both scenarios
-    And each row shows the scenario name
-    And each row shows the labels
 
   @e2e @unimplemented
   Scenario: Click scenario row to edit
@@ -48,8 +42,3 @@ Feature: Scenario Library
   # Filtering
   # ============================================================================
 
-  @e2e @unimplemented
-  Scenario: Filter scenarios by label
-    Given scenarios exist with various labels
-    When I select label "support" in the filter
-    Then I only see scenarios with the "support" label

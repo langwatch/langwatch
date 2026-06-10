@@ -1,4 +1,13 @@
 Feature: AI Gateway — Coding CLI integrations
+
+  # All scenarios in this file describe how third-party CLIs (Claude
+  # Code, Codex, opencode, Cursor, Aider) interact with the LangWatch
+  # AI Gateway. They require running the gateway service plus the
+  # third-party CLI under test — neither integration exists in the
+  # TypeScript test harness. The data-plane scenarios (streaming,
+  # cache, budget hard-cap, VK revocation) are also Go-side. All
+  # aspirational pending an end-to-end CLI integration harness.
+
   As a LangWatch customer rolling out governed AI usage to engineering teams
   I want every coding CLI (Claude Code, Codex, opencode, Cursor, Aider) to work
   against the LangWatch AI Gateway with no custom client code
@@ -12,7 +21,7 @@ Feature: AI Gateway — Coding CLI integrations
 
   Background:
     Given the LangWatch AI Gateway is running at "http://localhost:7400"
-    And a LangWatch virtual key "cli-key" exists with secret "lw_vk_live_01HZX..."
+    And a LangWatch virtual key "cli-key" exists with secret "vk-lw-01HZX..."
     And the key has providers [openai (primary), anthropic (fallback)]
     And the key has models_allowed ["gpt-5-mini", "claude-haiku-4-5-20251001"]
 
@@ -27,7 +36,7 @@ Feature: AI Gateway — Coding CLI integrations
     When I run `claude --print "say hi"`
     Then the exit code is 0
     And the Claude Code process sent a POST to "http://localhost:7400/v1/messages"
-    And the request used header "x-api-key: lw_vk_live_..."
+    And the request used header "x-api-key: vk-lw-..."
     And the request body was a valid Anthropic Messages payload
     And the response was OpenAI-compatible-error-free (no 401/402/403/404)
     And the LangWatch trace in project "gateway-demo" shows span "gateway.messages" with attribute "langwatch.client.name=claude-code"
@@ -61,7 +70,7 @@ Feature: AI Gateway — Coding CLI integrations
     When I run `codex exec "say hi"`
     Then the exit code is 0
     And Codex sent a POST to "http://localhost:7400/v1/chat/completions"
-    And the request used header "Authorization: Bearer lw_vk_live_..."
+    And the request used header "Authorization: Bearer vk-lw-..."
 
   @integration @cli @codex @responses-api @unimplemented
   Scenario: Codex with wire_api "responses" hits /v1/responses

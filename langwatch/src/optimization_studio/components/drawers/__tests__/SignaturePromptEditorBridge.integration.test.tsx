@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import React from "react";
 import type { Node } from "@xyflow/react";
 import type { Component, Signature } from "../../../types/dsl";
-import type { LocalPromptConfig } from "~/evaluations-v3/types";
+import type { LocalPromptConfig } from "~/experiments-v3/types";
 
 // ---- Mocks ----
 

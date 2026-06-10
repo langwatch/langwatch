@@ -3,6 +3,31 @@ Feature: SCIM Group Mapping
   I want SCIM-provisioned groups to be stored as Groups in LangWatch and assigned RoleBindings
   So that identity-provider group membership automatically grants scoped access
 
+  # Parity status: 4 of 24 scenarios bound to existing tests.
+  # The remaining are tracked under #3458:
+  #   - 20 NO_TEST: behavior shipped + correct, no integration test yet exists
+  # NO_TEST gaps:
+  #   - "Entra pushes a new group via SCIM"
+  #   - "Entra pushes a group that already exists"
+  #   - "Entra pushes members for a group with no RoleBindings"
+  #   - "Entra pushes members for a group that has a RoleBinding"
+  #   - "Entra removes a member from a group"
+  #   - "Entra replaces full member list on a group"
+  #   - "Entra deletes a SCIM group"
+  #   - "Admin lists all SCIM groups"
+  #   - "Admin adds a RoleBinding to a SCIM group"
+  #   - "Admin removes a RoleBinding from a SCIM group"
+  #   - "Admin deletes a SCIM group"
+  #   - "Non-enterprise org cannot access group management endpoints"
+  #   - "Non-admin user cannot manage group bindings"
+  #   - "Custom role is available when assigning a binding to a group"
+  #   - "Deprovisioned user's org membership and role bindings are cleaned up"
+  #   - "Admin views SCIM groups table"
+  #   - "Admin sees member count per group"
+  #   - "Admin assigns a RoleBinding to a group via the settings UI"
+  #   - "Group member's access is resolved through standard RBAC"
+  #   - "Org admin override applies for SCIM-managed group members"
+
   Background:
     Given an organization on the ENTERPRISE plan
     And SCIM provisioning is enabled for the organization
@@ -110,25 +135,25 @@ Feature: SCIM Group Mapping
   # Built-in roles have a clear hierarchy: ADMIN > MEMBER > VIEWER
   # Users in multiple groups inherit the highest role at each scope
 
-  @unit @unimplemented
+  @unit
   Scenario: User with multiple roles resolves to the most permissive
     Given a user has roles [VIEWER, MEMBER] from different group bindings at the same scope
     When the effective role is resolved
     Then the result is MEMBER
 
-  @unit @unimplemented
+  @unit
   Scenario: Role hierarchy resolves ADMIN as most permissive
     Given a user has roles [MEMBER, ADMIN] from different group bindings
     When the effective role is resolved
     Then the result is ADMIN
 
-  @unit @unimplemented
+  @unit
   Scenario: Removing a binding recalculates to remaining most permissive
     Given a user has roles [VIEWER, MEMBER] from two group bindings
     When the MEMBER binding is removed
     Then the effective role recalculates to VIEWER
 
-  @unit @unimplemented
+  @unit
   Scenario: Role hierarchy ordering
     Given the role hierarchy for conflict resolution
     Then ADMIN is more permissive than MEMBER

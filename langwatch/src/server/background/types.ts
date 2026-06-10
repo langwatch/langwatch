@@ -5,7 +5,6 @@ import type {
   RESTEvaluation,
   ReservedTraceMetadata,
   Span,
-  TrackEventRESTParamsValidator,
 } from "../tracer/types";
 
 export type EvaluationJobCheck = {
@@ -64,15 +63,6 @@ export type TopicClusteringJob = {
   search_after?: [number, string];
 };
 
-export type TrackEventJob = {
-  project_id: string;
-  postpone_count: number;
-  event: TrackEventRESTParamsValidator & {
-    event_id: string;
-    timestamp: number;
-  };
-};
-
 export type CollectorJob = {
   spans: Span[];
   evaluations: RESTEvaluation[] | undefined;
@@ -100,5 +90,20 @@ export type CollectorCheckAndAdjustJob = {
 export type UsageStatsJob = {
   instance_id: string;
   timestamp: number;
+};
+
+export type AnomalyDetectionJob = {
+  /**
+   * Wall-clock timestamp the evaluator uses as `now`. Stored on the job
+   * so re-runs for the same scheduled tick are deterministic.
+   */
+  timestamp: number;
+};
+
+export type IngestionPullerJob = {
+  /** IngestionSource id this run targets. */
+  ingestionSourceId: string;
+  /** Wall-clock dispatch time (ms since epoch). */
+  scheduledAt: number;
 };
 

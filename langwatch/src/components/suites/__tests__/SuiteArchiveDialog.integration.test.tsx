@@ -33,6 +33,8 @@ describe("<SuiteArchiveDialog/>", () => {
   });
 
   describe("given the dialog is open", () => {
+    /** @scenario "Archive confirmation dialog appears when archiving a suite" */
+    /** @scenario 'Archive confirmation dialog uses "run plan"' */
     it("displays 'Archive run plan?' as the title", () => {
       render(<SuiteArchiveDialog {...defaultProps} />, { wrapper: Wrapper });
 
@@ -62,6 +64,7 @@ describe("<SuiteArchiveDialog/>", () => {
   });
 
   describe("when Cancel is clicked", () => {
+    /** @scenario "Cancel dismisses the archive confirmation dialog without archiving" */
     it("calls onClose", async () => {
       const user = userEvent.setup();
       const onClose = vi.fn();
@@ -84,6 +87,7 @@ describe("<SuiteArchiveDialog/>", () => {
   });
 
   describe("when Archive is clicked", () => {
+    /** @scenario "Confirm archives the suite" */
     it("calls onConfirm", async () => {
       const user = userEvent.setup();
       const onConfirm = vi.fn();
@@ -96,6 +100,7 @@ describe("<SuiteArchiveDialog/>", () => {
   });
 
   describe("when isLoading is true", () => {
+    /** @scenario "Buttons are disabled while archive is in progress" */
     it("disables the Cancel button", () => {
       render(<SuiteArchiveDialog {...defaultProps} isLoading={true} />, { wrapper: Wrapper });
 

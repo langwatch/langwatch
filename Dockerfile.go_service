@@ -1,21 +1,43 @@
-﻿# syntax=docker/dockerfile:1.7
+# syntax=docker/dockerfile:1.7
 
 # ─── Build stage ──────────────────────────────────────────────────────────────
-FROM golang:1.26.2-alpine AS build
+# Pin the build stage to the host arch (BUILDPLATFORM) and let Go cross-compile
+# to TARGETARCH natively. This avoids QEMU emulation when buildx is producing
+# images for an arch different from the host, which is the difference between
+# a 30-second compile and a 30-minute one.
+FROM --platform=$BUILDPLATFORM golang:1.26.2-alpine AS build
 WORKDIR /src
 RUN apk add --no-cache git ca-certificates tzdata
 
-# Dependency layer (cached until go.mod/go.sum change).
+ARG TARGETOS
+ARG TARGETARCH
+
+# Dependency layer (cached until go.mod/go.sum change). The module cache is
+# arch-independent, but keying both caches by TARGETARCH keeps buildx from
+# churning a shared dir when producing multiple platforms in the same job.
+#
+# Monorepo: sdk-go is in-tree and resolved via `replace ... => ./sdk-go`
+# in the root go.mod, so its go.mod must land in the build context
+# before `go mod download` runs. Same pattern python-sdk + langwatch_nlp
+# use — sdk-go changes flow with nlpgo changes in the same commit, no
+# publish-then-bump ping-pong. Full sdk-go source is copied below
+# alongside the other build inputs.
 COPY go.mod go.sum ./
-RUN go mod download && go mod verify
+COPY sdk-go/go.mod sdk-go/go.sum ./sdk-go/
+RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
+    go mod download && go mod verify
 
 # Copy only Go source directories needed for the build.
 COPY cmd/ cmd/
 COPY pkg/ pkg/
 COPY services/ services/
+# sdk-go full source — the in-tree dependency resolved via `replace`
+# in the root go.mod (see comment on the COPY of sdk-go/go.mod above).
+COPY sdk-go/ sdk-go/
 ARG VERSION=dev
-RUN --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 GOOS=linux go build \
+RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
+    --mount=type=cache,target=/root/.cache/go-build,id=go-build-${TARGETARCH} \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
       -ldflags="-s -w -X main.Version=${VERSION}" \
       -trimpath \
       -o /out/service ./cmd/service

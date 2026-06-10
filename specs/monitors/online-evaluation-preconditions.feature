@@ -3,6 +3,27 @@ Feature: Online Evaluation Preconditions Renewal
   I want powerful preconditions using the same filters available across LangWatch
   So that evaluations only run on relevant traces
 
+  # 14 of 21 scenarios bound to preconditions.unit.test.ts,
+  # precondition-matchers.unit.test.ts, preconditionFieldUtils.unit.test.ts, and
+  # OnlineEvaluationDrawer.preconditions.integration.test.tsx (per AUDIT_MANIFEST.md).
+  # Remaining 7 @unimplemented scenarios:
+  # - "Origin is application matches only explicit application origin": DELETE per
+  #   manifest (contradicts impl: normalizePreconditionTraceData defaults
+  #   undefined origin to "application")
+  # - "Sentiment filter": DELETE per manifest (no sentiment.input_sentiment matcher
+  #   in PRECONDITION_FIELD_MATCHERS — field not implemented)
+  # - "Migration adds origin precondition": KEEP per manifest, no migration test exists
+  # - "Nested key with contains rule": KEEP — metadata.value/contains backend
+  #   logic not yet covered by a unit test
+  # - "Clicking add precondition expands":
+  #   covered by drawer integration test "expands the form showing the origin row"
+  # - "All preconditions must pass": UPDATE — scenario's "no origin" branch
+  #   contradicts default-application semantics
+  # - "Evaluation trigger passes all trace attributes": KEEP, covered partially
+  #   by buildPreconditionTraceDataFromCommand tests
+  # Aspirational pending DELETE/UPDATE rewrites and KEEP test additions tracked
+  # in PR #3458.
+
   Background:
     Given I am logged in to a project
     And I have at least one evaluator created
@@ -29,7 +50,7 @@ Feature: Online Evaluation Preconditions Renewal
   # Precondition Field Registry (derived from filters)
   # ────────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: All filter fields plus input/output are available as precondition fields
     Given the filter registry defines these fields:
       | topics.topics | topics.subtopics | metadata.user_id | metadata.thread_id |
@@ -42,7 +63,7 @@ Feature: Online Evaluation Preconditions Renewal
     Then preconditions accept all filter fields plus "input" and "output"
     And each field uses the registry name as its label
 
-  @unit @unimplemented
+  @unit
   Scenario: Allowed rules derive from field characteristics
     Then text-like fields (input, output, metadata.user_id, metadata.thread_id, etc) support: is, contains, not_contains, matches_regex
     And boolean fields (traces.error, annotations.hasAnnotation) support: is
@@ -54,19 +75,23 @@ Feature: Online Evaluation Preconditions Renewal
   # In-Memory Trace Matching
   # ────────────────────────────────────────────
 
-  @unit @unimplemented
-  Scenario: Origin "is" application matches only explicit application origin
+  @unit
+  Scenario: Origin "is" application treats missing origin as application (legacy default)
     Given a precondition: traces.origin is "application"
     When a trace arrives with langwatch.origin = "application"
     Then the precondition passes
+    # Legacy traces without an explicit origin attribute default to
+    # "application" via normalizePreconditionTraceData (deferred origin
+    # stamping). This keeps existing customer monitors firing on traces
+    # written before origin tagging shipped.
     When a trace arrives with no langwatch.origin attribute
-    Then the precondition fails
+    Then the precondition passes
     When a trace arrives with langwatch.origin = ""
     Then the precondition fails
     When a trace arrives with langwatch.origin = "evaluation"
     Then the precondition fails
 
-  @unit @unimplemented
+  @unit
   Scenario: "is" rule on text fields does case-insensitive exact match
     Given a precondition: input is "Hello World"
     When a trace arrives with input "hello world"
@@ -74,7 +99,7 @@ Feature: Online Evaluation Preconditions Renewal
     When a trace arrives with input "Hello World!"
     Then the precondition fails
 
-  @unit @unimplemented
+  @unit
   Scenario: "is" rule on array fields matches if value is in array
     Given a precondition: metadata.labels is "production"
     When a trace arrives with labels ["production", "api"]
@@ -82,7 +107,7 @@ Feature: Online Evaluation Preconditions Renewal
     When a trace arrives with labels ["staging"]
     Then the precondition fails
 
-  @unit @unimplemented
+  @unit
   Scenario: "is" on spans.model matches if ANY span has that model
     Given a precondition: spans.model is "gpt-4"
     When a trace arrives with spans [llm(model="gpt-4"), llm(model="gpt-3.5")]
@@ -90,7 +115,7 @@ Feature: Online Evaluation Preconditions Renewal
     When a trace arrives with spans [llm(model="claude-3")]
     Then the precondition fails
 
-  @unit @unimplemented
+  @unit
   Scenario: "is" on traces.error matches error presence
     Given a precondition: traces.error is "true"
     When a trace arrives with error present
@@ -98,7 +123,7 @@ Feature: Online Evaluation Preconditions Renewal
     When a trace arrives with error null
     Then the precondition fails
 
-  @unit @unimplemented
+  @unit
   Scenario: Nested key filter - metadata.value with key
     Given a precondition: metadata.value key="environment" is "production"
     When a trace arrives with custom metadata { environment: "production" }
@@ -116,7 +141,7 @@ Feature: Online Evaluation Preconditions Renewal
     When a trace arrives with custom metadata { deployment_tag: "stable-v1" }
     Then the precondition fails
 
-  @unit @unimplemented
+  @unit
   Scenario: Topics filter matches topic ID
     Given a precondition: topics.topics is "billing"
     When a trace arrives with topic_id "billing"
@@ -134,7 +159,7 @@ Feature: Online Evaluation Preconditions Renewal
     When a trace arrives with satisfaction_score -0.5
     Then the precondition fails
 
-  @unit @unimplemented
+  @unit
   Scenario: All preconditions must pass (AND logic)
     Given preconditions:
       | field         | rule     | value       |
@@ -142,18 +167,22 @@ Feature: Online Evaluation Preconditions Renewal
       | input         | contains | help        |
     When a trace arrives with origin "application" and input "I need help"
     Then the evaluation runs
+    # Legacy traces without an explicit origin default to "application"
+    # via normalizePreconditionTraceData (see "Origin 'is' application"
+    # scenario above), so a missing-origin + matching input passes both
+    # preconditions and the evaluation runs.
     When a trace arrives with no origin and input "I need help"
-    Then the evaluation is skipped
+    Then the evaluation runs
     When a trace arrives with origin "simulation" and input "I need help"
     Then the evaluation is skipped
 
-  @unit @unimplemented
-  Scenario: Missing field values fail "is" and "contains" checks
+  @unit
+  Scenario: Missing field values fail "is" checks
     Given a precondition: metadata.user_id is "admin"
     When a trace arrives with no user_id set
     Then the precondition fails
 
-  @unit @unimplemented
+  @unit
   Scenario: Missing field values pass "not_contains" checks
     Given a precondition: metadata.user_id not_contains "admin"
     When a trace arrives with no user_id set
@@ -163,7 +192,7 @@ Feature: Online Evaluation Preconditions Renewal
   # Default Origin Precondition
   # ────────────────────────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: New evaluator includes default origin precondition
     Given the online evaluation drawer is open
     When I select an evaluator
@@ -182,7 +211,7 @@ Feature: Online Evaluation Preconditions Renewal
   # Collapsed / Expanded UI State
   # ────────────────────────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: Default-only precondition shows collapsed summary
     Given an online evaluator with only the default origin=application precondition
     When I view the preconditions section
@@ -196,7 +225,7 @@ Feature: Online Evaluation Preconditions Renewal
     Then the precondition form fields are shown
     And a new empty precondition row is added
 
-  @integration @unimplemented
+  @integration
   Scenario: Multiple preconditions always show expanded form
     Given an online evaluator with preconditions:
       | field         | rule     | value       |
@@ -219,7 +248,7 @@ Feature: Online Evaluation Preconditions Renewal
   # Backward Compatibility
   # ────────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: Existing preconditions with old fields still work
     Given a monitor with legacy preconditions:
       | field           | rule         | value      |

@@ -4,6 +4,25 @@ Feature: User Deactivation
   So that I can revoke access for users who should no longer use the platform
   without permanently deleting their data
 
+  # Parity status: 4 of 16 scenarios bound to existing tests.
+  # The remaining are tracked under #3458:
+  #   - 8 NO_TEST: behavior shipped + correct, no integration test yet exists
+  #   - 4 UPDATE: implementation diverged from the spec wording — needs scenario rewrite
+  # NO_TEST gaps:
+  #   - "user.deactivate is rejected for non-admin callers"
+  #   - "user.reactivate is rejected for non-admin callers"
+  #   - "getAllOrganizationMembers excludes deactivated users"
+  #   - "getOrganizationWithMembersAndTheirTeams excludes deactivated users by default"
+  #   - "TeamForm member dropdown omits deactivated users"
+  #   - "AddParticipants dropdown omits deactivated users"
+  #   - "AddAnnotationQueueDrawer assignee dropdown omits deactivated users"
+  #   - "Settings members list shows deactivated users with a Deactivated badge"
+  # UPDATE divergences:
+  #   - "Admin sees Deactivate button for an active user in the admin panel"
+  #   - "Admin sees Reactivate button and Deactivated badge for a deactivated user"
+  #   - "Admin deactivates a user via the admin panel"
+  #   - "Admin reactivates a deactivated user via the admin panel"
+
   # ─── Admin UI ───────────────────────────────────────────────────────────────
 
   @integration @unimplemented
@@ -38,13 +57,13 @@ Feature: User Deactivation
 
   # ─── tRPC mutations ─────────────────────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: user.deactivate sets deactivatedAt on the user
     Given a user exists with deactivatedAt null
     When an admin calls user.deactivate with that user's id
     Then the user's deactivatedAt is set to the current timestamp
 
-  @unit @unimplemented
+  @unit
   Scenario: user.reactivate clears deactivatedAt on the user
     Given a user exists with a non-null deactivatedAt
     When an admin calls user.reactivate with that user's id
@@ -111,13 +130,13 @@ Feature: User Deactivation
 
   # ─── Auth – login blocking ───────────────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: Deactivated user is blocked from signing in
     Given a user account with a non-null deactivatedAt
     When the NextAuth signIn callback runs for that user
     Then the callback returns false, denying login
 
-  @unit @unimplemented
+  @unit
   Scenario: Active user is not blocked from signing in
     Given a user account with deactivatedAt null
     When the NextAuth signIn callback runs for that user

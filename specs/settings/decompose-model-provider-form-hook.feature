@@ -3,6 +3,15 @@ Feature: Decompose useModelProviderForm hook into focused sub-hooks
   I want the hook logic organized into single-responsibility sub-hooks
   So that each concern is independently testable and the code is easier to navigate
 
+  # The two `@refactor @integration @unimplemented` scenarios below are
+  # acceptance criteria for a not-yet-started refactor (the hook
+  # decomposition itself). They intentionally remain `@unimplemented`
+  # — they assert the *result* of work that has not been done. The
+  # rest of this file (the `@refactor`-only scenarios) describes the
+  # target architecture and is also aspirational, not bound to tests.
+  # Existing coverage of the current monolithic hook lives in
+  # `useModelProviderForm.integration.test.tsx`.
+
   Background:
     Given the useModelProviderForm hook returns [state, actions]
     And two consumer components depend on the public API

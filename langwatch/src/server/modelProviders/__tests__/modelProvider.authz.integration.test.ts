@@ -192,7 +192,11 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
         .deleteMany({ where: { organizationId } })
         .catch(() => {});
       await prisma.modelProvider
-        .deleteMany({ where: { projectId: { in: projectIds } } })
+        .deleteMany({
+          where: {
+            scopes: { some: { scopeType: "PROJECT", scopeId: { in: projectIds } } },
+          },
+        })
         .catch(() => {});
       await prisma.teamUser
         .deleteMany({ where: { team: { slug: { startsWith: `--team-` } } } })
@@ -272,6 +276,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
       });
 
       describe("when the caller is only a team admin (not org admin)", () => {
+        /** @scenario Assigning a provider to an org without manage permission is denied */
         it("rejects with FORBIDDEN and does not persist", async () => {
           const before = await prisma.modelProvider.count({
             where: { projectId: projectAId, provider: "anthropic" },
@@ -344,6 +349,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
       });
 
       describe("when the caller is team admin for a DIFFERENT team", () => {
+        /** @scenario Assigning a provider to an unmanageable team is denied */
         it("rejects with FORBIDDEN", async () => {
           await expect(
             service().updateModelProvider(
@@ -367,6 +373,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
 
     describe("given a multi-scope write (ORG + TEAM)", () => {
       describe("when the caller can manage ONLY the team (not the org)", () => {
+        /** @scenario Adding an unauthorized team scope to an existing provider is rejected */
         it("rejects the entire mutation with no partial persistence", async () => {
           const before = await prisma.modelProvider.count({
             where: { projectId: projectAId, provider: "deepseek" },
@@ -478,11 +485,126 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
     });
 
     // =========================================================================
+    // Advanced (Gateway) writes: rate limits / fallback priority /
+    // providerConfig are folded into the unified `update` mutation. The
+    // service must still demand manage on every existing-row scope when
+    // the caller writes any advanced field — even when no `scopes`
+    // array is supplied — so a team admin can't nudge an org-shared
+    // credential's rate limit without org-manage perm.
+    // =========================================================================
+
+    describe("given an ORG-scoped MP exists", () => {
+      describe("when a team admin (not org admin) writes an advanced field via id-only", () => {
+        /** @scenario Advanced gateway writes require manage on every existing-row scope */
+        it("rejects with FORBIDDEN and does not mutate the rate limit", async () => {
+          const mp = await service().updateModelProvider(
+            {
+              projectId: projectAId,
+              provider: "cerebras",
+              enabled: true,
+              customKeys: { CEREBRAS_API_KEY: `sk-cer-${ns}` },
+              scopes: [
+                { scopeType: "ORGANIZATION", scopeId: organizationId },
+              ],
+            },
+            ctxFor(orgAdminUserId),
+          );
+          // Sanity: no rate limit set yet.
+          const before = await prisma.modelProvider.findFirst({
+            where: { id: mp.id },
+            select: { rateLimitRpm: true },
+          });
+          expect(before?.rateLimitRpm).toBeNull();
+
+          await expect(
+            service().updateModelProvider(
+              {
+                id: mp.id,
+                projectId: projectAId,
+                provider: "cerebras",
+                enabled: true,
+                rateLimitRpm: 600,
+              },
+              ctxFor(teamAAdminUserId),
+            ),
+          ).rejects.toMatchObject({
+            code: "FORBIDDEN",
+            message: expect.stringContaining("organization:manage"),
+          });
+
+          const after = await prisma.modelProvider.findFirst({
+            where: { id: mp.id },
+            select: { rateLimitRpm: true },
+          });
+          expect(after?.rateLimitRpm).toBeNull();
+        });
+      });
+
+      describe("when the org admin writes an advanced field via id-only", () => {
+        it("persists the rate limit", async () => {
+          const mp = await service().updateModelProvider(
+            {
+              projectId: projectAId,
+              provider: "xai",
+              enabled: true,
+              customKeys: { XAI_API_KEY: `sk-xai-${ns}` },
+              scopes: [
+                { scopeType: "ORGANIZATION", scopeId: organizationId },
+              ],
+            },
+            ctxFor(orgAdminUserId),
+          );
+          await service().updateModelProvider(
+            {
+              id: mp.id,
+              projectId: projectAId,
+              provider: "xai",
+              enabled: true,
+              rateLimitRpm: 900,
+            },
+            ctxFor(orgAdminUserId),
+          );
+          const stored = await prisma.modelProvider.findFirst({
+            where: { id: mp.id },
+            select: { rateLimitRpm: true },
+          });
+          expect(stored?.rateLimitRpm).toBe(900);
+        });
+      });
+
+      describe("when the supplied id no longer resolves a row", () => {
+        /** @scenario Update of a vanished id surfaces NOT_FOUND instead of silently creating */
+        it("throws NOT_FOUND instead of falling through to create a new row", async () => {
+          const beforeCount = await prisma.modelProvider.count({
+            where: { projectId: projectAId, provider: "groq" },
+          });
+          await expect(
+            service().updateModelProvider(
+              {
+                id: `vanished-mp-${ns}`,
+                projectId: projectAId,
+                provider: "groq",
+                enabled: true,
+                customKeys: { GROQ_API_KEY: `sk-groq-${ns}` },
+              },
+              ctxFor(orgAdminUserId),
+            ),
+          ).rejects.toMatchObject({ code: "NOT_FOUND" });
+          const afterCount = await prisma.modelProvider.count({
+            where: { projectId: projectAId, provider: "groq" },
+          });
+          expect(afterCount).toBe(beforeCount);
+        });
+      });
+    });
+
+    // =========================================================================
     // Read gate: NOT_FOUND (not FORBIDDEN) for unreadable scopes
     // =========================================================================
 
     describe("given an ORG-scoped MP that the caller cannot see", () => {
       describe("when an unrelated user calls getById", () => {
+        /** @scenario Reading a provider outside my access scope returns not found */
         it("surfaces NOT_FOUND to prevent id enumeration across tenants", async () => {
           const mp = await service().updateModelProvider(
             {
@@ -559,6 +681,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
       });
 
       describe("when a team-admin from a different team tries to delete", () => {
+        /** @scenario Deletion requires manage permission on EVERY current scope of the MP */
         it("rejects with FORBIDDEN", async () => {
           const mp = await service().updateModelProvider(
             {

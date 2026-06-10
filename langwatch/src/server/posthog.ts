@@ -11,32 +11,49 @@ const logger = createLogger("langwatch:posthog:client");
 // cheaper. Override via POSTHOG_FEATURE_FLAGS_POLLING_INTERVAL_MS.
 const DEFAULT_FLAGS_POLLING_INTERVAL_MS = 5 * 60 * 1000;
 
-// Create a private singleton instance.
 // When POSTHOG_FEATURE_FLAGS_KEY is set (Feature Flags Secure API key, phs_*,
 // or a legacy Personal API key, phx_*), posthog-node enables local
 // evaluation: flag definitions are polled in the background and
 // `isFeatureEnabled` resolves in-process without a /flags request per call.
 // The SDK option is named `personalApiKey` for historical reasons but accepts
 // both key types.
-const _posthogInstance = env.POSTHOG_KEY
-  ? new PostHog(env.POSTHOG_KEY, {
-      host: env.POSTHOG_HOST,
-      ...(env.POSTHOG_FEATURE_FLAGS_KEY
-        ? {
-            personalApiKey: env.POSTHOG_FEATURE_FLAGS_KEY,
-            featureFlagsPollingInterval:
-              env.POSTHOG_FEATURE_FLAGS_POLLING_INTERVAL_MS ??
-              DEFAULT_FLAGS_POLLING_INTERVAL_MS,
-          }
-        : {}),
-    })
-  : null;
+//
+// Constructing the client with local evaluation starts that background poller
+// immediately, regardless of whether any flag is ever evaluated. So the client
+// is built lazily on first use rather than at module load: a process that only
+// reads SYSTEM flags (workers, the event-sourcing pipeline — those resolve from
+// postgres and never touch PostHog) imports this module but never calls
+// getPostHogInstance, so it never starts the poller and never burns the
+// feature-flags quota. The web/API process builds it on its first PostHog flag
+// evaluation or analytics capture.
+//
+// `undefined` = not yet initialized, `null` = initialized with no POSTHOG_KEY.
+let _posthogInstance: PostHog | null | undefined;
+
+function createPostHogInstance(): PostHog | null {
+  if (!env.POSTHOG_KEY) return null;
+  return new PostHog(env.POSTHOG_KEY, {
+    host: env.POSTHOG_HOST,
+    ...(env.POSTHOG_FEATURE_FLAGS_KEY
+      ? {
+          personalApiKey: env.POSTHOG_FEATURE_FLAGS_KEY,
+          featureFlagsPollingInterval:
+            env.POSTHOG_FEATURE_FLAGS_POLLING_INTERVAL_MS ??
+            DEFAULT_FLAGS_POLLING_INTERVAL_MS,
+        }
+      : {}),
+  });
+}
 
 /**
- * Returns the PostHog instance if it exists, null otherwise.
- * The instance is immutable and should not be modified.
+ * Returns the PostHog instance if POSTHOG_KEY is configured, null otherwise.
+ * Constructs it on first call. The instance is immutable and should not be
+ * modified.
  */
 export function getPostHogInstance(): PostHog | null {
+  if (_posthogInstance === undefined) {
+    _posthogInstance = createPostHogInstance();
+  }
   return _posthogInstance;
 }
 
@@ -75,6 +92,12 @@ export function trackServerEvent({
 export async function shutdownPostHog(): Promise<void> {
   if (_posthogInstance) {
     logger.info("Shutting down PostHog client");
-    await _posthogInstance.shutdown();
+    const instance = _posthogInstance;
+    // Reset before awaiting so the next getPostHogInstance() rebuilds a fresh
+    // client rather than handing back the shut-down one. Harmless in prod
+    // (called once at exit) and load-bearing in tests, where one worker runs
+    // many files and a later file may evaluate a flag after this teardown.
+    _posthogInstance = undefined;
+    await instance.shutdown();
   }
 }

@@ -187,7 +187,9 @@ describe("LangWatchExtractor", () => {
 
         extractor.apply(ctx);
 
-        expect(ctx.out[ATTR_KEYS.LANGWATCH_RESERVED_EVALUATIONS]).toBeUndefined();
+        expect(
+          ctx.out[ATTR_KEYS.LANGWATCH_RESERVED_EVALUATIONS],
+        ).toBeUndefined();
       });
     });
   });

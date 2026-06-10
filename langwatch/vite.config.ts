@@ -1,9 +1,98 @@
+import dotenv from "dotenv";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
+import { generate as generateSelfsigned } from "selfsigned";
+
+// Load `.env` into the Vite config's process environment. Vite normally
+// only exposes `VITE_*` vars to client code — but this config itself
+// runs in Node and needs access to flags like `LANGWATCH_DEV_HTTP2`.
+// The API server (`server.mts`) loads its own copy via `dotenv.config()`
+// the same way; doing it here keeps both processes reading from one
+// source of truth.
+dotenv.config({ path: path.resolve(__dirname, ".env") });
 
 const FRONTEND_PORT = parseInt(process.env.PORT ?? "5560");
 const API_PORT = FRONTEND_PORT + 1000;
+
+// When `LANGWATCH_DEV_HTTP2=1` is set, Vite serves the SPA over
+// HTTPS+HTTP/2 (matching the API server) and proxies `/api/*` upstream
+// over HTTPS. Both sides share the same self-signed cert, cached at
+// `<repo>/.dev-certs/`, so opting in is zero-setup and the browser only
+// asks to trust the cert once for the whole local stack.
+const USE_HTTP2 = process.env.LANGWATCH_DEV_HTTP2 === "1";
+const API_PROTOCOL = USE_HTTP2 ? "https" : "http";
+
+/**
+ * Load (and lazily generate) the dev TLS credentials. Mirrors
+ * `loadDevHttpsCredentials` in `src/start.ts`. Both processes race to
+ * write on first boot; existence checks + atomic-ish file writes keep
+ * the race benign — whichever loses the race overwrites with the same
+ * effective contents, and subsequent reads find a valid pair.
+ */
+function loadDevHttpsCredentials():
+  | { cert: Buffer; key: Buffer }
+  | null {
+  if (!USE_HTTP2) return null;
+
+  if (process.env.DEV_HTTPS_CERT && process.env.DEV_HTTPS_KEY) {
+    return {
+      cert: readFileSync(process.env.DEV_HTTPS_CERT),
+      key: readFileSync(process.env.DEV_HTTPS_KEY),
+    };
+  }
+
+  const cacheDir =
+    process.env.LANGWATCH_DEV_CERT_DIR ??
+    path.join(__dirname, ".dev-certs");
+  const certPath = path.join(cacheDir, "dev.pem");
+  const keyPath = path.join(cacheDir, "dev-key.pem");
+
+  if (existsSync(certPath) && existsSync(keyPath)) {
+    return { cert: readFileSync(certPath), key: readFileSync(keyPath) };
+  }
+
+  const pems = generateSelfsigned(
+    [{ name: "commonName", value: "localhost" }],
+    {
+      days: 825,
+      keySize: 2048,
+      extensions: [
+        {
+          name: "subjectAltName",
+          altNames: [
+            { type: 2, value: "localhost" },
+            { type: 2, value: "*.localhost" },
+            { type: 7, ip: "127.0.0.1" },
+            { type: 7, ip: "::1" },
+          ],
+        },
+      ],
+    },
+  );
+  mkdirSync(cacheDir, { recursive: true });
+  writeFileSync(certPath, pems.cert);
+  writeFileSync(keyPath, pems.private);
+  return { cert: Buffer.from(pems.cert), key: Buffer.from(pems.private) };
+}
+
+const devHttpsCredentials = loadDevHttpsCredentials();
+
+// Diagnostic: when Vite hot-restarts on a config change, the https block is
+// re-evaluated but in-process TLS state can land in a broken pair (server
+// listening, TLS handshake failing with `ERR_SSL_PROTOCOL_ERROR`). This log
+// makes the post-restart scheme observable in `server.log`, so a "blank
+// page after editing config" failure mode is easy to diagnose without
+// digging into TLS errors. Drop in `pnpm dev:clean` to reset both the Vite
+// module graph and `.dev-certs/` if the cert pair is suspected.
+if (USE_HTTP2) {
+  console.log(
+    `[vite-config] HTTP/2 enabled; https credentials ${devHttpsCredentials ? "loaded" : "MISSING"}`,
+  );
+} else {
+  console.log("[vite-config] HTTPS disabled (set LANGWATCH_DEV_HTTP2=1)");
+}
 
 // object-inspect's index.js does `var inspectCustom = require('./util.inspect')`
 // and the package.json sets `"browser": { "./util.inspect.js": false }`. Vite
@@ -39,6 +128,7 @@ export default defineConfig({
       // Path aliases (matching tsconfig paths)
       "~": path.resolve(__dirname, "./src"),
       "@app": path.resolve(__dirname, "./src/server/app-layer"),
+      "@ee": path.resolve(__dirname, "./ee"),
 
       // Browser stubs for Node.js-only modules
       "pino-pretty": path.resolve(__dirname, "./src/noop-css.cjs"),
@@ -59,9 +149,46 @@ export default defineConfig({
     "process.env.VERCEL": "undefined",
     "process.env.VERCEL_URL": "undefined",
   },
+  optimizeDeps: {
+    // DEV-ONLY: optimizeDeps never touches the production build (prod bundles
+    // Shiki via the manualChunks rule below). Pre-bundle the whole Shiki
+    // ecosystem at dev-server start so the server doesn't discover Shiki's
+    // Oniguruma WASM engine + langs/themes lazily on the first /traces
+    // navigation and re-optimize mid-session. That re-optimization invalidates
+    // the in-flight `.vite/deps/wasm-*.js` (onig.wasm, ~620KB) request the span
+    // highlighter awaits, leaving the trace drawer stuck on "loading spans".
+    include: [
+      "shiki",
+      "@shikijs/core",
+      "@shikijs/engine-oniguruma",
+      "@shikijs/langs",
+      "@shikijs/themes",
+    ],
+  },
   build: {
     outDir: "dist/client",
     sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          // Keep the whole Shiki ecosystem in one self-contained chunk.
+          // Under the rolldown bundler the default split hoists Shiki's
+          // singleton factory into the entry chunk and leaves the Shiki
+          // chunk calling back into it at module top level. Because the
+          // entry eagerly loads Shiki, that call runs before the entry has
+          // initialized the export, throwing "undefined is not a function"
+          // at boot and white-screening the app. One chunk removes the
+          // cross-chunk cycle.
+          if (
+            /[\\/]node_modules[\\/](\.pnpm[\\/])?(@shikijs[\\/+]|shiki[\\/@]|oniguruma-to-es|oniguruma-parser|hast-util-to-html)/.test(
+              id,
+            )
+          ) {
+            return "shiki";
+          }
+        },
+      },
+    },
   },
   server: {
     watch: {
@@ -80,11 +207,66 @@ export default defineConfig({
     allowedHosts: true,
     port: FRONTEND_PORT,
     strictPort: true,
-    // Proxy API requests to the Hono backend (PORT + 1000)
+    // HTTPS+HTTP/2 when LANGWATCH_DEV_HTTP2=1. Vite negotiates h2 over
+    // TLS automatically when `https` is set. Both Vite and the API
+    // share the same auto-generated cert so the browser only has to
+    // trust one cert for the whole stack.
+    ...(devHttpsCredentials
+      ? {
+          https: {
+            cert: devHttpsCredentials.cert,
+            key: devHttpsCredentials.key,
+          },
+        }
+      : {}),
+    // Proxy API requests to the Hono backend (PORT + 1000). `ws: true`
+    // forwards WebSocket upgrades for the tRPC WS transport at /api/trpc-ws.
+    //
+    // The MCP routes (/mcp, /sse, /messages, /oauth/*, /.well-known/oauth-*)
+    // are registered directly on the Node HTTP server in start.ts (NOT
+    // mounted under /api), so they need explicit proxy entries here for
+    // external MCP clients (e.g. Claude Code adding the LangWatch MCP
+    // server in dev) to reach them via the canonical FRONTEND_PORT. The
+    // production server (start.ts) listens on a single port so this
+    // splitting is dev-only.
     proxy: {
       "/api": {
-        target: `http://localhost:${API_PORT}`,
+        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
         changeOrigin: true,
+        ws: true,
+        // Self-signed dev cert — don't fail the proxy on cert verification.
+        // No-op when API is on plain HTTP.
+        secure: false,
+      },
+      "/mcp": {
+        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
+        changeOrigin: true,
+        secure: false,
+      },
+      "/sse": {
+        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
+        changeOrigin: true,
+        secure: false,
+      },
+      "/messages": {
+        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
+        changeOrigin: true,
+        secure: false,
+      },
+      "/oauth": {
+        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
+        changeOrigin: true,
+        secure: false,
+      },
+      "/.well-known/oauth-protected-resource": {
+        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
+        changeOrigin: true,
+        secure: false,
+      },
+      "/.well-known/oauth-authorization-server": {
+        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
+        changeOrigin: true,
+        secure: false,
       },
     },
   },

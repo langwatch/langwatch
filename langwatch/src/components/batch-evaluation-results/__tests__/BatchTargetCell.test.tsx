@@ -5,6 +5,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -47,6 +48,7 @@ describe("BatchTargetCell", () => {
   });
 
   describe("Output Display", () => {
+    /** @scenario Display target output with cost and duration */
     it("renders string output", () => {
       const targetOutput = createTargetOutput({
         output: { message: "Hello world" },
@@ -82,6 +84,7 @@ describe("BatchTargetCell", () => {
       expect(screen.getByText("No output")).toBeInTheDocument();
     });
 
+    /** @scenario Display error state in target cell */
     it("displays error state with error message", () => {
       const targetOutput = createTargetOutput({
         output: null,
@@ -95,6 +98,53 @@ describe("BatchTargetCell", () => {
       expect(screen.getByText("Connection timeout")).toBeInTheDocument();
     });
 
+    describe("when the error message is long and clamped", () => {
+      const longError =
+        "gateway chat/completions: provider_error: the upstream model " +
+        "returned an error after exhausting all retries. " +
+        "Detail: rate limit exceeded for organization on requests per minute.";
+
+      /** @scenario Reveal full error message on hover */
+      it("shows the full error in a tooltip on hover", async () => {
+        const user = userEvent.setup();
+        const targetOutput = createTargetOutput({
+          output: null,
+          error: longError,
+        });
+
+        render(<BatchTargetCell targetOutput={targetOutput} />, {
+          wrapper: Wrapper,
+        });
+
+        await user.hover(screen.getByTestId("error-output-target-1"));
+
+        expect(
+          await screen.findByTestId("error-tooltip-target-1"),
+        ).toHaveTextContent(longError);
+      });
+
+      /** @scenario Expand full error message on click */
+      it("expands the full error into the overlay on click", async () => {
+        const user = userEvent.setup();
+        const targetOutput = createTargetOutput({
+          output: null,
+          error: longError,
+        });
+
+        render(<BatchTargetCell targetOutput={targetOutput} />, {
+          wrapper: Wrapper,
+        });
+
+        await user.click(screen.getByTestId("error-output-target-1"));
+
+        expect(
+          screen.getByTestId("expanded-cell-backdrop"),
+        ).toBeInTheDocument();
+      });
+    });
+
+    /** @scenario Expand long target output */
+    /** @scenario Truncate long text in dataset cells */
     it("truncates very long output with indicator", () => {
       const longText = "A".repeat(15000);
       const targetOutput = createTargetOutput({
@@ -110,6 +160,9 @@ describe("BatchTargetCell", () => {
   });
 
   describe("Evaluator Results", () => {
+    /** @scenario Display evaluator chips below target output */
+    /** @scenario Evaluator chip shows pass status */
+    /** @scenario Evaluator chip shows fail status */
     it("renders evaluator chips for each result", () => {
       const targetOutput = createTargetOutput({
         evaluatorResults: [
@@ -158,6 +211,7 @@ describe("BatchTargetCell", () => {
       expect(screen.getByText("0.75")).toBeInTheDocument();
     });
 
+    /** @scenario Evaluator chip shows error status */
     it("handles error status in evaluator", () => {
       const targetOutput = createTargetOutput({
         evaluatorResults: [

@@ -3,11 +3,19 @@ Feature: Nested drawer typing
   I want to type in input fields inside nested drawers
   So that I can create scenarios or agents without leaving the suite editor
 
+  # Parity status: 1 of 4 scenarios bound to existing tests.
+  # Remaining @unimplemented scenarios (#3458):
+  #   3 NO_TEST: shipped behavior, no integration test yet
+  # NO_TEST gaps:
+  #   - "Focus moves to the nested drawer when it opens"
+  #   - "Typing works in the parent drawer after closing a nested drawer"
+  #   - "Command bar does not intercept typing in a nested drawer"
+
   Background:
     Given I am on the suites page with a project
 
   # Full user workflow: open suite editor, open child drawer, type in it
-  @e2e @unimplemented
+  @e2e
   Scenario: User types in a nested drawer opened from the suite editor
     Given the suite editor drawer is open
     When I open the scenario editor from the suite editor

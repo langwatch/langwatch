@@ -95,7 +95,7 @@ export function ChangeHandleDialog({
         }
       }}
     >
-      <Dialog.Content>
+      <Dialog.Content bg="bg">
         <form
           onSubmit={(e) => {
             e.preventDefault();

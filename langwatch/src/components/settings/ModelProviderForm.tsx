@@ -1,6 +1,6 @@
 import { Box, Button, Field, HStack, Input, VStack } from "@chakra-ui/react";
 import { SmallLabel } from "../SmallLabel";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useModelProviderApiKeyValidation } from "../../hooks/useModelProviderApiKeyValidation";
@@ -19,9 +19,19 @@ import { parseZodFieldErrors, type ZodErrorStructure } from "../../utils/zod";
 import { Switch } from "../ui/switch";
 import { CredentialsSection } from "./ModelProviderCredentialsSection";
 import { CustomModelInputSection } from "./ModelProviderCustomModelInput";
-import { DefaultProviderSection } from "./ModelProviderDefaultSection";
+// DefaultProviderSection has been moved out of this drawer to a page-level
+// section on the model-providers settings page (DefaultModelsSection). See
+// specs/model-providers/hierarchical-default-models.feature.
 import { ExtraHeadersSection } from "./ModelProviderExtraHeadersSection";
+import {
+  draftFromProvider,
+  EMPTY_ADVANCED_DRAFT,
+  type ModelProviderAdvancedDraft,
+  ModelProviderAdvancedSection,
+  parseAdvancedDraft,
+} from "./ModelProviderAdvancedSection";
 import { ProviderScopeSection } from "./ModelProviderScopeSection";
+import { useFeatureFlag } from "../../hooks/useFeatureFlag";
 
 export type EditModelProviderFormProps = {
   projectId?: string | undefined;
@@ -61,25 +71,43 @@ export const EditModelProviderForm = ({
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  // Get provider - first try by ID, then fallback to provider key.
-  // The `modelProviderId === "new"` sentinel forces a blank form even
-  // when the same providerKey is already configured — that's the
-  // multi-instance flow (iter 109): a user can have multiple OpenAI
-  // rows at different scopes, and the "Add Model Provider" menu routes
-  // through this path.
+  // Advanced (Gateway) draft lives at the form root so the single Save
+  // sends basic + advanced in one update mutation. Gated on the AI
+  // Gateway feature flag — orgs without the gateway never see the
+  // accordion AND the form never spreads advanced fields into the
+  // payload, so toggling the flag has no payload-shape side effects.
+  const { enabled: gatewayMenuEnabled } = useFeatureFlag(
+    "release_ui_ai_gateway_menu_enabled",
+    {
+      organizationId: organization?.id,
+      enabled: !!organization?.id,
+    },
+  );
+  const [advancedDraft, setAdvancedDraft] =
+    useState<ModelProviderAdvancedDraft>(EMPTY_ADVANCED_DRAFT);
+  const [advancedJsonError, setAdvancedJsonError] = useState<string | null>(
+    null,
+  );
+
+  // Find the row this form is editing. Three inputs to the lookup:
+  //   - `modelProviderId === "new"` → always blank, never pre-fill from
+  //     an existing row. The Add Model Provider menu sets this so the
+  //     user can stand up a second instance of an already-configured
+  //     provider type without colliding with the first.
+  //   - `modelProviderId === "<cuid>"` → edit that specific row. With
+  //     multi-instance enabled the providers Record dedupes by provider
+  //     string and may not contain this row, so we don't fall back on
+  //     `providers[providerKey]` if the id lookup misses (that fallback
+  //     used to silently swap the user's intended row for whichever
+  //     same-type row happened to win the dedupe).
+  //   - `modelProviderId` undefined → no specific target, fresh blank
+  //     (deep-link from evaluator selector or similar).
   const provider: MaybeStoredModelProvider = useMemo(() => {
-    const isExplicitNew = modelProviderId === "new";
-    if (providers && !isExplicitNew) {
-      // First try to find by ID
-      if (modelProviderId) {
-        const existing = Object.values(providers).find(
-          (p) => p.id === modelProviderId,
-        );
-        if (existing) return existing;
-      }
-      // Fallback: find by provider key
-      const byKey = providers[providerKey];
-      if (byKey) return byKey;
+    if (providers && modelProviderId && modelProviderId !== "new") {
+      const existing = Object.values(providers).find(
+        (p) => p.id === modelProviderId,
+      );
+      if (existing) return existing;
     }
     return {
       provider: providerKey,
@@ -101,18 +129,76 @@ export const EditModelProviderForm = ({
     (!provider.customKeys ||
       Object.keys(provider.customKeys as Record<string, unknown>).length === 0);
 
+  // Reset advanced draft when the *drawer subject* changes — i.e. the
+  // user opened the drawer on a different provider row. We intentionally
+  // do NOT re-seed on every underlying-value change: a background
+  // refetch (window focus, invalidation, concurrent edit in another
+  // tab) re-runs this effect and would overwrite the user's in-progress
+  // draft + clear their JSON error with no warning. Keying on the row
+  // id + the flag preserves typed values across silent refetches.
+  const providerId = (provider as { id?: string }).id;
+  useEffect(() => {
+    if (!gatewayMenuEnabled) {
+      setAdvancedDraft(EMPTY_ADVANCED_DRAFT);
+      setAdvancedJsonError(null);
+      return;
+    }
+    setAdvancedDraft(
+      draftFromProvider({
+        rateLimitRpm:
+          (provider as { rateLimitRpm?: number | null }).rateLimitRpm ?? null,
+        rateLimitTpm:
+          (provider as { rateLimitTpm?: number | null }).rateLimitTpm ?? null,
+        rateLimitRpd:
+          (provider as { rateLimitRpd?: number | null }).rateLimitRpd ?? null,
+        fallbackPriorityGlobal:
+          (provider as { fallbackPriorityGlobal?: number | null })
+            .fallbackPriorityGlobal ?? null,
+        providerConfig: (provider as { providerConfig?: unknown })
+          .providerConfig,
+      }),
+    );
+    setAdvancedJsonError(null);
+    setAdvancedAccordionValue([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gatewayMenuEnabled, providerId]);
+
+  // Controlled accordion state: collapsed by default, but expands
+  // automatically when the user clicks Save with malformed JSON so the
+  // inline error is actually visible.
+  const [advancedAccordionValue, setAdvancedAccordionValue] = useState<
+    string[]
+  >([]);
+
+  const getAdvancedPayload = useCallback(() => {
+    if (!gatewayMenuEnabled) return null;
+    try {
+      const parsed = parseAdvancedDraft(advancedDraft);
+      setAdvancedJsonError(null);
+      return parsed;
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Invalid JSON";
+      setAdvancedJsonError(message);
+      // Auto-expand the accordion so the inline error is visible. Save
+      // would otherwise stop spinning + the drawer stay open with no
+      // visible feedback if the user collapsed the section before save.
+      setAdvancedAccordionValue(["advanced-gateway"]);
+      throw e;
+    }
+  }, [gatewayMenuEnabled, advancedDraft]);
+
   // Use project data as primary source (auto-updates when organization.getAll is invalidated)
   // Effective defaults (project values with fallbacks) are computed inside the hook
   const [state, actions] = useModelProviderForm({
     provider,
     projectId,
-    project,
     enabledProvidersCount,
     isUsingEnvVars,
     teamId: team?.id,
     organizationId: organization?.id,
     canManageOrganization,
     canManageTeam,
+    getAdvancedPayload,
     onSuccess: () => {
       closeDrawer();
     },
@@ -228,8 +314,7 @@ export const EditModelProviderForm = ({
           </Box>
           <Field.HelperText>
             Distinguish multiple instances (e.g. "OpenAI – EU prod" vs
-            "OpenAI – Dev"). Shown in the provider list and model
-            selectors.
+            "OpenAI – Dev").
           </Field.HelperText>
         </Field.Root>
 
@@ -245,18 +330,6 @@ export const EditModelProviderForm = ({
             </Switch>
           </Field.Root>
         )}
-
-        <CredentialsSection
-          state={state}
-          actions={actions}
-          provider={provider}
-          fieldErrors={fieldErrors}
-          setFieldErrors={setFieldErrors}
-          projectId={projectId}
-          organizationId={organizationId}
-          apiKeyValidationError={apiKeyValidationError}
-          onApiKeyValidationClear={clearApiKeyError}
-        />
 
         <ProviderScopeSection
           state={state}
@@ -282,6 +355,18 @@ export const EditModelProviderForm = ({
           }
         />
 
+        <CredentialsSection
+          state={state}
+          actions={actions}
+          provider={provider}
+          fieldErrors={fieldErrors}
+          setFieldErrors={setFieldErrors}
+          projectId={projectId}
+          organizationId={organizationId}
+          apiKeyValidationError={apiKeyValidationError}
+          onApiKeyValidationClear={clearApiKeyError}
+        />
+
         <ExtraHeadersSection
           state={state}
           actions={actions}
@@ -289,22 +374,37 @@ export const EditModelProviderForm = ({
         />
 
         {isLlmProvider && (
-          <>
-            <CustomModelInputSection
-              state={state}
-              actions={actions}
-              provider={provider}
-            />
+          <CustomModelInputSection
+            state={state}
+            actions={actions}
+            provider={provider}
+          />
+        )}
 
-            <DefaultProviderSection
-              state={state}
-              actions={actions}
-              provider={provider}
-              enabledProvidersCount={enabledProvidersCount}
-              project={project}
-              providers={providers}
-            />
-          </>
+        {gatewayMenuEnabled && (
+          <ModelProviderAdvancedSection
+            modelProviderId={(provider as { id?: string }).id}
+            draft={advancedDraft}
+            onDraftChange={(next) => {
+              setAdvancedDraft(next);
+              setAdvancedJsonError(null);
+            }}
+            jsonError={advancedJsonError}
+            accordionValue={advancedAccordionValue}
+            onAccordionValueChange={setAdvancedAccordionValue}
+            initial={{
+              healthStatus: (provider as { healthStatus?: string | null })
+                .healthStatus,
+              circuitOpenedAt: (provider as {
+                circuitOpenedAt?: Date | string | null;
+              }).circuitOpenedAt,
+              lastHealthCheckAt: (provider as {
+                lastHealthCheckAt?: Date | string | null;
+              }).lastHealthCheckAt,
+              disabledAt: (provider as { disabledAt?: Date | string | null })
+                .disabledAt,
+            }}
+          />
         )}
 
         <HStack width="full" justify="end">

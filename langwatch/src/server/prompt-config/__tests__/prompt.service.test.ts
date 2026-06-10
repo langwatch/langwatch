@@ -28,6 +28,12 @@ describe("PromptService", () => {
       const mockLatestVersion = {
         id: "version-1",
         version: 1,
+        schemaVersion: "1.0",
+        projectId: "project-1",
+        configId: "config-1",
+        authorId: null,
+        commitMessage: "Initial",
+        runtimeParameters: {},
         configData: {
           prompt: "Original prompt",
           messages: [],
@@ -43,6 +49,12 @@ describe("PromptService", () => {
       const mockUpdatedVersion = {
         id: "version-2",
         version: 2,
+        schemaVersion: "1.0",
+        projectId: "project-1",
+        configId: "config-1",
+        authorId: null,
+        commitMessage: "Update",
+        runtimeParameters: {},
         configData: {
           prompt: "Updated prompt",
           messages: [],
@@ -186,6 +198,7 @@ describe("PromptService", () => {
             },
             schemaVersion: "1.0",
             version: 2,
+            runtimeParameters: {},
           },
         });
       });

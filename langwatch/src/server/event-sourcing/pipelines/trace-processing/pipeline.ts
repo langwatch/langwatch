@@ -1,13 +1,18 @@
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { definePipeline } from "../../";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { AppendStore } from "../../projections/mapProjection.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
 import { AddAnnotationCommand, BulkSyncAnnotationsCommand, RemoveAnnotationCommand } from "./commands/annotationCommands";
 import { AssignTopicCommand } from "./commands/assignTopicCommand";
+import { ChangeTraceNameCommand } from "./commands/changeTraceNameCommand";
 import { RecordLogCommand } from "./commands/recordLogCommand";
 import { RecordMetricCommand } from "./commands/recordMetricCommand";
-import { RecordSpanCommand } from "./commands/recordSpanCommand";
+import {
+  RecordSpanCommand,
+  RECORD_SPAN_DEDUPLICATION,
+} from "./commands/recordSpanCommand";
 import { ResolveOriginCommand } from "./commands/resolveOriginCommand";
 import { LogRecordStorageMapProjection } from "./projections/logRecordStorage.mapProjection";
 import { MetricRecordStorageMapProjection } from "./projections/metricRecordStorage.mapProjection";
@@ -30,9 +35,20 @@ export interface TraceProcessingPipelineDeps {
   projectMetadataReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   simulationMetricsSyncReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   experimentMetricsSyncReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+  alertTriggerReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   spanStorageBroadcastReactor: ReactorDefinition<TraceProcessingEvent>;
+  claudeCodeSpanSyncReactor: ReactorDefinition<TraceProcessingEvent>;
   customerIoTraceSyncReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   gatewayBudgetSyncReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+  /**
+   * ADR-022: BlobStore injected so RecordSpanCommand can reconstitute oversized
+   * commands (fetch from S3 spool) and best-effort delete the spool after
+   * event_log INSERT succeeds. Optional — without it, the spool path is disabled.
+   */
+  blobStore?: BlobStore;
+  governanceKpisSyncReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+  retentionOrphanSweepReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+  governanceOcsfEventsSyncReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
 }
 
 /**
@@ -65,7 +81,9 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
     .withReactor("traceSummary", "projectMetadata", deps.projectMetadataReactor)
     .withReactor("traceSummary", "simulationMetricsSync", deps.simulationMetricsSyncReactor)
     .withReactor("traceSummary", "experimentMetricsSync", deps.experimentMetricsSyncReactor)
-    .withReactor("spanStorage", "spanStorageBroadcast", deps.spanStorageBroadcastReactor);
+    .withReactor("traceSummary", "alertTrigger", deps.alertTriggerReactor)
+    .withReactor("spanStorage", "spanStorageBroadcast", deps.spanStorageBroadcastReactor)
+    .withReactor("logRecordStorage", "claudeCodeSpanSync", deps.claudeCodeSpanSyncReactor);
 
   if (deps.customerIoTraceSyncReactor) {
     builder = builder.withReactor(
@@ -83,8 +101,47 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
     );
   }
 
-  return builder
-    .withCommand("recordSpan", RecordSpanCommand)
+  if (deps.governanceKpisSyncReactor) {
+    builder = builder.withReactor(
+      "traceSummary",
+      "governanceKpisSync",
+      deps.governanceKpisSyncReactor,
+    );
+  }
+
+  if (deps.governanceOcsfEventsSyncReactor) {
+    builder = builder.withReactor(
+      "traceSummary",
+      "governanceOcsfEventsSync",
+      deps.governanceOcsfEventsSyncReactor,
+    );
+  }
+
+  if (deps.retentionOrphanSweepReactor) {
+    builder = builder.withReactor(
+      "traceSummary",
+      "retentionOrphanSweep",
+      deps.retentionOrphanSweepReactor,
+    );
+  }
+
+  // ADR-022: When blobStore is provided, inject it into a pre-constructed
+  // RecordSpanCommand instance so the worker can reconstitute oversized commands
+  // (S3 spool fetch + best-effort delete). Falls back to zero-arg construction
+  // (no spool support) when blobStore is absent. Either way the recordSpan
+  // command carries the dedup config from main.
+  const recordSpanBuilder = deps.blobStore
+    ? builder.withCommandInstance(
+        "recordSpan",
+        RecordSpanCommand,
+        new RecordSpanCommand({ blobStore: deps.blobStore }),
+        { deduplication: RECORD_SPAN_DEDUPLICATION },
+      )
+    : builder.withCommand("recordSpan", RecordSpanCommand, {
+        deduplication: RECORD_SPAN_DEDUPLICATION,
+      });
+
+  return recordSpanBuilder
     .withCommand("assignTopic", AssignTopicCommand)
     .withCommand("recordLog", RecordLogCommand)
     .withCommand("recordMetric", RecordMetricCommand)
@@ -92,5 +149,6 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
     .withCommand("addAnnotation", AddAnnotationCommand)
     .withCommand("removeAnnotation", RemoveAnnotationCommand)
     .withCommand("bulkSyncAnnotations", BulkSyncAnnotationsCommand)
+    .withCommand("changeTraceName", ChangeTraceNameCommand)
     .build();
 }

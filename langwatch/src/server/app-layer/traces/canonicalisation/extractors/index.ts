@@ -1,4 +1,6 @@
 export * from "./_constants";
+export { ClaudeCodeExtractor } from "./claudeCode";
+export { CodexExtractor } from "./codex";
 export { FallbackExtractor } from "./fallback";
 export { GenAIExtractor } from "./genAi";
 export { HaystackExtractor } from "./haystack";
@@ -7,6 +9,7 @@ export { LegacyOtelTracesExtractor } from "./legacyOtel";
 export { LogfireExtractor } from "./logfire";
 export { MastraExtractor } from "./mastra";
 export { OpenInferenceExtractor } from "./openinference";
+export { SpringAIExtractor } from "./springAI";
 export { StrandsExtractor } from "./strands";
 export { TraceloopExtractor } from "./traceloop";
 export { VercelExtractor } from "./vercel";

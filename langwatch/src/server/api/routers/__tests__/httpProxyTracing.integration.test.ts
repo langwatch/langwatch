@@ -83,6 +83,8 @@ describe("HTTP Proxy Tracing", () => {
   }
 
   describe("when agentId is provided", () => {
+    /** @scenario Trace includes agent_test type */
+    /** @scenario Test execution creates a trace visible on the Traces page */
     it("creates a trace with type agent_test", async () => {
       mockSuccessResponse();
 
@@ -98,6 +100,7 @@ describe("HTTP Proxy Tracing", () => {
       expect(getTraceJob().customMetadata.type).toBe("agent_test");
     });
 
+    /** @scenario Trace includes agent ID */
     it("includes agent ID in trace metadata", async () => {
       mockSuccessResponse();
 
@@ -112,6 +115,7 @@ describe("HTTP Proxy Tracing", () => {
       expect(getTraceJob().customMetadata.agent_id).toBe("agent-123");
     });
 
+    /** @scenario Trace includes project ID */
     it("includes project ID in trace", async () => {
       mockSuccessResponse();
 
@@ -126,6 +130,7 @@ describe("HTTP Proxy Tracing", () => {
       expect(getTraceJob().projectId).toBe(projectId);
     });
 
+    /** @scenario Trace includes user ID */
     it("includes user ID in trace metadata", async () => {
       mockSuccessResponse();
 
@@ -140,6 +145,7 @@ describe("HTTP Proxy Tracing", () => {
       expect(getTraceJob().reservedTraceMetadata.user_id).toBe(userId);
     });
 
+    /** @scenario Trace captures response status code */
     it("captures response status code", async () => {
       mockSuccessResponse();
 
@@ -155,6 +161,7 @@ describe("HTTP Proxy Tracing", () => {
       expect(output.status).toBe(200);
     });
 
+    /** @scenario Trace captures response duration */
     it("captures request duration", async () => {
       mockSuccessResponse();
 
@@ -171,6 +178,7 @@ describe("HTTP Proxy Tracing", () => {
       expect(duration).toBeGreaterThanOrEqual(0);
     });
 
+    /** @scenario Trace captures response body */
     it("captures response body", async () => {
       const responseBody = { data: "test-value" };
       mockSuccessResponse(responseBody);
@@ -187,6 +195,7 @@ describe("HTTP Proxy Tracing", () => {
       expect(output.body).toEqual(responseBody);
     });
 
+    /** @scenario Trace captures extracted output */
     it("captures extracted output when output path configured", async () => {
       mockSsrfSafeFetch.mockResolvedValue(
         new Response(
@@ -254,6 +263,7 @@ describe("HTTP Proxy Tracing", () => {
   });
 
   describe("when endpoint returns an error", () => {
+    /** @scenario Trace captures HTTP error responses */
     it("captures the error response in the trace", async () => {
       mockSsrfSafeFetch.mockResolvedValue(
         new Response(JSON.stringify({ error: "Not found" }), {
@@ -278,6 +288,7 @@ describe("HTTP Proxy Tracing", () => {
   });
 
   describe("when endpoint is unreachable", () => {
+    /** @scenario Trace captures connection failures */
     it("captures the connection error in the trace", async () => {
       mockSsrfSafeFetch.mockRejectedValue(new Error("ECONNREFUSED"));
 
@@ -313,6 +324,8 @@ describe("HTTP Proxy Tracing", () => {
   });
 
   describe("when bearer auth is used", () => {
+    /** @scenario Bearer token credentials are redacted from trace */
+    /** @scenario Authorization headers are redacted in captured request headers */
     it("redacts the bearer token from the trace", async () => {
       mockSuccessResponse();
 
@@ -332,6 +345,8 @@ describe("HTTP Proxy Tracing", () => {
   });
 
   describe("when api_key auth is used", () => {
+    /** @scenario API key credentials are redacted from trace */
+    /** @scenario Custom auth headers are redacted in captured request headers */
     it("redacts the API key value from the trace", async () => {
       mockSuccessResponse();
 
@@ -355,6 +370,7 @@ describe("HTTP Proxy Tracing", () => {
   });
 
   describe("when basic auth is used", () => {
+    /** @scenario Basic auth credentials are redacted from trace */
     it("redacts the username and password from the trace", async () => {
       mockSuccessResponse();
 

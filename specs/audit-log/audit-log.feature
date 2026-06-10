@@ -62,6 +62,10 @@ Feature: Unified Audit Log
     When alice attaches an OpenAI provider binding to Virtual Key "prod-key"
     Then an AuditLog row is written with action "gateway.provider_binding.created" and targetKind "provider_binding"
 
+  # The cacheRule.service unit test mocks auditLog.create but does
+  # not assert action="gateway.cache_rule.created" on the call args
+  # (unlike the provider-binding test). Cheap to add but currently
+  # unbound — leaving @unimplemented.
   @integration @unimplemented
   Scenario: Cache rule mutation writes targetKind=cache_rule
     When alice creates a cache rule "long-context-anthropic" matching anthropic models
@@ -70,6 +74,14 @@ Feature: Unified Audit Log
   # ──────────────────────────────────────────────────────────────────────────
   # Read path — /settings/audit-log shows merged stream
   # ──────────────────────────────────────────────────────────────────────────
+  #
+  # The page-level rendering scenarios below describe the
+  # `/settings/audit-log` page (Source badge colours, Target column
+  # render, deep-link chips, em-dash for platform rows). The page is
+  # implemented in `src/pages/settings/audit-log.tsx` but no JSDOM
+  # render integration test exists for it yet — the underlying
+  # `getAuditLogs` query path is bound in the integration test
+  # above.
 
   @integration @unimplemented
   Scenario: Settings audit page lists gateway and platform events together
@@ -107,6 +119,8 @@ Feature: Unified Audit Log
     Then she navigates to `/settings/audit-log?targetKind=budget&targetId=<budget_id>`
     And the page shows only those 2 entries
 
+  # VK detail page revoked-state rendering — covered by the source
+  # but not by a JSDOM render test yet.
   @integration @unimplemented
   Scenario: Audit history button stays reachable for revoked VKs
     Given Virtual Key "prod-key" has status "revoked"
@@ -117,6 +131,11 @@ Feature: Unified Audit Log
   # ──────────────────────────────────────────────────────────────────────────
   # Sunset of /[project]/gateway/audit
   # ──────────────────────────────────────────────────────────────────────────
+  #
+  # The two scenarios below describe navigation/routing assertions
+  # (404 for the old route + nav menu absence). The route is gone
+  # from the codebase and the menu entry is removed, but no
+  # automated nav/routing test exists for either today.
 
   @integration @unimplemented
   Scenario: Old /[project]/gateway/audit route no longer exists
@@ -159,6 +178,14 @@ Feature: Unified Audit Log
   # ──────────────────────────────────────────────────────────────────────────
   # Multitenancy & RBAC
   # ──────────────────────────────────────────────────────────────────────────
+  #
+  # The two cross-org / cross-project boundary scenarios below
+  # would need a multi-org seed inside the `auditLog.consolidation`
+  # integration test (or a dedicated multitenancy test). The
+  # underlying enforcement is in `getAuditLogs()` (org fence + project
+  # filter) and lives behind the existing RBAC tests
+  # (`rbac.auditLog.test.ts`, `rbac-integration.test.ts`), but the
+  # specific "no leakage" assertion is unbound today.
 
   @integration @unimplemented
   Scenario: Audit log respects org/project boundaries

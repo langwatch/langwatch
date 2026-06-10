@@ -149,6 +149,7 @@ describe.skipIf(process.env.CI)("Scenario Processor - OTEL Isolation", () => {
     90000
   );
 
+  /** @scenario Pass labels to SDK for tracing */
   it(
     "passes OTEL_RESOURCE_ATTRIBUTES for labels",
     async () => {

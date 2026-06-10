@@ -12,7 +12,7 @@ Beyond plain pass-through, the gateway preserves tool-call streaming deltas byte
 
 ```
 POST /v1/messages
-x-api-key: lw_vk_live_<ULID>     # or Authorization: Bearer lw_vk_live_...
+x-api-key: vk-lw-<ULID>     # or Authorization: Bearer vk-lw-...
 anthropic-version: 2023-06-01
 Content-Type: application/json
 ```
@@ -34,7 +34,7 @@ Body matches [Anthropic's Messages API](https://docs.anthropic.com/claude/refere
 }
 ```
 
-Anthropic requires `max_tokens` — omitting it returns a 400 from upstream which the gateway surfaces.
+Anthropic requires `max_tokens`, omitting it returns a 400 from upstream which the gateway surfaces.
 
 ### Cache-aware system prompts
 
@@ -63,7 +63,7 @@ Same as [POST /v1/chat/completions](/ai-gateway/api/chat-completions#langwatch-s
 
 - `X-LangWatch-Cache: respect|force|disable|ttl=<s>`
 - `X-LangWatch-Trace-Metadata: {...}`
-- Trace-context headers (`traceparent`, `X-LangWatch-Trace-Id`, etc.) — see [SDKs → trace propagation](/ai-gateway/sdks/python#trace-propagation).
+- Trace-context headers (`traceparent`, `X-LangWatch-Trace-Id`, etc.), see [SDKs → trace propagation](/ai-gateway/sdks/python#trace-propagation).
 
 ## Response (non-streaming)
 
@@ -122,7 +122,7 @@ event: message_stop
 data: {"type":"message_stop"}
 ```
 
-The gateway forwards these byte-for-byte after the first chunk — including `content_block_start` / `content_block_delta` / `content_block_stop` events for tool use. See [Streaming](/ai-gateway/streaming) for the full contract.
+The gateway forwards these byte-for-byte after the first chunk, including `content_block_start`, `content_block_delta`, `content_block_stop` events for tool use. See [Streaming](/ai-gateway/streaming) for the full contract.
 
 ## Tool use
 
@@ -143,7 +143,7 @@ The gateway forwards these byte-for-byte after the first chunk — including `co
 }
 ```
 
-Subject to VK `policy_rules.tools` — a blocked tool name returns `403 tool_not_allowed` before the request leaves the gateway. See [Policy Rules](/ai-gateway/policy-rules).
+Subject to VK `policy_rules.tools`, a blocked tool name returns `403 tool_not_allowed` before the request leaves the gateway. See [Policy Rules](/ai-gateway/policy-rules).
 
 ## Extended thinking (Claude Opus 4.7, Sonnet 4.6)
 
@@ -170,7 +170,7 @@ If the resolved model isn't served by any provider in the VK, returns `403 model
 
 ## Errors
 
-See [API: Errors](/ai-gateway/api/errors) — the full type enum applies. Errors use the OpenAI-compatible envelope (not Anthropic's native `{type: "error", error: {...}}`) for consistency across `/v1/messages` and `/v1/chat/completions`. This is a small deviation from stock Anthropic — the tradeoff is a single error-handling code path for clients that hit both endpoints.
+See [API: Errors](/ai-gateway/api/errors): the full type enum applies. Errors use the OpenAI-compatible envelope (not Anthropic's native `{type: "error", error: {...}}`) for consistency across `/v1/messages` and `/v1/chat/completions`. This is a small deviation from stock Anthropic, the tradeoff is a single error-handling code path for clients that hit both endpoints.
 
 ## Example: Claude Code CLI
 
@@ -178,7 +178,7 @@ Claude Code uses `/v1/messages` natively. Setup is:
 
 ```bash
 export ANTHROPIC_BASE_URL="https://gateway.langwatch.ai"
-export ANTHROPIC_AUTH_TOKEN="lw_vk_live_..."
+export ANTHROPIC_AUTH_TOKEN="vk-lw-..."
 claude
 ```
 

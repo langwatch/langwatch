@@ -3,17 +3,35 @@ Feature: CLI Prompt Tag Commands
   I want to manage prompt tags via CLI commands
   So that I can control deployment slots (production, staging, etc.) without using the UI
 
+  # SDK-level renameTag scenarios are bound separately by PR #3696
+  # (`facade.tags.rename` + `PromptsApiService.renameTag`).
+  #
+  # CLI command-level scenarios (tag list/create/rename/assign/
+  # delete subcommands, --force flag, prompt-list Tags column,
+  # prompt-versions JSON output) are exercised by the per-command
+  # test files at
+  # `typescript-sdk/src/cli/commands/{prompt,tag}/__tests__/`. Those
+  # test files exist but have not yet been individually @scenario-
+  # bound (the audit manifest classifies each as KEEP). Cheap
+  # follow-up: pass through each command file once and add JSDoc
+  # markers per case.
+  #
+  # The "API get/list/versions returns latest+custom tags" rows are
+  # DUPLICATEs (server-side concerns covered in
+  # specs/prompts/prompt-tags.feature) and intentionally stay
+  # `@unimplemented` here.
+
   Background:
     Given I have a valid LANGWATCH_API_KEY configured
 
   # --- SDK: renameTag method ---
 
-  @unit @unimplemented
+  @unit
   Scenario: renameTag calls PUT /api/prompts/tags/{tag} with new name
     When I call promptsApiService.renameTag({ tag: "old-name", name: "new-name" })
     Then the SDK sends PUT /api/prompts/tags/old-name with body { name: "new-name" }
 
-  @unit @unimplemented
+  @unit
   Scenario: Facade tags.rename delegates to renameTag
     When I call facade.tags.rename("old-name", "new-name")
     Then it delegates to promptsApiService.renameTag({ tag: "old-name", name: "new-name" })

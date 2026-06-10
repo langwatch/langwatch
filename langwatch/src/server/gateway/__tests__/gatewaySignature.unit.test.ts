@@ -14,11 +14,11 @@ const VECTOR = {
   method: "POST",
   path: "/api/internal/gateway/resolve-key",
   timestamp: "1734567890",
-  body: '{"key_presented":"lw_vk_live_01HZX","gateway_node_id":"gw-a"}',
+  body: '{"key_presented":"vk-lw-01HZX","gateway_node_id":"gw-a"}',
   bodySha256:
-    "59f25745b66fbb0c7b3714572d20ffef741817b84b86093e4ac6af243af66816",
+    "ee1760159a23347bfefc6367dc8308be6d1a96c28fae184e17519f189de7d8a2",
   signature:
-    "4e4c8634b10a7ef719cf6d56b89b7f44a5ac7544c03d98ef132b79d36a1a6a1f",
+    "a73842ca249456600ab7752cc709e42c2b5ff2ca12f5b9f45f56ba873590c4e5",
 };
 
 describe("gateway HMAC signature", () => {

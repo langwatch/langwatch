@@ -4,6 +4,7 @@ import { analyticsMetrics } from "../registry";
 describe("analyticsMetrics", () => {
   describe("event_details", () => {
     describe("when calling aggregation()", () => {
+      /** @scenario "Event details and event score metrics use distinct aggregation keys" */
       it("produces a key containing 'event_details', not 'event_score'", () => {
         const result = analyticsMetrics.events.event_details.aggregation(
           0,
@@ -34,6 +35,7 @@ describe("analyticsMetrics", () => {
   });
 
   describe("evaluation_pass_rate", () => {
+    /** @scenario "Evaluation pass rate displays as percentage" */
     it("uses percentage format", () => {
       expect(analyticsMetrics.evaluations.evaluation_pass_rate.format).toBe(
         "0%",

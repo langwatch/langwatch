@@ -400,3 +400,194 @@ def test_nested_trace_linking_behavior() -> None:
 
         # The key point is that both decorators create their own traces
         # and the existing linking logic in _create_root_span handles relationships
+
+
+class TestDedicatedTracerProviderIsolation:
+    """Regression tests for issue #4203: dedicated TracerProvider must be
+    respected when passed, enabling isolation from other OTel-based SDKs."""
+
+    def setup_method(self) -> None:
+        Client.reset_for_testing()
+
+    def teardown_method(self) -> None:
+        Client.reset_for_testing()
+        import opentelemetry.trace as trace_api
+
+        trace_api._TRACER_PROVIDER = None  # type: ignore[attr-defined]
+        trace_api._TRACER_PROVIDER_SET_ONCE = trace_api.Once()  # type: ignore[attr-defined]
+
+    def test_dedicated_provider_used_when_global_exists(self) -> None:
+        """When another OTel-based SDK has set a global TracerProvider,
+        passing a dedicated provider to LangWatch attaches the exporter
+        to the dedicated provider — not the global one."""
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry import trace as trace_api
+
+        external_provider = TracerProvider()
+        trace_api.set_tracer_provider(external_provider)
+
+        lw_provider = TracerProvider()
+        client = Client(api_key="test-key", tracer_provider=lw_provider)
+
+        assert client.tracer_provider is lw_provider
+
+    def test_default_behavior_unchanged_without_custom_provider(self) -> None:
+        """When no tracer_provider is passed, _is_dedicated_provider stays
+        False and existing global-provider logic runs as before."""
+        Client(api_key="test-key")
+
+        assert Client._is_dedicated_provider is False
+
+    def test_dedicated_provider_does_not_become_global(self) -> None:
+        """When a dedicated provider is passed and the global is still a
+        ProxyTracerProvider, the dedicated provider must NOT replace the
+        global — it stays private for isolation."""
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry import trace as trace_api
+
+        assert isinstance(
+            trace_api.get_tracer_provider(), trace_api.ProxyTracerProvider
+        )
+
+        lw_provider = TracerProvider()
+        client = Client(api_key="test-key", tracer_provider=lw_provider)
+
+        assert client.tracer_provider is lw_provider
+        assert isinstance(
+            trace_api.get_tracer_provider(), trace_api.ProxyTracerProvider
+        )
+
+    def test_instrumentors_register_against_dedicated_provider(self) -> None:
+        """Instrumentors must be registered with tracer_provider=dedicated,
+        not the global provider."""
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.instrumentation.instrumentor import BaseInstrumentor
+        from unittest.mock import MagicMock
+
+        lw_provider = TracerProvider()
+        mock_instrumentor = MagicMock(spec=BaseInstrumentor)
+
+        Client(
+            api_key="test-key",
+            tracer_provider=lw_provider,
+            instrumentors=[mock_instrumentor],
+        )
+
+        mock_instrumentor.instrument.assert_called_once_with(
+            tracer_provider=lw_provider
+        )
+
+    def test_trace_uses_dedicated_provider_not_global(self) -> None:
+        """langwatch.trace() must create spans on the dedicated provider,
+        not the global one."""
+        from opentelemetry.sdk.trace import TracerProvider
+        from langwatch.telemetry.tracing import LangWatchTrace
+
+        lw_provider = TracerProvider()
+        Client(api_key="test-key", tracer_provider=lw_provider)
+
+        trace_obj = LangWatchTrace(name="test-trace")
+        assert trace_obj._tracer_provider is lw_provider
+
+    def test_reinit_on_api_key_change_stays_dedicated(self) -> None:
+        """After api_key change, _is_dedicated_provider remains True and
+        a new isolated provider is created (not attached to global)."""
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry import trace as trace_api
+
+        lw_provider = TracerProvider()
+        client = Client(api_key="first-key", tracer_provider=lw_provider)
+        assert Client._is_dedicated_provider is True
+
+        client.api_key = "second-key"
+
+        assert Client._is_dedicated_provider is True
+        assert client.tracer_provider is not None
+        assert isinstance(
+            trace_api.get_tracer_provider(), trace_api.ProxyTracerProvider
+        )
+
+    def test_same_provider_reattaches_after_reinit(self) -> None:
+        """When api_key changes, the old processor is removed and a fresh
+        one attached — no dead processors accumulate."""
+        from opentelemetry.sdk.trace import TracerProvider
+
+        lw_provider = TracerProvider()
+        Client(api_key="first-key", tracer_provider=lw_provider)
+
+        procs_before = lw_provider._active_span_processor._span_processors
+        assert len(procs_before) == 1
+
+        Client(api_key="second-key", tracer_provider=lw_provider)
+
+        procs_after = lw_provider._active_span_processor._span_processors
+        assert len(procs_after) == 1, (
+            f"Expected 1 processor (old removed, new added), got {len(procs_after)}"
+        )
+
+    def test_switch_from_global_to_dedicated_detaches_old(self) -> None:
+        """Switching from global provider to dedicated must detach our
+        processor from the old global — no dangling exporter."""
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry import trace as trace_api
+
+        Client(api_key="test-key")
+        global_provider = Client._tracer_provider
+        assert global_provider is not None
+        old_procs = global_provider._active_span_processor._span_processors
+        assert len(old_procs) == 1
+
+        lw_provider = TracerProvider()
+        Client(api_key="test-key", tracer_provider=lw_provider)
+
+        old_procs_after = global_provider._active_span_processor._span_processors
+        assert len(old_procs_after) == 0, (
+            f"Old provider should have 0 LW processors after switch, got {len(old_procs_after)}"
+        )
+        new_procs = lw_provider._active_span_processor._span_processors
+        assert len(new_procs) == 1
+
+    def test_switch_between_dedicated_providers_detaches_old(self) -> None:
+        """Switching from dedicated-A to dedicated-B must detach from A."""
+        from opentelemetry.sdk.trace import TracerProvider
+
+        provider_a = TracerProvider()
+        Client(api_key="test-key", tracer_provider=provider_a)
+        assert len(provider_a._active_span_processor._span_processors) == 1
+
+        provider_b = TracerProvider()
+        Client(api_key="test-key", tracer_provider=provider_b)
+
+        assert len(provider_a._active_span_processor._span_processors) == 0
+        assert len(provider_b._active_span_processor._span_processors) == 1
+
+    def test_switch_provider_reinstruments_against_new_provider(self) -> None:
+        """When switching providers, instrumentors must be uninstrumented
+        from the old provider and re-registered against the new one."""
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.instrumentation.instrumentor import BaseInstrumentor
+
+        class TrackingInstrumentor(BaseInstrumentor):
+            instrument_calls: list = []
+            uninstrument_calls: list = []
+            def instrumentation_dependencies(self):
+                return []
+            def _instrument(self, **kwargs):
+                TrackingInstrumentor.instrument_calls.append(kwargs.get("tracer_provider"))
+            def _uninstrument(self, **kwargs):
+                TrackingInstrumentor.uninstrument_calls.append(True)
+
+        TrackingInstrumentor.instrument_calls = []
+        TrackingInstrumentor.uninstrument_calls = []
+        inst = TrackingInstrumentor()
+
+        provider_a = TracerProvider()
+        Client(api_key="test-key", tracer_provider=provider_a, instrumentors=[inst])
+        assert len(TrackingInstrumentor.instrument_calls) == 1
+        assert TrackingInstrumentor.instrument_calls[0] is provider_a
+
+        provider_b = TracerProvider()
+        Client(api_key="test-key", tracer_provider=provider_b, instrumentors=[inst])
+        assert len(TrackingInstrumentor.uninstrument_calls) == 1
+        assert len(TrackingInstrumentor.instrument_calls) == 2
+        assert TrackingInstrumentor.instrument_calls[1] is provider_b

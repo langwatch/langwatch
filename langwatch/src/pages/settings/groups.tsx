@@ -100,7 +100,7 @@ function GroupsSettings() {
 
         {!groups.isLoading && (
           <Card.Root width="full" overflow="hidden">
-            <Card.Body paddingY={0} paddingX={0}>
+            <Card.Body paddingY={0} paddingX={0} overflowX="auto">
               <Table.Root variant="line" size="md" width="full">
                 <Table.Header>
                   <Table.Row>
@@ -239,7 +239,7 @@ function GroupsSettings() {
         open={!!groupToDelete}
         onOpenChange={(e) => { if (!e.open) setGroupToDelete(null); }}
       >
-        <Dialog.Content maxWidth="440px">
+        <Dialog.Content bg="bg" maxWidth="440px">
           <Dialog.Header>
             <Dialog.Title>Delete group</Dialog.Title>
           </Dialog.Header>
@@ -270,6 +270,6 @@ function GroupsSettings() {
   );
 }
 
-export default withPermissionGuard("organization:view", {
+export default withPermissionGuard("organization:manage", {
   layoutComponent: SettingsLayout,
 })(GroupsSettings);

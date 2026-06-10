@@ -39,6 +39,9 @@ describe("replayEventLoader", () => {
         EventOccurredAt: 1700000000000,
         EventVersion: "2025-01-01",
         EventPayload: JSON.stringify({ value: 10 }),
+        // Backdated fixture (Nov 2023). Stamp the never-expire sentinel so the
+        // retention TTL doesn't immediately delete the seed rows on next merge.
+        _retention_days: 0,
       },
       {
         TenantId: tenantId,
@@ -51,6 +54,7 @@ describe("replayEventLoader", () => {
         EventOccurredAt: 1700000001000,
         EventVersion: "2025-01-01",
         EventPayload: JSON.stringify({ value: 20 }),
+        _retention_days: 0,
       },
       {
         TenantId: tenantId,
@@ -63,6 +67,7 @@ describe("replayEventLoader", () => {
         EventOccurredAt: 1700000002000,
         EventVersion: "2025-01-01",
         EventPayload: JSON.stringify({ value: 30 }),
+        _retention_days: 0,
       },
       // Second tenant with colliding aggregate ID to verify tenant isolation
       {
@@ -76,6 +81,7 @@ describe("replayEventLoader", () => {
         EventOccurredAt: 1700000000500,
         EventVersion: "2025-01-01",
         EventPayload: JSON.stringify({ value: 999 }),
+        _retention_days: 0,
       },
     ];
 

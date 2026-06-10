@@ -24,6 +24,7 @@ function createMockClient(
 
 describe("wrapWithDefaultSettings", () => {
   describe("when calling query without clickhouse_settings", () => {
+    /** @scenario Analytics queries include a memory spill-to-disk safety setting */
     it("injects DEFAULT_CLICKHOUSE_SETTINGS", async () => {
       const mock = createMockClient();
       const wrapped = wrapWithDefaultSettings(mock);
@@ -42,6 +43,7 @@ describe("wrapWithDefaultSettings", () => {
   });
 
   describe("when calling query with caller-provided clickhouse_settings", () => {
+    /** @scenario Memory safety setting does not override explicit per-query settings */
     it("merges defaults with caller overrides taking precedence", async () => {
       const mock = createMockClient();
       const wrapped = wrapWithDefaultSettings(mock);

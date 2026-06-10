@@ -3,7 +3,7 @@ import { shouldOverrideOutput } from "../services/trace-io-accumulation.service"
 
 describe("shouldOverrideOutput", () => {
   describe("when the incoming span is the root span", () => {
-    it("overrides regardless of other factors", () => {
+    it("overrides a non-root output regardless of other factors", () => {
       expect(
         shouldOverrideOutput({
           isRoot: true,
@@ -14,6 +14,37 @@ describe("shouldOverrideOutput", () => {
           currentEndTime: 1000,
         }),
       ).toBe(true);
+    });
+  });
+
+  // claude_code Path B turns synthesize many parentless ("root") spans under
+  // one trace. Among roots the latest-finishing reply wins so the trace output
+  // is deterministic, rather than whichever root happened to fold last.
+  describe("when both the new and current output came from a root", () => {
+    it("overrides when the new root ends later", () => {
+      expect(
+        shouldOverrideOutput({
+          isRoot: true,
+          outputFromRoot: true,
+          isExplicit: false,
+          currentIsExplicit: false,
+          endTime: 2000,
+          currentEndTime: 1000,
+        }),
+      ).toBe(true);
+    });
+
+    it("does not override when the new root ends earlier", () => {
+      expect(
+        shouldOverrideOutput({
+          isRoot: true,
+          outputFromRoot: true,
+          isExplicit: false,
+          currentIsExplicit: false,
+          endTime: 500,
+          currentEndTime: 1000,
+        }),
+      ).toBe(false);
     });
   });
 

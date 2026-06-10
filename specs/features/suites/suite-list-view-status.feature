@@ -3,6 +3,14 @@ Feature: Suite list view status with criteria count
   I want the list view to show passed/failed status with criteria counts
   So that I can see at a glance whether a scenario passed and how many criteria were met
 
+  # Parity status: 8 of 11 scenarios bound to existing tests.
+  # Remaining scenarios (#3458):
+  #   3 NO_TEST: shipped behavior, no integration test yet
+  # NO_TEST gaps:
+  #   - "List view row with iteration shows iteration number in title"
+  #   - "Suite detail panel list view uses the same status format"
+  #   - "All runs panel list view uses the same status format"
+
   # The list view currently shows inconsistent values like "100%" for success
   # and "failed" for failures. This feature standardizes the status display
   # to always show "passed" or "failed" with criteria counts in parentheses,
@@ -13,28 +21,28 @@ Feature: Suite list view status with criteria count
 
   # --- Status label formatting ---
 
-  @unit @unimplemented
+  @unit
   Scenario: Successful run shows "passed" with criteria count
     Given a scenario run with status "success"
     And the run has 5 met criteria and 0 unmet criteria
     When the status label is computed
     Then the label reads "passed (5/5)"
 
-  @unit @unimplemented
+  @unit
   Scenario: Failed run shows "failed" with criteria count
     Given a scenario run with status "failed"
     And the run has 3 met criteria and 2 unmet criteria
     When the status label is computed
     Then the label reads "failed (3/5)"
 
-  @unit @unimplemented
+  @unit
   Scenario: Run with no criteria results shows status without count
     Given a scenario run with status "success"
     And the run has no evaluation results
     When the status label is computed
     Then the label reads "passed"
 
-  @unit @unimplemented
+  @unit
   Scenario: Run with zero criteria shows status without count
     Given a scenario run with status "failed"
     And the run has 0 met criteria and 0 unmet criteria
@@ -43,13 +51,13 @@ Feature: Suite list view status with criteria count
 
   # --- Non-terminal statuses remain unchanged ---
 
-  @unit @unimplemented
+  @unit
   Scenario: In-progress run shows "running" without criteria count
     Given a scenario run with status "in_progress"
     When the status label is computed
     Then the label reads "running"
 
-  @unit @unimplemented
+  @unit
   Scenario: Pending run shows "pending" without criteria count
     Given a scenario run with status "pending"
     When the status label is computed
@@ -57,14 +65,14 @@ Feature: Suite list view status with criteria count
 
   # --- List view rendering ---
 
-  @integration @unimplemented
+  @integration
   Scenario: List view row displays passed status with criteria count
     Given a suite run contains a scenario that passed with 4/5 criteria met
     When I view the run in list view
     Then the scenario row shows "passed (4/5)"
     And does not show "100%"
 
-  @integration @unimplemented
+  @integration
   Scenario: List view row displays failed status with criteria count
     Given a suite run contains a scenario that failed with 2/5 criteria met
     When I view the run in list view

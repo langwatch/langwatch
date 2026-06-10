@@ -9,6 +9,7 @@ import {
 import { checkOrganizationPermission } from "../rbac";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import { RoleBindingService } from "~/server/role-bindings/role-binding.service";
+import { RoleService } from "~/server/role/role.service";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { slugify } from "~/utils/slugify";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -80,7 +81,11 @@ export const groupRouter = createTRPCRouter({
    */
   listAll: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("organization:view"))
+    // Tightened from organization:view to manage — exposes every
+    // group's role-binding map (which scopes they grant on, what
+    // role, which custom role). Authz config, admin-surface.
+    // Sole TS caller is settings/groups.tsx, an admin-only page.
+    .use(checkOrganizationPermission("organization:manage"))
     .query(async ({ ctx, input }) => {
       await assertEnterprisePlan({
         organizationId: input.organizationId,
@@ -127,7 +132,13 @@ export const groupRouter = createTRPCRouter({
    */
   getById: protectedProcedure
     .input(z.object({ organizationId: z.string(), groupId: z.string() }))
-    .use(checkOrganizationPermission("organization:view"))
+    // Tightened from organization:view to manage — exposes the
+    // member roster (names + emails) and the group's role bindings,
+    // both admin-surface authorization data. Sole TS caller is
+    // GroupDetailDialog under settings/, an admin-only surface.
+    // Mirrors the #47 stack: roleBinding.listForOrg is already at
+    // organization:manage; group.getById should match.
+    .use(checkOrganizationPermission("organization:manage"))
     .query(async ({ ctx, input }) => {
       const group = await ctx.prisma.group.findFirst({
         where: { id: input.groupId, organizationId: input.organizationId },
@@ -211,6 +222,17 @@ export const groupRouter = createTRPCRouter({
             scopeId: b.scopeId,
           });
         }
+
+        const customRoleIds = input.bindings
+          .filter((b) => b.role === TeamUserRole.CUSTOM && b.customRoleId)
+          .map((b) => b.customRoleId!);
+        if (customRoleIds.length > 0) {
+          const roleService = new RoleService(ctx.prisma);
+          await roleService.validateRolesAssignable({
+            roleIds: customRoleIds,
+            organizationId: input.organizationId,
+          });
+        }
       }
 
       return ctx.prisma.$transaction(async (tx) => {
@@ -272,6 +294,14 @@ export const groupRouter = createTRPCRouter({
         scopeType: input.scopeType,
         scopeId: input.scopeId,
       });
+
+      if (input.role === TeamUserRole.CUSTOM && input.customRoleId) {
+        const roleService = new RoleService(ctx.prisma);
+        await roleService.validateRolesAssignable({
+          roleIds: [input.customRoleId],
+          organizationId: input.organizationId,
+        });
+      }
 
       return ctx.prisma.roleBinding.create({
         data: {
@@ -416,7 +446,11 @@ export const groupRouter = createTRPCRouter({
 
   listForMember: protectedProcedure
     .input(z.object({ organizationId: z.string(), userId: z.string() }))
-    .use(checkOrganizationPermission("organization:view"))
+    // Tightened from organization:view to manage — caller can pass any
+    // userId and enumerate which groups that user belongs to (which
+    // role bindings they inherit). That's admin-surface authorization
+    // visibility. Sole TS caller is MemberDetailDialog under settings/.
+    .use(checkOrganizationPermission("organization:manage"))
     .query(async ({ ctx, input }) => {
       await assertEnterprisePlan({
         organizationId: input.organizationId,
@@ -530,7 +564,8 @@ export const groupRouter = createTRPCRouter({
       }
 
       const repo = new PrismaRoleBindingRepository(ctx.prisma);
-      const service = new RoleBindingService(ctx.prisma, repo);
+      const roleService = new RoleService(ctx.prisma);
+      const service = new RoleBindingService(ctx.prisma, repo, roleService);
       return service.applyGroupEdits({
         organizationId: input.organizationId,
         groupId: input.groupId,

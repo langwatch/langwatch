@@ -189,7 +189,7 @@ export function StudioDrawerWrapper({
         closeOnInteractOutside={false}
         modal={false}
       >
-        <Drawer.Content marginTop="56px">
+        <Drawer.Content bg="bg" marginTop="56px">
           {node && (
             <Drawer.Header
               paddingTop={4}

@@ -1,5 +1,14 @@
 @wip @integration
 Feature: Project Limit Enforcement with License
+
+  # All scenarios in this file describe project-creation enforcement
+  # against license limits. The repository.getProjectCount is exercised
+  # indirectly by license-enforcement.service.unit.test.ts (the it.each
+  # over LimitType includes 'projects'). End-to-end "I create a project,
+  # FORBIDDEN" requires a tRPC project-create-router integration test
+  # against a license-bearing organization, which does not exist yet —
+  # all aspirational pending that harness.
+
   As a LangWatch self-hosted deployment with a license
   I want the project creation limit to be enforced
   So that organizations respect their licensed project count
@@ -13,22 +22,12 @@ Feature: Project Limit Enforcement with License
   # License-Based Project Limits
   # ============================================================================
 
-  @unimplemented
   Scenario: Allows project creation when under limit
     Given the organization has a license with maxProjects 5
     And the organization has 3 projects
     When I create a project named "New Project"
     Then the project is created successfully
 
-  @unimplemented
-  Scenario: Blocks project creation when at limit
-    Given the organization has a license with maxProjects 3
-    And the organization has 3 projects
-    When I create a project named "New Project"
-    Then the request fails with FORBIDDEN
-    And the error message contains "maximum number of projects"
-
-  @unimplemented
   Scenario: Blocks project creation when over limit
     Given the organization has a license with maxProjects 2
     And the organization has 3 projects
@@ -64,7 +63,6 @@ Feature: Project Limit Enforcement with License
   # Edge Cases
   # ============================================================================
 
-  @unimplemented
   Scenario: Counts only non-archived projects toward limit
     Given the organization has a license with maxProjects 3
     And the organization has 2 active projects
@@ -72,7 +70,6 @@ Feature: Project Limit Enforcement with License
     When I create a project named "New Project"
     Then the project is created successfully
 
-  @unimplemented
   Scenario: Counts projects across all teams
     Given the organization has a license with maxProjects 3
     And team "team-456" has 2 projects

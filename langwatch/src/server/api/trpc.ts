@@ -7,6 +7,12 @@
  * need to use are documented accordingly near the end.
  */
 
+import {
+  trace as otelTrace,
+  type Span,
+  SpanKind,
+  SpanStatusCode,
+} from "@opentelemetry/api";
 import type { inferParser } from "@trpc/server";
 import {
   initTRPC,
@@ -16,28 +22,32 @@ import {
   TRPCError,
 } from "@trpc/server";
 import { getHTTPStatusCodeFromError } from "@trpc/server/http";
+
 // Local type replacing CreateNextContextOptions from @trpc/server/adapters/next
 // to avoid pulling in the real `next` types.
 interface CreateNextContextOptions {
   req: any;
   res: any;
 }
+
+import type { OrganizationUserRole } from "@prisma/client";
 import type { Parser } from "@trpc-internal/parser";
 import type { UnsetMarker } from "@trpc-internal/utils";
-import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
-import type { Session } from "~/server/auth";
 import superjson from "superjson";
 import { ZodError } from "zod";
+import { DomainError } from "~/server/app-layer/domain-error";
+import type { Session } from "~/server/auth";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
-import { DomainError } from "~/server/app-layer/domain-error";
-import { getLogLevelFromStatusCode } from "../middleware/requestLogging";
+import { AiCallFailedError } from "~/server/modelProviders/aiCallFailedError";
+import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
+import { ModelProviderDisabledError } from "~/server/modelProviders/modelProviderDisabledError";
+import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import { createLogger } from "../../utils/logger/server";
 import { captureException } from "../../utils/posthogErrorCapture";
 import { auditLog } from "../auditLog";
-import type { OrganizationUserRole } from "@prisma/client";
-import type { PermissionMiddleware } from "./rbac";
-import type { OpsScope } from "./rbac";
+import { getLogLevelFromStatusCode } from "../middleware/requestLogging";
+import type { OpsScope, PermissionMiddleware } from "./rbac";
 
 const logger = createLogger("langwatch:trpc");
 
@@ -111,35 +121,91 @@ export const createTRPCContext = async (opts: CreateNextContextOptions) => {
  * errors on the backend.
  */
 
-const t = initTRPC.context<typeof createTRPCContext>().create({
-  transformer: superjson,
-  errorFormatter({ shape, error }) {
-    // Extract limit info if present in cause
-    const cause = error.cause as
-      | { limitType?: string; current?: number; max?: number }
-      | undefined;
-    const limitInfo = cause?.limitType
+/**
+ * Extracted for testing — see
+ * langwatch/src/server/api/__tests__/modelNotConfigured.trpc.integration.test.ts.
+ * Keep `errorFormatter` in `t.create` calling this so production and
+ * tests exercise the same code path.
+ */
+export function errorFormatterForTesting({
+  shape,
+  error,
+}: {
+  shape: any;
+  error: { cause?: unknown; message?: string };
+}) {
+  const cause = error.cause as
+    | { limitType?: string; current?: number; max?: number }
+    | undefined;
+  const limitInfo = cause?.limitType
+    ? {
+        limitType: cause.limitType,
+        current: cause.current,
+        max: cause.max,
+      }
+    : null;
+
+  const domainError =
+    error.cause instanceof DomainError ? error.cause.serialize() : null;
+
+  // Surface ModelNotConfiguredError on the wire so the frontend
+  // interceptor in `utils/trpcError.ts::extractMissingModelInfo` can
+  // open the missing-model modal. `cause` carries a stable
+  // discriminator (`code: "MODEL_NOT_CONFIGURED"`) plus the feature
+  // metadata the modal needs to render + deep-link.
+  const missingModelCause =
+    error.cause instanceof ModelNotConfiguredError
       ? {
-          limitType: cause.limitType,
-          current: cause.current,
-          max: cause.max,
+          code: error.cause.cause,
+          featureKey: error.cause.featureKey,
+          featureDisplayName: error.cause.featureDisplayName,
+          role: error.cause.role,
+          projectId: error.cause.projectId,
         }
       : null;
 
-    const domainError =
-      error.cause instanceof DomainError ? error.cause.serialize() : null;
+  // Surface AiCallFailedError on the wire so the frontend interceptor
+  // in `utils/trpcError.ts::extractAiCallFailedInfo` can show the
+  // "double-check your model configuration" toast. Same cause-channel
+  // as MODEL_NOT_CONFIGURED — different discriminator code.
+  const aiCallFailedCause =
+    error.cause instanceof AiCallFailedError
+      ? {
+          code: error.cause.cause,
+          featureKey: error.cause.featureKey,
+          featureDisplayName: error.cause.featureDisplayName,
+          role: error.cause.role,
+          errorMessage: error.cause.originalErrorMessage,
+        }
+      : null;
 
-    return {
-      ...shape,
-      data: {
-        ...shape.data,
-        zodError:
-          error.cause instanceof ZodError ? error.cause.flatten() : null,
-        cause: limitInfo,
-        domainError,
-      },
-    };
-  },
+  // Surface ModelProviderDisabledError on the wire so the frontend
+  // can render a swap-to-parent toast. Carries the cascade-next
+  // alternate so the toast's primary CTA can be a one-click swap
+  // rather than a generic "open settings" deep link.
+  const providerDisabledCause =
+    error.cause instanceof ModelProviderDisabledError
+      ? error.cause.toResponseBody()
+      : null;
+
+  return {
+    ...shape,
+    data: {
+      ...shape.data,
+      zodError: error.cause instanceof ZodError ? error.cause.flatten() : null,
+      cause:
+        missingModelCause ??
+        providerDisabledCause ??
+        aiCallFailedCause ??
+        limitInfo,
+      domainError,
+    },
+  };
+}
+
+const t = initTRPC.context<typeof createTRPCContext>().create({
+  transformer: superjson,
+  errorFormatter: errorFormatterForTesting,
 });
 
 /**
@@ -212,17 +278,134 @@ const auditLogTRPCErrors = t.middleware(
   },
 );
 
+/**
+ * Pull the resource ID + kind from a tRPC mutation result so the audit
+ * row's `targetId` / `targetKind` columns are populated. Without this,
+ * the audit log shows an empty Target column for Platform-side rows
+ * (Ariana caught this on the γ post-dogfood UI bug-bash — admin
+ * auditing "what did I just create?" couldn't see the new resource id
+ * on their own click's audit row, only on the gateway-side mirror row).
+ *
+ * Best-effort: tries common shapes (id at root, .source.id, .{tail}.id
+ * where tail is the resource name from the path), and derives kind
+ * from the path's leading segment via a small map. Returns nulls
+ * when the result shape isn't one we know — leaving the columns blank
+ * is fine, that's the legacy behavior.
+ */
+function deriveAuditTarget(
+  path: string,
+  data: unknown,
+): { targetKind?: string; targetId?: string } {
+  if (!data || typeof data !== "object") return {};
+  const root = path.split(".")[0] ?? "";
+  // Path-prefix → targetKind. Mirrors the gateway adapter's
+  // GATEWAY_AUDIT_TARGET_KINDS where applicable; new platform-side
+  // resources land here.
+  const TARGET_KIND_BY_ROUTER: Record<string, string> = {
+    gatewayBudgets: "budget",
+    virtualKeys: "virtual_key",
+    personalVirtualKeys: "virtual_key",
+    gatewayProviders: "provider_binding",
+    cacheRules: "cache_rule",
+    ingestionSources: "ingestion_source",
+    anomalyRules: "anomaly_rule",
+    routingPolicy: "routing_policy",
+    aiTools: "ai_tool_entry",
+    aiToolsCatalog: "ai_tool_entry",
+    organization: "organization",
+    project: "project",
+    team: "team",
+    user: "user",
+  };
+  const targetKind = TARGET_KIND_BY_ROUTER[root];
+  // Best-effort id extraction. Mutations return one of:
+  //   1. entity directly ({ id })
+  //   2. wrapped ({ source: { id } }, { budget: { id } })
+  //   3. tuple with one-shot secret ({ source, ingestSecret })
+  //   4. array of entities ([{ id }, ...]) — bulk creates
+  //   5. array of wrapped ([{ invite: { id } }, ...]) — createInvites shape
+  //   6. wrapped array ({ invites: [{ id }] }) — alt bulk shape
+  // First non-empty id wins; ok to log only the first when many exist
+  // (the args column already shows the input — Target is a navigation
+  // anchor, not a complete inventory).
+  const firstId = findFirstId(data);
+  return firstId ? { targetKind, targetId: firstId } : { targetKind };
+}
+
+function findFirstId(value: unknown): string | undefined {
+  if (!value) return undefined;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const id = findFirstId(item);
+      if (id) return id;
+    }
+    return undefined;
+  }
+  if (typeof value !== "object") return undefined;
+  const obj = value as Record<string, unknown>;
+  if (typeof obj.id === "string") return obj.id;
+  // One level of named-field walk into objects + arrays. We don't
+  // recurse arbitrarily deep — the audit Target column is best-effort,
+  // and an unbounded walk would surface unrelated ids buried in nested
+  // payloads.
+  for (const key of Object.keys(obj)) {
+    const child = obj[key];
+    if (Array.isArray(child)) {
+      for (const item of child) {
+        if (item && typeof item === "object") {
+          const itemId = (item as Record<string, unknown>).id;
+          if (typeof itemId === "string") return itemId;
+          // One more level for {invites:[{invite:{id}}]} shape
+          for (const innerKey of Object.keys(item)) {
+            const inner = (item as Record<string, unknown>)[innerKey];
+            if (inner && typeof inner === "object" && !Array.isArray(inner)) {
+              const innerId = (inner as Record<string, unknown>).id;
+              if (typeof innerId === "string") return innerId;
+            }
+          }
+        }
+      }
+    } else if (child && typeof child === "object") {
+      const childId = (child as Record<string, unknown>).id;
+      if (typeof childId === "string") return childId;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Mutations that fire on a heartbeat / per-tab cadence and aren't worth
+ * recording in the audit log. `presence.*` runs every ~15s per open tab
+ * (heartbeat + cursor broadcasts + leave on pagehide); auditing them
+ * buries every genuine action — project edits, deletions, role changes —
+ * under a wall of `presence.update` rows. They're already silenced from
+ * the request log via SILENCED_LOG_PATH_PREFIXES; this is the audit-log
+ * equivalent.
+ *
+ * Add new entries here when a router's mutations exist purely for
+ * ephemeral session state that doesn't need a permanent forensic record.
+ */
+const AUDIT_LOG_EXEMPT_PATHS = new Set(["user.updateLastLogin"]);
+const AUDIT_LOG_EXEMPT_PATH_PREFIXES = ["presence."] as const;
+
+function isAuditLogExempt(path: string): boolean {
+  if (AUDIT_LOG_EXEMPT_PATHS.has(path)) return true;
+  return AUDIT_LOG_EXEMPT_PATH_PREFIXES.some((p) => path.startsWith(p));
+}
+
 const auditLogMutations = t.middleware(
   async ({ ctx, next, type, path, input }) => {
     if (
       type !== "mutation" ||
       !ctx.session?.user ||
-      path === "user.updateLastLogin"
+      isAuditLogExempt(path)
     ) {
       return next();
     }
 
     let result = await next();
+
+    const target = result.ok ? deriveAuditTarget(path, result.data) : {};
 
     await auditLog({
       userId: ctx.session.user.id,
@@ -232,6 +415,8 @@ const auditLogMutations = t.middleware(
       args: input,
       error: !result.ok ? result.error : undefined,
       req: ctx.req,
+      targetKind: target.targetKind,
+      targetId: target.targetId,
       // Stamp the real admin id when the action is happening during
       // impersonation. `userId` above is the impersonated target (the
       // RBAC actor); metadata.impersonatorId is the human performing it.
@@ -244,49 +429,59 @@ const auditLogMutations = t.middleware(
   },
 );
 
-export const tracerMiddleware = t.middleware(
-  async ({ path, type, next }) => {
-    const { trace, SpanKind, SpanStatusCode } = await import(
-      "@opentelemetry/api"
-    );
+function spanAttributes(path: string, type: string) {
+  return {
+    "rpc.system": "trpc",
+    "rpc.method": path,
+    "rpc.type": type,
+  } as const;
+}
 
-    const tracer = trace.getTracer("langwatch:trpc");
-    const spanName = `trpc.${path}`;
+function recordSpanError(span: Span, error: unknown): void {
+  const e = error instanceof Error ? error : new Error(String(error));
+  span.recordException(e);
+  span.setStatus({ code: SpanStatusCode.ERROR, message: e.message });
+}
 
-    return tracer.startActiveSpan(
-      spanName,
-      {
-        kind: SpanKind.SERVER,
-        attributes: {
-          "rpc.system": "trpc",
-          "rpc.method": path,
-          "rpc.type": type,
-        },
-      },
-      async (span) => {
-        // IMPORTANT: In tRPC v10, next() never throws. Downstream errors are
-        // returned as { ok: false, error } result objects — NOT thrown.
-        const result = await next();
+export const tracerMiddleware = t.middleware(async ({ path, type, next }) => {
+  const tracer = otelTrace.getTracer("langwatch:trpc");
+  const spanName = `trpc.${path}`;
 
-        if (!result.ok) {
-          const err = result.error;
-          span.recordException(err instanceof Error ? err : new Error(String(err)));
-          span.setStatus({
-            code: SpanStatusCode.ERROR,
-            message: err instanceof Error ? err.message : String(err),
-          });
-        }
+  // For silenced routes (presence heartbeats, SSE subscription
+  // messages) we want zero spans on the happy path — they otherwise
+  // drown out the trace surface — but failures still need a span so
+  // real errors stay visible. Capture the start time before `next()`
+  // so the error span's duration matches the actual call.
+  if (isSilencedCall(path, type)) {
+    const startTime = Date.now();
+    const result = await next();
+    if (result.ok) return result;
 
-        span.end();
-        return result;
-      },
-    );
-  },
-);
+    const span = tracer.startSpan(spanName, {
+      kind: SpanKind.SERVER,
+      startTime,
+      attributes: spanAttributes(path, type),
+    });
+    recordSpanError(span, result.error);
+    span.end();
+    return result;
+  }
 
-function domainErrorToTRPCCode(
-  error: DomainError,
-): TRPCError["code"] {
+  return tracer.startActiveSpan(
+    spanName,
+    { kind: SpanKind.SERVER, attributes: spanAttributes(path, type) },
+    async (span) => {
+      // IMPORTANT: In tRPC v10, next() never throws. Downstream errors are
+      // returned as { ok: false, error } result objects — NOT thrown.
+      const result = await next();
+      if (!result.ok) recordSpanError(span, result.error);
+      span.end();
+      return result;
+    },
+  );
+});
+
+function domainErrorToTRPCCode(error: DomainError): TRPCError["code"] {
   const map: Partial<Record<number, TRPCError["code"]>> = {
     400: "BAD_REQUEST",
     401: "UNAUTHORIZED",
@@ -312,6 +507,41 @@ const domainErrorMiddleware = t.middleware(async ({ next }) => {
       code: domainErrorToTRPCCode(domainError),
       message: domainError.message,
       cause: domainError,
+    });
+  }
+  if (!result.ok && result.error.cause instanceof ModelNotConfiguredError) {
+    // Re-raise as a typed BAD_REQUEST TRPCError so the errorFormatter
+    // serialises the cause into `data.cause` for the frontend
+    // interceptor. Without this middleware the error falls through as
+    // INTERNAL_SERVER_ERROR and the missing-model modal never opens.
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: result.error.cause.message,
+      cause: result.error.cause,
+    });
+  }
+  if (!result.ok && result.error.cause instanceof AiCallFailedError) {
+    // Same shape as ModelNotConfiguredError: re-raise as BAD_REQUEST so
+    // the wire code matches the user-actionable nature of the toast
+    // ("double-check your model configuration") instead of falling
+    // through as a generic 500 that monitoring + retry policies treat
+    // as a server fault.
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: result.error.cause.message,
+      cause: result.error.cause,
+    });
+  }
+  if (!result.ok && result.error.cause instanceof ModelProviderDisabledError) {
+    // Same shape as the other typed model errors: BAD_REQUEST so the
+    // errorFormatter serialises `cause` and the frontend interceptor
+    // opens the swap-to-parent toast. Without this re-raise the error
+    // bubbles up as a generic INTERNAL_SERVER_ERROR and the user only
+    // sees a red "something went wrong" toast.
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: result.error.cause.message,
+      cause: result.error.cause,
     });
   }
   return result;
@@ -358,7 +588,10 @@ export function handleTrpcCallLogging({
     logData.statusCode = resolvedStatus;
 
     // Include domain error kind in log data for structured filtering
-    if (result.error instanceof TRPCError && result.error.cause instanceof DomainError) {
+    if (
+      result.error instanceof TRPCError &&
+      result.error.cause instanceof DomainError
+    ) {
       logData.domainErrorKind = result.error.cause.kind;
     }
 
@@ -374,11 +607,36 @@ export function handleTrpcCallLogging({
   }
 }
 
+/**
+ * Routers whose calls flood the request log without being useful for
+ * debugging: presence (peer cursor / drawer presence heartbeats fire
+ * every few seconds per open tab). Logging + tracing them buries the
+ * signal in noise. Errors are still reported by the middlewares below.
+ */
+const SILENCED_LOG_PATH_PREFIXES = ["presence."] as const;
+
+/**
+ * tRPC call types whose volume is unbounded — SSE subscriptions emit
+ * a "trpc call" log line per delivered message. Silencing the
+ * subscription type as a whole keeps the dev log readable without
+ * sprinkling per-router opt-outs across the codebase.
+ */
+const SILENCED_LOG_TYPES = new Set(["subscription"]);
+
+function isSilencedPath(path: string): boolean {
+  return SILENCED_LOG_PATH_PREFIXES.some((p) => path.startsWith(p));
+}
+
+function isSilencedCall(path: string, type: string): boolean {
+  return isSilencedPath(path) || SILENCED_LOG_TYPES.has(type);
+}
+
 export const loggerMiddleware = t.middleware(
   async ({ path, type, input, ctx, next }) => {
     // Import context utilities dynamically to avoid circular deps
-    const { createContextFromTRPC, runWithContext } =
-      await import("../context/asyncContext");
+    const { createContextFromTRPC, runWithContext } = await import(
+      "../context/asyncContext"
+    );
 
     // Create context from tRPC context and input
     const requestContext = createContextFromTRPC(ctx, input as any);
@@ -390,6 +648,13 @@ export const loggerMiddleware = t.middleware(
       // objects. Use result.ok to detect errors — NOT try/catch.
       const result = await next();
       const duration = Date.now() - start;
+
+      // Silence happy-path logs for high-frequency, low-signal routes
+      // (presence heartbeats) — still log errors so real failures are
+      // visible.
+      if (isSilencedCall(path, type) && result.ok) {
+        return result;
+      }
 
       handleTrpcCallLogging({
         result,

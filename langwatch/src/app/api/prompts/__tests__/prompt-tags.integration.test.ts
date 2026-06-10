@@ -76,6 +76,7 @@ describe("Prompt Tags REST API (/api/prompts/tags)", () => {
       data: {
         ...projectFactory.build({ slug: `test-project-${slug}` }),
         teamId: testTeam.id,
+        personalFeatures: {},
       },
     });
 
@@ -178,6 +179,9 @@ describe("Prompt Tags REST API (/api/prompts/tags)", () => {
 
   describe("POST /api/prompts/tags", () => {
     describe("when creating a valid custom tag", () => {
+      /** @scenario "Creating a custom tag" */
+      /** @scenario 'Recreating "production" after deletion succeeds' */
+      /** @scenario "Accepts valid non-numeric tag during creation" */
       it("returns 201 with id and name", async () => {
         const res = await post("/api/prompts/tags", { name: "canary" });
 
@@ -189,8 +193,17 @@ describe("Prompt Tags REST API (/api/prompts/tags)", () => {
     });
 
     describe("when name is purely numeric", () => {
+      /** @scenario "Rejects zero as a tag name during creation" */
       it("returns 422", async () => {
         const res = await post("/api/prompts/tags", { name: "42" });
+
+        expect(res.status).toBe(422);
+        const body = await res.json();
+        expect(body.message).toMatch(/numeric/i);
+      });
+
+      it("rejects '0' as a numeric tag name", async () => {
+        const res = await post("/api/prompts/tags", { name: "0" });
 
         expect(res.status).toBe(422);
         const body = await res.json();
@@ -207,6 +220,7 @@ describe("Prompt Tags REST API (/api/prompts/tags)", () => {
     });
 
     describe("when name already exists in the org", () => {
+      /** @scenario "Creating a duplicate tag returns 409" */
       it("returns 409 conflict", async () => {
         await prisma.promptTag.create({
           data: { id: `ptag_${nanoid()}`, organizationId: testOrganization.id, name: "canary" },
@@ -219,6 +233,7 @@ describe("Prompt Tags REST API (/api/prompts/tags)", () => {
     });
 
     describe("when name clashes with a protected tag", () => {
+      /** @scenario 'Creating "latest" via the API returns 422' */
       it("returns 422 mentioning protected for 'latest'", async () => {
         const res = await post("/api/prompts/tags", { name: "latest" });
 
@@ -281,6 +296,8 @@ describe("Prompt Tags REST API (/api/prompts/tags)", () => {
 
   describe("DELETE /api/prompts/tags/:tag", () => {
     describe("when deleting an existing custom tag", () => {
+      /** @scenario 'Deleting the seeded "production" tag succeeds' */
+      /** @scenario 'Deleting the seeded "staging" tag succeeds' */
       it("returns 204", async () => {
         await prisma.promptTag.create({
           data: { id: `ptag_${nanoid()}`, organizationId: testOrganization.id, name: "canary" },
@@ -298,6 +315,7 @@ describe("Prompt Tags REST API (/api/prompts/tags)", () => {
     });
 
     describe("when deleting a tag with assignments", () => {
+      /** @scenario "Deleting a custom tag cascades to assignments" */
       it("cascades to remove PromptTagAssignment rows", async () => {
         const tagId = `ptag_${nanoid()}`;
         await prisma.promptTag.create({

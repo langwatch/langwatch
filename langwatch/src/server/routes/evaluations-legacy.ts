@@ -17,7 +17,6 @@ import type { JsonArray } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
 import type { Edge, Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
-import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { type ZodError, ZodError as ZodErrorClass, z } from "zod";
 import { fromZodError } from "zod-validation-error";
@@ -41,51 +40,54 @@ import {
 import { prisma } from "~/server/db";
 import {
   AVAILABLE_EVALUATORS,
+  evaluatorsSchema,
   type EvaluationResult,
   type EvaluatorDefinition,
   type EvaluatorTypes,
   type SingleEvaluationResult,
 } from "~/server/evaluations/evaluators.generated";
-import { evaluatorsSchema } from "~/server/evaluations/evaluators.zod.generated";
 import { getEvaluatorDefaultSettings } from "~/server/evaluations/getEvaluator";
 import {
   type EvaluationRESTParams,
   type EvaluationRESTResult,
   evaluationInputSchema,
 } from "~/server/evaluations/types";
-import { mapEsTargetsToTargets } from "~/server/evaluations-v3/services/mappers";
-import type {
-  ESBatchEvaluation,
-  ESBatchEvaluationRESTParams,
-  ESBatchEvaluationTarget,
-  ESBatchEvaluationTargetType,
-} from "~/server/experiments/types";
+import { mapEsTargetsToTargets } from "~/server/experiments-v3/services/mappers";
 import {
   eSBatchEvaluationRESTParamsSchema,
   eSBatchEvaluationSchema,
   eSBatchEvaluationTargetTypeSchema,
-} from "~/server/experiments/types.generated";
+  type ESBatchEvaluation,
+  type ESBatchEvaluationRESTParams,
+  type ESBatchEvaluationTarget,
+  type ESBatchEvaluationTargetType,
+} from "~/server/experiments/types";
+import { ExperimentService } from "~/server/experiments/experiment.service";
 import { getPayloadSizeHistogram } from "~/server/metrics";
-import { rAGChunkSchema } from "~/server/tracer/types.generated";
+import { rAGChunkSchema } from "~/server/tracer/types";
+import { coerceEvaluatorScalar } from "~/server/utils/coerceEvaluatorScalar";
 import { createLogger } from "~/utils/logger/server";
 import { findOrCreateExperiment } from "~/pages/api/experiment/init";
 import type { Permission } from "~/server/api/rbac";
 import {
-  enforcePatCeiling,
+  enforceApiKeyCeiling,
   extractCredentials,
-  patCeilingDenialResponse,
-} from "~/server/pat/auth-middleware";
-import { TokenResolver } from "~/server/pat/token-resolver";
+  apiKeyCeilingDenialResponse,
+} from "~/server/api-key/auth-middleware";
+import { TokenResolver } from "~/server/api-key/token-resolver";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 
 const logger = createLogger("langwatch:evaluations-legacy");
 const tokenResolver = TokenResolver.create(prisma);
 
+const AUTH_REASON = "project API key resolved in-handler";
+
 /**
- * Authenticates via the unified PAT + legacy-key path and enforces the given
+ * Authenticates via the unified API-key + legacy-key path and enforces the given
  * permission ceiling. Returns either a `{ project, markUsed }` context on
  * success or `{ error, status }` for the caller to short-circuit with
  * c.json(...). `markUsed` is a no-op for legacy keys and a fire-and-forget
- * lastUsedAt bump for PATs — callers invoke it after building a success
+ * lastUsedAt bump for API keys — callers invoke it after building a success
  * response.
  */
 async function authenticateRequest(
@@ -116,25 +118,25 @@ async function authenticateRequest(
   }
 
   try {
-    await enforcePatCeiling({ prisma, resolved, permission });
+    await enforceApiKeyCeiling({ prisma, resolved, permission });
   } catch (error) {
-    const denial = patCeilingDenialResponse(error);
+    const denial = apiKeyCeilingDenialResponse(error);
     return { error: denial.message, status: denial.status };
   }
 
   const markUsed = () => {
-    if (resolved.type === "pat") {
-      tokenResolver.markUsed({ patId: resolved.patId });
+    if (resolved.type === "apiKey") {
+      tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
     }
   };
 
   return { project: resolved.project, markUsed };
 }
 
-export const app = new Hono().basePath("/api");
+const secured = createServiceApp({ basePath: "/api" });
 
 // ---------- GET /api/evaluations/list ----------
-app.get("/evaluations/list", async (c) => {
+secured.access(handlerManagedAuth(AUTH_REASON)).get("/evaluations/list", async (c) => {
   const evaluators = Object.fromEntries(
     Object.entries(AVAILABLE_EVALUATORS)
       .filter(
@@ -160,7 +162,7 @@ app.get("/evaluations/list", async (c) => {
 });
 
 // ---------- POST /api/evaluations/batch/log_results ----------
-app.post(
+secured.access(handlerManagedAuth(AUTH_REASON)).post(
   "/evaluations/batch/log_results",
   bodyLimit({ maxSize: 20 * 1024 * 1024 }),
   async (c) => {
@@ -168,7 +170,7 @@ app.post(
     if ("error" in auth) {
       return c.json({ message: auth.error }, auth.status);
     }
-    const { project } = auth;
+    const { project, markUsed } = auth;
 
     const contentType = c.req.header("content-type");
     if (!contentType || !contentType.includes("application/json")) {
@@ -269,12 +271,13 @@ app.post(
       }
     }
 
+    markUsed();
     return c.json({ message: "ok" });
   },
 );
 
 // ---------- POST /api/evaluations/:evaluator/evaluate ----------
-app.post(
+secured.access(handlerManagedAuth(AUTH_REASON)).post(
   "/evaluations/:evaluator/evaluate",
   bodyLimit({ maxSize: 30 * 1024 * 1024 }),
   async (c) => {
@@ -284,7 +287,7 @@ app.post(
 );
 
 // ---------- POST /api/evaluations/:evaluator/:subpath/evaluate ----------
-app.post(
+secured.access(handlerManagedAuth(AUTH_REASON)).post(
   "/evaluations/:evaluator/:subpath/evaluate",
   bodyLimit({ maxSize: 30 * 1024 * 1024 }),
   async (c) => {
@@ -294,7 +297,7 @@ app.post(
 );
 
 // ---------- POST /api/guardrails/:evaluator/evaluate ----------
-app.post(
+secured.access(handlerManagedAuth(AUTH_REASON)).post(
   "/guardrails/:evaluator/evaluate",
   bodyLimit({ maxSize: 30 * 1024 * 1024 }),
   async (c) => {
@@ -304,11 +307,12 @@ app.post(
 );
 
 // ---------- POST /api/dataset/evaluate ----------
-app.post("/dataset/evaluate", async (c) => {
+secured.access(handlerManagedAuth(AUTH_REASON)).post("/dataset/evaluate", async (c) => {
   const auth = await authenticateRequest(c, "evaluations:manage");
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
   }
+  const { markUsed } = auth;
   // dataset/evaluate needs the full team relation for downstream queries.
   const project = await prisma.project.findUnique({
     where: { id: auth.project.id },
@@ -417,13 +421,9 @@ app.post("/dataset/evaluate", async (c) => {
     };
   }
 
-  const experiment = await prisma.experiment.findUnique({
-    where: {
-      projectId_slug: {
-        projectId: project.id,
-        slug: experimentSlug,
-      },
-    },
+  const experiment = await ExperimentService.create(prisma).findBySlug({
+    projectId: project.id,
+    slug: experimentSlug,
   });
   if (!experiment) {
     throw new TRPCError({
@@ -468,8 +468,11 @@ app.post("/dataset/evaluate", async (c) => {
     },
   });
 
+  markUsed();
   return c.json(result);
 });
+
+export const app = secured.hono;
 
 // ============ Shared helpers ============
 
@@ -484,14 +487,19 @@ const batchEvaluationInputSchema = z.object({
 
 type BatchEvaluationRESTParams = z.infer<typeof batchEvaluationInputSchema>;
 
+const coercedString = z.preprocess(
+  coerceEvaluatorScalar,
+  z.string().optional().nullable(),
+);
+
 const defaultEvaluatorInputSchema = z.object({
-  input: z.string().optional().nullable(),
-  output: z.string().optional().nullable(),
+  input: coercedString,
+  output: coercedString,
   contexts: z
     .union([z.array(rAGChunkSchema), z.array(z.string())])
     .optional()
     .nullable(),
-  expected_output: z.string().optional().nullable(),
+  expected_output: coercedString,
   expected_contexts: z
     .union([z.array(rAGChunkSchema), z.array(z.string())])
     .optional()
@@ -499,8 +507,8 @@ const defaultEvaluatorInputSchema = z.object({
   conversation: z
     .array(
       z.object({
-        input: z.string().optional().nullable(),
-        output: z.string().optional().nullable(),
+        input: coercedString,
+        output: coercedString,
       }),
     )
     .optional()
@@ -606,7 +614,7 @@ async function handleEvaluatorCall(
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
   }
-  const { project } = auth;
+  const { project, markUsed } = auth;
 
   let body: Record<string, any>;
   try {
@@ -950,6 +958,7 @@ async function handleEvaluatorCall(
             ...(isGuardrail ? { passed: result!.passed ?? true } : {}),
           };
 
+  markUsed();
   return c.json(resultWithoutTraceback);
 }
 

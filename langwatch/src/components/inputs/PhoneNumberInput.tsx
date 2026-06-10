@@ -239,7 +239,7 @@ export function PhoneNumberInput(
           alignItems="center"
           px="3"
           pr="8"
-          color="fg.DEFAULT"
+          color="fg"
         >
           {`${countryCodeToFlagEmoji(country)} +${getCountryCallingCode(
             country,

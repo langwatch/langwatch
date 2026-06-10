@@ -55,6 +55,7 @@ describe("<WaitingApprovalActions/>", () => {
   });
 
   describe("when user is an admin", () => {
+    /** @scenario Admin approves an invitation request */
     it("displays an Approve button", () => {
       render(
         <WaitingApprovalActions
@@ -69,6 +70,7 @@ describe("<WaitingApprovalActions/>", () => {
       expect(screen.getByRole("button", { name: /approve/i })).toBeTruthy();
     });
 
+    /** @scenario Admin rejects an invitation request */
     it("displays a Reject button", () => {
       render(
         <WaitingApprovalActions

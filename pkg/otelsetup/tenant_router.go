@@ -111,6 +111,25 @@ func defaultTenantProcessor(endpoint, apiKey string) (sdktrace.SpanProcessor, er
 	return sdktrace.NewBatchSpanProcessor(exp), nil
 }
 
+// newSyncTenantProcessor builds a per-tenant SimpleSpanProcessor for
+// deterministic test export. Every span.End() blocks on the OTLP
+// roundtrip — slow on the request hot path, but the only way to
+// guarantee an HTTP handler can't return before its spans have been
+// delivered to the collector. Wired in via Options.SyncExport, gated
+// behind the NLPGO_SPAN_SYNC env var in deps.go. Never use in prod.
+func newSyncTenantProcessor(endpoint, apiKey string) (sdktrace.SpanProcessor, error) {
+	exp, err := otlptracehttp.New(context.Background(),
+		otlptracehttp.WithEndpointURL(endpoint),
+		otlptracehttp.WithHeaders(map[string]string{
+			"X-Auth-Token": apiKey,
+		}),
+	)
+	if err != nil {
+		return nil, err
+	}
+	return sdktrace.NewSimpleSpanProcessor(exp), nil
+}
+
 // OnStart records the request's api_key for the span. Called
 // synchronously in the goroutine that started the span — the parent
 // context still holds the per-request value at this point.

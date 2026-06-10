@@ -1,18 +1,23 @@
 import {
+  type Organization,
   OrganizationUserRole,
   PIIRedactionLevel,
   Prisma,
   type Project,
   ProjectSensitiveDataVisibilityLevel,
+  type Team,
   TeamUserRole,
+  type User,
 } from "@prisma/client";
 import { nanoid } from "nanoid";
-import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import { createMocks, type RequestMethod } from "node-mocks-http";
-import { prisma } from "../server/db";
+import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import { ENTERPRISE_LICENSE_KEY } from "../../ee/licensing/__tests__/fixtures/testLicenses";
+import { prisma } from "../server/db";
 
-async function ignoreUniqueViolation<T>(promise: Promise<T>): Promise<T | null> {
+async function ignoreUniqueViolation<T>(
+  promise: Promise<T>,
+): Promise<T | null> {
   try {
     return await promise;
   } catch (error) {
@@ -26,49 +31,85 @@ async function ignoreUniqueViolation<T>(promise: Promise<T>): Promise<T | null> 
   }
 }
 
+async function readAfterUniqueViolation<T>(
+  promise: Promise<T>,
+  readExisting: () => Promise<T | null>,
+): Promise<T> {
+  try {
+    return await promise;
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      const existing = await readExisting();
+      if (existing) {
+        return existing;
+      }
+    }
+    throw error;
+  }
+}
+
 export async function getTestUser() {
-  const user = await prisma.user.upsert({
-    where: { email: "test-user@example.com" },
-    update: {},
-    create: {
-      name: "Test User",
-      email: "test-user@example.com",
-    },
-  });
+  const user = await readAfterUniqueViolation<User>(
+    prisma.user.upsert({
+      where: { email: "test-user@example.com" },
+      update: {},
+      create: {
+        name: "Test User",
+        email: "test-user@example.com",
+      },
+    }),
+    () => prisma.user.findUnique({ where: { email: "test-user@example.com" } }),
+  );
 
-  const organization = await prisma.organization.upsert({
-    where: { slug: "test-organization" },
-    update: { license: ENTERPRISE_LICENSE_KEY },
-    create: {
-      name: "Test Organization",
-      slug: "test-organization",
-      license: ENTERPRISE_LICENSE_KEY,
-    },
-  });
+  const organization = await readAfterUniqueViolation<Organization>(
+    prisma.organization.upsert({
+      where: { slug: "test-organization" },
+      update: { license: ENTERPRISE_LICENSE_KEY },
+      create: {
+        name: "Test Organization",
+        slug: "test-organization",
+        license: ENTERPRISE_LICENSE_KEY,
+      },
+    }),
+    () =>
+      prisma.organization.findUnique({ where: { slug: "test-organization" } }),
+  );
 
-  const team = await prisma.team.upsert({
-    where: { slug: "test-team", organizationId: organization.id },
-    update: {},
-    create: {
-      name: "Test Team",
-      slug: "test-team",
-      organizationId: organization.id,
-    },
-  });
+  const team = await readAfterUniqueViolation<Team>(
+    prisma.team.upsert({
+      where: { slug: "test-team", organizationId: organization.id },
+      update: {},
+      create: {
+        name: "Test Team",
+        slug: "test-team",
+        organizationId: organization.id,
+      },
+    }),
+    () =>
+      prisma.team.findUnique({
+        where: { slug: "test-team", organizationId: organization.id },
+      }),
+  );
 
-  await prisma.project.upsert({
-    where: { id: "test-project-id" },
-    update: {},
-    create: {
-      id: "test-project-id",
-      name: "Test Project",
-      slug: "test-project",
-      apiKey: "test-api-key",
-      teamId: team.id,
-      language: "en",
-      framework: "test-framework",
-    },
-  });
+  await readAfterUniqueViolation<Project>(
+    prisma.project.upsert({
+      where: { id: "test-project-id" },
+      update: {},
+      create: {
+        id: "test-project-id",
+        name: "Test Project",
+        slug: "test-project",
+        apiKey: "test-api-key",
+        teamId: team.id,
+        language: "en",
+        framework: "test-framework",
+      },
+    }),
+    () => prisma.project.findUnique({ where: { id: "test-project-id" } }),
+  );
 
   await ignoreUniqueViolation(
     prisma.teamUser.create({

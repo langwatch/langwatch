@@ -1,25 +1,19 @@
 import type { Scenario } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
-import { Hono } from "hono";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
+import { type SecuredApp, requires } from "~/server/api/security";
 import { prisma } from "~/server/db";
 import { ScenarioNotFoundError } from "~/server/scenarios/errors";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
 import { createLogger } from "~/utils/logger/server";
-import {
-  type AuthMiddlewareVariables,
-  resourceLimitMiddleware,
-} from "../../middleware";
+import type { AuthMiddlewareVariables } from "../../middleware";
+import { resourceLimitMiddleware } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
 
 const logger = createLogger("langwatch:api:scenarios");
-
-type Variables = AuthMiddlewareVariables;
-
-export const app = new Hono<{ Variables: Variables }>().basePath("/");
 
 const getService = () => ScenarioService.create(prisma);
 
@@ -59,7 +53,10 @@ function toScenarioResponse(scenario: Scenario) {
   };
 }
 
-app.get(
+export function registerScenarioRoutes(
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
+): void {
+  secured.access(requires("scenarios:view")).get(
   "/",
   describeRoute({
     description: "Get all scenarios for a project",
@@ -92,7 +89,7 @@ app.get(
   },
 );
 
-app.get(
+  secured.access(requires("scenarios:view")).get(
   "/:id",
   describeRoute({
     description: "Get a specific scenario by ID",
@@ -136,7 +133,7 @@ app.get(
   },
 );
 
-app.post(
+  secured.access(requires("scenarios:manage")).post(
   "/",
   resourceLimitMiddleware("scenarios"),
   describeRoute({
@@ -179,7 +176,7 @@ app.post(
   },
 );
 
-app.put(
+  secured.access(requires("scenarios:manage")).put(
   "/:id",
   describeRoute({
     description: "Update an existing scenario",
@@ -235,7 +232,7 @@ app.put(
   },
 );
 
-app.delete(
+  secured.access(requires("scenarios:manage")).delete(
   "/:id",
   describeRoute({
     description: "Archive (soft-delete) a scenario",
@@ -280,3 +277,4 @@ app.delete(
     }
   },
 );
+}

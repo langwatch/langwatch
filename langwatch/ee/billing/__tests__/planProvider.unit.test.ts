@@ -38,6 +38,7 @@ const createMockDb = ({
 };
 
 describe("getFreePlanLimits", () => {
+  /** @scenario 'All pricing models get 50,000 events on the free tier' */
   it("returns 50,000 messages per month", () => {
     const plan = getFreePlanLimits();
     expect(plan.maxMessagesPerMonth).toBe(50_000);
@@ -90,6 +91,7 @@ describe("createSaaSPlanProvider", () => {
       });
 
       describe("when organization has SEAT_EVENT pricing model", () => {
+        /** @scenario 'SEAT_EVENT organization on FREE plan gets 50,000 events per month' */
         it("returns FREE with 50,000 messages per month", async () => {
           const db = createMockDb({
             orgFindUniqueResult: { pricingModel: "SEAT_EVENT" },
@@ -103,6 +105,7 @@ describe("createSaaSPlanProvider", () => {
       });
 
       describe("when organization has TIERED pricing model", () => {
+        /** @scenario 'TIERED organization on FREE plan gets 50,000 events per month' */
         it("returns FREE with 50,000 messages per month", async () => {
           const db = createMockDb({
             orgFindUniqueResult: { pricingModel: "TIERED" },
@@ -116,6 +119,7 @@ describe("createSaaSPlanProvider", () => {
       });
 
       describe("when organization is not found", () => {
+        /** @scenario 'Organization not found gets 50,000 events per month' */
         it("returns FREE with 50,000 messages per month", async () => {
           const db = createMockDb({
             orgFindUniqueResult: null,
@@ -130,6 +134,7 @@ describe("createSaaSPlanProvider", () => {
     });
 
     describe("when active subscription exists", () => {
+      /** @scenario Only non-null overrides replace plan defaults */
       it("returns plan limits with custom overrides", async () => {
         const subscription = {
           plan: PlanTypes.LAUNCH,
@@ -149,6 +154,7 @@ describe("createSaaSPlanProvider", () => {
       });
 
       describe("when valid subscription exists for SEAT_EVENT org", () => {
+        /** @scenario Valid subscription returns its own plan regardless of pricing model */
         it("does not query the organization table", async () => {
           const subscription = {
             plan: PlanTypes.LAUNCH,
@@ -245,6 +251,89 @@ describe("createSaaSPlanProvider", () => {
       });
     });
 
+    describe("when project capacity is overridden", () => {
+      /** @scenario Subscription with a project override uses that value */
+      it("returns the override value for maxProjects", async () => {
+        const subscription = {
+          plan: PlanTypes.LAUNCH,
+          status: SubscriptionStatus.ACTIVE,
+          maxProjects: 50,
+          ...Object.fromEntries(
+            NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxProjects").map(
+              (f) => [f, null],
+            ),
+          ),
+        };
+
+        const db = createMockDb({ findFirstResult: subscription });
+        const provider = createSaaSPlanProvider(db);
+        const plan = await provider.getActivePlan("org_1");
+
+        expect(plan.maxProjects).toBe(50);
+      });
+    });
+
+    describe("when monthly message capacity is overridden", () => {
+      /** @scenario Subscription with a monthly message override uses that value */
+      it("returns the override value for maxMessagesPerMonth", async () => {
+        const subscription = {
+          plan: PlanTypes.LAUNCH,
+          status: SubscriptionStatus.ACTIVE,
+          maxMessagesPerMonth: 500_000,
+          ...Object.fromEntries(
+            NUMERIC_OVERRIDE_FIELDS.filter(
+              (f) => f !== "maxMessagesPerMonth",
+            ).map((f) => [f, null]),
+          ),
+        };
+
+        const db = createMockDb({ findFirstResult: subscription });
+        const provider = createSaaSPlanProvider(db);
+        const plan = await provider.getActivePlan("org_1");
+
+        expect(plan.maxMessagesPerMonth).toBe(500_000);
+      });
+    });
+
+    describe("when several overrides are set together", () => {
+      /** @scenario Several overrides are applied together */
+      it("applies each override and leaves remaining fields at plan defaults", async () => {
+        const overrides = {
+          maxMembers: 20,
+          maxWorkflows: 50,
+          maxPrompts: 30,
+          maxMessagesPerMonth: 200_000,
+        };
+        const subscription = {
+          plan: PlanTypes.LAUNCH,
+          status: SubscriptionStatus.ACTIVE,
+          ...overrides,
+          ...Object.fromEntries(
+            NUMERIC_OVERRIDE_FIELDS.filter(
+              (f) => !(f in overrides),
+            ).map((f) => [f, null]),
+          ),
+        };
+
+        const db = createMockDb({ findFirstResult: subscription });
+        const provider = createSaaSPlanProvider(db);
+        const plan = await provider.getActivePlan("org_1");
+
+        expect(plan.maxMembers).toBe(20);
+        expect(plan.maxWorkflows).toBe(50);
+        expect(plan.maxPrompts).toBe(30);
+        expect(plan.maxMessagesPerMonth).toBe(200_000);
+
+        const basePlan = PLAN_LIMITS[PlanTypes.LAUNCH];
+        for (const field of NUMERIC_OVERRIDE_FIELDS) {
+          if (field in overrides) continue;
+          expect(plan[field], `expected ${field} to match plan default`).toBe(
+            basePlan[field],
+          );
+        }
+      });
+    });
+
     describe("when all overrides are null", () => {
       it("falls back to plan defaults for every field", async () => {
         const subscription = {
@@ -285,6 +374,7 @@ describe("createSaaSPlanProvider", () => {
         expect(plan.type).toBe(PlanTypes.FREE);
       });
 
+      /** @scenario 'Custom subscription limits override the base free allowance' */
       it("applies overrides over free defaults", async () => {
         const subscription = {
           plan: "NONEXISTENT_PLAN",
@@ -355,6 +445,7 @@ describe("createSaaSPlanProvider", () => {
     });
 
     describe("when subscription is CANCELLED", () => {
+      /** @scenario Cancelled subscription resolves to free tier limits */
       it("resolves to free tier limits", async () => {
         // A CANCELLED subscription must not appear in active subscription query.
         // The findFirst query filters by status: ACTIVE, so cancelled subs are excluded.

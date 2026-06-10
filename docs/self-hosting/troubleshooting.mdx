@@ -55,7 +55,7 @@ First startup is slower because:
 
 Subsequent starts are faster. If it remains slow, check Docker resource allocation.
 
-## Kubernetes / Helm Issues
+## Kubernetes, Helm Issues
 
 ### Pods stuck in `CrashLoopBackOff`
 
@@ -64,9 +64,9 @@ Subsequent starts are faster. If it remains slow, check Docker resource allocati
 kubectl -n langwatch logs <pod-name> --previous
 
 # Common causes:
-# 1. Database connection failed — check DATABASE_URL secret
-# 2. Missing secrets — check autogen.enabled or secrets.existingSecret
-# 3. ClickHouse not ready — check clickhouse pod status
+# 1. Database connection failed, check DATABASE_URL secret
+# 2. Missing secrets, check autogen.enabled or secrets.existingSecret
+# 3. ClickHouse not ready, check clickhouse pod status
 ```
 
 ### Pods stuck in `Pending`
@@ -115,7 +115,7 @@ kubectl get pods -n ingress-nginx  # or your ingress namespace
 
 Ensure `app.http.baseHost` and `app.http.publicUrl` match the Ingress host.
 
-### Istio / Service Mesh
+### Istio, Service Mesh
 
 CronJob pods may hang after completion because the Istio sidecar keeps the pod alive.
 
@@ -224,11 +224,11 @@ This happens when a user already has an email/password account. Follow the [SSO 
 
 ### Grafana Dashboards
 
-LangWatch ships with off-the-shelf Grafana dashboards for monitoring the platform — including trace throughput, worker queue depth, ClickHouse performance, and error rates. See [Observability & Monitoring](/self-hosting/configuration/observability) for setup.
+LangWatch ships with off-the-shelf Grafana dashboards for monitoring the platform, including trace throughput, worker queue depth, ClickHouse performance, and error rates. See [Observability & Monitoring](/self-hosting/configuration/observability) for setup.
 
 ### Skynet (Internal Event Debugger)
 
-LangWatch includes Skynet, an internal event debugging tool that lets you inspect the event sourcing pipeline in real-time — view individual events, trace processing steps, and diagnose pipeline issues.
+LangWatch includes Skynet, an internal event debugging tool that lets you inspect the event sourcing pipeline in real-time, view individual events, trace processing steps, and diagnose pipeline issues.
 
 ## FAQ
 
@@ -236,7 +236,7 @@ LangWatch includes Skynet, an internal event debugging tool that lets you inspec
 
 Roughly 1 KB per span (compressed). See [Sizing & Scaling](/self-hosting/configuration/sizing-and-scaling#storage-sizing) for detailed estimates.
 
-### Can I use an existing PostgreSQL / Redis?
+### Can I use an existing PostgreSQL, Redis?
 
 Yes. Use the external database overlays:
 

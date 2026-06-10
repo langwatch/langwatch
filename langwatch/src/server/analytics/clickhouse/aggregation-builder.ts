@@ -13,8 +13,10 @@ import {
   buildJoinClause,
   tableAliases,
   TRACE_ANALYTICS_COLUMNS,
+  TRACE_IDENTITY_COLUMNS,
   extractReferencedSpanColumns,
   extractReferencedEvaluationColumns,
+  extractReferencedTraceColumns,
 } from "./field-mappings";
 import { snakeCase } from "../../../utils/stringCasing";
 import {
@@ -26,9 +28,6 @@ import {
   translateAllFilters,
   type FilterTranslation,
 } from "./filter-translator";
-import { createLogger } from "../../../utils/logger/server";
-
-const logger = createLogger("langwatch:analytics:aggregation-builder");
 
 /**
  * Resolve which columns a joined table needs based on the SQL expressions
@@ -62,6 +61,24 @@ const DATE_FILTER_BOTH_PERIODS = `AND ((OccurredAt >= {currentStart:DateTime64(3
 const DATE_FILTER_CURRENT = `AND OccurredAt >= {currentStart:DateTime64(3)} AND OccurredAt < {currentEnd:DateTime64(3)}`;
 const DATE_FILTER_PREVIOUS = `AND OccurredAt >= {previousStart:DateTime64(3)} AND OccurredAt < {previousEnd:DateTime64(3)}`;
 const DATE_FILTER_START_END = `AND OccurredAt >= {startDate:DateTime64(3)} AND OccurredAt < {endDate:DateTime64(3)}`;
+
+/**
+ * StartTime partition-pruning predicates for the `stored_spans` subqueries that
+ * span/event facet filters generate (see translateAllFilters' spanTimePredicate
+ * argument). `stored_spans` is partitioned by `toYearWeek(StartTime)` and tiered
+ * to S3, so an unbounded facet subquery cold-scans every weekly partition. A
+ * span's StartTime falls within its trace's lifetime, so bounding it to the same
+ * date envelope the outer OccurredAt filter uses — plus a 2-day cushion for long
+ * traces / clock skew, matching the span-fetch partition hints elsewhere — prunes
+ * the scan without changing which traces match. One constant per caller date
+ * regime: the two-period aggregation vs. the single start/end-range builders.
+ */
+const SPAN_TIME_FILTER_BOTH_PERIODS =
+  "AND StartTime >= {previousStart:DateTime64(3)} - INTERVAL 2 DAY " +
+  "AND StartTime < {currentEnd:DateTime64(3)} + INTERVAL 2 DAY";
+const SPAN_TIME_FILTER_START_END =
+  "AND StartTime >= {startDate:DateTime64(3)} - INTERVAL 2 DAY " +
+  "AND StartTime < {endDate:DateTime64(3)} + INTERVAL 2 DAY";
 
 /**
  * Returns a deduped FROM-clause expression for trace_summaries.
@@ -491,8 +508,13 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
     }
   }
 
-  // Translate filters
-  const filterTranslation = translateAllFilters(input.filters ?? {});
+  // Translate filters. Span/event facet filters resolve to stored_spans
+  // subqueries; pass the StartTime envelope so they prune partitions instead of
+  // cold-scanning S3 (see SPAN_TIME_FILTER_BOTH_PERIODS).
+  const filterTranslation = translateAllFilters(
+    input.filters ?? {},
+    SPAN_TIME_FILTER_BOTH_PERIODS,
+  );
   for (const join of filterTranslation.requiredJoins) {
     allJoins.add(join);
   }
@@ -1186,6 +1208,9 @@ function buildArrayJoinTimeseriesQuery(
   // TODO(#3115): port this path to extractTraceAggregationColumn for parity.
   cteSelectExprs.push(
     `${traceColumnWrapper(`${ts}.TotalCost`)} AS trace_total_cost`,
+  );
+  cteSelectExprs.push(
+    `${traceColumnWrapper(`${ts}.NonBilledCost`)} AS trace_non_billed_cost`,
   );
   cteSelectExprs.push(
     `${traceColumnWrapper(`${ts}.TotalDurationMs`)} AS trace_duration_ms`,
@@ -2031,6 +2056,7 @@ function buildPipelineMetricCTE(
 /** Maps source field names to their corresponding CTE column names */
 const DEDUP_FIELD_MAPPINGS: Record<string, string> = {
   TotalCost: "trace_total_cost",
+  NonBilledCost: "trace_non_billed_cost",
   TotalDurationMs: "trace_duration_ms",
   TotalPromptTokenCount: "trace_prompt_tokens",
   TotalCompletionTokenCount: "trace_completion_tokens",
@@ -2231,7 +2257,10 @@ export function buildDataForFilterQuery(
   const es = tableAliases.evaluation_runs;
 
   // Translate filters if provided
-  const filterTranslation = translateAllFilters(filters ?? {});
+  const filterTranslation = translateAllFilters(
+    filters ?? {},
+    SPAN_TIME_FILTER_START_END,
+  );
   const filterWhere =
     filterTranslation.whereClause !== "1=1"
       ? `AND ${filterTranslation.whereClause}`
@@ -2452,21 +2481,37 @@ export function buildTopDocumentsQuery(
   const ss = tableAliases.stored_spans;
 
   // Translate filters
-  const filterTranslation = translateAllFilters(filters ?? {});
+  const filterTranslation = translateAllFilters(
+    filters ?? {},
+    SPAN_TIME_FILTER_START_END,
+  );
   const filterWhere =
     filterTranslation.whereClause !== "1=1"
       ? `AND ${filterTranslation.whereClause}`
       : "";
 
   // Build query to get top documents from RAG contexts
-  // Documents are stored in SpanAttributes['langwatch.rag.contexts'] as JSON
+  // Documents are stored in SpanAttributes['langwatch.rag.contexts'] as JSON.
+  // The document payload comes entirely from the stored_spans ARRAY JOIN; the
+  // fixed part of this query only uses trace_summaries identity/date columns
+  // (the JOIN keys and the OccurredAt filter). So the deduped subquery reads
+  // just the identity columns plus whatever the user filters reference, instead
+  // of the full analytics set, which avoids materialising the heavy Attributes
+  // map for every deduped trace.
+  const traceColumns = Array.from(
+    new Set([
+      ...TRACE_IDENTITY_COLUMNS,
+      ...extractReferencedTraceColumns([filterWhere]),
+    ]),
+  );
+
   const sql = `
     WITH document_refs AS (
       SELECT
         ${ts}.TraceId,
         toString(context.document_id) AS document_id,
         toString(context.content) AS content
-      FROM ${dedupedTraceSummaries(ts, undefined, DATE_FILTER_START_END)}
+      FROM ${dedupedTraceSummaries(ts, traceColumns, DATE_FILTER_START_END)}
       JOIN stored_spans ${ss} ON ${ts}.TenantId = ${ss}.TenantId AND ${ts}.TraceId = ${ss}.TraceId
       ARRAY JOIN JSONExtract(${ss}.SpanAttributes['langwatch.rag.contexts'], 'Array(JSON)') AS context
       WHERE ${ts}.TenantId = {tenantId:String}
@@ -2489,7 +2534,7 @@ export function buildTopDocumentsQuery(
 
   const totalSql = `
     SELECT uniq(toString(context.document_id)) AS total
-    FROM ${dedupedTraceSummaries(ts, undefined, DATE_FILTER_START_END)}
+    FROM ${dedupedTraceSummaries(ts, traceColumns, DATE_FILTER_START_END)}
     JOIN stored_spans ${ss} ON ${ts}.TenantId = ${ss}.TenantId AND ${ts}.TraceId = ${ss}.TraceId
     ARRAY JOIN JSONExtract(${ss}.SpanAttributes['langwatch.rag.contexts'], 'Array(JSON)') AS context
     WHERE ${ts}.TenantId = {tenantId:String}
@@ -2530,14 +2575,28 @@ export function buildFeedbacksQuery(
   const ss = tableAliases.stored_spans;
 
   // Translate filters
-  const filterTranslation = translateAllFilters(filters ?? {});
+  const filterTranslation = translateAllFilters(
+    filters ?? {},
+    SPAN_TIME_FILTER_START_END,
+  );
   const filterWhere =
     filterTranslation.whereClause !== "1=1"
       ? `AND ${filterTranslation.whereClause}`
       : "";
 
   // Build query to get feedback events
-  // Events are stored in stored_spans as parallel arrays
+  // Events are stored in stored_spans as parallel arrays. As with the documents
+  // query, the fixed part uses only trace_summaries identity/date columns, so
+  // the deduped subquery reads just the identity columns plus whatever the user
+  // filters reference rather than the full analytics set, skipping the heavy
+  // Attributes map.
+  const traceColumns = Array.from(
+    new Set([
+      ...TRACE_IDENTITY_COLUMNS,
+      ...extractReferencedTraceColumns([filterWhere]),
+    ]),
+  );
+
   const sql = `
     SELECT
       ${ts}.TraceId AS trace_id,
@@ -2545,7 +2604,7 @@ export function buildFeedbacksQuery(
       toUnixTimestamp64Milli(event_timestamp) AS started_at,
       event_name AS event_type,
       event_attrs AS attributes
-    FROM ${dedupedTraceSummaries(ts, undefined, DATE_FILTER_START_END)}
+    FROM ${dedupedTraceSummaries(ts, traceColumns, DATE_FILTER_START_END)}
     JOIN stored_spans ${ss} ON ${ts}.TenantId = ${ss}.TenantId AND ${ts}.TraceId = ${ss}.TraceId
     ARRAY JOIN
       ${ss}."Events.Timestamp" AS event_timestamp,

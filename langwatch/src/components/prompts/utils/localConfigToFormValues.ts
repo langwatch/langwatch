@@ -1,4 +1,4 @@
-import type { LocalPromptConfig } from "~/evaluations-v3/types";
+import type { LocalPromptConfig } from "~/experiments-v3/types";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import { buildDefaultFormValues } from "~/prompts/utils/buildDefaultFormValues";
 

@@ -5,13 +5,28 @@
 // langwatch-app-minted trace_id with one child per executed node.
 //
 // Span shape matches the Python langwatch_nlp engine:
-//   - name:                "execute_component"        (== Python's optional_langwatch_trace name)
+//   - name:                node.Data.Name (or node.ID fallback) — e.g.
+//     "v1" for an LLM Call named v1. Mirrors Python's
+//     DSPy autotracking which names spans by the
+//     generated wrapper-module class name. Earlier
+//     revisions used the literal "execute_component"
+//     for every node, which surfaced 3 identical
+//     spans in the Studio drawer for a 3-node
+//     workflow (rchaves dogfood 2026-05-14).
 //   - langwatch.span.type: "component"                (== Python's optional_langwatch_trace type)
 //   - langwatch.input:     JSON-encoded inputs map    (reserved attr; flips Studio output_source from inferred → explicit)
 //   - langwatch.output:    JSON-encoded outputs map   (reserved attr; same as above)
+//
+// Entry + End nodes are pass-throughs (no executor body in runEntry /
+// runEnd) so they don't get a span — Python's parsed_and_materialized_
+// workflow_class doesn't put @langwatch.span on those wrapper classes
+// either. nodeEmitsSpan filters them out at startup so the drawer
+// shows only nodes with real work.
+//
 // See specs/nlp-go/tracing-parity.feature for the contract and
-// langwatch_nlp/langwatch_nlp/studio/execute/execute_component.py for
-// the Python target shape.
+// langwatch_nlp/langwatch_nlp/studio/templates/workflow.py.jinja:47
+// for the Python target shape (`@langwatch.span(type="workflow")` on
+// the module forward + DSPy autotracking inside).
 package engine
 
 import (
@@ -30,10 +45,8 @@ import (
 const (
 	tracerName = "langwatch-nlpgo"
 
-	// componentSpanName matches Python's optional_langwatch_trace(name=…).
-	// Renaming it would break Studio filters that group "all component
-	// dispatches" by span name across the Python and Go engines.
-	componentSpanName = "execute_component"
+	// componentSpanType is the Python parity value the Studio trace
+	// drawer recognizes — sets the row's "Component" type chip.
 	componentSpanType = "component"
 
 	// llmSpanType matches the python-sdk reserved value Studio's Trace
@@ -42,11 +55,40 @@ const (
 	llmSpanType = "llm"
 )
 
-// startNodeSpan opens a span for one node's dispatch. Span name is
-// always "execute_component" (Python parity); the per-node type is
-// surfaced via langwatch.node_type. The span carries the workflow-level
-// identity (project_id / origin / thread_id) so it's queryable in
-// isolation without joining back to the parent.
+// nodeEmitsSpan reports whether a node kind has a body worth surfacing
+// in the trace tree. Entry + End are pass-throughs (runEntry just
+// materializes the dataset row, runEnd is a no-op) — they don't get
+// their own span on the Python path either (the workflow.py.jinja
+// generated wrapper class for those types lacks @langwatch.span). The
+// PromptingTechnique node is also a no-op decorator (signature nodes
+// apply it inline at LLM-call time). Everything else has actual work
+// — LLM call, code execution, HTTP request, evaluator dispatch,
+// sub-workflow run.
+func nodeEmitsSpan(kind dsl.ComponentType) bool {
+	//nolint:exhaustive // intentional default-to-true: only no-op pass-through kinds suppress the span.
+	switch kind {
+	case dsl.ComponentEntry, dsl.ComponentEnd, dsl.ComponentPromptingTechnique:
+		return false
+	}
+	return true
+}
+
+// nodeSpanName returns the span name for a per-node span. Prefers the
+// user-set node.Data.Name (e.g. "v1" or "Classify the question") so
+// the Studio drawer shows what the operator wrote in the canvas;
+// falls back to node.ID for unnamed nodes.
+func nodeSpanName(node *dsl.Node) string {
+	if node.Data.Name != nil && *node.Data.Name != "" {
+		return *node.Data.Name
+	}
+	return node.ID
+}
+
+// startNodeSpan opens a span for one node's dispatch. Span name comes
+// from nodeSpanName (user-set node name with id fallback). The per-node
+// kind is surfaced via langwatch.node_type. Span also carries the
+// workflow-level identity (project_id / origin / thread_id) so it's
+// queryable in isolation without joining back to the parent.
 func startNodeSpan(ctx context.Context, node *dsl.Node, req ExecuteRequest) (context.Context, trace.Span) {
 	tracer := otelapi.Tracer(tracerName)
 	attrs := []attribute.KeyValue{
@@ -66,7 +108,8 @@ func startNodeSpan(ctx context.Context, node *dsl.Node, req ExecuteRequest) (con
 	if req.Origin != "" {
 		attrs = append(attrs, attribute.String("langwatch.origin", req.Origin))
 	}
-	return tracer.Start(ctx, componentSpanName,
+	//nolint:spancheck // caller (engine.runLayer) owns the span lifecycle and ends it via endNodeSpan.
+	return tracer.Start(ctx, nodeSpanName(node),
 		trace.WithSpanKind(trace.SpanKindInternal),
 		trace.WithAttributes(attrs...),
 	)
@@ -151,6 +194,7 @@ func startLLMSpan(ctx context.Context, model, provider string, messages []app.Ch
 	if v, ok := encodeJSONAttr(messages); ok {
 		attrs = append(attrs, attribute.String("langwatch.input", v))
 	}
+	//nolint:spancheck // caller owns the span lifecycle and ends it via endLLMSpan.
 	return tracer.Start(ctx, displayModel,
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(attrs...),

@@ -572,9 +572,9 @@ interface OrgOption {
 }
 
 /**
- * Simple organization picker — fetches the first page by query (or first 50
- * if empty) and lets the operator pick. Mirrors react-admin's AutocompleteInput
- * behaviour for the Subscription form.
+ * Simple organization picker for the Subscription form: fetches the first page
+ * by query (or first 50 if empty) and lets the operator pick, with
+ * autocomplete as they type.
  */
 function OrganizationPicker({
   value,

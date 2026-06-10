@@ -321,8 +321,8 @@ export function DeployPromptDialog({
                     paddingX={4}
                     paddingY={3}
                   >
-                    <HStack justify="space-between">
-                      <HStack gap={3}>
+                    <HStack justify="space-between" gap={3}>
+                      <HStack gap={3} flexShrink={0}>
                         <Box
                           width="10px"
                           height="10px"
@@ -334,12 +334,13 @@ export function DeployPromptDialog({
                           {tagDef.name}
                         </Text>
                       </HStack>
-                      <HStack gap={2}>
+                      <HStack gap={2} flex="1" minWidth={0} justify="flex-end">
                         <Select.Root
                           collection={versionCollection}
                           size="sm"
-                          width="auto"
-                          minWidth="180px"
+                          flex="1"
+                          minWidth={0}
+                          maxWidth="280px"
                           value={tagSelections[tagDef.name] ? [tagSelections[tagDef.name] ?? ""] : []}
                           onValueChange={(details) => {
                             setTagVersionId(tagDef.name, details.value[0] ?? "");

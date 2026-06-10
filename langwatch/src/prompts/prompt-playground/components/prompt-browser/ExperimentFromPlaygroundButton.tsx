@@ -8,9 +8,9 @@ import { Tooltip } from "~/components/ui/tooltip";
 import {
   createInitialState,
   type DatasetReference,
-} from "~/evaluations-v3/types";
-import { extractPersistedState } from "~/evaluations-v3/types/persistence";
-import { inferAllTargetMappings } from "~/evaluations-v3/utils/mappingInference";
+} from "~/experiments-v3/types";
+import { extractPersistedState } from "~/experiments-v3/types/persistence";
+import { inferAllTargetMappings } from "~/experiments-v3/utils/mappingInference";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { areFormValuesEqual } from "~/prompts/utils/areFormValuesEqual";
 import { computeInitialFormValuesForPrompt } from "~/prompts/utils/computeInitialFormValuesForPrompt";
@@ -18,7 +18,7 @@ import { api } from "~/utils/api";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
 import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 import type { TabData } from "../../prompt-playground-store/DraggableTabsBrowserStore";
-import type { LocalPromptConfig, TargetConfig } from "~/evaluations-v3/types";
+import type { LocalPromptConfig, TargetConfig } from "~/experiments-v3/types";
 import type { Field } from "~/optimization_studio/types/dsl";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 
@@ -330,7 +330,7 @@ export function ExperimentFromPlaygroundButton({
         open={isDialogOpen}
         onOpenChange={({ open }) => setIsDialogOpen(open)}
       >
-        <Dialog.Content>
+        <Dialog.Content bg="bg">
           <Dialog.Header>
             <Dialog.Title>Create Experiment</Dialog.Title>
           </Dialog.Header>

@@ -1,4 +1,15 @@
 Feature: AI Gateway — Budgets
+
+  # Four scenarios below are bound to budget.service.unit.test.ts. The
+  # remaining @unimplemented scenarios are split between two unbindable
+  # categories: (1) gateway data-plane behaviour (HTTP 402 on debit,
+  # /budget/check materialised view, ClickHouse ledger reactor, monthly
+  # window reset, timezone handling) — implemented in Go and out of
+  # scope for the TS parity check; and (2) UI page-level rendering
+  # (budget detail drawer, banners, list columns, audit history) — needs
+  # component-test fixtures against the Gateway settings pages. All
+  # aspirational pending those harnesses.
+
   As an admin governing AI spend
   I want to set budgets that scope to organizations, teams, projects, virtual keys, or principals
   So that I can prevent runaway costs and route spending per unit of work
@@ -52,7 +63,7 @@ Feature: AI Gateway — Budgets
   # Enforcement — pre-request gate
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: Hard-block budget returns 402 when spent >= limit
     Given project "gateway-demo" has a monthly budget with limit $100 and on_breach "block"
     And 99.50 USD of spend has been attributed to this project this month
@@ -61,7 +72,7 @@ Feature: AI Gateway — Budgets
     And the error envelope is { error: { type: "budget_exceeded", code: "budget.project.exceeded", ... } }
     And no upstream provider is called
 
-  @integration @unimplemented
+  @integration
   Scenario: Soft budget emits warning header but allows the call
     Given project "gateway-demo" has a monthly budget with limit $100 and on_breach "warn"
     And 95.00 USD of spend has been attributed this month
@@ -70,7 +81,7 @@ Feature: AI Gateway — Budgets
     And the response includes header "X-LangWatch-Budget-Warning: project:95%"
     And the response body is the provider's response unchanged
 
-  @integration @unimplemented
+  @integration
   Scenario: Most restrictive budget wins when multiple apply
     Given virtual key "prod-key" has limit $10 (block) for today
     And its project has limit $1000 (block) for today
@@ -80,7 +91,7 @@ Feature: AI Gateway — Budgets
     Then the request is blocked with scope "virtual_key"
     And the error code indicates which scope was exceeded
 
-  @integration @unimplemented
+  @integration
   Scenario: Sum-of-breaches rule — any block-breach blocks
     Given project has limit $10 (warn) for today, 9.99 spent
     And its virtual key has limit $100 (block) for today, 99 spent

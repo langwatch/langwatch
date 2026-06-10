@@ -4,6 +4,7 @@ import { resolveHighestRole } from "./scim-role-resolver";
 
 describe("resolveHighestRole()", () => {
   describe("when resolving built-in roles", () => {
+    /** @scenario User with multiple roles resolves to the most permissive */
     it("picks MEMBER over VIEWER", () => {
       const result = resolveHighestRole([
         TeamUserRole.VIEWER,
@@ -22,6 +23,7 @@ describe("resolveHighestRole()", () => {
       expect(result).toBe(TeamUserRole.ADMIN);
     });
 
+    /** @scenario Role hierarchy resolves ADMIN as most permissive */
     it("picks ADMIN over all roles", () => {
       const result = resolveHighestRole([
         TeamUserRole.VIEWER,
@@ -34,6 +36,7 @@ describe("resolveHighestRole()", () => {
   });
 
   describe("when a role mapping is removed", () => {
+    /** @scenario Removing a binding recalculates to remaining most permissive */
     it("recalculates to remaining most permissive role", () => {
       // Originally [VIEWER, MEMBER], MEMBER mapping removed → only VIEWER remains
       const remainingRoles = [TeamUserRole.VIEWER];
@@ -45,6 +48,7 @@ describe("resolveHighestRole()", () => {
   });
 
   describe("when verifying hierarchy ordering", () => {
+    /** @scenario Role hierarchy ordering */
     it("ranks ADMIN above MEMBER", () => {
       expect(resolveHighestRole([TeamUserRole.MEMBER, TeamUserRole.ADMIN])).toBe(
         TeamUserRole.ADMIN

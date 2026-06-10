@@ -5,7 +5,6 @@ const RING_SIZE = 5;
 
 const INSTALL_TASKS = [
   { title: "preparing langwatch app", service: "prepare:app" },
-  { title: "installing langwatch_nlp deps", service: "prepare:langwatch_nlp" },
   { title: "installing langevals deps", service: "prepare:langevals" },
   { title: "installing langwatch deps", service: "prepare:langwatch" },
 ] as const;

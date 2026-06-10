@@ -414,6 +414,7 @@ describe("simulation run fold — event ordering invariants", () => {
   });
 
   describe("when queued event arrives after finished (late delivery)", () => {
+    /** @scenario "Late finish does not overwrite cancelled status" */
     it("preserves terminal status", async () => {
       const state = await processFold([
         createStartedEvent(1000),

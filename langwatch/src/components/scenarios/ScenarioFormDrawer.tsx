@@ -22,6 +22,7 @@ import { TagList } from "../ui/TagList";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
 import { SaveAndRunMenu } from "./SaveAndRunMenu";
+import { ScenarioRunModelDialog } from "./ScenarioRunModelDialog";
 import { ScenarioEditorSidebar } from "./ScenarioEditorSidebar";
 import { ScenarioForm, type ScenarioFormData, type ScenarioInitialData } from "./ScenarioForm";
 import type { TargetValue } from "./TargetSelector";
@@ -84,6 +85,16 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const [selectedTarget, setSelectedTarget] = useState<TargetValue>(null);
   const [promptDrawerOpen, setPromptDrawerOpen] = useState(false);
   const [agentTypeSelectorOpen, setAgentTypeSelectorOpen] = useState(false);
+
+  // Run-model dialog: after a target is picked in Save and Run, the user
+  // confirms which user-simulator and judge models to run with. null = follow
+  // the project default.
+  const [runModelDialogOpen, setRunModelDialogOpen] = useState(false);
+  const [pendingRunTarget, setPendingRunTarget] = useState<TargetValue>(null);
+  const [runSimulatorModel, setRunSimulatorModel] = useState<string | null>(
+    null,
+  );
+  const [runJudgeModel, setRunJudgeModel] = useState<string | null>(null);
 
   // Initialize from persisted target when scenario loads
   useEffect(() => {
@@ -181,7 +192,18 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   );
 
   const handleSave = useCallback(
-    async (data: ScenarioFormData, { skipTransition = false } = {}): Promise<Scenario | null> => {
+    async ({
+      data,
+      skipTransition = false,
+      models,
+    }: {
+      data: ScenarioFormData;
+      skipTransition?: boolean;
+      /** Model overrides chosen in the run dialog. Omitted on a plain save
+       *  so existing scenario models are left untouched (undefined = no-op
+       *  in the Prisma update). */
+      models?: { simulatorModel: string | null; judgeModel: string | null };
+    }): Promise<Scenario | null> => {
       if (!project?.id) return null;
 
       // Edit mode: scenarioId is in URL and scenario data is loaded
@@ -190,6 +212,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           projectId: project.id,
           id: scenario.id,
           ...data,
+          ...(models ?? {}),
         });
       }
 
@@ -200,6 +223,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
             const result = await createMutation.mutateAsync({
               projectId: project.id,
               ...data,
+              ...(models ?? {}),
             });
             // Transition to edit mode to prevent double-create on subsequent saves.
             // Skip when the drawer is about to close (save-without-running).
@@ -268,42 +292,88 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         }
       }
 
-      try {
-        await form.handleSubmit(async (data) => {
-          const savedScenario = await handleSave(data);
-          if (!savedScenario) return;
+      // Validate the scenario before asking for models so the dialog never
+      // pops over an invalid form. Then pre-fill the run-model dialog from the
+      // scenario's stored choices (null = follow the project default) and open
+      // it — the actual save + run happens on confirm.
+      const valid = await form.trigger();
+      if (!valid) return;
 
-          // Persist the target selection for this scenario
-          persistTarget(target);
-
-          // Generate batchRunId so the simulations page can show a placeholder immediately
-          const batchRunId = generate(KSUID_RESOURCES.SCENARIO_BATCH).toString();
-
-          // Fire the run — no callbacks, simulations page picks up via SSE
-          void runScenario({ scenarioId: savedScenario.id, target, batchRunId });
-
-          // Close drawer and navigate to simulations page
-          onClose();
-          void router.push(`/${project.slug}/simulations?pendingBatch=${batchRunId}`);
-        })();
-      } catch (error) {
-        toaster.create({
-          title: "Failed to run scenario",
-          description:
-            error instanceof Error ? error.message : "An error occurred",
-          type: "error",
-          meta: { closable: true },
-        });
-      }
+      setRunSimulatorModel(scenario?.simulatorModel ?? null);
+      setRunJudgeModel(scenario?.judgeModel ?? null);
+      setPendingRunTarget(target);
+      setRunModelDialogOpen(true);
     },
-    [handleSave, project?.id, project?.slug, persistTarget, runScenario, formInstance, onClose, router, utils, openDrawer],
+    [project?.id, project?.slug, formInstance, utils, openDrawer, scenario],
   );
+
+  const confirmRunWithModels = useCallback(async () => {
+    const form = formInstance;
+    const target = pendingRunTarget;
+    if (!form || !target || !project?.id || !project?.slug) return;
+    setRunModelDialogOpen(false);
+
+    try {
+      await form.handleSubmit(async (data) => {
+        // skipTransition: don't open the edit-mode drawer mid-save — we're
+        // navigating away to /simulations next, so the create→edit URL push
+        // would race with our redirect (lw#3586 F11). The whole `await` is
+        // also why the redirect itself MUST be the only router.push that
+        // fires after — `onClose()` does its own router.push inside
+        // closeDrawer, and back-to-back router.push calls get coalesced
+        // (the cleanup push wins, the redirect gets dropped silently).
+        const savedScenario = await handleSave({
+          data,
+          skipTransition: true,
+          models: {
+            simulatorModel: runSimulatorModel,
+            judgeModel: runJudgeModel,
+          },
+        });
+        if (!savedScenario) return;
+
+        // Persist the target selection for this scenario
+        persistTarget(target);
+
+        // Generate batchRunId so the simulations page can show a placeholder immediately
+        const batchRunId = generate(KSUID_RESOURCES.SCENARIO_BATCH).toString();
+
+        // Fire the run — no callbacks, simulations page picks up via SSE
+        void runScenario({ scenarioId: savedScenario.id, target, batchRunId });
+
+        // Navigate to simulations — drawer closes implicitly via route change.
+        // Intentionally NOT calling onClose() here: closeDrawer() does its
+        // own router.push to strip drawer.* params, which would race with
+        // this redirect and silently win (lw#3586 F11).
+        void router.push(`/${project.slug}/simulations?pendingBatch=${batchRunId}`);
+      })();
+    } catch (error) {
+      toaster.create({
+        title: "Failed to run scenario",
+        description:
+          error instanceof Error ? error.message : "An error occurred",
+        type: "error",
+        meta: { closable: true },
+      });
+    }
+  }, [
+    formInstance,
+    pendingRunTarget,
+    project?.id,
+    project?.slug,
+    handleSave,
+    persistTarget,
+    runScenario,
+    router,
+    runSimulatorModel,
+    runJudgeModel,
+  ]);
   const handleSaveWithoutRunning = useCallback(async () => {
     const form = formInstance;
     if (!form) return;
     await form.handleSubmit(async (data) => {
       try {
-        const saved = await handleSave(data, { skipTransition: true });
+        const saved = await handleSave({ data, skipTransition: true });
         if (saved) {
           toaster.create({
             title: scenario ? "Scenario updated" : "Scenario created",
@@ -337,7 +407,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       onOpenChange={({ open }) => !open && onClose()}
       size="xl"
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.CloseTrigger />
         <Drawer.Header borderBottomWidth="1px">
           <Heading size="md">
@@ -386,6 +456,18 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           </HStack>
         </Drawer.Footer>
       </Drawer.Content>
+
+      {/* Run-model dialog: choose user-simulator + judge models before running */}
+      <ScenarioRunModelDialog
+        open={runModelDialogOpen}
+        onOpenChange={setRunModelDialogOpen}
+        simulatorModel={runSimulatorModel}
+        judgeModel={runJudgeModel}
+        onSimulatorChange={setRunSimulatorModel}
+        onJudgeChange={setRunJudgeModel}
+        onConfirm={confirmRunWithModels}
+        isRunning={isSubmitting}
+      />
 
       {/* Agent Type Selector Drawer */}
       <AgentTypeSelectorDrawer

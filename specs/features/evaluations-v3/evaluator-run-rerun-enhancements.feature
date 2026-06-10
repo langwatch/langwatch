@@ -3,6 +3,15 @@ Feature: Evaluator Run/Rerun Enhancements
   I want to run individual evaluators on single cells and across all rows
   So that I can quickly test and refine evaluator settings without re-running targets
 
+  # Parity status: 8 of 11 scenarios bound to existing tests.
+  # Remaining @unimplemented scenarios (#3458):
+  #   3 NO_TEST: shipped behavior, no integration test yet
+  #     - "Running a pending evaluator executes without re-running the target"
+  #     - '"Run on all rows" executes the evaluator only on rows with existing target outputs'
+  #     - '"Run on all rows" reuses existing trace IDs'
+  #   1 UPDATE: '"Run on all rows" is hidden when no rows have target outputs'
+  #     (implementation shows item as disabled rather than hidden)
+
   Background:
     Given the evaluations-v3 workbench is open with a dataset, a target, and an evaluator
 
@@ -10,14 +19,14 @@ Feature: Evaluator Run/Rerun Enhancements
   # "Run evaluator" for freshly added (pending) evaluators
   # ---------------------------------------------------------------------------
 
-  @integration @unimplemented
+  @integration
   Scenario: Pending evaluator chip shows "Run" when target output exists
     Given the target has already produced output for the current row
     And a new evaluator has been added but not yet run
     When I open the evaluator chip menu
     Then I see a "Run" menu item
 
-  @integration @unimplemented
+  @integration
   Scenario: Pending evaluator chip hides "Run" when no target output exists
     Given no target output exists for the current row
     And a new evaluator has been added but not yet run
@@ -36,14 +45,14 @@ Feature: Evaluator Run/Rerun Enhancements
   # "Rerun" for already-run evaluators (existing behavior preserved)
   # ---------------------------------------------------------------------------
 
-  @integration @unimplemented
+  @integration
   Scenario: Completed evaluator chip shows "Rerun" instead of "Run"
     Given the evaluator has already been run and has a result
     When I open the evaluator chip menu
     Then I see a "Rerun" menu item
     And I do not see a "Run" menu item
 
-  @integration @unimplemented
+  @integration
   Scenario: Running evaluator chip hides both "Run" and "Rerun"
     Given the evaluator is currently running
     When I open the evaluator chip menu
@@ -54,7 +63,7 @@ Feature: Evaluator Run/Rerun Enhancements
   # "Run on all rows" for any evaluator
   # ---------------------------------------------------------------------------
 
-  @integration @unimplemented
+  @integration
   Scenario: Evaluator chip menu shows "Run on all rows" when target outputs exist
     Given at least one row has a target output for this target
     When I open the evaluator chip menu
@@ -66,7 +75,7 @@ Feature: Evaluator Run/Rerun Enhancements
     When I open the evaluator chip menu
     Then I do not see a "Run on all rows" menu item
 
-  @integration @unimplemented
+  @integration
   Scenario: "Run on all rows" is hidden while evaluator is running
     Given the evaluator is currently running
     When I open the evaluator chip menu
@@ -86,7 +95,7 @@ Feature: Evaluator Run/Rerun Enhancements
     When the user triggers "Run on all rows" for the evaluator
     Then each evaluator execution reuses the existing trace ID for its row
 
-  @unit @unimplemented
+  @unit
   Scenario: Running evaluator on all rows creates one execution per row with target output
     Given a request to run an evaluator on all rows for a target
     And pre-computed target outputs exist for some rows

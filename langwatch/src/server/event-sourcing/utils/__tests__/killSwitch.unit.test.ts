@@ -81,9 +81,11 @@ describe("isComponentDisabled", () => {
       expect(result).toBe(true);
       expect(ffs.isEnabled).toHaveBeenCalledWith(
         "es-trace-command-recordSpan-killswitch",
-        "tenant-1",
-        false,
-        expect.objectContaining({ cacheTtlMs: expect.any(Number) }),
+        expect.objectContaining({
+          distinctId: "tenant-1",
+          defaultValue: false,
+          cacheTtlMs: expect.any(Number),
+        }),
       );
     });
 
@@ -132,14 +134,19 @@ describe("isComponentDisabled", () => {
         componentType: "command",
         componentName: "test",
         tenantId: "tenant-1",
-        customKey: "my-custom-flag",
+        // Cast through `any` because the test deliberately uses a
+        // non-registered key to exercise the fallback path; production
+        // callers must pass a `FeatureFlagKey`.
+        customKey: "my-custom-flag" as any,
       });
 
       expect(ffs.isEnabled).toHaveBeenCalledWith(
         "my-custom-flag",
-        "tenant-1",
-        false,
-        expect.objectContaining({ cacheTtlMs: expect.any(Number) }),
+        expect.objectContaining({
+          distinctId: "tenant-1",
+          defaultValue: false,
+          cacheTtlMs: expect.any(Number),
+        }),
       );
     });
   });

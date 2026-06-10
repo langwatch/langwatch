@@ -82,6 +82,8 @@ describe("<RunHistoryFilters/> view mode toggle", () => {
   });
 
   describe("when viewMode and onViewModeChange are provided", () => {
+    /** @scenario "Filter bar shows a list/grid view toggle on suite detail" */
+    /** @scenario "Filter bar shows a list/grid view toggle on all runs" */
     it("renders list and grid view toggle buttons", () => {
       render(
         <RunHistoryFilters
@@ -183,6 +185,7 @@ describe("<RunRow/> view mode", () => {
   });
 
   describe("when expanded in grid view", () => {
+    /** @scenario "Switching to grid view shows scenario results as cards" */
     it("renders scenario results in a grid container", () => {
       render(
         <RunRow

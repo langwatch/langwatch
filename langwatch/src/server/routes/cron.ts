@@ -10,8 +10,13 @@
  * - src/pages/api/cron/triggers/index.ts
  */
 import type { Prisma, Project, Trigger } from "@prisma/client";
-import { Hono } from "hono";
+import type { Context } from "hono";
 import { env } from "~/env.mjs";
+import {
+  createServiceApp,
+  internalSecret,
+} from "~/server/api/security";
+import { validateInternalSecret } from "./_lib/internal-secret";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { esClient, TRACE_INDEX } from "~/server/elasticsearch";
@@ -23,26 +28,33 @@ import { migrateToColdStorage } from "~/tasks/cold/moveTracesToColdStorage";
 import { scheduleTopicClustering } from "~/server/background/queues/topicClusteringQueue";
 import cleanupOldLambdas from "~/tasks/cleanupOldLambdas";
 import { processCustomGraphTrigger } from "~/pages/api/cron/triggers/customGraphTrigger";
-import { processTraceBasedTrigger } from "~/pages/api/cron/triggers/traceBasedTrigger";
+import {
+  reportHasFailures,
+  type SeedRunReport,
+} from "../../../scripts/dogfood/governance/_lib/seedRunner";
+import { runSeedDemo } from "../../../scripts/dogfood/governance/seed-demo";
 import { ANALYTICS_KEYS } from "~/types";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
 
 const logger = createLogger("langwatch:cron");
 
-export const app = new Hono().basePath("/api");
+const secured = createServiceApp({ basePath: "/api" });
 
-/** Extracts and validates the cron API key from the Authorization header. */
-function validateCronKey(c: { req: { header: (name: string) => string | undefined } }): boolean {
-  let cronApiKey = c.req.header("authorization");
-  cronApiKey = cronApiKey?.startsWith("Bearer ")
-    ? cronApiKey.slice(7)
-    : cronApiKey;
-  return cronApiKey === process.env.CRON_API_KEY;
+type CronContext = Context;
+
+const cronPolicy = () =>
+  internalSecret(
+    "cron shared secret validated in-handler via validateInternalSecret",
+  );
+
+/** Validates the cron shared secret. See validateInternalSecret (fail-closed + constant-time). */
+function validateCronKey(c: CronContext): boolean {
+  return validateInternalSecret(c);
 }
 
-// ---------- GET /api/cron/old_lambdas_cleanup ----------
-app.all("/cron/old_lambdas_cleanup", async (c) => {
+// ---------- GET|POST /api/cron/old_lambdas_cleanup ----------
+const oldLambdasCleanupHandler = async (c: CronContext) => {
   if (!validateCronKey(c)) {
     return c.body(null, 401);
   }
@@ -59,10 +71,12 @@ app.all("/cron/old_lambdas_cleanup", async (c) => {
       500,
     );
   }
-});
+};
+secured.access(cronPolicy()).get("/cron/old_lambdas_cleanup", oldLambdasCleanupHandler);
+secured.access(cronPolicy()).post("/cron/old_lambdas_cleanup", oldLambdasCleanupHandler);
 
 // ---------- GET /api/cron/scenario_analytics ----------
-app.get("/cron/scenario_analytics", async (c) => {
+secured.access(cronPolicy()).get("/cron/scenario_analytics", async (c) => {
   if (!validateCronKey(c)) {
     return c.body(null, 401);
   }
@@ -83,8 +97,8 @@ app.get("/cron/scenario_analytics", async (c) => {
   }
 });
 
-// ---------- GET /api/cron/schedule_topic_clustering ----------
-app.all("/cron/schedule_topic_clustering", async (c) => {
+// ---------- GET|POST /api/cron/schedule_topic_clustering ----------
+const scheduleTopicClusteringHandler = async (c: CronContext) => {
   if (!validateCronKey(c)) {
     return c.body(null, 401);
   }
@@ -101,10 +115,12 @@ app.all("/cron/schedule_topic_clustering", async (c) => {
       500,
     );
   }
-});
+};
+secured.access(cronPolicy()).get("/cron/schedule_topic_clustering", scheduleTopicClusteringHandler);
+secured.access(cronPolicy()).post("/cron/schedule_topic_clustering", scheduleTopicClusteringHandler);
 
 // ---------- GET /api/cron/trace_analytics ----------
-app.get("/cron/trace_analytics", async (c) => {
+secured.access(cronPolicy()).get("/cron/trace_analytics", async (c) => {
   if (!validateCronKey(c)) {
     return c.body(null, 401);
   }
@@ -324,8 +340,8 @@ app.get("/cron/trace_analytics", async (c) => {
   return c.json({ success: true });
 });
 
-// ---------- GET /api/cron/traces_retention_period_cleanup ----------
-app.all("/cron/traces_retention_period_cleanup", async (c) => {
+// ---------- GET|POST /api/cron/traces_retention_period_cleanup ----------
+const tracesRetentionPeriodCleanupHandler = async (c: CronContext) => {
   if (!validateCronKey(c)) {
     return c.body(null, 401);
   }
@@ -366,10 +382,12 @@ app.all("/cron/traces_retention_period_cleanup", async (c) => {
       500,
     );
   }
-});
+};
+secured.access(cronPolicy()).get("/cron/traces_retention_period_cleanup", tracesRetentionPeriodCleanupHandler);
+secured.access(cronPolicy()).post("/cron/traces_retention_period_cleanup", tracesRetentionPeriodCleanupHandler);
 
 // ---------- GET /api/cron/triggers ----------
-app.get("/cron/triggers", async (c) => {
+secured.access(cronPolicy()).get("/cron/triggers", async (c) => {
   if (!validateCronKey(c)) {
     return c.body(null, 401);
   }
@@ -398,48 +416,67 @@ app.get("/cron/triggers", async (c) => {
     );
   }
 
+  // Only process custom graph triggers — trace-based triggers are handled
+  // reactively by the alertTrigger reactor on the trace-processing pipeline.
+  const graphTriggers = triggers.filter((t) => t.customGraphId);
+
   const results = [];
 
-  for (const trigger of triggers) {
-    if (trigger.customGraphId) {
-      try {
-        const result = await processCustomGraphTrigger(trigger, projects);
-        results.push(result);
-      } catch (error) {
-        logger.error(
-          { triggerId: trigger.id, error },
-          "error processing custom graph trigger",
-        );
-        results.push({
-          triggerId: trigger.id,
-          status: "error",
-          message:
-            error instanceof Error ? error.message : "Unknown error",
-          type: "customGraph",
-        });
-      }
-    } else {
-      try {
-        const result = await processTraceBasedTrigger(trigger, projects);
-        results.push(result);
-      } catch (error) {
-        logger.error(
-          { triggerId: trigger.id, error },
-          "error processing trace-based trigger",
-        );
-        results.push({
-          triggerId: trigger.id,
-          status: "error",
-          message:
-            error instanceof Error ? error.message : "Unknown error",
-          type: "traceBased",
-        });
-      }
+  for (const trigger of graphTriggers) {
+    try {
+      const result = await processCustomGraphTrigger(trigger, projects);
+      results.push(result);
+    } catch (error) {
+      logger.error(
+        { triggerId: trigger.id, error },
+        "error processing custom graph trigger",
+      );
+      results.push({
+        triggerId: trigger.id,
+        status: "error",
+        message:
+          error instanceof Error ? error.message : "Unknown error",
+        type: "customGraph",
+      });
     }
   }
 
   return c.json(results);
 });
+
+// ---------- POST /api/cron/seed_demo ----------
+//
+// Triggers a daily reset of the canonical demo org allowlist. The
+// langwatch-saas Kubernetes CronJob curls this route with the
+// `CRON_API_KEY` Bearer header. `runSeedDemo` is the same code path the
+// dev CLI uses (`scripts/dogfood/governance/seed-demo.ts`), gated by
+// the `DEMO_ORG_IDS` allowlist guard so an unset env returns a clean
+// 500 instead of touching real customer data.
+//
+// Returns the SeedRunReport JSON either way; HTTP 500 when any action
+// failed so CronJob alerting can fire on the response code.
+const seedDemoHandler = async (c: CronContext) => {
+  if (!validateCronKey(c)) {
+    return c.body(null, 401);
+  }
+  let report: SeedRunReport;
+  try {
+    report = await runSeedDemo({ execute: true });
+  } catch (error: any) {
+    logger.error({ error }, "demo seed run threw before completing");
+    return c.json(
+      {
+        message: "demo seed run threw",
+        error: error?.message ? error.message.toString() : `${error}`,
+      },
+      500,
+    );
+  }
+  const status = reportHasFailures(report) ? 500 : 200;
+  return c.json({ report }, status);
+};
+secured.access(cronPolicy()).get("/cron/seed_demo", seedDemoHandler);
+secured.access(cronPolicy()).post("/cron/seed_demo", seedDemoHandler);
 
 // --- Scenario analytics helper functions ---
 
@@ -600,3 +637,5 @@ async function processScenarioAnalytics() {
     analyticsCreated: analyticsToCreate.length,
   };
 }
+
+export const app = secured.hono;

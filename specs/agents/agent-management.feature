@@ -7,11 +7,17 @@ Feature: Agent management
   # Note: Agents are now only Code or Workflow types.
   # For LLM-based prompts, use the Prompts feature instead.
 
+  # The remaining @unimplemented scenarios in this file cover the agents-page
+  # CRUD flows (create / list / edit / archive via the UI) and the
+  # WorkflowSelectorDrawer flows below. These still need either a Next.js
+  # page-level integration harness or Playwright E2E support — neither exists
+  # for these surfaces today. The individual drawer components that are
+  # bindable have been covered by tests in this PR.
+
   # ============================================================================
   # Agent types
   # ============================================================================
 
-  @unimplemented
   Scenario: Agent types available
     When I create a new agent
     Then I can choose from the following types:
@@ -141,21 +147,18 @@ Feature: Agent management
   # Agent selection drawer (for use in Evaluations V3)
   # ============================================================================
 
-  @unimplemented
   Scenario: AgentListDrawer shows available agents
     Given agents "Code Processor" and "Pipeline Agent" exist
     When the AgentListDrawer opens
     Then I see both agents listed
     And I see a "New Agent" button at the top
 
-  @unimplemented
   Scenario: AgentListDrawer empty state
     Given no agents exist
     When the AgentListDrawer opens
     Then I see "Create your first agent" message
     And I see a "New Agent" button
 
-  @unimplemented
   Scenario: Select agent from drawer
     Given the AgentListDrawer is open
     And agent "Code Processor" exists
@@ -163,7 +166,6 @@ Feature: Agent management
     Then the drawer closes
     And "Code Processor" is selected for use
 
-  @unimplemented
   Scenario: Create new agent from drawer flow
     Given the AgentListDrawer is open
     When I click "New Agent"
@@ -178,7 +180,6 @@ Feature: Agent management
   # Agent type selector drawer
   # ============================================================================
 
-  @unimplemented
   Scenario: AgentTypeSelectorDrawer shows two options
     When the AgentTypeSelectorDrawer opens
     Then I see two options:
@@ -186,7 +187,6 @@ Feature: Agent management
       | Code Agent     | code     | Create a Python code executor  |
       | Workflow Agent | workflow | Use an existing workflow       |
 
-  @unimplemented
   Scenario: Selecting type navigates to appropriate editor
     Given the AgentTypeSelectorDrawer is open
     When I select "Code Agent"

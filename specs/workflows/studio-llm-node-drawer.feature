@@ -3,6 +3,11 @@ Feature: Studio LLM Node Drawer
   I want the LLM node to use the same drawer-based prompt editor as evaluations-v3
   So that I have a consistent editing experience and can leverage local state / save patterns
 
+  # All scenarios describe LLM-node behavior (PromptEditorDrawer, drag-and-drop,
+  # Apply/Save) on the workflow studio canvas. Need a studio-canvas component
+  # test against the prompt-editor drawer flow (no such fixture exists for
+  # the studio side; eval-v3 has its own equivalents).
+
   # Context:
   # Currently, the LLM (signature) node uses SignaturePropertiesPanel, a complex right-sidebar
   # form that syncs directly to node data via debounced setNode(). There is no concept of

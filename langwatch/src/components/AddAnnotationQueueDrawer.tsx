@@ -232,7 +232,7 @@ export const AddAnnotationQueueDrawer = ({
           }
         }}
       >
-        <Drawer.Content>
+        <Drawer.Content bg="bg">
           <Drawer.Header>
             <HStack>
               <Drawer.CloseTrigger onClick={() => closeAll()} />
@@ -457,7 +457,7 @@ export const AddAnnotationQueueDrawer = ({
         size="lg"
         onOpenChange={({ open }) => scoreTypeDrawerOpen.setOpen(open)}
       >
-        <Drawer.Content>
+        <Drawer.Content bg="bg">
           <Drawer.Header>
             <HStack>
               <Drawer.CloseTrigger />

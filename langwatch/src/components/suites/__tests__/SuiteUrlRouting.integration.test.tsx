@@ -55,6 +55,8 @@ const mockSuites = [
     targets: [],
     repeatCount: 1,
     labels: [],
+    simulatorModel: null,
+    judgeModel: null,
     archivedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -69,6 +71,8 @@ const mockSuites = [
     targets: [],
     repeatCount: 1,
     labels: [],
+    simulatorModel: null,
+    judgeModel: null,
     archivedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -206,6 +210,7 @@ describe("Simulation Page URL Routing", () => {
       expect(screen.getByText("Simulations")).toBeInTheDocument();
     });
 
+    /** @scenario "Detail panel empty state button" */
     it("displays New Run Plan button", async () => {
       await renderSimulationsPage();
       expect(screen.getByText(/New Run Plan/)).toBeInTheDocument();
@@ -239,6 +244,7 @@ describe("Simulation Page URL Routing", () => {
   });
 
   describe("when clicking a suite in the sidebar", () => {
+    /** @scenario "Quick run from drawer navigates to runs page via URL with drawer params" */
     it("navigates with shallow routing", async () => {
       const user = userEvent.setup();
       await renderSimulationsPage();

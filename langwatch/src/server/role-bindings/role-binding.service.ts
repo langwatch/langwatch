@@ -12,13 +12,43 @@ import {
   getOrganizationRolePermissions,
   getTeamRolePermissions,
 } from "~/server/api/rbac";
+import type { RoleService } from "~/server/role/role.service";
 
 export class RoleBindingService {
   constructor(
     // TODO: complex queries (listForUser, listForOrg, etc.) should be moved to the repository
     private readonly prisma: PrismaClient,
     private readonly repo: RoleBindingRepository,
+    private readonly roleService: RoleService,
   ) {}
+
+  private async validateCustomRolesAssignable({
+    organizationId,
+    bindings,
+  }: {
+    organizationId: string;
+    bindings: Array<{ role: TeamUserRole; customRoleId?: string | null }>;
+  }) {
+    for (const b of bindings) {
+      if (b.role === TeamUserRole.CUSTOM && !b.customRoleId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "CUSTOM role requires a customRoleId",
+        });
+      }
+    }
+
+    const customRoleIds = bindings
+      .filter((b) => b.role === TeamUserRole.CUSTOM && b.customRoleId)
+      .map((b) => b.customRoleId!);
+
+    if (customRoleIds.length === 0) return;
+
+    await this.roleService.validateRolesAssignable({
+      roleIds: customRoleIds,
+      organizationId,
+    });
+  }
 
   async listForUser({ organizationId, userId }: { organizationId: string; userId: string }) {
     const bindings = await this.prisma.roleBinding.findMany({
@@ -326,6 +356,10 @@ export class RoleBindingService {
     }
 
     await this.repo.validateScopeInOrg({ organizationId, scopeType, scopeId });
+    await this.validateCustomRolesAssignable({
+      organizationId,
+      bindings: [{ role, customRoleId }],
+    });
 
     return this.prisma.roleBinding.create({
       data: {
@@ -358,6 +392,10 @@ export class RoleBindingService {
     if (!binding) {
       throw new TRPCError({ code: "NOT_FOUND", message: "Binding not found" });
     }
+    await this.validateCustomRolesAssignable({
+      organizationId,
+      bindings: [{ role, customRoleId }],
+    });
     return this.prisma.roleBinding.update({
       where: { id: bindingId },
       data: {
@@ -405,8 +443,8 @@ export class RoleBindingService {
       scopeId: string;
     }>;
   }) {
-    // Validate scopes up front so a bad input fails the whole batch before
-    // we open the transaction.
+    // Validate scopes and role assignability up front so a bad input fails
+    // the whole batch before we open the transaction.
     for (const b of bindingsToCreate) {
       await this.repo.validateScopeInOrg({
         organizationId,
@@ -414,6 +452,7 @@ export class RoleBindingService {
         scopeId: b.scopeId,
       });
     }
+    await this.validateCustomRolesAssignable({ organizationId, bindings: bindingsToCreate });
 
     return this.prisma.$transaction(async (tx) => {
       if (bindingIdsToDelete.length > 0) {
@@ -486,6 +525,7 @@ export class RoleBindingService {
         scopeId: b.scopeId,
       });
     }
+    await this.validateCustomRolesAssignable({ organizationId, bindings: bindingsToCreate });
 
     return this.prisma.$transaction(async (tx) => {
       const group = await tx.group.findFirst({

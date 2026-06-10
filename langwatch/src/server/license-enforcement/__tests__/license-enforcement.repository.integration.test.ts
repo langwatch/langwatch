@@ -213,6 +213,7 @@ describe("LicenseEnforcementRepository Integration", () => {
   // ==========================================================================
 
   describe("getWorkflowCount", () => {
+    /** @scenario Counts only non-archived workflows toward limit */
     it("excludes archived workflows from count", async () => {
       // Given: 2 active workflows and 2 archived workflows
       await createWorkflow({ archived: false });
@@ -244,6 +245,7 @@ describe("LicenseEnforcementRepository Integration", () => {
       expect(count).toBe(initialCount);
     });
 
+    /** @scenario Counts workflows across all projects in organization */
     it("counts workflows across multiple projects in same organization", async () => {
       // Given: another project in the same organization
       const project2 = await prisma.project.create({
@@ -289,6 +291,7 @@ describe("LicenseEnforcementRepository Integration", () => {
   // ==========================================================================
 
   describe("getEvaluatorCount", () => {
+    /** @scenario Counts only non-archived evaluators toward limit */
     it("excludes archived evaluators from count", async () => {
       // Given: 2 active evaluators and 2 archived evaluators
       await createEvaluator({ archived: false });

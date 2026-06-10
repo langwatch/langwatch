@@ -139,12 +139,12 @@ describe("LangWatchExtractor", () => {
           }),
         });
         // Pre-set cost (as if enrichment or another extractor already set it)
-        ctx.out[ATTR_KEYS.LANGWATCH_SPAN_COST] = 0.010;
+        ctx.out[ATTR_KEYS.LANGWATCH_SPAN_COST] = 0.01;
 
         extractor.apply(ctx);
 
         // setAttrIfAbsent should not override existing value
-        expect(ctx.out[ATTR_KEYS.LANGWATCH_SPAN_COST]).toBe(0.010);
+        expect(ctx.out[ATTR_KEYS.LANGWATCH_SPAN_COST]).toBe(0.01);
       });
     });
 

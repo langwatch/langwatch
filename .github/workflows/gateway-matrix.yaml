@@ -34,7 +34,7 @@ on:
       providers:
         description: 'Build tags (space-separated). Default = all six.'
         type: string
-        default: 'live_openai live_anthropic live_gemini live_bedrock live_azure live_vertex'
+        default: 'live_openai live_anthropic live_gemini live_bedrock live_azure live_vertex live_embeddings'
       run_id_label:
         description: 'Optional label appended to trace tags for grep.'
         type: string
@@ -98,16 +98,23 @@ jobs:
       LW_GATEWAY_INTERNAL_SECRET: ${{ secrets.MATRIX_LW_GATEWAY_INTERNAL_SECRET }}
       LW_GATEWAY_JWT_SECRET: ${{ secrets.MATRIX_LW_GATEWAY_JWT_SECRET }}
       LW_VIRTUAL_KEY_PEPPER: ${{ secrets.MATRIX_LW_VIRTUAL_KEY_PEPPER }}
-      # VK secrets minted by `pnpm tsx scripts/seed-gateway-dogfood.ts`
+      # VK secrets minted by `pnpm tsx scripts/seed-governance-refactor-dogfood.ts`
       # against the long-lived matrix project — capture the script's
       # final block once + paste into GH org secrets, not regenerate
-      # per-run (the seed script creates a NEW VK on each invocation).
+      # per-run (the seed mints fresh VKs only on first invocation per
+      # name; re-runs return "<existing; not re-emitted>" by design).
       TEST_VK_OPENAI: ${{ secrets.MATRIX_TEST_VK_OPENAI }}
       TEST_VK_ANTHROPIC: ${{ secrets.MATRIX_TEST_VK_ANTHROPIC }}
       TEST_VK_GEMINI: ${{ secrets.MATRIX_TEST_VK_GEMINI }}
       TEST_VK_BEDROCK: ${{ secrets.MATRIX_TEST_VK_BEDROCK }}
       TEST_VK_AZURE: ${{ secrets.MATRIX_TEST_VK_AZURE }}
       TEST_VK_VERTEX: ${{ secrets.MATRIX_TEST_VK_VERTEX }}
+      # Voyage VK + API key — used by the live_embeddings matrix once
+      # the Voyage direct-HTTP gateway adapter ships (Bifrost has no
+      # Voyage ModelProvider enum). The embeddings_test.go cell skips
+      # when VOYAGE_ENABLED is unset so this stays inert until then.
+      TEST_VK_VOYAGE: ${{ secrets.MATRIX_TEST_VK_VOYAGE }}
+      VOYAGE_API_KEY: ${{ secrets.MATRIX_VOYAGE_API_KEY }}
       LW_PROJECT_API_KEY: ${{ secrets.MATRIX_LW_PROJECT_API_KEY }}
 
     services:
@@ -137,14 +144,14 @@ jobs:
         ports: ['6379:6379']
 
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5
+      - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.4.0
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
 
-      - uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d # v3
+      - uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v4
         with:
@@ -194,7 +201,7 @@ jobs:
           # still produces useful coverage signal — a missing-cred
           # cell t.Skips with a clear reason instead of silently
           # being absent from the report.
-          MATRIX_TAGS: ${{ github.event.inputs.providers || 'live_openai live_anthropic live_gemini live_bedrock live_azure live_vertex' }}
+          MATRIX_TAGS: ${{ github.event.inputs.providers || 'live_openai live_anthropic live_gemini live_bedrock live_azure live_vertex live_embeddings' }}
         run: |
           go test -tags="$MATRIX_TAGS" -v -count=1 -timeout 1200s \
             ./tests/matrix/... 2>&1 | tee /tmp/matrix.log
@@ -220,7 +227,7 @@ jobs:
 
       - name: Upload logs on failure
         if: failure()
-        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: matrix-logs-${{ github.run_id }}
           path: |

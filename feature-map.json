@@ -670,6 +670,76 @@
       "description": "Platform configuration and administration",
       "children": [
         {
+          "id": "settings.projects",
+          "name": "Projects",
+          "description": "Create, list, update, and archive LangWatch projects within your organization",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [
+                "projects list",
+                "projects create",
+                "projects get",
+                "projects update",
+                "projects delete"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/settings",
+              "mcp": [
+                "platform_list_projects",
+                "platform_get_project",
+                "platform_create_project",
+                "platform_update_project",
+                "platform_archive_project"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/projects",
+            "docs": null
+          },
+          "sync": null
+        },
+        {
+          "id": "settings.api-keys",
+          "name": "API Keys",
+          "description": "Create, list, and revoke API keys for authentication",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [
+                "api-keys list",
+                "api-keys create",
+                "api-keys revoke"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/settings/api-keys",
+              "mcp": [
+                "platform_list_api_keys",
+                "platform_create_api_key",
+                "platform_revoke_api_key"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/api-keys",
+            "docs": null
+          },
+          "sync": null
+        },
+        {
           "id": "settings.model-providers",
           "name": "Model Providers",
           "description": "Configure LLM provider API keys for platform features",

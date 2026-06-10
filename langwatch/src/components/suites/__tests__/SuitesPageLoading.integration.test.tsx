@@ -132,6 +132,7 @@ describe("Single loading indicator on suites page (Issue #1904)", () => {
       });
     });
 
+    /** @scenario "Sidebar shows skeleton placeholders while loading" */
     it("displays skeleton placeholder rows in the sidebar", () => {
       render(<SuitesPage />, { wrapper: Wrapper });
 
@@ -139,6 +140,7 @@ describe("Single loading indicator on suites page (Issue #1904)", () => {
       expect(skeletons.length).toBeGreaterThan(0);
     });
 
+    /** @scenario "Main panel content is hidden while the page is still loading" */
     it("does not show a spinner", () => {
       render(<SuitesPage />, { wrapper: Wrapper });
 
@@ -167,6 +169,8 @@ describe("Single loading indicator on suites page (Issue #1904)", () => {
             targets: [],
             repeatCount: 1,
             labels: [],
+            simulatorModel: null,
+            judgeModel: null,
             archivedAt: null,
             createdAt: new Date(),
             updatedAt: new Date(),
@@ -191,6 +195,7 @@ describe("Single loading indicator on suites page (Issue #1904)", () => {
     });
 
     describe("when main panel data is still loading", () => {
+      /** @scenario "Main panel shows its own loading indicator after sidebar is ready" */
       it("displays a loading indicator in the main panel", () => {
         allRunsPanelLoading = true;
 

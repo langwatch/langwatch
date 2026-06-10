@@ -19,6 +19,7 @@
 
 import { ATTR_KEYS } from "./_constants";
 import { ALLOWED_SPAN_TYPES } from "./_extraction";
+import { asNumber } from "./_guards";
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
 export class OpenInferenceExtractor implements CanonicalAttributesExtractor {
@@ -79,10 +80,71 @@ export class OpenInferenceExtractor implements CanonicalAttributesExtractor {
     const tags = attrs.take(ATTR_KEYS.OPENINFERENCE_TAG_TAGS);
     if (tags !== undefined) {
       // Normalize to string for consistency with langwatch.labels format
-      const labelsStr =
-        typeof tags === "string" ? tags : JSON.stringify(tags);
+      const labelsStr = typeof tags === "string" ? tags : JSON.stringify(tags);
       ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_LABELS, labelsStr);
       ctx.recordRule(`${this.id}:tag.tags`);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Token Usage (llm.token_count.*)
+    // OpenInference instrumentors (openai, anthropic, langchain, ...) emit
+    // token counts under this namespace. Map them to canonical gen_ai.usage.*
+    // so downstream cost computation picks them up.
+    // ─────────────────────────────────────────────────────────────────────────
+    const prompt = asNumber(
+      attrs.take(ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_PROMPT),
+    );
+    if (prompt !== null) {
+      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS, prompt);
+    }
+    const completion = asNumber(
+      attrs.take(ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_COMPLETION),
+    );
+    if (completion !== null) {
+      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS, completion);
+    }
+    // `total` is consumed (so it doesn't leak into params) but not stored —
+    // total tokens are always derived as prompt + completion downstream.
+    attrs.take(ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_TOTAL);
+
+    const reasoning = asNumber(
+      attrs.take(
+        ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_COMPLETION_DETAILS_REASONING,
+      ),
+    );
+    if (reasoning !== null) {
+      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS, reasoning);
+    }
+    const cacheRead = asNumber(
+      attrs.take(
+        ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_PROMPT_DETAILS_CACHE_READ,
+      ),
+    );
+    if (cacheRead !== null) {
+      ctx.setAttrIfAbsent(
+        ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+        cacheRead,
+      );
+    }
+    const cacheWrite = asNumber(
+      attrs.take(
+        ATTR_KEYS.OPENINFERENCE_LLM_TOKEN_COUNT_PROMPT_DETAILS_CACHE_WRITE,
+      ),
+    );
+    if (cacheWrite !== null) {
+      ctx.setAttrIfAbsent(
+        ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+        cacheWrite,
+      );
+    }
+    if (
+      prompt !== null ||
+      completion !== null ||
+      reasoning !== null ||
+      cacheRead !== null ||
+      cacheWrite !== null
+    ) {
+      ctx.recordRule(`${this.id}:llm.token_count`);
     }
   }
 }

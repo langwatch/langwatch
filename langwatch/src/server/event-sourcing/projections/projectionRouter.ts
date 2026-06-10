@@ -34,6 +34,16 @@ import type { MapProjectionDefinition } from "./mapProjection.types";
 import { MapProjectionExecutor } from "./mapProjectionExecutor";
 import type { ProjectionStoreContext } from "./projectionStoreContext";
 import type { ReplayMarkerChecker } from "./replayMarkerCheck";
+import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
+import type { ResolvedRetention } from "../../data-retention/retentionPolicy.schema";
+
+/**
+ * Default cap on how many same-aggregate fold events are coalesced into one
+ * load/apply/store cycle. Bounds the per-cycle drain + apply loop (and the
+ * re-stage loop on failure) while collapsing a backed-up group from O(n²) to
+ * O(n). A fold can opt out by setting options.coalesceMaxBatch = 1.
+ */
+const DEFAULT_FOLD_COALESCE_MAX_BATCH = 100;
 
 /**
  * Central router that registers fold and map projections and dispatches events.
@@ -66,6 +76,7 @@ export class ProjectionRouter<
     private readonly featureFlagService?: FeatureFlagServiceInterface,
     private readonly processRole?: ProcessRole,
     private readonly replayMarkerChecker?: ReplayMarkerChecker,
+    private readonly retentionPolicyResolver?: RetentionPolicyResolver,
   ) {}
 
   registerFoldProjection(projection: FoldProjectionDefinition<any, EventType>): void {
@@ -227,13 +238,28 @@ export class ProjectionRouter<
     const projectionDefs: Record<string, {
       name: string;
       groupKeyFn?: (event: EventType) => string;
-      options?: { killSwitch?: { customKey?: string } };
+      coalesceMaxBatch?: number;
+      options?: { killSwitch?: KillSwitchOptions };
     }> = {};
 
     for (const [name, fold] of this.foldProjections) {
       projectionDefs[name] = {
         name,
         groupKeyFn: fold.key,
+        // Coalesce a backed-up group's events into one fold load/apply/store
+        // cycle. On for every fold (harmless at batch size 1 when the queue
+        // keeps up). Safe for all folds because: the final folded state is
+        // identical to applying events one at a time (pure left-fold, the
+        // intermediate stores never affect the result); processFoldProjectionBatch
+        // still dispatches reactors per event, so event-sensitive reactors
+        // (per-span eval sync, evaluation/scenario triggers keyed on event type)
+        // see every event; and out-of-order is handled identically to the
+        // single-event path (executeBatch sorts by occurredAt and uses the same
+        // checkpoint re-fold). The only difference is reactors observe the final
+        // batch fold-state, which is the correct "current state" for a
+        // react-after-fold side effect. A fold can opt out via
+        // options.coalesceMaxBatch = 1.
+        coalesceMaxBatch: fold.options?.coalesceMaxBatch ?? DEFAULT_FOLD_COALESCE_MAX_BATCH,
         options: fold.options,
       };
     }
@@ -257,6 +283,23 @@ export class ProjectionRouter<
           { tenantId: triggerEvent.tenantId },
         );
       },
+      async (projectionName, events, _context) => {
+        const fold = this.foldProjections.get(projectionName);
+        if (!fold) {
+          throw new ConfigurationError(
+            "ProjectionRouter",
+            `Fold projection "${projectionName}" not found`,
+            { projectionName },
+          );
+        }
+
+        await this.processFoldProjectionBatch(
+          projectionName,
+          fold,
+          events,
+          { tenantId: events[0]!.tenantId },
+        );
+      },
     );
   }
 
@@ -277,10 +320,7 @@ export class ProjectionRouter<
         name,
         handler: {
           handle: async (event: EventType) => {
-            const context: ProjectionStoreContext = {
-              aggregateId: String(event.aggregateId),
-              tenantId: event.tenantId,
-            };
+            const context = await this.buildStoreContext(event);
             const record = await withMetrics({
               fn: () => this.mapExecutor.execute(mapProj, event, context),
               onComplete: (ms) => { incrementEsMapProjectionTotal(this.pipelineName, name, "completed"); observeEsMapProjectionDuration(this.pipelineName, name, ms); },
@@ -518,10 +558,7 @@ export class ProjectionRouter<
           }
 
           try {
-            const storeContext: ProjectionStoreContext = {
-              aggregateId: String(event.aggregateId),
-              tenantId: event.tenantId,
-            };
+            const storeContext = await this.buildStoreContext(event);
             const record = await withMetrics({
               fn: () => this.mapExecutor.execute(mapProj, event, storeContext),
               onComplete: (ms) => { incrementEsMapProjectionTotal(this.pipelineName, name, "completed"); observeEsMapProjectionDuration(this.pipelineName, name, ms); },
@@ -594,11 +631,7 @@ export class ProjectionRouter<
         }
 
         const key = fold.key ? fold.key(event) : undefined;
-        const storeContext: ProjectionStoreContext = {
-          aggregateId: String(event.aggregateId),
-          tenantId: event.tenantId,
-          key,
-        };
+        const storeContext = await this.buildStoreContext(event, key);
 
         const foldState = await withMetrics({
           fn: () => this.foldExecutor.execute(fold, event, storeContext),
@@ -610,6 +643,97 @@ export class ProjectionRouter<
         const reactors = this.reactorsForFold.get(projectionName);
         if (reactors && reactors.length > 0) {
           await this.dispatchToReactors(projectionName, reactors, event, foldState);
+        }
+      },
+    );
+  }
+
+  /**
+   * Processes a batch of same-aggregate events for a fold projection in a single
+   * load/apply/store cycle (see FoldProjectionExecutor.executeBatch). Used by the
+   * GroupQueue's coalescing path when a group is backed up. All events share the
+   * aggregate (and tenant), so kill-switch and store key are resolved once.
+   *
+   * Reactors fire once with the final folded state (using the last event), which
+   * is the correct coalesced behavior for the trace's debounced reactors.
+   */
+  private async processFoldProjectionBatch(
+    projectionName: string,
+    fold: FoldProjectionDefinition<any, EventType>,
+    events: EventType[],
+    context: EventStoreReadContext<EventType>,
+  ): Promise<void> {
+    if (events.length === 0) return;
+
+    await this.tracer.withActiveSpan(
+      "ProjectionRouter.processFoldProjectionBatch",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "projection.name": projectionName,
+          "event.count": events.length,
+          "event.aggregate_id": String(events[0]!.aggregateId),
+        },
+      },
+      async () => {
+        EventUtils.validateTenantId(context, "processFoldProjectionBatch");
+
+        // Check kill switch (all events share the tenant)
+        const disabled = await isComponentDisabled({
+          featureFlagService: this.featureFlagService,
+          aggregateType: this.aggregateType,
+          componentType: "projection",
+          componentName: projectionName,
+          tenantId: events[0]!.tenantId,
+          customKey: fold.options?.killSwitch?.customKey,
+          logger: this.logger,
+        });
+        if (disabled) return;
+
+        // Defer or skip events for which projection-replay is active.
+        let toApply = events;
+        if (this.replayMarkerChecker) {
+          const kept: EventType[] = [];
+          for (const event of events) {
+            const decision = await this.replayMarkerChecker.check(projectionName, event);
+            if (decision !== "skip") kept.push(event);
+          }
+          toApply = kept;
+        }
+        if (toApply.length === 0) return;
+
+        // Apply (and dispatch reactors) in occurredAt order — the same order
+        // executeBatch folds in — so reactor metadata and the final state are
+        // consistent regardless of the order events were drained/dispatched in.
+        toApply = [...toApply].sort(
+          (a, b) =>
+            (((a as Record<string, unknown>).occurredAt as number) ?? 0) -
+            (((b as Record<string, unknown>).occurredAt as number) ?? 0),
+        );
+
+        const first = toApply[0]!;
+        const key = fold.key ? fold.key(first) : undefined;
+        const storeContext = await this.buildStoreContext(first, key);
+
+        const foldState = await withMetrics({
+          fn: () => this.foldExecutor.executeBatch(fold, toApply, storeContext),
+          onComplete: (ms) => { incrementEsFoldProjectionTotal(this.pipelineName, projectionName, "completed"); observeEsFoldProjectionDuration(this.pipelineName, projectionName, ms); },
+          onFail: (ms) => { incrementEsFoldProjectionTotal(this.pipelineName, projectionName, "failed"); observeEsFoldProjectionDuration(this.pipelineName, projectionName, ms); },
+        });
+
+        // Dispatch reactors for EVERY folded event, with the final fold state.
+        // Fold-state reactors (broadcast, metadata, alerts) carry makeJobId
+        // dedup and collapse to one effective run, so firing per event is cheap.
+        // Per-span reactors must see every event: customEvaluationSync reads
+        // event.data.span to extract embedded SDK evals, and evaluationTrigger
+        // inspects each span's attributes — firing only once would silently
+        // drop N-1 spans' work, and only under backlog (the recovery path).
+        // The O(n²)->O(n) win lives in the single fold load/store, not here.
+        const reactors = this.reactorsForFold.get(projectionName);
+        if (reactors && reactors.length > 0) {
+          for (const event of toApply) {
+            await this.dispatchToReactors(projectionName, reactors, event, foldState);
+          }
         }
       },
     );
@@ -791,5 +915,29 @@ export class ProjectionRouter<
   private isReactorExcluded(reactor: ReactorDefinition<EventType>): boolean {
     if (!reactor.options?.runIn || !this.processRole) return false;
     return !reactor.options.runIn.includes(this.processRole);
+  }
+
+  private async resolveRetention(tenantId: unknown): Promise<ResolvedRetention | null> {
+    if (!this.retentionPolicyResolver) return null;
+    return this.retentionPolicyResolver.resolve(String(tenantId));
+  }
+
+  /**
+   * Build the per-event ProjectionStoreContext shared by all projection
+   * executors (map handler, fold processFoldProjectionEvent, fold batch).
+   * Centralising it ensures every store sees the same shape — and any new
+   * context field (e.g. process role, trace correlation) lands in one place.
+   */
+  private async buildStoreContext(
+    event: EventType,
+    key?: string,
+  ): Promise<ProjectionStoreContext> {
+    const retentionPolicy = await this.resolveRetention(event.tenantId);
+    return {
+      aggregateId: String(event.aggregateId),
+      tenantId: event.tenantId,
+      ...(key !== undefined ? { key } : {}),
+      retentionPolicy,
+    };
   }
 }

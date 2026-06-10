@@ -24,7 +24,6 @@ import (
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
 )
 
-
 // Root is the service entrypoint called by cmd/service.
 func Root(ctx context.Context, _ []string) error {
 	cfg, err := nlpgo.LoadConfig(ctx)
@@ -34,6 +33,15 @@ func Root(ctx context.Context, _ []string) error {
 
 	info := contexts.MustGetServiceInfo(ctx)
 	info.Environment = cfg.Environment
+	// Override the OTel-facing service.name. The mono-binary subcommand
+	// is `nlpgo` (Helm chart, Lambda task, dev shell invoke `service
+	// nlpgo`), but everywhere operators look at this service — charts,
+	// architecture diagrams, deployment names — it's "langwatch_nlp".
+	// Studio's trace drawer reads `service.name` for its SERVICE column,
+	// so the "nlpgo" label there leaked an implementation detail of the
+	// Python→Go migration (rchaves dogfood 2026-05-14). Keep the binary
+	// command name as-is and rename only the public-facing identity.
+	info.Service = "langwatch_nlp"
 	ctx = contexts.SetServiceInfo(ctx, *info)
 
 	ctx, deps, err := nlpgo.NewDeps(ctx, cfg)
@@ -90,8 +98,6 @@ func Root(ctx context.Context, _ []string) error {
 
 	application := app.New(
 		app.WithLogger(deps.Logger),
-		app.WithChildProxy(deps.ChildProxy),
-		app.WithChildManager(deps.Child),
 		app.WithWorkflowExecutor(executor),
 	)
 

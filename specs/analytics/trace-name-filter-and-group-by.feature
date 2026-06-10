@@ -46,15 +46,64 @@ Feature: Trace Name Filter and Group-By
     Then the TraceName field still equals "OrderAgent"
 
   @unit
-  Scenario: Multiple root spans use earliest start time
+  Scenario: Trace name is sticky once set
     Given a trace with two root spans
     And the first root span starts at T1 with name "auto-instrumented-GET"
     And the second root span starts at T2 (after T1) with name "manual-handler"
-    When both spans are processed in any order
-    Then the TraceName field equals "auto-instrumented-GET"
+    When the later root "manual-handler" is processed first
+    And the earlier root "auto-instrumented-GET" is processed second
+    Then the TraceName field stays equal to "manual-handler"
+    And the canonical root start time rotates to T1
+
+  # ---------------------------------------------------------------------------
+  # Fallback: no real root span ever arrives
+  #
+  # Customers regularly emit the first span with a parent_span_id that points
+  # to nothing in the trace (auto-instrumentation handoff bugs, SDK propagation
+  # glitches). Without a fallback, no span would ever satisfy
+  # `parentSpanId === null` and the trace would render with an empty name
+  # forever. The projection picks the earliest-starting span as a tentative
+  # name source; a genuine real root arriving later still takes over.
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: Trace name falls back to root-most span when no real parent resolves
+    Given a trace whose only span has a parent_span_id pointing to no span in the trace
+    And the span is named "RequirementsShredding"
+    When the trace summary is projected
+    Then the TraceName field equals "RequirementsShredding"
+    And the fold projection marks the name as a fallback so a real root can still take over later
+
+  @unit
+  Scenario: Trace name falls back to earliest-starting span across multiple unparented spans
+    Given a trace with two spans, both pointing at parent IDs not present in the trace
+    And the first-processed span starts at T2 with name "LangGraph"
+    And the second-processed span starts at T1 (earlier than T2) with name "RequirementsShredding"
+    When both spans are projected
+    Then the TraceName field equals "RequirementsShredding"
+    And the canonical root start time equals T1
+    And the fold projection still marks the name as a fallback
+
+  @unit
+  Scenario: Real root metadata upgrades after a user rename clears the name fallback flag
+    Given a fallback span first claimed both the trace name and the root metadata (startTimeMs + spanType)
+    And the user then renamed the trace through a TraceNameChanged event
+    When a real root span arrives later in time than the fallback span
+    Then the user-supplied trace name is preserved
+    And rootSpanStartTimeMs is reassigned to the real root's start time
+    And rootSpanType is reassigned to the real root's span type
+    And both fallback flags resolve to false
 
   # ---------------------------------------------------------------------------
   # Filter: trace name appears as a filter dimension
+  #
+  # The remaining `@unimplemented` scenarios in this file describe analytics
+  # filter / group-by behavior on TraceName that needs an integration harness
+  # against a seeded ClickHouse — the existing `filter-evaluation-queries`
+  # integration test pattern would extend cleanly to cover these. The
+  # `@unit` filter-translator and group-by-resolver scenarios at the bottom
+  # similarly need a dedicated unit test for TraceName mapping (no test file
+  # currently references the TraceName translator path).
   # ---------------------------------------------------------------------------
 
   @integration @unimplemented

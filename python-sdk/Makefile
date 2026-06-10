@@ -92,10 +92,13 @@ test-notebooks:
 batch-evaluation-example:
 	uv run python $(filter-out $@,$(MAKECMDGOALS))
 
+# Pinned to the upstream version that openapi-templates/ was forked from.
+# When bumping, re-diff openapi-templates/*.jinja against the new upstream
+# and drop the override if upstream PR #1407 has landed.
+OPENAPI_PYTHON_CLIENT_VERSION := 0.28.4
+
 ensure-openapi-python-client:
-	@if ! command -v openapi-python-client &> /dev/null; then \
-		uv pip install openapi-python-client; \
-	fi
+	@uv pip install --quiet "openapi-python-client==$(OPENAPI_PYTHON_CLIENT_VERSION)"
 
 generate/api-client: ensure-openapi-python-client
 	@echo "Generating OpenAPI spec..."
@@ -107,6 +110,7 @@ generate/api-client: ensure-openapi-python-client
 	uv run openapi-python-client generate \
 		--path ../langwatch/src/app/api/openapiLangWatch.json \
 		--output-path .tmp/api-client \
+		--custom-template-path openapi-templates \
 		--overwrite
 	@echo "Copying necessary files to SDK..."
 	@mkdir -p src/langwatch/generated/langwatch_rest_api_client

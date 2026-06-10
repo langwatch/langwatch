@@ -359,6 +359,7 @@ describe("NotificationService", () => {
     };
 
     describe("when SLACK_CHANNEL_SIGNUPS is not set", () => {
+      /** @scenario 'Missing Slack webhook does not block onboarding completion' */
       it("returns without sending", async () => {
         config.slackSignupsChannel = undefined;
 
@@ -369,6 +370,8 @@ describe("NotificationService", () => {
     });
 
     describe("when optional fields are present", () => {
+      /** @scenario 'Slack notification sent after onboarding creates the organization' */
+      /** @scenario 'Slack notification includes optional campaign context when present' */
       it("includes phone number and campaign in the Slack text", async () => {
         config.slackSignupsChannel = "https://hooks.slack.com/signups";
 
@@ -381,6 +384,7 @@ describe("NotificationService", () => {
     });
 
     describe("when optional fields are missing", () => {
+      /** @scenario 'Missing optional signup fields do not block the notification' */
       it("sends the baseline signup notification text", async () => {
         config.slackSignupsChannel = "https://hooks.slack.com/signups";
 
@@ -397,6 +401,7 @@ describe("NotificationService", () => {
     });
 
     describe("when Slack webhook fails", () => {
+      /** @scenario 'Slack delivery failure does not block onboarding completion' */
       it("captures the exception and does not throw", async () => {
         config.slackSignupsChannel = "https://hooks.slack.com/signups";
 

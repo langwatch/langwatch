@@ -4,6 +4,30 @@ Feature: Guardrails Drawer
   I want to set up guardrails using my evaluators
   So that I can protect users from harmful outputs
 
+  # 5 of 15 scenarios bound to GuardrailsDrawer.test.tsx (Select evaluator,
+  # Python async by default, Copy code, Close without saving, API key
+  # placeholder). Remaining 10 @unimplemented scenarios:
+  # - "Open evaluator list directly from menu": DUPLICATE per manifest of
+  #   new-evaluation-menu "New Guardrail opens evaluator list".
+  # - "Python async code template": UPDATE per manifest (code uses
+  #   langwatch.evaluation.async_evaluate(slug, data={...}, as_guardrail=True),
+  #   not langwatch.guardrails.async_evaluate).
+  # - "Switch to TypeScript tab" / "Switch to curl tab": UPDATE per manifest
+  #   (UI uses NativeSelect dropdown, not tabs; cURL option label is "cURL").
+  # - "TypeScript code template": UPDATE (emits LangWatch capitalization +
+  #   langwatch.evaluations.evaluate(slug, {data,name,asGuardrail:true})).
+  # - "Curl code template": UPDATE (endpoint /api/evaluations/{slug}/evaluate;
+  #   body uses as_guardrail/name/data fields).
+  # - "Create new evaluator during guardrail setup": DELETE per manifest (no
+  #   "Create New Evaluator" button in flow; only EvaluatorListDrawer delegation).
+  # - "Evaluator without slug shows ID (fallback)": DELETE per manifest (code
+  #   uses literal placeholder "your-evaluator-slug" if missing; no ID fallback).
+  # - "Project-specific API endpoint": DELETE per manifest (curl hardcodes
+  #   https://app.langwatch.ai; no project-scoped endpoint setting).
+  # - "Show evaluator description in drawer": DELETE per manifest (drawer
+  #   renders name + slug only via EvaluatorSelectionBox; description never shown).
+  # Aspirational pending DELETE/UPDATE rewrites tracked in PR #3458.
+
   Background:
     Given I am logged in to a project
     And I have at least one evaluator created
@@ -15,14 +39,12 @@ Feature: Guardrails Drawer
     Then the evaluator list drawer should open
     And I should see my existing evaluators
 
-  @unimplemented
   Scenario: Select existing evaluator for guardrail
     Given I selected "New Guardrail" and the evaluator list is open
     When I select evaluator "PII Check" with slug "pii-check-abc12"
     Then the guardrails drawer should show code integration
     And the code should reference "evaluators/pii-check-abc12"
 
-  @unimplemented
   Scenario: Python code shows async by default
     Given the guardrails code block is displayed
     Then the Python tab should be active by default
@@ -86,14 +108,12 @@ Feature: Guardrails Drawer
         -d '{"input": "user input", "output": "llm output"}'
       """
 
-  @unimplemented
   Scenario: Copy code to clipboard
     Given the guardrails code block is displayed
     When I click the copy button
     Then the code should be copied to clipboard
     And a success feedback should appear
 
-  @unimplemented
   Scenario: Close without saving
     Given the guardrails code is displayed
     When I click "Close"
@@ -117,7 +137,6 @@ Feature: Guardrails Drawer
     Then the code should use the evaluator ID as fallback
     Or a warning should suggest generating a slug
 
-  @unimplemented
   Scenario: API key placeholder in code
     Given the guardrails code block is displayed
     Then the code should include a placeholder for the API key

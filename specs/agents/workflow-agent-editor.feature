@@ -4,6 +4,13 @@ Feature: Workflow agent editor with workflow link
   I want to access the underlying workflow from the agent editor
   So that I can modify the agent logic
 
+  # The workflow-link / studio-navigation scenarios in this file describe
+  # page-level UI flows on the agent-editor + workflow-studio crossover and
+  # need a Next.js integration harness or Playwright E2E to drive end-to-end.
+  # Aspirational pending that harness. Editor-side checks that don't cross
+  # into the studio (e.g. read-only field rendering) are bindable directly
+  # and don't share this caveat.
+
   Background:
     Given I am logged in to a project
     And I have a workflow "Complex Pipeline" in the project

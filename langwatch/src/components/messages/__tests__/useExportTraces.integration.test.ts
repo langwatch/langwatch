@@ -309,4 +309,45 @@ describe("useExportTraces()", () => {
       );
     });
   });
+
+  describe("when server returns an empty response body", () => {
+    it("shows a warning toast instead of downloading a blank file", async () => {
+      const createObjectURLSpy = vi
+        .fn()
+        .mockReturnValue("blob:fake-url");
+      vi.stubGlobal("URL", {
+        ...globalThis.URL,
+        createObjectURL: createObjectURLSpy,
+        revokeObjectURL: vi.fn(),
+      });
+
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          headers: new Headers({
+            "X-Total-Traces": "0",
+            "Content-Disposition": 'attachment; filename="export.csv"',
+          }),
+          blob: vi.fn().mockResolvedValue(new Blob([])),
+        }),
+      );
+
+      const { result } = renderHook(() =>
+        useExportTraces({ projectId: "proj-1", startDate: 1000, endDate: 2000 }),
+      );
+
+      await act(async () => {
+        result.current.startExport({ mode: "summary", format: "csv" });
+        await new Promise((r) => setTimeout(r, 50));
+      });
+
+      expect(createObjectURLSpy).not.toHaveBeenCalled();
+      expect(mockToasterCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "warning",
+        }),
+      );
+    });
+  });
 });

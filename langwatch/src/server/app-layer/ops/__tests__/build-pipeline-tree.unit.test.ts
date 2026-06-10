@@ -35,6 +35,7 @@ function createQueue(overrides: Partial<QueueInfo> = {}): QueueInfo {
     activeGroupCount: 0,
     totalPendingJobs: 0,
     dlqCount: 0,
+    parkedGroupCount: 0,
     groups: [],
     ...overrides,
   };

@@ -32,6 +32,8 @@ function makeSuite(
     ] as SuiteTarget[],
     repeatCount: 1,
     labels: [],
+    simulatorModel: null,
+    judgeModel: null,
     archivedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -239,6 +241,7 @@ describe("SuiteService", () => {
 
     describe("given a suite references a deleted scenario", () => {
       describe("when the suite run is triggered", () => {
+        /** @scenario Deleted scenarios still cause validation errors */
         it("throws InvalidScenarioReferencesError before reaching suiteRunService", async () => {
           const { service, suiteRunService } = createService({
             scenarioRepository: {
@@ -319,6 +322,8 @@ describe("SuiteService", () => {
 
     describe("given a suite with mixed active and archived scenarios", () => {
       describe("when the suite run is triggered", () => {
+        /** @scenario Suite run excludes archived scenarios from job scheduling */
+        /** @scenario Filters out archived scenarios from a reference list */
         it("passes only active scenario IDs to suiteRunService", async () => {
           const archivedAt = new Date();
           const { service, suiteRunService } = createService({
@@ -352,6 +357,8 @@ describe("SuiteService", () => {
 
     describe("given a suite with mixed active and archived targets", () => {
       describe("when the suite run is triggered", () => {
+        /** @scenario Suite run excludes archived targets from job scheduling */
+        /** @scenario Filters out archived targets from a reference list */
         it("passes only active targets to suiteRunService", async () => {
           const archivedAt = new Date();
           const { service, suiteRunService } = createService({
@@ -386,6 +393,7 @@ describe("SuiteService", () => {
 
     describe("given all scenarios in a suite are archived", () => {
       describe("when the suite run is triggered", () => {
+        /** @scenario Suite run fails when all scenarios are archived */
         it("throws AllScenariosArchivedError", async () => {
           const archivedAt = new Date();
           const { service, suiteRunService } = createService({
@@ -409,6 +417,7 @@ describe("SuiteService", () => {
 
     describe("given all targets in a suite are archived", () => {
       describe("when the suite run is triggered", () => {
+        /** @scenario Suite run fails when all targets are archived */
         it("throws AllTargetsArchivedError", async () => {
           const archivedAt = new Date();
           const { service, suiteRunService } = createService({
@@ -434,6 +443,9 @@ describe("SuiteService", () => {
 
     describe("given 3 scenario refs, 2 target refs, 1 scenario archived, 1 target archived", () => {
       describe("when the suite run is triggered", () => {
+        /** @scenario Suite run reports skipped archived scenarios */
+        /** @scenario Suite run reports skipped archived targets */
+        /** @scenario Job count reflects only active scenarios and targets */
         it("passes only active refs and reports skipped archived", async () => {
           const archivedAt = new Date();
           const { service } = createService({

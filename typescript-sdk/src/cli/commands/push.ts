@@ -4,13 +4,18 @@ import chalk from "chalk";
 import ora from "ora";
 import * as yaml from "js-yaml";
 import { PromptConverter } from "@/cli/utils/promptConverter";
+import { responseFormatToOutputs } from "@/cli/utils/responseFormat";
 import {
   type ConfigData,
   PromptsApiService,
   PromptsError,
   type SyncAction,
 } from "@/client-sdk/services/prompts";
-import type { PromptsConfig, PromptsLock, SyncResult } from "../types";
+import type {
+  PromptsConfig,
+  PromptsLock,
+  SyncResult,
+} from "../types";
 import { FileManager } from "../utils/fileManager";
 import { ensureProjectInitialized } from "../utils/init";
 import { checkApiKey } from "../utils/apiKey";
@@ -112,18 +117,14 @@ export const pushPrompts = async ({
 
         const currentVersion = lock.prompts[promptName]?.version;
 
-        // Build outputs based on response_format if present
-        const responseFormat = (localConfig as any).response_format;
-        let outputs: ConfigData["outputs"] = [{ identifier: "output", type: "str" }];
-        if (responseFormat?.schema) {
-          outputs = [
-            {
-              identifier: responseFormat.name ?? "output",
-              type: "json_schema",
-              json_schema: responseFormat.schema,
-            },
-          ];
-        }
+        // Build outputs from the local response_format block. A flat object
+        // schema expands back into flat platform fields; a richer schema is
+        // preserved verbatim as one json_schema output. Exact inverse of the
+        // pull direction (outputsToResponseFormat) so push/pull is lossless.
+        const outputs: ConfigData["outputs"] =
+          (responseFormatToOutputs(
+            (localConfig as any).response_format,
+          ) as ConfigData["outputs"]) ?? [{ identifier: "output", type: "str" }];
 
         const configData: ConfigData = {
           model: localConfig.model,
@@ -144,6 +145,7 @@ export const pushPrompts = async ({
         const syncResult = await promptsApiService.sync({
           name: promptName,
           configData,
+          parameters: localConfig.parameters ?? {},
           localVersion: currentVersion,
           commitMessage: `Synced from local file: ${path.basename(filePath)}`,
         });
@@ -167,7 +169,9 @@ export const pushPrompts = async ({
           }
 
           if (conflictResolution === "remote" && syncResult.conflictInfo) {
-            const remoteConfig = {
+            const remoteParameters =
+              syncResult.conflictInfo.remoteParameters ?? {};
+            const remotePrompt = {
               model: syncResult.conflictInfo.remoteConfigData.model,
               modelParameters: {
                 temperature:
@@ -182,9 +186,15 @@ export const pushPrompts = async ({
                 },
                 ...(syncResult.conflictInfo.remoteConfigData.messages ?? []),
               ],
+              // Only write `parameters` when present, matching
+              // PromptConverter.fromMaterializedToYaml — avoids writing an
+              // empty `parameters: {}` into prompt files that have none.
+              ...(Object.keys(remoteParameters).length > 0
+                ? { parameters: remoteParameters }
+                : {}),
             };
 
-            const yamlContent = yaml.dump(remoteConfig, {
+            const yamlContent = yaml.dump(remotePrompt, {
               lineWidth: -1,
               noRefs: true,
               sortKeys: false,

@@ -3,6 +3,21 @@ Feature: Unified group-by and list/grid view across all run views
   I want the same layout controls (group-by, list/grid toggle) on every run view
   So that I have a consistent experience whether viewing suite runs, external sets, or all runs
 
+  # Parity status: 0 of 10 scenarios bound to existing tests.
+  # Remaining @unimplemented scenarios (#3458):
+  #   10 NO_TEST: shipped behavior, no integration test yet
+  # NO_TEST gaps:
+  #   - "External set view shows group-by and list/grid toggle"
+  #   - "All run views provide the same layout controls"
+  #   - "External set group-by selector omits target option"
+  #   - "Suite detail group-by selector includes target option"
+  #   - "All runs group-by selector includes all options"
+  #   - "Grouping by scenario in external set groups runs under scenario headers"
+  #   - "External set supports list and grid view modes"
+  #   - "Each view shows scenario filter, status filter, group-by, and view toggle"
+  #   - "View mode selection carries over between views"
+  #   - "External set with group-by None shows batch run grouping"
+
   Background:
     Given I am logged into a project with scenario runs
 

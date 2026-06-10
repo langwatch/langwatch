@@ -117,8 +117,8 @@ describe.skipIf(isTestcontainersOnly)(
       customRoleId = role.id;
     });
 
-    beforeEach(() => {
-      resetApp();
+    beforeEach(async () => {
+      await resetApp();
       mockGetActivePlan = vi.fn();
       globalForApp.__langwatch_app = createTestApp({
         planProvider: PlanProviderService.create({
@@ -127,8 +127,8 @@ describe.skipIf(isTestcontainersOnly)(
       });
     });
 
-    afterEach(() => {
-      resetApp();
+    afterEach(async () => {
+      await resetApp();
     });
 
     afterAll(async () => {
@@ -182,6 +182,7 @@ describe.skipIf(isTestcontainersOnly)(
 
     describe("role.create", () => {
       describe("when plan is not enterprise", () => {
+        /** @scenario Non-enterprise org cannot create custom roles */
         it("rejects with FORBIDDEN", async () => {
           mockGetActivePlan.mockResolvedValue(freePlan);
           const caller = createCaller();
@@ -200,6 +201,7 @@ describe.skipIf(isTestcontainersOnly)(
       });
 
       describe("when plan is enterprise", () => {
+        /** @scenario Enterprise org can create custom roles */
         it("allows creation", async () => {
           mockGetActivePlan.mockResolvedValue(enterprisePlan);
           const caller = createCaller();
@@ -220,6 +222,7 @@ describe.skipIf(isTestcontainersOnly)(
 
     describe("role.update", () => {
       describe("when plan is not enterprise", () => {
+        /** @scenario Non-enterprise org cannot update custom roles */
         it("rejects with FORBIDDEN", async () => {
           mockGetActivePlan.mockResolvedValue(freePlan);
           const caller = createCaller();
@@ -255,6 +258,7 @@ describe.skipIf(isTestcontainersOnly)(
 
     describe("role.assignToUser", () => {
       describe("when plan is not enterprise", () => {
+        /** @scenario Non-enterprise org cannot assign custom roles to users */
         it("rejects with FORBIDDEN", async () => {
           mockGetActivePlan.mockResolvedValue(freePlan);
           const caller = createCaller();
@@ -292,6 +296,7 @@ describe.skipIf(isTestcontainersOnly)(
 
     describe("role.removeFromUser", () => {
       describe("when plan is not enterprise", () => {
+        /** @scenario Non-enterprise org can remove custom roles from users */
         it("allows removal on free plan", async () => {
           mockGetActivePlan.mockResolvedValue(freePlan);
 
@@ -323,6 +328,7 @@ describe.skipIf(isTestcontainersOnly)(
 
     describe("role.delete", () => {
       describe("when plan is not enterprise", () => {
+        /** @scenario Non-enterprise org can delete custom roles for cleanup */
         it("allows deletion on free plan", async () => {
           // Create a role to delete (needs enterprise)
           mockGetActivePlan.mockResolvedValue(enterprisePlan);
@@ -347,6 +353,7 @@ describe.skipIf(isTestcontainersOnly)(
 
     describe("role.getAll", () => {
       describe("when plan is not enterprise", () => {
+        /** @scenario Non-enterprise org can list custom roles */
         it("allows listing on free plan", async () => {
           mockGetActivePlan.mockResolvedValue(freePlan);
           const caller = createCaller();
@@ -361,6 +368,7 @@ describe.skipIf(isTestcontainersOnly)(
 
     describe("organization.getAuditLogs", () => {
       describe("when plan is not enterprise", () => {
+        /** @scenario Non-enterprise org cannot access audit logs */
         it("rejects with FORBIDDEN", async () => {
           mockGetActivePlan.mockResolvedValue(freePlan);
           const caller = createCaller();
@@ -377,6 +385,7 @@ describe.skipIf(isTestcontainersOnly)(
       });
 
       describe("when plan is enterprise", () => {
+        /** @scenario Enterprise org can access audit logs */
         it("allows access", async () => {
           mockGetActivePlan.mockResolvedValue(enterprisePlan);
           const caller = createCaller();
@@ -394,6 +403,7 @@ describe.skipIf(isTestcontainersOnly)(
 
     describe("team.createTeamWithMembers", () => {
       describe("when members include custom role on non-enterprise plan", () => {
+        /** @scenario Non-enterprise org cannot create teams with custom role members */
         it("rejects with FORBIDDEN", async () => {
           mockGetActivePlan.mockResolvedValue(freePlan);
           const caller = createCaller();
@@ -438,6 +448,7 @@ describe.skipIf(isTestcontainersOnly)(
 
     describe("team.update", () => {
       describe("when members include custom role on non-enterprise plan", () => {
+        /** @scenario Non-enterprise org cannot assign custom roles via team update */
         it("rejects with FORBIDDEN", async () => {
           mockGetActivePlan.mockResolvedValue(freePlan);
           const caller = createCaller();
@@ -462,6 +473,7 @@ describe.skipIf(isTestcontainersOnly)(
       });
 
       describe("when members use only built-in roles on non-enterprise plan", () => {
+        /** @scenario Non-enterprise org can update team members with built-in roles */
         it("allows update", async () => {
           mockGetActivePlan.mockResolvedValue(freePlan);
           const caller = createCaller();
@@ -481,6 +493,7 @@ describe.skipIf(isTestcontainersOnly)(
 
     describe("organization.updateMemberRole", () => {
       describe("when teamRoleUpdates include custom role on non-enterprise plan", () => {
+        /** @scenario Non-enterprise org cannot assign custom roles via member role update */
         it("rejects with FORBIDDEN", async () => {
           mockGetActivePlan.mockResolvedValue(freePlan);
           const caller = createCaller();
@@ -533,6 +546,8 @@ describe.skipIf(isTestcontainersOnly)(
 
     describe("organization.createInvites", () => {
       describe("when invites include custom role on non-enterprise plan", () => {
+        /** @scenario Non-enterprise org cannot invite members with custom roles */
+        /** @scenario Batch invite rejects entirely when any invite has a custom role */
         it("rejects the entire batch", async () => {
           mockGetActivePlan.mockResolvedValue(freePlan);
           const caller = createCaller();
@@ -562,6 +577,7 @@ describe.skipIf(isTestcontainersOnly)(
       });
 
       describe("when invites use only built-in roles on non-enterprise plan", () => {
+        /** @scenario Non-enterprise org can invite members with built-in roles */
         it("allows creation", async () => {
           mockGetActivePlan.mockResolvedValue(freePlan);
           const caller = createCaller();
@@ -591,6 +607,7 @@ describe.skipIf(isTestcontainersOnly)(
 
     describe("organization.updateTeamMemberRole", () => {
       describe("when assigning custom role on non-enterprise plan", () => {
+        /** @scenario Non-enterprise org cannot update team member role to custom role */
         it("rejects with FORBIDDEN", async () => {
           mockGetActivePlan.mockResolvedValue(freePlan);
           const caller = createCaller();
@@ -629,6 +646,7 @@ describe.skipIf(isTestcontainersOnly)(
 
     describe("organization.createInviteRequest", () => {
       describe("when invites include custom role on non-enterprise plan", () => {
+        /** @scenario Non-enterprise org cannot create invite requests with custom roles */
         it("rejects with FORBIDDEN", async () => {
           mockGetActivePlan.mockResolvedValue(freePlan);
           const caller = createCaller();
@@ -686,6 +704,7 @@ describe.skipIf(isTestcontainersOnly)(
     // --- Fail closed behavior ---
 
     describe("when plan provider fails", () => {
+      /** @scenario Guard fails closed when plan lookup fails */
       it("denies access to role.create", async () => {
         mockGetActivePlan.mockRejectedValue(
           new Error("Plan provider unavailable"),

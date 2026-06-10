@@ -155,7 +155,7 @@ export function AICreateModal({
 
   return (
     <Dialog.Root open={open} onOpenChange={handleOpenChange}>
-      <Dialog.Content>
+      <Dialog.Content bg="bg">
         {showCloseButton && <Dialog.CloseTrigger />}
         <Dialog.Header>
           <Dialog.Title>{title}</Dialog.Title>

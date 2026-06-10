@@ -5,6 +5,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "~/prompts/hooks/useAllPromptsForProject";
 import { computeInitialFormValuesForPrompt } from "~/prompts/utils/computeInitialFormValuesForPrompt";
 import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
+import { api } from "~/utils/api";
 import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 import { PublishedPromptContent } from "./PublishedPromptContent";
 import { Sidebar } from "./ui/Sidebar";
@@ -29,6 +30,12 @@ export function PublishedPromptsList() {
   const { data, isLoading } = useAllPromptsForProject();
   const { addTab } = useDraggableTabsBrowserStore(({ addTab }) => ({ addTab }));
   const { project } = useOrganizationTeamProject();
+
+  // Cascade-resolved model for new-tab prompt defaults.
+  const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
+    { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
+    { enabled: !!project?.id },
+  );
 
   /**
    * Group the prompts by folder, derived from the handle prefix.
@@ -84,14 +91,9 @@ export function PublishedPromptsList() {
                 ]
               }
               onClick={() => {
-                const projectDefaultModel = project?.defaultModel;
-                const normalizedDefaultModel =
-                  typeof projectDefaultModel === "string"
-                    ? projectDefaultModel
-                    : undefined;
                 const defaultValues = computeInitialFormValuesForPrompt({
                   prompt,
-                  defaultModel: normalizedDefaultModel,
+                  defaultModel: resolvedDefault.data?.model ?? "",
                   useSystemMessage: true,
                 });
                 addTab({

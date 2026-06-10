@@ -45,8 +45,7 @@ describe("tagDeleteCommand", () => {
     vi.clearAllMocks();
     mockDeleteTag = vi.fn();
     vi.mocked(PromptsApiService).mockImplementation(
-      () => ({ deleteTag: mockDeleteTag }) as unknown as InstanceType<typeof PromptsApiService>,
-    );
+      function () { return ({ deleteTag: mockDeleteTag }) as unknown as InstanceType<typeof PromptsApiService>; });
     vi.spyOn(process, "exit").mockImplementation((code) => {
       throw new ProcessExitError(code as number);
     });

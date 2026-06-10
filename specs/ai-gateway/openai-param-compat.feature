@@ -1,4 +1,10 @@
 Feature: AI Gateway — OpenAI client-param compatibility translation
+
+  # All scenarios in this file describe gateway request-param
+  # translation (legacy max_tokens → max_completion_tokens, upstream
+  # error logging, Prometheus counters). Implemented in the Go gateway
+  # service, out of scope for the TS parity check.
+
   As a developer using an older OpenAI SDK / CrewAI / LangChain client
   I want the gateway to accept legacy `max_tokens` on `gpt-5-*` requests
   So that I'm not forced into a client-library upgrade before I can use the latest OpenAI models through LangWatch

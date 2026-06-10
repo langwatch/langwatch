@@ -38,6 +38,7 @@ import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { AgentHttpEditorDrawer } from "../agents/AgentHttpEditorDrawer";
 import { ScenarioFormDrawer } from "../scenarios/ScenarioFormDrawer";
+import { SimulationModelSelect } from "../scenarios/SimulationModelSelect";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
 import { useSuiteForm, type SuiteFormData } from "./useSuiteForm";
@@ -62,6 +63,8 @@ function buildMutationPayload(data: SuiteFormData, projectId: string) {
     targets: data.selectedTargets,
     repeatCount: data.repeatCount,
     labels: data.labels,
+    simulatorModel: data.simulatorModel,
+    judgeModel: data.judgeModel,
   };
 }
 
@@ -278,7 +281,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
       placement="end"
       size="lg"
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.Header>
           <Drawer.Title>{title}</Drawer.Title>
           <Drawer.CloseTrigger />
@@ -381,6 +384,29 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                   {errors.selectedTargets.message}
                 </Text>
               )}
+            </VStack>
+
+            {/* Models */}
+            <VStack align="start" gap={2}>
+              <Text fontSize="sm" fontWeight="medium">
+                Models
+              </Text>
+              <Text fontSize="xs" color="fg.muted">
+                Choose the models that role-play the user and judge the runs.
+                Both default to your project&apos;s Default model.
+              </Text>
+              <SimulationModelSelect
+                label="User simulator"
+                featureKey="scenarios.user_simulator"
+                value={suiteForm.simulatorModel}
+                onChange={suiteForm.setSimulatorModel}
+              />
+              <SimulationModelSelect
+                label="Judge"
+                featureKey="scenarios.judge"
+                value={suiteForm.judgeModel}
+                onChange={suiteForm.setJudgeModel}
+              />
             </VStack>
 
             {/* Execution Options */}

@@ -18,7 +18,9 @@ import (
 	"time"
 
 	"github.com/oklog/ulid/v2"
+	"go.opentelemetry.io/otel/trace"
 
+	"github.com/langwatch/langwatch/sdk-go/prompts"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/agentblock"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/codeblock"
@@ -104,6 +106,13 @@ type ExecuteRequest struct {
 	// outputs and propagate via edges. Mirrors Python's
 	// `ExecuteComponentPayload.node_id` (langwatch_nlp/studio/app.py).
 	NodeID string
+	// UntilNodeID, when non-empty, scopes the run to the backward
+	// dependency path of the named node — the Studio "Run until here"
+	// flow (Nodes.tsx wires Play → startWorkflowExecution({untilNodeId})).
+	// Mirrors Python's `ExecuteFlowPayload.until_node_id` consumed by
+	// `find_path_until_node` in studio/parser.py. Disconnected siblings
+	// + everything downstream of the target are trimmed from the plan.
+	UntilNodeID string
 	// Type is the StudioClientEvent discriminator. Routes the engine
 	// between the parallel state-event families Studio's reducer
 	// expects (`execution_state_change` for execute_flow,
@@ -180,7 +189,7 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*ExecuteResul
 		// workflow execution.
 		req.TraceID = traceID
 	}
-	plan, err := planner.New(req.Workflow)
+	plan, err := planner.New(req.Workflow, planOptionsFor(req)...)
 	if err != nil {
 		return nil, err
 	}
@@ -224,7 +233,15 @@ func (e *Engine) runLayer(ctx context.Context, req ExecuteRequest, plan *planner
 			node := state.nodes[nodeID]
 			inputs := state.resolveInputs(plan, nodeID)
 			ns := &NodeState{ID: nodeID, Status: "running", Inputs: inputs}
-			nodeCtx, span := startNodeSpan(ctx, node, req)
+			// Skip the span for pass-through node kinds (Entry, End,
+			// PromptingTechnique) — Python doesn't emit spans for those
+			// either. nodeEmitsSpan keeps the trace tree free of 0ms
+			// noise rows so operators see only nodes with real work.
+			nodeCtx := ctx
+			var span trace.Span
+			if nodeEmitsSpan(node.Type) {
+				nodeCtx, span = startNodeSpan(ctx, node, req)
+			}
 			started := time.Now()
 			outputs, derr := e.dispatch(nodeCtx, req, node, inputs, ns)
 			ns.DurationMS = time.Since(started).Milliseconds()
@@ -242,7 +259,9 @@ func (e *Engine) runLayer(ctx context.Context, req ExecuteRequest, plan *planner
 			// it must run after the success branch sets it. Tracing parity
 			// with Python's execute_component depends on this attribute
 			// being present.
-			endNodeSpan(span, ns, derr)
+			if span != nil {
+				endNodeSpan(span, ns, derr)
+			}
 			state.recordState(nodeID, ns)
 		}()
 	}
@@ -259,9 +278,9 @@ func (e *Engine) dispatch(ctx context.Context, req ExecuteRequest, node *dsl.Nod
 	case dsl.ComponentEnd:
 		return inputs, nil
 	case dsl.ComponentCode:
-		return e.runCode(ctx, node, inputs, ns)
+		return e.runCode(ctx, node, inputs, ns, req.Workflow.Secrets)
 	case dsl.ComponentHTTP:
-		return e.runHTTP(ctx, node, inputs, ns)
+		return e.runHTTP(ctx, node, inputs, ns, req.Workflow.Secrets)
 	case dsl.ComponentSignature:
 		return e.runSignature(ctx, req, node, inputs)
 	case dsl.ComponentPromptingTechnique:
@@ -316,7 +335,7 @@ func (e *Engine) runEntry(node *dsl.Node, req ExecuteRequest) (map[string]any, *
 	return map[string]any{}, nil
 }
 
-func (e *Engine) runCode(ctx context.Context, node *dsl.Node, inputs map[string]any, ns *NodeState) (map[string]any, *NodeError) {
+func (e *Engine) runCode(ctx context.Context, node *dsl.Node, inputs map[string]any, ns *NodeState, secrets map[string]string) (map[string]any, *NodeError) {
 	if e.code == nil {
 		return nil, &NodeError{Type: "code_runner_unavailable", Message: "no code runner configured"}
 	}
@@ -326,6 +345,7 @@ func (e *Engine) runCode(ctx context.Context, node *dsl.Node, inputs map[string]
 		Code:            code,
 		Inputs:          inputs,
 		DeclaredOutputs: declared,
+		Secrets:         secrets,
 	})
 	if err != nil {
 		return nil, &NodeError{Type: "code_runner_error", Message: err.Error()}
@@ -338,27 +358,35 @@ func (e *Engine) runCode(ctx context.Context, node *dsl.Node, inputs map[string]
 	return res.Outputs, nil
 }
 
-func (e *Engine) runHTTP(ctx context.Context, node *dsl.Node, inputs map[string]any, ns *NodeState) (map[string]any, *NodeError) {
+func (e *Engine) runHTTP(ctx context.Context, node *dsl.Node, inputs map[string]any, ns *NodeState, secrets map[string]string) (map[string]any, *NodeError) {
 	if e.http == nil {
 		return nil, &NodeError{Type: "http_executor_unavailable", Message: "no http executor configured"}
 	}
+	// Resolve `{{ secrets.NAME }}` in the URL, headers, and auth at
+	// request-build time. BodyTemplate is deliberately left unresolved:
+	// it is rendered against inputs and surfaced in execution events, so
+	// substituting a secret there would leak the plaintext into logs.
 	req := httpblock.Request{
-		URL:          paramString(node.Data.Parameters, "url"),
+		URL:          resolveSecretRefs(paramString(node.Data.Parameters, "url"), secrets),
 		Method:       paramString(node.Data.Parameters, "method"),
 		BodyTemplate: paramString(node.Data.Parameters, "body_template"),
 		OutputPath:   paramString(node.Data.Parameters, "output_path"),
-		Headers:      paramStringMap(node.Data.Parameters, "headers"),
-		Auth:         paramAuth(node.Data.Parameters),
+		Headers:      resolveSecretsInMap(paramStringMap(node.Data.Parameters, "headers"), secrets),
+		Auth:         resolveAuthSecrets(paramAuth(node.Data.Parameters), secrets),
 		TimeoutMS:    paramInt(node.Data.Parameters, "timeout_ms"),
 		Inputs:       inputs,
 	}
 	res, err := e.http.Execute(ctx, req)
 	if err != nil {
+		// Redact resolved secret values from the error message: Go HTTP
+		// errors embed the request URL, so a `{{ secrets.X }}` in the
+		// URL/query/headers must not leak into the stored NodeError.
+		msg := redactSecrets(err.Error(), secrets)
 		var ue *httpblock.UpstreamError
 		if errors.As(err, &ue) {
-			return nil, &NodeError{Type: "upstream_http_error", Message: err.Error(), Status: ue.Status}
+			return nil, &NodeError{Type: "upstream_http_error", Message: msg, Status: ue.Status}
 		}
-		return nil, &NodeError{Type: "http_error", Message: err.Error()}
+		return nil, &NodeError{Type: "http_error", Message: msg}
 	}
 	out := make(map[string]any, 1)
 	if res.Output != nil {
@@ -382,6 +410,17 @@ func (e *Engine) runSignature(ctx context.Context, execReq ExecuteRequest, node 
 	if llmCfg != nil && llmCfg.Model != nil {
 		model, provider = splitModel(*llmCfg.Model)
 	}
+	// Emit the PromptApiService.get + Prompt.compile span pair when this
+	// signature node is bound to a saved prompt config (configId set on
+	// the DSL). Both spans inherit ctx's current span as parent so they
+	// land as siblings of the LLM span emitted below — the shape the
+	// trace-UI ancestor walk in findPromptReferenceInAncestors.ts
+	// depends on. Saved-version: id/handle/version attrs carry the base
+	// reference and draft is omitted. Inline-edited: same identity stays
+	// on, plus langwatch.prompt.draft=true so the drawer can label it as
+	// "(unsaved edits)".
+	emitPromptSpans(ctx, node, inputs)
+
 	messages := buildMessages(node, inputs)
 	req := app.LLMRequest{
 		Model:    model,
@@ -438,20 +477,39 @@ func (e *Engine) runSignature(ctx context.Context, execReq ExecuteRequest, node 
 }
 
 // signatureNeedsStructuredOutput returns true when the engine should
-// ask the LLM for a JSON-shaped response and parse it across multiple
-// outputs. True iff any output is typed json_schema OR there are 2+
-// outputs (multi-output requires field separation — assigning the raw
-// content to every declared output loses signal).
+// ask the LLM for a JSON-shaped response and parse it across one or
+// more typed outputs.
+//
+// Python parity — langwatch_nlp/langwatch_nlp/studio/dspy/template_
+// adapter.py:228-232 `_use_text_only_completion`: text-only iff there
+// are zero outputs OR a single output whose annotation is `str`.
+// Everything else (single bool, single float, single json_schema, OR
+// 2+ outputs) needs response_format on the LLM request so the model
+// returns a parseable JSON object the engine can coerce back into the
+// declared field types.
+//
+// Earlier revision (PR #4062 baseline) only triggered structured
+// outputs for json_schema-typed OR 2+ outputs. That missed single
+// `bool` / `float` outputs entirely: the engine sent no response_format,
+// the LLM replied with prose, and engine.go's fallback shoved that prose
+// into a typed slot as a raw string — manifesting as a blank chat bubble
+// in the playground (rchaves dogfood 2026-05-16) because the TS output-
+// formatter silently rejects type-mismatched values.
 func signatureNeedsStructuredOutput(outputs []dsl.Field) bool {
-	if len(outputs) >= 2 {
-		return true
+	if len(outputs) == 0 {
+		return false
 	}
 	for _, f := range outputs {
-		if f.Type == dsl.FieldTypeJSONSchema {
+		if f.Type != dsl.FieldTypeStr {
 			return true
 		}
 	}
-	return false
+	// All outputs are `str`: when there's exactly one, use the text-
+	// only fast path (Python's _use_text_only_completion). When there
+	// are multiple `str` outputs, we still need structured output —
+	// otherwise the same response text would be assigned to every
+	// declared output, losing signal.
+	return len(outputs) >= 2
 }
 
 // sanitizeSchemaName normalizes a string to OpenAI's
@@ -554,13 +612,20 @@ func jsonSchemaForField(f dsl.Field) map[string]any {
 // non-JSON fallback.
 func extractSignatureOutputs(content string, outputs []dsl.Field) (map[string]any, []string) {
 	out := make(map[string]any, len(outputs))
-	var parsed map[string]any
-	if err := jsonUnmarshalRaw([]byte(content), &parsed); err != nil {
+
+	parsed, ok := recoverJSONObject(content)
+	if !ok {
+		// The completion wasn't a JSON object even after stripping a
+		// markdown ```json fence and extracting the first balanced {...}.
+		// Preserve the raw text in the first declared field so the
+		// response isn't lost, and warn so operators see the malformed
+		// structured response.
 		if len(outputs) > 0 {
 			out[outputs[0].Identifier] = content
 		}
-		return out, []string{fmt.Sprintf("signature: structured response did not parse as JSON object: %v", err)}
+		return out, []string{"signature: structured response did not parse as a JSON object"}
 	}
+
 	var warnings []string
 	for _, f := range outputs {
 		if v, ok := parsed[f.Identifier]; ok {
@@ -570,6 +635,32 @@ func extractSignatureOutputs(content string, outputs []dsl.Field) (map[string]an
 		}
 	}
 	return out, warnings
+}
+
+// recoverJSONObject parses an LLM completion into a JSON object, tolerating
+// the markdown ```json fence and surrounding prose that models (notably
+// Anthropic/Claude) emit even when a JSON response_format is requested.
+// Mirrors DSPy's JSONAdapter.parse, which strips the fence and extracts the
+// first balanced object before parsing. Tries, in order: the raw content,
+// the fence-stripped content, then the first balanced {...} object. Without
+// this, a fenced ```json{...}``` completion fails to parse and the whole
+// blob is dumped into the first output field instead of being split across
+// the declared fields.
+func recoverJSONObject(content string) (map[string]any, bool) {
+	candidates := []string{content}
+	if stripped := stripJSONFence(content); stripped != content {
+		candidates = append(candidates, stripped)
+	}
+	if obj, ok := extractFirstJSONObject(content); ok {
+		candidates = append(candidates, obj)
+	}
+	for _, c := range candidates {
+		var parsed map[string]any
+		if err := jsonUnmarshalRaw([]byte(c), &parsed); err == nil && parsed != nil {
+			return parsed, true
+		}
+	}
+	return nil, false
 }
 
 // runEvaluator dispatches an evaluator node to the LangWatch evaluator
@@ -623,8 +714,8 @@ func (e *Engine) runEvaluator(ctx context.Context, req ExecuteRequest, node *dsl
 	// final result panel. The Studio expects the same field names the
 	// Python EvaluationResultWithMetadata produces.
 	out := map[string]any{
-		"status":   res.Status,
-		"details":  res.Details,
+		"status":  res.Status,
+		"details": res.Details,
 	}
 	if res.Score != nil {
 		out["score"] = *res.Score
@@ -643,14 +734,30 @@ func (e *Engine) runEvaluator(ctx context.Context, req ExecuteRequest, node *dsl
 		ns.Cost = res.Cost.Amount
 	}
 
-	// The evaluator node may declare a subset of outputs (e.g. a
-	// workflow that only cares about `passed`). Filter to declared
-	// names if present; otherwise hand back everything.
+	// The evaluator node may declare a subset of its VALUE outputs (e.g. a
+	// workflow that only wires `passed`). Restrict those to the declared
+	// set, but ALWAYS surface the EvaluationResultWithMetadata envelope
+	// (status / details / cost) regardless of what the node declares.
+	//
+	// The envelope is evaluation metadata, not workflow data: the Studio
+	// result panel, the experiments-v3 SSE consumer (resultMapper reads
+	// outputs.details for the reasoning) and the batch reporter
+	// (evaluation.go reads outputs.details) all expect it unconditionally.
+	// Python's end_component_event surfaced the full result dict and never
+	// filtered, so dropping `details` here was a silent NLP→Go migration
+	// regression that erased the evaluator reasoning everywhere the node
+	// declared only [passed, score, label].
 	declared := outputNames(node.Data.Outputs)
 	if len(declared) == 0 {
 		return out, nil
 	}
-	filtered := make(map[string]any, len(declared))
+	envelopeKeys := []string{"status", "details", "cost"}
+	filtered := make(map[string]any, len(declared)+len(envelopeKeys))
+	for _, name := range envelopeKeys {
+		if v, ok := out[name]; ok {
+			filtered[name] = v
+		}
+	}
 	for _, name := range declared {
 		if v, ok := out[name]; ok {
 			filtered[name] = v
@@ -665,14 +772,14 @@ func (e *Engine) runEvaluator(ctx context.Context, req ExecuteRequest, node *dsl
 //   - http     → reuse the HTTP-block executor with the agent's URL/method/etc.
 //   - code     → reuse the code-block executor with the agent's `code`.
 //   - workflow → call the LangWatch app's /api/workflows/<id>[/<version>]/run
-//                via the agentblock.WorkflowRunner.
+//     via the agentblock.WorkflowRunner.
 func (e *Engine) runAgent(ctx context.Context, req ExecuteRequest, node *dsl.Node, inputs map[string]any, ns *NodeState) (map[string]any, *NodeError) {
 	agentType := paramString(node.Data.Parameters, "agent_type")
 	switch agentType {
 	case "http":
-		return e.runHTTP(ctx, node, inputs, ns)
+		return e.runHTTP(ctx, node, inputs, ns, req.Workflow.Secrets)
 	case "code":
-		return e.runCode(ctx, node, inputs, ns)
+		return e.runCode(ctx, node, inputs, ns, req.Workflow.Secrets)
 	case "workflow":
 		return e.runAgentWorkflow(ctx, req, node, inputs, ns)
 	case "":
@@ -818,6 +925,17 @@ func (e *Engine) runCustom(ctx context.Context, req ExecuteRequest, node *dsl.No
 	return map[string]any{"value": res.Result}, nil
 }
 
+// planOptionsFor translates ExecuteRequest's run-shaping fields into the
+// planner's functional options. Keeps engine.go and stream.go from
+// diverging on which knobs reach the planner.
+func planOptionsFor(req ExecuteRequest) []planner.Option {
+	var opts []planner.Option
+	if req.UntilNodeID != "" {
+		opts = append(opts, planner.WithUntilNode(req.UntilNodeID))
+	}
+	return opts
+}
+
 // applyManualInputs primes runState with the inbound execute_component
 // payload's `node_id` + `inputs` so resolveInputs can short-circuit for
 // the target node. Both Execute and ExecuteStream MUST call this — the
@@ -835,13 +953,13 @@ func applyManualInputs(state *runState, req ExecuteRequest) {
 // runState aggregates per-node outputs and tracks the first error
 // observed. It is the engine's equivalent of WorkflowState.execution.
 type runState struct {
-	mu          sync.Mutex
-	nodes       map[string]*dsl.Node
-	outputs     map[string]map[string]any
-	states      map[string]*NodeState
-	firstError  *NodeError
-	endNodeID   string
-	totalCost   float64
+	mu         sync.Mutex
+	nodes      map[string]*dsl.Node
+	outputs    map[string]map[string]any
+	states     map[string]*NodeState
+	firstError *NodeError
+	endNodeID  string
+	totalCost  float64
 	// edgesByTarget indexes Edge entries by their target node id so
 	// resolveInputs can rename outputs.<source_name> → inputs.<target_name>
 	// per Studio's wire convention.
@@ -978,7 +1096,7 @@ func finalize(state *runState, traceID string, started time.Time, ctxErr error) 
 	}
 	if ctxErr != nil {
 		res.Status = "error"
-		res.Error = &NodeError{Type: "context_cancelled", Message: ctxErr.Error()}
+		res.Error = &NodeError{Type: "context_canceled", Message: ctxErr.Error()}
 		return res
 	}
 	if state.firstError != nil {
@@ -1057,6 +1175,26 @@ func paramAnyMap(params []dsl.Field, name string) map[string]any {
 	return nil
 }
 
+// paramAny reads a parameter as an arbitrary JSON-decoded value.
+// Used for the prompt-config `messages` parameter (a saved template
+// message list) which buildMessages feeds through coerceChatMessages
+// the same way it handles an inputs-borne list.
+func paramAny(params []dsl.Field, name string) any {
+	for _, p := range params {
+		if p.Identifier != name {
+			continue
+		}
+		if len(p.Value) == 0 {
+			return nil
+		}
+		var v any
+		if err := jsonUnmarshalRaw(p.Value, &v); err == nil {
+			return v
+		}
+	}
+	return nil
+}
+
 func paramStringMap(params []dsl.Field, name string) map[string]string {
 	for _, p := range params {
 		if p.Identifier != name {
@@ -1096,6 +1234,23 @@ func paramAuth(params []dsl.Field) *httpblock.Auth {
 			Value:    raw.Value,
 			Username: raw.Username,
 			Password: raw.Password,
+		}
+	}
+	// Fallback: the Studio UI and the experiments builder emit auth as
+	// discrete `auth_type` + `auth_token`/`auth_header`/`auth_value`/
+	// `auth_username`/`auth_password` params (see HttpPropertiesPanel.tsx
+	// and experiments-v3/workflowBuilder.ts), NOT a single `auth` object.
+	// Honor that shape too, otherwise HTTP-block auth is silently dropped on
+	// the real UI path (engine sent no Authorization header). Secret refs in
+	// these values are resolved downstream by resolveAuthSecrets.
+	if authType := paramString(params, "auth_type"); authType != "" && authType != "none" {
+		return &httpblock.Auth{
+			Type:     authType,
+			Token:    paramString(params, "auth_token"),
+			Header:   paramString(params, "auth_header"),
+			Value:    paramString(params, "auth_value"),
+			Username: paramString(params, "auth_username"),
+			Password: paramString(params, "auth_password"),
 		}
 	}
 	return nil
@@ -1155,6 +1310,80 @@ func splitModel(s string) (model, provider string) {
 	return s[idx+1:], s[:idx]
 }
 
+// emitPromptSpans writes the PromptApiService.get + Prompt.compile span
+// pair when a signature node is bound to a saved prompt config. No-ops
+// for ad-hoc / unbound signature nodes (text-in/text-out without a
+// configId) so trace shapes only inherit the prompt-ancestry overhead
+// when the trace-UI deep-link can actually resolve to a saved prompt.
+//
+// Wire-format reference: python-sdk prompt_service_tracing.py +
+// prompt_tracing.py. Bound by specs/nlp-go/prompt-spans-*.feature.
+func emitPromptSpans(ctx context.Context, node *dsl.Node, inputs map[string]any) {
+	if node == nil || node.Data.PromptConfigID == nil {
+		return
+	}
+	configID := *node.Data.PromptConfigID
+
+	handle := ""
+	if node.Data.PromptHandle != nil {
+		handle = *node.Data.PromptHandle
+	}
+	versionID := ""
+	versionNumber := 0
+	if node.Data.VersionMetadata != nil {
+		versionID = node.Data.VersionMetadata.VersionID
+		versionNumber = node.Data.VersionMetadata.VersionNumber
+	}
+	draft := false
+	if node.Data.PromptDraft != nil {
+		draft = *node.Data.PromptDraft
+	}
+
+	prompts.EmitGet(ctx, prompts.GetSpec{
+		PromptID:      configID,
+		Handle:        handle,
+		VersionNumber: versionNumber,
+	})
+
+	prompts.EmitCompile(ctx, prompts.CompileSpec{
+		PromptID:      configID,
+		Handle:        handle,
+		VersionID:     versionID,
+		VersionNumber: versionNumber,
+		Variables:     filterPromptCompileVariables(inputs),
+		Draft:         draft,
+	})
+}
+
+// filterPromptCompileVariables strips dispatch-internal keys from the
+// inputs map before they reach the Prompt.compile span. The signature
+// node's `inputs` carries both user template variables (the things a
+// `{{var}}` placeholder binds to) AND envelope-shape keys the engine
+// uses to route conversation history — only the former belong on
+// `langwatch.prompt.variables`. Surfacing the latter at the trace-UI
+// resume path renders them as Variables-panel form rows ("messages =
+// [object Object]"), which is the 2026-05-17 prod regression caught
+// in the merged #4094 dogfood.
+//
+// Reserved keys mirror what buildMessages consults for conversation
+// history (engine.go:1299): `messages` and `chat_messages`. Both are
+// dropped here regardless of value shape — even an empty-array
+// messages field is dispatch envelope, not a user variable.
+func filterPromptCompileVariables(inputs map[string]any) map[string]any {
+	if len(inputs) == 0 {
+		return inputs
+	}
+	out := make(map[string]any, len(inputs))
+	for k, v := range inputs {
+		switch k {
+		case "messages", "chat_messages":
+			continue
+		}
+		out[k] = v
+	}
+	return out
+}
+
 // buildMessages constructs the OpenAI-style chat history for a
 // signature node. Strategy: if the inputs include a "chat_messages"
 // list use it verbatim; else fold each scalar input into a single
@@ -1170,23 +1399,70 @@ func splitModel(s string) (model, provider string) {
 // type. We accept both shapes; the legacy `messages` key is also
 // accepted for callers that pre-populate explicit history.
 func buildMessages(node *dsl.Node, inputs map[string]any) []app.ChatMessage {
-	if msgs := coerceChatMessages(inputs["chat_messages"]); msgs != nil {
-		return msgs
-	}
-	if msgs := coerceChatMessages(inputs["messages"]); msgs != nil {
-		return msgs
-	}
+	// Render the system prompt from the `instructions` parameter using
+	// the input variables. Mirrors langwatch_nlp's
+	// dspy/template_adapter.py format(): `{% for %}` / `{% if %}` /
+	// filters / `{{ var }}` all resolve here. Empty/whitespace-only
+	// after rendering ⇒ no system message (Python drops it too —
+	// template_adapter.py:170).
+	system := ""
 	if instr := paramString(node.Data.Parameters, "instructions"); instr != "" {
-		// Render Liquid placeholders + control flow + filters against
-		// the upstream inputs. Mirrors langwatch_nlp's
-		// dspy/template_adapter.py — DSPy templates with loops over
-		// chat history (`{% for m in messages %}{{ m.content }}{% endfor %}`)
-		// or branches on input shape now render correctly on the Go
-		// path. Pure `{{ var }}` templates fall back to the simple
-		// JSON-escaping interpolator so HTTP-block parity stays.
-		rendered, _ := template.RenderFull(instr, inputs)
+		system, _ = template.RenderFull(instr, inputs)
+	}
+
+	// Resolve the conversation history. Priority:
+	//  1. inputs["chat_messages"] / inputs["messages"] — the node→node
+	//     pipeline shape and the prompt-playground execute_component
+	//     shape (PromptStudioAdapter sends the saved template messages
+	//     + live turns under inputs.messages).
+	//  2. the node's `messages` PARAMETER — the saved prompt-config
+	//     template list, used when no inputs-borne history is present.
+	var history []app.ChatMessage
+	if msgs := coerceChatMessages(inputs["chat_messages"]); msgs != nil {
+		history = msgs
+	} else if msgs := coerceChatMessages(inputs["messages"]); msgs != nil {
+		history = msgs
+	} else if msgs := coerceChatMessages(paramAny(node.Data.Parameters, "messages")); msgs != nil {
+		history = msgs
+	}
+
+	if history != nil {
+		// Python parity (template_adapter.py:166-191): prepend the
+		// rendered system, render EACH message's string content with
+		// the input variables, then drop any message whose content is
+		// empty after rendering. The empty-drop is the load-bearing
+		// step — an unfilled `{{input}}` template turn renders to ""
+		// and is removed, so it is NOT duplicated alongside the real
+		// user turn (the 2026-05-14 prompt-playground regression).
+		out := make([]app.ChatMessage, 0, len(history)+1)
+		if strings.TrimSpace(system) != "" {
+			out = append(out, app.ChatMessage{Role: "system", Content: system})
+		}
+		for _, m := range history {
+			if s, ok := m.Content.(string); ok {
+				rendered, _ := template.RenderFull(s, inputs)
+				m.Content = rendered
+				// Mirrors _filter_empty_content_messages: a turn whose
+				// text content is empty after rendering is dropped —
+				// UNLESS it carries tool_calls (an assistant turn that
+				// only requests a tool legitimately has empty content).
+				if strings.TrimSpace(rendered) == "" && len(m.ToolCalls) == 0 {
+					continue
+				}
+			}
+			out = append(out, m)
+		}
+		return out
+	}
+
+	// No explicit history: fold scalar inputs into a single user turn
+	// (text-in / text-out signatures). composeUserPrompt is NOT
+	// template-rendered — it is the raw upstream input, matching the
+	// Python parity expectation that interpolation applies to
+	// instructions + template messages, not the live user prompt.
+	if strings.TrimSpace(system) != "" {
 		return []app.ChatMessage{
-			{Role: "system", Content: rendered},
+			{Role: "system", Content: system},
 			{Role: "user", Content: composeUserPrompt(inputs)},
 		}
 	}

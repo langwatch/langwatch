@@ -122,8 +122,26 @@ func extractCandidates(body []byte, rules []domain.PolicyRule) map[domain.Policy
 	if targets[domain.PolicyTargetURL] {
 		result[domain.PolicyTargetURL] = extractURLs(body)
 	}
+	if targets[domain.PolicyTargetModel] {
+		result[domain.PolicyTargetModel] = extractModel(body)
+	}
 
 	return result
+}
+
+// extractModel pulls the requested model id from the top-level `model`
+// field shared by the OpenAI and Anthropic request shapes.
+func extractModel(body []byte) []string {
+	var env struct {
+		Model string `json:"model"`
+	}
+	if err := sonic.Unmarshal(body, &env); err != nil {
+		return nil
+	}
+	if env.Model == "" {
+		return nil
+	}
+	return []string{env.Model}
 }
 
 // extractToolNames pulls tool names from both OpenAI (tools[].function.name)

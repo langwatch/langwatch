@@ -44,6 +44,28 @@ export function resolveFieldMappings({
   return resolved;
 }
 
+/** Canonical scenario source fields a mapping can resolve to. */
+export type ScenarioSourceField = "input" | "messages" | "threadId";
+
+/**
+ * The canonical scenario source field a mapping resolves to, or `null` for
+ * static `value` mappings and unknown/unsupported sources. Callers use this to
+ * decide JSON treatment: `messages` is a pre-serialized JSON array (inject
+ * raw), everything else is a scalar string (must be JSON-escaped).
+ */
+export function sourceFieldOf(
+  mapping: FieldMapping,
+): ScenarioSourceField | null {
+  if (mapping.type === "value" || mapping.sourceId !== "scenario") {
+    return null;
+  }
+  const [rawField] = mapping.path;
+  const field = LEGACY_FIELD_NAMES[rawField ?? ""] ?? rawField;
+  return field === "input" || field === "messages" || field === "threadId"
+    ? field
+    : null;
+}
+
 function resolveMapping({
   mapping,
   agentInput,

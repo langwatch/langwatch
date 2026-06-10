@@ -1,6 +1,6 @@
 import type { Node } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
-import type { LocalPromptConfig } from "~/evaluations-v3/types";
+import type { LocalPromptConfig } from "~/experiments-v3/types";
 import type {
   Component,
   Evaluator,
@@ -168,12 +168,35 @@ describe("mergeLocalConfigsIntoDsl()", () => {
       expect(data.localPromptConfig).toBeUndefined();
     });
 
+    it("flags the merged node as a draft via promptDraft=true", () => {
+      const nodes = [createSignatureNode({ localPromptConfig })];
+      const result = mergeLocalConfigsIntoDsl(nodes);
+      const data = result[0]!.data as Signature;
+
+      expect(data.promptDraft).toBe(true);
+    });
+
     it("does not mutate the original node", () => {
       const nodes = [createSignatureNode({ localPromptConfig })];
       const originalData = { ...nodes[0]!.data };
       mergeLocalConfigsIntoDsl(nodes);
 
       expect(nodes[0]!.data).toEqual(originalData);
+    });
+  });
+
+  describe("when a signature node has no localPromptConfig", () => {
+    it("does NOT stamp promptDraft (omission, not false)", () => {
+      // Saved-version path: the node has no local edits, so the
+      // dispatcher must NOT set promptDraft. nlpgo's omission-not-false
+      // convention (matching python-sdk's _set_attribute_if_not_none)
+      // depends on this — explicit `promptDraft: false` would still
+      // pass through the zod schema and pollute the draft signal.
+      const nodes = [createSignatureNode({})];
+      const result = mergeLocalConfigsIntoDsl(nodes);
+      const data = result[0]!.data as Signature;
+
+      expect(data.promptDraft).toBeUndefined();
     });
   });
 

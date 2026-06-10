@@ -46,7 +46,7 @@ describe("Overlay z-index stacking", () => {
     it("assigns incrementing z-indexes so the inner overlay is above the outer", () => {
       render(
         <Dialog.Root open={true}>
-          <Dialog.Content>
+          <Dialog.Content bg="bg">
             <Dialog.Body>
               <Popover.Root open={true}>
                 <Popover.Trigger>

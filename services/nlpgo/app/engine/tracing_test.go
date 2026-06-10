@@ -32,16 +32,19 @@ func withRecorder(t *testing.T) *tracetest.SpanRecorder {
 	return rec
 }
 
-// TestStartNodeSpan_NameMatchesPythonExecuteComponent pins the span
-// name to "execute_component" — the same name Python's
-// optional_langwatch_trace uses in execute_component.py. Operators
-// filter "all component dispatches" by this exact name across both
-// engines; renaming it would silently break Studio's component-time
-// roll-up.
-func TestStartNodeSpan_NameMatchesPythonExecuteComponent(t *testing.T) {
+// TestStartNodeSpan_NameIsUserSetNodeName pins the span name to the
+// user-set node.Data.Name (with node.ID fallback). Earlier revisions
+// hard-coded "execute_component" for every node, which surfaced N
+// identical "execute_component" spans in the Studio drawer for an
+// N-node workflow (rchaves dogfood 2026-05-14). Python's DSPy
+// autotracking names spans by the generated wrapper-module class
+// name (e.g. "v1" for an LLM Call named v1) — we mirror that by
+// reading node.Data.Name.
+func TestStartNodeSpan_NameIsUserSetNodeName(t *testing.T) {
 	rec := withRecorder(t)
 
-	node := &dsl.Node{ID: "code-1", Type: dsl.ComponentCode}
+	nodeName := "Classify the question"
+	node := &dsl.Node{ID: "code-1", Type: dsl.ComponentCode, Data: dsl.Component{Name: &nodeName}}
 	req := ExecuteRequest{
 		ProjectID: "proj_abc",
 		TraceID:   "trace_xyz",
@@ -59,7 +62,7 @@ func TestStartNodeSpan_NameMatchesPythonExecuteComponent(t *testing.T) {
 	spans := rec.Ended()
 	require.Len(t, spans, 1)
 	got := spans[0]
-	assert.Equal(t, "execute_component", got.Name())
+	assert.Equal(t, "Classify the question", got.Name())
 	attrs := attrMap(got.Attributes())
 	assert.Equal(t, "component", attrs["langwatch.span.type"])
 	assert.Equal(t, "code-1", attrs["langwatch.node_id"])
@@ -69,8 +72,37 @@ func TestStartNodeSpan_NameMatchesPythonExecuteComponent(t *testing.T) {
 	assert.Equal(t, "thread_qq", attrs["langwatch.thread_id"])
 	assert.Equal(t, "workflow", attrs["langwatch.origin"])
 	assert.Equal(t, int64(42), attrs["langwatch.duration_ms"])
-	assert.Equal(t, 0.001, attrs["langwatch.cost"])
+	assert.InDelta(t, 0.001, attrs["langwatch.cost"], 1e-9)
 	assert.Equal(t, codes.Ok, got.Status().Code)
+}
+
+// TestNodeSpanName_FallsBackToNodeID covers the unnamed-node case —
+// when node.Data.Name is nil/empty, the span name uses node.ID so the
+// Studio drawer still shows a stable identifier.
+func TestNodeSpanName_FallsBackToNodeID(t *testing.T) {
+	node := &dsl.Node{ID: "auto-generated-id-abc123", Type: dsl.ComponentCode}
+	assert.Equal(t, "auto-generated-id-abc123", nodeSpanName(node))
+
+	empty := ""
+	node.Data.Name = &empty
+	assert.Equal(t, "auto-generated-id-abc123", nodeSpanName(node))
+}
+
+// TestNodeEmitsSpan_EntryAndEndAreSuppressed pins the pass-through-
+// suppression contract: Entry/End nodes don't emit spans because the
+// Python workflow.py.jinja template doesn't decorate those wrapper
+// classes with @langwatch.span — and a 3-node workflow showing 3
+// "execute_component" spans (entry/middle/end) confused operators
+// who saw 3× the dispatch count they expected (rchaves dogfood
+// 2026-05-14).
+func TestNodeEmitsSpan_EntryAndEndAreSuppressed(t *testing.T) {
+	assert.False(t, nodeEmitsSpan(dsl.ComponentEntry), "entry is a pass-through, no span")
+	assert.False(t, nodeEmitsSpan(dsl.ComponentEnd), "end is a pass-through, no span")
+	assert.False(t, nodeEmitsSpan(dsl.ComponentPromptingTechnique), "prompting technique is a no-op decorator, no span")
+	assert.True(t, nodeEmitsSpan(dsl.ComponentSignature))
+	assert.True(t, nodeEmitsSpan(dsl.ComponentCode))
+	assert.True(t, nodeEmitsSpan(dsl.ComponentHTTP))
+	assert.True(t, nodeEmitsSpan(dsl.ComponentEvaluator))
 }
 
 // TestEndNodeSpan_StampsLangwatchInputAndOutput is the M2 contract:

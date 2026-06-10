@@ -71,9 +71,9 @@ describe.skip("organizationRouter member role validation", () => {
     customRole: { findUnique: ReturnType<typeof vi.fn> };
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
-    resetApp();
+    await resetApp();
 
     // Wire App singleton with permissive PlanProvider mock values.
     globalForApp.__langwatch_app = createTestApp({
@@ -120,8 +120,8 @@ describe.skip("organizationRouter member role validation", () => {
     caller = organizationRouter.createCaller(ctx);
   });
 
-  afterEach(() => {
-    resetApp();
+  afterEach(async () => {
+    await resetApp();
   });
 
   describe("updateTeamMemberRole", () => {
@@ -192,7 +192,7 @@ describe.skip("organizationRouter member role validation", () => {
     describe("when mutation reaches enforcement logic", () => {
       let fullTxMock: Record<string, Record<string, ReturnType<typeof vi.fn>>>;
 
-      beforeEach(() => {
+      beforeEach(async () => {
         fullTxMock = {
           team: {
             findUnique: vi.fn().mockResolvedValue({ organizationId: "org-1" }),

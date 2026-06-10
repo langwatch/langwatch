@@ -12,7 +12,7 @@ Feature: Azure safety evaluators require BYOK provider
   # Evaluator Type Selector Drawer gating
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: Azure evaluators are disabled when no Azure Safety provider is configured
     Given the project has no "azure_safety" model provider configured
     When I open the evaluator type selector for the "Safety" category
@@ -21,7 +21,7 @@ Feature: Azure safety evaluators require BYOK provider
     And the "Azure Jailbreak Detection" card is disabled
     And each disabled card shows a tooltip saying "Configure Azure Safety provider in Settings → Model Providers"
 
-  @integration @unimplemented
+  @integration
   Scenario: Disabled Azure card shows CTA to configure the provider
     Given the project has no "azure_safety" model provider configured
     When I open the evaluator type selector for the "Safety" category
@@ -29,7 +29,7 @@ Feature: Azure safety evaluators require BYOK provider
     Then I navigate to the model providers settings page
     And the Azure Safety provider configuration drawer opens
 
-  @integration @unimplemented
+  @integration
   Scenario: Configuring Azure Safety enables all three Azure evaluators
     Given the project has no "azure_safety" model provider configured
     And the evaluator type selector is open on the "Safety" category
@@ -45,7 +45,7 @@ Feature: Azure safety evaluators require BYOK provider
     When I open the evaluator type selector for the "Safety" category
     Then the "Azure Content Safety" card is disabled
 
-  @integration @unimplemented
+  @integration
   Scenario: Non-Azure safety evaluators are unaffected by Azure Safety config
     Given the project has no "azure_safety" model provider configured
     When I open the evaluator type selector for the "Safety" category
@@ -54,6 +54,13 @@ Feature: Azure safety evaluators require BYOK provider
 
   # ============================================================================
   # availableEvaluators router
+  #
+  # The remaining @unimplemented scenarios in this file need server-side
+  # tests against the availableEvaluators router and a monitor pipeline
+  # integration harness with a real langevals client mock. The
+  # `EvaluatorTypeSelectorDrawer.azure-byok.integration.test.tsx`
+  # component test already exercises the UI gating; the router and
+  # runtime-skip behavior would extend that with API-level coverage.
   # ============================================================================
 
   @integration @unimplemented

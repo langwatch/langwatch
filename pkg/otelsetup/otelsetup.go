@@ -8,6 +8,7 @@ package otelsetup
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -23,6 +24,23 @@ import (
 
 	"github.com/langwatch/langwatch/pkg/contexts"
 )
+
+// slogErrorHandler is the fallback delegate behind startupErrorHandler.
+// Using a concrete handler — rather than whatever otelapi.GetErrorHandler()
+// returns — is load-bearing: GetErrorHandler() returns the global
+// *ErrDelegator wrapper, which forwards to the latest handler registered
+// via SetErrorHandler. If we captured the delegator and then registered
+// startupErrorHandler globally, dispatching any OTel error would recurse
+// (startupErrorHandler.Handle → delegator → startupErrorHandler.Handle …)
+// until the goroutine stack overflowed and the process exited with code 2.
+type slogErrorHandler struct{}
+
+func (slogErrorHandler) Handle(err error) {
+	if err == nil {
+		return
+	}
+	slog.Warn("otel error", "err", err)
+}
 
 // startupErrorHandler silences OTLP export errors during the first few
 // seconds of startup. The gateway commonly races its OTel exporter
@@ -77,6 +95,20 @@ func isTransportAuthError(err error) bool {
 		strings.Contains(s, "no such host")
 }
 
+// BaggageKeyCausalityDepth is the W3C baggage key whose value is auto-
+// stamped onto every span via BaggageAttributeProcessor. The
+// `langwatch.reserved.*` prefix signals "system-set, do not override
+// from client SDKs" — same convention as the rest of the reserved
+// namespace. See specs/monitors/online-evaluator-loop-prevention.feature.
+const BaggageKeyCausalityDepth = "langwatch.reserved.causality_depth"
+
+// AutoStampedBaggageKeys lists the baggage keys that the default tracer
+// provider copies onto every span at OnStart. Keep narrow — every entry
+// adds one attribute lookup per span.
+var AutoStampedBaggageKeys = []string{
+	BaggageKeyCausalityDepth,
+}
+
 // Options configures the telemetry provider. Fields left empty are filled from
 // the context's ServiceInfo when available.
 type Options struct {
@@ -98,6 +130,22 @@ type Options struct {
 	// admin token. When true, OTLPHeaders is ignored (the per-tenant
 	// processors set their own auth).
 	MultiTenant bool
+	// SyncExport=true swaps each tenant's BatchSpanProcessor for a
+	// SimpleSpanProcessor (sync OnEnd → exporter). Only honored when
+	// MultiTenant=true. Purpose: deterministic test mode. The default
+	// async BSP buffers spans for up to 5s then exports in batches;
+	// under heavy concurrent test load on a saturated CI runner this
+	// has been observed to extend the end-to-end "span emitted at
+	// nlpgo → row in ClickHouse" wall-clock past any reasonable poll
+	// budget. SimpleSpanProcessor blocks span.End() until the OTLP
+	// roundtrip completes, so by the time the HTTP handler returns,
+	// every span for that request has already been delivered to the
+	// collector — no batching, no scheduled-delay window, no flake
+	// surface. NEVER enable in production: synchronous export makes
+	// every span pay the full collector RTT on the request hot path,
+	// and a stalled collector wedges the request thread. Gated on the
+	// NLPGO_SPAN_SYNC env var in deps.go.
+	SyncExport bool
 }
 
 // Provider holds the configured OTel SDK providers.
@@ -171,10 +219,15 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 			rootSampler = sdktrace.AlwaysSample()
 		}
 		router := NewTenantRouter(opts.OTLPEndpoint)
+		if opts.SyncExport {
+			router.newProcessor = newSyncTenantProcessor
+		}
 		tp := sdktrace.NewTracerProvider(
 			sdktrace.WithResource(res),
+			sdktrace.WithSpanProcessor(NewBaggageAttributeProcessor(AutoStampedBaggageKeys...)),
 			sdktrace.WithSpanProcessor(router),
 			sdktrace.WithSampler(sdktrace.ParentBased(rootSampler)),
+			sdktrace.WithIDGenerator(NewIDGenerator()),
 		)
 		otelapi.SetTracerProvider(tp)
 		return &Provider{tp: tp}, nil
@@ -197,7 +250,7 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 	// once the healthyExporter wrapper sees a successful export, or after
 	// the 30s grace window elapses (whichever comes first).
 	startupFilter := newStartupErrorHandler(
-		otelapi.GetErrorHandler(),
+		slogErrorHandler{},
 		30*time.Second,
 	)
 	otelapi.SetErrorHandler(startupFilter)
@@ -228,11 +281,13 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 
 	tp := sdktrace.NewTracerProvider(
 		sdktrace.WithResource(res),
+		sdktrace.WithSpanProcessor(NewBaggageAttributeProcessor(AutoStampedBaggageKeys...)),
 		sdktrace.WithBatcher(wrappedExp,
 			sdktrace.WithBatchTimeout(batchTimeout),
 			sdktrace.WithMaxQueueSize(queueSize),
 		),
 		sdktrace.WithSampler(sdktrace.ParentBased(rootSampler)),
+		sdktrace.WithIDGenerator(NewIDGenerator()),
 	)
 	otelapi.SetTracerProvider(tp)
 

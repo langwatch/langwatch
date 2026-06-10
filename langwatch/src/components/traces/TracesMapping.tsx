@@ -13,6 +13,9 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight } from "react-feather";
 import type { Trace } from "~/server/tracer/types";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { useAnnotationsByTraceIds } from "../../hooks/useAnnotationsByTraceIds";
+import { useProjectSpanNames } from "../../hooks/useProjectSpanNames";
+import { useProjectEventTypes } from "../../hooks/useProjectEventTypes";
 import type { Workflow } from "../../optimization_studio/types/dsl";
 import type { DatasetRecordEntry } from "../../server/datasets/types";
 import {
@@ -69,6 +72,63 @@ const DATASET_INFERRED_MAPPINGS_BY_NAME_TRANSPOSED = Object.entries(
   {} as Record<string, string[]>,
 );
 
+type KeyOption = { key: string; label: string };
+
+/**
+ * Sources whose key dropdowns are expanded with the project's distinct field
+ * names from the last 30 days (not just the names on the loaded trace), served
+ * by getDistinctFieldNames / useProjectSpanNames.
+ *
+ * Events are not in this list because their types are not served from
+ * getDistinctFieldNames (they live only in the heavy stored_spans.SpanAttributes
+ * map, which that query must not scan). They get the same project-wide treatment
+ * through a separate, bounded source — useProjectEventTypes, which reuses the
+ * analytics event-type filter options query.
+ */
+const PROJECT_FIELD_NAME_SOURCES: string[] = [
+  "spans",
+  "metadata",
+  "evaluations",
+];
+
+/** Result subfields an evaluation always exposes (see the evaluations mapping). */
+const DEFAULT_EVALUATION_SUBKEYS: KeyOption[] = [
+  "passed",
+  "score",
+  "label",
+  "details",
+  "status",
+  "error",
+].map((key) => ({ key, label: key }));
+
+/** Placeholder shown while a source's project-wide names are still loading. */
+const FIELD_NAME_LOADING_LABEL: Record<string, string> = {
+  spans: "Loading span names…",
+  metadata: "Loading metadata keys…",
+  evaluations: "Loading evaluations…",
+  events: "Loading event types…",
+};
+
+/** Label for the "match everything" option at the top of a source's dropdown. */
+const FIELD_NAME_ANY_LABEL: Record<string, string> = {
+  spans: "* (any span)",
+  metadata: "* (all metadata)",
+  evaluations: "* (any evaluation)",
+  events: "* (any event)",
+};
+
+/** Dedupe {key,label} options by key, preserving first-seen order. */
+const dedupeKeyOptions = (options: KeyOption[]): KeyOption[] => {
+  const seen = new Set<string>();
+  const result: KeyOption[] = [];
+  for (const option of options) {
+    if (!option || seen.has(option.key)) continue;
+    seen.add(option.key);
+    result.push(option);
+  }
+  return result;
+};
+
 export const TracesMapping = ({
   titles,
   traces,
@@ -111,13 +171,11 @@ export const TracesMapping = ({
     task: state.workbenchState.task,
   }));
 
-  const annotationScores = api.annotation.getByTraceIds.useQuery(
-    {
-      projectId: project?.id ?? "",
-      traceIds: traces.map((trace) => trace.trace_id),
-    },
-    { enabled: !!project, refetchOnWindowFocus: false },
-  );
+  const annotationScores = useAnnotationsByTraceIds({
+    projectId: project?.id ?? "",
+    traceIds: traces.map((trace) => trace.trace_id),
+    enabled: !!project,
+  });
   const getAnnotationScoreOptions = api.annotationScore.getAllActive.useQuery(
     { projectId: project?.id ?? "" },
     {
@@ -192,6 +250,73 @@ export const TracesMapping = ({
     [traceMappingState, setTraceMapping],
   );
   const mapping = traceMappingState.mapping;
+
+  // The spans, metadata and evaluations sources draw their project-wide names
+  // from getDistinctFieldNames. Fetch that 30-day list lazily — only when such a
+  // column is actually being mapped — so merely opening the drawer/wizard (or
+  // any other place that renders this component) doesn't trigger the heavier
+  // ClickHouse scan when none of those sources is in play.
+  const needsProjectFieldNames = useMemo(
+    () =>
+      Object.values(mapping).some((m) =>
+        PROJECT_FIELD_NAME_SOURCES.includes(m.source),
+      ),
+    [mapping],
+  );
+  const {
+    spanNames: projectSpanNames,
+    metadataKeys: projectMetadataKeys,
+    evaluationNames: projectEvaluationNames,
+    isLoading: projectFieldNamesLoading,
+  } = useProjectSpanNames({
+    projectId: project?.id,
+    enabled: needsProjectFieldNames,
+  });
+
+  // Events get the same project-wide treatment from a separate bounded source
+  // (the analytics event-type filter options), gated the same way.
+  const needsProjectEventTypes = useMemo(
+    () => Object.values(mapping).some((m) => m.source === "events"),
+    [mapping],
+  );
+  const {
+    eventTypes: projectEventTypes,
+    isLoading: projectEventTypesLoading,
+  } = useProjectEventTypes({
+    projectId: project?.id,
+    enabled: needsProjectEventTypes,
+  });
+
+  // These dropdowns should offer every name the project produced in the last 30
+  // days, not just the names on the loaded trace(s) — otherwise a span (or
+  // evaluator, or event type) that exists elsewhere in the project cannot be
+  // selected for mapping.
+  const mergeProjectKeyOptions = useCallback(
+    (source: string, baseOptions: KeyOption[]): KeyOption[] => {
+      const projectOptions =
+        source === "spans"
+          ? projectSpanNames
+          : source === "metadata"
+            ? projectMetadataKeys
+            : source === "evaluations"
+              ? projectEvaluationNames
+              : source === "events"
+                ? projectEventTypes
+                : [];
+      if (projectOptions.length === 0) {
+        return baseOptions;
+      }
+      return dedupeKeyOptions([...baseOptions, ...projectOptions]).sort((a, b) =>
+        a.label.localeCompare(b.label),
+      );
+    },
+    [
+      projectSpanNames,
+      projectMetadataKeys,
+      projectEvaluationNames,
+      projectEventTypes,
+    ],
+  );
 
   // Check if any column uses a server-only source (e.g. formatted_trace)
   const needsFormattedDigest = useMemo(
@@ -448,17 +573,64 @@ export const TracesMapping = ({
             { key: "contexts", label: "contexts" },
           ];
 
+          const computeSubkeys = (k: string) =>
+            traceMappingDefinition && "subkeys" in traceMappingDefinition
+              ? traceMappingDefinition.subkeys(traces_, k, {
+                  annotationScoreOptions: getAnnotationScoreOptions.data,
+                })
+              : [];
+
           const subkeys =
             traceMappingDefinition &&
             "subkeys" in traceMappingDefinition &&
             source !== "threads" &&
             source !== "threads_until_current"
-              ? key === "" && source === "spans"
-                ? defaultSpanSubkeys
-                : traceMappingDefinition.subkeys(traces_, key!, {
-                    annotationScoreOptions: getAnnotationScoreOptions.data,
-                  })
+              ? source === "spans"
+                ? // Spans always expose the same subfields. Offer them for any
+                  // span name — including project-wide names that aren't on the
+                  // loaded trace, where subkey discovery would otherwise be empty.
+                  dedupeKeyOptions([
+                    ...defaultSpanSubkeys,
+                    ...(key ? computeSubkeys(key) : []),
+                  ])
+                : source === "evaluations" && key
+                  ? // Evaluations always expose the same result subfields. Offer
+                    // them for any selected evaluator — including project-wide
+                    // ones not on the loaded trace, where subkey discovery would
+                    // otherwise be empty.
+                    dedupeKeyOptions([
+                      ...DEFAULT_EVALUATION_SUBKEYS,
+                      ...computeSubkeys(key),
+                    ])
+                  : computeSubkeys(key!)
               : undefined;
+
+          // The key dropdown waits on whichever project-wide list feeds it:
+          // getDistinctFieldNames for spans/metadata/evaluations, the event-type
+          // options for events.
+          const isLoadingFieldNames =
+            (projectFieldNamesLoading &&
+              PROJECT_FIELD_NAME_SOURCES.includes(source)) ||
+            (projectEventTypesLoading && source === "events");
+
+          // Options for the (searchable) key dropdown: the "match everything"
+          // entry plus every project-wide / trace name for this source. These
+          // lists can be large (hundreds of span names), which is why the key
+          // dropdown is a searchable select rather than a plain <select>.
+          const hasKeys =
+            !!traceMappingDefinition && "keys" in traceMappingDefinition;
+          const keyOptions: KeyOption[] =
+            isLoadingFieldNames || !hasKeys
+              ? []
+              : [
+                  { key: "", label: FIELD_NAME_ANY_LABEL[source] ?? "* (any)" },
+                  ...mergeProjectKeyOptions(
+                    source,
+                    traceMappingDefinition.keys(traces_),
+                  ),
+                ];
+          const selectedKeyOption =
+            keyOptions.find((option) => option.key === (key ?? "")) ?? null;
 
           const targetHandle = `inputs.${targetField}`;
           const currentSourceMapping = dsl?.targetEdges
@@ -619,48 +791,55 @@ export const TracesMapping = ({
                               borderRight={0}
                               marginLeft="12px"
                             />
-                            <NativeSelect.Root width="full">
-                              <NativeSelect.Field
-                                onChange={(e) => {
-                                  setTraceMappingState((prev) => ({
-                                    ...prev,
-                                    mapping: {
-                                      ...prev.mapping,
-                                      [targetField]: {
-                                        ...(prev.mapping[targetField] as any),
-                                        key: e.target.value,
-                                      },
+                            {/* Searchable key dropdown: these lists can hold
+                                hundreds of names, so a plain <select> is hard to
+                                scan. While project-wide names load it shows a
+                                loading placeholder with a spinner. */}
+                            <MultiSelect
+                              isDisabled={isLoadingFieldNames}
+                              isLoading={isLoadingFieldNames}
+                              options={keyOptions.map((option) => ({
+                                value: option.key,
+                                label: option.label,
+                              }))}
+                              value={
+                                selectedKeyOption
+                                  ? {
+                                      value: selectedKeyOption.key,
+                                      label: selectedKeyOption.label,
+                                    }
+                                  : null
+                              }
+                              onChange={(newValue) => {
+                                const selected = newValue as {
+                                  value: string;
+                                } | null;
+                                setTraceMappingState((prev) => ({
+                                  ...prev,
+                                  mapping: {
+                                    ...prev.mapping,
+                                    [targetField]: {
+                                      ...(prev.mapping[targetField] as any),
+                                      key: selected?.value ?? "",
                                     },
-                                  }));
-                                }}
-                                value={key}
-                              >
-                                {/* "* (any span)" option - matches all spans */}
-                                <option value="">
-                                  {source === "spans"
-                                    ? "* (any span)"
-                                    : source === "metadata"
-                                      ? "* (all metadata)"
-                                      : "* (any)"}
-                                </option>
-                                {traceMappingDefinition
-                                  .keys(traces_)
-                                  .map(
-                                    ({
-                                      key,
-                                      label,
-                                    }: {
-                                      key: string;
-                                      label: string;
-                                    }) => (
-                                      <option key={key} value={key}>
-                                        {label}
-                                      </option>
-                                    ),
-                                  )}
-                              </NativeSelect.Field>
-                              <NativeSelect.Indicator />
-                            </NativeSelect.Root>
+                                  },
+                                }));
+                              }}
+                              placeholder={
+                                isLoadingFieldNames
+                                  ? FIELD_NAME_LOADING_LABEL[source] ??
+                                    "Loading…"
+                                  : FIELD_NAME_ANY_LABEL[source] ?? "* (any)"
+                              }
+                              chakraStyles={{
+                                container: (base) => ({
+                                  ...base,
+                                  width: "100%",
+                                  minWidth: "260px",
+                                }),
+                                menu: (base) => ({ ...base, zIndex: 2 }),
+                              }}
+                            />
                           </HStack>
                         )}
                       {subkeys && subkeys.length > 0 && (

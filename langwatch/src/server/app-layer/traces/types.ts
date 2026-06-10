@@ -1,9 +1,5 @@
 import { z } from "zod";
 
-// ---------------------------------------------------------------------------
-// Span Insert (write path)
-// ---------------------------------------------------------------------------
-
 export const spanInsertDataSchema = z.object({
   id: z.string(),
   tenantId: z.string(),
@@ -43,13 +39,10 @@ export const spanInsertDataSchema = z.object({
   droppedAttributesCount: z.number(),
   droppedEventsCount: z.number(),
   droppedLinksCount: z.number(),
+  retentionDays: z.number().optional().default(0),
 });
 
 export type SpanInsertData = z.infer<typeof spanInsertDataSchema>;
-
-// ---------------------------------------------------------------------------
-// Trace Summary (write + read)
-// ---------------------------------------------------------------------------
 
 export const traceSummaryDataSchema = z.object({
   traceId: z.string(),
@@ -66,28 +59,77 @@ export const traceSummaryDataSchema = z.object({
   errorMessage: z.string().nullable(),
   models: z.array(z.string()),
   totalCost: z.number().nullable(),
+  // Bundled portion of totalCost, summed per span at fold time (a span whose
+  // langwatch.cost.non_billable marker is set is covered by a flat plan, not
+  // billed per token). Billed = totalCost - nonBilledCost. Null for rows
+  // folded before the column existed; the read layer falls back to the legacy
+  // trace-level boolean for those.
+  nonBilledCost: z.number().nullable(),
   tokensEstimated: z.boolean(),
   totalPromptTokenCount: z.number().nullable(),
   totalCompletionTokenCount: z.number().nullable(),
   outputFromRootSpan: z.boolean(),
   outputSpanEndTimeMs: z.number(),
   blockedByGuardrail: z.boolean(),
+  rootSpanType: z.string().nullable(),
+  containsAi: z.boolean(),
+  containsPrompt: z.boolean(),
+  selectedPromptId: z.string().nullable(),
+  selectedPromptSpanId: z.string().nullable(),
+  /** Tracks the latest source span's startTimeUnixMs — internal bookkeeping
+   * to disambiguate which span won the "latest" race. Not surfaced. */
+  selectedPromptStartTimeMs: z.number().nullable(),
+  lastUsedPromptId: z.string().nullable(),
+  lastUsedPromptVersionNumber: z.number().nullable(),
+  lastUsedPromptVersionId: z.string().nullable(),
+  lastUsedPromptSpanId: z.string().nullable(),
+  lastUsedPromptStartTimeMs: z.number().nullable(),
   topicId: z.string().nullable(),
   subTopicId: z.string().nullable(),
   annotationIds: z.array(z.string()),
   attributes: z.record(z.string()),
-  scenarioRoleCosts: z.record(z.string(), z.number()).optional(),
-  scenarioRoleLatencies: z.record(z.string(), z.number()).optional(),
-  scenarioRoleSpans: z.record(z.string(), z.string()).optional(),
-  /** Per-span costs for retroactive role assignment when parent arrives after children. Internal bookkeeping. */
-  spanCosts: z.record(z.string(), z.number()).optional(),
   traceName: z.string(),
   /** Start time of the root span that set traceName, used for deterministic tie-breaking when multiple root spans exist. Internal bookkeeping. */
   rootSpanStartTimeMs: z.number().optional(),
+  /**
+   * When true the user has explicitly renamed the trace via
+   * `ChangeTraceNameCommand`, and the fold projection must NOT clobber
+   * `traceName` from a later root-span arrival. Without this latch, a
+   * delayed root span landing post-rename would wipe out the user's edit
+   * the next time the projection re-folds.
+   */
+  traceNameUserOverridden: z.boolean().optional(),
+  /**
+   * True when `traceName` came from the "no real root, fall back to
+   * earliest span" path rather than a span with `parentSpanId === null`.
+   * Customers occasionally emit the first span with a bogus
+   * `parent_span_id` that points to no span in the trace, so no real
+   * root ever exists and the trace would otherwise stay unnamed. The
+   * fallback lets it pick up a sensible name immediately; if a real
+   * root span arrives later the projection prefers it and clears this
+   * flag, since fold updates are incremental.
+   *
+   * Cleared by a user rename (TraceNameChanged event) — the rename is
+   * itself a higher-precedence source of the name, so the "is this
+   * still fallback-sourced?" question is meaningfully no.
+   * `rootMetadataFromFallback` continues to track the metadata
+   * provenance independently in that case.
+   */
+  traceNameFromFallback: z.boolean().optional(),
+  /**
+   * True when `rootSpanStartTimeMs` / `rootSpanType` were claimed via
+   * the fallback path (a non-root span used as a stand-in because no
+   * real root has arrived yet). Pairs with `traceNameFromFallback` but
+   * outlives a user rename — a user-supplied name disowns the fallback
+   * for *naming purposes* but the metadata itself is still a stand-in,
+   * so a real root arriving later must still be allowed to take it
+   * over.
+   */
+  rootMetadataFromFallback: z.boolean().optional(),
   occurredAt: z.number(),
   createdAt: z.number(),
   updatedAt: z.number(),
-  lastEventOccurredAt: z.number(),
+  LastEventOccurredAt: z.number(),
 });
 
 export type TraceSummaryData = z.infer<typeof traceSummaryDataSchema>;

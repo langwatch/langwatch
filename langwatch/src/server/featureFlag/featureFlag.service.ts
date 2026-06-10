@@ -3,138 +3,158 @@ import { createLogger } from "~/utils/logger/server";
 import { checkFlagEnvOverride } from "./envOverride";
 import { FeatureFlagServiceMemory } from "./featureFlagService.memory";
 import { FeatureFlagServicePostHog } from "./featureFlagService.posthog";
-import type { FeatureFlagOptions, FeatureFlagServiceInterface } from "./types";
+import {
+  FeatureFlagStorePostgres,
+  getFeatureFlagStore,
+} from "./featureFlagStore.postgres";
+import type { FeatureFlagKey } from "./registry";
+import { resolveFlagDefinition } from "./registry";
+import type {
+  FeatureFlagEvaluateOptions,
+  FeatureFlagServiceInterface,
+} from "./types";
 
 /**
- * Main feature flag service with automatic backend selection and env overrides.
+ * Main feature flag service.
  *
- * This is the primary entry point for feature flag evaluation. It automatically
- * selects the appropriate backend (PostHog or memory) based on environment
- * configuration and supports environment variable overrides for local development.
+ * Resolution order depends on the flag's scope as declared in
+ * `registry.ts`:
  *
- * ## Backend Selection
+ *  - SYSTEM (kill switches, pipeline toggles): env override -> postgres
+ *    store -> registry default. PostHog is never called. This is the
+ *    path that exists specifically so hot-path event-sourcing reactors
+ *    don't generate per-tenant PostHog traffic.
  *
- * - **PostHog** (production): Used when `POSTHOG_KEY` env var is set
- * - **Memory** (development): Fallback when PostHog is not configured
+ *  - PRODUCT (UI features, A/B tests): env override -> postgres store
+ *    (operator override) -> PostHog (when configured) -> registry
+ *    default. Operator-set rows in /ops/feature-flags win so the Ops
+ *    UI actually flips the flag — without that, both concrete legacy
+ *    backends (PostHog and memory) swallow their own failures and
+ *    return the registry default, so a postgres-only fallback after
+ *    PostHog would be unreachable on the happy path. PostHog keeps
+ *    user targeting and rollouts when no DB override exists.
  *
- * ## Environment Overrides
+ *  - Unregistered keys: legacy path (env -> PostHog/memory). Kept for
+ *    back-compat with flags that haven't been migrated into the
+ *    registry yet.
  *
- * Flags can be force-enabled/disabled via environment variables:
- * - `FLAG_NAME=1` - Force enable (e.g., `RELEASE_UI_SIMULATIONS_MENU_ENABLED=1`)
- * - `FLAG_NAME=0` - Force disable
- *
- * Env overrides take precedence over PostHog evaluation.
- *
- * ## Usage
- *
- * ```typescript
- * // Use the singleton instance
- * import { featureFlagService } from "./featureFlag";
- *
- * const enabled = await featureFlagService.isEnabled(
- *   "release_ui_simulations_menu_enabled",
- *   userId,
- *   false, // defaultValue
- *   { projectId, organizationId }
- * );
- * ```
- *
- * @see dev/docs/adr/005-feature-flags.md for architecture decisions
- * @see FeatureFlagServicePostHog for PostHog implementation details
+ * @see specs/ops/internal-feature-flags.feature for the contract
+ * @see registry.ts for the list of registered flags
  */
 export class FeatureFlagService implements FeatureFlagServiceInterface {
-  private readonly service: FeatureFlagServiceInterface;
+  private readonly legacyOverride?: FeatureFlagServiceInterface;
+  private legacyInstance?: FeatureFlagServiceInterface;
+  private readonly store: FeatureFlagStorePostgres;
   private readonly logger = createLogger("langwatch:feature-flag-service");
 
-  constructor() {
-    this.service = this.createService();
+  constructor(
+    deps: {
+      legacy?: FeatureFlagServiceInterface;
+      store?: FeatureFlagStorePostgres;
+    } = {},
+  ) {
+    this.legacyOverride = deps.legacy;
+    this.store = deps.store ?? getFeatureFlagStore();
   }
 
   /**
-   * Static factory method for creating FeatureFlagService with default dependencies.
+   * The legacy backend (PostHog when configured, memory otherwise) is built on
+   * first use, not in the constructor. Constructing the PostHog backend starts
+   * its background flag-definition poller, so a process that only ever
+   * evaluates SYSTEM flags (workers, the event-sourcing pipeline) never builds
+   * it and never polls PostHog. Only a PRODUCT/unregistered flag evaluation
+   * reaches here.
    */
+  private get legacy(): FeatureFlagServiceInterface {
+    if (this.legacyOverride) return this.legacyOverride;
+    this.legacyInstance ??= this.createLegacyService();
+    return this.legacyInstance;
+  }
+
   static create(): FeatureFlagService {
     return new FeatureFlagService();
   }
 
   /**
-   * Check if a feature flag is enabled for a given user or tenant/project.
-   * Environment overrides take precedence over PostHog/memory service.
+   * `flagKey` is constrained to the union of registered flag keys plus
+   * the `es-*-killswitch` family template literal, so unregistered
+   * string literals fail at compile time. Callers pass everything else
+   * (distinctId, defaultValue, projectId/organizationId for PostHog
+   * targeting, cacheTtlMs for hot-path TTL overrides) via the options
+   * object.
    */
   async isEnabled(
-    flagKey: string,
-    distinctId: string,
-    defaultValue = true,
-    options?: FeatureFlagOptions,
+    flagKey: FeatureFlagKey,
+    opts: FeatureFlagEvaluateOptions,
   ): Promise<boolean> {
-    const envOverride = checkFlagEnvOverride(flagKey);
+    const { distinctId, defaultValue = false } = opts;
+    const definition = resolveFlagDefinition(flagKey);
+
+    const envOverride = checkFlagEnvOverride(flagKey, definition?.legacyEnvVar);
     if (envOverride !== undefined) {
-      this.logger.debug(
-        { flagKey, distinctId, envOverride },
-        "Flag resolved via env override",
-      );
       return envOverride;
     }
-    // Comma-separated FEATURE_FLAG_FORCE_ENABLE list. Complements the
-    // per-flag `RELEASE_UI_*_ENABLED=1` envOverride pattern — one list
-    // can flip many flags at once for internal-dogfood windows. Runs at
-    // the top-level so BOTH the posthog and memory sub-services get the
-    // override (sergey iter 66 follow-up).
     const forceOn = (process.env.FEATURE_FLAG_FORCE_ENABLE ?? "")
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
     if (forceOn.includes(flagKey)) {
-      this.logger.debug(
-        { flagKey, distinctId },
-        "Flag resolved via FEATURE_FLAG_FORCE_ENABLE",
-      );
       return true;
     }
-    const result = await this.service.isEnabled(
-      flagKey,
-      distinctId,
-      defaultValue,
-      options,
-    );
-    this.logger.debug(
-      {
-        flagKey,
-        distinctId,
-        enabled: result,
-        projectId: options?.projectId,
-        organizationId: options?.organizationId,
-      },
-      "Flag checked",
-    );
-    return result;
-  }
 
-  /**
-   * Create the appropriate service based on environment.
-   */
-  private createService(): FeatureFlagServiceInterface {
-    // Use PostHog if the environment variable is set
-    if (env.POSTHOG_KEY) {
-      this.logger.info("Using PostHog feature flag service");
-      return FeatureFlagServicePostHog.create();
+    const storeCtx = {
+      projectId: opts.projectId,
+      organizationId: opts.organizationId,
+    };
+
+    if (definition?.scope === "SYSTEM") {
+      const stored = await this.store.get(flagKey, storeCtx);
+      if (stored !== null) return stored;
+      return definition.defaultValue;
     }
 
-    this.logger.warn(
-      "POSTHOG_KEY not set, using memory feature flag service. All flags will return defaults. Set POSTHOG_KEY or use env overrides (e.g. RELEASE_UI_SIMULATIONS_MENU_ENABLED=1).",
-    );
+    if (definition?.scope === "PRODUCT") {
+      // Operator override via /ops/feature-flags wins. The store
+      // evaluates per-org/per-project targeting rules first; if any
+      // rule matches the calling context we use that result and never
+      // touch PostHog. With no rule match and no row, fall through to
+      // the legacy backend (PostHog when configured, memory otherwise).
+      // Both legacy backends catch their own failures and return the
+      // registry default, so checking the store first is also what
+      // keeps the Ops UI usable during PostHog outages or quota caps.
+      const stored = await this.store.get(flagKey, storeCtx);
+      if (stored !== null) return stored;
+
+      return await this.legacy.isEnabled(flagKey, {
+        ...opts,
+        distinctId,
+        defaultValue: definition.defaultValue,
+      });
+    }
+
+    // Unregistered keys reach the legacy backend for back-compat with
+    // ad-hoc PostHog flags. The legacy memory/PostHog services widen
+    // the param to `string` in their own implementations, so the
+    // interface-level `FeatureFlagKey` constraint still gates new
+    // callers without blocking runtime back-compat.
+    return this.legacy.isEnabled(flagKey, { ...opts, defaultValue });
+  }
+
+  private createLegacyService(): FeatureFlagServiceInterface {
+    if (env.POSTHOG_KEY) {
+      this.logger.info("Using PostHog feature flag service for PRODUCT flags");
+      return FeatureFlagServicePostHog.create();
+    }
     return FeatureFlagServiceMemory.create();
   }
 
-  /**
-   * Get the underlying service (useful for testing or advanced operations).
-   */
-  getService(): FeatureFlagServiceInterface {
-    return this.service;
+  getLegacyService(): FeatureFlagServiceInterface {
+    return this.legacy;
+  }
+
+  getStore(): FeatureFlagStorePostgres {
+    return this.store;
   }
 }
 
-/**
- * Default instance of the feature flag service.
- */
 export const featureFlagService = FeatureFlagService.create();

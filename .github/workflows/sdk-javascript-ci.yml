@@ -42,8 +42,7 @@ jobs:
     if: >
       needs.changes.outputs.relevant == 'true'
       && (github.event_name != 'pull_request_target'
-          || (github.event.label.name == 'approved-ci'
-              && github.event.pull_request.user.login == 'dependabot[bot]'))
+          || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
     # Run lint, typecheck, tests, and build for TypeScript SDK
     defaults:
@@ -82,8 +81,7 @@ jobs:
     if: >
       needs.changes.outputs.relevant == 'true'
       && (github.event_name != 'pull_request_target'
-          || (github.event.label.name == 'approved-ci'
-              && github.event.pull_request.user.login == 'dependabot[bot]'))
+          || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
 
     env:
@@ -150,7 +148,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@eae0cfeb286e66ffb5155f1a79b90583a127a68b # v2
+        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
         with:
           version: 10.24.0
 
@@ -166,6 +164,14 @@ jobs:
             typescript-sdk/pnpm-lock.yaml
             langwatch/pnpm-lock.yaml
             mcp-server/pnpm-lock.yaml
+
+      # node-pty@1.1.0 only ships prebuilds for darwin/win32, so on Linux
+      # its postinstall always falls back to `node-gyp rebuild`. With
+      # pnpm/action-setup v6's npm-bootstrap path, node-gyp isn't on PATH
+      # by default — install it globally before any install that hits
+      # mcp-server's onlyBuiltDependencies allowlist.
+      - name: Install node-gyp (for node-pty postinstall)
+        run: npm install -g node-gyp@12.3.0
 
       - name: Build mcp-server
         working-directory: mcp-server

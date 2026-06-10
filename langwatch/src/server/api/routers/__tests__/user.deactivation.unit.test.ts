@@ -54,6 +54,7 @@ describe("userRouter", () => {
 
   describe("deactivate()", () => {
     describe("when called", () => {
+      /** @scenario user.deactivate sets deactivatedAt on the user */
       it("sets deactivatedAt on the user", async () => {
         const before = new Date();
         await createCaller().deactivate({ userId: "user-1" });
@@ -68,6 +69,7 @@ describe("userRouter", () => {
 
   describe("reactivate()", () => {
     describe("when called", () => {
+      /** @scenario user.reactivate clears deactivatedAt on the user */
       it("clears deactivatedAt to null", async () => {
         await createCaller().reactivate({ userId: "user-1" });
 

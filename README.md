@@ -12,6 +12,7 @@
 <a href="https://twitter.com/intent/follow?screen_name=langwatchai" target="_blank">
    <img src="https://img.shields.io/twitter/follow/langwatchai?logo=X&color=%20%23f5f5f5"
       alt="follow on X"></a>
+<img src="https://img.shields.io/badge/license-Apache%202.0%20%2B%20Enterprise-blue" alt="Open-core: Apache 2.0 floor + Enterprise extension">
 </p>
 
 <video src="https://github.com/user-attachments/assets/ff49882d-4e9d-4b7c-819b-be690fba9387" autoplay loop muted playsinline width="100%" style="display: block; aspect-ratio: 16 / 9;"></video>
@@ -159,9 +160,11 @@ Contributions are what make the open-source community such an amazing place to l
 
 Please read our [Contribution Guidelines](https://github.com/langwatch/langwatch/blob/main/CONTRIBUTING.md) for details on our code of conduct, and the process for submitting pull requests.
 
-## ✍️ License
+## ✍️ License — open-core split
 
-Please read our [LICENSE.md](/LICENSE.md) file.
+LangWatch is Apache 2.0, except for the enterprise modules (SCIM, audit logs, license and billing management, etc.) which live under `langwatch/ee/` and need a commercial license for production use. The SDKs (`typescript-sdk`, `python-sdk`, `mcp-server`) are MIT.
+
+See [`LICENSE.md`](/LICENSE.md), [`NOTICE`](/NOTICE), and [`langwatch/ee/LICENSE.md`](/langwatch/ee/LICENSE.md) for the full text and the per-folder breakdown.
 
 ## 👮‍♀️ Security + Compliance
 

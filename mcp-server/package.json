@@ -1,6 +1,6 @@
 {
   "name": "@langwatch/mcp-server",
-  "version": "0.7.0",
+  "version": "0.10.1",
   "description": "An MCP server for Langwatch.",
   "type": "module",
   "main": "./dist/index.js",
@@ -42,16 +42,16 @@
   },
   "devDependencies": {
     "@ai-sdk/anthropic": "^3.0.44",
-    "@anthropic-ai/claude-code": "^2.1.72",
+    "@anthropic-ai/claude-code": "^2.1.119",
     "@eslint/js": "^10.0.1",
     "@langwatch/scenario": "^0.4.6",
     "@types/debug": "^4.1.12",
     "@types/eslint__js": "^8.42.3",
     "@types/express": "^5.0.6",
-    "@types/node": "^16.0.0",
+    "@types/node": "^25.6.0",
     "@types/yargs": "^17.0.33",
     "@typescript/native-preview": "7.0.0-dev.20250911.1",
-    "ai": "^6.0.0",
+    "ai": "^6.0.161",
     "dotenv": "^17.2.2",
     "esbuild": "^0.25.0",
     "eslint": "^10.2.1",
@@ -63,22 +63,17 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",
     "@opentelemetry/context-async-hooks": "^2.1.0",
-    "@opentelemetry/sdk-node": "^0.215.0",
+    "@opentelemetry/sdk-node": "^0.217.0",
     "chalk": "^5.6.2",
     "date-fns": "^4.1.0",
     "express": "^5.2.1",
     "node-pty": "^1.0.0",
-    "vitest": "^3.2.4",
+    "vitest": "^4.1.0",
     "yargs": "^17.7.2",
     "zod": "^4.3.6",
     "zod-validation-error": "^5.0.0"
   },
   "bin": {
     "langwatch-mcp-server": "./dist/index.js"
-  },
-  "pnpm": {
-    "overrides": {
-      "protobufjs": ">=7.5.5 <8.0.0 || >=8.0.1"
-    }
   }
 }

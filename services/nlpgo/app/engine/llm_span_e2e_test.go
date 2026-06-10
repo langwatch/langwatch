@@ -108,8 +108,8 @@ func TestEngineExecute_SignatureNodeEmitsLLMChildSpan(t *testing.T) {
 		}
 	}
 
-	assert.Equal(t, 3, componentSpans,
-		"one execute_component span per dispatched node (entry, answer, end)")
+	assert.Equal(t, 1, componentSpans,
+		"only the signature 'answer' node emits a component span — Entry/End are pass-throughs (Python parity)")
 	require.Equal(t, 1, llmSpans, "signature node must emit exactly one LLM child span")
 	assert.Equal(t, componentSpanID, llmSpanID,
 		"LLM span must be parented at the answer node's execute_component span — Studio's tree view nests on parent span_id")

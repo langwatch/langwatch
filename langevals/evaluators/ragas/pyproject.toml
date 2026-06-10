@@ -10,7 +10,7 @@ license = {text = "MIT"}
 requires-python = ">=3.11"
 dependencies = [
     "langevals-core>=0.1.0",
-    "ragas==0.2.9",
+    "ragas==0.4.3",
     "langchain-openai>=0.1.23",
     "langchain_community>=0.2.16",
     "litellm>=1.79.0",
@@ -33,6 +33,9 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["langevals_ragas"]
+
+[tool.uv]
+exclude-newer = "7 days"
 
 [tool.uv.sources]
 langevals-core = { workspace = true }

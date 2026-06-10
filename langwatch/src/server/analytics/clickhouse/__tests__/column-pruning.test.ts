@@ -32,6 +32,7 @@ describe("column-pruning", () => {
 
   describe("trace dedup subquery column pruning", () => {
     describe("when requesting trace_count metric", () => {
+      /** @scenario Trace dedup subquery selects only columns required by the query */
       it("does not use SELECT * in the dedup subquery", () => {
         const result = buildTimeseriesQuery({
           ...baseInput,
@@ -83,6 +84,7 @@ describe("column-pruning", () => {
     });
 
     describe("when requesting total_cost grouped by metadata.user_id", () => {
+      /** @scenario Dedup subquery includes groupBy columns when grouping is active */
       it("includes the column mapped to metadata.user_id", () => {
         const result = buildTimeseriesQuery({
           ...baseInput,
@@ -116,6 +118,7 @@ describe("column-pruning", () => {
     });
 
     describe("when requesting trace_count filtered by metadata.labels", () => {
+      /** @scenario Dedup subquery includes filter columns when filters are active */
       it("includes the column mapped to metadata.labels", () => {
         const result = buildTimeseriesQuery({
           ...baseInput,
@@ -137,6 +140,7 @@ describe("column-pruning", () => {
 
   describe("evaluation runs subquery column pruning", () => {
     describe("when referencing an evaluation metric", () => {
+      /** @scenario Evaluation runs subquery selects only needed evaluation columns */
       it("does not use SELECT * in the evaluation_runs subquery", () => {
         const result = buildTimeseriesQuery({
           ...baseInput,
@@ -175,6 +179,7 @@ describe("column-pruning", () => {
     });
 
     describe("when grouping by evaluations.evaluation_passed", () => {
+      /** @scenario Evaluation runs subquery adapts columns to groupBy field */
       it("includes the Passed column", () => {
         const result = buildTimeseriesQuery({
           ...baseInput,
@@ -195,6 +200,7 @@ describe("column-pruning", () => {
 
   describe("stored spans JOIN column pruning", () => {
     describe("when grouping by metadata.span_type", () => {
+      /** @scenario Stored spans JOIN selects only needed span columns */
       it("does not include wide span columns like Input and Output", () => {
         const result = buildTimeseriesQuery({
           ...baseInput,
@@ -213,6 +219,7 @@ describe("column-pruning", () => {
     });
 
     describe("when grouping by events.event_type", () => {
+      /** @scenario Stored spans JOIN adapts columns to event-based grouping */
       it("includes the Events.Name column", () => {
         const result = buildTimeseriesQuery({
           ...baseInput,
@@ -230,6 +237,7 @@ describe("column-pruning", () => {
     });
 
     describe("when requesting performance.tokens_per_second", () => {
+      /** @scenario Tokens per second metric resolves duration from stored spans */
       it("includes DurationMs in the stored_spans subquery", () => {
         const result = buildTimeseriesQuery({
           ...baseInput,
@@ -318,6 +326,8 @@ describe("column-pruning", () => {
 
   describe("query correctness after pruning", () => {
     describe("when building a timeseries query for trace_count", () => {
+      /** @scenario Pruned query generates syntactically valid SQL */
+      /** @scenario Pruned query resolves all column references from pruned sources */
       it("generates syntactically valid SQL", () => {
         const result = buildTimeseriesQuery({
           ...baseInput,
@@ -341,6 +351,7 @@ describe("column-pruning", () => {
     });
 
     describe("when building a CTE query for arrayJoin grouping", () => {
+      /** @scenario Pruned CTE query for arrayJoin grouping preserves metric accuracy */
       it("selects only needed columns in the CTE inner query", () => {
         const result = buildTimeseriesQuery({
           ...baseInput,

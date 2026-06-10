@@ -28,9 +28,22 @@ autogen: { enabled: false }
 secrets:
   existingSecret: "langwatch-secrets"
 
+# When secrets.existingSecret is overridden, the gateway subchart's
+# secret reference must point at the same name. Helm subchart values
+# are literal YAML so this has to be set explicitly when the operator
+# names the Secret something other than the langwatch-app-secrets default.
+gateway:
+  secrets:
+    existingSecretName: "langwatch-secrets"
+
 # --- overlays/size-ha.yaml ---
 app:
   replicaCount: 3
+  # Multi-pod: local-FS is unsafe (pods don't share filesystems). Use S3/GCS/Azure
+  # via app.dataplane (see overlays/cold-storage-s3.yaml).
+  storedObjects:
+    localFilesystem:
+      enabled: false
   resources:
     requests: { cpu: 1, memory: 4Gi }
     limits:   { cpu: 2, memory: 4Gi }
@@ -50,8 +63,8 @@ workers:
 langwatch_nlp:
   replicaCount: 2
   resources:
-    requests: { cpu: 1, memory: 2Gi }
-    limits:   { cpu: 2, memory: 4Gi }
+    requests: { cpu: 250m, memory: 256Mi }
+    limits:   { cpu: 1, memory: 1Gi }
 
 langevals:
   replicaCount: 2

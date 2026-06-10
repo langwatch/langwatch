@@ -1,18 +1,19 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import {
   classifyClickHouseError,
   SecurityError,
   StoreError,
   ValidationError,
 } from "~/server/event-sourcing/services/errorHandling";
+import { createLogger } from "../../../../../utils/logger";
 import type {
   Projection,
   ProjectionStoreReadContext,
   ProjectionStoreWriteContext,
 } from "../../../";
 import { createTenantId, EventUtils } from "../../../";
-import { createLogger } from "../../../../../utils/logger";
 import type {
   SuiteRunState,
   SuiteRunStateData,
@@ -47,6 +48,7 @@ interface ClickHouseSuiteRunRecord {
   StartedAt: number | null;
   FinishedAt: number | null;
   LastEventOccurredAt: number;
+  _retention_days: number;
 }
 
 type ClickHouseSuiteRunWriteRecord = WithDateWrites<
@@ -113,6 +115,9 @@ export class SuiteRunStateRepositoryClickHouse<
       StartedAt: new Date(data.StartedAt ?? data.CreatedAt),
       FinishedAt: data.FinishedAt != null ? new Date(data.FinishedAt) : null,
       LastEventOccurredAt: data.LastEventOccurredAt ? new Date(data.LastEventOccurredAt) : new Date(0),
+      // Placeholder; storeProjection / storeProjectionBatch overwrite this with
+      // the resolved retention (platform default when the tenant has none).
+      _retention_days: PLATFORM_DEFAULT_RETENTION_DAYS,
     };
   }
 
@@ -129,21 +134,36 @@ export class SuiteRunStateRepositoryClickHouse<
 
     try {
       const client = await this.resolveClient(context.tenantId);
+      // IN-tuple dedup over the ReplacingMergeTree (see
+      // dev/docs/best_practices/clickhouse-queries.md). UpdatedAt referenced
+      // via table alias because the column is also projected as
+      // `toUnixTimestamp64Milli(...) AS UpdatedAt`.
       const result = await client.query({
         query: `
           SELECT
-            ProjectionId, TenantId, SuiteRunId, BatchRunId, ScenarioSetId, SuiteId,
-            Version, Status, Total, StartedCount, CompletedCount, FailedCount, Progress,
-            PassRateBps, PassedCount, GradedCount,
-            toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
-            toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
-            toUnixTimestamp64Milli(StartedAt) AS StartedAt,
-            toUnixTimestamp64Milli(FinishedAt) AS FinishedAt,
-            toUnixTimestamp64Milli(LastEventOccurredAt) AS LastEventOccurredAt
-          FROM ${TABLE_NAME}
-          WHERE TenantId = {tenantId:String}
-            AND BatchRunId = {batchRunId:String}
-          ORDER BY UpdatedAt DESC
+            t.ProjectionId AS ProjectionId, t.TenantId AS TenantId,
+            t.SuiteRunId AS SuiteRunId, t.BatchRunId AS BatchRunId,
+            t.ScenarioSetId AS ScenarioSetId, t.SuiteId AS SuiteId,
+            t.Version AS Version, t.Status AS Status, t.Total AS Total,
+            t.StartedCount AS StartedCount, t.CompletedCount AS CompletedCount,
+            t.FailedCount AS FailedCount, t.Progress AS Progress,
+            t.PassRateBps AS PassRateBps, t.PassedCount AS PassedCount,
+            t.GradedCount AS GradedCount,
+            toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
+            toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
+            toUnixTimestamp64Milli(t.StartedAt) AS StartedAt,
+            toUnixTimestamp64Milli(t.FinishedAt) AS FinishedAt,
+            toUnixTimestamp64Milli(t.LastEventOccurredAt) AS LastEventOccurredAt
+          FROM ${TABLE_NAME} AS t
+          WHERE t.TenantId = {tenantId:String}
+            AND t.BatchRunId = {batchRunId:String}
+            AND (t.TenantId, t.BatchRunId, t.UpdatedAt) IN (
+              SELECT TenantId, BatchRunId, max(UpdatedAt)
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                AND BatchRunId = {batchRunId:String}
+              GROUP BY TenantId, BatchRunId
+            )
           LIMIT 1
         `,
         query_params: { tenantId: context.tenantId, batchRunId },
@@ -214,6 +234,10 @@ export class SuiteRunStateRepositoryClickHouse<
         projection.version,
       );
 
+      const retentionPolicy = context.metadata?.retentionPolicy as { scenarios?: number | null } | undefined;
+      projectionRecord._retention_days =
+        retentionPolicy?.scenarios ?? PLATFORM_DEFAULT_RETENTION_DAYS;
+
       await client.insert({
         table: TABLE_NAME,
         values: [projectionRecord],
@@ -264,14 +288,19 @@ export class SuiteRunStateRepositoryClickHouse<
     }
 
     try {
-      const records = projections.map((projection) =>
-        this.mapProjectionDataToClickHouseRecord(
+      const retentionPolicy = context.metadata?.retentionPolicy as { scenarios?: number | null } | undefined;
+      const retentionDays =
+        retentionPolicy?.scenarios ?? PLATFORM_DEFAULT_RETENTION_DAYS;
+      const records = projections.map((projection) => {
+        const record = this.mapProjectionDataToClickHouseRecord(
           projection.data as SuiteRunStateData,
           String(context.tenantId),
           projection.id,
           projection.version,
-        ),
-      );
+        );
+        record._retention_days = retentionDays;
+        return record;
+      });
 
       const client = await this.resolveClient(context.tenantId);
       await client.insert({

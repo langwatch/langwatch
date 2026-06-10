@@ -51,8 +51,17 @@ Wire shape (stdin):
     {
       "code":    "<python source>",
       "inputs":  {"name": value, ...},
-      "outputs": ["name", ...]
+      "outputs": ["name", ...],
+      "secrets": {"NAME": "value", ...}
     }
+
+The optional `secrets` map is the project's decrypted secrets (rides on
+the workflow DSL as `workflow.secrets`, populated upstream by
+addEnvs.ts). When non-empty it is exposed to user code as a `secrets`
+namespace object so `secrets.NAME` resolves as attribute access —
+matching the Studio code-editor hint and the Python executor's
+`build_secrets_preamble`. When absent/empty the name is left undefined,
+mirroring the Python preamble's no-op-on-empty behavior.
 
 Wire shape (result file):
     {
@@ -78,6 +87,7 @@ import sys
 import time
 import traceback
 from contextlib import redirect_stdout, redirect_stderr
+from types import SimpleNamespace
 
 # Inject fake_dspy as the user-visible `dspy` module BEFORE any user
 # code is exec'd. We resolve it by file path so the runner stays
@@ -109,6 +119,7 @@ def main() -> int:
     code = payload.get("code", "")
     inputs = payload.get("inputs", {}) or {}
     declared_outputs = payload.get("outputs", []) or []
+    secrets = payload.get("secrets", {}) or {}
 
     stdout_buf = io.StringIO()
     stderr_buf = io.StringIO()
@@ -119,6 +130,15 @@ def main() -> int:
     try:
         with redirect_stdout(stdout_buf), redirect_stderr(stderr_buf):
             module_globals: dict = {"__name__": "__user_code__"}
+            # Expose project secrets as `secrets.NAME` attribute access.
+            # Injected as a global (not a source preamble) so user-code
+            # line numbers in tracebacks stay accurate. Left undefined
+            # when there are no secrets — parity with the Python
+            # executor's build_secrets_preamble, which is a no-op on an
+            # empty/None map (so `secrets.X` with nothing configured
+            # raises NameError on both engines).
+            if secrets:
+                module_globals["secrets"] = SimpleNamespace(**secrets)
             exec(compile(code, "<code-block>", "exec"), module_globals)
             result = _invoke_user_entrypoint(module_globals, inputs)
             result = _coerce_result(result)

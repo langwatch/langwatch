@@ -1,4 +1,12 @@
 Feature: Advanced routing — weighted, canary, sticky-session, composable
+
+  # All scenarios in this file describe data-plane routing behaviour
+  # implemented in the Go gateway service (services/aigateway/). The
+  # parity check only scans TypeScript test roots — Go tests cannot
+  # bind via @scenario JSDoc. Aspirational at the parity-check level;
+  # the underlying behaviour is covered by Go unit tests inside the
+  # services/aigateway/ tree.
+
   As an enterprise customer running LLM traffic at scale
   I want routing policies richer than fallback-chains
   So that I can cost-optimize (80/20 mini vs full), roll out new models safely
@@ -26,9 +34,9 @@ Feature: Advanced routing — weighted, canary, sticky-session, composable
   Background:
     Given a VK "vk_cost_opt" bound to provider credentials:
       | id           | provider  | model               |
-      | gpc_4o_mini  | openai    | gpt-4o-mini         |
-      | gpc_4o       | openai    | gpt-4o              |
-      | gpc_anthropic| anthropic | claude-haiku-4-5    |
+      | mp_openai_4o_mini  | openai    | gpt-4o-mini         |
+      | mp_openai_4o       | openai    | gpt-4o              |
+      | mp_anthropic| anthropic | claude-haiku-4-5    |
     And the gateway is receiving steady traffic
 
   # ============================================================================
@@ -43,17 +51,17 @@ Feature: Advanced routing — weighted, canary, sticky-session, composable
         "routing": {
           "mode": "weighted",
           "slots": [
-            { "credential_id": "gpc_4o_mini", "weight": 8 },
-            { "credential_id": "gpc_4o",      "weight": 2 }
+            { "model_provider_id": "mp_openai_4o_mini", "weight": 8 },
+            { "model_provider_id": "mp_openai_4o",      "weight": 2 }
           ]
         }
       }
       """
     When 10,000 requests are dispatched through "vk_cost_opt"
-    Then approximately 8,000 ± 200 hit `gpc_4o_mini`
-    And approximately 2,000 ± 200 hit `gpc_4o`
-    And every response has `X-LangWatch-Provider-Credential` set to the chosen slot
-    And every OTel span has `langwatch.routing.slot` attribute
+    Then approximately 8,000 ± 200 hit `mp_openai_4o_mini`
+    And approximately 2,000 ± 200 hit `mp_openai_4o`
+    And every response has `X-LangWatch-Model-Provider` set to the chosen slot
+    And every OTel span has `langwatch.routing.modelProvider` attribute
 
   @unit @routing @unimplemented
   Scenario: Weights normalize regardless of scale
@@ -78,8 +86,8 @@ Feature: Advanced routing — weighted, canary, sticky-session, composable
       {
         "routing": {
           "mode": "canary",
-          "canary": { "credential_id": "gpc_anthropic", "weight": 5 },
-          "default_credential_id": "gpc_4o_mini"
+          "canary": { "model_provider_id": "mp_anthropic", "weight": 5 },
+          "default_model_provider_id": "mp_openai_4o_mini"
         }
       }
       """
@@ -109,15 +117,15 @@ Feature: Advanced routing — weighted, canary, sticky-session, composable
         "routing": {
           "mode": "weighted",
           "slots": [
-            { "credential_id": "gpc_4o_mini", "weight": 5 },
-            { "credential_id": "gpc_anthropic", "weight": 5 }
+            { "model_provider_id": "mp_openai_4o_mini", "weight": 5 },
+            { "model_provider_id": "mp_anthropic", "weight": 5 }
           ],
           "sticky": { "by": "X-LangWatch-Session-Id" }
         }
       }
       """
     When 100 requests come from session id `session_abc`
-    Then all 100 hit the same slot (either all gpc_4o_mini or all gpc_anthropic)
+    Then all 100 hit the same slot (either all mp_openai_4o_mini or all mp_anthropic)
     When 100 requests come from session id `session_xyz`
     Then all 100 hit some slot consistently (may be the same or different from session_abc)
 
@@ -148,23 +156,23 @@ Feature: Advanced routing — weighted, canary, sticky-session, composable
         "routing": {
           "mode": "weighted",
           "slots": [
-            { "credential_id": "gpc_4o_mini",  "weight": 8 },
-            { "credential_id": "gpc_4o",       "weight": 2 }
+            { "model_provider_id": "mp_openai_4o_mini",  "weight": 8 },
+            { "model_provider_id": "mp_openai_4o",       "weight": 2 }
           ]
         },
         "fallback": {
-          "chain": ["gpc_anthropic"],
+          "chain": ["mp_anthropic"],
           "on":    ["5xx", "timeout", "rate_limit"],
           "max_attempts": 1
         }
       }
       """
-    And `gpc_4o_mini` is returning 503 for every request
+    And `mp_openai_4o_mini` is returning 503 for every request
     When 100 requests are dispatched
-    Then approximately 80 attempts hit `gpc_4o_mini` first (failed), fell back to `gpc_anthropic`
-    And approximately 20 attempts hit `gpc_4o` directly (no fallback needed)
+    Then approximately 80 attempts hit `mp_openai_4o_mini` first (failed), fell back to `mp_anthropic`
+    And approximately 20 attempts hit `mp_openai_4o` directly (no fallback needed)
     And the response header `X-LangWatch-Fallback-Count` is 1 for the fallback subset, 0 otherwise
-    And `langwatch.routing.slot` + `langwatch.fallback.count` span attrs disambiguate the two paths
+    And `langwatch.routing.modelProvider` + `langwatch.fallback.count` span attrs disambiguate the two paths
 
   # ============================================================================
   # Observability
@@ -176,11 +184,11 @@ Feature: Advanced routing — weighted, canary, sticky-session, composable
     Then the OTel span has:
       | attribute                   | value                         |
       | langwatch.routing.mode      | weighted|canary|sticky         |
-      | langwatch.routing.slot      | <credential_id>               |
+      | langwatch.routing.modelProvider      | <model_provider_id>               |
       | langwatch.routing.weight    | <normalized weight, 0.0-1.0>  |
       | langwatch.routing.sticky_key| <session id when sticky>      |
-    And Prometheus exposes `gateway_routing_slot_selected_total{credential, reason}` counter
-    And the /gateway/usage UI filters on routing.slot
+    And Prometheus exposes `gateway_model_provider_id_selected_total{credential, reason}` counter
+    And the /gateway/usage UI filters on routing.modelProvider
 
   # ============================================================================
   # Migration path from flat provider chain
@@ -188,9 +196,9 @@ Feature: Advanced routing — weighted, canary, sticky-session, composable
 
   @contract @migration
   Scenario: Existing VKs without routing config behave unchanged
-    Given a VK configured only with `provider_credential_ids: ["gpc_a", "gpc_b"]` (no routing block)
+    Given a VK configured only with `provider_model_provider_ids: ["mp_a", "mp_b"]` (no routing block)
     When a request is dispatched
-    Then the gateway uses `gpc_a` as primary (first in chain) and falls back to `gpc_b` on failure
+    Then the gateway uses `mp_a` as primary (first in chain) and falls back to `mp_b` on failure
     And no weighted distribution occurs (backward-compatible with v1.0 shape)
     And this behavior is equivalent to `routing.mode = "priority"` with implicit weights `[1, 0, 0, ...]`
 

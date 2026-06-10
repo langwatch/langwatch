@@ -3,33 +3,41 @@ Feature: Unified Reasoning Form Field
   I want to see a single "Reasoning" field in forms
   So that I have a consistent experience across all providers
 
+  # The mapReasoningToProvider / normalizeReasoningFromProviderFields
+  # functions are bound via existing `reasoningBoundary.unit.test.ts`.
+  # The remaining @unimplemented scenarios cover form-schema validation
+  # and form-to-save-params helpers that need targeted unit tests in
+  # `langwatch/src/prompts/utils/__tests__/llmPromptConfigUtils.test.ts`
+  # — which exercises the same family of converters but not these
+  # specific reasoning-field invariants.
+
   # Form Schema Validation
-  @unit @unimplemented
+  @unit
   Scenario: Form schema accepts reasoning field with valid value
     Given a prompt config form
     When I set llm.reasoning to "high"
     Then the form should validate successfully
 
-  @unit @unimplemented
+  @unit
   Scenario: Form schema accepts reasoning field with "low" value
     Given a prompt config form
     When I set llm.reasoning to "low"
     Then the form should validate successfully
 
-  @unit @unimplemented
+  @unit
   Scenario: Form schema accepts reasoning field with "medium" value
     Given a prompt config form
     When I set llm.reasoning to "medium"
     Then the form should validate successfully
 
-  @unit @unimplemented
+  @unit
   Scenario: Form schema accepts undefined reasoning
     Given a prompt config form
     When I do not set llm.reasoning
     Then the form should validate successfully
 
   # Form to Save Params Conversion
-  @unit @unimplemented
+  @unit
   Scenario: formValuesToTriggerSaveVersionParams includes reasoning
     Given form values with llm.reasoning "high"
     When converting to save params
@@ -38,7 +46,7 @@ Feature: Unified Reasoning Form Field
     And the result should NOT include thinkingLevel
     And the result should NOT include effort
 
-  @unit @unimplemented
+  @unit
   Scenario: formValuesToTriggerSaveVersionParams handles undefined reasoning
     Given form values with no llm.reasoning set
     When converting to save params
@@ -46,13 +54,13 @@ Feature: Unified Reasoning Form Field
     And the result should NOT include reasoningEffort
 
   # Versioned Prompt to Form Values Conversion
-  @unit @unimplemented
+  @unit
   Scenario: versionedPromptToPromptConfigFormValues maps reasoning correctly
     Given a versioned prompt with reasoning "high"
     When converting to form values
     Then the form should have llm.reasoning "high"
 
-  @unit @unimplemented
+  @unit
   Scenario: versionedPromptToPromptConfigFormValues handles missing reasoning
     Given a versioned prompt with no reasoning
     When converting to form values

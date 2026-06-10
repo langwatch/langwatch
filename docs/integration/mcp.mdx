@@ -11,7 +11,7 @@ The [LangWatch MCP Server](https://www.npmjs.com/package/@langwatch/mcp-server) 
 - **Set up evaluations** to test and monitor your LLM outputs
 - **Search and inspect traces** from your LangWatch project directly in your editor
 - **Query analytics** to understand performance trends, costs, and error rates
-- **Manage prompts** — list, create, update, and version prompts without leaving your IDE
+- **Manage prompts**: list, create, update, and version prompts without leaving your IDE
 
 Instead of manually reading docs and writing boilerplate code, just ask your AI assistant to instrument your codebase with LangWatch, and it will do it for you.
 
@@ -20,7 +20,9 @@ Instead of manually reading docs and writing boilerplate code, just ask your AI 
 <Steps>
 
 <Step title="Get your API key">
-Go to your LangWatch project **Settings** page and copy your API key. The API key is required for observability and prompt tools. Documentation tools work without it.
+Go to [**Settings → API Keys**](https://app.langwatch.ai/settings/api-keys) and create a **personal API key**. This key connects your coding assistant to your LangWatch account for observability, prompts, and analytics tools. Documentation tools work without a key.
+
+See the [API Keys guide](/platform/api-keys#creating-a-personal-api-key) for step-by-step instructions.
 </Step>
 
 <Step title="Configure your MCP">
@@ -93,7 +95,7 @@ Add to `.vscode/mcp.json` in your project (or use **MCP: Add Server** from the C
 1. Go to **Settings → Connectors**
 2. Click **Add connector**
 3. Enter the server URL: `https://app.langwatch.ai/sse`
-4. Click **Connect** — you'll be redirected to sign in and authorize access to your project
+4. Click **Connect**: you'll be redirected to sign in and authorize access to your project
 
 *Requires a Plus or Team plan.*
 </Tab>
@@ -102,18 +104,18 @@ Add to `.vscode/mcp.json` in your project (or use **MCP: Add Server** from the C
 1. Go to **Settings → Connectors**
 2. Click **Add custom connector**
 3. Enter the server URL: `https://app.langwatch.ai/mcp`
-4. Click **Connect** — you'll be redirected to sign in and authorize access to your project
+4. Click **Connect**: you'll be redirected to sign in and authorize access to your project
 
 *Requires a Pro or Max plan.*
 </Tab>
 
-<Tab title="BoltAI / Other MCP Clients">
+<Tab title="BoltAI, Other MCP Clients">
 For any MCP client that supports remote servers with OAuth:
 
 1. Add a new remote MCP server
 2. Enter the endpoint URL: `https://app.langwatch.ai/mcp`
 3. Select **OAuth (browser)** authentication
-4. Click **Connect** — you'll be redirected to sign in and authorize access to your project
+4. Click **Connect**: you'll be redirected to sign in and authorize access to your project
 
 The server supports OAuth Authorization Code + PKCE with Dynamic Client Registration, so any standards-compliant MCP client should work automatically.
 </Tab>
@@ -158,7 +160,7 @@ Open your AI assistant chat (e.g., `Cmd/Ctrl + I` in Cursor, or `Cmd/Ctrl + Shif
 The MCP server runs in two modes:
 
 - **Local (stdio)**: Default. Runs as a subprocess of your coding assistant (Claude Code, Copilot, Cursor). API key set via `--apiKey` flag or `LANGWATCH_API_KEY` env var.
-- **Remote (HTTP/SSE)**: For web-based assistants (ChatGPT, Claude Chat, BoltAI, etc.). Hosted at `https://app.langwatch.ai`. Uses OAuth Authorization Code + PKCE — click Connect and sign in via your browser to authorize access to your project. Supports both Streamable HTTP (`/mcp`) and SSE (`/sse`) transports.
+- **Remote (HTTP/SSE)**: For web-based assistants (ChatGPT, Claude Chat, BoltAI, etc.). Hosted at `https://app.langwatch.ai`. Uses OAuth Authorization Code + PKCE, click Connect and sign in via your browser to authorize access to your project. Supports both Streamable HTTP (`/mcp`) and SSE (`/sse`) transports.
 
 ## Usage Examples
 
@@ -387,7 +389,7 @@ The LangWatch MCP is so powerful that it can help AI agents automatically instru
 
 ## MCP Tools Reference
 
-The MCP server provides 10 tools organized into three categories. Your AI assistant automatically chooses the right tools based on your request.
+The MCP server provides tools organized into categories. Your AI assistant automatically chooses the right tools based on your request.
 
 ### Documentation
 
@@ -414,6 +416,23 @@ The MCP server provides 10 tools organized into three categories. Your AI assist
 | `create_prompt` | Create a new prompt with messages and model configuration |
 | `update_prompt` | Update a prompt or create a new version |
 
+### Organization Management (requires org-level API key)
+
+| Tool | Description |
+|------|-------------|
+| `platform_list_projects` | List all projects in the organization |
+| `platform_get_project` | Get project details by ID |
+| `platform_create_project` | Create a new project (returns a one-time service API key) |
+| `platform_update_project` | Update a project's name, language, framework, or PII settings |
+| `platform_archive_project` | Archive a project (soft-delete) |
+| `platform_list_api_keys` | List all API keys in the organization |
+| `platform_create_api_key` | Create a personal or service API key |
+| `platform_revoke_api_key` | Revoke an API key |
+
+<Info>
+Organization management tools require an API key with org-level permissions. If the configured key lacks organization permissions, these tools will return a clear error message.
+</Info>
+
 ### Tool Details
 
 #### `discover_schema`
@@ -429,8 +448,8 @@ Search traces with filters, text query, and date range. Returns AI-readable trac
 
 **Parameters:**
 - `query` (optional): Text search query
-- `startDate` (optional): Start date — ISO string or relative like `"24h"`, `"7d"`, `"30d"`. Default: 24h ago
-- `endDate` (optional): End date — ISO string or relative. Default: now
+- `startDate` (optional): Start date, ISO string or relative like `"24h"`, `"7d"`, `"30d"`. Default: 24h ago
+- `endDate` (optional): End date, ISO string or relative. Default: now
 - `filters` (optional): Filter object (e.g. `{"metadata.labels": ["production"]}`)
 - `pageSize` (optional): Results per page (default: 25, max: 1000)
 - `scrollId` (optional): Pagination token from previous search
@@ -451,7 +470,7 @@ Query analytics timeseries from LangWatch. Metrics use `"category.name"` format 
 **Parameters:**
 - `metric` (required): Metric in `"category.name"` format (e.g., `"metadata.trace_id"`, `"performance.total_cost"`)
 - `aggregation` (optional): `avg`, `sum`, `min`, `max`, `median`, `p90`, `p95`, `p99`, `cardinality`, `terms`. Default: `avg`
-- `startDate` (optional): Start date — ISO string or relative. Default: 7 days ago
+- `startDate` (optional): Start date, ISO string or relative. Default: 7 days ago
 - `endDate` (optional): End date. Default: now
 - `groupBy` (optional): Group results by field
 - `filters` (optional): Filters to apply

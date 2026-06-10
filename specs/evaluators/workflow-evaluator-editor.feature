@@ -4,6 +4,11 @@ Feature: Workflow evaluator editor with workflow link
   I want to access the underlying workflow from the evaluator editor
   So that I can modify the evaluation logic
 
+  # All scenarios in this file describe page-level UI flows on the
+  # evaluator-editor + workflow-studio crossover. Need a Next.js
+  # integration harness or Playwright E2E to drive end-to-end.
+  # Aspirational pending that harness.
+
   Background:
     Given I am logged in to a project
     And I have a workflow "Custom Scorer" in the project

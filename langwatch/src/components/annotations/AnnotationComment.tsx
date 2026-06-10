@@ -295,7 +295,7 @@ export function AnnotationComment({ key = "" }: { key: string }) {
                       <Menu.Content portalled={false}>
                         <Menu.Item
                           value="delete"
-                          color="red.600"
+                          color="red.fg"
                           onClick={() => {
                             doNotCloseMenu = true;
                             handleDelete();

@@ -13,7 +13,7 @@ LangWatch stores data across three systems. Each requires its own backup strateg
 
 ## PostgreSQL Backups
 
-PostgreSQL holds your control plane data — losing it means losing user accounts, project configurations, and monitor definitions.
+PostgreSQL holds your control plane data, losing it means losing user accounts, project configurations, and monitor definitions.
 
 ### Chart-Managed PostgreSQL
 
@@ -77,7 +77,7 @@ helm install langwatch langwatch/langwatch \
 
 ### S3 Authentication
 
-**IRSA / Workload Identity (recommended):**
+**IRSA, Workload Identity (recommended):**
 
 ```yaml
 clickhouse:
@@ -130,7 +130,7 @@ Restoring a backup will overwrite existing data in the target database. Always v
 
 ## ClickHouse Cold Storage
 
-Cold storage is separate from backups — it's a tiered storage strategy that automatically moves older data from local SSD to S3 for cost savings.
+Cold storage is separate from backups, it's a tiered storage strategy that automatically moves older data from local SSD to S3 for cost savings.
 
 ### How It Works
 
@@ -171,7 +171,7 @@ For a deployment with 150 GB/month of trace data, cold storage can save ~$500/ye
 
 ## S3 Dataset Backups
 
-If you're using S3 for dataset storage (`app.datasetObjectStorage.enabled: true`), protect this data with:
+If you're using S3 for dataset storage (`app.dataplane.enabled: true`), protect this data with:
 
 - **S3 Versioning**: Enable versioning on the bucket to recover from accidental deletes
 - **Cross-region replication**: For disaster recovery, replicate to another region

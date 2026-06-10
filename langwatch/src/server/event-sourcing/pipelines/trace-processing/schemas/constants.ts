@@ -60,6 +60,14 @@ export const ANNOTATIONS_BULK_SYNCED_EVENT_VERSIONS = [
   ANNOTATIONS_BULK_SYNCED_EVENT_VERSION_LATEST,
 ] as const;
 
+export const TRACE_NAME_CHANGED_EVENT_TYPE =
+  "lw.obs.trace.trace_name_changed" as const;
+export const TRACE_NAME_CHANGED_EVENT_VERSION_LATEST = "2026-05-07" as const;
+
+export const TRACE_NAME_CHANGED_EVENT_VERSIONS = [
+  TRACE_NAME_CHANGED_EVENT_VERSION_LATEST,
+] as const;
+
 export const TRACE_PROCESSING_EVENT_TYPES = [
   SPAN_RECEIVED_EVENT_TYPE,
   TOPIC_ASSIGNED_EVENT_TYPE,
@@ -69,6 +77,7 @@ export const TRACE_PROCESSING_EVENT_TYPES = [
   ANNOTATION_ADDED_EVENT_TYPE,
   ANNOTATION_REMOVED_EVENT_TYPE,
   ANNOTATIONS_BULK_SYNCED_EVENT_TYPE,
+  TRACE_NAME_CHANGED_EVENT_TYPE,
 ] as const;
 
 export type TraceProcessingEventType =
@@ -82,6 +91,7 @@ export const RESOLVE_ORIGIN_COMMAND_TYPE = "lw.obs.trace.resolve_origin" as cons
 export const ADD_ANNOTATION_COMMAND_TYPE = "lw.obs.trace.add_annotation" as const;
 export const REMOVE_ANNOTATION_COMMAND_TYPE = "lw.obs.trace.remove_annotation" as const;
 export const BULK_SYNC_ANNOTATIONS_COMMAND_TYPE = "lw.obs.trace.bulk_sync_annotations" as const;
+export const CHANGE_TRACE_NAME_COMMAND_TYPE = "lw.obs.trace.change_trace_name" as const;
 
 export const TRACE_PROCESSING_COMMAND_TYPES = [
   RECORD_SPAN_COMMAND_TYPE,
@@ -92,16 +102,26 @@ export const TRACE_PROCESSING_COMMAND_TYPES = [
   ADD_ANNOTATION_COMMAND_TYPE,
   REMOVE_ANNOTATION_COMMAND_TYPE,
   BULK_SYNC_ANNOTATIONS_COMMAND_TYPE,
+  CHANGE_TRACE_NAME_COMMAND_TYPE,
 ] as const;
+
+/**
+ * Domain rules for the user-editable trace name. These mirror the schema
+ * literals in `events.ts` so the UI, the command, and the projection all
+ * read the same numbers.
+ */
+export const TRACE_NAME_MIN_LENGTH = 1;
+export const TRACE_NAME_MAX_LENGTH = 200;
 
 export type TraceProcessingCommandType =
   (typeof TRACE_PROCESSING_COMMAND_TYPES)[number];
 
-export const TRACE_SUMMARY_PROJECTION_VERSION_LATEST = "2026-03-25" as const;
+export const TRACE_SUMMARY_PROJECTION_VERSION_LATEST = "2026-05-07" as const;
 
 /** Reactors skip traces older than this threshold to avoid re-processing during resyncs. */
 export const STALE_TRACE_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour
 
 export const TRACE_SUMMARY_PROJECTION_VERSIONS = [
+  "2026-04-23",
   TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
 ] as const;

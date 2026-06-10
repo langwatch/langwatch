@@ -17,9 +17,9 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { OnboardingMeshBackground } from "../OnboardingMeshBackground";
 import SpookyScarySkeleton from "../SpookyScarySkeleton";
 
-const MotionBox = motion(Box);
-const MotionCenter = motion(Center);
-const MotionText = motion(Text);
+const MotionBox = motion.create(Box);
+const MotionCenter = motion.create(Center);
+const MotionText = motion.create(Text);
 
 interface OnboardingContainerProps extends React.PropsWithChildren {
   loading?: boolean;
@@ -53,7 +53,7 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
           key={title}
           textStyle="xl"
           fontWeight="600"
-          color="fg.DEFAULT"
+          color="fg"
           letterSpacing="-0.01em"
           lineHeight="1.3"
           initial={{ opacity: 0, y: 6, filter: "blur(4px)" }}
@@ -102,7 +102,7 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
               size="sm"
               borderRadius="full"
               aria-label="Go back"
-              _hover={{ bg: "blackAlpha.50" }}
+              _hover={{ bg: "bg.muted" }}
               onClick={onBack}
             >
               <ArrowLeft size={18} />
@@ -127,7 +127,7 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
             borderRadius="full"
             aria-label="Sign out"
             color="fg.subtle"
-            _hover={{ bg: "blackAlpha.50", color: "fg.DEFAULT" }}
+            _hover={{ bg: "bg.muted", color: "fg" }}
             onClick={() => {
               emit("clicked", "sign_out");
               void signOut();
@@ -169,7 +169,7 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
             transition="all 0.25s ease"
             _hover={{
               bg: "bg.panel",
-              color: "fg.DEFAULT",
+              color: "fg",
               boxShadow: "md",
               transform: "translateY(-2px)",
               borderColor: "border.emphasized",

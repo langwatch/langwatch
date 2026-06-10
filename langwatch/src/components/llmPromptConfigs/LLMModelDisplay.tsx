@@ -1,5 +1,8 @@
 import { Box, HStack, type StackProps, Text, VStack } from "@chakra-ui/react";
+import { AlertTriangle } from "lucide-react";
 
+import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
+import { Tooltip } from "../ui/tooltip";
 import { allModelOptions, useModelSelectionOptions } from "../ModelSelector";
 import { OverflownTextWithTooltip } from "../OverflownText";
 import { MODEL_ICON_SIZE } from "./constants";
@@ -22,7 +25,7 @@ export function LLMModelDisplay({
   subtitle,
   ...props
 }: LLMModelDisplayProps) {
-  const { modelOption } = useModelSelectionOptions(
+  const { modelOption, groupedByProvider, isLoading } = useModelSelectionOptions(
     allModelOptions,
     model,
     "chat",
@@ -30,14 +33,35 @@ export function LLMModelDisplay({
 
   // Model is disabled if explicitly marked or if provider is disabled
   const isDisabled = modelOption?.isDisabled ?? false;
-  // Unknown model (not in our list) - still show it but don't mark as deprecated
-  const _isUnknown = !modelOption?.label;
 
-  return (
+  // Invalid = model points at a provider that's not enabled for this
+  // project (deleted, scope dropped, or never configured). The
+  // evaluator / prompt config still carries the stored id, but the
+  // resolver will fail on it at runtime. Render the same red strike +
+  // AlertTriangle + tooltip pattern the Default Models table uses.
+  // Skip the warning while the providers query is in flight to avoid
+  // flashing a false-positive before data resolves.
+  const providerKey = model.split("/")[0] ?? "";
+  const isProviderMissing =
+    !!model &&
+    !isLoading &&
+    groupedByProvider.length > 0 &&
+    !groupedByProvider.some((g) => g.provider === providerKey);
+  // Use a stable provider-icon lookup for the invalid case so the
+  // trigger still shows the right brand mark when the provider row is
+  // gone (modelOption?.icon is null when the provider isn't in the
+  // selector's option list).
+  const iconNode =
+    modelOption?.icon ??
+    (isProviderMissing
+      ? modelProviderIcons[providerKey as keyof typeof modelProviderIcons]
+      : undefined);
+
+  const stack = (
     <HStack align="center" gap={2} {...props}>
-      {modelOption?.icon && (
+      {iconNode && (
         <Box width={MODEL_ICON_SIZE} minWidth={MODEL_ICON_SIZE}>
-          {modelOption.icon}
+          {iconNode}
         </Box>
       )}
       <VStack gap={0} align="start">
@@ -51,8 +75,12 @@ export function LLMModelDisplay({
           fontFamily="mono"
           lineClamp={1}
           wordBreak="break-all"
-          color={isDisabled ? "fg.muted" : undefined}
-          textDecoration={isDisabled ? "line-through" : undefined}
+          color={
+            isProviderMissing ? "red.600" : isDisabled ? "fg.muted" : undefined
+          }
+          textDecoration={
+            isProviderMissing || isDisabled ? "line-through" : undefined
+          }
         >
           {modelOption?.label ?? model}
         </OverflownTextWithTooltip>
@@ -62,6 +90,31 @@ export function LLMModelDisplay({
           </Text>
         )}
       </VStack>
+      {isProviderMissing && (
+        <HStack gap={1} color="red.600" flexShrink={0}>
+          <AlertTriangle size={14} aria-hidden />
+          <Text
+            fontSize="xs"
+            fontWeight="medium"
+            textTransform="uppercase"
+            letterSpacing="wide"
+          >
+            Update needed
+          </Text>
+        </HStack>
+      )}
     </HStack>
+  );
+
+  if (!isProviderMissing) return stack;
+
+  return (
+    <Tooltip
+      content={`${providerKey} provider isn't enabled here. Re-add the provider or pick a different model to use it.`}
+      positioning={{ placement: "top" }}
+      showArrow
+    >
+      <Box>{stack}</Box>
+    </Tooltip>
   );
 }

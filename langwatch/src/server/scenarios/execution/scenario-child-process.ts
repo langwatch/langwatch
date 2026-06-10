@@ -32,6 +32,9 @@ import { RemoteSpanJudgeAgent } from "./remote-span-judge-agent";
 import { createTraceApiSpanQuery } from "./trace-api-span-query";
 import { SerializedHttpAgentAdapter } from "./serialized-adapters/http-agent.adapter";
 import { bridgeTraceIdFromAdapterToJudge } from "./bridge-trace-id";
+import { createChildProcessLogger } from "./child-logger";
+
+const logger = createChildProcessLogger("langwatch:scenarios:child");
 
 /**
  * Some TracerProvider implementations (like ProxyTracerProvider) wrap a delegate.
@@ -84,7 +87,16 @@ async function readJobDataFromStdin(): Promise<ChildProcessJobData> {
 }
 
 async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
-  const { context, scenario, adapterData, modelParams, nlpServiceUrl, target } = jobData;
+  const {
+    context,
+    scenario,
+    adapterData,
+    modelParams,
+    simulatorModelParams,
+    judgeModelParams,
+    nlpServiceUrl,
+    target,
+  } = jobData;
 
   const langwatchEndpoint = process.env.LANGWATCH_ENDPOINT;
   const langwatchApiKey = process.env.LANGWATCH_API_KEY;
@@ -100,7 +112,18 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
     modelParams,
     nlpServiceUrl,
   });
-  const model = createModelFromParams(modelParams, nlpServiceUrl);
+  // The user-simulator and judge resolve their own models (run-plan /
+  // scenario override or the DEFAULT-role scenarios.* defaults). Older jobs
+  // only carried modelParams, so fall back to it when the split params are
+  // absent — preserves the previous single-model behavior during rollout.
+  const simulatorModel = createModelFromParams(
+    simulatorModelParams ?? modelParams,
+    nlpServiceUrl,
+  );
+  const judgeModel = createModelFromParams(
+    judgeModelParams ?? modelParams,
+    nlpServiceUrl,
+  );
 
   // For HTTP targets, use a remote span judge that queries spans from
   // the platform API before evaluation. The trace ID will be captured
@@ -111,7 +134,7 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
       ? (() => {
           remoteSpanJudge = new RemoteSpanJudgeAgent({
             criteria: scenario.criteria,
-            model,
+            model: judgeModel,
             projectId: context.projectId,
             querySpans: createTraceApiSpanQuery({
               endpoint: langwatchEndpoint,
@@ -120,7 +143,7 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
           });
           return remoteSpanJudge;
         })()
-      : ScenarioRunner.judgeAgent({ criteria: scenario.criteria, model });
+      : ScenarioRunner.judgeAgent({ criteria: scenario.criteria, model: judgeModel });
 
   // Results are reported via LangWatch SDK automatically
   const verbose = process.env.SCENARIO_VERBOSE === "true";
@@ -139,7 +162,7 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
       setId: context.setId,
       agents: [
         adapter,
-        ScenarioRunner.userSimulatorAgent({ model }),
+        ScenarioRunner.userSimulatorAgent({ model: simulatorModel }),
         judgeAgent,
       ],
       verbose,
@@ -160,12 +183,11 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
     },
   );
 
-  // Log the result to stderr (human-readable) but don't exit with error code for failed tests
-  // A failed test is still a successful execution - results are reported via SDK
+  // A failed test is still a successful execution — results are reported via SDK.
   if (result.success) {
-    console.error(`Scenario passed`);
+    logger.info("scenario passed");
   } else {
-    console.error(`Scenario failed: ${result.reasoning}`);
+    logger.warn({ reasoning: result.reasoning }, "scenario failed");
   }
 
   // Flush OTEL traces before exiting
@@ -199,23 +221,26 @@ async function flushOtelTraces(): Promise<void> {
 
     // Try forceFlush first (preferred), then shutdown
     if (concreteProvider.forceFlush) {
-      console.error("Flushing OTEL traces...");
+      logger.debug("flushing otel traces");
       await concreteProvider.forceFlush();
-      console.error("OTEL traces flushed");
+      logger.debug("otel traces flushed");
     } else if (concreteProvider.shutdown) {
-      console.error("Shutting down OTEL provider...");
+      logger.debug("shutting down otel provider");
       await concreteProvider.shutdown();
-      console.error("OTEL provider shutdown complete");
+      logger.debug("otel provider shutdown complete");
     }
   } catch (error) {
     // Don't fail the scenario if OTEL flush fails
-    console.error(`OTEL flush warning: ${error instanceof Error ? error.message : String(error)}`);
+    logger.warn(
+      { err: error instanceof Error ? error.message : String(error) },
+      "otel flush warning",
+    );
   }
 }
 
 main().catch(async (error) => {
   const errorMessage = error instanceof Error ? error.message : String(error);
-  console.error(`Scenario execution failed: ${errorMessage}`);
+  logger.error({ err: errorMessage }, "scenario execution failed");
   // Still flush traces on error so we capture what happened
   await flushOtelTraces();
   // Output JSON error result to stdout for parent process to parse

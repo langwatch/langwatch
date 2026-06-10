@@ -102,9 +102,10 @@ func TestCredentialFromHeaders_Bedrock(t *testing.T) {
 	hdr := encodeCreds(t, inlineCreds{
 		Provider: "bedrock",
 		Bedrock: map[string]string{
-			"aws_access_key_id":     "AKIA-TEST",
-			"aws_secret_access_key": "shh-secret",
-			"aws_region_name":       "us-east-1",
+			"aws_access_key_id":            "AKIA-TEST",
+			"aws_secret_access_key":        "shh-secret",
+			"aws_region_name":              "us-east-1",
+			"aws_bedrock_runtime_endpoint": "http://vpce-abc.vpce-svc.us-east-1.vpce.amazonaws.com:80",
 		},
 	})
 	cred, err := credentialFromHeaders(map[string]string{headerInlineCredentials: hdr})
@@ -123,6 +124,12 @@ func TestCredentialFromHeaders_Bedrock(t *testing.T) {
 	}
 	if cred.Extra["region"] != "us-east-1" {
 		t.Errorf("region lost: %v", cred.Extra)
+	}
+	// Managed-Bedrock customers reach the model only through their PrivateLink
+	// VPC endpoint; the gateway's VPCE dispatch reads it from this key. Losing
+	// it here silently routes them at the public endpoint and 403s.
+	if cred.Extra["bedrock_runtime_endpoint"] != "http://vpce-abc.vpce-svc.us-east-1.vpce.amazonaws.com:80" {
+		t.Errorf("runtime endpoint lost: %v", cred.Extra)
 	}
 }
 

@@ -1,11 +1,17 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook, act } from "@testing-library/react";
-import { useTraceDetailsDrawer } from "../useTraceDetailsDrawer";
-import type { DrawerProps } from "../../components/drawerRegistry";
 
+import { act, renderHook } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { DrawerProps } from "../../components/drawerRegistry";
+import { useTraceDetailsDrawer } from "../useTraceDetailsDrawer";
+
+// The hook is a thin convenience wrapper: it always delegates to
+// `openDrawer("traceDetails", …)`. The cross-cutting concerns (EXTERNAL-user
+// restriction, traces-v2 opt-in routing) live centrally in `CurrentDrawer`
+// and `openDrawer` and are covered by their own tests — here we only pin the
+// delegation contract.
 vi.mock("../useDrawer", () => ({
   useDrawer: vi.fn(),
 }));

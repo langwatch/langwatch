@@ -201,7 +201,7 @@ export function ScenarioRunDetailDrawer({
         placement="end"
         size="lg"
       >
-        <Drawer.Content paddingX={0} maxWidth="720px" overflow="hidden">
+        <Drawer.Content bg="bg" paddingX={0} maxWidth="720px" overflow="hidden">
           {!scenarioState && open && (
             <Drawer.Body>
               {runStateError ? (
@@ -388,6 +388,7 @@ export function ScenarioRunDetailDrawer({
                       messages={scenarioState.messages ?? []}
                       streamingMessages={streamingMessages}
                       variant="drawer"
+                      projectId={project?.id ?? ""}
                     />
                   </Box>
                 </Box>
@@ -402,7 +403,7 @@ export function ScenarioRunDetailDrawer({
                 position="relative"
                 className="group"
                 css={{
-                  "& > div:first-child": { borderRadius: 0, minHeight: "100%", height: "100%" },
+                  "& > div:first-of-type": { borderRadius: 0, minHeight: "100%", height: "100%" },
                 }}
               >
                 <SimulationConsole
@@ -457,7 +458,7 @@ export function ScenarioRunDetailDrawer({
         size="xl"
         modal={true}
       >
-        <Drawer.Content paddingX={0} maxWidth="70%">
+        <Drawer.Content bg="bg" paddingX={0} maxWidth="70%">
           <Drawer.CloseTrigger zIndex={10} />
           <Drawer.Body paddingY={0} paddingX={0} overflowY="auto">
             {traceDrawerTraceId && (

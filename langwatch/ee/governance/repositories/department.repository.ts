@@ -1,0 +1,68 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
+/**
+ * Repository for Department row access. Every `prisma.department.*` call
+ * lives here; the service delegates through it and owns validation, org
+ * scoping, and assignment orchestration.
+ *
+ * Spec: specs/ai-gateway/governance/departments.feature
+ */
+import type { Prisma, PrismaClient } from "@prisma/client";
+
+type Client = Prisma.TransactionClient | PrismaClient;
+
+export class DepartmentRepository {
+  findAll(client: Client, params: { organizationId: string }) {
+    return client.department.findMany({
+      where: { organizationId: params.organizationId, archivedAt: null },
+      orderBy: { name: "asc" },
+    });
+  }
+
+  /** Cross-org-safe: returns the row only when it belongs to the org. */
+  findById(
+    client: Client,
+    params: { id: string; organizationId: string },
+  ) {
+    return client.department.findFirst({
+      where: {
+        id: params.id,
+        organizationId: params.organizationId,
+        archivedAt: null,
+      },
+    });
+  }
+
+  create(
+    client: Client,
+    params: { organizationId: string; name: string },
+  ) {
+    return client.department.create({
+      data: { organizationId: params.organizationId, name: params.name },
+    });
+  }
+
+  updateName(
+    client: Client,
+    params: { id: string; organizationId: string; name: string },
+  ) {
+    return client.department.updateMany({
+      // archivedAt: null so an archived row can't be renamed — the service
+      // rename flow reads back through getById (which enforces archivedAt:
+      // null) and would otherwise return null after a successful update count.
+      where: {
+        id: params.id,
+        organizationId: params.organizationId,
+        archivedAt: null,
+      },
+      data: { name: params.name },
+    });
+  }
+
+  archive(client: Client, params: { id: string; organizationId: string }) {
+    return client.department.updateMany({
+      where: { id: params.id, organizationId: params.organizationId },
+      data: { archivedAt: new Date() },
+    });
+  }
+}

@@ -10,7 +10,6 @@ import type {
   TeamUserRole,
   User,
 } from "@prisma/client";
-import type { OrganizationFeatureName } from "../organization.service";
 
 export type TeamWithProjects = Team & {
   projects: Project[];
@@ -22,15 +21,9 @@ export type TeamWithProjectsAndMembers = TeamWithProjects & {
   })[];
 };
 
-export type OrganizationFeature = {
-  feature: string;
-  trialEndDate: Date | null;
-};
-
 export type FullyLoadedOrganization = Organization & {
   members: OrganizationUser[];
   teams: TeamWithProjectsAndMembers[];
-  features: OrganizationFeature[];
 };
 
 export type TeamMemberWithUser = TeamUser & {
@@ -59,12 +52,6 @@ export type OrganizationMemberWithUser = OrganizationUser & {
 export type OrganizationWithMembersAndTheirTeams = Organization & {
   members: OrganizationMemberWithUser[];
 };
-
-export interface OrganizationFeatureRow {
-  feature: string;
-  organizationId: string;
-  trialEndDate: Date | null;
-}
 
 /**
  * Organization with admin members and their users, used for notification delivery.
@@ -186,6 +173,8 @@ export interface UpdateOrganizationInput {
   elasticsearchNodeUrl?: string | null;
   elasticsearchApiKey?: string | null;
   s3Bucket?: string | null;
+  presenceEnabled?: boolean;
+  supportContact?: string | null;
 }
 
 /**
@@ -224,11 +213,15 @@ export interface UpdateTeamMemberRoleInput {
 
 export interface OrganizationRepository {
   getOrganizationIdByTeamId(teamId: string): Promise<string | null>;
+  getUserOrgRole(params: {
+    userId: string;
+    organizationId: string;
+  }): Promise<OrganizationUserRole | null>;
+  getUserOrgRoleByTeamId(params: {
+    userId: string;
+    teamId: string;
+  }): Promise<OrganizationUserRole | null>;
   getProjectIds(organizationId: string): Promise<string[]>;
-  getFeature(
-    organizationId: string,
-    feature: OrganizationFeatureName,
-  ): Promise<OrganizationFeatureRow | null>;
   findWithAdmins(
     organizationId: string,
   ): Promise<OrganizationWithAdmins | null>;
@@ -301,15 +294,22 @@ export class NullOrganizationRepository implements OrganizationRepository {
     return null;
   }
 
-  async getProjectIds(_organizationId: string): Promise<string[]> {
-    return [];
+  async getUserOrgRole(_params: {
+    userId: string;
+    organizationId: string;
+  }): Promise<OrganizationUserRole | null> {
+    return null;
   }
 
-  async getFeature(
-    _organizationId: string,
-    _feature: OrganizationFeatureName,
-  ): Promise<OrganizationFeatureRow | null> {
+  async getUserOrgRoleByTeamId(_params: {
+    userId: string;
+    teamId: string;
+  }): Promise<OrganizationUserRole | null> {
     return null;
+  }
+
+  async getProjectIds(_organizationId: string): Promise<string[]> {
+    return [];
   }
 
   async findWithAdmins(

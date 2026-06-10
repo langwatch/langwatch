@@ -1,6 +1,7 @@
 import type { EventSourcing } from "../event-sourcing/eventSourcing";
 import type { AppCommands } from "../event-sourcing/pipelineRegistry";
 import type { BroadcastService } from "./broadcast/broadcast.service";
+import type { PresenceService } from "./presence/presence.service";
 import type { AppConfig } from "./config";
 import type { EvaluationExecutionService } from "./evaluations/evaluation-execution.service";
 import type { EvaluationRunService } from "./evaluations/evaluation-run.service";
@@ -15,6 +16,7 @@ import type { SpanStorageService } from "./traces/span-storage.service";
 import type { TokenizerService } from "./traces/tokenizer.service";
 import type { LogRequestCollectionService } from "./traces/log-request-collection.service";
 import type { MetricRequestCollectionService } from "./traces/metric-request-collection.service";
+import type { TraceListService } from "./traces/trace-list.service";
 import type { TraceRequestCollectionService } from "./traces/trace-request-collection.service";
 import type { TraceSummaryService } from "./traces/trace-summary.service";
 import type { PlanProvider } from "./subscription/plan-provider";
@@ -30,6 +32,20 @@ import type { ReplayService } from "./ops/replay.service";
 import type { OpsMetricsCollector } from "./ops/metrics-collector";
 import type { UsageService } from "./usage/usage.service";
 import type { ExperimentService } from "../experiments/experiment.service";
+import type { TriggerService } from "./triggers/trigger.service";
+import type { RetentionPolicyCache } from "../data-retention/retentionPolicyCache";
+import type { ShareService } from "./share/share.service";
+import type { DataRetentionPolicyService } from "../data-retention/policy/dataRetentionPolicy.service";
+import type { PinnedTraceService } from "../data-retention/pinning/pinnedTrace.service";
+import type { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
+import type { StorageMeterService } from "../data-retention/metering/storageMeter.service";
+
+export interface DataRetentionDependencies {
+  policy: DataRetentionPolicyService;
+  pinning: PinnedTraceService;
+  retroactive: RetroactiveUpdateService;
+  metering: StorageMeterService;
+}
 
 export interface OpsDependencies {
   queues: QueueService;
@@ -42,9 +58,11 @@ export interface AppDependencies {
   config: AppConfig;
 
   broadcast: BroadcastService;
+  presence: PresenceService;
 
   traces: {
     summary: TraceSummaryService;
+    list: TraceListService;
     spans: SpanStorageService;
     logRecords: LogRecordStorageService;
     metricRecords: MetricRecordStorageService;
@@ -66,6 +84,7 @@ export interface AppDependencies {
     runs: SuiteRunService;
   };
   experiments: ExperimentService;
+  triggers: TriggerService;
   organizations: OrganizationService;
   projects: ProjectService;
   tokenizer: TokenizerService;
@@ -80,6 +99,9 @@ export interface AppDependencies {
   notifications: NotificationService;
   nurturing?: NurturingService;
   usageLimits: UsageLimitService;
+  retentionPolicyCache: RetentionPolicyCache;
+  dataRetention: DataRetentionDependencies;
+  share: ShareService;
   commands: AppCommands;
   ops?: OpsDependencies;
 

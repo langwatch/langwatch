@@ -170,6 +170,8 @@ describe("EvaluatorTypeSelectorDrawer", () => {
       });
     });
 
+    /** @scenario Each category contains specific evaluators */
+    /** @scenario EvaluatorTypeSelectorDrawer shows evaluators in category */
     it("shows evaluators for the selected category", async () => {
       renderDrawer({ category: "expected_answer" });
 
@@ -192,6 +194,7 @@ describe("EvaluatorTypeSelectorDrawer", () => {
   });
 
   describe("Navigation", () => {
+    /** @scenario Select evaluator type opens editor */
     it("opens evaluator editor when selecting an evaluator (no onSelect provided)", async () => {
       const user = userEvent.setup();
       renderDrawer();

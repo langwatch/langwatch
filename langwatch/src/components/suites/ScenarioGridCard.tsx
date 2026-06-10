@@ -52,7 +52,8 @@ export function ScenarioGridCard({
       </Box>
       {onCancel && isCancellableStatus(scenarioRun.status) && (
         <HStack
-          as="button"
+          as="span"
+          role="button"
           tabIndex={isCancelling ? -1 : 0}
           gap={1}
           paddingX={2}

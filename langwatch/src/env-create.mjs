@@ -61,12 +61,34 @@ export function createEnvConfig() {
       // HS256 secret used by control-plane to sign the short-lived JWT that the
       // gateway verifies on every request (contract §4.1). 32+ chars.
       LW_GATEWAY_JWT_SECRET: z.string().min(32).optional(),
+      // Public-facing base URL the AI Gateway is reachable at. The Go
+      // gateway re-uses this same var name in the OPPOSITE direction
+      // (gateway -> control plane), so in dev `scripts/start.sh` hijacks
+      // it for the Go interpretation. That collision means the TS side
+      // (CLI bootstrap, /me VK reveal) must NOT read this var directly
+      // when LW_GATEWAY_PUBLIC_URL is set; prefer that instead. Kept
+      // here for back-compat with hosted SaaS deploys where the value
+      // is correctly the public gateway URL.
+      LW_GATEWAY_BASE_URL: z.string().url().optional(),
+      // Public-facing data plane URL the CLI + /me VK reveal cards
+      // surface to the user. Distinct from LW_GATEWAY_BASE_URL because
+      // the Go gateway hijacks that name for its control-plane
+      // discovery; this var stays unambiguous on the TS read path. In
+      // dev: http://localhost:5563 (or `PORT + 3` when PORT is set);
+      // hosted SaaS: https://gateway.langwatch.com. Falls back to
+      // LW_GATEWAY_BASE_URL when unset for legacy deploys.
+      LW_GATEWAY_PUBLIC_URL: z.string().url().optional(),
+      // Internal control-plane → gateway URL for the HMAC-signed
+      // /internal/* surface (validate-ottl, transform). Different from
+      // LW_GATEWAY_BASE_URL because the Go gateway re-uses that name
+      // for the OPPOSITE direction (gateway → control plane), so a
+      // shared `.env` would otherwise collide. In dev:
+      // http://localhost:5563. In Docker: http://host.docker.internal:5563.
+      // Falls back to LW_GATEWAY_BASE_URL when unset for back-compat.
+      LW_GATEWAY_INTERNAL_URL: z.string().url().optional(),
       // Argon2id pepper mixed into virtual-key hashing. Rotating this
       // invalidates all existing VKs — treat as append-only / key-management.
       LW_VIRTUAL_KEY_PEPPER: z.string().min(32).optional(),
-      ELASTICSEARCH_NODE_URL: z.string().optional(),
-      ELASTICSEARCH_API_KEY: z.string().optional(),
-      ELASTICSEARCH_CONFIGURED: z.boolean().optional(),
       REDIS_URL: z.string().optional(),
       REDIS_CLUSTER_ENDPOINTS: z.string().optional(),
       REDIS_DB_INDEX: z.preprocess(
@@ -82,24 +104,83 @@ export function createEnvConfig() {
       OPENAI_API_KEY: z.string().optional(),
       SENDGRID_API_KEY: z.string().optional(),
       LANGWATCH_NLP_SERVICE: z.string().optional(),
-      TOPIC_CLUSTERING_SERVICE: z.string().optional(),
       LANGEVALS_ENDPOINT: z.string().optional(),
+      // S3 staging for outbound langevals POSTs is opt-in: only relevant
+      // when langevals is fronted by AWS Lambda (6 MB sync-invoke cap).
+      // Self-hosted langevals on a plain HTTP service has no such cap,
+      // so leave LANGEVALS_STAGING_THRESHOLD_BYTES unset and bodies
+      // always go inline. When set, bodies above the threshold are
+      // uploaded to S3 and the GET presigned URL is forwarded via
+      // X-Payload-S3-URL. EVAL_MAX_PAYLOAD_BYTES and
+      // TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES are hard upper bounds —
+      // anything larger is rejected before any network call.
+      // LANGEVALS_STAGING_TTL_SECONDS bounds how long the presigned URL
+      // stays valid; keep it short so a leaked URL doesn't grant
+      // long-window access.
+      LANGEVALS_STAGING_THRESHOLD_BYTES: z.coerce.number().int().positive().optional(),
+      LANGEVALS_STAGING_TTL_SECONDS: z.coerce.number().int().positive().default(600),
+      EVAL_MAX_PAYLOAD_BYTES: z.coerce.number().int().positive().default(16_000_000),
+      TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES: z.coerce.number().int().positive().default(180_000_000),
       DEMO_PROJECT_ID: z.string().optional(),
       DEMO_PROJECT_USER_ID: z.string().optional(),
       DEMO_PROJECT_SLUG: z.string().optional(),
-      IS_OPENSEARCH: z.boolean().optional(),
-      IS_QUICKWIT: z.boolean().optional(),
       USE_AWS_SES: z.string().optional(),
       AWS_REGION: z.string().optional(),
       EMAIL_DEFAULT_FROM: z.string().optional(),
       S3_KEY_SALT: z.string().optional(),
       IS_SAAS: z.boolean().optional(),
+      // Controls SSRF blocking for outbound HTTP calls (TS proxy + scenario
+      // runner; mirrored on the Python NLP side via the same env name). When
+      // true: private IPs, localhost, and hostnames resolving to private IPs
+      // are blocked unless listed in ALLOWED_PROXY_HOSTS. When unset/false:
+      // local destinations are allowed (cloud metadata is still always
+      // blocked). Default: false.
+      BLOCK_LOCAL_HTTP_CALLS: z.boolean().optional(),
+      ALLOWED_PROXY_HOSTS: z.string().optional(),
       SHOW_OPS_IN_MAIN_SIDEBAR: z.string().optional(),
+      // Post-2026-05-11 loop-prevention kill-switch. Set to "1" to
+      // bypass the reactor depth check; emergency rollback only.
+      LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD: z.string().optional(),
+      // Post-2026-05-11 tenant soft-cap: max in-flight event-sourcing
+      // groups per tenant in the DISPATCH_LUA scheduler.
+      // Default 100 (≈ one worker pod's concurrency) — every install
+      // gets noisy-neighbour protection out of the box. Set to "0" to
+      // disable entirely (incident kill switch). Set to a positive int
+      // to retune (e.g. raise for a legitimate heavy single-tenant
+      // workload).
+      LANGWATCH_DISPATCH_TENANT_CAP: z.string().optional(),
+      // Post-2026-05-29 dynamic water-level cap (option C). Global in-flight
+      // budget = the fleet ceiling (pods x GLOBAL_QUEUE_CONCURRENCY) that the
+      // water-fill divides across competing tenants, so a lone tenant bursts to
+      // the full fleet and N contenders converge to a max-min fair share. Unset
+      // or "0" (default) keeps the fixed LANGWATCH_DISPATCH_TENANT_CAP behaviour
+      // — the feature ships inert and is enabled per-environment.
+      LANGWATCH_DISPATCH_GLOBAL_BUDGET: z.string().optional(),
       USE_S3_STORAGE: z.boolean().optional(),
       S3_ENDPOINT: z.string().optional(),
       S3_ACCESS_KEY_ID: z.string().optional(),
       S3_SECRET_ACCESS_KEY: z.string().optional(),
+      // Optional STS session token. Required for temporary credentials
+      // (SSO local dev, STS:AssumeRole, etc.). For long-lived IAM-user
+      // keys this stays unset.
+      S3_SESSION_TOKEN: z.string().optional(),
+      // AWS region for the S3 client. The legacy default "auto" is the
+      // R2 / MinIO convention; real AWS S3 needs a real region
+      // (eu-central-1, us-east-1, etc.) or SigV4 fails with
+      // SignatureDoesNotMatch.
+      S3_REGION: z.string().optional(),
       S3_BUCKET_NAME: z.string().optional(),
+      // Root path used by the stored-objects LocalFilesystemDriver when S3 is
+      // not configured. Defaults to /var/lib/langwatch/objects inside the
+      // service. Self-hosting operators running multi-pod deployments MUST
+      // configure object storage instead — the local-FS path is dev-only.
+      LANGWATCH_LOCAL_STORAGE_PATH: z.string().optional(),
+      // Azure Blob Storage — optional alternative to S3 for stored-objects.
+      // Set all three together; AZURE_BLOB_ENDPOINT only needs to be set for
+      // emulator or sovereign-cloud deployments (e.g. Azurite, Azure Gov).
+      AZURE_BLOB_ACCOUNT_NAME: z.string().optional(),
+      AZURE_BLOB_ACCOUNT_KEY: z.string().optional(),
+      AZURE_BLOB_ENDPOINT: z.string().optional(),
       DATASET_STORAGE_LOCAL: z.boolean().optional(),
       CREDENTIALS_SECRET: z.string().optional(),
       AZURE_AD_CLIENT_ID: z.string().optional(),
@@ -193,6 +274,9 @@ export function createEnvConfig() {
       NEXTAUTH_URL: process.env.NEXTAUTH_URL,
       LW_GATEWAY_INTERNAL_SECRET: process.env.LW_GATEWAY_INTERNAL_SECRET,
       LW_GATEWAY_JWT_SECRET: process.env.LW_GATEWAY_JWT_SECRET,
+      LW_GATEWAY_BASE_URL: process.env.LW_GATEWAY_BASE_URL,
+      LW_GATEWAY_PUBLIC_URL: process.env.LW_GATEWAY_PUBLIC_URL,
+      LW_GATEWAY_INTERNAL_URL: process.env.LW_GATEWAY_INTERNAL_URL,
       LW_VIRTUAL_KEY_PEPPER: process.env.LW_VIRTUAL_KEY_PEPPER,
       AUTH0_CLIENT_ID: process.env.AUTH0_CLIENT_ID,
       AUTH0_CLIENT_SECRET: process.env.AUTH0_CLIENT_SECRET,
@@ -200,9 +284,6 @@ export function createEnvConfig() {
       AUTH0_MGMT_CLIENT_ID: process.env.AUTH0_MGMT_CLIENT_ID,
       AUTH0_MGMT_CLIENT_SECRET: process.env.AUTH0_MGMT_CLIENT_SECRET,
       API_TOKEN_JWT_SECRET: process.env.API_TOKEN_JWT_SECRET,
-      ELASTICSEARCH_NODE_URL: process.env.ELASTICSEARCH_NODE_URL,
-      ELASTICSEARCH_API_KEY: process.env.ELASTICSEARCH_API_KEY,
-      ELASTICSEARCH_CONFIGURED: !!(process.env.ELASTICSEARCH_NODE_URL),
       REDIS_URL: process.env.REDIS_URL,
       REDIS_CLUSTER_ENDPOINTS: process.env.REDIS_CLUSTER_ENDPOINTS,
       REDIS_DB_INDEX: process.env.REDIS_DB_INDEX,
@@ -212,21 +293,14 @@ export function createEnvConfig() {
       OPENAI_API_KEY: process.env.OPENAI_API_KEY,
       SENDGRID_API_KEY: process.env.SENDGRID_API_KEY,
       LANGWATCH_NLP_SERVICE: process.env.LANGWATCH_NLP_SERVICE,
-      // Temporary, ideally we want to move this to lambda too
-      TOPIC_CLUSTERING_SERVICE: process.env.TOPIC_CLUSTERING_SERVICE
-        ? process.env.TOPIC_CLUSTERING_SERVICE
-        : process.env.LANGWATCH_NLP_SERVICE,
       LANGEVALS_ENDPOINT: process.env.LANGEVALS_ENDPOINT,
+      LANGEVALS_STAGING_THRESHOLD_BYTES: process.env.LANGEVALS_STAGING_THRESHOLD_BYTES,
+      LANGEVALS_STAGING_TTL_SECONDS: process.env.LANGEVALS_STAGING_TTL_SECONDS,
+      EVAL_MAX_PAYLOAD_BYTES: process.env.EVAL_MAX_PAYLOAD_BYTES,
+      TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES: process.env.TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES,
       DEMO_PROJECT_ID: process.env.DEMO_PROJECT_ID,
       DEMO_PROJECT_USER_ID: process.env.DEMO_PROJECT_USER_ID,
       DEMO_PROJECT_SLUG: process.env.DEMO_PROJECT_SLUG,
-      IS_OPENSEARCH:
-        process.env.IS_OPENSEARCH === "1" ||
-        process.env.IS_OPENSEARCH?.toLowerCase() === "true",
-      IS_QUICKWIT:
-        process.env.IS_QUICKWIT === "1" ||
-        process.env.IS_QUICKWIT?.toLowerCase() === "true" ||
-        process.env.ELASTICSEARCH_NODE_URL?.startsWith("quickwit://"),
       USE_AWS_SES: process.env.USE_AWS_SES,
       AWS_REGION: process.env.AWS_REGION,
       EMAIL_DEFAULT_FROM: process.env.EMAIL_DEFAULT_FROM,
@@ -234,14 +308,29 @@ export function createEnvConfig() {
       IS_SAAS:
         process.env.IS_SAAS === "1" ||
         process.env.IS_SAAS?.toLowerCase() === "true",
+      BLOCK_LOCAL_HTTP_CALLS:
+        process.env.BLOCK_LOCAL_HTTP_CALLS === "1" ||
+        process.env.BLOCK_LOCAL_HTTP_CALLS?.toLowerCase() === "true",
+      ALLOWED_PROXY_HOSTS: process.env.ALLOWED_PROXY_HOSTS,
       SHOW_OPS_IN_MAIN_SIDEBAR: process.env.SHOW_OPS_IN_MAIN_SIDEBAR,
+      LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD:
+        process.env.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD,
+      LANGWATCH_DISPATCH_TENANT_CAP: process.env.LANGWATCH_DISPATCH_TENANT_CAP,
+      LANGWATCH_DISPATCH_GLOBAL_BUDGET:
+        process.env.LANGWATCH_DISPATCH_GLOBAL_BUDGET,
       USE_S3_STORAGE:
         process.env.USE_S3_STORAGE === "1" ||
         process.env.USE_S3_STORAGE?.toLowerCase() === "true",
       S3_ENDPOINT: process.env.S3_ENDPOINT,
       S3_ACCESS_KEY_ID: process.env.S3_ACCESS_KEY_ID,
       S3_SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY,
+      S3_SESSION_TOKEN: process.env.S3_SESSION_TOKEN,
+      S3_REGION: process.env.S3_REGION,
       S3_BUCKET_NAME: process.env.S3_BUCKET_NAME,
+      LANGWATCH_LOCAL_STORAGE_PATH: process.env.LANGWATCH_LOCAL_STORAGE_PATH,
+      AZURE_BLOB_ACCOUNT_NAME: process.env.AZURE_BLOB_ACCOUNT_NAME,
+      AZURE_BLOB_ACCOUNT_KEY: process.env.AZURE_BLOB_ACCOUNT_KEY,
+      AZURE_BLOB_ENDPOINT: process.env.AZURE_BLOB_ENDPOINT,
       DATASET_STORAGE_LOCAL:
         process.env.DATASET_STORAGE_LOCAL === "1" ||
         process.env.DATASET_STORAGE_LOCAL?.toLowerCase() === "true",
@@ -306,6 +395,18 @@ export function createEnvConfig() {
     !process.env.SKIP_ENV_VALIDATION &&
     !process.env.BUILD_TIME
   ) {
+    if (
+      (process.env.IS_SAAS === "1" ||
+        process.env.IS_SAAS?.toLowerCase() === "true") &&
+      !(
+        process.env.BLOCK_LOCAL_HTTP_CALLS === "1" ||
+        process.env.BLOCK_LOCAL_HTTP_CALLS?.toLowerCase() === "true"
+      )
+    ) {
+      throw new Error(
+        "IS_SAAS=true requires BLOCK_LOCAL_HTTP_CALLS=true to keep SSRF protections enabled",
+      );
+    }
     assertGatewaySecretsAllOrNone(process.env);
   }
 

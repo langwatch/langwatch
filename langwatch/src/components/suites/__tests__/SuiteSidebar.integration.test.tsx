@@ -15,6 +15,21 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SimulationSuite } from "@prisma/client";
+
+// VoiceAgentsCallout pulls project context via useOrganizationTeamProject,
+// which in turn fires tRPC queries the bare SuiteSidebar test rig doesn't
+// provide. Stub it here so the sidebar tests keep their narrow scope; the
+// callout itself has dedicated coverage in VoiceAgentsCallout.unit.test.tsx.
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: vi.fn(() => ({
+    project: { id: "project_1" },
+  })),
+}));
+
+vi.mock("posthog-js", () => ({
+  default: { capture: vi.fn() },
+}));
+
 import { SuiteSidebar, SUITE_SIDEBAR_COLLAPSED_KEY } from "../SuiteSidebar";
 import { NowProvider } from "../NowProvider";
 import { ALL_RUNS_ID } from "../useSuiteRouting";
@@ -36,6 +51,8 @@ function makeSuite(
     targets: [],
     repeatCount: 1,
     labels: [],
+    simulatorModel: null,
+    judgeModel: null,
     archivedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -60,6 +77,7 @@ describe("<SuiteSidebar/>", () => {
   });
 
   describe("given no suites exist", () => {
+    /** @scenario "Empty state when no run plans exist" */
     it("displays empty state message", () => {
       render(<SuiteSidebar {...defaultProps} suites={[]} />, {
         wrapper: Wrapper,
@@ -84,6 +102,7 @@ describe("<SuiteSidebar/>", () => {
       makeSuite({ id: "suite_3", name: "Quick Run", slug: "quick-run" }),
     ];
 
+    /** @scenario "Sidebar still shows suite names and action buttons after label removal" */
     it("displays all suite names", () => {
       render(<SuiteSidebar {...defaultProps} suites={suites} />, {
         wrapper: Wrapper,
@@ -186,6 +205,7 @@ describe("<SuiteSidebar/>", () => {
     });
 
     describe("when typing 'billing' in the search box", () => {
+      /** @scenario Suite sidebar filters suites with search icon visible */
       it("filters to only show Billing Edge", async () => {
         const user = userEvent.setup();
 
@@ -203,6 +223,7 @@ describe("<SuiteSidebar/>", () => {
     });
 
     describe("when search matches no suites", () => {
+      /** @scenario "Empty state when search has no matches" */
       it("displays no matching suites message", async () => {
         const user = userEvent.setup();
 

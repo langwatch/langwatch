@@ -4,6 +4,20 @@ Feature: Correct checkType for workflow evaluators in monitors
   I want workflow evaluators to save with correct checkType
   So that they execute properly at runtime
 
+  # All 10 @unimplemented scenarios remain unbound — per AUDIT_MANIFEST.md all
+  # KEEP-need-test-added against OnlineEvaluationDrawer.tsx + evaluationsWorker.ts:
+  # - "Workflow evaluator saves with workflow checkType" (drawer:979)
+  # - "Workflow evaluator does NOT save as langevals/basic" (drawer:979-981)
+  # - "Built-in evaluator saves with correct evaluator type" (drawer:981)
+  # - "Different built-in evaluators save correct types" (parametric variant)
+  # - "Editing workflow monitor preserves checkType" (monitors.ts:228)
+  # - "Editing built-in monitor preserves checkType" (same router update path)
+  # - "Monitor with workflow checkType uses evaluatorId for execution" (worker:110-124)
+  # - "Monitor with built-in checkType uses checkType for execution" (worker:412)
+  # - "Workflow evaluator config remains empty" (drawer:982)
+  # - "Built-in evaluator config contains evaluatorType" (drawer:973-981)
+  # All implementations exist; integration tests pending in PR #3458.
+
   Background:
     Given I am logged in to a project
     And I have a workflow evaluator "Custom Scorer"

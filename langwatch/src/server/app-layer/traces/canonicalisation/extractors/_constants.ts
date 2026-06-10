@@ -25,6 +25,9 @@ export const ATTR_KEYS = {
   GEN_AI_REQUEST_SEED: "gen_ai.request.seed",
   GEN_AI_REQUEST_STOP_SEQUENCES: "gen_ai.request.stop_sequences",
   GEN_AI_REQUEST_CHOICE_COUNT: "gen_ai.request.choice.count",
+  // Reasoning effort knob (OpenAI low|medium|high; Anthropic emits it as
+  // `effort`, e.g. xhigh, on its claude_code api_request events).
+  GEN_AI_REQUEST_REASONING_EFFORT: "gen_ai.request.reasoning_effort",
   GEN_AI_INPUT_MESSAGES: "gen_ai.input.messages",
   GEN_AI_OUTPUT_MESSAGES: "gen_ai.output.messages",
   GEN_AI_OUTPUT_TYPE: "gen_ai.output.type",
@@ -76,9 +79,17 @@ export const ATTR_KEYS = {
   AI_RESPONSE_OBJECT: "ai.response.object",
   AI_MODEL: "ai.model",
   AI_USAGE: "ai.usage",
+  // Vercel AI SDK cache token details (flat-dotted; opencode and other AI-SDK
+  // embedders emit these instead of gen_ai.usage.cache_*). cacheReadTokens and
+  // cacheWriteTokens live under inputTokenDetails; cachedInputTokens is the
+  // older flat alias for the read count.
+  AI_USAGE_CACHED_INPUT_TOKENS: "ai.usage.cachedInputTokens",
+  AI_USAGE_CACHE_READ_TOKENS: "ai.usage.inputTokenDetails.cacheReadTokens",
+  AI_USAGE_CACHE_WRITE_TOKENS: "ai.usage.inputTokenDetails.cacheWriteTokens",
   AI_TOOL_CALL: "ai.toolCall",
   AI_TOOL_CALL_NAME: "ai.toolCall.name",
   AI_TOOL_CALL_ARGS: "ai.toolCall.args",
+  AI_TOOL_CALL_RESULT: "ai.toolCall.result",
 
   // OpenTelemetry LLM attributes
   LLM_MODEL_NAME: "llm.model_name",
@@ -104,10 +115,22 @@ export const ATTR_KEYS = {
   LANGWATCH_METRICS: "langwatch.metrics",
   LANGWATCH_MODEL_INPUT_COST_PER_TOKEN: "langwatch.model.inputCostPerToken",
   LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN: "langwatch.model.outputCostPerToken",
+  LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN:
+    "langwatch.model.cacheReadCostPerToken",
+  LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN:
+    "langwatch.model.cacheCreationCostPerToken",
 
   // LangWatch attributes
   LANGWATCH_INPUT: "langwatch.input",
   LANGWATCH_OUTPUT: "langwatch.output",
+  // The verbatim provider request/response bodies a Claude Code model call was
+  // folded from. The light gen_ai.input.messages / gen_ai.completion give the
+  // readable chat view; these carry the FULL payload (system prompt, every
+  // tool/skill schema, the whole message history with cache_control markers) so
+  // a call's cache_creation / cache_read token counts can be traced to what
+  // actually filled the prompt cache. Surfaced in the drawer's Span Attributes.
+  CLAUDE_CODE_REQUEST_BODY: "langwatch.claude_code.request_body",
+  CLAUDE_CODE_RESPONSE_BODY: "langwatch.claude_code.response_body",
   LANGWATCH_RESERVED_VALUE_TYPES: "langwatch.reserved.value_types",
   LANGWATCH_PARAMS: "langwatch.params",
   LANGWATCH_RAG_CONTEXTS: "langwatch.rag.contexts",
@@ -164,6 +187,18 @@ export const ATTR_KEYS = {
   OPENINFERENCE_USER_ID: "user.id",
   OPENINFERENCE_SESSION_ID: "session.id",
   OPENINFERENCE_TAG_TAGS: "tag.tags",
+  // OpenInference token-usage attributes (llm.token_count.*) — emitted by
+  // openinference.instrumentation.{openai,anthropic,langchain,...}.
+  // Mapped to canonical gen_ai.usage.* by OpenInferenceExtractor.
+  OPENINFERENCE_LLM_TOKEN_COUNT_PROMPT: "llm.token_count.prompt",
+  OPENINFERENCE_LLM_TOKEN_COUNT_COMPLETION: "llm.token_count.completion",
+  OPENINFERENCE_LLM_TOKEN_COUNT_TOTAL: "llm.token_count.total",
+  OPENINFERENCE_LLM_TOKEN_COUNT_COMPLETION_DETAILS_REASONING:
+    "llm.token_count.completion_details.reasoning",
+  OPENINFERENCE_LLM_TOKEN_COUNT_PROMPT_DETAILS_CACHE_READ:
+    "llm.token_count.prompt_details.cache_read",
+  OPENINFERENCE_LLM_TOKEN_COUNT_PROMPT_DETAILS_CACHE_WRITE:
+    "llm.token_count.prompt_details.cache_write",
 
   // Haystack attributes
   RETRIEVAL_DOCUMENTS: "retrieval.documents",
@@ -177,6 +212,14 @@ export const ATTR_KEYS = {
   GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS:
     "gen_ai.usage.cache_creation.input_tokens",
   GEN_AI_USAGE_CACHED_INPUT_TOKENS: "gen_ai.usage.cached_input_tokens", // Mastra non-standard
+
+  // Set by an extractor on a span whose token usage is a redundant copy of
+  // another span's (e.g. codex emits one turn-rollup span AND a lower-level
+  // response span carrying the SAME usage). The fold skips token/cost/cache
+  // accumulation for marked spans so the trace total counts the usage once,
+  // while the per-span detail still shows it on each span.
+  LANGWATCH_RESERVED_SKIP_TOKEN_ACCUMULATION:
+    "langwatch.reserved.skip_token_accumulation",
 
   // Mastra attributes
   MASTRA_INPUT: "input",

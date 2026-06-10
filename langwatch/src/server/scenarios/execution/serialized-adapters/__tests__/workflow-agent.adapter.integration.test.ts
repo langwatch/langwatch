@@ -171,6 +171,7 @@ describe("SerializedWorkflowAgentAdapter — e2e against live NLP (#3415)", () =
     nlpUp = await nlpReachable();
   });
 
+  /** @scenario chat_messages-typed signature input runs without HTTP 500 */
   it("runs repro-bug2 (chat_messages type) without HTTP 500 [AC 2]", async () => {
     if (!nlpUp) return;
     const wf = cloneWorkflow(loadRepro(REPRO_BUG2));
@@ -186,6 +187,10 @@ describe("SerializedWorkflowAgentAdapter — e2e against live NLP (#3415)", () =
     expect(output).not.toMatch(/\\"role\\":/);
   }, 120_000);
 
+  /** @scenario All scenario-mapped and static variables interpolate into the LLM prompt */
+  /** @scenario Pre-existing str-typed workflows still function */
+  /** @scenario A 2-turn scenario produces at least 2 distinct provider messages */
+  /** @scenario Same template interpolates cleanly across Studio-exposed field types */
   it(
     "interpolates template variables and preserves history [AC 1, 4, 6]",
     async () => {

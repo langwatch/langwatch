@@ -152,6 +152,57 @@ export const getProjectModelProvidersForFrontend = async (
   };
 };
 
+// List shape (one entry per row) for surfaces that need to render every
+// stored credential — the Model Providers settings table can show two
+// rows of the same provider when the user has e.g. "OpenAI — Org" and
+// "OpenAI — Project override" side by side. The Record-by-provider-key
+// `getProjectModelProvidersForFrontend` collapses those duplicates and
+// is not safe to use here.
+export const listOrgModelProvidersForFrontend = async (
+  organizationId: string,
+) => {
+  const service = ModelProviderService.create(prisma);
+  const providers =
+    await service.listOrgModelProvidersForFrontend(organizationId);
+
+  const registryMetadata = getModelMetadataForFrontend();
+  const providersAsRecord = Object.fromEntries(
+    providers.map((p) => [p.id ?? `system-${p.provider}`, p]),
+  );
+  const modelMetadata = mergeCustomModelMetadata(
+    registryMetadata,
+    providersAsRecord,
+  );
+
+  return {
+    providers,
+    modelMetadata,
+  };
+};
+
+export const listProjectModelProvidersForFrontend = async (
+  projectId: string,
+) => {
+  const service = ModelProviderService.create(prisma);
+  const providers = await service.listProjectModelProvidersForFrontend(
+    projectId,
+  );
+
+  const registryMetadata = getModelMetadataForFrontend();
+  const providersAsRecord = Object.fromEntries(
+    providers.map((p) => [p.id ?? p.provider, p]),
+  );
+  const modelMetadata = mergeCustomModelMetadata(
+    registryMetadata,
+    providersAsRecord,
+  );
+
+  return {
+    providers,
+    modelMetadata,
+  };
+};
+
 const getModelOrDefaultEnvKey = (
   modelProvider: MaybeStoredModelProvider,
   envKey: string,

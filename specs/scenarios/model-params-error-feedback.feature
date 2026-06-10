@@ -3,6 +3,13 @@ Feature: Model params preparation error feedback
   I want to see specific error messages when scenario model params preparation fails
   So that I can quickly diagnose and fix model configuration issues
 
+  # Per AUDIT_MANIFEST.md: 12 scenarios → 2 DUPLICATE (already covered elsewhere
+  # and removed) + 10 KEEP-need-test-added. The 10 KEEP scenarios remain
+  # @unimplemented pending direct factory-branch unit tests (invalid_model_format,
+  # provider_not_found, missing_params×2, preparation_error,
+  # success-with-LiteLLM-params, prefetcher logging) and TRPC-layer integration
+  # tests (3 reasons) — tracked in PR #3458.
+
   # ============================================================================
   # Factory-level structured errors - Unit Tests
   # ============================================================================
@@ -24,14 +31,6 @@ Feature: Model params preparation error feedback
     And the project has no provider named "azure"
     When model params preparation runs
     Then it returns failure with reason "provider_not_found"
-    And the error message includes the provider name "azure"
-
-  @unit @unimplemented
-  Scenario: Reject model when provider exists but is not enabled
-    Given a model string "azure/gpt-4" with valid format
-    And the project has provider "azure" but it is disabled
-    When model params preparation runs
-    Then it returns failure with reason "provider_not_enabled"
     And the error message includes the provider name "azure"
 
   @unit @unimplemented
@@ -60,7 +59,7 @@ Feature: Model params preparation error feedback
     Then it returns failure with reason "preparation_error"
     And the error message includes the original error detail
 
-  @unit @unimplemented
+  @unit
   Scenario: Return success with LiteLLM params on valid configuration
     Given a model string "openai/gpt-4" with valid format
     And the provider "openai" is enabled with a valid API key
@@ -73,15 +72,7 @@ Feature: Model params preparation error feedback
   # prefetchScenarioData must forward the reason code and actionable message
   # from the modelParamsProvider instead of a generic error.
 
-  @unit @unimplemented
-  Scenario: Prefetcher forwards reason code from model params failure
-    Given modelParamsProvider returns failure with reason "provider_not_enabled"
-    And the failure message is "Provider 'azure' is not enabled for this project"
-    When prefetchScenarioData is called
-    Then the result includes reason "provider_not_enabled"
-    And the error message is "Provider 'azure' is not enabled for this project"
-
-  @unit @unimplemented
+  @unit
   Scenario: Prefetcher logs model params failure with reason
     Given modelParamsProvider returns failure with reason "invalid_model_format"
     When prefetchScenarioData is called

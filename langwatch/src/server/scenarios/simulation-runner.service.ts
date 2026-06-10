@@ -1,7 +1,6 @@
 import ScenarioRunner, { type AgentAdapter } from "@langwatch/scenario";
 import type { PrismaClient } from "@prisma/client";
 import { env } from "~/env.mjs";
-import { DEFAULT_MODEL } from "~/utils/constants";
 import { createLogger } from "~/utils/logger/server";
 import type { SimulationTarget } from "../api/routers/scenarios";
 import { getVercelAIModel } from "../modelProviders/utils";
@@ -58,17 +57,27 @@ export class SimulationRunnerService {
       // TODO: We should use the project service or repository instead of prisma directly
       const project = await this.prisma.project.findUnique({
         where: { id: projectId },
-        select: { apiKey: true, defaultModel: true },
+        select: { apiKey: true },
       });
 
       if (!project?.apiKey) {
         throw new Error(`Project ${projectId} not found or has no API key`);
       }
 
-      // 3. Get project's default model for simulator and judge agents
-      const defaultModel = project.defaultModel ?? DEFAULT_MODEL;
-      const simulatorModel = await getVercelAIModel(projectId, defaultModel);
-      const judgeModel = await getVercelAIModel(projectId, defaultModel);
+      // 3. Resolve the user-simulator and judge models via the cascade.
+      //    Each defaults to its own DEFAULT-role feature key so the
+      //    role-play and evaluation use a smart model. Throws
+      //    ModelNotConfiguredError if no scope has one configured; the
+      //    surrounding catch logs and bails so the user is prompted to add
+      //    a default before retrying.
+      const simulatorModel = await getVercelAIModel({
+        projectId,
+        featureKey: "scenarios.user_simulator",
+      });
+      const judgeModel = await getVercelAIModel({
+        projectId,
+        featureKey: "scenarios.judge",
+      });
 
       // 4. Resolve target to adapter
       logger.debug(
@@ -98,7 +107,6 @@ export class SimulationRunnerService {
           batchRunId,
           batchRunIdLength: batchRunId.length,
           targetType: target.type,
-          model: defaultModel,
         },
         "Starting scenario execution with batchRunId",
       );

@@ -40,6 +40,9 @@ export class GroupQueueDispatcher {
           let dispatched: number;
           do {
             dispatched = await this.dispatchBatch();
+            if (dispatched > 0) {
+              await new Promise((resolve) => setTimeout(resolve, 25));
+            }
           } while (dispatched > 0 && !this.shutdownRequested);
 
           // Drain signals that arrived during dispatch to prevent

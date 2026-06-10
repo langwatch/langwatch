@@ -35,7 +35,7 @@ export function ConfirmDialog({
       open={open}
       onOpenChange={(details) => onOpenChange(details.open)}
     >
-      <Dialog.Content maxWidth="480px">
+      <Dialog.Content bg="bg" maxWidth="480px">
         <Dialog.Header>
           <HStack gap={3} align="start">
             <AlertTriangle

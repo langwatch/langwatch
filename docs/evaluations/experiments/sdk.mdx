@@ -45,7 +45,12 @@ Be sure to login or create an account on the link that will be displayed, then p
   <Tab title="Environment Variable">
 ```bash
 export LANGWATCH_API_KEY=your_api_key
+export LANGWATCH_PROJECT_ID=your_project_id  # Required for service API keys
 ```
+
+<Note>
+  `LANGWATCH_PROJECT_ID` is required when using a **service API key** (e.g. for CI/CD or multi-project setups). Project API keys obtained via `langwatch.login()` or from the project settings page already have the project context built in.
+</Note>
   </Tab>
 </Tabs>
 
@@ -188,7 +193,7 @@ evaluation.log("coherence", {
 ## Comparing Multiple Targets
 
 When comparing different models, prompts, or configurations, use targets to organize your results.
-Both SDKs provide a `target()` / `withTarget()` context that automatically captures latency and enables context inference.
+Both SDKs provide a `target()`, `withTarget()` context that automatically captures latency and enables context inference.
 
 <Tabs>
   <Tab title="Python">
@@ -373,9 +378,9 @@ for index, row in evaluation.loop(df.iterrows(), threads=4):
 
 ### Async-native mode
 
-The default `loop()` / `submit()` path above already parallelises — each submitted task runs in a worker thread, so sync and async tasks both speed up with no extra work on your side. That's the right choice for most users.
+The default `loop()`, `submit()` path above already parallelises, each submitted task runs in a worker thread, so sync and async tasks both speed up with no extra work on your side. That's the right choice for most users.
 
-Reach for `aloop()` / `asubmit()` only when your code is fully async-first and your task relies on async state whose identity is tied to one event loop. The threading path spins up a fresh event loop per worker, so those objects raise `"Future attached to a different loop"` on first use. `aloop` / `asubmit` keep every submitted task on the caller's event loop, so that state stays valid across concurrent items.
+Reach for `aloop()`, `asubmit()` only when your code is fully async-first and your task relies on async state whose identity is tied to one event loop. The threading path spins up a fresh event loop per worker, so those objects raise `"Future attached to a different loop"` on first use. `aloop`, `asubmit` keep every submitted task on the caller's event loop, so that state stays valid across concurrent items.
 
 ```python
 evaluation = langwatch.experiment.init("async-eval-example")

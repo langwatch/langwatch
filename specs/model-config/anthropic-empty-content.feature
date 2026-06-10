@@ -3,6 +3,12 @@ Feature: Anthropic Empty Content Block Handling
   I want empty content blocks filtered before sending to Anthropic API
   So that prompts don't fail with "text content blocks must be non-empty"
 
+  # All scenarios describe the empty-content-block filter that lives in
+  # the Python boundary layer (`langwatch_nlp/`). LangWatch-side
+  # bindings don't apply. The TS-side handlers don't filter content blocks
+  # — that responsibility is downstream. Move/duplicate to the Python
+  # repo's test suite.
+
   Background:
     Given Anthropic API strictly rejects empty text content blocks
     And other providers (OpenAI, Google) are lenient with empty content

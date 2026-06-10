@@ -12,9 +12,43 @@ import type { ProjectionStoreContext } from "./projectionStoreContext";
 
 const logger = createLogger("langwatch:event-sourcing:redis-cached-fold-store");
 
-export interface RedisCachedFoldStoreOptions {
+export interface RedisCachedFoldStoreOptions<State = unknown> {
   keyPrefix: string;
   ttlSeconds?: number;
+  /**
+   * Optional projection applied to the fold state before it is cached in Redis.
+   * The inner store still receives the FULL state (ClickHouse is the durable
+   * source of truth); only the Redis cache entry is leaned. Use this to keep
+   * carried-but-not-folded payload (e.g. computed input/output text) out of the
+   * hot cache — the Redis-clog + O(N²)-serialize root cause for large traces.
+   * The next fold step reads this shape back on a cache hit, so the projection
+   * MUST preserve every field the fold's `apply` reads (reductions + winner
+   * pointers + nullness markers).
+   */
+  toCacheable?: (state: State) => unknown;
+}
+
+/**
+ * Default cache TTL, in seconds. Sized to outlast the processing of a single
+ * aggregate's event stream so the fold state stays warm in Redis across
+ * consecutive events instead of expiring mid-stream and forcing a ClickHouse
+ * fallback read of the (potentially large) state on every event. Matches the
+ * queue's activeTtlSec — the upper bound on how long one aggregate stays
+ * in-flight.
+ *
+ * Overridable via LANGWATCH_FOLD_CACHE_TTL_SECONDS (read at call time, like
+ * LANGWATCH_DISPATCH_TENANT_CAP) so operators can dial residency down without a
+ * redeploy: the fold-cache key set is one entry per aggregate touched within
+ * the TTL window, so a longer TTL trades Redis memory for fewer ClickHouse
+ * fallback reads. Group-coalescing already collapses an aggregate's in-flight
+ * reads to one per batch, so this is a secondary lever, not the primary fix.
+ */
+function defaultFoldCacheTtlSeconds(): number {
+  const raw = process.env.LANGWATCH_FOLD_CACHE_TTL_SECONDS;
+  if (raw === undefined || raw === "") return 300;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 300;
+  return parsed;
 }
 
 /**
@@ -32,14 +66,16 @@ export class RedisCachedFoldStore<State>
 {
   private readonly ttlSeconds: number;
   private readonly keyPrefix: string;
+  private readonly toCacheable?: (state: State) => unknown;
 
   constructor(
     private readonly inner: FoldProjectionStore<State>,
     private readonly redis: Redis,
-    options: RedisCachedFoldStoreOptions,
+    options: RedisCachedFoldStoreOptions<State>,
   ) {
     this.keyPrefix = options.keyPrefix;
-    this.ttlSeconds = options.ttlSeconds ?? 30;
+    this.ttlSeconds = options.ttlSeconds ?? defaultFoldCacheTtlSeconds();
+    this.toCacheable = options.toCacheable;
   }
 
   async get(
@@ -90,7 +126,8 @@ export class RedisCachedFoldStore<State>
     // 2. Redis second — cache for fast reads on next fold step
     try {
       const key = this.redisKey(aggregateId, context);
-      await this.redis.set(key, JSON.stringify(state), "EX", this.ttlSeconds);
+      const cacheable = this.toCacheable ? this.toCacheable(state) : state;
+      await this.redis.set(key, JSON.stringify(cacheable), "EX", this.ttlSeconds);
     } catch (error) {
       incrementEsFoldCacheRedisError(this.keyPrefix, "set");
       logger.warn(

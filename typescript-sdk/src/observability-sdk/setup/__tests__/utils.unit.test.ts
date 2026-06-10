@@ -20,6 +20,19 @@ describe('utils.ts', () => {
     it('returns true for object with addSpanProcessor function', () => {
       expect(utils.isConcreteProvider({ addSpanProcessor: () => { /* */ } })).toBe(true);
     });
+    it('returns false for object with _activeSpanProcessor but no array registry', () => {
+      expect(utils.isConcreteProvider({ _activeSpanProcessor: {} })).toBe(false);
+      expect(utils.isConcreteProvider({ _activeSpanProcessor: { _spanProcessors: 'not-array' } })).toBe(false);
+    });
+    it('returns true for OTel 2.x shape: _activeSpanProcessor._spanProcessors array', () => {
+      expect(utils.isConcreteProvider({ _activeSpanProcessor: { _spanProcessors: [] } })).toBe(true);
+    });
+    it('returns true for OTel 1.x shape: _registeredSpanProcessors array', () => {
+      expect(utils.isConcreteProvider({ _registeredSpanProcessors: [] })).toBe(true);
+    });
+    it('returns true for alternate shape: activeSpanProcessor._spanProcessors array', () => {
+      expect(utils.isConcreteProvider({ activeSpanProcessor: { _spanProcessors: [] } })).toBe(true);
+    });
   });
 
   describe('createMergedResource', () => {

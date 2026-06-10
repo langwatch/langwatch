@@ -1,4 +1,11 @@
 Feature: Gateway service — public HTTP surface and operational basics
+
+  # All scenarios in this file describe the Go gateway service's HTTP
+  # surface — content-type negotiation, request-id echoing, panic
+  # recovery, graceful shutdown, structured logging, body size cap,
+  # config validation, JWT secret rotation. Implemented entirely in
+  # services/aigateway/, out of scope for the TS parity check.
+
   The Go gateway service exposes OpenAI-compatible, Anthropic-compatible,
   and operational endpoints. This feature covers the plumbing: routing,
   request ids, logging, panic recovery, graceful shutdown.

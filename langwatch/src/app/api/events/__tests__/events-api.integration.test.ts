@@ -4,24 +4,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
 
-vi.mock("~/server/app-layer/events/track-event.service", async (importOriginal) => {
-  const actual =
-    await importOriginal<
-      typeof import("~/server/app-layer/events/track-event.service")
-    >();
-  return {
-    ...actual,
-    recordTrackedEventSpan: vi.fn().mockResolvedValue(void 0),
-  };
-});
-
-vi.mock("~/server/background/queues/trackEventsQueue", () => ({
-  TRACK_EVENTS_QUEUE: { JOB: "track_event" },
-  trackEventsQueue: { add: vi.fn().mockResolvedValue(void 0) },
-}));
+vi.mock(
+  "~/server/app-layer/events/track-event.service",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/events/track-event.service")
+      >();
+    return {
+      ...actual,
+      recordTrackedEventSpan: vi.fn().mockResolvedValue(void 0),
+    };
+  },
+);
 
 import { recordTrackedEventSpan } from "~/server/app-layer/events/track-event.service";
-import { trackEventsQueue } from "~/server/background/queues/trackEventsQueue";
 import { app } from "../[[...route]]/app";
 
 describe("Events API", () => {
@@ -61,13 +58,11 @@ describe("Events API", () => {
       },
     });
 
-    testProject = projectFactory.build({
-      slug: nanoid(),
-    });
     testProject = await prisma.project.create({
       data: {
-        ...testProject,
+        ...projectFactory.build({ slug: nanoid() }),
         teamId: testTeam.id,
+        personalFeatures: {},
       },
     });
 
@@ -91,7 +86,7 @@ describe("Events API", () => {
 
   describe("POST /api/events/track", () => {
     describe("when a custom event type is posted", () => {
-      it("records the span, enqueues the background job, and returns 200", async () => {
+      it("records the span and returns 200", async () => {
         const res = await post({
           trace_id: "trace_123",
           event_type: "my_custom_event",
@@ -108,19 +103,6 @@ describe("Events API", () => {
               event_type: "my_custom_event",
             }),
             eventId: expect.any(String),
-          }),
-        );
-        expect(trackEventsQueue.add).toHaveBeenCalledWith(
-          "track_event",
-          expect.objectContaining({
-            project_id: testProjectId,
-            event: expect.objectContaining({
-              trace_id: "trace_123",
-              event_type: "my_custom_event",
-            }),
-          }),
-          expect.objectContaining({
-            jobId: expect.stringContaining(`${testProjectId}_track_event_`),
           }),
         );
       });
@@ -152,7 +134,6 @@ describe("Events API", () => {
         const body = (await res.json()) as { error: string };
         expect(body.error).toContain("vote");
         expect(recordTrackedEventSpan).not.toHaveBeenCalled();
-        expect(trackEventsQueue.add).not.toHaveBeenCalled();
       });
     });
 

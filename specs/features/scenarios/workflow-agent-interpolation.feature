@@ -3,6 +3,11 @@ Feature: Workflow agent scenario interpolation and type coverage
   I want prompt template variables interpolated correctly and every Studio-exposed field type to work
   So that multi-turn scenarios behave predictably and no user-selectable type crashes the NLP service
 
+  # Parity status: 5 of 6 scenarios bound to existing tests.
+  # The remaining 1 @unimplemented scenario is covered by Python tests only;
+  # no TS adapter test exists for it yet (#3458):
+  #   - "A field type not present in FIELD_TYPE_TO_DSPY_TYPE produces a structured error"
+
   Issue: langwatch/langwatch#3415
 
   Background:
@@ -24,7 +29,7 @@ Feature: Workflow agent scenario interpolation and type coverage
 
   # --- AC 1: Interpolation (parrot-back) ---
 
-  @integration @unimplemented
+  @integration
   Scenario: All scenario-mapped and static variables interpolate into the LLM prompt
     Given the entry and signature node inputs are all typed "str"
     And the scenario supplies a 2-turn conversation history with thread id "thread-123"
@@ -37,7 +42,7 @@ Feature: Workflow agent scenario interpolation and type coverage
 
   # --- AC 2: chat_messages type no longer crashes ---
 
-  @integration @unimplemented
+  @integration
   Scenario: chat_messages-typed signature input runs without HTTP 500
     Given the entry output "messages" is typed "chat_messages"
     And the signature input "messages" is typed "chat_messages"
@@ -48,7 +53,7 @@ Feature: Workflow agent scenario interpolation and type coverage
 
   # --- AC 3: No regression for existing string-typed workflows ---
 
-  @integration @unimplemented
+  @integration
   Scenario: Pre-existing str-typed workflows still function
     Given a workflow whose entry and signature node inputs are all typed "str"
     And the signature node prompt template references "{{question}}" only
@@ -58,7 +63,7 @@ Feature: Workflow agent scenario interpolation and type coverage
 
   # --- AC 4: Multi-turn preserved as distinct chat turns ---
 
-  @integration @unimplemented
+  @integration
   Scenario: A 2-turn scenario produces at least 2 distinct provider messages
     Given a scenario with a conversation history of 2 turns (user then assistant then user)
     And the workflow signature consumes the history via a chat_messages-typed input
@@ -78,7 +83,7 @@ Feature: Workflow agent scenario interpolation and type coverage
 
   # --- AC 6: Type-agnostic interpolation ---
 
-  @integration @unimplemented
+  @integration
   Scenario Outline: Same template interpolates cleanly across Studio-exposed field types
     Given a signature input "foo" typed "<field_type>"
     And the prompt template references "{{foo}}"

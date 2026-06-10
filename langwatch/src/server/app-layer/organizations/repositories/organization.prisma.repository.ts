@@ -19,7 +19,6 @@ import {
 } from "~/utils/memberRoleConstraints";
 import { isCustomRole } from "../../../api/enterprise";
 import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "../compute-effective-team-role-updates";
-import type { OrganizationFeatureName } from "../organization.service";
 import type {
   AuditLogFilters,
   CreateAndAssignInput,
@@ -27,7 +26,6 @@ import type {
   DeleteMemberInput,
   EnrichedAuditLog,
   FullyLoadedOrganization,
-  OrganizationFeatureRow,
   OrganizationForBilling,
   OrganizationMemberWithUser,
   OrganizationRepository,
@@ -50,23 +48,53 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     return team?.organizationId ?? null;
   }
 
+  async getUserOrgRole({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }): Promise<OrganizationUserRole | null> {
+    const orgUser = await this.prisma.organizationUser.findUnique({
+      where: { userId_organizationId: { userId, organizationId } },
+      select: { role: true },
+    });
+    return orgUser?.role ?? null;
+  }
+
+  async getUserOrgRoleByTeamId({
+    userId,
+    teamId,
+  }: {
+    userId: string;
+    teamId: string;
+  }): Promise<OrganizationUserRole | null> {
+    // The Prisma multitenancy middleware rejects `OrganizationUser`
+    // queries that don't pin an `organizationId` in the where clause.
+    // Resolve teamId -> organizationId first, then look up the
+    // membership directly — keeps the middleware happy without
+    // exempting the model.
+    const team = await this.prisma.team.findUnique({
+      where: { id: teamId },
+      select: { organizationId: true },
+    });
+    if (!team) return null;
+    const orgUser = await this.prisma.organizationUser.findFirst({
+      where: {
+        userId,
+        organizationId: team.organizationId,
+      },
+      select: { role: true },
+    });
+    return orgUser?.role ?? null;
+  }
+
   async getProjectIds(organizationId: string): Promise<string[]> {
     const projects = await this.prisma.project.findMany({
       where: { team: { organizationId } },
       select: { id: true },
     });
     return projects.map((p) => p.id);
-  }
-
-  async getFeature(
-    organizationId: string,
-    feature: OrganizationFeatureName,
-  ): Promise<OrganizationFeatureRow | null> {
-    return this.prisma.organizationFeature.findUnique({
-      where: {
-        feature_organizationId: { feature, organizationId },
-      },
-    });
   }
 
   async findWithAdmins(
@@ -283,7 +311,6 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
             userId,
           },
         },
-        features: true,
         teams: {
           where: {
             archivedAt: null,
@@ -297,6 +324,11 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
             projects: {
               where: {
                 archivedAt: null,
+                // Hide the internal-governance Project from every UI consumer.
+                // It exists only as a routing/tenancy artifact for IngestionSource
+                // data; never user-visible. See specs/ai-gateway/governance/
+                // architecture-invariants.feature + ui-contract.feature.
+                kind: { not: "internal_governance" },
               },
             },
           },
@@ -417,6 +449,12 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           ? encrypt(input.elasticsearchApiKey)
           : null,
         s3Bucket: input.s3Bucket,
+        ...(input.presenceEnabled !== undefined
+          ? { presenceEnabled: input.presenceEnabled }
+          : {}),
+        ...(input.supportContact !== undefined
+          ? { supportContact: input.supportContact?.trim() || null }
+          : {}),
       },
     });
   }
@@ -575,9 +613,9 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         if (updateIsCustomRole && teamRoleUpdate.customRoleId) {
           const customRole = await tx.customRole.findUnique({
             where: { id: teamRoleUpdate.customRoleId },
-            select: { organizationId: true },
+            select: { organizationId: true, kind: true },
           });
-          if (!customRole || customRole.organizationId !== organizationId) {
+          if (!customRole || customRole.kind !== "custom" || customRole.organizationId !== organizationId) {
             throw new NotFoundError("custom_role_not_found", "CustomRole", teamRoleUpdate.customRoleId ?? "unknown");
           }
         }
@@ -660,9 +698,9 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         }
         const customRole = await tx.customRole.findUnique({
           where: { id: storedCustomRoleId },
-          select: { organizationId: true, permissions: true },
+          select: { organizationId: true, permissions: true, kind: true },
         });
-        if (!customRole || customRole.organizationId !== team.organizationId) {
+        if (!customRole || customRole.kind !== "custom" || customRole.organizationId !== team.organizationId) {
           throw new TRPCError({
             code: "FORBIDDEN",
             message: "Role does not belong to team's organization",

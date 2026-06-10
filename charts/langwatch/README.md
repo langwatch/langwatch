@@ -219,19 +219,19 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `app.evaluators.google.enabled`                                         | Enable Google evaluator.                                                                  | `false`                 |
 | `app.evaluators.google.credentials.value`                               | Google credentials JSON (base64 or inline).                                               | `""`                    |
 | `app.evaluators.google.credentials.secretKeyRef`                        | Secret ref for Google credentials JSON.                                                   | `{}`                    |
-| `app.datasetObjectStorage`                                              | Object storage configuration for datasets.                                                |                         |
-| `app.datasetObjectStorage.enabled`                                      | Enable dataset object storage.                                                            | `false`                 |
-| `app.datasetObjectStorage.provider`                                     | Object storage provider.                                                                  | `awsS3`                 |
-| `app.datasetObjectStorage.bucket`                                       | Bucket name for datasets.                                                                 | `langwatch-dataset`     |
-| `app.datasetObjectStorage.providers.awsS3`                              | AWS S3 provider configuration.                                                            |                         |
-| `app.datasetObjectStorage.providers.awsS3.endpoint.value`               | Custom S3 endpoint.                                                                       | `""`                    |
-| `app.datasetObjectStorage.providers.awsS3.accessKeyId.value`            | S3 access key ID.                                                                         | `""`                    |
-| `app.datasetObjectStorage.providers.awsS3.secretAccessKey.value`        | S3 secret access key.                                                                     | `""`                    |
-| `app.datasetObjectStorage.providers.awsS3.keySalt.value`                | Optional key salt.                                                                        | `""`                    |
-| `app.datasetObjectStorage.providers.awsS3.endpoint.secretKeyRef`        | Secret ref for custom S3 endpoint.                                                        | `{}`                    |
-| `app.datasetObjectStorage.providers.awsS3.accessKeyId.secretKeyRef`     | Secret ref for S3 access key ID.                                                          | `{}`                    |
-| `app.datasetObjectStorage.providers.awsS3.secretAccessKey.secretKeyRef` | Secret ref for S3 secret access key.                                                      | `{}`                    |
-| `app.datasetObjectStorage.providers.awsS3.keySalt.secretKeyRef`         | Secret ref for optional key salt.                                                         | `{}`                    |
+| `app.dataplane`                                              | Object storage configuration for datasets.                                                |                         |
+| `app.dataplane.enabled`                                      | Enable dataset object storage.                                                            | `false`                 |
+| `app.dataplane.provider`                                     | Object storage provider.                                                                  | `awsS3`                 |
+| `app.dataplane.bucket`                                       | Bucket name for datasets.                                                                 | `langwatch-dataset`     |
+| `app.dataplane.providers.awsS3`                              | AWS S3 provider configuration.                                                            |                         |
+| `app.dataplane.providers.awsS3.endpoint.value`               | Custom S3 endpoint.                                                                       | `""`                    |
+| `app.dataplane.providers.awsS3.accessKeyId.value`            | S3 access key ID.                                                                         | `""`                    |
+| `app.dataplane.providers.awsS3.secretAccessKey.value`        | S3 secret access key.                                                                     | `""`                    |
+| `app.dataplane.providers.awsS3.keySalt.value`                | Optional key salt.                                                                        | `""`                    |
+| `app.dataplane.providers.awsS3.endpoint.secretKeyRef`        | Secret ref for custom S3 endpoint.                                                        | `{}`                    |
+| `app.dataplane.providers.awsS3.accessKeyId.secretKeyRef`     | Secret ref for S3 access key ID.                                                          | `{}`                    |
+| `app.dataplane.providers.awsS3.secretAccessKey.secretKeyRef` | Secret ref for S3 secret access key.                                                      | `{}`                    |
+| `app.dataplane.providers.awsS3.keySalt.secretKeyRef`         | Secret ref for optional key salt.                                                         | `{}`                    |
 | `app.email`                                                             | Email provider configuration.                                                             |                         |
 | `app.email.enabled`                                                     | Enable email notifications.                                                               | `false`                 |
 | `app.email.defaultFrom`                                                 | Default "from" address.                                                                   | `""`                    |
@@ -372,10 +372,10 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `langwatch_nlp.service.type`                    | Service type.                                 | `ClusterIP`     |
 | `langwatch_nlp.service.port`                    | Service port.                                 | `5561`          |
 | `langwatch_nlp.resources`                       | Resource requests and limits.                 |                 |
-| `langwatch_nlp.resources.requests.cpu`          | Requested CPU.                                | `1000m`         |
-| `langwatch_nlp.resources.requests.memory`       | Requested memory.                             | `2Gi`           |
-| `langwatch_nlp.resources.limits.cpu`            | CPU limit.                                    | `2000m`         |
-| `langwatch_nlp.resources.limits.memory`         | Memory limit.                                 | `4Gi`           |
+| `langwatch_nlp.resources.requests.cpu`          | Requested CPU.                                | `250m`          |
+| `langwatch_nlp.resources.requests.memory`       | Requested memory.                             | `256Mi`         |
+| `langwatch_nlp.resources.limits.cpu`            | CPU limit.                                    | `1`             |
+| `langwatch_nlp.resources.limits.memory`         | Memory limit.                                 | `1Gi`           |
 | `langwatch_nlp.upstreams`                       | Upstream to app (callbacks, etc.).            |                 |
 | `langwatch_nlp.upstreams.langwatch.scheme`      | Scheme to app.                                | `http`          |
 | `langwatch_nlp.upstreams.langwatch.name`        | Service name for app.                         | `langwatch-app` |

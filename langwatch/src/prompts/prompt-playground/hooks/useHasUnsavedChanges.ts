@@ -22,6 +22,14 @@ export function useHasUnsavedChanges(tabId: string): boolean {
     state.windows.flatMap((w) => w.tabs).find((t) => t.id === tabId),
   );
 
+  // Cascade-resolved model for new-prompt defaults used when computing
+  // baseline form values to compare against.
+  const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
+    { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
+    { enabled: !!project?.id },
+  );
+  const resolvedDefaultModel = resolvedDefault.data?.model;
+
   const configId = tab?.data.form.currentValues.configId;
   const currentValues = tab?.data.form.currentValues;
   const handle = tab?.data.form.currentValues.handle;
@@ -53,13 +61,9 @@ export function useHasUnsavedChanges(tabId: string): boolean {
     // No current values, still creating store for form
     if (!currentValues) return false;
 
-    const projectDefaultModel = project?.defaultModel;
-    const normalizedDefaultModel =
-      typeof projectDefaultModel === "string" ? projectDefaultModel : undefined;
-
     const savedValues = computeInitialFormValuesForPrompt({
       prompt: savedPrompt,
-      defaultModel: normalizedDefaultModel,
+      defaultModel: resolvedDefaultModel,
       useSystemMessage: true,
     });
 
@@ -68,7 +72,7 @@ export function useHasUnsavedChanges(tabId: string): boolean {
     configId,
     savedPrompt,
     currentValues,
-    project?.defaultModel,
+    resolvedDefaultModel,
     isLoadingSavedPrompt,
     handle,
   ]);

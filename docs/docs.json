@@ -65,6 +65,7 @@
                   "skills/pms-and-domain-experts"
                 ]
               },
+              "integration/install",
               "integration/cli",
               "integration/mcp",
               "better-agents/overview"
@@ -74,11 +75,9 @@
             "group": "Agent Simulations",
             "pages": [
               "agent-simulations/introduction",
-              "agent-simulations/overview",
               "agent-simulations/getting-started",
-              "agent-simulations/set-overview",
-              "agent-simulations/batch-runs",
-              "agent-simulations/individual-run"
+              "agent-simulations/voice-agents",
+              "agent-simulations/red-teaming"
             ]
           },
           {
@@ -209,10 +208,12 @@
               {
                 "group": "Administration",
                 "pages": [
+                  "platform/api-keys",
                   "platform/rbac",
                   "platform/audit-log",
                   "platform/scim",
-                  "platform/model-providers"
+                  "platform/model-providers",
+                  "platform/data-retention"
                 ]
               }
             ]
@@ -245,6 +246,7 @@
           {
             "group": "Help",
             "pages": [
+              "pricing",
               "support",
               "status"
             ]
@@ -258,7 +260,8 @@
           {
             "group": "Overview",
             "pages": [
-              "integration/overview"
+              "integration/overview",
+              "observability/trace-vs-activity-ingestion"
             ]
           },
           {
@@ -296,6 +299,7 @@
                 ]
               },
               "integration/opentelemetry/guide",
+              "integration/opentelemetry/multiple-providers",
               "integration/metadata-and-labels",
               {
                 "group": "Tutorials",
@@ -457,6 +461,7 @@
             "group": "Direct Integrations",
             "pages": [
               "integration/opentelemetry/guide",
+              "integration/opentelemetry/multiple-providers",
               "integration/rest-api"
             ]
           }
@@ -552,6 +557,15 @@
             ]
           },
           {
+            "group": "Governance",
+            "pages": [
+              "ai-gateway/governance/overview",
+              "ai-gateway/governance/personal-keys",
+              "ai-gateway/governance/admin-setup",
+              "ai-gateway/governance/routing-policies"
+            ]
+          },
+          {
             "group": "Providers",
             "pages": [
               "ai-gateway/providers/overview",
@@ -579,7 +593,6 @@
                 "group": "Safety & Governance",
                 "pages": [
                   "ai-gateway/guardrails",
-                  "ai-gateway/blocked-patterns",
                   "ai-gateway/security",
                   "ai-gateway/audit"
                 ]
@@ -610,6 +623,7 @@
             "group": "Self-Hosting",
             "pages": [
               "ai-gateway/self-hosting/helm",
+              "ai-gateway/self-hosting/post-install-checklist",
               "ai-gateway/self-hosting/config",
               "ai-gateway/self-hosting/dns-and-tls",
               "ai-gateway/self-hosting/health-checks",
@@ -628,6 +642,93 @@
               "ai-gateway/cookbooks/prometheus-alerts",
               "ai-gateway/cookbooks/grafana-dashboard",
               "ai-gateway/cookbooks/production-runbook"
+            ]
+          }
+        ]
+      },
+      {
+        "anchor": "AI Governance",
+        "icon": "shield-check",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "ai-governance/overview",
+              "ai-governance/track-your-claude-code-usage",
+              "ai-governance/getting-started-developer",
+              "ai-governance/getting-started-admin",
+              "ai-governance/open-core-licensing"
+            ]
+          },
+          {
+            "group": "Personal Portal",
+            "pages": [
+              "ai-governance/personal-portal/overview",
+              "ai-governance/personal-portal/end-user",
+              "ai-governance/personal-portal/admin-catalog",
+              "ai-governance/personal-portal/sessions"
+            ]
+          },
+          {
+            "group": "Workspaces & Access",
+            "pages": [
+              "ai-governance/workspaces",
+              "ai-governance/members-and-invites",
+              "ai-governance/roles-and-permissions"
+            ]
+          },
+          {
+            "group": "Dashboards",
+            "pages": [
+              "ai-governance/governance-dashboard",
+              "ai-governance/departments"
+            ]
+          },
+          {
+            "group": "Privacy",
+            "pages": [
+              "ai-governance/no-spy-mode"
+            ]
+          },
+          {
+            "group": "Sources",
+            "pages": [
+              "ai-governance/ingestion-sources/index",
+              "ai-governance/ingestion-sources/otel-generic",
+              "ai-governance/ingestion-sources/claude-cowork",
+              "ai-governance/ingestion-sources/workato",
+              "ai-governance/ingestion-sources/s3-custom",
+              "ai-governance/ingestion-sources/copilot-studio",
+              "ai-governance/ingestion-sources/openai-compliance",
+              "ai-governance/ingestion-sources/claude-compliance"
+            ]
+          },
+          {
+            "group": "Detection",
+            "pages": [
+              "ai-governance/anomaly-rules"
+            ]
+          },
+          {
+            "group": "Compliance & Architecture",
+            "pages": [
+              "ai-governance/compliance-architecture",
+              "ai-governance/control-plane"
+            ]
+          },
+          {
+            "group": "Operations",
+            "pages": [
+              "ai-governance/cli-debug",
+              "ai-governance/pull-mode-connectors"
+            ]
+          },
+          {
+            "group": "Programmatic surfaces",
+            "pages": [
+              "ai-governance/api",
+              "ai-governance/cli",
+              "ai-governance/mcp"
             ]
           }
         ]
@@ -661,7 +762,8 @@
               "self-hosting/deployment/docker-compose",
               "self-hosting/deployment/docker-images",
               "self-hosting/deployment/kubernetes-helm",
-              "self-hosting/deployment/kubernetes-local"
+              "self-hosting/deployment/kubernetes-local",
+              "self-hosting/deployment/argocd"
             ]
           },
           {
@@ -674,6 +776,7 @@
             "group": "Operations",
             "pages": [
               "self-hosting/security",
+              "self-hosting/compliance",
               "self-hosting/upgrade",
               "self-hosting/upgrade-v3"
             ]
@@ -699,11 +802,130 @@
             "group": "Traces",
             "pages": [
               "api-reference/traces/overview",
-              "api-reference/traces/get-trace",
-              "api-reference/traces/get-thread-details",
               "api-reference/traces/search",
+              "api-reference/traces/get-trace",
+              "api-reference/traces/update-metadata",
               "api-reference/traces/create-public-trace-path",
               "api-reference/traces/delete-public-trace-path"
+            ]
+          },
+          {
+            "group": "Datasets",
+            "pages": [
+              "api-reference/datasets/overview",
+              "api-reference/datasets/list-dataset",
+              "api-reference/datasets/create-dataset",
+              "api-reference/datasets/create-upload",
+              "api-reference/datasets/get-dataset",
+              "api-reference/datasets/get-records",
+              "api-reference/datasets/update-dataset",
+              "api-reference/datasets/update-records",
+              "api-reference/datasets/post-dataset-entries",
+              "api-reference/datasets/action-records",
+              "api-reference/datasets/action-upload",
+              "api-reference/datasets/delete-dataset",
+              "api-reference/datasets/delete-records"
+            ]
+          },
+          {
+            "group": "Evaluators",
+            "pages": [
+              "api-reference/evaluators-config/overview",
+              "api-reference/evaluators-config/list-evaluators",
+              "api-reference/evaluators-config/create-evaluators",
+              "api-reference/evaluators-config/get-evaluators",
+              "api-reference/evaluators-config/update-evaluators",
+              "api-reference/evaluators-config/delete-evaluators"
+            ]
+          },
+          {
+            "group": "Built-in Evaluators",
+            "pages": [
+              "api-reference/evaluators/overview",
+              {
+                "group": "Expected Answer",
+                "pages": [
+                  "api-reference/evaluators/exact-match-evaluator",
+                  "api-reference/evaluators/llm-answer-match",
+                  "api-reference/evaluators/llm-factual-match",
+                  "api-reference/evaluators/bleu-score",
+                  "api-reference/evaluators/rouge-score",
+                  "api-reference/evaluators/sql-query-equivalence",
+                  "api-reference/evaluators/semantic-similarity-evaluator"
+                ]
+              },
+              {
+                "group": "LLM as Judge",
+                "pages": [
+                  "api-reference/evaluators/llm-as-a-judge-boolean-evaluator",
+                  "api-reference/evaluators/llm-as-a-judge-category-evaluator",
+                  "api-reference/evaluators/llm-as-a-judge-score-evaluator",
+                  "api-reference/evaluators/rubrics-based-scoring",
+                  "api-reference/evaluators/custom-basic-evaluator",
+                  "api-reference/evaluators/summarization-score"
+                ]
+              },
+              {
+                "group": "RAG Quality",
+                "pages": [
+                  "api-reference/evaluators/ragas-answer-correctness",
+                  "api-reference/evaluators/ragas-answer-relevancy",
+                  "api-reference/evaluators/ragas-context-precision",
+                  "api-reference/evaluators/ragas-context-recall",
+                  "api-reference/evaluators/ragas-context-relevancy",
+                  "api-reference/evaluators/ragas-context-utilization",
+                  "api-reference/evaluators/ragas-faithfulness",
+                  "api-reference/evaluators/ragas-faithfulness-1",
+                  "api-reference/evaluators/ragas-response-context-precision",
+                  "api-reference/evaluators/ragas-response-context-recall",
+                  "api-reference/evaluators/ragas-response-relevancy",
+                  "api-reference/evaluators/context-f1",
+                  "api-reference/evaluators/context-precision",
+                  "api-reference/evaluators/context-recall"
+                ]
+              },
+              {
+                "group": "Quality Aspects",
+                "pages": [
+                  "api-reference/evaluators/lingua-language-detection",
+                  "api-reference/evaluators/valid-format-evaluator",
+                  "api-reference/evaluators/off-topic-evaluator",
+                  "api-reference/evaluators/query-resolution"
+                ]
+              },
+              {
+                "group": "Safety",
+                "pages": [
+                  "api-reference/evaluators/azure-content-safety",
+                  "api-reference/evaluators/azure-jailbreak-detection",
+                  "api-reference/evaluators/azure-prompt-shield",
+                  "api-reference/evaluators/openai-moderation",
+                  "api-reference/evaluators/presidio-pii-detection",
+                  "api-reference/evaluators/competitor-blocklist",
+                  "api-reference/evaluators/competitor-allowlist-check",
+                  "api-reference/evaluators/competitor-llm-check"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Evaluations v3",
+            "pages": [
+              "api-reference/evaluations/overview",
+              "api-reference/evaluations/get-runs",
+              "api-reference/evaluations/action-run"
+            ]
+          },
+          {
+            "group": "Monitors",
+            "pages": [
+              "api-reference/monitors/overview",
+              "api-reference/monitors/list-monitors",
+              "api-reference/monitors/create-monitors",
+              "api-reference/monitors/get-monitors",
+              "api-reference/monitors/update-monitors",
+              "api-reference/monitors/action-toggle",
+              "api-reference/monitors/delete-monitors"
             ]
           },
           {
@@ -711,12 +933,18 @@
             "pages": [
               "api-reference/prompts/overview",
               "api-reference/prompts/get-prompts",
+              "api-reference/prompts/list-tags",
               "api-reference/prompts/create-prompt",
+              "api-reference/prompts/create-tags",
               "api-reference/prompts/get-prompt",
-              "api-reference/prompts/update-prompt",
-              "api-reference/prompts/delete-prompt",
               "api-reference/prompts/get-prompt-versions",
-              "api-reference/prompts/create-prompt-version"
+              "api-reference/prompts/update-prompt",
+              "api-reference/prompts/update-tags",
+              "api-reference/prompts/put-update-tags",
+              "api-reference/prompts/action-sync",
+              "api-reference/prompts/action-restore",
+              "api-reference/prompts/delete-prompt",
+              "api-reference/prompts/delete-tags"
             ]
           },
           {
@@ -725,83 +953,229 @@
               "api-reference/annotations/overview",
               "api-reference/annotations/get-annotation",
               "api-reference/annotations/get-single-annotation",
-              "api-reference/annotations/delete-annotation",
-              "api-reference/annotations/patch-annotation",
               "api-reference/annotations/get-all-annotations-trace",
-              "api-reference/annotations/create-annotation-trace"
-            ]
-          },
-          {
-            "group": "Datasets",
-            "pages": [
-              "api-reference/datasets/post-dataset-entries"
-            ]
-          },
-          {
-            "group": "Automations",
-            "pages": [
-              "api-reference/automations/create-slack-automation"
+              "api-reference/annotations/patch-annotation",
+              "api-reference/annotations/create-annotation-trace",
+              "api-reference/annotations/delete-annotation"
             ]
           },
           {
             "group": "Scenarios",
             "pages": [
               "api-reference/scenarios/overview",
-              "api-reference/scenarios/create-event"
+              "api-reference/scenarios/list-scenarios",
+              "api-reference/scenarios/create-scenarios",
+              "api-reference/scenarios/get-scenarios",
+              "api-reference/scenarios/update-scenarios",
+              "api-reference/scenarios/delete-scenarios"
             ]
           },
           {
-            "group": "Evaluators",
+            "group": "Scenario Events",
             "pages": [
-              "api-reference/evaluators/overview",
-              "api-reference/evaluators/exact-match-evaluator",
-              "api-reference/evaluators/llm-answer-match",
-              "api-reference/evaluators/bleu-score",
-              "api-reference/evaluators/llm-factual-match",
-              "api-reference/evaluators/rouge-score",
-              "api-reference/evaluators/sql-query-equivalence",
-              "api-reference/evaluators/llm-as-a-judge-boolean-evaluator",
-              "api-reference/evaluators/llm-as-a-judge-category-evaluator",
-              "api-reference/evaluators/llm-as-a-judge-score-evaluator",
-              "api-reference/evaluators/rubrics-based-scoring",
-              "api-reference/evaluators/ragas-answer-correctness",
-              "api-reference/evaluators/ragas-answer-relevancy",
-              "api-reference/evaluators/ragas-context-precision",
-              "api-reference/evaluators/ragas-context-recall",
-              "api-reference/evaluators/ragas-context-relevancy",
-              "api-reference/evaluators/ragas-context-utilization",
-              "api-reference/evaluators/ragas-faithfulness",
-              "api-reference/evaluators/ragas-faithfulness-1",
-              "api-reference/evaluators/ragas-response-context-precision",
-              "api-reference/evaluators/ragas-response-context-recall",
-              "api-reference/evaluators/ragas-response-relevancy",
-              "api-reference/evaluators/context-f1",
-              "api-reference/evaluators/context-precision",
-              "api-reference/evaluators/context-recall",
-              "api-reference/evaluators/azure-content-safety",
-              "api-reference/evaluators/azure-jailbreak-detection",
-              "api-reference/evaluators/azure-prompt-shield",
-              "api-reference/evaluators/openai-moderation",
-              "api-reference/evaluators/presidio-pii-detection",
-              "api-reference/evaluators/custom-basic-evaluator",
-              "api-reference/evaluators/competitor-blocklist",
-              "api-reference/evaluators/competitor-allowlist-check",
-              "api-reference/evaluators/competitor-llm-check",
-              "api-reference/evaluators/off-topic-evaluator",
-              "api-reference/evaluators/query-resolution",
-              "api-reference/evaluators/semantic-similarity-evaluator",
-              "api-reference/evaluators/summarization-score",
-              "api-reference/evaluators/valid-format-evaluator",
-              "api-reference/evaluators/lingua-language-detection"
+              "api-reference/scenario-events/overview",
+              "api-reference/scenario-events/create-scenario-events",
+              "api-reference/scenario-events/delete-scenario-events"
             ]
           },
           {
-            "group": "Saved Evaluators",
+            "group": "Simulation Runs",
             "pages": [
-              "api-reference/saved-evaluators/overview",
-              "api-reference/saved-evaluators/get-evaluators",
-              "api-reference/saved-evaluators/get-evaluator",
-              "api-reference/saved-evaluators/create-evaluator"
+              "api-reference/simulation-runs/overview",
+              "api-reference/simulation-runs/list-simulation-runs",
+              "api-reference/simulation-runs/list-list",
+              "api-reference/simulation-runs/get-simulation-runs"
+            ]
+          },
+          {
+            "group": "Suites",
+            "pages": [
+              "api-reference/suites/overview",
+              "api-reference/suites/list-suites",
+              "api-reference/suites/create-suites",
+              "api-reference/suites/get-suites",
+              "api-reference/suites/update-suites",
+              "api-reference/suites/action-duplicate",
+              "api-reference/suites/action-run",
+              "api-reference/suites/delete-suites"
+            ]
+          },
+          {
+            "group": "Agents",
+            "pages": [
+              "api-reference/agents/overview",
+              "api-reference/agents/list-agents",
+              "api-reference/agents/create-agents",
+              "api-reference/agents/get-agents",
+              "api-reference/agents/update-agents",
+              "api-reference/agents/delete-agents"
+            ]
+          },
+          {
+            "group": "Triggers",
+            "pages": [
+              "api-reference/triggers/overview",
+              "api-reference/triggers/list-triggers",
+              "api-reference/triggers/create-triggers",
+              "api-reference/triggers/get-triggers",
+              "api-reference/triggers/update-triggers",
+              "api-reference/triggers/delete-triggers"
+            ]
+          },
+          {
+            "group": "Workflows",
+            "pages": [
+              "api-reference/workflows/overview",
+              "api-reference/workflows/list-workflows",
+              "api-reference/workflows/get-workflows",
+              "api-reference/workflows/update-workflows",
+              "api-reference/workflows/delete-workflows"
+            ]
+          },
+          {
+            "group": "Dashboards",
+            "pages": [
+              "api-reference/dashboards/overview",
+              "api-reference/dashboards/list-dashboards",
+              "api-reference/dashboards/create-dashboards",
+              "api-reference/dashboards/get-dashboards",
+              "api-reference/dashboards/update-reorder",
+              "api-reference/dashboards/update-dashboards",
+              "api-reference/dashboards/delete-dashboards"
+            ]
+          },
+          {
+            "group": "Graphs",
+            "pages": [
+              "api-reference/graphs/overview",
+              "api-reference/graphs/list-graphs",
+              "api-reference/graphs/create-graphs",
+              "api-reference/graphs/get-graphs",
+              "api-reference/graphs/update-graphs",
+              "api-reference/graphs/delete-graphs"
+            ]
+          },
+          {
+            "group": "Analytics",
+            "pages": [
+              "api-reference/analytics/overview",
+              "api-reference/analytics/create-timeseries"
+            ]
+          },
+          {
+            "group": "Secrets",
+            "pages": [
+              "api-reference/secrets/overview",
+              "api-reference/secrets/list-secrets",
+              "api-reference/secrets/create-secrets",
+              "api-reference/secrets/get-secrets",
+              "api-reference/secrets/update-secrets",
+              "api-reference/secrets/delete-secrets"
+            ]
+          },
+          {
+            "group": "Model Providers",
+            "pages": [
+              "api-reference/model-providers/overview",
+              "api-reference/model-providers/list-model-providers",
+              "api-reference/model-providers/update-model-providers"
+            ]
+          },
+          {
+            "group": "Projects",
+            "pages": [
+              "api-reference/projects/overview",
+              "api-reference/projects/list-projects",
+              "api-reference/projects/create-project",
+              "api-reference/projects/get-project",
+              "api-reference/projects/update-project",
+              "api-reference/projects/archive-project",
+              "api-reference/projects/get-api-key",
+              "api-reference/projects/regenerate-api-key"
+            ]
+          },
+          {
+            "group": "Teams",
+            "pages": [
+              "api-reference/teams/overview",
+              "api-reference/teams/list-teams",
+              "api-reference/teams/create-team",
+              "api-reference/teams/get-team",
+              "api-reference/teams/update-team",
+              "api-reference/teams/archive-team",
+              "api-reference/teams/list-members",
+              "api-reference/teams/add-member",
+              "api-reference/teams/remove-member",
+              "api-reference/teams/list-projects"
+            ]
+          },
+          {
+            "group": "Groups",
+            "pages": [
+              "api-reference/groups/overview",
+              "api-reference/groups/list-groups",
+              "api-reference/groups/create-group",
+              "api-reference/groups/get-group",
+              "api-reference/groups/rename-group",
+              "api-reference/groups/delete-group",
+              "api-reference/groups/list-members",
+              "api-reference/groups/add-member",
+              "api-reference/groups/remove-member",
+              "api-reference/groups/list-bindings",
+              "api-reference/groups/add-binding",
+              "api-reference/groups/remove-binding"
+            ]
+          },
+          {
+            "group": "API Keys",
+            "pages": [
+              "api-reference/api-keys/overview",
+              "api-reference/api-keys/list-api-keys",
+              "api-reference/api-keys/create-api-key",
+              "api-reference/api-keys/revoke-api-key"
+            ]
+          },
+          {
+            "group": "Gateway: Virtual Keys",
+            "pages": [
+              "api-reference/gateway-virtual-keys/overview",
+              "api-reference/gateway-virtual-keys/list-virtual-keys",
+              "api-reference/gateway-virtual-keys/create-virtual-key",
+              "api-reference/gateway-virtual-keys/get-virtual-key",
+              "api-reference/gateway-virtual-keys/update-virtual-key",
+              "api-reference/gateway-virtual-keys/revoke-virtual-key",
+              "api-reference/gateway-virtual-keys/rotate-virtual-key-secret"
+            ]
+          },
+          {
+            "group": "Gateway: Provider Bindings",
+            "pages": [
+              "api-reference/gateway-providers/overview",
+              "api-reference/gateway-providers/list-provider-bindings",
+              "api-reference/gateway-providers/bind-a-model-provider-to-the-gateway",
+              "api-reference/gateway-providers/update-provider-binding",
+              "api-reference/gateway-providers/disable-provider-binding"
+            ]
+          },
+          {
+            "group": "Gateway: Budgets",
+            "pages": [
+              "api-reference/gateway-budgets/overview",
+              "api-reference/gateway-budgets/list-budgets-applicable-to-the-project",
+              "api-reference/gateway-budgets/create-budget",
+              "api-reference/gateway-budgets/update-budget",
+              "api-reference/gateway-budgets/archive-budget"
+            ]
+          },
+          {
+            "group": "Gateway: Cache Rules",
+            "pages": [
+              "api-reference/gateway-cache-rules/overview",
+              "api-reference/gateway-cache-rules/list-cache-control-rules",
+              "api-reference/gateway-cache-rules/create-a-cache-rule",
+              "api-reference/gateway-cache-rules/get-a-cache-rule",
+              "api-reference/gateway-cache-rules/update-a-cache-rule",
+              "api-reference/gateway-cache-rules/archive-a-cache-rule"
             ]
           }
         ]
@@ -859,7 +1233,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1777391164",
+      "source": "/ci/cache/busted/1781096166",
       "destination": "/"
     },
     {
@@ -935,24 +1309,40 @@
       "destination": "/self-hosting/docker-compose"
     },
     {
+      "source": "/agent-simulations/overview",
+      "destination": "/agent-simulations/introduction"
+    },
+    {
+      "source": "/agent-simulations/set-overview",
+      "destination": "/agent-simulations/introduction"
+    },
+    {
+      "source": "/agent-simulations/batch-runs",
+      "destination": "/agent-simulations/introduction"
+    },
+    {
+      "source": "/agent-simulations/individual-run",
+      "destination": "/agent-simulations/introduction"
+    },
+    {
       "source": "/simulations/overview",
-      "destination": "/agent-simulations/overview"
+      "destination": "/agent-simulations/introduction"
+    },
+    {
+      "source": "/simulations/set-overview",
+      "destination": "/agent-simulations/introduction"
+    },
+    {
+      "source": "/simulations/batch-runs",
+      "destination": "/agent-simulations/introduction"
+    },
+    {
+      "source": "/simulations/individual-run",
+      "destination": "/agent-simulations/introduction"
     },
     {
       "source": "/simulations/getting-started",
       "destination": "/agent-simulations/getting-started"
-    },
-    {
-      "source": "/simulations/set-overview",
-      "destination": "/agent-simulations/set-overview"
-    },
-    {
-      "source": "/simulations/batch-runs",
-      "destination": "/agent-simulations/batch-runs"
-    },
-    {
-      "source": "/simulations/individual-run",
-      "destination": "/agent-simulations/individual-run"
     },
     {
       "source": "/simulations/introduction",
@@ -1049,6 +1439,66 @@
     {
       "source": "/ai-gateway/cli/langwatch-cli",
       "destination": "/integration/cli"
+    },
+    {
+      "source": "/ai-gateway/governance/compliance-architecture",
+      "destination": "/ai-governance/compliance-architecture"
+    },
+    {
+      "source": "/ai-gateway/governance/control-plane",
+      "destination": "/ai-governance/control-plane"
+    },
+    {
+      "source": "/ai-gateway/governance/anomaly-rules",
+      "destination": "/ai-governance/anomaly-rules"
+    },
+    {
+      "source": "/ai-gateway/governance/cli-debug",
+      "destination": "/ai-governance/cli-debug"
+    },
+    {
+      "source": "/ai-gateway/governance/ingestion-sources/index",
+      "destination": "/ai-governance/ingestion-sources/index"
+    },
+    {
+      "source": "/ai-gateway/governance/ingestion-sources/otel-generic",
+      "destination": "/ai-governance/ingestion-sources/otel-generic"
+    },
+    {
+      "source": "/ai-gateway/governance/ingestion-sources/claude-cowork",
+      "destination": "/ai-governance/ingestion-sources/claude-cowork"
+    },
+    {
+      "source": "/ai-gateway/governance/ingestion-sources/workato",
+      "destination": "/ai-governance/ingestion-sources/workato"
+    },
+    {
+      "source": "/ai-gateway/governance/ingestion-sources/s3-custom",
+      "destination": "/ai-governance/ingestion-sources/s3-custom"
+    },
+    {
+      "source": "/ai-gateway/governance/ingestion-sources/copilot-studio",
+      "destination": "/ai-governance/ingestion-sources/copilot-studio"
+    },
+    {
+      "source": "/ai-gateway/governance/ingestion-sources/openai-compliance",
+      "destination": "/ai-governance/ingestion-sources/openai-compliance"
+    },
+    {
+      "source": "/ai-gateway/governance/ingestion-sources/claude-compliance",
+      "destination": "/ai-governance/ingestion-sources/claude-compliance"
+    },
+    {
+      "source": "/api-reference/saved-evaluators/:path*",
+      "destination": "/api-reference/evaluators-config/overview"
+    },
+    {
+      "source": "/api-reference/automations/:path*",
+      "destination": "/api-reference/triggers/overview"
+    },
+    {
+      "source": "/api-reference/endpoint/:path*",
+      "destination": "/api-reference/introduction"
     }
   ]
 }

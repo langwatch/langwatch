@@ -31,6 +31,7 @@ describe("<ScenarioTargetRow/> cancel button", () => {
   });
 
   describe("given a pending scenario run with onCancel", () => {
+    /** @scenario "User cancels a single running job from the run card" */
     it("displays the cancel button", () => {
       render(
         <ScenarioTargetRow
@@ -82,6 +83,7 @@ describe("<ScenarioTargetRow/> cancel button", () => {
   });
 
   describe("given a completed scenario run with onCancel", () => {
+    /** @scenario "Cancel button is hidden for jobs that already completed" */
     it("does not display the cancel button", () => {
       render(
         <ScenarioTargetRow
@@ -278,6 +280,7 @@ describe("<RunRow/> cancel all button", () => {
   });
 
   describe("when Cancel All button is clicked", () => {
+    /** @scenario "User cancels all remaining jobs for a batch run" */
     it("calls onCancelAll and does not toggle the row", async () => {
       // pointerEventsCheck disabled because the cancel button uses CSS
       // _groupHover to toggle pointer-events, which jsdom cannot simulate

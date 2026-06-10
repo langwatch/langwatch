@@ -4,8 +4,10 @@ import type { Cluster } from "ioredis";
 import type { Logger } from "pino";
 import {
   gqActiveGroups,
+  gqBlockedGroups,
   gqFastqActive,
   gqFastqPending,
+  gqParkedGroups,
   gqPendingGroups,
   gqOldestPendingAgeMilliseconds,
 } from "./metrics";
@@ -56,14 +58,38 @@ export class GroupQueueMetricsCollector {
 
       const keyPrefix = this.params.scripts.getKeyPrefix();
       const readyKey = `${keyPrefix}ready`;
+      const blockedKey = `${keyPrefix}blocked`;
+      const parkedTenantsKey = `${keyPrefix}parked-tenants`;
 
       const pendingGroupCount = await this.params.redisConnection.zcard(
         readyKey,
       );
+      const blockedGroupCount =
+        await this.params.redisConnection.scard(blockedKey);
+
+      // Parked depth = sum of every over-cap tenant's parked zset. The registry
+      // set is tiny (one entry per over-cap tenant) and empty in the cap=0
+      // steady state, so this is effectively free when nothing is parked.
+      let parkedGroupCount = 0;
+      const parkedTenants =
+        await this.params.redisConnection.smembers(parkedTenantsKey);
+      for (const tenantId of parkedTenants) {
+        parkedGroupCount += await this.params.redisConnection.zcard(
+          `${keyPrefix}parked:${tenantId}`,
+        );
+      }
 
       gqPendingGroups.set(
         { queue_name: this.params.queueName },
         pendingGroupCount,
+      );
+      gqBlockedGroups.set(
+        { queue_name: this.params.queueName },
+        blockedGroupCount,
+      );
+      gqParkedGroups.set(
+        { queue_name: this.params.queueName },
+        parkedGroupCount,
       );
       gqActiveGroups.set(
         { queue_name: this.params.queueName },

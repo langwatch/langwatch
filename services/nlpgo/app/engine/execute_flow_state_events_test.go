@@ -285,6 +285,67 @@ func TestExecuteStream_EvaluationErrorEmitsEvaluationErrorEvent(t *testing.T) {
 	assert.Contains(t, es, "error", "error event must carry the message Studio surfaces in the alertOnError toast")
 }
 
+// TestExecuteStream_ComponentStateChangeCarriesTraceIDInExecutionState
+// pins the B3 contract: every `component_state_change` event must stamp
+// trace_id INSIDE execution_state (not only on the outer envelope).
+// Studio's eval-v3 resultMapper reads target_result.traceId solely from
+// execution_state.trace_id (resultMapper.ts:306); the envelope trace_id
+// is consumed only by execution_state_change / evaluation_state_change.
+// Pre-fix nlpgo put trace_id only on the envelope, so eval-v3's
+// TargetCell rendered no "View trace" link (rchaves dogfood 2026-05-15).
+// Python's start/end/error component events all set
+// ExecutionState.trace_id (langwatch_nlp/studio/types/events.py:216,
+// 250,269) — this is the parity restoration.
+func TestExecuteStream_ComponentStateChangeCarriesTraceIDInExecutionState(t *testing.T) {
+	eng := New(Options{})
+	wf := &dsl.Workflow{
+		WorkflowID: "wf_b3_trace_id",
+		Nodes: []dsl.Node{
+			{ID: "entry", Type: dsl.ComponentEntry},
+			{ID: "end", Type: dsl.ComponentEnd},
+		},
+		Edges: []dsl.Edge{
+			{Source: "entry", SourceHandle: "outputs.input", Target: "end", TargetHandle: "inputs.output"},
+		},
+	}
+
+	const wantTrace = "abc123def456trace"
+	events, err := eng.ExecuteStream(context.Background(), ExecuteRequest{
+		Workflow: wf,
+		Inputs:   map[string]any{"input": "hello"},
+		NodeID:   "end",
+		TraceID:  wantTrace,
+	}, ExecuteStreamOptions{})
+	require.NoError(t, err)
+
+	collected := drain(events)
+	componentEvents := filterByType(collected, "component_state_change")
+	require.NotEmpty(t, componentEvents,
+		"the execute_component path must emit per-node component_state_change events")
+
+	for i, ev := range componentEvents {
+		es, ok := ev.Payload["execution_state"].(map[string]any)
+		require.True(t, ok, "component_state_change[%d] must carry execution_state payload", i)
+		assert.Equal(t, wantTrace, es["trace_id"],
+			"component_state_change[%d].execution_state.trace_id must echo the request trace_id "+
+				"(status=%v) — this is the field eval-v3's TargetCell links the trace from", i, es["status"])
+	}
+}
+
+// TestStateEvent_OmitsTraceIDWhenEmpty keeps the payload lean: a
+// curl/test caller that sends no trace_id must not get an empty-string
+// trace_id the Studio UI would treat as "set" (the `if (traceId)`
+// render guard is truthiness-based). nlpgo always assigns a ulid when
+// the request omits one, so in practice this only protects direct
+// stateEvent callers, but the guard is the contract.
+func TestStateEvent_OmitsTraceIDWhenEmpty(t *testing.T) {
+	ev := stateEvent("", "node-1", &NodeState{Status: "success"})
+	es, ok := ev.Payload["execution_state"].(map[string]any)
+	require.True(t, ok)
+	_, present := es["trace_id"]
+	assert.False(t, present, "empty trace_id must be omitted from execution_state, not set as \"\"")
+}
+
 func drain(events <-chan StreamEvent) []StreamEvent {
 	var out []StreamEvent
 	timeout := time.After(5 * time.Second)

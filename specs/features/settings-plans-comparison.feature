@@ -6,7 +6,16 @@ Feature: Settings Plans Comparison Page
   Background:
     Given I am logged in as a member of an organization on LangWatch Cloud
 
-  @e2e @unimplemented
+  # 5 of 9 scenarios are bound to existing tests in langwatch/src/components/plans/__tests__/PlansComparisonPage.integration.test.tsx.
+  # The remaining 4 @unimplemented scenarios are UPDATE-class per AUDIT_MANIFEST
+  # — detail tables rendered as feature tag lists, not structured detail/value rows — and need the scenarios
+  # rewritten before binding (tracked under #3458):
+  #   - "Free plan column shows default limits"
+  #   - "Growth plan column shows seat and usage pricing"
+  #   - "Enterprise plan column shows custom commercial option"
+  #   - "Plan details are visually comparable by row"
+
+  @e2e
   Scenario: Member compares plans on the plans page
     Given my organization is on the "Free" plan
     When I navigate to /settings/plans
@@ -18,7 +27,7 @@ Feature: Settings Plans Comparison Page
     And plan capabilities are shown in side-by-side rows
     And the "Free" plan is shown as my current plan
 
-  @integration @unimplemented
+  @integration
   Scenario: Non-admin members can access plans comparison
     Given I am logged in with role "MEMBER"
     When I navigate to /settings/plans
@@ -26,7 +35,7 @@ Feature: Settings Plans Comparison Page
     And I see Free, Growth, and Enterprise plan columns
     And I do not see an access denied state
 
-  @integration @unimplemented
+  @integration
   Scenario: Growth organizations see Growth as current
     Given my organization is on the "Growth" plan
     When I view /settings/plans
@@ -34,13 +43,13 @@ Feature: Settings Plans Comparison Page
     And the "Free" plan is not shown as current
     And the "Enterprise" plan is not shown as current
 
-  @integration @unimplemented
+  @integration
   Scenario: Legacy tier organizations show no current plan in comparison
     Given my organization is on a legacy tier plan that is not shown in this comparison
     When I view /settings/plans
     Then no plan column is shown as current
 
-  @integration @unimplemented
+  @integration
   Scenario: TIERED organizations see a discontinued plan migration notice
     Given my organization is on a legacy pricing plan that has been discontinued
     When I view /settings/plans

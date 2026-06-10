@@ -1,10 +1,13 @@
 import { vi } from "vitest";
 
-import type { NormalizedAttributes, NormalizedEvent } from "../../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
-import { SpanDataBag } from "../../spanDataBag";
-import type { ExtractorContext } from "../_types";
-
+import type {
+  NormalizedAttributes,
+  NormalizedEvent,
+} from "../../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
 import { parseJsonStringValues as parseJsonStringAttrs } from "../../../../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
+import { LogRecordDataBag } from "../../logRecordDataBag";
+import { SpanDataBag } from "../../spanDataBag";
+import type { ExtractorContext, LogExtractorContext } from "../_types";
 
 export { parseJsonStringAttrs };
 
@@ -52,4 +55,41 @@ export function createExtractorContext(
   };
 
   return { bag, out, span, recordRule, setAttr, setAttrIfAbsent };
+}
+
+/**
+ * Creates a real LogExtractorContext for extractor.applyLog unit
+ * tests. Builds a real LogRecordDataBag so extractors exercise their
+ * actual production code paths; recordRule / setAttr / setAttrIfAbsent
+ * are vi.fn() wrappers around an `out` bag that mirrors production
+ * shape for easy assertion.
+ */
+export function createLogExtractorContext(
+  scopeName: string,
+  attrs: Record<string, unknown>,
+  body = "",
+): LogExtractorContext {
+  const parsed = parseJsonStringAttrs(attrs);
+  const bag = new LogRecordDataBag(
+    scopeName,
+    body,
+    parsed as NormalizedAttributes,
+  );
+  const out: NormalizedAttributes = {};
+
+  const setAttr = vi.fn((key: string, value: unknown) => {
+    if (value === null || value === undefined) return;
+    out[key] = value;
+  });
+
+  const setAttrIfAbsent = vi.fn((key: string, value: unknown) => {
+    if (!(key in out)) {
+      if (value === null || value === undefined) return;
+      out[key] = value;
+    }
+  });
+
+  const recordRule = vi.fn();
+
+  return { bag, out, recordRule, setAttr, setAttrIfAbsent };
 }

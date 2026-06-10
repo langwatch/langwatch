@@ -1,5 +1,3 @@
-import { featureFlagService } from "../featureFlag/featureFlag.service";
-import { resolveOrganizationId } from "../organizations/resolveOrganizationId";
 import { lambdaFetch } from "../../utils/lambdaFetch";
 import { getProjectLambdaArn } from "../../optimization_studio/server/lambda";
 
@@ -15,13 +13,42 @@ export type NLPOrigin =
   | "scenario"
   | "topic_clustering";
 
+const TRACE_ID_HEX_RE = /^[0-9a-fA-F]{32}$/;
+const SPAN_ID_HEX_RE = /^[0-9a-fA-F]{16}$/;
+
 /**
- * `release_nlp_go_engine_enabled` — gates whether traffic for a project
- * routes through the new Go path (`/go/*`) or stays on the legacy Python
- * path. Per-project rollout via PostHog. Topic clustering is intentionally
- * NOT gated by this flag (it stays on Python regardless).
+ * Format a W3C `traceparent` header value. Validates that traceId and
+ * parentSpanId are well-formed hex; throws on malformed input rather
+ * than silently emitting a broken header (silent breakage = orphan
+ * traces in prod, the exact failure mode we're fixing).
+ *
+ * The `sampled` flag defaults to true because every existing caller
+ * is in the evaluator chain, where we always want to record. If a
+ * future caller is propagating from a non-sampled inbound trace, it
+ * MUST pass `sampled: false` so we don't force-sample downstream.
+ *
+ * Exported for unit tests.
  */
-const NLP_GO_FLAG = "release_nlp_go_engine_enabled";
+export function formatTraceparent(
+  parent: {
+    traceId: string;
+    parentSpanId: string;
+  },
+  options: { sampled?: boolean } = {},
+): string {
+  if (!TRACE_ID_HEX_RE.test(parent.traceId)) {
+    throw new Error(
+      `nlpgoFetch.formatTraceparent: invalid traceId (need 32 hex chars), got: ${JSON.stringify(parent.traceId)}`,
+    );
+  }
+  if (!SPAN_ID_HEX_RE.test(parent.parentSpanId)) {
+    throw new Error(
+      `nlpgoFetch.formatTraceparent: invalid parentSpanId (need 16 hex chars), got: ${JSON.stringify(parent.parentSpanId)}`,
+    );
+  }
+  const flags = options.sampled === false ? "00" : "01";
+  return `00-${parent.traceId.toLowerCase()}-${parent.parentSpanId.toLowerCase()}-${flags}`;
+}
 
 export interface NLPGOFetchOptions<TBody = unknown> {
   /** projectId is the distinct_id used for the per-project flag rollout. */
@@ -36,47 +63,91 @@ export interface NLPGOFetchOptions<TBody = unknown> {
   origin: NLPOrigin;
   /** Optional organization scope for PostHog group targeting. */
   organizationId?: string;
+  /**
+   * Causality depth of the *caller*. nlpgo increments by 1 and stamps
+   * the result on every span it emits. The reactor in trace-processing
+   * skips dispatching evaluations on spans where depth >= 1, breaking
+   * the eval-of-eval loop. See
+   * specs/monitors/online-evaluator-loop-prevention.feature.
+   *
+   * 0 (or absent) means "this call originates from non-evaluator code"
+   * (eg. user-triggered Studio run). The receiver always emits depth=1
+   * on its spans in that case.
+   */
+  causalityDepth?: number;
+  /**
+   * Parent trace context for W3C `traceparent` propagation. When set,
+   * nlpgo's spans inherit `traceId` so the eval workflow appears as
+   * a child sub-tree of the parent trace in Studio's waterfall view
+   * instead of landing on a separate trace.
+   *
+   * Without this, nlpgo's `applyInboundCausality` finds no traceparent
+   * header, `startStudioSpan` falls through to a fresh trace, and
+   * eval spans become orphans of the original trace they evaluate.
+   * This is exactly the bug rchaves caught in prod on 2026-05-14
+   * (eval ran, spans emitted, but landed on a new trace_id).
+   *
+   * `parentSpanId` is the 16-hex span_id the eval root span should
+   * link to as its parent. Callers should pass the root span_id of
+   * the parent trace so the waterfall renders cleanly; a synthesized
+   * value still gives trace_id continuity but loses the linkage UI.
+   */
+  parentTrace?: {
+    traceId: string;
+    parentSpanId: string;
+  };
 }
 
 export interface NLPGOFetchResult<T> {
   ok: boolean;
   status: number;
   statusText: string;
-  enginePath: "go" | "python";
+  /** Always "go" — nlpgo is the only engine. Retained for span attribution. */
+  enginePath: "go";
   json: () => Promise<T>;
   text: () => Promise<string>;
 }
 
 /**
- * Send a request to the langwatch_nlp service, choosing between the new
- * Go engine path and the legacy Python path based on the
- * `release_nlp_go_engine_enabled` feature flag (per-project).
+ * Send a request to the nlpgo service. nlpgo serves the Go engine under
+ * the `/go` prefix, so the caller's `path` (e.g. "/studio/execute_sync")
+ * is rewritten to "/go/studio/execute_sync" and tagged with
+ * X-LangWatch-Origin. There is no auth on this hop: the TS app and nlpgo
+ * share the Lambda function URL boundary.
  *
- * When the flag is on:
- *  - the path is rewritten with the `/go` prefix
- *  - X-LangWatch-Origin is added with the call site's origin
- *
- * When off: existing behavior — POST to the legacy Python handler.
- * Bit-identical to today's traffic shape. There is no auth on this
- * hop — TS app and nlpgo share the Lambda function URL boundary, the
- * same posture today's Python NLP service uses.
- *
- * Topic clustering and other code paths that should stay on Python
- * regardless MUST NOT call this helper — they should keep using
- * `lambdaFetch` directly.
+ * Topic clustering runs on langevals, not nlpgo, so it MUST NOT call this
+ * helper (see topicClustering.ts).
  */
 export async function nlpgoFetch<T = unknown>(
   opts: NLPGOFetchOptions,
 ): Promise<NLPGOFetchResult<T>> {
-  const goEnabled = await isNlpGoEnabled(opts);
-  const enginePath: "go" | "python" = goEnabled ? "go" : "python";
-  const finalPath = goEnabled ? "/go" + opts.path : opts.path;
+  const finalPath = "/go" + opts.path;
   const bodyStr = JSON.stringify(opts.body);
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "X-LangWatch-Origin": opts.origin,
   };
+
+  // Causality depth: forwarded to nlpgo only when the caller is part of
+  // an evaluator chain (i.e. opts.causalityDepth is explicitly set, even
+  // to 0). When undefined we DO NOT send the header — otherwise nlpgo
+  // would stamp depth>=1 on every non-evaluator workflow run (playground,
+  // scenarios, customer workflow API), silently blocking ON_MESSAGE
+  // monitors from firing on workflow-produced traces.
+  if (opts.causalityDepth !== undefined) {
+    const callerDepth = Math.max(0, Math.floor(opts.causalityDepth));
+    headers["X-LangWatch-Causality-Depth"] = String(callerDepth);
+  }
+
+  // W3C traceparent — makes the receiving service's spans inherit our
+  // trace_id and parent_span_id. Without this header, nlpgo creates a
+  // new trace_id for the evaluation, breaking the parent-child link
+  // (the 2026-05-14 orphan-trace bug rchaves caught in prod).
+  // Format: 00-<32-hex traceId>-<16-hex parentSpanId>-<flags>
+  if (opts.parentTrace) {
+    headers["traceparent"] = formatTraceparent(opts.parentTrace);
+  }
 
   const functionArn = process.env.LANGWATCH_NLP_LAMBDA_CONFIG
     ? await getProjectLambdaArn(opts.projectId)
@@ -86,70 +157,31 @@ export async function nlpgoFetch<T = unknown>(
     method: "POST",
     headers,
     body: bodyStr,
+    // Scopes S3 staging when the body is too large for the 6 MiB Lambda
+    // sync-invoke Payload cap (per-project ARN path only; no-op for the
+    // self-hosted HTTP URL path).
+    projectId: opts.projectId,
   });
 
   return {
     ok: response.ok,
     status: response.status,
     statusText: response.statusText,
-    enginePath,
+    enginePath: "go",
     json: response.json,
     text: response.text,
   };
 }
 
 /**
- * Public read-only check for whether a project would route to the Go
- * engine. Used by:
- *   - the studio UI to hide the (now-defunct) Optimize button
- *   - the optimize REST endpoint to return 410
- *   - tRPC procedures that want to surface the engine choice to the UI
- *
- * If `organizationId` isn't supplied, we look it up from the project so
- * PostHog rules that target the `organization_id` person property
- * (org-level rollouts) match correctly. Caught when an org-level enable
- * in PostHog wasn't reaching projects under that org because every call
- * site passed only `projectId` — PostHog's `release_nlp_go_engine_enabled`
- * rule can't match `organization_id` if we never send it.
- *
- * `resolveOrganizationId` has its own 10-minute TTL cache and silently
- * returns undefined for orphan projects, so this stays fast and safe.
- */
-export async function isNlpGoEnabled(
-  opts: Pick<NLPGOFetchOptions, "projectId" | "organizationId">,
-): Promise<boolean> {
-  const organizationId =
-    opts.organizationId ?? (await resolveOrganizationId(opts.projectId));
-  return featureFlagService.isEnabled(NLP_GO_FLAG, opts.projectId, false, {
-    projectId: opts.projectId,
-    organizationId,
-  });
-}
-
-/**
  * Return the OpenAI-compatible proxy base URL for the playground +
- * modelProviders surface, gated on `release_nlp_go_engine_enabled`.
+ * modelProviders surface: `${baseURL}/go/proxy/v1` — the Go playground
+ * proxy (in-process dispatcher, real AI Gateway, no LiteLLM).
  *
- * - FF on  → `${LANGWATCH_NLP_SERVICE}/go/proxy/v1` (Go playground proxy:
- *   dispatcher in-process, real AI Gateway, no LiteLLM)
- * - FF off → `${LANGWATCH_NLP_SERVICE}/proxy/v1` (legacy LiteLLM proxy
- *   on the uvicorn child)
- *
- * On the wire shape stays bit-identical: x-litellm-* credential headers
- * + OpenAI-shape body. The Go side parses x-litellm-* via gatewayproxy/
- * headers.go and forwards to the gateway dispatcher; the Python side
- * keeps doing whatever LiteLLM does today. Customers don't see a
- * difference unless they've opted into the Go path.
+ * On the wire: x-litellm-* credential headers + OpenAI-shape body, parsed
+ * by gatewayproxy/headers.go and forwarded to the gateway dispatcher.
  */
-export async function nlpgoProxyBaseURL(opts: {
-  projectId: string;
-  baseURL: string;
-  organizationId?: string;
-}): Promise<string> {
-  const goEnabled = await isNlpGoEnabled({
-    projectId: opts.projectId,
-    organizationId: opts.organizationId,
-  });
+export function nlpgoProxyBaseURL(opts: { baseURL: string }): string {
   const trimmed = opts.baseURL.replace(/\/$/, "");
-  return goEnabled ? `${trimmed}/go/proxy/v1` : `${trimmed}/proxy/v1`;
+  return `${trimmed}/go/proxy/v1`;
 }

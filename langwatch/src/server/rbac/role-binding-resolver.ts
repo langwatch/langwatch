@@ -5,6 +5,7 @@ import {
   type PrismaClient,
 } from "@prisma/client";
 import {
+  bindingScopeCanGrant,
   hasPermissionWithHierarchy,
   organizationRoleHasPermission,
   teamRoleHasPermission,
@@ -29,11 +30,11 @@ export type ScopeRef =
 /**
  * A principal is the entity whose permissions are being checked.
  * - "user": a human user (supports group memberships)
- * - "pat": a personal access token (no groups)
+ * - "apiKey": an API key (no groups)
  */
 export type Principal =
   | { type: "user"; id: string }
-  | { type: "pat"; id: string };
+  | { type: "apiKey"; id: string };
 
 type ResolvedBinding = {
   role: TeamUserRole;
@@ -76,7 +77,7 @@ function ancestorScopes(
  * (i.e. at any ancestor scope: project → team → org).
  *
  * For user principals: direct bindings + group-memberships bindings.
- * For PAT principals: queries by patId only; no group expansion.
+ * For API key principals: queries by apiKeyId only; no group expansion.
  *
  * @internal — use checkRoleBindingPermission for access-control decisions.
  */
@@ -91,8 +92,8 @@ async function collectBindingsForScope({
   organizationId: string;
   scope: ScopeRef;
 }): Promise<ResolvedBinding[]> {
-  if (principal.type === "pat") {
-    return collectBindingsForPat({ prisma, patId: principal.id, organizationId, scope });
+  if (principal.type === "apiKey") {
+    return collectBindingsForApiKey({ prisma, apiKeyId: principal.id, organizationId, scope });
   }
 
   return collectBindingsForUser({ prisma, userId: principal.id, organizationId, scope });
@@ -135,19 +136,19 @@ async function collectBindingsForUser({
     .map((b) => ({ role: b.role, customRoleId: b.customRoleId, scopeType: b.scopeType }));
 }
 
-async function collectBindingsForPat({
+async function collectBindingsForApiKey({
   prisma,
-  patId,
+  apiKeyId,
   organizationId,
   scope,
 }: {
   prisma: PrismaClient;
-  patId: string;
+  apiKeyId: string;
   organizationId: string;
   scope: ScopeRef;
 }): Promise<ResolvedBinding[]> {
   const bindings = await prisma.roleBinding.findMany({
-    where: { organizationId, patId },
+    where: { organizationId, apiKeyId },
     select: { role: true, customRoleId: true, scopeType: true, scopeId: true },
   });
 
@@ -196,6 +197,11 @@ export async function checkRoleBindingPermission({
   const bindings = await collectBindingsForScope({ prisma, principal: resolvedPrincipal, organizationId, scope });
 
   for (const binding of bindings) {
+    // A team/project binding can never grant an org-exclusive permission,
+    // even via a custom role that lists it (ADR-021). Stays in sync with
+    // checkPermissionFromBindings() in rbac.ts.
+    if (!bindingScopeCanGrant(binding.scopeType, permission)) continue;
+
     // Custom role — look up its permissions
     if (binding.role === TeamUserRole.CUSTOM && binding.customRoleId) {
       const customRole = await prisma.customRole.findUnique({
@@ -203,7 +209,7 @@ export async function checkRoleBindingPermission({
         select: { permissions: true },
       });
       // Use the shared parser so shape validation is consistent with the
-      // PAT-create ceiling path. On malformed data we fail safe here (the
+      // API-key-create ceiling path. On malformed data we fail safe here (the
       // caller is a permission check — deny, log, move on) rather than
       // bubbling the error up, because unrelated principals should not be
       // blocked by one corrupted custom role.
@@ -225,12 +231,19 @@ export async function checkRoleBindingPermission({
           }
         }
       }
-      if (perms.length > 0 && hasPermissionWithHierarchy(perms, permission)) {
-        return true;
+      if (perms.length > 0) {
+        if (hasPermissionWithHierarchy(perms, permission)) {
+          return true;
+        }
+        // Non-empty custom role is authoritative — skip VIEWER baseline.
+        // See also resolveBindingPermission() in rbac.ts which must stay
+        // in sync with this logic.
+        continue;
       }
       // Empty/missing/malformed custom role — fall through to the built-in
-      // CUSTOM permission set below, which grants the same `*:view`
-      // permissions as a VIEWER binding.
+      // CUSTOM permission set below (VIEWER-equivalent baseline). This
+      // preserves backward compatibility for legacy CUSTOM bindings that
+      // were created before fine-grained permissions existed.
     }
 
     // Org-scoped bindings: ADMIN grants everything; MEMBER grants org-level permissions only
@@ -252,40 +265,43 @@ export async function checkRoleBindingPermission({
 }
 
 /**
- * Resolution-time ceiling enforcement for PATs.
+ * Resolution-time ceiling enforcement for API keys.
  *
- * effective_permissions = PAT.roleBindings(scope) ∩ user.roleBindings(scope)
+ * effective_permissions = ApiKey.roleBindings(scope) ∩ user.roleBindings(scope)
  *
- * Returns true only if BOTH the PAT's own bindings AND the owning user's
+ * Returns true only if BOTH the API key's own bindings AND the owning user's
  * current bindings grant the requested permission. If the user's role has been
- * downgraded, the PAT auto-degrades immediately.
+ * downgraded, the API key auto-degrades immediately.
  */
-export async function resolvePatPermission({
+export async function resolveApiKeyPermission({
   prisma,
-  patId,
+  apiKeyId,
   userId,
   organizationId,
   scope,
   permission,
 }: {
   prisma: PrismaClient;
-  patId: string;
-  userId: string;
+  apiKeyId: string;
+  userId: string | null;
   organizationId: string;
   scope: ScopeRef;
   permission: Permission;
 }): Promise<boolean> {
-  // 1. Check PAT's own bindings
-  const patAllowed = await checkRoleBindingPermission({
+  // 1. Check API key's own bindings
+  const apiKeyAllowed = await checkRoleBindingPermission({
     prisma,
-    principal: { type: "pat", id: patId },
+    principal: { type: "apiKey", id: apiKeyId },
     organizationId,
     scope,
     permission,
   });
-  if (!patAllowed) return false;
+  if (!apiKeyAllowed) return false;
 
-  // 2. Check owning user's current bindings (ceiling)
+  // 2. Service keys (no userId) have no user ceiling — binding check is sufficient
+  if (!userId) return true;
+
+  // 3. Check owning user's current bindings (ceiling)
   return checkRoleBindingPermission({
     prisma,
     principal: { type: "user", id: userId },

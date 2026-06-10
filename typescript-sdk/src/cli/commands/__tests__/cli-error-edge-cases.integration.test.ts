@@ -148,6 +148,7 @@ describe("CLI error edge cases", () => {
   });
 
   describe("when the API returns 401 unauthorized", () => {
+    /** @scenario Invalid API key returns a clear authentication error, not a generic one */
     it("tells the user the API key is invalid", async () => {
       pushResponse("GET", "/api/prompts", {
         status: 401,
@@ -186,6 +187,7 @@ describe("CLI error edge cases", () => {
   });
 
   describe("when the API host is unreachable", () => {
+    /** @scenario Network errors surface the underlying cause */
     it("shows a transport-level error, not a silent timeout", async () => {
       const result = await runCli(["prompt", "list"], testDir, {
         LANGWATCH_ENDPOINT: "http://127.0.0.1:1", // port 1 is almost certainly closed

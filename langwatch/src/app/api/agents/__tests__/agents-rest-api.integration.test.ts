@@ -43,7 +43,7 @@ describe("Feature: Agent REST API", () => {
   });
 
   beforeEach(async () => {
-    resetApp();
+    await resetApp();
     mockGetActivePlan = vi.fn().mockResolvedValue(FREE_PLAN);
     mockNotifyPlanLimitReached = vi.fn().mockResolvedValue(undefined);
     globalForApp.__langwatch_app = createTestApp({
@@ -71,11 +71,11 @@ describe("Feature: Agent REST API", () => {
       },
     });
 
-    testProject = projectFactory.build({ slug: nanoid() });
     testProject = await prisma.project.create({
       data: {
-        ...testProject,
+        ...projectFactory.build({ slug: nanoid() }),
         teamId: testTeam.id,
+        personalFeatures: {},
       },
     });
 
@@ -127,7 +127,7 @@ describe("Feature: Agent REST API", () => {
     await prisma.organization.delete({
       where: { id: testOrganization.id },
     });
-    resetApp();
+    await resetApp();
   });
 
   async function createAgent(overrides: {
@@ -150,11 +150,13 @@ describe("Feature: Agent REST API", () => {
   // ── Authentication ─────────────────────────────────────────────
 
   describe("Authentication", () => {
+    /** @scenario Request without API key returns 401 */
     it("returns 401 without X-Auth-Token header", async () => {
       const res = await app.request("/api/agents");
       expect(res.status).toBe(401);
     });
 
+    /** @scenario Request with invalid API key returns 401 */
     it("returns 401 with invalid X-Auth-Token", async () => {
       const res = await app.request("/api/agents", {
         headers: { "X-Auth-Token": "invalid-key-xyz" },
@@ -177,6 +179,7 @@ describe("Feature: Agent REST API", () => {
         });
       });
 
+      /** @scenario List agents returns paginated non-archived agents */
       it("returns paginated non-archived agents", async () => {
         const res = await helpers.api.get("/api/agents");
         expect(res.status).toBe(200);
@@ -215,6 +218,7 @@ describe("Feature: Agent REST API", () => {
         }
       });
 
+      /** @scenario List agents with page and limit parameters */
       it("paginates with page and limit parameters", async () => {
         const res = await helpers.api.get("/api/agents?page=2&limit=5");
         expect(res.status).toBe(200);
@@ -231,6 +235,7 @@ describe("Feature: Agent REST API", () => {
     });
 
     describe("when the project has no agents", () => {
+      /** @scenario List agents returns empty array for project with no agents */
       it("returns empty paginated response", async () => {
         const res = await helpers.api.get("/api/agents");
         expect(res.status).toBe(200);
@@ -245,6 +250,7 @@ describe("Feature: Agent REST API", () => {
   // ── Create Agent ─────────────────────────────────────────────
 
   describe("POST /api/agents", () => {
+    /** @scenario Create an agent with name, type, and config */
     it("creates an agent with name, type, and config", async () => {
       const res = await helpers.api.post("/api/agents", {
         name: "My Agent",
@@ -260,6 +266,7 @@ describe("Feature: Agent REST API", () => {
       expect(body.config).toMatchObject(VALID_SIGNATURE_CONFIG);
     });
 
+    /** @scenario Create an agent requires a name */
     it("returns 422 when name is missing", async () => {
       const res = await helpers.api.post("/api/agents", {
         type: "signature",
@@ -268,6 +275,7 @@ describe("Feature: Agent REST API", () => {
       expect(res.status).toBe(422);
     });
 
+    /** @scenario Create an agent requires a type */
     it("returns 422 when type is missing", async () => {
       const res = await helpers.api.post("/api/agents", {
         name: "No Type Agent",
@@ -276,6 +284,7 @@ describe("Feature: Agent REST API", () => {
       expect(res.status).toBe(422);
     });
 
+    /** @scenario Create an agent validates config against type schema */
     it("returns 422 when type is invalid", async () => {
       const res = await helpers.api.post("/api/agents", {
         name: "Bad Type Agent",
@@ -295,6 +304,7 @@ describe("Feature: Agent REST API", () => {
         });
       });
 
+      /** @scenario Create an agent enforces plan limits */
       it("returns 403 Forbidden", async () => {
         const res = await helpers.api.post("/api/agents", {
           name: "Over Limit",
@@ -310,6 +320,7 @@ describe("Feature: Agent REST API", () => {
   // ── Get Single Agent ─────────────────────────────────────────
 
   describe("GET /api/agents/:id", () => {
+    /** @scenario Get an agent by id */
     it("returns agent details by id", async () => {
       const agent = await createAgent({ name: "Detail Agent", id: "agent_detail123" });
 
@@ -323,6 +334,7 @@ describe("Feature: Agent REST API", () => {
       expect(body.config).toBeDefined();
     });
 
+    /** @scenario Get agent returns 404 for non-existent id */
     it("returns 404 for non-existent agent", async () => {
       const res = await helpers.api.get("/api/agents/agent_doesnotexist");
       expect(res.status).toBe(404);
@@ -332,6 +344,7 @@ describe("Feature: Agent REST API", () => {
   // ── Update Agent ─────────────────────────────────────────────
 
   describe("PATCH /api/agents/:id", () => {
+    /** @scenario Update an agent name */
     it("updates agent name", async () => {
       const agent = await createAgent({ name: "Original Name" });
 
@@ -344,6 +357,7 @@ describe("Feature: Agent REST API", () => {
       expect(body.name).toBe("Updated Name");
     });
 
+    /** @scenario Update an agent config */
     it("updates agent config", async () => {
       const agent = await createAgent({ name: "Config Agent" });
 
@@ -357,6 +371,7 @@ describe("Feature: Agent REST API", () => {
       expect(body.config).toMatchObject(newConfig);
     });
 
+    /** @scenario Update a non-existent agent returns 404 */
     it("returns 404 for non-existent agent", async () => {
       const res = await helpers.api.patch("/api/agents/agent_ghost", {
         name: "Whatever",
@@ -368,6 +383,7 @@ describe("Feature: Agent REST API", () => {
   // ── Delete (Archive) Agent ───────────────────────────────────
 
   describe("DELETE /api/agents/:id", () => {
+    /** @scenario Delete an agent archives it */
     it("archives the agent and returns archivedAt", async () => {
       const agent = await createAgent({ name: "To Delete" });
 
@@ -388,6 +404,7 @@ describe("Feature: Agent REST API", () => {
       expect(getRes.status).toBe(404);
     });
 
+    /** @scenario Delete a non-existent agent returns 404 */
     it("returns 404 for non-existent agent", async () => {
       const res = await helpers.api.delete("/api/agents/agent_nope");
       expect(res.status).toBe(404);

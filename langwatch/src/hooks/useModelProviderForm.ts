@@ -19,7 +19,11 @@ import { useCredentialKeys } from "./useCredentialKeys";
 import { useCustomModels } from "./useCustomModels";
 import { useDefaultProviderSelection } from "./useDefaultProviderSelection";
 import { type ExtraHeader, useExtraHeaders } from "./useExtraHeaders";
-import { type FormSnapshot, useProviderFormSubmit } from "./useProviderFormSubmit";
+import {
+  type AdvancedGatewayPayload,
+  type FormSnapshot,
+  useProviderFormSubmit,
+} from "./useProviderFormSubmit";
 
 export type ModelProviderScopeType = "ORGANIZATION" | "TEAM" | "PROJECT";
 
@@ -31,14 +35,6 @@ export type ScopeSelection = {
 export type UseModelProviderFormParams = {
   provider: MaybeStoredModelProvider;
   projectId: string | undefined;
-  project:
-    | {
-        defaultModel?: string | null;
-        topicClusteringModel?: string | null;
-        embeddingsModel?: string | null;
-      }
-    | null
-    | undefined;
   enabledProvidersCount: number;
   isUsingEnvVars?: boolean;
   // Principal-style scope context (iter 108). The team+org IDs come from
@@ -56,6 +52,13 @@ export type UseModelProviderFormParams = {
    */
   canManageOrganization?: boolean;
   canManageTeam?: boolean;
+  /**
+   * Optional advanced-gateway payload callback used by the unified
+   * Save. The drawer wires this when the AI Gateway feature flag is
+   * on for the caller's org; throwing (malformed JSON) aborts submit
+   * so the parent can render the inline parse error.
+   */
+  getAdvancedPayload?: () => AdvancedGatewayPayload | null;
   onSuccess?: () => void;
   onError?: (error: unknown) => void;
 };
@@ -125,13 +128,13 @@ export function useModelProviderForm(
   const {
     provider,
     projectId,
-    project,
     enabledProvidersCount,
     isUsingEnvVars,
     teamId,
     organizationId,
     canManageOrganization,
     canManageTeam,
+    getAdvancedPayload,
     onSuccess,
     onError,
   } = params;
@@ -209,7 +212,6 @@ export function useModelProviderForm(
   const customModelsHook = useCustomModels({ provider });
   const defaultProviderHook = useDefaultProviderSelection({
     provider,
-    project,
     enabledProvidersCount,
   });
 
@@ -258,6 +260,7 @@ export function useModelProviderForm(
 
   const formSubmitHook = useProviderFormSubmit({
     getFormSnapshot,
+    getAdvancedPayload,
     onSuccess,
     onError,
   });
@@ -284,7 +287,7 @@ export function useModelProviderForm(
     const nextUseApiGateway = credentialKeysHook.reset(provider);
     extraHeadersHook.reset(provider, nextUseApiGateway);
     customModelsHook.reset(provider);
-    defaultProviderHook.reset(provider, project, enabledProvidersCount);
+    defaultProviderHook.reset(provider, enabledProvidersCount);
     formSubmitHook.reset();
     setName(
       (provider as { name?: string }).name ??
@@ -298,9 +301,11 @@ export function useModelProviderForm(
     provider.customModels,
     provider.customEmbeddingsModels,
     provider.extraHeaders,
-    project?.defaultModel,
-    project?.topicClusteringModel,
-    project?.embeddingsModel,
+    // The reset re-fires when provider mutations propagate; the
+    // resolved default models come from
+    // `api.modelProvider.getResolvedDefault` at the actual consumer of
+    // each role chip, so we don't need to subscribe at the reducer
+    // level any more.
     enabledProvidersCount,
   ]);
 

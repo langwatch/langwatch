@@ -208,6 +208,57 @@ import { DashboardLayout } from "~/components/DashboardLayout";
 - Maintains navigation accessibility
 - Reduces visual noise
 
+## 6. Form Validation: Submit-then-Surface, Don't Pre-Disable
+
+Forms always allow Save to be clicked. Validation runs on submit and surfaces errors inline (field-level) and/or via toast (cross-field or backend). The Save button is disabled **only** while a request is in flight.
+
+### Why
+
+- A disabled button doesn't tell the user what's wrong. Inline errors do.
+- Users sometimes click Save expecting to discover what's missing. A pre-disabled button is silent and frustrating.
+- Async validation (uniqueness checks, server-side rules) can't always pre-compute disabled state — the button would lie about readiness.
+
+See [ADR 018](../adr/018-form-validation-and-save.md) for the full decision context.
+
+### Implementation
+
+```tsx
+<Button
+  type="submit"
+  disabled={mutation.isPending}  // ✅ in-flight only
+  // disabled={!form.formState.isValid}  // ❌ don't pre-disable
+>
+  Save
+</Button>
+```
+
+For validation:
+
+- **Field-level (sync schema rules):** Use `react-hook-form` + `zodResolver`, render inline via `<Field.ErrorText>`.
+- **Cross-field or backend-only:** Validate inside the submit handler. On failure, call `toaster.create({ type: "error", title, description })` and `return` before any mutation fires.
+- **Mutation errors:** Catch in `onError`, surface via `toaster.create({ type: "error", … })`.
+
+```tsx
+const handleSubmit = async () => {
+  // Cross-field check
+  if (useAsDefault && !defaultModel.startsWith(`${provider}/`)) {
+    toaster.create({
+      title: "Cannot save: pick a model from this provider",
+      description: "…",
+      type: "error",
+    });
+    return;
+  }
+  await mutation.mutateAsync(payload);
+};
+```
+
+### Anti-patterns
+
+- ❌ `disabled={!isValid}` — forces the user to find what's wrong without help.
+- ❌ Silent no-op on submit — appears to succeed; persists nothing or persists garbage.
+- ❌ Validation that only renders if a field is touched — invisible until the user randomly stumbles on it.
+
 ## Summary Checklist
 
 When implementing new features, verify:
@@ -218,3 +269,5 @@ When implementing new features, verify:
 - [ ] Page follows standard layout (header, title, actions)
 - [ ] Content-heavy pages use compact menu
 - [ ] Components imported from `components/ui/` where available
+- [ ] Save buttons disable only on `isPending`, never on `!isValid`
+- [ ] Validation errors surface inline or via toast; Save never silently no-ops

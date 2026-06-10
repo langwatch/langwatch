@@ -71,7 +71,7 @@ func CheckURL(raw string, opts SSRFOptions) error {
 		// DNS failed — let the actual request fail with a network
 		// error so the customer sees a real upstream message instead
 		// of a misleading SSRF reject.
-		return nil
+		return nil //nolint:nilerr // error is surfaced via the channel/result payload, not the function error return
 	}
 	for _, ip := range ips {
 		if ipBlocked(ip) {
@@ -160,7 +160,7 @@ func ipBlocked(ip net.IP) bool { return isPrivate(ip) || metadataIP(ip) }
 func resolveHost(host string, opts SSRFOptions) ([]net.IP, error) {
 	r := opts.Resolver
 	if r == nil {
-		r = func(h string) ([]net.IP, error) { return net.LookupIP(h) }
+		r = net.LookupIP
 	}
 	return r(host)
 }

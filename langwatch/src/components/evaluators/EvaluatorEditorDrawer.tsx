@@ -30,7 +30,7 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
       closeOnInteractOutside={false}
       modal={false}
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.CloseTrigger />
         <Drawer.Header>
           <HStack gap={2}>

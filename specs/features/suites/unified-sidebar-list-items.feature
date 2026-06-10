@@ -3,6 +3,18 @@ Feature: Unified sidebar list items for suites and external sets
   I want external set items in the sidebar to look the same as suite items
   So that I have a consistent experience regardless of where the evaluation runs originated
 
+  # Parity status: 0 of 7 scenarios bound to existing tests.
+  # Remaining @unimplemented scenarios (#3458):
+  #   7 NO_TEST: shipped behavior, no integration test yet
+  # NO_TEST gaps:
+  #   - "External set item displays the same information as a suite item"
+  #   - "External set item does not show a Run button"
+  #   - "Suite item shows a Run button"
+  #   - "External set item does not show a three-dot context menu on hover"
+  #   - "Suite item shows a three-dot context menu on hover"
+  #   - "External set list item displays pass count and recency using shared building blocks"
+  #   - "External set list item displays no summary when there are no runs"
+
   Background:
     Given I am logged into project "my-project"
 

@@ -48,6 +48,7 @@ vi.mock("~/server/traces/trace-formatting", () => ({
 
 vi.mock("~/utils/logger/server", () => ({
   createLogger: () => ({
+    debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
@@ -66,8 +67,28 @@ vi.mock("~/server/api/routers/traces.schemas", () => {
   };
 });
 
-// Import app after mocks are defined
-const { app: v1App } = await import("../app.v1");
+// The routes are registered through the SecuredApp builder, whose project
+// strategy runs the real authMiddleware. Mock it to a passthrough so these
+// unit tests exercise the handler logic with an injected project, not real auth.
+vi.mock("~/app/api/middleware/auth", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("~/app/api/middleware/auth")>();
+  return {
+    ...actual,
+    authMiddleware: async (c: { set: (k: string, v: unknown) => void }, next: () => Promise<void>) => {
+      c.set("project", { id: "project-123", apiKey: "key-123" });
+      await next();
+    },
+    requirePermission: () => async (_c: unknown, next: () => Promise<void>) => next(),
+  };
+});
+
+// Import app after mocks are defined. Build the v1 routes onto a secured app
+// rooted at "/" so the request paths in this suite stay unprefixed.
+const { registerTracesRoutes } = await import("../app.v1");
+const { createProjectApp } = await import("~/server/api/security");
+const securedTest = createProjectApp({ basePath: "/" });
+registerTracesRoutes(securedTest);
+const v1App = securedTest.hono;
 const { AmbiguousTraceIdPrefixError } = await import(
   "~/server/traces/trace.service"
 );
@@ -128,6 +149,7 @@ describe("GET /:traceId", () => {
   });
 
   describe("when fetching a trace", () => {
+    /** @scenario Full trace ID resolves exactly */
     it("uses TraceService.getById instead of Elasticsearch directly", async () => {
       const res = await makeRequest("trace-abc", { format: "json" });
 
@@ -166,6 +188,9 @@ describe("GET /:traceId", () => {
   });
 
   describe("when trace is not found", () => {
+    /** @scenario No match returns 404 */
+    /** @scenario Too-short prefix falls through to 404 */
+    /** @scenario Non-hex input skips prefix scan and returns 404 */
     it("returns 404", async () => {
       mockGetById.mockResolvedValue(undefined);
 
@@ -178,6 +203,8 @@ describe("GET /:traceId", () => {
   });
 
   describe("when the caller passes a unique prefix", () => {
+    /** @scenario Unique prefix resolves to the full trace */
+    /** @scenario CLI `trace get` with truncated ID from `trace search` succeeds */
     it("returns the trace using the resolved full trace ID", async () => {
       // Service resolves the prefix and hands back the full trace
       const fullId = "63dc535cea6335c506bc81ef3543a07d";
@@ -204,6 +231,7 @@ describe("GET /:traceId", () => {
   });
 
   describe("when the prefix matches multiple traces", () => {
+    /** @scenario Ambiguous prefix returns 409 with the matching IDs */
     it("returns 409 with the candidate trace IDs", async () => {
       const candidates = [
         "abc1230000000000000000000000aaaa",

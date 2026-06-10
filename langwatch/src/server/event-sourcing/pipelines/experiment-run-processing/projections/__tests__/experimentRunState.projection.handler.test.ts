@@ -312,6 +312,7 @@ describe("experimentRunStateFoldProjection", () => {
       };
     }
 
+    /** @scenario Trace cost is accumulated into experiment run TotalCost */
     it("accumulates trace cost into TotalCost", () => {
       const state = foldEvents([
         createStartedEvent(),
@@ -322,6 +323,7 @@ describe("experimentRunStateFoldProjection", () => {
       expect(state.TotalCost).toBeCloseTo(0.003, 6);
     });
 
+    /** @scenario Multiple trace costs accumulate */
     it("accumulates multiple trace costs", () => {
       const state = foldEvents([
         createStartedEvent(),
@@ -336,6 +338,7 @@ describe("experimentRunStateFoldProjection", () => {
       expect(state.TotalCost).toBeCloseTo(0.005, 6);
     });
 
+    /** @scenario Per-trace cost breakdown is maintained */
     it("stores per-trace breakdown in TraceMetrics", () => {
       const state = foldEvents([
         createStartedEvent(),

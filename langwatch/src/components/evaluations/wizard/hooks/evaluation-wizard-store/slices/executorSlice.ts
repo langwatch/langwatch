@@ -26,10 +26,12 @@ export interface ExecutorSlice {
    */
   upsertExecutorNodeByType: ({
     type,
-    project,
+    defaultModel,
   }: {
     type: "signature" | "code";
-    project?: { defaultModel?: string | null };
+    /** Resolved DEFAULT model from `api.modelProvider.getResolvedDefault`
+     *  at the React caller. Empty string is a valid value. */
+    defaultModel?: string;
   }) => NodeId;
 }
 
@@ -44,11 +46,11 @@ export const createExecutorSlice: StateCreator<
 > = (_set, get) => {
   const createNodeByType = (
     type: "signature" | "code",
-    project?: { defaultModel?: string | null },
+    defaultModel?: string,
   ) => {
     switch (type) {
       case "signature":
-        return get().createNewLlmSignatureNode({ project });
+        return get().createNewLlmSignatureNode({ defaultModel });
       case "code":
         return get().createNewCodeExecutionNode();
       default:
@@ -64,14 +66,14 @@ export const createExecutorSlice: StateCreator<
         (node) => node.type && EXECUTOR_NODE_TYPES.includes(node.type),
       );
     },
-    upsertExecutorNodeByType: ({ type, project }) => {
+    upsertExecutorNodeByType: ({ type, defaultModel }) => {
       const existingExecutorNode = get().getFirstExecutorNode();
-      const node = createNodeByType(type, project);
+      const node = createNodeByType(type, defaultModel);
 
       if (!existingExecutorNode) {
         switch (type) {
           case "signature":
-            return get().addNewSignatureNodeToWorkflow({ project });
+            return get().addNewSignatureNodeToWorkflow({ defaultModel });
           case "code":
             return get().addCodeExecutionNodeToWorkflow();
           default:

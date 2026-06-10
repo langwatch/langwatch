@@ -87,8 +87,8 @@ describe.skipIf(isTestcontainersOnly)(
       });
     });
 
-    beforeEach(() => {
-      resetApp();
+    beforeEach(async () => {
+      await resetApp();
       mockGetActivePlan = vi.fn();
       mockNotifyResourceLimitReached = vi.fn().mockResolvedValue(undefined);
       globalForApp.__langwatch_app = createTestApp({
@@ -102,8 +102,8 @@ describe.skipIf(isTestcontainersOnly)(
       });
     });
 
-    afterEach(() => {
-      resetApp();
+    afterEach(async () => {
+      await resetApp();
     });
 
     afterAll(async () => {
@@ -224,6 +224,7 @@ describe.skipIf(isTestcontainersOnly)(
     });
 
     describe("when overrideAddingLimitations is true", () => {
+      /** @scenario Allow creation when plan has override enabled */
       it("allows project creation despite exceeding limit", async () => {
         const plan: PlanInfo = {
           ...FREE_PLAN,
@@ -309,8 +310,8 @@ describe.skipIf(isTestcontainersOnly)(
       });
     });
 
-    beforeEach(() => {
-      resetApp();
+    beforeEach(async () => {
+      await resetApp();
       globalForApp.__langwatch_app = createTestApp({
         planProvider: PlanProviderService.create({
           getActivePlan: vi.fn().mockResolvedValue({
@@ -326,8 +327,8 @@ describe.skipIf(isTestcontainersOnly)(
       });
     });
 
-    afterEach(() => {
-      resetApp();
+    afterEach(async () => {
+      await resetApp();
     });
 
     afterAll(async () => {

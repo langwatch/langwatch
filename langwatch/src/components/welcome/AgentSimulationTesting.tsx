@@ -19,7 +19,7 @@ import {
 } from "react-icons/lu";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 
-const MotionBox = motion(Box);
+const MotionBox = motion.create(Box);
 
 interface SimulationButtonProps {
   href: string;

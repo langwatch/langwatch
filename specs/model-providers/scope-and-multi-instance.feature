@@ -3,6 +3,13 @@ Feature: Model Provider Scope and Multi-Instance
   I want a model provider row to span multiple projects/teams/orgs and co-exist with other rows of the same provider type
   So that I can run one shared credential across many projects while still isolating production/experimentation keys when needed
 
+  # Server-side scope authz + wire-format scenarios are bound to
+  # `modelProvider.authz.integration.test.ts`, `wireFormat.unit.test.ts`,
+  # and `modelProvider.repository.unit.test.ts`. Remaining @unimplemented
+  # scenarios describe scope-picker UI, ModelSelector grouping, and gateway
+  # binding drawer flows that need JSDOM renders of those components.
+  # Aspirational pending those UI harnesses.
+
   # Scope has TWO axes:
   #   1. Multi-select across the org/team/project hierarchy (one MP row can cover
   #      N scope entries; see ModelProviderScope join table below).
@@ -62,7 +69,7 @@ Feature: Model Provider Scope and Multi-Instance
     And I have only "project:manage" on "web-app"
     Then the Scope field is pre-filled with project "web-app"
 
-  @integration @unimplemented
+  @integration
   Scenario: Save a provider with multiple scopes
     Given I open the Create Model Provider drawer for "openai"
     When I set the name to "OpenAI Production"
@@ -120,7 +127,7 @@ Feature: Model Provider Scope and Multi-Instance
   # check. Users disambiguate duplicates through the scope chips on the
   # list page and the scope-grouped header in model selectors.
 
-  @integration @unimplemented
+  @integration
   Scenario: Create a second OpenAI row under a different scope
     Given the org "acme" already has a ModelProvider named "OpenAI" scoped to project "web-app"
     When I open the Create Model Provider drawer and select provider "openai"
@@ -157,7 +164,7 @@ Feature: Model Provider Scope and Multi-Instance
     When I navigate to the Model Providers settings page
     Then I do not see a ProjectSelector in the page header
 
-  @integration @unimplemented
+  @integration
   Scenario: Model Providers page lists all accessible rows across scopes
     Given I have access to org "acme" with team "platform" and projects "web-app", "mobile-app"
     And the following ModelProvider rows exist:
@@ -170,7 +177,7 @@ Feature: Model Provider Scope and Multi-Instance
     Then I see all four rows listed
     And each row shows the scope chips corresponding to its ModelProviderScope entries
 
-  @integration @unimplemented
+  @integration
   Scenario: Rows outside my permission are hidden
     Given a ModelProvider "OpenAI Other Team" scoped to team "marketing"
     And I have no access to team "marketing"
@@ -197,7 +204,7 @@ Feature: Model Provider Scope and Multi-Instance
     Then options are grouped per provider ("OpenAI", "Anthropic")
     And the wire value saved for gpt-5 is the canonical "{OpenAI.id}/gpt-5"
 
-  @integration @unimplemented
+  @integration
   Scenario: Legacy "provider/model" wire value resolves when exactly one MP matches
     Given I have exactly one accessible "openai" ModelProvider "OpenAI Shared"
     And a previously-saved Prompt with model "openai/gpt-5"
@@ -205,7 +212,7 @@ Feature: Model Provider Scope and Multi-Instance
     Then it resolves against "OpenAI Shared"
     And subsequent save-operations persist the canonical "{OpenAIShared.id}/gpt-5"
 
-  @integration @unimplemented
+  @integration
   Scenario: Legacy wire value errors when multiple MPs match
     Given I have two accessible "openai" ModelProviders "OpenAI Shared" and "OpenAI Mobile"
     And a Prompt previously saved with the legacy value "openai/gpt-5"
@@ -213,7 +220,7 @@ Feature: Model Provider Scope and Multi-Instance
     Then the UI shows a banner "Ambiguous provider — re-select your model"
     And the model picker surfaces a clear error state
 
-  @integration @unimplemented
+  @integration
   Scenario: Legacy wire value errors when no MPs match
     Given I have no accessible "cohere" ModelProvider
     And a Prompt was saved long ago with "cohere/command-r"
@@ -260,8 +267,8 @@ Feature: Model Provider Scope and Multi-Instance
   #      (scopeType, scopeId) pairs from the user's membership set; rows whose
   #      every scope falls outside that set are never read.
 
-  @integration @security @unimplemented
-  Scenario: Service rejects assigning an MP to an org the user is not a member of
+  @integration @security
+  Scenario: Assigning a provider to an org without manage permission is denied
     Given I am a member of org "acme" only
     And I tamper with a tRPC payload to set scopes to ORGANIZATION=beta
     When the request hits modelProviderRouter.create
@@ -270,16 +277,16 @@ Feature: Model Provider Scope and Multi-Instance
     And no ModelProviderScope row is created
     And an audit log entry is written with outcome FAILED_AUTHZ
 
-  @integration @security @unimplemented
-  Scenario: Service rejects assigning an MP to a team the user cannot manage
+  @integration @security
+  Scenario: Assigning a provider to an unmanageable team is denied
     Given I am a member of team "platform" in org "acme"
     And I have no manage permission on team "marketing" in the same org
     When I submit a create request with scopes = [TEAM=marketing]
     Then the service throws "Forbidden: team:manage required on marketing"
     And the row is not created
 
-  @integration @security @unimplemented
-  Scenario: Service rejects updating scopes to add a team the user cannot manage
+  @integration @security
+  Scenario: Adding an unauthorized team scope to an existing provider is rejected
     Given I own an MP scoped to TEAM=platform
     When I submit an update that replaces scopes with [TEAM=platform, TEAM=marketing]
     And I cannot manage team "marketing"
@@ -297,8 +304,8 @@ Feature: Model Provider Scope and Multi-Instance
     And even the row's id is absent from the response
     # This protects enumeration: we don't want clients probing ids.
 
-  @integration @security @unimplemented
-  Scenario: getById rejects reading an MP outside the user's scope
+  @integration @security
+  Scenario: Reading a provider outside my access scope returns not found
     Given a ModelProvider "Y" scoped to team "marketing"
     And I have no access to team "marketing"
     When I call the getById tRPC procedure with the id of "Y"
@@ -306,7 +313,7 @@ Feature: Model Provider Scope and Multi-Instance
     # Returning 404 instead of 403 prevents information leakage about whether
     # a given id exists across tenants.
 
-  @integration @security @unimplemented
+  @integration @security
   Scenario: Deletion requires manage permission on EVERY current scope of the MP
     Given a ModelProvider "Z" scoped to [ORG=acme, TEAM=platform]
     And I have team:manage on platform but not organization:manage on acme

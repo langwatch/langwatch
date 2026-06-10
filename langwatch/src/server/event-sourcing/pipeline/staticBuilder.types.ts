@@ -1,3 +1,4 @@
+import type { FeatureFlagKey } from "../../featureFlag/registry";
 import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 import type { CommandHandlerClass } from "../commands/commandHandlerClass";
 import type { Event, Projection } from "../domain/types";
@@ -12,8 +13,13 @@ import type { PipelineMetadata } from "./types";
  * When the feature flag is true, the component is disabled.
  */
 export interface KillSwitchOptions {
-  /** Optional custom feature flag key override */
-  customKey?: string;
+  /**
+   * Optional custom feature flag key override. Must satisfy
+   * `FeatureFlagKey` so the registry catches unregistered keys at
+   * compile time; pass a registered explicit flag or an
+   * `es-*-killswitch` template-literal key.
+   */
+  customKey?: FeatureFlagKey;
   /** Default value if feature flag service unavailable */
   defaultValue?: boolean;
 }

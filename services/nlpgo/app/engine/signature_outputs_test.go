@@ -11,21 +11,41 @@ import (
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/dsl"
 )
 
-// TestSignatureNeedsStructuredOutput pins the policy: structured
-// response_format is requested when (a) any output is json_schema-typed
-// or (b) there are 2+ outputs (multi-output requires field separation).
+// TestSignatureNeedsStructuredOutput pins the Python-parity policy
+// (_use_text_only_completion at langwatch_nlp/langwatch_nlp/studio/dspy/
+// template_adapter.py:228-232): text-only fast path is taken iff there
+// are zero outputs OR a single output whose type is `str`. Everything
+// else needs response_format — including single `bool`, single `float`,
+// single `json_schema`, and any multi-output signature.
+//
+// Pre-fix this gate only fired for json_schema-typed or 2+ outputs;
+// single `bool` / single `float` slipped through, the LLM replied with
+// prose, and the engine shoved that prose into a typed slot. Manifested
+// as a blank chat bubble in the playground (rchaves dogfood 2026-05-16)
+// because the TS output-formatter silently rejects type-mismatched
+// values.
 func TestSignatureNeedsStructuredOutput(t *testing.T) {
 	cases := []struct {
 		name string
 		out  []dsl.Field
 		want bool
 	}{
-		{"single str", []dsl.Field{{Identifier: "a", Type: dsl.FieldTypeStr}}, false},
-		{"single int", []dsl.Field{{Identifier: "n", Type: dsl.FieldTypeInt}}, false},
-		{"single json_schema", []dsl.Field{{Identifier: "o", Type: dsl.FieldTypeJSONSchema}}, true},
-		{"two str", []dsl.Field{{Identifier: "a"}, {Identifier: "b"}}, true},
-		{"three mixed", []dsl.Field{{Identifier: "a"}, {Identifier: "b"}, {Identifier: "c"}}, true},
+		// Text-only fast path (Python parity).
 		{"empty", []dsl.Field{}, false},
+		{"single str", []dsl.Field{{Identifier: "a", Type: dsl.FieldTypeStr}}, false},
+
+		// Single non-str — was the gap, now correctly structured.
+		{"single bool", []dsl.Field{{Identifier: "passed", Type: dsl.FieldTypeBool}}, true},
+		{"single float", []dsl.Field{{Identifier: "score", Type: dsl.FieldTypeFloat}}, true},
+		{"single int", []dsl.Field{{Identifier: "n", Type: dsl.FieldTypeInt}}, true},
+		{"single json_schema", []dsl.Field{{Identifier: "o", Type: dsl.FieldTypeJSONSchema}}, true},
+		{"single list[str]", []dsl.Field{{Identifier: "tags", Type: dsl.FieldTypeListStr}}, true},
+		{"single dict", []dsl.Field{{Identifier: "meta", Type: dsl.FieldTypeDict}}, true},
+
+		// Multi-output always structured (assigning the same response
+		// to every declared output loses signal).
+		{"two str", []dsl.Field{{Identifier: "a", Type: dsl.FieldTypeStr}, {Identifier: "b", Type: dsl.FieldTypeStr}}, true},
+		{"three mixed", []dsl.Field{{Identifier: "a"}, {Identifier: "b"}, {Identifier: "c"}}, true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -52,6 +72,31 @@ func TestComposeSignatureResponseFormat_TwoStringOutputs(t *testing.T) {
 	assert.Equal(t, map[string]any{"type": "number"}, props["confidence"])
 	required := schema["required"].([]string)
 	assert.ElementsMatch(t, []string{"label", "confidence"}, required)
+}
+
+// TestComposeSignatureResponseFormat_SingleBool pins the rchaves
+// dogfood case (2026-05-16): a prompt with Structured Outputs ON and a
+// single output `passed: bool` must produce a response_format with a
+// boolean property so the LLM returns `{"passed": true}` instead of
+// prose. Pre-fix the gate predicate skipped this entirely and the
+// engine never sent response_format.
+func TestComposeSignatureResponseFormat_SingleBool(t *testing.T) {
+	rf := composeSignatureResponseFormat("Verifier", []dsl.Field{
+		{Identifier: "passed", Type: dsl.FieldTypeBool},
+	})
+	require.NotNil(t, rf, "single-bool output must produce a response_format (Python parity)")
+	assert.Equal(t, "json_schema", rf.Type)
+	js := rf.JSONSchema
+	assert.Equal(t, "Verifier", js["name"])
+	assert.Equal(t, true, js["strict"])
+	schema := js["schema"].(map[string]any)
+	assert.Equal(t, "object", schema["type"])
+	assert.Equal(t, false, schema["additionalProperties"])
+	props := schema["properties"].(map[string]any)
+	assert.Equal(t, map[string]any{"type": "boolean"}, props["passed"],
+		"the bool field must declare type:boolean so the LLM returns a JSON bool, not prose")
+	required := schema["required"].([]string)
+	assert.ElementsMatch(t, []string{"passed"}, required)
 }
 
 // TestComposeSignatureResponseFormat_JSONSchemaPassthrough proves a
@@ -115,6 +160,104 @@ func TestExtractSignatureOutputs_MissingFieldWarns(t *testing.T) {
 	assert.False(t, ok, "missing field should not be set")
 	require.NotEmpty(t, warnings)
 	assert.Contains(t, warnings[0], `"b"`)
+}
+
+// TestExtractSignatureOutputs_StripsMarkdownFence is the regression for the
+// nlpgo structured-output bug (Skai "Tool Selection Evaluator", rchaves
+// dogfood 2026-05-29): Anthropic/Claude wraps the JSON object in a ```json
+// markdown fence even when a response_format is requested, so a bare
+// json.Unmarshal choked and the engine dumped the WHOLE fenced blob into the
+// first declared field — leaving passed/details unset. Downstream nodes bound
+// to a specific field then received the raw blob. This executes the actual
+// extract path and asserts the fields split correctly.
+func TestExtractSignatureOutputs_StripsMarkdownFence(t *testing.T) {
+	outputs := []dsl.Field{
+		{Identifier: "passed", Type: dsl.FieldTypeBool},
+		{Identifier: "details", Type: dsl.FieldTypeStr},
+		{Identifier: "reasoning", Type: dsl.FieldTypeStr},
+	}
+	cases := []struct {
+		name    string
+		content string
+	}{
+		{
+			"```json fence",
+			"```json\n{\"passed\": true, \"details\": \"CHECK 1: PASS\", \"reasoning\": \"no tools needed\"}\n```",
+		},
+		{
+			"bare ``` fence",
+			"```\n{\"passed\": true, \"details\": \"CHECK 1: PASS\", \"reasoning\": \"no tools needed\"}\n```",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, warnings := extractSignatureOutputs(tc.content, outputs)
+			assert.Empty(t, warnings, "fenced JSON must parse cleanly across declared fields")
+			assert.Equal(t, true, got["passed"], "bool field must split out as a real bool, not be lost in a raw blob")
+			assert.Equal(t, "CHECK 1: PASS", got["details"])
+			assert.Equal(t, "no tools needed", got["reasoning"],
+				"the field a downstream node binds to must hold its own value, not the whole blob")
+		})
+	}
+}
+
+// TestExtractSignatureOutputs_RecoversProseWrappedJSON covers a model that
+// surrounds the object with prose (no fence) — the balanced-object fallback
+// recovers the first {...} so the fields still split.
+func TestExtractSignatureOutputs_RecoversProseWrappedJSON(t *testing.T) {
+	outputs := []dsl.Field{{Identifier: "label", Type: dsl.FieldTypeStr}}
+	got, warnings := extractSignatureOutputs(`Sure! Here is the result: {"label":"weather"} — hope that helps.`, outputs)
+	assert.Empty(t, warnings)
+	assert.Equal(t, "weather", got["label"])
+}
+
+func TestStripJSONFence(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"no fence passthrough", `{"a":1}`, `{"a":1}`},
+		{"json tag", "```json\n{\"a\":1}\n```", `{"a":1}`},
+		{"uppercase tag", "```JSON\n{\"a\":1}\n```", `{"a":1}`},
+		{"bare fence", "```\n{\"a\":1}\n```", `{"a":1}`},
+		{"leading whitespace", "  ```json\n{\"a\":1}\n```  ", `{"a":1}`},
+		{"no closing fence", "```json\n{\"a\":1}", `{"a":1}`},
+		// An interior ``` inside a string value (no real closing fence)
+		// must NOT be treated as the closing fence — only a genuine
+		// trailing fence is stripped.
+		{"interior fence not stripped", "```json\n{\"code\":\"a```b\"}", `{"code":"a` + "```" + `b"}`},
+		{"plain text untouched", "just text", "just text"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, stripJSONFence(tc.in))
+		})
+	}
+}
+
+func TestExtractFirstJSONObject(t *testing.T) {
+	cases := []struct {
+		name   string
+		in     string
+		want   string
+		wantOK bool
+	}{
+		{"plain object", `{"a":1}`, `{"a":1}`, true},
+		{"object with prose around", `prefix {"a":1} suffix`, `{"a":1}`, true},
+		{"brace inside string ignored", `{"a":"}"}`, `{"a":"}"}`, true},
+		{"escaped quote inside string", `{"a":"x\"}y"}`, `{"a":"x\"}y"}`, true},
+		{"nested object", `{"a":{"b":2}}`, `{"a":{"b":2}}`, true},
+		{"no object", `just text, no braces`, "", false},
+		{"unbalanced", `{"a":1`, "", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := extractFirstJSONObject(tc.in)
+			assert.Equal(t, tc.wantOK, ok)
+			assert.Equal(t, tc.want, got)
+		})
+	}
 }
 
 func TestJSONSchemaForField_ScalarMappings(t *testing.T) {

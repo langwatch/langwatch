@@ -4,7 +4,7 @@ import { type FileManager } from "@/cli/utils/fileManager";
 import { mock, type MockProxy } from "vitest-mock-extended";
 import { localPromptConfigFactory } from "../../../../../__tests__/factories/local-prompt-config.factory";
 import { type Logger } from "@/logger";
-import { type LocalPromptConfig } from "@/cli/types";
+import type { PromptData } from "../types";
 
 describe("LocalPromptsService", () => {
   const handle = "my-handle";
@@ -138,7 +138,7 @@ describe("LocalPromptsService", () => {
       const filePath = "missing-file.prompt.yaml";
       const errorMessage =
         "Local prompt file not found: missing-file.prompt.yaml";
-      let result: LocalPromptConfig | null;
+      let result: PromptData | null;
 
       beforeEach(async () => {
         mockFileManager.loadPromptsConfig.mockReturnValue({
@@ -161,7 +161,7 @@ describe("LocalPromptsService", () => {
     describe("when version reference fails to materialize", () => {
       const errorMessage =
         "Local prompt file not found: prompts/.materialized/my-handle.prompt.yaml";
-      let result: LocalPromptConfig | null;
+      let result: PromptData | null;
 
       beforeEach(async () => {
         mockFileManager.loadPromptsConfig.mockReturnValue({

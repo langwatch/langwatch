@@ -263,6 +263,89 @@ describe("simulationRunStateFoldProjection", () => {
       expect(state.Status).toBe("IN_PROGRESS");
     });
 
+    it("caps oversized message Content (defence vs SDKs shipping inline media that wasn't externalised)", () => {
+      // 80 KiB string — over the 64 KiB cap. Models the symptom we hit when a
+      // voice SDK ships full base64 audio inline because the stored-objects
+      // pipeline failed to externalise the file part. Without this cap the
+      // bytes land verbatim in ClickHouse Messages.Content and re-leak on
+      // every list query.
+      const oversizedContent = "x".repeat(80 * 1024);
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createMessageSnapshotEvent({
+          messages: [{ role: "user", content: oversizedContent }],
+        }),
+      ]);
+
+      expect(state.Messages).toHaveLength(1);
+      const persisted = state.Messages[0]!.Content;
+      // Truncated to a clearly-marked placeholder, not the original payload.
+      expect(persisted.length).toBeLessThan(oversizedContent.length);
+      expect(persisted).toContain("[truncated:");
+      expect(persisted).toContain("inline media");
+    });
+
+    it("caps oversized multi-byte (UTF-8) Content (fast-path doesn't bypass on character count)", () => {
+      // A char-count fast-path (`value.length <= maxBytes`) would WRONGLY
+      // bypass this string: 30 KiB of chars = under the 64 KiB length, but
+      // each 4-byte UTF-8 emoji (😀) pushes the actual byte length to ~120 KiB.
+      // The safe fast-path uses `value.length * 3 <= maxBytes`, so this
+      // string falls through to the real Buffer.byteLength check and gets
+      // truncated.
+      const oversizedMultibyte = "😀".repeat(30 * 1024);
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createMessageSnapshotEvent({
+          messages: [{ role: "user", content: oversizedMultibyte }],
+        }),
+      ]);
+
+      const persisted = state.Messages[0]!.Content;
+      expect(persisted.length).toBeLessThan(oversizedMultibyte.length);
+      expect(persisted).toContain("[truncated:");
+    });
+
+    it("preserves normal-sized Content unchanged (no false-positive truncation)", () => {
+      // Below the cap — a long but reasonable assistant reply.
+      const longButReasonable = "a sentence. ".repeat(2000); // ~24 KiB
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createMessageSnapshotEvent({
+          messages: [{ role: "assistant", content: longButReasonable }],
+        }),
+      ]);
+
+      expect(state.Messages[0]!.Content).toBe(longButReasonable);
+    });
+
+    it("caps oversized Rest (covers array-content paths that route audio into Rest)", () => {
+      // Array content gets duplicated into Rest by buildMessageRestJson; cap
+      // there too so a misbehaving SDK can't punt the leak into Rest while
+      // Content stays small.
+      const oversizedPart = "y".repeat(80 * 1024);
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createMessageSnapshotEvent({
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "text", text: "hi" },
+                // The actual symptom is a file/input_audio part with base64 in
+                // `data`; an oversized text part is the simplest way to model
+                // the byte volume without coupling the test to a wire shape.
+                { type: "text", text: oversizedPart },
+              ],
+            },
+          ],
+        }),
+      ]);
+
+      const rest = state.Messages[0]!.Rest;
+      expect(rest.length).toBeLessThan(oversizedPart.length);
+      expect(rest).toContain("[truncated:");
+    });
+
     it("ignores snapshots with older timestamps (out-of-order protection)", () => {
       const state = foldEvents([
         createRunStartedEvent(),
@@ -514,6 +597,22 @@ describe("simulationRunStateFoldProjection", () => {
 
       expect(state.Messages[0]!.Rest).toContain("toolCalls");
     });
+
+    it("caps oversized Content on TextMessageEnd (same defence as snapshot path)", () => {
+      const oversized = "z".repeat(80 * 1024);
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createTextMessageEndEvent({
+          messageId: "msg-leak",
+          role: "assistant",
+          content: oversized,
+        }),
+      ]);
+
+      const persisted = state.Messages[0]!.Content;
+      expect(persisted.length).toBeLessThan(oversized.length);
+      expect(persisted).toContain("[truncated:");
+    });
   });
 
   describe("when START→END lifecycle", () => {
@@ -605,6 +704,63 @@ describe("simulationRunStateFoldProjection", () => {
       expect(state.Messages).toHaveLength(1);
       expect(state.TraceIds).toEqual(["trace-1"]);
       expect(state.FinishedAt).toBe(3000);
+    });
+  });
+
+  describe("when SimulationRunCancelRequested event is applied", () => {
+    function createCancelRequestedEvent(occurredAt = 5000): SimulationProcessingEvent {
+      return {
+        id: "event-cancel",
+        aggregateId: "scenario-run-1",
+        aggregateType: "simulation_run",
+        tenantId: TEST_TENANT_ID,
+        createdAt: occurredAt,
+        occurredAt,
+        type: SIMULATION_RUN_EVENT_TYPES.CANCEL_REQUESTED,
+        version: SIMULATION_EVENT_VERSIONS.CANCEL_REQUESTED,
+        data: { scenarioRunId: "scenario-run-1" },
+      } as SimulationProcessingEvent;
+    }
+
+    /** @scenario Fold projection sets CancellationRequestedAt without changing Status */
+    it("sets CancellationRequestedAt to event occurredAt while preserving Status", () => {
+      const initial = foldProjection.init();
+      const inProgress = foldProjection.apply(
+        initial,
+        createRunStartedEvent({}, { occurredAt: 1000 }),
+      );
+      expect(inProgress.Status).toBe("IN_PROGRESS");
+      expect(inProgress.CancellationRequestedAt).toBeNull();
+
+      const after = foldProjection.apply(
+        inProgress,
+        createCancelRequestedEvent(5000),
+      );
+
+      expect(after.CancellationRequestedAt).toBe(5000);
+      expect(after.Status).toBe("IN_PROGRESS");
+    });
+
+    /** @scenario Cancel request is idempotent */
+    it("preserves the original CancellationRequestedAt when applied a second time", () => {
+      const initial = foldProjection.init();
+      const inProgress = foldProjection.apply(
+        initial,
+        createRunStartedEvent({}, { occurredAt: 1000 }),
+      );
+      const afterFirst = foldProjection.apply(
+        inProgress,
+        createCancelRequestedEvent(5000),
+      );
+      expect(afterFirst.CancellationRequestedAt).toBe(5000);
+
+      const afterSecond = foldProjection.apply(
+        afterFirst,
+        createCancelRequestedEvent(8000),
+      );
+
+      expect(afterSecond.CancellationRequestedAt).toBe(5000);
+      expect(afterSecond.Status).toBe("IN_PROGRESS");
     });
   });
 });

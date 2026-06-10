@@ -25,6 +25,7 @@ function mockChRepoWithEvents(
   }));
   return {
     recentEventsForBudget: async () => fullEvents,
+    getSpendForBudgetsAcrossTenants: async () => [],
   } as unknown as GatewayBudgetClickHouseRepository;
 }
 
@@ -34,11 +35,6 @@ function stubBudget(overrides: Partial<GatewayBudget> = {}): GatewayBudget {
     organizationId: "org_01",
     scopeType: "PROJECT",
     scopeId: "project_01",
-    organizationScopedId: null,
-    teamScopedId: null,
-    projectScopedId: "project_01",
-    virtualKeyScopedId: null,
-    principalUserId: null,
     name: "monthly",
     description: null,
     window: "MONTH",
@@ -61,6 +57,9 @@ function mockPrismaWithBudgets(budgets: GatewayBudget[]): PrismaClient {
   return {
     gatewayBudget: {
       findMany: async () => budgets,
+    },
+    project: {
+      findMany: async () => [{ id: "project_01" }],
     },
   } as unknown as PrismaClient;
 }
@@ -117,6 +116,7 @@ describe("GatewayBudgetService.check", () => {
   });
 
   describe("when projected spend reaches the hard limit on a BLOCK budget", () => {
+    /** @scenario Hard-block budget returns 402 when spent >= limit */
     it("returns hard_block with a descriptive reason", async () => {
       const sut = GatewayBudgetService.create(
         mockPrismaWithBudgets([
@@ -147,7 +147,7 @@ describe("GatewayBudgetService.check", () => {
         spentUsd: new Prisma.Decimal("0.00"), // dormant post-cutover
       });
       const chRepoStub = {
-        getSpendForBudgets: async () => [
+        getSpendForBudgetsAcrossTenants: async () => [
           { budgetId: "b_ch_sourced", spentUsd: "95.00" },
         ],
       } as unknown as Parameters<typeof GatewayBudgetService.create>[1];
@@ -172,6 +172,7 @@ describe("GatewayBudgetService.check", () => {
   });
 
   describe("when a WARN budget crosses its limit", () => {
+    /** @scenario Soft budget emits warning header but allows the call */
     it("warns but does not block", async () => {
       const sut = GatewayBudgetService.create(
         mockPrismaWithBudgets([
@@ -190,6 +191,8 @@ describe("GatewayBudgetService.check", () => {
   });
 
   describe("when one BLOCK budget is at limit and another WARN budget is fine", () => {
+    /** @scenario Sum-of-breaches rule — any block-breach blocks */
+    /** @scenario Most restrictive budget wins when multiple apply */
     it("still hard_blocks (sum-of-breaches semantics)", async () => {
       const sut = GatewayBudgetService.create(
         mockPrismaWithBudgets([
@@ -309,10 +312,14 @@ describe("GatewayBudgetService.getDetail", () => {
       },
       project: {
         findUnique: vi.fn(async () => scopeRow),
+        findMany: vi.fn(async () => [{ id: "project_01" }]),
       },
       virtualKey: {
         findUnique: vi.fn(async () => scopeRow),
         findMany: vi.fn(async () => []),
+      },
+      virtualKeyScope: {
+        findFirst: vi.fn(async () => ({ scopeId: "project_01" })),
       },
       user: {
         findUnique: vi.fn(async () => scopeRow),
@@ -350,16 +357,15 @@ describe("GatewayBudgetService.getDetail", () => {
 
   describe("when scope is VIRTUAL_KEY", () => {
     it("includes the display prefix + project slug for linkback", async () => {
-      const sut = GatewayBudgetService.create(
-        mockPrismaWithDetail(
-          stubBudget({ scopeType: "VIRTUAL_KEY", scopeId: "vk_01" }),
-          {
-            name: "prod-openai",
-            displayPrefix: "lw_live_abc",
-            project: { slug: "proj" },
-          },
-        ),
+      const baseMock = mockPrismaWithDetail(
+        stubBudget({ scopeType: "VIRTUAL_KEY", scopeId: "vk_01" }),
+        { name: "prod-openai", displayPrefix: "lw_live_abc" },
       );
+      // VIRTUAL_KEY resolveScopeTarget chains vk → virtualKeyScope → project.
+      // Override project.findUnique to return the linkback slug.
+      (baseMock as unknown as { project: { findUnique: unknown } }).project.findUnique =
+        vi.fn(async () => ({ slug: "proj" }));
+      const sut = GatewayBudgetService.create(baseMock);
       const detail = await sut.getDetail("b_01", "org_01");
       expect(detail?.scopeTarget).toEqual({
         kind: "VIRTUAL_KEY",

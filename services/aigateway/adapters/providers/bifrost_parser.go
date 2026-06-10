@@ -14,6 +14,118 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
+// buildEmbeddingRequest parses an OpenAI-shape embedding body into a
+// BifrostEmbeddingRequest. The wire shape is:
+//
+//	{"model": "<provider-prefixed or bare>", "input": <string | []string | int[] | int[][]>, ...}
+//
+// Bifrost's EmbeddingInput is a strict one-of over those four shapes,
+// so we route the input by JSON type. Extra OpenAI params
+// (`encoding_format`, `dimensions`) map onto EmbeddingParameters; any
+// other keys (e.g. provider-specific `input_type` for Voyage/Cohere)
+// pass through via ExtraParams so Bifrost forwards them downstream.
+func buildEmbeddingRequest(
+	req *domain.Request,
+	provider bfschemas.ModelProvider,
+	model string,
+) (*bfschemas.BifrostEmbeddingRequest, error) {
+	if len(req.Body) == 0 {
+		return nil, fmt.Errorf("empty embedding request body")
+	}
+
+	inputResult := gjson.GetBytes(req.Body, "input")
+	if !inputResult.Exists() {
+		return nil, fmt.Errorf("embedding request missing 'input' field")
+	}
+
+	bfInput := &bfschemas.EmbeddingInput{}
+	switch inputResult.Type {
+	case gjson.String:
+		s := inputResult.String()
+		bfInput.Text = &s
+	case gjson.JSON:
+		// Array — either []string or [][]int or []int.
+		if inputResult.IsArray() {
+			arr := inputResult.Array()
+			if len(arr) == 0 {
+				return nil, fmt.Errorf("embedding input array is empty")
+			}
+			switch arr[0].Type {
+			case gjson.String:
+				texts := make([]string, len(arr))
+				for i, v := range arr {
+					texts[i] = v.String()
+				}
+				bfInput.Texts = texts
+			case gjson.Number:
+				ints := make([]int, len(arr))
+				for i, v := range arr {
+					ints[i] = int(v.Int())
+				}
+				bfInput.Embedding = ints
+			case gjson.JSON:
+				if arr[0].IsArray() {
+					nested := make([][]int, len(arr))
+					for i, v := range arr {
+						inner := v.Array()
+						ints := make([]int, len(inner))
+						for j, x := range inner {
+							ints[j] = int(x.Int())
+						}
+						nested[i] = ints
+					}
+					bfInput.Embeddings = nested
+				} else {
+					return nil, fmt.Errorf("unsupported embedding input shape: array of objects")
+				}
+			default:
+				return nil, fmt.Errorf("unsupported embedding input element type: %s", arr[0].Type)
+			}
+		} else {
+			return nil, fmt.Errorf("unsupported embedding input shape: object (expected string or array)")
+		}
+	default:
+		return nil, fmt.Errorf("unsupported embedding input type: %s", inputResult.Type)
+	}
+
+	bfReq := &bfschemas.BifrostEmbeddingRequest{
+		Provider: provider,
+		Model:    model,
+		Input:    bfInput,
+	}
+
+	// Carry OpenAI params + provider-specific extras. Bifrost passes
+	// ExtraParams through to the downstream provider verbatim.
+	params := &bfschemas.EmbeddingParameters{ExtraParams: map[string]interface{}{}}
+	hasParams := false
+	if v := gjson.GetBytes(req.Body, "encoding_format"); v.Exists() {
+		s := v.String()
+		params.EncodingFormat = &s
+		hasParams = true
+	}
+	if v := gjson.GetBytes(req.Body, "dimensions"); v.Exists() {
+		d := int(v.Int())
+		params.Dimensions = &d
+		hasParams = true
+	}
+	// Forward any remaining keys outside the OpenAI core set so
+	// Voyage's `input_type` / Cohere's `truncate` etc. survive the
+	// gateway.
+	gjson.ParseBytes(req.Body).ForEach(func(key, value gjson.Result) bool {
+		switch key.String() {
+		case "model", "input", "encoding_format", "dimensions":
+			return true
+		}
+		params.ExtraParams[key.String()] = value.Value()
+		hasParams = true
+		return true
+	})
+	if hasParams {
+		bfReq.Params = params
+	}
+	return bfReq, nil
+}
+
 // buildChatRequest constructs a BifrostChatRequest appropriate for the
 // inbound request type. RequestTypeChat expects an OpenAI-shape body and
 // goes through the parser (Bifrost then translates per-provider).

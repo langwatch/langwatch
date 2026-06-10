@@ -1,8 +1,5 @@
 import { Button, Container, Heading, HStack, Spacer } from "@chakra-ui/react";
 import type { Annotation, User } from "@prisma/client";
-import type { TRPCClientErrorLike } from "@trpc/client";
-import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
-import type { inferRouterOutputs } from "@trpc/server";
 import { useRouter } from "~/utils/compat/next-router";
 import Parse from "papaparse";
 import { Download } from "react-feather";
@@ -12,9 +9,9 @@ import {
   type AnnotationWithUser,
 } from "~/components/annotations/AnnotationsTable";
 import { PeriodSelector, usePeriodSelector } from "~/components/PeriodSelector";
+import { useAnnotationsByTraceIds } from "~/hooks/useAnnotationsByTraceIds";
 import { useFilterParams } from "~/hooks/useFilterParams";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { AppRouter } from "~/server/api/root";
 import type { Trace } from "~/server/tracer/types";
 import { api } from "~/utils/api";
 import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
@@ -40,38 +37,38 @@ export default function Annotations() {
 
   const {
     period: { startDate, endDate },
+    mode,
     setPeriod,
+    setRelativePeriod,
   } = usePeriodSelector();
 
-  type RouterOutput = inferRouterOutputs<AppRouter>;
-  type AnnotationsQuery = UseTRPCQueryResult<
-    | RouterOutput["annotation"]["getAll"]
-    | RouterOutput["annotation"]["getByTraceIds"],
-    TRPCClientErrorLike<AppRouter>
-  >;
+  // Both queries are declared unconditionally (rules of hooks) and gated
+  // via `enabled` on the active mode. `getByTraceIds` is chunked so a
+  // fully-filtered project with thousands of matching traces doesn't blow
+  // past the GET URL ceiling tRPC batches into.
+  const filteredTraceIds =
+    traceGroups.data?.groups.flatMap((group) =>
+      group.map((trace) => trace.trace_id),
+    ) ?? [];
 
-  let annotations: AnnotationsQuery;
+  const filteredAnnotations = useAnnotationsByTraceIds({
+    projectId: project?.id ?? "",
+    traceIds: filteredTraceIds,
+    enabled: hasAnyFilters && project?.id !== undefined,
+  });
 
-  if (hasAnyFilters) {
-    const traceIds =
-      traceGroups.data?.groups.flatMap((group) =>
-        group.map((trace) => trace.trace_id),
-      ) ?? [];
+  const allAnnotations = api.annotation.getAll.useQuery(
+    { projectId: project?.id ?? "", startDate, endDate },
+    { enabled: !hasAnyFilters && !!project },
+  );
 
-    annotations = api.annotation.getByTraceIds.useQuery(
-      { projectId: project?.id ?? "", traceIds },
-      {
-        enabled: project?.id !== undefined,
-      },
-    );
-  } else {
-    annotations = api.annotation.getAll.useQuery(
-      { projectId: project?.id ?? "", startDate, endDate },
-      {
-        enabled: !!project,
-      },
-    );
-  }
+  const annotations = hasAnyFilters ? filteredAnnotations : allAnnotations;
+  // In filtered mode the ids come from `traceGroups`, so its load must count
+  // toward the table's loading state — otherwise the table flashes an empty
+  // state before the ids (and then the annotations) arrive.
+  const annotationsLoading = hasAnyFilters
+    ? traceGroups.isLoading || filteredAnnotations.isLoading
+    : allAnnotations.isLoading;
 
   const traceIds = annotations.data?.map((annotation) => annotation.traceId);
 
@@ -183,14 +180,18 @@ export default function Annotations() {
       </Heading>
       <Spacer />
       <Button
-        colorPalette="black"
         minWidth="fit-content"
         variant="ghost"
         onClick={() => downloadCSV()}
       >
         Export all <Download style={{ marginLeft: "8px" }} />
       </Button>
-      <PeriodSelector period={{ startDate, endDate }} setPeriod={setPeriod} />
+      <PeriodSelector
+        period={{ startDate, endDate }}
+        mode={mode}
+        setPeriod={setPeriod}
+        setRelativePeriod={setRelativePeriod}
+      />
     </HStack>
   );
 
@@ -203,7 +204,7 @@ export default function Annotations() {
       >
         <AnnotationsTable
           groupedAnnotations={groupedAnnotations}
-          allAnnotationsLoading={annotations.isLoading || traces.isLoading}
+          allAnnotationsLoading={annotationsLoading || traces.isLoading}
           heading="Annotations"
           isDone={true}
           tableHeader={tableHeader}

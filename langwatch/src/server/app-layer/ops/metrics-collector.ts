@@ -1,28 +1,38 @@
+import { EventEmitter } from "node:events";
 import * as os from "node:os";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import type { NextApiResponse } from "~/types/next-stubs";
+import { createLogger } from "~/utils/logger/server";
+import { normalizeErrorMessage } from "./normalize-error-message";
+import {
+  computeEngineCpuPercent,
+  type RedisCpuSample,
+} from "./redis-engine-cpu";
+import type { QueueRepository } from "./repositories/queue.repository";
 import type {
   DashboardData,
+  JobNameMetrics,
   PipelineNode,
-  ThroughputPoint,
   QueueInfo,
   QueueSummaryInfo,
-  JobNameMetrics,
   RedisInfo,
+  ThroughputPoint,
 } from "./types";
-import type { QueueRepository } from "./repositories/queue.repository";
-import { normalizeErrorMessage } from "./normalize-error-message";
-import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:ops:metrics-collector");
 
 const THROUGHPUT_BUFFER_SIZE = 900;
 const METRICS_COLLECT_INTERVAL_MS = 2_000;
-const SSE_PUSH_INTERVAL_MS = 2_000;
-const SSE_HEARTBEAT_INTERVAL_MS = 15_000;
+const PENDING_RECONCILE_INTERVAL_MS = 60_000;
+const DASHBOARD_BROADCAST_INTERVAL_MS = 2_000;
 const REDIS_STATE_TTL_SECONDS = 3600;
 const QUEUE_DISCOVERY_INTERVAL_MS = 10_000;
+// Memoize badge counts for 5 seconds. The badge polls every 60s
+// off-route, but this also covers concurrent calls from multiple tabs
+// or layout remounts within the same window.
+const BADGE_CACHE_TTL_MS = 5_000;
+
+export const DASHBOARD_EVENT = "dashboard";
 
 const REDIS_STATE_KEY = "ops:metrics:state";
 const KNOWN_PIPELINES_KEY = "ops:known-pipelines";
@@ -59,11 +69,6 @@ interface PersistedMetricsState {
   throughputBuffer: ThroughputPoint[];
   latestTotalCompleted: number;
   latestTotalFailed: number;
-}
-
-interface SSEClient {
-  id: string;
-  res: NextApiResponse;
 }
 
 const EMPTY_PHASE = {
@@ -113,7 +118,10 @@ export function buildPipelineTree({
 }): PipelineNode[] {
   const pipelineMap = new Map<
     string,
-    Map<string, Map<string, { pending: number; active: number; blocked: number }>>
+    Map<
+      string,
+      Map<string, { pending: number; active: number; blocked: number }>
+    >
   >();
 
   const ensurePath = (pName: string, jType?: string, jName?: string) => {
@@ -195,7 +203,7 @@ export function buildPipelineTree({
   return tree;
 }
 
-class OpsMetricsCollector {
+export class OpsMetricsCollector {
   private redis: IORedis | Cluster;
   private groupQueueNames: string[] = [];
   private throughputBuffer: ThroughputPoint[] = [];
@@ -244,6 +252,12 @@ class OpsMetricsCollector {
   private latestTotalCompleted = 0;
   private latestTotalFailed = 0;
   private latestQueues: QueueInfo[] = [];
+  // Memoized badge-counts result. See `getBadgeCounts` for rationale.
+  private badgeCountsCache: {
+    blockedCount: number;
+    dlqCount: number;
+    computedAt: Date;
+  } | null = null;
   private latestRedisInfo: RedisInfo = {
     usedMemoryHuman: "?",
     peakMemoryHuman: "?",
@@ -251,11 +265,20 @@ class OpsMetricsCollector {
     peakMemoryBytes: 0,
     maxMemoryBytes: 0,
     connectedClients: 0,
+    usedCpuUserMainThreadSeconds: 0,
+    usedCpuSysMainThreadSeconds: 0,
   };
+  // Previous Redis CPU snapshot used to derive an engine-CPU percent between
+  // successive collect() cycles. Null until the first sample lands. We sample
+  // the *main-thread* counters specifically because Redis processes commands
+  // on a single thread — that's the metric that pegs at 100% during
+  // saturation (CloudWatch's `EngineCPUUtilization`).
+  private prevRedisCpu: RedisCpuSample | null = null;
+  private currentRedisEngineCpuPercent: number | null = null;
   private collectInterval: ReturnType<typeof setInterval> | null = null;
   private discoveryInterval: ReturnType<typeof setInterval> | null = null;
   private broadcastInterval: ReturnType<typeof setInterval> | null = null;
-  private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+  private reconcileInterval: ReturnType<typeof setInterval> | null = null;
   private lastCpuUsage = process.cpuUsage();
   private lastCpuTime = Date.now();
   private currentCpuPercent = 0;
@@ -270,12 +293,12 @@ class OpsMetricsCollector {
   >();
   private currentJobNameMetrics: JobNameMetrics[] = [];
   private currentPausedKeys: string[] = [];
+  private latestPendingDrift = 0;
   private knownPipelinePaths: string[] = [];
   private isCollecting = false;
   private prevCompleted = new Map<string, number>();
   private prevFailed = new Map<string, number>();
-  private clients: SSEClient[] = [];
-  private clientCounter = 0;
+  private emitter = new EventEmitter();
 
   private queueRepo: QueueRepository;
 
@@ -285,12 +308,23 @@ class OpsMetricsCollector {
   }) {
     this.redis = params.redis;
     this.queueRepo = params.queueRepo;
+    // Each tRPC subscriber adds one listener. The dashboard is admin-only;
+    // raise the cap so we don't get MaxListenersExceededWarning under
+    // multi-tab use without losing the leak signal entirely.
+    this.emitter.setMaxListeners(100);
+  }
+
+  /** Event emitter used by the tRPC dashboardStream subscription. */
+  getEmitter(): EventEmitter {
+    return this.emitter;
   }
 
   async start(): Promise<void> {
     await this.restoreState();
     await this.discoverQueues();
-    this.collect();
+    // Kick off the first collect without blocking start(); the interval below
+    // will keep collecting on schedule. Errors are caught inside collect().
+    void this.collect();
     this.collectInterval = setInterval(
       () => this.collect(),
       METRICS_COLLECT_INTERVAL_MS,
@@ -299,18 +333,19 @@ class OpsMetricsCollector {
       () => this.discoverQueues(),
       QUEUE_DISCOVERY_INTERVAL_MS,
     );
+    this.reconcileInterval = setInterval(
+      () => this.reconcilePending(),
+      PENDING_RECONCILE_INTERVAL_MS,
+    );
+    void this.reconcilePending();
     this.broadcastInterval = setInterval(() => {
-      if (this.clients.length === 0) return;
+      if (this.emitter.listenerCount(DASHBOARD_EVENT) === 0) return;
       try {
-        const data = this.getDashboardData();
-        this.broadcast("dashboard", data);
+        this.emitter.emit(DASHBOARD_EVENT, this.getDashboardData());
       } catch (err) {
         logger.warn({ error: err }, "Failed to broadcast dashboard data");
       }
-    }, SSE_PUSH_INTERVAL_MS);
-    this.heartbeatInterval = setInterval(() => {
-      this.broadcast("heartbeat", { timestamp: Date.now() });
-    }, SSE_HEARTBEAT_INTERVAL_MS);
+    }, DASHBOARD_BROADCAST_INTERVAL_MS);
   }
 
   stop(): void {
@@ -326,48 +361,85 @@ class OpsMetricsCollector {
       clearInterval(this.broadcastInterval);
       this.broadcastInterval = null;
     }
-    if (this.heartbeatInterval) {
-      clearInterval(this.heartbeatInterval);
-      this.heartbeatInterval = null;
+    if (this.reconcileInterval) {
+      clearInterval(this.reconcileInterval);
+      this.reconcileInterval = null;
     }
-    for (const client of this.clients) {
-      client.res.end();
-    }
-    this.clients = [];
+    this.emitter.removeAllListeners();
   }
 
-  addClient(res: NextApiResponse): string {
-    const id = `client-${++this.clientCounter}`;
-    const client: SSEClient = { id, res };
-    this.clients.push(client);
-
-    res.on("close", () => {
-      this.clients = this.clients.filter((c) => c.id !== id);
-    });
-
-    return id;
-  }
-
-  removeClient(res: NextApiResponse): void {
-    this.clients = this.clients.filter((c) => c.res !== res);
-  }
-
-  private broadcast(event: string, data: unknown): void {
-    const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-    for (const client of this.clients) {
-      try {
-        client.res.write(payload);
-      } catch {
-        // client disconnected
-      }
-    }
-  }
-
-  private async discoverQueues(): Promise<void> {
+  async discoverQueues(): Promise<void> {
     try {
       this.groupQueueNames = await this.queueRepo.discoverQueueNames();
     } catch (err) {
-      logger.warn({ error: err }, "Queue discovery failed, keeping existing names");
+      logger.warn(
+        { error: err },
+        "Queue discovery failed, keeping existing names",
+      );
+    }
+  }
+
+  /**
+   * Lightweight per-call summary used by the global ops badge in the
+   * main menu. Pulls only the two integers the badge renders, so the
+   * global poll doesn't drag the full dashboard aggregation
+   * (pipeline tree, error normalization, etc.) into every tRPC batch.
+   * One slow procedure in a tRPC HTTP batch holds back every other
+   * query that fired in the same window.
+   *
+   * The result is memoized for `BADGE_CACHE_TTL_MS` so any burst of
+   * concurrent callers (multiple browser tabs, layout remounts, etc.)
+   * shares a single computation. `latestQueues` is already a cached
+   * snapshot, so this is mostly defense-in-depth — a future change
+   * that makes the per-call work expensive would otherwise silently
+   * regress the badge poll back into the slow tRPC batch path.
+   *
+   * `computedAt` ships back so the caller (and ops dashboards) can
+   * tell exactly how stale the value is.
+   */
+  getBadgeCounts(): {
+    blockedCount: number;
+    dlqCount: number;
+    computedAt: Date;
+  } {
+    const now = Date.now();
+    if (
+      this.badgeCountsCache &&
+      now - this.badgeCountsCache.computedAt.getTime() < BADGE_CACHE_TTL_MS
+    ) {
+      return this.badgeCountsCache;
+    }
+
+    let blockedCount = 0;
+    let dlqCount = 0;
+    for (const q of this.latestQueues) {
+      blockedCount += q.blockedGroupCount;
+      dlqCount += q.dlqCount;
+    }
+    this.badgeCountsCache = {
+      blockedCount,
+      dlqCount,
+      computedAt: new Date(now),
+    };
+    return this.badgeCountsCache;
+  }
+
+  private async reconcilePending(): Promise<void> {
+    try {
+      let totalDrift = 0;
+      for (const queueName of this.groupQueueNames) {
+        const result = await this.queueRepo.reconcileTotalPending(queueName);
+        if (result) totalDrift += Math.abs(result.drift);
+      }
+      this.latestPendingDrift = totalDrift;
+      if (totalDrift !== 0) {
+        logger.info(
+          { pendingDrift: totalDrift },
+          "Reconciled GroupQueue pending counter to ground truth",
+        );
+      }
+    } catch (err) {
+      logger.warn({ error: err }, "Failed to reconcile pending counter");
     }
   }
 
@@ -377,11 +449,13 @@ class OpsMetricsCollector {
 
     let totalGroups = 0;
     let blockedGroups = 0;
+    let parkedGroups = 0;
     let totalPendingJobs = 0;
 
     for (const q of fullQueues) {
       totalGroups += q.groups.length;
       blockedGroups += q.blockedGroupCount;
+      parkedGroups += q.parkedGroupCount;
       totalPendingJobs += q.totalPendingJobs;
     }
 
@@ -441,7 +515,9 @@ class OpsMetricsCollector {
     return {
       totalGroups,
       blockedGroups,
+      parkedGroups,
       totalPendingJobs,
+      pendingDrift: this.latestPendingDrift,
       throughputIngestedPerSec: this.currentIngestedPerSec,
       totalCompleted: this.latestTotalCompleted,
       totalFailed: this.latestTotalFailed,
@@ -450,12 +526,11 @@ class OpsMetricsCollector {
       peakCompletedPerSec: this.peakCompletedPerSec,
       peakFailedPerSec: this.peakFailedPerSec,
       peakIngestedPerSec: this.peakIngestedPerSec,
-      redisMemoryUsed: redisInfo.usedMemoryHuman,
-      redisMemoryPeak: redisInfo.peakMemoryHuman,
       redisMemoryUsedBytes: redisInfo.usedMemoryBytes,
       redisMemoryPeakBytes: redisInfo.peakMemoryBytes,
       redisMemoryMaxBytes: redisInfo.maxMemoryBytes,
       redisConnectedClients: redisInfo.connectedClients,
+      redisEngineCpuPercent: this.currentRedisEngineCpuPercent,
       processCpuPercent: Math.round(this.currentCpuPercent * 10) / 10,
       processMemoryUsedMb: Math.round(mem.rss / 1024 / 1024),
       processMemoryTotalMb: Math.round(os.totalmem() / 1024 / 1024),
@@ -485,9 +560,7 @@ class OpsMetricsCollector {
     return phases;
   }
 
-  private buildJobNameCounts(
-    queues: QueueInfo[],
-  ): Map<
+  private buildJobNameCounts(queues: QueueInfo[]): Map<
     string,
     {
       pending: number;
@@ -570,36 +643,16 @@ class OpsMetricsCollector {
     if (newCompleted > 0 || !this.hasBaseline) {
       const latencyPipeline = this.redis.pipeline();
       for (const name of this.groupQueueNames) {
-        latencyPipeline.zrange(`${name}:completed`, 0, 24, "REV");
+        latencyPipeline.lrange(`${name}:gq:stats:latencies-ms`, 0, -1);
       }
       const latencyResults = await latencyPipeline.exec();
 
       if (latencyResults) {
-        const jobIdPipeline = this.redis.pipeline();
-        const jobKeys: string[] = [];
-        for (let i = 0; i < this.groupQueueNames.length; i++) {
-          const jobIds = (latencyResults[i]?.[1] as string[]) ?? [];
-          const name = this.groupQueueNames[i]!;
-          for (const jobId of jobIds) {
-            jobIdPipeline.hmget(
-              `${name}:${jobId}`,
-              "processedOn",
-              "finishedOn",
-            );
-            jobKeys.push(`${name}:${jobId}`);
-          }
-        }
-        if (jobKeys.length > 0) {
-          const jobResults = await jobIdPipeline.exec();
-          if (jobResults) {
-            for (const [, result] of jobResults) {
-              const fields = result as [string | null, string | null];
-              const processedOn = fields?.[0] ? Number(fields[0]) : 0;
-              const finishedOn = fields?.[1] ? Number(fields[1]) : 0;
-              if (processedOn > 0 && finishedOn > processedOn) {
-                latencies.push(finishedOn - processedOn);
-              }
-            }
+        for (const [, result] of latencyResults) {
+          if (!Array.isArray(result)) continue;
+          for (const raw of result) {
+            const ms = Number(raw);
+            if (Number.isFinite(ms) && ms >= 0) latencies.push(ms);
           }
         }
       }
@@ -659,16 +712,12 @@ class OpsMetricsCollector {
         jobNameCounterPipeline.get(
           `${queueName}:gq:stats:completed:${jobName}`,
         );
-        jobNameCounterPipeline.get(
-          `${queueName}:gq:stats:failed:${jobName}`,
-        );
+        jobNameCounterPipeline.get(`${queueName}:gq:stats:failed:${jobName}`);
       }
       dedupedJobNames.push(jobName);
     }
     const jobNameCounterResults =
-      dedupedJobNames.length > 0
-        ? await jobNameCounterPipeline.exec()
-        : [];
+      dedupedJobNames.length > 0 ? await jobNameCounterPipeline.exec() : [];
 
     const jobNameTotals = new Map<
       string,
@@ -761,14 +810,25 @@ class OpsMetricsCollector {
 
       const cutoff =
         Date.now() - THROUGHPUT_BUFFER_SIZE * METRICS_COLLECT_INTERVAL_MS;
-      this.throughputBuffer = state.throughputBuffer.filter(
-        (p) => p.timestamp > cutoff,
-      );
+      // Backfill parkedCount on points persisted before the Parked series
+      // existed, so the chart never reads undefined/NaN for old history. The
+      // state version is intentionally not bumped: this keeps the rolling
+      // history AND the accumulated peaks across the deploy (a bump would zero
+      // them, including the freshly-added Completed/s peak tile).
+      this.throughputBuffer = state.throughputBuffer
+        .filter((p) => p.timestamp > cutoff)
+        .map((p) => ({
+          ...p,
+          parkedCount: (p as { parkedCount?: number }).parkedCount ?? 0,
+        }));
 
       this.latestTotalCompleted = state.latestTotalCompleted;
       this.latestTotalFailed = state.latestTotalFailed;
     } catch (err) {
-      logger.warn({ error: err }, "Failed to restore persisted metrics state, starting fresh");
+      logger.warn(
+        { error: err },
+        "Failed to restore persisted metrics state, starting fresh",
+      );
     }
   }
 
@@ -808,6 +868,10 @@ class OpsMetricsCollector {
       peakMemoryBytes: parseInt(get("used_memory_peak"), 10) || 0,
       maxMemoryBytes: parseInt(get("maxmemory"), 10) || 0,
       connectedClients: parseInt(get("connected_clients"), 10) || 0,
+      usedCpuUserMainThreadSeconds:
+        parseFloat(get("used_cpu_user_main_thread")) || 0,
+      usedCpuSysMainThreadSeconds:
+        parseFloat(get("used_cpu_sys_main_thread")) || 0,
     };
   }
 
@@ -822,7 +886,7 @@ class OpsMetricsCollector {
     }
   }
 
-  private async collect(): Promise<void> {
+  async collect(): Promise<void> {
     if (this.isCollecting) return;
     this.isCollecting = true;
     try {
@@ -832,6 +896,19 @@ class OpsMetricsCollector {
       ]);
       this.latestQueues = queues;
       this.latestRedisInfo = redisInfo;
+
+      const sampledAt = Date.now();
+      this.currentRedisEngineCpuPercent = computeEngineCpuPercent({
+        prev: this.prevRedisCpu,
+        nextUserSec: redisInfo.usedCpuUserMainThreadSeconds,
+        nextSysSec: redisInfo.usedCpuSysMainThreadSeconds,
+        nextSampledAt: sampledAt,
+      });
+      this.prevRedisCpu = {
+        userSec: redisInfo.usedCpuUserMainThreadSeconds,
+        sysSec: redisInfo.usedCpuSysMainThreadSeconds,
+        sampledAt,
+      };
 
       const pausedPipeline = this.redis.pipeline();
       for (const name of this.groupQueueNames) {
@@ -870,11 +947,7 @@ class OpsMetricsCollector {
         );
         await pipelineBatch.exec();
       }
-      const knownPaths = await this.redis.zrange(
-        KNOWN_PIPELINES_KEY,
-        0,
-        9999,
-      );
+      const knownPaths = await this.redis.zrange(KNOWN_PIPELINES_KEY, 0, 9999);
       this.knownPipelinePaths = knownPaths;
 
       let totalPending = 0;
@@ -926,8 +999,10 @@ class OpsMetricsCollector {
       this.hasBaseline = true;
 
       let totalBlockedCount = 0;
+      let totalParkedCount = 0;
       for (const q of queues) {
         totalBlockedCount += q.blockedGroupCount;
+        totalParkedCount += q.parkedGroupCount;
       }
 
       this.throughputBuffer.push({
@@ -937,6 +1012,7 @@ class OpsMetricsCollector {
         failedPerSec: this.currentFailedPerSec,
         pendingCount: totalPending,
         blockedCount: totalBlockedCount,
+        parkedCount: totalParkedCount,
       });
 
       if (this.throughputBuffer.length > THROUGHPUT_BUFFER_SIZE) {
@@ -957,7 +1033,10 @@ class OpsMetricsCollector {
         logger.warn({ error: err }, "Failed to persist metrics state");
       });
     } catch (err) {
-      logger.warn({ error: err }, "Metrics collection failed, retrying next interval");
+      logger.warn(
+        { error: err },
+        "Metrics collection failed, retrying next interval",
+      );
     } finally {
       this.isCollecting = false;
     }
@@ -978,5 +1057,3 @@ export function getOpsMetricsCollector(params: {
   }
   return singleton;
 }
-
-export type { OpsMetricsCollector };

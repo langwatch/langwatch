@@ -9,12 +9,10 @@
  * - src/pages/api/thread/[id].ts
  */
 import type { Context } from "hono";
-import { Hono } from "hono";
 import { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";
 import { getProtectionsForProject } from "~/server/api/utils";
-import { createShare } from "~/server/api/routers/share";
-import { unshareItem } from "~/server/api/routers/share";
+import { getApp } from "~/server/app-layer/app";
 import { getAllForProjectInput } from "~/server/api/routers/traces.schemas";
 import { prisma } from "~/server/db";
 import { generateAsciiTree } from "~/server/traces/trace-formatting";
@@ -28,18 +26,21 @@ import { enrichTracesWithEvaluations } from "~/server/traces/enrich-evaluations"
 import type { Span, Trace } from "~/server/tracer/types";
 import type { Permission } from "~/server/api/rbac";
 import {
-  enforcePatCeiling,
+  enforceApiKeyCeiling,
   extractCredentials,
-  patCeilingDenialResponse,
-} from "~/server/pat/auth-middleware";
-import { TokenResolver } from "~/server/pat/token-resolver";
+  apiKeyCeilingDenialResponse,
+} from "~/server/api-key/auth-middleware";
+import { TokenResolver } from "~/server/api-key/token-resolver";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 
 const tokenResolver = TokenResolver.create(prisma);
 
-export const app = new Hono().basePath("/api");
+const AUTH_REASON = "project API key / public share resolved in-handler";
+
+const secured = createServiceApp({ basePath: "/api" });
 
 /**
- * Authenticates via the unified PAT + legacy-key path and enforces the given
+ * Authenticates via the unified API-key + legacy-key path and enforces the given
  * permission ceiling. Returns either `{ project, markUsed }` or
  * `{ error, status }`. `markUsed` is fire-and-forget and a no-op for legacy
  * keys — callers invoke it after a successful response.
@@ -63,15 +64,15 @@ async function authenticateRequest(c: Context, permission: Permission) {
   }
 
   try {
-    await enforcePatCeiling({ prisma, resolved, permission });
+    await enforceApiKeyCeiling({ prisma, resolved, permission });
   } catch (error) {
-    const denial = patCeilingDenialResponse(error);
+    const denial = apiKeyCeilingDenialResponse(error);
     return { error: denial.message, status: denial.status };
   }
 
   const markUsed = () => {
-    if (resolved.type === "pat") {
-      tokenResolver.markUsed({ patId: resolved.patId });
+    if (resolved.type === "apiKey") {
+      tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
     }
   };
 
@@ -79,12 +80,12 @@ async function authenticateRequest(c: Context, permission: Permission) {
 }
 
 // ---------- GET /api/trace/:id ----------
-app.get("/trace/:id", async (c) => {
+secured.access(handlerManagedAuth(AUTH_REASON)).get("/trace/:id", async (c) => {
   const auth = await authenticateRequest(c, "traces:view");
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
   }
-  const { project } = auth;
+  const { project, markUsed } = auth;
 
   try {
     const traceId = c.req.param("id");
@@ -120,6 +121,8 @@ app.get("/trace/:id", async (c) => {
     );
     const evaluations = evaluationsMap[traceId] ?? [];
 
+    markUsed();
+
     if (format === "digest") {
       return c.json({
         trace_id: traceId,
@@ -151,40 +154,42 @@ app.get("/trace/:id", async (c) => {
 });
 
 // ---------- POST /api/trace/:id/share ----------
-app.post("/trace/:id/share", async (c) => {
+secured.access(handlerManagedAuth(AUTH_REASON)).post("/trace/:id/share", async (c) => {
   const auth = await authenticateRequest(c, "traces:share");
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
   }
-  const { project } = auth;
+  const { project, markUsed } = auth;
 
   const traceId = c.req.param("id");
 
-  const share = await createShare({
+  const share = await getApp().share.createShare({
     projectId: project.id,
     resourceType: "TRACE",
     resourceId: traceId,
   });
 
+  markUsed();
   return c.json({ status: "success", path: `/share/${share.id}` });
 });
 
 // ---------- POST /api/trace/:id/unshare ----------
-app.post("/trace/:id/unshare", async (c) => {
+secured.access(handlerManagedAuth(AUTH_REASON)).post("/trace/:id/unshare", async (c) => {
   const auth = await authenticateRequest(c, "traces:share");
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
   }
-  const { project } = auth;
+  const { project, markUsed } = auth;
 
   const traceId = c.req.param("id");
 
-  await unshareItem({
+  await getApp().share.unshare({
     projectId: project.id,
     resourceType: "TRACE",
     resourceId: traceId,
   });
 
+  markUsed();
   return c.json({ status: "success" });
 });
 
@@ -213,12 +218,12 @@ const paramsSchema = getAllForProjectInput
     llmMode: z.boolean().optional().default(false),
   });
 
-app.post("/trace/search", async (c) => {
+secured.access(handlerManagedAuth(AUTH_REASON)).post("/trace/search", async (c) => {
   const auth = await authenticateRequest(c, "traces:view");
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
   }
-  const { project } = auth;
+  const { project, markUsed } = auth;
 
   let body: Record<string, any>;
   try {
@@ -294,6 +299,7 @@ app.post("/trace/search", async (c) => {
     traces = enrichedTraces;
   }
 
+  markUsed();
   return c.json({
     traces,
     pagination: {
@@ -304,12 +310,12 @@ app.post("/trace/search", async (c) => {
 });
 
 // ---------- GET /api/thread/:id ----------
-app.get("/thread/:id", async (c) => {
+secured.access(handlerManagedAuth(AUTH_REASON)).get("/thread/:id", async (c) => {
   const auth = await authenticateRequest(c, "traces:view");
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
   }
-  const { project } = auth;
+  const { project, markUsed } = auth;
 
   const threadId = c.req.param("id");
   const protections = await getProtectionsForProject(prisma, {
@@ -322,5 +328,8 @@ app.get("/thread/:id", async (c) => {
     protections,
   );
 
+  markUsed();
   return c.json({ traces });
 });
+
+export const app = secured.hono;

@@ -1,5 +1,4 @@
 import type { Workflow } from "@prisma/client";
-import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
@@ -7,21 +6,13 @@ import { badRequestSchema } from "~/app/api/shared/schemas";
 import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
-import {
-  type AuthMiddlewareVariables,
-  authMiddleware,
-} from "../../middleware";
-import { loggerMiddleware } from "../../middleware/logger";
-import { tracerMiddleware } from "../../middleware/tracer";
+import { createProjectApp, requires } from "~/server/api/security";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
-import { handleError } from "../../middleware";
 
 patchZodOpenapi();
 
 const logger = createLogger("langwatch:api:workflows");
-
-type Variables = AuthMiddlewareVariables;
 
 const workflowResponseSchema = z.object({
   id: z.string(),
@@ -51,14 +42,9 @@ function toWorkflowResponse(workflow: Workflow) {
   };
 }
 
-export const app = new Hono<{ Variables: Variables }>()
-  .basePath("/api/workflows")
-  .use(tracerMiddleware({ name: "workflows" }))
-  .use(loggerMiddleware())
-  .use(authMiddleware)
-  .onError(handleError)
+const secured = createProjectApp({ basePath: "/api/workflows" });
 
-  .get(
+secured.access(requires("workflows:view")).get(
     "/",
     describeRoute({
       description: "List all non-archived workflows for the project",
@@ -91,9 +77,9 @@ export const app = new Hono<{ Variables: Variables }>()
         }),
       })));
     },
-  )
+  );
 
-  .get(
+secured.access(requires("workflows:view")).get(
     "/:id",
     describeRoute({
       description: "Get a workflow by its ID",
@@ -136,9 +122,9 @@ export const app = new Hono<{ Variables: Variables }>()
         }),
       });
     },
-  )
+  );
 
-  .patch(
+secured.access(requires("workflows:manage")).patch(
     "/:id",
     describeRoute({
       description: "Update a workflow's metadata (name, icon, description)",
@@ -192,9 +178,9 @@ export const app = new Hono<{ Variables: Variables }>()
         }),
       });
     },
-  )
+  );
 
-  .delete(
+secured.access(requires("workflows:manage")).delete(
     "/:id",
     describeRoute({
       description: "Archive (soft-delete) a workflow",
@@ -237,3 +223,5 @@ export const app = new Hono<{ Variables: Variables }>()
       return c.json({ id, archived: true });
     },
   );
+
+export const app = secured.hono;

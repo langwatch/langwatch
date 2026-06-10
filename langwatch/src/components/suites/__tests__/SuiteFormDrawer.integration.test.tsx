@@ -115,6 +115,18 @@ vi.mock("~/utils/api", () => ({
         useMutation: vi.fn(() => ({ mutate: vi.fn() })),
       },
     },
+    modelProvider: {
+      listAllForProjectForFrontend: {
+        useQuery: vi.fn(() => ({
+          data: {
+            providers: [{ provider: "openai", enabled: true, customModels: [] }],
+          },
+        })),
+      },
+      getResolvedDefault: {
+        useQuery: vi.fn(() => ({ data: { model: "openai/gpt-5-mini" } })),
+      },
+    },
     useContext: vi.fn(() => ({
       suites: {
         getAll: { invalidate: vi.fn() },
@@ -210,6 +222,8 @@ function makeSuiteConfig(
     targets: [{ type: "http", referenceId: "agent_1" }],
     repeatCount: 1,
     labels: ["regression"],
+    simulatorModel: null,
+    judgeModel: null,
     archivedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -234,6 +248,8 @@ describe("<SuiteFormDrawer/>", () => {
   });
 
   describe("given the drawer is open in create mode", () => {
+    /** @scenario 'Form drawer title reads "New Run Plan" for creation' */
+    /** @scenario 'Form placeholder uses "Run Plan" terminology' */
     it("displays the 'New Run Plan' title", () => {
       render(<SuiteFormDrawer />, { wrapper: Wrapper });
 
@@ -258,6 +274,15 @@ describe("<SuiteFormDrawer/>", () => {
 
       expect(screen.getByRole("button", { name: /^Save$/i })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /Run Now/i })).toBeInTheDocument();
+    });
+
+    /** @scenario "The run plan drawer exposes simulator and judge model fields" */
+    it("exposes user-simulator and judge model fields", () => {
+      render(<SuiteFormDrawer />, { wrapper: Wrapper });
+
+      expect(screen.getByText("Models")).toBeInTheDocument();
+      expect(screen.getByText("User simulator")).toBeInTheDocument();
+      expect(screen.getByText("Judge")).toBeInTheDocument();
     });
 
     describe("when Save is clicked with an empty name", () => {
@@ -386,6 +411,7 @@ describe("<SuiteFormDrawer/>", () => {
         expect(descInput.value).toBe("Runs every deploy");
       });
 
+      /** @scenario 'Form drawer title reads "Edit Run Plan" for editing' */
       it("displays the Edit Run Plan title", () => {
         mocks.mockGetByIdData = makeSuiteConfig();
 
@@ -492,6 +518,7 @@ describe("<SuiteFormDrawer/>", () => {
 
   describe("given the suite editor is open", () => {
     describe("when 'Add Scenario' is clicked", () => {
+      /** @scenario Creating a new scenario from suite editor opens as a child drawer */
       it("opens the scenario editor as a child drawer", async () => {
         const user = userEvent.setup();
         render(<SuiteFormDrawer />, { wrapper: Wrapper });
@@ -514,6 +541,7 @@ describe("<SuiteFormDrawer/>", () => {
     });
 
     describe("when the scenario editor child drawer is closed", () => {
+      /** @scenario Closing the scenario editor child drawer returns to the suite editor */
       it("returns to suite editor with form state intact", async () => {
         const user = userEvent.setup();
         render(<SuiteFormDrawer />, { wrapper: Wrapper });
@@ -539,6 +567,7 @@ describe("<SuiteFormDrawer/>", () => {
     });
 
     describe("when 'Add Target' is clicked", () => {
+      /** @scenario Creating a new agent from suite editor opens as a child drawer */
       it("opens the agent HTTP editor as a child drawer", async () => {
         const user = userEvent.setup();
         render(<SuiteFormDrawer />, { wrapper: Wrapper });
@@ -561,6 +590,7 @@ describe("<SuiteFormDrawer/>", () => {
     });
 
     describe("when the agent HTTP editor child drawer is closed", () => {
+      /** @scenario Closing the agent editor child drawer returns to the suite editor */
       it("returns to suite editor with form state intact", async () => {
         const user = userEvent.setup();
         render(<SuiteFormDrawer />, { wrapper: Wrapper });
@@ -586,6 +616,7 @@ describe("<SuiteFormDrawer/>", () => {
     });
 
     describe("when form state is entered before opening a child drawer", () => {
+      /** @scenario Suite editor form state survives a child drawer round-trip */
       it("preserves suite name and scenario selections through a child drawer round-trip", async () => {
         const user = userEvent.setup();
         render(<SuiteFormDrawer />, { wrapper: Wrapper });

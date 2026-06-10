@@ -13,19 +13,32 @@ Let's get cracking.
 
 <Steps>
   <Step title="Create your LangWatch account">
-    First step: if you haven't already, grab your LangWatch account. Head over to [langwatch.ai](https://app.langwatch.ai), sign up, and get your API key ready.
-
-    <img src="/images/llm-observability/quick-start/setup-full.webp" />
+    Head over to [app.langwatch.ai](https://app.langwatch.ai) and sign up. Create your first organization and project.
   </Step>
 
-  <Step title="Sign in with LangWatch">
-    Open a terminal and run the following command to sign in with LangWatch:
+  <Step title="Get your API key">
+    You have two options:
+
+    **Option A: CLI login (recommended for local development)**
 
     ```bash
     npx langwatch login
     ```
 
-    This will add the `LANGWATCH_API_KEY` to your local `.env` file.
+    This opens your browser to authenticate and adds `LANGWATCH_API_KEY` to your local `.env` file.
+
+    **Option B: Create a key manually**
+
+    Go to [**Settings → API Keys**](https://app.langwatch.ai/settings/api-keys) and create an API key. See the [API Keys guide](/platform/api-keys) for details on personal vs service keys.
+
+    ```bash .env
+    LANGWATCH_API_KEY="sk-lw-..."
+    LANGWATCH_PROJECT_ID="your-project-id"
+    ```
+
+    <Note>
+      Keys created from **Settings → API Keys** (both personal and service) require `LANGWATCH_PROJECT_ID` so the SDK knows which project to send traces to. You can find the project ID in your project settings or URL.
+    </Note>
   </Step>
 
   <Step title="Let LangWatch MCP do the rest for you (Optional)">
@@ -77,6 +90,7 @@ from langwatch.instrumentors import OpenAIInstrumentor
 
 langwatch.setup(
     api_key=os.getenv("LANGWATCH_API_KEY"), # Your LangWatch API key
+    project_id=os.getenv("LANGWATCH_PROJECT_ID"), # Required for service API keys
     instrumentors=[OpenAIInstrumentor()] # Add the instrumentor for your LLM
 )
 ```
@@ -100,6 +114,7 @@ export function register() {
     serviceName: 'your-app-name', // Give your service a clear name
     traceExporter: new LangWatchExporter({
       apiKey: process.env.LANGWATCH_API_KEY, // Your LangWatch API key
+      projectId: process.env.LANGWATCH_PROJECT_ID, // Required for service API keys
     })
   });
 }
@@ -122,3 +137,8 @@ const result = await generateText({
     <img src="/images/llm-observability/quick-start/setup-monitor.webp" />
   </Step>
 </Steps>
+
+## Next steps
+
+- **Need org-wide controls?** See [AI Governance](/ai-governance/overview) for per-user workspaces, anomaly detection, OCSF/SIEM export, and ingestion sources for non-gateway telemetry, paired with the AI Gateway data plane.
+- **Routing every LLM call through a single endpoint?** See [AI Gateway](/ai-gateway/overview): virtual keys, budgets, fallback chains, guardrails.

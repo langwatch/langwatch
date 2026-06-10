@@ -1,4 +1,4 @@
-//go:build live_openai || live_anthropic || live_gemini || live_bedrock || live_azure || live_vertex
+//go:build live_openai || live_anthropic || live_gemini || live_bedrock || live_azure || live_vertex || live_embeddings
 
 // Package matrix runs the provider × scenario coverage matrix against a live
 // gateway + control plane + real provider credentials. Build-tagged per
@@ -13,12 +13,12 @@
 //
 // Per-provider VK env vars (a VK with the provider's credentials bound):
 //
-//	TEST_VK_OPENAI       lw_vk_live_...
-//	TEST_VK_ANTHROPIC    lw_vk_live_...
-//	TEST_VK_GEMINI       lw_vk_live_...
-//	TEST_VK_BEDROCK      lw_vk_live_...
-//	TEST_VK_AZURE        lw_vk_live_...
-//	TEST_VK_VERTEX       lw_vk_live_...
+//	TEST_VK_OPENAI       vk-lw-...
+//	TEST_VK_ANTHROPIC    vk-lw-...
+//	TEST_VK_GEMINI       vk-lw-...
+//	TEST_VK_BEDROCK      vk-lw-...
+//	TEST_VK_AZURE        vk-lw-...
+//	TEST_VK_VERTEX       vk-lw-...
 //
 // Each cell asserts four invariants:
 //  1. Gateway returns HTTP 200.
@@ -51,7 +51,7 @@ type cell struct {
 // test can run standalone without a shared fixture.
 type resolvedCell struct {
 	cell
-	vk        string // "lw_vk_live_..."
+	vk        string // "vk-lw-..."
 	model     string // e.g. "gpt-5-mini"
 	streaming bool
 	// endpoint is the gateway path to hit. Defaults to /v1/chat/completions
@@ -406,6 +406,95 @@ func assertTraceCaptured(t *testing.T, traceID string) float64 {
 	}
 }
 
+// traceCacheMetrics is the cache-relevant slice of a trace, read back via
+// /api/trace/:id. Cache counts are summed across spans (where gateway
+// emission lands); cost + prompt tokens come from the trace level.
+type traceCacheMetrics struct {
+	totalCost           float64
+	promptTokens        int
+	cacheReadTokens     int
+	cacheCreationTokens int
+}
+
+// fetchTraceCacheMetrics polls /api/trace/:id until the trace lands with a
+// non-zero cost, then returns the SPAN-level cache-token counts + the
+// trace-level cost. The cache breakdown is asserted at the span level (summed
+// across the trace's spans) because that is where gateway emission lands: the
+// gateway threads cache_read_input_tokens / cache_creation_input_tokens
+// through bifrost → domain.Usage → the dotted gen_ai.usage.cache_read.input_tokens
+// attr → the span. (The trace-level rollup is a separate aggregation that does
+// not yet carry cache tokens; cost is read from the trace level where it is
+// correct.) Without the span cache counts, a cached follow-up bills at full
+// input price.
+//
+// When requireCacheRead is set, the poll also waits for the summed span
+// cache-read count to settle (> 0). The trace cost is computed the moment the
+// span ingests, but the span-level cache breakdown lands on a slightly later
+// write, so returning on cost > 0 alone races the cache fields to zero.
+func fetchTraceCacheMetrics(t *testing.T, traceID string, requireCacheRead bool) traceCacheMetrics {
+	t.Helper()
+	apiKey := requireEnv(t, "LW_PROJECT_API_KEY")
+
+	deadline := time.Now().Add(30 * time.Second)
+	backoff := 500 * time.Millisecond
+	url := lwBaseURL() + "/api/trace/" + traceID
+
+	for {
+		req, _ := http.NewRequest(http.MethodGet, url, nil)
+		req.Header.Set("X-Auth-Token", apiKey)
+		client := &http.Client{Timeout: 10 * time.Second}
+		resp, err := client.Do(req)
+		if err == nil && resp.StatusCode == http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			var parsed struct {
+				Metrics struct {
+					TotalCost        float64 `json:"total_cost"`
+					PromptTokens     int     `json:"prompt_tokens"`
+					CompletionTokens int     `json:"completion_tokens"`
+				} `json:"metrics"`
+				Spans []struct {
+					Metrics struct {
+						CacheReadInputTokens     int `json:"cache_read_input_tokens"`
+						CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
+					} `json:"metrics"`
+				} `json:"spans"`
+			}
+			if err := json.Unmarshal(body, &parsed); err == nil {
+				var cacheRead, cacheCreate int
+				for _, s := range parsed.Spans {
+					cacheRead += s.Metrics.CacheReadInputTokens
+					cacheCreate += s.Metrics.CacheCreationInputTokens
+				}
+				costReady := parsed.Metrics.PromptTokens+parsed.Metrics.CompletionTokens > 0 && parsed.Metrics.TotalCost > 0
+				cacheReady := !requireCacheRead || cacheRead > 0
+				if costReady && cacheReady {
+					return traceCacheMetrics{
+						totalCost:           parsed.Metrics.TotalCost,
+						promptTokens:        parsed.Metrics.PromptTokens,
+						cacheReadTokens:     cacheRead,
+						cacheCreationTokens: cacheCreate,
+					}
+				}
+			}
+		}
+		if resp != nil {
+			resp.Body.Close()
+		}
+		if time.Now().After(deadline) {
+			suffix := ""
+			if requireCacheRead {
+				suffix = " + span cache-read tokens"
+			}
+			t.Fatalf("trace %s did not land with cost%s within 30s", traceID, suffix)
+		}
+		time.Sleep(backoff)
+		if backoff < 4*time.Second {
+			backoff *= 2
+		}
+	}
+}
+
 // runCell is the common end-to-end runner: fire → assert HTTP → wait for trace
 // with cost. Each provider's test file composes a resolvedCell + calls this.
 func runCell(t *testing.T, rc resolvedCell) float64 {
@@ -592,10 +681,31 @@ func runCacheCellWith(t *testing.T, rc resolvedCell, primeFn, readFn func(string
 		t.Errorf("%s/cache: want cache_read > 0 on 2nd call; got 0\nread body: %s", rc.provider, readBody)
 	}
 
-	// Verify the read trace lands on the platform with cost > 0 — the cache
-	// hit still costs a small amount even though it's discounted.
-	cost := assertTraceCaptured(t, readTraceID)
-	t.Logf("cell %s/cache: prime_trace=%s read_trace=%s cache_read_tokens=%d duration=%s captured_cost=$%.6f",
-		rc.provider, primeTraceID, readTraceID, cacheRead, time.Since(start), cost)
-	return cost
+	// The cache_read above proves the upstream RESPONSE body round-trips; it
+	// does NOT prove the gateway threaded the breakdown onto the SPAN. Read the
+	// read trace back and assert the span-level cache metrics — the
+	// gateway→OTLP→ingest drop that billed a cached follow-up at full input
+	// price is invisible from the response body alone.
+	readMetrics := fetchTraceCacheMetrics(t, readTraceID, true)
+
+	if readMetrics.cacheReadTokens != cacheRead {
+		t.Errorf("%s/cache: span cache_read_input_tokens=%d != response cache_read=%d (breakdown not threaded intact)",
+			rc.provider, readMetrics.cacheReadTokens, cacheRead)
+	}
+	// Native-exclusive guard: the billed input must be the small non-cached
+	// remainder, NOT the inflated total that folds the cached prefix in. In the
+	// original bug the cached prefix was counted as fresh input and priced at
+	// full rate; post-fix the fresh input is a fraction of the cache-read bulk.
+	// Rate-free + order-independent (no dependence on cache warmth across runs).
+	if readMetrics.promptTokens >= readMetrics.cacheReadTokens {
+		t.Errorf("%s/cache: billed input %d not native-exclusive vs cache_read %d — cached prefix folded into input (the original full-price bug)",
+			rc.provider, readMetrics.promptTokens, readMetrics.cacheReadTokens)
+	}
+	if readMetrics.totalCost <= 0 {
+		t.Errorf("%s/cache: read trace cost not computed", rc.provider)
+	}
+
+	t.Logf("cell %s/cache: read_trace=%s response_cache_read=%d span_cache_read=%d billed_input=%d read_cost=$%.6f duration=%s",
+		rc.provider, readTraceID, cacheRead, readMetrics.cacheReadTokens, readMetrics.promptTokens, readMetrics.totalCost, time.Since(start))
+	return readMetrics.totalCost
 }

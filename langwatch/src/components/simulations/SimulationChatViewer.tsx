@@ -86,6 +86,7 @@ export function SimulationChatViewer({
         messages={data?.messages ?? []}
         streamingMessages={streamingMessages}
         variant="grid"
+        projectId={project?.id ?? ""}
       />
     </SimulationCard>
   );

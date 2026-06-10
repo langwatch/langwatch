@@ -15,6 +15,7 @@ import {
   prefetchScenarioData,
   type DataPrefetcherDependencies,
   type ScenarioFetcher,
+  type SuiteModelFetcher,
   type PromptFetcher,
   type AgentFetcher,
   type ProjectFetcher,
@@ -50,7 +51,6 @@ describe("prefetchScenarioData", () => {
 
   const defaultProject = {
     apiKey: "test-api-key",
-    defaultModel: "anthropic/claude-3-sonnet",
   };
 
   const defaultModelParams: LiteLLMParams = {
@@ -68,6 +68,10 @@ describe("prefetchScenarioData", () => {
   ): DataPrefetcherDependencies {
     const scenarioFetcher: ScenarioFetcher = {
       getById: vi.fn().mockResolvedValue(defaultScenario),
+    };
+
+    const suiteModelFetcher: SuiteModelFetcher = {
+      getBySetId: vi.fn().mockResolvedValue(null),
     };
 
     const promptFetcher: PromptFetcher = {
@@ -94,13 +98,25 @@ describe("prefetchScenarioData", () => {
       getSecrets: vi.fn().mockResolvedValue({}),
     };
 
+    const modelResolver = {
+      // Distinguish the three feature keys so simulator/judge selection can be
+      // asserted independently of the adapter (scenarios.generator) model.
+      resolve: vi.fn().mockImplementation(async (featureKey: string) => {
+        if (featureKey === "scenarios.user_simulator") return "openai/sim-default";
+        if (featureKey === "scenarios.judge") return "openai/judge-default";
+        return "anthropic/claude-3-sonnet";
+      }),
+    };
+
     return {
       scenarioFetcher,
+      suiteModelFetcher,
       promptFetcher,
       agentFetcher,
       workflowVersionFetcher,
       projectFetcher,
       modelParamsProvider,
+      modelResolver,
       projectSecretsFetcher,
       ...overrides,
     };
@@ -215,6 +231,165 @@ describe("prefetchScenarioData", () => {
             "proj_123",
             "anthropic/claude-3-sonnet",
           );
+        });
+      });
+    });
+  });
+
+  describe("user-simulator and judge model selection", () => {
+    const httpAgent = {
+      id: "agent_http",
+      type: "http" as const,
+      name: "HTTP Agent",
+      projectId: "proj_123",
+      config: { url: "https://api.example.com/chat", method: "POST", headers: [] },
+      workflowId: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      archivedAt: null,
+    };
+    const httpTarget: TargetConfig = { type: "http", referenceId: "agent_http" };
+
+    // Echoes the requested model back as params so the resolved simulator /
+    // judge model is observable on result.data.{simulator,judge}ModelParams.
+    const echoingProvider = (): ModelParamsProvider => ({
+      prepare: vi.fn().mockImplementation(async (_projectId: string, model: string) => ({
+        success: true as const,
+        params: { api_key: "k", model },
+      })),
+    });
+
+    describe("given a scenario with no simulator or judge override", () => {
+      describe("when prefetching the run data", () => {
+        /** @scenario "Defaults resolve to the smart Default model when the scenario has no override" */
+        it("resolves the simulator and judge from their DEFAULT-role feature keys", async () => {
+          const deps = createMockDeps({
+            agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
+            modelParamsProvider: echoingProvider(),
+          });
+
+          const result = await prefetchScenarioData(defaultContext, httpTarget, deps);
+
+          expect(deps.modelResolver.resolve).toHaveBeenCalledWith(
+            "scenarios.user_simulator",
+            "proj_123",
+          );
+          expect(deps.modelResolver.resolve).toHaveBeenCalledWith(
+            "scenarios.judge",
+            "proj_123",
+          );
+          expect(result.success).toBe(true);
+          if (result.success) {
+            expect(result.data.simulatorModelParams?.model).toBe("openai/sim-default");
+            expect(result.data.judgeModelParams?.model).toBe("openai/judge-default");
+          }
+        });
+      });
+    });
+
+    describe("given a scenario with a simulator model override", () => {
+      describe("when prefetching the run data", () => {
+        /** @scenario "A scenario-level simulator override is used for the user-simulator" */
+        it("uses the override for the simulator and the default for the judge", async () => {
+          const deps = createMockDeps({
+            scenarioFetcher: {
+              getById: vi.fn().mockResolvedValue({
+                ...defaultScenario,
+                simulatorModel: "anthropic/sim-override",
+                judgeModel: null,
+              }),
+            },
+            agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
+            modelParamsProvider: echoingProvider(),
+          });
+
+          const result = await prefetchScenarioData(defaultContext, httpTarget, deps);
+
+          expect(result.success).toBe(true);
+          if (result.success) {
+            expect(result.data.simulatorModelParams?.model).toBe("anthropic/sim-override");
+            expect(result.data.judgeModelParams?.model).toBe("openai/judge-default");
+          }
+        });
+      });
+    });
+
+    describe("given a scenario with a judge model override", () => {
+      describe("when prefetching the run data", () => {
+        /** @scenario "A scenario-level judge override is used for the judge" */
+        it("uses the override for the judge and the default for the simulator", async () => {
+          const deps = createMockDeps({
+            scenarioFetcher: {
+              getById: vi.fn().mockResolvedValue({
+                ...defaultScenario,
+                simulatorModel: null,
+                judgeModel: "anthropic/judge-override",
+              }),
+            },
+            agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
+            modelParamsProvider: echoingProvider(),
+          });
+
+          const result = await prefetchScenarioData(defaultContext, httpTarget, deps);
+
+          expect(result.success).toBe(true);
+          if (result.success) {
+            expect(result.data.judgeModelParams?.model).toBe("anthropic/judge-override");
+            expect(result.data.simulatorModelParams?.model).toBe("openai/sim-default");
+          }
+        });
+      });
+    });
+
+    describe("given a run plan that sets a simulator model", () => {
+      describe("when prefetching a scenario in that plan with no override", () => {
+        /** @scenario "A run plan simulator model overrides the scenario default at run time" */
+        it("uses the run plan's simulator model over the scenario default", async () => {
+          const deps = createMockDeps({
+            suiteModelFetcher: {
+              getBySetId: vi.fn().mockResolvedValue({
+                simulatorModel: "groq/plan-sim",
+                judgeModel: null,
+              }),
+            },
+            agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
+            modelParamsProvider: echoingProvider(),
+          });
+
+          const result = await prefetchScenarioData(defaultContext, httpTarget, deps);
+
+          expect(result.success).toBe(true);
+          if (result.success) {
+            expect(result.data.simulatorModelParams?.model).toBe("groq/plan-sim");
+            // Plan leaves judge unset -> falls through to the default judge.
+            expect(result.data.judgeModelParams?.model).toBe("openai/judge-default");
+          }
+        });
+      });
+    });
+
+    describe("given a run plan with no model override", () => {
+      describe("when prefetching a scenario in that plan with no override", () => {
+        /** @scenario "A run plan with no model override falls back to the scenario or project default" */
+        it("falls back to the default simulator and judge models", async () => {
+          const deps = createMockDeps({
+            suiteModelFetcher: {
+              getBySetId: vi.fn().mockResolvedValue({
+                simulatorModel: null,
+                judgeModel: null,
+              }),
+            },
+            agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
+            modelParamsProvider: echoingProvider(),
+          });
+
+          const result = await prefetchScenarioData(defaultContext, httpTarget, deps);
+
+          expect(result.success).toBe(true);
+          if (result.success) {
+            expect(result.data.simulatorModelParams?.model).toBe("openai/sim-default");
+            expect(result.data.judgeModelParams?.model).toBe("openai/judge-default");
+          }
         });
       });
     });
@@ -368,6 +543,7 @@ describe("prefetchScenarioData", () => {
       };
 
       describe("when prefetching scenario data", () => {
+        /** @scenario "Prefetcher logs model params failure with reason" */
         it("returns failure with model params error", async () => {
           const deps = createMockDeps({
             promptFetcher: {
@@ -508,6 +684,7 @@ describe("prefetchScenarioData", () => {
       };
 
       describe("when prefetching scenario data", () => {
+        /** @scenario "Return success with LiteLLM params on valid configuration" */
         it("returns success with complete data", async () => {
           // The source reads process.env.LANGWATCH_ENDPOINT directly (not via env.mjs)
           const previousLangwatchEndpoint = process.env.LANGWATCH_ENDPOINT;

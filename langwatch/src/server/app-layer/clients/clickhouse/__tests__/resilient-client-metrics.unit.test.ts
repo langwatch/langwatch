@@ -131,4 +131,58 @@ describe("createResilientClickHouseClient()", () => {
       expect(mockIncrementQueryCount).toHaveBeenCalledWith("INSERT", "error");
     });
   });
+
+  describe("when an insert fails with a cluster-recovery transient error", () => {
+    const transientCases = [
+      {
+        label: "TOO_MANY_SIMULTANEOUS_QUERIES (overload, message-only)",
+        message: "Code: 202. DB::Exception: Too many simultaneous queries. Maximum: 100.",
+      },
+      {
+        label: "MEMORY_LIMIT_EXCEEDED (overload, message-only)",
+        message: "Code: 241. DB::Exception: Memory limit (for query) exceeded: would use 3.5 GiB (MEMORY_LIMIT_EXCEEDED)",
+      },
+      {
+        label: "QUERY_WAS_CANCELLED (CH replica graceful shutdown)",
+        message: "Code: 394. DB::Exception: Query was cancelled. (QUERY_WAS_CANCELLED)",
+      },
+      {
+        label: "TABLE_IS_READ_ONLY (ZK session lost)",
+        message: "Code: 242. DB::Exception: Table is in readonly mode (replica path: /clickhouse/tables/...)",
+      },
+      {
+        label: "KEEPER_EXCEPTION Session expired",
+        message: "Code: 999. Coordination::Exception: Session expired. (KEEPER_EXCEPTION)",
+      },
+      {
+        label: "KEEPER_EXCEPTION Connection loss",
+        message: "Code: 999. Coordination::Exception: Coordination error: Connection loss.",
+      },
+    ] as const;
+
+    for (const { label, message } of transientCases) {
+      it(`retries the insert for ${label}`, async () => {
+        const insert = vi
+          .fn()
+          .mockRejectedValueOnce(new Error(message))
+          .mockResolvedValueOnce(undefined);
+        const client = {
+          query: vi.fn(),
+          insert,
+        } as unknown as ClickHouseClient;
+
+        const wrapper = createResilientClickHouseClient({
+          client,
+          maxRetries: 2,
+          baseDelayMs: 1,
+          maxDelayMs: 1,
+        });
+
+        await wrapper.insert({ table: "events", values: [] } as any);
+
+        expect(insert).toHaveBeenCalledTimes(2);
+        expect(mockIncrementQueryCount).toHaveBeenCalledWith("INSERT", "success");
+      });
+    }
+  });
 });

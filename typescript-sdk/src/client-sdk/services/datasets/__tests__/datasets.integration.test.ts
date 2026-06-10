@@ -91,6 +91,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
         );
       });
 
+      /** @scenario "List datasets returns paginated results with record counts" */
       it("receives a response containing 3 datasets with id, name, slug, columnTypes, and recordCount", async () => {
         const result = await langwatch.datasets.list();
 
@@ -131,6 +132,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
         );
       });
 
+      /** @scenario "Create a dataset with name and column types" */
       it("sends POST /api/dataset with name and columnTypes and returns dataset metadata", async () => {
         const result = await langwatch.datasets.create({
           name: "my-data",
@@ -161,6 +163,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
         );
       });
 
+      /** @scenario "Create a dataset propagates conflict error" */
       it("throws a DatasetApiError with status 409", async () => {
         const error = await langwatch.datasets.create({ name: "existing-name" }).catch((e: unknown) => e);
         expect(error).toBeInstanceOf(DatasetApiError);
@@ -188,6 +191,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
         );
       });
 
+      /** @scenario "Get dataset by slug returns metadata and entries" */
       it("receives a dataset with 5 entries", async () => {
         const dataset = await langwatch.datasets.get("my-dataset");
 
@@ -211,6 +215,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
         );
       });
 
+      /** @scenario "Get non-existent dataset throws DatasetNotFoundError" */
       it("throws a DatasetNotFoundError", async () => {
         await expect(
           langwatch.datasets.get("does-not-exist"),
@@ -240,6 +245,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
         );
       });
 
+      /** @scenario "Update a dataset name" */
       it("sends PATCH /api/dataset/my-data with name and returns updated dataset", async () => {
         const result = await langwatch.datasets.update("my-data", { name: "new-name" });
 
@@ -262,6 +268,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
         );
       });
 
+      /** @scenario "Update a non-existent dataset throws DatasetNotFoundError" */
       it("throws a DatasetNotFoundError", async () => {
         await expect(
           langwatch.datasets.update("ghost", { name: "x" }),
@@ -286,6 +293,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
         );
       });
 
+      /** @scenario "Delete dataset sends DELETE and returns archived result" */
       it("sends DELETE /api/dataset/my-data and returns the archived dataset", async () => {
         const result = await langwatch.datasets.delete("my-data");
 
@@ -307,6 +315,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
         );
       });
 
+      /** @scenario "Delete a non-existent dataset throws DatasetNotFoundError" */
       it("throws a DatasetNotFoundError", async () => {
         await expect(
           langwatch.datasets.delete("ghost"),
@@ -337,6 +346,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
         );
       });
 
+      /** @scenario "Batch create records in a dataset" */
       it("sends POST /api/dataset/my-data/records with entries and returns created records", async () => {
         const result = await langwatch.datasets.createRecords("my-data", [
           { input: "hello", output: "world" },
@@ -363,6 +373,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
         );
       });
 
+      /** @scenario "Batch create records for non-existent dataset throws error" */
       it("throws a DatasetNotFoundError", async () => {
         await expect(
           langwatch.datasets.createRecords("ghost", [{ input: "x" }]),
@@ -398,6 +409,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
         );
       });
 
+      /** @scenario "Update a single record" */
       it("sends PATCH /api/dataset/my-data/records/rec-1 and returns updated record", async () => {
         const result = await langwatch.datasets.updateRecord("my-data", "rec-1", {
           input: "updated",
@@ -425,6 +437,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
         );
       });
 
+      /** @scenario "Update a record for non-existent dataset throws error" */
       it("throws a DatasetNotFoundError", async () => {
         await expect(
           langwatch.datasets.updateRecord("ghost", "rec-1", { input: "x" }),
@@ -452,6 +465,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
         );
       });
 
+      /** @scenario "Delete records by IDs" */
       it("sends DELETE /api/dataset/my-data/records with recordIds and returns deletedCount", async () => {
         const result = await langwatch.datasets.deleteRecords("my-data", [
           "rec-1",
@@ -476,6 +490,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
         );
       });
 
+      /** @scenario "Delete records for non-existent dataset throws error" */
       it("throws a DatasetNotFoundError", async () => {
         await expect(
           langwatch.datasets.deleteRecords("ghost", ["rec-1"]),
@@ -507,6 +522,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
         );
       });
 
+      /** @scenario "List records returns paginated results" */
       it("returns records with pagination metadata", async () => {
         const result = await langwatch.datasets.listRecords("my-data");
 
@@ -534,10 +550,42 @@ describe("Feature: Dataset TypeScript SDK", () => {
         );
       });
 
+      /** @scenario "List records for non-existent dataset throws error" */
       it("throws a DatasetNotFoundError", async () => {
         await expect(
           langwatch.datasets.listRecords("does-not-exist"),
         ).rejects.toThrow(DatasetNotFoundError);
+      });
+    });
+
+    describe("when called with explicit pagination", () => {
+      let capturedUrl: URL | undefined;
+
+      beforeEach(() => {
+        capturedUrl = undefined;
+        server.use(
+          http.get(
+            `${TEST_ENDPOINT}/api/dataset/:slugOrId/records`,
+            ({ request }) => {
+              capturedUrl = new URL(request.url);
+              return HttpResponse.json({
+                data: [],
+                pagination: { page: 2, limit: 20, total: 0, totalPages: 0 },
+              });
+            },
+          ),
+        );
+      });
+
+      /** @scenario "List records with explicit pagination" */
+      it("includes page and limit query parameters in the request", async () => {
+        await langwatch.datasets.listRecords("my-data", {
+          page: 2,
+          limit: 20,
+        });
+
+        expect(capturedUrl?.searchParams.get("page")).toBe("2");
+        expect(capturedUrl?.searchParams.get("limit")).toBe("20");
       });
     });
   });
@@ -567,6 +615,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
           );
         });
 
+        /** @scenario "Upload with append strategy appends to existing dataset" */
         it("uploads the file to the existing dataset", async () => {
           const file = new File(["input,output\nhello,world"], "data.csv", {
             type: "text/csv",
@@ -604,6 +653,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
           );
         });
 
+        /** @scenario "Upload with append strategy creates dataset if not found" */
         it("creates the dataset from the file", async () => {
           const file = new File(["input,output\nhello,world"], "data.csv", {
             type: "text/csv",
@@ -664,6 +714,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
           );
         });
 
+        /** @scenario "Upload with replace strategy deletes records then uploads" */
         it("deletes all existing records before uploading", async () => {
           const file = new File(["input,output\nhello,world"], "data.csv", {
             type: "text/csv",
@@ -692,6 +743,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
           );
         });
 
+        /** @scenario "Upload with error strategy throws if dataset exists" */
         it("throws a DatasetApiError with status 409", async () => {
           const file = new File(["data"], "data.csv", { type: "text/csv" });
 

@@ -1,7 +1,11 @@
 import { PublicShareResourceTypes } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
+import {
+  createTRPCRouter,
+  protectedProcedure,
+  publicProcedure,
+} from "~/server/api/trpc";
 import { TraceService } from "~/server/traces/trace.service";
 import { checkPermissionOrPubliclyShared } from "../rbac";
 import { checkProjectPermission } from "../rbac";
@@ -56,7 +60,7 @@ export const spansRouter = createTRPCRouter({
       return sortedSpans;
     }),
 
-  getForPromptStudio: publicProcedure
+  getForPromptStudio: protectedProcedure
     .input(
       z.object({
         projectId: z.string(),

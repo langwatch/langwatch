@@ -1,11 +1,8 @@
 import type { ModelProvider } from "@prisma/client";
 import { z } from "zod";
 import type { CustomModelEntry } from "./customModel.schema";
-// @ts-ignore - JSON import
-import * as llmModelsRaw from "./llmModels.json";
-import type { LLMModelEntry, LLMModelRegistry } from "./llmModels.types";
-
-const llmModels = llmModelsRaw as unknown as LLMModelRegistry;
+import { llmModels } from "./loadModelCatalog";
+import type { LLMModelEntry } from "./llmModels.types";
 
 // ============================================================================
 // Parameter Constraint Types
@@ -55,14 +52,39 @@ type ModelProviderDefinition = {
 export type MaybeStoredModelProvider = Omit<
   ModelProvider,
   | "id"
-  | "projectId"
   | "name"
   | "createdAt"
   | "updatedAt"
   | "customModels"
   | "customEmbeddingsModels"
+  // Advanced (gateway) fields land on persisted rows; form-time shapes
+  // omit them, so widen the type to make them optional here.
+  | "rateLimitRpm"
+  | "rateLimitTpm"
+  | "rateLimitRpd"
+  | "rotationPolicy"
+  | "providerConfig"
+  | "fallbackPriorityGlobal"
+  | "healthStatus"
+  | "circuitOpenedAt"
+  | "lastHealthCheckAt"
+  | "disabledAt"
+  // Single-organization tenancy anchor (ADR-021) lands on persisted rows;
+  // form-time shapes omit it, so widen to optional here.
+  | "organizationId"
 > & {
   id?: string;
+  organizationId?: string | null;
+  rateLimitRpm?: number | null;
+  rateLimitTpm?: number | null;
+  rateLimitRpd?: number | null;
+  rotationPolicy?: "MANUAL";
+  providerConfig?: unknown;
+  fallbackPriorityGlobal?: number | null;
+  healthStatus?: "UNKNOWN" | "HEALTHY" | "DEGRADED" | "CIRCUIT_OPEN";
+  circuitOpenedAt?: Date | null;
+  lastHealthCheckAt?: Date | null;
+  disabledAt?: Date | null;
   /**
    * Human-readable name (iter 109). Optional in the inbound shape used
    * by form seeding where registry defaults get promoted before a row
@@ -80,6 +102,13 @@ export type MaybeStoredModelProvider = Omit<
   customEmbeddingsModels?: CustomModelEntry[] | null;
   disabledByDefault?: boolean;
   extraHeaders?: { key: string; value: string }[] | null;
+  /**
+   * True for pseudo-rows synthesized from the server's process env
+   * (no `ModelProvider` row exists). The settings table renders these
+   * with a "SYSTEM" scope chip and hides the row's edit affordances,
+   * since they're managed via env vars rather than the UI.
+   */
+  isSystem?: boolean;
   /**
    * Multi-scope grant set (iter 109). Every persisted MP has at least
    * one entry; registry-seeded placeholders for providers that don't
@@ -350,6 +379,16 @@ export const modelProviders = {
       GROQ_API_KEY: z.string().min(1),
     }),
     enabledSince: new Date("2023-01-01"),
+  },
+  voyage: {
+    name: "Voyage AI",
+    type: "llm",
+    apiKey: "VOYAGE_API_KEY",
+    endpointKey: undefined,
+    keysSchema: z.object({
+      VOYAGE_API_KEY: z.string().min(1),
+    }),
+    enabledSince: new Date("2026-05-18"),
   },
   azure_safety: {
     name: "Azure Safety",

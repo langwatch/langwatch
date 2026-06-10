@@ -27,6 +27,7 @@ export const TRACE_ANALYTICS_COLUMNS = [
   ...TRACE_IDENTITY_COLUMNS,
   "CreatedAt",
   "TotalCost",
+  "NonBilledCost",
   "TotalDurationMs",
   "TimeToFirstTokenMs",
   "TotalPromptTokenCount",
@@ -582,8 +583,12 @@ function buildColumnPattern(col: string, alias: string): RegExp {
   const rawCol = col.replace(/"/g, "");
   // Escape special regex chars in the column name (e.g. dots in "Events.Name")
   const escaped = rawCol.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  // Match alias.Column or unqualified Column, followed by a boundary
-  const pattern = `(?:${alias}\\.)?(?:"?${escaped}"?)${COLUMN_BOUNDARY.source}`;
+  // Match alias.Column or an unqualified column token, but not a suffix inside
+  // another identifier. The left boundary applies to the whole match (before
+  // the optional alias too), so neither "Attributes" matches the tail of
+  // "SpanAttributes", nor "ts." matches the tail of "Events." in
+  // "Events.Attributes".
+  const pattern = `(?<![\\w."])(?:${alias}\\.)?(?:"?${escaped}"?)${COLUMN_BOUNDARY.source}`;
   return new RegExp(pattern);
 }
 
@@ -625,6 +630,32 @@ export function extractReferencedEvaluationColumns(
   const alias = tableAliases.evaluation_runs;
 
   for (const col of EVALUATION_SELECTABLE_COLUMNS) {
+    if (buildColumnPattern(col, alias).test(joined)) {
+      columns.add(col);
+    }
+  }
+
+  return columns;
+}
+
+/**
+ * Extract which trace_summaries columns are referenced in a set of SQL
+ * expressions.
+ *
+ * Scans the expressions for references to known trace analytics column names
+ * (including through the table alias `ts.`). Returns the set of column names
+ * suitable for passing to `dedupedTraceSummaries` so the deduped subquery only
+ * reads the columns actually used, instead of the full analytics set with its
+ * wide Attributes map.
+ */
+export function extractReferencedTraceColumns(
+  expressions: string[],
+): ReadonlySet<string> {
+  const joined = expressions.join(" ");
+  const columns = new Set<string>();
+  const alias = tableAliases.trace_summaries;
+
+  for (const col of TRACE_ANALYTICS_COLUMNS) {
     if (buildColumnPattern(col, alias).test(joined)) {
       columns.add(col);
     }

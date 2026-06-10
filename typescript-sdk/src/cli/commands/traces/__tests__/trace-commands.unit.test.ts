@@ -48,10 +48,10 @@ describe("searchTracesCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSearch = vi.fn();
-    vi.mocked(TracesApiService).mockImplementation(() => ({
+    vi.mocked(TracesApiService).mockImplementation(function () { return ({
       search: mockSearch,
       get: vi.fn(),
-    }) as unknown as TracesApiService);
+    }) as unknown as TracesApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -117,10 +117,10 @@ describe("getTraceCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGet = vi.fn();
-    vi.mocked(TracesApiService).mockImplementation(() => ({
+    vi.mocked(TracesApiService).mockImplementation(function () { return ({
       search: vi.fn(),
       get: mockGet,
-    }) as unknown as TracesApiService);
+    }) as unknown as TracesApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();

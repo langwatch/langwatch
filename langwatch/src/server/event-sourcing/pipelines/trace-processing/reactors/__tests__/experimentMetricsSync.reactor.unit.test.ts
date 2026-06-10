@@ -37,20 +37,29 @@ function createTraceSummaryState(overrides: Partial<TraceSummaryData> = {}): Tra
     errorMessage: null,
     models: ["gpt-5-mini"],
     totalCost: 0.003,
+    nonBilledCost: null,
     tokensEstimated: false,
     totalPromptTokenCount: 100,
     totalCompletionTokenCount: 50,
     outputFromRootSpan: true,
     outputSpanEndTimeMs: 1000,
     blockedByGuardrail: false,
+    rootSpanType: null,
+    containsAi: false,
     topicId: null,
     subTopicId: null,
     annotationIds: [],
+    containsPrompt: false,
+    selectedPromptId: null,
+    selectedPromptSpanId: null,
+    selectedPromptStartTimeMs: null,
+    lastUsedPromptId: null,
+    lastUsedPromptVersionNumber: null,
+    lastUsedPromptVersionId: null,
+    lastUsedPromptSpanId: null,
+    lastUsedPromptStartTimeMs: null,
     attributes: {},
-    scenarioRoleCosts: {},
-    scenarioRoleLatencies: {},
-    scenarioRoleSpans: {},
-    lastEventOccurredAt: 0,
+    LastEventOccurredAt: 0,
     occurredAt: 1000,
     createdAt: 1000,
     updatedAt: 2000,
@@ -95,6 +104,8 @@ describe("experimentMetricsSync reactor (trace-side ECST publisher)", () => {
   });
 
   describe("when trace has evaluation.run_id attribute", () => {
+    /** @scenario Trace metrics are published to experiment pipeline after stabilisation */
+    /** @scenario evaluation.run_id is hoisted to trace-level attributes */
     it("dispatches computeExperimentRunMetrics with cost payload", async () => {
       const deps = createDeps();
       const reactor = createExperimentMetricsSyncReactor(deps);
@@ -126,6 +137,7 @@ describe("experimentMetricsSync reactor (trace-side ECST publisher)", () => {
   });
 
   describe("when trace has no evaluation.run_id attribute", () => {
+    /** @scenario Reactor does not fire for traces without evaluation.run_id */
     it("skips without dispatching", async () => {
       const deps = createDeps();
       const reactor = createExperimentMetricsSyncReactor(deps);
@@ -145,6 +157,7 @@ describe("experimentMetricsSync reactor (trace-side ECST publisher)", () => {
   });
 
   describe("when trace has no cost data", () => {
+    /** @scenario Reactor does not fire when trace has no cost data */
     it("skips without dispatching when totalCost is null", async () => {
       const deps = createDeps();
       const reactor = createExperimentMetricsSyncReactor(deps);

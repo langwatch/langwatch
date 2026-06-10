@@ -6,24 +6,28 @@ Feature: Welcome Onboarding Screen for Scenarios
   Background:
     Given I am logged into project "my-project"
 
+  # All 4 scenarios are bound to existing tests in
+  # langwatch/src/hooks/scenarios/__tests__/useNewScenarioFlow.unit.test.ts
+  # and langwatch/src/components/scenarios/__tests__/ScenarioWelcomeScreen.integration.test.tsx.
+
   # ============================================================================
   # Welcome Screen Trigger
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: Show welcome screen on first scenario creation
     Given no scenarios exist in the project
     When I click "New Scenario"
     Then I see the scenario welcome screen
 
-  @integration @unimplemented
+  @integration
   Scenario: Proceed from welcome screen to scenario creation
     Given no scenarios exist in the project
     And I see the scenario welcome screen
     When I click the proceed button
     Then the scenario creation flow opens
 
-  @integration @unimplemented
+  @integration
   Scenario: Skip welcome screen when scenarios already exist
     Given scenarios exist in the project
     When I click "New Scenario"
@@ -34,7 +38,7 @@ Feature: Welcome Onboarding Screen for Scenarios
   # Welcome Screen Content
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: Scenario welcome screen content
     When I render the scenario welcome screen
     Then I see a title mentioning scenarios

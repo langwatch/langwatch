@@ -4,6 +4,14 @@ Feature: Onboarding Progress UI
   I want to see my onboarding progress on the home page
   So that I know what steps I need to complete
 
+  # The step-completeness logic (`buildOnboardingSteps`,
+  # `calculateCompletionPercentage`) is bound to its unit test in
+  # `OnboardingProgress.test.ts`. The remaining scenarios describe
+  # full OnboardingProgress component rendering (visibility, navigation,
+  # progress bar, loading, vertical stepper layout). Need a JSDOM
+  # render of the component with mocked tRPC query — fixture exists
+  # but render-path scenarios aren't covered yet.
+
   Background:
     Given I am on the home page
 

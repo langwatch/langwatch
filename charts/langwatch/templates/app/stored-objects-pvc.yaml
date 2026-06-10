@@ -1,0 +1,33 @@
+{{- if eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true" }}
+# Stored-objects local-FS PVC.
+#
+# Single-replica-only fallback for stored-objects bytes when no
+# real object storage backend is configured. The chart validation
+# (see _helpers.tpl) refuses to render with replicaCount > 1 because
+# the default RWO access mode means only one pod can mount this PVC
+# at a time.
+#
+# This PVC renders ONLY when local-filesystem is the ACTIVE backend
+# (`localFilesystem.enabled` AND NOT `dataplane.enabled`). When dataplane
+# is on, S3/Azure is the active backend and we must not create an RWO PVC
+# that would be mounted into multiple replicas — see helper docs.
+#
+# Operators running anything larger than a hobby instance MUST enable
+# app.dataplane with S3/MinIO/Azure-compatible storage
+# instead — see charts/langwatch/README.md.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-stored-objects
+  labels:
+    {{- include "langwatch.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.app.storedObjects.localFilesystem.size | default "10Gi" }}
+  {{- with .Values.app.storedObjects.localFilesystem.storageClassName }}
+  storageClassName: {{ . }}
+  {{- end }}
+{{- end }}

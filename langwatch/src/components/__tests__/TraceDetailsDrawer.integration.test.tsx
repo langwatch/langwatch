@@ -42,8 +42,22 @@ vi.mock("~/components/traces/TraceDetails", () => ({
   TraceDetails: () => <div data-testid="trace-details">TraceDetails</div>,
 }));
 
-// Capture the onOpenChange handler from Drawer.Root
-let capturedOnOpenChange: (() => void) | undefined;
+// NewTracesPromo pulls in tRPC (publicEnv → useOrganizationTeamProject) which
+// requires withTRPC context this test does not provide. Also exports the
+// `isDrawerSwapInProgress` flag-getter that TraceDetailsDrawer reads on
+// every onOpenChange — stub it as always-false so the close flow runs.
+vi.mock("~/components/messages/NewTracesPromo", () => ({
+  NewTracesPromo: () => null,
+  isDrawerSwapInProgress: () => false,
+}));
+
+// Capture the onOpenChange handler from Drawer.Root. The real
+// handler destructures `{ open }` from its single argument (Chakra
+// passes a details object on close), so type the captured signature
+// accordingly.
+let capturedOnOpenChange:
+  | ((details: { open: boolean }) => void)
+  | undefined;
 vi.mock("~/components/ui/drawer", () => ({
   Drawer: {
     Root: ({
@@ -51,7 +65,7 @@ vi.mock("~/components/ui/drawer", () => ({
       onOpenChange,
     }: {
       children: React.ReactNode;
-      onOpenChange?: () => void;
+      onOpenChange?: (details: { open: boolean }) => void;
     }) => {
       capturedOnOpenChange = onOpenChange;
       return <div data-testid="drawer-root">{children}</div>;
@@ -80,7 +94,8 @@ describe("TraceDetailsDrawer", () => {
       );
 
       expect(capturedOnOpenChange).toBeDefined();
-      capturedOnOpenChange!();
+      // Simulate Chakra firing the close event (open=false).
+      capturedOnOpenChange!({ open: false });
 
       expect(mockGoBack).toHaveBeenCalledOnce();
     });
@@ -90,7 +105,8 @@ describe("TraceDetailsDrawer", () => {
         <TraceDetailsDrawer traceId="test-trace-id" selectedTab="messages" />,
       );
 
-      capturedOnOpenChange!();
+      // Simulate Chakra firing the close event (open=false).
+      capturedOnOpenChange!({ open: false });
 
       expect(mockResetComment).toHaveBeenCalledOnce();
     });
@@ -100,7 +116,8 @@ describe("TraceDetailsDrawer", () => {
         <TraceDetailsDrawer traceId="test-trace-id" selectedTab="messages" />,
       );
 
-      capturedOnOpenChange!();
+      // Simulate Chakra firing the close event (open=false).
+      capturedOnOpenChange!({ open: false });
 
       expect(mockCloseDrawer).not.toHaveBeenCalled();
     });

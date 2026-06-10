@@ -1,5 +1,6 @@
 import { Container, VStack } from "@chakra-ui/react";
 import { DashboardLayout } from "../DashboardLayout";
+import { HomePageBanners } from "./HomePageBanners";
 import { LearningResources } from "./LearningResources";
 import { OnboardingProgress } from "./OnboardingProgress";
 import { QuickAccessLinks } from "./QuickAccessLinks";
@@ -14,6 +15,7 @@ export function HomePage() {
       <Container maxW="5xl" padding={6}>
         <VStack gap={6} width="full" align="start">
           <WelcomeHeader />
+          <HomePageBanners />
           <SdkRadarCard />
           <OnboardingProgress />
           <TracesOverview />

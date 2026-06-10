@@ -17,20 +17,20 @@ Every gateway error is returned in the OpenAI-compatible envelope:
 }
 ```
 
-This matches what the `openai` Python and TypeScript SDKs — plus the Anthropic SDK (which parses a superset) — expect. Existing client code raises its usual typed exceptions unchanged.
+This matches what the `openai` Python and TypeScript SDKs, plus the Anthropic SDK (which parses a superset), expect. Existing client code raises its usual typed exceptions unchanged.
 
 ## Response headers
 
 Errors (like successes) always carry:
 
-- `X-LangWatch-Request-Id: grq_<ULID>` — use this when filing support tickets.
-- `X-LangWatch-Provider` — present when the error originated from an upstream provider (absent for gateway-internal errors).
+- `X-LangWatch-Request-Id: grq_<ULID>`, use this when filing support tickets.
+- `X-LangWatch-Provider`, present when the error originated from an upstream provider (absent for gateway-internal errors).
 
 ## Type enum
 
 | `type` | HTTP | When |
 |---|---|---|
-| `invalid_api_key` | `401` | The `Authorization: Bearer …` / `x-api-key` / `api-key` header is missing, malformed, or points to a non-existent virtual key. |
+| `invalid_api_key` | `401` | The `Authorization: Bearer …`, `x-api-key`, `api-key` header is missing, malformed, or points to a non-existent virtual key. |
 | `virtual_key_revoked` | `403` | The VK exists but has been revoked. |
 | `model_not_allowed` | `403` | The VK has a `models_allowed` allowlist and the requested model is not in it, **or** the model matched a `policy_rules.models` deny regex (or fell outside its allow regex). Also used when the model/alias doesn't resolve to any configured provider. |
 | `permission_denied` | `403` | The principal lacks the RBAC permission required for the endpoint. |
@@ -39,20 +39,20 @@ Errors (like successes) always carry:
 | `guardrail_blocked` | `403` | A pre- or post-call guardrail returned `block`. `message` references which guardrail and why. Post-block also records a zero-cost `blocked_by_guardrail` debit on the budget ledger. |
 | `guardrail_upstream_unavailable` | `503` | A pre- or post-call guardrail's evaluator service was unreachable or errored, and the VK's `guardrails.{request,response}_fail_open` is `false` (the fail-closed default). Flip to fail-open on the VK to pass through on guardrail outages. |
 | `tool_not_allowed` | `403` | The request references a tool name matched by the VK's `policy_rules.tools.deny` (or absent from `allow` if set). |
-| `url_not_allowed` | `403` | Any `http://` / `https://` URL extracted from the request body (user messages, tool-call args, system prompts — anywhere) matched `policy_rules.urls.deny` or fell outside a non-null `allow` list. |
+| `url_not_allowed` | `403` | Any `http://`, `https://` URL extracted from the request body (user messages, tool-call args, system prompts, anywhere) matched `policy_rules.urls.deny` or fell outside a non-null `allow` list. |
 | `cache_override_invalid` | `400` | The `X-LangWatch-Cache` header was malformed or used an unknown mode. |
 | `cache_override_not_implemented` | `400` | The `X-LangWatch-Cache` header was well-formed but named a mode deferred to v1.1 (`force` or `ttl=NNN`). `respect` and `disable` are the v1 modes. |
 | `provider_error` | `502` | An upstream provider returned a non-recoverable error and fallback (if any) was exhausted. |
 | `upstream_timeout` | `504` | An upstream provider exceeded `timeout_ms` and fallback (if any) was exhausted. |
 | `bad_request` | `400` | Validation error on the incoming payload (e.g. missing `model`). |
-| `payload_too_large` | `413` | Request body exceeded `GATEWAY_MAX_REQUEST_BODY_BYTES` (default 10 MiB). Rejected at the edge — before auth, resolve-key, or any upstream dispatch — so a 1 GB drive-by scan never pressures the pod memory limit. Declared `Content-Length` above the cap returns 413 immediately without draining the socket; chunked unknown-length bodies trip a `*http.MaxBytesError` at the cap. |
+| `payload_too_large` | `413` | Request body exceeded `GATEWAY_MAX_REQUEST_BODY_BYTES` (default 10 MiB). Rejected at the edge, before auth, resolve-key, or any upstream dispatch, so a 1 GB drive-by scan never pressures the pod memory limit. Declared `Content-Length` above the cap returns 413 immediately without draining the socket; chunked unknown-length bodies trip a `*http.MaxBytesError` at the cap. |
 | `internal_error` | `500` | Unclassified gateway error. `X-LangWatch-Request-Id` is how we trace it. |
 
 ## Budget-warning headers (not errors)
 
 These are *soft* signals on **successful** responses:
 
-- `X-LangWatch-Budget-Warning: <scope>:<pct>` — a budget scope is over its soft threshold. Multiple can be present.
+- `X-LangWatch-Budget-Warning: <scope>:<pct>`, a budget scope is over its soft threshold. Multiple can be present.
 
 A `warn` breach never turns into an error envelope; it's only a header.
 
@@ -142,7 +142,7 @@ Clients that receive chunks and then an `error` frame should treat the response 
 
 ### Mid-stream `code` values
 
-Once bytes are flowing, the HTTP status is already 200 — so the distinguishing signal for clients is the `code` field inside the terminal frame:
+Once bytes are flowing, the HTTP status is already 200, so the distinguishing signal for clients is the `code` field inside the terminal frame:
 
 | `code` | Source | Meaning |
 |---|---|---|
@@ -150,4 +150,4 @@ Once bytes are flowing, the HTTP status is already 200 — so the distinguishing
 | `stream_chunk_blocked` | guardrail path | A `stream_chunk` guardrail returned `block` on a visible-text frame before emit. Subsequent upstream chunks are discarded (see [Guardrails → stream_chunk](/ai-gateway/guardrails#stream_chunk)). The channel is closed immediately after the frame. |
 | `guardrail_upstream_unavailable` | guardrail path | Terminal path is flag-only for streaming (see [Guardrails → fail-open vs fail-closed](/ai-gateway/guardrails#fail-open-vs-fail-closed)); you'll see this code only if a future iter wires post-stream enforcement. |
 
-<Note>The `type` on a streaming terminal frame always reflects the category (`provider_error`, `guardrail_blocked`) — clients keying off `type` will already have a usable classification. The `code` is the granular discriminator if you need it (for example, a retry policy that distinguishes "upstream flaked, retry with a different VK" from "guardrail policy said no, don't retry").</Note>
+<Note>The `type` on a streaming terminal frame always reflects the category (`provider_error`, `guardrail_blocked`), clients keying off `type` will already have a usable classification. The `code` is the granular discriminator if you need it (for example, a retry policy that distinguishes "upstream flaked, retry with a different VK" from "guardrail policy said no, don't retry").</Note>

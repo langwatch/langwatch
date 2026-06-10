@@ -63,18 +63,22 @@ export function useSSESubscription<
   subscription.useSubscription(input, {
     enabled,
 
+    // tRPC fires onStarted once the subscription is established (for SSE this
+    // is after the EventSource open handshake). Treat that as "connected" so
+    // the indicator doesn't sit at "connecting" until the first event arrives.
     onStarted: () => {
-      hasConnectedRef.current = false;
-      setConnectionState("connecting");
+      hasConnectedRef.current = true;
+      setConnectionState("connected");
       logger.info({ input }, "SSE subscription started");
       onStarted?.();
+      onConnected?.();
     },
 
     onData: (data: TData) => {
       if (!hasConnectedRef.current) {
         hasConnectedRef.current = true;
         setConnectionState("connected");
-        logger.info({ input }, "SSE subscription connected");
+        logger.info({ input }, "SSE subscription connected via first event");
         onConnected?.();
       }
 

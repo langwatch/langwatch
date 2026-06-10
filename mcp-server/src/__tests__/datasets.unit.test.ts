@@ -53,6 +53,7 @@ describe("formatDatasetResponse()", () => {
       expect(result).toContain("my-dataset");
     });
 
+    /** @scenario "formatDatasetResponse renders column table and record entries as markdown" */
     it("includes a column table", () => {
       expect(result).toContain("input");
       expect(result).toContain("output");
@@ -171,6 +172,7 @@ describe("handleGetDataset()", () => {
 
 describe("platform_create_dataset schema", () => {
   describe("when input has no name", () => {
+    /** @scenario "platform_create_dataset schema rejects input without a name" */
     it("rejects the input with a validation error", () => {
       const result = createDatasetSchema.safeParse({});
       expect(result.success).toBe(false);
@@ -196,6 +198,7 @@ describe("platform_create_dataset schema", () => {
 
 describe("MCP server dataset tool registration", () => {
   describe("when the MCP server is created", () => {
+    /** @scenario "All dataset tools are registered in the MCP server" */
     it("registers all 8 dataset tools", async () => {
       const { createMcpServer } = await import("../create-mcp-server.js");
       const server = createMcpServer();
@@ -219,6 +222,7 @@ describe("MCP server dataset tool registration", () => {
 
 describe("dataset tools API key requirement", () => {
   describe("when no API key is configured", () => {
+    /** @scenario "Dataset tools require an API key" */
     it("requireApiKey throws when apiKey is empty", async () => {
       const savedKey = process.env.LANGWATCH_API_KEY;
       delete process.env.LANGWATCH_API_KEY;

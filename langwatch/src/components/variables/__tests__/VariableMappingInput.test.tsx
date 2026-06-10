@@ -80,11 +80,54 @@ describe("VariableMappingInput", () => {
         path: ["input"],
       };
       renderComponent({ mapping });
-      // Should show a tag with the source prefix and field name
+      // Should show a tag with the friendly source name and field name
       expect(screen.getByTestId("source-mapping-tag")).toBeInTheDocument();
-      expect(screen.getByText("dataset-1.input")).toBeInTheDocument();
+      expect(screen.getByText("Test Data.input")).toBeInTheDocument();
       // Should have a close button
       expect(screen.getByTestId("clear-mapping-button")).toBeInTheDocument();
+    });
+
+    /** @scenario Mapping a value from another target shows the target name not its ID */
+    it("labels a target source mapping with the target name, not its raw id", () => {
+      const mapping: FieldMapping = {
+        type: "source",
+        sourceId: "runner-1",
+        path: ["output"],
+      };
+      renderComponent({ mapping });
+
+      const tag = screen.getByTestId("source-mapping-tag");
+      expect(tag).toHaveTextContent("GPT-4o Runner.output");
+      expect(tag.textContent).not.toContain("runner-1");
+    });
+
+    /** @scenario Source name falls back to the ID when no friendly name is known */
+    it("falls back to the source id when the source name has not loaded", () => {
+      const sourcesWithUnresolvedName: AvailableSource[] = [
+        {
+          id: "target_1778838627724",
+          name: "", // not loaded yet
+          type: "signature",
+          fields: [{ name: "l3", type: "str" }],
+        },
+      ];
+      const mapping: FieldMapping = {
+        type: "source",
+        sourceId: "target_1778838627724",
+        path: ["l3"],
+      };
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <VariableMappingInput
+            availableSources={sourcesWithUnresolvedName}
+            mapping={mapping}
+          />
+        </ChakraProvider>,
+      );
+
+      expect(screen.getByTestId("source-mapping-tag")).toHaveTextContent(
+        "target_1778838627724.l3",
+      );
     });
   });
 
@@ -121,6 +164,7 @@ describe("VariableMappingInput", () => {
       });
     });
 
+    /** @scenario Search/filter in dropdown */
     it("filters fields based on search", async () => {
       const user = userEvent.setup();
       renderComponent();
@@ -283,6 +327,7 @@ describe("VariableMappingInput", () => {
       });
     });
 
+    /** @scenario Keyboard navigation in dropdown */
     it("navigates down with ArrowDown and selects", async () => {
       const onMappingChange = vi.fn();
       renderComponent({ onMappingChange });
@@ -431,6 +476,7 @@ describe("VariableMappingInput", () => {
   });
 
   describe("clearing source mapping", () => {
+    /** @scenario Remove root badge clears all */
     it("clears mapping when clicking the X button on the tag", async () => {
       const user = userEvent.setup();
       const onMappingChange = vi.fn();
@@ -582,7 +628,7 @@ describe("VariableMappingInput", () => {
       // Should immediately show the new mapping as a tag
       await waitFor(() => {
         expect(screen.getByTestId("source-mapping-tag")).toBeInTheDocument();
-        expect(screen.getByText("dataset-1.input")).toBeInTheDocument();
+        expect(screen.getByText("Test Data.input")).toBeInTheDocument();
       });
     });
 
@@ -637,7 +683,7 @@ describe("VariableMappingInput", () => {
       // Should show the mapping immediately without needing to close/reopen
       await waitFor(() => {
         expect(screen.getByTestId("source-mapping-tag")).toBeInTheDocument();
-        expect(screen.getByText("dataset-1.input")).toBeInTheDocument();
+        expect(screen.getByText("Test Data.input")).toBeInTheDocument();
       });
     });
   });
@@ -856,6 +902,7 @@ describe("VariableMappingInput", () => {
       });
     });
 
+    /** @scenario Remove nested badge to re-select */
     it("allows clicking badge to go back to that level", async () => {
       const user = userEvent.setup();
       renderNestedComponent();
@@ -895,6 +942,7 @@ describe("VariableMappingInput", () => {
       });
     });
 
+    /** @scenario Select simple field (no nesting) */
     it("allows selecting simple field without nesting", async () => {
       const user = userEvent.setup();
       const onMappingChange = vi.fn();
@@ -1283,9 +1331,9 @@ describe("VariableMappingInput", () => {
           path: ["traces"],
         });
 
-        // Should show the mapping tag
+        // Should show the mapping tag with the friendly source name
         expect(screen.getByTestId("source-mapping-tag")).toBeInTheDocument();
-        expect(screen.getByText("thread.traces")).toBeInTheDocument();
+        expect(screen.getByText("Current Thread.traces")).toBeInTheDocument();
       });
     });
   });

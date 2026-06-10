@@ -3,12 +3,18 @@ Feature: Proxy passthrough — playground LLM calls via /go/proxy/v1/*
   I want my OpenAI-shaped requests to traverse the Go path when my project is flagged in
   So that I get the new gateway-backed cost tracking without any change in request/response shape
 
-  # _shared/contract.md §1 + §11 + §8: the playground hits /proxy/v1/* today on uvicorn.
+  # _shared/contract.md §1 + §8: the playground hits /go/proxy/v1/*, served in-process by the Go dispatcher.
   # When the project is on the Go engine, the TS app prepends /go/ and forwards the
   # request to nlpgo, which carries the x-litellm-* credential headers through to the
   # in-process gateway dispatcher. nlpgo translates the headers into a domain.Credential
   # and forwards verbatim — preserving every byte of the OpenAI shape including
   # streaming SSE, tool calls, image content, and the function-calling Beta variants.
+
+  # All scenarios are @unimplemented because services/nlpgo/ does not yet exist.
+  # The TS feature-parity checker only scans TS test roots, so Go-side proxy
+  # passthrough scenarios cannot be bound via @scenario JSDoc. TS-side routing
+  # logic is partially in langwatch/src/server/routes/playground.ts; Go-side
+  # tests will live under services/nlpgo/. Aspirational pending nlpgo stand-up.
 
   Background:
     Given nlpgo is running with the in-process AI Gateway dispatcher loaded
@@ -97,7 +103,7 @@ Feature: Proxy passthrough — playground LLM calls via /go/proxy/v1/*
     And the string contents are the canonical JSON the gateway emitted
 
   # ============================================================================
-  # Auth + bypass behavior
+  # Auth behavior
   # ============================================================================
 
   @integration @v1 @unimplemented
@@ -105,13 +111,6 @@ Feature: Proxy passthrough — playground LLM calls via /go/proxy/v1/*
     When a request to "/go/proxy/v1/chat/completions" arrives with no x-litellm-* credential headers and no provider prefix in body.model
     Then the response status is 400
     And no gateway call is made
-
-  @integration @v1 @unimplemented
-  Scenario: /go/proxy/v1/* requests under NLPGO_BYPASS=1 never reach the Go binary
-    Given the container is started with NLPGO_BYPASS=1
-    When a request to "/go/proxy/v1/chat/completions" arrives
-    Then nlpgo is not in the path; the entry script forwards directly to uvicorn :5561
-    And the legacy /proxy/v1/chat/completions handler responds (path rewrite handled by entry script)
 
   # ============================================================================
   # Errors

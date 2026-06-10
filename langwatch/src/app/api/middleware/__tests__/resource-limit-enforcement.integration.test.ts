@@ -36,7 +36,7 @@ describe("Feature: REST API resource limit enforcement parity", () => {
   });
 
   beforeEach(async () => {
-    resetApp();
+    await resetApp();
     const mockGetActivePlan = vi.fn().mockResolvedValue(FREE_PLAN);
     globalForApp.__langwatch_app = createTestApp({
       planProvider: PlanProviderService.create({
@@ -63,11 +63,11 @@ describe("Feature: REST API resource limit enforcement parity", () => {
       },
     });
 
-    testProject = projectFactory.build({ slug: nanoid() });
     testProject = await prisma.project.create({
       data: {
-        ...testProject,
+        ...projectFactory.build({ slug: nanoid() }),
         teamId: testTeam.id,
+        personalFeatures: {},
       },
     });
 
@@ -87,7 +87,7 @@ describe("Feature: REST API resource limit enforcement parity", () => {
     await prisma.project.delete({ where: { id: testProjectId } });
     await prisma.team.delete({ where: { id: testTeam.id } });
     await prisma.organization.delete({ where: { id: testOrganization.id } });
-    resetApp();
+    await resetApp();
   });
 
   describe("POST /api/triggers (automations limit)", () => {

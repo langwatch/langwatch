@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test";
 
+import { getProjectSlug } from "./helpers";
+
 /**
  * Smoke Tests
  *
@@ -8,13 +10,15 @@ import { test, expect } from "@playwright/test";
  */
 
 test("app loads after authentication", async ({ page }) => {
-  await page.goto("/");
+  // Derive a real project deterministically, independent of persona-based root
+  // routing (a personal-persona user lands on /me, not a project route).
+  const slug = await getProjectSlug(page);
 
-  // Verify we're not redirected to login
+  await page.goto(`/${slug}/messages`);
+
+  // Verify we're not bounced to login and the authenticated shell renders.
   await expect(page).not.toHaveURL(/\/auth\/signin/);
-
-  // Verify navigation is visible (indicates app is functional)
-  await expect(
-    page.getByRole("link", { name: "Home", exact: true })
-  ).toBeVisible({ timeout: 15000 });
+  await expect(page.locator('a[href="/settings"]').first()).toBeVisible({
+    timeout: 30000,
+  });
 });

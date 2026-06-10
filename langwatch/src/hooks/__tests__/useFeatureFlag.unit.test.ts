@@ -3,8 +3,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook } from "@testing-library/react";
-import { FEATURE_FLAG_CACHE_TTL_MS } from "../../server/featureFlag/constants";
-import { useFeatureFlag } from "../useFeatureFlag";
+import { CLIENT_FLAG_STALE_TIME_MS, useFeatureFlag } from "../useFeatureFlag";
 
 vi.mock("../../utils/api", () => ({
   api: {
@@ -35,7 +34,7 @@ describe("useFeatureFlag()", () => {
 
     it("returns isLoading true", () => {
       const { result } = renderHook(() =>
-        useFeatureFlag("release_ui_dark_mode_enabled"),
+        useFeatureFlag("release_ui_sdk_radar_banner_card_enabled"),
       );
 
       expect(result.current.isLoading).toBe(true);
@@ -43,7 +42,7 @@ describe("useFeatureFlag()", () => {
 
     it("returns enabled false", () => {
       const { result } = renderHook(() =>
-        useFeatureFlag("release_ui_dark_mode_enabled"),
+        useFeatureFlag("release_ui_sdk_radar_banner_card_enabled"),
       );
 
       expect(result.current.enabled).toBe(false);
@@ -60,7 +59,7 @@ describe("useFeatureFlag()", () => {
 
     it("returns enabled false", () => {
       const { result } = renderHook(() =>
-        useFeatureFlag("release_ui_dark_mode_enabled"),
+        useFeatureFlag("release_ui_sdk_radar_banner_card_enabled"),
       );
 
       expect(result.current.enabled).toBe(false);
@@ -68,7 +67,7 @@ describe("useFeatureFlag()", () => {
 
     it("returns isLoading false", () => {
       const { result } = renderHook(() =>
-        useFeatureFlag("release_ui_dark_mode_enabled"),
+        useFeatureFlag("release_ui_sdk_radar_banner_card_enabled"),
       );
 
       expect(result.current.isLoading).toBe(false);
@@ -85,7 +84,7 @@ describe("useFeatureFlag()", () => {
 
     it("returns enabled true", () => {
       const { result } = renderHook(() =>
-        useFeatureFlag("release_ui_dark_mode_enabled"),
+        useFeatureFlag("release_ui_sdk_radar_banner_card_enabled"),
       );
 
       expect(result.current.enabled).toBe(true);
@@ -93,7 +92,7 @@ describe("useFeatureFlag()", () => {
 
     it("returns isLoading false", () => {
       const { result } = renderHook(() =>
-        useFeatureFlag("release_ui_dark_mode_enabled"),
+        useFeatureFlag("release_ui_sdk_radar_banner_card_enabled"),
       );
 
       expect(result.current.isLoading).toBe(false);
@@ -110,7 +109,7 @@ describe("useFeatureFlag()", () => {
 
     it("passes projectId and organizationId to query", () => {
       renderHook(() =>
-        useFeatureFlag("release_ui_dark_mode_enabled", {
+        useFeatureFlag("release_ui_sdk_radar_banner_card_enabled", {
           projectId: "proj-123",
           organizationId: "org-456",
         }),
@@ -118,14 +117,15 @@ describe("useFeatureFlag()", () => {
 
       expect(mockUseQuery).toHaveBeenCalledWith(
         {
-          flag: "release_ui_dark_mode_enabled",
+          flag: "release_ui_sdk_radar_banner_card_enabled",
           projectId: "proj-123",
           organizationId: "org-456",
         },
         {
-          staleTime: FEATURE_FLAG_CACHE_TTL_MS,
+          staleTime: CLIENT_FLAG_STALE_TIME_MS,
           refetchOnWindowFocus: false,
           enabled: true,
+          trpc: { context: { skipBatch: true } },
         },
       );
     });
@@ -140,18 +140,19 @@ describe("useFeatureFlag()", () => {
     });
 
     it("passes undefined for optional params", () => {
-      renderHook(() => useFeatureFlag("release_ui_dark_mode_enabled"));
+      renderHook(() => useFeatureFlag("release_ui_sdk_radar_banner_card_enabled"));
 
       expect(mockUseQuery).toHaveBeenCalledWith(
         {
-          flag: "release_ui_dark_mode_enabled",
+          flag: "release_ui_sdk_radar_banner_card_enabled",
           projectId: undefined,
           organizationId: undefined,
         },
         {
-          staleTime: FEATURE_FLAG_CACHE_TTL_MS,
+          staleTime: CLIENT_FLAG_STALE_TIME_MS,
           refetchOnWindowFocus: false,
           enabled: true,
+          trpc: { context: { skipBatch: true } },
         },
       );
     });
@@ -167,7 +168,7 @@ describe("useFeatureFlag()", () => {
 
     it("disables the query", () => {
       renderHook(() =>
-        useFeatureFlag("release_ui_dark_mode_enabled", {
+        useFeatureFlag("release_ui_sdk_radar_banner_card_enabled", {
           projectId: undefined,
           enabled: false,
         }),
@@ -183,7 +184,7 @@ describe("useFeatureFlag()", () => {
 
     it("returns enabled false", () => {
       const { result } = renderHook(() =>
-        useFeatureFlag("release_ui_dark_mode_enabled", {
+        useFeatureFlag("release_ui_sdk_radar_banner_card_enabled", {
           enabled: false,
         }),
       );
@@ -193,7 +194,7 @@ describe("useFeatureFlag()", () => {
 
     it("returns isLoading false", () => {
       const { result } = renderHook(() =>
-        useFeatureFlag("release_ui_dark_mode_enabled", {
+        useFeatureFlag("release_ui_sdk_radar_banner_card_enabled", {
           enabled: false,
         }),
       );

@@ -102,6 +102,7 @@ describe("<ScenarioRunContent/>", () => {
   });
 
   describe("when a card is clicked", () => {
+    /** @scenario "Run Again from standalone run page stays on the standalone page" */
     it("calls onScenarioRunClick with the scenario run", async () => {
       const user = userEvent.setup();
       const onScenarioRunClick = vi.fn();

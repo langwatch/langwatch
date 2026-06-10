@@ -4,6 +4,19 @@ Feature: Member Role Team Restrictions
   I want team role options to be restricted based on organization role
   So that Lite Member users can only have Viewer team access and Members cannot be Viewers
 
+  # The role-validation + auto-correction logic is bound below to
+  # the unit tests in
+  # `langwatch/src/utils/__tests__/memberRoleConstraints.unit.test.ts`
+  # and `computeEffectiveTeamRoleUpdates.unit.test.ts`. Remaining
+  # `@unimplemented` scenarios describe UI dropdown behaviour ("only
+  # see Viewer in dropdown", "team role updates render in form",
+  # default values when adding a team) that need a JSDOM render of
+  # the AddMembers form — no fixture exists today. The "API rejects
+  # non-Viewer team role assignments" scenario is covered in
+  # `organization.member-roles.integration.test.ts` but that suite
+  # is currently `describe.skip` due to an app-layer regression
+  # (#3240).
+
   Background:
     Given I am on the Add Members form
     And there is at least one team available

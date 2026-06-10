@@ -11,11 +11,17 @@ export default defineConfig({
     maxWorkers: "50%", // Low default for local dev; CI overrides with VITEST_MAX_WORKERS
     vmMemoryLimit: "512MB", // Recycle workers aggressively — vmThreads leaks memory by design
     testTimeout: 30000, // 30s default to handle slower CI runners
+    // Global setup runs once before all tests. Unit needs no containers; this
+    // only carries a CI-gated hard-floor that mirrors the integration
+    // globalSetup, releasing the vitest finalize wedge on unit shards (which
+    // otherwise lack a hard-floor → 25-min job timeout → app-ci cancel).
+    globalSetup: ["./src/test-unit-global-setup.ts"],
     setupFiles: ["./test-setup.ts"],
     exclude: [
       ...configDefaults.exclude,
-      "**/*.integration.test.ts",
-      "**/*.stress.test.ts",
+      "**/*.integration.test.{ts,tsx}",
+      "**/*.stress.test.{ts,tsx}",
+      "**/*.browser.test.{ts,tsx}",
       ".next/**/*",
       ".next-saas/**/*",
       "**/e2e/**/*",
@@ -41,6 +47,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "~/": join(__dirname, "./src/"),
+      "@ee/": join(__dirname, "./ee/"),
       "@app/": join(__dirname, "./src/server/app-layer/"),
     },
   },

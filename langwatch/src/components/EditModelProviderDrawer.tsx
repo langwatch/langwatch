@@ -41,7 +41,7 @@ export const EditModelProviderDrawer = (
     <Drawer.Root
       open={true}
       placement="end"
-      size="md"
+      size="xl"
       onOpenChange={({ open }) => {
         if (!open) {
           closeDrawer();
@@ -49,7 +49,7 @@ export const EditModelProviderDrawer = (
       }}
       modal={false}
     >
-      <Drawer.Content>
+      <Drawer.Content bg="bg">
         <Drawer.Header>
           <HStack>
             <Drawer.CloseTrigger />

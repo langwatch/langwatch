@@ -38,6 +38,11 @@ export function SdkRadarBanner() {
       width="full"
       borderBottom="1px solid"
       borderBottomColor="yellow.300"
+      // Top-left only — matches the inner page chrome's rounded
+      // top-left corner so the banner's curve continues from the
+      // chrome. All other corners flush.
+      borderRadius={0}
+      borderTopLeftRadius="xl"
     >
       <Alert.Indicator />
       <Alert.Content>

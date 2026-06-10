@@ -2,7 +2,6 @@ package engine
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,17 +10,14 @@ import (
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/dsl"
 )
 
-// TestEngineExecute_EmitsExecuteComponentSpansWithJSONIO is the
-// end-to-end proof that Engine.Execute (not just the helpers) produces
-// the Python-parity span shape Studio's Trace Details drawer renders.
-// Pre-fix shipped on 2026-04-28 had a single empty `nlpgo.node.end`
-// span and `output_source: inferred`; this test asserts the fix.
-//
-// Workflow: entry → end. Both nodes get an execute_component span;
-// each span carries langwatch.input + langwatch.output as JSON
-// strings so Studio shows the actual values instead of falling back
-// to inferred output.
-func TestEngineExecute_EmitsExecuteComponentSpansWithJSONIO(t *testing.T) {
+// TestEngineExecute_SuppressesEntryAndEndSpans is the end-to-end
+// suppression proof: a workflow whose only nodes are pass-throughs
+// (Entry + End) must produce ZERO engine-emitted spans. Mirrors
+// Python's workflow.py.jinja generated wrapper classes for Entry/End
+// types which lack the `@langwatch.span` decorator. The pre-fix 3-
+// span output for a 3-node workflow confused operators who saw 3×
+// the dispatch count they expected (rchaves dogfood 2026-05-14).
+func TestEngineExecute_SuppressesEntryAndEndSpans(t *testing.T) {
 	rec := withRecorder(t)
 
 	eng := New(Options{})
@@ -47,42 +43,8 @@ func TestEngineExecute_EmitsExecuteComponentSpansWithJSONIO(t *testing.T) {
 	require.Equal(t, "success", res.Status)
 
 	spans := rec.Ended()
-	require.NotEmpty(t, spans, "engine must emit at least one span")
-
-	byNodeID := map[string]map[string]any{}
-	for _, s := range spans {
-		require.Equal(t, "execute_component", s.Name(),
-			"all engine-emitted spans must share the Python-parity name 'execute_component'")
-		attrs := attrMap(s.Attributes())
-		require.Equal(t, "component", attrs["langwatch.span.type"],
-			"span.type must be 'component' to match Python's optional_langwatch_trace(type='component')")
-		require.Equal(t, "proj_e2e", attrs["langwatch.project_id"])
-		require.Equal(t, "trace_e2e", attrs["langwatch.trace_id"])
-		require.Equal(t, "workflow", attrs["langwatch.origin"])
-		nodeID, _ := attrs["langwatch.node_id"].(string)
-		byNodeID[nodeID] = attrs
-	}
-
-	endAttrs, ok := byNodeID["end"]
-	require.True(t, ok, "end node must have its own execute_component span")
-	// langwatch.input on the end node is the resolved input map (the
-	// upstream entry's output flowing through the edge). Studio uses
-	// this exact attribute to render the "INPUT" panel of the trace
-	// drawer; without it, output_source falls back to "inferred" and
-	// the panel goes blank — the regression rchaves caught.
-	inJSON, ok := endAttrs["langwatch.input"].(string)
-	require.True(t, ok, "end node span must stamp langwatch.input")
-	var in map[string]any
-	require.NoError(t, json.Unmarshal([]byte(inJSON), &in))
-	assert.Equal(t, "hello", in["output"], "end node received entry's output via edge")
-
-	// langwatch.output on the end node is the same map (end is a
-	// passthrough). Studio renders this in the "OUTPUT" panel.
-	outJSON, ok := endAttrs["langwatch.output"].(string)
-	require.True(t, ok, "end node span must stamp langwatch.output")
-	var out map[string]any
-	require.NoError(t, json.Unmarshal([]byte(outJSON), &out))
-	assert.Equal(t, "hello", out["output"])
+	require.Empty(t, spans,
+		"Entry + End are pass-throughs and must NOT emit per-node spans (Python parity)")
 }
 
 // TestEngineExecute_ErrorPathStampsInputNotOutput pins the contract

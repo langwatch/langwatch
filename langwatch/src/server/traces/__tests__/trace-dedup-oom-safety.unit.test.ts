@@ -77,13 +77,18 @@ describe("trace dedup OOM safety", () => {
   const topicClusteringSource = fs.readFileSync(topicClusteringPath, "utf-8");
 
   // ---------------------------------------------------------------------------
-  // clickhouse-trace.service.ts: fetchTracesWithPagination
+  // clickhouse-trace.service.ts: fetchTracesWithPagination + fetchTraceSummaryRows
   // ---------------------------------------------------------------------------
   describe("fetchTracesWithPagination()", () => {
-    const body = extractMethodBody(
+    const paginationBody = extractMethodBody(
       traceServiceSource,
       "fetchTracesWithPagination",
     );
+    const summaryBody = extractMethodBody(
+      traceServiceSource,
+      "fetchTraceSummaryRows",
+    );
+    const body = paginationBody + summaryBody;
 
     describe("when the pagination query SQL is inspected", () => {
       it("does not use LIMIT 1 BY for deduplication", () => {
@@ -128,8 +133,8 @@ describe("trace dedup OOM safety", () => {
         expect(body).not.toMatch(/SELECT\s+\*\s+FROM\s+stored_spans/i);
       });
 
-      it("uses max(StartTime) GROUP BY for span dedup", () => {
-        expect(body).toContain("max(StartTime)");
+      it("uses max(UpdatedAt) GROUP BY for span dedup", () => {
+        expect(body).toContain("max(UpdatedAt)");
         expect(body).toMatch(
           /GROUP BY\s+TenantId,\s*TraceId,\s*SpanId/,
         );
@@ -152,15 +157,21 @@ describe("trace dedup OOM safety", () => {
     );
     const spanStorageSource = fs.readFileSync(spanStoragePath, "utf-8");
     const body = extractMethodBody(spanStorageSource, "getSpansByTraceId");
+    const dedupHelper = extractFunctionBody(spanStorageSource, "dedupInTuple");
 
     describe("when the stored_spans query SQL is inspected", () => {
       it("does not use LIMIT 1 BY for deduplication", () => {
         expect(body).not.toContain("LIMIT 1 BY");
+        expect(dedupHelper).not.toContain("LIMIT 1 BY");
       });
 
-      it("uses max(StartTime) GROUP BY for span dedup", () => {
-        expect(body).toContain("max(StartTime)");
-        expect(body).toMatch(
+      it("delegates dedup to the IN-tuple helper", () => {
+        expect(body).toContain("dedupInTuple");
+      });
+
+      it("uses max(UpdatedAt) GROUP BY for span dedup", () => {
+        expect(dedupHelper).toContain("max(UpdatedAt)");
+        expect(dedupHelper).toMatch(
           /GROUP BY\s+TenantId,\s*TraceId,\s*SpanId/,
         );
       });
@@ -182,17 +193,50 @@ describe("trace dedup OOM safety", () => {
     );
     const spanStorageSource = fs.readFileSync(spanStoragePath, "utf-8");
     const body = extractMethodBody(spanStorageSource, "getEventsByTraceId");
+    const dedupHelper = extractFunctionBody(spanStorageSource, "dedupInTuple");
 
     describe("when the stored_spans query SQL is inspected", () => {
       it("does not use LIMIT 1 BY for deduplication", () => {
         expect(body).not.toContain("LIMIT 1 BY");
+        expect(dedupHelper).not.toContain("LIMIT 1 BY");
       });
 
-      it("uses max(StartTime) GROUP BY for span dedup", () => {
-        expect(body).toContain("max(StartTime)");
-        expect(body).toMatch(
+      it("delegates dedup to the IN-tuple helper", () => {
+        expect(body).toContain("dedupInTuple");
+      });
+
+      it("uses max(UpdatedAt) GROUP BY for span dedup", () => {
+        expect(dedupHelper).toContain("max(UpdatedAt)");
+        expect(dedupHelper).toMatch(
           /GROUP BY\s+TenantId,\s*TraceId,\s*SpanId/,
         );
+      });
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // span-storage.clickhouse.repository.ts (app-layer): getTraceEventsByTraceId
+  // ---------------------------------------------------------------------------
+  describe("SpanStorageClickHouseRepository.getTraceEventsByTraceId() (app-layer)", () => {
+    const spanStoragePath = path.resolve(
+      __dirname,
+      "..",
+      "..",
+      "app-layer",
+      "traces",
+      "repositories",
+      "span-storage.clickhouse.repository.ts",
+    );
+    const spanStorageSource = fs.readFileSync(spanStoragePath, "utf-8");
+    const body = extractMethodBody(spanStorageSource, "getTraceEventsByTraceId");
+
+    describe("when the events-only query SQL is inspected", () => {
+      it("does not use LIMIT 1 BY for deduplication", () => {
+        expect(body).not.toContain("LIMIT 1 BY");
+      });
+
+      it("delegates dedup to the IN-tuple helper", () => {
+        expect(body).toContain("dedupInTuple");
       });
     });
   });
@@ -306,7 +350,7 @@ describe("trace dedup OOM safety", () => {
       __dirname,
       "..",
       "..",
-      "evaluations-v3",
+      "experiments-v3",
       "services",
       "clickhouse-experiment-run.service.ts",
     );

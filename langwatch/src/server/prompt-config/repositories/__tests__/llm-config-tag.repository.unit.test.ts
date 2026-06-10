@@ -100,6 +100,7 @@ describe("PromptTagAssignmentRepository", () => {
 
   describe("getTagsForConfig()", () => {
     describe("when no tags are assigned", () => {
+      /** @scenario getLabelsForConfig returns empty when no labels assigned */
       it("returns an empty list", async () => {
         const prisma = makeMockPrisma();
         (
@@ -121,6 +122,7 @@ describe("PromptTagAssignmentRepository", () => {
     });
 
     describe("when tags are assigned", () => {
+      /** @scenario "Fetch all labels for a prompt config" */
       it("returns all tags for the config with their tag definitions", async () => {
         const prisma = makeMockPrisma();
         const mockTags = [

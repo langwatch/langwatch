@@ -1,4 +1,14 @@
 Feature: AI Gateway — RBAC legacy ADMIN fallback for org-scoped checks
+
+  # All scenarios in this file describe the legacy-ADMIN fallback path
+  # in the RBAC system (OrganizationUser+TeamUser ADMIN with zero
+  # RoleBinding rows). The fallback resolution itself is in the RBAC
+  # service layer, but no dedicated unit test exists for the
+  # legacy-fallback decision tree yet. Page-level scenarios (audit log
+  # rendering, budget org-list, cache-rule-list access) need
+  # component-test fixtures. All aspirational pending the RBAC test
+  # harness.
+
   As a legacy LangWatch organization ADMIN who pre-dates the role-binding system
   I want gateway org-scoped pages to stay accessible when I have OrganizationUser+TeamUser ADMIN but zero RoleBinding rows
   So that upgrading to the AI Gateway doesn't silently revoke my access the day v1 ships

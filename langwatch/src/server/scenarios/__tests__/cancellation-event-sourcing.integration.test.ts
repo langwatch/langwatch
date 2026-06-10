@@ -109,6 +109,8 @@ describe("Event-sourcing cancellation (real Redis)", () => {
   });
 
   describe("when a single worker is running a scenario", () => {
+    /** @scenario "Cancel reactor broadcasts to Redis on cancel_requested event" */
+    /** @scenario "Worker kills its own child process on cancel broadcast" */
     it("kills the child process on cancel broadcast", async () => {
       const worker = createMockWorker(redis);
       worker.startChild("run-1");
@@ -129,6 +131,7 @@ describe("Event-sourcing cancellation (real Redis)", () => {
   });
 
   describe("when multiple workers run different scenarios", () => {
+    /** @scenario "Worker ignores cancel broadcast for scenarios it does not own" */
     it("only the worker running the target scenario kills its child", async () => {
       const workerA = createMockWorker(redis);
       workerA.startChild("run-A1");
@@ -281,6 +284,7 @@ describe("Event-sourcing cancellation (real Redis)", () => {
   });
 
   describe("when cancel arrives before execution pool picks up the job", () => {
+    /** @scenario "Worker skips execution if cancel was already requested" */
     it("startScenarioProcessor wiring dispatches finished(CANCELLED) for skipped jobs", async () => {
       // This tests the REAL wiring: startScenarioProcessor → pool → cancel
       // broadcast → pool.markCancelled → pool.submit skips → onSkipCancelled

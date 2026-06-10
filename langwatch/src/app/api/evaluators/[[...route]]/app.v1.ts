@@ -1,11 +1,14 @@
 import type { Prisma } from "@prisma/client";
-import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
+import { prisma } from "~/server/db";
+import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
+import { resolveModelForFeature } from "~/server/modelProviders/resolveModelForFeature";
+import { type SecuredApp, requires } from "~/server/api/security";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
 import {
@@ -35,22 +38,23 @@ const logger = createLogger("langwatch:api:evaluators");
 
 patchZodOpenapi();
 
-type Variables = EvaluatorServiceMiddlewareVariables &
+export type EvaluatorAppVariables = EvaluatorServiceMiddlewareVariables &
   AuthMiddlewareVariables &
   OrganizationMiddlewareVariables;
 
-export const app = new Hono<{
-  Variables: Variables;
-}>().basePath("/");
+export function registerEvaluatorRoutes(
+  secured: SecuredApp<{ Variables: EvaluatorAppVariables }>,
+): void {
+  // organizationMiddleware + evaluatorServiceMiddleware run AFTER the access
+  // chain (which authenticates and sets `project`), so they are applied
+  // per-route rather than app-wide.
 
-// Middleware
-app.use("/*", organizationMiddleware);
-app.use("/*", evaluatorServiceMiddleware);
-
-// Get all evaluators
-app.get(
-  "/",
-  describeRoute({
+  // Get all evaluators
+  secured.access(requires("evaluations:view")).get(
+    "/",
+    organizationMiddleware,
+    evaluatorServiceMiddleware,
+    describeRoute({
     description: "Get all evaluators for a project",
     responses: {
       ...baseResponses,
@@ -84,10 +88,12 @@ app.get(
   },
 );
 
-// Get evaluator by ID or slug
-app.get(
-  "/:idOrSlug{.+}",
-  describeRoute({
+  // Get evaluator by ID or slug
+  secured.access(requires("evaluations:view")).get(
+    "/:idOrSlug{.+}",
+    organizationMiddleware,
+    evaluatorServiceMiddleware,
+    describeRoute({
     description: "Get a specific evaluator by ID or slug",
     responses: {
       ...baseResponses,
@@ -147,11 +153,13 @@ app.get(
   },
 );
 
-// Create evaluator
-app.post(
-  "/",
-  resourceLimitMiddleware("evaluators"),
-  describeRoute({
+  // Create evaluator
+  secured.access(requires("evaluations:manage")).post(
+    "/",
+    organizationMiddleware,
+    evaluatorServiceMiddleware,
+    resourceLimitMiddleware("evaluators"),
+    describeRoute({
     description: "Create a new evaluator",
     responses: {
       ...baseResponses,
@@ -176,13 +184,38 @@ app.post(
       "Creating evaluator",
     );
 
+    // Resolve the project's DEFAULT and EMBEDDINGS models via the
+    // cascade. ModelNotConfiguredError propagates so the global
+    // domain-error middleware can surface the typed missing-model
+    // response — the PR's "no global system fallback" contract bars
+    // falling back to a hardcoded OpenAI constant when nothing is
+    // configured. Only unrelated resolver-internal errors (DB, race)
+    // become null and let createWithDefaults render with placeholders.
+    const swallowNonMissingConfig = (err: unknown): null => {
+      if (err instanceof ModelNotConfiguredError) throw err;
+      return null;
+    };
+    const [resolvedDefault, resolvedEmbedding] = await Promise.all([
+      resolveModelForFeature("evaluator.create_default", {
+        prisma,
+        projectId: project.id,
+      }).catch(swallowNonMissingConfig),
+      resolveModelForFeature("analytics.topic_clustering_embeddings", {
+        prisma,
+        projectId: project.id,
+      }).catch(swallowNonMissingConfig),
+    ]);
+
     const evaluator = await service.createWithDefaults({
       id: `evaluator_${nanoid()}`,
       projectId: project.id,
       name: data.name,
       type: "evaluator",
       config: data.config as Prisma.InputJsonValue,
-      project,
+      resolved: {
+        defaultModel: resolvedDefault?.model ?? null,
+        embeddingsModel: resolvedEmbedding?.model ?? null,
+      },
     });
 
     const enriched = await service.enrichWithFields(evaluator);
@@ -203,10 +236,12 @@ app.post(
   },
 );
 
-// Update evaluator
-app.put(
-  "/:id",
-  describeRoute({
+  // Update evaluator
+  secured.access(requires("evaluations:manage")).put(
+    "/:id",
+    organizationMiddleware,
+    evaluatorServiceMiddleware,
+    describeRoute({
     description: "Update an existing evaluator",
     responses: {
       ...baseResponses,
@@ -305,10 +340,12 @@ app.put(
   },
 );
 
-// Delete (archive) evaluator
-app.delete(
-  "/:id",
-  describeRoute({
+  // Delete (archive) evaluator
+  secured.access(requires("evaluations:manage")).delete(
+    "/:id",
+    organizationMiddleware,
+    evaluatorServiceMiddleware,
+    describeRoute({
     description: "Archive (soft-delete) an evaluator",
     responses: {
       ...baseResponses,
@@ -364,4 +401,5 @@ app.delete(
 
     return c.json({ success: true });
   },
-);
+  );
+}

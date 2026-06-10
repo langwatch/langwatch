@@ -35,7 +35,7 @@ describe("Feature: Dataset REST API", () => {
   });
 
   beforeEach(async () => {
-    resetApp();
+    await resetApp();
     mockGetActivePlan = vi.fn().mockResolvedValue(FREE_PLAN);
     mockNotifyPlanLimitReached = vi.fn().mockResolvedValue(undefined);
     globalForApp.__langwatch_app = createTestApp({
@@ -63,11 +63,11 @@ describe("Feature: Dataset REST API", () => {
       },
     });
 
-    testProject = projectFactory.build({ slug: nanoid() });
     testProject = await prisma.project.create({
       data: {
-        ...testProject,
+        ...projectFactory.build({ slug: nanoid() }),
         teamId: testTeam.id,
+        personalFeatures: {},
       },
     });
 
@@ -123,7 +123,7 @@ describe("Feature: Dataset REST API", () => {
     await prisma.organization.delete({
       where: { id: testOrganization.id },
     });
-    resetApp();
+    await resetApp();
   });
 
   // Helper to create a dataset directly via Prisma
@@ -167,11 +167,13 @@ describe("Feature: Dataset REST API", () => {
   // ── Authentication ─────────────────────────────────────────────
 
   describe("Authentication", () => {
+    /** @scenario Request without API key returns 401 */
     it("returns 401 without X-Auth-Token header", async () => {
       const res = await app.request("/api/dataset");
       expect(res.status).toBe(401);
     });
 
+    /** @scenario Request with invalid API key returns 401 */
     it("returns 401 with invalid X-Auth-Token", async () => {
       const res = await app.request("/api/dataset", {
         headers: { "X-Auth-Token": "invalid-key-xyz" },
@@ -195,6 +197,7 @@ describe("Feature: Dataset REST API", () => {
         });
       });
 
+      /** @scenario List datasets returns paginated non-archived datasets */
       it("returns paginated non-archived datasets", async () => {
         const res = await helpers.api.get("/api/dataset");
         expect(res.status).toBe(200);
@@ -235,6 +238,7 @@ describe("Feature: Dataset REST API", () => {
         }
       });
 
+      /** @scenario List datasets with page and limit parameters */
       it("paginates with page and limit parameters", async () => {
         const res = await helpers.api.get("/api/dataset?page=2&limit=5");
         expect(res.status).toBe(200);
@@ -251,6 +255,7 @@ describe("Feature: Dataset REST API", () => {
     });
 
     describe("when the project has no datasets", () => {
+      /** @scenario List datasets returns empty array for project with no datasets */
       it("returns a paginated response with 0 datasets", async () => {
         const res = await helpers.api.get("/api/dataset");
         expect(res.status).toBe(200);
@@ -266,6 +271,7 @@ describe("Feature: Dataset REST API", () => {
 
   describe("POST /api/dataset", () => {
     describe("when given valid name and columnTypes", () => {
+      /** @scenario Create a dataset with name and column types */
       it("creates a dataset with the correct slug", async () => {
         const res = await helpers.api.post("/api/dataset", {
           name: "User Feedback",
@@ -292,6 +298,7 @@ describe("Feature: Dataset REST API", () => {
         await createDataset({ name: "Test Data", slug: "test-data" });
       });
 
+      /** @scenario Create a dataset auto-generates a unique slug from the name */
       it("returns 409 Conflict", async () => {
         const res = await helpers.api.post("/api/dataset", {
           name: "Test Data",
@@ -305,6 +312,7 @@ describe("Feature: Dataset REST API", () => {
     });
 
     describe("when columnTypes contain an invalid type", () => {
+      /** @scenario Create a dataset validates column types */
       it("returns 422 Unprocessable Entity", async () => {
         const res = await helpers.api.post("/api/dataset", {
           name: "Bad Types",
@@ -316,6 +324,7 @@ describe("Feature: Dataset REST API", () => {
     });
 
     describe("when name is missing", () => {
+      /** @scenario Create a dataset requires a name */
       it("returns 422 Unprocessable Entity", async () => {
         const res = await helpers.api.post("/api/dataset", {
           columnTypes: [{ name: "input", type: "string" }],
@@ -335,6 +344,7 @@ describe("Feature: Dataset REST API", () => {
         });
       });
 
+      /** @scenario Create a dataset enforces plan limits */
       it("returns 403 Forbidden", async () => {
         const res = await helpers.api.post("/api/dataset", {
           name: "One More",
@@ -366,6 +376,8 @@ describe("Feature: Dataset REST API", () => {
         await createRecord(datasetId, "rec-1", { input: "hello" });
       });
 
+      /** @scenario Get a dataset by slug */
+      /** @scenario Endpoints accept both slug and dataset ID */
       it("returns the dataset by slug with its records", async () => {
         const res = await helpers.api.get("/api/dataset/my-dataset");
         expect(res.status).toBe(200);
@@ -378,6 +390,7 @@ describe("Feature: Dataset REST API", () => {
         expect(body.data).toHaveLength(1);
       });
 
+      /** @scenario Get a dataset by id */
       it("returns the dataset by id", async () => {
         const res = await helpers.api.get("/api/dataset/dataset_abc123");
         expect(res.status).toBe(200);
@@ -388,6 +401,7 @@ describe("Feature: Dataset REST API", () => {
     });
 
     describe("when the dataset does not exist", () => {
+      /** @scenario Get dataset returns 404 for non-existent slug */
       it("returns 404 Not Found", async () => {
         const res = await helpers.api.get("/api/dataset/does-not-exist");
         expect(res.status).toBe(404);
@@ -406,6 +420,7 @@ describe("Feature: Dataset REST API", () => {
         });
       });
 
+      /** @scenario Get dataset enforces 25MB response size limit */
       it("returns 400 Bad Request", async () => {
         const res = await helpers.api.get("/api/dataset/large-dataset");
 
@@ -424,6 +439,7 @@ describe("Feature: Dataset REST API", () => {
         await createDataset({ name: "Old Name", slug: "old-name" });
       });
 
+      /** @scenario Update a dataset name and column types */
       it("updates the dataset and changes the slug", async () => {
         const res = await helpers.api.patch("/api/dataset/old-name", {
           name: "New Name",
@@ -445,6 +461,7 @@ describe("Feature: Dataset REST API", () => {
         await createDataset({ name: "Original", slug: "original" });
       });
 
+      /** @scenario Update a dataset name regenerates the slug */
       it("regenerates the slug", async () => {
         const res = await helpers.api.patch("/api/dataset/original", {
           name: "Renamed Dataset",
@@ -462,6 +479,7 @@ describe("Feature: Dataset REST API", () => {
         await createDataset({ name: "Beta", slug: "beta" });
       });
 
+      /** @scenario Update a dataset fails when new slug conflicts */
       it("returns 409 Conflict", async () => {
         const res = await helpers.api.patch("/api/dataset/alpha", {
           name: "Beta",
@@ -472,6 +490,7 @@ describe("Feature: Dataset REST API", () => {
     });
 
     describe("when the dataset does not exist", () => {
+      /** @scenario Update a non-existent dataset returns 404 */
       it("returns 404 Not Found", async () => {
         const res = await helpers.api.patch("/api/dataset/ghost", {
           name: "Whatever",
@@ -492,6 +511,7 @@ describe("Feature: Dataset REST API", () => {
         existingDatasetSlug = dataset.slug;
       });
 
+      /** @scenario Update dataset does not enforce plan limits */
       it("updates the dataset successfully (no plan limit on PATCH)", async () => {
         const res = await helpers.api.patch(
           `/api/dataset/${existingDatasetSlug}`,
@@ -515,6 +535,7 @@ describe("Feature: Dataset REST API", () => {
         await createDataset({ name: "To Delete", slug: "to-delete" });
       });
 
+      /** @scenario Delete a dataset archives it */
       it("soft-deletes with archivedAt and mutates slug", async () => {
         const res = await helpers.api.delete("/api/dataset/to-delete");
         expect(res.status).toBe(200);
@@ -541,6 +562,7 @@ describe("Feature: Dataset REST API", () => {
     });
 
     describe("when the dataset does not exist", () => {
+      /** @scenario Delete a non-existent dataset returns 404 */
       it("returns 404 Not Found", async () => {
         const res = await helpers.api.delete("/api/dataset/nope");
         expect(res.status).toBe(404);
@@ -566,6 +588,7 @@ describe("Feature: Dataset REST API", () => {
         await prisma.datasetRecord.createMany({ data: records });
       });
 
+      /** @scenario List records with default pagination */
       it("returns the first page of records with pagination metadata", async () => {
         const res = await helpers.api.get("/api/dataset/my-dataset/records");
         expect(res.status).toBe(200);
@@ -575,6 +598,7 @@ describe("Feature: Dataset REST API", () => {
         expect(body.pagination.total).toBe(100);
       });
 
+      /** @scenario List records with explicit pagination */
       it("paginates with explicit page and limit", async () => {
         const res = await helpers.api.get(
           "/api/dataset/my-dataset/records?page=3&limit=20",
@@ -593,6 +617,7 @@ describe("Feature: Dataset REST API", () => {
     });
 
     describe("when the dataset does not exist", () => {
+      /** @scenario List records for non-existent dataset returns 404 */
       it("returns 404 Not Found", async () => {
         const res = await helpers.api.get("/api/dataset/ghost/records");
         expect(res.status).toBe(404);
@@ -615,6 +640,7 @@ describe("Feature: Dataset REST API", () => {
         await createRecord(datasetId, "rec-123", { input: "hello" });
       });
 
+      /** @scenario Update a record entry */
       it("updates the record entry", async () => {
         const res = await helpers.api.patch(
           "/api/dataset/my-dataset/records/rec-123",
@@ -632,6 +658,7 @@ describe("Feature: Dataset REST API", () => {
         await createDataset({ name: "My Dataset", slug: "my-dataset" });
       });
 
+      /** @scenario Update a non-existent record creates it */
       it("creates the record (upsert)", async () => {
         const res = await helpers.api.patch(
           "/api/dataset/my-dataset/records/rec-new",
@@ -646,6 +673,7 @@ describe("Feature: Dataset REST API", () => {
     });
 
     describe("when the dataset does not exist", () => {
+      /** @scenario Update a record for non-existent dataset returns 404 */
       it("returns 404 Not Found", async () => {
         const res = await helpers.api.patch(
           "/api/dataset/ghost/records/rec-1",
@@ -674,6 +702,7 @@ describe("Feature: Dataset REST API", () => {
         await createRecord(datasetId, "rec-3", { input: "c" });
       });
 
+      /** @scenario Delete records in batch */
       it("deletes the specified records and returns count", async () => {
         const res = await helpers.api.delete(
           "/api/dataset/my-dataset/records",
@@ -691,6 +720,7 @@ describe("Feature: Dataset REST API", () => {
         await createDataset({ name: "My Dataset", slug: "my-dataset" });
       });
 
+      /** @scenario Delete records with no matching IDs returns 404 */
       it("returns 404 Not Found", async () => {
         const res = await helpers.api.delete(
           "/api/dataset/my-dataset/records",
@@ -704,6 +734,7 @@ describe("Feature: Dataset REST API", () => {
     });
 
     describe("when the dataset does not exist", () => {
+      /** @scenario Delete records for non-existent dataset returns 404 */
       it("returns 404 Not Found", async () => {
         const res = await helpers.api.delete("/api/dataset/ghost/records", {
           recordIds: ["rec-1"],
@@ -718,6 +749,7 @@ describe("Feature: Dataset REST API", () => {
         await createDataset({ name: "My Dataset", slug: "my-dataset" });
       });
 
+      /** @scenario Delete records requires recordIds in body */
       it("returns 422 Unprocessable Entity", async () => {
         const res = await helpers.api.delete(
           "/api/dataset/my-dataset/records",
@@ -757,6 +789,7 @@ describe("Feature: Dataset REST API", () => {
         ]);
       });
 
+      /** @scenario Batch create records via POST /:slugOrId/records */
       it("creates records with unique IDs and returns them", async () => {
         const res = await helpers.api.post(
           "/api/dataset/my-dataset/records",
@@ -790,6 +823,7 @@ describe("Feature: Dataset REST API", () => {
         );
       });
 
+      /** @scenario Batch create records accepts dataset ID as well as slug */
       it("creates records for the matching dataset", async () => {
         const res = await helpers.api.post(
           "/api/dataset/dataset_xyz/records",
@@ -810,6 +844,7 @@ describe("Feature: Dataset REST API", () => {
         ]);
       });
 
+      /** @scenario Batch create records validates column names against dataset schema */
       it("returns 400 Bad Request identifying the invalid column and listing the valid ones", async () => {
         const res = await helpers.api.post(
           "/api/dataset/my-dataset/records",
@@ -832,6 +867,7 @@ describe("Feature: Dataset REST API", () => {
         ]);
       });
 
+      /** @scenario Batch create records allows entries with subset of columns */
       it("creates records with missing columns defaulting to null", async () => {
         const res = await helpers.api.post(
           "/api/dataset/my-dataset/records",
@@ -847,6 +883,7 @@ describe("Feature: Dataset REST API", () => {
     });
 
     describe("when the dataset does not exist", () => {
+      /** @scenario Batch create records returns 404 for non-existent dataset */
       it("returns 404 Not Found", async () => {
         const res = await helpers.api.post(
           "/api/dataset/ghost/records",
@@ -864,6 +901,7 @@ describe("Feature: Dataset REST API", () => {
         ]);
       });
 
+      /** @scenario Batch create records requires entries in body */
       it("returns 422 Unprocessable Entity for empty body", async () => {
         const res = await helpers.api.post(
           "/api/dataset/my-dataset/records",
@@ -871,6 +909,30 @@ describe("Feature: Dataset REST API", () => {
         );
 
         expect(res.status).toBe(422);
+      });
+    });
+
+    describe("when entries exceed the maximum batch size", () => {
+      beforeEach(async () => {
+        await createDatasetWithColumns("my-dataset", [
+          { name: "input", type: "string" },
+        ]);
+      });
+
+      /** @scenario Batch create records enforces maximum batch size */
+      it("returns 422 Unprocessable Entity when entries exceeds 1000", async () => {
+        const tooMany = Array.from({ length: 1001 }, (_, i) => ({
+          input: `value-${i}`,
+        }));
+        const res = await helpers.api.post(
+          "/api/dataset/my-dataset/records",
+          { entries: tooMany },
+        );
+
+        expect(res.status).toBe(422);
+        const body = await res.json();
+        const errorText = JSON.stringify(body).toLowerCase();
+        expect(errorText).toMatch(/too many|maximum|1000|limit|batch/);
       });
     });
 

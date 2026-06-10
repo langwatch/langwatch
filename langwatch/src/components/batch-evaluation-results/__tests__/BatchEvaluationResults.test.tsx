@@ -20,7 +20,7 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ExperimentRunWithItems } from "~/server/evaluations-v3/services/types";
+import type { ExperimentRunWithItems } from "~/server/experiments-v3/services/types";
 import { BatchEvaluationResults } from "../BatchEvaluationResults";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (

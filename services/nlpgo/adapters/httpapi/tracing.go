@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/hex"
 
 	otelapi "go.opentelemetry.io/otel"
@@ -31,7 +30,60 @@ const tracerName = "langwatch-nlpgo"
 //
 // When the inbound trace_id is malformed or absent, fall through to
 // a fresh trace (still better than dropping the request).
-func startStudioSpan(ctx context.Context, name string, req *app.WorkflowRequest, workflowAPIKey string) (context.Context, trace.Span) {
+// studioSpanNameAndType returns the OTel root span name and the
+// langwatch.span.type value that match Python's optional_langwatch_trace
+// shape per endpoint type.
+//
+// Naming priority (rchaves dogfood 2026-05-14, second pass):
+//  1. workflowName, when set, is the canvas name of the workflow the
+//     operator typed in Studio (e.g. "Translation Agent"). When a trace
+//     drawer lists three runs of the same workflow, they all share the
+//     workflow name — and that is the right grouping for an operator
+//     debugging "did my Translation Agent fail?". Mirrors Python's
+//     `optional_langwatch_trace(name=workflow.name)` in execute_flow.py.
+//  2. When workflowName is empty (sub-workflows that don't carry a name,
+//     direct curl tests, malformed payloads), fall back to the event
+//     type so the row still has a non-empty label.
+//
+// langwatch.span.type still switches strictly on the event type so
+// Studio's color dispatcher (workflow=blue / evaluation=purple /
+// component=green) stays right regardless of the user-typed name:
+//
+//	execute_flow        → "workflow"
+//	execute_evaluation  → "evaluation"
+//	execute_component   → "component"
+//	default (legacy)    → "workflow"
+//
+// Earlier revisions used a single hard-coded name ("nlpgo.studio.
+// execute_sync" / ".execute_stream") with no span.type, which left
+// the Studio drawer rendering the root row with no chip color +
+// migration-internal jargon. The first fix moved to event-type names
+// (still generic across workflows); this fix completes the rename by
+// using the workflow's actual canvas name.
+func studioSpanNameAndType(eventType, workflowName string) (name, spanType string) {
+	switch eventType {
+	case "execute_evaluation":
+		spanType = "evaluation"
+	case "execute_component":
+		spanType = "component"
+	case "execute_flow", "":
+		spanType = "workflow"
+	default:
+		spanType = "workflow"
+	}
+	if workflowName != "" {
+		return workflowName, spanType
+	}
+	switch eventType {
+	case "execute_evaluation":
+		return "execute_evaluation", spanType
+	case "execute_component":
+		return "execute_component", spanType
+	}
+	return "execute_flow", spanType
+}
+
+func startStudioSpan(ctx context.Context, req *app.WorkflowRequest, workflowAPIKey string) (context.Context, trace.Span) {
 	if workflowAPIKey != "" {
 		ctx = context.WithValue(ctx, otelsetup.APIKeyContextKey{}, workflowAPIKey)
 	}
@@ -46,24 +98,39 @@ func startStudioSpan(ctx context.Context, name string, req *app.WorkflowRequest,
 	if req.DoNotTrace {
 		return ctx, trace.SpanFromContext(ctx)
 	}
-	if tid, ok := parseTraceID(req.TraceID); ok {
-		// Remote=true tells the sampler to honor the inbound decision
-		// (we always-sample inbound Studio runs since the langwatch app
-		// already gated them).
-		sc := trace.NewSpanContext(trace.SpanContextConfig{
-			TraceID:    tid,
-			SpanID:     newSpanID(),
-			TraceFlags: trace.FlagsSampled,
-			Remote:     true,
-		})
-		ctx = trace.ContextWithSpanContext(ctx, sc)
+	// Prefer the W3C-extracted parent span context (set by
+	// applyInboundCausality via the global propagator) over the
+	// body-supplied req.TraceID. This is what lets evaluator workflows
+	// continue the caller's trace end-to-end — same trace_id, parent
+	// span_id linked.
+	//
+	// Fall-back path: when there's no inbound traceparent (Studio's
+	// playground frontend ships trace_id in the body only, no W3C
+	// headers), seed our context-aware IDGenerator with the body
+	// trace_id. The next tracer.Start call sees no valid parent
+	// SpanContext, falls into IDGenerator.NewIDs, and gets back
+	// (body_trace_id, fresh_span_id). The result is a TRUE root span:
+	// trace_id preserved, parent_span_id all-zeros.
+	//
+	// Earlier code synthesized a remote SpanContext with a random
+	// SpanID as a phantom parent — the LangWatch UI then flagged every
+	// playground workflow root as "Parent not in trace" because that
+	// phantom was never emitted. (2026-05-15 regression.)
+	if !trace.SpanContextFromContext(ctx).IsValid() {
+		if tid, ok := parseTraceID(req.TraceID); ok {
+			ctx = otelsetup.WithTraceIDOverride(ctx, tid)
+		}
 	}
+	spanName, spanType := studioSpanNameAndType(req.Type, req.WorkflowName)
 	tracer := otelapi.Tracer(tracerName)
-	ctx, span := tracer.Start(ctx, name,
+	attrs := studioRequestAttrs(req)
+	attrs = append(attrs, attribute.String("langwatch.span.type", spanType))
+	//nolint:spancheck // caller (executeSyncHandler) defers span.End() on the returned span.
+	ctx, span := tracer.Start(ctx, spanName,
 		trace.WithSpanKind(trace.SpanKindServer),
-		trace.WithAttributes(studioRequestAttrs(req)...),
+		trace.WithAttributes(attrs...),
 	)
-	return ctx, span
+	return ctx, span //nolint:spancheck // caller (executeSyncHandler) defers span.End() on the returned span.
 }
 
 func studioRequestAttrs(req *app.WorkflowRequest) []attribute.KeyValue {
@@ -105,13 +172,4 @@ func parseTraceID(s string) (trace.TraceID, bool) {
 		return trace.TraceID{}, false
 	}
 	return tid, true
-}
-
-// newSpanID returns a random 8-byte span id. crypto/rand because
-// span_id collisions across concurrent runs would silently corrupt
-// the trace tree.
-func newSpanID() trace.SpanID {
-	var sid trace.SpanID
-	_, _ = rand.Read(sid[:])
-	return sid
 }

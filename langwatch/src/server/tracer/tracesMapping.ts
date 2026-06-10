@@ -2,13 +2,13 @@ import type { Annotation, AnnotationScore, User } from "@prisma/client";
 import { z } from "zod";
 import { getSpanNameOrModel } from "../../utils/trace";
 import { datasetSpanSchema } from "../datasets/types";
-import type {
-  Trace as BaseTrace,
-  DatasetSpan,
-  Evaluation,
-  Span,
+import {
+  reservedTraceMetadataSchema,
+  type Trace as BaseTrace,
+  type DatasetSpan,
+  type Evaluation,
+  type Span,
 } from "./types";
-import { reservedTraceMetadataSchema } from "./types.generated";
 import { getRAGChunks, getRAGInfo } from "./utils";
 
 // Define a Trace type that includes annotations for use within this file
@@ -540,7 +540,7 @@ export const TRACE_EXPANSIONS = {
     },
   },
   "spans.all.span_id": {
-    label: "all spans",
+    label: "span",
     expansion: (trace: TraceWithAnnotations) => {
       const spans = trace.spans ?? [];
       return spans.map((span) => ({
@@ -697,6 +697,47 @@ export const mappingStateSchema = z.object({
 
 export type MappingState = z.infer<typeof mappingStateSchema>;
 
+// Coerces legacy `{}` and other partial-shape payloads into a valid MappingState
+// before persisting. Without this, monitors created via API with `mappings: {}`
+// end up missing the `.mapping` subkey, which crashes downstream evaluator code
+// at `Object.values(mappingState.mapping)` (see threadMappingResolver.ts). The
+// read-side guard there is defensive; this is the canonical write-side fix.
+//
+// Using z.preprocess (vs z.unknown().transform().pipe()) so hono-openapi can
+// infer the output type from the inner mappingStateSchema for the OpenAPI spec.
+export const monitorMappingsSchema = z.preprocess(
+  (value) => {
+    if (value === null || value === undefined) return value;
+    if (
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      "mapping" in (value as object)
+    ) {
+      return value;
+    }
+    return { mapping: {}, expansions: [] };
+  },
+  mappingStateSchema.nullable().optional(),
+);
+
+// Runtime equivalent of monitorMappingsSchema for callers that don't validate
+// through Zod (e.g. internal tRPC routes that consume already-typed input).
+// Coerces null/undefined/malformed shapes into a canonical empty MappingState
+// so the persist layer never writes the `{}` shape that triggers the
+// `Object.values(undefined)` crash in evaluator code paths.
+export const coerceMonitorMappings = (value: unknown): MappingState => {
+  if (
+    value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    "mapping" in (value as object)
+  ) {
+    const parsed = mappingStateSchema.safeParse(value);
+    if (parsed.success) return parsed.data;
+  }
+  return { mapping: {}, expansions: [] };
+};
+
 /**
  * Thread mapping type used in the wizard UI
  * Single Responsibility: Type definition for thread mapping configuration in the UI
@@ -842,10 +883,26 @@ type StringTypeToType = {
   array: any[];
 };
 
+// Returns the unwrapped .value if v is an OTel typed-object wrapper ({ type, value } with exactly
+// those two own keys and a string type). Returns undefined to signal "no unwrap needed" — this
+// lets null/0/false/etc. pass through correctly as unwrapped values.
+const unwrapTypedObject = (v: unknown): unknown => {
+  if (v === null || typeof v !== "object" || Array.isArray(v)) return undefined;
+  if (!("type" in v) || !("value" in v)) return undefined;
+  if (Object.keys(v as object).length !== 2) return undefined;
+  const obj = v as { type: unknown; value: unknown };
+  if (typeof obj.type !== "string") return undefined;
+  return obj.value;
+};
+
 export const tryAndConvertTo = <T extends keyof StringTypeToType>(
   value: any,
   type: T,
 ): StringTypeToType[T] | undefined => {
+  // Unwrap OTel typed-object wrappers first so downstream coercion sees the bare value.
+  // OTel SDK auto-wraps span IO as { type: <string>, value: <any> }; evaluators need bare values. (#3875)
+  const unwrapped = unwrapTypedObject(value);
+  if (unwrapped !== undefined) value = unwrapped;
   if (value === null || value === undefined) {
     return undefined;
   }

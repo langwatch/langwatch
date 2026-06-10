@@ -5,12 +5,12 @@ import { useDrawer } from "./useDrawer";
 /**
  * Convenience hook for opening the trace details drawer.
  *
- * EXTERNAL user restriction is enforced centrally in `CurrentDrawer` —
- * any `openDrawer("traceDetails", ...)` call (whether through this hook
- * or directly) is automatically intercepted for EXTERNAL users.
- *
- * This hook exists as a convenience wrapper for components that want a
- * purpose-specific function instead of the generic `openDrawer`.
+ * It is a thin wrapper around `openDrawer("traceDetails", …)`. Both
+ * cross-cutting concerns are enforced centrally, so every trace open — through
+ * this hook or a direct `openDrawer` call — behaves identically:
+ * - EXTERNAL-user restriction, in `CurrentDrawer`.
+ * - Traces v2 opt-in routing, in `openDrawer` (a trace open is sent to the new
+ *   explorer when this device opted in; see `routeTraceDrawerForV2`).
  */
 export function useTraceDetailsDrawer() {
   const { openDrawer } = useDrawer();

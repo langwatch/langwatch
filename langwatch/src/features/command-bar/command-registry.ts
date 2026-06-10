@@ -2,6 +2,7 @@ import {
   Activity,
   Anvil,
   Bell,
+  Bird,
   BookOpen,
   Bot,
   BookText,
@@ -38,6 +39,7 @@ import {
   FolderKanban,
   UserCog,
   Building2,
+  ToggleLeft,
 } from "lucide-react";
 import type { Command } from "./types";
 
@@ -72,6 +74,25 @@ export const navigationCommands: Command[] = [
     category: "navigation",
     keywords: ["messages", "logs", "requests", "history"],
     path: "/[project]/messages",
+  },
+  {
+    id: "nav-traces-v2",
+    label: "Trace Explorer",
+    description: "Open the new traces experience (beta)",
+    icon: Bird,
+    category: "navigation",
+    keywords: [
+      "traces",
+      "trace explorer",
+      "explorer",
+      "v2",
+      "evolved",
+      "new",
+      "beta",
+      "messages",
+      "logs",
+    ],
+    path: "/[project]/traces",
   },
   {
     id: "nav-simulations",
@@ -463,6 +484,23 @@ export const actionCommands: Command[] = [
     category: "actions",
     keywords: ["sdk", "version", "update", "outdated", "radar", "upgrade"],
   },
+  {
+    id: "action-feature-flags",
+    label: "Feature Flags (Dev)",
+    description: "Toggle feature flag overrides for this browser",
+    icon: ToggleLeft,
+    category: "actions",
+    keywords: [
+      "feature",
+      "flag",
+      "flags",
+      "toggle",
+      "dev",
+      "override",
+      "experiment",
+      "release",
+    ],
+  },
 ];
 
 /**
@@ -552,7 +590,7 @@ export const supportCommands: Command[] = [
 ];
 
 /**
- * Theme switching commands (only shown when dark mode feature flag is enabled).
+ * Theme switching commands.
  */
 export const themeCommands: Command[] = [
   {
@@ -588,6 +626,7 @@ const topLevelNavIds = new Set([
   "nav-home",
   "nav-analytics",
   "nav-traces",
+  "nav-traces-v2",
   "nav-simulations",
   "nav-evaluations",
   "nav-annotations",
