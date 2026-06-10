@@ -6,7 +6,6 @@ import {
   Outlet,
   type RouteObject,
   redirect,
-  type RouteObject,
   useLocation,
   useNavigation,
 } from "react-router";
