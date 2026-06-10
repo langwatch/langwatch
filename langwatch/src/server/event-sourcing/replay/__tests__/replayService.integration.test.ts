@@ -352,6 +352,47 @@ describe("ReplayService tenant-specific ClickHouse", () => {
       expect(completedLeft).toBe(0);
     });
 
+    it("waits for an active custom-key map job to drain before writing", async () => {
+      const redis = getTestRedisConnection()!;
+      const projectionName = `mapReplayDrain_${Date.now()}`;
+
+      // Live map jobs are grouped by the projection's custom groupKeyFn (e.g.
+      // `span:${event.id}`), not by `${aggregateType}:${aggregateId}` — the
+      // drain must detect those keys by prefix, not by reconstruction.
+      const activeCustomKeyGroup = `{event-sourcing/jobs}:gq:group:${tenantA}/map/${projectionName}/span:evt-live-1:active`;
+      await redis.set(activeCustomKeyGroup, "1");
+
+      let bulkAppendCalledWhileJobActive = false;
+      let jobStillActive = true;
+      const bulkAppend = vi.fn(async (_records: any[], _ctx: any) => {
+        if (jobStillActive) bulkAppendCalledWhileJobActive = true;
+      });
+
+      const projection = createMapProjection({ name: projectionName, bulkAppend });
+      const service = createServiceWithResolver();
+
+      const replayPromise = service.replay({
+        projections: [],
+        mapProjections: [projection],
+        tenantIds: [tenantA],
+        since: "2023-11-01",
+      });
+
+      // Give the replay time to reach (and sit in) the drain poll loop.
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      expect(bulkAppend).not.toHaveBeenCalled();
+
+      // Simulate the in-flight handler finishing.
+      jobStillActive = false;
+      await redis.del(activeCustomKeyGroup);
+
+      const result = await replayPromise;
+      expect(result.batchErrors).toBe(0);
+      expect(result.aggregatesReplayed).toBe(2);
+      expect(bulkAppend).toHaveBeenCalled();
+      expect(bulkAppendCalledWhileJobActive).toBe(false);
+    });
+
     it("runs both fold and map projections in the same replay, isolating pause-set entries", async () => {
       const redis = getTestRedisConnection()!;
       const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;

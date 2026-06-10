@@ -9,11 +9,55 @@ import type { ProjectionKind } from "./types";
 const GQ_KEY_PREFIX = "{event-sourcing/jobs}:gq:";
 
 /**
- * groupId path segment used by `QueueManager` when building groupKeys.
- * Folds use `fold/{name}`, maps use `map/{name}`.
+ * Fold groupIds are always `${tenantId}/fold/${name}/${aggregateType}:${aggregateId}`,
+ * so they can be reconstructed exactly from the discovered aggregates.
  */
-function groupSegment(kind: ProjectionKind): string {
-  return kind === "fold" ? "fold" : "map";
+function foldGroupActiveKey({
+  tenantId,
+  projectionName,
+  aggregateType,
+  aggregateId,
+}: {
+  tenantId: string;
+  projectionName: string;
+  aggregateType: string;
+  aggregateId: string;
+}): string {
+  const groupId = `${tenantId}/fold/${projectionName}/${aggregateType}:${aggregateId}`;
+  return `${GQ_KEY_PREFIX}group:${groupId}:active`;
+}
+
+/**
+ * Map groupIds end in the projection's `groupKeyFn(event)` output (e.g.
+ * `span:${event.id}`), which cannot be reconstructed from discovered
+ * aggregates. Drain maps by scanning for ANY active group under the
+ * `${tenantId}/map/${projectionName}/` prefix instead.
+ */
+async function hasActiveMapGroups({
+  redis,
+  tenantIds,
+  projectionName,
+}: {
+  redis: IORedis;
+  tenantIds: Iterable<string>;
+  projectionName: string;
+}): Promise<boolean> {
+  for (const tenantId of tenantIds) {
+    const pattern = `${GQ_KEY_PREFIX}group:${tenantId}/map/${projectionName}/*:active`;
+    let cursor = "0";
+    do {
+      const [nextCursor, keys] = await redis.scan(
+        cursor,
+        "MATCH",
+        pattern,
+        "COUNT",
+        500,
+      );
+      if (keys.length > 0) return true;
+      cursor = nextCursor;
+    } while (cursor !== "0");
+  }
+  return false;
 }
 
 /**
@@ -68,23 +112,34 @@ export async function waitForActiveJobs({
 }): Promise<void> {
   if (aggregates.length === 0) return;
 
-  const segment = groupSegment(kind);
+  const tenantIds = new Set(aggregates.map((agg) => agg.tenantId));
   const start = Date.now();
 
   while (Date.now() - start < maxWaitMs) {
-    const pipeline = redis.pipeline();
-    for (const agg of aggregates) {
-      const groupId = `${agg.tenantId}/${segment}/${projectionName}/${agg.aggregateType}:${agg.aggregateId}`;
-      pipeline.get(`${GQ_KEY_PREFIX}group:${groupId}:active`);
-    }
-    const results = await pipeline.exec();
-    if (!results) {
-      throw new Error(
-        `Failed to inspect active jobs while draining projection ${projectionName}`,
-      );
-    }
+    let allDrained: boolean;
+    if (kind === "map") {
+      allDrained = !(await hasActiveMapGroups({ redis, tenantIds, projectionName }));
+    } else {
+      const pipeline = redis.pipeline();
+      for (const agg of aggregates) {
+        pipeline.get(
+          foldGroupActiveKey({
+            tenantId: agg.tenantId,
+            projectionName,
+            aggregateType: agg.aggregateType,
+            aggregateId: agg.aggregateId,
+          }),
+        );
+      }
+      const results = await pipeline.exec();
+      if (!results) {
+        throw new Error(
+          `Failed to inspect active jobs while draining projection ${projectionName}`,
+        );
+      }
 
-    const allDrained = results.every(([_err, val]) => val === null);
+      allDrained = results.every(([_err, val]) => val === null);
+    }
     if (allDrained) return;
 
     await sleep(200);
@@ -112,35 +167,61 @@ export async function waitForAllActiveJobs({
 }): Promise<void> {
   if (aggregates.length === 0 || projections.length === 0) return;
 
+  const foldProjections = projections.filter((p) => p.kind === "fold");
+  const mapProjections = projections.filter((p) => p.kind === "map");
+  const tenantIds = new Set(aggregates.map((agg) => agg.tenantId));
   const start = Date.now();
 
   while (Date.now() - start < maxWaitMs) {
-    const pipeline = redis.pipeline();
-    for (const agg of aggregates) {
-      for (const proj of projections) {
-        const segment = groupSegment(proj.kind);
-        const groupId = `${agg.tenantId}/${segment}/${proj.projectionName}/${agg.aggregateType}:${agg.aggregateId}`;
-        pipeline.get(`${GQ_KEY_PREFIX}group:${groupId}:active`);
+    let foldsDrained = true;
+    if (foldProjections.length > 0) {
+      const pipeline = redis.pipeline();
+      for (const agg of aggregates) {
+        for (const proj of foldProjections) {
+          pipeline.get(
+            foldGroupActiveKey({
+              tenantId: agg.tenantId,
+              projectionName: proj.projectionName,
+              aggregateType: agg.aggregateType,
+              aggregateId: agg.aggregateId,
+            }),
+          );
+        }
+      }
+      const results = await pipeline.exec();
+      if (!results) {
+        const names = projections.map((p) => p.projectionName).join(", ");
+        throw new Error(
+          `Failed to inspect active jobs while draining projections [${names}]`,
+        );
+      }
+
+      const commandErrors = results.filter(([err]) => err != null);
+      if (commandErrors.length > 0) {
+        const names = projections.map((p) => p.projectionName).join(", ");
+        throw new Error(
+          `Failed to inspect active jobs while draining projections [${names}]: ${commandErrors[0]![0]!.message}`,
+        );
+      }
+
+      foldsDrained = results.every(([, val]) => val === null);
+    }
+
+    let mapsDrained = true;
+    for (const proj of mapProjections) {
+      if (
+        await hasActiveMapGroups({
+          redis,
+          tenantIds,
+          projectionName: proj.projectionName,
+        })
+      ) {
+        mapsDrained = false;
+        break;
       }
     }
-    const results = await pipeline.exec();
-    if (!results) {
-      const names = projections.map((p) => p.projectionName).join(", ");
-      throw new Error(
-        `Failed to inspect active jobs while draining projections [${names}]`,
-      );
-    }
 
-    const commandErrors = results.filter(([err]) => err != null);
-    if (commandErrors.length > 0) {
-      const names = projections.map((p) => p.projectionName).join(", ");
-      throw new Error(
-        `Failed to inspect active jobs while draining projections [${names}]: ${commandErrors[0]![0]!.message}`,
-      );
-    }
-
-    const allDrained = results.every(([, val]) => val === null);
-    if (allDrained) return;
+    if (foldsDrained && mapsDrained) return;
 
     await sleep(200);
   }
