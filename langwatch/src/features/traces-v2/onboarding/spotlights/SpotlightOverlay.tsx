@@ -202,6 +202,17 @@ export function SpotlightPopover({
   const hasNext = index < total - 1;
   const hasPrev = index > 0;
 
+  // Measure the rendered popover so the bottom clamp uses the real
+  // height — anchors near the bottom of the viewport (a low sidebar
+  // drilldown, a drawer accordion) were pushing the box off the page
+  // because only the top/left edges were clamped.
+  const boxRef = useRef<HTMLDivElement>(null);
+  const [measuredHeight, setMeasuredHeight] = useState(0);
+  useEffect(() => {
+    const h = boxRef.current?.offsetHeight ?? 0;
+    if (h > 0 && h !== measuredHeight) setMeasuredHeight(h);
+  });
+
   // Position calculation — place below the anchor by default; flip to
   // above when too close to the bottom of the viewport.
   const placement = spotlight.placement ?? "bottom";
@@ -227,14 +238,18 @@ export function SpotlightPopover({
     left = anchorRect.left - POPOVER_W - POPOVER_OFFSET;
   }
 
-  // Clamp to viewport
+  // Clamp to viewport — all four edges. The bottom clamp uses the
+  // measured height once available (first paint estimates 160px, then
+  // the effect above corrects within a frame).
   if (typeof window !== "undefined") {
+    const estimatedHeight = measuredHeight || 160;
     left = Math.max(8, Math.min(left, window.innerWidth - POPOVER_W - 8));
-    top = Math.max(8, top);
+    top = Math.max(8, Math.min(top, window.innerHeight - estimatedHeight - 8));
   }
 
   return (
     <Box
+      ref={boxRef}
       data-testid="spotlight-popover"
       position="fixed"
       top={`${top}px`}
