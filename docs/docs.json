@@ -685,6 +685,7 @@
           {
             "group": "Privacy",
             "pages": [
+              "ai-governance/data-privacy",
               "ai-governance/no-spy-mode"
             ]
           },

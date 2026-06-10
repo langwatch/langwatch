@@ -1,0 +1,266 @@
+---
+title: Data privacy policy
+description: One scoped, cascading policy that controls which trace content is stored, who can read it, and how PII and secrets are redacted, written once at the organization, department, team, or project level.
+sidebarTitle: Data Privacy
+---
+
+Traces carry the most sensitive material in your stack: user prompts,
+model responses, system instructions, tool arguments, and whatever
+credentials or personal data leaked into any of them. The **data
+privacy policy** is the single place to decide what happens to that
+content. One set of rules covers four concerns:
+
+1. **Content disposition**: whether each content category is stored
+   at all.
+2. **Audience visibility**: who can read the content that is stored.
+3. **PII redaction**: scrubbing personal data out of stored content.
+4. **Secrets redaction**: scrubbing credentials out of stored
+   content.
+
+Rules live under **Settings > Privacy** in your organization
+settings. A rule is written once at the scope it should govern, and
+every project underneath resolves it automatically.
+
+<Info>**Pairs with:** [No-spy mode](/ai-governance/no-spy-mode), the
+organization-wide posture built from this policy for enterprises that
+must not store employee conversational content, and
+[Compliance architecture](/ai-governance/compliance-architecture) for
+how privacy fits the broader audit story.</Info>
+
+## Content categories
+
+Four categories of trace content are governed independently:
+
+| Category | What it covers |
+|---|---|
+| **Input** | User prompts and request bodies |
+| **Output** | Model responses and completions |
+| **System instructions** | System prompts and instruction blocks |
+| **Tool calls** | Tool-call arguments and tool results |
+
+Each category is set to one of three dispositions: **Capture**,
+**Restrict**, or **Drop**.
+
+## The three dispositions
+
+| Disposition | Stored? | Who can read it |
+|---|---|---|
+| **Capture** (default) | Yes | The whole team |
+| **Restrict** | Yes | Only the audience chosen on the rule |
+| **Drop** | Never | No one, the content is stripped at ingestion |
+
+### Restrict or drop?
+
+**Restrict** keeps the data. Debugging stays possible for the chosen
+audience, the audience can be widened or narrowed at any time, and
+because the check runs at read time, an audience change applies
+immediately to every trace, including traces stored before the rule
+existed.
+
+**Drop** is the hard guarantee. The content is stripped in the
+ingestion pipeline and never written, so no later permission change,
+export, or breach can surface it. The cost is that nobody can debug
+with it, and it cannot be undone for data that already arrived
+dropped.
+
+Choose Restrict when the question is *who may read this*. Choose Drop
+when the requirement is *this must not exist in storage*.
+
+### Drop covers every ingestion path
+
+A drop rule applies wherever the trace comes from:
+
+- the OpenTelemetry endpoint
+- the REST collector
+- AI gateway traffic
+- ingestion keys
+- coding-agent logs (for example Claude Code request bodies)
+
+### Observability metadata always survives
+
+Whatever is dropped or restricted, the trace skeleton stays useful:
+token counts, cost, model name, latency and timings, span structure,
+and status are always stored and always visible. You can answer "what
+did this run cost?" and "where did it fail?" without anyone reading
+the conversation.
+
+### Retroactivity
+
+| Setting | Acts at | Applies to |
+|---|---|---|
+| Drop | Ingestion | New traces only |
+| PII redaction | Ingestion | New traces only |
+| Secrets redaction | Ingestion | New traces only |
+| Restrict audience | Read time | All traces, existing ones included, immediately |
+
+Adding a drop rule does not scrub traces that are already stored. To
+age out content that landed before the rule existed, pair the rule
+with your retention setup (see
+[Compliance architecture](/ai-governance/compliance-architecture)).
+
+## Scopes and the cascade
+
+A rule is written at one of four scopes:
+
+| Scope | Governs |
+|---|---|
+| **Organization** | Every project in the organization |
+| **Department** | Every project assigned to that department |
+| **Team** | Every project under that team |
+| **Project** | That project only |
+
+Organization and Department rules can be narrowed to **personal
+projects only**: every user's personal CLI workspace, where
+coding-agent traffic lands. A personal project's department follows
+its owner, so a department rule narrowed this way covers the personal
+workspaces of that department's people.
+
+When a project resolves its policy, the cascade walks **Project, then
+Department, then Team, then Organization**, and for each setting the
+most specific tier that sets it wins. A department rule beats a team
+rule: the people lens wins over the structural one. Settings a rule
+leaves unset inherit from the next tier up, so a project can drop its
+input while inheriting the organization's PII level. Two fields
+accumulate across tiers instead of overriding: **custom drop keys**
+and **custom secret patterns** are unioned, so every tier's additions
+apply.
+
+### Worked example
+
+Acme writes two rules:
+
+1. An **Organization** rule narrowed to personal projects only:
+   **Input is dropped**. Prompts from every employee's personal
+   coding-agent workspace are never stored.
+2. A **Department** rule on the HR department: **Output is
+   restricted** to the organization's `HR` group. HR's assistants
+   handle sensitive employee conversations, so only HR staff may read
+   them.
+
+How three projects resolve:
+
+| Project | Input | Output | Why |
+|---|---|---|---|
+| `billing-api`, a team project | Captured | Captured | The organization rule is narrowed to personal projects, so neither rule applies; platform defaults. |
+| `hr-helpdesk`, assigned to the HR department | Captured | Restricted to the `HR` group | The department rule sets output; nothing sets input. |
+| Dana's personal workspace (Dana is in HR) | Dropped | Restricted to the `HR` group | The organization rule drops personal-project input, and a personal project follows its owner's department, so HR's output rule applies too. |
+
+All three projects also resolve **Essential** PII redaction and
+secrets redaction **on**: no rule sets those fields, so the platform
+defaults apply. If `hr-helpdesk` later adds a Project rule setting
+output back to Capture, that wins, because Project is the most
+specific tier.
+
+## Audiences
+
+A restricted category is readable by the audience picked on the rule:
+
+- **Admins**, the built-in administrator audience
+- **All members**, everyone with access to the project
+- any of the organization's **groups**
+- any of the organization's **departments**
+
+An empty audience means **no one** can read the content, admins
+included.
+
+Viewers outside the audience see a `[REDACTED]` placeholder in place
+of the content, together with the reason: which privacy policy hid it
+and which audience can see it. Metadata (cost, tokens, latency,
+status) stays visible to everyone with project access.
+
+## Secrets redaction
+
+Secrets redaction is **on by default for every project**.
+Coding-agent traces are full of live credentials, so the safe default
+is to scrub them. It runs natively in the ingestion pipeline and
+replaces each detected secret with a redaction placeholder, leaving
+the surrounding text intact.
+
+The built-in catalog covers:
+
+- cloud and provider API keys: AWS, GitHub, OpenAI, Anthropic, Slack,
+  Google, Stripe
+- JWTs
+- private key blocks
+- database connection-string passwords
+- bearer tokens
+- values under obviously-sensitive attribute names (for example
+  `authorization`)
+
+### Custom patterns
+
+Add your own regular expressions for company-specific secrets, for
+example tokens shaped like `acme_live_...`. Patterns are validated
+when the rule is saved: a pattern that risks catastrophic
+backtracking is rejected. Custom patterns accumulate down the
+cascade, so a team's patterns apply on top of the organization's.
+
+### Turning it off
+
+A rule can disable secrets redaction for its scope.
+
+<Warning>With secrets redaction off, any credential pasted into a
+prompt or returned by a tool is stored in the clear. Turn it off only
+when you are certain no real credentials transit the projects in
+scope.</Warning>
+
+## PII redaction
+
+| Level | What it redacts | How it runs |
+|---|---|---|
+| **Disabled** | Nothing | No scanning at all |
+| **Essential** (default) | Emails, phone numbers, credit cards, IP addresses, IBANs, national IDs | Natively in the ingestion pipeline, fast, no external call |
+| **Strict** | Everything in Essential, plus person names and locations | Uses the deeper analysis service |
+
+Like secrets, detected PII is replaced with a redaction placeholder.
+
+<Note>Credit card numbers are validated before redaction, so a random
+16-digit order id in your traces is left intact.</Note>
+
+## Custom drop keys
+
+A rule can list extra span attribute keys to strip at ingestion, on
+top of the built-in catalog, for example `http.request.body`. Like
+custom secret patterns, drop keys accumulate across tiers: keys added
+at the organization, department, team, and project levels all apply.
+
+## Defaults
+
+With no rule anywhere in the cascade, a project resolves to:
+
+| Setting | Default |
+|---|---|
+| Input | Captured, visible to the whole team |
+| Output | Captured, visible to the whole team |
+| System instructions | Captured, visible to the whole team |
+| Tool calls | Captured, visible to the whole team |
+| PII redaction | Essential |
+| Secrets redaction | On |
+| Custom drop keys | None |
+| Custom secret patterns | None |
+
+Privacy is default-on where it matters most: secrets and essential
+PII are scrubbed before you write a single rule.
+
+## Permissions
+
+Rules are managed under **Settings > Privacy**. Writing a rule
+requires the permission matching its scope:
+
+| Rule scope | Required permission |
+|---|---|
+| Organization | Organization manage |
+| Department | Organization manage |
+| Team | Team manage |
+| Project | Project update |
+
+## Where to next
+
+- [No-spy mode](/ai-governance/no-spy-mode): the organization-wide
+  drop posture for employee coding assistants, built from this
+  policy.
+- [Compliance architecture](/ai-governance/compliance-architecture):
+  retention classes, OCSF export, and the audit substrate around the
+  trace store.
+- [Roles and permissions](/ai-governance/roles-and-permissions): how
+  the manage and update permissions are granted.
