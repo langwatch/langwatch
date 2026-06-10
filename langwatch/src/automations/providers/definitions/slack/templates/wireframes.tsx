@@ -72,6 +72,18 @@ export function DigestCompactWireframe() {
   );
 }
 
+export function TraceAlertOneLinerWireframe() {
+  return <WireStack rows={["section"]} />;
+}
+
+export function DigestEvaluatorRollupWireframe() {
+  return (
+    <WireStack
+      rows={["header", "context", "divider", "bullet", "bullet", "context"]}
+    />
+  );
+}
+
 export function DigestInlineRichWireframe() {
   return (
     <WireStack

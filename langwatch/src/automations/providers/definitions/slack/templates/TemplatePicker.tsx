@@ -42,7 +42,11 @@ export function SlackBlockKitTemplatePicker({
           ? "Your cadence bundles every trace matched in the window into one digest message. Pick a starting layout — the thumbnail shows structure, not the final look."
           : "Each matching trace sends its own message. Pick a starting layout — the thumbnail shows structure, not the final look."}
       </Text>
-      <SimpleGrid columns={{ base: 2, md: options.length }} gap={3}>
+      <SimpleGrid
+        columns={{ base: 2, md: Math.min(options.length, 3) }}
+        gap={3}
+        alignItems="stretch"
+      >
         {options.map((option) => {
           const isSelected = option.source === currentSource;
           const isDefault = option.id === defaultId;
@@ -79,9 +83,10 @@ function Card({
       onClick={onClick}
       aria-pressed={isSelected}
       aria-label={`Use ${option.displayName} template`}
-      style={{ textAlign: "left", width: "100%" }}
+      style={{ textAlign: "left", width: "100%", height: "100%" }}
     >
       <Box
+        height="full"
         borderWidth={isSelected ? "2px" : "1px"}
         borderColor={isSelected ? "border.emphasized" : "border"}
         borderRadius="md"
@@ -90,7 +95,7 @@ function Card({
         transition="border-color 120ms ease"
         _hover={{ borderColor: "border.emphasized" }}
       >
-        <Stack gap={2} align="stretch">
+        <Stack gap={2} align="stretch" height="full">
           <HStack gap={2}>
             <Text textStyle="md">{option.emoji}</Text>
             <Text textStyle="sm" fontWeight="medium">
@@ -103,25 +108,20 @@ function Card({
             ) : null}
           </HStack>
           <Box
-            position="relative"
             borderWidth="1px"
             borderColor="border.muted"
             borderRadius="sm"
             padding={2}
             bg="bg.subtle"
-            minHeight="120px"
+            height="120px"
+            overflow="hidden"
+            flexShrink={0}
           >
             <Wireframe />
-            <Badge
-              size="xs"
-              variant="surface"
-              position="absolute"
-              top={1.5}
-              right={1.5}
-            >
-              {option.deliveryNote}
-            </Badge>
           </Box>
+          <Badge size="xs" variant="surface" alignSelf="start">
+            {option.deliveryNote}
+          </Badge>
           <Text textStyle="xs" color="fg.muted" lineClamp={2}>
             {option.tagline}
           </Text>

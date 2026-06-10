@@ -1,21 +1,27 @@
 import type { ComponentType } from "react";
 
 import traceAlertCompactSource from "./trace_alert_compact.liquid?raw";
+import traceAlertOneLinerSource from "./trace_alert_one_liner.liquid?raw";
 import evalFailureDetailedSource from "./eval_failure_detailed.liquid?raw";
 import digestCompactSource from "./digest_compact.liquid?raw";
+import digestEvaluatorRollupSource from "./digest_evaluator_rollup.liquid?raw";
 import digestInlineRichSource from "./digest_inline_rich.liquid?raw";
 
 import {
   DigestCompactWireframe,
+  DigestEvaluatorRollupWireframe,
   DigestInlineRichWireframe,
   EvalFailureDetailedWireframe,
   TraceAlertCompactWireframe,
+  TraceAlertOneLinerWireframe,
 } from "./wireframes";
 
 export type SlackBlockKitTemplateId =
   | "trace_alert_compact"
+  | "trace_alert_one_liner"
   | "eval_failure_detailed"
   | "digest_compact"
+  | "digest_evaluator_rollup"
   | "digest_inline_rich";
 
 export type SlackBlockKitTemplateCadenceFit = "immediate" | "digest" | "both";
@@ -46,6 +52,17 @@ export const SLACK_BLOCK_KIT_TEMPLATES: SlackBlockKitTemplateOption[] = [
     Wireframe: TraceAlertCompactWireframe,
   },
   {
+    id: "trace_alert_one_liner",
+    displayName: "One-liner",
+    emoji: "💬",
+    tagline:
+      "A single line: automation name, score, input snippet, link. Minimal noise.",
+    deliveryNote: "1 message per trace",
+    cadenceFit: "immediate",
+    source: traceAlertOneLinerSource,
+    Wireframe: TraceAlertOneLinerWireframe,
+  },
+  {
     id: "eval_failure_detailed",
     displayName: "Eval failure detail",
     emoji: "🛑",
@@ -67,6 +84,17 @@ export const SLACK_BLOCK_KIT_TEMPLATES: SlackBlockKitTemplateOption[] = [
     cadenceFit: "digest",
     source: digestCompactSource,
     Wireframe: DigestCompactWireframe,
+  },
+  {
+    id: "digest_evaluator_rollup",
+    displayName: "Digest — evaluator rollup",
+    emoji: "📈",
+    tagline:
+      "Match counts per evaluator, no trace content. The quietest digest.",
+    deliveryNote: "all matches, 1 message",
+    cadenceFit: "digest",
+    source: digestEvaluatorRollupSource,
+    Wireframe: DigestEvaluatorRollupWireframe,
   },
   {
     id: "digest_inline_rich",
