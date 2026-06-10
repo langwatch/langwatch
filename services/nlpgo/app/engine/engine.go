@@ -232,7 +232,7 @@ func (e *Engine) runLayer(ctx context.Context, req ExecuteRequest, plan *planner
 			defer wg.Done()
 			node := state.nodes[nodeID]
 			// Branch gating: nodes behind a not-taken if/else branch are
-			// never dispatched — no cost, no latency, status "skipped".
+			// never dispatched - no cost, no latency, status "skipped".
 			if state.shouldSkip(nodeID) {
 				state.recordState(nodeID, &NodeState{
 					ID:     nodeID,
@@ -1117,7 +1117,7 @@ func (r *runState) shouldSkip(id string) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	// Single-node execution (Studio "run with manual input") bypasses
-	// edge resolution entirely — never gate it.
+	// edge resolution entirely - never gate it.
 	if id == r.manualInputsTarget && r.manualInputs != nil {
 		return false
 	}

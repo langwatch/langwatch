@@ -693,7 +693,7 @@ describe("PromptTextAreaWithVariables", () => {
       // jsdom reports offsetHeight 0, so the 28px floor applies.
       expect(textarea.style.paddingBottom).toBe("28px");
 
-      // Focusing rewrites the padding shorthand for the thicker border —
+      // Focusing rewrites the padding shorthand for the thicker border -
       // the banner reservation must survive it (this was the bug: the
       // last line was only covered while actually typing).
       fireEvent.focus(textarea);

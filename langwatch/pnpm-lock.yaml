@@ -50,18 +50,6 @@ importers:
 
   .:
     dependencies:
-      '@ag-grid-community/client-side-row-model':
-        specifier: ^32.3.9
-        version: 32.3.9
-      '@ag-grid-community/core':
-        specifier: ^32.3.9
-        version: 32.3.9
-      '@ag-grid-community/react':
-        specifier: ^32.3.9
-        version: 32.3.9(@ag-grid-community/core@32.3.9)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
-      '@ag-grid-community/styles':
-        specifier: ^32.3.9
-        version: 32.3.9
       '@ag-ui/core':
         specifier: ~0.0.53
         version: 0.0.53
@@ -927,22 +915,6 @@ packages:
 
   '@adobe/css-tools@4.4.4':
     resolution: {integrity: sha512-Elp+iwUx5rN5+Y8xLt5/GRoG20WGoDCQ/1Fb+1LiGtvwbDavuSk0jhD/eZdckHAuzcDzccnkv+rEjyWfRx18gg==}
-
-  '@ag-grid-community/client-side-row-model@32.3.9':
-    resolution: {integrity: sha512-/x6gPhxn6c/QQSmDuNf81xrBNc3TKGymmokznvXPPf4tAXeLZn5kF0cW3sGa52XyqZcIsYFQvLkI+pCsX+I4ng==}
-
-  '@ag-grid-community/core@32.3.9':
-    resolution: {integrity: sha512-oZeAEPgaJVMzfKqbAPCyadcN5+iy+tjvhRLqEYJdBxtLgW/s2s0qXcXQvnrz7eUMD3Z7h3BQRVt2h/p0T6Ox/w==}
-
-  '@ag-grid-community/react@32.3.9':
-    resolution: {integrity: sha512-W21ELmhbniJQ2LMCytv5lwxz3FHpZp1iMp0Kvm9TXXxhldgDwMqVQa1uePeNBa068KIfXwnst0D2TGD8r0N/iA==}
-    peerDependencies:
-      '@ag-grid-community/core': 32.3.9
-      react: ^19.2.5
-      react-dom: ^19.2.5
-
-  '@ag-grid-community/styles@32.3.9':
-    resolution: {integrity: sha512-uPNR5EXeQqAIC0gohmY7CJ97cTIA/JtNSqAUzJ8AdVZcz4dbk9JJIl9DRFUYL+qWhMY+fUSTw2a+Yi6aOGSs8A==}
 
   '@ag-ui/client@0.0.47':
     resolution: {integrity: sha512-zciVwYV6gmYzdMyWwSDR/VBcOj5x1lHPG/ZGDKyxDHbCeIdGp7sKoGORKHAiPAsfUhReGLKXsR/4IknqwY2PgQ==}
@@ -6313,9 +6285,6 @@ packages:
     resolution: {integrity: sha512-UVJyE9MttOsBQIDKw1skb9nAwQuR5wuGD3+82K6JgJlm/Y+KI92oNsMNGZCYdDsVtRHSak0pcV5Dno5+4jh9sw==}
     engines: {node: '>=0.4.0'}
     hasBin: true
-
-  ag-charts-types@10.3.9:
-    resolution: {integrity: sha512-drcRiJVencliC8LnRwk4MmeQDNNBg5GzmOoLFihO3/k0CUK0VF/N+2nc7iFozwaNG0btSB9vAhYuJLjqHMtRrQ==}
 
   agent-base@6.0.2:
     resolution: {integrity: sha512-RZNwNclF7+MS/8bDg70amg32dyeZGZxiDuQmZxKLAlQjr3jGyLx+4Kkk58UO7D2QdgFIQCovuSuZESne6RG6XQ==}
@@ -11851,25 +11820,6 @@ snapshots:
   '@acemir/cssom@0.9.31': {}
 
   '@adobe/css-tools@4.4.4': {}
-
-  '@ag-grid-community/client-side-row-model@32.3.9':
-    dependencies:
-      '@ag-grid-community/core': 32.3.9
-      tslib: 2.8.1
-
-  '@ag-grid-community/core@32.3.9':
-    dependencies:
-      ag-charts-types: 10.3.9
-      tslib: 2.8.1
-
-  '@ag-grid-community/react@32.3.9(@ag-grid-community/core@32.3.9)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
-    dependencies:
-      '@ag-grid-community/core': 32.3.9
-      prop-types: 15.8.1
-      react: 19.2.5
-      react-dom: 19.2.5(react@19.2.5)
-
-  '@ag-grid-community/styles@32.3.9': {}
 
   '@ag-ui/client@0.0.47':
     dependencies:
@@ -18667,8 +18617,6 @@ snapshots:
       acorn: 8.16.0
 
   acorn@8.16.0: {}
-
-  ag-charts-types@10.3.9: {}
 
   agent-base@6.0.2:
     dependencies:

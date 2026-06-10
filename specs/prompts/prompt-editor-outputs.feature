@@ -4,7 +4,7 @@ Feature: Structured outputs section in the prompt editor
   So that I can find and shape structured outputs without hunting inside the model selector
 
   # Customer context: during a call the user could not find where to
-  # rename the output to "score" / add "reasoning" — the only path was
+  # rename the output to "score" / add "reasoning" - the only path was
   # clicking the model chip and toggling structured outputs inside the
   # popover. The code block already shows an Outputs section in its
   # panel; prompts must offer the same affordance. The model-selector

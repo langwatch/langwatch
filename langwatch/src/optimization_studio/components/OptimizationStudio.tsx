@@ -396,7 +396,7 @@ export default function OptimizationStudio() {
 
       <CurrentDrawer marginTop={56} />
       {/* The studio route doesn't use DashboardLayout, so the
-          limit-exceeded dialog needs its own mount here — without it,
+          limit-exceeded dialog needs its own mount here - without it,
           plan-limited saves fired from inside the studio fail silently
           (the dialog only shows after navigating back to a dashboard
           page). See specs/workflows/studio-usage-limits.feature. */}

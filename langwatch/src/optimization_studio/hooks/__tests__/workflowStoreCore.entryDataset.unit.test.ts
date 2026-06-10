@@ -42,7 +42,7 @@ const sampleDataset: Entry["dataset"] = {
   name: "test-data",
 };
 
-describe("workflowStoreCore — entry dataset attach", () => {
+describe("workflowStoreCore - entry dataset attach", () => {
   let store: StoreApi<WorkflowStore>;
 
   beforeEach(() => {
@@ -128,7 +128,7 @@ describe("workflowStoreCore — entry dataset attach", () => {
   });
 });
 
-describe("workflowStoreCore — legacy entry name normalization", () => {
+describe("workflowStoreCore - legacy entry name normalization", () => {
   let store: StoreApi<WorkflowStore>;
 
   beforeEach(() => {

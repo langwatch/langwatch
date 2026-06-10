@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  *
  * Evaluator End node: the results are a fixed four-field vocabulary
- * (passed, score, details, label) — normalized on open, read-only, with
+ * (passed, score, details, label) - normalized on open, read-only, with
  * a connect-score-or-passed nudge. Non-evaluator end nodes keep their
  * free-form results.
  */
@@ -37,7 +37,7 @@ vi.mock("~/optimization_studio/hooks/useWorkflowStore", async (
   };
 });
 
-// Capture the props the panel hands to the shell — the read-only
+// Capture the props the panel hands to the shell - the read-only
 // results contract is expressed through them.
 const basePanelProps: Array<Record<string, unknown>> = [];
 vi.mock("../BasePropertiesPanel", async (importOriginal) => {

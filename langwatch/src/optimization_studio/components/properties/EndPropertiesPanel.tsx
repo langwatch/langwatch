@@ -9,7 +9,7 @@ import { BasePropertiesPanel } from "./BasePropertiesPanel";
 /**
  * The full vocabulary an evaluator can return. When the workflow
  * behaves as an evaluator, the End node's results are exactly these
- * four — fixed identifiers and types, no add/remove/rename. Unused
+ * four - fixed identifiers and types, no add/remove/rename. Unused
  * fields simply stay unconnected.
  */
 export const EVALUATOR_RESULT_FIELDS: Field[] = [
@@ -33,7 +33,7 @@ export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
   // Pin the evaluator end node to the fixed result vocabulary. Existing
   // connections survive (identifiers passed/score keep their handles);
   // free-form fields users created by hand are replaced by the
-  // contract, which is the point — the four options should be obvious,
+  // contract, which is the point - the four options should be obvious,
   // not discovered by renaming "output" to "score" on a call.
   useEffect(() => {
     if (!isEvaluator) return;
@@ -71,7 +71,7 @@ export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
       {isEvaluator && (
         <Text fontSize="13px" color="fg.muted">
           Evaluators return up to these four results. Connect the ones
-          your workflow produces — unconnected results are simply
+          your workflow produces - unconnected results are simply
           omitted.
         </Text>
       )}

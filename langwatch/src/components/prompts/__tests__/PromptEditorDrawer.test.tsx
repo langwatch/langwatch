@@ -417,7 +417,7 @@ describe("PromptEditorDrawer", () => {
     it("shows the add-variable button in the variables section", () => {
       renderWithProviders(<PromptEditorDrawer open={true} />);
       // Hiding this button confused users into thinking variables were
-      // limited to the suggestions — adding must always be one click away.
+      // limited to the suggestions - adding must always be one click away.
       expect(screen.getByTestId("add-variable-button")).toBeInTheDocument();
     });
 
@@ -430,7 +430,7 @@ describe("PromptEditorDrawer", () => {
       await user.click(screen.getByRole("menuitem", { name: /Text/ }));
 
       // The default "input" variable is locked, so the new one lands as
-      // input_1 — visible as a variable row in the section.
+      // input_1 - visible as a variable row in the section.
       expect(await screen.findByText("input_1")).toBeInTheDocument();
     });
 
@@ -441,7 +441,7 @@ describe("PromptEditorDrawer", () => {
       const variablesTitle = screen.getByText("Variables");
       const outputsTitle = screen.getByText("Outputs");
       expect(outputsTitle).toBeInTheDocument();
-      // Outputs renders after Variables in document order — users shape
+      // Outputs renders after Variables in document order - users shape
       // the response right where they define the inputs, instead of
       // hunting inside the model-selector popover (which still edits
       // the same state).

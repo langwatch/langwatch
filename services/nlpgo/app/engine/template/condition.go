@@ -10,7 +10,7 @@ import (
 // Liquid boolean expression so EvaluateCondition can reject references
 // to inputs the node doesn't have. Liquid itself treats unknown
 // variables as nil, which silently flips comparisons like
-// `context != ""` to true — a footgun for a gating condition, so we
+// `context != ""` to true - a footgun for a gating condition, so we
 // fail loudly instead.
 var conditionIdentifierRE = regexp.MustCompile(`[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*`)
 

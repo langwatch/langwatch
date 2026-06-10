@@ -33,7 +33,7 @@ export class NoCommittedVersionError extends Error {
 }
 
 /**
- * Triggers studio workflow evaluations outside the studio session —
+ * Triggers studio workflow evaluations outside the studio session -
  * the REST surface CI pipelines call. Builds the same
  * `execute_evaluation` event the Evaluate button posts, over a
  * committed version's DSL, and lets the run report back through the
@@ -139,7 +139,7 @@ export class WorkflowEvaluationService {
  * becomes an entry field (if not already one) and a constant column on
  * the materialized dataset, so every evaluated row carries the value.
  * With no dataset attached, the parameters themselves form a single
- * synthetic row — evaluate-with-flags needs no placeholder dataset.
+ * synthetic row - evaluate-with-flags needs no placeholder dataset.
  */
 export function injectEntryParameters(
   workflow: WorkflowDSL,

@@ -179,7 +179,7 @@ const ifElse: BaseComponent = {
     },
   ],
   inputs: [{ identifier: "input", type: "str" }] as Field[],
-  // The branch handles are the contract the engine gates on — fixed
+  // The branch handles are the contract the engine gates on - fixed
   // identifiers, not user-editable (see IfElsePropertiesPanel).
   outputs: [
     { identifier: "true", type: "bool" },

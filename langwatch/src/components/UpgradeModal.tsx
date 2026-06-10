@@ -63,7 +63,7 @@ export function UpgradeModal({ open, onClose, variant }: UpgradeModalProps) {
  * Store-driven mount for the upgrade/limit dialog. Every full-screen
  * surface must render this once: limit-exceeded mutations open the
  * dialog through `useUpgradeModalStore`, and a surface without this
- * mount swallows the error into a silent no-op (the studio bug — the
+ * mount swallows the error into a silent no-op (the studio bug - the
  * dialog only "appeared" after navigating back to a dashboard page).
  */
 export function GlobalUpgradeModal() {

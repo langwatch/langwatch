@@ -254,7 +254,7 @@ Feature: Variable insertion menu
   # ============================================================================
 
   # Customer context: while typing "{{myvar" the create suggestion shows,
-  # but the moment the final brace lands the menu vanishes — exactly when
+  # but the moment the final brace lands the menu vanishes - exactly when
   # the user finishes typing the name they wanted to create. The create
   # affordance must survive brace completion for unknown variables.
 

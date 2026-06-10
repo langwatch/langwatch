@@ -8,7 +8,7 @@ Feature: Trigger workflow evaluations via the API with parameters
   # evaluated from the Evaluate button; CI pipelines that let users pick
   # a PR number / feature flag / variant had no way to launch them or to
   # feed those values in. Parameters bind as constant entry inputs for
-  # every dataset row — pairing with the entry point's user-defined
+  # every dataset row - pairing with the entry point's user-defined
   # inputs (see entry-point-node.feature).
 
   Background:

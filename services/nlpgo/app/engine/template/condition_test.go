@@ -71,7 +71,7 @@ func TestEvaluateCondition(t *testing.T) {
 
 	t.Run("undefined input errors instead of silently passing", func(t *testing.T) {
 		// Liquid would treat the unknown variable as nil and evaluate
-		// `nil != ""` to true — the gating condition must fail loudly.
+		// `nil != ""` to true - the gating condition must fail loudly.
 		_, err := EvaluateCondition(`tool_called == true`, map[string]any{"context": "x"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "tool_called")

@@ -122,7 +122,7 @@ export type WorkflowStore = State & {
    * columns into the node's fields instead of overwriting them.
    * User-defined inputs survive a dataset attach; columns already
    * present (by identifier) are not duplicated. The user can then
-   * remove dataset-derived fields they don't care about — the dataset
+   * remove dataset-derived fields they don't care about - the dataset
    * stays attached either way.
    */
   attachEntryDataset: (
@@ -468,7 +468,7 @@ export const store = (
       typeof workflow === "function" ? workflow(get().getWorkflow()) : workflow;
     // The entry node was historically named "Entry" and styled as a
     // dataset grid, which made dataset columns read as the workflow's
-    // inputs. It now presents as "Entry point" everywhere — normalize
+    // inputs. It now presents as "Entry point" everywhere - normalize
     // legacy names on load so canvas and drawer agree (persisted on the
     // next autosave).
     if ("nodes" in resolved && resolved.nodes) {

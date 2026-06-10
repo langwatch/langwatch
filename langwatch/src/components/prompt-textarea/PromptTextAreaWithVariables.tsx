@@ -160,7 +160,7 @@ export const PromptTextAreaWithVariables = ({
 
           // A typed-trigger menu follows the cursor: once the caret
           // leaves both the in-progress `{{…` and a just-completed
-          // `{{name}}`, the menu no longer applies — close it. The
+          // `{{name}}`, the menu no longer applies - close it. The
           // button-opened menu manages its own lifecycle.
           if (variableMenu.menuOpen && !variableMenu.buttonMenuMode) {
             const cursor = nativeTextarea.selectionStart;
@@ -237,7 +237,7 @@ export const PromptTextAreaWithVariables = ({
   );
 
   // The undefined-variables banner overlays the bottom edge of the
-  // textarea, so the textarea reserves matching bottom padding —
+  // textarea, so the textarea reserves matching bottom padding -
   // otherwise the banner hides the last line of the prompt. The banner
   // height is measured (it grows when many names wrap onto two lines);
   // 28px is the single-line floor, which also keeps jsdom (offsetHeight
@@ -348,7 +348,7 @@ export const PromptTextAreaWithVariables = ({
       }
 
       // Typing the final `}` completes the reference and would normally
-      // dismiss the menu — exactly when the user finished typing the
+      // dismiss the menu - exactly when the user finished typing the
       // name they want to create. Keep the menu open for a completed
       // {{name}} that doesn't resolve, so "Create variable" stays one
       // click away.
@@ -532,7 +532,7 @@ export const PromptTextAreaWithVariables = ({
               : "var(--chakra-colors-blue-500)";
             e.currentTarget.style.borderWidth = "2px";
             e.currentTarget.style.padding = "7px 9px";
-            // The padding shorthand above wipes the banner reservation —
+            // The padding shorthand above wipes the banner reservation -
             // re-apply it or focusing hides the last line again.
             if (reservedBottomPadding !== null) {
               e.currentTarget.style.paddingBottom = `${reservedBottomPadding}px`;

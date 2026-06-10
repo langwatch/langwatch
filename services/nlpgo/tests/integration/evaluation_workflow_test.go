@@ -234,14 +234,14 @@ func TestEvaluationWorkflow_PostsBatchResultsToLangWatch(t *testing.T) {
 	}
 }
 
-// TestEvaluationWorkflow_RowTraceIDsResolveToExportedSpans — the
+// TestEvaluationWorkflow_RowTraceIDsResolveToExportedSpans - the
 // "Trace not found" customer bug on evaluate runs: each result row
 // recorded a per-row ULID as trace_id, but no exported span ever
 // carried that id (ingestion does not re-home spans by the
 // langwatch.trace_id attribute), so every "view trace" link from the
 // results table 404'd. The engine now pins a real W3C trace id per row
 // through the context-aware ID generator and records that same id on
-// the row — these assertions tie the two ends together.
+// the row - these assertions tie the two ends together.
 /** @scenario Result rows from a workflow evaluate run link to a resolvable trace */
 func TestEvaluationWorkflow_RowTraceIDsResolveToExportedSpans(t *testing.T) {
 	rec := installProductionTracerStack(t)
@@ -299,7 +299,7 @@ func TestEvaluationWorkflow_RowTraceIDsResolveToExportedSpans(t *testing.T) {
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	readSSE(t, resp.Body, func(f streamFrame) bool { return f.Event == "done" })
 
-	// Collect the per-row trace ids the batch recorded — what the
+	// Collect the per-row trace ids the batch recorded - what the
 	// results table's "view trace" will look up.
 	mu.Lock()
 	rowTraceIDs := []string{}
@@ -309,7 +309,7 @@ func TestEvaluationWorkflow_RowTraceIDsResolveToExportedSpans(t *testing.T) {
 			continue
 		}
 		ds, _ := r.body["dataset"].([]any)
-		// Reset on every batch post — the FINAL batch carries all rows;
+		// Reset on every batch post - the FINAL batch carries all rows;
 		// progress posts are prefixes of it.
 		rowTraceIDs = rowTraceIDs[:0]
 		for _, raw := range ds {
@@ -329,7 +329,7 @@ func TestEvaluationWorkflow_RowTraceIDsResolveToExportedSpans(t *testing.T) {
 	for _, tid := range rowTraceIDs {
 		assert.Len(t, tid, 32, "row trace_id must be a W3C trace id, got %q", tid)
 		assert.True(t, exported[tid],
-			"row trace_id %q must match an exported span's trace id — otherwise the trace view 404s",
+			"row trace_id %q must match an exported span's trace id - otherwise the trace view 404s",
 			tid)
 	}
 	// Distinct rows → distinct traces (one trace per evaluated row).

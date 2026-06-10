@@ -8,7 +8,7 @@ import { ComponentNode, NodeSectionTitle } from "./Nodes";
 
 /**
  * The workflow's entry point. A dataset CAN be attached as the data
- * source for evaluations/optimizations, but it is not required — the
+ * source for evaluations/optimizations, but it is not required - the
  * node's fields are the workflow inputs, user-owned, and a dataset
  * attach only seeds them. Attached datasets render as a compact marker
  * (name + row count), not an embedded data grid; the data itself lives

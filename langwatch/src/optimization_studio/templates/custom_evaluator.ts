@@ -243,7 +243,7 @@ Return your judgment as either TRUE (no significant cognitive biases) or FALSE (
       data: {
         name: "End",
         behave_as: "evaluator",
-        // The fixed evaluator result vocabulary — see
+        // The fixed evaluator result vocabulary - see
         // EVALUATOR_RESULT_FIELDS in EndPropertiesPanel. Unconnected
         // fields are simply omitted from the evaluator's result.
         inputs: [

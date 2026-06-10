@@ -4,7 +4,7 @@ Feature: Entry point node with optional dataset and user-defined inputs
   So that dataset columns and workflow inputs stop being conflated
 
   # Customer context: people are constantly confused by the dataset node
-  # doubling as the entry point — the embedded data grid makes it look
+  # doubling as the entry point - the embedded data grid makes it look
   # like a dataset is mandatory and that its columns ARE the workflow
   # inputs. The redesign: the node is the Entry point (like the End node
   # is End); a dataset CAN be attached and shows as a small marker; the

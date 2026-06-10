@@ -64,7 +64,7 @@ vi.mock("@xyflow/react", () => ({
   useUpdateNodeInternals: () => vi.fn(),
 }));
 
-// The dataset picker/editor dialog is its own surface — not under test.
+// The dataset picker/editor dialog is its own surface - not under test.
 vi.mock("../../DatasetModal", () => ({
   DatasetModal: ({ open }: { open: boolean }) =>
     open ? <div data-testid="dataset-modal" /> : null,
@@ -75,7 +75,7 @@ vi.mock("../../../hooks/useGetDatasetData", () => ({
   useGetDatasetData: (args: unknown) => mockUseGetDatasetData(args),
 }));
 
-// Keep the shell light but the FieldsDefinition editor real — the
+// Keep the shell light but the FieldsDefinition editor real - the
 // editable inputs ARE the behavior under test.
 vi.mock("../BasePropertiesPanel", async (importOriginal) => {
   const actual =
@@ -207,7 +207,7 @@ describe("EntryPointPropertiesPanel", () => {
           (update!.data.outputs as Array<{ identifier: string }>)[0]!
             .identifier,
         ).toBe("query");
-        // setNode merges data shallowly — dataset is not part of the
+        // setNode merges data shallowly - dataset is not part of the
         // update, so the attachment survives.
         expect("dataset" in update!.data).toBe(false);
       });

@@ -49,7 +49,7 @@ export type ExecutionStatus =
   | "running"
   | "success"
   | "error"
-  // The node sat behind an if/else branch that was not taken — never
+  // The node sat behind an if/else branch that was not taken - never
   // dispatched, zero cost.
   | "skipped";
 

@@ -129,7 +129,7 @@ describe("Optimization Studio Registry", () => {
       expect(conditionParam).toBeDefined();
       expect(conditionParam?.type).toBe("str");
 
-      // The branch handles are the engine's gating contract — fixed
+      // The branch handles are the engine's gating contract - fixed
       // identifiers true/false of type bool.
       expect(ifElse.outputs).toEqual([
         { identifier: "true", type: "bool" },

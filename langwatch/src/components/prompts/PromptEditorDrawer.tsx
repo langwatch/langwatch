@@ -1173,7 +1173,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
           />
         </Box>
 
-        {/* Outputs — same form state the model selector's structured
+        {/* Outputs - same form state the model selector's structured
             outputs editor mutates, surfaced as a section so shaping the
             response (rename to score, add reasoning, …) doesn't require
             discovering the popover. Mirrors the code component's panel. */}

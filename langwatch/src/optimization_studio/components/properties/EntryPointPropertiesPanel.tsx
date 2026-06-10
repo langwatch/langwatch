@@ -31,7 +31,7 @@ import {
 /**
  * Drawer for the workflow's entry point.
  *
- * The fields here are the workflow's INPUTS — user-owned and editable.
+ * The fields here are the workflow's INPUTS - user-owned and editable.
  * A dataset is an optional attachment that seeds those inputs with its
  * columns (merge + dedup, see attachEntryDataset) and provides the rows
  * for evaluations/optimizations; it is rendered as a compact card, not
@@ -150,7 +150,7 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
       hideInputs
       hideParameters
     >
-      {/* The entry fields are the workflow inputs — fully editable.
+      {/* The entry fields are the workflow inputs - fully editable.
           DSL-wise they live on the node's `outputs` (they're emitted to
           downstream nodes), the user-facing language is "Inputs". */}
       <FieldsDefinition node={node} title="Inputs" field="outputs" />

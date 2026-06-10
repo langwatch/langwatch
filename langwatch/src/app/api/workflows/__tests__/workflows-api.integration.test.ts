@@ -6,7 +6,7 @@ import type { StudioClientEvent } from "~/optimization_studio/types/events";
 import { prisma } from "~/server/db";
 
 // The evaluate endpoint hands the prepared event to the studio backend
-// (nlpgo) — that boundary is mocked so these tests assert what the API
+// (nlpgo) - that boundary is mocked so these tests assert what the API
 // SENDS, not what the engine does with it. addEnvs is identity-mocked:
 // provider env injection has its own tests and needs real keys.
 const mockStudioBackendPostEvent = vi.fn().mockResolvedValue(undefined);

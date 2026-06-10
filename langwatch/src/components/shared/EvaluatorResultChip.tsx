@@ -232,7 +232,7 @@ export function EvaluatorResultChip({
   // When we have inputs, use controlled tooltip with interactive behavior.
   // closeOnScroll stays off on both variants: the details box scrolls
   // internally (long evaluator reasoning) and zag's default scroll
-  // listener would dismiss the popover on the first wheel tick — the
+  // listener would dismiss the popover on the first wheel tick - the
   // "it disappears when I scroll" customer bug. The positioner keeps
   // tracking the anchor while the results table scrolls.
   if (hasInputs) {

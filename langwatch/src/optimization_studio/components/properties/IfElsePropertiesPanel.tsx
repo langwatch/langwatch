@@ -11,7 +11,7 @@ import {
 
 /**
  * Drawer for the if/else gate. The condition is a Liquid boolean
- * expression — the same template language as prompts — evaluated over
+ * expression - the same template language as prompts - evaluated over
  * the node's inputs; the engine routes execution down the true or
  * false branch handle and skips the not-taken side. The branch outputs
  * are the engine's gating contract, so they render read-only.
