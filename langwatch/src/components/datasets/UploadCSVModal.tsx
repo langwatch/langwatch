@@ -28,7 +28,7 @@ import {
   AddOrEditDatasetDrawer,
 } from "../AddOrEditDatasetDrawer";
 import { toaster } from "../ui/toaster";
-import type { InMemoryDataset } from "./DatasetTable";
+import type { InMemoryDataset } from "~/components/datasets/editor/DatasetEditorTable";
 import { getSafeColumnName } from "./utils/reservedColumns";
 export const MAX_ROWS_LIMIT = 10_000;
 

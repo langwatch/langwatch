@@ -1,4 +1,4 @@
-// Inline to avoid circular dependency: DatasetTable → ag-grid CSS → crashes in Node
+
 const DEFAULT_DATASET_NAME = "Draft Dataset";
 import { DEFAULT_MODEL } from "../../utils/constants";
 import type { End, Entry, Signature, Workflow } from "../types/dsl";

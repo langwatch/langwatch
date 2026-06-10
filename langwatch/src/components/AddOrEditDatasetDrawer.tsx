@@ -29,7 +29,7 @@ import {
 import { api } from "../utils/api";
 import { isHandledByGlobalHandler } from "../utils/trpcError";
 import { DatasetSlugDisplay } from "./datasets/DatasetSlugDisplay";
-import type { InMemoryDataset } from "./datasets/DatasetTable";
+import type { InMemoryDataset } from "~/components/datasets/editor/DatasetEditorTable";
 import { useDatasetSlugValidation } from "./datasets/useDatasetSlugValidation";
 import { HorizontalFormControl } from "./HorizontalFormControl";
 
