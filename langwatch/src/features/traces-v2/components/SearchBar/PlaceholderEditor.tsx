@@ -90,6 +90,28 @@ function buildSegments(text: string): DecoratedSegment[] {
   return out;
 }
 
+/**
+ * Swap a chip's raw value for its display label within the segment's
+ * literal text. Anchored after the first ':' so the search only runs
+ * over the value portion (a value that's a substring of the field name
+ * — e.g. field `topics`, value `topic` — can't hit the wrong span).
+ * Uses the replacer-function form of `replace` so `$&`/`$'` sequences
+ * in tenant-controlled labels are inserted verbatim, not interpreted.
+ * Exported for unit testing.
+ */
+export function replaceChipValue(
+  segText: string,
+  value: string,
+  label: string,
+): string {
+  const colon = segText.indexOf(":");
+  if (colon === -1) return segText.replace(value, () => label);
+  return (
+    segText.slice(0, colon + 1) +
+    segText.slice(colon + 1).replace(value, () => label)
+  );
+}
+
 export interface TokenClickPayload {
   /** Bounding rect of the clicked chip — used to anchor a popover. */
   rect: DOMRect;
@@ -250,9 +272,13 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
               const richLabel = resolveLabel(tok.field, tok.value!);
               // Swap the id for its display name in the rendered chip
               // only — token coords, data-attrs, and the query text all
-              // keep the unique id.
+              // keep the unique id. The replace is anchored after the
+              // first ':' so a value that happens to be a substring of
+              // the field name can't be swapped in the wrong place, and
+              // the replacer-function form keeps `$&`-style patterns in
+              // tenant-controlled labels from being interpreted.
               const display = richLabel
-                ? seg.text.replace(tok.value!, richLabel)
+                ? replaceChipValue(seg.text, tok.value!, richLabel)
                 : seg.text;
               return (
                 <span

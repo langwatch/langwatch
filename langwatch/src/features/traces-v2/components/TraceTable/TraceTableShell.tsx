@@ -83,13 +83,32 @@ export function TraceTableShell<T>({
       activationConstraint: { distance: 5 },
     }),
   );
+  // After a drag, the browser fires a synthetic click on pointerup —
+  // dnd-kit's PointerSensor doesn't suppress it. Because the drag zone
+  // lives inside the sort <Button onClick>, finishing a reorder would
+  // also toggle the column's sort. Flip this ref on drag start and
+  // clear it on the NEXT tick after drag end/cancel (the synthetic
+  // click fires synchronously before timers run), so the button's
+  // onClick can swallow exactly that one click. Plain clicks never
+  // start a drag, so the ref stays false and sorting works as normal.
+  const suppressSortClickRef = useRef(false);
   const sortableHeaderIds =
     table
       .getHeaderGroups()[0]
       ?.headers.map((h) => h.id)
       .filter((id) => !pinnedColumnIds?.has(id)) ?? [];
 
+  const releaseSortClickSuppression = () => {
+    // setTimeout(0) defers past the synthetic click that the browser
+    // dispatches synchronously after pointerup — resetting inline here
+    // would re-enable sorting before that click reaches the button.
+    setTimeout(() => {
+      suppressSortClickRef.current = false;
+    }, 0);
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
+    releaseSortClickSuppression();
     if (!onColumnReorder) return;
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -206,7 +225,11 @@ export function TraceTableShell<T>({
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
+            onDragStart={() => {
+              suppressSortClickRef.current = true;
+            }}
             onDragEnd={handleDragEnd}
+            onDragCancel={releaseSortClickSuppression}
           >
             <SortableContext
               items={sortableHeaderIds}
@@ -220,6 +243,7 @@ export function TraceTableShell<T>({
                       header={header}
                       isStickyFirst={stickyFirstColumn && i === 0}
                       reorderable={!pinnedColumnIds?.has(header.id)}
+                      suppressSortClickRef={suppressSortClickRef}
                     />
                   ))}
                 </Tr>
@@ -256,27 +280,34 @@ interface HeaderCellProps<T> {
    * checkbox column uses this).
    */
   reorderable?: boolean;
+  /**
+   * Shared flag set by the surrounding DndContext while a column drag
+   * is in flight. The sort button checks it to swallow the synthetic
+   * click the browser fires right after a drag's pointerup — without
+   * it, dropping a column onto a sortable header also toggled sort.
+   */
+  suppressSortClickRef?: React.RefObject<boolean>;
 }
 
 function HeaderCell<T>({
   header,
   isStickyFirst,
   reorderable = false,
+  suppressSortClickRef,
 }: HeaderCellProps<T>): React.ReactElement {
   // Conditional `useSortable` — same hooks-discipline-friendly pattern
   // the sidebar uses for SortableSection. We always call the hook so
   // its call order is stable; the returned props are simply unused
   // when `reorderable` is false.
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: header.id, disabled: !reorderable });
+  const { listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: header.id, disabled: !reorderable });
+  // Drag zone gets ONLY the pointer listeners. The sortable
+  // `attributes` (role="button", tabIndex=0) are deliberately dropped:
+  // they'd nest an interactive element inside the sort <Button>
+  // (invalid HTML) and add a dead tab stop — we only wire the
+  // PointerSensor, so there's no keyboard reorder to expose anyway.
   const dragHandleProps = (
-    reorderable ? { ...attributes, ...(listeners ?? {}) } : {}
+    reorderable ? { ...(listeners ?? {}) } : {}
   ) as React.HTMLAttributes<HTMLElement>;
   const meta = header.column.columnDef.meta as ColumnMeta | undefined;
   // Open the one-off education dialog the first time the user tries
@@ -435,6 +466,7 @@ function HeaderCell<T>({
             sortDirection={sortDirection}
             onToggle={header.column.getToggleSortingHandler()}
             dragZoneProps={reorderable ? dragHandleProps : undefined}
+            suppressSortClickRef={suppressSortClickRef}
           >
             {flexRender(header.column.columnDef.header, header.getContext())}
           </SortableHeaderButton>
@@ -464,7 +496,7 @@ interface SortableHeaderButtonProps {
   onToggle: ((event: unknown) => void) | undefined;
   children: React.ReactNode;
   /**
-   * dnd-kit sortable attributes + listeners. When set, the label text
+   * dnd-kit sortable pointer listeners. When set, the label text
    * becomes the drag-to-reorder zone (grab cursor); the sort chevron
    * stays outside it so sorting keeps priority — hovering the chevron
    * shows a pointer, not a grab. The PointerSensor's 5px activation
@@ -472,6 +504,8 @@ interface SortableHeaderButtonProps {
    * the button's sort toggle.
    */
   dragZoneProps?: React.HTMLAttributes<HTMLElement>;
+  /** See HeaderCellProps — true while a drag's synthetic click is pending. */
+  suppressSortClickRef?: React.RefObject<boolean>;
 }
 
 function SortableHeaderButton({
@@ -480,8 +514,17 @@ function SortableHeaderButton({
   onToggle,
   children,
   dragZoneProps,
+  suppressSortClickRef,
 }: SortableHeaderButtonProps): React.ReactElement {
   const isActive = sortDirection !== false;
+  const handleClick = (event: React.MouseEvent) => {
+    // The browser fires a synthetic click on pointerup after a drag,
+    // and dnd-kit doesn't suppress it. If a reorder just finished
+    // (ref flipped on drag start, cleared on the next tick after drag
+    // end), swallow the click so dropping a column doesn't also sort.
+    if (suppressSortClickRef?.current) return;
+    onToggle?.(event);
+  };
   return (
     <Button
       type="button"
@@ -501,7 +544,7 @@ function SortableHeaderButton({
       letterSpacing="inherit"
       textTransform="inherit"
       bg="transparent"
-      onClick={onToggle}
+      onClick={handleClick}
       _hover={{ color: "fg", bg: "transparent" }}
       _active={{ bg: "transparent" }}
       _focusVisible={{ bg: "transparent" }}

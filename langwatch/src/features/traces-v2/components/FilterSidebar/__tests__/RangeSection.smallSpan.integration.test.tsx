@@ -47,9 +47,9 @@ describe("RangeSection", () => {
       const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       renderRange({ min: 0, max: 0.004 });
       expect(screen.getAllByRole("slider").length).toBeGreaterThan(0);
-      expect(
-        errorSpy.mock.calls.flat().join("\n"),
-      ).not.toMatch(/min.*max.*step.*invalid|values are invalid/i);
+      expect(errorSpy.mock.calls.flat().join("\n")).not.toMatch(
+        /min.*max.*step.*invalid|values are invalid/i,
+      );
       errorSpy.mockRestore();
     });
   });

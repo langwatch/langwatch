@@ -29,7 +29,8 @@ export function useFacetValueLabelResolver(): (
   }, [data]);
 
   return useCallback(
-    (field: string, value: string) => labelByFieldValue.get(`${field}|${value}`),
+    (field: string, value: string) =>
+      labelByFieldValue.get(`${field}|${value}`),
     [labelByFieldValue],
   );
 }

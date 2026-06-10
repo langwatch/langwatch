@@ -7,8 +7,8 @@ import {
   getFacetValueState,
   getRangeValue,
 } from "~/server/app-layer/traces/query-language/queries";
-import { RangeEndpointInput, sliderStepForSpan } from "./RangeSection";
 import { RowButton } from "./RowButton";
+import { commitRange, RangeEndpointInput, stepForSpan } from "./rangeControls";
 import type { FacetItem } from "./types";
 import { formatCount } from "./utils";
 
@@ -25,7 +25,15 @@ interface EvaluatorDrilldownProps {
     value: string;
     isModifierKey?: boolean;
   }) => void;
-  setRange: ({ field, from, to }: { field: string; from: string; to: string }) => void;
+  setRange: ({
+    field,
+    from,
+    to,
+  }: {
+    field: string;
+    from: string;
+    to: string;
+  }) => void;
   removeRange: ({ field }: { field: string }) => void;
 }
 
@@ -278,9 +286,6 @@ const VerdictRow: React.FC<{
   );
 };
 
-/** Snap to "cleared" when both endpoints cover the full observed range. */
-const CLEAR_EPSILON = 0.01;
-
 /**
  * Score range in RangeSection's idiom: slider + click-to-edit endpoint
  * values. Commits on drag end / typed commit; selecting the full range
@@ -309,18 +314,16 @@ const ScoreRangeControl: React.FC<{
   }, [currentFrom, currentTo, min, max]);
 
   const commit = (rawFrom: number, rawTo: number) => {
-    if (!Number.isFinite(rawFrom) || !Number.isFinite(rawTo)) return;
-    const lo = Math.max(min, Math.min(rawFrom, rawTo));
-    const hi = Math.min(max, Math.max(rawFrom, rawTo));
-    setLocalValue([lo, hi]);
-    const isFullRange =
-      Math.abs(lo - min) < span * CLEAR_EPSILON &&
-      Math.abs(hi - max) < span * CLEAR_EPSILON;
-    if (isFullRange) {
-      onClear();
-    } else {
-      onChange(lo, hi);
-    }
+    const normalized = commitRange({
+      rawFrom,
+      rawTo,
+      min,
+      max,
+      span,
+      onChange,
+      onClear,
+    });
+    if (normalized) setLocalValue(normalized);
   };
 
   if (max <= min) {
@@ -337,7 +340,7 @@ const ScoreRangeControl: React.FC<{
         size="sm"
         min={min}
         max={max}
-        step={sliderStepForSpan(span)}
+        step={stepForSpan(span)}
         value={localValue}
         onValueChange={(d) => {
           const lo = d.value[0];

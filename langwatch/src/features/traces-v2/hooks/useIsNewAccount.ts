@@ -16,5 +16,7 @@ export function useIsNewAccount(): boolean {
     { staleTime: Infinity, refetchOnWindowFocus: false },
   );
   if (!data?.createdAt) return false;
-  return Date.now() - new Date(data.createdAt).getTime() < NEW_ACCOUNT_WINDOW_MS;
+  return (
+    Date.now() - new Date(data.createdAt).getTime() < NEW_ACCOUNT_WINDOW_MS
+  );
 }

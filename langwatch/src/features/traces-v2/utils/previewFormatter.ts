@@ -310,14 +310,34 @@ export function pythonReprToJson(input: string): string | null {
         const c = input[i]!;
         if (c === "\\") {
           const next = input[i + 1];
-          // \' has no meaning in JSON — unescape it; everything else
-          // passes through verbatim.
-          body += next === "'" ? "'" : "\\" + (next ?? "");
+          // \' has no meaning in JSON — unescape it. \xNN is a Python
+          // byte escape JSON.parse rejects — re-emit as \u00NN.
+          // Everything else passes through verbatim.
+          if (next === "'") {
+            body += "'";
+          } else if (next === "x" || next === "X") {
+            body += "\\u00" + input.slice(i + 2, i + 4);
+            i += 4;
+            continue;
+          } else {
+            body += "\\" + (next ?? "");
+          }
           i += 2;
           continue;
         }
         if (c === quote) break;
-        body += c === '"' ? '\\"' : c === "\n" ? "\\n" : c;
+        // Escape raw control characters JSON.parse rejects inside
+        // string literals — repr payloads carry literal tabs/CRs often.
+        body +=
+          c === '"'
+            ? '\\"'
+            : c === "\n"
+              ? "\\n"
+              : c === "\t"
+                ? "\\t"
+                : c === "\r"
+                  ? "\\r"
+                  : c;
         i++;
       }
       if (i >= input.length) return null; // unterminated string

@@ -306,14 +306,27 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                               scope="Couldn't render conversation context"
                               resetKeys={[trace.conversationId, trace.traceId]}
                             >
-                              <ConversationContext
-                                conversationId={trace.conversationId}
-                                traceId={trace.traceId}
-                                collapsed={ctxPaneState.collapsed}
-                                onToggleCollapsed={() =>
-                                  togglePaneCollapsed("conversationContext")
-                                }
-                              />
+                              {/* ConversationContext's root is height=100%
+                                  (sized by PaneLayout's resizable Panel in
+                                  Trace view). Here it sits in a plain flex
+                                  column, where 100% would claim the whole
+                                  drawer and crush the accordions below —
+                                  the wrapper gives it a natural-height,
+                                  capped, scrollable slot instead. */}
+                              <Box
+                                flexShrink={0}
+                                maxHeight="40%"
+                                overflow="auto"
+                              >
+                                <ConversationContext
+                                  conversationId={trace.conversationId}
+                                  traceId={trace.traceId}
+                                  collapsed={ctxPaneState.collapsed}
+                                  onToggleCollapsed={() =>
+                                    togglePaneCollapsed("conversationContext")
+                                  }
+                                />
+                              </Box>
                             </IsolatedErrorBoundary>
                           )}
                           <Box flex={1} minHeight={0} overflow="auto">
