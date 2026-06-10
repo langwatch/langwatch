@@ -1,7 +1,12 @@
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 
-import { guardProjectId } from "../dbMultiTenancyProtection";
+import { ORG_BEARING_MODEL_NAMES } from "../dbOrganizationIdProtection";
+import {
+  PROJECT_TENANCY_REGIMES,
+  SCOPED_MODEL_NAMES,
+  guardProjectId,
+} from "../dbMultiTenancyProtection";
 
 /**
  * Regression tests for the multitenancy guard — specifically its exempt
@@ -74,39 +79,9 @@ describe("guardProjectId — exempt org-scoped gateway models", () => {
     });
   });
 
-  describe("createMany on VirtualKeyProviderCredential without projectId", () => {
-    it("does NOT throw — join table, projectId reachable via parent VK", async () => {
-      // This path is hit on every VK create + every update that changes the
-      // provider chain (see virtualKey.repository.replaceProviderChain).
-      await expect(
-        runGuard({
-          model: "VirtualKeyProviderCredential",
-          action: "createMany",
-          args: {
-            data: [
-              {
-                virtualKeyId: "vk_01",
-                providerCredentialId: "gpc_01",
-                priority: 0,
-              },
-            ],
-          },
-        }),
-      ).resolves.toBe("ok");
-    });
-  });
-
-  describe("deleteMany on VirtualKeyProviderCredential by virtualKeyId", () => {
-    it("does NOT throw — same join-table rationale", async () => {
-      await expect(
-        runGuard({
-          model: "VirtualKeyProviderCredential",
-          action: "deleteMany",
-          args: { where: { virtualKeyId: "vk_01" } },
-        }),
-      ).resolves.toBe("ok");
-    });
-  });
+  // VirtualKeyProviderCredential coverage retired in iter 110: the
+  // binding join table was dropped; chain ordering moved to
+  // RoutingPolicy.modelProviderIds.
 
   describe("findMany on GatewayCacheRule with only organizationId filter", () => {
     it("does NOT throw (org-scoped; cache rules apply across every VK in the org)", async () => {
@@ -115,6 +90,50 @@ describe("guardProjectId — exempt org-scoped gateway models", () => {
           model: "GatewayCacheRule",
           action: "findMany",
           args: { where: { organizationId: "org_01", archivedAt: null } },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("findFirst on RoutingPolicy with org-scoped filter", () => {
+    // Regression: /api/auth/cli/exchange → approveDeviceCode →
+    // PersonalVirtualKeyService.ensureDefault → RoutingPolicyService.
+    // resolveDefaultForUser threw "requires projectId" inside the
+    // device-flow approval handler, blocking every CLI dogfood. Caught
+    // by @ai_gateway_andre during e2e dogfood on :5660.
+    it("does NOT throw (org-scoped; (organizationId, scope, scopeId) is the natural key)", async () => {
+      await expect(
+        runGuard({
+          model: "RoutingPolicy",
+          action: "findFirst",
+          args: {
+            where: {
+              organizationId: "org_01",
+              scope: "team",
+              scopeId: "team_01",
+              isDefault: true,
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("create on RoutingPolicy without projectId in data", () => {
+    it("does NOT throw (org-scoped; admin-defined templates carry organizationId+scope)", async () => {
+      await expect(
+        runGuard({
+          model: "RoutingPolicy",
+          action: "create",
+          args: {
+            data: {
+              organizationId: "org_01",
+              scope: "organization",
+              scopeId: "org_01",
+              name: "developer-default",
+              providerCredentialIds: [],
+            },
+          },
         }),
       ).resolves.toBe("ok");
     });
@@ -143,42 +162,73 @@ describe("guardProjectId — exempt org-scoped gateway models", () => {
   });
 });
 
-describe("guardProjectId — project-scoped gateway models still guarded", () => {
-  describe("findMany on VirtualKey WITHOUT projectId in where", () => {
-    it("STILL throws — VirtualKey is project-scoped (regression guard)", async () => {
+describe("guardProjectId — projectId_traceId compound key (PinnedTrace)", () => {
+  // Regression: pinning a trace silently threw "requires a 'projectId'
+  // or 'projectId.in' in the where clause" because the repo uses
+  // upsert/findUnique on the (projectId, traceId) compound unique key.
+  // The allowlist must include projectId_traceId alongside the other
+  // compound keys (projectId_slug / projectId_date / etc).
+  describe("findUnique on PinnedTrace with projectId_traceId compound key", () => {
+    it("does NOT throw (compound key carries projectId)", async () => {
+      await expect(
+        runGuard({
+          model: "PinnedTrace",
+          action: "findUnique",
+          args: {
+            where: {
+              projectId_traceId: { projectId: "proj_01", traceId: "t_01" },
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("upsert on PinnedTrace with projectId_traceId compound key", () => {
+    it("does NOT throw (compound key carries projectId)", async () => {
+      await expect(
+        runGuard({
+          model: "PinnedTrace",
+          action: "upsert",
+          args: {
+            where: {
+              projectId_traceId: { projectId: "proj_01", traceId: "t_01" },
+            },
+            create: {
+              projectId: "proj_01",
+              traceId: "t_01",
+              source: "manual",
+            },
+            update: {},
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+});
+
+describe("guardProjectId — org-scoped VirtualKey still guarded", () => {
+  describe("findMany on VirtualKey WITHOUT any tenancy predicate", () => {
+    it("STILL throws — VirtualKey requires organizationId/id/scope (regression guard)", async () => {
       await expect(
         runGuard({
           model: "VirtualKey",
           action: "findMany",
           args: { where: { status: "ACTIVE" } },
         }),
-      ).rejects.toThrow(/requires a 'projectId'/);
+      ).rejects.toThrow(/requires an 'organizationId'/);
     });
   });
 
-  describe("findMany on VirtualKey WITH projectId in where", () => {
-    it("does NOT throw (normal project-scoped query)", async () => {
+  describe("findMany on VirtualKey WITH organizationId in where", () => {
+    it("does NOT throw (canonical org-scoped query)", async () => {
       await expect(
         runGuard({
           model: "VirtualKey",
           action: "findMany",
-          args: { where: { projectId: "proj_01", status: "ACTIVE" } },
+          args: { where: { organizationId: "org_01", status: "ACTIVE" } },
         }),
       ).resolves.toBe("ok");
-    });
-  });
-
-  describe("create on GatewayProviderCredential WITHOUT projectId in data", () => {
-    it("STILL throws — provider credentials are project-scoped", async () => {
-      await expect(
-        runGuard({
-          model: "GatewayProviderCredential",
-          action: "create",
-          args: {
-            data: { modelProviderId: "mp_01", slot: "primary" },
-          },
-        }),
-      ).rejects.toThrow(/requires a 'projectId'/);
     });
   });
 });
@@ -205,7 +255,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelProvider family)", () => {
           action: "findMany",
           args: { where: {} },
         }),
-      ).rejects.toThrow(/projectId.*row id.*scope predicate/);
+      ).rejects.toThrow(/row id.*scope predicate/);
     });
   });
 
@@ -247,28 +297,16 @@ describe("guardProjectId — SCOPED_MODELS (ModelProvider family)", () => {
     });
   });
 
-  describe("ModelProvider.findMany with legacy projectId predicate", () => {
-    it("does NOT throw — legacy projectId column is still a valid tenancy clause", async () => {
-      await expect(
-        runGuard({
-          model: "ModelProvider",
-          action: "findMany",
-          args: { where: { projectId: "proj_01" } },
-        }),
-      ).resolves.toBe("ok");
-    });
-  });
-
-  describe("ModelProvider.create without scopes AND without projectId", () => {
-    /** @scenario A create without scopes or projectId throws */
-    it("THROWS — every create needs either projectId or scopes in the payload", async () => {
+  describe("ModelProvider.create without scopes", () => {
+    /** @scenario A create without scopes throws */
+    it("THROWS — every create needs a scopes relation in the payload", async () => {
       await expect(
         runGuard({
           model: "ModelProvider",
           action: "create",
           args: { data: { provider: "openai", enabled: true } },
         }),
-      ).rejects.toThrow(/either a 'projectId' or a 'scopes' relation/);
+      ).rejects.toThrow(/requires a 'scopes' relation/);
     });
   });
 
@@ -342,7 +380,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelDefaultConfig family)", () => {
           action: "findMany",
           args: { where: {} },
         }),
-      ).rejects.toThrow(/row id or scope predicate/);
+      ).rejects.toThrow(/row id.*scope predicate/);
     });
   });
 
@@ -420,7 +458,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelDefaultConfig family)", () => {
             },
           },
         }),
-      ).rejects.toThrow(/row id or scope predicate/);
+      ).rejects.toThrow(/row id.*scope predicate/);
     });
   });
 
@@ -444,7 +482,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelDefaultConfig family)", () => {
             },
           },
         }),
-      ).rejects.toThrow(/row id or scope predicate/);
+      ).rejects.toThrow(/row id.*scope predicate/);
     });
   });
 
@@ -585,5 +623,93 @@ describe("guardProjectId — SCOPED_MODELS (ModelDefaultConfig family)", () => {
         }),
       ).rejects.toThrow(/configId.*scopeType.*scopeId/);
     });
+  });
+});
+
+/**
+ * Regime partition (mirrors dbOrganizationIdProtection's). Every Prisma model
+ * WITHOUT a projectId column must be classified into exactly one regime, so a
+ * new model cannot silently slip in - or out of - the projectId guard:
+ *   - GLOBAL_MODELS / RELATIONAL_PARENT_SCOPED: hand-listed, no tenant column;
+ *   - SCOPED_MODELS: projectId-less but validated by row id / scope / parent FK;
+ *   - org-bearing: derived from ORG_BEARING_MODEL_NAMES (the org guard registry).
+ * Org-bearing models must NEVER be hand-listed here - the org guard is the
+ * single source of truth for "this model is org-scoped, not project-scoped".
+ */
+describe("project-tenancy regime partition", () => {
+  const {
+    GLOBAL_MODELS,
+    RELATIONAL_PARENT_SCOPED,
+    LICENSE_COUNTED_PROJECT_MODELS,
+  } = PROJECT_TENANCY_REGIMES;
+  const allModelNames = Prisma.dmmf.datamodel.models.map((m) => m.name);
+  const modelHasField = (model: string, field: string) =>
+    Prisma.dmmf.datamodel.models
+      .find((m) => m.name === model)
+      ?.fields.some((f) => f.name === field) ?? false;
+  const noProjectIdModels = allModelNames.filter(
+    (name) => !modelHasField(name, "projectId"),
+  );
+  const orgBearing = new Set(ORG_BEARING_MODEL_NAMES);
+
+  it("classifies every projectId-less model into exactly one regime", () => {
+    const classified = new Set<string>([
+      ...GLOBAL_MODELS,
+      ...RELATIONAL_PARENT_SCOPED,
+      ...SCOPED_MODEL_NAMES,
+      ...ORG_BEARING_MODEL_NAMES,
+    ]);
+    const unclassified = noProjectIdModels.filter(
+      (name) => !classified.has(name),
+    );
+    expect(unclassified).toEqual([]);
+  });
+
+  it("never hand-lists a phantom (every listed name exists in the datamodel)", () => {
+    const known = new Set(allModelNames);
+    const phantoms = [
+      ...GLOBAL_MODELS,
+      ...RELATIONAL_PARENT_SCOPED,
+      ...LICENSE_COUNTED_PROJECT_MODELS,
+      ...SCOPED_MODEL_NAMES,
+    ].filter((name) => !known.has(name));
+    expect(phantoms).toEqual([]);
+  });
+
+  it("never hand-lists an org-bearing model (those derive from the org registry)", () => {
+    const handListedOrgBearing = [
+      ...GLOBAL_MODELS,
+      ...RELATIONAL_PARENT_SCOPED,
+      ...LICENSE_COUNTED_PROJECT_MODELS,
+    ].filter((name) => orgBearing.has(name));
+    expect(handListedOrgBearing).toEqual([]);
+  });
+
+  it("keeps the hand-listed buckets and SCOPED_MODELS pairwise disjoint", () => {
+    const buckets: Array<[string, readonly string[]]> = [
+      ["GLOBAL_MODELS", GLOBAL_MODELS],
+      ["RELATIONAL_PARENT_SCOPED", RELATIONAL_PARENT_SCOPED],
+      ["LICENSE_COUNTED_PROJECT_MODELS", LICENSE_COUNTED_PROJECT_MODELS],
+      ["SCOPED_MODELS", SCOPED_MODEL_NAMES],
+    ];
+    const overlaps: string[] = [];
+    for (let i = 0; i < buckets.length; i++) {
+      for (let j = i + 1; j < buckets.length; j++) {
+        const earlier = new Set(buckets[i]![1]);
+        for (const name of buckets[j]![1]) {
+          if (earlier.has(name)) {
+            overlaps.push(`${name} in ${buckets[i]![0]} & ${buckets[j]![0]}`);
+          }
+        }
+      }
+    }
+    expect(overlaps).toEqual([]);
+  });
+
+  it("license-counted models actually carry a projectId column", () => {
+    const withoutProjectId = LICENSE_COUNTED_PROJECT_MODELS.filter(
+      (name) => !modelHasField(name, "projectId"),
+    );
+    expect(withoutProjectId).toEqual([]);
   });
 });

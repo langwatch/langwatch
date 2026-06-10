@@ -109,7 +109,7 @@ export const OrConnectorOverlay: React.FC<OrConnectorOverlayProps> = ({
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-    const observer = new ResizeObserver(recompute);
+    const observer = new ResizeObserver(() => recompute());
     observer.observe(container);
     container.addEventListener("scroll", recompute, true);
     return () => {

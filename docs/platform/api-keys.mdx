@@ -7,6 +7,20 @@ keywords: api keys, authentication, personal keys, service keys, langwatch, secu
 
 LangWatch uses API keys to authenticate SDK calls, MCP connections, and API requests. All keys are managed from a single place: **Settings → API Keys**.
 
+## Ingestion keys vs API keys
+
+LangWatch splits credentials into two concepts, the same way Datadog separates ingest-only API keys from RBAC-scoped application keys. Both are `sk-lw-…` strings, but they carry very different power:
+
+| | Ingestion key | API key |
+|---|---|---|
+| **What it does** | Writes traces, and nothing else | Reads and manages everything its scope allows |
+| **Role** | A built-in, write-only ingest-only role granting only `traces:create` | RBAC scopes you pick (personal: your ceiling; service: scope + mode) |
+| **Scope** | Exactly one project | One or more projects, teams, or the whole organization |
+| **Best for** | Spraying into agent environments, CLIs, and OTLP exporters (Claude Code, Cursor, Claude cowork, …) where you only want to push telemetry | SDK setup, MCP, CI/CD, dashboards, automation, anything that reads or changes data |
+| **Blast radius if leaked** | Minimal, it can only create traces in its one project, never read or delete | Whatever its RBAC scope grants, treat it like a password |
+
+Because an ingestion key is genuinely write-only, it's safe to drop into an agent's environment or a managed-settings file. An [ingestion template](/ai-governance/ingestion-templates) mints one for you and wires it into the tool's `OTEL_EXPORTER_OTLP_HEADERS`; the `langwatch <tool>` CLI does the same on your behalf. An ingestion key may also reference an `IngestionTemplate` (its OTTL / catalog metadata) so the receiver shapes the trace into the canonical `gen_ai.*` form. The rest of this page covers the RBAC-scoped **API keys** you create from **Settings → API Keys**.
+
 ## Key Types
 
 | | Personal Key | Service Key |

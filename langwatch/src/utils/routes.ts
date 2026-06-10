@@ -175,41 +175,36 @@ export const projectRoutes = {
     title: "Evaluators",
   },
   gateway: {
-    path: "/[project]/gateway",
+    path: "/settings/gateway",
     title: "AI Gateway",
   },
   gateway_virtual_keys: {
-    path: "/[project]/gateway/virtual-keys",
+    path: "/settings/gateway/virtual-keys",
     title: "Virtual Keys",
     parent: "gateway",
   },
   gateway_virtual_key_detail: {
-    path: "/[project]/gateway/virtual-keys/[id]",
+    path: "/settings/gateway/virtual-keys/[id]",
     title: "Virtual Key",
     parent: "gateway_virtual_keys",
   },
   gateway_budgets: {
-    path: "/[project]/gateway/budgets",
+    path: "/settings/gateway/budgets",
     title: "Budgets",
     parent: "gateway",
   },
   gateway_budget_detail: {
-    path: "/[project]/gateway/budgets/[id]",
+    path: "/settings/gateway/budgets/[id]",
     title: "Budget",
     parent: "gateway_budgets",
   },
-  gateway_providers: {
-    path: "/[project]/gateway/providers",
-    title: "Providers",
-    parent: "gateway",
-  },
   gateway_usage: {
-    path: "/[project]/gateway/usage",
+    path: "/settings/gateway/usage",
     title: "Usage",
     parent: "gateway",
   },
   gateway_cache_rules: {
-    path: "/[project]/gateway/cache-rules",
+    path: "/settings/gateway/cache-rules",
     title: "Cache Rules",
     parent: "gateway",
   },
@@ -263,4 +258,70 @@ export function buildRoutePath(
   }
 
   return path.replace(/\/\/+/g, "/");
+}
+
+/**
+ * Resolve where switching to another project should land, preserving the
+ * current view when the target project has an equivalent of it. The single
+ * source of truth for both the WorkspaceSwitcher (via `useWorkspaceData`) and
+ * the legacy `ProjectSelector`, which previously each carried their own copy of
+ * this branching - the drift between them was the "switching projects always
+ * goes home" regression.
+ *
+ * Resolution, in order:
+ *   1. Project-anchored route (`/[project]/...`): swap the slug so the same
+ *      view opens for the target. If the route has a second dynamic segment
+ *      (a trace / eval id that can't exist in another project) it drops to the
+ *      parent list route instead of 404ing.
+ *   2. A literal path that embeds the current slug (non-`[project]` route that
+ *      still names the project): replace the slug in place.
+ *   3. No per-project equivalent (org-scoped, personal, settings): fall back to
+ *      the project home. `homeFallback: "returnTo"` appends the current path as
+ *      a `return_to` query (legacy ProjectSelector behavior) so the project
+ *      root can bounce back; `"plain"` just lands on the project home (what the
+ *      org-scope WorkspaceSwitcher wants).
+ *
+ * `routePattern` is the Next.js route pattern (`router.pathname`, e.g.
+ * `/[project]/messages`); `resolvedPathname` is the concrete URL path
+ * (`window.location.pathname`, e.g. `/acme/messages`) used for the literal-slug
+ * and return_to branches.
+ */
+export function buildProjectSwitchHref({
+  routePattern,
+  targetSlug,
+  resolvedPathname,
+  currentProjectSlug,
+  homeFallback,
+}: {
+  routePattern: string;
+  targetSlug: string;
+  resolvedPathname?: string;
+  currentProjectSlug?: string;
+  homeFallback: "plain" | "returnTo";
+}): string {
+  const currentRoute = findCurrentRoute(routePattern);
+
+  if (currentRoute?.path.includes("[project]")) {
+    const hasOtherDynamicSegments = currentRoute.path
+      .replace("[project]", "")
+      .includes("[");
+    if (hasOtherDynamicSegments && currentRoute.parent) {
+      return projectRoutes[currentRoute.parent].path
+        .replace("[project]", targetSlug)
+        .replace(/\/\/+/g, "/");
+    }
+    return currentRoute.path
+      .replace("[project]", targetSlug)
+      .replace(/\/\/+/g, "/");
+  }
+
+  if (currentProjectSlug && resolvedPathname?.includes(currentProjectSlug)) {
+    return resolvedPathname.replace(currentProjectSlug, targetSlug);
+  }
+
+  if (homeFallback === "returnTo" && resolvedPathname) {
+    return `/${targetSlug}?return_to=${encodeURIComponent(resolvedPathname)}`;
+  }
+
+  return `/${targetSlug}`;
 }

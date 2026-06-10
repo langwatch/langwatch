@@ -6,13 +6,14 @@ import {
 } from "@/internal/api/client";
 import { buildAuthHeaders, isPersonalAccessToken } from "@/internal/api/auth";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 
 export const statusCommand = async (options?: { format?: string }): Promise<void> => {
   checkApiKey();
 
   const apiClient = createLangWatchApiClient();
   const apiKey = process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint = process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai";
+  const endpoint = resolveControlPlaneUrl();
   const spinner = ora("Fetching project status...").start();
 
   const results: Record<string, { count: number; error?: string; status?: number }> = {};

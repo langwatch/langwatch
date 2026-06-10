@@ -2,7 +2,7 @@ import { Box, Text } from "@chakra-ui/react";
 import { memo, useRef } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useCursorBroadcast } from "../hooks/useCursorBroadcast";
-import { usePeerCursors, type PeerCursor } from "../hooks/usePeerCursors";
+import { type PeerCursor, usePeerCursors } from "../hooks/usePeerCursors";
 import { usePresenceFeatureEnabled } from "../hooks/usePresenceFeatureEnabled";
 import {
   presenceUserColor,
@@ -37,7 +37,8 @@ export function PeerCursorOverlay({
   const { enabled: featureEnabled } = usePresenceFeatureEnabled();
   const effectivelyEnabled = enabled && featureEnabled;
   const internalRef = useRef<HTMLDivElement | null>(null);
-  const ref = (containerRef ?? internalRef) as React.RefObject<HTMLDivElement | null>;
+  const ref = (containerRef ??
+    internalRef) as React.RefObject<HTMLDivElement | null>;
 
   useCursorBroadcast({
     projectId,
@@ -53,7 +54,21 @@ export function PeerCursorOverlay({
   });
 
   return (
-    <Box ref={internalRef} position="relative" width="100%" height="100%">
+    // `minHeight={0}` (and `minWidth={0}`) is load-bearing in flex
+    // contexts: without it, the implicit `min-height: auto` clamps
+    // this Box to its content's natural size and prevents the
+    // `height: 100%` from shrinking to fit a flex column parent. In
+    // the trace drawer that bug surfaced as a non-scrollable Summary
+    // tab — the overlay grew past `Drawer.Body`'s clipped bounds and
+    // hid content past the fold.
+    <Box
+      ref={internalRef}
+      position="relative"
+      width="100%"
+      height="100%"
+      minHeight={0}
+      minWidth={0}
+    >
       {children}
       {effectivelyEnabled && anchor && projectId
         ? cursors.map((cursor) => (
@@ -117,4 +132,3 @@ function CursorArrow({ color }: { color: string }) {
     </svg>
   );
 }
-

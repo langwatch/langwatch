@@ -226,11 +226,19 @@ export function TraceSummaryAccordions({
             );
           }
           if (id === "exceptions") {
+            // Show the per-trace exception count in the section title — matches
+            // how the Evals and Events sections render their counts. Without
+            // this, "Exceptions" was the only erroring section in the drawer
+            // without a count, leaving users to expand it to find out whether
+            // they were looking at one bad span or twenty.
+            const exceptionsCount =
+              errorSpans.length + (trace.error && errorSpans.length === 0 ? 1 : 0);
             return (
               <Section
                 key="exceptions"
                 value="exceptions"
                 title="Exceptions"
+                count={exceptionsCount > 0 ? exceptionsCount : undefined}
                 isFirst={isFirst}
                 open={isOpen}
               >

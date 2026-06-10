@@ -1,9 +1,9 @@
 import type { Organization } from "@prisma/client";
-import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
+import { createOrgApp, requires } from "~/server/api/security";
 import type { ApiKeyService } from "~/server/api-key/api-key.service";
 import {
   ApiKeyNotFoundError,
@@ -13,15 +13,9 @@ import {
 } from "~/server/api-key/errors";
 import type { ApiKeyServiceMiddlewareVariables } from "../../middleware/api-key-service";
 import { apiKeyServiceMiddleware } from "../../middleware/api-key-service";
-import type { OrgAuthMiddlewareVariables } from "../../middleware/org-auth";
-import { orgAuthMiddleware, requireOrgPermission } from "../../middleware/org-auth";
-import { loggerMiddleware } from "../../middleware/logger";
-import { tracerMiddleware } from "../../middleware/tracer";
 import { handleApiKeyError } from "./error-handler";
 
 patchZodOpenapi();
-
-type Variables = OrgAuthMiddlewareVariables & ApiKeyServiceMiddlewareVariables;
 
 const bindingSchema = z.object({
   role: z.enum(["ADMIN", "MEMBER", "VIEWER"]),
@@ -67,20 +61,20 @@ function validationHook(
   return undefined;
 }
 
-export const app = new Hono<{ Variables: Variables }>()
-  .basePath("/api/api-keys")
-  .use(tracerMiddleware({ name: "api-keys" }))
-  .use(loggerMiddleware())
-  .use(orgAuthMiddleware)
-  .use(apiKeyServiceMiddleware)
-  .onError(handleApiKeyError)
+const secured = createOrgApp<ApiKeyServiceMiddlewareVariables>({
+  basePath: "/api/api-keys",
+});
 
+secured.hono.onError(handleApiKeyError);
+
+secured
+  .access(requires("organization:view"))
   .get(
     "/",
+    apiKeyServiceMiddleware,
     describeRoute({
       description: "List all API keys for the authenticated user in this organization",
     }),
-    requireOrgPermission("organization:view"),
     async (c) => {
       const organization = c.get("organization") as Organization;
       const userId = c.get("apiKeyUserId") as string | null;
@@ -108,14 +102,16 @@ export const app = new Hono<{ Variables: Variables }>()
         })),
       });
     },
-  )
+  );
 
+secured
+  .access(requires("organization:manage"))
   .post(
     "/",
+    apiKeyServiceMiddleware,
     describeRoute({
       description: "Create a new API key",
     }),
-    requireOrgPermission("organization:manage"),
     zValidator("json", createApiKeySchema, validationHook),
     async (c) => {
       const organization = c.get("organization") as Organization;
@@ -166,11 +162,13 @@ export const app = new Hono<{ Variables: Variables }>()
         throw error;
       }
     },
-  )
+  );
 
+secured
+  .access(requires("organization:manage"))
   .delete(
     "/:id",
-    requireOrgPermission("organization:manage"),
+    apiKeyServiceMiddleware,
     describeRoute({
       description: "Revoke an API key",
     }),
@@ -212,3 +210,5 @@ export const app = new Hono<{ Variables: Variables }>()
       return c.json({ success: true });
     },
   );
+
+export const app = secured.hono;

@@ -15,6 +15,21 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SimulationSuite } from "@prisma/client";
+
+// VoiceAgentsCallout pulls project context via useOrganizationTeamProject,
+// which in turn fires tRPC queries the bare SuiteSidebar test rig doesn't
+// provide. Stub it here so the sidebar tests keep their narrow scope; the
+// callout itself has dedicated coverage in VoiceAgentsCallout.unit.test.tsx.
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: vi.fn(() => ({
+    project: { id: "project_1" },
+  })),
+}));
+
+vi.mock("posthog-js", () => ({
+  default: { capture: vi.fn() },
+}));
+
 import { SuiteSidebar, SUITE_SIDEBAR_COLLAPSED_KEY } from "../SuiteSidebar";
 import { NowProvider } from "../NowProvider";
 import { ALL_RUNS_ID } from "../useSuiteRouting";
@@ -36,6 +51,8 @@ function makeSuite(
     targets: [],
     repeatCount: 1,
     labels: [],
+    simulatorModel: null,
+    judgeModel: null,
     archivedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),

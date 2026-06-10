@@ -65,6 +65,7 @@
                   "skills/pms-and-domain-experts"
                 ]
               },
+              "integration/install",
               "integration/cli",
               "integration/mcp",
               "better-agents/overview"
@@ -74,11 +75,9 @@
             "group": "Agent Simulations",
             "pages": [
               "agent-simulations/introduction",
-              "agent-simulations/overview",
               "agent-simulations/getting-started",
-              "agent-simulations/set-overview",
-              "agent-simulations/batch-runs",
-              "agent-simulations/individual-run"
+              "agent-simulations/voice-agents",
+              "agent-simulations/red-teaming"
             ]
           },
           {
@@ -213,7 +212,8 @@
                   "platform/rbac",
                   "platform/audit-log",
                   "platform/scim",
-                  "platform/model-providers"
+                  "platform/model-providers",
+                  "platform/data-retention"
                 ]
               }
             ]
@@ -246,6 +246,7 @@
           {
             "group": "Help",
             "pages": [
+              "pricing",
               "support",
               "status"
             ]
@@ -259,7 +260,8 @@
           {
             "group": "Overview",
             "pages": [
-              "integration/overview"
+              "integration/overview",
+              "observability/trace-vs-activity-ingestion"
             ]
           },
           {
@@ -555,6 +557,15 @@
             ]
           },
           {
+            "group": "Governance",
+            "pages": [
+              "ai-gateway/governance/overview",
+              "ai-gateway/governance/personal-keys",
+              "ai-gateway/governance/admin-setup",
+              "ai-gateway/governance/routing-policies"
+            ]
+          },
+          {
             "group": "Providers",
             "pages": [
               "ai-gateway/providers/overview",
@@ -582,7 +593,6 @@
                 "group": "Safety & Governance",
                 "pages": [
                   "ai-gateway/guardrails",
-                  "ai-gateway/blocked-patterns",
                   "ai-gateway/security",
                   "ai-gateway/audit"
                 ]
@@ -613,6 +623,7 @@
             "group": "Self-Hosting",
             "pages": [
               "ai-gateway/self-hosting/helm",
+              "ai-gateway/self-hosting/post-install-checklist",
               "ai-gateway/self-hosting/config",
               "ai-gateway/self-hosting/dns-and-tls",
               "ai-gateway/self-hosting/health-checks",
@@ -631,6 +642,93 @@
               "ai-gateway/cookbooks/prometheus-alerts",
               "ai-gateway/cookbooks/grafana-dashboard",
               "ai-gateway/cookbooks/production-runbook"
+            ]
+          }
+        ]
+      },
+      {
+        "anchor": "AI Governance",
+        "icon": "shield-check",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "ai-governance/overview",
+              "ai-governance/track-your-claude-code-usage",
+              "ai-governance/getting-started-developer",
+              "ai-governance/getting-started-admin",
+              "ai-governance/open-core-licensing"
+            ]
+          },
+          {
+            "group": "Personal Portal",
+            "pages": [
+              "ai-governance/personal-portal/overview",
+              "ai-governance/personal-portal/end-user",
+              "ai-governance/personal-portal/admin-catalog",
+              "ai-governance/personal-portal/sessions"
+            ]
+          },
+          {
+            "group": "Workspaces & Access",
+            "pages": [
+              "ai-governance/workspaces",
+              "ai-governance/members-and-invites",
+              "ai-governance/roles-and-permissions"
+            ]
+          },
+          {
+            "group": "Dashboards",
+            "pages": [
+              "ai-governance/governance-dashboard",
+              "ai-governance/departments"
+            ]
+          },
+          {
+            "group": "Privacy",
+            "pages": [
+              "ai-governance/no-spy-mode"
+            ]
+          },
+          {
+            "group": "Sources",
+            "pages": [
+              "ai-governance/ingestion-sources/index",
+              "ai-governance/ingestion-sources/otel-generic",
+              "ai-governance/ingestion-sources/claude-cowork",
+              "ai-governance/ingestion-sources/workato",
+              "ai-governance/ingestion-sources/s3-custom",
+              "ai-governance/ingestion-sources/copilot-studio",
+              "ai-governance/ingestion-sources/openai-compliance",
+              "ai-governance/ingestion-sources/claude-compliance"
+            ]
+          },
+          {
+            "group": "Detection",
+            "pages": [
+              "ai-governance/anomaly-rules"
+            ]
+          },
+          {
+            "group": "Compliance & Architecture",
+            "pages": [
+              "ai-governance/compliance-architecture",
+              "ai-governance/control-plane"
+            ]
+          },
+          {
+            "group": "Operations",
+            "pages": [
+              "ai-governance/cli-debug",
+              "ai-governance/pull-mode-connectors"
+            ]
+          },
+          {
+            "group": "Programmatic surfaces",
+            "pages": [
+              "ai-governance/api",
+              "ai-governance/cli",
+              "ai-governance/mcp"
             ]
           }
         ]
@@ -664,7 +762,8 @@
               "self-hosting/deployment/docker-compose",
               "self-hosting/deployment/docker-images",
               "self-hosting/deployment/kubernetes-helm",
-              "self-hosting/deployment/kubernetes-local"
+              "self-hosting/deployment/kubernetes-local",
+              "self-hosting/deployment/argocd"
             ]
           },
           {
@@ -677,6 +776,7 @@
             "group": "Operations",
             "pages": [
               "self-hosting/security",
+              "self-hosting/compliance",
               "self-hosting/upgrade",
               "self-hosting/upgrade-v3"
             ]
@@ -704,6 +804,7 @@
               "api-reference/traces/overview",
               "api-reference/traces/search",
               "api-reference/traces/get-trace",
+              "api-reference/traces/update-metadata",
               "api-reference/traces/create-public-trace-path",
               "api-reference/traces/delete-public-trace-path"
             ]
@@ -988,7 +1089,9 @@
               "api-reference/projects/create-project",
               "api-reference/projects/get-project",
               "api-reference/projects/update-project",
-              "api-reference/projects/archive-project"
+              "api-reference/projects/archive-project",
+              "api-reference/projects/get-api-key",
+              "api-reference/projects/regenerate-api-key"
             ]
           },
           {
@@ -999,7 +1102,28 @@
               "api-reference/teams/create-team",
               "api-reference/teams/get-team",
               "api-reference/teams/update-team",
-              "api-reference/teams/archive-team"
+              "api-reference/teams/archive-team",
+              "api-reference/teams/list-members",
+              "api-reference/teams/add-member",
+              "api-reference/teams/remove-member",
+              "api-reference/teams/list-projects"
+            ]
+          },
+          {
+            "group": "Groups",
+            "pages": [
+              "api-reference/groups/overview",
+              "api-reference/groups/list-groups",
+              "api-reference/groups/create-group",
+              "api-reference/groups/get-group",
+              "api-reference/groups/rename-group",
+              "api-reference/groups/delete-group",
+              "api-reference/groups/list-members",
+              "api-reference/groups/add-member",
+              "api-reference/groups/remove-member",
+              "api-reference/groups/list-bindings",
+              "api-reference/groups/add-binding",
+              "api-reference/groups/remove-binding"
             ]
           },
           {
@@ -1109,7 +1233,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1779914177",
+      "source": "/ci/cache/busted/1781096166",
       "destination": "/"
     },
     {
@@ -1185,24 +1309,40 @@
       "destination": "/self-hosting/docker-compose"
     },
     {
+      "source": "/agent-simulations/overview",
+      "destination": "/agent-simulations/introduction"
+    },
+    {
+      "source": "/agent-simulations/set-overview",
+      "destination": "/agent-simulations/introduction"
+    },
+    {
+      "source": "/agent-simulations/batch-runs",
+      "destination": "/agent-simulations/introduction"
+    },
+    {
+      "source": "/agent-simulations/individual-run",
+      "destination": "/agent-simulations/introduction"
+    },
+    {
       "source": "/simulations/overview",
-      "destination": "/agent-simulations/overview"
+      "destination": "/agent-simulations/introduction"
+    },
+    {
+      "source": "/simulations/set-overview",
+      "destination": "/agent-simulations/introduction"
+    },
+    {
+      "source": "/simulations/batch-runs",
+      "destination": "/agent-simulations/introduction"
+    },
+    {
+      "source": "/simulations/individual-run",
+      "destination": "/agent-simulations/introduction"
     },
     {
       "source": "/simulations/getting-started",
       "destination": "/agent-simulations/getting-started"
-    },
-    {
-      "source": "/simulations/set-overview",
-      "destination": "/agent-simulations/set-overview"
-    },
-    {
-      "source": "/simulations/batch-runs",
-      "destination": "/agent-simulations/batch-runs"
-    },
-    {
-      "source": "/simulations/individual-run",
-      "destination": "/agent-simulations/individual-run"
     },
     {
       "source": "/simulations/introduction",
@@ -1299,6 +1439,54 @@
     {
       "source": "/ai-gateway/cli/langwatch-cli",
       "destination": "/integration/cli"
+    },
+    {
+      "source": "/ai-gateway/governance/compliance-architecture",
+      "destination": "/ai-governance/compliance-architecture"
+    },
+    {
+      "source": "/ai-gateway/governance/control-plane",
+      "destination": "/ai-governance/control-plane"
+    },
+    {
+      "source": "/ai-gateway/governance/anomaly-rules",
+      "destination": "/ai-governance/anomaly-rules"
+    },
+    {
+      "source": "/ai-gateway/governance/cli-debug",
+      "destination": "/ai-governance/cli-debug"
+    },
+    {
+      "source": "/ai-gateway/governance/ingestion-sources/index",
+      "destination": "/ai-governance/ingestion-sources/index"
+    },
+    {
+      "source": "/ai-gateway/governance/ingestion-sources/otel-generic",
+      "destination": "/ai-governance/ingestion-sources/otel-generic"
+    },
+    {
+      "source": "/ai-gateway/governance/ingestion-sources/claude-cowork",
+      "destination": "/ai-governance/ingestion-sources/claude-cowork"
+    },
+    {
+      "source": "/ai-gateway/governance/ingestion-sources/workato",
+      "destination": "/ai-governance/ingestion-sources/workato"
+    },
+    {
+      "source": "/ai-gateway/governance/ingestion-sources/s3-custom",
+      "destination": "/ai-governance/ingestion-sources/s3-custom"
+    },
+    {
+      "source": "/ai-gateway/governance/ingestion-sources/copilot-studio",
+      "destination": "/ai-governance/ingestion-sources/copilot-studio"
+    },
+    {
+      "source": "/ai-gateway/governance/ingestion-sources/openai-compliance",
+      "destination": "/ai-governance/ingestion-sources/openai-compliance"
+    },
+    {
+      "source": "/ai-gateway/governance/ingestion-sources/claude-compliance",
+      "destination": "/ai-governance/ingestion-sources/claude-compliance"
     },
     {
       "source": "/api-reference/saved-evaluators/:path*",

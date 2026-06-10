@@ -11,9 +11,10 @@
  * - GET              /api/scim/v2/ServiceProviderConfig
  */
 import type { Context } from "hono";
-import { Hono } from "hono";
-import { loggerMiddleware } from "~/app/api/middleware/logger";
-import { tracerMiddleware } from "~/app/api/middleware/tracer";
+import {
+  createServiceApp,
+  internalSecret,
+} from "~/server/api/security";
 import { prisma } from "~/server/db";
 import { ScimGroupService } from "~/server/scim/scim-group.service";
 import { ScimService } from "~/server/scim/scim.service";
@@ -28,9 +29,9 @@ import {
 
 const SCIM_HEADERS = { "Content-Type": "application/scim+json" };
 
-export const app = new Hono().basePath("/api/scim/v2");
-app.use(tracerMiddleware({ name: "scim-v2" }));
-app.use(loggerMiddleware());
+const secured = createServiceApp({ basePath: "/api/scim/v2" });
+
+const SCIM_POLICY = internalSecret("SCIM bearer token validated in-handler");
 
 // ── helpers ──────────────────────────────────────────────────────────
 
@@ -83,7 +84,7 @@ async function parseJsonBody(c: Context): Promise<unknown | null> {
 
 // ── ServiceProviderConfig ────────────────────────────────────────────
 
-app.get("/ServiceProviderConfig", (c) => {
+secured.access(SCIM_POLICY).get("/ServiceProviderConfig", (c) => {
   return c.json({
     schemas: ["urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig"],
     documentationUri: "https://docs.langwatch.ai/scim",
@@ -106,7 +107,7 @@ app.get("/ServiceProviderConfig", (c) => {
 
 // ── ResourceTypes ────────────────────────────────────────────────────
 
-app.get("/ResourceTypes", (c) => {
+secured.access(SCIM_POLICY).get("/ResourceTypes", (c) => {
   return c.json({
     schemas: ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
     totalResults: 2,
@@ -141,7 +142,7 @@ app.get("/ResourceTypes", (c) => {
 
 // ── Schemas ──────────────────────────────────────────────────────────
 
-app.get("/Schemas", (c) => {
+secured.access(SCIM_POLICY).get("/Schemas", (c) => {
   return c.json({
     schemas: ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
     totalResults: 2,
@@ -269,7 +270,7 @@ app.get("/Schemas", (c) => {
 
 // ── Users ────────────────────────────────────────────────────────────
 
-app.get("/Users", async (c) => {
+secured.access(SCIM_POLICY).get("/Users", async (c) => {
   const organizationId = await requireAuth(c);
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
@@ -291,7 +292,7 @@ app.get("/Users", async (c) => {
   return scimJson(c, result);
 });
 
-app.post("/Users", async (c) => {
+secured.access(SCIM_POLICY).post("/Users", async (c) => {
   const organizationId = await requireAuth(c);
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
@@ -321,7 +322,7 @@ app.post("/Users", async (c) => {
   return scimJson(c, result, 201);
 });
 
-app.get("/Users/:id", async (c) => {
+secured.access(SCIM_POLICY).get("/Users/:id", async (c) => {
   const organizationId = await requireAuth(c);
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
@@ -339,7 +340,7 @@ app.get("/Users/:id", async (c) => {
   return scimJson(c, result);
 });
 
-app.put("/Users/:id", async (c) => {
+secured.access(SCIM_POLICY).put("/Users/:id", async (c) => {
   const organizationId = await requireAuth(c);
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
@@ -371,7 +372,7 @@ app.put("/Users/:id", async (c) => {
   return scimJson(c, result);
 });
 
-app.patch("/Users/:id", async (c) => {
+secured.access(SCIM_POLICY).patch("/Users/:id", async (c) => {
   const organizationId = await requireAuth(c);
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
@@ -403,7 +404,7 @@ app.patch("/Users/:id", async (c) => {
   return scimJson(c, result);
 });
 
-app.delete("/Users/:id", async (c) => {
+secured.access(SCIM_POLICY).delete("/Users/:id", async (c) => {
   const organizationId = await requireAuth(c);
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
@@ -423,7 +424,7 @@ app.delete("/Users/:id", async (c) => {
 
 // ── Groups ───────────────────────────────────────────────────────────
 
-app.get("/Groups", async (c) => {
+secured.access(SCIM_POLICY).get("/Groups", async (c) => {
   const organizationId = await requireAuth(c);
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
@@ -447,7 +448,7 @@ app.get("/Groups", async (c) => {
   return scimJson(c, result);
 });
 
-app.post("/Groups", async (c) => {
+secured.access(SCIM_POLICY).post("/Groups", async (c) => {
   const organizationId = await requireAuth(c);
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
@@ -477,7 +478,7 @@ app.post("/Groups", async (c) => {
   return scimJson(c, result, 201);
 });
 
-app.get("/Groups/:id", async (c) => {
+secured.access(SCIM_POLICY).get("/Groups/:id", async (c) => {
   const organizationId = await requireAuth(c);
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
@@ -503,7 +504,7 @@ app.get("/Groups/:id", async (c) => {
   return scimJson(c, result);
 });
 
-app.put("/Groups/:id", async (c) => {
+secured.access(SCIM_POLICY).put("/Groups/:id", async (c) => {
   const organizationId = await requireAuth(c);
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
@@ -534,7 +535,7 @@ app.put("/Groups/:id", async (c) => {
   return scimJson(c, result);
 });
 
-app.patch("/Groups/:id", async (c) => {
+secured.access(SCIM_POLICY).patch("/Groups/:id", async (c) => {
   const organizationId = await requireAuth(c);
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
@@ -565,7 +566,7 @@ app.patch("/Groups/:id", async (c) => {
   return scimJson(c, result);
 });
 
-app.delete("/Groups/:id", async (c) => {
+secured.access(SCIM_POLICY).delete("/Groups/:id", async (c) => {
   const organizationId = await requireAuth(c);
   if (!organizationId) {
     return scimError(c, 401, "Bearer token is required");
@@ -583,3 +584,5 @@ app.delete("/Groups/:id", async (c) => {
 
   return c.body(null, 204);
 });
+
+export const app = secured.hono;

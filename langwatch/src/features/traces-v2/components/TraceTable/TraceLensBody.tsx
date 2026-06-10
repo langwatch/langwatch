@@ -17,9 +17,19 @@ import { useFilterStore } from "../../stores/filterStore";
 import { type LensConfig, useViewStore } from "../../stores/viewStore";
 import type { TraceListItem } from "../../types/trace";
 import { RegistryRow } from "./registry";
+import { SELECT_COLUMN_ID } from "./registry/cells/SelectCells";
+
+/**
+ * Module-level singleton so the `pinnedColumnIds` prop is referentially
+ * stable across renders — without it, every render would hand the
+ * shell a new Set and the SortableContext would treat its items as
+ * having changed, kicking off unnecessary re-mounts of the header row.
+ */
+const SELECT_COLUMN_ID_SET = new Set([SELECT_COLUMN_ID]);
+
 import { buildTracePlaceholderRows } from "./skeletonPlaceholders";
-import { TraceStatisticsProvider } from "./traceStatisticsContext";
 import { TraceTableShell } from "./TraceTableShell";
+import { TraceStatisticsProvider } from "./traceStatisticsContext";
 import { useTraceLensColumns } from "./useTraceLensColumns";
 import { useTraceLensKeyboard } from "./useTraceLensKeyboard";
 import { useTraceTableVirtualizer } from "./useTraceTableVirtualizer";
@@ -67,6 +77,7 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
 
   const sortFromStore = useViewStore((s) => s.sort);
   const setSortInStore = useViewStore((s) => s.setSort);
+  const setVisibleColumns = useViewStore((s) => s.setVisibleColumns);
 
   const sizingKey = getColumnSizingKey(lens.id, "trace");
   const persistedSizing = useColumnSizingStore(
@@ -109,10 +120,24 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
     [sorting, setSortInStore],
   );
 
+  // Surface `columnOrder` as explicit Tanstack state. Without it,
+  // Tanstack falls back to "columns array order" for the header row
+  // but holds onto its INTERNAL leaf column cache (built once per
+  // identity) for cell rendering — which means reordering via the
+  // viewStore showed the new order in headers but kept cells in their
+  // old positions ("the cell doesn't match the col"). Passing the
+  // explicit `columnOrder` state forces Tanstack to recompute the
+  // visible leaf order on every change, keeping headers and cells in
+  // lockstep with the store.
+  const columnOrderState = useMemo<string[]>(
+    () => [SELECT_COLUMN_ID, ...lens.columns],
+    [lens.columns],
+  );
+
   const table = useReactTable({
     data: effectiveTraces,
     columns,
-    state: { sorting, columnSizing },
+    state: { sorting, columnSizing, columnOrder: columnOrderState },
     onSortingChange: handleSortingChange,
     onColumnSizingChange: handleColumnSizingChange,
     columnResizeMode: "onChange",
@@ -153,7 +178,24 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
   return (
     <Box tabIndex={0} onKeyDown={handleKeyDown} outline="none" height="full">
       <TraceStatisticsProvider traces={traces} skip={isLoading}>
-        <TraceTableShell table={table} minWidth={minWidth}>
+        {/* stickyFirstColumn pins the leftmost cell (the row-checkbox) so
+            the select target stays reachable during horizontal scroll —
+            the user can still tick a row off-screen without scrolling
+            back to the start. The wider column set (TIMESTAMP, etc.)
+            makes horizontal overflow the common case rather than the
+            edge case it used to be. */}
+        <TraceTableShell
+          table={table}
+          minWidth={minWidth}
+          stickyFirstColumn
+          // Persist drag-reorder via viewStore.setVisibleColumns. The
+          // shell passes the new ordered list of column ids excluding
+          // the select column (pinned via pinnedColumnIds); the store
+          // marks the active lens dirty so the change shows up in
+          // the "save lens" affordance.
+          onColumnReorder={setVisibleColumns}
+          pinnedColumnIds={SELECT_COLUMN_ID_SET}
+        >
           <VirtualSpacer height={paddingTop} colSpan={colSpan} />
           {virtualItems.map((virtualItem) => {
             const row = rows[virtualItem.index];
@@ -181,9 +223,7 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
                   isLoading ? undefined : () => toggleTrace(row.original)
                 }
                 onTogglePeek={
-                  isLoading
-                    ? undefined
-                    : () => togglePeek(row.original.traceId)
+                  isLoading ? undefined : () => togglePeek(row.original.traceId)
                 }
                 isLoading={isLoading}
                 isFirstOfErrorRun={

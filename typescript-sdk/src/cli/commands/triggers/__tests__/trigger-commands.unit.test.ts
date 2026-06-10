@@ -54,7 +54,7 @@ describe("listTriggersCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetch = vi.fn();
-    global.fetch = mockFetch;
+    global.fetch = mockFetch as unknown as typeof fetch;
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -104,7 +104,7 @@ describe("getTriggerCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetch = vi.fn();
-    global.fetch = mockFetch;
+    global.fetch = mockFetch as unknown as typeof fetch;
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -143,7 +143,7 @@ describe("createTriggerCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetch = vi.fn();
-    global.fetch = mockFetch;
+    global.fetch = mockFetch as unknown as typeof fetch;
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -185,7 +185,7 @@ describe("updateTriggerCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetch = vi.fn();
-    global.fetch = mockFetch;
+    global.fetch = mockFetch as unknown as typeof fetch;
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -219,7 +219,7 @@ describe("deleteTriggerCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetch = vi.fn();
-    global.fetch = mockFetch;
+    global.fetch = mockFetch as unknown as typeof fetch;
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();

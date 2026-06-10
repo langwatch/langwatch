@@ -53,6 +53,23 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("'previous'");
     });
 
+    // A span/event facet filter resolves to a `... FROM stored_spans ...`
+    // subquery. stored_spans is partitioned by toYearWeek(StartTime) and tiered
+    // to S3, so the subquery must carry a StartTime predicate or it cold-scans
+    // every weekly partition. The envelope reuses the query's own date params.
+    it("bounds the stored_spans facet subquery to the date envelope by StartTime", () => {
+      const input = {
+        ...baseInput,
+        filters: { "spans.type": ["llm"] },
+      };
+      const result = buildTimeseriesQuery(input);
+
+      expect(result.sql).toContain("FROM stored_spans");
+      // The subquery prunes partitions instead of cold-scanning S3.
+      expect(result.sql).toContain("StartTime >= {previousStart:DateTime64(3)}");
+      expect(result.sql).toContain("StartTime < {currentEnd:DateTime64(3)}");
+    });
+
     it("includes date truncation for timescale", () => {
       const result = buildTimeseriesQuery(baseInput);
 
@@ -1232,6 +1249,30 @@ describe("aggregation-builder", () => {
 
       expect(result.sql).toContain("LIMIT 10");
     });
+
+    it("prunes the deduped trace_summaries read to identity columns", () => {
+      const result = buildTopDocumentsQuery(projectId, startDate, endDate);
+
+      // The document payload comes from the stored_spans ARRAY JOIN, so the
+      // deduped trace_summaries subquery only needs identity/date columns and
+      // must not materialise the wide Attributes map.
+      expect(result.sql).toContain(
+        "SELECT TenantId, TraceId, OccurredAt, UpdatedAt FROM trace_summaries"
+      );
+    });
+
+    it("adds filter-referenced columns to the deduped read so filtered queries stay valid", () => {
+      const result = buildTopDocumentsQuery(projectId, startDate, endDate, {
+        "topics.topics": ["topic-1"],
+      });
+
+      // TopicId is referenced by the filter WHERE, so the deduped subquery must
+      // also select it (otherwise ClickHouse would reject ts.TopicId).
+      expect(result.sql).toContain(
+        "SELECT TenantId, TraceId, OccurredAt, UpdatedAt, TopicId FROM trace_summaries"
+      );
+      expect(result.sql).toContain("ts.TopicId IN");
+    });
   });
 
   describe("buildFeedbacksQuery", () => {
@@ -1298,6 +1339,29 @@ describe("aggregation-builder", () => {
       const result = buildFeedbacksQuery(projectId, startDate, endDate);
 
       expect(result.sql).toContain("ORDER BY event_timestamp DESC");
+    });
+
+    it("prunes the deduped trace_summaries read to identity columns", () => {
+      const result = buildFeedbacksQuery(projectId, startDate, endDate);
+
+      // Feedback payload comes from the stored_spans Events arrays, so the
+      // deduped trace_summaries subquery only needs identity/date columns.
+      expect(result.sql).toContain(
+        "SELECT TenantId, TraceId, OccurredAt, UpdatedAt FROM trace_summaries"
+      );
+    });
+
+    it("adds a filter-referenced Attributes read to the deduped subquery", () => {
+      const result = buildFeedbacksQuery(projectId, startDate, endDate, {
+        "metadata.user_id": ["user-1"],
+      });
+
+      // The user_id filter references ts.Attributes[...], so Attributes must be
+      // present in the deduped subquery's column list for the query to be valid.
+      expect(result.sql).toContain(
+        "SELECT TenantId, TraceId, OccurredAt, UpdatedAt, Attributes FROM trace_summaries"
+      );
+      expect(result.sql).toContain("ts.Attributes[{metaValues_");
     });
   });
 

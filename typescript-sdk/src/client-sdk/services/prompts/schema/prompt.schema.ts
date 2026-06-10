@@ -50,4 +50,5 @@ export const promptMetadataSchema = z.object({
 export const promptDataSchema = z.object({
   ...corePromptDataSchema.shape,
   ...promptMetadataSchema.shape,
+  parameters: z.record(z.string(), z.unknown()).optional(),
 });

@@ -1,7 +1,10 @@
-import type { ModelProvider, ModelProviderScope, Prisma, PrismaClient } from "@prisma/client";
+import type { ModelProvider, ModelProviderScope, PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { generate } from "@langwatch/ksuid";
 import { KSUID_RESOURCES } from "../../utils/constants";
 import { encrypt, decrypt } from "../../utils/encryption";
+import { resolveSingleOrganizationForScopes } from "../scopes/resolveOrganizationForScope";
+import { resolveScopeChain } from "../scopes/resolveScopeChain";
 import type { CustomModelsInput } from "./customModel.schema";
 
 /**
@@ -39,7 +42,10 @@ export class ModelProviderRepository {
   ): Promise<ModelProviderWithScopes | null> {
     const client = tx ?? this.prisma;
     const result = await client.modelProvider.findFirst({
-      where: { id, projectId },
+      where: {
+        id,
+        scopes: { some: { scopeType: "PROJECT", scopeId: projectId } },
+      },
       include: { scopes: true },
     });
     return result ? this.withDecryptedKeys(result) : null;
@@ -52,7 +58,37 @@ export class ModelProviderRepository {
   ): Promise<ModelProviderWithScopes | null> {
     const client = tx ?? this.prisma;
     const result = await client.modelProvider.findFirst({
-      where: { provider, projectId },
+      where: {
+        provider,
+        scopes: { some: { scopeType: "PROJECT", scopeId: projectId } },
+      },
+      include: { scopes: true },
+    });
+    return result ? this.withDecryptedKeys(result) : null;
+  }
+
+  /**
+   * Find a ModelProvider by id anywhere inside an organization, regardless
+   * of whether it is granted at the org, team, or a (possibly sibling)
+   * project scope. The single-org `organizationId` anchor (ADR-021) bounds
+   * the lookup to the caller's tenant, so an id from another org can't be
+   * probed.
+   *
+   * The settings list surfaces org- and sibling-project-scoped rows (see
+   * `findAllAccessibleForProject` / `findAllInOrganization`), so a
+   * PROJECT-scope lookup misses them — which is why deleting an org-scoped
+   * provider from a project view used to 404. The delete path uses this
+   * org-anchored lookup and then gates the action on the per-scope manage
+   * authz.
+   */
+  async findByIdForOrganization(
+    id: string,
+    organizationId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<ModelProviderWithScopes | null> {
+    const client = tx ?? this.prisma;
+    const result = await client.modelProvider.findFirst({
+      where: { id, organizationId },
       include: { scopes: true },
     });
     return result ? this.withDecryptedKeys(result) : null;
@@ -64,7 +100,9 @@ export class ModelProviderRepository {
   ): Promise<ModelProviderWithScopes[]> {
     const client = tx ?? this.prisma;
     const results = await client.modelProvider.findMany({
-      where: { projectId },
+      where: {
+        scopes: { some: { scopeType: "PROJECT", scopeId: projectId } },
+      },
       include: { scopes: true },
     });
     return results.map((result) => this.withDecryptedKeys(result));
@@ -96,11 +134,11 @@ export class ModelProviderRepository {
       where: {
         scopes: {
           some: {
-            OR: [
-              { scopeType: "PROJECT", scopeId: projectId },
-              { scopeType: "TEAM", scopeId: project.teamId },
-              { scopeType: "ORGANIZATION", scopeId: project.team.organizationId },
-            ],
+            OR: resolveScopeChain({
+              organizationId: project.team.organizationId,
+              teamId: project.teamId,
+              projectId,
+            }),
           },
         },
       },
@@ -167,6 +205,11 @@ export class ModelProviderRepository {
        * at `projectId`, matching the legacy iter-107 behavior.
        */
       scopes?: ScopeInput[];
+      rateLimitRpm?: number | null;
+      rateLimitTpm?: number | null;
+      rateLimitRpd?: number | null;
+      fallbackPriorityGlobal?: number | null;
+      providerConfig?: Record<string, unknown> | null;
     },
     tx?: Prisma.TransactionClient,
   ): Promise<ModelProviderWithScopes> {
@@ -177,19 +220,52 @@ export class ModelProviderRepository {
         ? data.scopes
         : [{ scopeType: "PROJECT" as const, scopeId: data.projectId }];
 
+    // Single-organization anchor (ADR-021): every scope this provider attaches
+    // to must resolve to the same org. Resolve them all and reject a mixed or
+    // unresolvable set, so a caller can't slip in scopes from another org under
+    // one anchor. The column is NOT NULL, so an unresolvable scope is a hard
+    // error.
+    const organizationId = await resolveSingleOrganizationForScopes(
+      client,
+      scopes,
+      "model provider",
+    );
+
     return client.modelProvider.create({
       data: {
         id: generate(KSUID_RESOURCES.MODEL_PROVIDER).toString(),
-        projectId: data.projectId,
         name: data.name,
         provider: data.provider,
         enabled: data.enabled,
+        organizationId,
         customKeys: encryptedKeys as Prisma.InputJsonValue | undefined,
         customModels: data.customModels as Prisma.InputJsonValue | undefined,
         customEmbeddingsModels: data.customEmbeddingsModels as
           | Prisma.InputJsonValue
           | undefined,
         extraHeaders: data.extraHeaders ?? [],
+        ...(data.rateLimitRpm !== undefined && {
+          rateLimitRpm: data.rateLimitRpm,
+        }),
+        ...(data.rateLimitTpm !== undefined && {
+          rateLimitTpm: data.rateLimitTpm,
+        }),
+        ...(data.rateLimitRpd !== undefined && {
+          rateLimitRpd: data.rateLimitRpd,
+        }),
+        ...(data.fallbackPriorityGlobal !== undefined && {
+          fallbackPriorityGlobal: data.fallbackPriorityGlobal,
+        }),
+        ...(data.providerConfig !== undefined && {
+          // Explicit null on the input clears the column (Prisma.JsonNull
+          // writes DB null to a Json? field). Bare `null` is rejected by
+          // InputJsonValue, and `?? undefined` would silently turn a
+          // "clear me" into a no-op.
+          providerConfig:
+            data.providerConfig === null
+              ? Prisma.JsonNull
+              : (data.providerConfig as Prisma.InputJsonValue),
+        }),
         scopes: {
           create: scopes.map((scope) => ({
             id: generate(KSUID_RESOURCES.MODEL_PROVIDER_SCOPE).toString(),
@@ -218,14 +294,38 @@ export class ModelProviderRepository {
        * inserted; when omitted the scope set is untouched.
        */
       scopes?: ScopeInput[];
+      rateLimitRpm?: number | null;
+      rateLimitTpm?: number | null;
+      rateLimitRpd?: number | null;
+      fallbackPriorityGlobal?: number | null;
+      providerConfig?: Record<string, unknown> | null;
     },
     tx?: Prisma.TransactionClient,
   ): Promise<ModelProviderWithScopes> {
     const encryptedKeys = this.encryptCustomKeys(data.customKeys);
-    const { scopes, ...rest } = data;
+    const { scopes, providerConfig, ...rest } = data;
 
     const runUpdate = async (workingTx: Prisma.TransactionClient) => {
       if (scopes) {
+        // Single-organization invariant (ADR-021): the replacement scope set
+        // must resolve to the same org the provider is already anchored to.
+        // Without this, swapping scopes could silently rebind the credential to
+        // another tenant while organizationId stays put — a multitenancy break,
+        // since provider visibility is driven from the scope table.
+        const organizationId = await resolveSingleOrganizationForScopes(
+          workingTx,
+          scopes,
+          "model provider",
+        );
+        const existing = await workingTx.modelProvider.findUnique({
+          where: { id },
+          select: { organizationId: true },
+        });
+        if (existing && existing.organizationId !== organizationId) {
+          throw new Error(
+            "Cannot update model provider: scopes must stay within the provider's organization",
+          );
+        }
         await workingTx.modelProviderScope.deleteMany({
           where: { modelProviderId: id },
         });
@@ -240,7 +340,7 @@ export class ModelProviderRepository {
       }
 
       return workingTx.modelProvider.update({
-        where: { id, projectId },
+        where: { id },
         data: {
           ...rest,
           customKeys: encryptedKeys as Prisma.InputJsonValue | undefined,
@@ -248,6 +348,12 @@ export class ModelProviderRepository {
           customEmbeddingsModels: data.customEmbeddingsModels as
             | Prisma.InputJsonValue
             | undefined,
+          ...(providerConfig !== undefined && {
+            providerConfig:
+              providerConfig === null
+                ? Prisma.JsonNull
+                : (providerConfig as Prisma.InputJsonValue),
+          }),
         },
         include: { scopes: true },
       });
@@ -261,12 +367,12 @@ export class ModelProviderRepository {
 
   async delete(
     id: string,
-    projectId: string,
+    _projectId: string,
     tx?: Prisma.TransactionClient,
   ): Promise<ModelProvider> {
     const client = tx ?? this.prisma;
     return client.modelProvider.delete({
-      where: { id, projectId },
+      where: { id },
     });
   }
 
@@ -277,7 +383,10 @@ export class ModelProviderRepository {
   ): Promise<Prisma.BatchPayload> {
     const client = tx ?? this.prisma;
     return client.modelProvider.deleteMany({
-      where: { provider, projectId },
+      where: {
+        provider,
+        scopes: { some: { scopeType: "PROJECT", scopeId: projectId } },
+      },
     });
   }
 

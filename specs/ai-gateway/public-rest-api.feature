@@ -50,52 +50,52 @@ Feature: Public REST API — /api/gateway/v1/*
     And error.code references "virtualKeys:create"
 
   # ============================================================================
-  # Personal Access Token permission ceiling (b8fb945b3 — PAT rebase follow-up)
+  # Scoped API-key permission ceiling (b8fb945b3 — API-key rebase follow-up)
   # ============================================================================
 
   @integration @rest @pat @unimplemented
-  Scenario: PATs exercise routes only within their scoped role (permission ceiling)
+  Scenario: Scoped API keys exercise routes only within their scoped role (permission ceiling)
     Given a user "alice" has role-bindings at project scope:
       | permission               |
       | virtualKeys:view         |
       | virtualKeys:rotate       |
-    And that user issues a PAT "lwp_alice_ro" scoped to the SAME bindings
-    When they send `GET /api/gateway/v1/virtual-keys` with PAT "lwp_alice_ro"
+    And that user issues a scoped API key "lwp_alice_ro" scoped to the SAME bindings
+    When they send `GET /api/gateway/v1/virtual-keys` with API key "lwp_alice_ro"
     Then the response status is 200
-    When they send `POST /api/gateway/v1/virtual-keys` with PAT "lwp_alice_ro"
+    When they send `POST /api/gateway/v1/virtual-keys` with API key "lwp_alice_ro"
     Then the response status is 403 permission_denied
     And error.code references "virtualKeys:create" as the missing permission
-    When they send `POST /api/gateway/v1/virtual-keys/vk_xxx/rotate` with PAT "lwp_alice_ro"
+    When they send `POST /api/gateway/v1/virtual-keys/vk_xxx/rotate` with API key "lwp_alice_ro"
     Then the response status is 200
 
   @integration @rest @pat @unimplemented
-  Scenario: PAT effective access = PAT bindings ∩ user's current bindings
-    Given a PAT "lwp_bob_admin" originally scoped to "virtualKeys:manage" when user "bob" had that role
+  Scenario: Scoped API-key effective access = key bindings ∩ user's current bindings
+    Given an API key "lwp_bob_admin" originally scoped to "virtualKeys:manage" when user "bob" had that role
     And user "bob"'s role has since been demoted to MEMBER (no :create, :update, :rotate, :delete)
-    When they send `POST /api/gateway/v1/virtual-keys` with PAT "lwp_bob_admin"
+    When they send `POST /api/gateway/v1/virtual-keys` with API key "lwp_bob_admin"
     Then the response status is 403 permission_denied
-    # Demoting the user immediately neutralises outstanding PATs without rotation.
+    # Demoting the user immediately neutralises outstanding API keys without rotation.
 
   @integration @rest @pat @security @unimplemented
-  Scenario: PAT fails closed when a linked custom-role row has malformed permissions (583f27ff6)
-    Given a PAT "lwp_broken" linked to a custom role whose `permissions` column is NOT a JSON array
+  Scenario: A scoped API key fails closed when a linked custom-role row has malformed permissions (583f27ff6)
+    Given an API key "lwp_broken" linked to a custom role whose `permissions` column is NOT a JSON array
     # This could happen after a bad migration or direct DB edit.
-    When they send `GET /api/gateway/v1/virtual-keys` with PAT "lwp_broken"
+    When they send `GET /api/gateway/v1/virtual-keys` with API key "lwp_broken"
     Then the response status is 403
-    # The ceiling check raises PatScopeViolationError instead of falling back to empty-array
+    # The ceiling check raises a scope-violation error instead of falling back to empty-array
     # (which would silently grant an "empty" ceiling and let every call through).
     # Parity with role-binding-resolver.ts: malformed permissions → no grants → deny.
 
   @integration @rest @pat @unimplemented
-  Scenario: Legacy project API tokens bypass PAT ceiling (full access)
+  Scenario: Legacy project API tokens bypass the API-key ceiling (full access)
     Given a legacy project API token "sess_legacy" tied to project "acme-prod"
     When they send `POST /api/gateway/v1/virtual-keys` with token "sess_legacy"
     Then the response status is 201
-    # Project tokens predate PATs and keep full access for backcompat —
-    # same behavior the PAT PR (#3213) established for every other unified-auth route.
+    # Project tokens predate scoped API keys and keep full access for backcompat —
+    # same behavior the unified-auth rebase (#3213) established for every other route.
 
-  Scenario Outline: PAT ceiling mapping for every gateway REST route (b8fb945b3)
-    Given a PAT with only "<permission>"
+  Scenario Outline: API-key ceiling mapping for every gateway REST route (b8fb945b3)
+    Given a scoped API key with only "<permission>"
     When they send `<method> <path>`
     Then the response is allowed (200/201) on a matching permission and 403 on a mismatch
 
@@ -185,9 +185,9 @@ Feature: Public REST API — /api/gateway/v1/*
     And error.type = "not_found"
 
   @integration @rest @cache-rules @unimplemented
-  Scenario: PAT without gatewayCacheRules:create cannot POST
-    Given a PAT "lwp_ro" with only gatewayCacheRules:view
-    When they send `POST /api/gateway/v1/cache-rules` with PAT "lwp_ro"
+  Scenario: A scoped API key without gatewayCacheRules:create cannot POST
+    Given a scoped API key "lwp_ro" with only gatewayCacheRules:view
+    When they send `POST /api/gateway/v1/cache-rules` with API key "lwp_ro"
     Then the response status is 403 permission_denied
     And error.code references "gatewayCacheRules:create"
 
@@ -204,17 +204,17 @@ Feature: Public REST API — /api/gateway/v1/*
 
   @integration @rest @unimplemented
   Scenario: Create a virtual key
-    Given a gateway-provider-credential "gpc_openai_primary" is bound on project "acme-prod"
+    Given a gateway-provider-credential "mp_openai_primary" is bound on project "acme-prod"
     When I send `POST /api/gateway/v1/virtual-keys` with token "sess_abc" and body:
       """
       {
         "name": "ci-key",
         "environment": "live",
-        "provider_credential_ids": ["gpc_openai_primary"]
+        "provider_model_provider_ids": ["mp_openai_primary"]
       }
       """
     Then the response status is 201
-    And the body has a non-empty `secret` field starting with "lw_vk_live_"
+    And the body has a non-empty `secret` field starting with "vk-lw-"
     And the body's `virtual_key.name` is "ci-key"
     And the body's `virtual_key.prefix` + "..." + `virtual_key.last_four` reconstructs the secret-visible portion
     And subsequent GET of the same key returns the virtual_key but NOT the secret
@@ -223,7 +223,7 @@ Feature: Public REST API — /api/gateway/v1/*
   Scenario: Reject VK creation without at least one provider
     When I send `POST /api/gateway/v1/virtual-keys` with body:
       """
-      { "name": "no-providers", "provider_credential_ids": [] }
+      { "name": "no-providers", "provider_model_provider_ids": [] }
       """
     Then the response status is 400
     And error.type = "bad_request"
@@ -293,17 +293,17 @@ Feature: Public REST API — /api/gateway/v1/*
       }
       """
     Then the response status is 201
-    And the body has `provider_credential.id` starting with "gpc_"
+    And the body has `model_provider.id` starting with "mp_"
     And subsequent `GET /providers` lists the new binding with `health_status` = "healthy"
 
   @integration @rest @unimplemented
   Scenario: Disable a provider binding stops it from being used on new VKs
-    Given a gateway-provider-credential "gpc_1" is bound and used by 2 VKs
-    When I send `DELETE /api/gateway/v1/providers/gpc_1`
+    Given a gateway-provider-credential "mp_openai_1" is bound and used by 2 VKs
+    When I send `DELETE /api/gateway/v1/providers/mp_openai_1`
     Then the response status is 200
-    And `provider_credential.disabled_at` is non-null
-    And existing VKs bound to gpc_1 still resolve successfully
-    But new `POST /virtual-keys` with `provider_credential_ids: ["gpc_1"]` returns 400 with error.code = "provider_disabled"
+    And `model_provider.disabled_at` is non-null
+    And existing VKs bound to mp_openai_1 still resolve successfully
+    But new `POST /virtual-keys` with `model_provider_ids: ["mp_openai_1"]` returns 400 with error.code = "provider_disabled"
 
   # ============================================================================
   # DTO shape (snake_case vs camelCase)

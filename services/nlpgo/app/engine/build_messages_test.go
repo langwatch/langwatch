@@ -103,7 +103,7 @@ func TestBuildMessages_DropsUnfilledPlaceholderTurn(t *testing.T) {
 	assert.Equal(t, "test6", msgs[0].Content)
 	for _, m := range msgs {
 		assert.NotEqual(t, "{{input}}", m.Content, "no literal placeholder turn may survive")
-		assert.NotEqual(t, "", strings.TrimSpace(m.Content.(string)), "no empty turn may survive")
+		assert.NotEmpty(t, strings.TrimSpace(m.Content.(string)), "no empty turn may survive")
 	}
 }
 
@@ -299,7 +299,7 @@ func TestBuildMessages_PreservesToolCallsThroughJSON(t *testing.T) {
 	assert.Equal(t, "call_abc", tc.ID)
 	assert.Equal(t, "function", tc.Type)
 	assert.Equal(t, "lookup", tc.Function["name"])
-	assert.Equal(t, `{"q":"weather"}`, tc.Function["arguments"])
+	assert.JSONEq(t, `{"q":"weather"}`, tc.Function["arguments"].(string))
 
 	// Tool turn keeps its linkage to the assistant call.
 	assert.Equal(t, "tool", msgs[1].Role)

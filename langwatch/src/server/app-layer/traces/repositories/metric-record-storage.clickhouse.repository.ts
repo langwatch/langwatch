@@ -1,4 +1,5 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { NormalizedMetricRecord } from "~/server/event-sourcing/pipelines/trace-processing/schemas/metricRecords";
 import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
@@ -16,7 +17,7 @@ export class MetricRecordStorageClickHouseRepository
 {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
-  async insertMetricRecord(record: NormalizedMetricRecord): Promise<void> {
+  async insertMetricRecord(record: NormalizedMetricRecord, retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS): Promise<void> {
     EventUtils.validateTenantId(
       { tenantId: record.tenantId },
       "MetricRecordStorageClickHouseRepository.insertMetricRecord",
@@ -42,6 +43,7 @@ export class MetricRecordStorageClickHouseRepository
             ResourceAttributes: record.resourceAttributes,
             CreatedAt: now,
             UpdatedAt: now,
+            _retention_days: retentionDays,
           },
         ],
         format: "JSONEachRow",

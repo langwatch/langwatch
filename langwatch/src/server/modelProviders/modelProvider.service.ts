@@ -2,6 +2,7 @@ import type { PrismaClient, Project } from "@prisma/client";
 import type { Session } from "~/server/auth";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { env } from "~/env.mjs";
 import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
 import type { CustomModelsInput } from "./customModel.schema";
 import { toLegacyCompatibleCustomModels } from "./customModel.schema";
@@ -59,6 +60,15 @@ export type UpdateModelProviderInput = {
    */
   scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
   scopeId?: string;
+  /**
+   * Advanced gateway settings, persisted on the same ModelProvider row
+   * as the basic fields so the drawer's single Save covers both.
+   */
+  rateLimitRpm?: number | null;
+  rateLimitTpm?: number | null;
+  rateLimitRpd?: number | null;
+  fallbackPriorityGlobal?: number | null;
+  providerConfig?: Record<string, unknown> | null;
 };
 
 export type DeleteModelProviderInput = {
@@ -66,6 +76,28 @@ export type DeleteModelProviderInput = {
   projectId: string;
   provider: string;
 };
+
+type AdvancedGatewayInput = {
+  rateLimitRpm?: number | null;
+  rateLimitTpm?: number | null;
+  rateLimitRpd?: number | null;
+  fallbackPriorityGlobal?: number | null;
+  providerConfig?: Record<string, unknown> | null;
+};
+
+function pickAdvancedFields(input: AdvancedGatewayInput): AdvancedGatewayInput {
+  const out: AdvancedGatewayInput = {};
+  if (input.rateLimitRpm !== undefined) out.rateLimitRpm = input.rateLimitRpm;
+  if (input.rateLimitTpm !== undefined) out.rateLimitTpm = input.rateLimitTpm;
+  if (input.rateLimitRpd !== undefined) out.rateLimitRpd = input.rateLimitRpd;
+  if (input.fallbackPriorityGlobal !== undefined) {
+    out.fallbackPriorityGlobal = input.fallbackPriorityGlobal;
+  }
+  if (input.providerConfig !== undefined) {
+    out.providerConfig = input.providerConfig;
+  }
+  return out;
+}
 
 /**
  * Service layer for ModelProvider business logic.
@@ -415,7 +447,26 @@ export class ModelProviderService {
       extraHeaders,
       defaultModel,
       name,
+      rateLimitRpm,
+      rateLimitTpm,
+      rateLimitRpd,
+      fallbackPriorityGlobal,
+      providerConfig,
     } = input;
+
+    const advanced = {
+      rateLimitRpm,
+      rateLimitTpm,
+      rateLimitRpd,
+      fallbackPriorityGlobal,
+      providerConfig,
+    };
+    const hasAdvancedWrite =
+      rateLimitRpm !== undefined ||
+      rateLimitTpm !== undefined ||
+      rateLimitRpd !== undefined ||
+      fallbackPriorityGlobal !== undefined ||
+      providerConfig !== undefined;
 
     // Validate provider exists
     if (!(provider in modelProviders)) {
@@ -434,6 +485,18 @@ export class ModelProviderService {
     // a user adds a second instance of the same provider type.
     const existingProvider = await this.findExistingProvider(id, projectId);
 
+    // When the caller supplied an `id` but no row resolves, the target
+    // row was concurrently deleted or is not visible from this project.
+    // Falling through to createNew would silently produce a brand-new
+    // row in the caller's project instead of erroring; surface
+    // NOT_FOUND so the client can refetch and retry.
+    if (id && !existingProvider) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Model provider not found",
+      });
+    }
+
     // Resolve input scope set. Callers may pass `scopes: [...]` directly,
     // or a single-scope pair via the legacy `scopeType`/`scopeId` fields.
     // When neither is given, defer to the create/update defaults.
@@ -451,6 +514,23 @@ export class ModelProviderService {
       await assertCanManageAllScopes(ctx, scopes);
     }
 
+    // Advanced (Gateway) writes also require manage on every scope the
+    // existing row is bound to — not just the project the caller is in.
+    // Matches the previous `updateAdvancedSettings` contract: a project
+    // admin must not nudge rate limits on a credential that's also
+    // bound to its parent org/team without manage there. The basic
+    // update path keeps its existing semantics (project:update gate
+    // only) so this PR doesn't tighten unrelated writes.
+    if (ctx && hasAdvancedWrite && existingProvider) {
+      await assertCanManageAllScopes(
+        ctx,
+        existingProvider.scopes.map((s) => ({
+          scopeType: s.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
+          scopeId: s.scopeId,
+        })),
+      );
+    }
+
     return await this.prisma.$transaction(async (tx) => {
       let result;
 
@@ -466,6 +546,7 @@ export class ModelProviderService {
             customModels: customModels ?? [],
             customEmbeddingsModels: customEmbeddingsModels ?? [],
             extraHeaders: extraHeaders ?? [],
+            advanced,
           },
           validatedKeys,
           customKeysProvided,
@@ -482,6 +563,7 @@ export class ModelProviderService {
             customModels: customModels ?? undefined,
             customEmbeddingsModels: customEmbeddingsModels ?? undefined,
             extraHeaders: extraHeaders ?? [],
+            advanced,
           },
           validatedKeys,
           customKeysProvided,
@@ -580,7 +662,12 @@ export class ModelProviderService {
   }
 
   /**
-   * Deletes a model provider.
+   * Deletes a model provider — a hard delete of the row and its encrypted
+   * credentials (scope grants cascade). The settings list surfaces rows
+   * granted at the org, team, or a sibling project, so the existence/authz
+   * lookup is anchored to the caller's organization rather than the viewing
+   * project; a PROJECT-scope lookup used to 404 an org-scoped provider that
+   * was plainly visible in the list.
    *
    * Scope authz: the caller must hold the manage-permission on EVERY
    * current scope entry. A team-level admin cannot silently blow up an
@@ -594,9 +681,17 @@ export class ModelProviderService {
     const { id, projectId, provider } = input;
 
     if (ctx) {
-      const existing = id
-        ? await this.repository.findById(id, projectId)
-        : await this.repository.findByProvider(provider, projectId);
+      const organizationId =
+        await this.resolveProjectOrganizationId(projectId);
+      // Org-anchored lookup when we can resolve the tenant; otherwise fall
+      // back to the legacy project-scope lookup so a missing project can't
+      // widen the blast radius.
+      const existing =
+        id && organizationId
+          ? await this.repository.findByIdForOrganization(id, organizationId)
+          : id
+            ? await this.repository.findById(id, projectId)
+            : await this.repository.findByProvider(provider, projectId);
       if (!existing) {
         throw new TRPCError({
           code: "NOT_FOUND",
@@ -617,6 +712,21 @@ export class ModelProviderService {
     } else {
       return await this.repository.deleteByProvider(provider, projectId);
     }
+  }
+
+  /**
+   * Resolves the organization a project belongs to (via its team). Returns
+   * null when the project can't be found, letting callers fall back to a
+   * project-scoped path instead of widening access.
+   */
+  private async resolveProjectOrganizationId(
+    projectId: string,
+  ): Promise<string | null> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { team: { select: { organizationId: true } } },
+    });
+    return project?.team?.organizationId ?? null;
   }
 
   /**
@@ -663,7 +773,21 @@ export class ModelProviderService {
       Object.entries(modelProviders)
         .filter(([_, modelProvider]) => modelProvider.enabledSince)
         .map(([providerKey, modelProvider]) => {
+          // Auto-enable from host env vars only when running in SaaS mode.
+          // In SaaS, the platform's `ANTHROPIC_API_KEY` (etc.) is the
+          // shared platform key that every org tenant inherits — that's
+          // the intended product behavior. In self-hosted, the host
+          // `.env` keys belong to whoever installed the deployment and
+          // should NOT silently leak into every fresh org as "already
+          // configured" (G79: Ariana's fresh-org Anthropic edit drawer
+          // pre-populated the API-key field with masked dots, making the
+          // admin think their org had a key when they didn't).
+          //
+          // Self-hosted operators who DO want global env-key sharing can
+          // still set `IS_SAAS=true` explicitly; the default is the
+          // safer multi-tenant isolation.
           const enabled =
+            env.IS_SAAS === true &&
             modelProvider.enabledSince! < project.createdAt &&
             !!process.env[modelProvider.apiKey] &&
             (providerKey !== "vertex_ai" || !!process.env.VERTEXAI_PROJECT);
@@ -925,6 +1049,7 @@ export class ModelProviderService {
       customModels: CustomModelsInput;
       customEmbeddingsModels: CustomModelsInput;
       extraHeaders: { key: string; value: string }[];
+      advanced: AdvancedGatewayInput;
     },
     validatedKeys: Record<string, unknown> | null,
     customKeysProvided: boolean,
@@ -952,6 +1077,7 @@ export class ModelProviderService {
         ...(customKeysToSave !== undefined && {
           customKeys: customKeysToSave,
         }),
+        ...pickAdvancedFields(data.advanced),
       },
       tx,
     );
@@ -967,6 +1093,7 @@ export class ModelProviderService {
       customEmbeddingsModels?: CustomModelsInput;
       extraHeaders: { key: string; value: string }[];
       scopes?: ScopeInput[];
+      advanced: AdvancedGatewayInput;
     },
     validatedKeys: Record<string, unknown> | null,
     customKeysProvided: boolean,
@@ -984,6 +1111,7 @@ export class ModelProviderService {
         scopes: data.scopes,
         ...(customKeysProvided &&
           validatedKeys && { customKeys: validatedKeys }),
+        ...pickAdvancedFields(data.advanced),
       },
       tx,
     );

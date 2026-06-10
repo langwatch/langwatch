@@ -288,6 +288,7 @@ describe("Feature: Projects REST API", () => {
   });
 
   describe("PATCH /api/projects/:id", () => {
+    /** @scenario PATCH /api/projects/:id updates project name */
     it("updates project fields", async () => {
       const createRes = await api.post("/api/projects", {
         name: `Patch Test ${nanoid(6)}`,
@@ -314,6 +315,117 @@ describe("Feature: Projects REST API", () => {
         name: "Whatever",
       });
       expect(res.status).toBe(404);
+    });
+
+    describe("when moving project to different team", () => {
+      let destinationTeam: Team;
+      let projectToMove: { id: string; teamId: string };
+
+      beforeAll(async () => {
+        destinationTeam = await prisma.team.create({
+          data: {
+            name: "Move Destination Team",
+            slug: `--test-move-dest-${ns}`,
+            organizationId: testOrganization.id,
+          },
+        });
+
+        const createRes = await api.post("/api/projects", {
+          name: `Move Test ${nanoid(6)}`,
+          teamId: testTeam.id,
+          language: "python",
+          framework: "langchain",
+        });
+        projectToMove = await createRes.json();
+      });
+
+      /** @scenario PATCH /api/projects/:id moves project to different team */
+      it("moves project to a different team in the same org", async () => {
+        const res = await api.patch(`/api/projects/${projectToMove.id}`, {
+          teamId: destinationTeam.id,
+        });
+        expect(res.status).toBe(200);
+
+        const body = await res.json();
+        expect(body.teamId).toBe(destinationTeam.id);
+      });
+
+      /** @scenario PATCH /api/projects/:id updates name and team together */
+      it("updates name and team together", async () => {
+        const res = await api.patch(`/api/projects/${projectToMove.id}`, {
+          name: "Moved And Renamed",
+          teamId: testTeam.id,
+        });
+        expect(res.status).toBe(200);
+
+        const body = await res.json();
+        expect(body.name).toBe("Moved And Renamed");
+        expect(body.teamId).toBe(testTeam.id);
+      });
+
+      /** @scenario PATCH rejects non-existent teamId */
+      it("rejects teamId that does not exist", async () => {
+        const res = await api.patch(`/api/projects/${projectToMove.id}`, {
+          teamId: "nonexistent-team",
+        });
+        expect(res.status).toBe(400);
+      });
+
+      /** @scenario PATCH rejects teamId of archived team */
+      it("rejects teamId of archived team", async () => {
+        const archivedTeam = await prisma.team.create({
+          data: {
+            name: "Archived Team",
+            slug: `--test-archived-${ns}`,
+            organizationId: testOrganization.id,
+            archivedAt: new Date(),
+          },
+        });
+
+        const res = await api.patch(`/api/projects/${projectToMove.id}`, {
+          teamId: archivedTeam.id,
+        });
+        expect(res.status).toBe(400);
+      });
+
+      /** @scenario PATCH rejects teamId from different organization */
+      it("rejects teamId from different organization", async () => {
+        const otherOrg = await prisma.organization.create({
+          data: { name: "Other Org", slug: `--test-other-org-${ns}` },
+        });
+        const otherTeam = await prisma.team.create({
+          data: {
+            name: "Other Team",
+            slug: `--test-other-team-${ns}`,
+            organizationId: otherOrg.id,
+          },
+        });
+
+        const res = await api.patch(`/api/projects/${projectToMove.id}`, {
+          teamId: otherTeam.id,
+        });
+        expect(res.status).toBe(400);
+
+        await prisma.team.delete({ where: { id: otherTeam.id } }).catch(() => {});
+        await prisma.organization.delete({ where: { id: otherOrg.id } }).catch(() => {});
+      });
+
+      /** @scenario PATCH with teamId and name is atomic */
+      it("does not update name when team validation fails (atomic)", async () => {
+        const beforeRes = await api.get(`/api/projects/${projectToMove.id}`);
+        const beforeBody = await beforeRes.json();
+        const beforeName = beforeBody.name;
+
+        const res = await api.patch(`/api/projects/${projectToMove.id}`, {
+          name: "Should Not Persist",
+          teamId: "nonexistent-team",
+        });
+        expect(res.status).toBe(400);
+
+        const afterRes = await api.get(`/api/projects/${projectToMove.id}`);
+        const after = await afterRes.json();
+        expect(after.name).toBe(beforeName);
+      });
     });
   });
 

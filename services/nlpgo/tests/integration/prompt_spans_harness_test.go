@@ -45,15 +45,20 @@ import (
 // configId), a saved-version node (configId + handle + versionMetadata),
 // or a draft node (saved + promptDraft=true).
 type signatureNodeOpts struct {
-	NodeID         string
-	NodeName       string
-	ConfigID       string
-	Handle         string
-	VersionID      string
-	VersionNumber  int
-	Draft          bool
-	Instructions   string
-	TemplateMsgs   []map[string]any
+	NodeID        string
+	NodeName      string
+	ConfigID      string
+	Handle        string
+	VersionID     string
+	VersionNumber int
+	Draft         bool
+	Instructions  string
+	TemplateMsgs  []map[string]any
+	// Origin sets the dispatch envelope's payload.origin. Defaults to
+	// "workflow" (Studio Run-Component). Eval-v3 dispatches use
+	// "evaluation"; the engine stamps it on langwatch.origin so the
+	// trace-UI groups per-row prompt spans under the experiment surface.
+	Origin string
 }
 
 // signatureWorkflowBody builds an execute_component envelope shaped
@@ -68,6 +73,10 @@ func signatureWorkflowBody(t *testing.T, node signatureNodeOpts, inputs map[stri
 	}
 	if node.NodeName == "" {
 		node.NodeName = "LLM Node"
+	}
+	origin := node.Origin
+	if origin == "" {
+		origin = "workflow"
 	}
 
 	parameters := []map[string]any{
@@ -120,7 +129,7 @@ func signatureWorkflowBody(t *testing.T, node signatureNodeOpts, inputs map[stri
 		"payload": map[string]any{
 			"trace_id": "prompt-spans-" + node.NodeID,
 			"node_id":  node.NodeID,
-			"origin":   "workflow",
+			"origin":   origin,
 			"workflow": map[string]any{
 				"workflow_id":      "wf_prompt_spans",
 				"api_key":          "sk-prompt-spans",
@@ -242,4 +251,3 @@ func (f *promptSpansFixture) FindPromptSpan(t *testing.T, name string) sdktrace.
 	}
 	return s
 }
-

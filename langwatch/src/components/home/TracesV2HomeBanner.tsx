@@ -50,13 +50,28 @@ function snooze(projectId: string) {
 	}
 }
 
+/**
+ * Exposed so the home page can decide whether to show this banner or fall
+ * back to the next-in-line announcement (e.g. {@link VoiceAgentsHomeBanner}).
+ */
+export function isTracesV2BannerSnoozed(projectId: string): boolean {
+	return isSnoozed(projectId);
+}
+
 // Colours mirror the in-app NewTracesPromo banner so the two surfaces feel
 // like the same announcement. Resolved hex values are required because the
 // MeshGradient WebGL shader cannot read CSS variables.
 const MESH_COLORS_LIGHT = ["#6b21a8", "#a855f7", "#ec4899", "#fdf2f8"];
 const MESH_COLORS_DARK = ["#581c87", "#9333ea", "#db2777", "#1f0a2e"];
 
-export function TracesV2HomeBanner() {
+/**
+ * @param onDismissed Fired when the user dismisses (or click-through-snoozes)
+ *   the banner. The parent ({@link HomePageBanners}) uses this to flip to the
+ *   next banner in the same render pass instead of waiting for a reload.
+ */
+export function TracesV2HomeBanner({
+	onDismissed,
+}: { onDismissed?: () => void } = {}) {
 	const { project } = useOrganizationTeamProject({
 		redirectToOnboarding: false,
 		redirectToProjectOnboarding: false,
@@ -84,6 +99,7 @@ export function TracesV2HomeBanner() {
 	const handleDismiss = () => {
 		if (projectId) snooze(projectId);
 		setDismissed(true);
+		onDismissed?.();
 	};
 
 	// Flip the per-device preference so `useTraceDetailsDrawer` opens

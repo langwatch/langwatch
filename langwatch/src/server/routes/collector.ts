@@ -1,23 +1,14 @@
 import crypto from "node:crypto";
-import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import superjson from "superjson";
 import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
-import { loggerMiddleware } from "../../app/api/middleware/logger";
-import { tracerMiddleware } from "../../app/api/middleware/tracer";
 import { captureException, getCurrentScope } from "../../utils/posthogErrorCapture";
 import { getApp } from "../app-layer/app";
 import { evaluationNameAutoslug } from "../background/workers/collector/evaluationNameAutoslug";
 import { maybeAddIdsToContextList } from "../background/workers/collector/rag";
 import { fetchExistingMD5s } from "../background/workers/collectorWorker";
 import { prisma } from "../db";
-import type {
-  CollectorRESTParamsValidator,
-  CustomMetadata,
-  ReservedTraceMetadata,
-  Span,
-} from "../tracer/types";
 import {
   collectorRESTParamsValidatorSchema,
   customMetadataSchema,
@@ -25,7 +16,11 @@ import {
   spanMetricsSchema,
   spanSchema,
   spanValidatorSchema,
-} from "../tracer/types.generated";
+  type CollectorRESTParamsValidator,
+  type CustomMetadata,
+  type ReservedTraceMetadata,
+  type Span,
+} from "../tracer/types";
 import { CollectorSpanUtils } from "../traces/collectorSpan.utils";
 import { createLogger } from "../../utils/logger/server";
 import { TokenResolver } from "../api-key/token-resolver";
@@ -34,18 +29,15 @@ import {
   extractCredentials,
   apiKeyCeilingDenialResponse,
 } from "../api-key/auth-middleware";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 
 const logger = createLogger("langwatch.collector");
 const tokenResolver = TokenResolver.create(prisma);
 
-export const app = new Hono().basePath("/api");
-
-// Middleware
-app.use(tracerMiddleware({ name: "langwatch.collector" }));
-app.use(loggerMiddleware());
+const secured = createServiceApp({ basePath: "/api" });
 
 // POST /api/collector
-app.post(
+secured.access(handlerManagedAuth("ingestion API key resolved in-handler")).post(
   "/collector",
   bodyLimit({ maxSize: 10 * 1024 * 1024 }), // 10MB
   async (c) => {
@@ -98,9 +90,9 @@ app.post(
       return c.json({ error: "Unauthorized", message: "Invalid credentials" }, 401);
     }
 
-    // Enforce PAT ceiling (legacy tokens bypass). `traces:create` gates write
+    // Enforce API-key ceiling (legacy tokens bypass). `traces:create` gates write
     // access — ADMIN and MEMBER have it; VIEWER does not, preventing
-    // read-only PATs from ingesting traces.
+    // read-only API keys from ingesting traces.
     try {
       await enforceApiKeyCeiling({
         prisma,
@@ -264,8 +256,8 @@ app.post(
       return c.json({ error: validationError.message }, 400);
     }
 
-    // Body successfully validated — mark PAT as used if this request was
-    // authenticated via PAT
+    // Body successfully validated — mark the API key as used if this request was
+    // authenticated via API key
     if (resolved.type === "apiKey") {
       tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
     }
@@ -286,23 +278,6 @@ app.post(
       return c.json(
         { message: "Invalid 'spans' field, expecting array" },
         400,
-      );
-    }
-
-    if (body.spans?.length > 200) {
-      logger.info(
-        {
-          projectId: project.id,
-          spansCount: body.spans?.length,
-          traceId: nullableTraceId,
-        },
-        "[429] Too many spans",
-      );
-      return c.json(
-        {
-          message: "Too many spans, maximum of 200 per trace",
-        },
-        429,
       );
     }
 
@@ -519,7 +494,7 @@ app.post(
 
       return c.json({
         message: "No changes",
-        partialSuccess: { rejectedSpans: 0, errorMessage: "" },
+        partialSuccess: { rejectedSpans: 0, dedupedSpans: 0, errorMessage: "" },
       });
     }
 
@@ -545,6 +520,7 @@ app.post(
     }
 
     let rejectedSpans = 0;
+    let dedupedSpans = 0;
     let rejectionErrors: string[] = [];
     try {
       const resource = CollectorSpanUtils.buildResource({
@@ -553,35 +529,38 @@ app.post(
         expectedOutput,
       });
 
-      const results = await Promise.allSettled(
+      const ingestion = getApp().traces.collection;
+      const results = await Promise.all(
         spans.map((span) =>
-          getApp().traces.recordSpan({
+          ingestion.ingestNormalizedSpan({
             tenantId: project.id,
             span: CollectorSpanUtils.convertSpanToOtlp(span),
             resource,
             instrumentationScope: { name: "langwatch.rest.collector" },
             piiRedactionLevel: project.piiRedactionLevel,
-            occurredAt: Date.now(),
           }),
         ),
       );
 
-      const failures = results.filter(
-        (r): r is PromiseRejectedResult => r.status === "rejected",
-      );
+      const failures = results.filter((r) => r.status === "failed");
+      dedupedSpans = results.filter((r) => r.status === "deduped").length;
       rejectedSpans = failures.length;
-      rejectionErrors = failures.map((f) =>
-        f.reason instanceof Error ? f.reason.message : String(f.reason),
-      );
+      rejectionErrors = failures.map((f) => f.error ?? "unknown error");
       if (failures.length > 0) {
         logger.error(
           {
             projectId: project.id,
             traceId,
             failureCount: failures.length,
-            errors: failures.map((f) => f.reason),
+            errors: rejectionErrors,
           },
           "Error dispatching collector spans to event sourcing",
+        );
+      }
+      if (dedupedSpans > 0) {
+        logger.info(
+          { projectId: project.id, traceId, dedupedSpans },
+          "REST collector deduped repeated spans",
         );
       }
     } catch (error) {
@@ -651,8 +630,11 @@ app.post(
       message: "Trace received successfully.",
       partialSuccess: {
         rejectedSpans,
+        dedupedSpans,
         errorMessage: rejectionErrors.join("; "),
       },
     });
   },
 );
+
+export const app = secured.hono;

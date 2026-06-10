@@ -14,6 +14,8 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
+import { PersonalFeatureGateDialog } from "~/components/me/PersonalFeatureGateDialog";
+import { usePersonalFeatureGate } from "~/components/me/usePersonalFeatureGate";
 import { AnnotationPopover } from "./AnnotationPopover";
 
 type AnnotationItem = RouterOutputs["annotation"]["getByTraceIds"][number];
@@ -40,7 +42,19 @@ export function TurnActionRow({ traceId, output }: TurnAnnotationProps) {
 
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 
+  const annotationsGate = usePersonalFeatureGate("annotations");
+  const datasetsGate = usePersonalFeatureGate("datasets");
+
   if (!canManage) return null;
+
+  // The trio used to sit permanently visible on every turn separator —
+  // ~180px of chrome multiplied across N turns adds a lot of visual
+  // weight to a view that's supposed to be "read the conversation".
+  // Default to invisible + reveal on `_groupHover` of the parent
+  // ChatTurnRow Flex (which already declares `role="group"`). Forced
+  // visible while a popover is open so the anchor doesn't vanish under
+  // the user mid-edit.
+  const isForceVisible = openPopover !== null;
 
   return (
     <HStack
@@ -49,13 +63,23 @@ export function TurnActionRow({ traceId, output }: TurnAnnotationProps) {
       flexWrap="wrap"
       justify="flex-end"
       onClick={stop}
+      opacity={isForceVisible ? 1 : 0}
+      _groupHover={{ opacity: 1 }}
+      _groupFocusWithin={{ opacity: 1 }}
+      transition="opacity 120ms ease"
     >
       <AnnotationPopover
         traceId={traceId}
         output={output}
         mode="annotate"
         open={openPopover === "annotate"}
-        onOpenChange={(open) => setOpenPopover(open ? "annotate" : null)}
+        onOpenChange={async (open) => {
+          if (open) {
+            const allowed = await annotationsGate.requestEnable();
+            if (!allowed) return;
+          }
+          setOpenPopover(open ? "annotate" : null);
+        }}
         triggerTooltip="Add a note or score"
         trigger={<ActionButton icon={Edit3} label="Annotate" />}
       />
@@ -64,7 +88,13 @@ export function TurnActionRow({ traceId, output }: TurnAnnotationProps) {
         output={output}
         mode="suggest"
         open={openPopover === "suggest"}
-        onOpenChange={(open) => setOpenPopover(open ? "suggest" : null)}
+        onOpenChange={async (open) => {
+          if (open) {
+            const allowed = await annotationsGate.requestEnable();
+            if (!allowed) return;
+          }
+          setOpenPopover(open ? "suggest" : null);
+        }}
         triggerTooltip="Suggest a corrected output"
         trigger={<ActionButton icon={Lightbulb} label="Suggest" />}
       />
@@ -78,8 +108,10 @@ export function TurnActionRow({ traceId, output }: TurnAnnotationProps) {
           color="fg.muted"
           gap={1}
           paddingX={2}
-          onClick={(e) => {
+          onClick={async (e) => {
             e.stopPropagation();
+            const allowed = await datasetsGate.requestEnable();
+            if (!allowed) return;
             openDrawer("addDatasetRecord", { traceId });
           }}
         >
@@ -87,6 +119,8 @@ export function TurnActionRow({ traceId, output }: TurnAnnotationProps) {
           <Text textStyle="2xs">Dataset</Text>
         </Button>
       </Tooltip>
+      <PersonalFeatureGateDialog state={annotationsGate.dialogState} />
+      <PersonalFeatureGateDialog state={datasetsGate.dialogState} />
     </HStack>
   );
 }

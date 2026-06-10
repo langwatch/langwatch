@@ -82,7 +82,7 @@ spec:
                 - name: CRON_API_KEY
                   valueFrom:
                     secretKeyRef:
-                      name: {{ $root.Values.secrets.existingSecret | default ($root.Values.autogen.secretNames.app | default (printf "%s-app-secrets" $root.Release.Name)) }}
+                      name: {{ include "langwatch.appSecretName" $root }}
                       key: {{ $root.Values.secrets.secretKeys.cronApiKey | default "cronApiKey" }}
               command: ["/bin/sh", "-c"]
               args:

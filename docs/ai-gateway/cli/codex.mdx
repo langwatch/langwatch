@@ -4,13 +4,25 @@ description: Route the OpenAI Codex CLI through the LangWatch AI Gateway.
 sidebarTitle: Codex CLI
 ---
 
-The Codex CLI speaks the OpenAI Chat Completions and Responses APIs. Both are available from the LangWatch AI Gateway and Codex will work with either — set the two env vars and go.
+The Codex CLI speaks the OpenAI Chat Completions and Responses APIs. Both are available from the LangWatch AI Gateway and Codex will work with either, set the two env vars and go.
 
-## Setup
+## Quick path: `langwatch codex` wrapper (recommended for personal IDE keys)
+
+If you've authenticated via `langwatch login --device` ([Personal IDE keys](/ai-gateway/governance/personal-keys)), the simplest invocation is the wrapper. It exec's Codex with the right env vars already pointing at your gateway:
+
+```bash
+langwatch codex "explain this repo"
+```
+
+All Codex flags, subcommands pass through unchanged, `langwatch codex` is byte-for-byte equivalent to bare `codex`, just with `OPENAI_BASE_URL` and `OPENAI_API_KEY` already set.
+
+## Manual setup: service VK, shared workstation
+
+If you have a **service-virtual-key** for non-personal traffic, or you want every plain `codex` invocation to route through the gateway without the wrapper:
 
 ```bash
 export OPENAI_BASE_URL="https://gateway.langwatch.ai/v1"
-export OPENAI_API_KEY="lw_vk_live_01HZX..."
+export OPENAI_API_KEY="vk-lw-01HZX..."
 codex exec "explain this repo"
 ```
 
@@ -41,11 +53,11 @@ model_reasoning_effort = "low"
 
 ### Cross-provider routing (Anthropic via /v1/messages, Gemini via /v1/beta)
 
-Codex's Responses-API wire shape is OpenAI-only by spec — it doesn't carry Anthropic's `cache_control` blocks or Gemini's `cached_content` field cleanly. To use Anthropic models from Codex you'd point Codex at the gateway with an OpenAI-shape body and let the gateway translate (chat-completions → Anthropic), at the cost of losing native cache_control. The recommended pattern is to use the right CLI per provider:
+Codex's Responses-API wire shape is OpenAI-only by spec, it doesn't carry Anthropic's `cache_control` blocks or Gemini's `cached_content` field cleanly. To use Anthropic models from Codex you'd point Codex at the gateway with an OpenAI-shape body and let the gateway translate (chat-completions → Anthropic), at the cost of losing native cache_control. The recommended pattern is to use the right CLI per provider:
 
-- **OpenAI / Azure OpenAI** → Codex via `/v1/responses` (this page)
-- **Anthropic / Bedrock Claude / Vertex Claude** → Claude Code via `/v1/messages` (see [Claude Code](./claude-code))
-- **Google Gemini / Vertex Gemini** → gemini-cli via `/v1beta/models/…:generateContent` (see [Gemini CLI](./gemini-cli))
+- **OpenAI, Azure OpenAI** → Codex via `/v1/responses` (this page)
+- **Anthropic, Bedrock Claude, Vertex Claude** → Claude Code via `/v1/messages` (see [Claude Code](./claude-code))
+- **Google Gemini, Vertex Gemini** → gemini-cli via `/v1beta/models/…:generateContent` (see [Gemini CLI](./gemini-cli))
 
 A single VK can route to multiple providers when paired with the right CLI per call shape.
 
@@ -59,7 +71,7 @@ export OPENAI_BASE_URL="https://langwatch-gateway.your-corp.internal/v1"
 
 Codex's `--model` flag maps directly to the `model` field the gateway sees. Use the VK's `model_aliases` to decouple the CLI from provider-specific names.
 
-Example — engineers type `gpt-4o`, the VK routes to Azure:
+Example, engineers type `gpt-4o`, the VK routes to Azure:
 
 ```json
 {
@@ -86,12 +98,12 @@ Per-session:
 
 ```bash
 OPENAI_BASE_URL="https://gateway.langwatch.ai/v1" \
-OPENAI_API_KEY="lw_vk_live_..." \
+OPENAI_API_KEY="vk-lw-..." \
 OPENAI_EXTRA_HEADERS='{"X-LangWatch-Cache":"disable"}' \
 codex exec "benchmark"
 ```
 
-<Note>OpenAI CLI / SDK support for custom headers varies; the header-injection method above is pseudo-code for illustration. Practical override: add `cache.mode: disable` to a dedicated "cold-benchmark" VK.</Note>
+<Note>OpenAI CLI, SDK support for custom headers varies; the header-injection method above is pseudo-code for illustration. Practical override: add `cache.mode: disable` to a dedicated "cold-benchmark" VK.</Note>
 
 ### Team-scoped daily budget
 
@@ -103,10 +115,10 @@ Every engineer's Codex usage counts against the team budget. The team lead gets 
 
 ## Troubleshooting
 
-- **`401 invalid_api_key`** — wrong VK or VK revoked. Check the first 12 chars match a live VK in the UI.
-- **`403 model_not_allowed`** — VK doesn't list that model. Extend `models_allowed` or use an alias.
-- **`402 budget_exceeded`** — a scope you belong to has hit its hard cap. Check the error `message` field for which scope.
-- **Intermittent latency spikes** — open the LangWatch trace; check `X-LangWatch-Fallback-Count` > 0 (primary provider is flaky) or `X-LangWatch-Cache: miss` on calls you expected to hit.
+- **`401 invalid_api_key`**, wrong VK or VK revoked. Check the first 12 chars match a live VK in the UI.
+- **`403 model_not_allowed`**, VK doesn't list that model. Extend `models_allowed` or use an alias.
+- **`402 budget_exceeded`**, a scope you belong to has hit its hard cap. Check the error `message` field for which scope.
+- **Intermittent latency spikes**: open the LangWatch trace; check `X-LangWatch-Fallback-Count` > 0 (primary provider is flaky) or `X-LangWatch-Cache: miss` on calls you expected to hit.
 
 ## Known good setup
 

@@ -21,6 +21,7 @@ function createMockPrisma() {
   return {
     modelProvider: {
       findFirst: vi.fn(),
+      findUnique: vi.fn(),
       findMany: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
@@ -68,14 +69,15 @@ function createScope(
 function createModelProvider(
   overrides: Partial<ModelProviderWithScopes> & {
     scopes?: ModelProviderScope[];
+    /** Convenience: seeds a single PROJECT-scope row if `scopes` isn't given. */
+    projectId?: string;
   } = {},
 ): ModelProviderWithScopes {
-  const { scopes, ...rest } = overrides;
+  const { scopes, projectId, ...rest } = overrides;
   const id = rest.id ?? "mp_test123";
-  const projectId = rest.projectId ?? "proj_test";
+  const seedProjectId = projectId ?? "proj_test";
   return {
     id,
-    projectId,
     name: "OpenAI",
     provider: "openai",
     enabled: true,
@@ -84,9 +86,20 @@ function createModelProvider(
     customEmbeddingsModels: null,
     deploymentMapping: null,
     extraHeaders: [],
+    rateLimitRpm: null,
+    rateLimitTpm: null,
+    rateLimitRpd: null,
+    rotationPolicy: "MANUAL",
+    providerConfig: null,
+    fallbackPriorityGlobal: null,
+    healthStatus: "UNKNOWN",
+    circuitOpenedAt: null,
+    lastHealthCheckAt: null,
+    disabledAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
-    scopes: scopes ?? [createScope("PROJECT", projectId, id)],
+    organizationId: "org_test",
+    scopes: scopes ?? [createScope("PROJECT", seedProjectId, id)],
     ...rest,
   };
 }
@@ -208,7 +221,10 @@ describe("ModelProviderRepository", () => {
         await repository.findById("mp_test123", "proj_test");
 
         expect(prisma.modelProvider.findFirst).toHaveBeenCalledWith({
-          where: { id: "mp_test123", projectId: "proj_test" },
+          where: {
+            id: "mp_test123",
+            scopes: { some: { scopeType: "PROJECT", scopeId: "proj_test" } },
+          },
           include: { scopes: true },
         });
       });
@@ -464,6 +480,14 @@ describe("ModelProviderRepository", () => {
   });
 
   describe("create()", () => {
+    beforeEach(() => {
+      // create() resolves the org anchor from the project (ADR-021), so the
+      // project must resolve to an organization.
+      (prisma.project.findUnique as any).mockResolvedValue({
+        team: { organizationId: "org_test" },
+      });
+    });
+
     describe("when customKeys are provided", () => {
       it("encrypts customKeys before storing", async () => {
         const keys = { OPENAI_API_KEY: "sk-secret" };
@@ -507,6 +531,40 @@ describe("ModelProviderRepository", () => {
         expect(createCall.data.customKeys).toBeUndefined();
       });
     });
+
+    describe("when scopes resolve to different organizations", () => {
+      it("rejects the create instead of persisting cross-org scope rows", async () => {
+        await expect(
+          repository.create({
+            projectId: "proj_test",
+            name: "OpenAI",
+            provider: "openai",
+            enabled: true,
+            scopes: [
+              { scopeType: "ORGANIZATION", scopeId: "org_a" },
+              { scopeType: "ORGANIZATION", scopeId: "org_b" },
+            ],
+          }),
+        ).rejects.toThrow(/same organization/);
+        expect(prisma.modelProvider.create as any).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when a scope does not resolve to an organization", () => {
+      it("rejects the create", async () => {
+        (prisma.project.findUnique as any).mockResolvedValue(null);
+
+        await expect(
+          repository.create({
+            projectId: "proj_orphan",
+            name: "OpenAI",
+            provider: "openai",
+            enabled: true,
+          }),
+        ).rejects.toThrow(/organization/);
+        expect(prisma.modelProvider.create as any).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe("update()", () => {
@@ -541,6 +599,40 @@ describe("ModelProviderRepository", () => {
 
         const updateCall = (prisma.modelProvider.update as any).mock.calls[0][0];
         expect(updateCall.data.customKeys).toBeUndefined();
+      });
+    });
+
+    describe("when replacing scopes with a different organization", () => {
+      it("rejects the update so a credential can't be rebound across tenants", async () => {
+        (prisma.modelProvider.findUnique as any).mockResolvedValue({
+          organizationId: "org_existing",
+        });
+
+        await expect(
+          repository.update("mp_test123", "proj_test", {
+            scopes: [{ scopeType: "ORGANIZATION", scopeId: "org_other" }],
+          }),
+        ).rejects.toThrow(/organization/);
+        expect(prisma.modelProviderScope.deleteMany as any).not.toHaveBeenCalled();
+        expect(prisma.modelProviderScope.createMany as any).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when replacing scopes within the same organization", () => {
+      it("deletes and recreates the scope rows", async () => {
+        (prisma.modelProvider.findUnique as any).mockResolvedValue({
+          organizationId: "org_existing",
+        });
+        (prisma.modelProvider.update as any).mockResolvedValue(
+          createModelProvider(),
+        );
+
+        await repository.update("mp_test123", "proj_test", {
+          scopes: [{ scopeType: "ORGANIZATION", scopeId: "org_existing" }],
+        });
+
+        expect(prisma.modelProviderScope.deleteMany as any).toHaveBeenCalledTimes(1);
+        expect(prisma.modelProviderScope.createMany as any).toHaveBeenCalledTimes(1);
       });
     });
   });

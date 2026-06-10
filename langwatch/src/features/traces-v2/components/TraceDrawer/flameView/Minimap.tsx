@@ -62,14 +62,18 @@ export function Minimap({
         });
       };
 
-      const handleUp = () => {
+      const cleanup = () => {
         document.body.style.cursor = "";
         window.removeEventListener("pointermove", handleMove);
-        window.removeEventListener("pointerup", handleUp);
+        window.removeEventListener("pointerup", cleanup);
+        window.removeEventListener("pointercancel", cleanup);
+        window.removeEventListener("blur", cleanup);
       };
 
       window.addEventListener("pointermove", handleMove);
-      window.addEventListener("pointerup", handleUp);
+      window.addEventListener("pointerup", cleanup);
+      window.addEventListener("pointercancel", cleanup);
+      window.addEventListener("blur", cleanup);
     },
     [viewport, fullDur, onViewport],
   );
@@ -104,14 +108,18 @@ export function Minimap({
         }
       };
 
-      const handleUp = () => {
+      const cleanup = () => {
         document.body.style.cursor = "";
         window.removeEventListener("pointermove", handleMove);
-        window.removeEventListener("pointerup", handleUp);
+        window.removeEventListener("pointerup", cleanup);
+        window.removeEventListener("pointercancel", cleanup);
+        window.removeEventListener("blur", cleanup);
       };
 
       window.addEventListener("pointermove", handleMove);
-      window.addEventListener("pointerup", handleUp);
+      window.addEventListener("pointerup", cleanup);
+      window.addEventListener("pointercancel", cleanup);
+      window.addEventListener("blur", cleanup);
     },
     [viewport, fullDur, onViewport],
   );
@@ -177,11 +185,7 @@ export function Minimap({
           >
             Overview
           </Text>
-          <Text
-            textStyle="2xs"
-            color="fg.subtle"
-            lineHeight={1}
-          >
+          <Text textStyle="2xs" color="fg.subtle" lineHeight={1}>
             {formatDuration(fullDur)}
           </Text>
         </Flex>

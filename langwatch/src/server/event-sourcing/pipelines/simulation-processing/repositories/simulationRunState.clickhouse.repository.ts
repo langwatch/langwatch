@@ -1,18 +1,19 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import {
   classifyClickHouseError,
   SecurityError,
   StoreError,
   ValidationError,
 } from "~/server/event-sourcing/services/errorHandling";
+import { createLogger } from "../../../../../utils/logger";
 import type {
   Projection,
   ProjectionStoreReadContext,
   ProjectionStoreWriteContext,
 } from "../../../";
 import { createTenantId, EventUtils } from "../../../";
-import { createLogger } from "../../../../../utils/logger";
 import type {
   SimulationRunState,
   SimulationRunStateData,
@@ -62,6 +63,7 @@ interface ClickHouseSimulationRunRecord {
   CancellationRequestedAt: number | null;
   LastSnapshotOccurredAt: number;
   LastEventOccurredAt: number;
+  _retention_days: number;
 }
 
 type ClickHouseSimulationRunWriteRecord = WithDateWrites<
@@ -152,7 +154,8 @@ export class SimulationRunStateRepositoryClickHouse<
       TotalCost: data.TotalCost,
       RoleCosts: data.RoleCosts,
       RoleLatencies: data.RoleLatencies,
-      TraceMetricsJson: Object.keys(data.TraceMetrics).length > 0 ? JSON.stringify(data.TraceMetrics) : "",
+      TraceMetricsJson:
+        Object.keys(data.TraceMetrics).length > 0 ? JSON.stringify(data.TraceMetrics) : "",
       StartedAt: new Date(data.StartedAt ?? data.CreatedAt),
       QueuedAt: data.QueuedAt != null ? new Date(data.QueuedAt) : null,
       CreatedAt: data.CreatedAt != null ? new Date(data.CreatedAt) : new Date(),
@@ -162,6 +165,9 @@ export class SimulationRunStateRepositoryClickHouse<
       CancellationRequestedAt: data.CancellationRequestedAt != null ? new Date(data.CancellationRequestedAt) : null,
       LastSnapshotOccurredAt: data.LastSnapshotOccurredAt ? new Date(data.LastSnapshotOccurredAt) : new Date(0),
       LastEventOccurredAt: data.LastEventOccurredAt ? new Date(data.LastEventOccurredAt) : new Date(0),
+      // Placeholder; storeProjection / storeProjectionBatch overwrite this with
+      // the resolved retention (platform default when the tenant has none).
+      _retention_days: PLATFORM_DEFAULT_RETENTION_DAYS,
     };
   }
 
@@ -178,14 +184,26 @@ export class SimulationRunStateRepositoryClickHouse<
 
     try {
       const client = await this.resolveClient(context.tenantId);
-      // IN-tuple dedup over the ReplacingMergeTree (see
-      // dev/docs/best_practices/clickhouse-queries.md). Inner SELECT scans
-      // only (TenantId, ScenarioRunId, UpdatedAt); outer SELECT pulls the
-      // heavy columns (Messages.*, TraceMetricsJson, RoleCosts, etc.) for
-      // the single matching row. Outer references UpdatedAt via table alias
-      // because the column is also projected as `toUnixTimestamp64Milli(...)
-      // AS UpdatedAt` — without the alias the IN-tuple comparison resolves
-      // to the projected UInt64 instead of the raw DateTime64.
+      // Latest-version read over the ReplacingMergeTree(UpdatedAt) for a single
+      // run. The inner scalar subquery finds the newest UpdatedAt reading only
+      // the light sort-key columns; the outer `t.UpdatedAt = (...)` equality is
+      // PREWHERE-able, so the heavy columns (Messages.*, TraceMetricsJson,
+      // RoleCosts, etc.) are materialized for only the single surviving row.
+      //
+      // The earlier `(TenantId, ScenarioRunId, UpdatedAt) IN (max-subquery)`
+      // tuple form was not applied as a PREWHERE on the version, so ClickHouse
+      // read the heavy Messages.* arrays across EVERY version of the run before
+      // discarding the stale ones. Runs with many snapshot versions exhausted
+      // the server memory limit (Code 241). For a single-aggregate get, scalar
+      // equality is preferable to the IN-tuple form (which stays the right
+      // choice for multi-key list reads); the sibling read path
+      // (simulation.clickhouse.repository.ts getScenarioRunData) already uses
+      // this scalar form for the same reason.
+      //
+      // Outer references UpdatedAt via the table alias because the column is
+      // also projected as `toUnixTimestamp64Milli(...) AS UpdatedAt` — without
+      // the alias the comparison resolves to the projected UInt64 instead of
+      // the raw DateTime64.
       const result = await client.query({
         query: `
           SELECT
@@ -219,12 +237,11 @@ export class SimulationRunStateRepositoryClickHouse<
           FROM ${TABLE_NAME} AS t
           WHERE t.TenantId = {tenantId:String}
             AND t.ScenarioRunId = {scenarioRunId:String}
-            AND (t.TenantId, t.ScenarioRunId, t.UpdatedAt) IN (
-              SELECT TenantId, ScenarioRunId, max(UpdatedAt)
-              FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
-                AND ScenarioRunId = {scenarioRunId:String}
-              GROUP BY TenantId, ScenarioRunId
+            AND t.UpdatedAt = (
+              SELECT max(s.UpdatedAt)
+              FROM ${TABLE_NAME} AS s
+              WHERE s.TenantId = {tenantId:String}
+                AND s.ScenarioRunId = {scenarioRunId:String}
             )
           LIMIT 1
         `,
@@ -297,6 +314,10 @@ export class SimulationRunStateRepositoryClickHouse<
         scenarioRunId,
       );
 
+      const retentionPolicy = context.metadata?.retentionPolicy as { scenarios?: number | null } | undefined;
+      projectionRecord._retention_days =
+        retentionPolicy?.scenarios ?? PLATFORM_DEFAULT_RETENTION_DAYS;
+
       const client = await this.resolveClient(context.tenantId);
       await client.insert({
         table: TABLE_NAME,
@@ -351,15 +372,20 @@ export class SimulationRunStateRepositoryClickHouse<
     }
 
     try {
+      const retentionPolicy = context.metadata?.retentionPolicy as { scenarios?: number | null } | undefined;
+      const retentionDays =
+        retentionPolicy?.scenarios ?? PLATFORM_DEFAULT_RETENTION_DAYS;
       const records = projections.map((projection) => {
         const scenarioRunId = String(projection.aggregateId);
-        return this.mapProjectionDataToClickHouseRecord(
+        const record = this.mapProjectionDataToClickHouseRecord(
           projection.data as SimulationRunStateData,
           String(context.tenantId),
           projection.id,
           projection.version,
           scenarioRunId,
         );
+        record._retention_days = retentionDays;
+        return record;
       });
 
       const client = await this.resolveClient(context.tenantId);

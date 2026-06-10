@@ -107,6 +107,7 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 	authSvc, err := authresolver.New(authresolver.Options{
 		Resolver:      cpClient,
 		ConfigFetcher: cpClient,
+		ChangePoller:  changePollerAdapter{client: cpClient},
 		Logger:        logger,
 		SoftBump:      cfg.AuthCache.SoftBump,
 		HardGrace:     cfg.AuthCache.HardGrace,
@@ -164,6 +165,34 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		Models:        modelresolver.New(),
 		Health:        probes,
 	}, nil
+}
+
+// changePollerAdapter bridges the controlplane client (which returns
+// its own []controlplane.Change wire shape) to the authresolver's
+// ChangePoller interface (which takes []authresolver.CacheChange).
+// Two slices share the same fields, so the adapter is a one-shot
+// element-wise copy.
+type changePollerAdapter struct {
+	client *controlplane.Client
+}
+
+func (a changePollerAdapter) PollChanges(ctx context.Context, organizationID, since string) ([]authresolver.CacheChange, string, error) {
+	cs, next, err := a.client.PollChanges(ctx, organizationID, since)
+	if err != nil {
+		return nil, since, err
+	}
+	out := make([]authresolver.CacheChange, len(cs))
+	for i, c := range cs {
+		out[i] = authresolver.CacheChange{
+			Kind:                 c.Kind,
+			VirtualKeyID:         c.VirtualKeyID,
+			BudgetID:             c.BudgetID,
+			ProviderCredentialID: c.ProviderCredentialID,
+			ProjectID:            c.ProjectID,
+			Revision:             c.Revision,
+		}
+	}
+	return out, next, nil
 }
 
 func resolveNodeID(ctx context.Context) string {

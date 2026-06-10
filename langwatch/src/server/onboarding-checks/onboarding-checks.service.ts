@@ -54,11 +54,6 @@ export class OnboardingChecksService {
           orderBy: { createdAt: "desc" },
           take: 1,
         },
-        modelProviders: {
-          where: { enabled: true },
-          select: { id: true },
-          take: 1,
-        },
         team: {
           select: {
             members: {
@@ -69,13 +64,28 @@ export class OnboardingChecksService {
       },
     });
 
+    // Project-visible MPs: any MP scoped at PROJECT, the project's TEAM,
+    // or the project's ORG (matches `findAllAccessibleForProject` in
+    // ModelProviderRepository). Project.modelProviders back-relation
+    // was dropped when the legacy projectId column went away.
+    const modelProviders = project
+      ? await prisma.modelProvider.findFirst({
+          where: {
+            enabled: true,
+            scopes: {
+              some: { scopeType: "PROJECT", scopeId: projectId },
+            },
+          },
+          select: { id: true },
+        })
+      : null;
+
     const {
       workflows,
       customGraphs,
       datasets,
       experiments,
       triggers,
-      modelProviders,
       team,
     } = project ?? {};
 
@@ -92,7 +102,7 @@ export class OnboardingChecksService {
       evaluations: experiments?.length ?? 0,
       triggers: triggers?.length ?? 0,
       simulations,
-      modelProviders: modelProviders?.length ?? 0,
+      modelProviders: modelProviders ? 1 : 0,
       prompts,
       teamMembers: team?.members?.length ?? 0,
       firstMessage: project?.firstMessage ?? false,

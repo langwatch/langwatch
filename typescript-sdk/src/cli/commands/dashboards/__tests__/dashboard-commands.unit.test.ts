@@ -49,13 +49,13 @@ describe("listDashboardsCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockList = vi.fn();
-    vi.mocked(DashboardsApiService).mockImplementation(() => ({
+    vi.mocked(DashboardsApiService).mockImplementation(function () { return ({
       list: mockList,
       get: vi.fn(),
       create: vi.fn(),
       rename: vi.fn(),
       delete: vi.fn(),
-    }) as unknown as DashboardsApiService);
+    }) as unknown as DashboardsApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -101,13 +101,13 @@ describe("createDashboardCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCreate = vi.fn();
-    vi.mocked(DashboardsApiService).mockImplementation(() => ({
+    vi.mocked(DashboardsApiService).mockImplementation(function () { return ({
       list: vi.fn(),
       get: vi.fn(),
       create: mockCreate,
       rename: vi.fn(),
       delete: vi.fn(),
-    }) as unknown as DashboardsApiService);
+    }) as unknown as DashboardsApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -140,13 +140,13 @@ describe("deleteDashboardCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDelete = vi.fn();
-    vi.mocked(DashboardsApiService).mockImplementation(() => ({
+    vi.mocked(DashboardsApiService).mockImplementation(function () { return ({
       list: vi.fn(),
       get: vi.fn(),
       create: vi.fn(),
       rename: vi.fn(),
       delete: mockDelete,
-    }) as unknown as DashboardsApiService);
+    }) as unknown as DashboardsApiService; });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();

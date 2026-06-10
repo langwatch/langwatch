@@ -1,0 +1,8 @@
+id: no-inline-dynamic-import-tsx
+snapshots:
+  const C = () => { const m = import("./Chart"); return null; };:
+    labels:
+    - source: import("./Chart")
+      style: primary
+      start: 28
+      end: 45

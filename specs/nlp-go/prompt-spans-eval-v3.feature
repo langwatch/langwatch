@@ -6,15 +6,19 @@ Feature: Prompt spans on Evaluations v3 — per-row prompt context for resumable
     in the playground for debugging or follow-up
 
   # Wire-format reference: identical to playground (see prompt-spans-playground.feature).
-  # Eval-v3 surfaces that exercise this path:
-  #   langwatch/src/evaluations-v3/components/TargetSection/TargetCell.tsx
-  #   langwatch/src/evaluations-v3/utils/promptEditorCallbacks.ts
-  # Per-row execution dispatcher:
-  #   useEvaluationExecution.ts:124 (origin = "evaluation")
+  # The prompt identity (configId / handle / versionMetadata) is forwarded onto
+  # the per-cell signature node by the server-side workflow builder:
+  #   langwatch/src/server/experiments-v3/execution/workflowBuilder.ts
+  #     (buildSignatureNodeFromPrompt — saved target; buildSignatureNodeFromLocalConfig
+  #      — inline-edited draft, which also forwards promptDraft=true)
+  # Per-row execution dispatcher (one execute_component per row, origin = "evaluation"):
+  #   langwatch/src/server/experiments-v3/execution/orchestrator.ts (executeCell)
   #
   # Bindings:
+  #   - App-side forwarding (the gap this feature fixes):
+  #       langwatch/src/server/experiments-v3/execution/__tests__/workflowBuilder.test.ts
   #   - Emission scenarios (1, 2, 4, 5): services/nlpgo/tests/integration/prompt_spans_eval_v3_test.go
-  #   - Drill-down resume (3): langwatch/src/evaluations-v3/components/.../TargetCell.integration.test.ts
+  #   - Drill-down resume (3): trace details drawer "Open in Prompts" (traces-v2)
 
   Background:
     Given the nlpgo service is running and the project is on the Go-NLP execution path

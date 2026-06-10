@@ -22,9 +22,14 @@ const HAS_VALUES = [
   "annotation",
   "conversation",
   "user",
+  "customer",
   "topic",
   "subtopic",
   "label",
+  "model",
+  "service",
+  "traceName",
+  "rootSpanType",
 ] as const;
 
 /** Stored simulation_runs.Status values, by their lowercase UI label. */
@@ -156,6 +161,18 @@ function translateExistence(
         "Attributes['langwatch.labels'] != '' AND Attributes['langwatch.labels'] != '[]'",
         negated,
       );
+
+    case "model":
+      return wrap("length(Models) > 0", negated);
+
+    case "service":
+      return wrap("Attributes['service.name'] != ''", negated);
+
+    case "traceName":
+      return wrap("ifNull(TraceName, '') != ''", negated);
+
+    case "rootSpanType":
+      return wrap("ifNull(RootSpanType, '') != ''", negated);
 
     default:
       throw new FilterParseError(

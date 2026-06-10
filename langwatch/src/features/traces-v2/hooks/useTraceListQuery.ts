@@ -4,7 +4,8 @@ import { api } from "~/utils/api";
 import { useSamplePreview } from "../onboarding";
 import { useFilterStore } from "../stores/filterStore";
 import { useViewStore } from "../stores/viewStore";
-import type { TraceEvalResult, TraceListItem } from "../types/trace";
+import type { TraceListItem } from "../types/trace";
+import { mapTraceListPayload } from "../utils/mapTraceListPayload";
 
 export interface TraceListQueryResult {
   data: TraceListItem[];
@@ -61,26 +62,10 @@ export function useTraceListQuery(): TraceListQueryResult {
     },
   );
 
-  const data = useMemo<TraceListItem[]>(() => {
-    if (!query.data) return [];
-    const evalMap = (query.data.evaluations ?? {}) as Record<
-      string,
-      TraceEvalResult[]
-    >;
-    return (query.data.items as TraceListItem[]).map((item) => ({
-      ...item,
-      spanCount: item.spanCount ?? 0,
-      evaluations: (evalMap[item.traceId] ?? []).map((e) => ({
-        evaluatorId: e.evaluatorId,
-        evaluatorName: e.evaluatorName,
-        status: e.status,
-        score: e.score,
-        passed: e.passed,
-        label: e.label,
-      })),
-      events: item.events ?? [],
-    }));
-  }, [query.data]);
+  const data = useMemo<TraceListItem[]>(
+    () => mapTraceListPayload(query.data),
+    [query.data],
+  );
 
   if (samplePreview) {
     return {

@@ -6,7 +6,7 @@ import type { SpanConfig, TraceConfig } from "./types";
 interface ExecutorOpts {
   apiKey: string;
   endpoint: string;
-  /** Required when apiKey is a PAT — see createFoundryProvider. */
+  /** Required when apiKey is a scoped API key — see createFoundryProvider. */
   projectId?: string;
   /**
    * Resource attributes for the OTel provider. Fixed at executor

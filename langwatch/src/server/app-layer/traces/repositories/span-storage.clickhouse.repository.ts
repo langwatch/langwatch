@@ -1,11 +1,12 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
+import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import {
+  type NormalizedSpan,
   NormalizedSpanKind,
   NormalizedStatusCode,
-  type NormalizedSpan,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
-import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
@@ -130,6 +131,29 @@ const FULL_SPAN_SELECT = `
 `;
 
 /**
+ * Per-query memory ceiling for the single-trace full-attribute reads below.
+ *
+ * The heavy column on these reads is the `SpanAttributes` Map: ClickHouse reads
+ * the whole values array to return any of it, so a trace with very large
+ * per-span attribute values (big prompts / responses / embeddings) can allocate
+ * gigabytes even at a low span count. Without a cap those allocations land
+ * against the server's *total* memory limit, where the OvercommitTracker
+ * resolves the pressure by killing whichever query is allocating — so one
+ * pathological trace can take down unrelated requests across the cluster.
+ *
+ * With an explicit `max_memory_usage` the offending read fails on its own
+ * (`MEMORY_LIMIT_EXCEEDED`) and surfaces as a drawer/query error, instead of
+ * degrading everyone. Set generously above any normal trace (p95 read is
+ * single-digit MB) and below the global per-query limit, so it only ever trips
+ * on the pathological tail. Tune here if legitimate large traces start failing.
+ */
+const SINGLE_TRACE_READ_MAX_MEMORY_BYTES = 2 * 1024 * 1024 * 1024; // 2 GiB
+const SINGLE_TRACE_READ_SETTINGS = {
+  // ClickHouse settings are string-typed over the wire.
+  max_memory_usage: String(SINGLE_TRACE_READ_MAX_MEMORY_BYTES),
+} as const;
+
+/**
  * Light projection used by readers that only need the span tree shape
  * (waterfall/flame, span list). Avoids reading heavy `SpanAttributes`,
  * `Events.*`, and `Links.*` columns. Map subscripts (`['key']`) read a
@@ -143,6 +167,7 @@ const SUMMARY_SPAN_SELECT = `
   StatusCode,
   SpanAttributes['langwatch.span.type'] AS SpanType,
   SpanAttributes['gen_ai.request.model'] AS Model,
+  SpanAttributes['gen_ai.usage.cost'] AS Cost,
   toUnixTimestamp64Milli(StartTime) AS StartTimeMs
 `;
 
@@ -194,10 +219,19 @@ interface SpanSummaryQueryRow {
   StatusCode: number | null;
   SpanType: string;
   Model: string;
+  // `SpanAttributes['gen_ai.usage.cost']` materialises as the raw map value;
+  // ClickHouse Map values are typed `String`, so the wire payload is the
+  // stringified number (or "" when absent). Parsed to a number in the
+  // mapper below.
+  Cost: string;
   StartTimeMs: number;
 }
 
 function mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
+  // Cost arrives as a string (Map values are typed String in CH); empty
+  // means the span has no cost attribute, NaN means a malformed value.
+  // Either falls through to null so the renderer doesn't paint `$NaN`.
+  const costNum = row.Cost ? Number(row.Cost) : NaN;
   return {
     spanId: row.SpanId,
     parentSpanId: row.ParentSpanId,
@@ -206,6 +240,7 @@ function mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
     statusCode: row.StatusCode,
     spanType: row.SpanType || null,
     model: row.Model || null,
+    cost: Number.isFinite(costNum) ? costNum : null,
     startTimeMs: Number(row.StartTimeMs),
   };
 }
@@ -456,6 +491,7 @@ interface ClickHouseSpanRecord {
   DroppedLinksCount: 0;
   CreatedAt: number;
   UpdatedAt: number;
+  _retention_days: number;
 }
 
 interface FullSpanRow {
@@ -654,6 +690,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
               limit: effectiveLimit,
               ...partition.params,
             },
+            clickhouse_settings: SINGLE_TRACE_READ_SETTINGS,
             format: "JSONEachRow",
           });
 
@@ -719,6 +756,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
               limit: effectiveLimit,
               ...partition.params,
             },
+            clickhouse_settings: SINGLE_TRACE_READ_SETTINGS,
             format: "JSONEachRow",
           });
 
@@ -777,6 +815,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
               LIMIT 1
             `,
             query_params: { tenantId, traceId, spanId, ...partition.params },
+            clickhouse_settings: SINGLE_TRACE_READ_SETTINGS,
             format: "JSONEachRow",
           });
 
@@ -888,6 +927,10 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           // Events-only ARRAY JOIN: reads just the `Events.*` columns, never
           // the heavy span attribute/link payload. Includes exception events
           // for parity with the trace-level list the fold used to carry.
+          //
+          // Dedup at row level inside the subquery so ARRAY JOIN only expands
+          // surviving spans — applying dedup post-expansion would multiply the
+          // tuple lookup by `events_per_span`.
           const result = await client.query({
             query: `
               SELECT
@@ -895,15 +938,22 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
                 toUnixTimestamp64Milli(event_timestamp) AS timestamp,
                 event_name AS name,
                 event_attrs AS attributes
-              FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
-                AND TraceId = {traceId:String}
-                ${partition.sqlAnd}
-                AND ${dedupInTuple(partition.sqlAndInner)}
+              FROM (
+                SELECT
+                  SpanId,
+                  "Events.Timestamp" AS Events_Timestamp,
+                  "Events.Name" AS Events_Name,
+                  "Events.Attributes" AS Events_Attributes
+                FROM ${TABLE_NAME}
+                WHERE TenantId = {tenantId:String}
+                  AND TraceId = {traceId:String}
+                  ${partition.sqlAnd}
+                  AND ${dedupInTuple(partition.sqlAndInner)}
+              )
               ARRAY JOIN
-                "Events.Timestamp" AS event_timestamp,
-                "Events.Name" AS event_name,
-                "Events.Attributes" AS event_attrs
+                Events_Timestamp AS event_timestamp,
+                Events_Name AS event_name,
+                Events_Attributes AS event_attrs
               ORDER BY event_timestamp ASC
             `,
             query_params: { tenantId, traceId, ...partition.params },
@@ -955,6 +1005,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         async (window) => {
           const partition = partitionFragment(window);
           const client = await this.resolveClient(tenantId);
+          // Same shape as `getTraceEventsByTraceId`: dedup at row level inside
+          // the subquery, then ARRAY JOIN the Events.* arrays of the survivors,
+          // and finally drop exception events (which is a per-event filter).
           const result = await client.query({
             query: `
               SELECT
@@ -964,15 +1017,22 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
                 toUnixTimestamp64Milli(event_timestamp) AS started_at,
                 event_name AS event_type,
                 event_attrs AS attributes
-              FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
-                AND TraceId = {traceId:String}
-                ${partition.sqlAnd}
-                AND ${dedupInTuple(partition.sqlAndInner)}
+              FROM (
+                SELECT
+                  TenantId, TraceId, SpanId,
+                  "Events.Timestamp" AS Events_Timestamp,
+                  "Events.Name" AS Events_Name,
+                  "Events.Attributes" AS Events_Attributes
+                FROM ${TABLE_NAME}
+                WHERE TenantId = {tenantId:String}
+                  AND TraceId = {traceId:String}
+                  ${partition.sqlAnd}
+                  AND ${dedupInTuple(partition.sqlAndInner)}
+              )
               ARRAY JOIN
-                "Events.Timestamp" AS event_timestamp,
-                "Events.Name" AS event_name,
-                "Events.Attributes" AS event_attrs
+                Events_Timestamp AS event_timestamp,
+                Events_Name AS event_name,
+                Events_Attributes AS event_attrs
               WHERE event_name != 'exception'
               ORDER BY event_timestamp DESC
             `,
@@ -1477,6 +1537,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       DroppedLinksCount: 0,
       CreatedAt: new Date(),
       UpdatedAt: new Date(),
+      _retention_days: span.retentionDays ?? PLATFORM_DEFAULT_RETENTION_DAYS,
     } satisfies ClickHouseSpanWriteRecord;
   }
 }

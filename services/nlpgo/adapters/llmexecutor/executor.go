@@ -3,17 +3,17 @@
 // pluggable app.GatewayClient.
 //
 // The LLM block in Sarah's engine talks to this executor. The executor:
-//   1. parses provider+model from the LLMRequest
-//   2. applies model-id rewrites (anthropic dot→dash, alias expansion)
-//   3. builds the OpenAI-shape request body (messages, tools, params)
-//   4. applies reasoning-model overrides + anthropic temperature clamp
-//   5. normalizes reasoning_effort spelling
-//   6. encodes inline credentials from litellm_params into the
-//      X-LangWatch-Inline-Credentials header that the GatewayClient
-//      consumes
-//   7. invokes the GatewayClient (in-process dispatcher in production
-//      since the library pivot)
-//   8. parses the response back into app.LLMResponse
+//  1. parses provider+model from the LLMRequest
+//  2. applies model-id rewrites (anthropic dot→dash, alias expansion)
+//  3. builds the OpenAI-shape request body (messages, tools, params)
+//  4. applies reasoning-model overrides + anthropic temperature clamp
+//  5. normalizes reasoning_effort spelling
+//  6. encodes inline credentials from litellm_params into the
+//     X-LangWatch-Inline-Credentials header that the GatewayClient
+//     consumes
+//  7. invokes the GatewayClient (in-process dispatcher in production
+//     since the library pivot)
+//  8. parses the response back into app.LLMResponse
 //
 // All providers route through chat/completions — Bifrost's per-provider
 // adapter handles native-format translation downstream. This matches the
@@ -200,7 +200,54 @@ func buildGatewayRequest(ctx context.Context, req app.LLMRequest, stream bool) (
 		body["reasoning_effort"] = req.ReasoningEffort
 	}
 	if req.ResponseFormat != nil {
-		body["response_format"] = req.ResponseFormat
+		// Bedrock + Anthropic: don't ship response_format. bifrost v1.4.22's
+		// bedrock provider routes response_format on anthropic-family
+		// models (any model whose id contains "anthropic." or "claude")
+		// through Anthropic's native output_config.format extension via
+		// additionalModelRequestFields (providers/bedrock/utils.go:1011-
+		// 1015). That field is a Bedrock+Anthropic feature that ships with
+		// rolling per-region / per-model-version support and requires the
+		// right anthropic-beta header to activate; when the combination
+		// doesn't line up the field is silently ignored and the model
+		// returns prose. Customer dogfood 2026-05-30 caught this on
+		// us.anthropic.claude-haiku-4-5-* via a managed-bedrock VPCE: a
+		// signature node with {output:bool, reason:str} got raw
+		// "TRUE\n\nReason: ..." back, the engine's extractSignatureOutputs
+		// then fell through to the prose-fallback and dumped the whole
+		// blob into the first declared field.
+		//
+		// LiteLLM (python langwatch_nlp's path) bypasses this entirely:
+		// it translates response_format → toolConfig.tools + toolChoice
+		// (forced tool_use), which is the oldest and most universally
+		// supported Anthropic structured-output mechanism. Every claude
+		// model in every region honors it, no beta header required. We
+		// mirror that translation here so the Go path has python parity
+		// + the same robustness profile.
+		//
+		// Conversion is one-shot and self-contained: build a synthetic
+		// tool whose input schema IS the response_format schema, append
+		// it to the tools array, pin tool_choice to it, then drop
+		// response_format from the body. The response side
+		// (parseChatCompletionResponse) lifts the tool_call arguments
+		// back into Content so engine.extractSignatureOutputs sees the
+		// same JSON-shape payload it would have received from
+		// response_format on a provider that does honor it natively.
+		if shouldUseToolUseForStructuredOutput(provider, req.Model) {
+			if tool, choice, ok := buildStructuredOutputTool(req.ResponseFormat); ok {
+				existingTools, _ := body["tools"].([]app.Tool)
+				body["tools"] = append(existingTools, tool)
+				body["tool_choice"] = choice
+			} else {
+				// Schema malformed (no "json_schema.schema"). Fall back to
+				// the response_format pass-through so providers that DO
+				// honor a top-level response_format get something rather
+				// than nothing — same defensive posture as the recoverJSON
+				// fallback in the engine.
+				body["response_format"] = req.ResponseFormat
+			}
+		} else {
+			body["response_format"] = req.ResponseFormat
+		}
 	}
 	if stream {
 		body["stream"] = true
@@ -246,6 +293,101 @@ func buildGatewayRequest(ctx context.Context, req app.LLMRequest, stream bool) (
 		Model:   translatedModel,
 		Project: req.ProjectID,
 	}, nil
+}
+
+// structuredOutputToolPrefix marks tools synthesized from
+// response_format. parseChatCompletionResponse unwraps tool_calls whose
+// function name starts with this prefix back into Content so the engine
+// sees the same JSON-shape payload as the response_format path. The
+// prefix mirrors bifrost's internal `bf_so_` convention but stays
+// nlpgo-owned so a bifrost rename can't silently break us.
+const structuredOutputToolPrefix = "lw_so_"
+
+// shouldUseToolUseForStructuredOutput returns true when response_format
+// must be rewritten to a forced tool_use call. Today: any Anthropic-family
+// model dispatched via Bedrock. Bifrost v1.4.22's bedrock provider routes
+// response_format on anthropic-family models through Anthropic's native
+// output_config.format extension which has variable per-region /
+// per-model-version support (customer dogfood 2026-05-30 with
+// us.anthropic.claude-haiku-4-5 returned prose). Tool_use is the oldest,
+// universally-supported Anthropic structured-output path.
+//
+// Match policy mirrors bifrost's IsAnthropicModel: any "anthropic." OR
+// "claude" substring in the model id. The provider gate ensures we don't
+// pre-empt direct Anthropic or other providers where the native
+// response_format path is well-supported.
+func shouldUseToolUseForStructuredOutput(provider, model string) bool {
+	if provider != "bedrock" {
+		return false
+	}
+	return strings.Contains(model, "anthropic.") || strings.Contains(model, "claude")
+}
+
+// buildStructuredOutputTool converts a response_format json_schema into
+// a forced-tool-call pair: the tool whose input_schema IS the json_schema
+// `schema` payload, and a tool_choice that pins the model to call it.
+// Returns ok=false when the response_format isn't a json_schema OR the
+// schema property is missing — caller falls back to passing
+// response_format through unchanged.
+func buildStructuredOutputTool(rf *app.ResponseFormat) (app.Tool, map[string]any, bool) {
+	if rf == nil || rf.Type != "json_schema" || rf.JSONSchema == nil {
+		return app.Tool{}, nil, false
+	}
+	// Schema must be an object. Strings, numbers, arrays, etc. would
+	// produce a tool with an invalid `parameters` field that bedrock
+	// rejects with a 400. Fall back to passing response_format through
+	// unchanged so the malformed payload at least reaches the upstream
+	// validator with a recognizable shape instead of being silently
+	// reshaped on the way out.
+	schema, ok := rf.JSONSchema["schema"].(map[string]any)
+	if !ok {
+		return app.Tool{}, nil, false
+	}
+	name, _ := rf.JSONSchema["name"].(string)
+	if name == "" {
+		name = "Outputs"
+	}
+	toolName := structuredOutputToolPrefix + name
+	function := map[string]any{
+		"name":        toolName,
+		"description": "Return the response as a JSON object matching the declared output schema.",
+		"parameters":  schema,
+	}
+	// Anthropic's JSON-schema-via-tool-use accepts strict-mode just like
+	// OpenAI's response_format. Preserve it when the engine asked for it
+	// so the model honors required/additionalProperties.
+	if strict, ok := rf.JSONSchema["strict"].(bool); ok && strict {
+		function["strict"] = true
+	}
+	tool := app.Tool{Type: "function", Function: function}
+	choice := map[string]any{
+		"type":     "function",
+		"function": map[string]any{"name": toolName},
+	}
+	return tool, choice, true
+}
+
+// liftStructuredOutputToolArgs returns the `arguments` payload of the
+// first tool_call whose function name carries the structuredOutputToolPrefix.
+// Matches the tools we synthesized in buildStructuredOutputTool; ignores
+// caller-supplied tools so a workflow that mixes its own tool_use with a
+// signature node's structured output isn't accidentally collapsed.
+func liftStructuredOutputToolArgs(toolCalls []app.ToolCall) (string, bool) {
+	for _, tc := range toolCalls {
+		if tc.Type != "function" {
+			continue
+		}
+		name, _ := tc.Function["name"].(string)
+		if !strings.HasPrefix(name, structuredOutputToolPrefix) {
+			continue
+		}
+		args, _ := tc.Function["arguments"].(string)
+		if args == "" {
+			continue
+		}
+		return args, true
+	}
+	return "", false
 }
 
 // translatedModelOrInferred returns the BARE model id we put on the wire
@@ -335,7 +477,7 @@ func parseChatCompletionResponse(body []byte, durationMS int64) (*app.LLMRespons
 	choice := raw.Choices[0]
 
 	out := &app.LLMResponse{
-		ToolCalls:  choice.Message.ToolCalls,
+		ToolCalls: choice.Message.ToolCalls,
 		Usage: app.Usage{
 			PromptTokens:     raw.Usage.PromptTokens,
 			CompletionTokens: raw.Usage.CompletionTokens,
@@ -347,6 +489,18 @@ func parseChatCompletionResponse(body []byte, durationMS int64) (*app.LLMRespons
 	}
 	if s, ok := choice.Message.Content.(string); ok {
 		out.Content = s
+	}
+	// When the request used the buildStructuredOutputTool rewrite
+	// (bedrock + anthropic-family + response_format), the model returns
+	// its JSON payload as the synthetic tool's `arguments` instead of
+	// text content. Lift it back into Content so the engine's
+	// extractSignatureOutputs sees the same JSON-shape payload it would
+	// have received from a provider that honored response_format
+	// natively — no engine-side branch needed.
+	if out.Content == "" {
+		if args, ok := liftStructuredOutputToolArgs(choice.Message.ToolCalls); ok {
+			out.Content = args
+		}
 	}
 	out.Messages = []app.ChatMessage{{
 		Role:             choice.Message.Role,
@@ -414,9 +568,9 @@ func filterEmptyContentMessages(messages []app.ChatMessage) []app.ChatMessage {
 			if len(filtered) == 0 {
 				continue
 			}
-			copy := m
-			copy.Content = filtered
-			out = append(out, copy)
+			msgCopy := m
+			msgCopy.Content = filtered
+			out = append(out, msgCopy)
 		default:
 			// Other content shapes (e.g. typed message structs) flow
 			// through unchanged — only the explicit empty cases above

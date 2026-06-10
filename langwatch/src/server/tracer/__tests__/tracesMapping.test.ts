@@ -260,6 +260,52 @@ describe("TRACE_MAPPINGS.spans.mapping", () => {
   });
 });
 
+describe("mapTraceToDatasetEntry span expansion", () => {
+  // Locks the "One row per span" behaviour: saved automations persist these
+  // expansion keys, so a flip here would silently corrupt customer datasets.
+  const threeSpanTrace = {
+    trace_id: "trace-1",
+    timestamps: { started_at: Date.now() },
+    spans: [
+      { span_id: "s1", name: "a", type: "span", input: { type: "text", value: "1" } },
+      { span_id: "s2", name: "b", type: "span", input: { type: "text", value: "2" } },
+      { span_id: "s3", name: "c", type: "span", input: { type: "text", value: "3" } },
+    ],
+  };
+  const spansMapping = {
+    spans: { source: "spans", key: "", subkey: "" },
+  };
+
+  describe("when the all-spans expansion is enabled", () => {
+    /** @scenario Expanding spans produces one dataset row per span */
+    it("produces one dataset row per span", () => {
+      const rows = mapTraceToDatasetEntry(
+        threeSpanTrace as any,
+        spansMapping,
+        new Set(["spans.all.span_id"]) as any,
+      );
+
+      expect(rows).toHaveLength(3);
+    });
+  });
+
+  describe("when no expansion is enabled", () => {
+    /** @scenario Without the span expansion the trace stays a single row */
+    it("produces a single row whose spans field holds all spans", () => {
+      const rows = mapTraceToDatasetEntry(
+        threeSpanTrace as any,
+        spansMapping,
+        new Set() as any,
+      );
+
+      expect(rows).toHaveLength(1);
+      // The spans column is serialized as JSON; it should contain all 3 spans.
+      const spansValue = JSON.parse(rows[0]!.spans as string);
+      expect(spansValue).toHaveLength(3);
+    });
+  });
+});
+
 describe("TRACE_MAPPINGS.metadata.mapping", () => {
   const mockTrace = {
     trace_id: "trace-1",

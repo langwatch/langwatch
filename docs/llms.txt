@@ -10,7 +10,7 @@ Always navigate to docs links using the .md extension for better readability.
 ## Overview
 
 - [Self-Hosting Overview](https://langwatch.ai/docs/self-hosting/overview.md): Deploy LangWatch on your own infrastructure for full data control
-- [Hybrid Setup](https://langwatch.ai/docs/hybrid-setup/overview.md): Use LangWatch Cloud with your own data plane — keep full data ownership while leveraging LangWatch's managed control plane.
+- [Hybrid Setup](https://langwatch.ai/docs/hybrid-setup/overview.md): Use LangWatch Cloud with your own data plane, keep full data ownership while leveraging LangWatch's managed control plane.
 - [Troubleshooting & FAQ](https://langwatch.ai/docs/self-hosting/troubleshooting.md): Common issues and solutions for LangWatch self-hosting
 
 ## Configuration
@@ -25,17 +25,19 @@ Always navigate to docs links using the .md extension for better readability.
 ## Deployment
 
 - [Docker Compose](https://langwatch.ai/docs/self-hosting/deployment/docker-compose.md): Get LangWatch running locally in minutes with Docker Compose
-- [Docker Images](https://langwatch.ai/docs/self-hosting/deployment/docker-images.md): LangWatch Docker image reference — what each container does and how they communicate
+- [Docker Images](https://langwatch.ai/docs/self-hosting/deployment/docker-images.md): LangWatch Docker image reference, what each container does and how they communicate
 - [Kubernetes (Helm)](https://langwatch.ai/docs/self-hosting/deployment/kubernetes-helm.md): Production Kubernetes deployment with the LangWatch Helm chart
 - [Local Kubernetes (Kind + Helm)](https://langwatch.ai/docs/self-hosting/deployment/kubernetes-local.md): Run LangWatch locally on Kind for development and testing
+- [ArgoCD](https://langwatch.ai/docs/self-hosting/deployment/argocd.md): Deploy the LangWatch Helm chart via ArgoCD with operator-managed secrets and no GitOps-specific workarounds
 
 ## Infrastructure
 
-- [Architecture & Infrastructure](https://langwatch.ai/docs/self-hosting/infrastructure/architecture.md): How LangWatch components fit together — what you're deploying and how data flows through the system
+- [Architecture & Infrastructure](https://langwatch.ai/docs/self-hosting/infrastructure/architecture.md): How LangWatch components fit together, what you're deploying and how data flows through the system
 
 ## Operations
 
 - [Security](https://langwatch.ai/docs/self-hosting/security.md): Security model, encryption, secrets management, and hardening for LangWatch
+- [Self-hosting compliance](https://langwatch.ai/docs/self-hosting/compliance.md): What works in self-hosted LangWatch under the Apache 2.0 license vs what requires an Enterprise license. Persona-aware coverage map across SOC 2, ISO 27001, GDPR, HIPAA, EU AI Act, plus the substrate primitives behind each.
 - [Upgrade Guide](https://langwatch.ai/docs/self-hosting/upgrade.md): How to upgrade LangWatch to the latest version
 - [Migrate to v3](https://langwatch.ai/docs/self-hosting/upgrade-v3.md): Step-by-step guide to upgrade LangWatch from v1.x or v2.x to v3.0
 
@@ -55,6 +57,7 @@ Always navigate to docs links using the .md extension for better readability.
 - [Overview](https://langwatch.ai/docs/api-reference/traces/overview.md): Search, retrieve, and share LangWatch traces via the REST API. Traces capture the full execution of your LLM pipelines including all spans, evaluations, and metadata.
 - [Search traces](https://langwatch.ai/docs/api-reference/traces/search.md)
 - [Get trace details](https://langwatch.ai/docs/api-reference/traces/get-trace.md)
+- [Update trace metadata](https://langwatch.ai/docs/api-reference/traces/update-metadata.md): Update metadata on an existing trace by trace ID. Injects a synthetic span through the standard ingestion pipeline carrying the new attributes.
 - [Create public path for single trace](https://langwatch.ai/docs/api-reference/traces/create-public-trace-path.md)
 - [Delete an existing public path for a trace](https://langwatch.ai/docs/api-reference/traces/delete-public-trace-path.md)
 
@@ -290,6 +293,8 @@ Always navigate to docs links using the .md extension for better readability.
 - [Get project](https://langwatch.ai/docs/api-reference/projects/get-project.md)
 - [Update project](https://langwatch.ai/docs/api-reference/projects/update-project.md)
 - [Archive project](https://langwatch.ai/docs/api-reference/projects/archive-project.md)
+- [Get project API key](https://langwatch.ai/docs/api-reference/projects/get-api-key.md)
+- [Regenerate project API key](https://langwatch.ai/docs/api-reference/projects/regenerate-api-key.md)
 
 ## Teams
 
@@ -299,6 +304,25 @@ Always navigate to docs links using the .md extension for better readability.
 - [Get team](https://langwatch.ai/docs/api-reference/teams/get-team.md)
 - [Update team](https://langwatch.ai/docs/api-reference/teams/update-team.md)
 - [Archive team](https://langwatch.ai/docs/api-reference/teams/archive-team.md)
+- [List team members](https://langwatch.ai/docs/api-reference/teams/list-members.md)
+- [Add team member](https://langwatch.ai/docs/api-reference/teams/add-member.md)
+- [Remove team member](https://langwatch.ai/docs/api-reference/teams/remove-member.md)
+- [List team projects](https://langwatch.ai/docs/api-reference/teams/list-projects.md)
+
+## Groups
+
+- [Overview](https://langwatch.ai/docs/api-reference/groups/overview.md): Create and manage access groups, their members, and role bindings via the REST API. Enterprise feature.
+- [List groups](https://langwatch.ai/docs/api-reference/groups/list-groups.md)
+- [Create group](https://langwatch.ai/docs/api-reference/groups/create-group.md)
+- [Get group](https://langwatch.ai/docs/api-reference/groups/get-group.md)
+- [Rename group](https://langwatch.ai/docs/api-reference/groups/rename-group.md)
+- [Delete group](https://langwatch.ai/docs/api-reference/groups/delete-group.md)
+- [List group members](https://langwatch.ai/docs/api-reference/groups/list-members.md)
+- [Add group member](https://langwatch.ai/docs/api-reference/groups/add-member.md)
+- [Remove group member](https://langwatch.ai/docs/api-reference/groups/remove-member.md)
+- [List group bindings](https://langwatch.ai/docs/api-reference/groups/list-bindings.md)
+- [Add group binding](https://langwatch.ai/docs/api-reference/groups/add-binding.md)
+- [Remove group binding](https://langwatch.ai/docs/api-reference/groups/remove-binding.md)
 
 ## API Keys
 

@@ -35,6 +35,8 @@ export interface SpanSummaryRow {
   statusCode: number | null;
   spanType: string | null;
   model: string | null;
+  /** USD cost from `gen_ai.usage.cost`, when present. */
+  cost: number | null;
   startTimeMs: number;
 }
 

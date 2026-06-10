@@ -124,7 +124,7 @@ main() {
   # Copy .env files from subdirectories that need them.
   # Warns when a required .env is missing so the developer knows to create one.
   local env_warnings=0
-  for src_dir in "langwatch" "langwatch_nlp" "langevals" "python-sdk" "typescript-sdk" "mcp-server"; do
+  for src_dir in "langwatch" "langevals" "python-sdk" "typescript-sdk" "mcp-server"; do
     local dest="${dir}/${src_dir}"
 
     # Skip directories that don't exist in the worktree
@@ -144,6 +144,38 @@ main() {
         echo "  → cp ${src_dir}/.env.example ${src_dir}/.env  (then re-run or copy manually)" >&2
       fi
       env_warnings=$((env_warnings + 1))
+      continue
+    fi
+
+    # Drift detection: warn when the source .env (which we just copied)
+    # is missing keys present in .env.example. The main checkout's .env
+    # often predates .env.example bumps — left silent, this manifests as
+    # "feature X mysteriously doesn't render in my worktree" later. Caught
+    # during the γ pre-dogfood when a worktree's .env predated the
+    # release_ui_ai_governance_enabled FF addition.
+    #
+    # Limitation: only catches MISSING keys (additive drift). Doesn't
+    # catch value drift on existing keys — e.g. FEATURE_FLAG_FORCE_ENABLE
+    # has the same key but a stale set of flags. Comparing values
+    # would generate false positives on legitimate user-customised
+    # values (LW_VIRTUAL_KEY_PEPPER, OPENAI_API_KEY, etc.). For
+    # FEATURE_FLAG_FORCE_ENABLE specifically: re-read the .env.example
+    # block when adding new gov UI surfaces.
+    if [ -f "${src_dir}/.env.example" ]; then
+      local example_keys env_keys missing_keys
+      # Extract KEY= from each (top of line, before =) and sort. Strip
+      # comment-only lines + blanks. Comments mid-file don't survive grep.
+      example_keys=$(grep -E '^[A-Z][A-Z0-9_]*=' "${src_dir}/.env.example" 2>/dev/null \
+        | sed 's/=.*//' | sort -u)
+      env_keys=$(grep -E '^[A-Z][A-Z0-9_]*=' "${dest}/.env" 2>/dev/null \
+        | sed 's/=.*//' | sort -u)
+      missing_keys=$(comm -23 <(printf '%s\n' "$example_keys") <(printf '%s\n' "$env_keys"))
+      if [ -n "$missing_keys" ]; then
+        echo "" >&2
+        echo "WARNING: ${src_dir}/.env is missing keys that exist in .env.example:" >&2
+        printf '  - %s\n' $missing_keys >&2
+        echo "  → review ${src_dir}/.env.example for new defaults and add to ${dest}/.env" >&2
+      fi
     fi
   done
 

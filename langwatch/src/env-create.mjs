@@ -61,6 +61,31 @@ export function createEnvConfig() {
       // HS256 secret used by control-plane to sign the short-lived JWT that the
       // gateway verifies on every request (contract §4.1). 32+ chars.
       LW_GATEWAY_JWT_SECRET: z.string().min(32).optional(),
+      // Public-facing base URL the AI Gateway is reachable at. The Go
+      // gateway re-uses this same var name in the OPPOSITE direction
+      // (gateway -> control plane), so in dev `scripts/start.sh` hijacks
+      // it for the Go interpretation. That collision means the TS side
+      // (CLI bootstrap, /me VK reveal) must NOT read this var directly
+      // when LW_GATEWAY_PUBLIC_URL is set; prefer that instead. Kept
+      // here for back-compat with hosted SaaS deploys where the value
+      // is correctly the public gateway URL.
+      LW_GATEWAY_BASE_URL: z.string().url().optional(),
+      // Public-facing data plane URL the CLI + /me VK reveal cards
+      // surface to the user. Distinct from LW_GATEWAY_BASE_URL because
+      // the Go gateway hijacks that name for its control-plane
+      // discovery; this var stays unambiguous on the TS read path. In
+      // dev: http://localhost:5563 (or `PORT + 3` when PORT is set);
+      // hosted SaaS: https://gateway.langwatch.com. Falls back to
+      // LW_GATEWAY_BASE_URL when unset for legacy deploys.
+      LW_GATEWAY_PUBLIC_URL: z.string().url().optional(),
+      // Internal control-plane → gateway URL for the HMAC-signed
+      // /internal/* surface (validate-ottl, transform). Different from
+      // LW_GATEWAY_BASE_URL because the Go gateway re-uses that name
+      // for the OPPOSITE direction (gateway → control plane), so a
+      // shared `.env` would otherwise collide. In dev:
+      // http://localhost:5563. In Docker: http://host.docker.internal:5563.
+      // Falls back to LW_GATEWAY_BASE_URL when unset for back-compat.
+      LW_GATEWAY_INTERNAL_URL: z.string().url().optional(),
       // Argon2id pepper mixed into virtual-key hashing. Rotating this
       // invalidates all existing VKs — treat as append-only / key-management.
       LW_VIRTUAL_KEY_PEPPER: z.string().min(32).optional(),
@@ -79,7 +104,6 @@ export function createEnvConfig() {
       OPENAI_API_KEY: z.string().optional(),
       SENDGRID_API_KEY: z.string().optional(),
       LANGWATCH_NLP_SERVICE: z.string().optional(),
-      TOPIC_CLUSTERING_SERVICE: z.string().optional(),
       LANGEVALS_ENDPOINT: z.string().optional(),
       // S3 staging for outbound langevals POSTs is opt-in: only relevant
       // when langevals is fronted by AWS Lambda (6 MB sync-invoke cap).
@@ -125,6 +149,13 @@ export function createEnvConfig() {
       // to retune (e.g. raise for a legitimate heavy single-tenant
       // workload).
       LANGWATCH_DISPATCH_TENANT_CAP: z.string().optional(),
+      // Post-2026-05-29 dynamic water-level cap (option C). Global in-flight
+      // budget = the fleet ceiling (pods x GLOBAL_QUEUE_CONCURRENCY) that the
+      // water-fill divides across competing tenants, so a lone tenant bursts to
+      // the full fleet and N contenders converge to a max-min fair share. Unset
+      // or "0" (default) keeps the fixed LANGWATCH_DISPATCH_TENANT_CAP behaviour
+      // — the feature ships inert and is enabled per-environment.
+      LANGWATCH_DISPATCH_GLOBAL_BUDGET: z.string().optional(),
       USE_S3_STORAGE: z.boolean().optional(),
       S3_ENDPOINT: z.string().optional(),
       S3_ACCESS_KEY_ID: z.string().optional(),
@@ -243,6 +274,9 @@ export function createEnvConfig() {
       NEXTAUTH_URL: process.env.NEXTAUTH_URL,
       LW_GATEWAY_INTERNAL_SECRET: process.env.LW_GATEWAY_INTERNAL_SECRET,
       LW_GATEWAY_JWT_SECRET: process.env.LW_GATEWAY_JWT_SECRET,
+      LW_GATEWAY_BASE_URL: process.env.LW_GATEWAY_BASE_URL,
+      LW_GATEWAY_PUBLIC_URL: process.env.LW_GATEWAY_PUBLIC_URL,
+      LW_GATEWAY_INTERNAL_URL: process.env.LW_GATEWAY_INTERNAL_URL,
       LW_VIRTUAL_KEY_PEPPER: process.env.LW_VIRTUAL_KEY_PEPPER,
       AUTH0_CLIENT_ID: process.env.AUTH0_CLIENT_ID,
       AUTH0_CLIENT_SECRET: process.env.AUTH0_CLIENT_SECRET,
@@ -259,10 +293,6 @@ export function createEnvConfig() {
       OPENAI_API_KEY: process.env.OPENAI_API_KEY,
       SENDGRID_API_KEY: process.env.SENDGRID_API_KEY,
       LANGWATCH_NLP_SERVICE: process.env.LANGWATCH_NLP_SERVICE,
-      // Temporary, ideally we want to move this to lambda too
-      TOPIC_CLUSTERING_SERVICE: process.env.TOPIC_CLUSTERING_SERVICE
-        ? process.env.TOPIC_CLUSTERING_SERVICE
-        : process.env.LANGWATCH_NLP_SERVICE,
       LANGEVALS_ENDPOINT: process.env.LANGEVALS_ENDPOINT,
       LANGEVALS_STAGING_THRESHOLD_BYTES: process.env.LANGEVALS_STAGING_THRESHOLD_BYTES,
       LANGEVALS_STAGING_TTL_SECONDS: process.env.LANGEVALS_STAGING_TTL_SECONDS,
@@ -286,6 +316,8 @@ export function createEnvConfig() {
       LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD:
         process.env.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD,
       LANGWATCH_DISPATCH_TENANT_CAP: process.env.LANGWATCH_DISPATCH_TENANT_CAP,
+      LANGWATCH_DISPATCH_GLOBAL_BUDGET:
+        process.env.LANGWATCH_DISPATCH_GLOBAL_BUDGET,
       USE_S3_STORAGE:
         process.env.USE_S3_STORAGE === "1" ||
         process.env.USE_S3_STORAGE?.toLowerCase() === "true",

@@ -57,6 +57,7 @@ export class EventSourcingPipeline<
       globalRegistry: definition.globalRegistry,
       processRole: definition.processRole,
       replayMarkerChecker: definition.replayMarkerChecker,
+      retentionPolicyResolver: definition.retentionPolicyResolver,
     });
   }
 }

@@ -6,9 +6,14 @@ import {
   type ExperimentRunDatasetEntry,
   type ExperimentRunEvaluation,
 } from "@/client-sdk/services/experiments/experiments-api.service";
+import {
+  deriveRunStatus,
+  isTerminalStatus,
+} from "@/client-sdk/services/experiments/run-status";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import { formatTable } from "../../utils/formatting";
+import { resolveRunId } from "./resolve-run";
 
 export type ExperimentResultsFilter = "failed" | "all";
 export type ExperimentResultsFormat = "table" | "json";
@@ -18,7 +23,7 @@ export interface ExperimentResultsOptions {
   evaluator?: string;
   format?: string;
   limit?: string;
-  experiment?: string;
+  runId?: string;
 }
 
 const DEFAULT_LIMIT = 20;
@@ -63,10 +68,10 @@ const isFailedRow = ({
 };
 
 export const experimentResultsCommand = async ({
-  runId,
+  experimentSlug,
   options = {},
 }: {
-  runId: string;
+  experimentSlug: string;
   options?: ExperimentResultsOptions;
 }): Promise<void> => {
   checkApiKey();
@@ -80,19 +85,34 @@ export const experimentResultsCommand = async ({
     return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_LIMIT;
   })();
   const evaluatorFilter = options.evaluator?.trim();
-  const experimentSlug = options.experiment?.trim();
 
   const service = new ExperimentsApiService();
-  const spinner = ora(`Fetching results for run "${runId}"...`).start();
+  const spinner = ora(`Fetching results for "${experimentSlug}"...`).start();
 
   try {
+    const runId = await resolveRunId({
+      service,
+      experimentSlug,
+      runId: options.runId,
+    });
     const results: ExperimentRunResultsResponse = await service.getRunResults({
       runId,
       experimentSlug,
     });
+    const runStatus = deriveRunStatus(results.timestamps);
     spinner.succeed(
       `Loaded results for ${chalk.cyan(runId)} (${results.dataset.length} rows, ${results.evaluations.length} evaluations)`,
     );
+
+    if (!isTerminalStatus(runStatus) && format !== "json") {
+      console.log(
+        chalk.yellow(
+          runStatus === "interrupted"
+            ? `Run status: interrupted. These are partial results (the run never sent a finished/stopped marker and has had no recent updates).`
+            : `Run status: running. These are partial results; more rows may appear later.`,
+        ),
+      );
+    }
 
     // Group evaluations by target-scoped row key.
     const evaluationsByRow = new Map<string, ExperimentRunEvaluation[]>();
@@ -149,7 +169,21 @@ export const experimentResultsCommand = async ({
     }
 
     if (rows.length === 0) {
-      console.log(chalk.gray("No rows matched the filter."));
+      if (filter === "failed") {
+        console.log(chalk.gray("No rows matched the filter."));
+      } else if (runStatus === "running") {
+        console.log(
+          chalk.gray(
+            "No rows recorded yet. The run is still in progress; run this again shortly.",
+          ),
+        );
+      } else if (runStatus === "interrupted") {
+        console.log(
+          chalk.gray("No rows were recorded before the run was interrupted."),
+        );
+      } else {
+        console.log(chalk.gray("No rows recorded for this run."));
+      }
       return;
     }
 

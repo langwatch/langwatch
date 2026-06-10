@@ -16,18 +16,25 @@ import {
 export class SimulationRunService {
   constructor(readonly repository: SimulationRepository) {}
 
-  static create(resolveClient: ClickHouseClientResolver | null): SimulationRunService {
+  static create(
+    resolveClient: ClickHouseClientResolver | null,
+  ): SimulationRunService {
     const repo = resolveClient
       ? new SimulationClickHouseRepository(resolveClient)
       : new NullSimulationRepository();
     return traced(new SimulationRunService(repo), "SimulationRunService");
   }
 
-  async getScenarioSetsData(params: { projectId: string }): Promise<ScenarioSetData[]> {
+  async getScenarioSetsData(params: {
+    projectId: string;
+  }): Promise<ScenarioSetData[]> {
     return this.repository.getScenarioSetsData(params);
   }
 
-  async getScenarioRunData(params: { projectId: string; scenarioRunId: string }): Promise<ScenarioRunData | null> {
+  async getScenarioRunData(params: {
+    projectId: string;
+    scenarioRunId: string;
+  }): Promise<ScenarioRunData | null> {
     return this.repository.getScenarioRunData(params);
   }
 
@@ -56,7 +63,11 @@ export class SimulationRunService {
     cursor?: string;
     startDate?: number;
     endDate?: number;
-  }): Promise<{ runs: ScenarioRunData[]; nextCursor?: string; hasMore: boolean }> {
+  }): Promise<{
+    runs: ScenarioRunData[];
+    nextCursor?: string;
+    hasMore: boolean;
+  }> {
     return this.repository.getRunDataForScenarioSet(params);
   }
 
@@ -81,11 +92,19 @@ export class SimulationRunService {
     return this.repository.getBatchRunCountForScenarioSet(params);
   }
 
-  async getExternalSetSummaries(params: { projectId: string; startDate?: number; endDate?: number }): Promise<ExternalSetSummary[]> {
+  async getExternalSetSummaries(params: {
+    projectId: string;
+    startDate?: number;
+    endDate?: number;
+  }): Promise<ExternalSetSummary[]> {
     return this.repository.getExternalSetSummaries(params);
   }
 
-  async getInternalSuiteSummaries(params: { projectId: string; startDate?: number; endDate?: number }): Promise<ExternalSetSummary[]> {
+  async getInternalSuiteSummaries(params: {
+    projectId: string;
+    startDate?: number;
+    endDate?: number;
+  }): Promise<ExternalSetSummary[]> {
     return this.repository.getInternalSuiteSummaries(params);
   }
 
@@ -100,15 +119,21 @@ export class SimulationRunService {
     return this.repository.getRunDataForAllSuites(params);
   }
 
-  async getAllRunIdsForProject(params: { projectId: string }): Promise<string[]> {
-    return this.repository.getAllRunIdsForProject(params);
+  async getRunIdsForScope(params: {
+    projectId: string;
+    batchRunId?: string;
+    scenarioSetId?: string;
+  }): Promise<string[]> {
+    return this.repository.getRunIdsForScope(params);
   }
 
   /**
    * Returns distinct external (non-internal) scenario set IDs across the given projects.
    * Used by UsageService for cross-org scenario set limit enforcement.
    */
-  async getDistinctExternalSetIds(params: { projectIds: string[] }): Promise<Set<string>> {
+  async getDistinctExternalSetIds(params: {
+    projectIds: string[];
+  }): Promise<Set<string>> {
     return this.repository.getDistinctExternalSetIds(params);
   }
 }

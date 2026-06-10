@@ -19,7 +19,7 @@
  * resolved-inherited model as a placeholder at reduced opacity so the
  * user sees what would apply if they don't override.
  *
- * Feature rows under an expanded role default to "Inherit" — picking
+ * Feature rows under an expanded role default to "Inherit" - picking
  * a model there pins that feature to the chosen value, leaving the
  * role-level pick alone.
  */
@@ -40,7 +40,7 @@ import { LATEST_ALIAS_PROVIDERS } from "~/server/modelProviders/latestAliases";
 import { INHERIT_SENTINEL, ProviderModelSelector } from "./ProviderModelSelector";
 import {
   ScopeChipPicker,
-  type ScopeChipPickerEntry,
+  type ScopeTriadEntry,
 } from "./ScopeChipPicker";
 
 type Payload = RouterOutputs["modelProvider"]["getDefaultModelsForProject"];
@@ -80,7 +80,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
   const { project } = useOrganizationTeamProject();
   const { closeDrawer } = useDrawer();
 
-  // Pulls the same Payload DefaultModelsSection consumes — tRPC
+  // Pulls the same Payload DefaultModelsSection consumes - tRPC
   // de-duplicates the query so the parent page render doesn't pay an
   // extra round-trip. The drawer used to receive these as props from
   // the page, but URL-routed drawers can't accept non-serializable
@@ -106,7 +106,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
       EMBEDDINGS: null,
     } as Payload["effective"]);
 
-  // Treat the drawer as always-open while mounted — the registry only
+  // Treat the drawer as always-open while mounted - the registry only
   // renders it when `drawer.open === "defaultModelOverride"`. closeDrawer
   // pops the URL param and unmounts.
   const open = true;
@@ -121,14 +121,14 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
   // feature key if the picked scopes had nothing set. The drawer uses
   // the answer to render the inherit-placeholder + the "Inherit (from
   // X) [model]" dropdown entry. Refetches whenever the chip selection
-  // changes — picking new scopes shifts the cascade answer.
+  // changes - picking new scopes shifts the cascade answer.
 
   // ── Local state ───────────────────────────────────────────────────
   // `config` mirrors the JSON we'll send on save. Keys present here =
   // overrides. Keys absent = inherit. Local-only "EXPANDED" tracking
   // for which roles have their feature lists open in the form.
 
-  const [scopes, setScopes] = useState<ScopeChipPickerEntry[]>([]);
+  const [scopes, setScopes] = useState<ScopeTriadEntry[]>([]);
   const [config, setConfig] = useState<Record<string, string>>({});
   const [expanded, setExpanded] = useState<Record<ModelRoleKey, boolean>>({
     DEFAULT: false,
@@ -188,7 +188,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
   // The legacy `getAllForProject` Record merges env-fed defaults
   // (every registry provider whose API key happens to be present in
   // the server's process env), which surfaces unrelated providers in
-  // the picker — a user with only Anthropic configured would see
+  // the picker - a user with only Anthropic configured would see
   // Voyage / Gemini / Perplexity embeddings just because those env
   // vars are set on the host. `listAllForProjectForFrontend` returns
   // stored rows only.
@@ -210,7 +210,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
     const enabledKeys = new Set(enabledEntries.map(([k]) => k));
     // Build the alias entries for enabled providers that support them.
     // Aliases sit at the TOP of the chat list (DEFAULT + FAST) so the
-    // user lands on "Latest" / "Latest smaller" without scrolling — the
+    // user lands on "Latest" / "Latest smaller" without scrolling - the
     // expectation is that pinning a specific model is the exceptional
     // case, not the default. EMBEDDINGS doesn't get aliases (the latest
     // embedding model isn't a moving target the way chat flagships are).
@@ -223,8 +223,8 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
     const filterByMode = (mode: "chat" | "embedding") => {
       // Still loading: show the full registry so the dropdown isn't
       // visually broken during first paint. Once data lands we either
-      // fall through to the enabled-filter path or — if the project
-      // has zero enabled providers (or the query errored) — return an
+      // fall through to the enabled-filter path or - if the project
+      // has zero enabled providers (or the query errored) - return an
       // empty list so the picker doesn't lie about what's available.
       if (isLoading) {
         return modelSelectorOptions
@@ -233,7 +233,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
       }
       if (hasProviderLoadError || enabledEntries.length === 0) return [];
       // Registry chat/embedding models from any enabled provider. This
-      // mirrors the ModelProviderDefaultSection logic — the registry is
+      // mirrors the ModelProviderDefaultSection logic - the registry is
       // the broad pool; provider toggles narrow it.
       const registryModels = modelSelectorOptions
         .filter((o) => {
@@ -273,7 +273,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
     setConfig((prev) => {
       const next = { ...prev };
       // Inherit sentinel + null + empty string all map to "clear the
-      // key from in-progress JSON" — the cascade walks up at save time
+      // key from in-progress JSON" - the cascade walks up at save time
       // since absent keys mean inherit (no sentinel in storage).
       if (model === null || model === "" || model === INHERIT_SENTINEL) {
         delete next[key];
@@ -374,7 +374,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
           </VStack>
         </Drawer.Body>
         <Drawer.Footer>
-          {/* Delete moved to the row's 3-dot menu in the table — matches
+          {/* Delete moved to the row's 3-dot menu in the table - matches
               the model-providers row pattern. The drawer is purely
               edit/save. */}
           <HStack width="full" justify="flex-end" gap={2}>
@@ -552,7 +552,7 @@ function FeatureRow({
   inheritedForFeature: InheritedEntry;
   /** Server cascade answer for the feature's role (fallback chain). */
   inheritedForRole: InheritedEntry;
-  /** Resolved model the role-level row would pick — wins over the
+  /** Resolved model the role-level row would pick - wins over the
    *  server-side feature inheritance because the in-progress config's
    *  role-level pick is local and not yet persisted. */
   inheritedRoleModel?: string;
@@ -617,13 +617,13 @@ function FeatureRow({
 
 /**
  * Builds the `inheritOption` payload `ProviderModelSelector` consumes.
- * The label tells the user where the value comes from — "Inherit (from
- * organization)" or similar — and the model is rendered at reduced
+ * The label tells the user where the value comes from - "Inherit (from
+ * organization)" or similar - and the model is rendered at reduced
  * opacity in the trigger + as the first dropdown entry.
  *
  * For the `inferred` source (server falls back to "we'd pick the
  * latest from your first provider") the label is a neutral "Inherit"
- * rather than "Suggested from X" — the picker already surfaces the
+ * rather than "Suggested from X" - the picker already surfaces the
  * provider's `/latest` and `/latest-mini` aliases at the top of the
  * list, so the per-provider attribution would just add noise. The
  * inherit entry itself stays so the user can always toggle back from
@@ -638,7 +638,7 @@ function buildInheritOption(
     // guessing what the user MIGHT want based on which providers are
     // enabled, not a real cascade hit. Showing it as a ghost
     // placeholder under a "Not configured" badge gave the
-    // contradictory read that something was set when nothing was —
+    // contradictory read that something was set when nothing was -
     // the row stays empty until the user explicitly picks a model.
     if (fromServer.source === "inferred") {
       return undefined;
@@ -673,7 +673,7 @@ function buildInheritOption(
 /**
  * Scope picker section. Quick-pick chips ("Organization" / "This team"
  * / "This project") follow the same pattern as `ProviderScopeSection`
- * from the model-provider drawer — picking one replaces the selection
+ * from the model-provider drawer - picking one replaces the selection
  * with that single scope, and the multi-scope chip picker stays
  * available below for fan-out cases. Lives inline here (rather than
  * pulling `ProviderScopeSection` in) because that component is tightly
@@ -685,17 +685,17 @@ function ScopeSection({
   onChange,
   available,
 }: {
-  scopes: ScopeChipPickerEntry[];
-  onChange: (next: ScopeChipPickerEntry[]) => void;
+  scopes: ScopeTriadEntry[];
+  onChange: (next: ScopeTriadEntry[]) => void;
   available: Payload["available"];
 }) {
-  // Drawer renders only the dropdown — the Organization/Team/Project
+  // Drawer renders only the dropdown - the Organization/Team/Project
   // quick-pick chips are redundant when scope assignment is effectively
   // always at org scope, and the dropdown already surfaces all reachable
   // scopes. The quick-pick variant is preserved on `ScopeChipPicker`
   // (`showQuickPicks` prop) for future surfaces where the chip-row UX
   // makes sense.
-  // Default label is "Scope" — render it so the picker reads consistent
+  // Default label is "Scope" - render it so the picker reads consistent
   // with the model-provider drawer's scope section.
   return (
     <ScopeChipPicker

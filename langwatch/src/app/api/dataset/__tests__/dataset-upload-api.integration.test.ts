@@ -23,7 +23,7 @@ describe("Feature: Dataset File Upload REST API", () => {
   let mockGetActivePlan: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
-    resetApp();
+    await resetApp();
     mockGetActivePlan = vi.fn().mockResolvedValue(FREE_PLAN);
     globalForApp.__langwatch_app = createTestApp({
       planProvider: PlanProviderService.create({
@@ -50,11 +50,11 @@ describe("Feature: Dataset File Upload REST API", () => {
       },
     });
 
-    testProject = projectFactory.build({ slug: nanoid() });
     testProject = await prisma.project.create({
       data: {
-        ...testProject,
+        ...projectFactory.build({ slug: nanoid() }),
         teamId: testTeam.id,
+        personalFeatures: {},
       },
     });
 
@@ -80,7 +80,7 @@ describe("Feature: Dataset File Upload REST API", () => {
     await prisma.organization.delete({
       where: { id: testOrganization.id },
     });
-    resetApp();
+    await resetApp();
   });
 
   // Helper: create a dataset directly via Prisma

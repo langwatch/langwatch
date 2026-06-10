@@ -1,0 +1,82 @@
+name: sign-release-images
+
+# Backfill cosign signatures + CycloneDX SBOM attestations for an already-published
+# release whose publish-docker-app signing step failed (e.g. the v3.4.0 run that ran
+# under the broken cosign 3.x default bundle format). This signs the images already in
+# the registry by digest; it does not rebuild or re-push anything, and it reuses the
+# exact signing logic from the release pipeline (.github/scripts/sign-image.sh).
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Released image tag to sign (e.g. 3.4.0)'
+        required: true
+      attach_to_release:
+        description: 'Attach the SBOMs to the langwatch@v<version> GitHub release'
+        type: boolean
+        default: true
+
+permissions:
+  contents: write # attach SBOMs to the GitHub release
+  id-token: write # keyless OIDC signing via Sigstore
+
+env:
+  COSIGN_YES: "true"
+
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          # Match publish-docker-app: cosign 3.x defaults to the OCI 1.1 referrers bundle
+          # format that Docker Hub does not reliably serve, breaking verify after sign.
+          cosign-release: v2.6.3
+
+      - name: Install syft
+        uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Sign images and attach per-platform CycloneDX SBOMs
+        env:
+          VERSION: ${{ inputs.version }}
+          CERT_IDENTITY_REGEX: ^https://github\.com/langwatch/langwatch/
+          CERT_OIDC_ISSUER: https://token.actions.githubusercontent.com
+        run: |
+          set -euo pipefail
+          mkdir -p sboms
+          for IMAGE in langwatch langwatch_nlp langevals ai-gateway; do
+            REPO="langwatch/${IMAGE}" \
+            IMAGE_NAME="${IMAGE}" \
+            INSPECT_TAG="${VERSION}" \
+            SBOM_DIR="sboms" \
+            CERT_IDENTITY_REGEX="${CERT_IDENTITY_REGEX}" \
+            CERT_OIDC_ISSUER="${CERT_OIDC_ISSUER}" \
+            bash .github/scripts/sign-image.sh
+          done
+
+      - name: Upload SBOMs as workflow artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sboms-${{ inputs.version }}
+          path: sboms/*.cdx.json
+          retention-days: 90
+
+      - name: Attach SBOMs to GitHub release
+        if: inputs.attach_to_release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: langwatch@v${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          gh release upload "${RELEASE_TAG}" sboms/*.cdx.json --clobber --repo "${GITHUB_REPOSITORY}"

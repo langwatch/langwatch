@@ -93,10 +93,19 @@ const INITIAL_STATE: SpanTreeState = {
 export function useSpanTreeLoader({
   projectId,
   traceId,
+  occurredAtMs,
   enabled = true,
 }: {
   projectId: string;
   traceId: string;
+  /**
+   * Approximate trace timestamp (ms since epoch). Threaded into the span reads
+   * as a partition-pruning hint so they scan the trace's weekly `stored_spans`
+   * partitions instead of cold-scanning every partition (incl. cold S3) on each
+   * drawer open. Optional: when absent the reads fall back to the full scan, so
+   * correctness is unchanged either way.
+   */
+  occurredAtMs?: number;
   enabled?: boolean;
 }) {
   const [state, dispatch] = useReducer(spanTreeReducer, INITIAL_STATE);
@@ -105,7 +114,7 @@ export function useSpanTreeLoader({
 
   // Initial paginated load
   const initialQuery = api.tracesV2.spansPaginated.useQuery(
-    { projectId, traceId, limit: PAGE_SIZE, offset: 0 },
+    { projectId, traceId, limit: PAGE_SIZE, offset: 0, occurredAtMs },
     { enabled: enabled && !!projectId && !!traceId },
   );
 
@@ -133,6 +142,7 @@ export function useSpanTreeLoader({
           traceId,
           limit: PAGE_SIZE,
           offset: state.nextOffset,
+          occurredAtMs,
         });
         dispatch({ type: "BATCH_LOADED", spans: result.spans });
 
@@ -155,7 +165,7 @@ export function useSpanTreeLoader({
         backfillTimerRef.current = null;
       }
     };
-  }, [state.phase, state.nextOffset, state.total, enabled, projectId, traceId, utils]);
+  }, [state.phase, state.nextOffset, state.total, enabled, projectId, traceId, occurredAtMs, utils]);
 
   // Delta fetch callback for SSE events
   const onSpanStored = useCallback(async () => {
@@ -165,6 +175,7 @@ export function useSpanTreeLoader({
         projectId,
         traceId,
         sinceStartTimeMs: state.highWaterMark,
+        occurredAtMs,
       });
       if (deltaSpans.length > 0) {
         dispatch({ type: "DELTA_RECEIVED", spans: deltaSpans });
@@ -172,7 +183,7 @@ export function useSpanTreeLoader({
     } catch {
       // Silently fail — next SSE event will retry
     }
-  }, [enabled, projectId, traceId, state.highWaterMark, utils]);
+  }, [enabled, projectId, traceId, occurredAtMs, state.highWaterMark, utils]);
 
   // Clear new flags after animation
   useEffect(() => {

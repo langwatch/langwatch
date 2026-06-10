@@ -3,7 +3,7 @@ title: Ops Dashboard
 description: "Real-time pipeline health monitoring with throughput, latency, and error tracking"
 ---
 
-The Ops Dashboard is the landing page of the Operations Console (`/ops`). It provides a real-time view of the event-sourcing pipeline — ingestion rates, processing throughput, latency percentiles, queue health, and top errors — all in a single screen.
+The Ops Dashboard is the landing page of the Operations Console (`/ops`). It provides a real-time view of the event-sourcing pipeline, ingestion rates, processing throughput, latency percentiles, queue health, and top errors, all in a single screen.
 
 <Frame>
 <img src="/images/ops/dashboard.png" alt="Ops Dashboard" />
@@ -15,15 +15,15 @@ The top of the dashboard displays six key metrics, each showing the current rate
 
 | Metric | What it measures | Secondary stat |
 |---|---|---|
-| **Staged/s** | Ingestion rate — commands entering the queue | Peak rate |
-| **Completed/s** | Processing throughput — commands fully processed | Total completed |
-| **Failed/s** | Failure rate — commands that errored | Total failed |
+| **Staged/s** | Ingestion rate, commands entering the queue | Peak rate |
+| **Completed/s** | Processing throughput, commands fully processed | Total completed |
+| **Failed/s** | Failure rate, commands that errored | Total failed |
 | **Blocked** | Groups stuck due to errors | Number of error groups |
 | **DLQ** | Items in the Dead Letter Queue | Redis memory usage |
-| **P50 / P99** | End-to-end processing latency | Peak latency |
+| **P50, P99** | End-to-end processing latency | Peak latency |
 
 <Tip>
-Metrics marked in red indicate an active problem — non-zero failure rates or blocked groups. Orange indicates a warning state, such as items in the DLQ.
+Metrics marked in red indicate an active problem, non-zero failure rates or blocked groups. Orange indicates a warning state, such as items in the DLQ.
 </Tip>
 
 ## Active Operations
@@ -47,9 +47,9 @@ Operators with `ops:manage` permission can **pause** and **unpause** individual 
 
 The bottom of the dashboard lists the top error patterns across all queues, showing:
 
-- **Count** — how many jobs hit this error
-- **Error message** — normalized and deduplicated
-- **Pipeline** — which pipeline stage produced the error
+- **Count**: how many jobs hit this error
+- **Error message**: normalized and deduplicated
+- **Pipeline**: which pipeline stage produced the error
 
 This gives a quick signal on whether errors are concentrated in a single pipeline or scattered across the system.
 
@@ -57,9 +57,9 @@ This gives a quick signal on whether errors are concentrated in a single pipelin
 
 The dashboard uses **Server-Sent Events (SSE)** for real-time metric streaming. A connection status indicator in the header shows:
 
-- **Connected** (green) — live SSE connection active
-- **Polling** (yellow) — SSE unavailable, falling back to 5-second polling
-- **Disconnected** (red) — no connection
+- **Connected** (green), live SSE connection active
+- **Polling** (yellow), SSE unavailable, falling back to 5-second polling
+- **Disconnected** (red), no connection
 
 Both modes deliver the same data; SSE simply provides lower-latency updates.
 

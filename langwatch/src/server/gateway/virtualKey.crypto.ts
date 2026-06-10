@@ -1,9 +1,9 @@
 /**
  * Virtual-key crypto primitives. Mint, hash, verify, and inspect.
  *
- * Format: `lw_vk_{live|test}_<26-char Crockford base32 ULID>` (40 chars total).
- *   - Fixed prefix `lw_vk_` is grep/DLP-friendly.
- *   - Env segment (`live` / `test`) is Stripe-style blast-radius insurance.
+ * Format: `vk-lw-<26-char Crockford base32 ULID>` (32 chars total).
+ *   - Fixed prefix `vk-lw-` is grep/DLP-friendly + function-named, paired
+ *     with `sk-lw-` (secret / ingestion keys) and `pat-lw-` (legacy).
  *   - Body is a monotonic ULID (128 random bits, 48 ms timestamp), encoded in
  *     Crockford base32 — sortable by creation time in dashboards.
  *
@@ -12,7 +12,7 @@
  *   - `hashedSecret` column: `HMAC-SHA256(pepper, secret)` hex string (64 chars).
  *     Deterministic so we can look up a presented secret by hash directly in
  *     one indexed query.
- *   - `displayPrefix` column: first 18 chars (`lw_vk_live_01HZX9`) — safe to
+ *   - `displayPrefix` column: first 13 chars (`vk-lw-01HZX9N`) — safe to
  *     surface in UI, logs, and traces.
  *
  * Why HMAC-SHA256 instead of argon2id? The secret body has 128+ bits of
@@ -24,10 +24,7 @@
  */
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 
-const VK_PREFIX = "lw_vk_";
-const VK_ENVS = ["live", "test"] as const;
-
-export type VirtualKeyEnvironment = (typeof VK_ENVS)[number];
+const VK_PREFIX = "vk-lw-";
 
 // Crockford base32 alphabet (no I L O U to avoid visual ambiguity).
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
@@ -36,7 +33,6 @@ export class VirtualKeyCryptoError extends Error {
   constructor(
     public readonly code:
       | "malformed_key"
-      | "invalid_env"
       | "pepper_missing"
       | "hash_mismatch",
     message: string,
@@ -77,42 +73,22 @@ export function mintUlid(now: number = Date.now()): string {
  * Mint a new virtual-key secret. The resulting string is shown once to the
  * user and never stored in plaintext.
  */
-export function mintVirtualKeySecret(
-  environment: VirtualKeyEnvironment,
-  now: number = Date.now(),
-): string {
-  if (!VK_ENVS.includes(environment)) {
-    throw new VirtualKeyCryptoError("invalid_env", `unknown env: ${environment}`);
-  }
-  return `${VK_PREFIX}${environment}_${mintUlid(now)}`;
+export function mintVirtualKeySecret(now: number = Date.now()): string {
+  return `${VK_PREFIX}${mintUlid(now)}`;
 }
 
 /**
- * Parse `lw_vk_{env}_{ulid}` and return its components. Throws on any
- * deviation from the canonical shape.
+ * Parse `vk-lw-<ulid>` and return its components. Throws on any deviation
+ * from the canonical shape.
  */
 export function parseVirtualKey(secret: string): {
-  environment: VirtualKeyEnvironment;
   ulid: string;
   displayPrefix: string;
 } {
   if (!secret.startsWith(VK_PREFIX)) {
-    throw new VirtualKeyCryptoError("malformed_key", "missing lw_vk_ prefix");
+    throw new VirtualKeyCryptoError("malformed_key", "missing vk-lw- prefix");
   }
-  const rest = secret.slice(VK_PREFIX.length);
-  // env is followed by `_`, then 26-char ulid
-  const underscore = rest.indexOf("_");
-  if (underscore === -1) {
-    throw new VirtualKeyCryptoError("malformed_key", "missing env segment");
-  }
-  const env = rest.slice(0, underscore);
-  if (!(VK_ENVS as readonly string[]).includes(env)) {
-    throw new VirtualKeyCryptoError(
-      "invalid_env",
-      `env must be one of ${VK_ENVS.join(", ")}`,
-    );
-  }
-  const ulid = rest.slice(underscore + 1);
+  const ulid = secret.slice(VK_PREFIX.length);
   if (ulid.length !== 26) {
     throw new VirtualKeyCryptoError("malformed_key", "ulid must be 26 chars");
   }
@@ -122,11 +98,9 @@ export function parseVirtualKey(secret: string): {
       "ulid must be uppercase Crockford base32",
     );
   }
-  // 18-char prefix: "lw_vk_" (6) + env (4) + "_" (1) + first 7 ulid chars = 18.
-  // For "live" env that's `lw_vk_live_<7chars>` (18 chars).
-  // For "test" env that's `lw_vk_test_<7chars>` (18 chars).
-  const displayPrefix = secret.slice(0, 18);
-  return { environment: env as VirtualKeyEnvironment, ulid, displayPrefix };
+  // 13-char prefix: "vk-lw-" (6) + first 7 ulid chars = 13.
+  const displayPrefix = secret.slice(0, 13);
+  return { ulid, displayPrefix };
 }
 
 // Reads pepper from process.env at call time. env.mjs also validates
@@ -169,4 +143,4 @@ export function verifyVirtualKeySecret(presented: string, stored: string): boole
   return timingSafeEqual(a, b);
 }
 
-export const VIRTUAL_KEY_DISPLAY_PREFIX_LENGTH = 18;
+export const VIRTUAL_KEY_DISPLAY_PREFIX_LENGTH = 13;

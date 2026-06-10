@@ -205,11 +205,11 @@ func TestParseCredentialFromHeaders_AzureAIAlias(t *testing.T) {
 
 func TestBareModel_StripsProviderPrefix(t *testing.T) {
 	cases := map[string]string{
-		"openai/gpt-5-mini":                       "gpt-5-mini",
-		"anthropic/claude-sonnet-4-20250514":      "claude-sonnet-4-20250514",
+		"openai/gpt-5-mini":                               "gpt-5-mini",
+		"anthropic/claude-sonnet-4-20250514":              "claude-sonnet-4-20250514",
 		"bedrock/anthropic.claude-3-sonnet-20240229-v1:0": "anthropic.claude-3-sonnet-20240229-v1:0",
-		"vertex_ai/gemini-2.0-flash":              "gemini-2.0-flash",
-		"no-prefix-here":                          "no-prefix-here",
+		"vertex_ai/gemini-2.0-flash":                      "gemini-2.0-flash",
+		"no-prefix-here":                                  "no-prefix-here",
 	}
 	for in, want := range cases {
 		if got := gatewayproxy.BareModel(in); got != want {

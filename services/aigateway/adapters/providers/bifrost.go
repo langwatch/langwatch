@@ -157,9 +157,10 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 			return &domain.Response{
 				Body:       rawBody,
 				StatusCode: status,
+				Headers:    forwardableUpstreamHeaders(bifrostResponseHeaders(bfCtx)),
 			}, nil
 		}
-		return nil, classifyBifrostError(ctx, berr)
+		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
 
 	// /v1/messages callers (Anthropic SDK, claude-code, ...) expect the
@@ -216,9 +217,10 @@ func (r *BifrostRouter) dispatchResponses(
 			return &domain.Response{
 				Body:       rawBody,
 				StatusCode: status,
+				Headers:    forwardableUpstreamHeaders(bifrostResponseHeaders(bfCtx)),
 			}, nil
 		}
-		return nil, classifyBifrostError(ctx, berr)
+		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
 
 	// Prefer the provider's native response bytes so /v1/responses
@@ -270,9 +272,10 @@ func (r *BifrostRouter) dispatchEmbeddings(
 			return &domain.Response{
 				Body:       rawBody,
 				StatusCode: status,
+				Headers:    forwardableUpstreamHeaders(bifrostResponseHeaders(bfCtx)),
 			}, nil
 		}
-		return nil, classifyBifrostError(ctx, berr)
+		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
 
 	body, _ := sonic.Marshal(resp)
@@ -365,11 +368,21 @@ func (r *BifrostRouter) dispatchVoyageDirect(
 }
 
 // DispatchStream sends a streaming request through bifrost. Routing
-// semantics match Dispatch (translate on RequestTypeChat, raw-forward
-// on RequestTypeMessages). Chunks returned by Bifrost are
-// BifrostChatResponse (OpenAI-compatible), so the SSE bytes the gateway
-// emits downstream are the shape the OpenAI SDK expects regardless of
-// which provider Bifrost routed to.
+// semantics match Dispatch:
+//
+//   - RequestTypeChat: translate inbound OpenAI-shape body through Bifrost's
+//     ChatCompletionStream, emit BifrostChatResponse (OpenAI-compatible)
+//     chunks. OpenAI SDK clients decode these as `delta.choices`.
+//   - RequestTypeMessages: raw-forward through Bifrost's PassthroughStream
+//     so the provider's native SSE frames (`event: content_block_delta`,
+//     `event: message_start`, etc.) reach the client unchanged. Anthropic
+//     SDK clients (Vercel AI SDK anthropic, opencode) Zod-validate every
+//     chunk against the Messages event union and reject any OpenAI-shape
+//     `delta.choices` payload with `No matching discriminator on 'type'`.
+//   - RequestTypeResponses: dedicated dispatchResponsesStream that emits
+//     OpenAI Responses-API SSE frames verbatim.
+//   - RequestTypePassthrough: dedicated dispatchPassthroughStream (Gemini
+//     /v1beta/...:streamGenerateContent).
 func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request, cred domain.Credential) (domain.StreamIterator, error) {
 	provider := mapProvider(cred.ProviderID)
 	model := req.Model
@@ -383,6 +396,10 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 
 	if req.Type == domain.RequestTypePassthrough {
 		return r.dispatchPassthroughStream(ctx, req, provider, model, cred)
+	}
+
+	if req.Type == domain.RequestTypeMessages {
+		return r.dispatchMessagesStream(ctx, req, provider, model, cred)
 	}
 
 	// Managed-Bedrock with a per-request runtime endpoint streams through the
@@ -411,10 +428,57 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 
 	ch, berr := r.bf.ChatCompletionStreamRequest(bfCtx, bfReq)
 	if berr != nil {
-		return nil, classifyBifrostError(ctx, berr)
+		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
 
 	return &bifrostStreamIterator{ch: ch}, nil
+}
+
+// dispatchMessagesStream raw-forwards a streaming /v1/messages request
+// through Bifrost's PassthroughStream so the upstream provider's native
+// SSE frames (Anthropic's `event: message_start / content_block_start /
+// content_block_delta / message_delta / message_stop`) reach the client
+// unchanged. Bifrost's ChatCompletionStream would emit OpenAI-shape
+// `delta.choices` chunks instead, which Anthropic SDK clients (Vercel
+// AI SDK, opencode) Zod-validate and reject with `No matching
+// discriminator on 'type'`.
+//
+// The non-streaming /v1/messages path achieves the same effect through
+// SendBackRawResponse + rawResponseBytes(); Bifrost's stream chunks
+// don't expose a comparable raw-bytes hook on each frame, so the fix
+// is to route through PassthroughStream instead. The provider's
+// PassthroughStream impl (anthropic.go:2700) sets x-api-key +
+// anthropic-version and forwards Method/Path/Body/Headers verbatim,
+// then streams the raw fasthttp body back chunk-by-chunk — exactly
+// what gemini's /v1beta passthrough already does for its native shape.
+func (r *BifrostRouter) dispatchMessagesStream(
+	ctx context.Context,
+	req *domain.Request,
+	provider bfschemas.ModelProvider,
+	model string,
+	cred domain.Credential,
+) (domain.StreamIterator, error) {
+	bfReq := &bfschemas.BifrostPassthroughRequest{
+		Model:  model,
+		Method: "POST",
+		Path:   "/v1/messages",
+		Body:   req.Body,
+		SafeHeaders: map[string]string{
+			"content-type": "application/json",
+			"accept":       "text/event-stream",
+		},
+	}
+	bfCtx := bfschemas.NewBifrostContext(withCredential(ctx, cred), time.Time{})
+
+	ch, berr := r.bf.PassthroughStream(bfCtx, provider, bfReq)
+	if berr != nil {
+		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
+	}
+	return &bifrostStreamIterator{
+		ch:         ch,
+		rawFraming: true,
+		parseUsage: parseAnthropicPassthroughUsage,
+	}, nil
 }
 
 // dispatchResponsesStream is the streaming sibling of dispatchResponses.
@@ -444,7 +508,7 @@ func (r *BifrostRouter) dispatchResponsesStream(
 
 	ch, berr := r.bf.ResponsesStreamRequest(bfCtx, bfReq)
 	if berr != nil {
-		return nil, classifyBifrostError(ctx, berr)
+		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
 	return &bifrostStreamIterator{ch: ch}, nil
 }
@@ -471,9 +535,10 @@ func (r *BifrostRouter) dispatchPassthrough(
 			return &domain.Response{
 				Body:       rawBody,
 				StatusCode: status,
+				Headers:    forwardableUpstreamHeaders(bifrostResponseHeaders(bfCtx)),
 			}, nil
 		}
-		return nil, classifyBifrostError(ctx, berr)
+		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
 
 	status := resp.StatusCode
@@ -514,7 +579,7 @@ func (r *BifrostRouter) dispatchPassthroughStream(
 
 	ch, berr := r.bf.PassthroughStream(bfCtx, provider, bfReq)
 	if berr != nil {
-		return nil, classifyBifrostError(ctx, berr)
+		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
 	return &bifrostStreamIterator{ch: ch, rawFraming: true}, nil
 }
@@ -781,6 +846,75 @@ func mapProvider(id domain.ProviderID) bfschemas.ModelProvider {
 
 // --- Error classification ---
 
+// errFromBifrost turns a Bifrost dispatch error into the error the gateway
+// surfaces to the client. When the provider returned a real HTTP status, that
+// status (and the provider's native error body when Bifrost captured it) is
+// forwarded verbatim via UpstreamError — so a terminal upstream 4xx reaches
+// the client as that 4xx instead of a retryable 502, and the client can tell
+// terminal from retryable correctly. A zero status means there was no upstream
+// response (transport failure / timeout) — fall back to classification, which
+// maps it to provider_timeout / the gateway's own error taxonomy.
+//
+// This is the streaming-path counterpart to the non-stream
+// rawResponseFromBifrostError branch: streaming dispatch can only return an
+// error, so the upstream status + body ride on UpstreamError instead of a
+// *domain.Response.
+func errFromBifrost(ctx context.Context, berr *bfschemas.BifrostError, respHeaders map[string]string) error {
+	status := 0
+	if berr.StatusCode != nil {
+		status = *berr.StatusCode
+	}
+	if status <= 0 {
+		return classifyBifrostError(ctx, berr)
+	}
+	body, _ := extractRawResponseBytes(berr.ExtraFields.RawResponse)
+	return &domain.UpstreamError{
+		StatusCode: status,
+		Body:       body,
+		Message:    bfErrorMsg(berr),
+		Headers:    forwardableUpstreamHeaders(respHeaders),
+	}
+}
+
+// bifrostResponseHeaders reads the provider's HTTP response headers that
+// Bifrost stashes on the dispatch context (provider handlers call
+// ctx.SetValue(BifrostContextKeyProviderResponseHeaders, ...) before returning,
+// including on the non-2xx error path). Returns nil when absent.
+func bifrostResponseHeaders(bfCtx *bfschemas.BifrostContext) map[string]string {
+	if bfCtx == nil {
+		return nil
+	}
+	if v, ok := bfCtx.Value(bfschemas.BifrostContextKeyProviderResponseHeaders).(map[string]string); ok {
+		return v
+	}
+	return nil
+}
+
+// forwardableUpstreamHeaders selects the upstream response headers that are
+// safe and useful to forward to the client on an error: the retry-signaling
+// headers Retry-After (backoff hint on 429/503) and x-should-retry (the
+// provider's canonical terminal-vs-retryable signal). Everything else
+// (transport headers, content-length, auth echoes) is dropped. Match is
+// case-insensitive; output uses canonical names.
+func forwardableUpstreamHeaders(in map[string]string) map[string]string {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string]string, 2)
+	for k, v := range in {
+		switch strings.ToLower(k) {
+		case "retry-after":
+			out["Retry-After"] = v
+		case "x-should-retry":
+			out["x-should-retry"] = v
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
 func classifyBifrostError(ctx context.Context, berr *bfschemas.BifrostError) error {
 	status := 0
 	if berr.StatusCode != nil {
@@ -817,11 +951,16 @@ func extractUsage(resp *bfschemas.BifrostChatResponse) domain.Usage {
 	if resp == nil || resp.Usage == nil {
 		return domain.Usage{}
 	}
-	return domain.Usage{
+	u := domain.Usage{
 		PromptTokens:     resp.Usage.PromptTokens,
 		CompletionTokens: resp.Usage.CompletionTokens,
 		TotalTokens:      resp.Usage.TotalTokens,
 	}
+	if d := resp.Usage.PromptTokensDetails; d != nil {
+		u.CacheReadTokens = d.CachedReadTokens
+		u.CacheCreationTokens = d.CachedWriteTokens
+	}
+	return u
 }
 
 // extractResponsesUsage maps the Responses-API usage block onto the
@@ -832,11 +971,16 @@ func extractResponsesUsage(resp *bfschemas.BifrostResponsesResponse) domain.Usag
 	if resp == nil || resp.Usage == nil {
 		return domain.Usage{}
 	}
-	return domain.Usage{
+	u := domain.Usage{
 		PromptTokens:     resp.Usage.InputTokens,
 		CompletionTokens: resp.Usage.OutputTokens,
 		TotalTokens:      resp.Usage.TotalTokens,
 	}
+	if d := resp.Usage.InputTokensDetails; d != nil {
+		u.CacheReadTokens = d.CachedReadTokens
+		u.CacheCreationTokens = d.CachedWriteTokens
+	}
+	return u
 }
 
 // extractEmbeddingUsage maps Bifrost's embedding usage block. Embedding
@@ -867,6 +1011,13 @@ type bifrostStreamIterator struct {
 	// yields proper `event:/data:` framing). Router.writeSSE inspects this
 	// to skip the default `data: <chunk>\n\n` re-wrap.
 	rawFraming bool
+	// parseUsage extracts provider-native usage telemetry off raw SSE
+	// chunk bytes on the passthrough path. Each provider's stream shape
+	// differs (Gemini's `usageMetadata`, Anthropic's `message_start` +
+	// `message_delta` events, etc.) so the dispatcher injects the
+	// right parser at iterator-construction time. When nil, the
+	// iterator skips usage extraction (final Usage() reports zeros).
+	parseUsage func([]byte) (domain.Usage, bool)
 }
 
 func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
@@ -892,12 +1043,7 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 			data, _ := sonic.Marshal(chunk.BifrostChatResponse)
 			it.current = data
 			if chunk.BifrostChatResponse.Usage != nil {
-				u := chunk.BifrostChatResponse.Usage
-				it.usage = domain.Usage{
-					PromptTokens:     u.PromptTokens,
-					CompletionTokens: u.CompletionTokens,
-					TotalTokens:      u.TotalTokens,
-				}
+				it.usage = extractUsage(chunk.BifrostChatResponse)
 			}
 		} else if chunk.BifrostResponsesStreamResponse != nil {
 			// Responses API stream frames (response.created /
@@ -909,12 +1055,7 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 			it.current = data
 			//nolint:staticcheck // explicit embedded-field reference matches the parallel branches above for readability.
 			if resp := chunk.BifrostResponsesStreamResponse.Response; resp != nil && resp.Usage != nil {
-				u := resp.Usage
-				it.usage = domain.Usage{
-					PromptTokens:     u.InputTokens,
-					CompletionTokens: u.OutputTokens,
-					TotalTokens:      u.TotalTokens,
-				}
+				it.usage = extractResponsesUsage(resp)
 			}
 		} else if chunk.BifrostPassthroughResponse != nil {
 			// Passthrough stream chunks carry the raw upstream bytes
@@ -931,9 +1072,40 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 			// non-final chunk omits usageMetadata; we keep the last
 			// non-zero values seen so the iterator's Usage() reports
 			// the FINAL token totals at stream close.
+			parser := it.parseUsage
+			if parser == nil {
+				parser = parseGeminiPassthroughUsage
+			}
 			//nolint:staticcheck // explicit embedded-field reference matches the parallel branches above for readability.
-			if u, ok := parseGeminiPassthroughUsage(chunk.BifrostPassthroughResponse.Body); ok {
-				it.usage = u
+			if u, ok := parser(chunk.BifrostPassthroughResponse.Body); ok {
+				// Merge — Anthropic streams emit prompt+cache tokens
+				// once on `message_start` and a stream of output token
+				// counters on `message_delta`, so a chunk-by-chunk
+				// replace would drop the message_start values. Gemini
+				// emits the full usageMetadata on every chunk that has
+				// it, so this merge is a no-op for it.
+				if u.PromptTokens > 0 {
+					it.usage.PromptTokens = u.PromptTokens
+				}
+				if u.CompletionTokens > 0 {
+					it.usage.CompletionTokens = u.CompletionTokens
+				}
+				if u.CacheReadTokens > 0 {
+					it.usage.CacheReadTokens = u.CacheReadTokens
+				}
+				if u.CacheCreationTokens > 0 {
+					it.usage.CacheCreationTokens = u.CacheCreationTokens
+				}
+				// Prefer the parser's reported total when non-zero —
+				// Gemini's `totalTokenCount` can exceed prompt+completion
+				// (reasoning / thinking tokens). Anthropic doesn't report
+				// a total on the wire, so the parser leaves it at 0 and
+				// we fall through to prompt+completion below.
+				if u.TotalTokens > 0 {
+					it.usage.TotalTokens = u.TotalTokens
+				} else if it.usage.PromptTokens > 0 || it.usage.CompletionTokens > 0 {
+					it.usage.TotalTokens = it.usage.PromptTokens + it.usage.CompletionTokens
+				}
 			}
 		}
 		return true
@@ -972,14 +1144,91 @@ func parseGeminiPassthroughUsage(body []byte) (domain.Usage, bool) {
 	if total == 0 {
 		total = prompt + completion
 	}
-	// Note: cachedContentTokenCount (when present) is folded into prompt
-	// tokens upstream by Gemini; the trace pipeline derives cache_read
-	// from a separate gen_ai.usage.cache_read attr, not from total.
+	// Gemini folds cachedContentTokenCount into promptTokenCount, so it rides
+	// inside PromptTokens; surfacing it as CacheReadTokens lets the span report
+	// the fresh input separately. Gemini bills no distinct cache-write tokens.
 	return domain.Usage{
 		PromptTokens:     prompt,
 		CompletionTokens: completion,
 		TotalTokens:      total,
+		CacheReadTokens:  int(usage.Get("cachedContentTokenCount").Int()),
 	}, true
+}
+
+// parseAnthropicPassthroughUsage extracts Anthropic's usage block from a
+// raw /v1/messages SSE chunk. Anthropic's streaming protocol emits
+// usage data twice:
+//
+//	event: message_start
+//	data: {"type":"message_start","message":{"usage":{"input_tokens":N,
+//	       "cache_creation_input_tokens":N,"cache_read_input_tokens":N,
+//	       "output_tokens":1, ...}}}
+//
+//	event: message_delta
+//	data: {"type":"message_delta","usage":{"output_tokens":N}}
+//
+// The `message_start` event has the only input-side counters; subsequent
+// `message_delta` events overwrite output_tokens as the response grows.
+// Returns (Usage{}, false) for any other event so the iterator keeps the
+// last-seen values (the final message_delta wins for completion tokens,
+// the message_start wins for prompt + cache tokens).
+func parseAnthropicPassthroughUsage(body []byte) (domain.Usage, bool) {
+	if len(body) == 0 {
+		return domain.Usage{}, false
+	}
+	// SSE chunks may contain multiple `event: ... / data: ...` frames in
+	// one byte slice; scan all `data: {` lines so the message_start and
+	// any trailing message_delta in the same buffered chunk both update
+	// the running counters.
+	var usage domain.Usage
+	var matched bool
+	scan := body
+	for {
+		i := bytes.Index(scan, []byte("data: {"))
+		if i < 0 {
+			break
+		}
+		scan = scan[i+len("data: "):]
+		// Locate the JSON object's closing brace by scanning the
+		// {...} balanced span. gjson parses a leading object regardless
+		// of trailing garbage, so we hand it the slice from `{` onward.
+		ev := gjson.GetBytes(scan, "type").String()
+		switch ev {
+		case "message_start":
+			m := gjson.GetBytes(scan, "message.usage")
+			if m.Exists() {
+				usage.PromptTokens = int(m.Get("input_tokens").Int())
+				usage.CompletionTokens = int(m.Get("output_tokens").Int())
+				usage.CacheReadTokens = int(m.Get("cache_read_input_tokens").Int())
+				usage.CacheCreationTokens = int(m.Get("cache_creation_input_tokens").Int())
+				usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
+				matched = true
+			}
+		case "message_delta":
+			u := gjson.GetBytes(scan, "usage")
+			if u.Exists() {
+				// message_delta only updates output_tokens; preserve the
+				// input-side counters captured at message_start (carried
+				// in the caller's it.usage via last-seen semantics).
+				out := int(u.Get("output_tokens").Int())
+				if out > 0 {
+					usage.CompletionTokens = out
+					// PromptTokens/CacheRead/CacheCreation stay zero in
+					// this branch; the iterator's last-seen carry-over
+					// keeps the message_start values intact for the
+					// final Usage().
+					matched = true
+				}
+			}
+		}
+	}
+	if !matched {
+		return domain.Usage{}, false
+	}
+	if usage.TotalTokens == 0 {
+		usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
+	}
+	return usage, true
 }
 
 func (it *bifrostStreamIterator) RawFraming() bool { return it.rawFraming }

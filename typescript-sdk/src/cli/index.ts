@@ -2,7 +2,8 @@
 
 // Load environment variables BEFORE any other imports
 import { config } from "dotenv";
-config();
+// quiet: silence dotenv's "injecting env" tip line on every CLI run.
+config({ quiet: true });
 
 import { Command } from "commander";
 import { parsePromptSpec } from "./types";
@@ -29,7 +30,9 @@ const initCommand = async (): Promise<void> => {
   return initCommandImpl();
 };
 
-const loginCommand = async (options?: { apiKey?: string }): Promise<void> => {
+const loginCommand = async (
+  options?: { apiKey?: string; device?: boolean; browser?: string },
+): Promise<void> => {
   const { loginCommand: loginCommandImpl } = await import("./commands/login.js");
   return loginCommandImpl(options);
 };
@@ -126,18 +129,428 @@ program
   .showSuggestionAfterError();
 
 // Top-level commands
-program
+const loginCmd = program
   .command("login")
-  .description("Login to LangWatch and save API key. Get a key from https://app.langwatch.ai/authorize (or ${LANGWATCH_ENDPOINT}/authorize for self-hosted).")
-  .option("--api-key <key>", "Set API key non-interactively (for CI/CD and agents)")
-  .action(async (options: { apiKey?: string }) => {
+  .description(
+    "Login to LangWatch. With no flags, asks where (cloud vs self-hosted) and how (AI tools vs project SDK). For CI/agents pass --device, --api-key, or --token to skip prompts.",
+  )
+  .option("--api-key <key>", "Set API key non-interactively (CI/agents that already have a project API key) — writes to .env")
+  .option("--endpoint <url>", "Override the LangWatch control-plane URL for this login (self-hosted instances)")
+  .option(
+    "--device",
+    "RFC 8628 device-flow login via your company SSO; provisions a personal virtual key for Claude Code / Codex / Cursor / Gemini CLI",
+  )
+  .option(
+    "--token <token>",
+    "Set device-session token non-interactively (CI/agents that already have a pre-minted token from the dashboard) — writes to ~/.langwatch/config.json",
+  )
+  .option(
+    "--browser <name>",
+    "browser to open for device-flow approval (chrome|chromium|firefox|safari|none|<path>)",
+  );
+
+loginCmd.action(async (options: { apiKey?: string; device?: boolean; browser?: string; endpoint?: string; token?: string }) => {
+  try {
+    await loginCommand(options);
+  } catch (error) {
+    console.error(`Error: ${formatApiErrorMessage({ error })}`);
+    process.exit(1);
+  }
+});
+
+// `langwatch config <get|set|list>` — explicit persistence + introspection
+// for user-global CLI config. Mirrors `gh config` / `doctl auth init` /
+// `stripe config` patterns so users don't hand-edit ~/.langwatch/config.json.
+const configCmd = program
+  .command("config")
+  .description("Read or write user-global CLI configuration (endpoint, gateway-url)");
+
+configCmd
+  .command("set <key> <value>")
+  .description("Persist a config value to ~/.langwatch/config.json (e.g. `langwatch config set endpoint https://lw.acme.internal`)")
+  .action(async (key: string, value: string) => {
+    const { configSetCommand } = await import("./commands/config.js");
+    await configSetCommand(key, value);
+  });
+
+configCmd
+  .command("get <key>")
+  .description("Print the resolved value for a config key (uses the same flag > env > config > default priority as the CLI)")
+  .action(async (key: string) => {
+    const { configGetCommand } = await import("./commands/config.js");
+    await configGetCommand(key);
+  });
+
+configCmd
+  .command("list")
+  .description("List the current resolved values + their sources (no secrets shown)")
+  .action(async () => {
+    const { configListCommand } = await import("./commands/config.js");
+    await configListCommand();
+  });
+
+program
+  .command("open [path]")
+  .description(
+    "Open the LangWatch app in your browser. No path: /me in personal mode, project home if LANGWATCH_API_KEY is set. With a path: BASE/<path>.",
+  )
+  .option("--browser <name>", "browser to open (chrome|chromium|firefox|safari|none|<path>)")
+  .action(async (path: string | undefined, options: { browser?: string }) => {
     try {
-      await loginCommand(options);
+      const { openCommand } = await import("./commands/open.js");
+      await openCommand({ path, browser: options.browser });
     } catch (error) {
       console.error(`Error: ${formatApiErrorMessage({ error })}`);
       process.exit(1);
     }
   });
+
+// AI Gateway governance — read identity, deep-link, request budget increase.
+program
+  .command("whoami")
+  .description("Print the identity persisted by `langwatch login --device` (governance plane).")
+  .action(async () => {
+    try {
+      const { whoamiCommand } = await import("./commands/whoami.js");
+      await whoamiCommand();
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("request-increase")
+  .description("Open the budget-increase request page (uses the gateway-issued signed URL when available).")
+  .option("--browser <name>", "browser to open (chrome|chromium|firefox|safari|none|<path>)")
+  .action(async (options: { browser?: string }) => {
+    try {
+      const { requestIncreaseCommand } = await import("./commands/request-increase.js");
+      await requestIncreaseCommand(options);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+// AI Gateway governance — wrapped tool runners.
+// Each `langwatch <tool>` exec's the underlying binary with the
+// right ANTHROPIC_*/OPENAI_*/GEMINI_* env vars injected pointing
+// at the gateway, after a Screen-8 budget pre-check.
+//
+// Marked `hidden:true` so they don't pollute the top-level command list
+// in `langwatch --help`; rendered together under a "Coding assistants:"
+// section via addHelpText below. `langwatch <tool> --help` still works.
+program
+  .command("claude", { hidden: true })
+  .description("Run `claude` (Claude Code) routed through the LangWatch gateway.")
+  .allowUnknownOption(true)
+  .helpOption(false)
+  .action(async (_opts, cmd: { args?: string[] }) => {
+    try {
+      const { wrapClaude } = await import("./commands/wrap.js");
+      await wrapClaude(cmd.args ?? []);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("codex", { hidden: true })
+  .description("Run `codex` (OpenAI Codex CLI) routed through the LangWatch gateway.")
+  .allowUnknownOption(true)
+  .helpOption(false)
+  .action(async (_opts, cmd: { args?: string[] }) => {
+    try {
+      const { wrapCodex } = await import("./commands/wrap.js");
+      await wrapCodex(cmd.args ?? []);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("cursor", { hidden: true })
+  .description("Run `cursor` routed through the LangWatch gateway.")
+  .allowUnknownOption(true)
+  .helpOption(false)
+  .action(async (_opts, cmd: { args?: string[] }) => {
+    try {
+      const { wrapCursor } = await import("./commands/wrap.js");
+      await wrapCursor(cmd.args ?? []);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("gemini", { hidden: true })
+  .description("Run `gemini` (Gemini CLI) routed through the LangWatch gateway.")
+  .allowUnknownOption(true)
+  .helpOption(false)
+  .action(async (_opts, cmd: { args?: string[] }) => {
+    try {
+      const { wrapGemini } = await import("./commands/wrap.js");
+      await wrapGemini(cmd.args ?? []);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("opencode")
+  .description("Run `opencode` routed through the LangWatch gateway (multi-provider; injects both Anthropic and OpenAI env vars).")
+  .allowUnknownOption(true)
+  .helpOption(false)
+  .action(async (_opts, cmd: { args?: string[] }) => {
+    try {
+      const { wrapOpencode } = await import("./commands/wrap.js");
+      await wrapOpencode(cmd.args ?? []);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+// 'after' (not 'afterAll') so the section only renders on `langwatch --help`,
+// not on every `langwatch <subcommand> --help` invocation.
+program.addHelpText(
+  "after",
+  [
+    "",
+    "Coding assistants:",
+    "  claude          Run `claude` (Claude Code) routed through the gateway",
+    "  codex           Run `codex` (OpenAI Codex CLI) routed through the gateway",
+    "  cursor          Run `cursor` routed through the gateway",
+    "  gemini          Run `gemini` (Gemini CLI) routed through the gateway",
+    "  opencode        Run `opencode` (multi-provider) routed through the gateway",
+    "",
+  ].join("\n"),
+);
+
+program
+  .command("logout-device")
+  .description("Server-revoke the device-flow refresh token AND clear the local ~/.langwatch/config.json. Idempotent.")
+  .action(async () => {
+    try {
+      const { logoutDeviceCommand } = await import("./commands/logout-device.js");
+      await logoutDeviceCommand();
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("init-shell")
+  .description("Print an eval-able shell snippet so any shell session auto-exports the gateway env vars (alternative to `langwatch claude`).")
+  .argument("[shell]", "zsh|bash|fish|cmd|powershell", "zsh")
+  .action(async (shell: string) => {
+    try {
+      const { initShellCommand } = await import("./commands/init-shell.js");
+      await initShellCommand(shell);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+// `langwatch ingest *` — read-only debug tools for the IngestionSource
+// + Activity Monitor surfaces. Mirrors the web admin /settings/governance
+// flows for ops folks who live in terminal. Authoring stays browser-only.
+const ingestCmd = program
+  .command("ingest")
+  .description("Inspect IngestionSources and tail their recent OCSF-normalised events (read-only governance debug helpers).");
+
+ingestCmd
+  .command("list")
+  .description("List the org's IngestionSources (active by default; --all includes archived).")
+  .option("--all", "include archived sources")
+  .option("--json", "emit machine-readable JSON")
+  .action(async (options: { all?: boolean; json?: boolean }) => {
+    try {
+      const { ingestListCommand } = await import("./commands/ingest/list.js");
+      await ingestListCommand(options);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+ingestCmd
+  .command("tail <sourceId>")
+  .description("Stream the most recent events for an IngestionSource. --follow polls every 3s.")
+  .option("--limit <n>", "how many events to fetch on first poll (default 50)", (v) => parseInt(v, 10))
+  .option("--follow", "keep polling for new events; exit on Ctrl-C")
+  .option("--json", "emit machine-readable JSON")
+  .action(async (sourceId: string, options: { limit?: number; follow?: boolean; json?: boolean }) => {
+    try {
+      const { ingestTailCommand } = await import("./commands/ingest/tail.js");
+      await ingestTailCommand(sourceId, options);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+ingestCmd
+  .command("health <sourceId>")
+  .description("Show events received in the last 24h / 7d / 30d + last-success timestamp for one IngestionSource.")
+  .option("--json", "emit machine-readable JSON")
+  .action(async (sourceId: string, options: { json?: boolean }) => {
+    try {
+      const { ingestHealthCommand } = await import("./commands/ingest/health.js");
+      await ingestHealthCommand(sourceId, options);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+// `langwatch ingest install <tool>` — hidden primitive used by CI /
+// devcontainer / scripted setups. The user surface is
+// `langwatch <tool>` (the wrapper auto-resolves Path A vs Path B
+// per cfg.tool_mode + VK presence). Kept registered so existing
+// scripts continue to work and so reviewers can find the install
+// helper from the help with `--help --all` if needed.
+ingestCmd
+  .command("install <tool>", { hidden: true })
+  .description(
+    "Hidden: low-level Path B install primitive. Normal users run `langwatch <tool>` which auto-installs when needed.",
+  )
+  .option("--env-only", "skip the codex config.toml write; print exports only")
+  .option("--json", "emit machine-readable JSON")
+  .action(
+    async (
+      tool: string,
+      options: { envOnly?: boolean; json?: boolean },
+    ) => {
+      const { installCommand } = await import(
+        "./commands/ingestion/install.js"
+      );
+      await installCommand(tool, options);
+    },
+  );
+
+const governanceCmd = program
+  .command("governance")
+  .description(
+    "Manage governance resources (ingestion templates) from the CLI. Mirrors the public REST surface at /api/governance/* — every mutating call lands an audit row with metadata.surface='cli'.",
+  );
+
+governanceCmd
+  .command("status")
+  .description("Show the org's governance setup-state OR-of-flags (mirrors api.governance.setupState).")
+  .option("--json", "emit machine-readable JSON")
+  .action(async (options: { json?: boolean }) => {
+    try {
+      const { governanceStatusCommand } = await import("./commands/governance/status.js");
+      await governanceStatusCommand(options);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+// ── Ingestion templates (admin/platform-curated catalog) ──────────────────
+
+const templatesCmd = governanceCmd
+  .command("ingestion-templates")
+  .description("CRUD on IngestionTemplate rows. Reads use aiTools:view; mutations use aiTools:manage.");
+
+templatesCmd
+  .command("admin-list")
+  .description("Admin readonly catalog — includes ottl_rules. Requires aiTools:manage.")
+  .option("--json", "emit machine-readable JSON")
+  .action(async (options: { json?: boolean }) => {
+    const { adminListCommand } = await import(
+      "./commands/governance/ingestion-templates.js"
+    );
+    await adminListCommand(options);
+  });
+
+templatesCmd
+  .command("get <id>")
+  .description("Fetch a single ingestion template by id.")
+  .option("--json", "emit machine-readable JSON")
+  .action(async (id: string, options: { json?: boolean }) => {
+    const { getCommand } = await import(
+      "./commands/governance/ingestion-templates.js"
+    );
+    await getCommand(id, options);
+  });
+
+templatesCmd
+  .command("create")
+  .description("Author a new org-authored ingestion template.")
+  .requiredOption("--source-type <slug>", "lowercase letters/digits/underscores, max 40 chars")
+  .requiredOption("--display-name <name>", "human-readable label")
+  .option("--description <text>", "optional description")
+  .option("--icon-asset <asset>", "preset:<kind> | data:image/svg+xml;base64,...")
+  .option(
+    "--credential-schema <kind>",
+    "otlp_token | static_api_key | agent_id (defaults to otlp_token)",
+  )
+  .option("--ottl-rules <text>", "OTTL rules (newline-separated statements)")
+  .option("--json", "emit machine-readable JSON")
+  .action(
+    async (options: {
+      sourceType: string;
+      displayName: string;
+      description?: string;
+      iconAsset?: string;
+      credentialSchema?: string;
+      ottlRules?: string;
+      json?: boolean;
+    }) => {
+      const { createCommand } = await import(
+        "./commands/governance/ingestion-templates.js"
+      );
+      await createCommand(options);
+    },
+  );
+
+templatesCmd
+  .command("update-ottl-rules <id>")
+  .description("Replace ottl_rules on an org-authored template. Platform rows reject.")
+  .requiredOption("--ottl-rules <text>", "OTTL rules (newline-separated statements)")
+  .option("--json", "emit machine-readable JSON")
+  .action(
+    async (id: string, options: { ottlRules: string; json?: boolean }) => {
+      const { updateOttlRulesCommand } = await import(
+        "./commands/governance/ingestion-templates.js"
+      );
+      await updateOttlRulesCommand(id, options);
+    },
+  );
+
+templatesCmd
+  .command("archive <id>")
+  .description("Soft-archive an org-authored template. Platform rows reject.")
+  .option("--json", "emit machine-readable JSON")
+  .action(async (id: string, options: { json?: boolean }) => {
+    const { archiveCommand } = await import(
+      "./commands/governance/ingestion-templates.js"
+    );
+    await archiveCommand(id, options);
+  });
+
+templatesCmd
+  .command("clone-from-platform <sourceTemplateId>")
+  .description("Clone a platform-published template into the caller's org for OTTL customisation.")
+  .option("--json", "emit machine-readable JSON")
+  .action(
+    async (sourceTemplateId: string, options: { json?: boolean }) => {
+      const { cloneFromPlatformCommand } = await import(
+        "./commands/governance/ingestion-templates.js"
+      );
+      await cloneFromPlatformCommand(sourceTemplateId, options);
+    },
+  );
 
 // Add prompt command group
 const promptCmd = program
@@ -474,52 +887,54 @@ experimentCmd
   });
 
 experimentCmd
-  .command("status <runId>")
-  .description("Check the status of an experiment run")
+  .command("status <experiment>")
+  .description("Check the status of an experiment run (defaults to the latest run)")
   .option("-f, --format <format>", "Output format: table (default) or json", "table")
-  .action(async (runId: string, options: { format?: string }) => {
+  .option("--run-id <id>", "Specific run id to check (defaults to the latest run)")
+  .action(async (experiment: string, options: { format?: string; runId?: string }) => {
     const { experimentStatusCommand: impl } = await import("./commands/experiment/status.js");
-    await impl(runId, options);
+    await impl(experiment, options);
   });
 
 experimentCmd
-  .command("list-runs")
+  .command("list-runs <experiment>")
   .description("List experiment runs for an experiment by slug")
-  .requiredOption("--experiment <slug>", "Experiment slug to list runs for")
   .option("-f, --format <format>", "Output format: table (default) or json", "table")
   .option("--limit <n>", "Maximum runs to fetch (default 50, max 200)", "50")
   .action(
-    async (options: {
-      experiment?: string;
-      format?: string;
-      limit?: string;
-    }) => {
-      await experimentListRunsCommand(options);
+    async (
+      experiment: string,
+      options: {
+        format?: string;
+        limit?: string;
+      },
+    ) => {
+      await experimentListRunsCommand({ experiment, ...options });
     },
   );
 
 experimentCmd
-  .command("results <runId>")
+  .command("results <experiment>")
   .description(
-    "Fetch per-row results for a completed experiment run (debug evaluator scores and missed rows)",
+    "Fetch per-row results for an experiment run, defaulting to the latest run (debug evaluator scores and missed rows)",
   )
+  .option("--run-id <id>", "Specific run id to fetch (defaults to the latest run)")
   .option("--filter <filter>", "Filter rows: failed | all (default)", "all")
   .option("--evaluator <name>", "Show only this evaluator's column")
   .option("-f, --format <format>", "Output format: table (default) or json", "table")
   .option("--limit <n>", "Maximum rows to print in table mode (default 20)", "20")
-  .option("--experiment <slug>", "Experiment slug — required for runs older than 24h")
   .action(
     async (
-      runId: string,
+      experiment: string,
       options: {
+        runId?: string;
         filter?: string;
         evaluator?: string;
         format?: string;
         limit?: string;
-        experiment?: string;
       },
     ) => {
-      await experimentResultsCommand({ runId, options });
+      await experimentResultsCommand({ experimentSlug: experiment, options });
     },
   );
 
@@ -813,21 +1228,24 @@ virtualKeysCmd
   .requiredOption("--name <name>", "Human-readable name for the key")
   .option("--description <desc>", "Optional description")
   .option("--env <env>", "Environment: live or test", "live")
-  .option("--provider <id...>", "Provider credential id(s) to bind (repeatable)")
-  .option("--principal <userId>", "Bind to a specific principal user id")
+  .option("--scope <typeAndId...>", "Scope row in TYPE:id form (repeatable). Types: ORG | TEAM | PROJECT. Example: --scope ORG:acme --scope TEAM:platform")
+  .option("--routing-policy <id>", "RoutingPolicy id to pin (otherwise uses the org's default policy)")
+  .option("--principal-user <userId>", "Mark this VK as personal and attribute spend to the named principal user")
   .option("-f, --format <format>", "Output format: text (default) or json", "text")
-  .action(async (options: { name: string; description?: string; env?: "live" | "test"; provider?: string[]; principal?: string; format?: string }) => {
+  .action(async (options: { name: string; description?: string; env?: "live" | "test"; scope?: string[]; routingPolicy?: string; principalUser?: string; format?: string }) => {
     const { createVirtualKeyCommand: impl } = await import("./commands/virtual-keys/create.js");
     await impl(options);
   });
 
 virtualKeysCmd
   .command("update <id>")
-  .description("Update a virtual key's name/description/providers/config (requires VK edit drawer-level changes)")
+  .description("Update a virtual key's name/description/scopes/routing-policy/config")
   .option("--name <name>", "New display name")
   .option("--description <desc>", "New description")
   .option("--clear-description", "Clear the description")
-  .option("--provider <id...>", "Replace the bound provider credential ids (repeatable; supplies the full set)")
+  .option("--scope <typeAndId...>", "Replace the scope set (repeatable; supplies the full set). Same TYPE:id form as create.")
+  .option("--routing-policy <id>", "Switch to a different RoutingPolicy (pass id)")
+  .option("--clear-routing-policy", "Unpin the routing policy; VK falls back to the org default ordering")
   .option("--config-json <json>", "Inline partial config JSON (model_aliases/cache/fallback/rate_limits/policy_rules). Merges with existing config")
   .option("--config-file <path>", "Read partial config JSON from a file")
   .option("-f, --format <format>", "Output format: text (default) or json", "text")
@@ -835,7 +1253,9 @@ virtualKeysCmd
     name?: string;
     description?: string;
     clearDescription?: boolean;
-    provider?: string[];
+    scope?: string[];
+    routingPolicy?: string;
+    clearRoutingPolicy?: boolean;
     configJson?: string;
     configFile?: string;
     format?: string;
@@ -942,54 +1362,6 @@ gatewayBudgetsCmd
   .option("-f, --format <format>", "Output format: text (default) or json", "text")
   .action(async (id: string, options: { format?: string }) => {
     const { archiveGatewayBudgetCommand: impl } = await import("./commands/gateway-budgets/archive.js");
-    await impl(id, options);
-  });
-
-// Add gateway-providers command group (AI Gateway)
-const gatewayProvidersCmd = program
-  .command("gateway-providers")
-  .description("Manage AI Gateway provider credential bindings");
-
-gatewayProvidersCmd
-  .command("list")
-  .description("List provider bindings attached to the current project's gateway")
-  .option("-f, --format <format>", "Output format: table (default) or json", "table")
-  .action(async (options: { format?: string }) => {
-    const { listGatewayProvidersCommand: impl } = await import("./commands/gateway-providers/list.js");
-    await impl(options);
-  });
-
-gatewayProvidersCmd
-  .command("create")
-  .description("Bind an existing model-provider to the gateway with optional rate limits")
-  .requiredOption("--model-provider <id>", "Existing model-provider id to bind")
-  .option("--slot <slot>", "Optional free-text slot tag (e.g. 'primary', 'eu-region')")
-  .option("--rate-limit-rpm <rpm>", "Requests per minute")
-  .option("--rate-limit-tpm <tpm>", "Tokens per minute")
-  .option("--rate-limit-rpd <rpd>", "Requests per day")
-  .option("--rotation-policy <p>", "auto|manual|external_secret_store")
-  .option("--fallback-priority <n>", "Global fallback priority (lower = earlier)")
-  .option("-f, --format <format>", "Output format: text (default) or json", "text")
-  .action(async (options: {
-    modelProvider: string;
-    slot?: string;
-    rateLimitRpm?: string;
-    rateLimitTpm?: string;
-    rateLimitRpd?: string;
-    rotationPolicy?: "auto" | "manual" | "external_secret_store";
-    fallbackPriority?: string;
-    format?: string;
-  }) => {
-    const { createGatewayProviderCommand: impl } = await import("./commands/gateway-providers/create.js");
-    await impl(options);
-  });
-
-gatewayProvidersCmd
-  .command("disable <id>")
-  .description("Disable a provider binding (stops routing traffic to it)")
-  .option("-f, --format <format>", "Output format: text (default) or json", "text")
-  .action(async (id: string, options: { format?: string }) => {
-    const { disableGatewayProviderCommand: impl } = await import("./commands/gateway-providers/disable.js");
     await impl(id, options);
   });
 

@@ -145,6 +145,9 @@ describe("memberRoleState", () => {
               createdAt: new Date(),
               updatedAt: new Date(),
               archivedAt: null,
+              isPersonal: false,
+              ownerUserId: null,
+              departmentId: null,
             },
           }),
           makeMembership({
@@ -158,6 +161,9 @@ describe("memberRoleState", () => {
               createdAt: new Date(),
               updatedAt: new Date(),
               archivedAt: null,
+              isPersonal: false,
+              ownerUserId: null,
+              departmentId: null,
             },
           }),
         ];

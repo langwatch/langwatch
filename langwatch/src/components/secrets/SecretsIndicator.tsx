@@ -120,9 +120,24 @@ export function SecretsIndicator({
 										paddingX={3}
 										paddingY={1.5}
 										_hover={{ bg: "bg.subtle" }}
-										cursor="pointer"
+										cursor="grab"
 										justify="space-between"
 										onClick={() => handleSecretClick(secret.name)}
+										draggable
+										onDragStart={(e) => {
+											// `text/x-langwatch-secret` is our private MIME the Monaco
+											// drop handler matches on. `text/plain` is the fallback so
+											// dragging into a normal textarea still works.
+											e.dataTransfer.setData(
+												"text/x-langwatch-secret",
+												secret.name,
+											);
+											e.dataTransfer.setData(
+												"text/plain",
+												`secrets.${secret.name}`,
+											);
+											e.dataTransfer.effectAllowed = "copy";
+										}}
 										data-testid={`secret-item-${secret.name}`}
 									>
 										<Code fontSize="xs">{secret.name}</Code>

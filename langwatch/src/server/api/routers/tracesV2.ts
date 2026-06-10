@@ -1,6 +1,11 @@
+import { on } from "node:events";
 import { z } from "zod";
+import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
+import { CollectorSpanUtils } from "~/server/traces/collectorSpan.utils";
+import type { ReservedTraceMetadata, CustomMetadata } from "~/server/tracer/types";
+import { prisma } from "~/server/db";
 import {
   generateTraceAction,
   generateTraceQueryFromPrompt,
@@ -13,6 +18,7 @@ import type { SpanSummaryRow } from "~/server/app-layer/traces/repositories/span
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { changeTraceNameInputSchema } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
+import { withoutHiddenResourceAttrs } from "./tracesV2.resourceAttrs";
 import {
   TRACE_NAME_MAX_LENGTH,
   TRACE_NAME_MIN_LENGTH,
@@ -91,6 +97,12 @@ function mapTraceSummaryToHeader(summary: TraceSummaryData): TraceHeader {
 
   const status = deriveTraceStatus(summary);
 
+  const nonBilledCost = resolveNonBilledCost({
+    foldedNonBilledCost: summary.nonBilledCost,
+    totalCost: summary.totalCost,
+    attributes: summary.attributes,
+  });
+
   return {
     traceId: summary.traceId,
     timestamp: summary.occurredAt,
@@ -111,6 +123,7 @@ function mapTraceSummaryToHeader(summary: TraceSummaryData): TraceHeader {
     output: summary.computedOutput,
     models: summary.models,
     totalCost: summary.totalCost,
+    nonBilledCost,
     totalTokens,
     inputTokens: summary.totalPromptTokenCount,
     outputTokens: summary.totalCompletionTokenCount,
@@ -145,7 +158,54 @@ function mapSpanSummaryToTreeNode(row: SpanSummaryRow): SpanTreeNode {
     durationMs: row.durationMs,
     status,
     model: row.model,
+    cost: row.cost,
   };
+}
+
+/**
+ * The OTel gen_ai semconv (and our canonicaliser, see `_extraction.ts`) split
+ * the system prompt out of `gen_ai.input.messages` into the separate
+ * `gen_ai.system_instructions` attribute. Reads it back, tolerating both the
+ * flat-dotted (`"gen_ai.system_instructions"`) and nested
+ * (`{ gen_ai: { system_instructions } }`) param shapes.
+ */
+function readSystemInstructions(
+  params: Record<string, unknown> | null | undefined,
+): string | null {
+  if (!params) return null;
+  const flat = params["gen_ai.system_instructions"];
+  if (typeof flat === "string" && flat.trim().length > 0) return flat;
+  const genAi = params.gen_ai;
+  if (genAi && typeof genAi === "object" && !Array.isArray(genAi)) {
+    const nested = (genAi as Record<string, unknown>).system_instructions;
+    if (typeof nested === "string" && nested.trim().length > 0) return nested;
+  }
+  return null;
+}
+
+/**
+ * Build the display string for a span's input. The canonicaliser strips the
+ * system prompt out of the chat transcript into `gen_ai.system_instructions`,
+ * so a faithfully-rendered Input panel would silently drop it — the
+ * conversation reads as if nothing steered the model. For display we
+ * recombine them: when the input is a chat transcript with no system message
+ * of its own and the span carries system instructions, prepend them as a
+ * leading `system` message. Doing it here (not in the canonicaliser) keeps
+ * the stored attribute split semconv-correct while every view mode (pretty /
+ * text / json / copy) stays consistent. All other shapes fall through.
+ */
+export function buildDisplayInput(span: Pick<Span, "input" | "params">): string | null {
+  const io = span.input;
+  if (io && io.type === "chat_messages" && Array.isArray(io.value)) {
+    const system = readSystemInstructions(span.params ?? null);
+    const alreadyHasSystem = io.value.some(
+      (m) => !!m && typeof m === "object" && "role" in m && m.role === "system",
+    );
+    if (system && !alreadyHasSystem) {
+      return JSON.stringify([{ role: "system", content: system }, ...io.value]);
+    }
+  }
+  return stringifySpanIO(io);
 }
 
 function stringifySpanIO(
@@ -194,7 +254,7 @@ function mapSpanToDetail(
     status,
     model: "model" in span ? (span.model ?? null) : null,
     vendor: "vendor" in span ? (span.vendor ?? null) : null,
-    input: stringifySpanIO(span.input),
+    input: buildDisplayInput(span),
     output: stringifySpanIO(span.output),
     error: span.error
       ? { message: span.error.message, stacktrace: span.error.stacktrace }
@@ -462,6 +522,34 @@ export const tracesV2Router = createTRPCRouter({
       });
     }),
 
+  /**
+   * SSE subscription that pushes `discover_updated` events to active
+   * browsers when a tenant's facet payload finishes background refresh.
+   * The client listens, invalidates its TanStack cache for
+   * `tracesV2.discover`, and refetches — landing the fresh payload
+   * without polling.
+   *
+   * Mirrors the shape of `traces.onTraceUpdate` so the existing
+   * `useSSESubscription` hook handles it without changes.
+   */
+  onDiscoverUpdate: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission("traces:view"))
+    .subscription(async function* (opts) {
+      const { projectId } = opts.input;
+      const emitter = getApp().broadcast.getTenantEmitter(projectId);
+      try {
+        for await (const eventArgs of on(emitter, "discover_updated", {
+          // @ts-expect-error - signal is not typed
+          signal: opts.signal,
+        })) {
+          yield eventArgs[0];
+        }
+      } finally {
+        getApp().broadcast.cleanupTenantEmitter(projectId);
+      }
+    }),
+
   facetValues: protectedProcedure
     .input(
       z.object({
@@ -600,6 +688,87 @@ export const tracesV2Router = createTRPCRouter({
       });
 
       return { traceId: input.traceId, newName: parsed.data.newName };
+    }),
+
+  changeMetadata: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        traceId: z.string(),
+        metadata: z.record(
+          z.union([
+            z.string().max(4096),
+            z.number(),
+            z.boolean(),
+            z.array(z.string()),
+            z.record(z.unknown()),
+          ]),
+        ).refine((obj) => Object.keys(obj).length > 0, {
+          message: "metadata must contain at least one key",
+        }).refine(
+          (obj) => JSON.stringify(obj).length <= 32768,
+          { message: "total metadata payload must not exceed 32KB" },
+        ),
+      }),
+    )
+    .use(checkProjectPermission("traces:update"))
+    .mutation(async ({ input }) => {
+      const RESERVED_METADATA_KEYS = new Set([
+        "user_id", "customer_id", "thread_id", "labels",
+      ]);
+
+      const reserved: ReservedTraceMetadata = {};
+      const custom: CustomMetadata = {};
+      for (const [key, value] of Object.entries(input.metadata)) {
+        if (RESERVED_METADATA_KEYS.has(key)) {
+          (reserved as Record<string, unknown>)[key] = value;
+        } else {
+          custom[key] = value as CustomMetadata[string];
+        }
+      }
+
+      const resource = CollectorSpanUtils.buildResource({
+        reservedTraceMetadata: reserved,
+        customMetadata: custom,
+      });
+
+      const project = await prisma.project.findUniqueOrThrow({
+        where: { id: input.projectId },
+        select: { piiRedactionLevel: true },
+      });
+
+      const now = Date.now();
+      const nowNano = String(now * 1_000_000);
+      const spanId = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+
+      await getApp().traces.recordSpan({
+        tenantId: input.projectId,
+        span: {
+          traceId: input.traceId,
+          spanId,
+          traceState: null,
+          parentSpanId: null,
+          name: "langwatch.metadata_update",
+          kind: 1,
+          startTimeUnixNano: nowNano,
+          endTimeUnixNano: nowNano,
+          attributes: [
+            { key: "langwatch.span.type", value: { stringValue: "span" } },
+          ],
+          events: [],
+          links: [],
+          status: { code: 1 },
+          droppedAttributesCount: 0,
+          droppedEventsCount: 0,
+          droppedLinksCount: 0,
+        },
+        resource,
+        instrumentationScope: { name: "langwatch.api.metadata_update" },
+        piiRedactionLevel: project.piiRedactionLevel,
+        occurredAt: now,
+      });
+
+      return { traceId: input.traceId };
     }),
 
   spansPaginated: protectedProcedure
@@ -863,7 +1032,7 @@ export const tracesV2Router = createTRPCRouter({
       const spans = rows.map((r) => ({
         spanId: r.spanId,
         parentSpanId: r.parentSpanId,
-        resourceAttributes: r.resourceAttributes,
+        resourceAttributes: withoutHiddenResourceAttrs(r.resourceAttributes),
         scope: { name: r.scopeName ?? "", version: r.scopeVersion },
       }));
 
@@ -872,7 +1041,9 @@ export const tracesV2Router = createTRPCRouter({
 
       return {
         rootSpanId: root?.spanId ?? null,
-        resourceAttributes: root?.resourceAttributes ?? {},
+        resourceAttributes: withoutHiddenResourceAttrs(
+          root?.resourceAttributes ?? {},
+        ),
         scope: root
           ? { name: root.scopeName ?? "", version: root.scopeVersion }
           : null,

@@ -33,12 +33,12 @@ import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { useOverflowVisibility } from "../../hooks/useOverflowVisibility";
 import { usePrefetchSpanDetail } from "../../hooks/usePrefetchSpanDetail";
 import { type DrawerTab, useDrawerStore } from "../../stores/drawerStore";
-import { OverflowMenu } from "../shared/OverflowMenu";
 import {
   abbreviateModel,
   formatDuration,
   SPAN_TYPE_COLORS,
 } from "../../utils/formatters";
+import { OverflowMenu } from "../shared/OverflowMenu";
 
 /**
  * When more than this many spans are pinned, collapse the tail into a
@@ -58,7 +58,6 @@ const INLINE_KEEP_WHEN_OVERFLOW = 3;
  */
 const RIGHT_SLOT_OVERFLOW_ID = "right-slot:instrumentation";
 
-
 /** Map span type → Chakra colorPalette so Badge variants stay consistent. */
 const SPAN_TYPE_PALETTE: Record<string, string> = {
   llm: "blue",
@@ -74,8 +73,6 @@ const SPAN_TYPE_PALETTE: Record<string, string> = {
 
 interface SpanTabBarProps {
   spanTree: SpanTreeNode[];
-  /** Distinct prompt references on this trace — drives the Prompts tab. */
-  promptCount: number;
   /**
    * Optional right-aligned slot rendered after all tabs — used to
    * surface things like the instrumentation scope or other secondary
@@ -90,29 +87,6 @@ interface SpanTabBarProps {
    * decides which edge of the tab row gets the disclosure icon.
    */
   collapsePosition?: "leading" | "trailing";
-}
-
-function DrawerTabPresenceDot({
-  traceId,
-  tab,
-}: {
-  traceId: string;
-  tab: DrawerTab;
-}) {
-  const peers = usePresenceStore(
-    useShallow((s) =>
-      selectPeersMatching(
-        s,
-        (session) =>
-          session.location.route.traceId === traceId &&
-          session.location.view?.tab === tab,
-      ),
-    ),
-  );
-  if (peers.length === 0) return null;
-  return (
-    <PresenceMarker peers={peers} size={16} tooltipSuffix={`${tab} tab`} />
-  );
 }
 
 function SpanFocusPresenceDot({
@@ -138,15 +112,12 @@ function SpanFocusPresenceDot({
 
 export const SpanTabBar = memo(function SpanTabBar({
   spanTree,
-  promptCount,
   rightSlot,
   collapsePosition = "leading",
 }: SpanTabBarProps) {
   const traceId = useDrawerStore((s) => s.traceId);
-  const activeTab = useDrawerStore((s) => s.activeTab);
   const selectedSpanId = useDrawerStore((s) => s.selectedSpanId);
   const pinnedSpanIds = useDrawerStore((s) => s.pinnedSpanIds);
-  const setActiveTab = useDrawerStore((s) => s.setActiveTab);
   const selectSpan = useDrawerStore((s) => s.selectSpan);
   const clearSpan = useDrawerStore((s) => s.clearSpan);
   const pinSpan = useDrawerStore((s) => s.pinSpan);
@@ -260,113 +231,29 @@ export const SpanTabBar = memo(function SpanTabBar({
     /** Dropdown-row contents when this tab is folded into the menu. */
     menuContent: React.ReactNode;
   };
+  // After the trace-view redesign the SpanTabBar carries only
+  // span-scope tabs: pinned spans (rendered first, in pin order) and
+  // the currently-selected ephemeral span (rendered at the trailing
+  // edge if it isn't already pinned). Summary / LLM-Optimized / Prompts
+  // moved out — Summary is its own DrawerViewMode in ModeSwitch; LLM
+  // and prompt views are auto-selected inside SpanDetailPane based on
+  // the selected span's kind, so there's nothing for the user to pick
+  // here.
   const tabDescriptors: TabDescriptor[] = useMemo(() => {
-    const list: TabDescriptor[] = [
-      {
-        id: "tab:summary",
-        activeId: activeTab === "summary" ? "tab:summary" : undefined,
-        label: "Summary",
-        onSelect: () => setActiveTab("summary"),
-        render: () => (
-          <DrawerTabButton
-            overflowId="tab:summary"
-            label="Summary"
-            shortcut="O"
-            tooltip="Show trace summary"
-            active={activeTab === "summary"}
-            activeColorPalette="blue"
-            onClick={() => setActiveTab("summary")}
-            traceId={traceId}
-            tab="summary"
-          />
-        ),
-        menuContent: (
-          <HStack gap={1.5}>
-            <Text>Summary</Text>
-            <Kbd>O</Kbd>
-          </HStack>
-        ),
-      },
-      {
-        id: "tab:llm",
-        activeId: activeTab === "llm" ? "tab:llm" : undefined,
-        label: "LLM-Optimized",
-        onSelect: () => setActiveTab("llm"),
-        render: () => (
-          <DrawerTabButton
-            overflowId="tab:llm"
-            label="LLM-Optimized"
-            shortcut="L"
-            tooltip="Token-efficient summary for an LLM"
-            active={activeTab === "llm"}
-            activeColorPalette="purple"
-            onClick={() => setActiveTab("llm")}
-            traceId={traceId}
-            tab="llm"
-          />
-        ),
-        menuContent: (
-          <HStack gap={1.5}>
-            <Text>LLM-Optimized</Text>
-            <Kbd>L</Kbd>
-          </HStack>
-        ),
-      },
-    ];
-    if (promptCount > 0) {
-      list.push({
-        id: "tab:prompts",
-        activeId: activeTab === "prompts" ? "tab:prompts" : undefined,
-        label: "Prompts",
-        onSelect: () => setActiveTab("prompts"),
-        render: () => (
-          <DrawerTabButton
-            overflowId="tab:prompts"
-            label="Prompts"
-            shortcut="P"
-            tooltip="Prompts used in this trace"
-            icon={<Icon as={LuFileText} boxSize={3.5} />}
-            active={activeTab === "prompts"}
-            activeColorPalette="blue"
-            onClick={() => setActiveTab("prompts")}
-            traceId={traceId}
-            tab="prompts"
-            badge={
-              <Badge size="xs" variant="subtle" colorPalette="blue">
-                {promptCount}
-              </Badge>
-            }
-          />
-        ),
-        menuContent: (
-          <HStack gap={1.5}>
-            <Icon as={LuFileText} boxSize={3.5} />
-            <Text>Prompts</Text>
-            <Kbd>P</Kbd>
-            <Badge size="xs" variant="subtle" colorPalette="blue">
-              {promptCount}
-            </Badge>
-          </HStack>
-        ),
-      });
-    }
+    const list: TabDescriptor[] = [];
     inlinePinned.forEach((span) => {
       const id = `span:${span.spanId}`;
+      const isActive = selectedSpan?.spanId === span.spanId;
       list.push({
         id,
-        activeId:
-          activeTab === "span" && selectedSpan?.spanId === span.spanId
-            ? id
-            : undefined,
+        activeId: isActive ? id : undefined,
         label: span.name ?? span.spanId,
         onSelect: () => selectSpan(span.spanId),
         render: () => (
           <SpanTab
             overflowId={id}
             span={span}
-            isActive={
-              activeTab === "span" && selectedSpan?.spanId === span.spanId
-            }
+            isActive={isActive}
             onClick={() => selectSpan(span.spanId)}
             onHover={() => prefetchSpan(span.spanId)}
             actionIcon={<Icon as={LuPinOff} boxSize={3} />}
@@ -392,15 +279,15 @@ export const SpanTabBar = memo(function SpanTabBar({
       const id = "span:ephemeral";
       list.push({
         id,
-        activeId: activeTab === "span" ? id : undefined,
+        activeId: id,
         label: selectedSpan.name ?? selectedSpan.spanId,
-        onSelect: () => setActiveTab("span"),
+        onSelect: () => selectSpan(selectedSpan.spanId),
         render: () => (
           <SpanTab
             overflowId={id}
             span={selectedSpan}
-            isActive={activeTab === "span"}
-            onClick={() => setActiveTab("span")}
+            isActive
+            onClick={() => selectSpan(selectedSpan.spanId)}
             actionIcon={<Icon as={LuPin} boxSize={3} />}
             actionLabel="Pin span tab"
             onAction={() => pinSpan(selectedSpan.spanId)}
@@ -428,10 +315,7 @@ export const SpanTabBar = memo(function SpanTabBar({
     }
     return list;
   }, [
-    activeTab,
-    setActiveTab,
     traceId,
-    promptCount,
     inlinePinned,
     selectedSpan,
     isSelectedPinned,
@@ -451,8 +335,7 @@ export const SpanTabBar = memo(function SpanTabBar({
     if (rightSlot) ids.push(RIGHT_SLOT_OVERFLOW_ID);
     return ids;
   }, [tabDescriptors, rightSlot]);
-  const activeOverflowId =
-    tabDescriptors.find((d) => d.activeId)?.id ?? null;
+  const activeOverflowId = tabDescriptors.find((d) => d.activeId)?.id ?? null;
   const scrollerRef = useRef<HTMLDivElement>(null);
   // Reserve room for kebab trigger + optional rightSlot + the
   // pinned-span overflow menu + the trailing collapse toggle. 96px gives
@@ -504,9 +387,7 @@ export const SpanTabBar = memo(function SpanTabBar({
         {overflowPinned.length > 0 && (
           <PinnedSpanOverflowMenu
             spans={overflowPinned}
-            activeSpanId={
-              activeTab === "span" ? (selectedSpan?.spanId ?? null) : null
-            }
+            activeSpanId={selectedSpan?.spanId ?? null}
             onSelectSpan={selectSpan}
             onUnpinSpan={unpinSpan}
           />
@@ -568,73 +449,6 @@ export const SpanTabBar = memo(function SpanTabBar({
     </HStack>
   );
 });
-
-interface DrawerTabButtonProps {
-  label: string;
-  shortcut: string;
-  tooltip: string;
-  active: boolean;
-  activeColorPalette: "blue" | "purple";
-  onClick: () => void;
-  icon?: React.ReactNode;
-  badge?: React.ReactNode;
-  traceId: string | null;
-  tab: DrawerTab;
-  /** Marker for `useOverflowVisibility` measurement. */
-  overflowId?: string;
-}
-
-function DrawerTabButton({
-  label,
-  shortcut,
-  tooltip,
-  active,
-  activeColorPalette,
-  onClick,
-  icon,
-  badge,
-  traceId,
-  tab,
-  overflowId,
-}: DrawerTabButtonProps) {
-  const activeBorder =
-    activeColorPalette === "purple" ? "purple.solid" : "blue.solid";
-  const activeColor = activeColorPalette === "purple" ? "purple.fg" : "fg";
-  return (
-    <Tooltip
-      content={
-        <HStack gap={1}>
-          <Text>{tooltip}</Text>
-          <Kbd>{shortcut}</Kbd>
-        </HStack>
-      }
-      positioning={{ placement: "bottom" }}
-    >
-      <Button
-        size="sm"
-        variant="ghost"
-        borderRadius={0}
-        borderBottomWidth="2px"
-        borderBottomColor={active ? activeBorder : "transparent"}
-        color={active ? activeColor : "fg.muted"}
-        fontWeight={active ? "semibold" : "medium"}
-        onClick={onClick}
-        paddingX={3}
-        paddingY={0}
-        height="38px"
-        flexShrink={0}
-        gap={1.5}
-        data-overflow-id={overflowId}
-      >
-        {icon}
-        {label}
-        <Kbd>{shortcut}</Kbd>
-        {badge}
-        {traceId ? <DrawerTabPresenceDot traceId={traceId} tab={tab} /> : null}
-      </Button>
-    </Tooltip>
-  );
-}
 
 interface SpanTabProps {
   span: SpanTreeNode;
@@ -767,13 +581,22 @@ function SpanTab({
 }
 
 function SpanTypeBadge({ type }: { type: string }) {
-  const palette = SPAN_TYPE_PALETTE[type] ?? "gray";
+  // Span types in the catalog (llm / tool / agent / …) keep the
+  // `subtle` colour-tinted look so they read as the curated palette
+  // the rest of the drawer uses. Anything outside the catalog (the
+  // raw OTel SpanKind values "CLIENT", "SERVER", "INTERNAL",
+  // "PRODUCER", "CONSUMER" that come through unmapped, plus future
+  // custom types) falls through to a bordered `outline` variant on
+  // the gray palette so it stays readable in dark mode — the prior
+  // `subtle` + `gray` combination painted gray.fg on top of
+  // gray.subtle which collapsed to a dark-on-dark blob in dark theme.
+  const mappedPalette = SPAN_TYPE_PALETTE[type];
   const label = type === "llm" || type === "rag" ? type.toUpperCase() : type;
   return (
     <Badge
       size="sm"
-      variant="subtle"
-      colorPalette={palette}
+      variant={mappedPalette ? "subtle" : "outline"}
+      colorPalette={mappedPalette ?? "gray"}
       flexShrink={0}
       borderRadius="md"
       fontWeight="medium"

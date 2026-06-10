@@ -26,7 +26,7 @@ import type {
 } from "~/components/variables";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { getInputsOutputs } from "~/optimization_studio/utils/nodeUtils";
+import { getMappingSurfaceInputs } from "~/optimization_studio/utils/nodeUtils";
 import type {
   CustomComponentConfig,
   Field as DSLField,
@@ -54,43 +54,36 @@ function getWorkflowConfig(config: AgentComponentConfig): CustomComponentConfig 
 }
 
 /**
- * Extract entry inputs and end outputs from a workflow's published DSL.
+ * Extract mapping-surface inputs and end outputs from a workflow's published DSL.
  *
- * `getInputsOutputs` returns loose shapes because the DSL is stored as opaque
- * JSON. We narrow them into `Variable` (the shape expected by
- * `ScenarioInputMappingSection`). Workflow DSL fields are always string-typed
- * in practice, and the scenario section only needs the identifier to build
- * its rows, so we coerce unknown field types to `"str"`.
+ * Inputs are derived from the entry node's declared outputs via
+ * `getMappingSurfaceInputs`, which includes unwired fields. Outputs are read
+ * directly from the end node's declared inputs. Both are narrowed into
+ * `Variable` (the shape expected by `ScenarioInputMappingSection`), coercing
+ * unknown field types to `"str"`.
  */
 function extractVariables(dsl: Workflow | undefined): {
   inputs: Variable[];
   outputs: Variable[];
 } {
   if (!dsl) return { inputs: [], outputs: [] };
-  const { inputs, outputs } = getInputsOutputs(dsl.edges, dsl.nodes);
-  const normalizedInputs: Variable[] = (inputs ?? []).flatMap((i) =>
+  const rawInputs = getMappingSurfaceInputs(dsl.edges, dsl.nodes);
+  const normalizedInputs: Variable[] = rawInputs.flatMap((i) =>
     typeof i.identifier === "string"
-      ? [
-          {
-            identifier: i.identifier,
-            type: "str" as DSLField["type"],
-          },
-        ]
+      ? [{ identifier: i.identifier, type: "str" as DSLField["type"] }]
       : [],
   );
-  const rawOutputs = Array.isArray(outputs) ? outputs : [];
+  const endNodeData = dsl.nodes.find(
+    (n) => n.type === "end" || n.id === "end",
+  )?.data;
+  const rawOutputs: DSLField[] = Array.isArray(endNodeData?.inputs)
+    ? (endNodeData.inputs as DSLField[])
+    : [];
   const normalizedOutputs: Variable[] = rawOutputs.flatMap(
-    (o: unknown): Variable[] => {
-      if (typeof o !== "object" || o === null) return [];
-      const field = o as { identifier?: unknown };
-      if (typeof field.identifier !== "string") return [];
-      return [
-        {
-          identifier: field.identifier,
-          type: "str" as DSLField["type"],
-        },
-      ];
-    },
+    (o): Variable[] =>
+      typeof o.identifier === "string"
+        ? [{ identifier: o.identifier, type: "str" as DSLField["type"] }]
+        : [],
   );
   return { inputs: normalizedInputs, outputs: normalizedOutputs };
 }

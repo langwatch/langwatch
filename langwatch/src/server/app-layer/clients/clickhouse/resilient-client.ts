@@ -5,6 +5,7 @@ import {
   incrementClickHouseQueryCount,
 } from "~/server/clickhouse/metrics";
 import { CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS } from "~/server/event-sourcing/services/errorHandling";
+import { detectColdScan } from "./cold-scan-detector";
 
 const logger = createLogger("langwatch:clickhouse:resilient");
 const queryLogger = createLogger("langwatch:clickhouse:query");
@@ -57,6 +58,69 @@ function jitteredBackoff({
   const exponential = baseDelayMs * 2 ** attempt;
   const jitter = Math.random() * baseDelayMs;
   return Math.min(exponential + jitter, maxDelayMs);
+}
+
+/**
+ * Runs an operation against ClickHouse, retrying transient failures with
+ * jittered backoff. Both reads and writes use this: a read rejected with
+ * "Too many simultaneous queries" (or any other transient overload /
+ * cluster-recovery condition) frees up within moments, and reads are
+ * idempotent, so retrying rides through the spike instead of surfacing a
+ * 500 to the user. Non-transient errors (e.g. a query syntax error) fail
+ * fast on the first attempt.
+ */
+async function withTransientRetry<T>(
+  fn: () => Promise<T>,
+  {
+    operation,
+    maxRetries,
+    baseDelayMs,
+    maxDelayMs,
+  }: {
+    operation: "query" | "insert";
+    maxRetries: number;
+    baseDelayMs: number;
+    maxDelayMs: number;
+  },
+): Promise<T> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+
+      if (!isTransientError(error) || attempt === maxRetries) {
+        throw error;
+      }
+
+      const delay = jitteredBackoff({ attempt, baseDelayMs, maxDelayMs });
+
+      try {
+        logger.warn(
+          {
+            source: "clickhouse",
+            operation,
+            attempt: attempt + 1,
+            maxRetries,
+            delayMs: Math.round(delay),
+            error,
+          },
+          `Transient ClickHouse ${operation} error, retrying`,
+        );
+      } catch (loggingError) {
+        logger.error(
+          { loggingError },
+          `Failed to log transient ${operation} retry`,
+        );
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+
+  throw lastError;
 }
 
 function safeQueryMeta(params: unknown): {
@@ -190,6 +254,12 @@ function extractQueryPreview(params: unknown): string | undefined {
   return p.query.length > 200 ? p.query.slice(0, 200) + "..." : p.query;
 }
 
+function extractRawQuery(params: unknown): string {
+  if (!params || typeof params !== "object") return "";
+  const p = params as Record<string, unknown>;
+  return typeof p.query === "string" ? p.query : "";
+}
+
 function logFailure({
   operation,
   error,
@@ -242,10 +312,20 @@ function logSuccess({
       && readBytes !== undefined
       && readBytes > expectations.maxReadBytes;
 
-    if (isSlow || isTooHeavy) {
+    // A SELECT against a time-partitioned table with no predicate on its time
+    // column cannot prune partitions, so it walks the whole history including
+    // the cold tier on S3 - a burst of S3 GET requests per call. Worth warning
+    // even when fast, because the cost is request count, not latency.
+    const coldScanTable = operation === "query"
+      ? detectColdScan(extractRawQuery(params))
+      : null;
+    const isColdScan = coldScanTable !== null;
+
+    if (isSlow || isTooHeavy || isColdScan) {
       const reasons: string[] = [];
       if (isSlow) reasons.push(`${roundedMs}ms > ${expectations.maxDurationMs}ms`);
       if (isTooHeavy) reasons.push(`${formatBytes(readBytes!)} > ${formatBytes(expectations.maxReadBytes!)} expected`);
+      if (isColdScan) reasons.push(`cold scan of ${coldScanTable} (no time filter, walks S3 partitions)`);
 
       queryLogger.warn(
         {
@@ -259,8 +339,10 @@ function logSuccess({
           table: meta.table,
           paramKeys: meta.paramKeys,
           query: extractQueryPreview(params),
+          coldScan: isColdScan,
+          ...(coldScanTable ? { coldScanTable } : {}),
         },
-        `ClickHouse slow ${operation}: ${reasons.join(", ")}`
+        `ClickHouse ${isColdScan && !isSlow && !isTooHeavy ? "cold-scan" : "slow"} ${operation}: ${reasons.join(", ")}`
       );
     } else {
       queryLogger.debug(
@@ -306,7 +388,11 @@ export function createResilientClickHouseClient({
     const table = extractTableName(params);
     const start = performance.now();
     try {
-      const result = await client.query(cleanedParams as Parameters<typeof client.query>[0]);
+      const result = await withTransientRetry(
+        () =>
+          client.query(cleanedParams as Parameters<typeof client.query>[0]),
+        { operation: "query", maxRetries, baseDelayMs, maxDelayMs },
+      );
       const durationMs = performance.now() - start;
       const readBytes = extractReadBytes(result);
       // params (not cleanedParams) so extractExpectations can read langwatch_* keys
@@ -326,53 +412,25 @@ export function createResilientClickHouseClient({
   wrapper.insert = async (params) => {
     const insertTable = (params as unknown as Record<string, unknown>).table as string ?? "unknown";
     const start = performance.now();
-    let lastError: unknown;
-
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        const result = await client.insert(params);
-        const durationMs = performance.now() - start;
-        logSuccess({ operation: "insert", durationMs, params });
-        observeClickHouseQueryDuration("INSERT", insertTable, durationMs / 1000);
-        incrementClickHouseQueryCount("INSERT", "success");
-        return result;
-      } catch (error) {
-        lastError = error;
-
-        if (!isTransientError(error) || attempt === maxRetries) {
-          const durationMs = performance.now() - start;
-          logFailure({ operation: "insert", error, durationMs, params });
-          observeClickHouseQueryDuration("INSERT", insertTable, durationMs / 1000);
-          incrementClickHouseQueryCount("INSERT", "error");
-          throw error;
-        }
-
-        const delay = jitteredBackoff({ attempt, baseDelayMs, maxDelayMs });
-
-        try {
-          logger.warn(
-            {
-              source: "clickhouse",
-              operation: "insert",
-              attempt: attempt + 1,
-              maxRetries,
-              delayMs: Math.round(delay),
-              error,
-            },
-            "Transient ClickHouse insert error, retrying"
-          );
-        } catch (loggingError) {
-          logger.error(
-            { loggingError },
-            "Failed to log transient insert retry"
-          );
-        }
-
-        await new Promise((resolve) => setTimeout(resolve, delay));
-      }
+    try {
+      const result = await withTransientRetry(() => client.insert(params), {
+        operation: "insert",
+        maxRetries,
+        baseDelayMs,
+        maxDelayMs,
+      });
+      const durationMs = performance.now() - start;
+      logSuccess({ operation: "insert", durationMs, params });
+      observeClickHouseQueryDuration("INSERT", insertTable, durationMs / 1000);
+      incrementClickHouseQueryCount("INSERT", "success");
+      return result;
+    } catch (error) {
+      const durationMs = performance.now() - start;
+      logFailure({ operation: "insert", error, durationMs, params });
+      observeClickHouseQueryDuration("INSERT", insertTable, durationMs / 1000);
+      incrementClickHouseQueryCount("INSERT", "error");
+      throw error;
     }
-
-    throw lastError;
   };
 
   return wrapper;

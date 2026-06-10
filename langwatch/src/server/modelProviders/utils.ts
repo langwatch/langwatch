@@ -6,9 +6,14 @@ import {
 } from "../api/routers/modelProviders.utils";
 import { prisma } from "../db";
 import { nlpgoProxyBaseURL } from "../nlpgo/nlpgoFetch";
+import { featureByKey } from "./featureRegistry";
 import { ModelNotConfiguredError } from "./modelNotConfiguredError";
+import { ModelProviderDisabledError } from "./modelProviderDisabledError";
 import type { MaybeStoredModelProvider } from "./registry";
-import { resolveModelForFeature } from "./resolveModelForFeature";
+import {
+  findAlternateBelowScope,
+  resolveModelForFeature,
+} from "./resolveModelForFeature";
 
 /**
  * Returns a Vercel AI SDK model handle for the given project + feature.
@@ -21,11 +26,15 @@ import { resolveModelForFeature } from "./resolveModelForFeature";
  * `ModelNotConfiguredError` and the surrounding tRPC interceptor maps
  * it to a sticky toast prompting the user to configure a default.
  */
-export const getVercelAIModel = async (
-  projectId: string,
-  model?: string,
-  featureKey: string = "prompt.create_default",
-) => {
+export const getVercelAIModel = async ({
+  projectId,
+  model,
+  featureKey = "prompt.create_default",
+}: {
+  projectId: string;
+  model?: string;
+  featureKey?: string;
+}) => {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
   });
@@ -69,13 +78,11 @@ export const getVercelAIModel = async (
     ]),
   );
 
-  // FF-gated: Go playground proxy when release_nlp_go_engine_enabled is
-  // on, legacy LiteLLM proxy otherwise. Same wire shape (x-litellm-*
-  // headers + OpenAI body) — the Go side reads x-litellm-* via the
-  // gatewayproxy package and dispatches in-process; the Python side
-  // does what it did before.
-  const baseURL = await nlpgoProxyBaseURL({
-    projectId,
+  // Go playground proxy: nlpgo's /go/proxy/v1/* (in-process AI Gateway,
+  // no LiteLLM). Wire shape is x-litellm-* headers + OpenAI body; the Go
+  // side reads x-litellm-* via the gatewayproxy package and dispatches
+  // in-process.
+  const baseURL = nlpgoProxyBaseURL({
     baseURL: env.LANGWATCH_NLP_SERVICE!,
   });
   const vercelProvider = createOpenAICompatible({
@@ -117,19 +124,47 @@ async function resolveModel({
     if (modelProviders[providerKey]?.enabled) return resolved.model;
     // Cascade picked a model but the backing provider is disabled.
     // Silently swapping to a random enabled provider is dangerous (the
-    // user thinks they're calling the one they configured); surface
-    // the disabled state so the operator can re-enable or re-pick.
-    throw new Error(
-      `Model "${resolved.model}" is configured at ${resolved.scope} scope for "${featureKey}", but its provider "${providerKey}" is currently disabled. Re-enable it in Settings → Model Providers, or pick a different default.`,
+    // user thinks they're calling the one they configured); throw a
+    // typed error so the frontend can offer a one-click swap to the
+    // cascade-next candidate (if any) or a deep-link to settings.
+    //
+    // `resolved.scope` is always non-null on the success path (the
+    // resolver returns ModelNotConfiguredError when nothing resolves,
+    // not a null-scope Resolution), but the type is loose — narrow
+    // here so the typed error stays correct.
+    if (resolved.scope === null) {
+      throw new Error("resolveModelForFeature returned a null scope");
+    }
+    const alternate = await findAlternateBelowScope(
+      featureKey,
+      { prisma, projectId },
+      resolved.scope,
+    );
+    const feature = featureByKey(featureKey);
+    const alternateProviderKey = alternate?.model.split("/")[0] ?? null;
+    throw new ModelProviderDisabledError(
+      featureKey,
+      feature?.displayName ?? featureKey,
+      resolved.feature.role,
+      projectId,
+      resolved.scope,
+      resolved.model,
+      providerKey,
+      alternate && alternate.scope !== null && alternate.scope !== "project"
+        ? {
+            scope: alternate.scope,
+            model: alternate.model,
+            providerKey: alternateProviderKey ?? "",
+            providerEnabled: Boolean(
+              alternateProviderKey &&
+                modelProviders[alternateProviderKey]?.enabled,
+            ),
+          }
+        : null,
     );
   } catch (err) {
     if (err instanceof ModelNotConfiguredError) throw err;
-    if (
-      err instanceof Error &&
-      err.message.includes("is currently disabled")
-    ) {
-      throw err;
-    }
+    if (err instanceof ModelProviderDisabledError) throw err;
     // Otherwise fall through to the "any enabled provider" rescue;
     // resolver-internal errors (DB, race) get the conservative
     // recovery path.

@@ -7670,13 +7670,6 @@
                               "null"
                             ]
                           },
-                          "environment": {
-                            "type": "string",
-                            "enum": [
-                              "live",
-                              "test"
-                            ]
-                          },
                           "status": {
                             "type": "string",
                             "enum": [
@@ -7714,7 +7707,6 @@
                           "display_prefix",
                           "name",
                           "description",
-                          "environment",
                           "status",
                           "principal_user_id",
                           "provider_credential_ids",
@@ -7852,13 +7844,6 @@
                             "null"
                           ]
                         },
-                        "environment": {
-                          "type": "string",
-                          "enum": [
-                            "live",
-                            "test"
-                          ]
-                        },
                         "status": {
                           "type": "string",
                           "enum": [
@@ -7896,7 +7881,6 @@
                         "display_prefix",
                         "name",
                         "description",
-                        "environment",
                         "status",
                         "principal_user_id",
                         "provider_credential_ids",
@@ -8052,13 +8036,6 @@
                             "null"
                           ]
                         },
-                        "environment": {
-                          "type": "string",
-                          "enum": [
-                            "live",
-                            "test"
-                          ]
-                        },
                         "status": {
                           "type": "string",
                           "enum": [
@@ -8096,7 +8073,6 @@
                         "display_prefix",
                         "name",
                         "description",
-                        "environment",
                         "status",
                         "principal_user_id",
                         "provider_credential_ids",
@@ -8275,13 +8251,6 @@
                             "null"
                           ]
                         },
-                        "environment": {
-                          "type": "string",
-                          "enum": [
-                            "live",
-                            "test"
-                          ]
-                        },
                         "status": {
                           "type": "string",
                           "enum": [
@@ -8319,7 +8288,6 @@
                         "display_prefix",
                         "name",
                         "description",
-                        "environment",
                         "status",
                         "principal_user_id",
                         "provider_credential_ids",
@@ -8480,13 +8448,6 @@
                             "null"
                           ]
                         },
-                        "environment": {
-                          "type": "string",
-                          "enum": [
-                            "live",
-                            "test"
-                          ]
-                        },
                         "status": {
                           "type": "string",
                           "enum": [
@@ -8524,7 +8485,6 @@
                         "display_prefix",
                         "name",
                         "description",
-                        "environment",
                         "status",
                         "principal_user_id",
                         "provider_credential_ids",
@@ -8672,13 +8632,6 @@
                             "null"
                           ]
                         },
-                        "environment": {
-                          "type": "string",
-                          "enum": [
-                            "live",
-                            "test"
-                          ]
-                        },
                         "status": {
                           "type": "string",
                           "enum": [
@@ -8716,7 +8669,6 @@
                         "display_prefix",
                         "name",
                         "description",
-                        "environment",
                         "status",
                         "principal_user_id",
                         "provider_credential_ids",
@@ -12795,6 +12747,11 @@
                           ]
                         },
                         "default": []
+                      },
+                      "parameters": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "default": {}
                       }
                     },
                     "required": [
@@ -12813,7 +12770,8 @@
                       "inputs",
                       "outputs",
                       "model",
-                      "tags"
+                      "tags",
+                      "parameters"
                     ]
                   }
                 }
@@ -13338,6 +13296,11 @@
                         ]
                       },
                       "default": []
+                    },
+                    "parameters": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "default": {}
                     }
                   },
                   "required": [
@@ -13356,7 +13319,8 @@
                     "inputs",
                     "outputs",
                     "model",
-                    "tags"
+                    "tags",
+                    "parameters"
                   ]
                 }
               }
@@ -13613,6 +13577,10 @@
                       "type": "string",
                       "minLength": 1
                     }
+                  },
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": {}
                   }
                 },
                 "required": [
@@ -14559,6 +14527,11 @@
                         ]
                       },
                       "default": []
+                    },
+                    "parameters": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "default": {}
                     }
                   },
                   "required": [
@@ -14577,7 +14550,8 @@
                     "inputs",
                     "outputs",
                     "model",
-                    "tags"
+                    "tags",
+                    "parameters"
                   ]
                 }
               }
@@ -15151,6 +15125,11 @@
                         ]
                       },
                       "default": []
+                    },
+                    "parameters": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "default": {}
                     }
                   },
                   "required": [
@@ -15169,7 +15148,8 @@
                     "inputs",
                     "outputs",
                     "model",
-                    "tags"
+                    "tags",
+                    "parameters"
                   ]
                 }
               }
@@ -15444,6 +15424,10 @@
                       "type": "string",
                       "minLength": 1
                     }
+                  },
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": {}
                   },
                   "scope": {
                     "type": "string",
@@ -16048,6 +16032,11 @@
                             ]
                           },
                           "default": []
+                        },
+                        "parameters": {
+                          "type": "object",
+                          "additionalProperties": {},
+                          "default": {}
                         }
                       },
                       "required": [
@@ -16066,7 +16055,8 @@
                         "inputs",
                         "outputs",
                         "model",
-                        "tags"
+                        "tags",
+                        "parameters"
                       ]
                     },
                     "conflictInfo": {
@@ -16484,6 +16474,10 @@
                             "outputs",
                             "model"
                           ]
+                        },
+                        "remoteConfig": {
+                          "type": "object",
+                          "additionalProperties": {}
                         }
                       },
                       "required": [
@@ -17002,6 +16996,10 @@
                       "outputs",
                       "model"
                     ]
+                  },
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": {}
                   },
                   "localVersion": {
                     "type": "number",
@@ -17631,6 +17629,11 @@
                           ]
                         },
                         "default": []
+                      },
+                      "parameters": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "default": {}
                       }
                     },
                     "required": [
@@ -17649,7 +17652,8 @@
                       "inputs",
                       "outputs",
                       "model",
-                      "tags"
+                      "tags",
+                      "parameters"
                     ]
                   }
                 }
@@ -18206,6 +18210,11 @@
                         ]
                       },
                       "default": []
+                    },
+                    "parameters": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "default": {}
                     }
                   },
                   "required": [
@@ -18224,7 +18233,8 @@
                     "inputs",
                     "outputs",
                     "model",
-                    "tags"
+                    "tags",
+                    "parameters"
                   ]
                 }
               }
@@ -19314,6 +19324,34 @@
                                                 "required": [
                                                   "type"
                                                 ]
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "type": {
+                                                    "type": "string",
+                                                    "const": "binary"
+                                                  },
+                                                  "mimeType": {
+                                                    "type": "string"
+                                                  },
+                                                  "data": {
+                                                    "type": "string"
+                                                  },
+                                                  "url": {
+                                                    "type": "string"
+                                                  },
+                                                  "id": {
+                                                    "type": "string"
+                                                  },
+                                                  "filename": {
+                                                    "type": "string"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "type",
+                                                  "mimeType"
+                                                ]
                                               }
                                             ]
                                           }
@@ -19445,6 +19483,34 @@
                                             },
                                             "required": [
                                               "type"
+                                            ]
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "type": {
+                                                "type": "string",
+                                                "const": "binary"
+                                              },
+                                              "mimeType": {
+                                                "type": "string"
+                                              },
+                                              "data": {
+                                                "type": "string"
+                                              },
+                                              "url": {
+                                                "type": "string"
+                                              },
+                                              "id": {
+                                                "type": "string"
+                                              },
+                                              "filename": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "type",
+                                              "mimeType"
                                             ]
                                           }
                                         ]
@@ -19826,7 +19892,7 @@
       "delete": {
         "responses": {
           "200": {
-            "description": "Events deleted successfully",
+            "description": "Matching runs archived successfully",
             "content": {
               "application/json": {
                 "schema": {
@@ -19850,16 +19916,13 @@
             }
           },
           "400": {
-            "description": "Bad Request",
+            "description": "No scope provided — a batchRunId or scenarioSetId is required",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
                     "error": {
-                      "type": "string"
-                    },
-                    "message": {
                       "type": "string"
                     }
                   },
@@ -19935,8 +19998,25 @@
           }
         },
         "operationId": "deleteApiScenario-events",
-        "parameters": [],
-        "description": "Delete all events"
+        "parameters": [
+          {
+            "in": "query",
+            "name": "batchRunId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "scenarioSetId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "description": "Archive the simulation runs for a batch run and/or scenario set. Requires at least one of batchRunId or scenarioSetId — archiving every run in the project in one call is not supported."
       }
     },
     "/api/scenarios": {
@@ -27880,6 +27960,1418 @@
           }
         ],
         "description": "Delete a default-model config. Scope attachments cascade."
+      }
+    },
+    "/api/governance/ingestion-templates": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Templates visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "slug": {
+                            "type": "string"
+                          },
+                          "source_type": {
+                            "type": "string"
+                          },
+                          "display_name": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "icon_asset": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "credential_schema": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "ottl_rules": {
+                            "type": "string"
+                          },
+                          "platform_published": {
+                            "type": "boolean"
+                          },
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "organization_id": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "slug",
+                          "source_type",
+                          "display_name",
+                          "description",
+                          "icon_asset",
+                          "credential_schema",
+                          "ottl_rules",
+                          "platform_published",
+                          "enabled",
+                          "organization_id"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getApiGovernanceIngestion-templates",
+        "tags": [
+          "Governance / Ingestion Templates"
+        ],
+        "parameters": [],
+        "summary": "List ingestion templates",
+        "description": "Returns the union of platform-published default templates and any org-authored templates visible to the caller's organization. Disabled / archived rows are filtered out. `ottl_rules` is empty in this end-user shape; admins use GET /ingestion-templates/admin to read the canonical OTTL."
+      },
+      "post": {
+        "responses": {
+          "201": {
+            "description": "Template created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ingestion_template": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "slug": {
+                          "type": "string"
+                        },
+                        "source_type": {
+                          "type": "string"
+                        },
+                        "display_name": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "icon_asset": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "credential_schema": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "ottl_rules": {
+                          "type": "string"
+                        },
+                        "platform_published": {
+                          "type": "boolean"
+                        },
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "organization_id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "slug",
+                        "source_type",
+                        "display_name",
+                        "description",
+                        "icon_asset",
+                        "credential_schema",
+                        "ottl_rules",
+                        "platform_published",
+                        "enabled",
+                        "organization_id"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ingestion_template"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postApiGovernanceIngestion-templates",
+        "tags": [
+          "Governance / Ingestion Templates"
+        ],
+        "parameters": [],
+        "summary": "Create org-authored ingestion template",
+        "description": "Creates a brand-new template scoped to the caller's organization. Slug is auto-generated. Platform rows (organizationId IS NULL) are NEVER created via this endpoint — admins customize platform defaults via POST /ingestion-templates/clone instead."
+      }
+    },
+    "/api/governance/ingestion-templates/admin": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Admin templates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "slug": {
+                            "type": "string"
+                          },
+                          "source_type": {
+                            "type": "string"
+                          },
+                          "display_name": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "icon_asset": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "credential_schema": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "ottl_rules": {
+                            "type": "string"
+                          },
+                          "platform_published": {
+                            "type": "boolean"
+                          },
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "organization_id": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "slug",
+                          "source_type",
+                          "display_name",
+                          "description",
+                          "icon_asset",
+                          "credential_schema",
+                          "ottl_rules",
+                          "platform_published",
+                          "enabled",
+                          "organization_id"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getApiGovernanceIngestion-templatesAdmin",
+        "tags": [
+          "Governance / Ingestion Templates"
+        ],
+        "parameters": [],
+        "summary": "List ingestion templates (admin shape, includes OTTL)",
+        "description": "Same union as the user list but includes the canonical `ottl_rules` source for every row. Used by admin tooling to render the transparency block / authoring drawer."
+      }
+    },
+    "/api/governance/ingestion-templates/{id}": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Template detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ingestion_template": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "slug": {
+                          "type": "string"
+                        },
+                        "source_type": {
+                          "type": "string"
+                        },
+                        "display_name": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "icon_asset": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "credential_schema": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "ottl_rules": {
+                          "type": "string"
+                        },
+                        "platform_published": {
+                          "type": "boolean"
+                        },
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "organization_id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "slug",
+                        "source_type",
+                        "display_name",
+                        "description",
+                        "icon_asset",
+                        "credential_schema",
+                        "ottl_rules",
+                        "platform_published",
+                        "enabled",
+                        "organization_id"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ingestion_template"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getApiGovernanceIngestion-templatesById",
+        "tags": [
+          "Governance / Ingestion Templates"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "summary": "Get ingestion template",
+        "description": "Single-template lookup by id, scoped to the caller's organization. Cross-org probes collapse to 404 (no enumeration vector)."
+      },
+      "delete": {
+        "responses": {
+          "200": {
+            "description": "Archived",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "archived": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "archived"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Platform template immutable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Template not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "deleteApiGovernanceIngestion-templatesById",
+        "tags": [
+          "Governance / Ingestion Templates"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "summary": "Soft-archive an org-authored template",
+        "description": "Marks the row archived; existing ingestion keys continue to land traces but the row disappears from list views. Platform-published rows reject with 403."
+      }
+    },
+    "/api/governance/ingestion-templates/{id}/ottl-rules": {
+      "patch": {
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ingestion_template": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "slug": {
+                          "type": "string"
+                        },
+                        "source_type": {
+                          "type": "string"
+                        },
+                        "display_name": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "icon_asset": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "credential_schema": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "ottl_rules": {
+                          "type": "string"
+                        },
+                        "platform_published": {
+                          "type": "boolean"
+                        },
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "organization_id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "slug",
+                        "source_type",
+                        "display_name",
+                        "description",
+                        "icon_asset",
+                        "credential_schema",
+                        "ottl_rules",
+                        "platform_published",
+                        "enabled",
+                        "organization_id"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ingestion_template"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Platform template immutable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Template not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "patchApiGovernanceIngestion-templatesByIdOttl-rules",
+        "tags": [
+          "Governance / Ingestion Templates"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "summary": "Replace ottl_rules on an org-authored template",
+        "description": "Audit-logged with line counts pre/post. Platform-published rows reject with 403. Admins must clone a platform row before editing it."
+      }
+    },
+    "/api/governance/ingestion-templates/clone": {
+      "post": {
+        "responses": {
+          "201": {
+            "description": "Cloned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ingestion_template": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "slug": {
+                          "type": "string"
+                        },
+                        "source_type": {
+                          "type": "string"
+                        },
+                        "display_name": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "icon_asset": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "credential_schema": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "ottl_rules": {
+                          "type": "string"
+                        },
+                        "platform_published": {
+                          "type": "boolean"
+                        },
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "organization_id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "slug",
+                        "source_type",
+                        "display_name",
+                        "description",
+                        "icon_asset",
+                        "credential_schema",
+                        "ottl_rules",
+                        "platform_published",
+                        "enabled",
+                        "organization_id"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ingestion_template"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Source template not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postApiGovernanceIngestion-templatesClone",
+        "tags": [
+          "Governance / Ingestion Templates"
+        ],
+        "parameters": [],
+        "summary": "Clone a platform-published template into the caller's org",
+        "description": "Forks the source row's source_type / display_name / OTTL into a fresh org-authored row that the admin can then edit via PATCH /ingestion-templates/:id/ottl-rules."
       }
     }
   },

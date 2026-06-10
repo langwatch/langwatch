@@ -1,6 +1,7 @@
 import type { ModelDefaultScopeType, PrismaClient } from "@prisma/client";
 
 import { llmModels } from "./loadModelCatalog";
+import { ModelDefaultsRepository } from "./modelDefaults.repository";
 
 interface RegistryEntry {
   id: string;
@@ -131,13 +132,13 @@ export async function seedOnboardingDefaultsForProvider(params: {
   });
   if (existing) return;
 
-  await prisma.modelDefaultConfig.create({
-    data: {
-      config,
-      authorId: authorId ?? null,
-      scopes: {
-        create: [{ scopeType, scopeId }],
-      },
-    },
+  // Persist through the repository so the org anchor resolution + single-org
+  // invariant (ADR-021) live in one place. It mints the KSUIDs, resolves the
+  // org for the seeded scope, and hard-fails an unresolvable scope (the column
+  // is NOT NULL).
+  await new ModelDefaultsRepository(prisma).create({
+    config,
+    authorId: authorId ?? null,
+    scopes: [{ scopeType, scopeId }],
   });
 }

@@ -53,10 +53,6 @@ if [ ! -f "langwatch/.env" ] && [ -f "langwatch/.env.example" ]; then
   echo "Creating langwatch/.env from example..."
   cp langwatch/.env.example langwatch/.env
 fi
-if [ ! -f "langwatch_nlp/.env" ] && [ -f "langwatch_nlp/.env.example" ]; then
-  echo "Creating langwatch_nlp/.env from example..."
-  cp langwatch_nlp/.env.example langwatch_nlp/.env
-fi
 
 # ---------------------------------------------------------------------------
 # Prepare host files (codegen, prisma, etc.)

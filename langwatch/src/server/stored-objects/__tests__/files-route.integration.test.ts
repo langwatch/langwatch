@@ -170,12 +170,12 @@ beforeAll(async () => {
   teamId = team.id;
 
   const projA = projectFactory.build({ slug: `--so-files-proj-a-${nanoid(6)}` });
-  const createdA = await prisma.project.create({ data: { ...projA, teamId: team.id } });
+  const createdA = await prisma.project.create({ data: { ...projA, teamId: team.id, personalFeatures: {} } });
   projectAKey = createdA.apiKey;
   projectAId = createdA.id;
 
   const projB = projectFactory.build({ slug: `--so-files-proj-b-${nanoid(6)}` });
-  const createdB = await prisma.project.create({ data: { ...projB, teamId: team.id } });
+  const createdB = await prisma.project.create({ data: { ...projB, teamId: team.id, personalFeatures: {} } });
   projectBKey = createdB.apiKey;
   projectBId = createdB.id;
 });
@@ -190,7 +190,7 @@ afterAll(async () => {
     await prisma.organization.deleteMany({ where: { id: orgId } });
   } catch (error) {
     // The integration suite's postgres schema does not always include the
-    // unified-PAT ApiKey table; deleting a project that has related ApiKey
+    // unified API-key ApiKey table; deleting a project that has related ApiKey
     // rows would FK-cascade through a missing table and throw P2003 (FK
     // constraint failed) or P2021 (table does not exist). Swallow ONLY
     // those two known shapes — anything else means cleanup is genuinely

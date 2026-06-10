@@ -1,0 +1,6 @@
+id: no-inline-dynamic-import-tsx
+valid:
+  - 'import { Button } from "./Button";'
+  - 'import type { Props } from "./types";'
+invalid:
+  - 'const C = () => { const m = import("./Chart"); return null; };'

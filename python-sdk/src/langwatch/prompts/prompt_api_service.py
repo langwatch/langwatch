@@ -252,6 +252,7 @@ class PromptApiService:
         inputs: Optional[List[InputDict]] = None,
         outputs: Optional[List[OutputDict]] = None,
         tags: Optional[List[str]] = None,
+        parameters: Optional[Dict[str, Any]] = None,
     ) -> PromptData:
         """
         Create a new prompt with clean dictionary interfaces.
@@ -264,6 +265,7 @@ class PromptApiService:
             messages: List of message dicts with 'role' and 'content' keys
             inputs: List of input dicts with 'identifier' and 'type' keys
             outputs: List of output dicts with 'identifier', 'type', and optional 'json_schema' keys
+            parameters: Runtime parameters object returned with the prompt version
 
         Returns:
             PromptData dictionary containing the created prompt data
@@ -300,6 +302,7 @@ class PromptApiService:
                 inputs=api_inputs,
                 outputs=api_outputs,
                 tags=tags if tags is not None else UNSET,
+                parameters=parameters if parameters is not None else UNSET,
             ),
         )
         ok = unwrap_response(
@@ -324,6 +327,7 @@ class PromptApiService:
         inputs: Optional[List[InputDict]] = None,
         outputs: Optional[List[OutputDict]] = None,
         tags: Optional[List[str]] = None,
+        parameters: Optional[Dict[str, Any]] = None,
     ) -> PromptData:
         """
         Update an existing prompt with clean dictionary interfaces.
@@ -337,6 +341,7 @@ class PromptApiService:
             messages: New list of message dicts
             inputs: New list of input dicts
             outputs: New list of output dicts
+            parameters: Runtime parameters object for the new prompt version
 
         Returns:
             PromptData dictionary containing the updated prompt data
@@ -374,6 +379,7 @@ class PromptApiService:
                 inputs=api_inputs,
                 outputs=api_outputs,
                 tags=tags if tags is not None else UNSET,
+                parameters=parameters if parameters is not None else UNSET,
             ),
         )
 

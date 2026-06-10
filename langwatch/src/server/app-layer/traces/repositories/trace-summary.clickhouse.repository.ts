@@ -1,5 +1,6 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import { TRACE_SUMMARY_PROJECTION_VERSION_LATEST } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import { IdUtils } from "~/server/event-sourcing/pipelines/trace-processing/utils/id.utils";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
@@ -26,6 +27,7 @@ interface ClickHouseSummaryRecord extends TraceSummaryFieldsBase {
   Attributes: Record<string, string>;
   HasAnnotation: number | null;
   LastEventOccurredAt: number;
+  _retention_days: number;
 }
 
 export class TraceSummaryClickHouseRepository
@@ -33,7 +35,7 @@ export class TraceSummaryClickHouseRepository
 {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
-  async upsert(data: TraceSummaryData, tenantId: string): Promise<void> {
+  async upsert(data: TraceSummaryData, tenantId: string, retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS): Promise<void> {
     EventUtils.validateTenantId(
       { tenantId },
       "TraceSummaryClickHouseRepository.upsert",
@@ -52,6 +54,7 @@ export class TraceSummaryClickHouseRepository
         tenantId,
         projectionId,
         TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
+        retentionDays,
       );
 
       await client.insert({
@@ -72,7 +75,7 @@ export class TraceSummaryClickHouseRepository
   }
 
   async upsertBatch(
-    entries: Array<{ data: TraceSummaryData; tenantId: string }>,
+    entries: Array<{ data: TraceSummaryData; tenantId: string; retentionDays?: number }>,
   ): Promise<void> {
     if (entries.length === 0) return;
 
@@ -83,7 +86,7 @@ export class TraceSummaryClickHouseRepository
 
     try {
       const client = await this.resolveClient(tenantId);
-      const records = entries.map(({ data, tenantId: tid }) => {
+      const records = entries.map(({ data, tenantId: tid, retentionDays: rd }) => {
         const projectionId =
           IdUtils.generateDeterministicTraceSummaryIdFromData(
             tid,
@@ -95,6 +98,7 @@ export class TraceSummaryClickHouseRepository
           tid,
           projectionId,
           TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
+          rd,
         );
       });
 
@@ -207,6 +211,7 @@ export class TraceSummaryClickHouseRepository
           t.ErrorMessage AS ErrorMessage,
           t.Models AS Models,
           t.TotalCost AS TotalCost,
+          t.NonBilledCost AS NonBilledCost,
           t.TokensEstimated AS TokensEstimated,
           t.TotalPromptTokenCount AS TotalPromptTokenCount,
           t.TotalCompletionTokenCount AS TotalCompletionTokenCount,
@@ -271,6 +276,7 @@ export class TraceSummaryClickHouseRepository
       errorMessage: record.ErrorMessage,
       models: record.Models,
       totalCost: record.TotalCost,
+      nonBilledCost: record.NonBilledCost ?? null,
       tokensEstimated: !!record.TokensEstimated,
       totalPromptTokenCount: record.TotalPromptTokenCount,
       totalCompletionTokenCount: record.TotalCompletionTokenCount,
@@ -306,6 +312,7 @@ export class TraceSummaryClickHouseRepository
     tenantId: string,
     projectionId: string,
     version: string,
+    retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS,
   ): ClickHouseSummaryWriteRecord {
     return {
       ProjectionId: projectionId,
@@ -339,6 +346,7 @@ export class TraceSummaryClickHouseRepository
       ErrorMessage: data.errorMessage,
       Models: data.models,
       TotalCost: data.totalCost,
+      NonBilledCost: data.nonBilledCost,
       TokensEstimated: data.tokensEstimated,
       TotalPromptTokenCount: data.totalPromptTokenCount,
       TotalCompletionTokenCount: data.totalCompletionTokenCount,
@@ -359,6 +367,7 @@ export class TraceSummaryClickHouseRepository
       AnnotationIds: data.annotationIds,
       HasAnnotation: data.annotationIds.length > 0 ? 1 : 0,
       TraceName: data.traceName,
+      _retention_days: retentionDays,
     };
   }
 }

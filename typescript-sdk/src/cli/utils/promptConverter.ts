@@ -1,4 +1,8 @@
-import type { LocalPromptConfig, MaterializedPrompt } from "../types";
+import type {
+  LocalPromptConfig,
+  MaterializedPrompt,
+  RuntimeParameters,
+} from "../types";
 import { type PromptResponse, type UpdatePromptBody } from "@/client-sdk/services/prompts/types";
 import {
   type CliOutput,
@@ -33,6 +37,7 @@ export class PromptConverter {
       maxTokens: prompt.maxTokens,
       inputs: prompt.inputs,
       outputs: prompt.outputs,
+      parameters: prompt.parameters ?? {},
       updatedAt: prompt.updatedAt,
     };
   }
@@ -52,11 +57,16 @@ export class PromptConverter {
       content: string;
     }>;
     response_format?: LocalResponseFormat;
+    parameters?: RuntimeParameters;
   } {
     const result: any = {
       model: prompt.model,
       messages: prompt.messages,
     };
+
+    if (Object.keys(prompt.parameters ?? {}).length > 0) {
+      result.parameters = prompt.parameters;
+    }
 
     // Add modelParameters if temperature or maxTokens exist. The server is the
     // source of truth for which sampling parameters a model accepts and omits
@@ -90,13 +100,16 @@ export class PromptConverter {
    * Converts a LocalPromptConfig (loaded from YAML) to the format
    * expected by the API service for upserting.
    */
-  static fromLocalToApiFormat(config: LocalPromptConfig): Omit<UpdatePromptBody, "commitMessage">
+  static fromLocalToApiFormat(
+    config: LocalPromptConfig,
+  ): Omit<UpdatePromptBody, "commitMessage"> & { parameters?: RuntimeParameters }
   {
     return {
       model: config.model,
       temperature: config.modelParameters?.temperature,
       maxTokens: config.modelParameters?.max_tokens,
       messages: config.messages,
+      parameters: config.parameters ?? {},
     };
   }
 

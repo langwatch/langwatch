@@ -19,13 +19,13 @@ If no feature file exists for your task, create one before writing code.
 
 ```bash
 make quickstart                        # Interactive preset picker
-make quickstart all-local              # Local CH + PG + Redis + app, no NLP (fast iteration default)
-make quickstart all-local-nlp          # all-local + langwatch_nlp + langevals
-make quickstart dev-storage            # Local DBs, stored-objects -> dev S3 (runtime-storage-dev)
-make quickstart dev-infra              # Everything against shared dev infra (no compose)
+make quickstart all-local              # Local CH + PG + Redis + app + workers, no NLP (fast iteration default)
+make quickstart all-local-nlp          # all-local + nlpgo + langevals
+make quickstart dev-storage            # Local DBs + workers, stored-objects -> dev S3 (runtime-storage-dev)
+make quickstart dev-infra              # Local app + redis + workers compose; shared dev for PG/CH/NLP/S3
 make quickstart frontend-only          # No compose, fastest — UI / design work
-make quickstart migration              # postgres + clickhouse on host ports for prisma migrate
-make quickstart full-local             # Kitchen-sink local: all-local-nlp + workers + bullboard + ai-server
+make quickstart migration              # postgres + clickhouse on host ports for prisma migrate (no app, no workers)
+make quickstart full-local             # Kitchen-sink local: all-local-nlp + dedicated workers container + bullboard + ai-server
 make quickstart-help                   # Non-interactive preset reference
 make down                              # Stop all services
 make service svc=aigateway             # Start the Go AI Gateway data plane on :5563
@@ -46,7 +46,11 @@ See `dev/docs/adr/004-docker-dev-environment.md` for architecture decisions.
 
 The gateway is a separate Go service (not in `compose.dev.yml`) that terminates
 virtual-key traffic, fans out to providers via Bifrost, and reports usage back to
-the control plane. Run it alongside `pnpm dev` / `make dev`:
+the control plane. `pnpm dev` auto-starts it alongside vite + api when the Go
+toolchain is on PATH; the process appears as `gateway` in the concurrent output
+and reuses an existing listener on :5563 if another worktree already booted one.
+Set `LANGWATCH_SKIP_AIGATEWAY=1` to opt out (e.g. TS-only contributors). To run
+the gateway standalone:
 
 ```bash
 make service svc=aigateway       # run once
@@ -78,8 +82,8 @@ When debugging locally, `pnpm dev` may tee output to `langwatch/server.log` — 
 
 ```
 langwatch/           # Next.js app (main product)
-langwatch_nlp/       # Python NLP service
 langwatch_server/    # Python server
+services/nlpgo/      # Go NLP engine (:5561, built as langwatch/langwatch_nlp)
 services/aigateway/  # Go AI Gateway data plane (:5563)
 charts/gateway/      # Helm sub-chart for the gateway
 python-sdk/          # Python SDK

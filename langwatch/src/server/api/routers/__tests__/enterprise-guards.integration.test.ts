@@ -117,8 +117,8 @@ describe.skipIf(isTestcontainersOnly)(
       customRoleId = role.id;
     });
 
-    beforeEach(() => {
-      resetApp();
+    beforeEach(async () => {
+      await resetApp();
       mockGetActivePlan = vi.fn();
       globalForApp.__langwatch_app = createTestApp({
         planProvider: PlanProviderService.create({
@@ -127,8 +127,8 @@ describe.skipIf(isTestcontainersOnly)(
       });
     });
 
-    afterEach(() => {
-      resetApp();
+    afterEach(async () => {
+      await resetApp();
     });
 
     afterAll(async () => {

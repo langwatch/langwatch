@@ -42,14 +42,25 @@ jobs:
 
       - name: Check for broken links
         run: |
-          output=$(npx mintlify broken-links)
+          # Pipe `continue\n` to dismiss any first-run interactive prompt
+          # (Mintlify CLI in a fresh CI runner can prompt about config / version
+          # before producing output, exiting nonzero from inside $() under
+          # `set -eo pipefail` and killing the step before the broken-links
+          # report ever runs). `|| true` keeps us from short-circuiting on
+          # CLI nonzero; we drive pass/fail purely from the captured output
+          # so a real broken-link report still fails the step.
+          output=$(printf 'continue\n' | npx mintlify broken-links 2>&1 || true)
           echo "$output"
           if echo "$output" | grep -qi "found.*broken links in"; then
             echo "Broken links detected!"
             exit 1
-          else
-            echo "No broken links found"
           fi
+          if echo "$output" | grep -qi "no broken links found"; then
+            echo "No broken links found"
+            exit 0
+          fi
+          echo "Mintlify CLI did not report success or broken-links — treating as failure."
+          exit 1
 
   check_generated_files:
     needs: changes

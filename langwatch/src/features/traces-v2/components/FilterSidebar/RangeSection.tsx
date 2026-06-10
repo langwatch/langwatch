@@ -1,7 +1,8 @@
-import { HStack, Input, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SimpleSlider } from "~/components/ui/slider";
+import { Tooltip } from "~/components/ui/tooltip";
 import { useFacetLensStore } from "../../stores/facetLensStore";
 import { SidebarSection } from "./SidebarSection";
 
@@ -37,11 +38,19 @@ interface RangeSectionProps {
   onClear: () => void;
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
   onShiftToggle?: (nextOpen: boolean) => void;
+  /** Remove this section from the sidebar (per-user). */
+  onHide?: () => void;
   orGroupId?: string;
   orPeers?: readonly string[];
+  /**
+   * True when this range section was synthesised as a placeholder before
+   * traces arrive. When `min === max === 0`, renders a caption instead of
+   * an unusable zero-span slider.
+   */
+  synthetic?: boolean;
 }
 
-export const RangeSection: React.FC<RangeSectionProps> = ({
+const RangeSectionInner: React.FC<RangeSectionProps> = ({
   title,
   icon,
   field,
@@ -54,8 +63,10 @@ export const RangeSection: React.FC<RangeSectionProps> = ({
   onClear,
   dragHandleProps,
   onShiftToggle,
+  onHide,
   orGroupId,
   orPeers,
+  synthetic,
 }) => {
   const lensOverride = useFacetLensStore((s) => s.lens.sectionOpen[field]);
   const setSectionOpen = useFacetLensStore((s) => s.setSectionOpen);
@@ -160,6 +171,8 @@ export const RangeSection: React.FC<RangeSectionProps> = ({
       onOpenChange={(next) => setSectionOpen(field, next)}
       dragHandleProps={dragHandleProps}
       onShiftToggle={onShiftToggle}
+      onHide={onHide}
+      hideLabel={`Hide ${title}`}
       orGroupId={orGroupId}
       orPeers={orPeers}
       hasActive={isActive}
@@ -176,12 +189,37 @@ export const RangeSection: React.FC<RangeSectionProps> = ({
       }
     >
       <VStack gap={2} align="stretch" paddingX={2}>
+        {/* Synthetic placeholder — shown when the range section exists but no
+            traces have been ingested yet (min === max === 0, synthetic flag). */}
+        {synthetic && min === 0 && max === 0 ? (
+          <Box
+            paddingX={1}
+            paddingY={1.5}
+            borderRadius="sm"
+            bg="bg.subtle"
+            borderWidth="1px"
+            borderColor="border.subtle"
+          >
+            <Text textStyle="2xs" color="fg.subtle" lineHeight="1.3">
+              Range will populate once traces arrive
+            </Text>
+          </Box>
+        ) : null}
+        {!synthetic || max > 0 ? (
+        <>
         {/*
          * A SimpleSlider with `min === max` (or any non-positive span)
          * trips zag-js's invariants and throws synchronously, which has
          * been masking real errors during empty-state mounts. Skip the
-         * slider in that degenerate case and render the single value
-         * as static text instead.
+         * slider in that degenerate case.
+         *
+         * When every visible trace shares the same value (e.g. all
+         * traces have `totalTokens = 512`) the range can't narrow
+         * anything. Render a disabled-looking slider with both thumbs
+         * collapsed at the value plus a hover tooltip explaining why
+         * — visually consistent with the interactive case, just
+         * inert. Rare in practice (mostly sample-data territory) so
+         * it doesn't deserve its own special-case empty-state copy.
          */}
         {max > min ? (
           <>
@@ -222,14 +260,21 @@ export const RangeSection: React.FC<RangeSectionProps> = ({
             </HStack>
           </>
         ) : (
-          <Text textStyle="2xs" color="fg.subtle">
-            {formatValue(min)}
-          </Text>
+          <DisabledRangeVisual
+            value={min}
+            format={formatValue}
+            isActive={isActive}
+            onClear={onClear}
+          />
         )}
+        </>
+        ) : null}
       </VStack>
     </SidebarSection>
   );
 };
+
+export const RangeSection = memo(RangeSectionInner);
 
 interface RangeEndpointInputProps {
   value: number;
@@ -247,6 +292,82 @@ interface RangeEndpointInputProps {
  * silently rejects unparseable input (the field reverts to the current
  * value via the next prop sync).
  */
+/**
+ * Disabled visual for the `min === max` case. Mimics the SimpleSlider's
+ * track + filled segment + thumbs at the same position, drained of
+ * colour, with a hover tooltip explaining why interaction is blocked.
+ * We can't actually mount a SimpleSlider here — zag-js asserts on
+ * `min !== max` and throws synchronously — so this is a CSS-only
+ * stand-in that matches the live slider's visual rhythm so the section
+ * doesn't read as broken.
+ *
+ * Rare in practice: typically only fires on sample data or projects
+ * that have run a single trace. Keeping the Clear escape hatch in case
+ * a URL-driven filter somehow lands here.
+ */
+const DisabledRangeVisual: React.FC<{
+  value: number;
+  format: (v: number) => string;
+  isActive: boolean;
+  onClear: () => void;
+}> = ({ value, format, isActive, onClear }) => (
+  <VStack align="stretch" gap={1.5}>
+    <Tooltip content="Can't change the range — every trace shares this value.">
+      <Box
+        position="relative"
+        height="20px"
+        cursor="not-allowed"
+        aria-disabled="true"
+        opacity={0.6}
+      >
+        {/* Track */}
+        <Box
+          position="absolute"
+          left={0}
+          right={0}
+          top="50%"
+          transform="translateY(-50%)"
+          height="4px"
+          borderRadius="full"
+          bg="border"
+        />
+        {/* Filled segment — collapsed at the value, so just the thumb pair */}
+        <Box
+          position="absolute"
+          left="50%"
+          top="50%"
+          transform="translate(-50%, -50%)"
+          width="14px"
+          height="14px"
+          borderRadius="full"
+          bg="bg.surface"
+          borderWidth="2px"
+          borderColor="fg.muted"
+        />
+      </Box>
+    </Tooltip>
+    <HStack justify="space-between" align="center" gap={2}>
+      <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+        {format(value)}
+      </Text>
+      {isActive && (
+        <Button
+          size="2xs"
+          variant="ghost"
+          color="blue.fg"
+          paddingX={1}
+          height="auto"
+          minHeight={0}
+          onClick={onClear}
+          aria-label="Clear range filter"
+        >
+          Clear
+        </Button>
+      )}
+    </HStack>
+  </VStack>
+);
+
 const RangeEndpointInput: React.FC<RangeEndpointInputProps> = ({
   value,
   format,

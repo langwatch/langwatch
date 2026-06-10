@@ -116,6 +116,38 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       Then the node's status is "success" (today's parity — no network restriction is added by the migration)
       # Note: tightening egress is tracked as a follow-up hardening item, not blocking this PR.
 
+  Rule: Project secrets are exposed to user code as the `secrets` namespace
+
+    # Parity with the Python executor's build_secrets_preamble
+    # (langwatch_nlp/studio/utils.py): decrypted project secrets ride on
+    # the workflow DSL (`workflow.secrets`, populated by addEnvs.ts) and
+    # are surfaced to user code as attribute access on a `secrets` object,
+    # matching the Studio code-editor hint ("Use secrets.NAME syntax").
+
+    @unit @unimplemented
+    Scenario: a configured project secret is readable as secrets.NAME
+      Given the workflow carries secret "CLOUDFLARE_ACCESS_CLIENT_ID" = "id-123"
+      And a code node whose body returns {"token": secrets.CLOUDFLARE_ACCESS_CLIENT_ID}
+      When the engine invokes the node
+      Then the node's output equals {"token": "id-123"}
+      And the node's status is "success"
+
+    @unit @unimplemented
+    Scenario: referencing an undefined secret raises AttributeError, not NameError
+      Given the workflow carries secret "PRESENT" = "yes"
+      And a code node whose body returns {"x": secrets.ABSENT}
+      When the engine invokes the node
+      Then the node's status is "error"
+      And the error message contains "ABSENT"
+
+    @unit @unimplemented
+    Scenario: with no project secrets the `secrets` name is left undefined (Python parity)
+      Given the workflow carries no secrets
+      And a code node whose body returns {"x": secrets.ANYTHING}
+      When the engine invokes the node
+      Then the node's status is "error"
+      And the error message contains "secrets"
+
   Rule: Parity with Python code-node executor
 
     @integration @parity @unimplemented

@@ -87,6 +87,10 @@ jobs:
       BUILD_TIME: "true"
 
     runs-on: ubuntu-latest
+    # Same fail-fast cap as test-integration: a worker that wedges post-test
+    # (open handle, coverage finalize, etc.) should fail in ~25 min instead of
+    # burning the 6h default.
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -137,7 +141,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6]
     env:
       VITEST_MAX_WORKERS: "4" # physical core count on GitHub-hosted ubuntu runners
       # Required environment variables for integration tests
@@ -153,6 +157,10 @@ jobs:
       CI: "true"
 
     runs-on: ubuntu-latest
+    # Belt-and-suspenders: per-shard coverage accumulation in the single fork
+    # worker can wedge post-test (worker fails to exit). Cap the per-job wait
+    # so a wedge fails fast in ~25 min instead of burning the 6h default.
+    timeout-minutes: 25
 
     services:
       redis:
@@ -223,11 +231,20 @@ jobs:
           done
           exit 1
 
-      - name: Run integration tests with coverage (shard ${{ matrix.shard }}/4)
+      - name: Run integration tests with coverage (shard ${{ matrix.shard }}/6)
         id: integration-tests
         working-directory: langwatch
+        # Integration files run sequentially in a single long-lived fork worker
+        # (fileParallelism:false, for Redis contention), so v8 coverage data
+        # accumulates across every file in the shard. Two levers keep that
+        # accumulation manageable: the shard count bounds files-per-worker, and
+        # the raised --max-old-space-size gives the worker enough headroom to
+        # finalize coverage and exit. NODE_OPTIONS is inherited by the fork
+        # worker (execArgv is not), so it raises the heap where it's needed.
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
         run: |
-          pnpm test:integration --shard=${{ matrix.shard }}/4 \
+          pnpm test:integration --shard=${{ matrix.shard }}/6 \
             --coverage --coverage.reporter=lcov --coverage.reporter=text \
             --reporter=default --reporter=json --outputFile=test-results.json
 
@@ -382,6 +399,26 @@ jobs:
       - name: Build
         working-directory: langwatch
         run: pnpm build
+
+      # A successful `vite build` only proves the bundle compiles, not that it
+      # boots. Serve the built output and load it in a headless browser to
+      # catch runtime boot failures (white screens from chunk-init errors).
+      # Uses the runner's preinstalled Google Chrome (no browser download).
+      - name: Boot smoke test
+        working-directory: langwatch
+        env:
+          SMOKE_BROWSER_CHANNEL: chrome
+        run: |
+          pnpm exec vite preview --port 4173 --outDir dist/client &
+          PREVIEW_PID=$!
+          trap 'kill $PREVIEW_PID 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            curl -sf -o /dev/null http://localhost:4173/ && break
+            sleep 1
+          done
+          # Under the runner's `bash -e`, a non-zero exit here fails the step
+          # (the gate we want); the EXIT trap still stops the preview server.
+          node scripts/smoke-boot.mjs
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'

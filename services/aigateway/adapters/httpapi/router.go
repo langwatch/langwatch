@@ -23,6 +23,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/httpmiddleware"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/customertracebridge"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaytracer"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/ottlserver"
 	"github.com/langwatch/langwatch/services/aigateway/app"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -35,12 +36,20 @@ type RouterDeps struct {
 	Version               string
 	TraceRegistry         *customertracebridge.Registry
 	DefaultExportEndpoint string
+	// OTTLServer handles /internal/validate-ottl and /internal/transform.
+	// Optional; when nil, the /internal/* routes are not mounted. The
+	// service runs without it for backwards-compat with old configs that
+	// don't expect ingestion-source OTTL traffic.
+	OTTLServer *ottlserver.Server
+	// InternalSecret is the HMAC shared secret protecting /internal/*.
+	// Required when OTTLServer is set.
+	InternalSecret string
 	// MaxRequestBodyBytes caps the per-request body size. 0 falls back to
-	// config.DefaultMaxRequestBodyBytes (32 MiB) — sized for 1M-context LLM
-	// workloads where legitimate requests can be multi-MB. Set higher on
-	// enterprise deployments that send full-context 1M Gemini / multi-image
-	// vision payloads; lower on public edge deployments to tighten DDoS
-	// protection.
+	// config.DefaultMaxRequestBodyBytes (128 MiB) — sized for large-context
+	// LLM workloads where legitimate requests run tens of MB (a 10M-token
+	// text context alone is ~40-50 MB). Set higher on enterprise deployments
+	// that send full-context multi-image / media payloads; lower on public
+	// edge deployments to tighten DDoS protection.
 	MaxRequestBodyBytes int64
 }
 
@@ -89,6 +98,20 @@ func NewRouter(deps RouterDeps) http.Handler {
 		v1beta.HandleFunc("/*", geminiPassthroughHandler(deps))
 	})
 
+	// Internal control-plane channel — protected by a shared HMAC
+	// secret (`LW_GATEWAY_INTERNAL_SECRET`). Currently used by the
+	// LangWatch governance ingestion pipeline to validate and execute
+	// OTTL statements over inbound OTLP payloads. See
+	// `langwatch/ee/governance/services/activity-monitor/ottlGatewayClient.ts`
+	// for the matching client.
+	if deps.OTTLServer != nil {
+		r.Route("/internal", func(in chi.Router) {
+			in.Use(InternalAuthMiddleware(deps.InternalSecret))
+			in.Post("/validate-ottl", deps.OTTLServer.HandleValidate)
+			in.Post("/transform", deps.OTTLServer.HandleTransform)
+		})
+	}
+
 	return r
 }
 
@@ -109,15 +132,14 @@ func chatHandler(deps RouterDeps) http.HandlerFunc {
 			return
 		}
 
-		peek, body, release, ok := readAndPeekBody(w, r, deps.MaxRequestBodyBytes)
+		body, ok := readFullBody(deps.Logger, w, r, deps.MaxRequestBodyBytes)
 		if !ok {
 			return
 		}
-		defer release()
 
-		model := app.PeekModel(peek)
-		if app.PeekStream(peek) {
-			result, err := deps.App.HandleChatStream(r.Context(), bundle, body, model)
+		model := app.PeekModel(body)
+		if app.PeekStream(body) {
+			result, err := deps.App.HandleChatStream(r.Context(), bundle, bytes.NewReader(body), model)
 			if err != nil {
 				writeError(deps.Logger, w, r.Context(), err)
 				return
@@ -125,7 +147,7 @@ func chatHandler(deps RouterDeps) http.HandlerFunc {
 			setMetaHeaders(w, result.Meta)
 			writeSSE(r.Context(), w, result.Iterator)
 		} else {
-			result, err := deps.App.HandleChat(r.Context(), bundle, body, model)
+			result, err := deps.App.HandleChat(r.Context(), bundle, bytes.NewReader(body), model)
 			if err != nil {
 				writeError(deps.Logger, w, r.Context(), err)
 				return
@@ -143,11 +165,10 @@ func messagesHandler(deps RouterDeps) http.HandlerFunc {
 			return
 		}
 
-		peek, body, release, ok := readAndPeekBody(w, r, deps.MaxRequestBodyBytes)
+		body, ok := readFullBody(deps.Logger, w, r, deps.MaxRequestBodyBytes)
 		if !ok {
 			return
 		}
-		defer release()
 
 		// One-off DEBUG dump of the inbound /v1/messages body — enabled by
 		// LW_LOG_MESSAGE_BODY=1. Lets operators see exactly what
@@ -158,14 +179,14 @@ func messagesHandler(deps RouterDeps) http.HandlerFunc {
 		// prompts.
 		if os.Getenv("LW_LOG_MESSAGE_BODY") == "1" {
 			deps.Logger.Info("/v1/messages request body",
-				zap.Int("peek_bytes", len(peek)),
-				zap.String("peek", string(peek)),
+				zap.Int("body_bytes", len(body)),
+				zap.String("body", string(body)),
 			)
 		}
 
-		model := app.PeekModel(peek)
-		if app.PeekStream(peek) {
-			result, err := deps.App.HandleMessagesStream(r.Context(), bundle, body, model)
+		model := app.PeekModel(body)
+		if app.PeekStream(body) {
+			result, err := deps.App.HandleMessagesStream(r.Context(), bundle, bytes.NewReader(body), model)
 			if err != nil {
 				writeError(deps.Logger, w, r.Context(), err)
 				return
@@ -173,7 +194,7 @@ func messagesHandler(deps RouterDeps) http.HandlerFunc {
 			setMetaHeaders(w, result.Meta)
 			writeSSE(r.Context(), w, result.Iterator)
 		} else {
-			result, err := deps.App.HandleMessages(r.Context(), bundle, body, model)
+			result, err := deps.App.HandleMessages(r.Context(), bundle, bytes.NewReader(body), model)
 			if err != nil {
 				writeError(deps.Logger, w, r.Context(), err)
 				return
@@ -197,18 +218,17 @@ func responsesHandler(deps RouterDeps) http.HandlerFunc {
 			return
 		}
 
-		// Large peek: codex 0.122+ and opencode send ~35-60 KiB bodies
-		// (full tool schemas + multi-turn developer input arrays) where
-		// the top-level `stream` field can land past the 32 KiB default
-		// window. Missing it routes a streaming request through the
-		// non-streaming handler, turns OpenAI's 200+SSE response into a
-		// Bifrost unmarshal failure, and surfaces as a 502 with the SSE
-		// frames as the error body.
-		peek, body, release, ok := readAndPeekBodyLarge(w, r, deps.MaxRequestBodyBytes)
+		// codex 0.122+ and opencode send ~35-60 KiB bodies (full tool
+		// schemas + multi-turn developer input arrays) where the top-level
+		// `stream` field lands at the tail. Detecting it from a prefix peek
+		// misroutes a streaming request through the non-streaming handler,
+		// turns OpenAI's 200+SSE response into a Bifrost unmarshal failure,
+		// and surfaces as a 502 with the SSE frames as the error body — so
+		// scan the full body, not a fixed window.
+		body, ok := readFullBody(deps.Logger, w, r, deps.MaxRequestBodyBytes)
 		if !ok {
 			return
 		}
-		defer release()
 
 		// Same one-off DEBUG body dump as /v1/messages — gated on
 		// LW_LOG_MESSAGE_BODY=1. Helpful for diagnosing codex/opencode
@@ -216,14 +236,14 @@ func responsesHandler(deps RouterDeps) http.HandlerFunc {
 		// codex-shaped tools[] or other Responses-API features.
 		if os.Getenv("LW_LOG_MESSAGE_BODY") == "1" {
 			deps.Logger.Info("/v1/responses request body",
-				zap.Int("peek_bytes", len(peek)),
-				zap.String("peek", string(peek)),
+				zap.Int("body_bytes", len(body)),
+				zap.String("body", string(body)),
 			)
 		}
 
-		model := app.PeekModel(peek)
-		if app.PeekStream(peek) {
-			result, err := deps.App.HandleResponsesStream(r.Context(), bundle, body, model)
+		model := app.PeekModel(body)
+		if app.PeekStream(body) {
+			result, err := deps.App.HandleResponsesStream(r.Context(), bundle, bytes.NewReader(body), model)
 			if err != nil {
 				writeError(deps.Logger, w, r.Context(), err)
 				return
@@ -231,7 +251,7 @@ func responsesHandler(deps RouterDeps) http.HandlerFunc {
 			setMetaHeaders(w, result.Meta)
 			writeSSE(r.Context(), w, result.Iterator)
 		} else {
-			result, err := deps.App.HandleResponses(r.Context(), bundle, body, model)
+			result, err := deps.App.HandleResponses(r.Context(), bundle, bytes.NewReader(body), model)
 			if err != nil {
 				writeError(deps.Logger, w, r.Context(), err)
 				return
@@ -414,15 +434,15 @@ func requireBundle(w http.ResponseWriter, r *http.Request, logger *zap.Logger) (
 	return bundle, true
 }
 
-// Peek sizes are tuned per-endpoint: larger than needed burns memory
-// on every hot-path request (256 KiB × QPS adds up on chat-completions
-// where bodies are small); smaller than needed silently misroutes
-// coding-agent requests on /v1/responses when `stream` lands past the
-// window. /v1/chat/completions and /v1/messages keep the 32 KiB
-// default; /v1/responses uses the 256 KiB variant because codex /
-// opencode routinely send 30-60 KiB bodies with `stream:true` at the
-// tail. Revisit per-endpoint if we observe misses elsewhere; consider
-// an env knob before widening the default.
+// Prefix-peek sizes for endpoints that do NOT decide streaming from a
+// body field: /v1/embeddings (never streams) uses the 32 KiB default,
+// and the Gemini passthrough (streaming decided by the URL suffix, peek
+// only locates the model) uses the 256 KiB variant for its larger
+// generate-content bodies. The chat / messages / responses dispatch
+// endpoints do NOT use these — they read the full body (readFullBody)
+// because their top-level `stream` flag lands at the tail, past any
+// fixed window, and a miss misroutes a streaming request to the
+// non-streaming handler (502 SSE-in-error-body).
 const (
 	defaultPeekBytes = 32 * 1024
 	largePeekBytes   = 256 * 1024
@@ -439,6 +459,36 @@ func readAndPeekBody(w http.ResponseWriter, r *http.Request, maxBytes int64) ([]
 // handler, surfacing as a 502 SSE-in-error-body to the client.
 func readAndPeekBodyLarge(w http.ResponseWriter, r *http.Request, maxBytes int64) ([]byte, io.Reader, func(), bool) {
 	return readAndPeekBodySized(w, r, maxBytes, largePeekBytes)
+}
+
+// readFullBody materializes the entire request body (capped at maxBytes)
+// so stream/model detection scans the whole payload instead of a prefix.
+// The top-level `stream` flag on chat / messages / responses bodies sits
+// at the tail, after the unbounded messages/input array — Claude Code
+// emits it dead last and its offset grows with every conversation turn,
+// so any fixed-size peek window misses it once the body outgrows the
+// window. A miss routes a streaming request through the non-streaming
+// handler; the provider answers 200+SSE, Bifrost cannot unmarshal the
+// SSE frames as a single JSON object, and the client gets a 502 with the
+// SSE as the error body. The body is read in full to forward upstream
+// regardless, so scanning all of it adds no extra I/O on the hot path.
+func readFullBody(logger *zap.Logger, w http.ResponseWriter, r *http.Request, maxBytes int64) ([]byte, bool) {
+	ctx := r.Context()
+	if maxBytes <= 0 {
+		maxBytes = config.DefaultMaxRequestBodyBytes
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		code := domain.ErrBadRequest
+		var mbe *http.MaxBytesError
+		if errors.As(err, &mbe) {
+			code = domain.ErrPayloadTooLarge
+		}
+		writeError(logger, w, ctx, herr.New(ctx, code, nil))
+		return nil, false
+	}
+	return body, true
 }
 
 func readAndPeekBodySized(w http.ResponseWriter, r *http.Request, maxBytes int64, peekSize int) ([]byte, io.Reader, func(), bool) {
@@ -604,6 +654,11 @@ func writeSSE(ctx context.Context, w http.ResponseWriter, iter domain.StreamIter
 // writeError sends a herr directly to the client. For unexpected (non-herr)
 // errors it logs the details and returns a generic internal error.
 func writeError(logger *zap.Logger, w http.ResponseWriter, ctx context.Context, err error) {
+	var ue *domain.UpstreamError
+	if errors.As(err, &ue) {
+		writeUpstreamError(w, ue)
+		return
+	}
 	var e herr.E
 	if errors.As(err, &e) {
 		herr.WriteHTTP(w, e)
@@ -611,6 +666,39 @@ func writeError(logger *zap.Logger, w http.ResponseWriter, ctx context.Context, 
 	}
 	logger.Error("unhandled error", zap.Error(err))
 	herr.WriteHTTP(w, herr.New(ctx, domain.ErrInternal, nil))
+}
+
+// writeUpstreamError forwards a provider's terminal response to the client.
+// The provider's native error body is written byte-for-byte when present, so
+// the client sees the exact upstream envelope under the upstream's real
+// status code (not a masked 502) and can tell terminal from retryable. When
+// only the status + message are available, a minimal JSON envelope carrying
+// both is emitted instead.
+func writeUpstreamError(w http.ResponseWriter, ue *domain.UpstreamError) {
+	status := ue.StatusCode
+	if status <= 0 {
+		status = http.StatusBadGateway
+	}
+	// Forward the upstream's retry-signaling headers (Retry-After,
+	// x-should-retry) so the client can honor the provider's backoff and
+	// terminal-vs-retryable hint, not just the status code.
+	for k, v := range ue.Headers {
+		w.Header().Set(k, v)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if len(ue.Body) > 0 {
+		_, _ = w.Write(ue.Body)
+		return
+	}
+	body, _ := sonic.Marshal(map[string]any{
+		"error": map[string]any{
+			"type":    "provider_error",
+			"message": ue.Message,
+			"meta":    map[string]any{"status": status},
+		},
+	})
+	_, _ = w.Write(body)
 }
 
 var errorsRegistered bool

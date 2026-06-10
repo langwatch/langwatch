@@ -13,14 +13,13 @@ import {
 } from "@chakra-ui/react";
 import { BrainCircuit, Edit, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { DefaultModelsSection } from "../../components/settings/DefaultModelsSection";
-import {
-  DefaultModelsScopeFilter,
-  type ScopeFilter as PageScopeFilter,
-} from "../../components/settings/DefaultModelsScopeFilter";
+import { ScopeFilter as ScopeFilterComponent } from "../../components/settings/ScopeFilter";
 import { ProviderScopeChips } from "../../components/settings/ProviderScopeChips";
 import { useEffect, useMemo, useState } from "react";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useAvailableScopes } from "~/hooks/useAvailableScopes";
+import { useUrlScopeFilter } from "~/hooks/useUrlScopeFilter";
 import { api } from "~/utils/api";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Dialog } from "../../components/ui/dialog";
@@ -29,10 +28,7 @@ import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
 import { modelProviders as modelProvidersRegistry } from "../../server/modelProviders/registry";
-import {
-  filterProvidersByScope,
-  type ScopeHierarchy,
-} from "../../utils/filterProvidersByScope";
+import { filterProvidersByScope } from "../../utils/filterProvidersByScope";
 
 export default function ModelsPage() {
   const { project, organization, team, hasPermission } =
@@ -75,39 +71,27 @@ export default function ModelsPage() {
   const isProviderDrawerOpen = isDrawerOpen("editModelProvider");
   const updateMutation = api.modelProvider.update.useMutation();
   const deleteMutation = api.modelProvider.delete.useMutation();
-  const [providerToDisable, setProviderToDisable] = useState<{
+  const [providerToDelete, setProviderToDelete] = useState<{
     id?: string;
     provider: string;
     name: string;
   } | null>(null);
 
-  // One scope filter drives both tables on this page (Model Providers
-  // and Default Models). Shape matches the DefaultModelsScopeFilter
-  // primitive used in the header.
-  const [scopeFilter, setScopeFilter] = useState<PageScopeFilter>({
-    kind: "all",
-  });
-
   // Build the `available` payload the filter dropdown needs (org / teams /
-  // projects). Pulled from the current organization graph so the page
-  // doesn't have to wait on the default-models query before the header
-  // filter can render.
-  const filterAvailable = useMemo(() => {
-    const teams = organization?.teams ?? [];
-    return {
-      organization: organization
-        ? { id: organization.id, name: organization.name }
-        : null,
-      teams: teams.map((t) => ({ id: t.id, name: t.name })),
-      projects: teams.flatMap((t) =>
-        (t.projects ?? []).map((p) => ({
-          id: p.id,
-          name: p.name,
-          teamId: t.id,
-        })),
-      ),
-    };
-  }, [organization]);
+  // projects / hierarchy). Pulled from the current organization graph so
+  // the page doesn't have to wait on the default-models query before the
+  // header filter can render.
+  const filterAvailable = useAvailableScopes(organization);
+  const { hierarchy } = filterAvailable;
+
+  // One scope filter drives both tables on this page (Model Providers
+  // and Default Models). URL hydration and setter are shared with the
+  // api-keys page via useUrlScopeFilter.
+  const [scopeFilter, handleScopeFilterChange] = useUrlScopeFilter({
+    filterAvailable,
+    teamId: team?.id,
+    projectId: project?.id,
+  });
 
   const allEnabledProviders = useMemo(() => {
     return allProvidersList.filter((provider) => provider.enabled);
@@ -121,21 +105,6 @@ export default function ModelsPage() {
   const enabledProviderKeys = useMemo(
     () => new Set(allEnabledProviders.map((p) => p.provider)),
     [allEnabledProviders],
-  );
-
-  // Hierarchy describing the org tree the page is rendering. Drives
-  // inclusive scope filtering (parents up, children down) for both the
-  // Model Providers and Default Models tables.
-  const hierarchy: ScopeHierarchy = useMemo(
-    () => ({
-      organization: organization ? { id: organization.id } : null,
-      teams: filterAvailable.teams.map((t) => ({ id: t.id })),
-      projects: filterAvailable.projects.map((p) => ({
-        id: p.id,
-        teamId: p.teamId,
-      })),
-    }),
-    [organization, filterAvailable],
   );
 
   // Client-side filter for the scope dropdown at the top of the page.
@@ -188,11 +157,11 @@ export default function ModelsPage() {
           <Spacer />
           {/* Single scope filter for the whole page — narrows both the
               Model Providers table and the Default Models table below.
-              The DefaultModelsScopeFilter primitive carries the caret
-              icon + "More Scopes" submenu (see scope-filter.feature). */}
-          <DefaultModelsScopeFilter
+              The shared ScopeFilter primitive carries the caret icon +
+              "More Scopes" submenu (see scope-filter.feature). */}
+          <ScopeFilterComponent
             value={scopeFilter}
-            onChange={setScopeFilter}
+            onChange={handleScopeFilterChange}
             available={filterAvailable}
             currentTeamId={team?.id}
             currentProjectId={project?.id}
@@ -279,7 +248,7 @@ export default function ModelsPage() {
           </EmptyState.Root>
         ) : (
           <Card.Root width="full" overflow="hidden">
-            <Card.Body paddingY={0} paddingX={0}>
+            <Card.Body paddingY={0} paddingX={0} overflowX="auto">
           <Table.Root variant="line" size="md" width="full">
             <Table.Header>
               <Table.Row>
@@ -389,15 +358,21 @@ export default function ModelsPage() {
                               </Box>
                             </Menu.Item>
                             <Menu.Item
-                              value="disable"
+                              value="delete"
                               color="red"
                               onClick={(event) => {
                                 event.stopPropagation();
-                                setProviderToDisable({
+                                setProviderToDelete({
                                   id: provider.id ?? undefined,
                                   provider: provider.provider,
+                                  // Match the row label (the instance name,
+                                  // e.g. "OpenAI2") instead of the generic
+                                  // registry name so the dialog names the
+                                  // exact provider the user clicked.
                                   name:
-                                    providerSpec?.name ?? provider.provider,
+                                    (provider as { name?: string }).name ??
+                                    providerSpec?.name ??
+                                    provider.provider,
                                 });
                               }}
                             >
@@ -429,30 +404,35 @@ export default function ModelsPage() {
             with getAllForProject above, instead of waterfalling. */}
         <DefaultModelsSection
           filter={scopeFilter}
-          onFilterChange={setScopeFilter}
+          onFilterChange={handleScopeFilterChange}
           enabledProviderKeys={enabledProviderKeys}
           noProvidersConfigured={!isLoading && enabledProviders.length === 0}
           hierarchy={hierarchy}
         />
 
         <Dialog.Root
-          open={!!providerToDisable}
+          open={!!providerToDelete}
           onOpenChange={(details) => {
             if (!details.open) {
-              setProviderToDisable(null);
+              setProviderToDelete(null);
             }
           }}
         >
           <Dialog.Content bg="bg">
             <Dialog.Header>
-              <Dialog.Title>Delete {providerToDisable?.name}?</Dialog.Title>
+              <Dialog.Title>Delete {providerToDelete?.name}?</Dialog.Title>
             </Dialog.Header>
             <Dialog.Body>
-              <Text>This provider will no longer be available for use.</Text>
-              <Text fontSize="sm" color="fg.muted" marginTop={2}>
-                Default model configs that reference this provider will
-                surface as &ldquo;Update needed&rdquo; in the table below.
-              </Text>
+              <VStack gap={3} align="start">
+                <Text>
+                  This permanently deletes the provider and its stored API
+                  keys. This cannot be undone.
+                </Text>
+                <Text fontSize="sm" color="fg.muted">
+                  Default model configs that reference this provider will
+                  surface as &ldquo;Update needed&rdquo; in the table below.
+                </Text>
+              </VStack>
             </Dialog.Body>
             <Dialog.Footer>
               <Dialog.ActionTrigger asChild>
@@ -462,14 +442,14 @@ export default function ModelsPage() {
                 colorPalette="red"
                 loading={deleteMutation.isPending}
                 onClick={async () => {
-                  if (!providerToDisable) return;
+                  if (!providerToDelete) return;
                   if (!project?.id) return;
                   await deleteMutation.mutateAsync({
-                    id: providerToDisable.id,
+                    id: providerToDelete.id,
                     projectId: project.id,
-                    provider: providerToDisable.provider,
+                    provider: providerToDelete.provider,
                   });
-                  setProviderToDisable(null);
+                  setProviderToDelete(null);
                   await refetch();
                   // Invalidate every cross-page query that gates UI on
                   // "are there enabled providers?" so the prompts page
@@ -553,7 +533,7 @@ function AddModelProviderMenu({
 function ProvidersTableSkeleton() {
   return (
     <Card.Root width="full" overflow="hidden" data-testid="providers-table-skeleton">
-      <Card.Body paddingY={0} paddingX={0}>
+      <Card.Body paddingY={0} paddingX={0} overflowX="auto">
         <Table.Root variant="line" size="md" width="full">
           <Table.Header>
             <Table.Row>

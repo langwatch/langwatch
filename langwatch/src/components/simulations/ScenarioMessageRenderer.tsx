@@ -146,6 +146,9 @@ export function ScenarioMessageRenderer({
                     </Text>
                   )}
                 </VStack>
+                {!smallerView && item.traceId && item.role === "assistant" && (
+                  <TraceMessage traceId={item.traceId} />
+                )}
               </VStack>
             );
 

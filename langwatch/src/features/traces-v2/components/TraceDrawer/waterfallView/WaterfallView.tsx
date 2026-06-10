@@ -6,6 +6,8 @@ import { LuChevronsDownUp, LuChevronsUpDown, LuSparkles } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { useSpanLangwatchSignals } from "../../../hooks/useSpanLangwatchSignals";
+import { useDrawerStore } from "../../../stores/drawerStore";
+import { useSpanPulseStore } from "../../../stores/spanPulseStore";
 import { formatDuration } from "../../../utils/formatters";
 import { GroupRow } from "./GroupRow";
 import { GroupTimelineBar, TimelineBar } from "./TimelineBar";
@@ -32,6 +34,24 @@ export const WaterfallView = memo(function WaterfallView({
   const [treePct, setTreePct] = useState(DEFAULT_TREE_PCT);
   const [hoveredSpanId, setHoveredSpanId] = useState<string | null>(null);
   const [showOnlyLangwatch, setShowOnlyLangwatch] = useState(false);
+
+  // Pin gestures wire straight to the drawer store — `pinnedSpanIds`
+  // doubles as both the SpanTabBar tab list and the row-level "is this
+  // span pinned" check, so a Set lookup per render is cheaper than
+  // recomputing membership inside each row. `pinSpan`/`unpinSpan` are
+  // both no-ops on duplicates / unknowns, so the toggle handler is
+  // safe to call without first checking membership.
+  const pinnedSpanIds = useDrawerStore((s) => s.pinnedSpanIds);
+  const pinSpan = useDrawerStore((s) => s.pinSpan);
+  const unpinSpan = useDrawerStore((s) => s.unpinSpan);
+  const pinnedSet = useMemo(() => new Set(pinnedSpanIds), [pinnedSpanIds]);
+  const handleTogglePin = useCallback(
+    (spanId: string) => {
+      if (pinnedSet.has(spanId)) unpinSpan(spanId);
+      else pinSpan(spanId);
+    },
+    [pinnedSet, pinSpan, unpinSpan],
+  );
 
   const { signalsBySpanId, isFetched: signalsFetched } =
     useSpanLangwatchSignals();
@@ -71,6 +91,37 @@ export const WaterfallView = memo(function WaterfallView({
     () => flattenTree(tree, collapsedIds, expandedGroups),
     [tree, collapsedIds, expandedGroups],
   );
+
+  // When SSE delivers a new span for the trace currently in the drawer,
+  // the waterfall used to wash itself with an Aurora gradient — which
+  // forced a layout cascade through the virtualizer every time. Now we
+  // identify which span IDs are genuinely new since the last render and
+  // fire a per-row pulse for each, leaving the visible viewport stable.
+  // Trace switches reset the baseline so opening a different trace does
+  // not pulse every existing row. The root span's id is stable within a
+  // trace and unique across traces, so it doubles as the trace-identity
+  // marker here (SpanTreeNode doesn't carry the traceId field).
+  const prevSpanIdsRef = useRef<Set<string> | null>(null);
+  const prevRootSpanIdRef = useRef<string | null>(null);
+  const currentRootSpanId = spans[0]?.spanId ?? null;
+  useEffect(() => {
+    const currentIds = new Set(spans.map((s) => s.spanId));
+    if (prevRootSpanIdRef.current !== currentRootSpanId) {
+      prevRootSpanIdRef.current = currentRootSpanId;
+      prevSpanIdsRef.current = currentIds;
+      return;
+    }
+    if (prevSpanIdsRef.current === null) {
+      prevSpanIdsRef.current = currentIds;
+      return;
+    }
+    const prev = prevSpanIdsRef.current;
+    const pulse = useSpanPulseStore.getState().pulse;
+    for (const id of currentIds) {
+      if (!prev.has(id)) pulse(id);
+    }
+    prevSpanIdsRef.current = currentIds;
+  }, [spans, currentRootSpanId]);
   const { rootStart, rootDuration } = useMemo(
     () => getTraceRange(filteredSpans),
     [filteredSpans],
@@ -465,6 +516,7 @@ export const WaterfallView = memo(function WaterfallView({
                     rootDuration={rootDuration}
                     isSelected={node.span.spanId === selectedSpanId}
                     isHovered={node.span.spanId === hoveredSpanId}
+                    isPinned={pinnedSet.has(node.span.spanId)}
                     isCollapsed={collapsedIds.has(node.span.spanId)}
                     hasChildren={node.children.length > 0}
                     isDimmed={
@@ -476,6 +528,7 @@ export const WaterfallView = memo(function WaterfallView({
                       handleToggleCollapse(node.span.spanId)
                     }
                     onSelect={() => handleSelectSpan(node.span.spanId)}
+                    onTogglePin={() => handleTogglePin(node.span.spanId)}
                     onHoverStart={() => setHoveredSpanId(node.span.spanId)}
                     onHoverEnd={() => setHoveredSpanId(null)}
                   />

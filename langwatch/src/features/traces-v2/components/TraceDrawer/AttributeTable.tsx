@@ -19,7 +19,10 @@ const LABEL_WIDTH_DEFAULT = 200;
 
 function clampLabelWidth(value: number): number {
   if (!Number.isFinite(value)) return LABEL_WIDTH_DEFAULT;
-  return Math.min(LABEL_WIDTH_MAX, Math.max(LABEL_WIDTH_MIN, Math.round(value)));
+  return Math.min(
+    LABEL_WIDTH_MAX,
+    Math.max(LABEL_WIDTH_MIN, Math.round(value)),
+  );
 }
 
 /**
@@ -146,7 +149,18 @@ interface AttributeTableProps {
   attributes: Record<string, unknown>;
   resourceAttributes?: Record<string, unknown>;
   title?: string;
+  /**
+   * When set, the span's id is injected as a synthetic leading `span_id` row
+   * in the attributes table. It isn't a real OTel attribute, but operators
+   * want a one-click copy of the span id straight from the table; it sorts
+   * first regardless of search / pinning and can't be pinned to the header.
+   */
+  spanId?: string;
 }
+
+/** Synthetic, always-first row key for the injected span id. */
+const SPAN_ID_KEY = "span_id";
+const SPAN_ID_LEADING_KEYS = [SPAN_ID_KEY] as const;
 
 type AttrViewMode = "flat" | "json";
 
@@ -274,6 +288,39 @@ function PinToggle({
   );
 }
 
+/**
+ * Pin affordance for synthetic rows (span_id) that can't actually be pinned
+ * to the trace header. Rendered disabled and extra-faded rather than as a
+ * blank gap so the column reads consistently top-to-bottom — every row shows
+ * a pin, this one is just clearly inert. A tooltip explains why.
+ */
+function DisabledPin({ attrKey }: { attrKey: string }) {
+  return (
+    <Tooltip
+      content="The span id can't be pinned to the trace header"
+      positioning={{ placement: "top" }}
+    >
+      <Box
+        as="span"
+        display="inline-flex"
+        alignItems="center"
+        justifyContent="center"
+        width="20px"
+        height="20px"
+        marginLeft={2}
+        marginRight={1.5}
+        flexShrink={0}
+        opacity={0.2}
+        cursor="default"
+        aria-disabled="true"
+        aria-label={`${attrKey} can't be pinned`}
+      >
+        <Icon as={LuPin} boxSize={3} color="fg.subtle" />
+      </Box>
+    </Tooltip>
+  );
+}
+
 function CopyAllButton({ payload }: { payload: string }) {
   const [copied, setCopied] = useState(false);
   const handleClick = () => {
@@ -308,6 +355,7 @@ function FlatRow({
   value,
   source,
   pinned,
+  pinnable = true,
   isLast,
   onTogglePin,
   labelWidth,
@@ -317,6 +365,7 @@ function FlatRow({
   value: unknown;
   source: PinnedAttributeSource;
   pinned: boolean;
+  pinnable?: boolean;
   isLast: boolean;
   onTogglePin: () => void;
   labelWidth: number;
@@ -333,12 +382,19 @@ function FlatRow({
       className="attr-row"
       bg={pinned ? "bg.subtle" : undefined}
     >
-      <PinToggle
-        pinned={pinned}
-        source={source}
-        attrKey={attrKey}
-        onToggle={onTogglePin}
-      />
+      {pinnable ? (
+        <PinToggle
+          pinned={pinned}
+          source={source}
+          attrKey={attrKey}
+          onToggle={onTogglePin}
+        />
+      ) : (
+        // Synthetic leading rows (span_id) aren't real attributes, so they
+        // can't be pinned to the trace header — show a disabled, faded pin
+        // (matching the PinToggle footprint) instead of a blank gap.
+        <DisabledPin attrKey={attrKey} />
+      )}
       <Tooltip
         content={attrKey}
         openDelay={250}
@@ -398,6 +454,7 @@ function AttrSection({
   source,
   labelWidth,
   onLabelResize,
+  leadingKeys,
 }: {
   title: string;
   attributes: Record<string, unknown>;
@@ -405,11 +462,14 @@ function AttrSection({
   source: PinnedAttributeSource;
   labelWidth: number;
   onLabelResize: (deltaPx: number) => void;
+  /** Keys that always sort first (before pins) and render non-pinnable. */
+  leadingKeys?: readonly string[];
 }) {
   const { project } = useOrganizationTeamProject();
   const { pins, isPinned, togglePin } = usePinnedAttributes(project?.id);
 
   const flat = useMemo(() => flattenAttributes(attributes), [attributes]);
+  const leading = useMemo(() => new Set(leadingKeys ?? []), [leadingKeys]);
   const pinnedKeys = useMemo(
     () => new Set(pins.filter((p) => p.source === source).map((p) => p.key)),
     [pins, source],
@@ -417,12 +477,15 @@ function AttrSection({
   const sortedEntries = useMemo(
     () =>
       Object.entries(flat).sort(([a], [b]) => {
+        const aLead = leading.has(a) ? 0 : 1;
+        const bLead = leading.has(b) ? 0 : 1;
+        if (aLead !== bLead) return aLead - bLead;
         const aPin = pinnedKeys.has(a) ? 0 : 1;
         const bPin = pinnedKeys.has(b) ? 0 : 1;
         if (aPin !== bPin) return aPin - bPin;
         return a.localeCompare(b);
       }),
-    [flat, pinnedKeys],
+    [flat, pinnedKeys, leading],
   );
 
   if (sortedEntries.length === 0) return null;
@@ -449,22 +512,26 @@ function AttrSection({
           borderRadius="md"
           borderWidth="1px"
           borderColor="border"
-            overflow="hidden"
+          overflow="hidden"
           bg="bg.panel"
         >
-          {sortedEntries.map(([key, val], i) => (
-            <FlatRow
-              key={key}
-              attrKey={key}
-              value={val}
-              source={source}
-              pinned={isPinned(source, key)}
-              isLast={i === sortedEntries.length - 1}
-              onTogglePin={() => togglePin({ source, key })}
-              labelWidth={labelWidth}
-              onLabelResize={onLabelResize}
-            />
-          ))}
+          {sortedEntries.map(([key, val], i) => {
+            const isLeading = leading.has(key);
+            return (
+              <FlatRow
+                key={key}
+                attrKey={key}
+                value={val}
+                source={source}
+                pinned={!isLeading && isPinned(source, key)}
+                pinnable={!isLeading}
+                isLast={i === sortedEntries.length - 1}
+                onTogglePin={() => togglePin({ source, key })}
+                labelWidth={labelWidth}
+                onLabelResize={onLabelResize}
+              />
+            );
+          })}
         </Box>
       ) : (
         <Box
@@ -490,13 +557,19 @@ export function AttributeTable({
   attributes,
   resourceAttributes,
   title,
+  spanId,
 }: AttributeTableProps) {
   const [viewMode, setViewMode] = useState<AttrViewMode>("flat");
   const [searchTerm, setSearchTerm] = useState("");
   const [labelWidth, , applyLabelDelta] = useLabelColumnWidth();
   const handleLabelResize = applyLabelDelta;
 
-  const flatAttrs = useMemo(() => flattenAttributes(attributes), [attributes]);
+  const flatAttrs = useMemo(() => {
+    const flat = flattenAttributes(attributes);
+    // Prepend the span id as a synthetic, copyable first row. A real
+    // `span_id` attribute (vanishingly unlikely) still wins via the spread.
+    return spanId ? { [SPAN_ID_KEY]: spanId, ...flat } : flat;
+  }, [attributes, spanId]);
   const flatResAttrs = useMemo(
     () =>
       resourceAttributes ? flattenAttributes(resourceAttributes) : undefined,
@@ -558,6 +631,7 @@ export function AttributeTable({
         source="attribute"
         labelWidth={labelWidth}
         onLabelResize={handleLabelResize}
+        leadingKeys={spanId ? SPAN_ID_LEADING_KEYS : undefined}
       />
       {filterResAttrs && (
         <AttrSection

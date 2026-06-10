@@ -116,17 +116,6 @@ export const FEATURE_FLAGS = [
   },
 
   // ----- PRODUCT -----
-  // Hot-ish per-project gate, but only checked on workflow execution
-  // paths (post_event, runWorkflow, playground, topic clustering, model
-  // provider routing), not on /api/collector. PostHog targeting still
-  // useful for per-project rollouts.
-  {
-    key: "release_nlp_go_engine_enabled",
-    scope: "PRODUCT",
-    defaultValue: false,
-    description:
-      "Routes a project's workflow / playground / topic-clustering traffic to the Go nlpgo service instead of the legacy Python langwatch_nlp pipeline.",
-  },
   {
     key: "release_ui_sdk_radar_banner_card_enabled",
     scope: "PRODUCT",
@@ -136,8 +125,28 @@ export const FEATURE_FLAGS = [
   {
     key: "release_ui_ai_gateway_menu_enabled",
     scope: "PRODUCT",
+    defaultValue: true,
+    description:
+      "Surfaces the AI Gateway menu in the project sidebar. Default flipped to on: operators can hide the surface per project via a PostHog rule or operator-store row.",
+  },
+  // Per-project gate for trace blob offload (#4215 / ADR-022). Checked ONCE per
+  // ingestion request (not per span) via the postgres-cached store, so the
+  // hot-path cost is one cached lookup. When on, over-threshold spans get
+  // routed via the transient S3 spool at the edge (ADR-022). Off = today's
+  // behavior — the existing capOversizedAttributes(256 KB) is the only cap.
+  {
+    key: "release_trace_blob_offload",
+    scope: "PRODUCT",
     defaultValue: false,
-    description: "Reveals the AI Gateway menu in the project sidebar.",
+    description:
+      "Routes over-threshold OTLP spans via a transient S3 spool at the ingestion edge (ADR-022). Off = current behavior (full value flows through the command queue; capOversizedAttributes(256 KB) is the only cap).",
+  },
+  {
+    key: "release_ui_ai_governance_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Gates the personal keys, admin oversight, RoutingPolicy, and IngestionSource UI surfaces. Distinct from release_ui_ai_gateway_menu_enabled — the existing gateway product ships unblocked while governance keeps cooking.",
   },
 ] as const satisfies readonly FeatureFlagDefinition[];
 

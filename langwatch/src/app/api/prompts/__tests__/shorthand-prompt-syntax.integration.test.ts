@@ -32,7 +32,7 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
     });
 
   beforeEach(async () => {
-    resetApp();
+    await resetApp();
     globalForApp.__langwatch_app = createTestApp({
       planProvider: PlanProviderService.create({
         getActivePlan: vi
@@ -57,9 +57,8 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
       },
     });
 
-    testProject = projectFactory.build({ slug: nanoid() });
     testProject = await prisma.project.create({
-      data: { ...testProject, teamId: testTeam.id },
+      data: { ...projectFactory.build({ slug: nanoid() }), teamId: testTeam.id },
     });
 
     testApiKey = testProject.apiKey;
@@ -70,6 +69,7 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
     const seededDefault = await prisma.modelDefaultConfig.create({
       data: {
         config: { DEFAULT: "openai/gpt-4o-mini" },
+        organizationId: testOrganization.id,
         scopes: {
           create: [
             { scopeType: "ORGANIZATION", scopeId: testOrganization.id },

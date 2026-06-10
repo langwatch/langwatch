@@ -35,6 +35,9 @@ export class ApiKeyRepository {
     createdByUserId,
     organizationId,
     expiresAt,
+    ingestSourceType,
+    ingestionTemplateId,
+    createdByDeviceLabel,
   }: {
     name: string;
     description?: string | null;
@@ -45,6 +48,9 @@ export class ApiKeyRepository {
     createdByUserId?: string | null;
     organizationId: string;
     expiresAt?: Date | null;
+    ingestSourceType?: string | null;
+    ingestionTemplateId?: string | null;
+    createdByDeviceLabel?: string | null;
   }): Promise<ApiKey> {
     return this.prisma.apiKey.create({
       data: {
@@ -57,7 +63,66 @@ export class ApiKeyRepository {
         createdByUserId: createdByUserId ?? null,
         organizationId,
         expiresAt: expiresAt ?? null,
+        ingestSourceType: ingestSourceType ?? null,
+        ingestionTemplateId: ingestionTemplateId ?? null,
+        createdByDeviceLabel: createdByDeviceLabel ?? null,
       },
+    });
+  }
+
+  /**
+   * Finds the live ingestion key for a (project, sourceType) pair: a non-revoked
+   * ApiKey carrying that ingestSourceType whose role binding is project-scoped to
+   * `projectId`. Used by the ingest-key service to rotate-in-place rather than
+   * accumulate keys.
+   */
+  async findIngestKey({
+    organizationId,
+    projectId,
+    sourceType,
+  }: {
+    organizationId: string;
+    projectId: string;
+    sourceType: string;
+  }): Promise<ApiKeyWithBindings | null> {
+    return this.prisma.apiKey.findFirst({
+      where: {
+        organizationId,
+        ingestSourceType: sourceType,
+        revokedAt: null,
+        roleBindings: {
+          some: { scopeType: RoleBindingScopeType.PROJECT, scopeId: projectId },
+        },
+      },
+      include: { roleBindings: true },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  /**
+   * Lists every live ingestion key (`ingestSourceType IS NOT NULL`, not
+   * revoked) whose role binding is project-scoped to `projectId`. Powers
+   * the /me Trace Ingest installed-state lookup so a connected tile stays
+   * green-checked across reloads.
+   */
+  async findIngestKeysForProject({
+    organizationId,
+    projectId,
+  }: {
+    organizationId: string;
+    projectId: string;
+  }): Promise<ApiKeyWithBindings[]> {
+    return this.prisma.apiKey.findMany({
+      where: {
+        organizationId,
+        ingestSourceType: { not: null },
+        revokedAt: null,
+        roleBindings: {
+          some: { scopeType: RoleBindingScopeType.PROJECT, scopeId: projectId },
+        },
+      },
+      include: { roleBindings: true },
+      orderBy: { createdAt: "desc" },
     });
   }
 
@@ -101,12 +166,16 @@ export class ApiKeyRepository {
     userId: string;
     organizationId: string;
   }): Promise<ApiKeyWithBindings[]> {
-    // Include both the user's own keys and service keys (userId = null)
+    // The caller's own keys (including their own personal ingestion key, which
+    // is user-owned) plus org service keys (userId = null). Company-wide
+    // ingestion keys are org-owned (userId = null) but must NOT leak their
+    // source/template/activity metadata to non-admins, so they are excluded
+    // here; admins reach them via the admin-gated company-wide list.
     return this.prisma.apiKey.findMany({
       where: {
         organizationId,
         revokedAt: null,
-        OR: [{ userId }, { userId: null }],
+        OR: [{ userId }, { userId: null, ingestSourceType: null }],
       },
       include: {
         roleBindings: {

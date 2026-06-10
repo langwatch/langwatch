@@ -43,9 +43,14 @@ import {
 import { LimitExceededError } from "../../license-enforcement/errors";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { skipPermissionCheck } from "../rbac";
-import { checkOrganizationPermission, checkTeamPermission } from "../rbac";
+import {
+  checkOrganizationPermission,
+  checkTeamPermission,
+  hasOrganizationPermission,
+} from "../rbac";
 import { signUpDataSchema } from "~/server/schemas/sign-up-data.schema";
 import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "~/server/app-layer/organizations/compute-effective-team-role-updates";
+import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import type { FullyLoadedOrganization } from "~/server/app-layer/organizations/repositories/organization.repository";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import { enrichTeamWithRoleBindings } from "~/server/app-layer/organizations/organization.service";
@@ -206,6 +211,27 @@ export const organizationRouter = createTRPCRouter({
             b.scopeType === RoleBindingScopeType.ORGANIZATION &&
             b.role === TeamUserRole.ADMIN,
         );
+        // RoleBinding(scope=ORGANIZATION, role=ADMIN) is authoritative when present:
+        // promote the user's exposed role so the frontend hook
+        // `useOrganizationTeamProject().organizationRole` and downstream guards
+        // (`withPermissionGuard("organization:manage")`) honor it. Without this,
+        // a stale `OrganizationUser.role=MEMBER` row shadows a fresh ADMIN
+        // RoleBinding, gating the admin out of /governance + /settings/governance/*.
+        // Backend RBAC paths already honor RoleBindings (`resolveOrganizationPermission`,
+        // `requireApiKeyPermission`); this closes the page-guard / SSR-only drift.
+        if (isOrgAdminViaBinding) {
+          if (organization.members[0]) {
+            organization.members[0].role = OrganizationUserRole.ADMIN;
+          } else {
+            organization.members = [
+              {
+                userId,
+                organizationId: organization.id,
+                role: OrganizationUserRole.ADMIN,
+              } as (typeof organization.members)[number],
+            ];
+          }
+        }
         const isExternal =
           !isOrgAdminViaBinding &&
           organization.members[0]?.role !== "ADMIN" &&
@@ -273,6 +299,7 @@ export const organizationRouter = createTRPCRouter({
           elasticsearchApiKey: z.string().optional(),
           s3Bucket: z.string().optional(),
           presenceEnabled: z.boolean().optional(),
+          supportContact: z.string().max(500).nullable().optional(),
         })
         .refine((data) => {
           const hasNodeUrl = !!data.elasticsearchNodeUrl?.trim();
@@ -297,24 +324,7 @@ export const organizationRouter = createTRPCRouter({
         ),
     )
     .use(checkOrganizationPermission("organization:manage"))
-    .mutation(async ({ input, ctx }) => {
-      const prisma = ctx.prisma;
-
-      const organizationUser = await prisma.organizationUser.findFirst({
-        where: {
-          userId: ctx.session.user.id,
-          organizationId: input.organizationId,
-          role: "ADMIN",
-        },
-      });
-
-      if (!organizationUser) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "You don't have the necessary permissions",
-        });
-      }
-
+    .mutation(async ({ input }) => {
       await getApp().organizations.update({
         organizationId: input.organizationId,
         name: input.name,
@@ -325,6 +335,7 @@ export const organizationRouter = createTRPCRouter({
         elasticsearchApiKey: input.elasticsearchApiKey,
         s3Bucket: input.s3Bucket,
         presenceEnabled: input.presenceEnabled,
+        supportContact: input.supportContact,
       });
 
       if (input.elasticsearchNodeUrl && input.elasticsearchApiKey) {
@@ -341,6 +352,11 @@ export const organizationRouter = createTRPCRouter({
         includeDeactivated: z.boolean().optional(),
       }),
     )
+    // Stays at organization:view because non-admin pickers (annotation
+    // queue assignment, trace participants, group dialogs) legitimately
+    // need to enumerate org members by name. The full record contains
+    // member emails, which are admin-surface PII — we redact them on
+    // the way out for non-admin callers below.
     .use(checkOrganizationPermission("organization:view"))
     .query(async ({ input, ctx }) => {
       const organization = await getApp().organizations.getOrganizationWithMembers({
@@ -356,6 +372,35 @@ export const organizationRouter = createTRPCRouter({
         });
       }
 
+      // PII guard for picker callers: when the caller doesn't have
+      // organization:manage, null out other members' emails AND
+      // strip their personal-workspace teamMemberships (existence of
+      // someone else's personal workspace is itself private). The
+      // caller's own email + own personal workspace stay visible.
+      const callerHasManage = await hasOrganizationPermission(
+        ctx,
+        input.organizationId,
+        "organization:manage",
+      );
+      if (!callerHasManage) {
+        const callerId = ctx.session.user.id;
+        for (const m of organization.members ?? []) {
+          if (m.user.id !== callerId) {
+            m.user.email = null;
+          }
+          // Drop teamMembership rows that point at someone else's
+          // personal workspace. The caller's own personal workspace
+          // stays even when iterating someone else's memberships
+          // (it's their team too — they belong to it).
+          if (m.user.teamMemberships) {
+            m.user.teamMemberships = m.user.teamMemberships.filter((tm) => {
+              if (!tm.team.isPersonal) return true;
+              return tm.team.ownerUserId === callerId;
+            });
+          }
+        }
+      }
+
       return organization;
     }),
 
@@ -366,7 +411,11 @@ export const organizationRouter = createTRPCRouter({
         userId: z.string(),
       }),
     )
-    .use(checkOrganizationPermission("organization:view"))
+    // Tightened from organization:view to manage — exposing one
+    // member's full record (role assignments, team memberships) is an
+    // admin-surface read, not a peer-context read. No TS callers
+    // currently depend on member-role access to this procedure.
+    .use(checkOrganizationPermission("organization:manage"))
     .query(async ({ input, ctx }) => {
       const member = await getApp().organizations.getMemberById({
         organizationId: input.organizationId,
@@ -659,7 +708,11 @@ export const organizationRouter = createTRPCRouter({
         organizationId: z.string(),
       }),
     )
-    .use(checkOrganizationPermission("organization:view"))
+    // Tightened from organization:view to manage — pending invites
+    // expose admin intent (who's being added, with what role / to
+    // which teams). MEMBER reading this is a leak. Both TS callers
+    // (settings/members, SubscriptionPage) are admin-only surfaces.
+    .use(checkOrganizationPermission("organization:manage"))
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
@@ -1042,6 +1095,35 @@ export const organizationRouter = createTRPCRouter({
         });
       });
 
+      // Provision the user's Personal Workspace (Team.isPersonal +
+      // Project.isPersonal) for this org. Idempotent — safe if a prior
+      // invite already triggered it. Runs outside the invite tx so an
+      // unexpected failure here doesn't roll the membership back; the
+      // next login will retry via the lazy backfill in
+      // `user.personalContext`.
+      try {
+        const personalWorkspaceService = new PersonalWorkspaceService(prisma);
+        await personalWorkspaceService.ensure({
+          userId: session.user.id,
+          organizationId: invite.organizationId,
+          displayName: session.user.name,
+          displayEmail: session.user.email,
+        });
+      } catch (err) {
+        // Non-fatal — capture and continue. Lazy backfill will recover
+        // on the user's next session resolution. PostHog signal lets
+        // operators catch systemic provisioning regressions (bad
+        // migration, schema drift, Prisma constraint violation) before
+        // users start complaining about missing personal workspaces.
+        captureException(err, {
+          extra: {
+            origin: "governance.acceptInvite",
+            userId: session.user.id,
+            organizationId: invite.organizationId,
+          },
+        });
+      }
+
       void getApp()
         .notifications.sendSlackSignupEvent({
           userName: session.user.name,
@@ -1203,7 +1285,12 @@ export const organizationRouter = createTRPCRouter({
         organizationId: z.string(),
       }),
     )
-    .use(checkOrganizationPermission("organization:view"))
+    // Tightened from organization:view to manage — full member list
+    // with PII (emails) is admin-surface data. No TS callers currently
+    // depend on this procedure; documented here so a future picker
+    // UX that needs member names knows to use a basic-view variant
+    // rather than re-loosening the permission.
+    .use(checkOrganizationPermission("organization:manage"))
     .query(async ({ input }) => {
       return getApp().organizations.getAllMembers(input.organizationId);
     }),

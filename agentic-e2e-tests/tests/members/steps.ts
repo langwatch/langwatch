@@ -8,6 +8,8 @@
  */
 import { Page, expect } from "@playwright/test";
 
+import { getProjectSlug } from "../helpers";
+
 /**
  * Typed shape of a tRPC response from organization.getAll.
  * tRPC wraps results in a nested `result.data` structure,
@@ -38,18 +40,7 @@ interface TrpcOrganizationResponse {
  * Extracts the org slug from the Home link to build the URL.
  */
 export async function givenIAmOnTheMembersPage(page: Page) {
-  await page.goto("/");
-  await expect(page).not.toHaveURL(/\/auth\//);
-
-  // Extract org slug from the Home link
-  const homeLink = page.getByRole("link", { name: "Home", exact: true });
-  await expect(homeLink).toBeVisible({ timeout: 30000 });
-  const href = await homeLink.getAttribute("href");
-  const projectSlug = href?.replace(/^\//, "") || "";
-
-  if (!projectSlug) {
-    throw new Error("Could not extract project slug from Home link");
-  }
+  const projectSlug = await getProjectSlug(page);
 
   // Navigate to settings/members using the org context
   await page.goto(`/${projectSlug}/settings/members`);
@@ -222,10 +213,8 @@ export async function getOrgAndTeamIds(page: Page): Promise<{
   organizationId: string;
   teamId: string;
 }> {
-  // Navigate to the home page and extract org info from the URL/page state
-  await page.goto("/");
-  const homeLink = page.getByRole("link", { name: "Home", exact: true });
-  await expect(homeLink).toBeVisible({ timeout: 30000 });
+  // Confirm the authenticated app loaded before calling the org API.
+  await getProjectSlug(page);
 
   // Use the settings API to get org data
   const orgData = await page.evaluate(async () => {

@@ -64,7 +64,7 @@ vi.mock("~/server/elasticsearch", () => ({
 }));
 
 // Mock generated types module (build artifact, not present in raw checkout)
-vi.mock("~/server/tracer/types.generated", () => ({
+vi.mock("~/server/tracer/types", () => ({
   chatMessageSchema: vi.fn(),
 }));
 

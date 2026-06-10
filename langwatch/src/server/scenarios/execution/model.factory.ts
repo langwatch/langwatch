@@ -30,7 +30,7 @@ export function createModelFromParams(
   const vercelProvider = createOpenAICompatible({
     name: providerKey ?? "unknown",
     apiKey: litellmParams.api_key,
-    baseURL: `${nlpServiceUrl}/proxy/v1`,
+    baseURL: `${nlpServiceUrl}/go/proxy/v1`,
     headers,
   });
 

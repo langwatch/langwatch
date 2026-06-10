@@ -1,3 +1,19 @@
+/**
+ * TokenCreatedDialog — shown immediately after an API key is minted.
+ *
+ * Renders four sections:
+ *  1. "Use in Code" tabs (.env / Bearer / Basic Auth) — ShikiCommandBox
+ *  2. Amber "Copy this token now" warning
+ *  3. "Use with Code Assistants" tabs (Claude Code / Codex) — ShikiCommandBox
+ *  4. "Or paste into your config file" — existing JsonHighlight (no change)
+ *
+ * ShikiCommandBox is lazy-loaded via dynamic() (ssr:false) so the settings
+ * page never statically imports the ~hundreds-of-KB Shiki bundle at page load.
+ *
+ * @see specs/api-keys/token-created-snippets.feature
+ */
+
+import type React from "react";
 import {
   Alert,
   Box,
@@ -6,7 +22,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Terminal } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Dialog } from "../../../components/ui/dialog";
 import { Select } from "../../../components/ui/select";
@@ -20,74 +35,21 @@ import { InlineCopyButton } from "../../../features/onboarding/components/sectio
 import { JsonHighlight } from "../../../features/onboarding/components/sections/shared/JsonHighlight";
 import { TabButton } from "../../../features/onboarding/components/sections/shared/TabButton";
 import { copyToClipboard } from "../../../features/onboarding/components/sections/shared/copy-to-clipboard";
-import { CodeBlock } from "./CodeBlock";
+import dynamic from "~/utils/compat/next-dynamic";
+import type { ShikiCommandBoxProps } from "~/components/code/ShikiCommandBox";
 import { formatEnvLines, maskSecret } from "./utils";
+
+// Lazy-load ShikiCommandBox so /settings/api-keys/index.tsx never statically
+// imports shikiAdapter. The loading fallback is null (dialog already has
+// ambient padding; a shimmer would feel heavy here).
+const ShikiCommandBox = dynamic(
+  () =>
+    import("~/components/code/ShikiCommandBox").then((m) => m.ShikiCommandBox),
+  { ssr: false },
+) as React.ComponentType<ShikiCommandBoxProps>;
 
 type AssistantTab = "claude-code" | "codex";
 type CodeTab = "env" | "bearer" | "basic";
-
-function accentCredentialSegments(command: string): React.ReactNode[] {
-  const re =
-    /(--api-key \S+|LANGWATCH_(?:API_KEY|PROJECT_ID|ENDPOINT)=\S+)/g;
-  return command.split(re).map((part, i) =>
-    i % 2 === 1 ? (
-      <Text as="span" key={i} color="orange.fg" fontWeight="semibold">
-        {part}
-      </Text>
-    ) : (
-      part
-    ),
-  );
-}
-
-function QuickCommand({
-  label,
-  displayCommand,
-  copyCommand,
-}: {
-  label: string;
-  displayCommand: string;
-  copyCommand: string;
-}) {
-  return (
-    <HStack
-      justify="space-between"
-      align="center"
-      px={4}
-      py={3}
-      borderRadius="xl"
-      border="1px solid"
-      borderColor="border.subtle"
-      bg="bg.panel/70"
-      boxShadow="xs"
-      transition="all 0.17s ease"
-      _hover={{
-        borderColor: "orange.emphasized",
-        boxShadow: "md",
-      }}
-    >
-      <HStack gap={2.5} align="center" minW={0}>
-        <Box flexShrink={0} display="flex" alignItems="center">
-          <Terminal size={13} color="var(--chakra-colors-fg-muted)" />
-        </Box>
-        <VStack align="start" gap={0} minW={0}>
-          <Text fontSize="xs" fontWeight="semibold" color="fg">
-            {label}
-          </Text>
-          <Text
-            fontSize="xs"
-            fontFamily="mono"
-            color="fg.muted"
-            wordBreak="break-all"
-          >
-            {accentCredentialSegments(displayCommand)}
-          </Text>
-        </VStack>
-      </HStack>
-      <InlineCopyButton text={copyCommand} label="Command" />
-    </HStack>
-  );
-}
 
 const EDITOR_PATHS = [
   { editor: "Claude Code", path: ".claude/settings.json" },
@@ -130,7 +92,6 @@ export function TokenCreatedDialog({
 
   const isSelfHosted = endpoint && endpoint !== CLOUD_ENDPOINT;
   const endpointFlag = isSelfHosted ? ` --endpoint ${endpoint}` : "";
-  const maskedEndpointFlag = isSelfHosted ? ` --endpoint ${endpoint}` : "";
   const projectIdEnvBefore = activeProjectId
     ? ` --env LANGWATCH_PROJECT_ID=${activeProjectId}`
     : "";
@@ -158,6 +119,47 @@ export function TokenCreatedDialog({
     [maskedKey, endpoint, activeProjectId],
   );
 
+  // ── .env snippet ──────────────────────────────────────────────────────
+  const envMasked = useMemo(
+    () =>
+      formatEnvLines([
+        { key: "LANGWATCH_API_KEY", value: newToken ?? "", mask: true },
+        { key: "LANGWATCH_PROJECT_ID", value: activeProjectId ?? "<your-project-id>" },
+        { key: "LANGWATCH_ENDPOINT", value: endpoint },
+      ]),
+    [newToken, activeProjectId, endpoint],
+  );
+  const envUnmasked = useMemo(
+    () =>
+      formatEnvLines([
+        { key: "LANGWATCH_API_KEY", value: newToken ?? "" },
+        { key: "LANGWATCH_PROJECT_ID", value: activeProjectId ?? "<your-project-id>" },
+        { key: "LANGWATCH_ENDPOINT", value: endpoint },
+      ]),
+    [newToken, activeProjectId, endpoint],
+  );
+
+  // ── Bearer snippet ─────────────────────────────────────────────────────
+  const bearerMasked = newToken
+    ? `Authorization: Bearer ${maskSecret(newToken)}\nX-Project-Id: ${activeProjectId ?? "<your-project-id>"}`
+    : "";
+  const bearerUnmasked = `Authorization: Bearer ${newToken ?? ""}\nX-Project-Id: ${activeProjectId ?? "<your-project-id>"}`;
+
+  // ── Basic Auth snippet ─────────────────────────────────────────────────
+  const basicUnmasked =
+    newToken && activeProjectId
+      ? `Authorization: Basic ${btoa(`${activeProjectId}:${newToken}`)}`
+      : "";
+  const basicMasked = `Authorization: Basic base64(${activeProjectId ?? "<your-project-id>"}:pat-lw-...)`;
+
+  // ── Claude Code command ────────────────────────────────────────────────
+  const claudeCommand = `claude mcp add langwatch${projectIdEnvBefore} -- npx -y @langwatch/mcp-server --api-key ${newToken ?? ""}${endpointFlag}`;
+  const claudeMasked = `claude mcp add langwatch${projectIdEnvBefore} -- npx -y @langwatch/mcp-server --api-key ${maskedKey}${endpointFlag}`;
+
+  // ── Codex command ──────────────────────────────────────────────────────
+  const codexCommand = `codex mcp add langwatch --env LANGWATCH_API_KEY=${newToken ?? ""}${projectIdEnvAfter}${isSelfHosted ? ` --env LANGWATCH_ENDPOINT=${endpoint}` : ""} -- npx -y @langwatch/mcp-server`;
+  const codexMasked = `codex mcp add langwatch --env LANGWATCH_API_KEY=${maskedKey}${projectIdEnvAfter}${isSelfHosted ? ` --env LANGWATCH_ENDPOINT=${endpoint}` : ""} -- npx -y @langwatch/mcp-server`;
+
   return (
     <Dialog.Root
       size="xl"
@@ -173,17 +175,39 @@ export function TokenCreatedDialog({
         <Dialog.CloseTrigger />
         <Dialog.Body paddingBottom={6}>
           <VStack gap={6} align="stretch">
-            {/* ── Section 1: Code Implementation (token visible first) ── */}
+            {/* ── Section 1: Use in Code ── */}
             <VStack gap={3} align="stretch">
               <HStack gap={4} align="start">
                 <VStack gap={2} align="start" flex={1}>
                   <Text fontWeight="700" fontSize="sm">
                     Use in Code
                   </Text>
-                  <HStack gap={1} px={1.5} py={1.5} borderRadius="xl" border="1px solid" borderColor="border.subtle" bg="bg.panel/70" boxShadow="sm" width="fit-content">
-                <TabButton label=".env" active={codeTab === "env"} onClick={() => setCodeTab("env")} />
-                <TabButton label="Bearer" active={codeTab === "bearer"} onClick={() => setCodeTab("bearer")} />
-                <TabButton label="Basic Auth" active={codeTab === "basic"} onClick={() => setCodeTab("basic")} />
+                  <HStack
+                    gap={1}
+                    px={1.5}
+                    py={1.5}
+                    borderRadius="xl"
+                    border="1px solid"
+                    borderColor="border.subtle"
+                    bg="bg.panel/70"
+                    boxShadow="sm"
+                    width="fit-content"
+                  >
+                    <TabButton
+                      label=".env"
+                      active={codeTab === "env"}
+                      onClick={() => setCodeTab("env")}
+                    />
+                    <TabButton
+                      label="Bearer"
+                      active={codeTab === "bearer"}
+                      onClick={() => setCodeTab("bearer")}
+                    />
+                    <TabButton
+                      label="Basic Auth"
+                      active={codeTab === "basic"}
+                      onClick={() => setCodeTab("basic")}
+                    />
                   </HStack>
                 </VStack>
                 {orgProjects.length > 1 && (
@@ -215,73 +239,50 @@ export function TokenCreatedDialog({
                 )}
               </HStack>
 
+              {/* .env — ini-highlighted */}
               {codeTab === "env" && newToken && (
-                <CodeBlock
-                  label=".env"
-                  defaultRevealed
-                  display={formatEnvLines([
-                    { key: "LANGWATCH_API_KEY", value: newToken, mask: true },
-                    { key: "LANGWATCH_PROJECT_ID", value: activeProjectId ?? "<your-project-id>" },
-                    { key: "LANGWATCH_ENDPOINT", value: endpoint },
-                  ])}
-                  revealedDisplay={formatEnvLines([
-                    { key: "LANGWATCH_API_KEY", value: newToken },
-                    { key: "LANGWATCH_PROJECT_ID", value: activeProjectId ?? "<your-project-id>" },
-                    { key: "LANGWATCH_ENDPOINT", value: endpoint },
-                  ])}
-                  copyValue={formatEnvLines([
-                    { key: "LANGWATCH_API_KEY", value: newToken },
-                    { key: "LANGWATCH_PROJECT_ID", value: activeProjectId ?? "<your-project-id>" },
-                    { key: "LANGWATCH_ENDPOINT", value: endpoint },
-                  ])}
-                  copyToastTitle=".env copied to clipboard"
-                  ariaLabel="Copy .env contents"
+                <ShikiCommandBox
+                  command={envUnmasked}
+                  maskedCommand={envMasked}
+                  lang="ini"
+                  copyLabel=".env"
                 />
               )}
 
+              {/* Bearer — shellscript-highlighted */}
               {codeTab === "bearer" && (
                 <VStack gap={1} align="stretch">
                   <Text fontSize="xs" color="fg.muted">
                     Use the <code>Authorization</code> header plus{" "}
                     <code>X-Project-Id</code>:
                   </Text>
-                  <CodeBlock
-                    label="http"
-                    display={`Authorization: Bearer ${newToken ? maskSecret(newToken) : "pat-lw-..."}\nX-Project-Id: ${activeProjectId ?? "<your-project-id>"}`}
-                    revealedDisplay={`Authorization: Bearer ${newToken ?? ""}\nX-Project-Id: ${activeProjectId ?? "<your-project-id>"}`}
-                    copyValue={`Authorization: Bearer ${newToken ?? ""}\nX-Project-Id: ${activeProjectId ?? "<your-project-id>"}`}
-                    copyToastTitle="Bearer headers copied"
-                    ariaLabel="Copy Bearer headers"
+                  <ShikiCommandBox
+                    command={bearerUnmasked}
+                    maskedCommand={bearerMasked}
+                    lang="shellscript"
+                    copyLabel="Bearer headers"
                   />
                 </VStack>
               )}
 
+              {/* Basic Auth — shellscript-highlighted */}
               {codeTab === "basic" && (
                 <VStack gap={1} align="stretch">
                   <Text fontSize="xs" color="fg.muted">
                     Encode the project ID and token as{" "}
                     <code>base64(projectId:token)</code>:
                   </Text>
-                  <CodeBlock
-                    label="http"
-                    display={`Authorization: Basic base64(${activeProjectId ?? "<your-project-id>"}:pat-lw-...)`}
-                    revealedDisplay={
-                      newToken && activeProjectId
-                        ? `Authorization: Basic ${btoa(`${activeProjectId}:${newToken}`)}`
-                        : ""
-                    }
-                    copyValue={
-                      newToken && activeProjectId
-                        ? `Authorization: Basic ${btoa(`${activeProjectId}:${newToken}`)}`
-                        : ""
-                    }
-                    copyToastTitle="Basic Auth header copied"
-                    ariaLabel="Copy Basic Auth header"
+                  <ShikiCommandBox
+                    command={basicUnmasked}
+                    maskedCommand={basicMasked}
+                    lang="shellscript"
+                    copyLabel="Basic Auth header"
                   />
                 </VStack>
               )}
             </VStack>
 
+            {/* ── Amber warning ── */}
             <Alert.Root status="warning" variant="subtle" opacity={0.8}>
               <Alert.Indicator />
               <Alert.Title fontSize="xs">
@@ -289,39 +290,68 @@ export function TokenCreatedDialog({
               </Alert.Title>
             </Alert.Root>
 
-            {/* ── Section 2: Code Assistants ── */}
+            {/* ── Section 2: Use with Code Assistants ── */}
             <VStack gap={3} align="stretch">
               <Text fontWeight="700" fontSize="sm">
                 Use with Code Assistants
               </Text>
 
-              <HStack gap={1} px={1.5} py={1.5} borderRadius="xl" border="1px solid" borderColor="border.subtle" bg="bg.panel/70" boxShadow="sm" width="fit-content">
-                <TabButton label="Claude Code" active={assistantTab === "claude-code"} onClick={() => setAssistantTab("claude-code")} />
-                <TabButton label="Codex" active={assistantTab === "codex"} onClick={() => setAssistantTab("codex")} />
+              <HStack
+                gap={1}
+                px={1.5}
+                py={1.5}
+                borderRadius="xl"
+                border="1px solid"
+                borderColor="border.subtle"
+                bg="bg.panel/70"
+                boxShadow="sm"
+                width="fit-content"
+              >
+                <TabButton
+                  label="Claude Code"
+                  active={assistantTab === "claude-code"}
+                  onClick={() => setAssistantTab("claude-code")}
+                />
+                <TabButton
+                  label="Codex"
+                  active={assistantTab === "codex"}
+                  onClick={() => setAssistantTab("codex")}
+                />
               </HStack>
 
-              {/* Quick setup command */}
+              {/* Claude Code terminal command — bash-highlighted with >_ prompt */}
               {assistantTab === "claude-code" && newToken && (
                 <VStack align="stretch" gap={3}>
-                  <QuickCommand
-                    label="Run in your terminal"
-                    displayCommand={`claude mcp add langwatch${projectIdEnvBefore} -- npx -y @langwatch/mcp-server --api-key ${maskedKey}${maskedEndpointFlag}`}
-                    copyCommand={`claude mcp add langwatch${projectIdEnvBefore} -- npx -y @langwatch/mcp-server --api-key ${newToken}${endpointFlag}`}
+                  <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                    Run in your terminal
+                  </Text>
+                  <ShikiCommandBox
+                    command={claudeCommand}
+                    maskedCommand={claudeMasked}
+                    lang="bash"
+                    showPrompt
+                    copyLabel="Claude Code command"
                   />
                 </VStack>
               )}
 
+              {/* Codex terminal command — bash-highlighted with >_ prompt */}
               {assistantTab === "codex" && newToken && (
                 <VStack align="stretch" gap={3}>
-                  <QuickCommand
-                    label="Run in your terminal"
-                    displayCommand={`codex mcp add langwatch --env LANGWATCH_API_KEY=${maskedKey}${projectIdEnvAfter}${isSelfHosted ? ` --env LANGWATCH_ENDPOINT=${endpoint}` : ""} -- npx -y @langwatch/mcp-server`}
-                    copyCommand={`codex mcp add langwatch --env LANGWATCH_API_KEY=${newToken}${projectIdEnvAfter}${isSelfHosted ? ` --env LANGWATCH_ENDPOINT=${endpoint}` : ""} -- npx -y @langwatch/mcp-server`}
+                  <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                    Run in your terminal
+                  </Text>
+                  <ShikiCommandBox
+                    command={codexCommand}
+                    maskedCommand={codexMasked}
+                    lang="bash"
+                    showPrompt
+                    copyLabel="Codex command"
                   />
                 </VStack>
               )}
 
-              {/* JSON config */}
+              {/* JSON config — existing JsonHighlight wiring unchanged */}
               {newToken && (
                 <VStack align="stretch" gap={2}>
                   <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
@@ -367,7 +397,10 @@ export function TokenCreatedDialog({
                         borderColor="border.subtle"
                         cursor="pointer"
                         transition="all 0.15s ease"
-                        _hover={{ borderColor: "orange.emphasized", bg: "bg.panel" }}
+                        _hover={{
+                          borderColor: "orange.emphasized",
+                          bg: "bg.panel",
+                        }}
                         onClick={() => {
                           void copyToClipboard({
                             text: ep.path,
@@ -375,7 +408,10 @@ export function TokenCreatedDialog({
                           });
                         }}
                       >
-                        <button type="button" aria-label={`Copy ${ep.editor} config path`}>
+                        <button
+                          type="button"
+                          aria-label={`Copy ${ep.editor} config path`}
+                        >
                           <Text fontSize="2xs" fontWeight="medium" color="fg">
                             {ep.editor}
                           </Text>
@@ -386,7 +422,6 @@ export function TokenCreatedDialog({
                 </VStack>
               )}
             </VStack>
-
           </VStack>
         </Dialog.Body>
       </Dialog.Content>

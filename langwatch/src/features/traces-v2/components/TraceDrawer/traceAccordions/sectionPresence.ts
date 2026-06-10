@@ -13,11 +13,15 @@ export function useAutoOpenSections(
   identity: string,
   content: Record<string, boolean>,
 ): [string[], (next: string[]) => void] {
-  const [open, setOpen] = useState<string[]>(() =>
-    Object.entries(content)
-      .filter(([, has]) => has)
-      .map(([k]) => k),
-  );
+  // Default to "every section open" instead of only sections whose
+  // content predicate is truthy. Operator feedback was that the
+  // gated-open behaviour made the drawer feel half-empty when a trace
+  // had no I/O or no attributes — the user couldn't tell whether the
+  // section was missing or just collapsed. Opening everything by
+  // default surfaces the empty states (so users learn what fields
+  // exist on a trace) and trades a couple of pixels of scroll for
+  // discoverability.
+  const [open, setOpen] = useState<string[]>(() => Object.keys(content));
   const lastIdentityRef = useRef(identity);
   const prevContentRef = useRef(content);
 
@@ -31,11 +35,8 @@ export function useAutoOpenSections(
     if (lastIdentityRef.current !== identity) {
       lastIdentityRef.current = identity;
       prevContentRef.current = content;
-      setOpen(
-        Object.entries(content)
-          .filter(([, has]) => has)
-          .map(([k]) => k),
-      );
+      // Reset to all-open on identity change (matching initial state).
+      setOpen(Object.keys(content));
       return;
     }
     // Same identity — auto-open sections that just gained content.

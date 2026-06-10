@@ -8,9 +8,7 @@
  */
 import { createOpenAI } from "@ai-sdk/openai";
 import { streamText } from "ai";
-import { Hono } from "hono";
-import { loggerMiddleware } from "~/app/api/middleware/logger";
-import { tracerMiddleware } from "~/app/api/middleware/tracer";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { env } from "~/env.mjs";
 import { hasProjectPermission } from "~/server/api/rbac";
 import { nlpgoProxyBaseURL } from "~/server/nlpgo/nlpgoFetch";
@@ -24,11 +22,11 @@ import type { NextRequestShim as any } from "./types";
 
 const errorCache: Record<string, any> = {};
 
-export const app = new Hono().basePath("/api");
-app.use(tracerMiddleware({ name: "playground" }));
-app.use(loggerMiddleware());
+const secured = createServiceApp({ basePath: "/api" });
 
-app.post("/playground", async (c) => {
+secured.access(
+  handlerManagedAuth("user session validated in-handler via getServerAuthSession"),
+).post("/playground", async (c) => {
   const session = await getServerAuthSession({ req: c.req.raw as any });
   if (!session) {
     return c.json(
@@ -106,13 +104,10 @@ app.post("/playground", async (c) => {
     ]),
   );
 
-  // FF-gated proxy: when release_nlp_go_engine_enabled is on for this
-  // project, route through nlpgo's /go/proxy/v1/* (in-process AI Gateway,
-  // no LiteLLM); otherwise stay on the legacy /proxy/v1/* (Python LiteLLM
-  // proxy). Wire shape (x-litellm-* headers + OpenAI body) is identical
-  // either way.
-  const baseURL = await nlpgoProxyBaseURL({
-    projectId,
+  // Go playground proxy: nlpgo's /go/proxy/v1/* (in-process AI Gateway,
+  // no LiteLLM). Wire shape is x-litellm-* headers + OpenAI body, read by
+  // the gatewayproxy package and dispatched in-process.
+  const baseURL = nlpgoProxyBaseURL({
     baseURL: env.LANGWATCH_NLP_SERVICE,
   });
   const vercelProvider = createOpenAI({
@@ -151,3 +146,5 @@ app.post("/playground", async (c) => {
     throw e;
   }
 });
+
+export const app = secured.hono;

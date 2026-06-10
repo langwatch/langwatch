@@ -222,12 +222,12 @@ topic clustering on Python. Roll out per-project via feature flag.
 - [x] Optimize endpoint 410 / websocket guard (ash, 27238ce28) — REST guard + websocket entry rejects with 410 envelope when project is on Go engine
 - [x] Telemetry origin header set in runWorkflow (ash) — propagated through engine ctx → dispatcher
 
-### Phase 3 — deployment
-- [x] `Dockerfile.langwatch_nlp.lambda` bundles Go binary + entry script (ash) — Go build stage in multi-stage; entrypoint at `langwatch_nlp/scripts/entrypoint.sh`
-- [x] `NLPGO_BYPASS=1` honored in entry script (ash)
-- [ ] Helm chart updates if needed (ash) — likely no changes since same container; verify
-- [ ] Dev `Dockerfile.langwatch_nlp` mirror update (ash, follow-up)
-- [ ] Terraform: no memory bump expected; verify (ash)
+### Phase 3 — deployment (Go-only end state)
+- [x] Self-hosted `Dockerfile.langwatch_nlp` rewritten distroless Go-only (sarah) — distroless/python3 + the static Go binary + a curated code-block sandbox (requests/httpx/pydantic/langwatch); ~136MB, no uvicorn/litellm/dspy/langwatch_nlp.
+- [x] Monorepo `Dockerfile.langwatch_nlp.lambda` DELETED (sarah) — it was an orphan (only consumer was a CI build smoke). The prod per-tenant lambda image is owned entirely by the langwatch-saas runtime Dockerfile (langwatch-saas#570).
+- [x] uvicorn child + `NLPGO_BYPASS` / `NLPGO_CHILD_*` removed entirely (sarah) — nlpgo is unconditionally go-only; any non-`/go/*` path returns a typed 502.
+- [x] Helm chart points the nlp deployment at the Go image (sarah) — resources lowered to the Go tier, probes repointed to `/healthz` `/readyz` `/startupz`.
+- [x] Terraform memory right-sized for the Go service (ash, langwatch-saas#570) — 4Gi → 1–2Gi.
 
 ### Phase 4 — tests + QA
 - [x] Provider matrix tests **removed** (sarah, ba6d13353) — duplicated `services/aigateway/tests/matrix/` per rchaves's direction. Wire-format bugs they caught (prefix stripping, max_completion_tokens, Credential.ID, field-name mapping, DeploymentMap) are now protected by the e2e tests below + the `dispatcheradapter` unit tests.

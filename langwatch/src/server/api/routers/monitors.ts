@@ -7,9 +7,9 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
 import {
   AVAILABLE_EVALUATORS,
+  evaluatorsSchema,
   type EvaluatorTypes,
 } from "../../evaluations/evaluators.generated";
-import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
 import { validatedPreconditionsSchema } from "../../evaluations/preconditionValidation";
 import { enforceLicenseLimit } from "../../license-enforcement";
 import { coerceMonitorMappings } from "../../tracer/tracesMapping";

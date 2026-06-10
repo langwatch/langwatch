@@ -3,6 +3,7 @@ import React from "react";
 import { EmptyStateOverlay } from "../../onboarding/components/EmptyStateOverlay";
 import { SampleDataBanner } from "../../onboarding/components/SampleDataBanner";
 import { OnboardingAurora } from "../../onboarding/effects/OnboardingAurora";
+import { usePreviewTracesActive } from "../../onboarding/hooks/usePreviewTracesActive";
 import { useOnboardingStore } from "../../onboarding/store/onboardingStore";
 import { Toolbar } from "../Toolbar/Toolbar";
 import { TraceTable } from "../TraceTable/TraceTable";
@@ -15,6 +16,7 @@ export const EmptyResultsPane: React.FC = React.memo(() => {
   // — sample data is already on screen, no waiting for ingestion.
   const setupDisengaged = useOnboardingStore((s) => s.setupDisengaged);
   const onboardingStage = useOnboardingStore((s) => s.stage);
+  const isPreviewActive = usePreviewTracesActive();
   const isPostArrival = onboardingStage === "postArrival";
 
   return (
@@ -73,6 +75,23 @@ export const EmptyResultsPane: React.FC = React.memo(() => {
         >
           <TraceTable />
         </Box>
+        {/* Diagonal-stripe overlay — purely peripheral signal that the
+            visible rows are sample data, not real traces. Transparent
+            orange stripes match the SampleDataBanner palette and are
+            faint enough to read as "preview mode" without fighting the
+            table content. Pointer-events:none so it never blocks clicks. */}
+        {isPreviewActive && (
+          <Box
+            position="absolute"
+            inset={0}
+            pointerEvents="none"
+            zIndex={0}
+            opacity={0.25}
+            color="orange.subtle"
+            backgroundImage="repeating-linear-gradient(45deg, transparent 0 14px, currentColor 14px 15px)"
+            aria-hidden="true"
+          />
+        )}
         {/* Aurora ribbon — self-gates on stage, lazy-mounts only
             during aurora stages. Owned by the onboarding module so
             this pane doesn't have to know about `shouldShowAurora`

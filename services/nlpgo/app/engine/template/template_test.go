@@ -63,7 +63,7 @@ func TestRender_PreservesNonASCIIUnicodeVerbatim(t *testing.T) {
 		out, _ := Render("Echo: {{ x }}", map[string]any{"x": value})
 		assert.Equal(t, "Echo: "+value, out, "case %q should round-trip verbatim", name)
 		// And no escape leakage.
-		assert.False(t, strings.Contains(out, `\u`),
+		assert.NotContains(t, out, `\u`,
 			"case %q produced escape sequences in %q", name, out)
 	}
 }

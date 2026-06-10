@@ -13,7 +13,7 @@ import {
   Wrap,
 } from "@chakra-ui/react";
 import { MoreVertical, Pencil, UserCheck } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useDebounce } from "use-debounce";
 import { Dialog } from "~/components/ui/dialog";
 import { Drawer } from "~/components/ui/drawer";
@@ -224,6 +224,7 @@ export function ImpersonateDialog({
 }) {
   const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(false);
+  const reasonRef = useRef<HTMLInputElement>(null);
 
   // Re-seed the reason on every new target user — prevents leaking one
   // reason across multiple impersonation attempts.
@@ -266,6 +267,7 @@ export function ImpersonateDialog({
   return (
     <Dialog.Root
       open={!!user}
+      initialFocusEl={() => reasonRef.current}
       onOpenChange={({ open }) => {
         if (!open && !loading) onClose();
       }}
@@ -287,6 +289,7 @@ export function ImpersonateDialog({
             <Field.Root required>
               <Field.Label>Reason</Field.Label>
               <Input
+                ref={reasonRef}
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 onKeyDown={(e) => {
@@ -476,8 +479,8 @@ function UserEditDrawer({
  * Renders a wrapped list of clickable chips for the Users table's
  * Organizations / Projects columns. Each chip deep-links to the matching
  * Backoffice list page with the row's id pre-loaded into the `q` search
- * param so the user lands on a single-row, filtered view — same one-click
- * drill-down the old react-admin `ReferenceField` used to give us.
+ * param so the user lands on a single-row, filtered view, giving a one-click
+ * drill-down from the Users table into the related record.
  */
 function RefChipList({
   refs,

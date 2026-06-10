@@ -19,6 +19,7 @@ import type { VersionedPrompt } from "~/server/prompt-config";
 import { PromptConfigProvider } from "../../providers/PromptConfigProvider";
 import { DemonstrationsField } from "../fields/DemonstrationsField";
 import { ModelSelectField } from "../fields/ModelSelectField";
+import { RuntimeParametersField } from "../fields/RuntimeParametersField";
 import { PromptMessagesField } from "../fields/message-history-fields/PromptMessagesField";
 import { PromptHandleInfo } from "./components/PromptHandleInfo";
 import { VersionHistoryButton } from "./components/VersionHistoryButton";
@@ -38,7 +39,13 @@ function InnerPromptConfigForm() {
   const [isSaving, setIsSaving] = useState(false);
   const configId = methods.watch("configId");
   const isDraft = !Boolean(methods.watch("handle"));
-  const saveEnabled = (methods.formState.isDirty || isDraft) && !isSaving;
+  const hasRuntimeParametersError = Boolean(
+    methods.formState.errors.version?.parameters,
+  );
+  const saveEnabled =
+    (methods.formState.isDirty || isDraft) &&
+    !isSaving &&
+    !hasRuntimeParametersError;
 
   /**
    * It is a known limitation of react-hook-form useFieldArray that we cannot
@@ -59,11 +66,14 @@ function InnerPromptConfigForm() {
   }));
 
   const handleSaveClick = useCallback(async () => {
-    const isValid = await methods.trigger("version.configData.llm");
+    const isValid = await methods.trigger([
+      "version.configData.llm",
+      "version.parameters",
+    ]);
     if (!isValid) {
       toaster.create({
         title: "Validation error",
-        description: "Please fix the LLM configuration errors before saving",
+        description: "Please fix the configuration errors before saving",
         type: "error",
       });
       return;
@@ -131,6 +141,7 @@ function InnerPromptConfigForm() {
             otherNodesFields={{}}
           />
           <FormVariablesSection showMappings={false} title="Variables" />
+          <RuntimeParametersField />
           {hasDemonstrations && <DemonstrationsField />}
         </VStack>
         <HStack

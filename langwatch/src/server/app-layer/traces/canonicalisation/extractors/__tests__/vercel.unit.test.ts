@@ -119,8 +119,8 @@ describe("VercelExtractor", () => {
     });
   });
 
-  describe("when instrumentationScope.name is not 'ai'", () => {
-    it("returns early with nothing in out", () => {
+  describe("when instrumentationScope.name is not 'ai' but ai.* attrs are present", () => {
+    it("still lifts (covers opencode/embedded-Vercel-SDK case)", () => {
       const ctx = createExtractorContext(
         {
           [ATTR_KEYS.AI_MODEL]: JSON.stringify({
@@ -130,6 +130,26 @@ describe("VercelExtractor", () => {
         },
         {
           name: "ai.generateText",
+          instrumentationScope: { name: "opencode", version: null },
+        },
+      );
+
+      extractor.apply(ctx);
+
+      // Span type + model lift fire because ai.model attr triggers the gate
+      expect(ctx.out[ATTR_KEYS.SPAN_TYPE]).toBe("llm");
+      expect(ctx.out[ATTR_KEYS.GEN_AI_REQUEST_MODEL]).toBe("openai/gpt-4");
+    });
+  });
+
+  describe("when scope is unrelated AND no ai.* attrs are present", () => {
+    it("returns early with nothing in out", () => {
+      const ctx = createExtractorContext(
+        {
+          [ATTR_KEYS.GEN_AI_REQUEST_MODEL]: "claude-haiku-4-5",
+        },
+        {
+          name: "spanWithoutAiAttrs",
           instrumentationScope: { name: "opentelemetry", version: null },
         },
       );
@@ -142,8 +162,8 @@ describe("VercelExtractor", () => {
     });
   });
 
-  describe("when instrumentationScope.name is undefined", () => {
-    it("returns early with nothing in out", () => {
+  describe("when instrumentationScope.name is undefined but ai.* attrs are present", () => {
+    it("still lifts via attrs-presence fallback", () => {
       const ctx = createExtractorContext(
         {
           [ATTR_KEYS.AI_MODEL]: JSON.stringify({
@@ -162,8 +182,124 @@ describe("VercelExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(Object.keys(ctx.out)).toHaveLength(0);
-      expect(ctx.setAttr).not.toHaveBeenCalled();
+      expect(ctx.out[ATTR_KEYS.GEN_AI_REQUEST_MODEL]).toBe("openai/gpt-4");
+    });
+  });
+
+  describe("when the AI SDK reports cache token details", () => {
+    it("maps inputTokenDetails.cacheWriteTokens to gen_ai cache_creation (opencode Path B)", () => {
+      const ctx = createExtractorContext(
+        {
+          [ATTR_KEYS.AI_MODEL]: JSON.stringify({
+            id: "claude-haiku-4-5",
+            provider: "anthropic",
+          }),
+          [ATTR_KEYS.AI_USAGE_CACHE_WRITE_TOKENS]: 12629,
+          [ATTR_KEYS.AI_USAGE_CACHE_READ_TOKENS]: 0,
+        },
+        {
+          name: "ai.streamText.doStream",
+          instrumentationScope: { name: "opencode", version: null },
+        },
+      );
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]).toBe(
+        12629,
+      );
+      // a zero read count is not surfaced as a redundant gen_ai attr
+      expect(
+        ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS],
+      ).toBeUndefined();
+    });
+
+    it("maps inputTokenDetails.cacheReadTokens to gen_ai cache_read on a cached turn", () => {
+      const ctx = createExtractorContext(
+        {
+          [ATTR_KEYS.AI_MODEL]: JSON.stringify({
+            id: "claude-haiku-4-5",
+            provider: "anthropic",
+          }),
+          [ATTR_KEYS.AI_USAGE_CACHE_READ_TOKENS]: 12629,
+        },
+        {
+          name: "ai.streamText.doStream",
+          instrumentationScope: { name: "opencode", version: null },
+        },
+      );
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(
+        12629,
+      );
+    });
+
+    it("falls back to the cachedInputTokens alias for the read count", () => {
+      const ctx = createExtractorContext(
+        {
+          [ATTR_KEYS.AI_MODEL]: JSON.stringify({
+            id: "claude-haiku-4-5",
+            provider: "anthropic",
+          }),
+          [ATTR_KEYS.AI_USAGE_CACHED_INPUT_TOKENS]: 8745,
+        },
+        {
+          name: "ai.streamText.doStream",
+          instrumentationScope: { name: "opencode", version: null },
+        },
+      );
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(
+        8745,
+      );
+    });
+  });
+
+  describe("when the span is an ai.toolCall tool span under the opencode scope", () => {
+    /** @scenario "Opencode tool-call spans capture the tool name, arguments, and result" */
+    it("lifts ai.toolCall.{name,args,result} to the tool name + input/output", () => {
+      const ctx = createExtractorContext(
+        {
+          [ATTR_KEYS.AI_TOOL_CALL_NAME]: "bash",
+          [ATTR_KEYS.AI_TOOL_CALL_ARGS]: '{"command":"ls -la"}',
+          [ATTR_KEYS.AI_TOOL_CALL_RESULT]: "total 4\ndrwxr-xr-x",
+        },
+        {
+          name: "ai.toolCall",
+          instrumentationScope: { name: "opencode", version: null },
+        },
+      );
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.SPAN_TYPE]).toBe("tool");
+      expect(ctx.out[ATTR_KEYS.GEN_AI_TOOL_NAME]).toBe("bash");
+      expect(ctx.out[ATTR_KEYS.LANGWATCH_INPUT]).toBe('{"command":"ls -la"}');
+      expect(ctx.out[ATTR_KEYS.GEN_AI_TOOL_CALL_ARGUMENTS]).toBe(
+        '{"command":"ls -la"}',
+      );
+      expect(ctx.out[ATTR_KEYS.LANGWATCH_OUTPUT]).toBe("total 4\ndrwxr-xr-x");
+      expect(ctx.out[ATTR_KEYS.GEN_AI_TOOL_CALL_RESULT]).toBe(
+        "total 4\ndrwxr-xr-x",
+      );
+    });
+
+    it("detects the tool span even though the scope is not 'ai'", () => {
+      const ctx = createExtractorContext(
+        { [ATTR_KEYS.AI_TOOL_CALL_NAME]: "read_file" },
+        {
+          name: "ai.toolCall",
+          instrumentationScope: { name: "opencode", version: null },
+        },
+      );
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_TOOL_NAME]).toBe("read_file");
     });
   });
 });

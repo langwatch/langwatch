@@ -18,6 +18,11 @@ export const SPAN_ATTR_MAPPINGS = [
   [ATTR_KEYS.GEN_AI_AGENT_NAME, "gen_ai.agent.name"],
   [ATTR_KEYS.GEN_AI_AGENT_ID, "gen_ai.agent.id"],
   [ATTR_KEYS.GEN_AI_PROVIDER_NAME, "gen_ai.provider.name"],
+  // The model's reasoning effort SETTING (low/medium/high/...), distinct
+  // from the reasoning TOKEN count. Hoisted to the trace attribute map so
+  // the drawer header can show it next to the model — the same lift that
+  // surfaces the conversation id. First non-empty span value wins.
+  [ATTR_KEYS.GEN_AI_REQUEST_REASONING_EFFORT, "gen_ai.request.reasoning_effort"],
   [ATTR_KEYS.LANGWATCH_LANGGRAPH_THREAD_ID, "langgraph.thread_id"],
   // AI Gateway markers — stamped on every gateway-emitted customer span by
   // services/aigateway/adapters/customertracebridge/emitter.go so the
@@ -27,6 +32,16 @@ export const SPAN_ATTR_MAPPINGS = [
   // gateway_budget_ledger_events stays empty.
   ["langwatch.virtual_key_id", "langwatch.virtual_key_id"],
   ["langwatch.gateway_request_id", "langwatch.gateway_request_id"],
+  // Governance ingest markers — stamped on every span by the
+  // /api/ingest/otel/:sourceId receiver (langwatch/src/server/routes/ingest/ingestionRoutes.ts).
+  // Hoisted into trace_summaries so the ActivityMonitorService dashboard
+  // queries can roll up spend / users / events by ingestion source without
+  // having to scan stored_spans. The receiver is the only emitter of
+  // these keys; non-governance traces never carry them.
+  ["langwatch.origin.kind", "langwatch.origin.kind"],
+  ["langwatch.ingestion_source.id", "langwatch.ingestion_source.id"],
+  ["langwatch.ingestion_source.organization_id", "langwatch.ingestion_source.organization_id"],
+  ["langwatch.ingestion_source.source_type", "langwatch.ingestion_source.source_type"],
 ] as const;
 
 /**
@@ -71,6 +86,19 @@ export const RESOURCE_ATTR_CANONICAL_MAPPINGS = [
   },
 ] as const;
 
+/**
+ * Resource attributes that carry a cost-classification signal rather than
+ * trace identity. They are consumed per span at fold time (the bundled
+ * portion is rolled into NonBilledCost) and must NOT be hoisted onto the
+ * trace's attribute map — a trace's cost split is two real amounts, not a
+ * single trace-level boolean. Existing rows that still carry the key keep it;
+ * the read layer treats the column as authoritative and the key as a
+ * fallback only.
+ */
+const NON_HOISTED_RESOURCE_KEYS: ReadonlySet<string> = new Set([
+  "langwatch.cost.non_billable",
+]);
+
 export const STANDARD_RESOURCE_PREFIXES = [
   "host.",
   "process.",
@@ -106,6 +134,7 @@ export class TraceAttributeAccumulationService {
 
     for (const [key, value] of Object.entries(resourceAttrs)) {
       if (STANDARD_RESOURCE_PREFIXES.some((p) => key.startsWith(p))) continue;
+      if (NON_HOISTED_RESOURCE_KEYS.has(key)) continue;
       // Normalize langwatch.metadata.* resource attributes to metadata.* canonical form
       const normalizedKey = key.startsWith("langwatch.metadata.")
         ? key.replace("langwatch.metadata.", "metadata.")

@@ -133,7 +133,7 @@ spec:
             - name: CRON_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.autogen.secretNames.app | default (printf "%s-app-secrets" .Release.Name) }}
+                  name: {{ include "langwatch.appSecretName" . }}
                   key: cronApiKey
             {{- end }}
 
@@ -168,25 +168,49 @@ spec:
             - name: LW_VIRTUAL_KEY_PEPPER
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.autogen.secretNames.app | default (printf "%s-app-secrets" .Release.Name) }}
+                  name: {{ include "langwatch.appSecretName" . }}
                   key: virtualKeyPepper
             {{- end }}
 
             # AI Gateway shared auth — HMAC internal-call signing + per-request
-            # JWT issuance. The gateway pod pulls these from the same Secret
-            # (see charts/gateway/templates/deployment.yaml). Rotating either
-            # value requires rolling both Deployments.
+            # JWT issuance. langwatch-app and the gateway pod mount these from
+            # the SAME Secret (the app Secret — secrets.existingSecret when
+            # operator-provided, autogen.secretNames.app when chart-rendered).
+            # Rotating either value requires rolling both Deployments.
             {{- if .Values.gateway.chartManaged }}
             - name: LW_GATEWAY_INTERNAL_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.gateway.secrets.existingSecretName | default "langwatch-gateway-auth" }}
-                  key: {{ .Values.gateway.secrets.internalSecretKey | default "LW_GATEWAY_INTERNAL_SECRET" }}
+                  name: {{ include "langwatch.appSecretName" . }}
+                  key: LW_GATEWAY_INTERNAL_SECRET
             - name: LW_GATEWAY_JWT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.gateway.secrets.existingSecretName | default "langwatch-gateway-auth" }}
-                  key: {{ .Values.gateway.secrets.jwtSecretKey | default "LW_GATEWAY_JWT_SECRET" }}
+                  name: {{ include "langwatch.appSecretName" . }}
+                  key: LW_GATEWAY_JWT_SECRET
+            {{- end }}
+
+            # LW_GATEWAY_PUBLIC_URL — the externally-reachable AI Gateway URL
+            # the control plane hands to CLI users (langwatch claude/codex/
+            # cursor) at login. Without it the CLI falls back to
+            # http://localhost:5563, which a developer laptop can't reach
+            # against a remote cluster. Prefer the explicit gateway.publicUrl
+            # knob; otherwise derive it from an operator-set gateway ingress
+            # host (the SaaS default host is skipped so a self-host install
+            # never silently points at gateway.langwatch.ai).
+            {{- $gwPublic := .Values.gateway.publicUrl | default "" }}
+            {{- if not $gwPublic }}
+            {{- $gwIngress := .Values.gateway.ingress | default dict }}
+            {{- $gwHost := $gwIngress.host | default "" }}
+            {{- if and $gwIngress.enabled $gwHost (ne $gwHost "gateway.langwatch.ai") }}
+            {{- $scheme := "http" }}
+            {{- if and $gwIngress.tls $gwIngress.tls.enabled }}{{- $scheme = "https" }}{{- end }}
+            {{- $gwPublic = printf "%s://%s" $scheme $gwHost }}
+            {{- end }}
+            {{- end }}
+            {{- if $gwPublic }}
+            - name: LW_GATEWAY_PUBLIC_URL
+              value: {{ $gwPublic | quote }}
             {{- end }}
 
             # NextAuth configuration
@@ -210,7 +234,7 @@ spec:
             - name: NEXTAUTH_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.autogen.secretNames.app | default (printf "%s-app-secrets" .Release.Name) }}
+                  name: {{ include "langwatch.appSecretName" . }}
                   key: nextAuthSecret
             {{- end }}
 

@@ -2,6 +2,7 @@ import { Suspense, useEffect } from "react";
 import {
   createBrowserRouter,
   Outlet,
+  redirect,
   useLocation,
   useNavigation,
   type RouteObject,
@@ -11,9 +12,10 @@ import NProgress from "nprogress";
 import { InnerProviders } from "./AppProviders";
 import NotFoundOrErrorPage from "./pages/_not-found";
 import { PageErrorFallback } from "~/components/ui/PageErrorFallback";
+import { reloadOnChunkError } from "./utils/chunkReload";
 
 /**
- * Root layout — wraps all routes.
+ * Root layout - wraps all routes.
  * - InnerProviders: CommandBar, Analytics, PostHog (need Router context)
  * - NProgress: loading bar on navigation (starts when lazy route begins loading)
  */
@@ -52,31 +54,16 @@ function RootLayout() {
  * React Router's lazy keeps the OLD route visible while the new module loads,
  * eliminating the gray flash that React.lazy + Suspense causes.
  */
-// Minimum gap between self-triggered reloads. Short enough that a second
-// deploy mid-session still reloads; long enough to avoid a loop if the server
-// is genuinely returning broken chunks.
-const CHUNK_RELOAD_COOLDOWN_MS = 10_000;
-
 const page = (importFn: () => Promise<{ default: React.ComponentType }>) => ({
   lazy: () =>
-    importFn().then((m) => ({ Component: m.default })).catch((err: unknown) => {
-      const msg = err instanceof Error ? err.message.toLowerCase() : "";
-      const isChunkError =
-        msg.includes("loading chunk") ||
-        msg.includes("dynamically imported module") ||
-        msg.includes("importing a module script failed");
-
-      if (!isChunkError) throw err;
-
-      const lastReloadAt = Number(
-        sessionStorage.getItem("chunk-reload-at") ?? "0"
-      );
-      if (Date.now() - lastReloadAt > CHUNK_RELOAD_COOLDOWN_MS) {
-        sessionStorage.setItem("chunk-reload-at", String(Date.now()));
-        window.location.reload();
-      }
-      throw err;
-    }),
+    importFn()
+      .then((m) => ({ Component: m.default }))
+      .catch((err: unknown) => {
+        // Stale route chunk after a deploy → reload once to pick up the new
+        // hashes. Non-chunk errors fall through to the error boundary.
+        reloadOnChunkError(err);
+        throw err;
+      }),
 });
 
 const routes: RouteObject[] = [
@@ -111,12 +98,16 @@ const routes: RouteObject[] = [
   // Settings
   { path: "/settings", ...page(() => import("./pages/settings")) },
   {
-    path: "/settings/access-audit",
-    ...page(() => import("./pages/settings/access-audit")),
+    path: "/settings/role-bindings",
+    ...page(() => import("./pages/settings/role-bindings")),
   },
   {
     path: "/settings/annotation-scores",
     ...page(() => import("./pages/settings/annotation-scores")),
+  },
+  {
+    path: "/settings/data-retention",
+    ...page(() => import("./pages/settings/data-retention")),
   },
   {
     path: "/settings/audit-log",
@@ -183,6 +174,108 @@ const routes: RouteObject[] = [
     path: "/settings/usage",
     ...page(() => import("./pages/settings/usage")),
   },
+  {
+    path: "/settings/routing-policies",
+    ...page(() => import("./pages/settings/routing-policies")),
+  },
+  {
+    // Top-level governance home (admin oversight dashboard).
+    // Sub-routes for admin authoring (ingestion-sources, anomaly-rules,
+    // routing-policies) stay under /settings/* per the daily-use vs
+    // admin-authoring distinction.
+    path: "/governance",
+    ...page(() => import("./pages/settings/governance")),
+  },
+  {
+    // Back-compat alias for the original path. Any existing bookmarks
+    // / docs referencing /settings/governance still land on the same
+    // dashboard. Removed in a future cleanup once nothing links here.
+    path: "/settings/governance",
+    ...page(() => import("./pages/settings/governance")),
+  },
+  {
+    path: "/settings/governance/ingestion-sources",
+    ...page(() => import("@ee/governance/dashboard/pages/ingestion-sources")),
+  },
+  {
+    path: "/settings/governance/ingestion-sources/:id",
+    ...page(() =>
+      import("@ee/governance/dashboard/pages/ingestion-source-detail"),
+    ),
+  },
+  {
+    path: "/settings/governance/anomaly-rules",
+    ...page(() => import("@ee/governance/dashboard/pages/anomaly-rules")),
+  },
+  {
+    path: "/settings/governance/tool-catalog",
+    ...page(() => import("./pages/settings/governance/tool-catalog")),
+  },
+  {
+    path: "/settings/governance/departments",
+    ...page(() => import("./pages/settings/governance/departments")),
+  },
+  {
+    // Redirect the pre-rename path so old bookmarks do not 404.
+    path: "/settings/governance/cost-centers",
+    loader: () => redirect("/settings/governance/departments"),
+  },
+  {
+    // View-all teams listing - bird's-eye `View all teams →` lands here.
+    // 500-row paginated list with sort chips for spend / requests /
+    // last-activity. Per-row click-through routes to the team detail
+    // page below.
+    path: "/settings/governance/teams",
+    ...page(() => import("./pages/settings/governance/teams")),
+  },
+  {
+    // Per-team detail - single-row scoped view of `spendByTeam` filtered
+    // to the URL-encoded team id, four-stat KPI grid + breadcrumb back
+    // to the listing. Detail-data depth (per-day trend, per-user
+    // breakdown, model mix) defers to a follow-up.
+    path: "/settings/governance/teams/:id",
+    ...page(() => import("./pages/settings/governance/teams/[id]")),
+  },
+  {
+    // View-all users listing - bird's-eye `View all users →` lands here.
+    path: "/settings/governance/users",
+    ...page(() => import("./pages/settings/governance/users")),
+  },
+  {
+    // Per-user detail - single-row scoped view keyed off the
+    // URL-encoded actor id (email / sub claim).
+    path: "/settings/governance/users/:id",
+    ...page(() => import("./pages/settings/governance/users/[id]")),
+  },
+
+  // Personal-scope governance routes (must precede the /:project catch-all
+  // so "me" doesn't get treated as a project slug)
+  {
+    path: "/me",
+    ...page(() => import("./pages/me/index")),
+  },
+  {
+    path: "/me/configure",
+    ...page(() => import("./pages/me/configure")),
+  },
+  {
+    path: "/me/sessions",
+    ...page(() => import("./pages/me/sessions")),
+  },
+  {
+    // Budget-increase request page that the CLI's `langwatch request-increase`
+    // opens. The page file existed but routes.tsx is explicit (Vite migration)
+    // - without this entry the URL 404'd, breaking the per-spec
+    // budget-exceeded → request flow Ariana caught in dogfood.
+    path: "/me/budget/request",
+    ...page(() => import("./pages/me/budget/request")),
+  },
+
+  // CLI device-flow approval (RFC 8628 user-facing screen)
+  {
+    path: "/cli/auth",
+    ...page(() => import("./pages/cli/auth")),
+  },
 
   // Project routes
   {
@@ -197,37 +290,41 @@ const routes: RouteObject[] = [
     path: "/:project/automations",
     ...page(() => import("./pages/[project]/automations")),
   },
+  // AI Gateway - org-scoped admin pages live under /settings/gateway/**
+  // alongside model-providers, routing-policies, audit-log etc. Every
+  // gateway resource (VirtualKey / GatewayBudget / ModelProvider) is
+  // org-keyed by the schema, so the chrome reflects that.
   {
-    path: "/:project/gateway",
-    ...page(() => import("./pages/[project]/gateway/index")),
+    path: "/settings/gateway",
+    ...page(() => import("./pages/settings/gateway/index")),
   },
   {
-    path: "/:project/gateway/virtual-keys",
-    ...page(() => import("./pages/[project]/gateway/virtual-keys")),
+    path: "/settings/gateway/virtual-keys",
+    ...page(() => import("./pages/settings/gateway/virtual-keys")),
   },
   {
-    path: "/:project/gateway/virtual-keys/:id",
-    ...page(() => import("./pages/[project]/gateway/virtual-keys/[id]")),
+    path: "/settings/gateway/virtual-keys/:id",
+    ...page(() => import("./pages/settings/gateway/virtual-keys/[id]")),
   },
   {
-    path: "/:project/gateway/budgets",
-    ...page(() => import("./pages/[project]/gateway/budgets")),
+    path: "/settings/gateway/budgets",
+    ...page(() => import("./pages/settings/gateway/budgets")),
   },
   {
-    path: "/:project/gateway/budgets/:id",
-    ...page(() => import("./pages/[project]/gateway/budgets/[id]")),
+    path: "/settings/gateway/budgets/:id",
+    ...page(() => import("./pages/settings/gateway/budgets/[id]")),
   },
   {
-    path: "/:project/gateway/providers",
-    ...page(() => import("./pages/[project]/gateway/providers")),
+    path: "/settings/gateway/usage",
+    ...page(() => import("./pages/settings/gateway/usage")),
   },
   {
-    path: "/:project/gateway/usage",
-    ...page(() => import("./pages/[project]/gateway/usage")),
+    path: "/settings/gateway/cache-rules",
+    ...page(() => import("./pages/settings/gateway/cache-rules")),
   },
   {
-    path: "/:project/gateway/cache-rules",
-    ...page(() => import("./pages/[project]/gateway/cache-rules")),
+    path: "/settings/gateway/guardrails",
+    ...page(() => import("./pages/settings/gateway/guardrails")),
   },
   {
     path: "/:project/datasets",
@@ -440,13 +537,13 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/ops/backoffice/subscriptions")),
   },
 
-  // @project redirect — Next.js parallel route that redirects /@project/path to /:project/path
+  // @project redirect - Next.js parallel route that redirects /@project/path to /:project/path
   {
     path: "/@project/*",
     ...page(() => import("./pages/@project/[...path]/index")),
   },
 
-  // Catch-all 404 — must stay last.
+  // Catch-all 404 - must stay last.
   {
     path: "*",
     ...page(() => import("./pages/not-found")),
@@ -456,7 +553,7 @@ const routes: RouteObject[] = [
 // React Router v7 expects a HydrateFallback when the root route is async; the
 // app uses lazy() per-route and never blocks hydration, but RR still emits a
 // console warning if no fallback is declared. An empty fragment is correct
-// here — InnerProviders + Suspense already render the right shell once
+// here - InnerProviders + Suspense already render the right shell once
 // children resolve, and showing nothing for the few ms before that is the
 // existing behaviour.
 function HydrateFallback() {

@@ -61,10 +61,15 @@ describe("buildSpanAttributeKeysFacetQuery", () => {
       expect(query.sql).not.toContain("SpanAttributes.values");
     });
 
-    it("short-circuits rows where SpanAttributes is empty", () => {
-      // length() check kicks in before the arrayJoin so empty-attr granules
-      // get pruned cleanly. Mirrors what `events.ts` does for Events.Name.
-      expect(query.sql).toMatch(/length\(SpanAttributes\)\s*>\s*0/);
+    it("short-circuits empty maps via the keys subcolumn, not the whole Map", () => {
+      // The empty-map check must probe `SpanAttributes.keys`, never
+      // `SpanAttributes`: `length(SpanAttributes)` makes ClickHouse
+      // materialise the entire Map (keys AND values) just to count entries,
+      // pulling the heavy values column into memory and tipping busy tenants
+      // into MEMORY_LIMIT_EXCEEDED. Reproduced against a real ClickHouse in
+      // span-attribute-keys.integration.test.ts.
+      expect(query.sql).toMatch(/length\(SpanAttributes\.keys\)\s*>\s*0/);
+      expect(query.sql).not.toMatch(/length\(SpanAttributes\)\s*>\s*0/);
     });
 
     it("groups by key and orders by frequency", () => {
@@ -117,6 +122,44 @@ describe("buildSpanAttributeKeysFacetQuery", () => {
     it("filters out '' rows in the outer WHERE", () => {
       const query = buildSpanAttributeKeysFacetQuery(baseCtx);
       expect(query.sql).toMatch(/WHERE key\s*!=\s*''/);
+    });
+  });
+
+  describe("excludes reserved namespace keys from user-visible facet results", () => {
+    /** @scenario Reserved namespace is excluded from user-visible facet enumeration */
+    it("filters out keys starting with 'langwatch.reserved.' in the outer WHERE", () => {
+      // Reserved keys (e.g. langwatch.reserved.eventref.langwatch.output) are
+      // server-internal plumbing that should never appear in the Traces UI
+      // facet sidebar. A span with offloaded fields will carry these keys in
+      // SpanAttributes; without this filter they would surface as browsable
+      // facet entries exposing raw ref JSON as values. Concern 1 / #4215.
+      const query = buildSpanAttributeKeysFacetQuery(baseCtx);
+      expect(query.sql).toContain(
+        "NOT startsWith(key, 'langwatch.reserved.')",
+      );
+    });
+
+    it("SQL would exclude langwatch.reserved.eventref.langwatch.output from discovered keys", () => {
+      // Validate the filter is in the outer WHERE (post-arrayJoin) so it applies
+      // before GROUP BY — the reserved key must not appear in the result set.
+      const query = buildSpanAttributeKeysFacetQuery(baseCtx);
+      // The filter must appear in the WHERE clause after the subquery
+      const outerWhereIdx = query.sql.lastIndexOf("WHERE key");
+      expect(outerWhereIdx).toBeGreaterThan(-1);
+      const outerWhere = query.sql.slice(outerWhereIdx);
+      expect(outerWhere).toContain("NOT startsWith(key, 'langwatch.reserved.')");
+    });
+  });
+
+  describe("memory safety", () => {
+    it("never reads the SpanAttributes values column", () => {
+      // Both the projection and the empty-map filter must stay on the keys
+      // subcolumn. Touching the full `SpanAttributes` Map anywhere pulls the
+      // heavy values column into memory — the cause of the prod OOM.
+      const query = buildSpanAttributeKeysFacetQuery(baseCtx);
+      expect(query.sql).not.toMatch(/length\(SpanAttributes\)/);
+      expect(query.sql).not.toContain("mapValues");
+      expect(query.sql).not.toContain("SpanAttributes.values");
     });
   });
 });

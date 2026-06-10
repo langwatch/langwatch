@@ -11,6 +11,7 @@
  *
  * @see specs/scenarios/scenario-deferred-persistence.feature
  */
+import * as React from "react";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -56,6 +57,23 @@ vi.mock("../SaveAndRunMenu", () => ({
 }));
 vi.mock("../ScenarioEditorSidebar", () => ({
   ScenarioEditorSidebar: () => null,
+}));
+// The run-model dialog is covered in ScenarioRunModelDialog.integration.test.tsx.
+// Here it auto-confirms once on open so these flow tests exercise the
+// save → run → navigate path without driving the picker UI.
+vi.mock("../ScenarioRunModelDialog", () => ({
+  ScenarioRunModelDialog: ({
+    open,
+    onConfirm,
+  }: {
+    open?: boolean;
+    onConfirm?: () => void;
+  }) => {
+    React.useEffect(() => {
+      if (open) onConfirm?.();
+    }, [open]);
+    return null;
+  },
 }));
 
 import { ScenarioFormDrawer } from "../ScenarioFormDrawer";

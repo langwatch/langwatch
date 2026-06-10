@@ -78,7 +78,7 @@ const TRUNCATE_BREAK_PREFER_RATIO = 0.5;
 
 // Cuts on a paragraph/sentence boundary above maxChars*ratio so we don't slice
 // mid-token and produce broken markdown (unclosed code fences, dangling lists).
-function truncateMarkdown({
+export function truncateMarkdown({
   text,
   maxChars,
 }: {

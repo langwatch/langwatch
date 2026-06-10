@@ -48,9 +48,9 @@ export async function startLangevals(
   });
 
   const ready = await pollUntilHealthy({
-    // 120s — parity with langwatch_nlp. Langevals' fastapi boot + evaluator
-    // discovery is normally ~25-30s but a parallel boot with nlp + langwatch
-    // app can push it past the previous 60s ceiling under load.
+    // 120s. Langevals' fastapi boot + evaluator discovery is normally
+    // ~25-30s but a parallel boot with nlp + langwatch app can push it
+    // past the previous 60s ceiling under load.
     check: httpGetCheck(`http://127.0.0.1:${ctx.ports.langevals}/`),
     timeoutMs: 120_000,
   });

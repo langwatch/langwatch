@@ -2,698 +2,880 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-    provider = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 datasource db {
-    provider     = "postgresql"
-    // NOTE: When using mysql or sqlserver, uncomment the @db.Text annotations in model Account below
-    // Further reading:
-    // https://next-auth.js.org/adapters/prisma#create-the-prisma-schema
-    // https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference#string
-    url          = env("DATABASE_URL")
-    relationMode = "prisma"
+  provider     = "postgresql"
+  // NOTE: When using mysql or sqlserver, uncomment the @db.Text annotations in model Account below
+  // Further reading:
+  // https://next-auth.js.org/adapters/prisma#create-the-prisma-schema
+  // https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference#string
+  url          = env("DATABASE_URL")
+  relationMode = "prisma"
 }
 
 // BetterAuth-compatible Account. Column names preserved; BetterAuth's field
 // mapping in src/server/better-auth/index.ts points its expected names at
-// these columns. `password` is new — credential passwords moved here from
+// these columns. `password` is new - credential passwords moved here from
 // `User.password` in the better_auth_cutover migration.
 model Account {
-    id                String   @id @default(nanoid())
-    userId            String
-    type              String   @default("oauth")
-    provider          String
-    providerAccountId String
-    refresh_token     String?  @db.Text
-    access_token      String?  @db.Text
-    expires_at        DateTime?
-    ext_expires_in    Int?
-    token_type        String?
-    scope             String?
-    id_token          String?  @db.Text
-    session_state     String?
-    password          String?  @db.Text
-    user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-    createdAt         DateTime @default(now())
-    updatedAt         DateTime @default(now()) @updatedAt
+  id                String    @id @default(nanoid())
+  userId            String
+  type              String    @default("oauth")
+  provider          String
+  providerAccountId String
+  refresh_token     String?   @db.Text
+  access_token      String?   @db.Text
+  expires_at        DateTime?
+  ext_expires_in    Int?
+  token_type        String?
+  scope             String?
+  id_token          String?   @db.Text
+  session_state     String?
+  password          String?   @db.Text
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @default(now()) @updatedAt
 
-    @@unique([provider, providerAccountId])
-    @@index([userId])
+  @@unique([provider, providerAccountId])
+  @@index([userId])
 }
 
 model Session {
-    id            String   @id @default(nanoid())
-    sessionToken  String   @unique
-    userId        String
-    expires       DateTime
-    user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-    impersonating Json?
-    ipAddress     String?
-    userAgent     String?  @db.Text
-    createdAt     DateTime @default(now())
-    updatedAt     DateTime @default(now()) @updatedAt
+  id            String   @id @default(nanoid())
+  sessionToken  String   @unique
+  userId        String
+  expires       DateTime
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  impersonating Json?
+  ipAddress     String?
+  userAgent     String?  @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
 
-    @@index([userId])
+  @@index([userId])
 }
 
 model User {
-    id                      String                   @id @default(nanoid())
-    name                    String?
-    email                   String?                  @unique
-    emailVerified           Boolean                  @default(false)
-    image                   String?                  @db.Text
-    pendingSsoSetup         Boolean                  @default(false)
-    accounts                Account[]
-    sessions                Session[]
-    teamMemberships         TeamUser[]
-    orgMemberships          OrganizationUser[]
-    createdAt               DateTime                 @default(now())
-    updatedAt               DateTime                 @default(now()) @updatedAt
-    lastLoginAt             DateTime?
-    deactivatedAt           DateTime?
-    Annotation              Annotation[]
-    publicShares            PublicShare[]
-    Workflow                Workflow[]
-    WorkflowVersion         WorkflowVersion[]
-    annotationQueues        AnnotationQueueMembers[]
-    assignedQueueItems      AnnotationQueueItem[]    @relation("AssignedTo")
-    createdQueueItems       AnnotationQueueItem[]    @relation("CreatedBy")
-    llmPromptConfigVersions LlmPromptConfigVersion[]
-    scenarios               Scenario[]
-    inviteRequests          OrganizationInvite[]
-    secretsCreated          ProjectSecret[]          @relation("secretCreatedBy")
-    secretsUpdated          ProjectSecret[]          @relation("secretUpdatedBy")
-    savedViews              SavedView[]
-    versionTagsCreated      PromptTagAssignment[]  @relation("versionTagCreatedBy")
-    versionTagsUpdated      PromptTagAssignment[]  @relation("versionTagUpdatedBy")
-    promptTagsCreated       PromptTag[]            @relation("promptTagCreatedBy")
-    promptTagsUpdated       PromptTag[]            @relation("promptTagUpdatedBy")
-    groupMemberships        GroupMembership[]
-    roleBindings            RoleBinding[]
-    apiKeys                 ApiKey[]
-    virtualKeysCreated      VirtualKey[]           @relation("VirtualKeyCreatedBy")
-    virtualKeysRevoked      VirtualKey[]           @relation("VirtualKeyRevokedBy")
-    gatewayBudgetsCreated   GatewayBudget[]        @relation("GatewayBudgetCreatedBy")
-    principalVirtualKeys    VirtualKey[]           @relation("VirtualKeyPrincipalUser")
-    principalGatewayBudgets GatewayBudget[]        @relation("PrincipalScopedGatewayBudgets")
+  id                      String                   @id @default(nanoid())
+  name                    String?
+  email                   String?                  @unique
+  emailVerified           Boolean                  @default(false)
+  image                   String?                  @db.Text
+  pendingSsoSetup         Boolean                  @default(false)
+  accounts                Account[]
+  sessions                Session[]
+  teamMemberships         TeamUser[]
+  orgMemberships          OrganizationUser[]
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @default(now()) @updatedAt
+  lastLoginAt             DateTime?
+  deactivatedAt           DateTime?
+  // User-level pin for the persona-resolver redirect target. NULL = use
+  // auto-detection. When set, wins over auto-detected persona destination.
+  // Spec: specs/ai-gateway/governance/persona-home-content.feature
+  lastHomePath            String?
+  Annotation              Annotation[]
+  publicShares            PublicShare[]
+  Workflow                Workflow[]
+  WorkflowVersion         WorkflowVersion[]
+  annotationQueues        AnnotationQueueMembers[]
+  assignedQueueItems      AnnotationQueueItem[]    @relation("AssignedTo")
+  createdQueueItems       AnnotationQueueItem[]    @relation("CreatedBy")
+  llmPromptConfigVersions LlmPromptConfigVersion[]
+  scenarios               Scenario[]
+  inviteRequests          OrganizationInvite[]
+  secretsCreated          ProjectSecret[]          @relation("secretCreatedBy")
+  secretsUpdated          ProjectSecret[]          @relation("secretUpdatedBy")
+  savedViews              SavedView[]
+  versionTagsCreated      PromptTagAssignment[]    @relation("versionTagCreatedBy")
+  versionTagsUpdated      PromptTagAssignment[]    @relation("versionTagUpdatedBy")
+  promptTagsCreated       PromptTag[]              @relation("promptTagCreatedBy")
+  promptTagsUpdated       PromptTag[]              @relation("promptTagUpdatedBy")
+  groupMemberships        GroupMembership[]
+  roleBindings            RoleBinding[]
+  apiKeys                 ApiKey[]
+  gatewayBudgetsCreated   GatewayBudget[]          @relation("GatewayBudgetCreatedBy")
+  principalVirtualKeys    VirtualKey[]             @relation("PrincipalScopedVirtualKeys")
+  personalTeams           Team[]                   @relation("PersonalTeamOwner")
+  personalProjects        Project[]                @relation("PersonalProjectOwner")
+  routingPoliciesCreated  RoutingPolicy[]          @relation("RoutingPolicyCreatedBy")
+  routingPoliciesUpdated  RoutingPolicy[]          @relation("RoutingPolicyUpdatedBy")
+  gatewayGuardrailsCreated GatewayGuardrail[]      @relation("GatewayGuardrailCreatedBy")
+  gatewayGuardrailsUpdated GatewayGuardrail[]      @relation("GatewayGuardrailUpdatedBy")
+  ingestionSourcesCreated IngestionSource[]        @relation("IngestionSourceCreatedBy")
+  anomalyRulesCreated     AnomalyRule[]            @relation("AnomalyRuleCreatedBy")
+  pinnedTraces            PinnedTrace[]
 }
 
 model VerificationToken {
-    id         String   @id @default(nanoid())
-    identifier String
-    token      String   @unique
-    expires    DateTime
-    createdAt  DateTime @default(now())
-    updatedAt  DateTime @default(now()) @updatedAt
+  id         String   @id @default(nanoid())
+  identifier String
+  token      String   @unique
+  expires    DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
 
-    @@unique([identifier, token])
+  @@unique([identifier, token])
 }
 
 enum TeamUserRole {
-    ADMIN
-    MEMBER
-    VIEWER
-    CUSTOM
+  ADMIN
+  MEMBER
+  VIEWER
+  CUSTOM
 }
 
-// Scoped RBAC — scope levels for RoleBinding
+// Scoped RBAC - scope levels for RoleBinding
 enum RoleBindingScopeType {
-    ORGANIZATION
-    TEAM
-    PROJECT
+  ORGANIZATION
+  TEAM
+  PROJECT
 }
 
 enum OrganizationUserRole {
-    ADMIN
-    MEMBER
-    EXTERNAL
+  ADMIN
+  MEMBER
+  EXTERNAL
 }
 
 model TeamUser {
-    userId         String
-    teamId         String
-    role           TeamUserRole
-    assignedRoleId String?
-    assignedRole   CustomRole?  @relation(fields: [assignedRoleId], references: [id])
-    user           User         @relation(fields: [userId], references: [id])
-    team           Team         @relation(fields: [teamId], references: [id])
-    createdAt      DateTime     @default(now())
-    updatedAt      DateTime     @default(now()) @updatedAt
+  userId         String
+  teamId         String
+  role           TeamUserRole
+  assignedRoleId String?
+  assignedRole   CustomRole?  @relation(fields: [assignedRoleId], references: [id])
+  user           User         @relation(fields: [userId], references: [id])
+  team           Team         @relation(fields: [teamId], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @default(now()) @updatedAt
 
-    @@id([userId, teamId])
-    @@index([teamId])
-    @@index([userId])
-    @@index([assignedRoleId])
+  @@id([userId, teamId])
+  @@index([teamId])
+  @@index([userId])
+  @@index([assignedRoleId])
 }
 
 model OrganizationUser {
-    userId         String
-    organizationId String
-    role           OrganizationUserRole
-    user           User                 @relation(fields: [userId], references: [id])
-    organization   Organization         @relation(fields: [organizationId], references: [id])
-    createdAt      DateTime             @default(now())
-    updatedAt      DateTime             @default(now()) @updatedAt
+  userId         String
+  organizationId String
+  role           OrganizationUserRole
+  user           User                 @relation(fields: [userId], references: [id])
+  organization   Organization         @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @default(now()) @updatedAt
 
-    @@id([userId, organizationId])
-    @@index([organizationId])
-    @@index([userId])
+  /// Department assignment for spend attribution (the people lens).
+  /// Single-valued, org-scoped, accounting-only (never gates access).
+  /// Plain column ref (relationMode="prisma"); the service validates the
+  /// id belongs to this org. See departments.feature.
+  departmentId String?
+
+  @@id([userId, organizationId])
+  @@index([organizationId])
+  @@index([userId])
+  @@index([departmentId])
 }
 
 model Team {
-    id              String          @id @default(nanoid())
-    name            String
-    slug            String          @unique
-    members         TeamUser[]
-    organizationId  String
-    organization    Organization    @relation(fields: [organizationId], references: [id])
-    projects        Project[]
-    createdAt       DateTime        @default(now())
-    updatedAt       DateTime        @default(now()) @updatedAt
-    archivedAt      DateTime?
-    gatewayBudgets  GatewayBudget[] @relation("TeamScopedGatewayBudgets")
-    @@index([organizationId])
+  id             String          @id @default(nanoid())
+  name           String
+  slug           String          @unique
+  members        TeamUser[]
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id])
+  projects       Project[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @default(now()) @updatedAt
+  archivedAt     DateTime?
+
+  // Personal workspace per (org, user). Created on user's first
+  // visit to an org. UI hides isPersonal=true teams from team
+  // pickers; they surface under "My Workspace" instead.
+  isPersonal  Boolean @default(false)
+  ownerUserId String? @db.VarChar(255)
+  ownerUser   User?   @relation("PersonalTeamOwner", fields: [ownerUserId], references: [id])
+
+  ingestionSources IngestionSource[]
+  aiToolEntryTeams AiToolEntryTeam[]
+
+  /// Department assignment inherited as the default for members and
+  /// projects that have none of their own. Accounting-only.
+  departmentId String?
+
+  @@index([organizationId])
+  @@index([isPersonal])
+  @@index([departmentId])
 }
 
 model Organization {
-    id                     String               @id @default(nanoid())
-    name                   String
-    phoneNumber            String?
-    slug                   String               @unique
-    members                OrganizationUser[]
-    teams                  Team[]
-    createdAt              DateTime             @default(now())
-    updatedAt              DateTime             @default(now()) @updatedAt
-    OrganizationInvite     OrganizationInvite[]
-    usageSpendingMaxLimit  Int?
-    signupData             Json?
-    signedDPA              Boolean              @default(false)
-    elasticsearchNodeUrl   String?
-    elasticsearchApiKey    String?
-    useCustomElasticsearch Boolean              @default(false)
-    s3Endpoint             String?
-    s3AccessKeyId          String?
-    s3SecretAccessKey      String?
-    s3Bucket               String?
-    useCustomS3            Boolean              @default(false)
-    sentPlanLimitAlert     DateTime?
-    ssoDomain              String?              @unique
-    ssoProvider            String?
-    presenceEnabled        Boolean              @default(true)
+  id                       String               @id @default(nanoid())
+  name                     String
+  phoneNumber              String?
+  slug                     String               @unique
+  members                  OrganizationUser[]
+  teams                    Team[]
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @default(now()) @updatedAt
+  OrganizationInvite       OrganizationInvite[]
+  usageSpendingMaxLimit    Int?
+  /// Phase 8 - admin-configurable max lifetime for CLI device-flow
+  /// sessions, in days. 0 = unbounded (default, mirrors GitHub CLI /
+  /// gh-style flows). Companies that need finite session lifetime
+  /// (eg. SOC 2 / ISO 27001 customers with mandated session
+  /// expiration) can set a positive value. The /api/auth/cli/refresh
+  /// endpoint rejects refresh attempts where now - issued_at exceeds
+  /// this value, regardless of the underlying refresh-token TTL.
+  /// Spec: specs/ai-governance/sessions/session-ttl.feature.
+  maxSessionDurationDays   Int                  @default(0)
+  /// Phase 9 - receiver-side gen_ai content stripping ("no-spy mode").
+  /// Values:
+  ///   "full"      (default) - store all content in CH (current behavior)
+  ///   "strip_io"  - drop gen_ai.prompt + gen_ai.completion + gen_ai.system_message
+  ///                 from gateway-origin spans BEFORE the CH write
+  ///   "strip_all" - strip_io + tool_call.arguments + tool_result.content
+  /// Forward-looking only: changes do not retroactively scrub historical
+  /// content; existing rows remain stored. Only applies to spans with
+  /// `langwatch.origin = "gateway"`; user-app traces are untouched so
+  /// customer-controlled data flows continue to work unchanged.
+  /// Spec: specs/ai-governance/no-spy-mode/no-spy-mode.feature.
+  governanceLogContentMode String               @default("full")
+  signupData               Json?
+  signedDPA                Boolean              @default(false)
+  elasticsearchNodeUrl     String?
+  elasticsearchApiKey      String?
+  useCustomElasticsearch   Boolean              @default(false)
+  s3Endpoint               String?
+  s3AccessKeyId            String?
+  s3SecretAccessKey        String?
+  s3Bucket                 String?
+  useCustomS3              Boolean              @default(false)
+  sentPlanLimitAlert       DateTime?
+  ssoDomain                String?              @unique
+  ssoProvider              String?
+  presenceEnabled          Boolean              @default(true)
+  /// Org-configurable contact surfaced to users in CLI "contact your
+  /// admin" messages and the in-app budget-exceeded banner. Free text:
+  /// accepts an email, a URL (internal ticketing system), or any other
+  /// instruction. When null, callers fall back to the first ADMIN
+  /// member's email (`resolveSupportContact` helper).
+  supportContact           String?
 
-    promoCode     String?
-    stripeCustomerId String?      @unique
-    currency      Currency         @default(EUR)
-    pricingModel  PricingModel     @default(TIERED)
-    CustomRoles   CustomRole[]
-    notifications Notification[]
-    subscriptions Subscription[]
-    scimTokens    ScimToken[]
-    promptTags    PromptTag[]
-    groups        Group[]
-    roleBindings           RoleBinding[]
-    apiKeys                ApiKey[]
-    // License enforcement fields (COSS-0226)
-    license                String?              @db.Text
-    licenseExpiresAt       DateTime?
-    licenseLastValidatedAt DateTime?
-    gatewayBudgets         GatewayBudget[]      @relation("OrgScopedGatewayBudgets")
-    gatewayChangeEvents    GatewayChangeEvent[]
+  promoCode              String?
+  stripeCustomerId       String?                @unique
+  currency               Currency               @default(EUR)
+  pricingModel           PricingModel           @default(TIERED)
+  CustomRoles            CustomRole[]
+  notifications          Notification[]
+  subscriptions          Subscription[]
+  scimTokens             ScimToken[]
+  promptTags             PromptTag[]
+  groups                 Group[]
+  roleBindings           RoleBinding[]
+  apiKeys                ApiKey[]
+  // License enforcement fields (COSS-0226)
+  license                String?                @db.Text
+  licenseExpiresAt       DateTime?
+  licenseLastValidatedAt DateTime?
+  gatewayChangeEvents    GatewayChangeEvent[]
+  routingPolicies        RoutingPolicy[]
+  ingestionSources       IngestionSource[]
+  anomalyRules           AnomalyRule[]
+  anomalyAlerts          AnomalyAlert[]
+  aiToolEntries          AiToolEntry[]
+  ingestionTemplates     IngestionTemplate[]
 
-    @@index([ssoProvider])
+  @@index([ssoProvider])
 }
 
 model ScimToken {
-    id             String       @id @default(nanoid())
-    organizationId String
-    organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-    hashedToken    String
-    description    String?
-    createdAt      DateTime     @default(now())
-    lastUsedAt     DateTime?
+  id             String       @id @default(nanoid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  hashedToken    String
+  description    String?
+  createdAt      DateTime     @default(now())
+  lastUsedAt     DateTime?
 
-    @@index([organizationId])
-    @@index([hashedToken])
+  @@index([organizationId])
+  @@index([hashedToken])
 }
 
-
 enum PlanTypes {
-    FREE
-    PRO
-    GROWTH
-    GROWTH_SEAT_EUR_MONTHLY
-    GROWTH_SEAT_EUR_ANNUAL
-    GROWTH_SEAT_USD_MONTHLY
-    GROWTH_SEAT_USD_ANNUAL
-    ENTERPRISE
-    LAUNCH
-    ACCELERATE
-    LAUNCH_ANNUAL
-    ACCELERATE_ANNUAL
+  FREE
+  PRO
+  GROWTH
+  GROWTH_SEAT_EUR_MONTHLY
+  GROWTH_SEAT_EUR_ANNUAL
+  GROWTH_SEAT_USD_MONTHLY
+  GROWTH_SEAT_USD_ANNUAL
+  ENTERPRISE
+  LAUNCH
+  ACCELERATE
+  LAUNCH_ANNUAL
+  ACCELERATE_ANNUAL
 }
 
 enum PricingModel {
-    TIERED
-    SEAT_EVENT
+  TIERED
+  SEAT_EVENT
 }
 
 enum SubscriptionStatus {
-    PENDING
-    FAILED
-    ACTIVE
-    CANCELLED
+  PENDING
+  FAILED
+  ACTIVE
+  CANCELLED
 }
 
 enum Currency {
-    USD
-    EUR
+  USD
+  EUR
 }
 
 enum PIIRedactionLevel {
-    STRICT
-    ESSENTIAL
-    DISABLED
+  STRICT
+  ESSENTIAL
+  DISABLED
 }
 
 enum ProjectSensitiveDataVisibilityLevel {
-    REDACTED_TO_ALL
-    VISIBLE_TO_ADMIN
-    VISIBLE_TO_ALL
+  REDACTED_TO_ALL
+  VISIBLE_TO_ADMIN
+  VISIBLE_TO_ALL
 }
 
 model Project {
-    id                       String                              @id @default(nanoid())
-    name                     String
-    slug                     String                              @unique
-    apiKey                   String                              @unique
-    teamId                   String
-    team                     Team                                @relation(fields: [teamId], references: [id])
-    language                 String
-    framework                String
-    firstMessage             Boolean                             @default(false)
-    integrated               Boolean                             @default(false)
-    createdAt                DateTime                            @default(now())
-    updatedAt                DateTime                            @default(now()) @updatedAt
-    userLinkTemplate         String?
-    checks                   Monitor[]
-    costs                    Cost[]
-    topics                   Topic[]
-    datasets                 Dataset[]
-    datasetRecords           DatasetRecord[]
-    customGraphs             CustomGraph[]
-    dashboards               Dashboard[]
-    batchEvaluations         BatchEvaluation[]
-    piiRedactionLevel        PIIRedactionLevel                   @default(ESSENTIAL)
-    capturedInputVisibility  ProjectSensitiveDataVisibilityLevel @default(VISIBLE_TO_ALL)
-    capturedOutputVisibility ProjectSensitiveDataVisibilityLevel @default(VISIBLE_TO_ALL)
-    traceSharingEnabled      Boolean                             @default(true)
-    presenceEnabled          Boolean                             @default(true)
-    triggers                 Trigger[]
-    experiments              Experiment[]
-    annotations              Annotation[]
-    modelProviders           ModelProvider[]
-    projectSecrets           ProjectSecret[]
-    TriggerSent              TriggerSent[]
-    annotationScores         AnnotationScore[]
-    publicShares             PublicShare[]
-    workflows                Workflow[]
-    WorkflowVersion          WorkflowVersion[]
-    AnnotationQueue          AnnotationQueue[]
-    AnnotationQueueItem      AnnotationQueueItem[]
-    s3Endpoint               String?
-    s3AccessKeyId            String?
-    s3SecretAccessKey        String?
-    s3Bucket                 String?
-    llmPromptConfigs         LlmPromptConfig[]
-    analytics                Analytics[]
-    archivedAt               DateTime?
-    notifications            Notification[]
-    agents                   Agent[]
-    evaluators               Evaluator[]
-    scenarios                Scenario[]
-    suiteConfigurations      SimulationSuite[]
-    savedViews               SavedView[]
-    virtualKeys              VirtualKey[]
-    gatewayProviderCreds     GatewayProviderCredential[]
-    gatewayBudgets           GatewayBudget[]                     @relation("ProjectScopedGatewayBudgets")
-    gatewayChangeEvents      GatewayChangeEvent[]
+  id                       String                              @id @default(nanoid())
+  name                     String
+  slug                     String                              @unique
+  apiKey                   String                              @unique
+  teamId                   String
+  team                     Team                                @relation(fields: [teamId], references: [id])
+  language                 String
+  framework                String
+  /// Project kind:
+  ///   - "application": user-facing workspace where developers send their
+  ///     own app traces. The default for everything created via the
+  ///     onboarding/quickstart flow.
+  ///   - "internal_governance": hidden per-org routing/tenancy artifact
+  ///     for IngestionSource ingest data. Auto-created lazily on the
+  ///     first IngestionSource mint via ensureHiddenGovernanceProject().
+  ///     MUST be filtered out of every user-visible Project surface
+  ///     (project picker, /api/v1/projects, billing exports, RBAC
+  ///     pickers, etc.) - the regression-test invariant in
+  ///     specs/ai-gateway/governance/ui-contract.feature codifies this.
+  /// Stored as a free-form string (matching IngestionSource.sourceType
+  /// pattern) so future routing kinds can ship without schema migrations.
+  kind                     String                              @default("application")
+  firstMessage             Boolean                             @default(false)
+  integrated               Boolean                             @default(false)
+  createdAt                DateTime                            @default(now())
+  updatedAt                DateTime                            @default(now()) @updatedAt
+  userLinkTemplate         String?
+  checks                   Monitor[]
+  costs                    Cost[]
+  topics                   Topic[]
+  datasets                 Dataset[]
+  datasetRecords           DatasetRecord[]
+  customGraphs             CustomGraph[]
+  dashboards               Dashboard[]
+  batchEvaluations         BatchEvaluation[]
+  piiRedactionLevel        PIIRedactionLevel                   @default(ESSENTIAL)
+  capturedInputVisibility  ProjectSensitiveDataVisibilityLevel @default(VISIBLE_TO_ALL)
+  capturedOutputVisibility ProjectSensitiveDataVisibilityLevel @default(VISIBLE_TO_ALL)
+  traceSharingEnabled      Boolean                             @default(true)
+  presenceEnabled          Boolean                             @default(true)
+  triggers                 Trigger[]
+  experiments              Experiment[]
+  annotations              Annotation[]
+  projectSecrets           ProjectSecret[]
+  TriggerSent              TriggerSent[]
+  annotationScores         AnnotationScore[]
+  publicShares             PublicShare[]
+  workflows                Workflow[]
+  WorkflowVersion          WorkflowVersion[]
+  AnnotationQueue          AnnotationQueue[]
+  AnnotationQueueItem      AnnotationQueueItem[]
+  s3Endpoint               String?
+  s3AccessKeyId            String?
+  s3SecretAccessKey        String?
+  s3Bucket                 String?
+  llmPromptConfigs         LlmPromptConfig[]
+  analytics                Analytics[]
+  archivedAt               DateTime?
+  notifications            Notification[]
+  agents                   Agent[]
+  evaluators               Evaluator[]
+  scenarios                Scenario[]
+  suiteConfigurations      SimulationSuite[]
+  savedViews               SavedView[]
+  gatewayGuardrails        GatewayGuardrail[]                  @relation("ProjectGatewayGuardrails")
+  gatewayChangeEvents      GatewayChangeEvent[]
+  pinnedTraces             PinnedTrace[]
 
-    @@index([teamId])
+  // Denormalised mirror of parent Team's personal flag for fast
+  // lookup at trace ingest time without a Team join. Always equals
+  // the parent Team.isPersonal value; PersonalWorkspaceService
+  // sets both atomically.
+  isPersonal  Boolean @default(false)
+  ownerUserId String? @db.VarChar(255)
+  ownerUser   User?   @relation("PersonalProjectOwner", fields: [ownerUserId], references: [id])
+
+  /// Per-feature unlock flags for personal projects only. Shape:
+  /// `{ evaluations: bool, datasets: bool, annotations: bool, automations: bool }`.
+  /// Empty `{}` (default) reads as all-false at the service layer -
+  /// existing rows pre-migration require no backfill. The bundle is
+  /// a UI/nav predicate, NOT an auth gate (the underlying tRPC
+  /// routers stay open even when the bundle is off; admin tooling +
+  /// offline migration scripts can still operate on the data).
+  /// Team / org-scope projects are not feature-gated - this column
+  /// is meaningful only when `isPersonal=true`.
+  personalFeatures Json @default("{}")
+
+  /// Department assignment for spend attribution (the project / agent
+  /// lens, used when a trace has no principal user). Accounting-only.
+  departmentId String?
+
+  @@index([teamId])
+  @@index([isPersonal])
+  @@index([ownerUserId])
+  @@index([teamId, kind])
+  @@index([departmentId])
+}
+
+/// A department is a single-valued accounting dimension, separate from
+/// RBAC, for rolling up AI spend by org unit (Engineering, Marketing,
+/// ...). Assigned to OrganizationUser, Team, and Project via their
+/// `departmentId` column. Pure accounting: never grants or restricts
+/// access. See specs/ai-gateway/governance/departments.feature.
+model Department {
+  id             String    @id @default(nanoid())
+  organizationId String
+  name           String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @default(now()) @updatedAt
+  archivedAt     DateTime?
+
+  @@index([organizationId])
+}
+
+/// Per-(organization, tool) override for which `langwatch <tool>` paths the
+/// CLI may use: `allowVk` gates the gateway / virtual-key path (Path A) and
+/// `allowOtelDirect` gates the direct-OTLP ingestion path (Path B). A missing
+/// row resolves to the hardcoded defaults (both true for claude/codex/gemini/
+/// opencode; cursor allows the gateway path only), so the policy is purely
+/// additive: disabling a path is an explicit admin choice. The CLI caches the
+/// resolved map at login and gates path selection on it.
+/// See specs/ai-gateway/governance/cli-tool-mode-policy.feature.
+model PlatformToolPolicy {
+  id              String   @id @default(nanoid())
+  organizationId  String
+  toolSlug        String
+  allowVk         Boolean  @default(true)
+  allowOtelDirect Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now()) @updatedAt
+
+  @@unique([organizationId, toolSlug])
+  @@index([organizationId])
 }
 
 enum INVITE_STATUS {
-    PENDING
-    ACCEPTED
-    WAITING_APPROVAL
-    PAYMENT_PENDING
+  PENDING
+  ACCEPTED
+  WAITING_APPROVAL
+  PAYMENT_PENDING
 }
 
 model OrganizationInvite {
-    id              String               @id @default(nanoid())
-    email           String
-    inviteCode      String               @unique
-    expiration      DateTime?
-    status          INVITE_STATUS        @default(PENDING)
-    organizationId  String
-    organization    Organization         @relation(fields: [organizationId], references: [id])
-    teamIds         String
-    teamAssignments Json? // Array of {teamId: string, role: TeamUserRole, customRoleId?: string}
-    role            OrganizationUserRole
-    requestedBy     String?
-    requestedByUser User?                @relation(fields: [requestedBy], references: [id])
-    subscriptionId  String?
-    createdAt       DateTime             @default(now())
-    updatedAt       DateTime             @default(now()) @updatedAt
+  id              String               @id @default(nanoid())
+  email           String
+  inviteCode      String               @unique
+  expiration      DateTime?
+  status          INVITE_STATUS        @default(PENDING)
+  organizationId  String
+  organization    Organization         @relation(fields: [organizationId], references: [id])
+  teamIds         String
+  teamAssignments Json? // Array of {teamId: string, role: TeamUserRole, customRoleId?: string}
+  role            OrganizationUserRole
+  requestedBy     String?
+  requestedByUser User?                @relation(fields: [requestedBy], references: [id])
+  subscriptionId  String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @default(now()) @updatedAt
 
-    @@index([organizationId])
-    @@index([requestedBy])
+  @@index([organizationId])
+  @@index([requestedBy])
 }
 
 enum EvaluationExecutionMode {
-    ON_MESSAGE
-    AS_GUARDRAIL
-    MANUALLY
+  ON_MESSAGE
+  AS_GUARDRAIL
+  MANUALLY
 }
 
 model Monitor {
-    id                String                  @id @default(nanoid())
-    projectId         String
-    project           Project                 @relation(fields: [projectId], references: [id])
-    experimentId      String?                 @unique
-    experiment        Experiment?             @relation(fields: [experimentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-    evaluatorId       String? // Reference to saved Evaluator (new monitors)
-    evaluator         Evaluator?              @relation(fields: [evaluatorId], references: [id])
-    checkType         String
-    name              String
-    slug              String
-    executionMode     EvaluationExecutionMode @default(ON_MESSAGE)
-    enabled           Boolean                 @default(true)
-    preconditions     Json
-    parameters        Json // Keep for backward compatibility, new monitors may have empty
-    mappings          Json?
-    sample            Float                   @default(1.0)
-    level             String                  @default("trace") // "trace" or "thread" - evaluation level
-    threadIdleTimeout Int? // Seconds to wait after last message before evaluating thread. null = disabled (evaluate on every message)
-    createdAt         DateTime                @default(now())
-    updatedAt         DateTime                @default(now()) @updatedAt
+  id                String                  @id @default(nanoid())
+  projectId         String
+  project           Project                 @relation(fields: [projectId], references: [id])
+  experimentId      String?                 @unique
+  experiment        Experiment?             @relation(fields: [experimentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  evaluatorId       String? // Reference to saved Evaluator (new monitors)
+  evaluator         Evaluator?              @relation(fields: [evaluatorId], references: [id])
+  checkType         String
+  name              String
+  slug              String
+  executionMode     EvaluationExecutionMode @default(ON_MESSAGE)
+  enabled           Boolean                 @default(true)
+  preconditions     Json
+  parameters        Json // Keep for backward compatibility, new monitors may have empty
+  mappings          Json?
+  sample            Float                   @default(1.0)
+  level             String                  @default("trace") // "trace" or "thread" - evaluation level
+  threadIdleTimeout Int? // Seconds to wait after last message before evaluating thread. null = disabled (evaluate on every message)
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @default(now()) @updatedAt
 
-    @@unique([projectId, slug])
-    @@index([projectId])
-    @@index([evaluatorId])
+  @@unique([projectId, slug])
+  @@index([projectId])
+  @@index([evaluatorId])
 }
 
 enum CostType {
-    TRACE_CHECK
-    GUARDRAIL
-    CLUSTERING
-    BATCH_EVALUATION
+  TRACE_CHECK
+  GUARDRAIL
+  CLUSTERING
+  BATCH_EVALUATION
 }
 
 enum CostReferenceType {
-    CHECK
-    TRACE
-    PROJECT
-    BATCH
+  CHECK
+  TRACE
+  PROJECT
+  BATCH
 }
 
 model Cost {
-    id            String            @id @default(nanoid())
-    projectId     String
-    project       Project           @relation(fields: [projectId], references: [id])
-    costType      CostType
-    costName      String?
-    referenceType CostReferenceType
-    referenceId   String
-    amount        Float
-    currency      String
-    createdAt     DateTime          @default(now())
-    updatedAt     DateTime          @default(now()) @updatedAt
-    extraInfo     Json?
+  id            String            @id @default(nanoid())
+  projectId     String
+  project       Project           @relation(fields: [projectId], references: [id])
+  costType      CostType
+  costName      String?
+  referenceType CostReferenceType
+  referenceId   String
+  amount        Float
+  currency      String
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @default(now()) @updatedAt
+  extraInfo     Json?
 
-    @@index([referenceType, referenceId])
-    @@index([costType])
-    @@index([projectId])
-    @@index([projectId, createdAt])
+  @@index([referenceType, referenceId])
+  @@index([costType])
+  @@index([projectId])
+  @@index([projectId, createdAt])
 }
 
 model Topic {
-    id        String  @id @default(nanoid())
-    projectId String
-    project   Project @relation(fields: [projectId], references: [id])
-    name      String
-    parentId  String?
-    parent    Topic?  @relation("Subtopics", fields: [parentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-    subtopics Topic[] @relation("Subtopics")
+  id        String  @id @default(nanoid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id])
+  name      String
+  parentId  String?
+  parent    Topic?  @relation("Subtopics", fields: [parentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  subtopics Topic[] @relation("Subtopics")
 
-    embeddings_model       String
-    centroid               Json
-    p95Distance            Float
-    automaticallyGenerated Boolean @default(true)
+  embeddings_model       String
+  centroid               Json
+  p95Distance            Float
+  automaticallyGenerated Boolean @default(true)
 
-    createdAt DateTime @default(now())
-    updatedAt DateTime @default(now()) @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 
-    @@index([parentId])
-    @@index([projectId])
+  @@index([parentId])
+  @@index([projectId])
 }
 
 model Dataset {
-    id               String            @id @default(nanoid())
-    projectId        String
-    project          Project           @relation(fields: [projectId], references: [id])
-    name             String
-    slug             String
-    columnTypes      Json
-    createdAt        DateTime          @default(now())
-    updatedAt        DateTime          @default(now()) @updatedAt
-    archivedAt       DateTime?
-    datasetRecords   DatasetRecord[]
-    batchEvaluations BatchEvaluation[]
-    mapping          Json?
-    useS3            Boolean           @default(false)
-    s3RecordCount    Int?
+  id               String            @id @default(nanoid())
+  projectId        String
+  project          Project           @relation(fields: [projectId], references: [id])
+  name             String
+  slug             String
+  columnTypes      Json
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @default(now()) @updatedAt
+  archivedAt       DateTime?
+  datasetRecords   DatasetRecord[]
+  batchEvaluations BatchEvaluation[]
+  mapping          Json?
+  useS3            Boolean           @default(false)
+  s3RecordCount    Int?
 
-    @@unique([projectId, slug])
+  @@unique([projectId, slug])
 }
 
 model DatasetRecord {
-    id        String   @id @default(nanoid())
-    datasetId String
-    dataset   Dataset  @relation(fields: [datasetId], references: [id])
-    projectId String
-    project   Project  @relation(fields: [projectId], references: [id])
-    entry     Json
-    createdAt DateTime @default(now())
-    updatedAt DateTime @default(now()) @updatedAt
+  id        String   @id @default(nanoid())
+  datasetId String
+  dataset   Dataset  @relation(fields: [datasetId], references: [id])
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id])
+  entry     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 
-    @@index([datasetId])
-    @@index([projectId])
-    @@index([createdAt])
+  @@index([datasetId])
+  @@index([projectId])
+  @@index([createdAt])
 }
 
 model Dashboard {
-    id        String        @id @default(nanoid())
-    projectId String
-    project   Project       @relation(fields: [projectId], references: [id])
-    name      String
-    order     Int           @default(0)
-    createdAt DateTime      @default(now())
-    updatedAt DateTime      @default(now()) @updatedAt
-    graphs    CustomGraph[]
+  id        String        @id @default(nanoid())
+  projectId String
+  project   Project       @relation(fields: [projectId], references: [id])
+  name      String
+  order     Int           @default(0)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @default(now()) @updatedAt
+  graphs    CustomGraph[]
 
-    @@index([projectId])
-    @@index([projectId, order])
-    @@map("Dashboard")
+  @@index([projectId])
+  @@index([projectId, order])
+  @@map("Dashboard")
 }
 
 model SavedView {
-    id        String   @id @default(nanoid())
-    projectId String
-    project   Project  @relation(fields: [projectId], references: [id])
-    userId    String?
-    user      User?    @relation(fields: [userId], references: [id])
-    name      String
-    filters   Json     @default("{}")
-    query     String?
-    period    Json?
-    order     Int      @default(0)
-    /// Discriminator for the two storage shapes that share this table:
-    ///   - "v1-traces-filter" (default) — legacy /messages page filter map saved views
-    ///   - "v2-traces-lens"             — new traces v2 lens configs (columns, addons, grouping, sort, filterText) encoded inside `filters` JSON
-    /// Each client filters by its own kind on read so neither sees the other's rows.
-    kind      String   @default("v1-traces-filter")
-    createdAt DateTime @default(now())
-    updatedAt DateTime @default(now()) @updatedAt
+  id        String   @id @default(nanoid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id])
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  name      String
+  filters   Json     @default("{}")
+  query     String?
+  period    Json?
+  order     Int      @default(0)
+  /// Discriminator for the two storage shapes that share this table:
+  ///   - "v1-traces-filter" (default) - legacy /messages page filter map saved views
+  ///   - "v2-traces-lens"             - new traces v2 lens configs (columns, addons, grouping, sort, filterText) encoded inside `filters` JSON
+  /// Each client filters by its own kind on read so neither sees the other's rows.
+  kind      String   @default("v1-traces-filter")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 
-    @@index([projectId])
-    @@index([projectId, order])
-    @@index([userId])
-    @@index([projectId, kind, order])
+  @@index([projectId])
+  @@index([projectId, order])
+  @@index([userId])
+  @@index([projectId, kind, order])
 }
 
 model CustomGraph {
-    id        String   @id @default(nanoid())
-    projectId String
-    project   Project  @relation(fields: [projectId], references: [id])
-    name      String
-    graph     Json
-    filters   Json?
-    createdAt DateTime @default(now())
-    updatedAt DateTime @default(now()) @updatedAt
+  id        String   @id @default(nanoid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id])
+  name      String
+  graph     Json
+  filters   Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 
-    // Report page relationship
-    dashboardId String?
-    dashboard   Dashboard? @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+  // Report page relationship
+  dashboardId String?
+  dashboard   Dashboard? @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
 
-    // Grid positioning (2-column grid)
-    gridColumn  Int           @default(0)
-    gridRow     Int           @default(0)
-    colSpan     Int           @default(1)
-    rowSpan     Int           @default(1)
-    trigger     Trigger?
-    TriggerSent TriggerSent[]
+  // Grid positioning (2-column grid)
+  gridColumn  Int           @default(0)
+  gridRow     Int           @default(0)
+  colSpan     Int           @default(1)
+  rowSpan     Int           @default(1)
+  trigger     Trigger?
+  TriggerSent TriggerSent[]
 
-    @@index([projectId])
-    @@index([dashboardId])
+  @@index([projectId])
+  @@index([dashboardId])
 }
 
 model BatchEvaluation {
-    id           String     @id @default(nanoid())
-    experimentId String
-    experiment   Experiment @relation(fields: [experimentId], references: [id])
-    projectId    String
-    project      Project    @relation(fields: [projectId], references: [id])
-    data         Json       @default("{}")
-    status       String
-    score        Float
-    label        String?
-    passed       Boolean
-    details      String
-    cost         Float
-    datasetSlug  String
-    datasetId    String
-    dataset      Dataset    @relation(fields: [datasetId], references: [id])
-    evaluation   String
-    createdAt    DateTime   @default(now())
-    updatedAt    DateTime   @default(now()) @updatedAt
+  id           String     @id @default(nanoid())
+  experimentId String
+  experiment   Experiment @relation(fields: [experimentId], references: [id])
+  projectId    String
+  project      Project    @relation(fields: [projectId], references: [id])
+  data         Json       @default("{}")
+  status       String
+  score        Float
+  label        String?
+  passed       Boolean
+  details      String
+  cost         Float
+  datasetSlug  String
+  datasetId    String
+  dataset      Dataset    @relation(fields: [datasetId], references: [id])
+  evaluation   String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @default(now()) @updatedAt
 
-    @@unique([id])
-    @@index([projectId])
-    @@index([datasetId])
-    @@index([experimentId])
+  @@unique([id])
+  @@index([projectId])
+  @@index([datasetId])
+  @@index([experimentId])
 }
 
 enum TriggerAction {
-    SEND_EMAIL
-    ADD_TO_DATASET
-    ADD_TO_ANNOTATION_QUEUE
-    SEND_SLACK_MESSAGE
+  SEND_EMAIL
+  ADD_TO_DATASET
+  ADD_TO_ANNOTATION_QUEUE
+  SEND_SLACK_MESSAGE
 }
 
 enum AlertType {
-    CRITICAL
-    WARNING
-    INFO
+  CRITICAL
+  WARNING
+  INFO
 }
 
 model Trigger {
-    id            String        @id @default(nanoid())
-    name          String
-    projectId     String
-    project       Project       @relation(fields: [projectId], references: [id])
-    action        TriggerAction
-    actionParams  Json
-    filters       Json
-    lastRunAt     Float         @default(0)
-    createdAt     DateTime      @default(now())
-    updatedAt     DateTime      @default(now()) @updatedAt
-    active        Boolean       @default(true)
-    message       String?
-    deleted       Boolean       @default(false)
-    alertType     AlertType?
-    TriggerSent   TriggerSent[]
-    customGraphId String?       @unique
-    customGraph   CustomGraph?  @relation(fields: [customGraphId], references: [id], onDelete: Cascade)
+  id            String        @id @default(nanoid())
+  name          String
+  projectId     String
+  project       Project       @relation(fields: [projectId], references: [id])
+  action        TriggerAction
+  actionParams  Json
+  filters       Json
+  lastRunAt     Float         @default(0)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @default(now()) @updatedAt
+  active        Boolean       @default(true)
+  message       String?
+  deleted       Boolean       @default(false)
+  alertType     AlertType?
+  TriggerSent   TriggerSent[]
+  customGraphId String?       @unique
+  customGraph   CustomGraph?  @relation(fields: [customGraphId], references: [id], onDelete: Cascade)
 
-    @@index([projectId])
+  @@index([projectId])
 }
 
 enum ExperimentType {
-    DSPY
-    BATCH_EVALUATION
-    BATCH_EVALUATION_V2
-    EVALUATIONS_V3
+  DSPY
+  BATCH_EVALUATION
+  BATCH_EVALUATION_V2
+  EVALUATIONS_V3
 }
 
 model Experiment {
-    id               String            @id @default(nanoid())
-    name             String?
-    type             ExperimentType
-    slug             String
-    projectId        String
-    project          Project           @relation(fields: [projectId], references: [id])
-    workflowId       String?
-    workflow         Workflow?         @relation(fields: [workflowId], references: [id])
-    createdAt        DateTime          @default(now())
-    updatedAt        DateTime          @default(now()) @updatedAt
-    batchEvaluations BatchEvaluation[]
-    workbenchState   Json?
-    monitor          Monitor?
+  id               String            @id @default(nanoid())
+  name             String?
+  type             ExperimentType
+  slug             String
+  projectId        String
+  project          Project           @relation(fields: [projectId], references: [id])
+  workflowId       String?
+  workflow         Workflow?         @relation(fields: [workflowId], references: [id])
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @default(now()) @updatedAt
+  archivedAt       DateTime?
+  batchEvaluations BatchEvaluation[]
+  workbenchState   Json?
+  monitor          Monitor?
 
-    @@unique([projectId, slug])
-    @@index([projectId])
-    @@index([workflowId])
+  @@unique([projectId, slug])
+  @@index([projectId])
+  @@index([workflowId])
+  @@index([projectId, archivedAt])
 }
 
 model Annotation {
-    id             String   @id @default(nanoid())
-    projectId      String
-    project        Project  @relation(fields: [projectId], references: [id])
-    traceId        String
-    comment        String?
-    isThumbsUp     Boolean?
-    userId         String?
-    user           User?    @relation(fields: [userId], references: [id])
-    createdAt      DateTime @default(now())
-    updatedAt      DateTime @default(now()) @updatedAt
-    email          String?
-    scoreOptions   Json?
-    expectedOutput String?
+  id             String   @id @default(nanoid())
+  projectId      String
+  project        Project  @relation(fields: [projectId], references: [id])
+  traceId        String
+  comment        String?
+  isThumbsUp     Boolean?
+  userId         String?
+  user           User?    @relation(fields: [userId], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+  email          String?
+  scoreOptions   Json?
+  expectedOutput String?
 
-    @@index([projectId])
-    @@index([traceId])
-    @@index([userId])
-    @@index([projectId, traceId])
+  @@index([projectId])
+  @@index([traceId])
+  @@index([userId])
+  @@index([projectId, traceId])
 }
 
+// ModelProvider - org-scoped, multi-scope provider configuration.
+//
+// Iter 110: absorbed GatewayProviderCredential entirely. The gateway
+// data-plane reads its provider chain directly from ModelProvider +
+// RoutingPolicy.modelProviderIds. Multi-deployment (Azure regions,
+// OpenAI base-url variants) ships as N MP rows with auto-suffixed
+// names (iter 109 pattern) - no `slot` discriminator column anymore.
+//
+// Access via ModelProviderScope only. No `projectId` legacy pointer;
+// reads filter by the caller's membership set against scope rows.
+//
+// "Advanced (Gateway)" tab in the drawer surfaces the rate-limit /
+// extraHeaders / providerConfig / fallbackPriorityGlobal / health
+// fields below - same fields that lived on GatewayProviderCredential
+// pre-110, just collapsed onto the provider they always 1:1-bound.
 model ModelProvider {
-    id                     String                      @id @default(nanoid())
-    // Legacy pointer. Always the project the row was originally
-    // created under (or a sibling project in the same org/team for
-    // org/team-scoped credentials). Kept so existing per-project
-    // lookups keep compiling; access is granted via ModelProviderScope.
-    projectId              String
-    project                Project                     @relation(fields: [projectId], references: [id])
-    // Human-readable name (iter 109): one "OpenAI" by default, auto-
-    // suffixed as "OpenAI 2" / "OpenAI 3" when duplicates coexist
-    // under the same organization. Model selectors use this to group
-    // options when multiple instances of the same provider are in
-    // scope for a project.
-    name                   String
-    provider               String
-    enabled                Boolean
-    customKeys             Json?
-    extraHeaders           Json?
-    customModels           Json?
-    customEmbeddingsModels Json?
-    deploymentMapping      Json?
-    createdAt              DateTime                    @default(now())
-    updatedAt              DateTime                    @default(now()) @updatedAt
-    scopes                 ModelProviderScope[]
-    gatewayCredentials     GatewayProviderCredential[]
+  id                     String   @id @default(nanoid())
+  // Human-readable name (iter 109): one "OpenAI" by default, auto-
+  // suffixed as "OpenAI 2" / "OpenAI 3" when duplicates coexist
+  // under the same organization. Model selectors use this to group
+  // options when multiple instances of the same provider are in
+  // scope for a project.
+  name                   String
+  provider               String
+  enabled                Boolean
+  customKeys             Json?
+  // Provider-side custom headers - appended on every request the
+  // gateway routes through this MP. (Pre-110 this lived on GPC.)
+  extraHeaders           Json?
+  customModels           Json?
+  customEmbeddingsModels Json?
+  deploymentMapping      Json?
 
-    @@index([projectId])
+  // Gateway rate-limits (advanced). Optional caps applied per MP.
+  rateLimitRpm           Int?
+  rateLimitTpm           Int?
+  rateLimitRpd           Int?
+
+  // Per-MP credential rotation policy (gateway-only). v1 ships MANUAL
+  // only; AUTO + external-secret-store integration are v1.1 scope.
+  rotationPolicy         GatewayProviderRotationPolicy @default(MANUAL)
+
+  // Provider-specific routing hints (e.g. bedrock region, azure
+  // deployment override). Gateway applies on top of standard config.
+  providerConfig         Json?
+
+  // Fallback priority used when a VK has no RoutingPolicy. Lower =
+  // tried first. Tiebreak by createdAt ASC. Deterministic across runs.
+  fallbackPriorityGlobal Int?
+
+  // Health / circuit breaker state written by the gateway.
+  healthStatus           GatewayProviderHealthStatus @default(UNKNOWN)
+  circuitOpenedAt        DateTime?
+  lastHealthCheckAt      DateTime?
+
+  disabledAt             DateTime?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @default(now()) @updatedAt
+  scopes                 ModelProviderScope[]
+
+  // Single-organization tenancy anchor (ADR-021). Every scope of a given
+  // provider resolves to the same organization, so this column is that org.
+  organizationId         String
+
+  @@index([healthStatus])
+  @@index([fallbackPriorityGlobal])
+  @@index([organizationId])
 }
 
 // Principal-style N-scope access (iter 109, ADR-016 follow-up): a
@@ -713,16 +895,16 @@ enum ModelProviderScopeType {
 }
 
 model ModelProviderScope {
-    id              String                 @id @default(nanoid())
-    modelProviderId String
-    modelProvider   ModelProvider          @relation(fields: [modelProviderId], references: [id], onDelete: Cascade)
-    scopeType       ModelProviderScopeType
-    scopeId         String
-    createdAt       DateTime               @default(now())
+  id              String                 @id @default(nanoid())
+  modelProviderId String
+  modelProvider   ModelProvider          @relation(fields: [modelProviderId], references: [id], onDelete: Cascade)
+  scopeType       ModelProviderScopeType
+  scopeId         String
+  createdAt       DateTime               @default(now())
 
-    @@unique([modelProviderId, scopeType, scopeId])
-    @@index([scopeType, scopeId])
-    @@index([modelProviderId])
+  @@unique([modelProviderId, scopeType, scopeId])
+  @@index([scopeType, scopeId])
+  @@index([modelProviderId])
 }
 
 // ModelDefault is the source of truth for "which model does {feature, role}
@@ -732,9 +914,9 @@ model ModelProviderScope {
 //
 // The two partial unique indexes encode the (NULL = role-level) semantics
 // since Postgres treats NULLs as distinct in a single composite unique.
-// They live in the migration alongside the table itself — Prisma can't
+// They live in the migration alongside the table itself - Prisma can't
 // express partial indexes in schema.prisma.
-// scopeType uses its own Postgres enum — same per-table convention as
+// scopeType uses its own Postgres enum - same per-table convention as
 // ModelProviderScopeType. See dev/docs/best_practices/scoped-resources.md.
 enum ModelDefaultScopeType {
     ORGANIZATION
@@ -745,7 +927,7 @@ enum ModelDefaultScopeType {
 // ModelDefaultConfig is one CSS-style cascading policy. The JSON `config`
 // payload maps role names (DEFAULT / FAST / EMBEDDINGS) and feature keys
 // (prompt.create_default, traces.ai_search, …) to a model id. Absence of
-// a key means "inherit from the next scope up" — there is no explicit
+// a key means "inherit from the next scope up" - there is no explicit
 // "inherit" sentinel in storage. See
 // specs/model-providers/model-default-config-cascade.feature.
 //
@@ -765,6 +947,12 @@ model ModelDefaultConfig {
     createdAt DateTime                  @default(now())
     updatedAt DateTime                  @updatedAt
     scopes    ModelDefaultConfigScope[]
+
+    // Single-organization tenancy anchor (ADR-021). Every scope a config
+    // attaches to resolves to the same organization.
+    organizationId String
+
+    @@index([organizationId])
 }
 
 // Join table binding a ModelDefaultConfig to a (scopeType, scopeId).
@@ -784,693 +972,801 @@ model ModelDefaultConfigScope {
 }
 
 model ProjectSecret {
-    id             String   @id @default(nanoid())
-    projectId      String
-    project        Project  @relation(fields: [projectId], references: [id])
-    name           String
-    encryptedValue String
-    createdById    String
-    createdBy      User     @relation("secretCreatedBy", fields: [createdById], references: [id])
-    updatedById    String
-    updatedBy      User     @relation("secretUpdatedBy", fields: [updatedById], references: [id])
-    createdAt      DateTime @default(now())
-    updatedAt      DateTime @default(now()) @updatedAt
+  id             String   @id @default(nanoid())
+  projectId      String
+  project        Project  @relation(fields: [projectId], references: [id])
+  name           String
+  encryptedValue String
+  createdById    String
+  createdBy      User     @relation("secretCreatedBy", fields: [createdById], references: [id])
+  updatedById    String
+  updatedBy      User     @relation("secretUpdatedBy", fields: [updatedById], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
 
-    @@unique([projectId, name])
-    @@index([projectId])
+  @@unique([projectId, name])
+  @@index([projectId])
 }
 
 model TriggerSent {
-    id            String       @id @default(nanoid())
-    triggerId     String
-    traceId       String? // Set for trace-based triggers, null for custom graph alerts
-    customGraphId String? // Set for custom graph alerts, null for trace-based triggers
-    customGraph   CustomGraph? @relation(fields: [customGraphId], references: [id], onDelete: Cascade)
-    projectId     String
-    project       Project      @relation(fields: [projectId], references: [id])
-    trigger       Trigger      @relation(fields: [triggerId], references: [id])
-    resolvedAt    DateTime? // For custom graph alerts: null = still firing, set = resolved
-    createdAt     DateTime     @default(now())
-    updatedAt     DateTime     @default(now()) @updatedAt
+  id            String       @id @default(nanoid())
+  triggerId     String
+  traceId       String? // Set for trace-based triggers, null for custom graph alerts
+  customGraphId String? // Set for custom graph alerts, null for trace-based triggers
+  customGraph   CustomGraph? @relation(fields: [customGraphId], references: [id], onDelete: Cascade)
+  projectId     String
+  project       Project      @relation(fields: [projectId], references: [id])
+  trigger       Trigger      @relation(fields: [triggerId], references: [id])
+  resolvedAt    DateTime? // For custom graph alerts: null = still firing, set = resolved
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @default(now()) @updatedAt
 
-    @@unique([triggerId, traceId])
-    @@index([triggerId])
-    @@index([projectId])
-    @@index([customGraphId])
-    @@index([resolvedAt])
+  @@unique([triggerId, traceId])
+  @@index([triggerId])
+  @@index([projectId])
+  @@index([customGraphId])
+  @@index([resolvedAt])
 }
 
 enum AnnotationScoreDataType {
-    CATEGORICAL
-    BOOLEAN
-    LIKERT
-    OPTION
-    CHECKBOX
+  CATEGORICAL
+  BOOLEAN
+  LIKERT
+  OPTION
+  CHECKBOX
 }
 
 model AnnotationScore {
-    id                    String                   @id @default(nanoid())
-    name                  String
-    projectId             String
-    project               Project                  @relation(fields: [projectId], references: [id])
-    createdAt             DateTime                 @default(now())
-    updatedAt             DateTime                 @default(now()) @updatedAt
-    deletedAt             DateTime?
-    description           String?
-    active                Boolean                  @default(true)
-    dataType              AnnotationScoreDataType?
-    options               Json?
-    defaultValue          Json?
-    global                Boolean                  @default(false)
-    AnnotationQueueScores AnnotationQueueScores[]
+  id                    String                   @id @default(nanoid())
+  name                  String
+  projectId             String
+  project               Project                  @relation(fields: [projectId], references: [id])
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @default(now()) @updatedAt
+  deletedAt             DateTime?
+  description           String?
+  active                Boolean                  @default(true)
+  dataType              AnnotationScoreDataType?
+  options               Json?
+  defaultValue          Json?
+  global                Boolean                  @default(false)
+  AnnotationQueueScores AnnotationQueueScores[]
 
-    @@index([projectId])
+  @@index([projectId])
 }
 
 enum PublicShareResourceTypes {
-    TRACE
-    THREAD
+  TRACE
+  THREAD
 }
 
 model AnnotationQueue {
-    id                    String                   @id @default(nanoid())
-    name                  String
-    slug                  String
-    projectId             String
-    description           String?
-    project               Project                  @relation(fields: [projectId], references: [id])
-    members               AnnotationQueueMembers[]
-    createdAt             DateTime                 @default(now())
-    updatedAt             DateTime                 @default(now()) @updatedAt
-    AnnotationQueueScores AnnotationQueueScores[]
-    AnnotationQueueItems  AnnotationQueueItem[]
+  id                    String                   @id @default(nanoid())
+  name                  String
+  slug                  String
+  projectId             String
+  description           String?
+  project               Project                  @relation(fields: [projectId], references: [id])
+  members               AnnotationQueueMembers[]
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @default(now()) @updatedAt
+  AnnotationQueueScores AnnotationQueueScores[]
+  AnnotationQueueItems  AnnotationQueueItem[]
 
-    @@unique([projectId, slug])
-    @@index([projectId])
+  @@unique([projectId, slug])
+  @@index([projectId])
 }
 
 model AnnotationQueueMembers {
-    annotationQueueId String
-    userId            String
-    user              User            @relation(fields: [userId], references: [id])
-    annotationQueue   AnnotationQueue @relation(fields: [annotationQueueId], references: [id])
+  annotationQueueId String
+  userId            String
+  user              User            @relation(fields: [userId], references: [id])
+  annotationQueue   AnnotationQueue @relation(fields: [annotationQueueId], references: [id])
 
-    @@id([annotationQueueId, userId])
-    @@index([annotationQueueId])
-    @@index([userId])
+  @@id([annotationQueueId, userId])
+  @@index([annotationQueueId])
+  @@index([userId])
 }
 
 model AnnotationQueueScores {
-    annotationQueueId String
-    annotationScoreId String
-    annotationScore   AnnotationScore @relation(fields: [annotationScoreId], references: [id])
-    annotationQueue   AnnotationQueue @relation(fields: [annotationQueueId], references: [id])
+  annotationQueueId String
+  annotationScoreId String
+  annotationScore   AnnotationScore @relation(fields: [annotationScoreId], references: [id])
+  annotationQueue   AnnotationQueue @relation(fields: [annotationQueueId], references: [id])
 
-    @@id([annotationQueueId, annotationScoreId])
-    @@index([annotationQueueId])
-    @@index([annotationScoreId])
+  @@id([annotationQueueId, annotationScoreId])
+  @@index([annotationQueueId])
+  @@index([annotationScoreId])
 }
 
 model AnnotationQueueItem {
-    id                String           @id @default(nanoid())
-    annotationQueueId String?
-    annotationQueue   AnnotationQueue? @relation(fields: [annotationQueueId], references: [id])
-    userId            String?
-    user              User?            @relation("AssignedTo", fields: [userId], references: [id])
-    createdAt         DateTime         @default(now())
-    updatedAt         DateTime         @default(now()) @updatedAt
-    createdByUserId   String?
-    createdByUser     User?            @relation("CreatedBy", fields: [createdByUserId], references: [id])
-    traceId           String
-    projectId         String
-    doneAt            DateTime?
-    project           Project          @relation(fields: [projectId], references: [id])
+  id                String           @id @default(nanoid())
+  annotationQueueId String?
+  annotationQueue   AnnotationQueue? @relation(fields: [annotationQueueId], references: [id])
+  userId            String?
+  user              User?            @relation("AssignedTo", fields: [userId], references: [id])
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @default(now()) @updatedAt
+  createdByUserId   String?
+  createdByUser     User?            @relation("CreatedBy", fields: [createdByUserId], references: [id])
+  traceId           String
+  projectId         String
+  doneAt            DateTime?
+  project           Project          @relation(fields: [projectId], references: [id])
 
-    @@unique([traceId, userId, projectId])
-    @@unique([traceId, annotationQueueId, projectId])
-    @@index([annotationQueueId])
-    @@index([userId])
-    @@index([projectId])
-    @@index([projectId, doneAt])
-    @@index([projectId, userId, doneAt])
-    @@index([annotationQueueId, doneAt])
+  @@unique([traceId, userId, projectId])
+  @@unique([traceId, annotationQueueId, projectId])
+  @@index([annotationQueueId])
+  @@index([userId])
+  @@index([projectId])
+  @@index([projectId, doneAt])
+  @@index([projectId, userId, doneAt])
+  @@index([annotationQueueId, doneAt])
 }
 
 model PublicShare {
-    id           String                   @id @default(nanoid())
-    resourceType PublicShareResourceTypes
-    resourceId   String
-    projectId    String
-    project      Project                  @relation(fields: [projectId], references: [id])
-    userId       String?
-    user         User?                    @relation(fields: [userId], references: [id])
+  id           String                   @id @default(nanoid())
+  resourceType PublicShareResourceTypes
+  resourceId   String
+  projectId    String
+  project      Project                  @relation(fields: [projectId], references: [id])
+  userId       String?
+  user         User?                    @relation(fields: [userId], references: [id])
 
-    createdAt DateTime @default(now())
-    updatedAt DateTime @default(now()) @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 
-    @@unique([projectId, resourceType, resourceId])
-    @@index([userId])
+  @@unique([projectId, resourceType, resourceId])
+  @@index([userId])
 }
 
-model CustomLLMModelCost {
-    id                 String   @id @default(nanoid())
-    projectId          String
-    model              String
-    regex              String
-    inputCostPerToken  Float?
-    outputCostPerToken Float?
-    createdAt          DateTime @default(now())
-    updatedAt          DateTime @default(now()) @updatedAt
+enum PinSource {
+    manual
+    share
+}
 
+model PinnedTrace {
+    id        String    @id @default(nanoid())
+    projectId String
+    project   Project   @relation(fields: [projectId], references: [id])
+    traceId   String
+    userId    String?
+    user      User?     @relation(fields: [userId], references: [id])
+    source    PinSource @default(manual)
+    reason    String?
+    createdAt DateTime  @default(now())
+
+    @@unique([projectId, traceId])
     @@index([projectId])
+}
+
+enum RetentionPolicyScopeType {
+  ORGANIZATION
+  TEAM
+  PROJECT
+}
+
+// A data-retention override for one category at one scope. Single-scope-per-row
+// (ADR-021): the row applies at exactly one scope, identified inline by
+// (scopeType, scopeId), anchored to one owning organization. Resolution cascades
+// PROJECT -> TEAM -> ORGANIZATION -> platform default (49 days), per category,
+// so an org admin can set a retention once and have it apply to every project
+// that has no closer override. The ClickHouse migration default for rows that
+// predate the retention column is separate and intentionally 308 days.
+// One row per (scope, category): each row holds a single category's day count,
+// so categories cascade independently.
+model RetentionPolicy {
+  id             String                   @id @default(nanoid())
+  organizationId String
+  scopeType      RetentionPolicyScopeType
+  scopeId        String
+  category       String
+  retentionDays  Int
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @default(now()) @updatedAt
+
+  @@unique([scopeType, scopeId, category])
+  @@index([organizationId])
+  @@index([scopeType, scopeId])
+}
+
+enum CustomLLMModelCostScopeType {
+  ORGANIZATION
+  TEAM
+  PROJECT
+}
+
+// A custom model-cost override. Single-scope-per-row (ADR-021): the row
+// applies at exactly one scope, identified inline by (scopeType, scopeId),
+// and is anchored to one owning organization. Resolution cascades
+// PROJECT -> TEAM -> ORGANIZATION -> the static llmModels.json default, so
+// an org admin can set a cost once and have it apply to every project that
+// has no closer override. The legacy projectId column is kept (nullable)
+// for one release of read compatibility; new writes target the scope.
+model CustomLLMModelCost {
+  id                        String                      @id @default(nanoid())
+  organizationId            String
+  scopeType                 CustomLLMModelCostScopeType @default(PROJECT)
+  scopeId                   String
+  projectId                 String?
+  model                     String
+  regex                     String
+  inputCostPerToken         Float?
+  outputCostPerToken        Float?
+  cacheReadCostPerToken     Float?
+  cacheCreationCostPerToken Float?
+  createdAt                 DateTime                    @default(now())
+  updatedAt                 DateTime                    @default(now()) @updatedAt
+
+  @@index([organizationId])
+  @@index([scopeType, scopeId])
+  @@index([projectId])
 }
 
 model Workflow {
-    id                   String            @id @default(nanoid())
-    projectId            String
-    project              Project           @relation(fields: [projectId], references: [id])
-    name                 String
-    icon                 String
-    description          String
-    createdAt            DateTime          @default(now())
-    updatedAt            DateTime          @default(now()) @updatedAt
-    latestVersionId      String?
-    latestVersion        WorkflowVersion?  @relation("LatestVersion", fields: [latestVersionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-    currentVersionId     String?
-    currentVersion       WorkflowVersion?  @relation("CurrentVersion", fields: [currentVersionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-    versions             WorkflowVersion[] @relation("Versions")
-    publishedId          String?
-    publishedById        String?
-    publishedBy          User?             @relation(fields: [publishedById], references: [id])
-    archivedAt           DateTime?
-    experiments          Experiment[]
-    isEvaluator          Boolean           @default(false)
-    isComponent          Boolean           @default(false)
-    copiedFromWorkflowId String?
-    copiedFrom           Workflow?         @relation("WorkflowCopies", fields: [copiedFromWorkflowId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-    copiedWorkflows      Workflow[]        @relation("WorkflowCopies")
-    agents               Agent[]
-    evaluators           Evaluator[]
+  id                   String            @id @default(nanoid())
+  projectId            String
+  project              Project           @relation(fields: [projectId], references: [id])
+  name                 String
+  icon                 String
+  description          String
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @default(now()) @updatedAt
+  latestVersionId      String?
+  latestVersion        WorkflowVersion?  @relation("LatestVersion", fields: [latestVersionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  currentVersionId     String?
+  currentVersion       WorkflowVersion?  @relation("CurrentVersion", fields: [currentVersionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  versions             WorkflowVersion[] @relation("Versions")
+  publishedId          String?
+  publishedById        String?
+  publishedBy          User?             @relation(fields: [publishedById], references: [id])
+  archivedAt           DateTime?
+  experiments          Experiment[]
+  isEvaluator          Boolean           @default(false)
+  isComponent          Boolean           @default(false)
+  copiedFromWorkflowId String?
+  copiedFrom           Workflow?         @relation("WorkflowCopies", fields: [copiedFromWorkflowId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  copiedWorkflows      Workflow[]        @relation("WorkflowCopies")
+  agents               Agent[]
+  evaluators           Evaluator[]
 
-    @@index([projectId])
-    @@index([publishedById])
-    @@index([latestVersionId])
-    @@index([currentVersionId])
-    @@index([copiedFromWorkflowId])
+  @@index([projectId])
+  @@index([publishedById])
+  @@index([latestVersionId])
+  @@index([currentVersionId])
+  @@index([copiedFromWorkflowId])
 }
 
 model WorkflowVersion {
-    id                       String            @id @default(nanoid())
-    version                  String
-    commitMessage            String
-    authorId                 String
-    author                   User              @relation(fields: [authorId], references: [id])
-    projectId                String
-    project                  Project           @relation(fields: [projectId], references: [id])
-    workflowId               String
-    workflow                 Workflow          @relation("Versions", fields: [workflowId], references: [id])
-    parentId                 String?
-    parent                   WorkflowVersion?  @relation("WorkflowVersionHistory", fields: [parentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-    children                 WorkflowVersion[] @relation("WorkflowVersionHistory")
-    autoSaved                Boolean           @default(false)
-    createdAt                DateTime          @default(now())
-    updatedAt                DateTime          @default(now()) @updatedAt
-    dsl                      Json
-    WorkflowAsLatestVersion  Workflow[]        @relation("LatestVersion")
-    WorkflowAsCurrentVersion Workflow[]        @relation("CurrentVersion")
+  id                       String            @id @default(nanoid())
+  version                  String
+  commitMessage            String
+  authorId                 String
+  author                   User              @relation(fields: [authorId], references: [id])
+  projectId                String
+  project                  Project           @relation(fields: [projectId], references: [id])
+  workflowId               String
+  workflow                 Workflow          @relation("Versions", fields: [workflowId], references: [id])
+  parentId                 String?
+  parent                   WorkflowVersion?  @relation("WorkflowVersionHistory", fields: [parentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  children                 WorkflowVersion[] @relation("WorkflowVersionHistory")
+  autoSaved                Boolean           @default(false)
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @default(now()) @updatedAt
+  dsl                      Json
+  WorkflowAsLatestVersion  Workflow[]        @relation("LatestVersion")
+  WorkflowAsCurrentVersion Workflow[]        @relation("CurrentVersion")
 
-    @@unique([workflowId, version])
-    @@index([workflowId])
-    @@index([projectId])
-    @@index([parentId])
-    @@index([authorId])
-    @@index([createdAt])
+  @@unique([workflowId, version])
+  @@index([workflowId])
+  @@index([projectId])
+  @@index([parentId])
+  @@index([authorId])
+  @@index([createdAt])
 }
 
 // AuditLog is the unified governance ledger. Both gateway-driven mutations
 // (VK/budget/provider-binding/cache-rule via the 4 gateway services) and
 // platform-driven actions (tRPC mutations via auditLogMutations middleware)
-// write here. There is no separate GatewayAuditLog table — see migration
+// write here. There is no separate GatewayAuditLog table - see migration
 // 20260425000000_consolidate_gateway_audit_into_audit_log.
 //
 // Two write shapes coexist on the same table:
-//   * Platform shape  — `args` + `metadata` + `error` carry the call-site
+//   * Platform shape  - `args` + `metadata` + `error` carry the call-site
 //     context. `targetKind`, `targetId`, `before`, `after` stay null.
-//   * Gateway shape   — `targetKind`, `targetId`, `before`, `after` carry
+//   * Gateway shape   - `targetKind`, `targetId`, `before`, `after` carry
 //     resource identity + diff. `args` / `metadata` / `error` stay null.
 // The /settings/audit-log page renders both via a `source` field computed
 // from the presence of `targetKind` (gateway = purple badge, platform = grey).
 model AuditLog {
-    id             String   @id @default(cuid())
-    createdAt      DateTime @default(now())
-    userId         String?
-    projectId      String?
-    organizationId String?
-    action         String
-    args           Json?
-    error          String?
-    ipAddress      String?
-    userAgent      String?
-    metadata       Json?
+  id             String   @id @default(cuid())
+  createdAt      DateTime @default(now())
+  userId         String?
+  projectId      String?
+  organizationId String?
+  action         String
+  args           Json?
+  error          String?
+  ipAddress      String?
+  userAgent      String?
+  metadata       Json?
 
-    // Gateway-shape governance fields (see model docstring above).
-    targetKind     String?
-    targetId       String?
-    before         Json?
-    after          Json?
+  // Gateway-shape governance fields (see model docstring above).
+  targetKind String?
+  targetId   String?
+  before     Json?
+  after      Json?
 
-    @@index([createdAt])
-    @@index([userId])
-    @@index([projectId])
-    @@index([action])
-    @@index([ipAddress])
-    @@index([organizationId, createdAt])
-    @@index([targetKind, targetId])
+  @@index([createdAt])
+  @@index([userId])
+  @@index([projectId])
+  @@index([action])
+  @@index([ipAddress])
+  @@index([organizationId, createdAt])
+  @@index([targetKind, targetId])
 }
 
 enum PromptScope {
-    ORGANIZATION
-    PROJECT
+  ORGANIZATION
+  PROJECT
 }
 
 model LlmPromptConfig {
-    id             String      @id @default(nanoid())
-    handle         String? // Globally unique identifier in format team/sample-prompt
-    name           String
-    projectId      String
-    project        Project     @relation(fields: [projectId], references: [id])
-    createdAt      DateTime    @default(now())
-    updatedAt      DateTime    @default(now()) @updatedAt
-    deletedAt      DateTime?
-    organizationId String
-    scope          PromptScope @default(PROJECT)
+  id             String      @id @default(nanoid())
+  handle         String? // Globally unique identifier in format team/sample-prompt
+  name           String
+  projectId      String
+  project        Project     @relation(fields: [projectId], references: [id])
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @default(now()) @updatedAt
+  deletedAt      DateTime?
+  organizationId String
+  scope          PromptScope @default(PROJECT)
 
-    // Copy tracking
-    copiedFromPromptId String?
-    copiedFrom         LlmPromptConfig?  @relation("PromptCopies", fields: [copiedFromPromptId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-    copiedPrompts      LlmPromptConfig[] @relation("PromptCopies")
+  // Copy tracking
+  copiedFromPromptId String?
+  copiedFrom         LlmPromptConfig?  @relation("PromptCopies", fields: [copiedFromPromptId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  copiedPrompts      LlmPromptConfig[] @relation("PromptCopies")
 
-    // Relation to all versions - latest is determined by query
-    versions LlmPromptConfigVersion[] @relation("Versions")
+  // Relation to all versions - latest is determined by query
+  versions LlmPromptConfigVersion[] @relation("Versions")
 
-    // Relation to labels (e.g., "production", "staging")
-    versionTags PromptTagAssignment[] @relation("VersionTags")
+  // Relation to labels (e.g., "production", "staging")
+  versionTags PromptTagAssignment[] @relation("VersionTags")
 
-    @@unique([handle], map: "LlmPromptConfig_handle_key")
-    @@index([projectId])
-    @@index([organizationId], map: "LlmPromptConfig_organizationId_idx")
-    @@index([copiedFromPromptId])
+  @@unique([handle], map: "LlmPromptConfig_handle_key")
+  @@index([projectId])
+  @@index([organizationId], map: "LlmPromptConfig_organizationId_idx")
+  @@index([copiedFromPromptId])
 }
 
 model LlmPromptConfigVersion {
-    id            String          @id @default(nanoid())
-    version       Int // The version number of the config
-    commitMessage String? // Optional: Describe changes in this version
-    authorId      String? // Optional: User who created this version
-    author        User?           @relation(fields: [authorId], references: [id])
-    configId      String // Foreign key to the parent LlmPromptConfig
-    config        LlmPromptConfig @relation("Versions", fields: [configId], references: [id], onDelete: Cascade) // Cascade delete versions if parent is deleted
+  id            String          @id @default(nanoid())
+  version       Int // The version number of the config
+  commitMessage String? // Optional: Describe changes in this version
+  authorId      String? // Optional: User who created this version
+  author        User?           @relation(fields: [authorId], references: [id])
+  configId      String // Foreign key to the parent LlmPromptConfig
+  config        LlmPromptConfig @relation("Versions", fields: [configId], references: [id], onDelete: Cascade) // Cascade delete versions if parent is deleted
 
-    // Version specific data
-    configData    Json   @map("config") // The actual config JSON for this version
-    schemaVersion String // Schema version for this specific configData
+  // Version specific data
+  configData    Json   @map("config") // The actual config JSON for this version
+  schemaVersion String // Schema version for this specific configData
 
-    createdAt DateTime @default(now()) // Used to determine the latest version
+  runtimeParameters Json @default("{}")
 
-    // Required for multi-tenancy
-    projectId String
+  createdAt DateTime @default(now()) // Used to determine the latest version
 
-    // Tags pointing to this version
-    versionTags PromptTagAssignment[]
+  // Required for multi-tenancy
+  projectId String
 
-    @@unique([configId, version]) // Each version number must be unique per config
-    @@index([configId])
-    @@index([authorId])
-    @@index([createdAt]) // Index important for finding the latest efficiently
+  // Tags pointing to this version
+  versionTags PromptTagAssignment[]
+
+  @@unique([configId, version]) // Each version number must be unique per config
+  @@index([configId])
+  @@index([authorId])
+  @@index([createdAt]) // Index important for finding the latest efficiently
 }
 
 model PromptTagAssignment {
-    id          String   @id @default(nanoid())
-    configId    String
-    config      LlmPromptConfig        @relation("VersionTags", fields: [configId], references: [id], onDelete: Cascade)
-    versionId   String
-    version     LlmPromptConfigVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
-    tagId       String
-    promptTag   PromptTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
-    projectId   String
-    createdAt   DateTime @default(now())
-    updatedAt   DateTime @default(now()) @updatedAt
-    createdById String?
-    createdBy   User?    @relation("versionTagCreatedBy", fields: [createdById], references: [id])
-    updatedById String?
-    updatedBy   User?    @relation("versionTagUpdatedBy", fields: [updatedById], references: [id])
+  id          String                 @id @default(nanoid())
+  configId    String
+  config      LlmPromptConfig        @relation("VersionTags", fields: [configId], references: [id], onDelete: Cascade)
+  versionId   String
+  version     LlmPromptConfigVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  tagId       String
+  promptTag   PromptTag              @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  projectId   String
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @default(now()) @updatedAt
+  createdById String?
+  createdBy   User?                  @relation("versionTagCreatedBy", fields: [createdById], references: [id])
+  updatedById String?
+  updatedBy   User?                  @relation("versionTagUpdatedBy", fields: [updatedById], references: [id])
 
-    @@unique([configId, tagId])
-    @@index([configId])
-    @@index([versionId])
-    @@index([projectId])
-    @@index([tagId])
+  @@unique([configId, tagId])
+  @@index([configId])
+  @@index([versionId])
+  @@index([projectId])
+  @@index([tagId])
 }
 
 model PromptTag {
-    id             String       @id @default(nanoid())
-    organizationId String
-    organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-    name           String
-    assignments    PromptTagAssignment[]
-    createdAt      DateTime     @default(now())
-    updatedAt      DateTime     @default(now()) @updatedAt
-    createdById    String?
-    createdBy      User?        @relation("promptTagCreatedBy", fields: [createdById], references: [id])
-    updatedById    String?
-    updatedBy      User?        @relation("promptTagUpdatedBy", fields: [updatedById], references: [id])
+  id             String                @id @default(nanoid())
+  organizationId String
+  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  assignments    PromptTagAssignment[]
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @default(now()) @updatedAt
+  createdById    String?
+  createdBy      User?                 @relation("promptTagCreatedBy", fields: [createdById], references: [id])
+  updatedById    String?
+  updatedBy      User?                 @relation("promptTagUpdatedBy", fields: [updatedById], references: [id])
 
-    @@unique([organizationId, name])
-    @@index([organizationId])
+  @@unique([organizationId, name])
+  @@index([organizationId])
 }
 
 model Analytics {
-    id           String   @id @default(nanoid())
-    projectId    String
-    project      Project  @relation(fields: [projectId], references: [id])
-    key          String
-    value        Json? // For complex/metadata
-    numericValue Float? // For metrics that need aggregation
-    stringValue  String? // For categorical data
-    boolValue    Boolean? // For true/false metrics
-    createdAt    DateTime @default(now())
+  id           String   @id @default(nanoid())
+  projectId    String
+  project      Project  @relation(fields: [projectId], references: [id])
+  key          String
+  value        Json? // For complex/metadata
+  numericValue Float? // For metrics that need aggregation
+  stringValue  String? // For categorical data
+  boolValue    Boolean? // For true/false metrics
+  createdAt    DateTime @default(now())
 
-    @@index([createdAt, key, projectId, numericValue])
-    @@index([projectId])
+  @@index([createdAt, key, projectId, numericValue])
+  @@index([projectId])
 }
 
 model CustomRole {
-    id             String       @id @default(nanoid())
-    organizationId String
-    organization   Organization @relation(fields: [organizationId], references: [id])
-    name           String
-    description    String?
-    permissions    Json // Array of Permission strings
-    kind           String       @default("custom") // "custom" = user-created, "system_api_key" = generated for API keys
-    createdAt      DateTime     @default(now())
-    updatedAt      DateTime     @default(now()) @updatedAt
-    assignedUsers      TeamUser[]
-    roleBindings       RoleBinding[]
+  id             String        @id @default(nanoid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id])
+  name           String
+  description    String?
+  permissions    Json // Array of Permission strings
+  kind           String        @default("custom") // "custom" = user-created, "system_api_key" = generated for API keys
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @default(now()) @updatedAt
+  assignedUsers  TeamUser[]
+  roleBindings   RoleBinding[]
 
-    @@unique([organizationId, name])
-    @@index([organizationId])
+  @@unique([organizationId, name])
+  @@index([organizationId])
 }
 
 model Notification {
-    id String @id @default(nanoid())
+  id String @id @default(nanoid())
 
-    // Optional context - notifications can be at user, organization, or project level
-    organizationId String?
-    organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-    projectId      String?
-    project        Project?      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  // Optional context - notifications can be at user, organization, or project level
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  projectId      String?
+  project        Project?      @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-    // Flexible metadata to store notification-specific data
-    // For usage limit: { currentUsage: number, limit: number, percentage: number, threshold: number }
-    metadata Json
+  // Flexible metadata to store notification-specific data
+  // For usage limit: { currentUsage: number, limit: number, percentage: number, threshold: number }
+  metadata Json
 
-    // Timestamps
-    createdAt DateTime @default(now())
-    updatedAt DateTime @default(now()) @updatedAt
-    sentAt    DateTime // When email was actually sent
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+  sentAt    DateTime // When email was actually sent
 
-    @@index([organizationId])
-    @@index([projectId])
-    @@index([createdAt])
-    @@index([sentAt])
+  @@index([organizationId])
+  @@index([projectId])
+  @@index([createdAt])
+  @@index([sentAt])
 }
 
 model Agent {
-    id                 String    @id @default(nanoid())
-    projectId          String
-    project            Project   @relation(fields: [projectId], references: [id])
-    name               String
-    type               String // "signature" | "code" | "workflow"
-    config             Json // Node configuration (model, prompt, code, etc.)
-    workflowId         String? // For "workflow" type - top level for joins
-    workflow           Workflow? @relation(fields: [workflowId], references: [id])
-    copiedFromAgentId  String?
-    copiedFrom         Agent?    @relation("AgentCopies", fields: [copiedFromAgentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-    copiedAgents       Agent[]   @relation("AgentCopies")
-    archivedAt         DateTime?
-    createdAt          DateTime  @default(now())
-    updatedAt          DateTime  @default(now()) @updatedAt
+  id                String    @id @default(nanoid())
+  projectId         String
+  project           Project   @relation(fields: [projectId], references: [id])
+  name              String
+  type              String // "signature" | "code" | "workflow"
+  config            Json // Node configuration (model, prompt, code, etc.)
+  workflowId        String? // For "workflow" type - top level for joins
+  workflow          Workflow? @relation(fields: [workflowId], references: [id])
+  copiedFromAgentId String?
+  copiedFrom        Agent?    @relation("AgentCopies", fields: [copiedFromAgentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  copiedAgents      Agent[]   @relation("AgentCopies")
+  archivedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @default(now()) @updatedAt
 
-    @@index([projectId])
-    @@index([workflowId])
-    @@index([copiedFromAgentId])
+  @@index([projectId])
+  @@index([workflowId])
+  @@index([copiedFromAgentId])
 }
 
 model Evaluator {
-    id                    String     @id @default(nanoid())
-    projectId             String
-    project               Project    @relation(fields: [projectId], references: [id])
-    name                  String
-    slug                  String? // Human-readable identifier for guardrails API
-    type                  String // "evaluator" (built-in) | "workflow" (custom)
-    config                Json // Settings for built-in, or empty for workflow
-    workflowId            String? // For "workflow" type - top level for joins
-    workflow              Workflow?  @relation(fields: [workflowId], references: [id])
-    copiedFromEvaluatorId String?
-    copiedFrom            Evaluator? @relation("EvaluatorCopies", fields: [copiedFromEvaluatorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-    copiedEvaluators      Evaluator[] @relation("EvaluatorCopies")
-    monitors              Monitor[] // Monitors using this evaluator
-    archivedAt            DateTime?
-    createdAt             DateTime   @default(now())
-    updatedAt             DateTime   @default(now()) @updatedAt
+  id                    String      @id @default(nanoid())
+  projectId             String
+  project               Project     @relation(fields: [projectId], references: [id])
+  name                  String
+  slug                  String? // Human-readable identifier for guardrails API
+  type                  String // "evaluator" (built-in) | "workflow" (custom)
+  config                Json // Settings for built-in, or empty for workflow
+  workflowId            String? // For "workflow" type - top level for joins
+  workflow              Workflow?   @relation(fields: [workflowId], references: [id])
+  copiedFromEvaluatorId String?
+  copiedFrom            Evaluator?  @relation("EvaluatorCopies", fields: [copiedFromEvaluatorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  copiedEvaluators      Evaluator[] @relation("EvaluatorCopies")
+  monitors              Monitor[] // Monitors using this evaluator
+  gatewayGuardrails     GatewayGuardrail[] @relation("EvaluatorGatewayGuardrails")
+  archivedAt            DateTime?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @default(now()) @updatedAt
 
-    @@unique([projectId, slug])
-    @@index([projectId])
-    @@index([workflowId])
-    @@index([copiedFromEvaluatorId])
+  @@unique([projectId, slug])
+  @@index([projectId])
+  @@index([workflowId])
+  @@index([copiedFromEvaluatorId])
 }
 
 model Scenario {
-    id              String    @id @default(nanoid())
-    projectId       String
-    project         Project   @relation(fields: [projectId], references: [id])
-    name            String
-    situation       String
-    criteria        String[]
-    labels          String[]
-    lastUpdatedById String?
-    lastUpdatedBy   User?     @relation(fields: [lastUpdatedById], references: [id])
-    archivedAt      DateTime?
-    createdAt       DateTime  @default(now())
-    updatedAt       DateTime  @default(now()) @updatedAt
+  id              String    @id @default(nanoid())
+  projectId       String
+  project         Project   @relation(fields: [projectId], references: [id])
+  name            String
+  situation       String
+  criteria        String[]
+  labels          String[]
+  // Optional per-scenario model overrides for the run. When null the run
+  // resolves the project's scenarios.user_simulator / scenarios.judge
+  // DEFAULT-role models. See specs/scenarios/scenario-model-selection.feature.
+  simulatorModel  String?
+  judgeModel      String?
+  lastUpdatedById String?
+  lastUpdatedBy   User?     @relation(fields: [lastUpdatedById], references: [id])
+  archivedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @default(now()) @updatedAt
 
-    @@index([projectId])
+  @@index([projectId])
 }
 
 model SimulationSuite {
-    id          String    @id @default(nanoid())
-    projectId   String
-    project     Project   @relation(fields: [projectId], references: [id])
-    name        String
-    slug        String
-    description String?
-    scenarioIds String[]
-    targets     Json      // Array of { type: "prompt" | "http", referenceId: string }
-    repeatCount Int       @default(1)
-    labels      String[]
-    archivedAt  DateTime?
-    createdAt   DateTime  @default(now())
-    updatedAt   DateTime  @default(now()) @updatedAt
+  id          String    @id @default(nanoid())
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id])
+  name        String
+  slug        String
+  description String?
+  scenarioIds String[]
+  targets     Json // Array of { type: "prompt" | "http", referenceId: string }
+  repeatCount Int       @default(1)
+  labels      String[]
+  // Optional run-plan-wide model overrides. When set they take precedence
+  // over each scenario's own override for every scenario in the run; when
+  // null the per-scenario value (or the project default) applies. See
+  // specs/suites/suite-model-selection.feature.
+  simulatorModel String?
+  judgeModel     String?
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
 
-    @@index([projectId])
-    @@unique([projectId, slug])
+  @@unique([projectId, slug])
+  @@index([projectId])
 }
 
 model ProjectDailySdkUsage {
-    id                 String   @id
-    projectId          String
-    date               String   // UTC date "YYYY-MM-DD"
-    sdkName            String   @default("")
-    sdkVersion         String   @default("")
-    sdkLanguage        String   @default("")
-    count              Int      @default(0)
-    lastEventTimestamp BigInt?  // Unix ms from event.timestamp
-    updatedAt          DateTime @default(now()) @updatedAt
+  id                 String   @id
+  projectId          String
+  date               String // UTC date "YYYY-MM-DD"
+  sdkName            String   @default("")
+  sdkVersion         String   @default("")
+  sdkLanguage        String   @default("")
+  count              Int      @default(0)
+  lastEventTimestamp BigInt? // Unix ms from event.timestamp
+  updatedAt          DateTime @default(now()) @updatedAt
 
-    @@unique([projectId, date, sdkName, sdkVersion, sdkLanguage])
-    @@index([projectId, date])
+  @@unique([projectId, date, sdkName, sdkVersion, sdkLanguage])
+  @@index([projectId, date])
 }
 
 model Subscription {
-    id                    String             @id @default(nanoid())
-    organizationId        String
-    plan                  PlanTypes
-    stripeSubscriptionId  String?            @unique
-    status                SubscriptionStatus
-    startDate             DateTime?
-    endDate               DateTime?
-    lastPaymentFailedDate DateTime?
-    createdAt             DateTime           @default(now())
-    updatedAt             DateTime           @default(now()) @updatedAt
-    maxMembers            Int?
-    maxProjects           Int?
-    maxMessagesPerMonth   Int?
-    maxWorkflows          Int?
-    maxRetentionDays      Int?
-    maxMembersLite        Int?
-    maxTeams              Int?
-    maxPrompts            Int?
-    maxEvaluators         Int?
-    maxScenarios          Int?
-    maxAgents             Int?
-    maxExperiments        Int?
-    maxOnlineEvaluations  Int?
-    maxDatasets           Int?
-    maxDashboards         Int?
-    maxCustomGraphs       Int?
-    maxAutomations        Int?
+  id                    String             @id @default(nanoid())
+  organizationId        String
+  plan                  PlanTypes
+  stripeSubscriptionId  String?            @unique
+  status                SubscriptionStatus
+  startDate             DateTime?
+  endDate               DateTime?
+  lastPaymentFailedDate DateTime?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @default(now()) @updatedAt
+  maxMembers            Int?
+  maxProjects           Int?
+  maxMessagesPerMonth   Int?
+  maxWorkflows          Int?
+  maxRetentionDays      Int?
+  maxMembersLite        Int?
+  maxTeams              Int?
+  maxPrompts            Int?
+  maxEvaluators         Int?
+  maxScenarios          Int?
+  maxAgents             Int?
+  maxExperiments        Int?
+  maxOnlineEvaluations  Int?
+  maxDatasets           Int?
+  maxDashboards         Int?
+  maxCustomGraphs       Int?
+  maxAutomations        Int?
 
-    organization Organization @relation(fields: [organizationId], references: [id])
-    invoices     Invoice[]
+  organization Organization @relation(fields: [organizationId], references: [id])
+  invoices     Invoice[]
 
-    @@index([organizationId])
+  @@index([organizationId])
 }
 
 model Invoice {
-    id             String   @id @default(nanoid())
-    subscriptionId String
-    totalAmount    Float
-    currency       String
-    dueDate        DateTime
-    paid           Boolean  @default(false)
-    createdAt      DateTime @default(now())
-    updatedAt      DateTime @default(now()) @updatedAt
+  id             String   @id @default(nanoid())
+  subscriptionId String
+  totalAmount    Float
+  currency       String
+  dueDate        DateTime
+  paid           Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
 
-    subscription Subscription  @relation(fields: [subscriptionId], references: [id])
-    lineItems    InvoiceItem[]
+  subscription Subscription  @relation(fields: [subscriptionId], references: [id])
+  lineItems    InvoiceItem[]
 
-    @@index([subscriptionId])
+  @@index([subscriptionId])
 }
 
 model InvoiceItem {
-    id          String   @id @default(nanoid())
-    invoiceId   String
-    description String
-    amount      Float
-    createdAt   DateTime @default(now())
-    updatedAt   DateTime @default(now()) @updatedAt
+  id          String   @id @default(nanoid())
+  invoiceId   String
+  description String
+  amount      Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
 
-    invoice Invoice @relation(fields: [invoiceId], references: [id])
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
 
-    @@index([invoiceId])
+  @@index([invoiceId])
 }
 
-
 // ============================================================================
-// Scoped RBAC — Groups, GroupMembership, RoleBinding
+// Scoped RBAC - Groups, GroupMembership, RoleBinding
 // ============================================================================
 
 model Group {
-    id             String            @id @default(nanoid())
-    organizationId String
-    organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-    name           String
-    slug           String
-    // SCIM provenance — null for manually created groups
-    externalId     String?           // IdP-side group ID (SCIM externalId)
-    scimSource     String?           // e.g. "azure-ad", "okta"
-    members        GroupMembership[]
-    roleBindings   RoleBinding[]     @relation("GroupBindings")
-    createdAt      DateTime          @default(now())
-    updatedAt      DateTime          @default(now()) @updatedAt
+  id             String            @id @default(nanoid())
+  organizationId String
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  slug           String
+  // SCIM provenance - null for manually created groups
+  externalId     String? // IdP-side group ID (SCIM externalId)
+  scimSource     String? // e.g. "azure-ad", "okta"
+  members        GroupMembership[]
+  roleBindings   RoleBinding[]     @relation("GroupBindings")
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @default(now()) @updatedAt
 
-    @@unique([organizationId, slug])
-    @@unique([organizationId, externalId])
-    @@index([organizationId])
+  @@unique([organizationId, slug])
+  @@unique([organizationId, externalId])
+  @@index([organizationId])
 }
 
 model GroupMembership {
-    userId    String
-    groupId   String
-    user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-    group     Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
-    createdAt DateTime @default(now())
+  userId    String
+  groupId   String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
 
-    @@id([userId, groupId])
-    @@index([userId])
-    @@index([groupId])
+  @@id([userId, groupId])
+  @@index([userId])
+  @@index([groupId])
 }
 
 model RoleBinding {
-    id             String               @id @default(nanoid())
-    organizationId String
-    organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  id             String       @id @default(nanoid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-    // Principal — exactly one must be set
-    userId         String?
-    user           User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
-    groupId        String?
-    group          Group?               @relation("GroupBindings", fields: [groupId], references: [id], onDelete: Cascade)
-    apiKeyId       String?
-    apiKey         ApiKey?              @relation(fields: [apiKeyId], references: [id], onDelete: Restrict)
+  // Principal - exactly one must be set
+  userId   String?
+  user     User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  groupId  String?
+  group    Group?   @relation("GroupBindings", fields: [groupId], references: [id], onDelete: Cascade)
+  apiKeyId String?
+  apiKey   ApiKey?  @relation(fields: [apiKeyId], references: [id], onDelete: Restrict)
 
-    // Role — built-in named role or custom
-    role           TeamUserRole
-    customRoleId   String?
-    customRole     CustomRole?          @relation(fields: [customRoleId], references: [id])
+  // Role - built-in named role or custom
+  role         TeamUserRole
+  customRoleId String?
+  customRole   CustomRole?  @relation(fields: [customRoleId], references: [id])
 
-    // Scope — scopeType + scopeId identify the resource
-    scopeType      RoleBindingScopeType
-    scopeId        String               // orgId, teamId, or projectId depending on scopeType
+  // Scope - scopeType + scopeId identify the resource
+  scopeType RoleBindingScopeType
+  scopeId   String // orgId, teamId, or projectId depending on scopeType
 
-    createdAt      DateTime             @default(now())
-    updatedAt      DateTime             @default(now()) @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 
-    // Uniqueness is enforced by six partial unique indexes defined in migrations:
-    //   • user + group (built-in and custom) — 20260410120000_fix_role_binding_unique_custom_role
-    //   • apiKey (built-in and custom) — 20260414222341_add_personal_access_tokens
-    // Prisma does not support partial indexes natively, so there is no @@unique here.
-    @@index([organizationId])
-    @@index([userId])
-    @@index([groupId])
-    @@index([apiKeyId])
-    @@index([scopeType, scopeId])
+  // Uniqueness is enforced by six partial unique indexes defined in migrations:
+  //   • user + group (built-in and custom) - 20260410120000_fix_role_binding_unique_custom_role
+  //   • apiKey (built-in and custom) - 20260414222341_add_personal_access_tokens
+  // Prisma does not support partial indexes natively, so there is no @@unique here.
+  @@index([organizationId])
+  @@index([userId])
+  @@index([groupId])
+  @@index([apiKeyId])
+  @@index([scopeType, scopeId])
 }
 
 model ApiKey {
-    id              String        @id @default(nanoid())
-    name            String
-    description     String?
-    lookupId        String        @unique
-    hashedSecret    String
-    permissionMode  String        @default("all") // "all" | "readonly" | "restricted"
-    userId          String?
-    user            User?         @relation(fields: [userId], references: [id], onDelete: Restrict)
-    createdByUserId String?       // null = self-created; set when admin creates for another user
-    organizationId  String
-    organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-    roleBindings    RoleBinding[]
-    expiresAt       DateTime?
-    lastUsedAt      DateTime?
-    revokedAt       DateTime?
-    createdAt       DateTime      @default(now())
-    updatedAt       DateTime      @default(now()) @updatedAt
+  id              String        @id @default(nanoid())
+  name            String
+  description     String?
+  lookupId        String        @unique
+  hashedSecret    String
+  permissionMode  String        @default("all") // "all" | "readonly" | "restricted"
+  userId          String?
+  user            User?         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  createdByUserId String?       // null = self-created; set when admin creates for another user
+  organizationId  String
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  roleBindings    RoleBinding[]
+  expiresAt       DateTime?
+  lastUsedAt      DateTime?
+  revokedAt       DateTime?
 
-    @@index([userId])
-    @@index([organizationId])
-    @@index([lookupId])
+  /// Non-null marks this key as an "ingestion key": a project-scoped,
+  /// ingest-only ApiKey the unified `langwatch <tool>` CLI (and template
+  /// installs) mint for OTLP Path B. The slug (claude_code / codex / gemini /
+  /// opencode / claude_cowork) is stamped as `langwatch.source` provenance on
+  /// every span the key authorizes. NULL for normal API / service keys.
+  ingestSourceType String?
+
+  /// Set only for ingestion keys derived from an admin IngestionTemplate
+  /// (e.g. claude_cowork). Drives receiver OTTL application + the
+  /// `langwatch.template.id` provenance stamp. NULL for unified-CLI tools
+  /// (which have no template) and for normal keys. Column ref only (no FK,
+  /// per the app-layer-integrity convention); resolved by the ingest-key service.
+  ingestionTemplateId String?
+
+  /// Human label of the CLI device session that minted this ingestion key
+  /// (e.g. "Rogerio's MacBook Pro"), snapshotted at mint time from the device
+  /// flow's `client_info`. Denormalized so the org-wide API-keys settings page
+  /// can show which device a key came from without resolving another user's
+  /// Redis-stored sessions. NULL for non-ingestion keys and for keys minted by
+  /// a CLI old enough to predate device metadata.
+  createdByDeviceLabel String?
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @default(now()) @updatedAt
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([lookupId])
+  @@index([ingestSourceType])
+  @@index([ingestionTemplateId])
 }
 
 model BillingMeterCheckpoint {
-    id                   String   @id @default(cuid())
-    organizationId       String
-    billingMonth         String   // "2026-02"
-    lastReportedTotal    Int      @default(0)
-    pendingReportedTotal Int?     // non-null = in-flight Stripe call
-    consecutiveFailures  Int      @default(0)
-    updatedAt            DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  organizationId       String
+  billingMonth         String // "2026-02"
+  lastReportedTotal    Int      @default(0)
+  pendingReportedTotal Int? // non-null = in-flight Stripe call
+  consecutiveFailures  Int      @default(0)
+  updatedAt            DateTime @updatedAt
 
-    @@unique([organizationId, billingMonth])
+  @@unique([organizationId, billingMonth])
 }
 
 // ============================================================================
@@ -1488,25 +1784,21 @@ model BillingMeterCheckpoint {
 // - GatewayBudget: hierarchical budgets (org / team / project / vk /
 //   principal) with calendar resets and block|warn semantics.
 // - GatewayBudgetLedger: idempotent spend ledger keyed by
-//   gateway_request_id (outbox pattern — writes from the Go gateway).
+//   gateway_request_id (outbox pattern - writes from the Go gateway).
 // - GatewayChangeEvent: monotonically-increasing revision feed consumed by
 //   the gateway's long-poll `/internal/gateway/changes?since=N` endpoint.
 // - AuditLog (top of file): unified actor/action/before/after audit for
 //   every gateway-surface mutation alongside platform mutations.
 // ============================================================================
 
-enum VirtualKeyEnvironment {
-    LIVE
-    TEST
-}
 
 enum VirtualKeyStatus {
-    ACTIVE
-    REVOKED
+  ACTIVE
+  REVOKED
 }
 
 // Rotation policy for gateway provider credentials.
-// v1 ships MANUAL only — operators rotate via the Rotate button in
+// v1 ships MANUAL only - operators rotate via the Rotate button in
 // the UI or by calling POST /providers/:id/rotate. Scheduled rotation
 // (AUTO) and external-secret-store integration (Vault / AWS Secrets
 // Manager / GCP Secret Manager) are v1.1 scope; the enum will grow
@@ -1514,349 +1806,904 @@ enum VirtualKeyStatus {
 // would mislead operators into thinking they're configuring a feature
 // that silently does nothing. See iter 56 dogfood feedback.
 enum GatewayProviderRotationPolicy {
-    MANUAL
+  MANUAL
 }
 
 enum GatewayProviderHealthStatus {
-    UNKNOWN
-    HEALTHY
-    DEGRADED
-    CIRCUIT_OPEN
+  UNKNOWN
+  HEALTHY
+  DEGRADED
+  CIRCUIT_OPEN
 }
 
 enum GatewayBudgetScopeType {
-    ORGANIZATION
-    TEAM
-    PROJECT
-    VIRTUAL_KEY
-    PRINCIPAL
+  ORGANIZATION
+  TEAM
+  PROJECT
+  VIRTUAL_KEY
+  PRINCIPAL
 }
 
 enum GatewayBudgetWindow {
-    MINUTE
-    HOUR
-    DAY
-    WEEK
-    MONTH
-    TOTAL
+  MINUTE
+  HOUR
+  DAY
+  WEEK
+  MONTH
+  TOTAL
 }
 
 enum GatewayBudgetBreachAction {
-    BLOCK
-    WARN
+  BLOCK
+  WARN
 }
 
 enum GatewayBudgetLedgerStatus {
-    SUCCESS
-    PROVIDER_ERROR
-    BLOCKED_BY_GUARDRAIL
-    CANCELLED
+  SUCCESS
+  PROVIDER_ERROR
+  BLOCKED_BY_GUARDRAIL
+  CANCELLED
 }
 
 enum GatewayChangeEventKind {
-    VK_CREATED
-    VK_CONFIG_UPDATED
-    VK_REVOKED
-    VK_ROTATED
-    BUDGET_CREATED
-    BUDGET_UPDATED
-    BUDGET_DELETED
-    PROVIDER_BINDING_UPDATED
-    CACHE_RULE_CREATED
-    CACHE_RULE_UPDATED
-    CACHE_RULE_DELETED
+  VK_CREATED
+  VK_CONFIG_UPDATED
+  VK_REVOKED
+  VK_ROTATED
+  BUDGET_CREATED
+  BUDGET_UPDATED
+  BUDGET_DELETED
+  MODEL_PROVIDER_UPDATED
+  CACHE_RULE_CREATED
+  CACHE_RULE_UPDATED
+  CACHE_RULE_DELETED
 }
 
-// Gateway audit action codes — kept as a TypeScript const union in
+// Gateway audit action codes - kept as a TypeScript const union in
 // langwatch/src/server/gateway/auditLog.repository.ts (no Prisma enum
 // because gateway rows now write to the shared `AuditLog` table whose
 // `action` column is a free-form String).
 //
-// enum GatewayAuditAction { ... } — removed in migration
+// enum GatewayAuditAction { ... } - removed in migration
 // 20260425000000_consolidate_gateway_audit_into_audit_log.
 
 enum GatewayCacheRuleMode {
-    RESPECT
-    FORCE
-    DISABLE
+  RESPECT
+  FORCE
+  DISABLE
 }
 
+// VirtualKey - org-scoped, multi-scope routing key for the AI Gateway.
+//
+// Iter 110 refactor: collapsed VirtualKey -> GatewayProviderCredential
+// binding entirely (per rchaves). Provider-routing knobs (rpm/tpm/headers/
+// providerConfig/etc) moved onto ModelProvider's "Advanced (Gateway)" tab.
+// Per-VK chain ordering moved onto RoutingPolicy.modelProviderIds. Per-VK
+// header overrides removed (use a sibling ModelProvider row for that 1%).
+//
+// Scoping mirrors ModelProviderScope (iter 109): a single VirtualKey row
+// is reachable from multiple scopes (org / team / project) via
+// VirtualKeyScope rows. No `projectId` column - multitenant key is
+// `organizationId` (mandatory, matches the new dbMultiTenancyProtection
+// invariant).
+//
+// `principalUserId` stays orthogonal to scopes: it marks "who owns this
+// personal VK" for trace attribution + admin-view filtering, not "where
+// can this route". A personal VK is a VK with `principalUserId` set; its
+// scopes (typically ORGANIZATION) determine the routing reach.
+//
+// No DB-level FK constraints (codebase convention) - string columns +
+// indexes; integrity enforced at service layer.
 model VirtualKey {
-    id                       String                         @id @default(nanoid())
-    projectId                String
-    project                  Project                        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id             String @id @default(nanoid())
+  organizationId String
 
-    name                     String
-    description              String?
-    environment              VirtualKeyEnvironment          @default(LIVE)
-    status                   VirtualKeyStatus               @default(ACTIVE)
+  name        String
+  description String?
+  status      VirtualKeyStatus @default(ACTIVE)
 
-    // Credential material. Full secret format:
-    //   lw_vk_{live|test}_<26-char-crockford-ulid>  (40 chars total)
-    // Only the hashed form and a short display prefix (first 18 chars) are
-    // kept after creation. The full secret is shown exactly once.
-    hashedSecret             String                         // argon2id(secret + server pepper)
-    displayPrefix            String                         // e.g. "lw_vk_live_01HZX9"
+  // Credential material. Full secret format:
+  //   vk-lw-<26-char-crockford-ulid>  (32 chars total)
+  // Only the hashed form and a short display prefix are kept after
+  // creation. The full secret is shown exactly once.
+  hashedSecret  String // argon2id(secret + server pepper)
+  displayPrefix String // e.g. "vk-lw-01HZX9"
 
-    // Principal to attribute traces to when this VK is used. Optional because
-    // a VK can be owned by a project without binding to a specific human.
-    principalUserId          String?
-    principalUser            User?                          @relation("VirtualKeyPrincipalUser", fields: [principalUserId], references: [id])
+  // Principal user the VK is attributed to for trace ownership + audit.
+  // Set for personal VKs minted via `langwatch login --device`; null for
+  // org-/team-/project-owned VKs minted by an admin.
+  principalUserId String?
+  principalUser   User?   @relation("PrincipalScopedVirtualKeys", fields: [principalUserId], references: [id], onDelete: SetNull)
 
-    // Config blob. Mirrors the shape of `GET /internal/gateway/config/:vk_id`.
-    // Stored as a single JSON blob so the control-plane can version it and
-    // return it to the gateway without reassembling from many tables. Fields:
-    //   model_aliases, models_allowed, cache, guardrails, policy_rules,
-    //   rate_limits, fallback (non-chain scalars). The chain itself is
-    //   materialised in VirtualKeyProviderCredential for FK integrity.
-    config                   Json                           @default("{}")
+  // Slim config blob - per-key state only. The "gateway-config bundle"
+  // that the gateway reads via /internal/gateway/config/:vk_id is now
+  // materialised on-read from the scope graph (eligible ModelProviders
+  // resolved by VirtualKeyScope + the linked RoutingPolicy ordering),
+  // not pre-baked into this field. Allowed keys: `model_aliases`,
+  // `models_allowed`. Everything else (rate_limits, fallback, cache,
+  // guardrails) moved to ModelProvider (Advanced tab) or RoutingPolicy.
+  config Json @default("{}")
 
-    // Revision — every mutation bumps this; gateway uses it to skip config
-    // fetches that would be no-ops.
-    revision                 BigInt                         @default(0)
+  // Revision - every mutation bumps this; gateway uses it to skip config
+  // fetches that would be no-ops.
+  revision BigInt @default(0)
 
-    // Rotation bookkeeping. When rotated in place, the previous secret stays
-    // valid for 24h via `previousHashedSecret` + `previousSecretValidUntil`.
-    previousHashedSecret     String?
-    previousSecretValidUntil DateTime?
+  // Rotation bookkeeping. When rotated in place, the previous secret stays
+  // valid for 24h via `previousHashedSecret` + `previousSecretValidUntil`.
+  previousHashedSecret     String?
+  previousSecretValidUntil DateTime?
 
-    revokedAt                DateTime?
-    revokedById              String?
-    revokedBy                User?                          @relation("VirtualKeyRevokedBy", fields: [revokedById], references: [id])
+  revokedAt   DateTime?
+  revokedById String?
 
-    createdAt                DateTime                       @default(now())
-    updatedAt                DateTime                       @default(now()) @updatedAt
-    createdById              String
-    createdBy                User                           @relation("VirtualKeyCreatedBy", fields: [createdById], references: [id])
-    lastUsedAt               DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+  createdById String
+  lastUsedAt  DateTime?
 
-    providerCredentials      VirtualKeyProviderCredential[]
-    budgets                  GatewayBudget[]                @relation("VirtualKeyScopedGatewayBudgets")
-    ledgerEntries            GatewayBudgetLedger[]
+  scopes        VirtualKeyScope[]
+  ledgerEntries GatewayBudgetLedger[]
 
-    @@unique([projectId, name])
-    @@unique([hashedSecret])
-    @@index([projectId])
-    @@index([displayPrefix])
-    @@index([status])
-    @@index([principalUserId])
-    @@index([revision])
+  // Optional RoutingPolicy reference. When set, gateway pulls
+  // ordered ModelProvider chain from the policy + the policy's
+  // modelAliases + policyRules. When null, the materialiser falls
+  // back to ordering eligible ModelProviders by
+  // `fallbackPriorityGlobal` (asc) then `createdAt` (asc) -
+  // deterministic across runs and Go-side parsers.
+  routingPolicyId String?
+  routingPolicy   RoutingPolicy? @relation("VirtualKeyRoutingPolicy", fields: [routingPolicyId], references: [id], onDelete: SetNull)
+
+  @@unique([hashedSecret])
+  @@index([organizationId])
+  @@index([displayPrefix])
+  @@index([status])
+  @@index([principalUserId])
+  @@index([revision])
+  @@index([routingPolicyId])
 }
 
-model GatewayProviderCredential {
-    id                     String                          @id @default(nanoid())
-    projectId              String
-    project                Project                         @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-    modelProviderId        String
-    modelProvider          ModelProvider                   @relation(fields: [modelProviderId], references: [id], onDelete: Cascade)
-
-    // A project can register the same ModelProvider under multiple slots
-    // (e.g. "primary", "secondary" for the same vendor with different
-    // deployments or quota tiers). Unique per (project, provider, slot).
-    slot                   String                          @default("primary")
-
-    // Gateway-only settings — do NOT leak to litellm/legacy path.
-    rateLimitRpm           Int?
-    rateLimitTpm           Int?
-    rateLimitRpd           Int?
-    rotationPolicy         GatewayProviderRotationPolicy   @default(MANUAL)
-    extraHeaders           Json?                           // appended by gateway only
-    fallbackPriorityGlobal Int?                            // used when a VK has no explicit chain
-
-    // Provider-specific routing hints (e.g. bedrock region, azure deployment
-    // override) that the gateway applies on top of ModelProvider defaults.
-    providerConfig         Json?
-
-    // Health / circuit breaker state written by the gateway.
-    healthStatus           GatewayProviderHealthStatus     @default(UNKNOWN)
-    circuitOpenedAt        DateTime?
-    lastHealthCheckAt      DateTime?
-
-    disabledAt             DateTime?
-    createdAt              DateTime                        @default(now())
-    updatedAt              DateTime                        @default(now()) @updatedAt
-
-    virtualKeyBindings     VirtualKeyProviderCredential[]
-    ledgerEntries          GatewayBudgetLedger[]
-
-    @@unique([projectId, modelProviderId, slot])
-    @@index([projectId])
-    @@index([modelProviderId])
-    @@index([healthStatus])
+// VirtualKeyScope - N-scope access for VirtualKey, mirrors
+// ModelProviderScope exactly. A single VK row is reachable from any
+// scope it has a matching entry for. Writing requires the caller to
+// hold the matching `virtualKeys:manage` permission at that scope.
+//
+// Scope-cascade resolution (read-time): a VK at PROJECT:P sees
+// ModelProviders scoped at PROJECT:P, TEAM:P.team, or
+// ORGANIZATION:vk.organizationId. A VK at ORGANIZATION sees only
+// ORGANIZATION-scoped MPs (no leakage down). Same upward-walking
+// intersection rule used by ModelDefaultConfig.
+enum VirtualKeyScopeType {
+  ORGANIZATION
+  TEAM
+  PROJECT
 }
 
-model VirtualKeyProviderCredential {
-    virtualKeyId         String
-    providerCredentialId String
-    // Position in the VK's fallback chain. Lower = higher priority.
-    priority             Int
-    // Optional per-binding overrides that apply only when this VK routes via
-    // this credential (e.g. alternate extra headers, alternate model alias set).
-    overrides            Json?
-    createdAt            DateTime                  @default(now())
+model VirtualKeyScope {
+  id           String              @id @default(nanoid())
+  virtualKeyId String
+  virtualKey   VirtualKey          @relation(fields: [virtualKeyId], references: [id], onDelete: Cascade)
+  scopeType    VirtualKeyScopeType
+  scopeId      String
+  createdAt    DateTime            @default(now())
 
-    virtualKey           VirtualKey                @relation(fields: [virtualKeyId], references: [id], onDelete: Cascade)
-    providerCredential   GatewayProviderCredential @relation(fields: [providerCredentialId], references: [id], onDelete: Cascade)
-
-    @@id([virtualKeyId, providerCredentialId])
-    @@unique([virtualKeyId, priority])
-    @@index([providerCredentialId])
+  @@unique([virtualKeyId, scopeType, scopeId])
+  @@index([scopeType, scopeId])
+  @@index([virtualKeyId])
 }
+
+// ---------------------------------------------------------------------------
+// RoutingPolicy - admin-defined routing template referenced by VirtualKey.
+//
+// A policy answers two gateway questions in one place:
+//   1. Which provider credentials are eligible for a given request?
+//   2. In what order / by what strategy do we pick among eligible providers?
+//
+// Decoupling these from the VK itself lets the admin publish (e.g.)
+// `developer-default` once and have every personal VK in the org inherit
+// the same routing semantics - no per-key configuration needed.
+//
+// Scoping mirrors GatewayBudget: an org-scoped policy applies to any VK
+// in the org; a team-scoped policy applies to VKs whose project lives in
+// that team; a project-scoped policy applies only to VKs in that project.
+// `isDefault=true` (one per scope tier) makes the policy auto-apply when
+// `virtualKey.issuePersonal` is called without an explicit policyId.
+// ---------------------------------------------------------------------------
+// RoutingPolicyScopeType - normalised from the legacy String 'scope'
+// column to a proper Postgres enum, matching the per-table convention
+// used by ModelProviderScopeType / GatewayBudgetScopeType / etc.
+enum RoutingPolicyScopeType {
+  ORGANIZATION
+  TEAM
+  PROJECT
+}
+
+model RoutingPolicy {
+  id             String       @id @default(nanoid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+
+  // Ordered list of ModelProvider.id values (post-iter-110: GPC merged
+  // into MP, the chain refers to MPs directly). JSON for shape
+  // flexibility; gateway materialises into provider chain at request
+  // time. Order = try-first when strategy = 'priority'.
+  modelProviderIds Json @default("[]")
+
+  // Optional model allowlist (JSON array of glob patterns).
+  // null/empty = "all models the eligible providers can serve".
+  modelAllowlist Json?
+
+  // Model name rewrites applied before dispatch. Shape:
+  //   { "gpt-4o": "gpt-4o-mini", "claude": "anthropic/claude-haiku-4-5" }
+  // Hoisted from per-VK config (iter 110) onto the RoutingPolicy so a
+  // single policy edit updates every VK linked to it. Empty object = no
+  // rewrites.
+  modelAliases Json @default("{}")
+
+  // Provider-agnostic policy rules - deny/allow lists per dimension.
+  // Shape: { tools: { deny: string[]; allow: string[] | null }, mcp: {...}, urls: {...}, models: {...} }
+  // Hoisted from per-VK config (iter 110). Enforced pre-provider-dispatch.
+  policyRules Json @default("{}")
+
+  // Routing strategy applied across the model-eligible subset.
+  //   'priority'    - try modelProviderIds in order (default)
+  //   'cost'        - pick lowest unit cost first
+  //   'latency'     - pick fastest healthy provider
+  //   'round_robin' - distribute evenly
+  strategy String @default("priority")
+
+  isDefault Boolean @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+  createdById String?
+  createdBy   User?    @relation("RoutingPolicyCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedById String?
+  updatedBy   User?    @relation("RoutingPolicyUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  // VKs that reference this policy. relationMode="prisma" so no SQL FK
+  // is emitted; this exists purely to let the materialiser hydrate the
+  // policy via `include: { routingPolicy: ... }` on the VK query.
+  virtualKeys VirtualKey[] @relation("VirtualKeyRoutingPolicy")
+
+  // Multi-scope assignments. A policy is selectable from any scope row
+  // (union semantics). RoutingPolicyScope is the only source of truth
+  // for which scopes a policy is reachable from.
+  scopes RoutingPolicyScope[]
+
+  @@index([organizationId])
+}
+
+// RoutingPolicyScope - N-scope access for RoutingPolicy. Mirrors
+// VirtualKeyScope + ModelProviderScope exactly. A single RP row is
+// reachable from any scope it has a matching entry for.
+model RoutingPolicyScope {
+  id              String                 @id @default(nanoid())
+  routingPolicyId String
+  routingPolicy   RoutingPolicy          @relation(fields: [routingPolicyId], references: [id], onDelete: Cascade)
+  scopeType       RoutingPolicyScopeType
+  scopeId         String
+  createdAt       DateTime               @default(now())
+
+  @@unique([routingPolicyId, scopeType, scopeId])
+  @@index([scopeType, scopeId])
+  @@index([routingPolicyId])
+}
+
+// ---------------------------------------------------------------------------
+// GatewayGuardrail - project-scoped Evaluator binding the gateway enforces
+// on inbound + outbound traffic per VK opt-in.
+//
+// Lifted from per-VK config (iter 110: vk.config.guardrails) so a project
+// admin can author one guardrail and attach it to N VKs by reference,
+// instead of duplicating the evaluator binding + failure mode on every VK.
+// VKs opt in via vk.config.guardrailAttachments[] of
+//   { direction, guardrailIds[] }
+// tuples; cross-project attach is rejected at write time.
+//
+// Project-scoped only (for now) per rchaves: a single non-null projectId
+// column, NO scope join table. Widening to team / org guardrails later
+// drops the column to nullable + adds a GatewayGuardrailScope join in a
+// separate migration. The single-column shape is intentional - keeps the
+// current constraint enforced at schema level, not at resolver level.
+//
+// Spec: specs/ai-gateway/governance/guardrails-project-scope.feature
+// ---------------------------------------------------------------------------
+enum GatewayGuardrailDirection {
+  PRE
+  POST
+  STREAM_CHUNK
+}
+
+enum GatewayGuardrailFailureMode {
+  FAIL_OPEN
+  FAIL_CLOSED
+}
+
+model GatewayGuardrail {
+  id          String                      @id @default(nanoid())
+  projectId   String
+  project     Project                     @relation("ProjectGatewayGuardrails", fields: [projectId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  evaluatorId String
+  evaluator   Evaluator                   @relation("EvaluatorGatewayGuardrails", fields: [evaluatorId], references: [id], onDelete: Restrict)
+  direction   GatewayGuardrailDirection
+  failureMode GatewayGuardrailFailureMode @default(FAIL_CLOSED)
+
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+  createdById String?
+  createdBy   User?     @relation("GatewayGuardrailCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedById String?
+  updatedBy   User?     @relation("GatewayGuardrailUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([evaluatorId])
+  @@index([projectId, archivedAt])
+}
+
+/// Per-platform fleet configuration that connects a closed SaaS
+/// product's audit / OTel / S3 stream to LangWatch's Activity
+/// Monitor (cf. specs/ai-gateway/governance/activity-monitor.feature
+/// + ingestion-sources.feature, docs/ai-gateway/governance/architecture.md).
+///
+/// One IngestionSource = one upstream fleet (e.g. "Miro Cowork",
+/// "Acme Workato production"). The runtime ingests events on whatever
+/// cadence the source supports - push for OTel/webhook/S3 (Tier C/D),
+/// pull for poll-based admin APIs (Tier C). Per-source-type adapters
+/// normalise platform-specific shapes into OCSF + AOS before they
+/// land in trace_summaries with SourceType + SourceId tags.
+model IngestionSource {
+  id             String       @id @default(nanoid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// Optional team-scope. null = org-wide.
+  teamId String?
+  team   Team?   @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  /// 'otel_generic' | 'claude_cowork' | 'workato' | 'copilot_studio' |
+  /// 'openai_compliance' | 'claude_compliance' | 's3_custom' (extensible).
+  /// String not enum so adapters can be added without migrations - the
+  /// supported set lives in code (activity-monitor adapter registry).
+  sourceType String
+
+  /// Human-friendly label for the admin UI. Unique per-org so two
+  /// "Cowork" sources can coexist with different names.
+  name        String
+  description String?
+
+  /// HMAC bearer token the upstream operator pastes into the platform
+  /// (or LangWatch sends in pull mode). Stored encrypted at rest via
+  /// the same pepper-derived KEK as VirtualKey secrets. Auto-generated
+  /// on create, rotatable via the admin UI with a 24h grace window.
+  ingestSecretHash String
+
+  /// Per-source-type configuration. Shape is platform-specific:
+  ///   - otel_generic: { allowedSourceTypeLabel?: string }
+  ///   - claude_cowork: { workspaceId: string }
+  ///   - workato: { sharedSecretLastFour: string }
+  ///   - copilot_studio: { tenantId, clientId, clientSecretHash, pollEverySec }
+  ///   - openai_compliance: { bucket, prefix, roleArn, pollEverySec }
+  ///   - claude_compliance: { workspaceApiKeyHash, pollEverySec }
+  ///   - s3_custom: { bucket, prefix, roleArn, parserDsl, pollEverySec }
+  parserConfig Json @default("{}")
+
+  /// For pull-based sources, persisted between polls so the next poll
+  /// resumes where the last left off (timestamp / cursor / file marker).
+  pollerCursor Json?
+
+  /// Phase 10 - number of consecutive errors observed by the puller
+  /// worker. Reset to 0 on a successful run. Drives admin-UI banners
+  /// ("Microsoft authentication failed - re-authorize") + back-off
+  /// scheduling when the source has been broken for a while.
+  /// Spec: specs/ai-governance/puller-framework/puller-adapter-contract.feature
+  errorCount Int @default(0)
+
+  /// Phase 10 - cron schedule for pull-mode sources. Validated by the
+  /// adapter's pullConfig schema; mirrored here for fast worker
+  /// dispatch. Null for push-mode sources.
+  pullSchedule String?
+
+  /// Status flag. 'active' (default), 'disabled' (admin paused), or
+  /// 'awaiting_first_event' (created but never received).
+  status String @default("awaiting_first_event")
+
+  /// Last event timestamp observed (any direction). Surfaces in the
+  /// admin UI as "last event 2 minutes ago".
+  lastEventAt DateTime?
+
+  archivedAt DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+  createdById String?
+  createdBy   User?    @relation("IngestionSourceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@index([teamId])
+  @@index([sourceType])
+}
+
+/// Admin-defined anomaly detection rule. Evaluated server-side at
+/// ingest time (Option C - not in this slice yet) against
+/// gateway_activity_events. When triggered, an alert is dispatched
+/// to the destinations configured on the rule (Slack / SIEM / webhook
+/// / PagerDuty / email).
+///
+/// This is a configuration entity - the actual rule evaluation +
+/// alert state lives in a future ClickHouse table
+/// (gateway_anomaly_alerts) and a server-side worker. Spec:
+/// specs/ai-gateway/governance/anomaly-rules.feature
+/// (Alexis lane B C-UI; mocked-v0 today, real persistence is THIS slice).
+model AnomalyRule {
+  id             String       @id @default(nanoid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// 'organization' | 'team' | 'project' | 'source_type' | 'source'.
+  /// String not enum so new scopes ship without migrations.
+  scope   String
+  /// Org id / team id / project id / source-type string / source id
+  /// - narrows what the rule applies to.
+  scopeId String
+
+  name        String
+  description String?
+
+  /// 'critical' | 'warning' | 'info'. Drives default destination
+  /// routing (e.g. critical → PagerDuty, warning → Slack only).
+  severity String
+
+  /// Extensible rule taxonomy: 'spend_spike' | 'rate_limit' |
+  /// 'tool_mismatch' | 'after_hours' | 'unusual_model' | 'pii_leak'
+  /// | 'custom'. New types ship without migrations - evaluator
+  /// picks a per-type implementation from a code registry.
+  ruleType String
+
+  /// Per-rule-type threshold shape. Examples:
+  ///   spend_spike: { windowSec, ratioVsBaseline, minBaselineUsd }
+  ///   rate_limit: { windowSec, requestsThreshold }
+  ///   after_hours: { startHour, endHour, timezone, requestsThreshold }
+  thresholdConfig Json @default("{}")
+
+  /// Alert routing per destination. Shape:
+  ///   { slack?: { channelId }, siem?: { endpointUrl, authHeader },
+  ///     webhook?: { url, authHeader }, pagerduty?: { routingKey },
+  ///     email?: { to: string[] } }
+  /// Empty map = use org defaults (when defaults exist; today no-op).
+  destinationConfig Json @default("{}")
+
+  /// 'active' (default - evaluator picks it up) | 'disabled' (admin
+  /// paused; rule rows kept for audit). 'archived' uses archivedAt
+  /// timestamp instead so we can filter `archivedAt IS NULL` cheaply.
+  status String @default("active")
+
+  archivedAt DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+  createdById String?
+  createdBy   User?    @relation("AnomalyRuleCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  alerts AnomalyAlert[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@index([scope, scopeId])
+  @@index([ruleType])
+  @@index([status])
+}
+
+/// Persisted anomaly detection. Inserted by the anomaly-detection
+/// reactor (event-sourcing pipeline; modeled on PR #3351's
+/// alertTrigger pattern) when a rule's threshold trips while
+/// processing a freshly-arrived ActivityEventReceived event.
+/// Read by api.activityMonitor.recentAnomalies for the admin dashboard.
+///
+/// Dedup: (ruleId, triggerWindowStart) - re-evaluating the same
+/// window updates the existing row rather than creating a duplicate.
+/// Acknowledgement / resolution are admin actions on the row.
+///
+/// Spec: specs/ai-gateway/governance/anomaly-detection.feature
+model AnomalyAlert {
+  id             String       @id @default(nanoid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  ruleId         String
+  rule           AnomalyRule  @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  /// Denormalised from rule for fast WHERE filtering on the
+  /// dashboard query (no join needed for the common path).
+  severity String
+  ruleName String
+  ruleType String
+
+  /// Window the trigger refers to (UTC).
+  triggerWindowStart DateTime
+  triggerWindowEnd   DateTime
+
+  /// Numeric trigger context. Per-rule-type detail in `detail` JSONB.
+  triggerSpendUsd   Decimal? @db.Decimal(18, 6)
+  triggerEventCount Int?
+
+  /// Per-rule-type extra context: {topActors: [...], baseline: ...,
+  /// observed: ..., timezone: ..., etc}.
+  detail Json @default("{}")
+
+  /// 'open' | 'acknowledged' | 'resolved'.
+  state String @default("open")
+
+  /// Per-destination dispatch outcome:
+  ///   { webhook: { lastAttemptIso, lastError?, attemptCount, statusCode? },
+  ///     slack: ..., pagerduty: ..., siem: ..., email: ... }
+  destinationStatus Json @default("{}")
+
+  detectedAt     DateTime  @default(now())
+  acknowledgedAt DateTime?
+  resolvedAt     DateTime?
+
+  @@unique([ruleId, triggerWindowStart])
+  @@index([organizationId, detectedAt])
+  @@index([ruleId])
+  @@index([state])
+}
+
+/// Org-scoped catalog of AI tools surfaced on the personal home portal
+/// (/me) and managed by org admins at /settings/governance/tool-catalog.
+///
+/// Three first-class tile types via `type` discriminator:
+///   - "coding_assistant" - click expands to setup helper (e.g. `langwatch claude`)
+///   - "model_provider"   - click expands to inline personal-VK creation
+///   - "external_tool"    - click expands to admin-attached markdown + external link
+///
+/// Scoping: organization-default entries can be OVERRIDDEN at the team
+/// tier (same `slug` + `scope=team` + matching `scopeId`) so admins can
+/// hide or re-skin a globally-listed tool for a specific team. The
+/// user-facing `list` endpoint resolves this hierarchy at read time.
+///
+/// `config` is a discriminated JSON union per `type`:
+///   coding_assistant: { setupCommand, setupDocsUrl, helperText? }
+///   model_provider:   { providerKey, suggestedRoutingPolicyId?, defaultLabel?, projectSuggestionText? }
+///   external_tool:    { descriptionMarkdown, linkUrl, ctaLabel? }
+///
+/// Spec: specs/ai-governance/personal-portal/tool-catalog-*.feature
+model AiToolEntry {
+  id             String       @id @default(nanoid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// "organization" | "team". String not enum so new scopes ship
+  /// without migrations.
+  scope   String
+  /// organizationId or teamId, narrowing what scope this entry applies
+  /// to. Always equals organizationId when scope=organization.
+  scopeId String
+
+  /// "coding_assistant" | "model_provider" | "external_tool".
+  /// Discriminator drives the per-tile UX shape and validates
+  /// the `config` JSON column at the app layer.
+  type String
+
+  displayName String
+
+  /// Stable slug for team-overrides-org resolution (a team-scoped
+  /// entry with the same slug as an org-scoped one hides the org
+  /// default for users in that team). Server-owned: generated from
+  /// displayName + nanoid(6) on create, immutable on update.
+  slug String
+
+  /// @deprecated Use `iconAsset` instead. Kept for back-compat with
+  /// pre-refactor rows; new writes should populate iconAsset.
+  iconKey String?
+
+  /// Icon source - single column, prefix-discriminated:
+  ///   "preset:claude_code" / "preset:codex" / ...   (built-in)
+  ///   "data:image/svg+xml;base64,..."               (admin-uploaded)
+  ///   null                                          → fall back to
+  ///                                                   type-default in UI
+  iconAsset String? @db.Text
+
+  /// Admin-curated sort within the user-facing portal grid.
+  order Int @default(0)
+
+  /// When false the entry is hidden from the user-facing list but
+  /// remains in the admin list (so admins can re-enable without
+  /// losing per-entry config). Disabled is "soft-hide", archived is
+  /// "soft-delete" (preserves audit trail + scope binding history).
+  enabled Boolean @default(true)
+
+  /// Per-type config JSON. Validated via zod discriminated union
+  /// at the service layer (see AiToolEntryService).
+  config Json @default("{}")
+
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+  createdById String?
+  updatedById String?
+
+  /// @deprecated Multi-team scope. Superseded by `departments` - the
+  /// "Visible to" model is now WHOLE ORGANIZATION or a set of
+  /// DEPARTMENTS. Rows are no longer written here (the table is kept
+  /// for now to avoid a destructive drop); readers prefer `departments`.
+  teams AiToolEntryTeam[]
+
+  /// Department scope. Empty = org-wide (visible to every member).
+  /// Non-empty = visible only to members whose `departmentId` is in
+  /// this set. Mirrored onto the legacy scope/scopeId pair for
+  /// back-compat reads (scope='organization' when empty,
+  /// scope='department' otherwise).
+  departments AiToolEntryDepartment[]
+
+  @@index([organizationId, scope, scopeId])
+  @@index([organizationId, enabled, archivedAt])
+  @@index([organizationId, type])
+}
+
+/// @deprecated Per-team scope binding for AiToolEntry. Superseded by
+/// AiToolEntryDepartment; kept so the rename migration is non-destructive.
+/// No new rows are written here.
+model AiToolEntryTeam {
+  id      String      @id @default(nanoid())
+  entryId String
+  teamId  String
+  entry   AiToolEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  team    Team        @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([entryId, teamId])
+  @@index([teamId])
+}
+
+/// Per-department scope binding for AiToolEntry. Empty set = org-wide.
+/// Non-empty = entry visible only to members of those departments (an
+/// OrganizationUser whose `departmentId` is in the set). Mirrors
+/// AiToolEntryTeam's shape. `departmentId` is a plain column ref
+/// (relationMode="prisma"), matching how Department is referenced
+/// elsewhere; the service validates the id belongs to the org.
+model AiToolEntryDepartment {
+  id           String      @id @default(nanoid())
+  entryId      String
+  departmentId String
+  entry        AiToolEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@unique([entryId, departmentId])
+  @@index([departmentId])
+}
+
+/// Admin/platform-curated catalog row for upstream OTLP normalization.
+/// Owns the OTTL transform that reshapes a specific upstream tool's
+/// span shape into canonical gen_ai conventions. Users connect via an
+/// ingestion key (an ingest-only ApiKey carrying ingestionTemplateId) to
+/// land traces in their personal project.
+///
+/// `organizationId` NULL = platform-published default (always-visible
+/// across every org). NOT NULL = org-authored (visible only within
+/// that org). v1 ships only platform-published; org-authored authoring
+/// UI lands v2 (the column ships now to avoid a future migration).
+///
+/// Spec: specs/ai-gateway/governance/ingestion-templates-catalog.feature
+model IngestionTemplate {
+  id             String        @id @default(nanoid())
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// Stable slug - unique within (organizationId, slug) scope. Generated
+  /// from displayName + nanoid(6) on create for org-authored; canonical
+  /// values for platform-published (`claude_code` / `cursor` /
+  /// `claude_cowork` / `raw_otlp_advanced`).
+  slug String
+
+  /// Mirrors the slug for v1 platform-published rows. Kept as a separate
+  /// column so a future v2 may publish two templates that share an
+  /// upstream sourceType (e.g. claude_code-personal vs claude_code-team)
+  /// without a migration. String not enum - extensibility.
+  sourceType String
+
+  displayName String
+  description String? @db.Text
+
+  /// Icon source - single column, prefix-discriminated, mirrors
+  /// AiToolEntry.iconAsset:
+  ///   `preset:<kind>`                 (built-in slot)
+  ///   `data:image/svg+xml;base64,…`   (admin-uploaded for org-authored)
+  ///   null                            → fall back to slug-default in UI
+  iconAsset String? @db.Text
+
+  /// Discriminator for what (if any) extra credential metadata the
+  /// install drawer captures from the user:
+  ///   null              → otlp_token-only (drawer auto-issues the
+  ///                       ingestion key, no input form)
+  ///   `static_api_key`  → drawer captures the user's upstream tool API key
+  ///   `agent_id`        → drawer captures an agent identifier (e.g.
+  ///                       Cursor agentId)
+  /// String not enum so v2 shapes (oauth_redirect / s3_bucket) ship
+  /// without a migration.
+  credentialSchema String?
+
+  /// Admin/platform-authored OTTL statements. Applied at receive time
+  /// AFTER the receiver re-stamps the binding's authoritative principal
+  /// + provenance keys (see `protectedTemplateAttributeKeys` 19-key
+  /// closed list). Templates write canonical OTTL outputs (gen_ai.*,
+  /// cost.usd, response.model) - they CANNOT write attribution or
+  /// provenance keys; the receiver guard restores those post-OTTL.
+  ottlRules String @default("") @db.Text
+
+  /// True for the v1 platform-published default templates
+  /// (organizationId IS NULL). Future org-authored rows write false.
+  /// Drives the admin UI "READ-ONLY view + Request a custom template"
+  /// surface - admins consume + opt-out only in v1.
+  platformPublished Boolean @default(false)
+
+  /// Admin/platform enable. False = hidden from /me catalog. Existing
+  /// ingestion keys continue to land traces; new installs are blocked.
+  enabled Boolean @default(true)
+
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+  createdById String?
+  updatedById String?
+
+  @@unique([organizationId, slug])
+  @@index([organizationId, archivedAt])
+  @@index([sourceType])
+}
+
+// GatewayProviderCredential + VirtualKeyProviderCredential were both
+// dropped in iter 110 (collapse-VK-binding refactor). Provider-routing
+// knobs (rateLimitRpm/Tpm/Rpd, extraHeaders, providerConfig,
+// fallbackPriorityGlobal, rotationPolicy, health-status / circuit
+// state) live on `ModelProvider` directly; the order-of-providers
+// ("which to try first") lives on `RoutingPolicy.modelProviderIds`.
 
 model GatewayBudget {
-    id                     String                    @id @default(nanoid())
-    organizationId         String
-    // Scope is identified by (scopeType, scopeId). The typed relations below
-    // exist for RI when a matching target row is deleted; scopeId is the
-    // canonical discriminator the query layer uses.
-    scopeType              GatewayBudgetScopeType
-    scopeId                String
+  id             String                 @id @default(nanoid())
+  organizationId String
+  // Single source of truth for the target (ADR-021): inline (scopeType,
+  // scopeId) within one organization. scopeId is a team / project / virtual
+  // key / user id depending on scopeType; the query layer reads it directly.
+  // No typed FK columns - scope-entity deletion cleanup is a service-layer
+  // concern, consistent with the no-foreign-key-constraints convention.
+  scopeType      GatewayBudgetScopeType
+  scopeId        String
 
-    // Typed FKs — exactly one matches scopeType. The mismatched ones are NULL.
-    organizationScopedId   String?
-    organizationScoped     Organization?             @relation("OrgScopedGatewayBudgets", fields: [organizationScopedId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  window      GatewayBudgetWindow
+  limitUsd    Decimal                   @db.Decimal(18, 6)
+  onBreach    GatewayBudgetBreachAction @default(BLOCK)
+  timezone    String? // org-level default if null
 
-    teamScopedId           String?
-    teamScoped             Team?                     @relation("TeamScopedGatewayBudgets", fields: [teamScopedId], references: [id], onDelete: Cascade)
+  // Mutated by the ledger, read by the gateway as part of the config payload.
+  spentUsd               Decimal   @default(0) @db.Decimal(18, 6)
+  currentPeriodStartedAt DateTime  @default(now())
+  resetsAt               DateTime
+  lastResetAt            DateTime?
 
-    projectScopedId        String?
-    projectScoped          Project?                  @relation("ProjectScopedGatewayBudgets", fields: [projectScopedId], references: [id], onDelete: Cascade)
+  archivedAt DateTime?
 
-    virtualKeyScopedId     String?
-    virtualKeyScoped       VirtualKey?               @relation("VirtualKeyScopedGatewayBudgets", fields: [virtualKeyScopedId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+  createdById String
+  createdBy   User     @relation("GatewayBudgetCreatedBy", fields: [createdById], references: [id])
 
-    principalUserId        String?
-    principalUser          User?                     @relation("PrincipalScopedGatewayBudgets", fields: [principalUserId], references: [id], onDelete: Cascade)
+  ledgerEntries GatewayBudgetLedger[]
 
-    name                   String
-    description            String?
-    window                 GatewayBudgetWindow
-    limitUsd               Decimal                   @db.Decimal(18, 6)
-    onBreach               GatewayBudgetBreachAction @default(BLOCK)
-    timezone               String?                   // org-level default if null
-
-    // Mutated by the ledger, read by the gateway as part of the config payload.
-    spentUsd               Decimal                   @default(0) @db.Decimal(18, 6)
-    currentPeriodStartedAt DateTime                  @default(now())
-    resetsAt               DateTime
-    lastResetAt            DateTime?
-
-    archivedAt             DateTime?
-
-    createdAt              DateTime                  @default(now())
-    updatedAt              DateTime                  @default(now()) @updatedAt
-    createdById            String
-    createdBy              User                      @relation("GatewayBudgetCreatedBy", fields: [createdById], references: [id])
-
-    ledgerEntries          GatewayBudgetLedger[]
-
-    @@index([organizationId])
-    @@index([scopeType, scopeId])
-    @@index([resetsAt])
+  @@index([organizationId])
+  @@index([scopeType, scopeId])
+  @@index([resetsAt])
 }
 
 model GatewayBudgetLedger {
-    id                   String                     @id @default(nanoid())
-    budgetId             String
-    budget               GatewayBudget              @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  id       String        @id @default(nanoid())
+  budgetId String
+  budget   GatewayBudget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
 
-    virtualKeyId         String
-    virtualKey           VirtualKey                 @relation(fields: [virtualKeyId], references: [id], onDelete: Cascade)
-    providerCredentialId String?
-    providerCredential   GatewayProviderCredential? @relation(fields: [providerCredentialId], references: [id])
+  virtualKeyId    String
+  virtualKey      VirtualKey @relation(fields: [virtualKeyId], references: [id], onDelete: Cascade)
+  // Post-iter-110 GPC merged into ModelProvider; ledger entries point
+  // at the MP directly. Column kept nullable for ledger rows whose
+  // resolving provider has since been deleted (audit-only state).
+  modelProviderId String?
 
-    // Idempotency key — ULID produced by the gateway per request. Dedup for 24h.
-    gatewayRequestId     String
-    amountUsd            Decimal                    @db.Decimal(18, 6)
-    tokensInput          Int                        @default(0)
-    tokensOutput         Int                        @default(0)
-    tokensCacheRead      Int                        @default(0)
-    tokensCacheWrite     Int                        @default(0)
-    model                String
-    providerSlot         String?
-    durationMs           Int?
-    status               GatewayBudgetLedgerStatus  @default(SUCCESS)
-    occurredAt           DateTime                   @default(now())
+  // Idempotency key - ULID produced by the gateway per request. Dedup for 24h.
+  gatewayRequestId String
+  amountUsd        Decimal                   @db.Decimal(18, 6)
+  tokensInput      Int                       @default(0)
+  tokensOutput     Int                       @default(0)
+  tokensCacheRead  Int                       @default(0)
+  tokensCacheWrite Int                       @default(0)
+  model            String
+  durationMs       Int?
+  status           GatewayBudgetLedgerStatus @default(SUCCESS)
+  occurredAt       DateTime                  @default(now())
 
-    @@unique([budgetId, gatewayRequestId])
-    @@index([virtualKeyId])
-    @@index([gatewayRequestId])
-    @@index([occurredAt])
+  @@unique([budgetId, gatewayRequestId])
+  @@index([virtualKeyId])
+  @@index([gatewayRequestId])
+  @@index([occurredAt])
 }
 
 model GatewayChangeEvent {
-    // Monotonically-increasing revision the gateway long-polls on.
-    revision             BigInt                 @id @default(autoincrement())
-    organizationId       String
-    organization         Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-    kind                 GatewayChangeEventKind
-    virtualKeyId         String?
-    budgetId             String?
-    providerCredentialId String?
-    projectId            String?
-    project              Project?               @relation(fields: [projectId], references: [id], onDelete: SetNull)
-    payload              Json?
-    createdAt            DateTime               @default(now())
+  // Monotonically-increasing revision the gateway long-polls on.
+  revision        BigInt                 @id @default(autoincrement())
+  organizationId  String
+  organization    Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  kind            GatewayChangeEventKind
+  virtualKeyId    String?
+  budgetId        String?
+  // Post-collapse: events pointing at a provider point at the
+  // ModelProvider directly (no separate binding row).
+  modelProviderId String?
+  projectId       String?
+  project         Project?               @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  payload         Json?
+  createdAt       DateTime               @default(now())
 
-    @@index([organizationId, revision])
-    @@index([projectId, revision])
-    @@index([virtualKeyId])
-    @@index([budgetId])
+  @@index([organizationId, revision])
+  @@index([projectId, revision])
+  @@index([virtualKeyId])
+  @@index([budgetId])
 }
 
-// model GatewayAuditLog removed — gateway services now write to the
+// model GatewayAuditLog removed - gateway services now write to the
 // shared `AuditLog` model (top of file). See migration
 // 20260425000000_consolidate_gateway_audit_into_audit_log.
 
-// AI Gateway cache-control rules — operator-defined overrides without
+// AI Gateway cache-control rules - operator-defined overrides without
 // client code changes. Org-scoped; compiled into the VK bundle at
 // /changes-refresh time so the hot path stays at ~700 ns. Matchers +
 // action live as JSON so the wire schema can evolve without migrations.
 // See specs/ai-gateway/cache-control-rules.feature for the contract and
 // docs/ai-gateway/cache-control.mdx for the rules-engine narrative.
 model GatewayCacheRule {
-    id             String               @id @default(nanoid())
-    // organizationId is the multitenancy boundary; no FK is enforced at the
-    // DB level (org-scoped table, distribution-friendly). The service layer
-    // guards orphan-org refs at write time.
-    organizationId String
+  id             String @id @default(nanoid())
+  // organizationId is the multitenancy boundary; no FK is enforced at the
+  // DB level (org-scoped table, distribution-friendly). The service layer
+  // guards orphan-org refs at write time.
+  organizationId String
 
-    name           String
-    description    String?
-    priority       Int                  @default(100)
-    enabled        Boolean              @default(true)
+  name        String
+  description String?
+  priority    Int     @default(100)
+  enabled     Boolean @default(true)
 
-    // Matchers are ANDed. Null / empty means "no constraint on this field".
-    // Shape (validated in the service layer, JSON on the wire):
-    //   {
-    //     vk_id?: string,
-    //     vk_tags?: string[],
-    //     vk_prefix?: string,
-    //     principal_id?: string,
-    //     model?: string,
-    //     request_metadata?: Record<string, string>
-    //   }
-    matchers       Json
+  // Matchers are ANDed. Null / empty means "no constraint on this field".
+  // Shape (validated in the service layer, JSON on the wire):
+  //   {
+  //     vk_id?: string,
+  //     vk_tags?: string[],
+  //     vk_prefix?: string,
+  //     principal_id?: string,
+  //     model?: string,
+  //     request_metadata?: Record<string, string>
+  //   }
+  matchers Json
 
-    // Action applied when the rule matches.
-    //   { mode: "respect"|"force"|"disable", ttl?: number, salt?: string }
-    // `mode` is also captured in `modeEnum` so we can index by it; the
-    // JSON column keeps the full action for forward compatibility with
-    // ttl / salt etc.
-    action         Json
-    modeEnum       GatewayCacheRuleMode
+  // Action applied when the rule matches.
+  //   { mode: "respect"|"force"|"disable", ttl?: number, salt?: string }
+  // `mode` is also captured in `modeEnum` so we can index by it; the
+  // JSON column keeps the full action for forward compatibility with
+  // ttl / salt etc.
+  action   Json
+  modeEnum GatewayCacheRuleMode
 
-    archivedAt     DateTime?
+  archivedAt DateTime?
 
-    createdAt      DateTime             @default(now())
-    updatedAt      DateTime             @default(now()) @updatedAt
-    // createdById is a user reference; no FK enforced (distribution policy).
-    // The service layer enforces "rule is created by an active user".
-    createdById    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+  // createdById is a user reference; no FK enforced (distribution policy).
+  // The service layer enforces "rule is created by an active user".
+  createdById String
 
-    @@index([organizationId, archivedAt, priority])
-    @@index([organizationId, enabled, priority])
+  @@index([organizationId, archivedAt, priority])
+  @@index([organizationId, enabled, priority])
 }
 
 // FeatureFlag stores the postgres-backed value for one registered
@@ -1874,7 +2721,7 @@ model FeatureFlag {
     enabled      Boolean
     // Optional list of targeting rules evaluated before the `enabled`
     // fallback. Each rule is `{ match: { projectId?, organizationId? },
-    // enabled: boolean }` — first match wins. Shape lives in
+    // enabled: boolean }` - first match wins. Shape lives in
     // `src/server/featureFlag/rules.ts` so it can grow over time
     // (percentage rollouts, email-domain matches, etc.) without a
     // migration. Storing as JSON keeps the surface flexible while

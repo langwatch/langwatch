@@ -1,10 +1,11 @@
 import type { PrismaClient } from "@prisma/client";
 import { UNLIMITED_MESSAGES } from "../../../ee/billing/planLimits";
 import type { PlanInfo } from "../../../ee/licensing/planInfo";
-import type { PlanProvider } from "../app-layer/subscription/plan-provider";
-import type { UsageUnit } from "../app-layer/usage/usage-meter-policy";
+import { env } from "../../env.mjs";
 import { formatNumber, formatPercent } from "../../utils/formatNumber";
 import { getApp } from "../app-layer/app";
+import type { PlanProvider } from "../app-layer/subscription/plan-provider";
+import type { UsageUnit } from "../app-layer/usage/usage-meter-policy";
 import {
   type ILicenseEnforcementRepository,
   LicenseEnforcementRepository,
@@ -78,7 +79,16 @@ export function buildMessageLimitInfo(
  * Follows Interface Segregation Principle - only what we need.
  */
 export interface ITraceUsageService {
-  getCurrentMonthCount(params: { organizationId: string }): Promise<number | "unlimited">;
+  getCurrentMonthCount(params: {
+    organizationId: string;
+  }): Promise<number | "unlimited">;
+  /**
+   * Real current-month usage count for display, computed even for unlimited
+   * (seat-based / metered) plans where getCurrentMonthCount returns "unlimited".
+   */
+  getCurrentMonthCountForDisplay(params: {
+    organizationId: string;
+  }): Promise<number>;
 }
 
 /**
@@ -86,9 +96,7 @@ export interface ITraceUsageService {
  * Follows Interface Segregation Principle.
  */
 export interface IUsageUnitResolver {
-  getResolvedUsageUnit(params: {
-    organizationId: string;
-  }): Promise<UsageUnit>;
+  getResolvedUsageUnit(params: { organizationId: string }): Promise<UsageUnit>;
 }
 
 /**
@@ -172,7 +180,7 @@ export class UsageStatsService {
       usageUnit,
     ] = await Promise.all([
       this.repository.getProjectCount(organizationId),
-      this.traceUsageService.getCurrentMonthCount({ organizationId }),
+      this.traceUsageService.getCurrentMonthCountForDisplay({ organizationId }),
       this.repository.getCurrentMonthCost(organizationId),
       this.planProvider.getActivePlan({ organizationId, user }),
       this.getMaxMonthlyUsageLimit(organizationId),
@@ -188,10 +196,12 @@ export class UsageStatsService {
       this.usageUnitResolver.getResolvedUsageUnit({ organizationId }),
     ]);
 
-    const resolvedCount = currentMonthMessagesCount === "unlimited" ? null : currentMonthMessagesCount;
+    // Real metered/trace volume for the month — surfaced even for unlimited
+    // (seat-based) plans so the usage page shows actual billable events.
+    const resolvedCount = currentMonthMessagesCount;
 
     const messageLimitInfo = buildMessageLimitInfo(
-      resolvedCount ?? 0,
+      resolvedCount,
       activePlan.maxMessagesPerMonth,
     );
 

@@ -52,6 +52,12 @@ jobs:
       NEXTAUTH_SECRET: "test-secret-for-e2e-testing"
       NEXTAUTH_URL: "http://localhost:5570"
       API_TOKEN_JWT_SECRET: "test-jwt-secret-for-e2e"
+      # AI Gateway data-plane secrets (shared by control plane + Go gateway).
+      # The gateway validates these as required; without them `make service
+      # svc=aigateway` crash-loops. Test-only values, 32+ chars.
+      LW_GATEWAY_INTERNAL_SECRET: "e2e-gateway-internal-secret-000000000000000000000000000000000000"
+      LW_GATEWAY_JWT_SECRET: "e2e-gateway-jwt-secret-00000000000000000000000000000000000000000"
+      LW_VIRTUAL_KEY_PEPPER: "e2e-virtual-key-pepper-00000000000000000000000000000000000000000"
       SKIP_ENV_VALIDATION: "true"
       DISABLE_PII_REDACTION: "true"
       NODE_ENV: "development"
@@ -162,9 +168,9 @@ jobs:
         working-directory: agentic-e2e-tests
         run: pnpm install --frozen-lockfile --ignore-workspace
 
-      - name: Install Playwright browsers
-        working-directory: agentic-e2e-tests
-        run: pnpm exec playwright install --with-deps chromium
+      # No Playwright browser/ffmpeg download: the tests launch the runner's
+      # preinstalled Google Chrome via channel (E2E_BROWSER_CHANNEL below) and
+      # video recording is off in CI, so no ffmpeg binary is needed.
 
       - name: Prepare files
         working-directory: langwatch
@@ -190,6 +196,8 @@ jobs:
           # Migrations already ran in earlier steps; skip them during pnpm start
           SKIP_PRISMA_MIGRATE: "true"
           SKIP_CLICKHOUSE_MIGRATE: "true"
+          # Launch the runner's preinstalled Google Chrome (no browser download)
+          E2E_BROWSER_CHANNEL: chrome
         run: |
           # Start the app in background
           cd langwatch && PORT=5570 pnpm start &

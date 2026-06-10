@@ -47,6 +47,7 @@ const FoundryDrawer = lazy(
   () => import("./ops/foundry/FoundryDrawer").then((m) => ({ default: m.FoundryDrawer })),
 );
 import { CreateProjectDrawer } from "./projects/CreateProjectDrawer";
+import { EditProjectDrawer } from "./projects/EditProjectDrawer";
 import { PromptEditorDrawer } from "./prompts/PromptEditorDrawer";
 import { PromptListDrawer } from "./prompts/PromptListDrawer";
 import { SeriesFiltersDrawer } from "./SeriesFilterDrawer";
@@ -119,6 +120,7 @@ export const drawers = {
   suiteEditor: SuiteFormDrawer,
   // Project management
   createProject: CreateProjectDrawer,
+  editProject: EditProjectDrawer,
   createTeam: CreateTeamDrawer,
   // Online Evaluations (Monitors)
   onlineEvaluation: OnlineEvaluationDrawer,

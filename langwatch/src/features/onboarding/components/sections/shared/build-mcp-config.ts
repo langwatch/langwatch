@@ -4,7 +4,7 @@ interface BuildMcpInput {
   apiKey: string;
   endpoint: string | undefined;
   /**
-   * Project id to surface as `LANGWATCH_PROJECT_ID`. Required for PATs (the
+   * Project id to surface as `LANGWATCH_PROJECT_ID`. Required for API keys (the
    * unified auth middleware needs it to resolve scope), harmless for legacy
    * `sk-lw-*` keys (the SDK + MCP server simply prefer it when set). We
    * always emit it when supplied so users see one consistent env block

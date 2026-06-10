@@ -18,13 +18,13 @@ import {
 } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
+import { randomUUID } from "crypto";
 
 import { config } from "dotenv";
 import {
   expectations,
   CliRunner,
   LockFileManager,
-  PROMPT_NAME_PREFIX,
   PromptFileManager,
 } from "./helpers";
 import { LangWatch } from "../../../dist";
@@ -35,8 +35,21 @@ config({ path: ".env.test", override: true });
 const { expectCliResultSuccess } = expectations;
 const TMP_BASE_DIR = path.join(__dirname, "tmp", "sync");
 
+// File-local prefix that does NOT start with the shared PROMPT_NAME_PREFIX.
+// Vitest runs e2e files in parallel, and sibling files (cli-push/pull/tag)
+// each run cleanUpTestPrompts() in their afterAll, which deletes every
+// prompt starting with the shared prefix. Using a distinct prefix here
+// keeps those siblings from nuking this file's prompts mid-test.
+const SYNC_PROMPT_PREFIX = "cli-sync-e2e-test-prompt-";
+
+// Track every prompt handle this file creates so we can scope our own
+// cleanup to the prompts we actually own.
+const createdHandles = new Set<string>();
+
 const createUniquePromptName = () => {
-  return `${PROMPT_NAME_PREFIX}-${Date.now()}`;
+  const handle = `${SYNC_PROMPT_PREFIX}${randomUUID()}`;
+  createdHandles.add(handle);
+  return handle;
 };
 
 describe("CLI E2E", () => {
@@ -75,18 +88,23 @@ describe("CLI E2E", () => {
 
   afterEach(async () => {
     process.chdir(originalCwd);
+    if (testDir && fs.existsSync(testDir)) {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
   });
 
   afterAll(async () => {
-    // Clean up test prompts
     const apiHelpers = new ApiHelpers(langwatch);
-    await apiHelpers.cleapUpTestPrompts();
+    try {
+      await apiHelpers.cleanUpTestPrompts(Array.from(createdHandles));
+    } finally {
+      if (fs.existsSync(TMP_BASE_DIR)) {
+        fs.rmSync(TMP_BASE_DIR, { recursive: true, force: true });
+      }
+    }
   });
 
-  // Entire sync suite skipped due to chronic CI flakes — see langwatch/langwatch#3240.
-  // Multiple tests in this describe block fail non-deterministically; skip
-  // the whole group rather than whack-a-mole individual tests.
-  describe.skip("sync", () => {
+  describe("sync", () => {
     describe("create local -> sync -> update local -> sync", () => {
       it("should keep remote prompt up to date", async () => {
         // Initialize project
@@ -156,13 +174,13 @@ describe("CLI E2E", () => {
         expect(localPromptFileManagement.getPromptFileContent(promptHandle))
           .toMatchInlineSnapshot(`
         "model: gpt-4-turbo
-        modelParameters:
-          temperature: 0.9
         messages:
           - role: system
             content: You are an updated system message.
           - role: user
             content: You are an updated user message.
+        modelParameters:
+          temperature: 0.9
         "
       `);
 
@@ -226,12 +244,8 @@ describe("CLI E2E", () => {
         }
         expect(remotePrompt.handle).toBe(promptHandle);
         expect(remotePrompt.model).toBe(localPrompt.model);
-        if (!localPrompt.modelParameters) {
-          throw new Error("Local prompt model parameters not found");
-        }
-        expect(remotePrompt.temperature).toBe(
-          localPrompt.modelParameters.temperature,
-        );
+        // Template omits temperature (gpt-5+ incompatible), so no temperature is synced
+        expect(remotePrompt.temperature).toBeUndefined();
         expect(remotePrompt.messages).toEqual(localPrompt.messages);
 
         // 5. Modify remote prompt

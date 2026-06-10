@@ -35,6 +35,7 @@ import { useActivePlan } from "../../hooks/useActivePlan";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { EnrichedAuditLog } from "~/server/app-layer/organizations/repositories/organization.repository";
 import { api } from "../../utils/api";
+import { disambiguateLabels } from "../../utils/disambiguateLabels";
 
 // CSV-cell cap for JSON columns (args / before / after). 4 KB is enough
 // to capture typical gateway-shape diffs while staying well under the
@@ -495,13 +496,20 @@ function AuditLogPage() {
                 }
               >
                 <option value="all">All Projects</option>
-                {organization.teams
-                  .flatMap((team) => team.projects)
-                  .map((proj) => (
-                    <option key={proj.id} value={proj.id}>
-                      {proj.name}
-                    </option>
-                  ))}
+                {disambiguateLabels(
+                  organization.teams.flatMap((team) =>
+                    team.projects.map((proj) => ({
+                      id: proj.id,
+                      label: proj.name,
+                      teamName: team.name,
+                    })),
+                  ),
+                  (proj) => proj.teamName,
+                ).map((proj) => (
+                  <option key={proj.id} value={proj.id}>
+                    {proj.displayLabel}
+                  </option>
+                ))}
               </NativeSelect.Field>
               <NativeSelect.Indicator />
             </NativeSelect.Root>
@@ -563,6 +571,7 @@ function AuditLogPage() {
           </VStack>
         ) : (
           <>
+            <Box width="full" overflowX="auto">
             <Table.Root variant="line" width="full">
               <Table.Header>
                 <Table.Row>
@@ -683,6 +692,7 @@ function AuditLogPage() {
                 ))}
               </Table.Body>
             </Table.Root>
+            </Box>
 
             {/* Pagination */}
             {totalHits > 0 && (
@@ -702,6 +712,6 @@ function AuditLogPage() {
   );
 }
 
-export default withPermissionGuard("auditLog:view", {
+export default withPermissionGuard("organization:manage", {
   layoutComponent: SettingsLayout,
 })(AuditLogPage);

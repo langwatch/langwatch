@@ -9,8 +9,14 @@
  * UX contract: specs/model-providers/missing-model-popup.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   AI_CALL_FAILED_CAUSE,
@@ -18,8 +24,11 @@ import {
 import {
   aiCallFailedToastId,
   missingModelToastId,
+  type ProviderDisabledInfo,
+  providerDisabledToastId,
   showAiCallFailedToast,
   showMissingModelToast,
+  showProviderDisabledToast,
 } from "../MissingModelToast";
 import { Toaster, toaster } from "../ui/toaster";
 
@@ -169,6 +178,136 @@ describe("showAiCallFailedToast", () => {
       ).toHaveLength(1);
     });
     expect(toaster.isVisible(aiCallFailedToastId(info))).toBe(true);
+  });
+});
+
+function buildProviderDisabledInfo(
+  overrides: Partial<ProviderDisabledInfo> = {},
+): ProviderDisabledInfo {
+  return {
+    featureKey: "traces.ai_search",
+    featureDisplayName: "AI search",
+    role: "DEFAULT",
+    projectId: "proj-1",
+    resolvedScope: "project",
+    resolvedModel: "openai/gpt-4o",
+    providerKey: "openai",
+    alternate: {
+      scope: "organization",
+      model: "azure/gpt-4o",
+      providerKey: "azure",
+      providerEnabled: true,
+    },
+    ...overrides,
+  };
+}
+
+describe("showProviderDisabledToast", () => {
+  /** @scenario Project-scope override with disabled provider and an org alternate */
+  it("names the disabled project default and swaps to the org alternate on click", async () => {
+    mountToaster();
+    const onSwapToAlternate = vi.fn();
+    showProviderDisabledToast(buildProviderDisabledInfo({ onSwapToAlternate }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Model unavailable for AI search/i),
+      ).toBeInTheDocument();
+    });
+    // Description names the disabled default + its scope, and offers the
+    // cascade-next alternate.
+    expect(
+      screen.getByText(/openai\/gpt-4o is set at project scope/i),
+    ).toBeInTheDocument();
+    const swapButton = screen.getByText(
+      "Use organization default (azure/gpt-4o)",
+    );
+    fireEvent.click(swapButton);
+    // The click delegates to the injected swap handler — the interceptor
+    // wires this to setFeatureOverrideForScope(model: null) at the
+    // project scope (see providerDisabledSwapHandler in utils/api.tsx).
+    expect(onSwapToAlternate).toHaveBeenCalledTimes(1);
+  });
+
+  /** @scenario No alternate falls back to settings deep-link */
+  it("offers an Open settings deep-link when the cascade has no alternate", async () => {
+    mountToaster();
+    const assign = vi.fn();
+    const originalLocation = window.location;
+    Object.defineProperty(window, "location", {
+      value: { ...originalLocation, assign },
+      writable: true,
+      configurable: true,
+    });
+    try {
+      showProviderDisabledToast(
+        buildProviderDisabledInfo({
+          alternate: null,
+          onSwapToAlternate: undefined,
+        }),
+      );
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/Model unavailable for AI search/i),
+        ).toBeInTheDocument();
+      });
+      const settingsButton = screen.getByText("Open settings");
+      fireEvent.click(settingsButton);
+      expect(assign).toHaveBeenCalledWith(
+        "/settings/model-providers#role-default",
+      );
+    } finally {
+      Object.defineProperty(window, "location", {
+        value: originalLocation,
+        writable: true,
+        configurable: true,
+      });
+    }
+  });
+
+  /** @scenario Disabled scope above project is not user-clearable from the toast */
+  it("names the team-scope default but offers no inline swap without a handler", async () => {
+    mountToaster();
+    // The interceptor only injects onSwapToAlternate for project-scope
+    // resolutions — clearing team/org defaults needs permissions the
+    // current user may not hold, so the toast gets no swap handler even
+    // though an enabled alternate exists.
+    showProviderDisabledToast(
+      buildProviderDisabledInfo({
+        resolvedScope: "team",
+        onSwapToAlternate: undefined,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Model unavailable for AI search/i),
+      ).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText(/openai\/gpt-4o is set at team scope/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Open settings")).toBeInTheDocument();
+    expect(
+      screen.queryByText(/Use organization default/i),
+    ).not.toBeInTheDocument();
+  });
+
+  /** @scenario Repeated failures within the same scope coalesce into one toast */
+  it("renders exactly one toast for the same error signature across a retry storm", async () => {
+    mountToaster();
+    const info = buildProviderDisabledInfo();
+    for (let i = 0; i < 5; i++) {
+      showProviderDisabledToast(info);
+    }
+
+    await waitFor(() => {
+      expect(
+        screen.getAllByText(/Model unavailable for AI search/i),
+      ).toHaveLength(1);
+    });
+    expect(toaster.isVisible(providerDisabledToastId(info))).toBe(true);
   });
 });
 

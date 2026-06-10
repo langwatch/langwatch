@@ -324,6 +324,11 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
             projects: {
               where: {
                 archivedAt: null,
+                // Hide the internal-governance Project from every UI consumer.
+                // It exists only as a routing/tenancy artifact for IngestionSource
+                // data; never user-visible. See specs/ai-gateway/governance/
+                // architecture-invariants.feature + ui-contract.feature.
+                kind: { not: "internal_governance" },
               },
             },
           },
@@ -446,6 +451,9 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         s3Bucket: input.s3Bucket,
         ...(input.presenceEnabled !== undefined
           ? { presenceEnabled: input.presenceEnabled }
+          : {}),
+        ...(input.supportContact !== undefined
+          ? { supportContact: input.supportContact?.trim() || null }
           : {}),
       },
     });

@@ -21,12 +21,12 @@ End user's runtime ──/v1/chat/completions──▶ LangWatch Gateway ──�
 
 Key properties:
 
-- **Each end-user has their own VK.** One per customer, or per seat — your call.
+- **Each end-user has their own VK.** One per customer, or per seat, your call.
 - **You set per-customer budgets.** Enforced at the gateway. When a customer hits their cap, the gateway returns `402 budget_exceeded`. Your code doesn't need to track spend.
 - **All audit + trace data lands in your LangWatch project.** End-users never see LangWatch.
 - **End-users can't escape your policy.** Policy rules, model allowlists, cache rules all attach to the VK.
 
-## Step 1 — Model the tenancy
+## Step 1: Model the tenancy
 
 Decide your scope granularity:
 
@@ -38,25 +38,26 @@ Decide your scope granularity:
 
 For this walkthrough, assume **per-customer** model.
 
-## Step 2 — Provision the provider binding once
+## Step 2: Configure the upstream ModelProvider once
 
-Your LangWatch project owns a single provider binding per upstream (OpenAI, Anthropic). End-users don't see these:
+Your LangWatch org owns a single ModelProvider row per upstream (OpenAI, Anthropic) at ORGANIZATION scope. End-users never see these. Configure them under **Settings → Model Providers → Add Model Provider** (Scope = Organization), then open each row's **Advanced (Gateway)** tab and set the per-credential gateway caps:
+
+| Field | Suggested value |
+|---|---|
+| RPM | 100000 (your bulk-purchase cap from the upstream) |
+| Fallback priority | 10 for primary, 20 for backup |
+| Provider config (JSON) | region/deployment overrides as needed |
+
+No separate "binding" entity to mint. The ModelProvider id is what your code references:
 
 ```bash
-export LANGWATCH_API_KEY="$YOUR_BACKEND_TOKEN"  # service-account token with gatewayProviders:create
-
-GPC_ID=$(langwatch gateway-providers create \
-  --model-provider mp_openai \
-  --slot primary \
-  --rate-limit-rpm 100000 \
-  --format json | jq -r .id)
-echo "gpc_id: $GPC_ID"
-# gpc_id: gpc_01HZX...
+# Look up the id once and store it in your backend config
+langwatch model-providers list --format json | \
+  jq -r '.[] | select(.provider == "openai" and .scope.scope_type == "ORGANIZATION") | .id'
+# → mp_01HZX...
 ```
 
-Store `$GPC_ID` in your backend config.
-
-## Step 3 — Provision a VK when a customer signs up
+## Step 3: Provision a VK when a customer signs up
 
 Server-side code (Node.js example):
 
@@ -72,7 +73,10 @@ export async function provisionCustomer(customerId: string) {
     name: `customer-${customerId}`,
     environment: "live",
     principal_user_id: customerId,          // audit attribution
-    provider_credential_ids: [process.env.LANGWATCH_GPC_ID!],
+    scopes: [
+      { scope_type: "ORGANIZATION", scope_id: process.env.LANGWATCH_ORG_SLUG! },
+    ],
+    routing_policy_id: process.env.LANGWATCH_DEFAULT_ROUTING_POLICY_ID ?? null,
     config: {
       models_allowed: ["gpt-5-mini", "gpt-5", "claude-haiku-4-5-20251001"],
       cache: { mode: "respect" },
@@ -87,6 +91,8 @@ export async function provisionCustomer(customerId: string) {
 }
 ```
 
+The VK lives at your reseller-org scope. The eligible-MP set is the union of every ModelProvider visible from that scope (the ones you configured in Step 2). If you omit `routing_policy_id`, dispatch falls back to the org's default ordering (`fallbackPriorityGlobal` then `createdAt`).
+
 In a signup webhook:
 
 ```ts
@@ -99,7 +105,7 @@ await db.customers.update({
 // exactly once. Your system never stores it in plaintext.
 ```
 
-## Step 4 — Attach a per-customer budget
+## Step 4: Attach a per-customer budget
 
 Tie the budget to the VK:
 
@@ -121,15 +127,15 @@ export async function attachCustomerBudget(vkId: string, planLimit: number) {
 }
 ```
 
-When you upgrade / downgrade a customer:
+When you upgrade, downgrade a customer:
 
 ```ts
 await budgets.update(budgetId, { limit_usd: newPlanLimit });
 ```
 
-Changes propagate to the gateway within 30 s via the `/changes` feed — no restart, no customer impact.
+Changes propagate to the gateway within 30 s via the `/changes` feed, no restart, no customer impact.
 
-## Step 5 — End-user makes a call
+## Step 5: End-user makes a call
 
 Your customer's app calls the gateway directly with the VK you gave them:
 
@@ -151,7 +157,7 @@ The gateway:
 - Meters the cost against the customer's budget.
 - Emits a LangWatch trace into your project, tagged with `principal_user_id = customerId`.
 
-## Step 6 — Bill the customer
+## Step 6: Bill the customer
 
 You have two options, matching two mental models:
 
@@ -164,11 +170,11 @@ langwatch gateway-budgets list --format json | \
   jq '[.[] | select(.scope_type == "VIRTUAL_KEY") | {vk: .scope_id, spent: .spent_usd, limit: .limit_usd}]'
 ```
 
-Your Stripe / billing layer reads this and invoices.
+Your Stripe, billing layer reads this and invoices.
 
 ### (b) Passthrough billing
 
-For passthrough, your UI shows the same numbers you see in LangWatch + a per-customer markup or flat management fee. The BudgetLedger row is per-request and includes cost — you can stream it into your reporting.
+For passthrough, your UI shows the same numbers you see in LangWatch + a per-customer markup or flat management fee. The BudgetLedger row is per-request and includes cost, you can stream it into your reporting.
 
 ## Handling over-limit customers
 
@@ -197,11 +203,11 @@ Because the response is standard OpenAI-compatible, your error handler only need
 
 **Customer cancels their subscription** → `langwatch.revoke(vkId)`. The next request returns `403 virtual_key_revoked`. If you want a grace period, schedule the revoke job for 24–48 h after cancellation instead.
 
-## Audit — who did what
+## Audit: who did what
 
 Every write through your backend token is audited with `actor = "svc_<your_project_id>"`, action, target, and metadata. Filter the audit log on `resource_type = "virtualKey"` to get a per-customer provisioning history. Under **/settings/audit-log** in the LangWatch UI.
 
-If you need SIEM export: the Postgres `AuditLog` table is queryable for gateway-shape rows (filter on `targetKind IN ('virtual_key', 'budget', 'provider_binding', 'cache_rule')`). Set up a daily `pg_dump`-then-ship pipeline into your SIEM's ingestion path. There is no public REST audit-export endpoint in v1 — see [Audit log → Querying programmatically](/ai-gateway/audit#querying-programmatically) for the supported paths (UI CSV download, direct SQL).
+If you need SIEM export: the Postgres `AuditLog` table is queryable for gateway-shape rows (filter on `targetKind IN ('virtual_key', 'budget', 'model_provider', 'routing_policy', 'cache_rule')`). Set up a daily `pg_dump`-then-ship pipeline into your SIEM's ingestion path. There is no public REST audit-export endpoint in v1, see [Audit log → Querying programmatically](/ai-gateway/audit#querying-programmatically) for the supported paths (UI CSV download, direct SQL).
 
 ## Gotchas
 
@@ -227,8 +233,8 @@ Gateway enforces at the VK level; customer sees `429 rate_limit_exceeded`. Combi
 
 ## See also
 
-- [Management REST API](/ai-gateway/api/management) — every endpoint used above.
-- [Virtual Keys](/ai-gateway/virtual-keys) — VK lifecycle semantics.
-- [Budgets](/ai-gateway/budgets) — hierarchical scope logic.
-- [Security](/ai-gateway/security) — how backend tokens are isolated from VK secrets.
-- [CI smoke-test cookbook](/ai-gateway/cookbooks/ci-smoke-test) — validate the full flow in CI.
+- [Management REST API](/ai-gateway/api/management): every endpoint used above.
+- [Virtual Keys](/ai-gateway/virtual-keys): VK lifecycle semantics.
+- [Budgets](/ai-gateway/budgets): hierarchical scope logic.
+- [Security](/ai-gateway/security): how backend tokens are isolated from VK secrets.
+- [CI smoke-test cookbook](/ai-gateway/cookbooks/ci-smoke-test): validate the full flow in CI.

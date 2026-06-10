@@ -59,7 +59,7 @@ class RagasROUGEScoreEvaluator(
     def evaluate(self, entry: RagasROUGEScoreEntry) -> SingleEvaluationResult:
         scorer = RougeScore(
             rouge_type=self.settings.rouge_type,
-            measure_type=self.settings.measure_type,
+            mode=self.settings.measure_type,
         )
 
         score = scorer.single_turn_score(

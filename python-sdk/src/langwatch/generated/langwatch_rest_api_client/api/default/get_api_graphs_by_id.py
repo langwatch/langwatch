@@ -1,4 +1,3 @@
-from http import HTTPStatus
 from typing import Any
 from urllib.parse import quote
 
@@ -12,7 +11,7 @@ from ...models.get_api_graphs_by_id_response_401 import GetApiGraphsByIdResponse
 from ...models.get_api_graphs_by_id_response_404 import GetApiGraphsByIdResponse404
 from ...models.get_api_graphs_by_id_response_422 import GetApiGraphsByIdResponse422
 from ...models.get_api_graphs_by_id_response_500 import GetApiGraphsByIdResponse500
-from ...types import Response
+from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
@@ -86,8 +85,11 @@ def _build_response(
     | GetApiGraphsByIdResponse422
     | GetApiGraphsByIdResponse500
 ]:
+    # LangWatch override: use safe_http_status to tolerate non-IANA status codes
+    # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
+    # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
     return Response(
-        status_code=HTTPStatus(response.status_code),
+        status_code=safe_http_status(response.status_code),
         content=response.content,
         headers=response.headers,
         parsed=_parse_response(client=client, response=response),

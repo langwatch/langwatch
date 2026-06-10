@@ -11,4 +11,7 @@ export const teamFactory = Factory.define<Team>(({ sequence }) => ({
   updatedAt: new Date(),
   archivedAt: null,
   defaultCustomRoleId: null,
+  isPersonal: false,
+  ownerUserId: null,
+  departmentId: null,
 }));

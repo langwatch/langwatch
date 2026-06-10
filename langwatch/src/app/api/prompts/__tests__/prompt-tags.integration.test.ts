@@ -76,6 +76,7 @@ describe("Prompt Tags REST API (/api/prompts/tags)", () => {
       data: {
         ...projectFactory.build({ slug: `test-project-${slug}` }),
         teamId: testTeam.id,
+        personalFeatures: {},
       },
     });
 

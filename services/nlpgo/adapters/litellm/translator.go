@@ -13,14 +13,14 @@ import (
 // shape — keep them in sync. Only the slot for the active provider should
 // be populated; the rest should be omitted.
 type InlineCredentials struct {
-	Provider  string                 `json:"provider"`
-	OpenAI    map[string]string      `json:"openai,omitempty"`
-	Anthropic map[string]string      `json:"anthropic,omitempty"`
-	Azure     map[string]any         `json:"azure,omitempty"`
-	Bedrock   map[string]string      `json:"bedrock,omitempty"`
-	VertexAI  map[string]string      `json:"vertex_ai,omitempty"`
-	Gemini    map[string]string      `json:"gemini,omitempty"`
-	Custom    map[string]string      `json:"custom,omitempty"`
+	Provider  string            `json:"provider"`
+	OpenAI    map[string]string `json:"openai,omitempty"`
+	Anthropic map[string]string `json:"anthropic,omitempty"`
+	Azure     map[string]any    `json:"azure,omitempty"`
+	Bedrock   map[string]string `json:"bedrock,omitempty"`
+	VertexAI  map[string]string `json:"vertex_ai,omitempty"`
+	Gemini    map[string]string `json:"gemini,omitempty"`
+	Custom    map[string]string `json:"custom,omitempty"`
 }
 
 // Encode returns the base64-JSON header value for the inline-credentials

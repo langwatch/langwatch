@@ -12,6 +12,36 @@ describe("formatPreview", () => {
     });
   });
 
+  describe("given prepended XML context above the human text", () => {
+    /** @scenario "The trace list preview shows the human text, not the boilerplate" */
+    it("strips a leading system-reminder block from a plain string", () => {
+      const input =
+        "<system-reminder>\nThe following skills are available\n</system-reminder>\n\nhi";
+      const result = formatPreview(input, opts);
+      expect(result.text).toBe("hi");
+    });
+
+    it("strips the leading context inside a chat-array user message", () => {
+      const input = JSON.stringify([
+        {
+          role: "user",
+          content:
+            "<system-reminder>big boilerplate</system-reminder>\n\nwhat is 2+2?",
+        },
+      ]);
+      const result = formatPreview(input, opts);
+      expect(result.text).toBe("what is 2+2?");
+      expect(result.role).toBe("user");
+    });
+
+    /** @scenario "A context-only message stays visible instead of blanking" */
+    it("keeps a context-only message visible rather than blanking it", () => {
+      const input = "<system-reminder>only context, no human text</system-reminder>";
+      const result = formatPreview(input, opts);
+      expect(result.text).toContain("only context");
+    });
+  });
+
   describe("given plain prose", () => {
     it("returns the input unchanged when within the cap", () => {
       const result = formatPreview("Hello, how are you?", opts);

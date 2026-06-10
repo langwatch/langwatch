@@ -654,6 +654,7 @@ describe("LicenseEnforcementRepository", () => {
       expect(mockPrisma.experiment.count).toHaveBeenCalledWith({
         where: {
           projectId: { in: ["proj-1", "proj-2"] },
+          archivedAt: null,
           NOT: {
             workbenchState: {
               path: ["task"],
@@ -710,6 +711,14 @@ describe("LicenseEnforcementRepository", () => {
       await repository.getAgentCount(organizationId);
 
       const call = mockPrisma.agent.count.mock.calls[0]?.[0];
+      expect(call?.where).toHaveProperty("archivedAt", null);
+    });
+
+    it("experiment query excludes archived experiments", async () => {
+      mockPrisma.project.findMany.mockResolvedValue([{ id: "proj-1" }]);
+      await repository.getExperimentCount(organizationId);
+
+      const call = mockPrisma.experiment.count.mock.calls[0]?.[0];
       expect(call?.where).toHaveProperty("archivedAt", null);
     });
   });

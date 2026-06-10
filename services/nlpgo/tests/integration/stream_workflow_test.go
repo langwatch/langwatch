@@ -70,7 +70,7 @@ func readSSE(t *testing.T, r io.Reader, stop func(streamFrame) bool) []streamFra
 
 func postStreamURL(t *testing.T, url, body string, hdrs map[string]string) *http.Response {
 	t.Helper()
-	req, err := http.NewRequest("POST", url+"/go/studio/execute", bytes.NewBufferString(body))
+	req, err := http.NewRequest(http.MethodPost, url+"/go/studio/execute", bytes.NewBufferString(body))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-LangWatch-Origin", "workflow")

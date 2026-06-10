@@ -15,7 +15,7 @@ import type {
 const TABLE_NAME = "trace_summaries" as const;
 
 interface ClickHouseSummaryRow extends TraceSummaryFieldsBase {
-  // The list mapper only reads these five keys out of `Attributes`.
+  // The list mapper only reads a fixed set of keys out of `Attributes`.
   // Projecting them individually lets ClickHouse skip reading the full
   // Map column off disk for every row — the dominant cost on traces
   // with large attribute bags.
@@ -24,8 +24,11 @@ interface ClickHouseSummaryRow extends TraceSummaryFieldsBase {
   AttrConversationId: string;
   AttrUserId: string;
   AttrOrigin: string;
+  AttrNonBillable: string;
+  AttrCacheReadTokens: string;
+  AttrCacheCreationTokens: string;
+  AttrReasoningTokens: string;
   LastEventOccurredAt: number;
-  TotalCount: number;
 }
 
 /**
@@ -109,15 +112,30 @@ export class TraceListClickHouseRepository implements TraceListRepository {
 
     const client = await this.resolveClient(query.tenantId);
 
-    // Subquery so WHERE/ORDER BY operate on raw DateTime columns —
-    // aliasing DateTime to millis in the same scope shadows the column
-    // and breaks the WHERE comparison. The inner SELECT also lists
-    // explicit columns (no `SELECT *`) so ClickHouse doesn't read the
-    // whole `Attributes` Map off storage just to drop it on the floor.
-    // Only five attribute keys flow through to the list mapper — see
-    // `mapToTraceListItem`.
-    const result = await client.query({
-      query: `
+    // Latest-version dedup, shared by the page, the heavy read, and the count.
+    const dedupFilter = `(TenantId, TraceId, UpdatedAt) IN (
+          SELECT TenantId, TraceId, max(UpdatedAt)
+          FROM ${TABLE_NAME}
+          WHERE ${whereClause}
+          GROUP BY TenantId, TraceId
+        )`;
+
+    // Page the matching TraceIds first (key + sort columns only), then read
+    // the heavy columns (ComputedInput/ComputedOutput and the rest) for that
+    // bounded page alone. The previous single query materialized those
+    // payloads for every deduped trace in the window before ORDER BY ... LIMIT
+    // trimmed it, and `count() OVER ()` forced the whole deduped set to buffer
+    // — together the dominant read-bytes cost on this list. The total is now a
+    // separate light count that never touches the payload columns.
+    //
+    // The inner subquery keeps WHERE/ORDER BY on raw DateTime columns —
+    // aliasing DateTime to millis in the same scope shadows the column and
+    // breaks the comparison. It also lists explicit columns (no `SELECT *`) so
+    // ClickHouse skips reading the full `Attributes` Map; only five keys flow
+    // through to the list mapper (see `mapToTraceListItem`).
+    const [result, countResult] = await Promise.all([
+      client.query({
+        query: `
         SELECT
           TraceId,
           TenantId,
@@ -126,6 +144,10 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           AttrConversationId,
           AttrUserId,
           AttrOrigin,
+          AttrNonBillable,
+          AttrCacheReadTokens,
+          AttrCacheCreationTokens,
+          AttrReasoningTokens,
           toUnixTimestamp64Milli(OccurredAt) AS OccurredAt,
           toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
           toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
@@ -142,6 +164,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           ErrorMessage,
           Models,
           TotalCost,
+          NonBilledCost,
           TokensEstimated,
           TotalPromptTokenCount,
           TotalCompletionTokenCount,
@@ -161,8 +184,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           TopicId,
           SubTopicId,
           AnnotationIds,
-          toUnixTimestamp64Milli(LastEventOccurredAt) AS LastEventOccurredAt,
-          TotalCount
+          toUnixTimestamp64Milli(LastEventOccurredAt) AS LastEventOccurredAt
         FROM (
           SELECT
             TraceId,
@@ -172,6 +194,10 @@ export class TraceListClickHouseRepository implements TraceListRepository {
             Attributes['gen_ai.conversation.id'] AS AttrConversationId,
             Attributes['langwatch.user_id'] AS AttrUserId,
             Attributes['langwatch.origin'] AS AttrOrigin,
+            Attributes['langwatch.cost.non_billable'] AS AttrNonBillable,
+            Attributes['langwatch.reserved.cache_read_tokens'] AS AttrCacheReadTokens,
+            Attributes['langwatch.reserved.cache_creation_tokens'] AS AttrCacheCreationTokens,
+            Attributes['langwatch.reserved.reasoning_tokens'] AS AttrReasoningTokens,
             OccurredAt,
             CreatedAt,
             UpdatedAt,
@@ -188,6 +214,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
             ErrorMessage,
             Models,
             TotalCost,
+            NonBilledCost,
             TokensEstimated,
             TotalPromptTokenCount,
             TotalCompletionTokenCount,
@@ -207,31 +234,46 @@ export class TraceListClickHouseRepository implements TraceListRepository {
             TopicId,
             SubTopicId,
             AnnotationIds,
-            LastEventOccurredAt,
-            count() OVER () AS TotalCount
+            LastEventOccurredAt
           FROM ${TABLE_NAME}
           WHERE ${whereClause}
-            AND (TenantId, TraceId, UpdatedAt) IN (
-              SELECT TenantId, TraceId, max(UpdatedAt)
+            AND TraceId IN (
+              SELECT TraceId
               FROM ${TABLE_NAME}
               WHERE ${whereClause}
-              GROUP BY TenantId, TraceId
+                AND ${dedupFilter}
+              ORDER BY ${sortExpression} ${sortDir}
+              LIMIT {limit:UInt32}
+              OFFSET {offset:UInt32}
             )
+            AND ${dedupFilter}
           ORDER BY ${sortExpression} ${sortDir}
           LIMIT {limit:UInt32}
-          OFFSET {offset:UInt32}
         )
       `,
-      query_params: {
-        ...params,
-        limit: query.limit,
-        offset: query.offset,
-      },
-      format: "JSONEachRow",
-    });
+        query_params: {
+          ...params,
+          limit: query.limit,
+          offset: query.offset,
+        },
+        format: "JSONEachRow",
+      }),
+      client.query({
+        query: `
+        SELECT count() AS totalHits
+        FROM ${TABLE_NAME}
+        WHERE ${whereClause}
+          AND ${dedupFilter}
+      `,
+        query_params: { ...params },
+        format: "JSONEachRow",
+      }),
+    ]);
 
     const rows = await result.json<ClickHouseSummaryRow>();
-    const totalHits = rows.length > 0 ? Number(rows[0]!.TotalCount) : 0;
+    const countRows = await countResult.json<{ totalHits: number | string }>();
+    const totalHits =
+      countRows.length > 0 ? Number(countRows[0]!.totalHits) : 0;
 
     return {
       rows: rows.map((row) => this.toTraceSummaryData(row)),
@@ -805,6 +847,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       errorMessage: row.ErrorMessage,
       models: row.Models,
       totalCost: row.TotalCost,
+      nonBilledCost: row.NonBilledCost ?? null,
       tokensEstimated: !!row.TokensEstimated,
       totalPromptTokenCount: row.TotalPromptTokenCount,
       totalCompletionTokenCount: row.TotalCompletionTokenCount,
@@ -840,6 +883,17 @@ type FacetRow = {
   facet_label?: string;
   cnt: number;
   total_distinct: number;
+  // Optional per-value aggregates carried by the evaluator facet's
+  // custom queryBuilder so the sidebar can render the inline drilldown
+  // (verdict pills + score range + hasLabel indicator) without firing
+  // a second query per evaluator.
+  passed_count?: string | number;
+  failed_count?: string | number;
+  errored_count?: string | number;
+  score_min?: number | null;
+  score_max?: number | null;
+  has_score?: boolean | number;
+  has_label?: boolean | number;
 };
 
 function mapFacetRows(rows: FacetRow[]): CategoricalFacetResult {
@@ -848,8 +902,46 @@ function mapFacetRows(rows: FacetRow[]): CategoricalFacetResult {
       value: r.facet_value,
       ...(r.facet_label ? { label: r.facet_label } : {}),
       count: Number(r.cnt),
+      ...extractFacetAggregates(r),
     })),
     totalDistinct: rows.length > 0 ? Number(rows[0]!.total_distinct) : 0,
+  };
+}
+
+function extractFacetAggregates(r: FacetRow): {
+  aggregates?: {
+    passedCount: number;
+    failedCount: number;
+    erroredCount: number;
+    scoreMin: number | null;
+    scoreMax: number | null;
+    hasScore: boolean;
+    hasLabel: boolean;
+  };
+} {
+  // Only the evaluator facet's queryBuilder emits these columns. Other
+  // facets (status, model, …) return undefined for all of them, so the
+  // discriminator below avoids attaching an empty aggregates object to
+  // every facet value.
+  if (
+    r.passed_count === undefined &&
+    r.failed_count === undefined &&
+    r.errored_count === undefined &&
+    r.has_score === undefined &&
+    r.has_label === undefined
+  ) {
+    return {};
+  }
+  return {
+    aggregates: {
+      passedCount: Number(r.passed_count ?? 0),
+      failedCount: Number(r.failed_count ?? 0),
+      erroredCount: Number(r.errored_count ?? 0),
+      scoreMin: r.score_min == null ? null : Number(r.score_min),
+      scoreMax: r.score_max == null ? null : Number(r.score_max),
+      hasScore: Boolean(r.has_score),
+      hasLabel: Boolean(r.has_label),
+    },
   };
 }
 
@@ -857,7 +949,7 @@ function mapFacetRows(rows: FacetRow[]): CategoricalFacetResult {
 // list mapper expects keys absent (so its `?? null` / `?? ""` fallbacks
 // fire) rather than present-but-empty.
 //
-// The five keys below match the explicit Attributes[...] projections in
+// The six keys below match the explicit Attributes[...] projections in
 // `findAll`'s SELECT. To surface another attribute in the list, add it
 // in both places. If user-pinned attribute columns ever ship, prefer
 // extending the query input with an `extraAttributeKeys: string[]` list
@@ -875,5 +967,21 @@ function buildListAttributes(
   }
   if (row.AttrUserId) attributes["langwatch.user_id"] = row.AttrUserId;
   if (row.AttrOrigin) attributes["langwatch.origin"] = row.AttrOrigin;
+  if (row.AttrNonBillable) {
+    attributes["langwatch.cost.non_billable"] = row.AttrNonBillable;
+  }
+  // Fold-summed cache / reasoning token counts the drawer header reads to show
+  // the "Cache read" / "Cache write" / reasoning rows (the raw per-span
+  // gen_ai.usage.cache_* values never reach the trace attribute map).
+  if (row.AttrCacheReadTokens) {
+    attributes["langwatch.reserved.cache_read_tokens"] = row.AttrCacheReadTokens;
+  }
+  if (row.AttrCacheCreationTokens) {
+    attributes["langwatch.reserved.cache_creation_tokens"] =
+      row.AttrCacheCreationTokens;
+  }
+  if (row.AttrReasoningTokens) {
+    attributes["langwatch.reserved.reasoning_tokens"] = row.AttrReasoningTokens;
+  }
   return attributes;
 }

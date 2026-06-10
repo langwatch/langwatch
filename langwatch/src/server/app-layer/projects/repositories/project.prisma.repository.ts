@@ -189,6 +189,19 @@ export class PrismaProjectRepository implements ProjectRepository {
     return !!team;
   }
 
+  async findActiveTeamInOrganization({
+    teamId,
+    organizationId,
+  }: {
+    teamId: string;
+    organizationId: string;
+  }): Promise<{ id: string } | null> {
+    return this.prisma.team.findFirst({
+      where: { id: teamId, organizationId, archivedAt: null },
+      select: { id: true },
+    });
+  }
+
   async createTeamWithRoleBinding(input: CreateTeamWithBindingInput): Promise<{ id: string }> {
     const team = await this.prisma.team.create({
       data: {

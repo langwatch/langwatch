@@ -1,0 +1,137 @@
+LangWatch {{ .Chart.AppVersion }} has been deployed to namespace {{ .Release.Namespace }}.
+
+──────────────────────────────────────────────────────────────────────
+1. Reach the UI
+──────────────────────────────────────────────────────────────────────
+{{- if .Values.ingress.enabled }}
+Once DNS is pointing at your ingress, your team reaches LangWatch at:
+
+  https://{{ .Values.ingress.host | default "<your-ingress-host>" }}
+
+{{- else }}
+Ingress is disabled. Port-forward to reach the UI from your laptop:
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ .Release.Name }}-app 5560:{{ .Values.app.service.port | default 5560 }}
+  open http://localhost:5560
+
+{{- end }}
+The first user to sign in becomes the bootstrap organization admin
+and claims the `Organization`. Plan to do this from a trusted
+workstation before sharing the URL widely.
+
+──────────────────────────────────────────────────────────────────────
+2. Wire up at least one Model Provider
+──────────────────────────────────────────────────────────────────────
+The AI Gateway needs at least one Anthropic / OpenAI / Bedrock / etc.
+credential before any virtual key can route traffic. As the bootstrap
+admin:
+
+  • Open  https://<your-host>/settings/model-providers
+  • Click "Add provider", pick Anthropic / OpenAI / etc.
+  • Paste your provider API key and save.
+
+The credential is stored encrypted (per-deployment KMS / `LW_VK_PEPPER`)
+and never re-displayed. Rotate via the same screen.
+
+──────────────────────────────────────────────────────────────────────
+3. Publish a default RoutingPolicy (recommended)
+──────────────────────────────────────────────────────────────────────
+RoutingPolicies turn "click a button, get a key" into a one-step UX
+for end users. Every personal `langwatch login` issues a virtual key
+bound to the org-default policy — no per-user provider chain config.
+
+  • Open  https://<your-host>/settings/routing-policies
+  • Click "New policy", scope = Organization
+  • Pick the providers you want personal keys to consume,
+    in your preferred fallback order
+  • Mark "Set as default for this scope"
+
+If no policy is published, end-users can still authenticate but their
+keys cannot route until one exists. The CLI surfaces a clear error
+in that state.
+
+──────────────────────────────────────────────────────────────────────
+4. Tell your devs to install the CLI
+──────────────────────────────────────────────────────────────────────
+Once steps 1-3 are done, share the install command with your team:
+
+  npx langwatch@latest login --device --url https://{{ .Values.ingress.host | default "<your-host>" }}
+
+Then in any terminal:
+
+  langwatch claude     # Claude Code with org-managed keys
+  langwatch codex      # Codex CLI
+  langwatch cursor     # Cursor
+  langwatch shell      # Subshell with ANTHROPIC_BASE_URL etc. preloaded
+
+Per-user identity comes from your SSO; spend / quota live under each
+dev's Personal Workspace at https://<your-host>/me .
+
+──────────────────────────────────────────────────────────────────────
+5. Helpful next steps
+──────────────────────────────────────────────────────────────────────
+{{- if and .Values.gateway .Values.gateway.chartManaged }}
+  • AI Gateway pod:
+      kubectl -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/name={{ .Release.Name }}-gateway
+  • Healthcheck (in-cluster):
+      curl http://{{ .Release.Name }}-gateway/healthz
+{{- end }}
+  • Self-host docs:
+      https://docs.langwatch.ai/self-hosting/
+  • Personal-keys onboarding walkthrough:
+      https://docs.langwatch.ai/ai-gateway/governance/admin-setup
+  • Troubleshooting:
+      https://docs.langwatch.ai/self-hosting/troubleshooting
+
+──────────────────────────────────────────────────────────────────────
+{{- if not (and .Values.gateway .Values.gateway.chartManaged) }}
+
+NOTE: gateway.chartManaged=false — the AI Gateway pod was not
+deployed by this chart. Personal keys + virtual-key proxying
+require a running gateway. Either flip gateway.chartManaged=true
+on a `helm upgrade` or run the gateway out-of-band per
+docs/ai-gateway/self-hosting/helm.
+
+{{- end }}
+
+──────────────────────────────────────────────────────────────────────
+6. Required Secrets — check before upgrading
+──────────────────────────────────────────────────────────────────────
+Each chart bump may introduce new required keys on the umbrella's app
+Secret. When upgrading, verify these are present in the Secret the app
++ gateway pods mount, otherwise the pods crashloop at boot with a
+CreateContainerConfigError that hides the missing key behind a generic
+message.
+
+  {{ include "langwatch.appSecretName" . }} keys (always required):
+    - credentialsEncryptionKey
+    - cronApiKey
+    - nextAuthSecret
+    - virtualKeyPepper
+{{- if and .Values.gateway .Values.gateway.chartManaged }}
+    - LW_GATEWAY_INTERNAL_SECRET      (gateway.chartManaged=true)
+    - LW_GATEWAY_JWT_SECRET           (gateway.chartManaged=true)
+{{- end }}
+
+  When autogen.enabled=true the chart materialises this Secret on
+  first install via per-key lookup-or-rand and heals missing keys
+  on subsequent renders. When autogen.enabled=false the operator
+  pre-creates the Secret out-of-band and the preflight Job validates
+  the required keys are present before pods roll. The
+  operator-provided path is the only one that works cleanly under
+  GitOps controllers whose render step has no cluster access (ArgoCD
+  repo-server, etc.) because the chart never renders the Secret for
+  the controller to reconcile against. See
+  docs/self-hosting/deployment/argocd.mdx for the full guide.
+
+  Pre-create command for the operator-provided path:
+
+    kubectl -n {{ .Release.Namespace }} create secret generic {{ include "langwatch.appSecretName" . }} \
+      --from-literal=credentialsEncryptionKey="$(openssl rand -hex 32)" \
+      --from-literal=cronApiKey="$(openssl rand -hex 32)" \
+      --from-literal=nextAuthSecret="$(openssl rand -hex 32)" \
+      --from-literal=virtualKeyPepper="$(openssl rand -hex 32)" \
+{{- if and .Values.gateway .Values.gateway.chartManaged }}
+      --from-literal=LW_GATEWAY_INTERNAL_SECRET="$(openssl rand -hex 32)" \
+      --from-literal=LW_GATEWAY_JWT_SECRET="$(openssl rand -hex 32)"
+{{- end }}

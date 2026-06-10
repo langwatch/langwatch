@@ -154,56 +154,30 @@ export const TRACE_DRAWER_SHORTCUTS: ShortcutEntry[] = [
     matchKeys: ["3"],
     displayKeys: ["3"],
     group: "Visualisation",
-    description: "Span list",
-    run: ({ store }) => store.setVizTab("spanlist"),
+    description: "Topology",
+    run: ({ store }) => store.setVizTab("topology"),
   },
   {
     matchKeys: ["4"],
     displayKeys: ["4"],
     group: "Visualisation",
-    description: "Topology",
-    run: ({ store }) => store.setVizTab("topology"),
-  },
-  {
-    matchKeys: ["5"],
-    displayKeys: ["5"],
-    group: "Visualisation",
     description: "Sequence diagram",
     run: ({ store }) => store.setVizTab("sequence"),
   },
   {
+    // O used to jump to the trace Summary tab inside SpanTabBar. The
+    // tab moved to the ModeSwitch (Trace | Summary | Conversation), so
+    // O now swaps the drawer mode — same destination, different chrome.
     matchKeys: ["o", "O"],
     displayKeys: ["O"],
     group: "Navigation",
-    description: "Back to trace summary",
-    run: ({ store }) => store.setActiveTab("summary"),
+    description: "Trace summary",
+    run: ({ store }) => store.setViewMode("summary"),
   },
-  {
-    matchKeys: ["l", "L"],
-    displayKeys: ["L"],
-    group: "View",
-    description: "LLM tab",
-    run: ({ store }) => {
-      store.setViewMode("trace");
-      store.setActiveTab("llm");
-    },
-  },
-  {
-    matchKeys: ["p", "P"],
-    displayKeys: ["P"],
-    group: "View",
-    description: "Prompts tab",
-    detail: "When the trace used a managed prompt",
-    // Only available when the trace touched a managed prompt — same gate as
-    // the tab visibility in SpanTabBar.
-    guard: ({ trace }) =>
-      trace.containsPrompt ||
-      (trace.attributes["langwatch.prompt_ids"] ?? "").length > 0,
-    run: ({ store }) => {
-      store.setViewMode("trace");
-      store.setActiveTab("prompts");
-    },
-  },
+  // L (LLM-Optimized tab) and P (Prompts tab) shortcuts retired in the
+  // span-detail redesign. The LLM and Prompts views are now selected
+  // automatically based on the selected span's kind — there's no
+  // user-facing toggle to bind a shortcut to.
   {
     matchKeys: ["t", "T"],
     displayKeys: ["T"],

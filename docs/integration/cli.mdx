@@ -20,48 +20,98 @@ Or run any command with `npx`:
 npx langwatch --help
 ```
 
+For pnpm, yarn equivalents, self-hosted endpoint pre-config, and
+enterprise-network notes, see the [full install guide](/integration/install).
+
 ## Authenticate
 
-Sign in once and the CLI saves your API key to `.env` in the current directory:
+`langwatch login` is interactive by default, it asks where (cloud vs self-hosted) and how (AI tools vs project SDK), opens your browser to approve, and the credential flows back to the CLI automatically. **No copy-paste of keys**:
 
 ```bash
 langwatch login
 ```
 
-This opens [app.langwatch.ai/authorize](https://app.langwatch.ai/authorize) in your browser, where you copy a key and paste it back. For CI/CD or headless setups, pass the key non-interactively:
+You'll see two questions:
 
-```bash
-langwatch login --api-key sk-lw-...
-```
+1. **Where do you want to log in?**: LangWatch Cloud (`app.langwatch.ai`) or a self-hosted instance (custom URL).
+2. **How do you want to use it?**: three options:
+   - **AI tools, agentic flows**: `claude`, `codex`, `cursor`, `gemini`, `opencode`. Mints an OAuth-style device session in `~/.langwatch/config.json` (user-scoped) so `langwatch claude` etc. wrap any tool through your gateway.
+   - **Project, SDK API key**: for `langwatch sync`, `langwatch eval`, and SDK auto-instrumentation. Mints a fresh project API key into `$CWD/.env` (project-scoped).
+   - **Both**: runs both flows in sequence.
+
+The browser shows an "Approve" or "Generate API key" button (depending on the chosen mode); after you click, the credential is delivered back to the CLI over the same RFC 8628 device-code poll. **You never copy-paste a key.**
+
+### Storage discipline (where credentials land)
+
+| Scope | Path | What lives there |
+|---|---|---|
+| Project | `$CWD/.env` | `LANGWATCH_API_KEY`, used by SDK consumers + `langwatch sync`, `eval`, `prompt` |
+| User-global | `~/.langwatch/config.json` (mode `0600`) | Device session (`access_token` + `refresh_token`), control-plane URL, gateway URL, default org, used by `langwatch claude/codex/cursor/gemini/opencode`, `langwatch whoami`, `langwatch request-increase` |
+
+The two stores serve different audiences and never leak into each other. Logging out of one (`langwatch logout-device` clears `~/.langwatch/config.json`) doesn't touch the other.
 
 ### Self-hosted
 
-If you run a self-hosted LangWatch, point the CLI at your deployment:
+The CLI picks up your self-hosted endpoint from any of these (highest priority first):
+
+| Priority | Source | Use case |
+|---|---|---|
+| 1 | `--endpoint <url>` flag on `langwatch login` | one-shot login at a different host |
+| 2 | `LANGWATCH_ENDPOINT` env var | CI, scripts |
+| 3 | `~/.langwatch/config.json:control_plane_url` | persisted from prior login (daily driver) |
+| 4 | `https://app.langwatch.ai` | built-in cloud default |
+
+The simplest path for self-hosted users is the interactive prompt, pick "Self-hosted instance", enter your URL, and the CLI saves it for future invocations:
 
 ```bash
-export LANGWATCH_ENDPOINT=https://langwatch.mycompany.com
 langwatch login
+# → Where do you want to log in?  ▸ Self-hosted instance
+# → URL: https://langwatch.acme.internal
 ```
 
-The `authorize` flow, docs fetcher, and every API call will automatically use that endpoint. Add `LANGWATCH_ENDPOINT` to your `.env` so it persists.
+Or, equivalently, one-shot with the flag:
+
+```bash
+langwatch login --endpoint https://langwatch.acme.internal
+```
+
+To inspect or change persisted settings without re-logging in:
+
+```bash
+langwatch config list                                          # show resolved values + sources
+langwatch config get endpoint
+langwatch config set endpoint https://langwatch.acme.internal  # writes ~/.langwatch/config.json
+```
+
+### Non-interactive escape hatches (for CI, agents)
+
+When you're driving the CLI from automation and already have a credential, skip the prompts:
+
+| Flag | Use case | Where it lands |
+|---|---|---|
+| `langwatch login --device` | AI tools mode, skip Q1/Q2 prompts | `~/.langwatch/config.json` |
+| `langwatch login --api-key <KEY>` | CI pipeline that has `LANGWATCH_API_KEY` injected from secrets | `$CWD/.env` |
+| `langwatch login --token <TOKEN>` | Agent harness with a pre-minted device session token (issued via dashboard "Personal Access Tokens") | `~/.langwatch/config.json` |
+| `langwatch login --endpoint <URL>` | combine with any of the above to pin a self-hosted instance | persisted to config |
+
+The interactive `langwatch login` always shows these flags in a banner above the prompts, so a fake-TTY agent (`Claude Code`, certain Gemini CLI sandboxes) can detect the prompt and re-invoke with the right flag instead of getting stuck.
+
+When stdin is not a TTY (genuine CI), `langwatch login` with no flags errors out with the same flag list, explicit > implicit, no surprise API-key fall-throughs.
 
 ### Letting an agent do it
 
-If you're driving the CLI from a coding assistant, just ask the agent to set it up. When the API key is missing, the CLI prints a message pointing at the `/authorize` URL so the agent can walk the user through it:
+A coding assistant driving `langwatch` will see the always-on banner naming `--device`, `--api-key`, `--token`, `--endpoint` whenever the interactive prompt fires. If the assistant's harness reports as a TTY but can't actually answer prompts, the banner gives it everything it needs to re-invoke:
 
-```
-Error: LANGWATCH_API_KEY not found.
-Get your API key from:
-  https://app.langwatch.ai/authorize
-Then either run:
-  langwatch login --api-key <your-key>
-Or add it to your .env file:
-  echo 'LANGWATCH_API_KEY=<your-key>' >> .env
+```bash
+langwatch login --device                # AI tools mode (recommended for assistants)
+langwatch login --api-key sk-lw-...     # if a project key was injected from secrets
+langwatch login --token lwc_...         # if a device session token was pre-minted
+langwatch login --endpoint https://...  # combine with any of the above for self-hosted
 ```
 
 ## Fetch documentation
 
-`langwatch docs` returns any LangWatch documentation page as plain Markdown — ideal for feeding into an agent's context before it writes code.
+`langwatch docs` returns any LangWatch documentation page as plain Markdown, ideal for feeding into an agent's context before it writes code.
 
 ```bash
 langwatch docs                                # Documentation index
@@ -81,7 +131,7 @@ langwatch scenario-docs advanced/red-teaming
 Both commands accept full URLs too, and any missing `.md` extension is appended automatically.
 
 <Tip>
-If you're inside an assistant with no shell (for example, a chat-only environment), the same content is available over plain HTTP — append `.md` to any documentation path, e.g. `https://langwatch.ai/docs/integration/python/guide.md`. Indexes: [docs](https://langwatch.ai/docs/llms.txt), [scenarios](https://langwatch.ai/scenario/llms.txt).
+If you're inside an assistant with no shell (for example, a chat-only environment), the same content is available over plain HTTP, append `.md` to any documentation path, e.g. `https://langwatch.ai/docs/integration/python/guide.md`. Indexes: [docs](https://langwatch.ai/docs/llms.txt), [scenarios](https://langwatch.ai/scenario/llms.txt).
 </Tip>
 
 ## Version prompts
@@ -156,7 +206,7 @@ langwatch suite run <suite-id>                # kicks off every scenario × targ
 
 ### Inspect simulation runs
 
-Every scenario execution produces a **simulation run** you can inspect after the fact — full conversation, judge verdict, reasoning, met/unmet criteria, cost, and duration.
+Every scenario execution produces a **simulation run** you can inspect after the fact, full conversation, judge verdict, reasoning, met/unmet criteria, cost, and duration.
 
 ```bash
 langwatch simulation-run list                         # recent runs, with relative timestamps
@@ -166,13 +216,13 @@ langwatch simulation-run get <run-id>                 # full details for one run
 langwatch simulation-run get <run-id> --full         # don't truncate long messages
 ```
 
-The `get` command renders assistant thinking blocks and tool calls as readable plain text — no raw JSON dumps in your terminal. Use `--format json` on either command for structured output.
+The `get` command renders assistant thinking blocks and tool calls as readable plain text, no raw JSON dumps in your terminal. Use `--format json` on either command for structured output.
 
-For the full scenario testing guide, see the [Scenarios documentation](/agent-simulations/overview).
+For the full scenario testing guide, see the [Scenarios documentation](/agent-simulations/introduction).
 
 ## Inspect traces
 
-Traces capture every LLM call your agent makes — prompts, responses, latency, cost, errors. Search and drill into them from the terminal:
+Traces capture every LLM call your agent makes, prompts, responses, latency, cost, errors. Search and drill into them from the terminal:
 
 ```bash
 langwatch trace search --limit 10              # most recent traces
@@ -181,7 +231,7 @@ langwatch trace get <trace-id>                 # one trace in detail
 langwatch trace export --output traces.jsonl   # stream traces for offline analysis
 ```
 
-Agents use this to debug their own instrumentation: after running your code once, ask the assistant to run `langwatch trace search --limit 5` and verify traces are flowing. If nothing appears, the instrumentation is wrong — no need to read logs.
+Agents use this to debug their own instrumentation: after running your code once, ask the assistant to run `langwatch trace search --limit 5` and verify traces are flowing. If nothing appears, the instrumentation is wrong, no need to read logs.
 
 ## Query analytics
 
@@ -207,16 +257,16 @@ langwatch <resource> delete <id>
 
 Available resources include:
 
-- **`evaluator`** — create and version evaluators (answer correctness, faithfulness, custom LLM judges)
-- **`monitor`** — online evaluations that score production traces automatically
-- **`dataset`** — evaluation datasets (upload CSV, download, manage columns)
-- **`agent`** — agent definitions used by scenarios and monitors
-- **`dashboard`** and **`graph`** — custom analytics dashboards
-- **`trigger`** — automations (alerts, webhooks, dataset-append on failure)
-- **`secret`** — encrypted environment variables for scheduled agent runs
-- **`workflow`** — reusable workflows built in the UI
-- **`model-provider`** — configure OpenAI, Anthropic, Azure, or Bedrock for your project
-- **`annotation`** — attach labels to traces for supervised fine-tuning data
+- **`evaluator`**, create and version evaluators (answer correctness, faithfulness, custom LLM judges)
+- **`monitor`**, online evaluations that score production traces automatically
+- **`dataset`**, evaluation datasets (upload CSV, download, manage columns)
+- **`agent`**, agent definitions used by scenarios and monitors
+- **`dashboard`** and **`graph`**, custom analytics dashboards
+- **`trigger`**, automations (alerts, webhooks, dataset-append on failure)
+- **`secret`**, encrypted environment variables for scheduled agent runs
+- **`workflow`**, reusable workflows built in the UI
+- **`model-provider`**, configure OpenAI, Anthropic, Azure, or Bedrock for your project
+- **`annotation`**, attach labels to traces for supervised fine-tuning data
 
 Run `langwatch <resource> --help` on any of these for subcommand-level options, and `--format json` to get structured output for scripting.
 
@@ -291,11 +341,11 @@ langwatch prompt tag --help
 langwatch prompt tag create --help
 ```
 
-This keeps the CLI honest — new capabilities show up in `--help` the moment they ship, so you never have to wonder whether a flag exists.
+This keeps the CLI honest, new capabilities show up in `--help` the moment they ship, so you never have to wonder whether a flag exists.
 
 ## AI Gateway commands
 
-The CLI also provisions AI Gateway resources — virtual keys, budgets, provider bindings, cache rules — without touching the UI. Behaviour matches the dashboard exactly; the CLI and UI share a server-side service layer.
+The CLI also provisions AI Gateway resources, virtual keys, budgets, provider bindings, cache rules, without touching the UI. Behaviour matches the dashboard exactly; the CLI and UI share a server-side service layer.
 
 ### Virtual keys
 
@@ -337,7 +387,7 @@ langwatch gateway-budgets create \
 langwatch gateway-budgets archive bgt_01HZ...
 ```
 
-`--window` accepts `minute|hour|day|week|month|total`. `--on-breach` is `block` (default) or `warn`. `--limit` is USD. List output colourises spent-vs-limit — red at ≥100%, yellow at ≥80%.
+`--window` accepts `minute|hour|day|week|month|total`. `--on-breach` is `block` (default) or `warn`. `--limit` is USD. List output colourises spent-vs-limit, red at ≥100%, yellow at ≥80%.
 
 ### Provider bindings
 
@@ -403,6 +453,6 @@ See the [public REST API reference](/ai-gateway/api/chat-completions) for direct
 
 ## Use the CLI as your agent's control plane
 
-The CLI was designed so that an AI coding assistant can operate LangWatch end-to-end on your behalf. Skills like [Tracing, Evaluations, Scenarios, and Prompt Versioning](/skills/directory) are built on top of it — the assistant reads docs via `langwatch docs`, runs platform operations via the subcommands, and verifies its own work by searching traces and inspecting simulation runs.
+The CLI was designed so that an AI coding assistant can operate LangWatch end-to-end on your behalf. Skills like [Tracing, Evaluations, Scenarios, and Prompt Versioning](/skills/directory) are built on top of it, the assistant reads docs via `langwatch docs`, runs platform operations via the subcommands, and verifies its own work by searching traces and inspecting simulation runs.
 
 If you're building your own agent workflows, the pattern works the same way: give the assistant the CLI and ask it what you want. It's a small surface area with a big reach, and everything it does is auditable in the LangWatch app afterwards.

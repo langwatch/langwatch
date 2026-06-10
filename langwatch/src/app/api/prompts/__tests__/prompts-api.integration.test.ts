@@ -7,8 +7,8 @@ import type {
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  buildVersionCreateInput,
   llmPromptConfigFactory,
-  llmPromptConfigVersionFactory,
 } from "~/factories/llm-config.factory";
 import { projectFactory } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
@@ -48,7 +48,7 @@ describe("Prompts API", () => {
   beforeEach(async () => {
     // Initialize the test App container so middleware that depends on it
     // (resource-limit, license-enforcement) can run.
-    resetApp();
+    await resetApp();
     globalForApp.__langwatch_app = createTestApp({
       planProvider: PlanProviderService.create({
         getActivePlan: vi
@@ -78,15 +78,12 @@ describe("Prompts API", () => {
       },
     });
 
-    // Test data setup
-    testProject = projectFactory.build({
-      slug: nanoid(),
-    });
     // Create test project in the database with the proper team
     testProject = await prisma.project.create({
       data: {
-        ...testProject,
+        ...projectFactory.build({ slug: nanoid() }),
         teamId: testTeam.id,
+        personalFeatures: {},
       },
     });
 
@@ -102,6 +99,7 @@ describe("Prompts API", () => {
     const seededDefault = await prisma.modelDefaultConfig.create({
       data: {
         config: { DEFAULT: "openai/gpt-4o-mini" },
+        organizationId: testOrganization.id,
         scopes: {
           create: [{ scopeType: "PROJECT", scopeId: testProjectId }],
         },
@@ -205,7 +203,7 @@ describe("Prompts API", () => {
         });
 
         await prisma.llmPromptConfigVersion.create({
-          data: llmPromptConfigVersionFactory.build({
+          data: buildVersionCreateInput({
             configId: config.id,
             projectId: testProjectId,
           }),

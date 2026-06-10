@@ -34,6 +34,7 @@ describe("Feature: Prompt version tags", () => {
       data: {
         ...projectFactory.build({ slug: nanoid() }),
         teamId: testTeam.id,
+        personalFeatures: {},
       },
     });
 
@@ -41,6 +42,7 @@ describe("Feature: Prompt version tags", () => {
       data: {
         ...projectFactory.build({ slug: nanoid() }),
         teamId: testTeam.id,
+        personalFeatures: {},
       },
     });
 
@@ -51,6 +53,7 @@ describe("Feature: Prompt version tags", () => {
     const seededDefault = await prisma.modelDefaultConfig.create({
       data: {
         config: { DEFAULT: "openai/gpt-4o-mini" },
+        organizationId: testOrganization.id,
         scopes: {
           create: [
             { scopeType: "ORGANIZATION", scopeId: testOrganization.id },

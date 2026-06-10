@@ -1,0 +1,140 @@
+---
+title: Governance MCP server
+description: An MCP server exposing every governance resource × verb as a tool under the governance_ namespace. Same RBAC, same audit emission, same service-layer source of truth as the REST API and CLI, built so an agent (Claude Code, Codex, Cursor) can fully set up governance via tool calls.
+sidebarTitle: MCP server
+---
+
+<Info>**Pairs with:** [Governance REST API](/ai-governance/api) and [Governance CLI](/ai-governance/cli): all three surfaces dispatch through the same service-layer functions, with audit emission tagged `metadata.surface = "trpc" | "hono" | "cli" | "mcp"` for incident response. Distinct from LangWatch's general MCP server, this is a governance-namespaced toolset specifically for setting up and querying governance state.</Info>
+
+<Note>**Architecture: in-process service calls (not HTTP-shell over REST).** Governance MCP tools register in `langwatch/src/mcp/handler.ts` via `registerGovernanceMcpTools(server, prisma)` and call the governance services (`IngestionTemplateService`, `IngestionKeyService`, etc.) directly with `surface: "mcp"`. They do NOT route through `/api/governance/*` over HTTP. Reason: it avoids the project-API-key vs PAT auth mismatch and matches Sergey's explicit `GovernanceCallSurface` contract at `fc6d54100` without needing Hono middleware changes. Cross-path uniformity (audit, RBAC, multitenancy) still holds by construction, the service layer is the single source of truth, and `metadata.surface` distinguishes the entrypoint.</Note>
+
+<Note>**RBAC enforced at the tool layer.** Per `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`, write tools and admin reads resolve the caller's user session to its RBAC scopes and reject with `FORBIDDEN` (or `AUTH_REQUIRED` when no user is bound) if the required permission is missing; the plain `list`/`get` read tools are available to a project API key without a user. No tool can bypass the service-layer or the multitenancy middleware, the same defense-in-depth that protects the REST API protects the MCP surface, even though MCP doesn't go through the REST surface.</Note>
+
+## Why an MCP server for governance
+
+Model Context Protocol (MCP) is the standard way for agents (Claude Code, Cursor, Codex, Claude desktop, custom MCP clients) to discover and call tools provided by a service. By exposing governance as MCP tools, rather than expecting agents to compose REST calls themselves, we give the agent:
+
+- **Tool discovery**: `tools/list` enumerates every governance verb with descriptions and input schemas the agent can reason about.
+- **Type-safe inputs**: the same Zod schemas the REST API and CLI consume are exposed via MCP `inputSchema`, so the agent gets validation feedback before the tool call leaves the client.
+- **Built-in RBAC + audit**: every successful tool call lands in the same audit log as a dashboard click, tagged with `surface="mcp"` for incident response.
+
+The MCP server is the most agent-native of the three governance surfaces. It's also the *highest-leverage* surface for self-hosted onboarding, drop the MCP server into Claude Code, point the agent at a fresh LangWatch deployment, and walk it through setting up the org via a chat conversation.
+
+## Tool naming
+
+Every governance MCP tool's name starts with `governance_`:
+
+```
+governance_ingestion_templates_list
+governance_ingestion_templates_admin_list
+governance_ingestion_templates_get
+governance_ingestion_templates_create
+governance_ingestion_templates_update_ottl_rules
+governance_ingestion_templates_archive
+governance_ingestion_templates_clone_from_platform
+
+governance_ingestion_keys_list
+governance_ingestion_keys_mint
+
+governance_anomaly_rules_list
+governance_anomaly_rules_create
+…
+
+governance_role_bindings_assign_to_user
+governance_audit_log_query
+```
+
+The pattern is `governance_<resource_with_underscores>_<verb_with_underscores>`, MCP tool names by convention use snake_case while the REST API uses kebab-case. Description text on every tool summarises the verb + resource + RBAC scope so the agent can quickly decide whether to use it.
+
+## Authentication
+
+Governance MCP tools register inside LangWatch's existing MCP server (mounted at `/api/mcp/*` on the same host that serves the dashboard), there is **no separate `langwatch mcp serve` binary**. Clients connect over HTTP using either streamable-HTTP at `/mcp` or SSE at `/sse`, and authenticate with one of:
+
+- **Project API key as Bearer** (`Authorization: Bearer <projectApiKey>`), the plain read tools work immediately. Sufficient to call `governance_*_list` and `governance_*_get`. Admin reads (`governance_*_admin_list`, which expose `ottlRules`) and every write tool require a user-bound session and reject a project-key-only caller.
+- **OAuth (PKCE) flow** at `/api/mcp/authorize` → `/oauth/token`, required for write tools and admin reads. The OAuth flow captures the user's id at authorize time, threads it through the session token cache, and surfaces it to governance tools as `ctx.callerUserId`. Without it, a write tool returns an `AUTH_REQUIRED:` error pointing the client at the OAuth flow.
+
+```jsonc
+// MCP client config, points at the LangWatch instance's MCP endpoint
+// (SaaS shown; self-hosted uses your deployment's host).
+{
+  "mcpServers": {
+    "langwatch-governance": {
+      "url": "https://app.langwatch.ai/api/mcp"
+      // Read-only access: add Authorization: Bearer <projectApiKey>.
+      // Read+write access: complete the OAuth PKCE flow at /api/mcp/authorize.
+    }
+  }
+}
+```
+
+The 9 governance tools register via `registerGovernanceMcpTools(server, ctx)` from `langwatch/src/mcp/governance-tools.ts` (Lane-Q at `7639b6c2b`). The same registration runs at all three `createMcpServer()` callsites in `handler.ts` so the tools are available regardless of which MCP transport the client chose.
+
+<Note>**Dev-environment port routing**: in production, LangWatch listens on a single port and the `/mcp` + `/sse` + `/oauth/*` + `/.well-known/oauth-*` routes are all reachable on the same host. In dev (Vite), external MCP clients (e.g. Claude Code) hit `FRONTEND_PORT` (default `5560`) which proxies the seven MCP route prefixes through to the API port. Local Claude Code runbook: `claude mcp add langwatch http://localhost:5560/mcp` (or the OAuth flow at `http://localhost:5560/api/mcp/authorize` for write tools). The proxy wiring + a real-SDK probe at `langwatch/scripts/dogfood/governance/mcp-client-probe.ts` shipped at `82375478e`; the probe asserts all 9 tools register, that read tools return the catalog with a project apiKey Bearer, and that write tools return `AUTH_REQUIRED:` until the OAuth flow completes.</Note>
+
+## RBAC enforcement
+
+Governance tools enforce two distinct gates at the tool layer (`langwatch/src/mcp/governance-tools.ts`), BEFORE the service call:
+
+**`AUTH_REQUIRED:`**, write tools (e.g. `governance_ingestion_templates_create`, `governance_ingestion_keys_mint`) called from a project-apiKey-only session without OAuth. Read tools are NOT subject to this gate; they work with project-apiKey-only sessions.
+
+```jsonc
+{
+  "isError": true,
+  "content": [{ "type": "text", "text": "AUTH_REQUIRED: this tool requires an OAuth-authenticated MCP session. Complete the OAuth flow at /api/mcp/authorize and reconnect." }]
+}
+```
+
+**`FORBIDDEN:`**, the caller has a session but their organization role doesn't include the required permission (mirrors `hasOrganizationPermission` from `langwatch/src/server/api/rbac.ts`).
+
+```jsonc
+{
+  "isError": true,
+  "content": [{ "type": "text", "text": "FORBIDDEN: caller does not have aiTools:manage on this organization" }]
+}
+```
+
+In both cases no record is created and no audit row is emitted (failed calls are not state-changes by design). The agent's harness can decide whether to escalate (ask the human to complete the OAuth flow, use a more-privileged apiKey) or back off.
+
+The Path B mechanics (per `fc6d54100` + `7639b6c2b`):
+
+- **RBAC check happens at the MCP tool layer**, BEFORE the service call, the tool mirrors `hasOrganizationPermission` from `langwatch/src/server/api/rbac.ts` and returns `FORBIDDEN:` early if the required permission is missing. Services trust the surface, they do not gate on the MCP-resolved scope a second time. This split is intentional: the MCP tool owns the RBAC contract for its surface; the service owns the multitenancy + business-logic contract.
+- **`callerUserId` flows from the OAuth session**, the OAuth PKCE flow at `/api/mcp/authorize` captures the user's id, threads it through the session token cache and `SessionState`, and surfaces it as `ctx.callerUserId`. For `IngestionKeyService.{install, rotate}` it's required (write tools reject with `AUTH_REQUIRED:` if absent). For `IngestionTemplateService` authoring methods (which take `callerUserId` for the audit trail), same plumbing.
+- **Snake_case ↔ camelCase boundary**: MCP tool inputs use snake_case (`source_template_id`, `template_id`) per public-surface convention; the tool maps to camelCase (`sourceTemplateId`, `templateId`) before calling the service, since service signatures are camelCase. The mapping is the tool's job, not the service's.
+
+## Audit emission
+
+Every state-changing tool call emits an audit row with `AuditLog.metadata.surface = "mcp"` (the shared `GovernanceCallSurface` type at `@ee/governance/services/auditSurface.ts`, threaded through every mutating governance service method as of Sergey's Lane B-3 at `fc6d54100`):
+
+| Tool | Audit row |
+|---|---|
+| `governance_anomaly_rules_create` | `gateway.anomaly_rule.created` (`metadata.surface = "mcp"`) |
+| `governance_ingestion_templates_clone_from_platform` | `gateway.ingestion_template.cloned` (`metadata.surface = "mcp"`) |
+| `governance_ingestion_keys_mint` | `gateway.ingestion_key.minted` (`metadata.surface = "mcp"`) |
+| `governance_role_bindings_assign_to_user` | `organization.roleBinding.assignedToUser` (`metadata.surface = "mcp"`) |
+
+Payload shapes are identical to the REST API's audit rows apart from `metadata.surface`, every other field (actorUserId, apiKeyId, target, error) follows the same shape. This lets incident response queries answer "what did the agent do?" without changing the audit-row event-kind taxonomy.
+
+The contract is service-layer-asserted by `langwatch/src/mcp/__tests__/governance-tools.audit-uniform.integration.test.ts` (Lane B-MCP audit at `66fd35162`), 3 cases against real Postgres: `governance_ingestion_templates_create` stamps `metadata.surface = "mcp"`, `governance_ingestion_keys_mint` stamps `metadata.surface = "mcp"`, and the `AUTH_REQUIRED:` negative path fails before any audit row is written. No wire-level MCP test is needed (per the Path B architecture there is no MCP-over-HTTP wire to assert at).
+
+For the agent-end-to-end gate (real Claude Code agent provisions governance via MCP only, no UI clicks) the runbook lives at `dev/docs/runbooks/governance-dogfood-mcp-claude-code.md`. Six steps: `claude mcp add langwatch http://localhost:5560/mcp` → read-tool walkthrough (list + get with project apiKey) → write-tool walkthrough (admin_list + clone + update_ottl_rules + archive after OAuth → 3 audit rows with `metadata.surface = "mcp"`) → ingestion-key mint (1 audit row + one-time `sk-lw-…` token) → fail-closed `AUTH_REQUIRED:` negative case → checklist for pasting evidence back.
+
+## Agent setup-from-scratch (the dogfood gate)
+
+The umbrella spec defines an end-to-end test: an agent connecting with admin apiKey can fully configure governance via a sequence of MCP tool calls:
+
+1. `governance_ingestion_templates_list`, read existing platform templates
+2. `governance_ingestion_templates_clone_from_platform`, clone `claude_code` into the org (delegates to `POST /api/governance/ingestion-templates/clone`)
+3. `governance_anomaly_rules_create`, rule on org spend > $100/day
+4. `governance_role_bindings_assign_to_user`, give a user `governance:view`
+5. `governance_audit_log_query`, verify steps 2–4 all emitted audit rows
+
+If every step succeeds and step 5 returns the matching audit rows, the MCP surface is genuinely agentic-usable. The dogfood-gate runbook is co-owned with QA (Lane-Q) and lives alongside the IngestionTemplate v1 dogfood discipline.
+
+## Cross-references
+
+- [Governance REST API](/ai-governance/api): the API the MCP tools shell over
+- [Governance CLI](/ai-governance/cli): same surface for shell invocation
+- [Roles and permissions](/ai-governance/roles-and-permissions): RBAC scopes the MCP server enforces
+- [Audit log](/ai-governance/audit-log): where state-change rows land
+- [Compliance architecture](/ai-governance/compliance-architecture): how the OCSF v1.1 export consumes the same audit stream
+- Spec, `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`

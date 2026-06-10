@@ -4,9 +4,10 @@ import "time"
 
 // Bundle is the resolved virtual-key configuration used for the request lifecycle.
 type Bundle struct {
-	VirtualKeyID string
-	ProjectID    string
-	TeamID       string
+	VirtualKeyID   string
+	ProjectID      string
+	TeamID         string
+	OrganizationID string
 
 	// Credentials is the ordered fallback chain of provider credentials.
 	Credentials []Credential
@@ -51,7 +52,7 @@ type BundleConfig struct {
 	// ProjectOTLPToken is the project's auth token for AI trace export.
 	ProjectOTLPToken string
 
-	// VKDisplayPrefix is the VK's public display prefix (e.g. "lw_vk_live_…").
+	// VKDisplayPrefix is the VK's public display prefix (e.g. "vk-lw-…").
 	// Carried so rule matchers can target VKs by prefix without leaking the
 	// secret. Sourced from the control-plane config payload.
 	VKDisplayPrefix string
@@ -152,9 +153,10 @@ const (
 type PolicyRuleTarget string
 
 const (
-	PolicyTargetTool PolicyRuleTarget = "tool"
-	PolicyTargetMCP  PolicyRuleTarget = "mcp"
-	PolicyTargetURL  PolicyRuleTarget = "url"
+	PolicyTargetTool  PolicyRuleTarget = "tool"
+	PolicyTargetMCP   PolicyRuleTarget = "mcp"
+	PolicyTargetURL   PolicyRuleTarget = "url"
+	PolicyTargetModel PolicyRuleTarget = "model"
 )
 
 // CacheRule is a priority-ordered cache control rule.

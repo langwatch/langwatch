@@ -9,7 +9,7 @@ LangWatch provides role-based access control (RBAC) to manage user permissions a
 
 # Role-Based Access Control (RBAC) System
 
-LangWatch implements a comprehensive Role-Based Access Control (RBAC) system that manages permissions across organizations, teams, and projects. Role bindings can be assigned directly to users or to groups — including groups synced from your identity provider via SCIM.
+LangWatch implements a comprehensive Role-Based Access Control (RBAC) system that manages permissions across organizations, teams, and projects. Role bindings can be assigned directly to users or to groups, including groups synced from your identity provider via SCIM.
 
 <Info>
   For group-based access control and identity provider integration, see [SCIM Groups](/platform/scim-groups).
@@ -114,6 +114,23 @@ The system implements a hierarchical permission model where:
 - **`manage` permissions automatically include** `view`, `create`, `update`, and `delete` permissions
 - This means if a user has `analytics:manage`, they automatically have `analytics:view`, `analytics:create`, `analytics:update`, and `analytics:delete`
 
+## Organization Structure
+
+LangWatch uses three layers for access and ownership:
+
+- **Organization**: the top-level container for billing, users, and shared policy.
+- **Team**: the container that groups projects and members together.
+- **Project**: the actual unit where traces, evaluations, prompts, and API keys live.
+
+Practical rules:
+
+- Create teams first when you want a new workspace boundary for a department or product line.
+- Create projects inside a team, or move an existing project to another team when ownership changes.
+- Moving a project between teams changes the inherited RBAC boundary. Team members on the destination team gain access, and source-team inheritance no longer applies.
+- Groups are the scale mechanism on top of this hierarchy. Use them to assign the same role bindings to many users at once.
+
+The day-to-day flows live in the UI under **Settings → Teams**, **Settings → Projects**, and **Settings → Groups**. The same operations are available through the Teams, Projects, and Groups APIs.
+
 ## Custom Roles
 
 ### Overview
@@ -180,7 +197,7 @@ The system supports public sharing of traces, allowing access without authentica
 
 ## Scoped Role Bindings
 
-Roles in LangWatch are assigned via **role bindings** — a binding links a principal (user or group) to a role at a specific scope.
+Roles in LangWatch are assigned via **role bindings**: a binding links a principal (user or group) to a role at a specific scope.
 
 ### Scopes
 
@@ -192,14 +209,14 @@ Roles in LangWatch are assigned via **role bindings** — a binding links a prin
 
 ### Resolution Rules
 
-- **Most specific scope wins** — a project-level binding overrides a team-level binding for that project
-- **Org Admin always wins** — an org-level Admin binding grants full access everywhere regardless of narrower bindings
-- **Multiple bindings at the same scope** — the highest role is used (e.g. Member + Viewer → Member)
+- **Most specific scope wins**: a project-level binding overrides a team-level binding for that project
+- **Org Admin always wins**: an org-level Admin binding grants full access everywhere regardless of narrower bindings
+- **Multiple bindings at the same scope**: the highest role is used (e.g. Member + Viewer → Member)
 
 Role bindings can be assigned to users directly from **Settings → Members**, or to groups from **Settings → Groups**. Users inherit all bindings assigned to groups they belong to.
 
 <Tip>
-  Use group bindings (especially SCIM groups from your IdP) to manage access at scale — assigning a binding to a group is equivalent to assigning it to every member of that group. See [SCIM Groups](/platform/scim-groups).
+  Use group bindings (especially SCIM groups from your IdP) to manage access at scale, assigning a binding to a group is equivalent to assigning it to every member of that group. See [SCIM Groups](/platform/scim-groups).
 </Tip>
 
 ---

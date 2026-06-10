@@ -94,7 +94,7 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
   }
 
   /**
-   * Execute the pre-fetched workflow DSL via /studio/execute_sync.
+   * Execute the pre-fetched workflow DSL via /go/studio/execute_sync.
    *
    * The DSL is passed through unchanged (unlike the code adapter which
    * synthesizes a minimal entry→code→end workflow). The NLP service injects
@@ -137,7 +137,7 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
     try {
       let response: Response;
       try {
-        response = await fetch(`${this.nlpServiceUrl}/studio/execute_sync`, {
+        response = await fetch(`${this.nlpServiceUrl}/go/studio/execute_sync`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(event),
@@ -151,7 +151,7 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
               )})`
             : "";
         throw new Error(
-          `Workflow execution failed: fetch to ${this.nlpServiceUrl}/studio/execute_sync failed - ${
+          `Workflow execution failed: fetch to ${this.nlpServiceUrl}/go/studio/execute_sync failed - ${
             fetchError instanceof Error ? fetchError.message : String(fetchError)
           }${cause}`,
         );

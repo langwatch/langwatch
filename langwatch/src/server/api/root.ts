@@ -41,6 +41,8 @@ import { sdkRadarRouter } from "./routers/sdkRadar";
 import { secretsRouter } from "./routers/secrets";
 import { suiteRouter } from "./routers/suites";
 import { shareRouter } from "./routers/share";
+import { pinnedTraceRouter } from "./routers/pinnedTrace";
+import { dataRetentionRouter } from "./routers/dataRetention";
 import { spansRouter } from "./routers/spans";
 import { teamRouter } from "./routers/team";
 import { topicsRouter } from "./routers/topics";
@@ -55,9 +57,22 @@ import { groupRouter } from "./routers/group";
 import { userRouter } from "./routers/user";
 import { gatewayBudgetsRouter } from "./routers/gatewayBudgets";
 import { gatewayCacheRulesRouter } from "./routers/gatewayCacheRules";
+import { gatewayGuardrailsRouter } from "./routers/gatewayGuardrails";
 import { gatewayUsageRouter } from "./routers/gatewayUsage";
-import { gatewayProvidersRouter } from "./routers/gatewayProviders";
 import { virtualKeysRouter } from "./routers/virtualKeys";
+import { personalVirtualKeysRouter } from "./routers/personalVirtualKeys";
+import { personalWorkspaceFeaturesRouter } from "./routers/personalWorkspaceFeatures";
+import { routingPoliciesRouter } from "./routers/routingPolicies";
+import { ingestionSourcesRouter } from "@ee/governance/routers/ingestionSources";
+import { activityMonitorRouter } from "@ee/governance/routers/activityMonitor";
+import { anomalyRulesRouter } from "@ee/governance/routers/anomalyRules";
+import { aiToolsRouter } from "@ee/governance/routers/aiTools";
+import { departmentsRouter } from "@ee/governance/routers/departments";
+import { ingestionTemplatesRouter } from "@ee/governance/routers/ingestionTemplates";
+import { ingestionKeyRouter } from "@ee/governance/routers/ingestionKey";
+import { governanceRouter } from "@ee/governance/routers/governance";
+import { personalSessionsRouter } from "@ee/governance/routers/personalSessions";
+import { sessionPolicyRouter } from "@ee/governance/routers/sessionPolicy";
 import { workflowRouter } from "./routers/workflows";
 import { opsRouter } from "./routers/ops";
 import { storedObjectsRouter } from "./routers/stored-objects.router";
@@ -97,6 +112,8 @@ const coreRouters = {
   annotationScore: annotationScoreRouter,
   publicEnv: publicEnvRouter,
   share: shareRouter,
+  pinnedTrace: pinnedTraceRouter,
+  dataRetention: dataRetentionRouter,
   translate: translateRouter,
   workflow: workflowRouter,
   optimization: optimizationRouter,
@@ -119,9 +136,22 @@ const coreRouters = {
   ops: opsRouter,
   storedObjects: storedObjectsRouter,
   virtualKeys: virtualKeysRouter,
-  gatewayProviders: gatewayProvidersRouter,
+  personalVirtualKeys: personalVirtualKeysRouter,
+  personalWorkspaceFeatures: personalWorkspaceFeaturesRouter,
+  routingPolicy: routingPoliciesRouter,
+  ingestionSources: ingestionSourcesRouter,
+  activityMonitor: activityMonitorRouter,
+  anomalyRules: anomalyRulesRouter,
+  aiTools: aiToolsRouter,
+  departments: departmentsRouter,
+  ingestionTemplates: ingestionTemplatesRouter,
+  ingestionKey: ingestionKeyRouter,
+  governance: governanceRouter,
+  personalSessions: personalSessionsRouter,
+  sessionPolicy: sessionPolicyRouter,
   gatewayBudgets: gatewayBudgetsRouter,
   gatewayCacheRules: gatewayCacheRulesRouter,
+  gatewayGuardrails: gatewayGuardrailsRouter,
   gatewayUsage: gatewayUsageRouter,
 };
 

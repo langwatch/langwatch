@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SCOPE_TIERS, scopeAssignmentSchema } from "~/server/scopes/scope.types";
 import { customModelUpdateInputSchema } from "../../modelProviders/customModel.schema";
 import {
   featureByKey,
@@ -132,22 +133,25 @@ export const modelProviderRouter = createTRPCRouter({
         // service runs the fail-closed authz check on every entry before
         // persisting — any non-manageable scope aborts the whole write.
         scopes: z
-          .array(
-            z.object({
-              scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),
-              scopeId: z.string().min(1),
-            }),
-          )
+          .array(scopeAssignmentSchema)
           .min(1, "At least one scope must be selected.")
           .optional(),
-        scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]).optional(),
+        scopeType: z.enum(SCOPE_TIERS).optional(),
         scopeId: z.string().optional(),
+        // Advanced (Gateway) fields live on the same ModelProvider row.
+        // Accepted on the unified write path so the drawer ships one Save
+        // button across basic + advanced settings.
+        rateLimitRpm: z.number().int().min(0).nullable().optional(),
+        rateLimitTpm: z.number().int().min(0).nullable().optional(),
+        rateLimitRpd: z.number().int().min(0).nullable().optional(),
+        fallbackPriorityGlobal: z.number().int().nullable().optional(),
+        providerConfig: z.object({}).passthrough().nullable().optional(),
       }),
     )
     .use(checkProjectPermission("project:update"))
     .mutation(async ({ input, ctx }) => {
       const service = ModelProviderService.create(ctx.prisma);
-      return await service.updateModelProvider(
+      const result = await service.updateModelProvider(
         {
           id: input.id,
           projectId: input.projectId,
@@ -165,9 +169,19 @@ export const modelProviderRouter = createTRPCRouter({
           scopes: input.scopes,
           scopeType: input.scopeType,
           scopeId: input.scopeId,
+          rateLimitRpm: input.rateLimitRpm,
+          rateLimitTpm: input.rateLimitTpm,
+          rateLimitRpd: input.rateLimitRpd,
+          fallbackPriorityGlobal: input.fallbackPriorityGlobal,
+          providerConfig: input.providerConfig as
+            | Record<string, unknown>
+            | null
+            | undefined,
         },
         { prisma: ctx.prisma, session: ctx.session },
       );
+
+      return result;
     }),
 
   delete: protectedProcedure
@@ -307,7 +321,7 @@ export const modelProviderRouter = createTRPCRouter({
   setRoleAssignmentForScope: protectedProcedure
     .input(
       z.object({
-        scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),
+        scopeType: z.enum(SCOPE_TIERS),
         scopeId: z.string(),
         role: z.enum(MODEL_ROLES),
         model: z.string().nullable(),
@@ -331,7 +345,7 @@ export const modelProviderRouter = createTRPCRouter({
   setFeatureOverrideForScope: protectedProcedure
     .input(
       z.object({
-        scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),
+        scopeType: z.enum(SCOPE_TIERS),
         scopeId: z.string(),
         featureKey: z.string(),
         model: z.string().nullable(),
@@ -375,7 +389,7 @@ export const modelProviderRouter = createTRPCRouter({
         scopes: z
           .array(
             z.object({
-              scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),
+              scopeType: z.enum(SCOPE_TIERS),
               scopeId: z.string().min(1),
             }),
           )
@@ -448,7 +462,7 @@ export const modelProviderRouter = createTRPCRouter({
         scopes: z
           .array(
             z.object({
-              scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),
+              scopeType: z.enum(SCOPE_TIERS),
               scopeId: z.string().min(1),
             }),
           )

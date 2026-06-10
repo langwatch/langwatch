@@ -155,6 +155,7 @@ function AnnotationScorePage() {
             icon={<ThumbsUp />}
           />
         ) : (
+          <Box width="full" overflowX="auto">
           <Table.Root variant="line" width="full">
             <Table.Header>
               <Table.Row>
@@ -273,6 +274,7 @@ function AnnotationScorePage() {
               )}
             </Table.Body>
           </Table.Root>
+          </Box>
         )}
       </VStack>
       <DeleteConfirmationDialog

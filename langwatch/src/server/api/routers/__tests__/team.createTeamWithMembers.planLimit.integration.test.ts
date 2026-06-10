@@ -86,8 +86,8 @@ describe.skipIf(isTestcontainersOnly)(
       });
     });
 
-    beforeEach(() => {
-      resetApp();
+    beforeEach(async () => {
+      await resetApp();
       mockGetActivePlan = vi.fn();
       mockNotifyResourceLimitReached = vi.fn().mockResolvedValue(undefined);
       globalForApp.__langwatch_app = createTestApp({
@@ -101,8 +101,8 @@ describe.skipIf(isTestcontainersOnly)(
       });
     });
 
-    afterEach(() => {
-      resetApp();
+    afterEach(async () => {
+      await resetApp();
     });
 
     afterAll(async () => {

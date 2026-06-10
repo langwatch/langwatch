@@ -1,13 +1,13 @@
 import {
   OrganizationUserRole,
-  RoleBindingScopeType,
   type PrismaClient,
+  RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import type { Session } from "~/server/auth";
 import { env } from "~/env.mjs";
 import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
+import type { Session } from "~/server/auth";
 import { isAdmin } from "../../../ee/admin/isAdmin";
 
 // ============================================================================
@@ -31,6 +31,11 @@ export const Actions = {
   ROTATE: "rotate",
   ATTACH: "attach",
   DETACH: "detach",
+  // Resource-specific cross-principal audit action. Used today by
+  // `virtualKeys:viewOtherPersonal` so org admins can see every member's
+  // personal VKs during off-boarding sweeps. Personal-VK self-view stays
+  // implicit on principalUserId match (no perm needed for "see my own").
+  VIEW_OTHER_PERSONAL: "viewOtherPersonal",
 } as const;
 
 export type Action = (typeof Actions)[keyof typeof Actions];
@@ -51,6 +56,10 @@ export const Resources = {
   DATASETS: "datasets",
   TRIGGERS: "triggers",
   WORKFLOWS: "workflows",
+  // Experiments are their own capability: a user can run experiments on
+  // prompts or agents without touching the workflow studio. Historically they
+  // inherited `workflows:view`; this dedicated permission decouples them.
+  EXPERIMENTS: "experiments",
   PROMPTS: "prompts",
   SECRETS: "secrets",
   PLAYGROUND: "playground",
@@ -64,6 +73,11 @@ export const Resources = {
   VIRTUAL_KEYS: "virtualKeys",
   GATEWAY_BUDGETS: "gatewayBudgets",
   GATEWAY_PROVIDERS: "gatewayProviders",
+  // RoutingPolicies are Enterprise-tier gateway primitives (provider
+  // chain + fallback + per-model rules). Granular permission lets
+  // custom roles delegate routing-policy mgmt without granting
+  // organization:manage. Mirrors gatewayProviders:* shape.
+  ROUTING_POLICIES: "routingPolicies",
   GATEWAY_GUARDRAILS: "gatewayGuardrails",
   // Deprecated (kept for backwards-compat): pre-consolidation perm that
   // gated /[project]/gateway/audit. The page is gone; auditLog:view is
@@ -71,6 +85,23 @@ export const Resources = {
   GATEWAY_LOGS: "gatewayLogs",
   GATEWAY_USAGE: "gatewayUsage",
   GATEWAY_CACHE_RULES: "gatewayCacheRules",
+  // AI Governance resources — see specs/ai-gateway/governance/. These are
+  // org-level (not project/team-level), so they live in
+  // ORGANIZATION_ROLE_PERMISSIONS rather than the team role bags. Custom
+  // roles can grant any subset via the existing CustomRolePermissions JSON
+  // column without requiring a Prisma enum change.
+  GOVERNANCE: "governance",
+  INGESTION_SOURCES: "ingestionSources",
+  ANOMALY_RULES: "anomalyRules",
+  COMPLIANCE_EXPORT: "complianceExport",
+  ACTIVITY_MONITOR: "activityMonitor",
+  // AI Tools Portal (Phase 7) — the customizable per-org card grid on
+  // /me. Two permissions:
+  //   - aiTools:view → ALL org roles. Portal must work for every member
+  //     so they can discover what's available + click through to setup.
+  //   - aiTools:manage → org ADMIN only. Catalog editor surface at
+  //     /settings/governance/tool-catalog (CRUD + reorder + enable).
+  AI_TOOLS: "aiTools",
 } as const;
 
 export type Resource = (typeof Resources)[keyof typeof Resources];
@@ -80,6 +111,51 @@ export type Resource = (typeof Resources)[keyof typeof Resources];
  * Format: "resource:action" (e.g., "analytics:view", "datasets:manage")
  */
 export type Permission = `${Resource}:${Action}`;
+
+/**
+ * Resources that only exist at the organization tier — there is no team- or
+ * project-scoped meaning for them (the AI Governance family plus the
+ * organization resource itself). Org-tier authority comes only from an
+ * ORGANIZATION-scoped RoleBinding; a TEAM- or PROJECT-scoped binding must
+ * never grant a permission on one of these, even via a custom role that lists
+ * it. This is the defense the scope-chain resolvers apply so a custom role
+ * misconfigured below the org tier can't escalate to organization:manage,
+ * governance:manage, anomalyRules:manage, and so on (ADR-021).
+ *
+ * Gateway + core resources (virtualKeys, gatewayBudgets, datasets, workflows,
+ * …) are deliberately NOT here: they are legitimately accessible at team and
+ * project scope, so team/project bindings may grant them.
+ */
+const ORG_EXCLUSIVE_RESOURCES: ReadonlySet<Resource> = new Set<Resource>([
+  Resources.ORGANIZATION,
+  Resources.GOVERNANCE,
+  Resources.INGESTION_SOURCES,
+  Resources.ANOMALY_RULES,
+  Resources.COMPLIANCE_EXPORT,
+  Resources.ACTIVITY_MONITOR,
+  Resources.AI_TOOLS,
+]);
+
+/** True when the permission targets an organization-tier-only resource. */
+export function isOrgExclusivePermission(permission: Permission): boolean {
+  const resource = permission.split(":")[0] as Resource;
+  return ORG_EXCLUSIVE_RESOURCES.has(resource);
+}
+
+/**
+ * Whether a binding at `scopeType` may grant `permission`. Org-exclusive
+ * permissions require an ORGANIZATION-scoped binding; everything else is
+ * grantable at any scope. Both the tRPC resolver (`checkPermissionFromBindings`)
+ * and the gateway resolver (`checkRoleBindingPermission`) gate on this so the
+ * rule holds no matter which path evaluates the binding.
+ */
+export function bindingScopeCanGrant(
+  scopeType: RoleBindingScopeType,
+  permission: Permission,
+): boolean {
+  if (scopeType === RoleBindingScopeType.ORGANIZATION) return true;
+  return !isOrgExclusivePermission(permission);
+}
 
 // ============================================================================
 // ROLE DEFINITIONS
@@ -116,6 +192,9 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Workflows
     "workflows:view",
     "workflows:manage",
+    // Experiments
+    "experiments:view",
+    "experiments:manage",
     // Datasets
     "datasets:view",
     "datasets:manage",
@@ -141,6 +220,11 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "virtualKeys:delete",
     "virtualKeys:rotate",
     "virtualKeys:manage",
+    // Off-boarding sweep capability — view personal VKs owned by OTHER
+    // users in the org (own personal-VK visibility stays implicit on
+    // principalUserId match, no perm needed). Spec-bound to
+    // vk-scope-rbac.feature + vk-personal-scope.feature.
+    "virtualKeys:viewOtherPersonal",
     "gatewayBudgets:view",
     "gatewayBudgets:create",
     "gatewayBudgets:update",
@@ -149,6 +233,8 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "gatewayProviders:view",
     "gatewayProviders:update",
     "gatewayProviders:manage",
+    "routingPolicies:view",
+    "routingPolicies:manage",
     "gatewayGuardrails:view",
     "gatewayGuardrails:attach",
     "gatewayGuardrails:detach",
@@ -186,6 +272,9 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Workflows
     "workflows:view",
     "workflows:manage",
+    // Experiments
+    "experiments:view",
+    "experiments:manage",
     // Datasets
     "datasets:view",
     "datasets:manage",
@@ -210,6 +299,7 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "virtualKeys:rotate",
     "gatewayBudgets:view",
     "gatewayProviders:view",
+    "routingPolicies:view",
     "gatewayGuardrails:view",
     "gatewayLogs:view",
     "auditLog:view",
@@ -231,6 +321,8 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "datasets:view",
     // Workflows
     "workflows:view",
+    // Experiments
+    "experiments:view",
     // Prompts
     "prompts:view",
     // Scenarios
@@ -243,6 +335,7 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "virtualKeys:view",
     "gatewayBudgets:view",
     "gatewayProviders:view",
+    "routingPolicies:view",
     "gatewayGuardrails:view",
     "gatewayLogs:view",
     "auditLog:view",
@@ -265,6 +358,8 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "datasets:view",
     // Workflows
     "workflows:view",
+    // Experiments
+    "experiments:view",
     // Prompts
     "prompts:view",
     // Scenarios
@@ -277,6 +372,7 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "virtualKeys:view",
     "gatewayBudgets:view",
     "gatewayProviders:view",
+    "routingPolicies:view",
     "gatewayGuardrails:view",
     "gatewayLogs:view",
     "auditLog:view",
@@ -296,9 +392,48 @@ const ORGANIZATION_ROLE_PERMISSIONS: Record<
     "organization:view",
     "organization:manage",
     "organization:delete",
+    // AI Governance — org-level permissions for the governance offering
+    // (anomaly rules, ingestion sources, OCSF SIEM export, activity
+    // monitor, top-level Govern section). Default-attached to ADMIN so
+    // admins can bootstrap their first IngestionSource without a
+    // chicken-and-egg gate. MEMBER + EXTERNAL get nothing by default;
+    // custom roles via CustomRolePermissions JSON column are the
+    // production-shape delegation surface (e.g. a "security_analyst"
+    // custom role granting governance:view + activityMonitor:view +
+    // anomalyRules:view).
+    "governance:view",
+    "governance:manage",
+    "ingestionSources:view",
+    "ingestionSources:create",
+    "ingestionSources:update",
+    "ingestionSources:delete",
+    "ingestionSources:manage",
+    "anomalyRules:view",
+    "anomalyRules:create",
+    "anomalyRules:update",
+    "anomalyRules:delete",
+    "anomalyRules:manage",
+    "complianceExport:view",
+    "activityMonitor:view",
+    // AI Tools Portal — admin owns the catalog. View is implicit via
+    // the org-wide grant below (admins also see the user-facing portal).
+    "aiTools:view",
+    "aiTools:manage",
+    // AI Gateway — org-level VK capabilities. `virtualKeys:manage`
+    // mirrors the TeamUserRole.ADMIN grant so org admins can author VKs
+    // at ORGANIZATION scope (the team-role short-circuit at
+    // rbac.ts:715/:1099 covers existing customers automatically; the
+    // explicit string here documents the perm-listing UI + future custom
+    // roles that don't inherit the short-circuit). `viewOtherPersonal`
+    // gives org admins the off-boarding sweep capability. Spec-bound to
+    // vk-scope-rbac.feature.
+    "virtualKeys:manage",
+    "virtualKeys:viewOtherPersonal",
   ],
-  [OrganizationUserRole.MEMBER]: ["organization:view"],
-  [OrganizationUserRole.EXTERNAL]: ["organization:view"], // Limited view for Lite Member users
+  // MEMBER + EXTERNAL get aiTools:view so the /me portal renders for
+  // every org member. Catalog management stays admin-only.
+  [OrganizationUserRole.MEMBER]: ["organization:view", "aiTools:view"],
+  [OrganizationUserRole.EXTERNAL]: ["organization:view", "aiTools:view"],
 };
 
 /**
@@ -320,6 +455,7 @@ export const EXTERNAL_MEMBER_PERMISSIONS: Permission[] = [
   "evaluations:view",
   "datasets:view",
   "workflows:view",
+  "experiments:view",
   "prompts:view",
   "scenarios:view",
   "secrets:view",
@@ -497,7 +633,9 @@ export const checkProjectPermission =
         throw new TRPCError({
           code: "UNAUTHORIZED",
           message: "This feature is not available for your account",
-          cause: new LiteMemberRestrictedError(permission.split(":")[0] ?? "unknown"),
+          cause: new LiteMemberRestrictedError(
+            permission.split(":")[0] ?? "unknown",
+          ),
         });
       }
       throw new TRPCError({
@@ -532,7 +670,9 @@ export const checkTeamPermission =
         throw new TRPCError({
           code: "UNAUTHORIZED",
           message: "This feature is not available for your account",
-          cause: new LiteMemberRestrictedError(permission.split(":")[0] ?? "unknown"),
+          cause: new LiteMemberRestrictedError(
+            permission.split(":")[0] ?? "unknown",
+          ),
         });
       }
       throw new TRPCError({
@@ -635,6 +775,11 @@ async function checkPermissionFromBindings({
     });
 
     if (!teamUser) return false;
+    // Legacy team membership is a TEAM-scoped grant, so it can't confer an
+    // org-exclusive permission even through a custom role (ADR-021).
+    if (!bindingScopeCanGrant(RoleBindingScopeType.TEAM, permission)) {
+      return false;
+    }
     return resolveBindingPermission(
       { role: teamUser.role, customRoleId: teamUser.assignedRoleId ?? null },
       organizationRole,
@@ -645,6 +790,10 @@ async function checkPermissionFromBindings({
 
   // Union permissions across ALL matching bindings — permitted if any grants it
   for (const binding of bindings) {
+    // A team/project binding can never grant an org-exclusive permission,
+    // even via a custom role that lists it (ADR-021).
+    if (!bindingScopeCanGrant(binding.scopeType, permission)) continue;
+
     // Org-scoped bindings: ADMIN grants everything; MEMBER grants org-level permissions only.
     // ORG-scoped MEMBER bindings do NOT imply any team- or project-level access — team/project
     // access requires a TEAM- or PROJECT-scoped binding. Only org:* permissions are checked here.
@@ -657,7 +806,10 @@ async function checkPermissionFromBindings({
       // OrganizationUser role is authoritative for EXTERNAL restrictions.
       if (organizationRole === OrganizationUserRole.EXTERNAL) continue;
       if (binding.role === TeamUserRole.ADMIN) return true;
-      if (organizationRoleHasPermission(OrganizationUserRole.MEMBER, permission)) return true;
+      if (
+        organizationRoleHasPermission(OrganizationUserRole.MEMBER, permission)
+      )
+        return true;
       continue;
     }
 
@@ -818,7 +970,10 @@ export async function resolveTeamPermission(
     organizationId: team.organizationId,
     scopes: [
       { scopeType: RoleBindingScopeType.TEAM, scopeId: teamId },
-      { scopeType: RoleBindingScopeType.ORGANIZATION, scopeId: team.organizationId },
+      {
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: team.organizationId,
+      },
     ],
     organizationRole,
     permission,
@@ -865,12 +1020,38 @@ export async function hasOrganizationPermission(
     return permission === "organization:view";
   }
 
+  // Universal personal-context floor: every org member, regardless of
+  // role, gets MEMBER's base bag (`organization:view` + `aiTools:view`)
+  // so /me works. Without this floor, a bare org-member with no team
+  // membership AND no custom RoleBinding fell through every check
+  // below and was rejected from every personal-context tRPC procedure
+  // (user.personalContext / personalUsage / personalBudget /
+  // homePagePickerState / governance.resolveHome / limits.getUsage /
+  // aiTools.list — all gated on `organization:view`). Caught when
+  // MEMBER `rogerio@…` was added to an org for the Claude Code OTLP
+  // dogfood and his /me page permission-denied silently — the page
+  // rendered as if no data existed instead of "no access".
+  //
+  // Critical: floor is MEMBER's bag *only*, NOT the role's full bag.
+  // ADMIN-only org perms (`organization:manage` / `governance:manage`
+  // / `ingestionSources:create` / etc.) still require an explicit
+  // ORGANIZATION-scoped RoleBinding. A bare OrgUser.role=ADMIN with
+  // no RoleBinding doesn't escalate — the existing legacy fallback
+  // semantics expect RoleBindings (primary path) or TeamUser ADMIN
+  // (limited team-resource fallback) to be the source of admin
+  // power, not the OrgUser.role field by itself.
+  if (organizationRoleHasPermission(OrganizationUserRole.MEMBER, permission)) {
+    return true;
+  }
+
   // Primary path: resolve via ORGANIZATION-scoped RoleBindings.
   const permittedByBindings = await checkPermissionFromBindings({
     prisma: ctx.prisma,
     userId,
     organizationId,
-    scopes: [{ scopeType: RoleBindingScopeType.ORGANIZATION, scopeId: organizationId }],
+    scopes: [
+      { scopeType: RoleBindingScopeType.ORGANIZATION, scopeId: organizationId },
+    ],
     organizationRole: orgMember.role,
     permission,
   });
@@ -883,8 +1064,23 @@ export async function hasOrganizationPermission(
   // that org ADMINs / team ADMINs have broad access to org-scoped gateway
   // resources (audit, org-level budgets, cache rules) without requiring a
   // RoleBinding backfill first.
+  //
+  // Personal teams are excluded: every user is ADMIN of their own
+  // single-member personal workspace team, so unioning it here would let
+  // any member escalate to the full org ADMIN template (including
+  // virtualKeys:viewOtherPersonal / organization:manage) just by owning a
+  // personal workspace. A personal team's legitimate ADMIN power is
+  // team-scoped and flows through its TEAM-scoped RoleBinding, never this
+  // org-wide union.
+  // The team-membership union below is a TEAM-scoped grant applied to an
+  // org-level check; org-exclusive permissions (organization:* / governance
+  // family) are never conferred through it — only an ORGANIZATION-scoped
+  // binding can (ADR-021). Gateway/audit resources stay grantable here.
+  if (!bindingScopeCanGrant(RoleBindingScopeType.TEAM, permission)) {
+    return false;
+  }
   const teamMemberships = await ctx.prisma.teamUser.findMany({
-    where: { userId, team: { organizationId } },
+    where: { userId, team: { organizationId, isPersonal: false } },
     select: { role: true, assignedRoleId: true },
   });
   for (const tu of teamMemberships) {
@@ -942,8 +1138,7 @@ export async function batchScopePermissions(
     where: { userId, organizationId: args.organizationId },
     select: { role: true },
   });
-  const organizationRole: OrganizationUserRole | null =
-    orgMember?.role ?? null;
+  const organizationRole: OrganizationUserRole | null = orgMember?.role ?? null;
   if (!orgMember) {
     args.teamIds.forEach((id) => teamsMap.set(id, false));
     args.projectIds.forEach((id) => projectsMap.set(id, false));
@@ -956,11 +1151,7 @@ export async function batchScopePermissions(
   });
   const groupIds = groupMemberships.map((m) => m.groupId);
 
-  const scopeIds = [
-    args.organizationId,
-    ...args.teamIds,
-    ...args.projectIds,
-  ];
+  const scopeIds = [args.organizationId, ...args.teamIds, ...args.projectIds];
   const bindings =
     scopeIds.length > 0
       ? await ctx.prisma.roleBinding.findMany({
@@ -983,9 +1174,7 @@ export async function batchScopePermissions(
 
   const customRoleIds = Array.from(
     new Set(
-      bindings
-        .map((b) => b.customRoleId)
-        .filter((id): id is string => !!id),
+      bindings.map((b) => b.customRoleId).filter((id): id is string => !!id),
     ),
   );
   const customRoles =
@@ -1002,6 +1191,9 @@ export async function batchScopePermissions(
     customRoleId: string | null;
     scopeType: RoleBindingScopeType;
   }): boolean => {
+    // A team/project binding can never grant an org-exclusive permission,
+    // even via a custom role that lists it (ADR-021).
+    if (!bindingScopeCanGrant(binding.scopeType, args.permission)) return false;
     if (binding.customRoleId) {
       const custom = customRoleById.get(binding.customRoleId);
       if (custom) {
@@ -1138,6 +1330,7 @@ const DEMO_VIEW_PERMISSIONS: Permission[] = [
   "datasets:view",
   "evaluations:view",
   "workflows:view",
+  "experiments:view",
   "prompts:view",
   "scenarios:view",
   "playground:view",
@@ -1189,7 +1382,9 @@ function isMiddlewareParams(
  */
 export function skipPermissionCheck(
   options?: SkipPermissionCheckOptions,
-): (params: PermissionMiddlewareParams<object>) => ReturnType<typeof params.next>;
+): (
+  params: PermissionMiddlewareParams<object>,
+) => ReturnType<typeof params.next>;
 export function skipPermissionCheck(
   params: PermissionMiddlewareParams<object>,
 ): ReturnType<typeof params.next>;
@@ -1230,6 +1425,23 @@ export function skipPermissionCheck(
 }
 
 export const skipPermissionCheckProjectCreation = ({
+  ctx,
+  next,
+}: PermissionMiddlewareParams<object>) => {
+  ctx.permissionChecked = true;
+  return next();
+};
+
+/**
+ * For procedures that authorize against data-dependent scopes resolved at
+ * runtime (e.g. a row's own scope set, loaded by id) rather than a fixed
+ * input scope a `checkXxxPermission` could read. It satisfies the builder's
+ * fail-closed `enforcePermissionCheck` while keeping `protectedProcedure`'s
+ * auth + audit + domain-error handling. The resolver/service MUST perform
+ * the real authorization — this only defers WHERE the check happens, never
+ * whether it happens.
+ */
+export const authorizeInResolver = ({
   ctx,
   next,
 }: PermissionMiddlewareParams<object>) => {
@@ -1343,10 +1555,7 @@ export const checkOpsPermission =
     permission: Permission;
     throwOnDeny?: boolean;
   }) =>
-  async ({
-    ctx,
-    next,
-  }: PermissionMiddlewareParams<unknown>) => {
+  async ({ ctx, next }: PermissionMiddlewareParams<unknown>) => {
     const user = ctx.session?.user;
     if (!user) {
       throw new TRPCError({ code: "UNAUTHORIZED" });

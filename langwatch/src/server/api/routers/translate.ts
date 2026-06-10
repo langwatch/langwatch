@@ -19,7 +19,7 @@ export const translateRouter = createTRPCRouter({
     .use(checkProjectPermission("triggers:view"))
     .mutation(async ({ input }) => {
       try {
-        const model = await getVercelAIModel(input.projectId, undefined, "translate.text");
+        const model = await getVercelAIModel({ projectId: input.projectId, featureKey: "translate.text" });
         const response: { text: string } = await generateText({
           model,
           prompt: `Translate the following text to English only reply with the translated text, do not include any other text: ${input.textToTranslate}`,

@@ -12,10 +12,15 @@
     "@hono/node-server": "^2.0.0",
     "bullmq": "^5.70.1",
     "dotenv": "^17.3.1",
-    "hono": "^4.12.14",
+    "hono": "^4.12.18",
     "ioredis": "^5.9.3"
   },
   "devDependencies": {
     "typescript": "^5.9.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "uuid@<11.1.1": ">=11.1.1 <12"
+    }
   }
 }

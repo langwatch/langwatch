@@ -194,3 +194,55 @@ Feature: Evaluator as evaluation target
     Then the evaluator target is restored
     And the target has the correct dbEvaluatorId
     And the mappings are preserved
+
+  # ============================================================================
+  # Type coercion when piping a target output into a downstream evaluator input
+  # ============================================================================
+  #
+  # An evaluator-as-target emits typed outputs: passed (bool), score (float),
+  # label (str). A downstream string-input evaluator (Exact Match, LLM Answer
+  # Match, etc.) accepts those outputs without surfacing the customer-visible
+  # "Validation error: Expected string, received boolean" rejection. The
+  # workbench live-execute path coerces the mapped value to the evaluator's
+  # declared input type before the request is validated, matching the
+  # coercion the batch worker already applied for years.
+
+  @regression
+  Scenario: Downstream evaluator receives a boolean target output without rejection
+    Given an evaluator target "Sentiment Check" emits "passed" as a boolean
+    And a downstream evaluator "Exact Match" expects "output" as a string
+    And "output" is mapped to "Sentiment Check.passed"
+    And "expected_output" is mapped to a dataset column containing "1"
+    When I run the downstream evaluator
+    Then the evaluator runs without a "Expected string, received boolean" error
+    And the row scores as a match
+
+  Scenario Outline: Non-string target outputs are coerced to the evaluator's declared input type
+    Given an evaluator target emits an output of type "<source_type>" with value "<source_value>"
+    And a downstream evaluator expects an "output" input typed as string
+    When the downstream evaluator runs with that mapping
+    Then the value reaches the scorer as the string "<as_string>"
+    And no validation error is surfaced to the user
+
+    Examples:
+      | source_type | source_value | as_string          |
+      | boolean     | true         | true               |
+      | boolean     | false        | false              |
+      | number      | 42           | 42                 |
+      | number      | 0.5          | 0.5                |
+      | object      | {"a":1}      | {"a":1}            |
+      | array       | [1,2,3]      | [1,2,3]            |
+
+  Scenario: Null target outputs are preserved, not coerced into a string
+    Given an evaluator target emits "output" as null
+    And a downstream evaluator's "output" mapping points at that field
+    When the downstream evaluator runs
+    Then the scorer receives a null/absent value
+    And the row is reported as inconclusive rather than rejected
+
+  @regression
+  Scenario: Online evaluation request with a boolean trace metadata mapping runs without rejection
+    Given an online evaluator pulls "output" from a trace metadata field that is a boolean
+    When the evaluation is dispatched
+    Then the live-execute path coerces the boolean to its string form
+    And no "Expected string, received boolean" error is surfaced

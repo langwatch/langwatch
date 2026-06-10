@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
@@ -59,7 +58,7 @@ func executeSyncHandler(application *app.App) http.HandlerFunc {
 			}, errors.New("workflow executor missing from app")))
 			return
 		}
-		body, err := io.ReadAll(r.Body)
+		body, err := readStudioRequestBody(r, stagedPayloadClient)
 		if err != nil {
 			herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrBadRequest, herr.M{
 				"reason": "read_body",
@@ -101,7 +100,7 @@ func executeSyncHandler(application *app.App) http.HandlerFunc {
 //     StudioClientEvent union sent by langwatch/src/server/workflows/
 //     runWorkflow.ts):
 //     {"type":"execute_flow"|"execute_component"|"execute_evaluation",
-//      "payload":{trace_id, workflow, inputs?, origin?, ...}}
+//     "payload":{trace_id, workflow, inputs?, origin?, ...}}
 //
 //  2. Flat envelope (used by tests + manual curl):
 //     {trace_id, workflow, inputs?, origin?, project_id?}
@@ -151,8 +150,16 @@ func decodeStudioClientEvent(r *http.Request, body []byte) (*app.WorkflowRequest
 		// values for THIS node, not as Entry-node outputs — see
 		// langwatch/src/optimization_studio/hooks/useComponentExecution.ts.
 		// Absent for execute_flow / execute_evaluation.
-		NodeID    string `json:"node_id,omitempty"`
-		ProjectID string `json:"project_id,omitempty"`
+		NodeID string `json:"node_id,omitempty"`
+		// UntilNodeID scopes a flow run to the dependency path of the
+		// named node — Studio's "Run until here" gesture (Nodes.tsx
+		// per-node Play button → startWorkflowExecution({untilNodeId})
+		// → useWorkflowExecution.ts sends until_node_id on the event
+		// payload). Disconnected siblings + everything downstream of
+		// the target are trimmed in the planner (planner.WithUntilNode).
+		// Mirrors `ExecuteFlowPayload.until_node_id` on the Python side.
+		UntilNodeID string `json:"until_node_id,omitempty"`
+		ProjectID   string `json:"project_id,omitempty"`
 		// RunID is present only on execute_evaluation envelopes
 		// (langwatch/src/optimization_studio/hooks/useEvaluationExecution.ts).
 		// Plumbed through to the engine so evaluation_state_change events
@@ -209,6 +216,7 @@ func decodeStudioClientEvent(r *http.Request, body []byte) (*app.WorkflowRequest
 		ProjectID:         inner.ProjectID,
 		ThreadID:          threadID,
 		NodeID:            inner.NodeID,
+		UntilNodeID:       inner.UntilNodeID,
 		APIKey:            peekWorkflowAPIKey(inner.Workflow),
 		WorkflowName:      peekWorkflowName(inner.Workflow),
 		Type:              peek.Type,
@@ -375,7 +383,7 @@ func executeStreamHandler(application *app.App) http.HandlerFunc {
 			}, errors.New("workflow executor missing from app")))
 			return
 		}
-		body, err := io.ReadAll(r.Body)
+		body, err := readStudioRequestBody(r, stagedPayloadClient)
 		if err != nil {
 			herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrBadRequest, herr.M{
 				"reason": "read_body",

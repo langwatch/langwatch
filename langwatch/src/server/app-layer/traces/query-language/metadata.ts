@@ -431,12 +431,30 @@ const HAS_NONE_VALUES: string[] = [
   "topic",
   "subtopic",
   "label",
+  // Round-3 additions — "is this field set on the trace?" is a useful
+  // filter for AI observability cohort triage. Each one maps to a
+  // single column / Attributes key in trace_summaries; see the matching
+  // cases in `meta-handlers.ts`.
+  "model",
+  "service",
+  "traceName",
+  "rootSpanType",
 ];
 
 /** Known values for autocomplete suggestions. */
 export const FIELD_VALUES: Record<string, string[]> = {
   status: ["error", "warning", "ok"],
-  origin: ["application", "simulation", "evaluation", "sample"],
+  origin: [
+    "application",
+    "simulation",
+    "evaluation",
+    "sample",
+    "gateway",
+    "playground",
+    "workflow",
+    "coding_agent",
+    "ai_tool",
+  ],
   has: HAS_NONE_VALUES,
   none: HAS_NONE_VALUES,
   scenarioVerdict: ["success", "failure", "inconclusive"],

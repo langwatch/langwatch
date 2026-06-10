@@ -24,7 +24,6 @@ import (
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
 )
 
-
 // Root is the service entrypoint called by cmd/service.
 func Root(ctx context.Context, _ []string) error {
 	cfg, err := nlpgo.LoadConfig(ctx)
@@ -99,8 +98,6 @@ func Root(ctx context.Context, _ []string) error {
 
 	application := app.New(
 		app.WithLogger(deps.Logger),
-		app.WithChildProxy(deps.ChildProxy),
-		app.WithChildManager(deps.Child),
 		app.WithWorkflowExecutor(executor),
 	)
 

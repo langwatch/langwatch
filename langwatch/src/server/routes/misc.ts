@@ -24,8 +24,9 @@ import { OpenAI } from "openai";
 import { nanoid } from "nanoid";
 import { randomUUID, createHash } from "node:crypto";
 import crypto from "crypto";
-import { Hono } from "hono";
+import type { Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
+import { validateInternalSecret } from "./_lib/internal-secret";
 import { type ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { TRPCError } from "@trpc/server";
@@ -44,11 +45,14 @@ import {
   matchModelCostWithFallbacks,
 } from "~/server/background/workers/collector/cost";
 import { prisma } from "~/server/db";
-import type {
-  DSPyLLMCall,
-  DSPyStepRESTParams,
+import { hasProjectPermission, isDemoProject } from "~/server/api/rbac";
+import { ProjectService } from "~/server/app-layer/projects/project.service";
+import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
+import {
+  dSPyStepRESTParamsSchema,
+  type DSPyLLMCall,
+  type DSPyStepRESTParams,
 } from "~/server/experiments/types";
-import { dSPyStepRESTParamsSchema } from "~/server/experiments/types.generated";
 import { filterFieldsEnum } from "~/server/filters/types";
 import { createLicenseEnforcementService } from "~/server/license-enforcement";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
@@ -62,8 +66,10 @@ import { getPostHogInstance } from "~/server/posthog";
 import { getServerAuthSession } from "~/server/auth";
 import { connection as redis } from "~/server/redis";
 import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
-import type { TrackEventRESTParamsValidator } from "~/server/tracer/types";
-import { trackEventRESTParamsValidatorSchema } from "~/server/tracer/types.generated";
+import {
+  trackEventRESTParamsValidatorSchema,
+  type TrackEventRESTParamsValidator,
+} from "~/server/tracer/types";
 import { runWorkflow as runWorkflowFn } from "~/server/workflows/runWorkflow";
 import type Stripe from "stripe";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -77,9 +83,15 @@ import {
   requireApiKeyPermission,
   type UnifiedAuthVariables,
 } from "~/server/api-key/auth-middleware";
+import {
+  createServiceApp,
+  handlerManagedAuth,
+  internalSecret,
+  publicEndpoint,
+} from "~/server/api/security";
 
 const logger = createLogger("langwatch:misc");
-// Shared auth middlewares for every PAT-aware handler in this file.
+// Shared auth middlewares for every API-key-aware handler in this file.
 // `createUnifiedAuthMiddleware` runs the extractCredentials → TokenResolver
 // → setContext → late markUsed pipeline once; `requireApiKeyPermission`
 // enforces the per-route ceiling and returns 403 on denial.
@@ -88,12 +100,15 @@ const requireAnalyticsView = requireApiKeyPermission({
   prisma,
   permission: "analytics:view",
 });
-// TODO(pat): move DSPy steps under a dedicated experiments permission once
-// the RBAC catalog has one. `workflows:manage` is the closest existing
-// ceiling — VIEWER blocked, ADMIN/MEMBER allowed.
 const requireWorkflowsManage = requireApiKeyPermission({
   prisma,
   permission: "workflows:manage",
+});
+// DSPy step logging + experiment bootstrapping are experiment writes, gated on
+// the dedicated experiments permission rather than the workflow studio's.
+const requireExperimentsManage = requireApiKeyPermission({
+  prisma,
+  permission: "experiments:manage",
 });
 const requireTracesCreate = requireApiKeyPermission({
   prisma,
@@ -104,14 +119,24 @@ const requireTriggersManage = requireApiKeyPermission({
   permission: "triggers:manage",
 });
 
-export const app = new Hono<{ Variables: UnifiedAuthVariables }>().basePath(
-  "/api",
+const secured = createServiceApp<{ Variables: UnifiedAuthVariables }>({
+  basePath: "/api",
+});
+
+// Most endpoints here authenticate a project key plus a permission ceiling via
+// in-route middleware (authMiddleware + requireApiKeyPermission); the rest are
+// documented at their route.
+const inRouteAuth = handlerManagedAuth(
+  "project auth + permission ceiling enforced by in-route middleware",
+);
+const internalAuth = internalSecret(
+  "internal shared secret validated in-handler via validateInternalSecret",
 );
 
 // =============================================
 // POST /api/analytics
 // =============================================
-app.post("/analytics", authMiddleware, requireAnalyticsView, async (c) => {
+secured.access(inRouteAuth).post("/analytics", authMiddleware, requireAnalyticsView, async (c) => {
   const project = c.get("project");
 
   let body: Record<string, any>;
@@ -171,13 +196,13 @@ const HOTEL_SYSTEM_PROMPT =
 const RAG_SYSTEM_PROMPT =
   "You are a restaurant expert knowing the best around town.";
 
-// NOTE(pat): /demo/hotel_bot is intentionally NOT migrated to the unified
+// NOTE: /demo/hotel_bot is intentionally NOT migrated to the unified
 // extractCredentials + TokenResolver + enforceApiKeyCeiling pipeline. It is a
 // demo fixture that only forwards the caller's token onward to /api/collector,
-// which performs full PAT/legacy auth + ceiling enforcement itself. Adding a
+// which performs full API-key/legacy auth + ceiling enforcement itself. Adding a
 // second layer here would double-validate the same token and require a
 // scope that demo tokens may not have.
-app.post("/demo/hotel_bot", async (c) => {
+secured.access(handlerManagedAuth("demo endpoint validates X-Auth-Token in-handler")).post("/demo/hotel_bot", async (c) => {
   const authToken = c.req.header("x-auth-token");
   if (!authToken) {
     return c.json({ message: "X-Auth-Token header is required." }, 401);
@@ -232,11 +257,11 @@ app.post("/demo/hotel_bot", async (c) => {
 // =============================================
 // POST /api/dspy/log_steps
 // =============================================
-app.post(
+secured.access(inRouteAuth).post(
   "/dspy/log_steps",
   bodyLimit({ maxSize: 20 * 1024 * 1024 }),
   authMiddleware,
-  requireWorkflowsManage,
+  requireExperimentsManage,
   async (c) => {
     const project = c.get("project");
 
@@ -369,13 +394,10 @@ const dspyInitParamsSchema = z
     return true;
   });
 
-// TODO(pat): introduce a dedicated `experiments:manage` permission once
-// the RBAC catalog grows beyond workflows. `workflows:manage` is the
-// closest existing ceiling — VIEWER blocked, ADMIN/MEMBER pass through.
-app.post(
+secured.access(inRouteAuth).post(
   "/experiment/init",
   authMiddleware,
-  requireWorkflowsManage,
+  requireExperimentsManage,
   async (c) => {
   const project = c.get("project");
 
@@ -455,7 +477,7 @@ app.post(
 const REDIS_AUTH_CODE_PREFIX = "mcp:auth_code:";
 const AUTH_CODE_TTL_SECONDS = 600;
 
-app.post("/mcp/authorize", async (c) => {
+secured.access(handlerManagedAuth("user session validated in-handler via getServerAuthSession")).post("/mcp/authorize", async (c) => {
   const session = await getServerAuthSession({ req: c.req.raw as any });
   if (!session?.user?.id) {
     return c.json({ error: "Not authenticated" }, 401);
@@ -507,19 +529,37 @@ app.post("/mcp/authorize", async (c) => {
     );
   }
 
-  const project = await prisma.project.findFirst({
-    where: {
-      id: projectId,
-      archivedAt: null,
-      team: {
-        members: {
-          some: { user: { id: session.user.id } },
-        },
-      },
-    },
-  });
+  // The demo project is a globally-readable showcase: isDemoProject grants
+  // `project:view` to ANY caller, so it must never reach the RoleBinding check
+  // below — otherwise any authenticated user could mint an MCP auth code
+  // embedding the demo project's API key. (The old `team.members.some` check
+  // happened to block this; the RoleBinding-aware check does not.)
+  if (isDemoProject(projectId, "project:view")) {
+    return c.json(
+      { error: "Project not found or you don't have access" },
+      403,
+    );
+  }
 
-  if (!project) {
+  // Authorize against RoleBindings (the authoritative source since migration
+  // 20260407120000_migrate_team_users_to_role_bindings), not the legacy
+  // TeamUser relation. A user added to the team after that migration has no
+  // TeamUser row, so the old `team.members.some` check rejected them with a
+  // false 403. `project:view` is the baseline grant every team role (incl.
+  // VIEWER) has, and hasProjectPermission also honors org-level access.
+  // ProjectService is constructed directly (not via getApp()) so this handler
+  // stays unit-testable without booting the app container — the same pattern
+  // used in presets.ts and the project-service middleware.
+  const projectService = new ProjectService(new PrismaProjectRepository(prisma));
+  const project = await projectService.getById(projectId);
+
+  if (
+    !project ||
+    project.archivedAt !== null ||
+    !(await hasProjectPermission({ prisma, session }, projectId, "project:view"))
+  ) {
+    // Single 403 whether the project is missing, archived, or simply
+    // inaccessible — never disclose existence of a project the caller can't reach.
     return c.json(
       { error: "Project not found or you don't have access" },
       403,
@@ -535,6 +575,11 @@ app.post("/mcp/authorize", async (c) => {
   const authCodeEntry = JSON.stringify({
     projectId: project.id,
     encryptedApiKey: encrypt(project.apiKey),
+    // Captured here so MCP tools that need a caller identity (e.g.,
+    // governance install/uninstall/rotate) can attribute audit rows to
+    // the actual OAuth-flowing user instead of falling back to a project-
+    // wide identity. Read in handler.ts at the token-exchange step.
+    userId: session.user.id,
     codeChallenge: code_challenge,
     codeChallengeMethod: code_challenge_method ?? "S256",
     clientId: client_id ?? "",
@@ -560,7 +605,7 @@ app.post("/mcp/authorize", async (c) => {
 // =============================================
 // POST /api/optimization/:workflowId/:versionId  (deprecated)
 // =============================================
-app.post(
+secured.access(inRouteAuth).post(
   "/optimization/:workflowId/:versionId",
   authMiddleware,
   requireWorkflowsManage,
@@ -599,7 +644,10 @@ app.post(
 // =============================================
 // GET /api/rerun_checks
 // =============================================
-app.all("/rerun_checks", async (c) => {
+const rerunChecksHandler = async (c: Context) => {
+  if (!validateInternalSecret(c)) {
+    return c.body(null, 401);
+  }
   try {
     const checkId = c.req.query("checkId") as string;
     const projectId = c.req.query("projectId") as string;
@@ -617,14 +665,19 @@ app.all("/rerun_checks", async (c) => {
       500,
     );
   }
-});
+};
+secured.access(internalAuth).get("/rerun_checks", rerunChecksHandler);
+secured.access(internalAuth).post("/rerun_checks", rerunChecksHandler);
 
 // =============================================
 // GET /api/start_workers
 // =============================================
 const MAX_WORKER_DURATION = 300;
 
-app.all("/start_workers", async (c) => {
+const startWorkersHandler = async (c: Context) => {
+  if (!validateInternalSecret(c)) {
+    return c.body(null, 401);
+  }
   try {
     const maxRuntimeMs = (MAX_WORKER_DURATION - 60) * 1000;
     await start(undefined, maxRuntimeMs);
@@ -638,7 +691,9 @@ app.all("/start_workers", async (c) => {
       500,
     );
   }
-});
+};
+secured.access(internalAuth).get("/start_workers", startWorkersHandler);
+secured.access(internalAuth).post("/start_workers", startWorkersHandler);
 
 // =============================================
 // POST /api/track_event
@@ -678,7 +733,7 @@ const predefinedEventTypes = predefinedEventsSchemas.options.map(
   (schema) => schema.shape.event_type.value,
 );
 
-app.post("/track_event", authMiddleware, requireTracesCreate, async (c) => {
+secured.access(inRouteAuth).post("/track_event", authMiddleware, requireTracesCreate, async (c) => {
   const project = c.get("project");
 
   let rawBody: Record<string, any>;
@@ -763,7 +818,7 @@ app.post("/track_event", authMiddleware, requireTracesCreate, async (c) => {
       }
     }
 
-    await getApp().traces.recordSpan({
+    await getApp().traces.collection.ingestNormalizedSpan({
       tenantId: project.id,
       span: {
         traceId: body.trace_id,
@@ -791,7 +846,6 @@ app.post("/track_event", authMiddleware, requireTracesCreate, async (c) => {
       resource: { attributes: [] },
       instrumentationScope: { name: TRACK_EVENT_SPAN_NAME },
       piiRedactionLevel: project.piiRedactionLevel,
-      occurredAt: Date.now(),
     });
   } catch (error) {
     logger.error({ error }, "unable to dispatch tracked event span");
@@ -803,7 +857,7 @@ app.post("/track_event", authMiddleware, requireTracesCreate, async (c) => {
 // =============================================
 // POST /api/track_usage
 // =============================================
-app.post("/track_usage", async (c) => {
+secured.access(publicEndpoint("anonymous product telemetry, no credential")).post("/track_usage", async (c) => {
   let body: Record<string, any>;
   try {
     body = await c.req.json();
@@ -843,7 +897,7 @@ const filterSchema = z
   )
   .default({});
 
-app.post(
+secured.access(inRouteAuth).post(
   "/trigger/slack",
   authMiddleware,
   requireTriggersManage,
@@ -899,7 +953,7 @@ app.post(
 // POST /api/workflows/:workflowId/run
 // POST /api/workflows/:workflowId/:versionId/run
 // =============================================
-app.post(
+secured.access(inRouteAuth).post(
   "/workflows/:workflowId/run",
   authMiddleware,
   requireWorkflowsManage,
@@ -908,7 +962,7 @@ app.post(
   },
 );
 
-app.post(
+secured.access(inRouteAuth).post(
   "/workflows/:workflowId/:versionId/run",
   authMiddleware,
   requireWorkflowsManage,
@@ -956,7 +1010,7 @@ async function handleWorkflowRun(
 // =============================================
 // POST /api/webhooks/stripe
 // =============================================
-app.post("/webhooks/stripe", async (c) => {
+secured.access(internalSecret("Stripe webhook signature verified in-handler")).post("/webhooks/stripe", async (c) => {
   const { webhookService, stripeClient } = getApp();
   if (!env.IS_SAAS || !webhookService || !stripeClient) {
     return c.json({ error: "Not Found" }, 404);
@@ -1335,7 +1389,7 @@ const secondChatMessage = async (
 // =============================================
 // GET /image-proxy — SSRF-safe image proxy
 // =============================================
-app.get("/image-proxy", async (c) => {
+secured.access(publicEndpoint("SSRF-guarded image proxy, no credential")).get("/image-proxy", async (c) => {
   const url = c.req.query("url");
   if (!url) {
     return c.json({ error: "Missing url" }, 400);
@@ -1368,3 +1422,5 @@ app.get("/image-proxy", async (c) => {
     return c.json({ error: "Failed to fetch image" }, 500);
   }
 });
+
+export const app = secured.hono;

@@ -128,7 +128,7 @@ describe("organization.getAll — team membership enrichment via RoleBinding", (
   });
 
   afterAll(async () => {
-    resetApp();
+    await resetApp();
 
     // Cleanup is best-effort: if beforeAll threw partway through, some of these
     // IDs may be undefined, so wrap each call to avoid masking the real failure.

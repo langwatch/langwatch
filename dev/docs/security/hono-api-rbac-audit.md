@@ -1,0 +1,152 @@
+# Hono API RBAC + tenant-isolation audit
+
+This documents the audit of every external/HTTP endpoint on the LangWatch Hono
+API surface (the routes used by SDKs, the CLI, the MCP server, and our own
+frontend, as opposed to tRPC) for three properties:
+
+1. **Authentication** — is the caller identified at all?
+2. **Authorization** — does the route require the correct RBAC permission?
+3. **Tenant isolation** — can a credential for one organization/project ever
+   read or mutate another tenant's data?
+
+The motivation: tRPC enforces permissions through a fail-closed,
+compile-time-checked middleware (`enforcePermissionCheck` + the
+`checkProjectPermission`/`checkOrganizationPermission` builders). The Hono
+surface had no equivalent guarantee — a route enforced RBAC only if a developer
+remembered to chain `requirePermission("resource:action")`, a positional,
+forgettable middleware.
+
+## Scope
+
+258 routes across 47 route families were audited (every `app.ts` /
+`app.v1.ts` under `langwatch/src/app/api/**` plus every file under
+`langwatch/src/server/routes/**` and the EE admin routes). Each route was
+classified by auth mechanism, declared vs. expected permission, and
+tenant-scoping posture; high/critical and cross-tenant findings were then
+adversarially re-verified against the actual code path.
+
+## Headline counts
+
+| Metric | Count |
+|--------|-------|
+| Routes audited | 258 |
+| No authorization gate where one was expected | 26 |
+| Declared permission weaker/wrong vs. action | 31 |
+| High-risk cross-tenant exposure | 2 |
+| Routes with no permission/tenant regression test | 189 |
+| Confirmed/partial vulnerabilities after verification | 22 (3 high, 6 medium, 13 low) |
+
+## Confirmed vulnerabilities and remediation
+
+### Authentication (fail-open / missing)
+
+- **`cron` shared-secret was fail-open.** `validateCronKey` compared the header
+  directly to `process.env.CRON_API_KEY`; when the secret was unset,
+  `undefined === undefined` returned `true`, so a credential-less request could
+  trigger destructive jobs (`traces_retention_period_cleanup`,
+  `old_lambdas_cleanup`). **Fixed:** the guard now lives in
+  `server/routes/_lib/internal-secret.ts`, fails closed when the secret is unset
+  or empty, and uses a constant-time comparison.
+- **`/api/rerun_checks` and `/api/start_workers` had no authentication.** These
+  ops/worker endpoints accepted any caller (and `rerun_checks` took an
+  arbitrary `projectId`). **Fixed:** both now require the internal shared secret.
+
+### Authorization (missing RBAC gate)
+
+Six project-scoped endpoints authenticated the caller but enforced no
+permission, so any valid project token reached the handler regardless of its
+role bindings. **Fixed** by migrating each to the `SecuredApp` builder, which
+makes the permission a mandatory, compile-time-checked argument:
+
+| Route | Permission |
+|-------|-----------|
+| `GET /api/model-providers` | `project:view` |
+| `PUT /api/model-providers/:provider` | `project:update` |
+| `POST /api/analytics/timeseries` | `analytics:view` |
+| `GET /api/experiments` | `experiments:view` |
+| `GET /api/model-defaults` | `project:view` |
+| `POST /api/copilotkit` | `prompts:view` |
+
+Permissions mirror the equivalent tRPC procedure where one exists (the
+authoritative, type-checked surface) rather than a heuristic guess.
+
+Experiments previously inherited `workflows:view` (the experiment routes live
+under the optimization studio historically). They now have a dedicated
+`experiments:view` / `experiments:manage` permission so a role can read or run
+experiments on prompts and agents without holding any workflow permission. The
+tRPC experiment procedures, the REST list endpoint, and the DSPy / experiment
+bootstrap write routes all gate on the new permission. Built-in roles receive it
+in code; a data migration grants it to existing custom roles that already held
+the matching `workflows:*` permission, so no one loses access.
+
+### Public REST surface — declared permission vs. API-key ceiling
+
+The gateway-platform (`/api/gateway/v1/*`) and governance (`/api/governance/*`)
+families authenticate a project API key and enforce a permission through the
+**API-key ceiling**: legacy project keys keep full access, personal access
+tokens must hold the permission. These were registered as `anyAuthenticated()`
+with the real permission enforced by an inline `requireApiKeyPermission(...)`,
+so the route registry reported "any authenticated" for routes that actually
+require `gatewayBudgets:delete`, `aiTools:manage`, etc. **Fixed** with a
+`apiKeyPermission(permission)` policy kind: the project strategy translates it to
+the same ceiling check, and the registry now records the true permission, so the
+introspection audit reflects what each route really requires.
+
+### Tenant isolation (cross-tenant)
+
+- **`POST /api/experiments/abort` could abort another project's run.** The
+  permission check gated the body's `projectId`, but the `runId` was never
+  verified to belong to it. **Fixed:** the run state is loaded and the request
+  404s unless the run is owned by the authenticated project (mirrors
+  `GET /api/experiments/runs/:runId`).
+- **`POST /api/gateway/v1/budgets` could scope a budget to another org's team or
+  project.** `organizationId` was derived from the caller, but the scope's
+  `teamId`/`projectId` was request-supplied and unchecked. **Fixed:** the budget
+  service now verifies the scoped team/project belongs to the budget's org
+  (mirrors the existing PRINCIPAL-scope guard).
+- **`PUT`/`DELETE /api/model-defaults/:id`** relied on the invariant that every
+  config has at least one scope attachment for its per-scope write check to run.
+  **Fixed:** an orphan config (zero scopes) now 404s rather than being editable
+  by any authenticated caller.
+
+### Documented, not changed
+
+- **Legacy project keys** intentionally bypass per-permission RBAC but are bound
+  to exactly one project — this is the documented model and never extends across
+  projects or organizations (token resolution rejects a key used against a
+  project outside its organization).
+- **SCIM, auth-cli device-flow, health probes, tRPC mount, EE admin** authenticate
+  by their own mechanism (SCIM token, device-code, none-by-design, browser
+  session + per-procedure RBAC, super-admin allowlist). Each is classified in the
+  legacy allowlist with that rationale.
+
+## The durable guarantee
+
+Two layers prevent regression:
+
+1. **Type-level — `SecuredApp`** (`server/api/security/`). The builder's verb
+   methods are only reachable through `.access(policy)`; the bare app exposes no
+   `.get/.post/...`. Omitting the policy is a compile error. The policy is one of
+   `requires(permission)`, `apiKeyPermission(permission)`, `anyAuthenticated()`,
+   `publicEndpoint(reason)`, `internalSecret(reason)`, or
+   `handlerManagedAuth(reason)`. `apiKeyPermission` enforces a permission through
+   the API-key ceiling (legacy project keys bypass, API keys must hold it) for the
+   public REST surface. `handlerManagedAuth` is for
+   legacy routes that authenticate inside their handler (in-handler API-key
+   resolution, `getServerAuthSession`, signature checks, or a framework like
+   tRPC/BetterAuth that runs its own per-request RBAC): the builder applies no
+   chain, but the route still declares a reviewable policy + reason. Prefer a
+   real `requires(...)` / `internalSecret(...)` strategy when the auth can be
+   expressed as middleware.
+
+2. **CI backstop — router introspection.** A test boots the fully composed
+   router and asserts every mounted concrete-method endpoint is registered
+   through `SecuredApp` (its policy recorded in the route registry). A new route
+   added via raw Hono with no policy fails this test, so no human or agent can
+   add an unclassified endpoint by accident. Every route family is migrated, so
+   there is no allowlist — the guarantee covers the whole surface. (Method-`ALL`
+   entries — `.use` middleware, sub-app mounts, and the two OAuth-callback
+   rewrite shims — are not data endpoints and are excluded by construction.)
+
+See `specs/security/api-endpoint-authorization.feature` for the behavioral
+specification and bound tests.

@@ -18,23 +18,20 @@ Claude Code supports OpenTelemetry (OTel) traces for monitoring and observabilit
 
 ## Quick Start
 
-Configure Claude Code to send traces to LangWatch using environment variables:
+Configure Claude Code to send telemetry to LangWatch using environment variables:
 
 ```bash
-# 1. Enable telemetry
 export CLAUDE_CODE_ENABLE_TELEMETRY=1
-
-# 2. Configure OTLP exporter for traces
 export OTEL_TRACES_EXPORTER=otlp
-
-# 3. Set OTLP protocol and endpoint
+export OTEL_LOGS_EXPORTER=otlp
+export OTEL_METRICS_EXPORTER=otlp
+export OTEL_LOG_USER_PROMPTS=1
+export OTEL_LOG_TOOL_DETAILS=1
+export OTEL_LOG_TOOL_CONTENT=1
+export OTEL_LOG_RAW_API_BODIES=1
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
 export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
-
-# 4. Set authentication headers
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-langwatch-api-key"
-
-# 5. Run Claude Code
 claude
 ```
 
@@ -55,6 +52,12 @@ Example managed settings configuration for LangWatch:
   "env": {
     "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
     "OTEL_TRACES_EXPORTER": "otlp",
+    "OTEL_LOGS_EXPORTER": "otlp",
+    "OTEL_METRICS_EXPORTER": "otlp",
+    "OTEL_LOG_USER_PROMPTS": "1",
+    "OTEL_LOG_TOOL_DETAILS": "1",
+    "OTEL_LOG_TOOL_CONTENT": "1",
+    "OTEL_LOG_RAW_API_BODIES": "1",
     "OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
     "OTEL_EXPORTER_OTLP_ENDPOINT": "https://app.langwatch.ai/api/otel",
     "OTEL_EXPORTER_OTLP_HEADERS": "Authorization=Bearer company-langwatch-api-key"
@@ -135,9 +138,15 @@ Claude Code traces include:
 ### Basic LangWatch Integration
 
 ```bash
-# Enable telemetry and send traces to LangWatch
+# Enable telemetry and send to LangWatch
 export CLAUDE_CODE_ENABLE_TELEMETRY=1
 export OTEL_TRACES_EXPORTER=otlp
+export OTEL_LOGS_EXPORTER=otlp
+export OTEL_METRICS_EXPORTER=otlp
+export OTEL_LOG_USER_PROMPTS=1
+export OTEL_LOG_TOOL_DETAILS=1
+export OTEL_LOG_TOOL_CONTENT=1
+export OTEL_LOG_RAW_API_BODIES=1
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
 export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-api-key"
@@ -149,6 +158,12 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-api-key"
 # Basic telemetry setup
 export CLAUDE_CODE_ENABLE_TELEMETRY=1
 export OTEL_TRACES_EXPORTER=otlp
+export OTEL_LOGS_EXPORTER=otlp
+export OTEL_METRICS_EXPORTER=otlp
+export OTEL_LOG_USER_PROMPTS=1
+export OTEL_LOG_TOOL_DETAILS=1
+export OTEL_LOG_TOOL_CONTENT=1
+export OTEL_LOG_RAW_API_BODIES=1
 
 # LangWatch endpoint configuration
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
@@ -156,7 +171,7 @@ export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-api-key"
 
 # Custom resource attributes for team identification
-export OTEL_RESOURCE_ATTRIBUTES="department=engineering,team.id=platform,cost_center=eng-123"
+export OTEL_RESOURCE_ATTRIBUTES="department=engineering,team.id=platform"
 ```
 
 ### Debug Configuration
@@ -165,6 +180,9 @@ export OTEL_RESOURCE_ATTRIBUTES="department=engineering,team.id=platform,cost_ce
 # Debug configuration with console output and LangWatch
 export CLAUDE_CODE_ENABLE_TELEMETRY=1
 export OTEL_TRACES_EXPORTER=console,otlp
+export OTEL_LOGS_EXPORTER=console,otlp
+export OTEL_METRICS_EXPORTER=console,otlp
+export OTEL_LOG_USER_PROMPTS=1
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
 export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-api-key"
@@ -176,13 +194,13 @@ Organizations with multiple teams can add custom attributes to distinguish betwe
 
 ```bash
 # Add custom attributes for team identification
-export OTEL_RESOURCE_ATTRIBUTES="department=engineering,team.id=platform,cost_center=eng-123,project=langwatch-integration"
+export OTEL_RESOURCE_ATTRIBUTES="department=engineering,team.id=platform,project=langwatch-integration"
 ```
 
 These custom attributes will be included in all traces sent to LangWatch, allowing you to:
 
 * Filter traces by team or department
-* Track usage per cost center
+* Track usage per department
 * Create team-specific dashboards
 * Set up alerts for specific teams
 
@@ -270,10 +288,21 @@ echo $OTEL_EXPORTER_OTLP_HEADERS
 <AccordionGroup>
   <Accordion title="No data appearing in LangWatch">
     - Verify `CLAUDE_CODE_ENABLE_TELEMETRY=1` is set
+    - Verify `OTEL_LOGS_EXPORTER=otlp` is set — Claude Code 2.1.x ships its cost-bearing events as OTLP logs, not spans. With only `OTEL_TRACES_EXPORTER` set you'll see nothing in LangWatch
     - Check that the endpoint URL is correct: `https://app.langwatch.ai/api/otel`
     - Ensure your API key is valid and has proper permissions
     - Check network connectivity to the LangWatch endpoint
     - Verify the OTLP protocol is supported (http/json or grpc)
+  </Accordion>
+
+  <Accordion title="Trace shows but input/prompt is empty">
+    Set `OTEL_LOG_USER_PROMPTS=1`. Claude Code redacts the prompt body on its `user_prompt` event by default — without this env, the receiver has no input text to attach to the synthesized trace.
+  </Accordion>
+
+  <Accordion title="Trace shows but output/response is empty">
+    Set `OTEL_LOG_RAW_API_BODIES=1`. Claude Code only emits the assistant's response text on its `api_response_body` event, and that event is off by default. With the flag set, LangWatch lifts the full response text into the trace output alongside the cost and token breakdown.
+
+    Claude Code also emits `api_response_body` for non-conversational utility calls (autosuggestions, session-title generation). LangWatch filters those by `query_source` so only genuine conversation turns populate the trace output, never a stray title or suggestion.
   </Accordion>
 
   <Accordion title="Authentication errors">
@@ -283,11 +312,8 @@ echo $OTEL_EXPORTER_OTLP_HEADERS
     - Verify the header is properly formatted in the environment variable
   </Accordion>
 
-  <Accordion title="Performance issues">
-    - Consider using batch span processors for high-volume applications
-    - Implement sampling to reduce the number of traces sent
-    - Use async span processors to avoid blocking your application
-    - Adjust export intervals based on your monitoring needs
+  <Accordion title="Large payloads or truncated content">
+    The content flags ship the full request and response JSON on every turn, so `api_request_body` / `api_response_body` events can reach tens of KB each. LangWatch caps oversized log records on ingestion to protect the pipeline, keeping the lifted input and output text while trimming the rest. If you only need cost and token data, drop `OTEL_LOG_RAW_API_BODIES` and `OTEL_LOG_TOOL_DETAILS` to keep payloads small. The other flags (`OTEL_LOG_USER_PROMPTS`, `OTEL_LOG_TOOL_CONTENT`) are lightweight.
   </Accordion>
 
   <Accordion title="Configuration not taking effect">
@@ -345,8 +371,8 @@ For comprehensive monitoring resources, see the [Claude Code Monitoring Guide](h
 ## Security and Privacy
 
 - **Telemetry is opt-in** and requires explicit configuration
-- **Sensitive information** like API keys or file contents are never included in traces
-- **User prompt content** is redacted by default - only prompt length is recorded
+- **Prompts, tool I/O, and full request/response bodies are off by default** - only token counts and cost ship until you opt in with the content flags (`OTEL_LOG_USER_PROMPTS`, `OTEL_LOG_TOOL_DETAILS`, `OTEL_LOG_TOOL_CONTENT`, `OTEL_LOG_RAW_API_BODIES`)
+- **Once enabled, prompt text, tool outputs, and file contents passed to tools will appear in traces** - enable the flags only where capturing that content is acceptable
 
 <Note>
   All data sent to LangWatch is encrypted in transit and stored securely. Review LangWatch's [privacy policy](https://langwatch.ai/privacy) and [security practices](https://langwatch.ai/security) for more details.

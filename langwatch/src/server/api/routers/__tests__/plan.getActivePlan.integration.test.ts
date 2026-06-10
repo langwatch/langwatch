@@ -75,8 +75,8 @@ describe.skipIf(isTestcontainersOnly)("plan.getActivePlan integration", () => {
     });
   });
 
-  beforeEach(() => {
-    resetApp();
+  beforeEach(async () => {
+    await resetApp();
     mockGetActivePlan = vi.fn();
     globalForApp.__langwatch_app = createTestApp({
       planProvider: PlanProviderService.create({
@@ -93,8 +93,8 @@ describe.skipIf(isTestcontainersOnly)("plan.getActivePlan integration", () => {
     caller = appRouter.createCaller(ctx);
   });
 
-  afterEach(() => {
-    resetApp();
+  afterEach(async () => {
+    await resetApp();
   });
 
   afterAll(async () => {

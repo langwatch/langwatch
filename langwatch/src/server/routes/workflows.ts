@@ -10,15 +10,12 @@
 import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
 import { zValidator } from "@hono/zod-validator";
 import { generateText } from "ai";
-import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { CompletionCopilot } from "monacopilot";
 import { z } from "zod";
-import { loggerMiddleware } from "~/app/api/middleware/logger";
-import { tracerMiddleware } from "~/app/api/middleware/tracer";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
-import { isNlpGoEnabled } from "~/server/nlpgo/nlpgoFetch";
 import {
   type StudioClientEvent,
   type StudioServerEvent,
@@ -35,13 +32,13 @@ import type { NextRequestShim as any } from "./types";
 
 const logger = createLogger("langwatch:workflows");
 
-export const app = new Hono().basePath("/api/workflows");
-app.use(tracerMiddleware({ name: "workflows" }));
-app.use(loggerMiddleware());
+const secured = createServiceApp({ basePath: "/api/workflows" });
 
 // ── POST /code-completion ────────────────────────────────────────────
 
-app.post("/code-completion", async (c) => {
+secured.access(
+  handlerManagedAuth("user session validated in-handler via getServerAuthSession"),
+).post("/code-completion", async (c) => {
   const body = await c.req.json();
 
   const session = await getServerAuthSession({ req: c.req.raw as any });
@@ -70,7 +67,7 @@ app.post("/code-completion", async (c) => {
   }
 
   try {
-    const model = await getVercelAIModel(projectId, undefined, "studio.autocomplete");
+    const model = await getVercelAIModel({ projectId, featureKey: "studio.autocomplete" });
 
     const copilot = new CompletionCopilot(undefined, {
       model: async (prompt) => {
@@ -118,7 +115,9 @@ app.post("/code-completion", async (c) => {
 
 // ── POST /post_event ─────────────────────────────────────────────────
 
-app.post(
+secured.access(
+  handlerManagedAuth("user session validated in-handler via getServerAuthSession"),
+).post(
   "/post_event",
   zValidator(
     "json",
@@ -181,20 +180,17 @@ app.post(
         );
     }
 
-    // Optimization is DSPy-only; the Go engine intentionally drops it.
-    // Stop events still pass so a previously-started run can be cancelled.
+    // Optimization is DSPy-only; the Go engine dropped it. Stop events
+    // still pass so a previously-started run can be cancelled.
     if (message.type === "execute_optimization") {
-      const goEnabled = await isNlpGoEnabled({ projectId });
-      if (goEnabled) {
-        return c.json(
-          {
-            type: "optimize_disabled",
-            message:
-              "Optimization is no longer supported on the Go engine. The Optimize feature relied on DSPy, which has been removed.",
-          },
-          { status: 410 },
-        );
-      }
+      return c.json(
+        {
+          type: "optimize_disabled",
+          message:
+            "Optimization is no longer supported. The Optimize feature relied on DSPy, which has been removed.",
+        },
+        { status: 410 },
+      );
     }
 
     return streamSSE(c, async (stream) => {
@@ -259,3 +255,5 @@ app.post(
     });
   },
 );
+
+export const app = secured.hono;

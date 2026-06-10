@@ -23,10 +23,10 @@ type Executor struct {
 
 // Options configures an Executor.
 type Options struct {
-	Client            *http.Client // nil → http.DefaultClient with our SSRF policy
-	SSRF              SSRFOptions
-	DefaultTimeout    time.Duration
-	MaxResponseBytes  int64 // 0 → 4 MiB
+	Client           *http.Client // nil → http.DefaultClient with our SSRF policy
+	SSRF             SSRFOptions
+	DefaultTimeout   time.Duration
+	MaxResponseBytes int64 // 0 → 4 MiB
 }
 
 // defaultMaxResponseBytes caps untrusted upstream payloads so a hostile
@@ -97,11 +97,11 @@ type Auth struct {
 
 // Result is the executor's output.
 type Result struct {
-	Output         any
-	StatusCode     int
-	UpstreamBody   []byte
-	RenderedBody   string
-	Warnings       []string
+	Output       any
+	StatusCode   int
+	UpstreamBody []byte
+	RenderedBody string
+	Warnings     []string
 }
 
 // Execute runs the request, performs SSRF check, sends, and extracts.

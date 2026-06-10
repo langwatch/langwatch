@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { prisma as defaultPrisma } from "~/server/db";
+import { ExperimentService } from "~/server/experiments/experiment.service";
 import { ClickHouseExperimentRunService } from "./clickhouse-experiment-run.service";
 import { ElasticsearchExperimentRunService } from "./elasticsearch-experiment-run.service";
 import type {
@@ -127,12 +128,11 @@ export class ExperimentRunService {
         },
       },
       async (span) => {
-        const experiment = await this.prisma.experiment.findFirst({
-          where: {
-            projectId: params.projectId,
-            slug: params.experimentSlug,
-          },
-          select: { id: true, slug: true },
+        const experiment = await ExperimentService.create(
+          this.prisma,
+        ).findIdBySlug({
+          projectId: params.projectId,
+          slug: params.experimentSlug,
         });
 
         if (!experiment) {

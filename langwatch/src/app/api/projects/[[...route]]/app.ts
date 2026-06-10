@@ -1,9 +1,9 @@
 import type { Organization } from "@prisma/client";
-import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
 import {
+  DestinationTeamNotFoundError,
   ProjectNotFoundError,
   ProjectSlugConflictError,
   TeamNotInOrganizationError,
@@ -11,14 +11,13 @@ import {
 } from "~/server/app-layer/projects/project.service";
 import type { ApiKeyService } from "~/server/api-key/api-key.service";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
+import { createOrgApp, requires } from "~/server/api/security";
+import { prisma } from "~/server/db";
+import { generateApiKey } from "~/server/utils/apiKeyGenerator";
 import type { ApiKeyServiceMiddlewareVariables } from "../../middleware/api-key-service";
 import { apiKeyServiceMiddleware } from "../../middleware/api-key-service";
-import type { OrgAuthMiddlewareVariables } from "../../middleware/org-auth";
-import { orgAuthMiddleware, requireOrgPermission } from "../../middleware/org-auth";
 import type { ProjectServiceMiddlewareVariables } from "../../middleware/project-service";
 import { projectServiceMiddleware } from "../../middleware/project-service";
-import { loggerMiddleware } from "../../middleware/logger";
-import { tracerMiddleware } from "../../middleware/tracer";
 import {
   BadRequestError,
   NotFoundError,
@@ -27,7 +26,7 @@ import { handleProjectError } from "./error-handler";
 
 patchZodOpenapi();
 
-type Variables = OrgAuthMiddlewareVariables & ProjectServiceMiddlewareVariables & ApiKeyServiceMiddlewareVariables;
+type ExtraVariables = ProjectServiceMiddlewareVariables & ApiKeyServiceMiddlewareVariables;
 
 const paginationQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional().default(1),
@@ -49,6 +48,7 @@ const updateProjectSchema = z.object({
   language: z.string().optional(),
   framework: z.string().optional(),
   piiRedactionLevel: z.enum(["STRICT", "ESSENTIAL", "DISABLED"]).optional(),
+  teamId: z.string().min(1).optional(),
 });
 
 function validationHook(
@@ -93,21 +93,20 @@ function projectResponse(project: {
   };
 }
 
-export const app = new Hono<{ Variables: Variables }>()
-  .basePath("/api/projects")
-  .use(tracerMiddleware({ name: "projects" }))
-  .use(loggerMiddleware())
-  .use(orgAuthMiddleware)
-  .use(projectServiceMiddleware)
-  .use(apiKeyServiceMiddleware)
-  .onError(handleProjectError)
+const secured = createOrgApp<ExtraVariables>({
+  basePath: "/api/projects",
+});
 
+secured.hono.onError(handleProjectError);
+
+secured
+  .access(requires("project:view"))
   .get(
     "/",
+    projectServiceMiddleware,
     describeRoute({
       description: "List all non-archived projects for the organization (paginated)",
     }),
-    requireOrgPermission("project:view"),
     zValidator("query", paginationQuerySchema),
     async (c) => {
       const organization = c.get("organization") as Organization;
@@ -125,14 +124,17 @@ export const app = new Hono<{ Variables: Variables }>()
         pagination: result.pagination,
       });
     },
-  )
+  );
 
+secured
+  .access(requires("project:create"))
   .post(
     "/",
+    projectServiceMiddleware,
+    apiKeyServiceMiddleware,
     describeRoute({
-      description: "Create a new project",
+      description: "Create a new project in an existing team or create a new team inline",
     }),
-    requireOrgPermission("project:create"),
     zValidator("json", createProjectSchema, validationHook),
     async (c) => {
       const organization = c.get("organization") as Organization;
@@ -189,14 +191,16 @@ export const app = new Hono<{ Variables: Variables }>()
         201,
       );
     },
-  )
+  );
 
+secured
+  .access(requires("project:view"))
   .get(
     "/:id",
+    projectServiceMiddleware,
     describeRoute({
       description: "Get a project by its id",
     }),
-    requireOrgPermission("project:view"),
     async (c) => {
       const { id } = c.req.param();
       const organization = c.get("organization") as Organization;
@@ -209,14 +213,16 @@ export const app = new Hono<{ Variables: Variables }>()
 
       return c.json(projectResponse(project));
     },
-  )
+  );
 
+secured
+  .access(requires("project:update"))
   .patch(
     "/:id",
+    projectServiceMiddleware,
     describeRoute({
-      description: "Update a project by its id",
+      description: "Update a project by its id, including moving it to another team with teamId",
     }),
-    requireOrgPermission("project:update"),
     zValidator("json", updateProjectSchema, validationHook),
     async (c) => {
       const { id } = c.req.param();
@@ -236,25 +242,31 @@ export const app = new Hono<{ Variables: Variables }>()
             ...(body.piiRedactionLevel !== undefined && {
               piiRedactionLevel: body.piiRedactionLevel,
             }),
+            ...(body.teamId !== undefined && { teamId: body.teamId }),
           },
         });
       } catch (error) {
         if (error instanceof ProjectNotFoundError) {
           throw new NotFoundError("Project not found");
         }
+        if (error instanceof DestinationTeamNotFoundError) {
+          throw new BadRequestError(error.message);
+        }
         throw error;
       }
 
       return c.json(projectResponse(project));
     },
-  )
+  );
 
+secured
+  .access(requires("project:delete"))
   .delete(
     "/:id",
+    projectServiceMiddleware,
     describeRoute({
       description: "Archive a project (soft-delete)",
     }),
-    requireOrgPermission("project:delete"),
     async (c) => {
       const { id } = c.req.param();
       const organization = c.get("organization") as Organization;
@@ -280,3 +292,53 @@ export const app = new Hono<{ Variables: Variables }>()
       });
     },
   );
+
+// ── API Key management ───────────────────────────────────────────────────────
+
+secured
+  .access(requires("project:view"))
+  .get(
+    "/:id/api-key",
+    projectServiceMiddleware,
+    describeRoute({ description: "Get the project API key" }),
+    async (c) => {
+      const { id } = c.req.param();
+      const organization = c.get("organization") as Organization;
+      const service = c.get("projectService") as ProjectService;
+
+      const project = await service.getWithTeam(id);
+      if (!project || project.team.organizationId !== organization.id) {
+        throw new NotFoundError("Project not found");
+      }
+
+      return c.json({ apiKey: project.apiKey });
+    },
+  );
+
+secured
+  .access(requires("project:manage"))
+  .post(
+    "/:id/regenerate-api-key",
+    projectServiceMiddleware,
+    describeRoute({ description: "Regenerate the project API key" }),
+    async (c) => {
+      const { id } = c.req.param();
+      const organization = c.get("organization") as Organization;
+      const service = c.get("projectService") as ProjectService;
+
+      const project = await service.getWithTeam(id);
+      if (!project || project.team.organizationId !== organization.id) {
+        throw new NotFoundError("Project not found");
+      }
+
+      const newApiKey = generateApiKey();
+      await prisma.project.update({
+        where: { id },
+        data: { apiKey: newApiKey },
+      });
+
+      return c.json({ apiKey: newApiKey });
+    },
+  );
+
+export const app = secured.hono;

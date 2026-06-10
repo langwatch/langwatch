@@ -42,7 +42,7 @@ const logger = createLogger(
 
 export interface ExecuteEvaluationCommandDeps {
   monitors: MonitorService;
-  spanStorage: { getSpansByTraceId(params: { tenantId: string; traceId: string }): Promise<Span[]> };
+  spanStorage: { getSpansByTraceId(params: { tenantId: string; traceId: string; occurredAtMs?: number }): Promise<Span[]> };
   traceEvents: { getEventsByTraceId(params: { tenantId: string; traceId: string }): Promise<ElasticSearchEvent[]> };
   evaluationExecution: EvaluationExecutionService;
   costRecorder: EvaluationCostRecorder;
@@ -174,8 +174,15 @@ export class ExecuteEvaluationCommand implements CommandHandler<
       return [];
     }
 
-    // 3. Read spans from CH, check evaluator required fields + preconditions
-    const spans = await this.deps.spanStorage.getSpansByTraceId({ tenantId, traceId: data.traceId });
+    // 3. Read spans from CH, check evaluator required fields + preconditions.
+    // Pass the event's occurredAt so the span read can prune stored_spans to the
+    // trace's weekly partition instead of cold-scanning every partition on S3
+    // (the read falls back to an unconstrained scan if the window misses).
+    const spans = await this.deps.spanStorage.getSpansByTraceId({
+      tenantId,
+      traceId: data.traceId,
+      occurredAtMs: data.occurredAt,
+    });
 
     // Check evaluator required fields first
     const requiredFieldsMet = checkEvaluatorRequiredFields({

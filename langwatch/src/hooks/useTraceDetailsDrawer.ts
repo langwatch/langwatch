@@ -1,33 +1,25 @@
 import { useCallback } from "react";
 import type { DrawerProps } from "../components/drawerRegistry";
-import { useTracesV2Preference } from "../features/traces-v2/hooks/useTracesV2Preference";
 import { useDrawer } from "./useDrawer";
 
 /**
  * Convenience hook for opening the trace details drawer.
  *
- * EXTERNAL user restriction is enforced centrally in `CurrentDrawer` —
- * any `openDrawer("traceDetails", ...)` call (whether through this hook
- * or directly) is automatically intercepted for EXTERNAL users.
- *
- * Routes to the v2 drawer when the operator has clicked "Try the new
- * one" at least once on this device (the preference lives in
- * localStorage; see `useTracesV2Preference`); otherwise the legacy v1
- * drawer.
+ * It is a thin wrapper around `openDrawer("traceDetails", …)`. Both
+ * cross-cutting concerns are enforced centrally, so every trace open — through
+ * this hook or a direct `openDrawer` call — behaves identically:
+ * - EXTERNAL-user restriction, in `CurrentDrawer`.
+ * - Traces v2 opt-in routing, in `openDrawer` (a trace open is sent to the new
+ *   explorer when this device opted in; see `routeTraceDrawerForV2`).
  */
 export function useTraceDetailsDrawer() {
   const { openDrawer } = useDrawer();
-  const { preferred: prefersV2 } = useTracesV2Preference();
 
   const openTraceDetailsDrawer = useCallback(
     (props?: Partial<DrawerProps<"traceDetails">>) => {
-      if (prefersV2 && props?.traceId) {
-        openDrawer("traceV2Details", { traceId: props.traceId });
-        return;
-      }
       openDrawer("traceDetails", props);
     },
-    [openDrawer, prefersV2],
+    [openDrawer],
   );
 
   return { openTraceDetailsDrawer };

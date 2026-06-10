@@ -8,7 +8,6 @@
  */
 import { nanoid } from "nanoid";
 import type { Context } from "hono";
-import { Hono } from "hono";
 import { prisma } from "~/server/db";
 import { createLogger } from "~/utils/logger/server";
 import type { Permission } from "~/server/api/rbac";
@@ -18,14 +17,18 @@ import {
   apiKeyCeilingDenialResponse,
 } from "~/server/api-key/auth-middleware";
 import { TokenResolver } from "~/server/api-key/token-resolver";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 
 const logger = createLogger("langwatch:annotations");
 const tokenResolver = TokenResolver.create(prisma);
 
-export const app = new Hono().basePath("/api");
+const AUTH_REASON =
+  "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling";
+
+const secured = createServiceApp({ basePath: "/api" });
 
 /**
- * Authenticates via the unified PAT + legacy-key path and enforces the given
+ * Authenticates via the unified API-key + legacy-key path and enforces the given
  * permission ceiling. Returns either a `{ project, markUsed }` context or an
  * error descriptor the caller surfaces via c.json(...). `markUsed` is
  * fire-and-forget and a no-op for legacy keys.
@@ -68,7 +71,7 @@ async function authenticateRequest(
 }
 
 // ---------- GET /api/annotations ----------
-app.get("/annotations", async (c) => {
+secured.access(handlerManagedAuth(AUTH_REASON)).get("/annotations", async (c) => {
   const auth = await authenticateRequest(c, "annotations:view");
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
@@ -98,7 +101,7 @@ app.get("/annotations", async (c) => {
 });
 
 // ---------- GET|DELETE|PATCH /api/annotations/:id ----------
-app.get("/annotations/:id", async (c) => {
+secured.access(handlerManagedAuth(AUTH_REASON)).get("/annotations/:id", async (c) => {
   const auth = await authenticateRequest(c, "annotations:view");
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
@@ -133,7 +136,7 @@ app.get("/annotations/:id", async (c) => {
   }
 });
 
-app.delete("/annotations/:id", async (c) => {
+secured.access(handlerManagedAuth(AUTH_REASON)).delete("/annotations/:id", async (c) => {
   const auth = await authenticateRequest(c, "annotations:manage");
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
@@ -162,7 +165,7 @@ app.delete("/annotations/:id", async (c) => {
   }
 });
 
-app.patch("/annotations/:id", async (c) => {
+secured.access(handlerManagedAuth(AUTH_REASON)).patch("/annotations/:id", async (c) => {
   const auth = await authenticateRequest(c, "annotations:manage");
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
@@ -224,7 +227,7 @@ app.patch("/annotations/:id", async (c) => {
 });
 
 // ---------- GET|POST /api/annotations/trace/:trace ----------
-app.get("/annotations/trace/:trace", async (c) => {
+secured.access(handlerManagedAuth(AUTH_REASON)).get("/annotations/trace/:trace", async (c) => {
   const auth = await authenticateRequest(c, "annotations:view");
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
@@ -254,7 +257,7 @@ app.get("/annotations/trace/:trace", async (c) => {
   }
 });
 
-app.post("/annotations/trace/:trace", async (c) => {
+secured.access(handlerManagedAuth(AUTH_REASON)).post("/annotations/trace/:trace", async (c) => {
   const auth = await authenticateRequest(c, "annotations:manage");
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
@@ -325,3 +328,5 @@ app.post("/annotations/trace/:trace", async (c) => {
     );
   }
 });
+
+export const app = secured.hono;

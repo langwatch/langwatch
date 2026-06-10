@@ -1,0 +1,40 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          { "key": "service.name", "value": { "stringValue": "cursor" } },
+          { "key": "service.version", "value": { "stringValue": "0.0.0-dogfood" } },
+          { "key": "cursor.agent.id", "value": { "stringValue": "agent_dogfood_cursor_0001" } }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": { "name": "cursor.agent.completion", "version": "0.0.0" },
+          "spans": [
+            {
+              "traceId": "00000000000000000000000000000000",
+              "spanId": "0000000000000000",
+              "name": "cursor.agent.completion",
+              "kind": 1,
+              "startTimeUnixNano": "1715175600000000000",
+              "endTimeUnixNano": "1715175600980000000",
+              "attributes": [
+                { "key": "gen_ai.system", "value": { "stringValue": "openai" } },
+                { "key": "gen_ai.operation.name", "value": { "stringValue": "chat" } },
+                { "key": "gen_ai.request.model", "value": { "stringValue": "gpt-5.4" } },
+                { "key": "gen_ai.response.model", "value": { "stringValue": "gpt-5.4" } },
+                { "key": "gen_ai.request.max_tokens", "value": { "intValue": "2048" } },
+                { "key": "gen_ai.usage.input_tokens", "value": { "intValue": "412" } },
+                { "key": "gen_ai.usage.output_tokens", "value": { "intValue": "118" } },
+                { "key": "cursor.agent.id", "value": { "stringValue": "agent_dogfood_cursor_0001" } },
+                { "key": "cursor.workspace.path", "value": { "stringValue": "/Users/dogfood/projects/sample" } }
+              ],
+              "status": { "code": 1 }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -23,7 +23,7 @@ type BudgetCreateDrawerProps = {
   onCreated: () => void;
 };
 
-type ScopeKind = "ORGANIZATION" | "TEAM" | "PROJECT";
+type ScopeKind = "ORGANIZATION" | "TEAM" | "PROJECT" | "PRINCIPAL";
 type Window = "MINUTE" | "HOUR" | "DAY" | "WEEK" | "MONTH" | "TOTAL";
 
 export function BudgetCreateDrawer({
@@ -35,9 +35,19 @@ export function BudgetCreateDrawer({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [scopeKind, setScopeKind] = useState<ScopeKind>("PROJECT");
+  const [principalUserId, setPrincipalUserId] = useState("");
   const [window, setWindow] = useState<Window>("MONTH");
   const [limitUsd, setLimitUsd] = useState("");
   const [onBreach, setOnBreach] = useState<"BLOCK" | "WARN">("BLOCK");
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const membersQuery = api.organization.getAllOrganizationMembers.useQuery(
+    { organizationId: organization?.id ?? "" },
+    {
+      enabled: !!organization?.id && scopeKind === "PRINCIPAL",
+      refetchOnWindowFocus: false,
+    },
+  );
 
   const utils = api.useContext();
   const createMutation = api.gatewayBudgets.create.useMutation({
@@ -61,9 +71,11 @@ export function BudgetCreateDrawer({
     setName("");
     setDescription("");
     setScopeKind("PROJECT");
+    setPrincipalUserId("");
     setWindow("MONTH");
     setLimitUsd("");
     setOnBreach("BLOCK");
+    setSubmitError(null);
   };
 
   const close = () => {
@@ -83,13 +95,8 @@ export function BudgetCreateDrawer({
       toaster.create({ title: "Limit must be a positive number", type: "error" });
       return;
     }
+    setSubmitError(null);
     try {
-      const scope =
-        scopeKind === "ORGANIZATION"
-          ? { kind: "ORGANIZATION" as const, organizationId: organization.id }
-          : scopeKind === "TEAM"
-          ? { kind: "TEAM" as const, teamId: team?.id ?? "" }
-          : { kind: "PROJECT" as const, projectId: project?.id ?? "" };
       if (scopeKind === "TEAM" && !team?.id) {
         toaster.create({ title: "Team scope requires a team", type: "error" });
         return;
@@ -98,6 +105,18 @@ export function BudgetCreateDrawer({
         toaster.create({ title: "Project scope requires a project", type: "error" });
         return;
       }
+      if (scopeKind === "PRINCIPAL" && !principalUserId) {
+        setSubmitError("Pick a member to bind this principal-scope budget to.");
+        return;
+      }
+      const scope =
+        scopeKind === "ORGANIZATION"
+          ? { kind: "ORGANIZATION" as const, organizationId: organization.id }
+          : scopeKind === "TEAM"
+          ? { kind: "TEAM" as const, teamId: team?.id ?? "" }
+          : scopeKind === "PROJECT"
+          ? { kind: "PROJECT" as const, projectId: project?.id ?? "" }
+          : { kind: "PRINCIPAL" as const, principalUserId };
       await createMutation.mutateAsync({
         organizationId: organization.id,
         name,
@@ -111,10 +130,15 @@ export function BudgetCreateDrawer({
       reset();
       onOpenChange(false);
     } catch (error) {
-      toaster.create({
-        title: error instanceof Error ? error.message : "Failed to create budget",
-        type: "error",
-      });
+      const message =
+        error instanceof Error ? error.message : "Failed to create budget";
+      // Cross-org guard + missing-member errors are inline-actionable; other
+      // failures get a toast so the user knows something happened.
+      if (scopeKind === "PRINCIPAL") {
+        setSubmitError(message);
+      } else {
+        toaster.create({ title: message, type: "error" });
+      }
     }
   };
 
@@ -177,13 +201,51 @@ export function BudgetCreateDrawer({
                   <option value="PROJECT">
                     Project — {project?.name ?? "current"}
                   </option>
+                  <option value="PRINCIPAL">
+                    Principal — single org member
+                  </option>
                 </NativeSelect.Field>
               </NativeSelect.Root>
               <Field.HelperText>
-                Tighter scopes (virtual key, principal) are configured from
-                their own detail pages.
+                Virtual-key scope is configured from each VK's detail page.
               </Field.HelperText>
             </Field.Root>
+            {scopeKind === "PRINCIPAL" && (
+              <Field.Root required>
+                <Field.Label>
+                  Member
+                  <FieldInfoTooltip
+                    description="Bind the budget to one organization member. Their AI spend across every project + virtual key in this org counts toward this cap. Cross-org users are rejected by the backend guard."
+                    docHref="/ai-gateway/budgets#principal-scope"
+                  />
+                </Field.Label>
+                <NativeSelect.Root
+                  size="sm"
+                  disabled={membersQuery.isLoading}
+                >
+                  <NativeSelect.Field
+                    value={principalUserId}
+                    onChange={(e) => setPrincipalUserId(e.target.value)}
+                  >
+                    <option value="">
+                      {membersQuery.isLoading
+                        ? "Loading members…"
+                        : "Pick a member"}
+                    </option>
+                    {(membersQuery.data ?? []).map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name ?? m.email ?? m.id}
+                      </option>
+                    ))}
+                  </NativeSelect.Field>
+                </NativeSelect.Root>
+              </Field.Root>
+            )}
+            {submitError && (
+              <Field.Root invalid>
+                <Field.ErrorText>{submitError}</Field.ErrorText>
+              </Field.Root>
+            )}
             <HStack gap={4} align="flex-start">
               <Field.Root required flex={1}>
                 <Field.Label>

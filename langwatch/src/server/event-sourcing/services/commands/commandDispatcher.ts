@@ -176,6 +176,21 @@ export async function processCommand<EventType extends Event>(
 
     if (events.length > 0) {
       await storeEventsFn(events, { tenantId });
+      // ADR-022: Post-store cleanup. Invoked AFTER the event_log INSERT is durable.
+      // Best-effort: errors are caught and logged, never rethrown — cleanup failure
+      // must not roll back a successfully stored event. The canonical use case is
+      // deleting the transient S3 spool that the edge created to carry an
+      // over-threshold command payload.
+      if (handler.cleanupAfterStore) {
+        try {
+          await handler.cleanupAfterStore(command);
+        } catch (err) {
+          log?.warn(
+            { error: err instanceof Error ? err.message : String(err), commandType },
+            "Post-store cleanup failed (best-effort) — event is durable, cleanup skipped",
+          );
+        }
+      }
     }
 
     const durationMs = performance.now() - commandStartTime;

@@ -12,9 +12,20 @@ import type { ProjectionStoreContext } from "./projectionStoreContext";
 
 const logger = createLogger("langwatch:event-sourcing:redis-cached-fold-store");
 
-export interface RedisCachedFoldStoreOptions {
+export interface RedisCachedFoldStoreOptions<State = unknown> {
   keyPrefix: string;
   ttlSeconds?: number;
+  /**
+   * Optional projection applied to the fold state before it is cached in Redis.
+   * The inner store still receives the FULL state (ClickHouse is the durable
+   * source of truth); only the Redis cache entry is leaned. Use this to keep
+   * carried-but-not-folded payload (e.g. computed input/output text) out of the
+   * hot cache — the Redis-clog + O(N²)-serialize root cause for large traces.
+   * The next fold step reads this shape back on a cache hit, so the projection
+   * MUST preserve every field the fold's `apply` reads (reductions + winner
+   * pointers + nullness markers).
+   */
+  toCacheable?: (state: State) => unknown;
 }
 
 /**
@@ -55,14 +66,16 @@ export class RedisCachedFoldStore<State>
 {
   private readonly ttlSeconds: number;
   private readonly keyPrefix: string;
+  private readonly toCacheable?: (state: State) => unknown;
 
   constructor(
     private readonly inner: FoldProjectionStore<State>,
     private readonly redis: Redis,
-    options: RedisCachedFoldStoreOptions,
+    options: RedisCachedFoldStoreOptions<State>,
   ) {
     this.keyPrefix = options.keyPrefix;
     this.ttlSeconds = options.ttlSeconds ?? defaultFoldCacheTtlSeconds();
+    this.toCacheable = options.toCacheable;
   }
 
   async get(
@@ -113,7 +126,8 @@ export class RedisCachedFoldStore<State>
     // 2. Redis second — cache for fast reads on next fold step
     try {
       const key = this.redisKey(aggregateId, context);
-      await this.redis.set(key, JSON.stringify(state), "EX", this.ttlSeconds);
+      const cacheable = this.toCacheable ? this.toCacheable(state) : state;
+      await this.redis.set(key, JSON.stringify(cacheable), "EX", this.ttlSeconds);
     } catch (error) {
       incrementEsFoldCacheRedisError(this.keyPrefix, "set");
       logger.warn(

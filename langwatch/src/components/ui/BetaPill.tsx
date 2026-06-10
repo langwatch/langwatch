@@ -67,6 +67,8 @@ export function BetaPill({
     handleClose();
   }, [handleClose]);
 
+  const colorPalette = label === "Preview" ? "purple" : "blue";
+
   const pill = (
     <PopoverRoot
       open={open}
@@ -75,9 +77,11 @@ export function BetaPill({
     >
       <PopoverAnchor asChild>
         <Badge
-          size="sm"
           variant="subtle"
-          colorPalette="blue"
+          colorPalette={colorPalette}
+          fontSize="2xs"
+          paddingX={1.5}
+          lineHeight={1.2}
           cursor="pointer"
           tabIndex={0}
           onMouseEnter={handleOpen}

@@ -61,12 +61,29 @@ export type UseProviderFormSubmitActions = {
 export type UseProviderFormSubmitReturn = UseProviderFormSubmitState &
   UseProviderFormSubmitActions;
 
+export type AdvancedGatewayPayload = {
+  rateLimitRpm: number | null;
+  rateLimitTpm: number | null;
+  rateLimitRpd: number | null;
+  fallbackPriorityGlobal: number | null;
+  providerConfig: Record<string, unknown> | null;
+};
+
 export function useProviderFormSubmit({
   getFormSnapshot,
+  getAdvancedPayload,
   onSuccess,
   onError,
 }: {
   getFormSnapshot: () => FormSnapshot;
+  /**
+   * Returns the parsed advanced (gateway) fields to send in the same
+   * `update` round-trip, or `null` to skip. Throwing here (malformed
+   * JSON in providerConfig) aborts the submit so the parent form can
+   * surface the parse error inline; the toaster path covers any other
+   * server-side failure.
+   */
+  getAdvancedPayload?: () => AdvancedGatewayPayload | null;
   onSuccess?: () => void;
   onError?: (error: unknown) => void;
 }): UseProviderFormSubmitReturn {
@@ -245,6 +262,18 @@ export function useProviderFormSubmit({
         .map(({ key, value }) => ({ key, value }));
 
       const trimmedName = (name ?? "").trim();
+      let advancedPayload: AdvancedGatewayPayload | null = null;
+      if (getAdvancedPayload) {
+        try {
+          advancedPayload = getAdvancedPayload();
+        } catch (err) {
+          // Malformed JSON in providerConfig — the parent form already
+          // surfaces the inline error, so just abort the submit.
+          setIsSaving(false);
+          onError?.(err);
+          return;
+        }
+      }
       await updateMutation.mutateAsync({
         id: provider.id,
         projectId: projectId ?? "",
@@ -261,6 +290,13 @@ export function useProviderFormSubmit({
         scopes: scopes && scopes.length > 0 ? scopes : undefined,
         scopeType,
         scopeId,
+        ...(advancedPayload && {
+          rateLimitRpm: advancedPayload.rateLimitRpm,
+          rateLimitTpm: advancedPayload.rateLimitTpm,
+          rateLimitRpd: advancedPayload.rateLimitRpd,
+          fallbackPriorityGlobal: advancedPayload.fallbackPriorityGlobal,
+          providerConfig: advancedPayload.providerConfig,
+        }),
       });
 
       // Project default models are no longer written from the provider
@@ -397,6 +433,7 @@ export function useProviderFormSubmit({
     }
   }, [
     getFormSnapshot,
+    getAdvancedPayload,
     onSuccess,
     onError,
     updateMutation,

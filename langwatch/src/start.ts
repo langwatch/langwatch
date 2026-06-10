@@ -129,23 +129,19 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   // env-create.mjs so workers.ts, CLI scripts, and every other entry
   // point that imports env get it at import time (was server-only here).
   //
-  // Server-only dev hint: if the AI Gateway menu is force-flagged on but
-  // no secrets are set at all, the UI renders but /api/internal/gateway/*
-  // returns 503. That's an onboarding confusion that's specific to
-  // running `pnpm dev` with the flag, so the warning stays here.
-  const gatewayFlagForced = (process.env.FEATURE_FLAG_FORCE_ENABLE ?? "")
-    .split(",")
-    .map((s) => s.trim())
-    .includes("release_ui_ai_gateway_menu_enabled");
+  // Server-only dev hint: the AI Gateway menu is on by default, so if no
+  // gateway secrets are set at all the UI renders but
+  // /api/internal/gateway/* returns 503. That's a `pnpm dev` onboarding
+  // confusion, so the warning stays here.
   const gwSecretsUnset =
     !process.env.LW_VIRTUAL_KEY_PEPPER &&
     !process.env.LW_GATEWAY_INTERNAL_SECRET &&
     !process.env.LW_GATEWAY_JWT_SECRET;
-  if (gatewayFlagForced && gwSecretsUnset) {
+  if (gwSecretsUnset) {
     logger.warn(
-      "AI Gateway menu forced on via FEATURE_FLAG_FORCE_ENABLE, but no " +
-        "gateway secrets are set. The UI will render but /api/internal/gateway/* " +
-        "will return 503. See langwatch/.env.example for the required block.",
+      "AI Gateway menu is on by default but no gateway secrets are set. " +
+        "The UI will render but /api/internal/gateway/* will return 503. " +
+        "See langwatch/.env.example for the required block.",
     );
   }
 

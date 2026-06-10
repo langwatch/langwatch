@@ -1,18 +1,19 @@
 import type { Experiment, ExperimentType, Project } from "@prisma/client";
 import { nanoid } from "nanoid";
-import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";
+import {
+  apiKeyCeilingDenialResponse,
+  enforceApiKeyCeiling,
+  extractCredentials,
+} from "~/server/api-key/auth-middleware";
+import { TokenResolver } from "~/server/api-key/token-resolver";
 import { prisma } from "~/server/db";
+import { ExperimentService } from "~/server/experiments/experiment.service";
 import { createLicenseEnforcementService } from "~/server/license-enforcement";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
 import { buildResourceLimitMessage } from "~/server/license-enforcement/limit-message";
-import {
-  enforceApiKeyCeiling,
-  extractCredentials,
-  apiKeyCeilingDenialResponse,
-} from "~/server/api-key/auth-middleware";
-import { TokenResolver } from "~/server/api-key/token-resolver";
+import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
 import { createLogger } from "../../../utils/logger/server";
@@ -67,15 +68,13 @@ export default async function handler(
     return res.status(401).json({ message: "Invalid auth token." });
   }
 
-  // TODO(pat): introduce a dedicated `experiments:manage` permission once
-  // the RBAC catalog grows beyond workflows. Experiments are created/owned
-  // by workflows today, so `workflows:manage` is the closest existing
-  // ceiling — VIEWER is correctly blocked, ADMIN/MEMBER pass through.
+  // Experiments carry their own RBAC permission, decoupled from workflows:
+  // initializing an experiment run requires `experiments:manage`.
   try {
     await enforceApiKeyCeiling({
       prisma,
       resolved,
-      permission: "workflows:manage",
+      permission: "experiments:manage",
     });
   } catch (error) {
     const denial = apiKeyCeilingDenialResponse(error);
@@ -138,7 +137,7 @@ export default async function handler(
     throw error;
   }
 
-  // Late markUsed: response has been fully built, the PAT was genuinely used
+  // Late markUsed: response has been fully built, the API key was genuinely used
   // for a successful request. Fire-and-forget; a DB hiccup must not mask the
   // experiment creation.
   if (resolved.type === "apiKey") {
@@ -167,10 +166,12 @@ export const findOrCreateExperiment = async ({
   workflowId?: string;
 }) => {
   let experiment: Experiment | null = null;
+  const experiments = ExperimentService.create(prisma);
 
   if (experiment_id) {
-    experiment = await prisma.experiment.findUnique({
-      where: { projectId: project.id, id: experiment_id },
+    experiment = await experiments.findById({
+      projectId: project.id,
+      id: experiment_id,
     });
     if (!experiment) {
       throw new Error("Experiment not found");
@@ -180,8 +181,13 @@ export const findOrCreateExperiment = async ({
   let slug_ = null;
   if (experiment_slug) {
     slug_ = slugify(experiment_slug);
-    experiment = await prisma.experiment.findUnique({
-      where: { projectId_slug: { projectId: project.id, slug: slug_ } },
+    // findBySlug filters archivedAt at the service layer. Archived rows
+    // also have a `-archived-<nanoid>` slug, so they would not collide
+    // even on a raw findUnique - we still go through the service so the
+    // archive rule stays one source of truth.
+    experiment = await experiments.findBySlug({
+      projectId: project.id,
+      slug: slug_,
     });
   }
 
@@ -223,9 +229,7 @@ export const findOrCreateExperiment = async ({
  * Resolves the organizationId from a teamId.
  * Returns null if the team or organization is not found.
  */
-async function resolveOrganizationId(
-  teamId: string,
-): Promise<string | null> {
+async function resolveOrganizationId(teamId: string): Promise<string | null> {
   const team = await prisma.team.findUnique({
     where: { id: teamId },
     select: { organizationId: true },

@@ -89,7 +89,7 @@ client = langwatch.setup(
 
 ## Tracing
 
-### `@langwatch.trace()` / `langwatch.trace()`
+### `@langwatch.trace()`, `langwatch.trace()`
 
 This is the primary way to define the boundaries of a request or a significant operation in your application. It can be used as a decorator around a function or as a context manager.
 
@@ -153,9 +153,13 @@ process_data("Sample Data")
   If `True`, this trace (and its spans) will be processed but not sent to the LangWatch backend. This can be useful for local debugging or conditional tracing.
 </ParamField>
 
-<ParamField path="max_string_length" type="Optional[int]" default="5000">
-  The maximum length for string values captured in inputs, outputs, and metadata. Longer strings will be truncated.
+<ParamField path="max_string_length" type="Optional[int]" default="None">
+  Optional per-field byte cap for string values in inputs, outputs, and metadata. Defaults to `None` (no client-side truncation) — full content is sent to the backend, which owns sizing. Set to an integer (≥ 100) to truncate longer strings client-side before transmission.
 </ParamField>
+
+<Warning>
+  **Upgrade note (behavior change):** earlier SDK versions truncated string values at 5,000 bytes by default. Now that `max_string_length` defaults to `None`, full input/output is transmitted — so projects **without** server-side blob offload enabled will send larger network payloads than before. If you need to bound client-side payload size, set `max_string_length` to an integer.
+</Warning>
 
 <ParamField path="skip_root_span" type="bool" default="False">
   If `True`, a root span will not be automatically created for this trace. This is an advanced option, typically used if you intend to manage the root span's lifecycle manually or if the trace is purely a logical grouping without its own primary operation.
@@ -338,7 +342,7 @@ When `langwatch.trace()` is used as a context manager, it yields a `LangWatchTra
   (Potentially) Revokes sharing for this trace if it was previously shared.
 </ParamField>
 
-### `@langwatch.span()` / `langwatch.span()`
+### `@langwatch.span()`, `langwatch.span()`
 
 Use this to instrument specific operations or blocks of code within a trace. Spans can be nested to create a hierarchical view of your application's execution flow.
 

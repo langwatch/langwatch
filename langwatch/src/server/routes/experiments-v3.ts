@@ -14,8 +14,7 @@ import { ExperimentType } from "@prisma/client";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import type { z } from "zod";
-import { loggerMiddleware } from "~/app/api/middleware/logger";
-import { tracerMiddleware } from "~/app/api/middleware/tracer";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import type { Permission } from "~/server/api/rbac";
 import {
   enforceApiKeyCeiling,
@@ -40,6 +39,7 @@ import {
 } from "~/server/experiments-v3/execution/orchestrator";
 import { runStateManager } from "~/server/experiments-v3/execution/runStateManager";
 import { ExperimentRunService } from "~/server/experiments-v3/services/experiment-run.service";
+import { ExperimentService } from "~/server/experiments/experiment.service";
 import {
   executionRequestSchema,
   type EvaluationV3Event,
@@ -54,9 +54,13 @@ import type { NextRequestShim as any } from "./types";
 
 const logger = createLogger("langwatch:experiments-v3");
 
-export const app = new Hono().basePath("/api/experiments");
-app.use(tracerMiddleware({ name: "experiments-v3" }));
-app.use(loggerMiddleware());
+const secured = createServiceApp({ basePath: "/api/experiments" });
+const sessionAuth = handlerManagedAuth(
+  "user session validated in-handler via getServerAuthSession",
+);
+const apiKeyAuth = handlerManagedAuth(
+  "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling",
+);
 
 // Backward-compat aliases: redirect old /api/evaluations/v3/... paths to new /api/experiments/...
 // Python SDK still calls the old routes until it is updated in a follow-up.
@@ -72,12 +76,12 @@ legacyAliasApp.all("/*", (c) => {
 const tokenResolver = TokenResolver.create(prisma);
 
 /**
- * Authenticates a request via the unified PAT + legacy-key path and enforces
+ * Authenticates a request via the unified API-key + legacy-key path and enforces
  * the given permission ceiling. Accepts any Hono-like context shape so this
  * helper remains testable.
  *
  * Returns `markUsed` in the success case — a no-op for legacy keys, a
- * fire-and-forget lastUsedAt bump for PATs. Callers invoke it only after the
+ * fire-and-forget lastUsedAt bump for API keys. Callers invoke it only after the
  * response has been built so `lastUsedAt` tracks fully-successful outcomes
  * (matches the route-owned pattern in `collector.ts`).
  */
@@ -148,7 +152,7 @@ const getRunUrl = (
 
 // ── POST /execute ────────────────────────────────────────────────────
 
-app.post("/execute", zValidator("json", executionRequestSchema), async (c) => {
+secured.access(sessionAuth).post("/execute", zValidator("json", executionRequestSchema), async (c) => {
   const request = await c.req.json();
   const { projectId } = request;
 
@@ -272,7 +276,7 @@ app.post("/execute", zValidator("json", executionRequestSchema), async (c) => {
 
 // ── POST /abort ──────────────────────────────────────────────────────
 
-app.post("/abort", async (c) => {
+secured.access(sessionAuth).post("/abort", async (c) => {
   let body: { projectId?: string; runId?: string };
   try {
     body = await c.req.json();
@@ -308,6 +312,16 @@ app.post("/abort", async (c) => {
     );
   }
 
+  // Ownership check: holding evaluations:manage on `projectId` does NOT grant
+  // the right to abort a run that belongs to a different project. The runId is
+  // attacker-controlled, so verify the run is owned by the authenticated
+  // project before signaling an abort (mirrors GET /runs/:runId). Without this,
+  // a user could abort another tenant's experiment run by guessing its runId.
+  const runState = await runStateManager.getRunState(runId);
+  if (!runState || runState.projectId !== projectId) {
+    return c.json({ error: "Run not found" }, { status: 404 });
+  }
+
   logger.info({ projectId, runId }, "Requesting abort");
   await requestAbort(runId);
   // Also signal via abortManager (the standalone abort route used this)
@@ -318,7 +332,7 @@ app.post("/abort", async (c) => {
 
 // ── POST /:slug/run  (CI/CD execution) ──────────────────────────────
 
-app.post("/:slug/run", async (c) => {
+secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
   const { slug } = c.req.param();
 
   const authResult = await authenticateRequest(c, "evaluations:manage");
@@ -327,12 +341,10 @@ app.post("/:slug/run", async (c) => {
   }
   const { project, markUsed } = authResult;
 
-  const experiment = await prisma.experiment.findFirst({
-    where: {
-      projectId: project.id,
-      slug,
-      type: ExperimentType.EVALUATIONS_V3,
-    },
+  const experiment = await ExperimentService.create(prisma).findBySlugAndType({
+    projectId: project.id,
+    slug,
+    type: ExperimentType.EVALUATIONS_V3,
   });
 
   if (!experiment) {
@@ -500,7 +512,7 @@ app.post("/:slug/run", async (c) => {
 
 // ── GET /runs?experimentSlug=... (list runs for an experiment) ──────
 
-app.get("/runs", async (c) => {
+secured.access(apiKeyAuth).get("/runs", async (c) => {
   const authResult = await authenticateRequest(c, "evaluations:view");
   if ("error" in authResult) {
     return c.json({ error: authResult.error }, { status: authResult.status });
@@ -560,7 +572,7 @@ app.get("/runs", async (c) => {
 
 // ── GET /runs/:runId (poll run status) ───────────────────────────────
 
-app.get("/runs/:runId", async (c) => {
+secured.access(apiKeyAuth).get("/runs/:runId", async (c) => {
   const { runId } = c.req.param();
 
   const authResult = await authenticateRequest(c, "evaluations:view");
@@ -577,6 +589,20 @@ app.get("/runs/:runId", async (c) => {
 
   if (runState.projectId !== project.id) {
     return c.json({ error: "Run not found" }, { status: 404 });
+  }
+
+  // Same archive guard as /runs/:runId/results: a run whose owning
+  // experiment was archived must not keep serving status from the Redis
+  // cache for the rest of the 24h TTL. Without this, archive visibility
+  // silently depends on run age.
+  if (runState.experimentId) {
+    const stillLive = await ExperimentService.create(prisma).isActive({
+      projectId: project.id,
+      id: runState.experimentId,
+    });
+    if (!stillLive) {
+      return c.json({ error: "Run not found" }, { status: 404 });
+    }
   }
 
   logger.debug({ runId, status: runState.status }, "Run status queried");
@@ -628,7 +654,7 @@ app.get("/runs/:runId", async (c) => {
 });
 
 // ── GET /runs/:runId/results (full per-row results from ClickHouse) ──
-app.get("/runs/:runId/results", async (c) => {
+secured.access(apiKeyAuth).get("/runs/:runId/results", async (c) => {
   const { runId } = c.req.param();
 
   const authResult = await authenticateRequest(c, "evaluations:view");
@@ -662,13 +688,25 @@ app.get("/runs/:runId/results", async (c) => {
 
   const experimentSlug = c.req.query("experimentSlug") ?? slugFromState;
   let experimentId = experimentIdFromState;
+  const experiments = ExperimentService.create(prisma);
 
   if (!experimentId && experimentSlug) {
-    const experiment = await prisma.experiment.findFirst({
-      where: { projectId: project.id, slug: experimentSlug },
-      select: { id: true },
+    const experiment = await experiments.findIdBySlug({
+      projectId: project.id,
+      slug: experimentSlug,
     });
     experimentId = experiment?.id;
+  } else if (experimentId) {
+    // Independent of how we resolved the id, refuse to return results once
+    // the owning experiment is archived. Without this check the Redis-state
+    // path (fresh runs, within 24h TTL) would keep serving ClickHouse rows
+    // after archive while the slug-based fallback already returns 404, so
+    // archive visibility would silently depend on run age.
+    const stillLive = await experiments.isActive({
+      projectId: project.id,
+      id: experimentId,
+    });
+    if (!stillLive) experimentId = undefined;
   }
 
   if (!experimentId) {
@@ -706,3 +744,5 @@ app.get("/runs/:runId/results", async (c) => {
     );
   }
 });
+
+export const app = secured.hono;

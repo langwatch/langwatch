@@ -60,11 +60,10 @@ def _make_api_response_200(
 
 def _mock_sync_detailed_response(parsed, status_code=200):
     """Create a mock Response object wrapping a parsed model."""
-    from http import HTTPStatus
-    from langwatch.generated.langwatch_rest_api_client.types import Response
+    from langwatch.generated.langwatch_rest_api_client.types import Response, safe_http_status
 
     return Response(
-        status_code=HTTPStatus(status_code),
+        status_code=safe_http_status(status_code),
         content=json.dumps({}).encode() if parsed else b"",
         headers={},
         parsed=parsed,
@@ -472,6 +471,53 @@ class TestPromptApiServiceCreateUpdateWithTags:
 
             body_arg = mock_module.sync_detailed.call_args[1]["body"]
             assert body_arg.tags == ["staging", "canary"]
+
+    def test_create_includes_parameters_in_request_body(self):
+        """
+        @scenario Python prompt API writes runtime config on create and update
+        """
+        parsed = _make_api_response_200()
+        mock_resp = _mock_sync_detailed_response(parsed)
+
+        with patch(
+            "langwatch.prompts.prompt_api_service.post_api_prompts"
+        ) as mock_module, patch(
+            "langwatch.prompts.prompt_api_service.unwrap_response",
+            return_value=parsed,
+        ):
+            mock_module.sync_detailed.return_value = mock_resp
+            client = Mock()
+            service = PromptApiService(client)
+            service.create(handle="pizza-prompt", parameters={"sdk_write": True})
+
+            body_arg = mock_module.sync_detailed.call_args[1]["body"]
+            assert body_arg.to_dict()["parameters"] == {"sdk_write": True}
+
+    def test_update_includes_parameters_in_request_body(self):
+        """
+        @scenario Python prompt API writes runtime config on create and update
+        """
+        parsed = _make_api_response_200()
+        mock_resp = _mock_sync_detailed_response(parsed)
+
+        with patch(
+            "langwatch.prompts.prompt_api_service.put_api_prompts_by_id"
+        ) as mock_module, patch(
+            "langwatch.prompts.prompt_api_service.unwrap_response",
+            return_value=parsed,
+        ):
+            mock_module.sync_detailed.return_value = mock_resp
+            client = Mock()
+            service = PromptApiService(client)
+            service.update(
+                prompt_id_or_handle="pizza-prompt",
+                scope="PROJECT",
+                commit_message="update config",
+                parameters={"sdk_write": True},
+            )
+
+            body_arg = mock_module.sync_detailed.call_args[1]["body"]
+            assert body_arg.to_dict()["parameters"] == {"sdk_write": True}
 
 
 # ---------------------------------------------------------------------------
