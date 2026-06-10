@@ -16,23 +16,25 @@
  *
  * Spec: specs/ai-gateway/governance/cli-login-personal-guard.feature
  */
-import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-const suffix = nanoid(8);
-const ORG_ID = `org-guard-${suffix}`;
-const TEAM_ID = `team-guard-${suffix}`;
-const PTEAM_ID = `pteam-guard-${suffix}`;
-const USER_ID = `usr-guard-${suffix}`;
-const SHARED_PROJECT_ID = `proj-shared-${suffix}`;
-const PERSONAL_PROJECT_ID = `proj-personal-${suffix}`;
-const SHARED_API_KEY = `sk-lw-shared-${suffix}-${"a".repeat(36)}`;
-const PERSONAL_API_KEY = `sk-lw-personal-${suffix}-${"b".repeat(36)}`;
+// vi.mock is hoisted above every top-level const, so the values the session
+// mock needs must come from vi.hoisted (hoisted alongside it). Math.random,
+// not nanoid — imports aren't available inside the hoisted block.
+const ids = vi.hoisted(() => {
+  const s = Math.random().toString(36).slice(2, 10);
+  return {
+    suffix: s,
+    USER_ID: `usr-guard-${s}`,
+    EMAIL: `guard-${s}@example.com`,
+    NAME: `Guard ${s}`,
+  };
+});
 
 // Only the auth identity is stubbed; the DB/governance calls are real.
 vi.mock("~/server/auth", () => ({
   getServerAuthSession: vi.fn().mockResolvedValue({
-    user: { id: USER_ID, email: `guard-${suffix}@example.com`, name: `Guard ${suffix}` },
+    user: { id: ids.USER_ID, email: ids.EMAIL, name: ids.NAME },
   }),
 }));
 // The picked shared project's key requires project:update; that RBAC decision
@@ -48,6 +50,16 @@ import {
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { app } from "../auth-cli";
+
+const suffix = ids.suffix;
+const ORG_ID = `org-guard-${suffix}`;
+const TEAM_ID = `team-guard-${suffix}`;
+const PTEAM_ID = `pteam-guard-${suffix}`;
+const USER_ID = ids.USER_ID;
+const SHARED_PROJECT_ID = `proj-shared-${suffix}`;
+const PERSONAL_PROJECT_ID = `proj-personal-${suffix}`;
+const SHARED_API_KEY = `sk-lw-shared-${suffix}-${"a".repeat(36)}`;
+const PERSONAL_API_KEY = `sk-lw-personal-${suffix}-${"b".repeat(36)}`;
 
 const GOV_FLAG = "release_ui_ai_governance_enabled";
 
