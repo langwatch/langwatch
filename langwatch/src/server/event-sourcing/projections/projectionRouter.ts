@@ -740,6 +740,39 @@ export class ProjectionRouter<
   }
 
   /**
+   * Evaluates a reactor's optional shouldReact predicate. Fails open: a
+   * thrown predicate is logged and treated as true so a predicate bug can
+   * never drop a side effect (worst case is one redundant job).
+   */
+  private reactorShouldReact(
+    reactor: ReactorDefinition<EventType>,
+    event: EventType,
+    foldState: unknown,
+  ): boolean {
+    if (!reactor.shouldReact) return true;
+
+    try {
+      return reactor.shouldReact(event, {
+        tenantId: event.tenantId,
+        aggregateId: String(event.aggregateId),
+        foldState,
+      });
+    } catch (error) {
+      this.logger.error(
+        {
+          reactorName: reactor.name,
+          eventId: event.id,
+          eventType: event.type,
+          tenantId: event.tenantId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Reactor shouldReact predicate threw — failing open and dispatching",
+      );
+      return true;
+    }
+  }
+
+  /**
    * Dispatches a single event to reactors registered on a fold projection.
    * In queued mode, sends to reactor queues. In inline mode, calls directly.
    */
@@ -755,6 +788,10 @@ export class ProjectionRouter<
     for (const reactor of reactors) {
       if (reactor.options?.disabled) continue;
       if (this.isReactorExcluded(reactor)) continue;
+      if (!this.reactorShouldReact(reactor, event, foldState)) {
+        incrementEsReactorTotal(this.pipelineName, reactor.name, "skipped");
+        continue;
+      }
 
       if (hasReactorQueues) {
         const queueProcessor = this.queueManager.getReactorQueue(reactor.name);

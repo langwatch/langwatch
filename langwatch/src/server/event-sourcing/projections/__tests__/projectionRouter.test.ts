@@ -440,6 +440,151 @@ describe("ProjectionRouter", () => {
       });
     });
 
+    describe("when a reactor declares a shouldReact predicate", () => {
+      const setupRouterWithFold = (queueManager: ReturnType<typeof createMockQueueManager>) => {
+        const router = new ProjectionRouter(
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          queueManager,
+        );
+
+        const store = createMockFoldProjectionStore<{ count: number }>();
+        (store.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+
+        const fold = createMockFoldProjectionDefinition("my-fold", {
+          store,
+          init: () => ({ count: 0 }),
+          apply: (state: { count: number }) => ({ count: state.count + 1 }),
+        });
+
+        router.registerFoldProjection(fold);
+        return router;
+      };
+
+      describe("when the predicate returns false", () => {
+        it("does not enqueue a job for that reactor", async () => {
+          const mockSend = vi.fn().mockResolvedValue(undefined);
+          const queueManager = createMockQueueManager({
+            hasReactorQueues: true,
+            getReactorQueue: vi.fn().mockReturnValue({ send: mockSend }),
+          });
+          const router = setupRouterWithFold(queueManager);
+
+          const reactorHandle = vi.fn().mockResolvedValue(undefined);
+          const reactor: ReactorDefinition<Event> = {
+            name: "filtered-reactor",
+            shouldReact: () => false,
+            handle: reactorHandle,
+          };
+          router.registerReactor("my-fold", reactor);
+
+          const event = createTestEvent(
+            TEST_CONSTANTS.AGGREGATE_ID,
+            TEST_CONSTANTS.AGGREGATE_TYPE,
+            tenantId,
+          );
+
+          await router.dispatch([event], { tenantId });
+
+          expect(mockSend).not.toHaveBeenCalled();
+          expect(reactorHandle).not.toHaveBeenCalled();
+        });
+
+        it("skips inline execution too", async () => {
+          const queueManager = createMockQueueManager();
+          const router = setupRouterWithFold(queueManager);
+
+          const reactorHandle = vi.fn().mockResolvedValue(undefined);
+          const reactor: ReactorDefinition<Event> = {
+            name: "filtered-inline-reactor",
+            shouldReact: () => false,
+            handle: reactorHandle,
+          };
+          router.registerReactor("my-fold", reactor);
+
+          const event = createTestEvent(
+            TEST_CONSTANTS.AGGREGATE_ID,
+            TEST_CONSTANTS.AGGREGATE_TYPE,
+            tenantId,
+          );
+
+          await router.dispatch([event], { tenantId });
+
+          expect(reactorHandle).not.toHaveBeenCalled();
+        });
+      });
+
+      describe("when the predicate returns true", () => {
+        it("enqueues the job with the event and fold state", async () => {
+          const mockSend = vi.fn().mockResolvedValue(undefined);
+          const queueManager = createMockQueueManager({
+            hasReactorQueues: true,
+            getReactorQueue: vi.fn().mockReturnValue({ send: mockSend }),
+          });
+          const router = setupRouterWithFold(queueManager);
+
+          const shouldReact = vi.fn().mockReturnValue(true);
+          const reactor: ReactorDefinition<Event> = {
+            name: "passing-reactor",
+            shouldReact,
+            handle: vi.fn(),
+          };
+          router.registerReactor("my-fold", reactor);
+
+          const event = createTestEvent(
+            TEST_CONSTANTS.AGGREGATE_ID,
+            TEST_CONSTANTS.AGGREGATE_TYPE,
+            tenantId,
+          );
+
+          await router.dispatch([event], { tenantId });
+
+          expect(shouldReact).toHaveBeenCalledWith(
+            event,
+            expect.objectContaining({
+              tenantId,
+              aggregateId: String(event.aggregateId),
+              foldState: { count: 1 },
+            }),
+          );
+          expect(mockSend).toHaveBeenCalledWith({
+            event,
+            foldState: { count: 1 },
+          });
+        });
+      });
+
+      describe("when the predicate throws", () => {
+        it("fails open and enqueues the job anyway", async () => {
+          const mockSend = vi.fn().mockResolvedValue(undefined);
+          const queueManager = createMockQueueManager({
+            hasReactorQueues: true,
+            getReactorQueue: vi.fn().mockReturnValue({ send: mockSend }),
+          });
+          const router = setupRouterWithFold(queueManager);
+
+          const reactor: ReactorDefinition<Event> = {
+            name: "throwing-predicate-reactor",
+            shouldReact: () => {
+              throw new Error("predicate boom");
+            },
+            handle: vi.fn(),
+          };
+          router.registerReactor("my-fold", reactor);
+
+          const event = createTestEvent(
+            TEST_CONSTANTS.AGGREGATE_ID,
+            TEST_CONSTANTS.AGGREGATE_TYPE,
+            tenantId,
+          );
+
+          await router.dispatch([event], { tenantId });
+
+          expect(mockSend).toHaveBeenCalled();
+        });
+      });
+    });
+
     describe("when a reactor queue send fails", () => {
       it("throws AggregateError", async () => {
         const mockSend = vi.fn().mockRejectedValue(new Error("queue send failed"));

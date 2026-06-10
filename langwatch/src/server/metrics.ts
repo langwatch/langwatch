@@ -289,7 +289,7 @@ export const eventSourcingStoreDurationHistogram = new Histogram({
 // Event Sourcing Pipeline Metrics (command, fold, map, reactor)
 // ============================================================================
 
-type ESStatus = "completed" | "failed";
+type ESStatus = "completed" | "failed" | "skipped";
 
 // --- Command metrics ---
 register.removeSingleMetric("es_command_total");
