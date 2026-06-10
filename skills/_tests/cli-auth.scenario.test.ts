@@ -130,25 +130,30 @@ describe("given the evaluations skill installed with a project key in .env", () 
           ],
           script: [
             scenario.user(
-              "set up a batch evaluation experiment for my agent using langwatch",
+              "Set up a batch evaluation experiment for my agent using langwatch: create the experiment script and wire up auth from the project's existing .env. Do NOT run it, install dependencies, or start any containers yet.",
             ),
             scenario.agent(),
             (state) => {
               toolCallFix(state);
               assertSkillWasRead(state, "evaluations");
-              const transcript = state.messages
-                .map((m) =>
+              // Hard guardrail: the agent must never EXECUTE the AI-tools / device
+              // login (that is what routes evaluations to a personal project). We
+              // scan the executed tool-call command fields, not the whole
+              // transcript: the skill prose itself names `langwatch login --device`
+              // to warn against it, so a plain substring check would always trip.
+              const ranDeviceLogin = state.messages.some((m) => {
+                const raw =
                   typeof m.content === "string"
                     ? m.content
-                    : JSON.stringify(m.content),
-                )
-                .join("\n")
-                .toLowerCase();
-              // Hard guardrail: the AI-tools / device login must never be invoked
-              // for evaluation setup, that is what routes to a personal project.
+                    : JSON.stringify(m.content ?? "");
+                const flattened = raw.replace(/\\/g, "");
+                return /"command":"[^"]*langwatch login[^"]*--device/.test(
+                  flattened,
+                );
+              });
               expect(
-                transcript.includes("login --device"),
-                "agent must not run `langwatch login --device` for evaluation setup",
+                ranDeviceLogin,
+                "agent must not execute `langwatch login --device` for evaluation setup",
               ).toBe(false);
             },
             scenario.judge(),
