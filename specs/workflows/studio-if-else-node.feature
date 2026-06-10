@@ -19,13 +19,13 @@ Feature: If/Else conditional branch node in workflows
   # Authoring: palette, node shape, condition editing
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: If/Else is available in the node palette
     When I open the node palette
     Then I see an "If/Else" block listed alongside Code and HTTP blocks
     And dragging it onto the canvas creates an if/else node
 
-  @integration @unimplemented
+  @integration
   Scenario: If/Else node has one condition and two output branches
     Given an if/else node on the canvas
     Then the node shows input handles for its declared inputs

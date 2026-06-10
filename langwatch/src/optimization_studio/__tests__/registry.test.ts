@@ -112,6 +112,32 @@ describe("Optimization Studio Registry", () => {
     });
   });
 
+  describe("if/else block defaults", () => {
+    const { ifElse } = MODULES;
+
+    /** @scenario If/Else is available in the node palette */
+    it("registers the If/Else module for the node palette", () => {
+      expect(ifElse.name).toBe("If/Else");
+      expect(ifElse.inputs).toEqual([{ identifier: "input", type: "str" }]);
+    });
+
+    /** @scenario If/Else node has one condition and two output branches */
+    it("ships a condition parameter and the fixed branch outputs", () => {
+      const conditionParam = ifElse.parameters?.find(
+        (p) => p.identifier === "condition",
+      );
+      expect(conditionParam).toBeDefined();
+      expect(conditionParam?.type).toBe("str");
+
+      // The branch handles are the engine's gating contract — fixed
+      // identifiers true/false of type bool.
+      expect(ifElse.outputs).toEqual([
+        { identifier: "true", type: "bool" },
+        { identifier: "false", type: "bool" },
+      ]);
+    });
+  });
+
   describe("unified naming consistency", () => {
     it("signature and code use same input/output naming", () => {
       const { signature, code } = MODULES;

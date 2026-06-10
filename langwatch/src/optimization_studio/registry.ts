@@ -167,11 +167,32 @@ const agent: BaseComponent = {
   outputs: [{ identifier: "output", type: "str" }] as Field[],
 };
 
+const ifElse: BaseComponent = {
+  name: "If/Else",
+  description:
+    "Route execution down the true or false branch based on a condition over the inputs",
+  parameters: [
+    {
+      identifier: "condition",
+      type: "str",
+      value: 'input != ""',
+    },
+  ],
+  inputs: [{ identifier: "input", type: "str" }] as Field[],
+  // The branch handles are the contract the engine gates on — fixed
+  // identifiers, not user-editable (see IfElsePropertiesPanel).
+  outputs: [
+    { identifier: "true", type: "bool" },
+    { identifier: "false", type: "bool" },
+  ] as Field[],
+};
+
 export const MODULES = {
   signature,
   code,
   http,
   agent,
+  ifElse,
   promptingTechniques,
   evaluators,
 };

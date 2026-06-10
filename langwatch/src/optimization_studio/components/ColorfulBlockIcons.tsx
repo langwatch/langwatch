@@ -5,6 +5,7 @@ import {
   Check,
   Code,
   Flag,
+  GitBranch,
   Globe,
   Home,
   Shield,
@@ -119,6 +120,7 @@ export const ComponentIcon = ({
     evaluator: <EvaluatorIcon cls={cls} />,
     end: <Flag />,
     custom: <BoxIcon />,
+    if_else: <GitBranch />,
   };
 
   const componentColorMap: Record<ComponentType, string> = {
@@ -132,6 +134,7 @@ export const ComponentIcon = ({
     evaluator: "green.emphasized",
     end: "orange.emphasized",
     custom: "gray.emphasized",
+    if_else: "yellow.emphasized",
   };
 
   let color = componentColorMap[type];

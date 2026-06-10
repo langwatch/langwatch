@@ -18,6 +18,7 @@ import { EntryPointPropertiesPanel } from "./EntryPointPropertiesPanel";
 import { AgentPropertiesPanel } from "./AgentPropertiesPanel";
 import { EvaluatorPropertiesPanel } from "./EvaluatorPropertiesPanel";
 import { HttpPropertiesPanel } from "./HttpPropertiesPanel";
+import { IfElsePropertiesPanel } from "./IfElsePropertiesPanel";
 import { SignaturePropertiesPanel } from "./llm-configs/signature-properties-panel/SignaturePropertiesPanel";
 import { PromptingTechniquePropertiesPanel } from "./PromptingTechniquePropertiesPanel";
 import { RetrievePropertiesPanel } from "./RetrievePropertiesPanel";
@@ -52,6 +53,7 @@ export function PropertiesPanel() {
     retriever: RetrievePropertiesPanel,
     prompting_technique: PromptingTechniquePropertiesPanel,
     evaluator: EvaluatorPropertiesPanel as React.FC<{ node: Node<Component> }>,
+    if_else: IfElsePropertiesPanel,
   };
 
   const { width, height } = useWindowSize();

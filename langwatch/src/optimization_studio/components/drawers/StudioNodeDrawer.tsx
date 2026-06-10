@@ -9,6 +9,7 @@ import { EndPropertiesPanel } from "../properties/EndPropertiesPanel";
 import { EntryPointPropertiesPanel } from "../properties/EntryPointPropertiesPanel";
 import { EvaluatorPropertiesPanel } from "../properties/EvaluatorPropertiesPanel";
 import { HttpPropertiesPanel } from "../properties/HttpPropertiesPanel";
+import { IfElsePropertiesPanel } from "../properties/IfElsePropertiesPanel";
 import { PromptingTechniquePropertiesPanel } from "../properties/PromptingTechniquePropertiesPanel";
 import { RetrievePropertiesPanel } from "../properties/RetrievePropertiesPanel";
 import { SignaturePromptEditorBridge } from "./SignaturePromptEditorBridge";
@@ -33,6 +34,7 @@ const ComponentPropertiesPanelMap: Partial<
   retriever: RetrievePropertiesPanel,
   prompting_technique: PromptingTechniquePropertiesPanel,
   evaluator: EvaluatorPropertiesPanel as React.FC<{ node: Node<Component> }>,
+  if_else: IfElsePropertiesPanel,
 };
 
 /**

@@ -23,6 +23,7 @@ import { useDragLayer } from "react-dnd";
 import {
   Check,
   Copy,
+  MinusCircle,
   MoreHorizontal,
   Play,
   Square,
@@ -500,6 +501,12 @@ export function ComponentExecutionButton({
               }
             >
               <Check size={iconSize} />
+            </Box>
+          ) : node?.data.execution_state?.status === "skipped" ? (
+            // The node sat behind a not-taken if/else branch — muted,
+            // not red: skipping is the gate doing its job.
+            <Box color="gray.400" data-testid="node-status-skipped">
+              <MinusCircle size={iconSize} />
             </Box>
           ) : null}
         </Center>

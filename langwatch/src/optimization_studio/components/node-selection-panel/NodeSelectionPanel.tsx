@@ -145,6 +145,8 @@ export const NodeSelectionPanel = ({
 
           <NodeDraggable component={MODULES.http} type="http" />
 
+          <NodeDraggable component={MODULES.ifElse} type="if_else" />
+
           <AgentNodeDraggable onDragEnd={handleAgentDragEnd} />
 
           <EvaluatorNodeDraggable onDragEnd={handleEvaluatorDragEnd} />
