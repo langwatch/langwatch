@@ -638,4 +638,167 @@ describe("ReplayService tenant-specific ClickHouse", () => {
     });
 
   });
+
+  describe("replayOptimized per-eventType projection mapping", () => {
+    function createFoldProjection({ name, store }: { name: string; store: any }): RegisteredFoldProjection {
+      const definition: FoldProjectionDefinition<{ count: number }, any> = {
+        name,
+        version: "v1",
+        eventTypes: ["trace.upserted"],
+        LastEventOccurredAtKey: "LastEventOccurredAt",
+        init: () => ({ count: 0 }),
+        apply: (state) => ({ count: state.count + 1 }),
+        store,
+      };
+      return {
+        projectionName: name,
+        pipelineName: "test_pipeline",
+        aggregateType: "trace",
+        source: "pipeline",
+        pauseKey: `test_pipeline/projection/${name}`,
+        kind: "fold",
+        definition,
+      };
+    }
+
+    function createSpanMapProjection({ name, bulkAppend }: { name: string; bulkAppend: any }): RegisteredMapProjection {
+      const definition: MapProjectionDefinition<{ src: string }, any> = {
+        name,
+        eventTypes: ["span.created"],
+        map: (event: any) => ({ src: event.aggregateId }),
+        store: { append: async () => undefined, bulkAppend },
+      };
+      return {
+        projectionName: name,
+        pipelineName: "test_pipeline",
+        aggregateType: "span",
+        source: "pipeline",
+        pauseKey: `test_pipeline/handler/${name}`,
+        kind: "map",
+        definition,
+      };
+    }
+
+    it("does not mark aggregates for projections whose event types they lack", async () => {
+      const redis = getTestRedisConnection()!;
+      const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      const foldName = `optFold_${suffix}`;
+      const mapName = `optMap_${suffix}`;
+
+      // A span-only aggregate: matches the map projection's event types but
+      // shares none with the fold projection.
+      await client.insert({
+        table: "event_log",
+        values: [
+          {
+            TenantId: tenantA,
+            AggregateType: "span",
+            AggregateId: `span-s1-${suffix}`,
+            EventId: "evt-span-001",
+            EventType: "span.created",
+            EventTimestamp: 1700000004000,
+            EventOccurredAt: 1700000004000,
+            EventVersion: "2025-01-01",
+            EventPayload: JSON.stringify({ value: 7 }),
+          },
+        ],
+        format: "JSONEachRow",
+      });
+
+      const spanAggKey = aggregateKey({
+        tenantId: tenantA,
+        aggregateType: "span",
+        aggregateId: `span-s1-${suffix}`,
+      });
+      const traceAggKeys = ["trace-a1", "trace-a2"].map((id) =>
+        aggregateKey({ tenantId: tenantA, aggregateType: "trace", aggregateId: id }),
+      );
+
+      // Capture marker state at WRITE time (markers are cleaned at run end).
+      let foldCutoffsAtWrite: Record<string, string> | null = null;
+      let mapCutoffsAtWrite: Record<string, string> | null = null;
+      const foldStore = vi.fn(async (_state: { count: number }, _ctx: any) => {
+        foldCutoffsAtWrite = await redis.hgetall(`${CUTOFF_KEY_PREFIX}${foldName}`);
+        mapCutoffsAtWrite = await redis.hgetall(`${CUTOFF_KEY_PREFIX}${mapName}`);
+      });
+      const bulkAppend = vi.fn().mockResolvedValue(undefined);
+
+      const foldProjection = createFoldProjection({
+        name: foldName,
+        store: { store: foldStore, get: vi.fn().mockResolvedValue(null) },
+      });
+      const mapProjection = createSpanMapProjection({ name: mapName, bulkAppend });
+
+      const service = createServiceWithResolver();
+      const batchKinds: string[] = [];
+
+      const result = await service.replayOptimized(
+        {
+          projections: [foldProjection],
+          mapProjections: [mapProjection],
+          tenantIds: [tenantA],
+          since: "2023-11-01",
+        },
+        { onBatchComplete: (info) => batchKinds.push(info.projectionKind) },
+      );
+
+      expect(result.batchErrors).toBe(0);
+
+      // Fold wrote both trace aggregates; map wrote only the span aggregate.
+      expect(foldStore).toHaveBeenCalledTimes(2);
+      expect(bulkAppend).toHaveBeenCalledTimes(1);
+      expect(bulkAppend.mock.calls[0]![0]).toEqual([{ src: `span-s1-${suffix}` }]);
+
+      // The fold projection's cutoff markers cover only its own aggregates —
+      // the span-only aggregate never appears, and vice versa for the map.
+      expect(foldCutoffsAtWrite).not.toBeNull();
+      expect(Object.keys(foldCutoffsAtWrite!).sort()).toEqual(traceAggKeys.sort());
+      expect(Object.keys(mapCutoffsAtWrite!)).toEqual([spanAggKey]);
+
+      // Mixed fold+map runs report the dominant kind.
+      expect(batchKinds).toEqual(["fold"]);
+    });
+
+    it("reports projectionKind map for map-only optimized runs", async () => {
+      const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      const mapName = `optMapOnly_${suffix}`;
+      const bulkAppend = vi.fn().mockResolvedValue(undefined);
+      const mapProjection: RegisteredMapProjection = {
+        projectionName: mapName,
+        pipelineName: "test_pipeline",
+        aggregateType: "trace",
+        source: "pipeline",
+        pauseKey: `test_pipeline/handler/${mapName}`,
+        kind: "map",
+        definition: {
+          name: mapName,
+          eventTypes: ["trace.upserted"],
+          map: (event: any) => ({ src: event.aggregateId }),
+          store: { append: async () => undefined, bulkAppend },
+        },
+      };
+
+      const service = createServiceWithResolver();
+      const batchKinds: string[] = [];
+      const progressKinds = new Set<string>();
+
+      const result = await service.replayOptimized(
+        {
+          projections: [],
+          mapProjections: [mapProjection],
+          tenantIds: [tenantA],
+          since: "2023-11-01",
+        },
+        {
+          onBatchComplete: (info) => batchKinds.push(info.projectionKind),
+          onProgress: (progress) => progressKinds.add(progress.currentProjectionKind),
+        },
+      );
+
+      expect(result.batchErrors).toBe(0);
+      expect(bulkAppend).toHaveBeenCalled();
+      expect(batchKinds).toEqual(["map"]);
+      expect([...progressKinds]).toEqual(["map"]);
+    });
+  });
 });

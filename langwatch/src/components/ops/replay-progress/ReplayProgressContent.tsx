@@ -23,6 +23,7 @@ import { formatDuration } from "~/components/ops/shared/formatters";
 import { replayStateColor } from "~/components/ops/shared/ReplayStateBadge";
 import { PhaseTimeline } from "~/components/ops/shared/PhaseTimeline";
 import { CowboyAnimation } from "./CowboyAnimation";
+import { parseActiveProjections } from "./parseActiveProjections";
 import type { ReplayStatus, ReplayHistoryEntry } from "~/server/app-layer/ops/repositories/replay.repository";
 
 const MESH_PULSE_CSS = `
@@ -155,9 +156,13 @@ function LiveRunView({
     return Math.round(status.eventsProcessed / elapsed);
   }, [status.startedAt, status.completedAt, status.eventsProcessed]);
 
-  const activeProjections = useMemo(
-    () => new Set(status.currentProjection?.split("+").filter(Boolean) ?? []),
+  const activeProjectionNames = useMemo(
+    () => parseActiveProjections(status.currentProjection),
     [status.currentProjection],
+  );
+  const activeProjections = useMemo(
+    () => new Set(activeProjectionNames),
+    [activeProjectionNames],
   );
 
   return (
@@ -234,9 +239,11 @@ function LiveRunView({
                     ? "in progress"
                     : status.state}
                 </Text>
-                {activeProjections.size > 0 && isRunning && (
+                {activeProjectionNames.length > 0 && isRunning && (
                   <Badge size="sm" variant="subtle">
-                    {activeProjections.size} projection{activeProjections.size !== 1 ? "s" : ""}
+                    {activeProjectionNames.length === 1
+                      ? activeProjectionNames[0]
+                      : `${activeProjectionNames.length} projections`}
                   </Badge>
                 )}
               </HStack>
@@ -278,8 +285,8 @@ function LiveRunView({
                 <Badge
                   key={name}
                   size="sm"
-                  variant={activeProjections.has(name) ? "solid" : "subtle"}
-                  colorPalette={activeProjections.has(name) ? "orange" : "gray"}
+                  variant={isRunning && activeProjections.has(name) ? "solid" : "subtle"}
+                  colorPalette={isRunning && activeProjections.has(name) ? "orange" : "gray"}
                 >
                   {name}
                 </Badge>

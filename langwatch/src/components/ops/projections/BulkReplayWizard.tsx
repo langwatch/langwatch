@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Badge,
   Box,
@@ -75,6 +75,17 @@ export function BulkReplayWizard({
       }
     });
   }, [canDiscover, allTenants, tenantIds, since]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const projectionMetaByName = useMemo(
+    () =>
+      new Map(
+        (projectionsQuery.data?.projections ?? []).map((p) => [
+          p.projectionName,
+          p,
+        ]),
+      ),
+    [projectionsQuery.data?.projections],
+  );
 
   const hasDiscovered = !!discoverQuery.data;
   const projectionsWithData = new Set(
@@ -326,6 +337,7 @@ export function BulkReplayWizard({
                 <Table.Body>
                   {discoverQuery.data!.projections.map((proj) => {
                     const hasData = proj.aggregateCount > 0;
+                    const meta = projectionMetaByName.get(proj.projectionName);
                     const isSelected = selectedProjections.has(
                       proj.projectionName,
                     );
@@ -350,28 +362,17 @@ export function BulkReplayWizard({
                         <Table.Cell>
                           <HStack gap={2}>
                             <Text textStyle="sm">{proj.projectionName}</Text>
-                            {(() => {
-                              const meta = projectionsQuery.data?.projections.find(
-                                (p) => p.projectionName === proj.projectionName,
-                              );
-                              return meta?.kind === "map" ? (
-                                <Badge
-                                  size="sm"
-                                  variant="subtle"
-                                  colorPalette="purple"
-                                >
-                                  map
-                                </Badge>
-                              ) : (
-                                <Badge
-                                  size="sm"
-                                  variant="subtle"
-                                  colorPalette="blue"
-                                >
-                                  fold
-                                </Badge>
-                              );
-                            })()}
+                            {meta && (
+                              <Badge
+                                size="sm"
+                                variant="subtle"
+                                colorPalette={
+                                  meta.kind === "map" ? "purple" : "blue"
+                                }
+                              >
+                                {meta.kind === "map" ? "map" : "fold"}
+                              </Badge>
+                            )}
                             {!hasData && (
                               <Badge
                                 size="sm"
@@ -385,10 +386,7 @@ export function BulkReplayWizard({
                         </Table.Cell>
                         <Table.Cell>
                           <Text textStyle="xs" color="fg.muted">
-                            {projectionsQuery.data?.projections.find(
-                              (p) =>
-                                p.projectionName === proj.projectionName,
-                            )?.pipelineName ?? "\u2014"}
+                            {meta?.pipelineName ?? "\u2014"}
                           </Text>
                         </Table.Cell>
                         <Table.Cell textAlign="end">

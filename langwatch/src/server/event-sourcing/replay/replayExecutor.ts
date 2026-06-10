@@ -116,8 +116,11 @@ export class FoldAccumulator {
  * the per-event context is preserved on the fallback path so stores keying
  * off `context.aggregateId` behave the same as the non-optimized replay.
  *
- * Memory is bounded by the number of events in a single aggregate batch
- * that match this projection's eventTypes.
+ * Map records are append-only and need no cross-page state, so `apply`
+ * flushes incrementally: once the buffer reaches `writeBatchSize` the
+ * buffered records are written immediately instead of deferring everything
+ * to the final `flush()`. Memory is therefore bounded by `writeBatchSize`,
+ * not by the number of events in an aggregate batch.
  */
 interface BufferedMapRecord {
   record: any;
@@ -126,18 +129,24 @@ interface BufferedMapRecord {
 
 export class MapAccumulator {
   private byTenant = new Map<string, BufferedMapRecord[]>();
+  private bufferedCount = 0;
   private _processed = 0;
   private readonly eventTypeSet: Set<string>;
+  private readonly writeBatchSize: number;
 
-  constructor(private readonly projection: MapProjectionDefinition<any, any>) {
+  constructor(
+    private readonly projection: MapProjectionDefinition<any, any>,
+    opts?: { writeBatchSize?: number },
+  ) {
     this.eventTypeSet = new Set(projection.eventTypes);
+    this.writeBatchSize = opts?.writeBatchSize ?? DEFAULT_WRITE_BATCH_SIZE;
   }
 
   get processed(): number {
     return this._processed;
   }
 
-  apply(event: ReplayEvent): void {
+  async apply(event: ReplayEvent): Promise<void> {
     if (!this.eventTypeSet.has(event.type)) return;
 
     const record = this.projection.map(event as any);
@@ -154,15 +163,30 @@ export class MapAccumulator {
       this.byTenant.set(event.tenantId, list);
     }
     list.push({ record, context });
+    this.bufferedCount++;
     this._processed++;
+
+    if (this.bufferedCount >= this.writeBatchSize) {
+      await this.drain(this.writeBatchSize);
+    }
   }
 
-  async flush(writeBatchSize = DEFAULT_WRITE_BATCH_SIZE): Promise<void> {
+  async flush(writeBatchSize = this.writeBatchSize): Promise<void> {
+    await this.drain(writeBatchSize);
+  }
+
+  private async drain(writeBatchSize: number): Promise<void> {
     if (this.byTenant.size === 0) return;
+
+    // Snapshot + reset synchronously so concurrent `apply` calls (optimized
+    // replay runs aggregates with concurrency) never double-write a buffer.
+    const byTenant = this.byTenant;
+    this.byTenant = new Map();
+    this.bufferedCount = 0;
 
     const store = this.projection.store;
 
-    for (const [_tenantId, entries] of this.byTenant) {
+    for (const [_tenantId, entries] of byTenant) {
       if (store.bulkAppend) {
         // Group by aggregateId so each `bulkAppend` call gets a real
         // per-aggregate context. Stores that key off `context.aggregateId`

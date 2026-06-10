@@ -3,6 +3,7 @@ import { ProjectionRouter } from "../projectionRouter";
 import type { QueueManager } from "../../services/queues/queueManager";
 import type { Event } from "../../domain/types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
+import { ReplayDeferralError } from "../replayMarkerCheck";
 import {
   createMockFoldProjectionDefinition,
   createMockFoldProjectionStore,
@@ -914,10 +915,13 @@ describe("ProjectionRouter", () => {
     });
 
     describe("when marker throws ReplayDeferralError", () => {
-      it("propagates as AggregateError from dispatch", async () => {
+      it("surfaces the deferral inside the AggregateError so the queue retries the event", async () => {
         const queueManager = createMockQueueManager();
-        const deferError = new Error("deferral");
-        deferError.name = "ReplayDeferralError";
+        const deferError = new ReplayDeferralError(
+          "deferred-map",
+          `${String(tenantId)}:${TEST_CONSTANTS.AGGREGATE_TYPE}:${TEST_CONSTANTS.AGGREGATE_ID}`,
+          "replay pending",
+        );
         const markerChecker = {
           check: vi.fn().mockRejectedValue(deferError),
         };
@@ -943,9 +947,22 @@ describe("ProjectionRouter", () => {
           tenantId,
         );
 
-        await expect(
-          router.dispatch([event], { tenantId }),
-        ).rejects.toThrow(AggregateError);
+        const rejection = await router.dispatch([event], { tenantId }).then(
+          () => {
+            throw new Error("expected dispatch to reject");
+          },
+          (error: unknown) => error,
+        );
+
+        expect(rejection).toBeInstanceOf(AggregateError);
+        const aggregateError = rejection as AggregateError;
+        expect(aggregateError.message).toContain(
+          "1 projection(s) failed during dispatch",
+        );
+        expect(aggregateError.errors).toHaveLength(1);
+        expect(aggregateError.errors[0]).toBeInstanceOf(ReplayDeferralError);
+        expect(aggregateError.errors[0]).toBe(deferError);
+        expect(markerChecker.check).toHaveBeenCalledWith("deferred-map", event);
         expect(store.append).not.toHaveBeenCalled();
       });
     });

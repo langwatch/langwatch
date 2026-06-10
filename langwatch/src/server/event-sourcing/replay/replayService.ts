@@ -10,6 +10,7 @@ import type {
   DiscoveryResult,
   BatchPhase,
   BatchCompleteInfo,
+  ProjectionKind,
 } from "./types";
 import type { CutoffInfo, DiscoveredAggregate, ReplayEvent } from "./replayEventLoader";
 import { isAtOrBeforeCutoff } from "./replayConstants";
@@ -30,9 +31,6 @@ import {
   removeStaleMarker,
   cleanupAll,
   hasPreviousRun,
-  markPendingBatchMulti,
-  markCutoffBatchMulti,
-  unmarkBatchMulti,
 } from "./replayMarkers";
 import { pauseProjection, unpauseProjection, waitForActiveJobs, waitForAllActiveJobs } from "./replayDrain";
 import { FoldAccumulator, MapAccumulator } from "./replayExecutor";
@@ -837,11 +835,14 @@ export class ReplayService {
         });
         const cutoff = cutoffs.get(key);
         if (cutoff != null && isAtOrBeforeCutoff(e.timestamp, e.id, cutoff.timestamp, cutoff.eventId)) {
-          accumulator.apply(e);
+          await accumulator.apply(e);
           eventsProcessed++;
-          onBatchPhase("replay", eventsProcessed);
         }
       }
+
+      // Emit progress once per loaded page, matching the fold path's cadence
+      // — not once per event, which would hammer the progress callback.
+      onBatchPhase("replay", eventsProcessed);
 
       const lastEvent = events[events.length - 1];
       if (lastEvent) cursorEventId = lastEvent.id;
@@ -895,6 +896,11 @@ export class ReplayService {
 
     const mapProjections = config.mapProjections ?? [];
 
+    // Progress/batch reporting kind: "map" for map-only runs, otherwise
+    // "fold" (fold-only and mixed runs — fold is the dominant kind).
+    const runProjectionKind: ProjectionKind =
+      config.projections.length === 0 && mapProjections.length > 0 ? "map" : "fold";
+
     // 1. Discover: single pass using the union of all event types (fold + map)
     const allEventTypesForDiscovery = new Set<string>();
     for (const p of config.projections) {
@@ -908,6 +914,18 @@ export class ReplayService {
       ...config.projections.map((p) => p.projectionName),
       ...mapProjections.map((p) => p.projectionName),
     ];
+
+    // eventTypes per projection — used to attach only the projections whose
+    // event types actually occur on each discovered aggregate. Without this,
+    // every aggregate would get cutoff/pending markers (and completion
+    // requirements) for unrelated projections that share no event types.
+    const eventTypesByProjection = new Map<string, Set<string>>();
+    for (const p of config.projections) {
+      eventTypesByProjection.set(p.projectionName, new Set(p.definition.eventTypes));
+    }
+    for (const p of mapProjections) {
+      eventTypesByProjection.set(p.projectionName, new Set(p.definition.eventTypes));
+    }
 
     const aggregateProjectionMap = new Map<
       string,
@@ -926,11 +944,20 @@ export class ReplayService {
       for (const agg of aggregates) {
         const key = aggregateKey(agg);
         if (!aggregateProjectionMap.has(key)) {
+          const aggEventTypes = new Set(agg.eventTypes);
+          const matchedProjections = allProjectionNames.filter((projName) => {
+            const projEventTypes = eventTypesByProjection.get(projName)!;
+            for (const et of aggEventTypes) {
+              if (projEventTypes.has(et)) return true;
+            }
+            return false;
+          });
+          if (matchedProjections.length === 0) continue;
           aggregateProjectionMap.set(key, {
             tenantId: agg.tenantId,
             aggregateId: agg.aggregateId,
             aggregateType: agg.aggregateType,
-            projections: [...allProjectionNames],
+            projections: matchedProjections,
           });
         }
       }
@@ -1031,7 +1058,7 @@ export class ReplayService {
         const progress: ReplayProgress = {
           phase: "replaying",
           currentProjectionName: allProjectionNames.join("+"),
-          currentProjectionKind: "fold",
+          currentProjectionKind: runProjectionKind,
           currentProjectionIndex: 0,
           totalProjections: allProjectionNames.length,
           totalAggregates: allAggregateKeys.length,
@@ -1085,7 +1112,7 @@ export class ReplayService {
 
           callbacks?.onBatchComplete?.({
             projectionName: allProjectionNames.join("+"),
-            projectionKind: "fold",
+            projectionKind: runProjectionKind,
             batchNum,
             totalBatches,
             aggregatesInBatch: batchKeys.length,
@@ -1183,19 +1210,28 @@ export class ReplayService {
   }): Promise<{ eventsReplayed: number }> {
     const redis = this.deps.redis;
 
-    // Collect all unique projection names for this batch
-    const batchProjectionNames = new Set<string>();
+    // Group aggregate keys per projection — each aggregate only carries the
+    // projections whose event types occur on it, so markers must be written
+    // per (projection, matching aggregates) rather than the full cross product.
+    const aggKeysByProjection = new Map<string, string[]>();
     for (const key of batchKeys) {
       const entry = aggregateProjectionMap.get(key)!;
       for (const projName of entry.projections) {
-        batchProjectionNames.add(projName);
+        let list = aggKeysByProjection.get(projName);
+        if (!list) {
+          list = [];
+          aggKeysByProjection.set(projName, list);
+        }
+        list.push(key);
       }
     }
-    const projNames = [...batchProjectionNames];
+    const projNames = [...aggKeysByProjection.keys()];
 
-    // 1. MARK all projections for this batch
+    // 1. MARK each projection for its matching aggregates
     onBatchPhase("mark");
-    await markPendingBatchMulti({ redis, projectionNames: projNames, aggKeys: batchKeys });
+    for (const [projName, projAggKeys] of aggKeysByProjection) {
+      await markPendingBatch({ redis, projectionName: projName, aggKeys: projAggKeys });
+    }
     log.write({ step: "mark-batch-multi", count: batchKeys.length, projections: projNames });
 
     // 2. CUTOFF — get cutoffs per tenant, per aggregate
@@ -1250,7 +1286,14 @@ export class ReplayService {
     }
 
     if (withoutCutoffKeys.length > 0) {
-      await unmarkBatchMulti({ redis, projectionNames: projNames, aggKeys: withoutCutoffKeys });
+      const withoutCutoffSet = new Set(withoutCutoffKeys);
+      for (const [projName, projAggKeys] of aggKeysByProjection) {
+        await unmarkBatch({
+          redis,
+          projectionName: projName,
+          aggKeys: projAggKeys.filter((k) => withoutCutoffSet.has(k)),
+        });
+      }
     }
 
     if (withCutoffKeys.length === 0) {
@@ -1258,7 +1301,14 @@ export class ReplayService {
       return { eventsReplayed: 0 };
     }
 
-    await markCutoffBatchMulti({ redis, projectionNames: projNames, cutoffs: allCutoffs });
+    for (const [projName, projAggKeys] of aggKeysByProjection) {
+      const projCutoffs = new Map<string, CutoffInfo>();
+      for (const key of projAggKeys) {
+        const cutoff = allCutoffs.get(key);
+        if (cutoff) projCutoffs.set(key, cutoff);
+      }
+      await markCutoffBatch({ redis, projectionName: projName, cutoffs: projCutoffs });
+    }
 
     // 3. REPLAY — load events per tenant, apply all relevant projections
     onBatchPhase("replay", 0);
@@ -1313,7 +1363,7 @@ export class ReplayService {
           if (foldAcc) foldAcc.apply(event);
 
           const mapAcc = mapAccumulators.get(projName);
-          if (mapAcc) mapAcc.apply(event);
+          if (mapAcc) await mapAcc.apply(event);
         }
         eventsProcessed++;
       }
@@ -1339,7 +1389,14 @@ export class ReplayService {
 
     // 5. UNMARK
     onBatchPhase("unmark", eventsProcessed);
-    await unmarkBatchMulti({ redis, projectionNames: projNames, aggKeys: withCutoffKeys });
+    const withCutoffSet = new Set(withCutoffKeys);
+    for (const [projName, projAggKeys] of aggKeysByProjection) {
+      await unmarkBatch({
+        redis,
+        projectionName: projName,
+        aggKeys: projAggKeys.filter((k) => withCutoffSet.has(k)),
+      });
+    }
     log.write({ step: "unmark-batch-multi", count: withCutoffKeys.length, projections: projNames });
 
     return { eventsReplayed: eventsProcessed };

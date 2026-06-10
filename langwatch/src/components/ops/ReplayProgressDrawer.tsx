@@ -26,6 +26,7 @@ import { useReplayStatus } from "~/hooks/useReplayStatus";
 import { api } from "~/utils/api";
 import { formatDuration } from "~/components/ops/shared/formatters";
 import { PhaseTimeline, PHASE_ICONS, PHASE_LABELS } from "~/components/ops/shared/PhaseTimeline";
+import { parseActiveProjections } from "~/components/ops/replay-progress/parseActiveProjections";
 
 export function ReplayProgressDrawer({
   open,
@@ -47,9 +48,10 @@ export function ReplayProgressDrawer({
 
   const status = statusQuery.data;
   const isRunning = status?.state === "running";
-  const activeProjections = new Set(
-    status?.currentProjection?.split("+").filter(Boolean) ?? [],
+  const activeProjectionNames = parseActiveProjections(
+    status?.currentProjection,
   );
+  const activeProjections = new Set(activeProjectionNames);
 
   const stateColor =
     status?.state === "completed"
@@ -119,9 +121,11 @@ export function ReplayProgressDrawer({
                     <Text textStyle="sm" fontWeight="medium">
                       {PHASE_LABELS[status.currentPhase] ?? status.currentPhase}
                     </Text>
-                    {activeProjections.size > 0 && (
+                    {activeProjectionNames.length > 0 && (
                       <Text textStyle="xs" color="fg.muted">
-                        {activeProjections.size} projection{activeProjections.size !== 1 ? "s" : ""}
+                        {activeProjectionNames.length === 1
+                          ? activeProjectionNames[0]
+                          : `${activeProjectionNames.length} projections`}
                       </Text>
                     )}
                   </VStack>
@@ -193,8 +197,8 @@ export function ReplayProgressDrawer({
                     <Badge
                       key={name}
                       size="sm"
-                      variant={activeProjections.has(name) ? "solid" : "subtle"}
-                      colorPalette={activeProjections.has(name) ? "orange" : "gray"}
+                      variant={isRunning && activeProjections.has(name) ? "solid" : "subtle"}
+                      colorPalette={isRunning && activeProjections.has(name) ? "orange" : "gray"}
                     >
                       {name}
                     </Badge>

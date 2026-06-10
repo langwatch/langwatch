@@ -40,6 +40,11 @@ export interface DiscoveredAggregate {
   aggregateId: string;
 }
 
+/** Discovered aggregate plus the distinct event types found on it. */
+export interface DiscoveredAggregateWithEventTypes extends DiscoveredAggregate {
+  eventTypes: string[];
+}
+
 function rowToEvent(row: ClickHouseEventRow): ReplayEvent {
   const data =
     row.EventPayload && row.EventPayload.length > 0
@@ -83,28 +88,30 @@ export async function discoverAffectedAggregates({
   eventTypes: readonly string[];
   sinceMs: number;
   tenantId?: string;
-}): Promise<DiscoveredAggregate[]> {
+}): Promise<DiscoveredAggregateWithEventTypes[]> {
   const tenantFilter = tenantId ? "AND TenantId = {tenantId:String}" : "";
   const params: Record<string, unknown> = { eventTypes: [...eventTypes], sinceMs };
   if (tenantId) params.tenantId = tenantId;
 
   const result = await client.query({
     query: `
-      SELECT DISTINCT
+      SELECT
         TenantId AS tenantId,
         AggregateType AS aggregateType,
-        AggregateId AS aggregateId
+        AggregateId AS aggregateId,
+        groupUniqArray(EventType) AS eventTypes
       FROM event_log
       WHERE EventType IN ({eventTypes:Array(String)})
         AND EventTimestamp >= {sinceMs:UInt64}
         ${tenantFilter}
+      GROUP BY TenantId, AggregateType, AggregateId
       ORDER BY TenantId
     `,
     query_params: params,
     format: "JSONEachRow",
   });
 
-  return (await result.json()) as DiscoveredAggregate[];
+  return (await result.json()) as DiscoveredAggregateWithEventTypes[];
 }
 
 /**
@@ -284,7 +291,8 @@ export async function batchLoadAggregateEvents({
 
   const query = `
     SELECT EventId, EventTimestamp, EventOccurredAt, EventType, EventPayload,
-           EventVersion, TenantId, AggregateType, AggregateId, ProcessingTraceparent
+           EventVersion, TenantId, AggregateType, AggregateId, ProcessingTraceparent,
+           IdempotencyKey
     FROM event_log
     WHERE TenantId = {tenantId:String}
       AND EventType IN ({eventTypes:Array(String)})
