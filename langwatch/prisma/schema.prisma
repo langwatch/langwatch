@@ -1353,6 +1353,8 @@ model LlmPromptConfigVersion {
   configData    Json   @map("config") // The actual config JSON for this version
   schemaVersion String // Schema version for this specific configData
 
+  runtimeParameters Json @default("{}")
+
   createdAt DateTime @default(now()) // Used to determine the latest version
 
   // Required for multi-tenancy
@@ -1517,6 +1519,11 @@ model Scenario {
   situation       String
   criteria        String[]
   labels          String[]
+  // Optional per-scenario model overrides for the run. When null the run
+  // resolves the project's scenarios.user_simulator / scenarios.judge
+  // DEFAULT-role models. See specs/scenarios/scenario-model-selection.feature.
+  simulatorModel  String?
+  judgeModel      String?
   lastUpdatedById String?
   lastUpdatedBy   User?     @relation(fields: [lastUpdatedById], references: [id])
   archivedAt      DateTime?
@@ -1537,6 +1544,12 @@ model SimulationSuite {
   targets     Json // Array of { type: "prompt" | "http", referenceId: string }
   repeatCount Int       @default(1)
   labels      String[]
+  // Optional run-plan-wide model overrides. When set they take precedence
+  // over each scenario's own override for every scenario in the run; when
+  // null the per-scenario value (or the project default) applies. See
+  // specs/suites/suite-model-selection.feature.
+  simulatorModel String?
+  judgeModel     String?
   archivedAt  DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @default(now()) @updatedAt

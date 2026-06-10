@@ -169,6 +169,8 @@ describe("Single loading indicator on suites page (Issue #1904)", () => {
             targets: [],
             repeatCount: 1,
             labels: [],
+            simulatorModel: null,
+            judgeModel: null,
             archivedAt: null,
             createdAt: new Date(),
             updatedAt: new Date(),

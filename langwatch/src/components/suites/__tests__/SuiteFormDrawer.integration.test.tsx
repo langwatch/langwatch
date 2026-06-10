@@ -115,6 +115,18 @@ vi.mock("~/utils/api", () => ({
         useMutation: vi.fn(() => ({ mutate: vi.fn() })),
       },
     },
+    modelProvider: {
+      listAllForProjectForFrontend: {
+        useQuery: vi.fn(() => ({
+          data: {
+            providers: [{ provider: "openai", enabled: true, customModels: [] }],
+          },
+        })),
+      },
+      getResolvedDefault: {
+        useQuery: vi.fn(() => ({ data: { model: "openai/gpt-5-mini" } })),
+      },
+    },
     useContext: vi.fn(() => ({
       suites: {
         getAll: { invalidate: vi.fn() },
@@ -210,6 +222,8 @@ function makeSuiteConfig(
     targets: [{ type: "http", referenceId: "agent_1" }],
     repeatCount: 1,
     labels: ["regression"],
+    simulatorModel: null,
+    judgeModel: null,
     archivedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -260,6 +274,15 @@ describe("<SuiteFormDrawer/>", () => {
 
       expect(screen.getByRole("button", { name: /^Save$/i })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /Run Now/i })).toBeInTheDocument();
+    });
+
+    /** @scenario "The run plan drawer exposes simulator and judge model fields" */
+    it("exposes user-simulator and judge model fields", () => {
+      render(<SuiteFormDrawer />, { wrapper: Wrapper });
+
+      expect(screen.getByText("Models")).toBeInTheDocument();
+      expect(screen.getByText("User simulator")).toBeInTheDocument();
+      expect(screen.getByText("Judge")).toBeInTheDocument();
     });
 
     describe("when Save is clicked with an empty name", () => {

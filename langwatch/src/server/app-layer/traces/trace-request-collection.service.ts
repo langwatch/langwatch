@@ -68,6 +68,17 @@ export interface TraceRequestCollectionResult {
 export interface TraceRequestCollectionDeps {
   dedup: SpanDedupService;
   recordSpan: (data: RecordSpanCommandData) => Promise<void>;
+  /**
+   * Optional edge command-data hook (ADR-022). When provided, receives the fully
+   * assembled RecordSpanCommandData before it is sent to the queue and may return
+   * a modified version (e.g., with `spoolRef` set and span attributes cleared for
+   * over-threshold payloads). Flag-gated by the composition root on
+   * `release_trace_blob_offload`; absent ⇒ unchanged behavior.
+   *
+   * FAIL-OPEN: errors from this hook are caught by the composition root wrapper
+   * and log at warn level, returning the original commandData unchanged.
+   */
+  processCommandData?: (data: RecordSpanCommandData) => Promise<RecordSpanCommandData>;
 }
 
 /**
@@ -226,14 +237,23 @@ export class TraceRequestCollectionService {
       }
       lockAcquired = lockResult === true;
 
-      await this.deps.recordSpan({
+      // ADR-022: Assemble the full command data, then pass it through the
+      // optional processCommandData hook (edge size-check + spool). No-op
+      // when the hook is absent (flag-gated by the composition root).
+      const baseCommandData: RecordSpanCommandData = {
         tenantId,
         span,
         resource,
         instrumentationScope,
         piiRedactionLevel,
         occurredAt: Date.now(),
-      });
+      };
+
+      const commandData = this.deps.processCommandData
+        ? await this.deps.processCommandData(baseCommandData)
+        : baseCommandData;
+
+      await this.deps.recordSpan(commandData);
 
       await this.deps.dedup.tryConfirmProcessed(
         tenantId,

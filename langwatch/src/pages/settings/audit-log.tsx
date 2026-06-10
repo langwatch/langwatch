@@ -571,6 +571,7 @@ function AuditLogPage() {
           </VStack>
         ) : (
           <>
+            <Box width="full" overflowX="auto">
             <Table.Root variant="line" width="full">
               <Table.Header>
                 <Table.Row>
@@ -691,6 +692,7 @@ function AuditLogPage() {
                 ))}
               </Table.Body>
             </Table.Root>
+            </Box>
 
             {/* Pagination */}
             {totalHits > 0 && (

@@ -1,6 +1,7 @@
 import {
   type LlmPromptConfig,
   type LlmPromptConfigVersion,
+  type Prisma,
   PromptScope,
 } from "@prisma/client";
 import { Factory } from "fishery";
@@ -78,9 +79,22 @@ export const llmPromptConfigVersionFactory = Factory.define<
     schemaVersion,
     createdAt: new Date(),
     projectId: nanoid(), // This should be overridden with an actual project ID when used
+    runtimeParameters: params?.runtimeParameters ?? {},
   } as LlmPromptConfigVersion & {
     configData: z.infer<
       (typeof schemaValidators)[typeof LATEST_SCHEMA_VERSION]
     >;
   };
 });
+
+export function buildVersionCreateInput(
+  overrides: Parameters<typeof llmPromptConfigVersionFactory.build>[0],
+): Prisma.LlmPromptConfigVersionUncheckedCreateInput {
+  const { configData, runtimeParameters, ...fields } =
+    llmPromptConfigVersionFactory.build(overrides);
+  return {
+    ...fields,
+    configData: JSON.parse(JSON.stringify(configData)),
+    runtimeParameters: JSON.parse(JSON.stringify(runtimeParameters ?? {})),
+  };
+}

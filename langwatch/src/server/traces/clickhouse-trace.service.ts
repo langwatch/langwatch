@@ -28,6 +28,8 @@ import {
 import { findPromptReferenceInAncestors } from "./findPromptReferenceInAncestors";
 import { parseLLMSpanMessages } from "./parseLLMSpanMessages";
 import { parsePromptReference } from "./parsePromptReference";
+import type { ExtractedIO } from "~/server/app-layer/traces/trace-io-extraction.service";
+import type { ResolvedTraceSpans } from "./resolve-offloaded-traces";
 import type {
   AggregationFiltersInput,
   CustomersAndLabelsResult,
@@ -37,6 +39,16 @@ import type {
   TopicCountsResult,
   TracesForProjectResult,
 } from "./types";
+
+/**
+ * Callback injected from TraceService that resolves offloaded blob refs for
+ * a single trace's normalized spans (ADR-021 decision B: read-time recompute).
+ * When present, called after fetching spans but before mapping to legacy Span.
+ */
+export type ResolveTraceSpansFn = (
+  projectId: string,
+  normalizedSpans: NormalizedSpan[],
+) => Promise<ResolvedTraceSpans>;
 
 /**
  * Cursor structure for keyset pagination.
@@ -83,7 +95,21 @@ export class ClickHouseTraceService {
   private readonly tracer = getLangWatchTracer(
     "langwatch.traces.clickhouse-service",
   );
-  constructor(private readonly prisma: PrismaClient) {}
+
+  /**
+   * Optional callback that resolves offloaded blob refs for a single trace's
+   * normalized spans before they are mapped to legacy Span objects. Injected
+   * from TraceService so blob-resolution deps are owned at a single composition
+   * point. When absent, spans are mapped as-is (preview values remain).
+   */
+  private readonly resolveTraceSpans: ResolveTraceSpansFn | undefined;
+
+  constructor(
+    private readonly prisma: PrismaClient,
+    resolveTraceSpans?: ResolveTraceSpansFn,
+  ) {
+    this.resolveTraceSpans = resolveTraceSpans;
+  }
 
   /**
    * Resolve the ClickHouse client for a given project.
@@ -99,8 +125,11 @@ export class ClickHouseTraceService {
   /**
    * Static factory method for creating ClickHouseTraceService with default dependencies.
    */
-  static create(prisma: PrismaClient = defaultPrisma): ClickHouseTraceService {
-    return new ClickHouseTraceService(prisma);
+  static create(
+    prisma: PrismaClient = defaultPrisma,
+    resolveTraceSpans?: ResolveTraceSpansFn,
+  ): ClickHouseTraceService {
+    return new ClickHouseTraceService(prisma, resolveTraceSpans);
   }
 
   /**
@@ -150,14 +179,13 @@ export class ClickHouseTraceService {
           // Map to legacy Trace format and apply protections
           const traces: Trace[] = [];
           for (const [_traceId, { summary, spans }] of tracesWithSpans) {
-            const mappedSpans = mapNormalizedSpansToSpans(spans);
-            const trace = mapTraceSummaryToTrace(
-              summary,
-              mappedSpans,
+            const trace = await this.resolveAndMerge({
               projectId,
-            );
-            // Apply redaction protections
-            traces.push(applyTraceProtections(trace, protections));
+              summary,
+              spans,
+              protections,
+            });
+            traces.push(trace);
           }
 
           this.logger.debug(
@@ -1743,6 +1771,61 @@ export class ClickHouseTraceService {
   }
 
   /**
+   * Resolve offloaded blob refs (if any), map normalized spans to legacy Span
+   * objects, build the Trace via mapTraceSummaryToTrace, patch recomputed I/O,
+   * and apply field-redaction protections.
+   *
+   * Extracted to remove the duplicated resolve+map+merge block that previously
+   * appeared in both getTracesWithSpans and enrichTracesWithSpans. Both call
+   * sites are now a single line.
+   *
+   * @internal
+   */
+  private async resolveAndMerge({
+    projectId,
+    summary,
+    spans,
+    protections,
+  }: {
+    projectId: string;
+    summary: TraceSummaryData;
+    spans: NormalizedSpan[];
+    protections: Protections;
+  }): Promise<Trace> {
+    let resolvedSpans = spans;
+    let recomputedInput: ExtractedIO | null = null;
+    let recomputedOutput: ExtractedIO | null = null;
+
+    if (this.resolveTraceSpans) {
+      const resolution = await this.resolveTraceSpans(projectId, spans);
+      resolvedSpans = resolution.resolvedSpans;
+      if (resolution.anyResolved) {
+        recomputedInput = resolution.recomputedInput;
+        recomputedOutput = resolution.recomputedOutput;
+      }
+    }
+
+    const mappedSpans = mapNormalizedSpansToSpans(resolvedSpans);
+    let trace = mapTraceSummaryToTrace(summary, mappedSpans, projectId);
+
+    // When blobs were resolved, patch trace.input / trace.output with
+    // the recomputed full values (overwriting the preview from trace_summaries).
+    if (recomputedInput !== null || recomputedOutput !== null) {
+      trace = {
+        ...trace,
+        ...(recomputedInput !== null
+          ? { input: { value: recomputedInput.text } }
+          : {}),
+        ...(recomputedOutput !== null
+          ? { output: { value: recomputedOutput.text } }
+          : {}),
+      };
+    }
+
+    return applyTraceProtections(trace, protections);
+  }
+
+  /**
    * Enrich traces (which have empty spans) with actual span data from ClickHouse.
    *
    * Fetches spans via fetchTracesWithSpansJoined and replaces the empty span
@@ -1762,17 +1845,21 @@ export class ClickHouseTraceService {
       traceIds,
     );
 
-    return traces.map((trace) => {
-      const data = tracesWithSpans.get(trace.trace_id);
-      if (!data || data.spans.length === 0) {
-        return trace;
-      }
-      const mappedSpans = mapNormalizedSpansToSpans(data.spans);
-      return applyTraceProtections(
-        mapTraceSummaryToTrace(data.summary, mappedSpans, projectId),
-        protections,
-      );
-    });
+    return Promise.all(
+      traces.map(async (trace) => {
+        const data = tracesWithSpans.get(trace.trace_id);
+        if (!data || data.spans.length === 0) {
+          return trace;
+        }
+
+        return this.resolveAndMerge({
+          projectId,
+          summary: data.summary,
+          spans: data.spans,
+          protections,
+        });
+      }),
+    );
   }
 
   /**

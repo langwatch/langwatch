@@ -223,6 +223,8 @@ export class SuiteService {
           targets: parseSuiteTargets(original.targets),
           repeatCount: original.repeatCount,
           labels: original.labels,
+          simulatorModel: original.simulatorModel,
+          judgeModel: original.judgeModel,
         });
         span.setAttribute("suite.duplicated_id", result.id);
         return result;

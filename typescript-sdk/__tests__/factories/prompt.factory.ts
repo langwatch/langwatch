@@ -41,5 +41,6 @@ export const promptResponseFactory = Factory.define<PromptResponse>(
       },
     },
     tags: [],
+    parameters: {},
   }),
 );

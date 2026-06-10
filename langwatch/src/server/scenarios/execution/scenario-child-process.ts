@@ -87,7 +87,16 @@ async function readJobDataFromStdin(): Promise<ChildProcessJobData> {
 }
 
 async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
-  const { context, scenario, adapterData, modelParams, nlpServiceUrl, target } = jobData;
+  const {
+    context,
+    scenario,
+    adapterData,
+    modelParams,
+    simulatorModelParams,
+    judgeModelParams,
+    nlpServiceUrl,
+    target,
+  } = jobData;
 
   const langwatchEndpoint = process.env.LANGWATCH_ENDPOINT;
   const langwatchApiKey = process.env.LANGWATCH_API_KEY;
@@ -103,7 +112,18 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
     modelParams,
     nlpServiceUrl,
   });
-  const model = createModelFromParams(modelParams, nlpServiceUrl);
+  // The user-simulator and judge resolve their own models (run-plan /
+  // scenario override or the DEFAULT-role scenarios.* defaults). Older jobs
+  // only carried modelParams, so fall back to it when the split params are
+  // absent — preserves the previous single-model behavior during rollout.
+  const simulatorModel = createModelFromParams(
+    simulatorModelParams ?? modelParams,
+    nlpServiceUrl,
+  );
+  const judgeModel = createModelFromParams(
+    judgeModelParams ?? modelParams,
+    nlpServiceUrl,
+  );
 
   // For HTTP targets, use a remote span judge that queries spans from
   // the platform API before evaluation. The trace ID will be captured
@@ -114,7 +134,7 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
       ? (() => {
           remoteSpanJudge = new RemoteSpanJudgeAgent({
             criteria: scenario.criteria,
-            model,
+            model: judgeModel,
             projectId: context.projectId,
             querySpans: createTraceApiSpanQuery({
               endpoint: langwatchEndpoint,
@@ -123,7 +143,7 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
           });
           return remoteSpanJudge;
         })()
-      : ScenarioRunner.judgeAgent({ criteria: scenario.criteria, model });
+      : ScenarioRunner.judgeAgent({ criteria: scenario.criteria, model: judgeModel });
 
   // Results are reported via LangWatch SDK automatically
   const verbose = process.env.SCENARIO_VERBOSE === "true";
@@ -142,7 +162,7 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
       setId: context.setId,
       agents: [
         adapter,
-        ScenarioRunner.userSimulatorAgent({ model }),
+        ScenarioRunner.userSimulatorAgent({ model: simulatorModel }),
         judgeAgent,
       ],
       verbose,

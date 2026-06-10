@@ -607,4 +607,5 @@ export class TraceSummaryFoldProjection
       traceNameFromFallback: false,
     };
   }
+
 }

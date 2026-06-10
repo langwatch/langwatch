@@ -12,6 +12,7 @@
  *
  * @see specs/scenarios/workflow-agent-mapping-gate.feature
  */
+import * as React from "react";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -56,6 +57,22 @@ vi.mock("../SaveAndRunMenu", () => ({
       </button>
     </div>
   ),
+}));
+// Auto-confirm the run-model dialog so the gate flow reaches the run; the
+// dialog UI is covered in ScenarioRunModelDialog.integration.test.tsx.
+vi.mock("../ScenarioRunModelDialog", () => ({
+  ScenarioRunModelDialog: ({
+    open,
+    onConfirm,
+  }: {
+    open?: boolean;
+    onConfirm?: () => void;
+  }) => {
+    React.useEffect(() => {
+      if (open) onConfirm?.();
+    }, [open]);
+    return null;
+  },
 }));
 
 import { ScenarioFormDrawer } from "../ScenarioFormDrawer";
