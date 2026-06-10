@@ -1,6 +1,3 @@
-import { CostReferenceType, CostType } from "@prisma/client";
-import { nanoid } from "nanoid";
-import { getProtectionsForProject } from "~/server/api/utils";
 import { EvaluatorConfigError } from "~/server/app-layer/evaluations/errors";
 import { setupModelEnv } from "~/server/app-layer/evaluations/evaluation-execution.factories";
 import { stagedLangevalsFetch } from "~/server/langevals/stagedFetch";
@@ -14,8 +11,6 @@ import {
   type EvaluatorTypes,
   type SingleEvaluationResult,
 } from "../../server/evaluations/evaluators.generated";
-import { createLogger } from "../../utils/logger/server";
-import { captureException, withScope } from "../../utils/posthogErrorCapture";
 import {
   AZURE_SAFETY_NOT_CONFIGURED_MESSAGE,
   isAzureEvaluatorType,
@@ -53,8 +48,6 @@ class UserConfigError extends Error {
     this.name = "UserConfigError";
   }
 }
-
-const logger = createLogger("langwatch:evaluations:runEvaluation");
 
 export type DataForEvaluation =
   | {
@@ -268,7 +261,7 @@ export const runEvaluationForTrace = async ({
   const traceService = TraceService.create();
   const trace = await traceService.getById(projectId, traceId, protections);
   if (!trace) {
-    throw "trace not found";
+    throw new Error("trace not found");
   }
 
   if (trace.error && !trace.input && !trace.output) {
