@@ -429,9 +429,40 @@ describe("PromptEditorDrawer", () => {
       await user.click(screen.getByTestId("add-variable-button"));
       await user.click(screen.getByRole("menuitem", { name: /Text/ }));
 
-      // The default "input" variable is locked, so the new one lands as
-      // input_1 - visible as a variable row in the section.
+      // The default "input" variable already exists, so the new one
+      // dedupes to input_1 - visible as a variable row in the section.
       expect(await screen.findByText("input_1")).toBeInTheDocument();
+    });
+
+    /** @scenario Input variable can be deleted like any other */
+    it("removes the default input variable like any other variable", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<PromptEditorDrawer open={true} />);
+
+      // An LLM-judge prompt may only need response/context variables;
+      // forcing an unused "input" made users map the same value twice.
+      await user.click(screen.getByTestId("remove-variable-input"));
+
+      await waitFor(() => {
+        expect(
+          screen.queryByTestId("variable-name-input"),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    /** @scenario Input variable can be renamed */
+    it("renames the default input variable", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<PromptEditorDrawer open={true} />);
+
+      await user.click(screen.getByTestId("variable-name-input"));
+      const nameField = await screen.findByTestId("variable-name-input-input");
+      await user.clear(nameField);
+      await user.type(nameField, "response");
+      await user.keyboard("{Enter}");
+
+      expect(await screen.findByText("response")).toBeInTheDocument();
+      expect(screen.queryByText(/^input$/)).not.toBeInTheDocument();
     });
 
     /** @scenario Outputs section renders below the inputs section */

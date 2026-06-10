@@ -146,16 +146,13 @@ export const useRunEvalution = () => {
               });
             commitMessage = (commitMessageResponse as string) ?? "autosaved";
           } catch (err) {
+            // Autogen is cosmetic sugar over the "autosaved" fallback;
+            // surfacing it as an error toast mid-evaluate reads like the
+            // run itself failed.
             logger.error(
               { error: err },
               "evaluation: error auto-generating version description",
             );
-            toaster.create({
-              title: "Error auto-generating version description",
-              type: "error",
-              duration: 5000,
-              meta: { closable: true },
-            });
           }
         }
 

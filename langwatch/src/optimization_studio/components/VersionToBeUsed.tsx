@@ -10,7 +10,6 @@ import {
 } from "../../components/ModelSelector";
 import { SmallLabel } from "../../components/SmallLabel";
 import { InputGroup } from "../../components/ui/input-group";
-import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
@@ -120,15 +119,8 @@ export function NewVersionFields({
               });
             }
           },
-          onError: (e) => {
-            toaster.create({
-              title: "Error auto-generating version description",
-              description: e.message,
-              type: "error",
-              duration: 5000,
-              meta: { closable: true },
-            });
-          },
+          // No onError toast: autogen only prefills the description
+          // field, the user types one either way when it stays empty.
         },
       );
     },

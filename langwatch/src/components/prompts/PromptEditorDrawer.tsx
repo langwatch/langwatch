@@ -1165,7 +1165,6 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
             onMappingChange={onInputMappingsChange}
             missingMappingIds={missingMappingIds}
             showMissingMappingsError={!props.headless}
-            lockedVariables={new Set(["input"])}
             variableInfo={{
               input:
                 "This is the user message input. It will be sent as the user message to the LLM.",
