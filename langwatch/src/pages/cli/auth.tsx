@@ -34,6 +34,7 @@ import { useRouter } from "~/utils/compat/next-router";
 
 import { useSession } from "~/utils/auth-client";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { resolveCliAuthProjects } from "./cliAuthProjects";
 
 /**
  * Credential the CLI is requesting.
@@ -75,7 +76,7 @@ type ActionState =
 export default function CliAuthPage() {
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
-  const { organizations } = useOrganizationTeamProject({
+  const { organizations, project: currentProject } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
 
@@ -105,41 +106,28 @@ export default function CliAuthPage() {
     }
   }, [organizations, selectedOrgId]);
 
-  // Projects scoped to the selected org, flattened across teams. Drives
-  // the project picker that only renders for `project_api_key` mode.
-  // Excludes the hidden `internal_governance` project — it's a system
-  // tenancy boundary, never a target for SDK keys.
-  const projectsForOrg = useMemo(() => {
-    if (!selectedOrgId || !organizations) return [] as Array<{
-      id: string;
-      name: string;
-      slug: string;
-      teamName: string;
-    }>;
-    const org = organizations.find((o) => o.id === selectedOrgId);
-    if (!org) return [];
-    return (org.teams ?? []).flatMap((team) =>
-      (team.projects ?? [])
-        .filter((p) => p.slug !== "internal_governance")
-        .map((p) => ({
-          id: p.id,
-          name: p.name,
-          slug: p.slug,
-          teamName: team.name,
-        })),
-    );
-  }, [organizations, selectedOrgId]);
+  // Projects offered in the project-login picker (project_api_key mode).
+  // resolveCliAuthProjects hides personal workspace projects — project login
+  // must target a real, shared project, never a personal one (a coding agent
+  // that picked one silently routed evaluations there) — and the hidden
+  // internal_governance tenancy project. It also picks the default: the last
+  // project the user worked in when it's offered, else the sole project.
+  const lastProjectSlug = currentProject?.slug ?? null;
+  const { projects: projectsForOrg, defaultProjectId } = useMemo(() => {
+    const org = organizations?.find((o) => o.id === selectedOrgId);
+    return resolveCliAuthProjects({ teams: org?.teams, lastProjectSlug });
+  }, [organizations, selectedOrgId, lastProjectSlug]);
 
-  // Auto-pick the only project, if there is exactly one. Reset when org
-  // changes so the picker is fresh per-org.
+  // Reset when org changes so the picker is fresh per-org, then apply the
+  // computed default selection.
   useEffect(() => {
     setSelectedProjectId(null);
   }, [selectedOrgId]);
   useEffect(() => {
-    if (projectsForOrg.length === 1 && !selectedProjectId) {
-      setSelectedProjectId(projectsForOrg[0]!.id);
+    if (defaultProjectId && !selectedProjectId) {
+      setSelectedProjectId(defaultProjectId);
     }
-  }, [projectsForOrg, selectedProjectId]);
+  }, [defaultProjectId, selectedProjectId]);
 
   // Redirect to sign-in if unauthenticated, preserving the user_code in
   // the callback URL so the user lands back here after SSO.
@@ -418,10 +406,11 @@ export default function CliAuthPage() {
                         <Alert.Root status="warning">
                           <Alert.Indicator />
                           <Alert.Content>
-                            <Alert.Title>No projects yet</Alert.Title>
+                            <Alert.Title>No shared projects yet</Alert.Title>
                             <Alert.Description>
-                              Create a project in this organization first, then
-                              re-run <code>langwatch login</code> in your
+                              Create a team project in this organization first
+                              (personal projects can&apos;t back an SDK key),
+                              then re-run <code>langwatch login</code> in your
                               terminal.
                             </Alert.Description>
                           </Alert.Content>

@@ -119,8 +119,8 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
     Then the CLI renders a top banner BEFORE the first prompt — always visible,
       not optional:
       "Running interactively. For agents/CI, skip the prompts by passing:
-         --device         AI tools / SSO (recommended)
-         --api-key <K>    project SDK key (writes .env)
+         --api-key <K>    project SDK key into .env (default — SDK, evals, prompts)
+         --device         AI tools / SSO (claude, codex, gemini, opencode)
          --token <T>      pre-minted device session
          --endpoint <U>   self-hosted instance URL"
     And the CLI prompts:
@@ -128,13 +128,13 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
         1) LangWatch Cloud (app.langwatch.ai)
         2) Self-hosted instance (custom URL)"
     And on selecting (2) the CLI prompts for the URL and validates http(s) scheme
-    And the CLI then prompts:
+    And the CLI then prompts, with project login as the default (option 1):
       "How do you want to use it?
-        1) AI tools / agentic flows  (claude, codex, cursor, gemini, opencode) — device-flow SSO
-        2) Project / SDK API key     (langwatch sync, langwatch eval, …)        — API key into .env
+        1) Project / SDK API key     (langwatch eval, sync, prompts, SDK)        — API key into .env
+        2) AI tools / agentic flows  (claude, codex, cursor, gemini, opencode)   — device-flow SSO
         3) Both"
-    And on selecting (1) it runs the device-flow → `~/.langwatch/config.json`
-    And on selecting (2) it runs the legacy API-key paste flow → `$CWD/.env`
+    And on selecting (1) it runs the project API-key device-code flow → `$CWD/.env`
+    And on selecting (2) it runs the device-flow → `~/.langwatch/config.json`
     And on selecting (3) it runs both flows in sequence
 
   @bdd @cli @login @agent-aware @fake-tty
@@ -149,16 +149,19 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
       sees it correctly
 
   @bdd @cli @login @non-tty
-  Scenario: `langwatch login` (no flags, NON-TTY) errors with an actionable hint
+  Scenario: `langwatch login` (no flags, NON-TTY) defaults to project login, never AI-tools
     Given the user is in a non-interactive context (CI, agent stdin, piped)
     When the user runs `langwatch login` with no flags
-    Then the CLI exits 1 with stderr:
-      "Cannot run interactive login in a non-TTY context.
-       Run one of:
-         langwatch login --device                    # device-flow (recommended for AI tools)
-         langwatch login --api-key <KEY>             # project SDK key (writes .env)
-         langwatch login --token <TOKEN>             # pre-minted device session (CI)
-         LANGWATCH_AUTO_LOGIN=1 langwatch <wrapper>  # let the wrapper trigger it"
+    Then the CLI does NOT start the AI-tools / device-session flow
+    And the CLI defaults to PROJECT login: it requests `credential_type: "project_api_key"`
+      and writes the resulting key to `$CWD/.env`
+    And it first prints that project login is the default — so evaluations, prompts and
+      the SDK target a real project, not a personal one
+    And it prints that `--device` is required to log in to AI tools (claude, codex, …)
+    # Rationale: a customer's coding agent ran `langwatch login` non-interactively while
+    # setting up experiments; the old behavior funnelled it into a personal device-session
+    # and evaluations silently landed on a personal project. Defaulting to project login
+    # closes that at the source.
 
   @bdd @cli @login @endpoint
   Scenario: `langwatch login --endpoint <url>` skips the cloud-vs-self-hosted prompt

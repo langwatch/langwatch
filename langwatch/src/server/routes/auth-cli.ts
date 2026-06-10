@@ -49,6 +49,7 @@ import { IngestionSourceService } from "@ee/governance/services/activity-monitor
 import { ActivityMonitorService } from "@ee/governance/services/activity-monitor/activityMonitor.service";
 import { GovernanceSetupStateService } from "@ee/governance/services/setupState.service";
 import { CliBootstrapService } from "@ee/governance/services/cliBootstrap.service";
+import { featureFlagService } from "~/server/featureFlag";
 import { IngestionTemplateService } from "@ee/governance/services/ingestionTemplate.service";
 import { IngestionKeyService } from "@ee/governance/services/ingestionKey.service";
 import {
@@ -1529,7 +1530,7 @@ secured.access(CLI_POLICY).post("/approve", async (c: Context) => {
           members: { some: { userId: session.user.id } },
         },
       },
-      select: { id: true, slug: true, name: true, apiKey: true },
+      select: { id: true, slug: true, name: true, apiKey: true, isPersonal: true },
     });
     if (!project) {
       return c.json(
@@ -1539,6 +1540,22 @@ secured.access(CLI_POLICY).post("/approve", async (c: Context) => {
             "Project not found in this organization, or you do not have access to it",
         },
         403,
+      );
+    }
+
+    // Project login must target a real, shared project — never a personal
+    // workspace project. A coding agent that picked (or had auto-selected)
+    // the personal project silently sent the user's evaluations there
+    // (customer report). The browser picker hides personal projects; this
+    // is the server-side guarantee.
+    if (project.isPersonal) {
+      return c.json(
+        {
+          error: "personal_project_not_allowed",
+          error_description:
+            "Personal projects can't back a project API key. Pick a shared team project so your evaluations, prompts and traces land on a real project.",
+        },
+        400,
       );
     }
 
@@ -1582,6 +1599,30 @@ secured.access(CLI_POLICY).post("/approve", async (c: Context) => {
         organization_id,
       },
       200,
+    );
+  }
+
+  // Governance gate: the device-session flow provisions a personal
+  // workspace (Team + Project) and a personal virtual key for the user.
+  // That is a governance-plane capability; for an org without governance
+  // enabled it silently created a personal project that then captured the
+  // user's evaluations (customer report). Refuse it and point at project
+  // login, which writes a real project's API key to `.env`.
+  const governanceEnabled = await featureFlagService
+    .isEnabled("release_ui_ai_governance_enabled", {
+      distinctId: session.user.id,
+      organizationId: organization_id,
+      defaultValue: false,
+    })
+    .catch(() => false);
+  if (!governanceEnabled) {
+    return c.json(
+      {
+        error: "governance_required",
+        error_description:
+          "AI-tools (device) login needs governance enabled for your organization. Re-run `langwatch login` and choose project login — it writes a project API key to your .env.",
+      },
+      403,
     );
   }
 
