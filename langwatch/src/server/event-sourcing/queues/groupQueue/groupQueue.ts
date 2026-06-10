@@ -13,6 +13,7 @@ import {
   runWithContext,
 } from "../../../context/asyncContext";
 import { connection } from "../../../redis";
+import { decodeJobEnvelope, encodeJobEnvelope } from "./jobEnvelope";
 import type {
   DeduplicationConfig,
   EventSourcedQueueDefinition,
@@ -299,7 +300,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       dispatchAfterMs,
       dedupId,
       dedupTtlMs,
-      jobDataJson: JSON.stringify(payloadWithContext),
+      jobDataJson: await encodeJobEnvelope(payloadWithContext),
       shouldExtend,
       shouldReplace,
     });
@@ -357,7 +358,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     const shouldExtend = dedup ? dedup.extend !== false : true;
     const shouldReplace = dedup ? dedup.replace !== false : true;
 
-    const jobsToStage = payloads.map((payload, index) => {
+    const jobsToStage = await Promise.all(payloads.map(async (payload, index) => {
       const groupId = this.groupKey(payload);
       const stagedJobId = this.generateStagedJobId(payload);
       const score = this.score?.(payload) ?? now;
@@ -382,11 +383,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         dispatchAfterMs,
         dedupId,
         dedupTtlMs,
-        jobDataJson: JSON.stringify(payloadWithContext),
+        jobDataJson: await encodeJobEnvelope(payloadWithContext),
         shouldExtend,
         shouldReplace,
       };
-    });
+    }));
 
     const newStagedCount = await this.scripts.stageBatch(jobsToStage);
 
@@ -440,7 +441,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     // Parse the stored job data
     let jobData: Record<string, unknown>;
     try {
-      jobData = JSON.parse(jobDataJson) as Record<string, unknown>;
+      jobData = await decodeJobEnvelope(jobDataJson);
     } catch {
       this.logger.error(
         { queueName: this.queueName, stagedJobId, groupId },
@@ -490,7 +491,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       if (drainedSiblings.length > 0) {
         const siblingPayloads: Payload[] = [];
         for (const sibling of drainedSiblings) {
-          const parsed = this.parseDrainedPayload(sibling, groupId);
+          const parsed = await this.parseDrainedPayload(sibling, groupId);
           if (parsed) siblingPayloads.push(parsed);
         }
         if (siblingPayloads.length > 0) {
@@ -606,7 +607,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                 gqRetryAttempt.observe(routingLabels, attempt);
                 gqRetryBackoffMilliseconds.observe(routingLabels, backoffMs);
                 const newStagedJobId = `${stagedJobId}/r/${attempt}`;
-                const retryJobData = JSON.stringify({
+                const retryJobData = await encodeJobEnvelope({
                   ...(payload as Record<string, unknown>),
                   __context: contextMetadata,
                   __attempt: attempt + 1,
@@ -716,9 +717,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * here and recoverable via event replay, mirroring the dispatched job's own
    * parse-failure handling).
    */
-  private parseDrainedPayload(sibling: DrainedJob, groupId: string): Payload | null {
+  private async parseDrainedPayload(sibling: DrainedJob, groupId: string): Promise<Payload | null> {
     try {
-      const jobData = JSON.parse(sibling.jobDataJson) as Record<string, unknown>;
+      const jobData = await decodeJobEnvelope(sibling.jobDataJson);
       return this.stripInternalFields(jobData);
     } catch {
       this.logger.error(
@@ -825,7 +826,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
     // Re-stage with a new ID
     const newStagedJobId = `${stagedJobId}/r/${Date.now()}`;
-    const jobDataJson = JSON.stringify({
+    const jobDataJson = await encodeJobEnvelope({
       ...(payload as Record<string, unknown>),
       __context: contextMetadata,
     });

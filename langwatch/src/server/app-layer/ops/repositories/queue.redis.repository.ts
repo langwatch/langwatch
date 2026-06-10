@@ -16,6 +16,7 @@ import {
   TTL_HELPER_LUA,
   PARK_HELPER_LUA,
 } from "~/server/event-sourcing/queues/groupQueue/scripts";
+import { readJobRoutingMeta } from "~/server/event-sourcing/queues/groupQueue/jobEnvelope";
 
 const logger = createLogger("langwatch:ops:queue-redis-repository");
 
@@ -440,14 +441,10 @@ export class QueueRedisRepository implements QueueRepository {
         const rawData = (dataResults?.[dataIdx]?.[1] as string) ?? null;
         dataIdx++;
         if (rawData) {
-          try {
-            const parsed = JSON.parse(rawData);
-            pipelineName = parsed.__pipelineName ?? null;
-            jobType = parsed.__jobType ?? null;
-            jobName = parsed.__jobName ?? null;
-          } catch {
-            // ignore invalid JSON
-          }
+          const meta = readJobRoutingMeta(rawData);
+          pipelineName = meta.pipelineName;
+          jobType = meta.jobType;
+          jobName = meta.jobName;
         }
       }
 
