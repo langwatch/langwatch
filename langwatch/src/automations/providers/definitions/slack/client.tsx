@@ -178,6 +178,19 @@ function SlackConfigForm({
               template: { value: option.source, usingDefault: false },
             })
           }
+          onSelectOtherCadence={(option) => {
+            // Cross-cadence pick: switch the cadence alongside the template
+            // so the author doesn't have to round-trip via the Cadence
+            // section. Both land in the same batch, so the cadence-mismatch
+            // reset effect above sees a consistent pair and leaves it alone.
+            ctx.setNotificationCadence(
+              option.cadenceFit === "digest" ? "5min_digest" : "immediate",
+            );
+            onChange({
+              ...slice,
+              template: { value: option.source, usingDefault: false },
+            });
+          }}
         />
       ) : null}
       {/* Block Kit templates are JSON whose string values contain Liquid.

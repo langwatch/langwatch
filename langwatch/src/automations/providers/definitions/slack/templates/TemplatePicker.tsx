@@ -1,11 +1,14 @@
 import {
   Badge,
   Box,
+  Collapsible,
   HStack,
   SimpleGrid,
   Stack,
   Text,
 } from "@chakra-ui/react";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { useState } from "react";
 
 import {
   pickDefaultSlackBlockKitTemplateId,
@@ -21,6 +24,10 @@ interface Props {
    *  (if any) matches it. Custom edits highlight nothing. */
   currentSource: string;
   onSelect: (option: SlackBlockKitTemplateOption) => void;
+  /** Picking a layout built for the other cadence. The form owner switches
+   *  the cadence alongside the template so the author doesn't have to make
+   *  the round-trip to the cadence stage. */
+  onSelectOtherCadence: (option: SlackBlockKitTemplateOption) => void;
 }
 
 export function SlackBlockKitTemplatePicker({
@@ -28,8 +35,15 @@ export function SlackBlockKitTemplatePicker({
   hasEvaluationFilter,
   currentSource,
   onSelect,
+  onSelectOtherCadence,
 }: Props) {
   const options = templateOptionsForCadence(cadence);
+  const otherCadence: DraftCadence =
+    cadence === "digest" ? "immediate" : "digest";
+  const otherOptions = templateOptionsForCadence(otherCadence).filter(
+    (opt) => opt.cadenceFit !== "both",
+  );
+  const [otherOpen, setOtherOpen] = useState(false);
   const defaultId = pickDefaultSlackBlockKitTemplateId({
     cadence,
     hasEvaluationFilter,
@@ -61,6 +75,51 @@ export function SlackBlockKitTemplatePicker({
           );
         })}
       </SimpleGrid>
+      {otherOptions.length > 0 ? (
+        <Collapsible.Root
+          open={otherOpen}
+          onOpenChange={(d) => setOtherOpen(d.open)}
+        >
+          <Collapsible.Trigger asChild>
+            <HStack cursor="pointer" gap={1} color="fg.muted" width="fit-content">
+              {otherOpen ? (
+                <ChevronDown size={14} />
+              ) : (
+                <ChevronRight size={14} />
+              )}
+              <Text textStyle="xs">
+                {otherCadence === "digest"
+                  ? `${otherOptions.length} more layouts for digest cadences`
+                  : `${otherOptions.length} more layouts for the Immediate cadence`}
+              </Text>
+            </HStack>
+          </Collapsible.Trigger>
+          <Collapsible.Content>
+            <Stack gap={2} align="stretch" pt={2}>
+              <Text textStyle="xs" color="fg.muted">
+                {otherCadence === "digest"
+                  ? "These layouts bundle every match in a window into one message. Picking one switches this automation's cadence to a 5-minute digest — you can adjust the window in the Cadence section."
+                  : "These layouts send one message per matching trace. Picking one switches this automation's cadence to Immediate."}
+              </Text>
+              <SimpleGrid
+                columns={{ base: 2, md: Math.min(otherOptions.length, 3) }}
+                gap={3}
+                alignItems="stretch"
+              >
+                {otherOptions.map((option) => (
+                  <Card
+                    key={option.id}
+                    option={option}
+                    isSelected={option.source === currentSource}
+                    isDefault={false}
+                    onClick={() => onSelectOtherCadence(option)}
+                  />
+                ))}
+              </SimpleGrid>
+            </Stack>
+          </Collapsible.Content>
+        </Collapsible.Root>
+      ) : null}
     </Stack>
   );
 }
