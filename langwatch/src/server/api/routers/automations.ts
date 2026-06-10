@@ -1,5 +1,4 @@
 import { AlertType, TriggerAction } from "@prisma/client";
-import { RoleService } from "~/server/role/role.service";
 import { TRPCError } from "@trpc/server";
 import { generate as ksuid } from "@langwatch/ksuid";
 import { z } from "zod";
@@ -155,8 +154,8 @@ async function resolveProjectIdentity(projectId: string): Promise<DraftProject> 
  * inboxes, …). The UI surfaces an "External" warning badge for non-team
  * addresses so operators know what they're shipping.
  *
- * A future per-project "strict mode" flag will re-enable team-membership
- * enforcement via `RecipientNotInTeamError`; that gate is not in this PR.
+ * A future per-project "strict mode" flag may re-enable team-membership
+ * enforcement; that gate is not in this PR.
  */
 function validateEmailRecipientFormats(recipients: string[]): void {
   for (const email of recipients) {
@@ -206,20 +205,13 @@ export const automationRouter = createTRPCRouter({
           id: input.projectId,
         },
         select: {
-          teamId: true,
-          team: { select: { organizationId: true } },
+          id: true,
         },
       });
 
       if (!project) {
         throw new Error(`Project with id ${input.projectId} not found`);
       }
-
-      const roleService = new RoleService(ctx.prisma);
-      const teamBindings = await roleService.getTeamMembersWithUsers({
-        organizationId: project.team.organizationId,
-        teamId: project.teamId,
-      });
 
       if (input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE) {
         input.actionParams.createdByUserId = ctx.session?.user.id;
@@ -245,9 +237,7 @@ export const automationRouter = createTRPCRouter({
         // UI surfaces an "External" warning badge for any non-team
         // address so operators know what they're shipping. Two server
         // contracts for the same action would force the drawer to
-        // branch on create-vs-edit, which is a footgun. `teamBindings`
-        // above is left in place because other action branches still
-        // read team state.
+        // branch on create-vs-edit, which is a footgun.
         if (input.actionParams.members && input.actionParams.members.length > 0) {
           try {
             validateEmailRecipientFormats(input.actionParams.members);
@@ -427,7 +417,12 @@ export const automationRouter = createTRPCRouter({
         trigger: triggerIdentitySchema,
         draft: templateDraftSchema,
         recipients: z.string().array().default([]),
-        webhook: z.string().nullable().default(null),
+        webhook: z
+          .string()
+          .url()
+          .startsWith("https://hooks.slack.com/")
+          .nullable()
+          .default(null),
       }),
     )
     .use(checkProjectPermission("triggers:update"))

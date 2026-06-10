@@ -50,7 +50,7 @@ const extractHostname = (baseHost: string): string => {
 
 export const computeDefaultFrom = (): string => {
   if (env.EMAIL_DEFAULT_FROM) return env.EMAIL_DEFAULT_FROM;
-  const hostname = extractHostname(env.BASE_HOST);
+  const hostname = extractHostname(env.BASE_HOST ?? "");
   if (
     hostname.includes("app.langwatch.ai") ||
     hostname.includes("localhost")
@@ -86,7 +86,6 @@ const sanitizeHeaderParam = (value: string): string =>
 const buildRawMimeMessage = ({
   from,
   to,
-  bcc,
   replyTo,
   subject,
   html,
@@ -94,17 +93,11 @@ const buildRawMimeMessage = ({
 }: {
   from: string;
   to: string[];
-  /** BCC recipients are NOT written into the MIME headers — SES uses the
-   *  envelope addresses from `SendRawEmail` to deliver them invisibly.
-   *  Including the field here is documentation-only; if the caller passes
-   *  bcc addresses we still don't render a `Bcc:` header. */
-  bcc?: string[];
   replyTo?: string;
   subject: string;
   html: string;
   attachments: EmailAttachment[];
 }): string => {
-  void bcc;
   const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
   const lines = [
@@ -148,10 +141,13 @@ const sendWithSES = async (content: EmailContent, defaultFrom: string) => {
 
   try {
     if (content.attachments && content.attachments.length > 0) {
+      // BCC recipients are NOT written into the MIME headers — SES uses the
+      // envelope `Destinations` from `SendRawEmail` to deliver them invisibly,
+      // so `buildRawMimeMessage` intentionally receives no bcc and renders no
+      // `Bcc:` header. Recipients only see the public To list.
       const rawMessage = buildRawMimeMessage({
         from,
         to: toAddresses,
-        bcc: bccAddresses,
         replyTo: content.replyTo,
         subject: content.subject,
         html: content.html,
@@ -168,7 +164,10 @@ const sendWithSES = async (content: EmailContent, defaultFrom: string) => {
         Destinations: allDestinations,
       });
       const data = await sesClient.send(command);
-      logger.info({ data }, "Email with attachments sent successfully");
+      logger.info(
+        { messageId: data.MessageId, recipientCount: allDestinations.length },
+        "Email with attachments sent successfully",
+      );
       return data;
     }
 
@@ -185,7 +184,10 @@ const sendWithSES = async (content: EmailContent, defaultFrom: string) => {
       ...(replyToAddresses ? { ReplyToAddresses: replyToAddresses } : {}),
     });
     const data = await sesClient.send(command);
-    logger.info({ data }, "Email sent successfully");
+    logger.info(
+      { messageId: data.MessageId, recipientCount: toAddresses.length },
+      "Email sent successfully",
+    );
     return data;
   } catch (error) {
     logger.error({ error }, "Error sending email with SES");

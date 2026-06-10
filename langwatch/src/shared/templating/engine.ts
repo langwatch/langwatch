@@ -8,6 +8,17 @@ import { Liquid, type Template } from "liquidjs";
  */
 export const RENDER_TIMEOUT_MS = 500;
 
+/**
+ * Object-creation budget for a single render (LiquidJS `memoryLimit`, counted in
+ * units of new objects/array-concats/strftime allocations, not bytes). Bounds a
+ * template that tries to balloon memory (e.g. nested loops building huge arrays)
+ * regardless of the wall-clock budget. 1e6 is generous for any legitimate
+ * notification template while still tripping on hostile growth.
+ */
+export const RENDER_MEMORY_LIMIT = 1_000_000;
+
+type PathSegment = string | number;
+
 let engine: Liquid | undefined;
 
 /**
@@ -27,6 +38,17 @@ export function getLiquidEngine(): Liquid {
     engine = new Liquid({
       strictFilters: true,
       strictVariables: false,
+      // Hide prototype chains from customer-authored templates so accesses like
+      // `{{ name.constructor }}` resolve to empty rather than leaking internals.
+      // Set explicitly rather than relying on LiquidJS's default, which could
+      // change on a minor bump.
+      ownPropertyOnly: true,
+      // DoS guards: `renderLimit` bounds wall-clock time *inside* a synchronous
+      // render (interrupting a CPU-bound loop the Promise.race backstop can't),
+      // and `memoryLimit` caps object creation. Both are interruption-capable in
+      // liquidjs >=10.6, so a hostile template no longer pins the worker.
+      renderLimit: RENDER_TIMEOUT_MS,
+      memoryLimit: RENDER_MEMORY_LIMIT,
     });
   }
   return engine;
@@ -58,6 +80,52 @@ function getParsedTemplate(source: string): Template[] {
   return parsed;
 }
 
+/**
+ * Process-local cache of the referenced-variable segment paths for a template
+ * source. `globalVariableSegmentsSync` re-parses the source on every call, so
+ * without this layer the missing-variable diagnostic pays a full parse on every
+ * render even when the AST is already in `PARSED_TEMPLATE_CACHE`. Keyed by the
+ * same source string and bounded the same way.
+ */
+const REFERENCED_SEGMENTS_CACHE = new Map<string, PathSegment[][]>();
+
+function getReferencedSegments(source: string): PathSegment[][] {
+  const cached = REFERENCED_SEGMENTS_CACHE.get(source);
+  if (cached) {
+    REFERENCED_SEGMENTS_CACHE.delete(source);
+    REFERENCED_SEGMENTS_CACHE.set(source, cached);
+    return cached;
+  }
+  // `globalVariableSegmentsSync` returns each referenced variable as an array of
+  // property segments (e.g. `project.nmae` → `["project", "nmae"]`), excluding
+  // locals (for-loop vars, `{% assign %}`, `{% capture %}`). It types segments as
+  // `(string | number | SegmentArray)[]` to cover bracketed/grouped expressions;
+  // for the variable surfaces we expose, only flat string/number segments make
+  // sense, so anything exotic gets dropped here rather than later per render.
+  const referenced = getLiquidEngine().globalVariableSegmentsSync(source);
+  const normalized: PathSegment[][] = [];
+  for (const raw of referenced) {
+    const segments: PathSegment[] = [];
+    let exotic = false;
+    for (const segment of raw) {
+      if (typeof segment === "string" || typeof segment === "number") {
+        segments.push(segment);
+      } else {
+        exotic = true;
+        break;
+      }
+    }
+    if (exotic || segments.length === 0) continue;
+    normalized.push(segments);
+  }
+  if (REFERENCED_SEGMENTS_CACHE.size >= PARSED_TEMPLATE_CACHE_LIMIT) {
+    const oldest = REFERENCED_SEGMENTS_CACHE.keys().next().value;
+    if (oldest !== undefined) REFERENCED_SEGMENTS_CACHE.delete(oldest);
+  }
+  REFERENCED_SEGMENTS_CACHE.set(source, normalized);
+  return normalized;
+}
+
 export interface LiquidRenderResult {
   output: string;
   /**
@@ -74,8 +142,6 @@ export class RenderTimeoutError extends Error {
     this.name = "RenderTimeoutError";
   }
 }
-
-type PathSegment = string | number;
 
 function hasNestedPath(context: Record<string, unknown>, segments: PathSegment[]): boolean {
   let current: unknown = context;
@@ -102,31 +168,15 @@ function detectMissingVariables({
   context: Record<string, unknown>;
 }): string[] {
   try {
-    // `globalVariableSegmentsSync` returns each referenced variable as an array
-    // of property segments (e.g. `project.nmae` → `["project", "nmae"]`), and
-    // it excludes locals (for-loop vars, `{% assign %}`, `{% capture %}`). Using
-    // full segment paths catches property-level typos that the top-level-only
-    // form misses — e.g. `{{ project.nmae }}` correctly reports `project.nmae`
-    // instead of silently accepting it because `project` exists.
-    const referenced = getLiquidEngine().globalVariableSegmentsSync(template);
+    // The referenced segment paths are cached per source string (see
+    // `getReferencedSegments`), so the full re-parse only happens on a cache
+    // miss. Using full segment paths catches property-level typos that the
+    // top-level-only form misses — e.g. `{{ project.nmae }}` correctly reports
+    // `project.nmae` instead of silently accepting it because `project` exists.
+    const referenced = getReferencedSegments(template);
     const missing: string[] = [];
     const seen = new Set<string>();
-    for (const raw of referenced) {
-      // LiquidJS types segments as `(string | number | SegmentArray)[]` to
-      // cover bracketed/grouped expressions; for the variable surfaces we
-      // expose, only flat string/number segments make sense, and anything
-      // exotic gets dropped from the diagnostic instead of crashing it.
-      const segments: PathSegment[] = [];
-      let exotic = false;
-      for (const segment of raw) {
-        if (typeof segment === "string" || typeof segment === "number") {
-          segments.push(segment);
-        } else {
-          exotic = true;
-          break;
-        }
-      }
-      if (exotic || segments.length === 0) continue;
+    for (const segments of referenced) {
       const path = segments.join(".");
       if (seen.has(path)) continue;
       seen.add(path);
@@ -165,8 +215,15 @@ export async function renderLiquid({
     // of the same source string skip the parse pass entirely. `parseAndRender`
     // would otherwise re-parse on every call.
     const parsed = getParsedTemplate(template);
+    // Pass the caller's budget as the per-render `renderLimit` so the
+    // interruption-capable engine guard matches `timeoutMs` (the engine-level
+    // default only covers callers that don't override the budget). The
+    // Promise.race deadline remains the async backstop.
     const output = await Promise.race([
-      getLiquidEngine().render(parsed, context),
+      getLiquidEngine().render(parsed, context, {
+        renderLimit: timeoutMs,
+        memoryLimit: RENDER_MEMORY_LIMIT,
+      }),
       deadline,
     ]);
     return { output, missingVariables };

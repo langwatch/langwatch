@@ -36,7 +36,7 @@ describe("renderTriggerEmail", () => {
       expect(email.html).toContain("Edit automation");
       expect(email.html).toContain('href="https://app.langwatch.ai/acme"');
       expect(email.html).toContain(
-        'href="https://app.langwatch.ai/acme/automations?drawer.open=automation&drawer.automationId=trg_1&drawer.source=email-link"',
+        'href="https://app.langwatch.ai/acme/automations?drawer.open=automation&amp;drawer.automationId=trg_1&amp;drawer.source=email-link"',
       );
     });
 

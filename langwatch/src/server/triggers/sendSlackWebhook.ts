@@ -1,8 +1,26 @@
 import { type AlertType, AlertType as AlertTypeEnum } from "@prisma/client";
 import { IncomingWebhook } from "@slack/webhook";
 import type { Trace } from "~/server/tracer/types";
-import { toDispatchError } from "~/server/event-sourcing/outbox/dispatchError";
+import {
+  DispatchError,
+  toDispatchError,
+} from "~/server/event-sourcing/outbox/dispatchError";
 import { env } from "../../env.mjs";
+
+const SLACK_WEBHOOK_PREFIX = "https://hooks.slack.com/";
+
+/**
+ * Minimal Slack mrkdwn escaping. Slack only requires the three HTML-ish
+ * control characters to be escaped in message text; everything else is
+ * literal. Escaping these stops user-authored trace content from forging
+ * links/formatting or breaking the message structure.
+ * See https://api.slack.com/reference/surfaces/formatting#escaping
+ */
+const escapeMrkdwn = (value: unknown): string =>
+  String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 
 interface TriggerData {
   traceId?: string;
@@ -27,6 +45,17 @@ export const sendSlackWebhook = async ({
   triggerType: AlertType | null;
   triggerMessage: string;
 }) => {
+  // Defense-in-depth: never dispatch to anything that is not a genuine Slack
+  // incoming-webhook endpoint, even if an older trigger stored an arbitrary
+  // URL before the slackActionParamsSchema startsWith-check landed. A bad URL
+  // can never become valid on retry, so this is non-retryable.
+  if (!triggerWebhook.startsWith(SLACK_WEBHOOK_PREFIX)) {
+    throw new DispatchError({
+      message: `Refusing to dispatch Slack webhook for trigger "${triggerName}": URL is not a ${SLACK_WEBHOOK_PREFIX} endpoint`,
+      retryable: false,
+    });
+  }
+
   const webhook = new IncomingWebhook(triggerWebhook);
 
   const traceIds = triggerData
@@ -67,20 +96,20 @@ export const sendSlackWebhook = async ({
     return `\n<${getLink(trace)}|${getDisplayText(trace)}>
     ${
       !triggerMessage && !isCustomGraph
-        ? ` \n*Input:* ${trace.input}
-    \n*Output:* ${trace.output}'\n`
+        ? ` \n*Input:* ${escapeMrkdwn(trace.input)}
+    \n*Output:* ${escapeMrkdwn(trace.output)}\n`
         : ""
     }
       ${
         !isCustomGraph &&
         (trace.events ?? [])
           .map((event: any) => {
-            return `\n*Event Type:* ${event.event_type}
+            return `\n*Event Type:* ${escapeMrkdwn(event.event_type)}
           ${Object.entries(event.metrics || {})
-            .map(([key, value]) => `\n*${key}:* ${value as string}`)
+            .map(([key, value]) => `\n*${escapeMrkdwn(key)}:* ${escapeMrkdwn(value)}`)
             .join("")}
           ${Object.entries(event.event_details || {})
-            .map(([key, value]) => `\n*${key}:* ${value as string}`)
+            .map(([key, value]) => `\n*${escapeMrkdwn(key)}:* ${escapeMrkdwn(value)}`)
             .join("")}
           \n-------------------`;
           })

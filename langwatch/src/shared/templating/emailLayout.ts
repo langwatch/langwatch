@@ -1,5 +1,14 @@
 const LOGO_URL = "https://app.langwatch.ai/images/logo-icon.png";
 
+/** Escape a value for safe interpolation into an HTML attribute. */
+function escapeHtmlAttribute(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 export interface EmailFrameFooter {
   /** Project home — anchor on the "LangWatch" word. */
   projectUrl: string;
@@ -36,9 +45,13 @@ export function wrapEmailHtml({
       <hr style="border:none;border-top:1px solid #E2E8F0;margin:28px 0 12px 0;"/>
       <div style="font-size:12px;color:#718096;text-align:center;line-height:1.6;">
         Sent with <span style="color:#E53E3E;">♥</span> from
-        <a href="${footer.projectUrl}" style="color:#DD6B20;text-decoration:none;">LangWatch</a>
+        <a href="${escapeHtmlAttribute(
+          footer.projectUrl
+        )}" style="color:#DD6B20;text-decoration:none;">LangWatch</a>
         &nbsp;·&nbsp;
-        <a href="${footer.editUrl}" style="color:#DD6B20;text-decoration:none;">Edit automation</a>
+        <a href="${escapeHtmlAttribute(
+          footer.editUrl
+        )}" style="color:#DD6B20;text-decoration:none;">Edit automation</a>
       </div>
     </div>
   </body>

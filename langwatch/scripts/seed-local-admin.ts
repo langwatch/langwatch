@@ -22,9 +22,16 @@ import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { hash } from "bcrypt";
 import { nanoid } from "nanoid";
 import { prisma } from "../src/server/db";
-import { ENTERPRISE_LICENSE_KEY } from "../ee/licensing/__tests__/fixtures/testLicenses";
+import { LOCAL_DEV_ENTERPRISE_LICENSE_KEY } from "./localDevLicense";
 
 async function main() {
+  if (process.env.NODE_ENV === "production" && !process.env.SEED_USER_PASSWORD) {
+    throw new Error(
+      "Refusing to seed a hardcoded default admin credential with NODE_ENV=production. " +
+        "Set SEED_USER_PASSWORD explicitly if you really intend to seed an admin user here.",
+    );
+  }
+
   const email = process.env.SEED_USER_EMAIL ?? "admin@local.langwatch.dev";
   const password = process.env.SEED_USER_PASSWORD ?? "LocalAdmin!2026";
   const name = process.env.SEED_USER_NAME ?? "Local Admin";
@@ -73,7 +80,7 @@ async function main() {
       data: {
         name: orgName,
         slug: `local-dev-org-${nanoid(6).toLowerCase()}`,
-        license: ENTERPRISE_LICENSE_KEY,
+        license: LOCAL_DEV_ENTERPRISE_LICENSE_KEY,
       },
     });
     console.log(`Created organization ${org.id} (${org.slug})`);

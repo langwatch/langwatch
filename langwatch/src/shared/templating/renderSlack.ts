@@ -22,6 +22,26 @@ export interface RenderedSlack {
   errors: string[];
 }
 
+async function fallbackToDefaultText({
+  context,
+  testFire,
+  error,
+  customMissing,
+}: {
+  context: Record<string, unknown>;
+  testFire: boolean;
+  error: string;
+  customMissing: string[] | undefined;
+}): Promise<RenderedSlack> {
+  const fallback = await defaultSlackText({ context, testFire });
+  return {
+    payload: { text: fallback.text },
+    usedDefault: true,
+    missingVariables: customMissing ?? fallback.missingVariables,
+    errors: [error],
+  };
+}
+
 function defaultSlackText({
   context,
   testFire,
@@ -99,7 +119,14 @@ export async function renderTriggerSlack({
       : (parsed as { blocks?: unknown })?.blocks;
     const blocks = filterBlockKit(blocksInput);
     if (blocks.length === 0) {
-      throw new Error("Block Kit template produced no allowed blocks");
+      // Expected outcome (e.g. every block was filtered by the allowlist),
+      // not a render failure — fall back to the plain-text default directly.
+      return fallbackToDefaultText({
+        context: ctx,
+        testFire,
+        error: "Block Kit template produced no allowed blocks",
+        customMissing,
+      });
     }
     return {
       payload: { blocks: testFire ? [testFireSlackBlock(), ...blocks] : blocks },
@@ -108,12 +135,11 @@ export async function renderTriggerSlack({
       errors: [],
     };
   } catch (err) {
-    const fallback = await defaultSlackText({ context: ctx, testFire });
-    return {
-      payload: { text: fallback.text },
-      usedDefault: true,
-      missingVariables: customMissing ?? fallback.missingVariables,
-      errors: [errorMessage(err)],
-    };
+    return fallbackToDefaultText({
+      context: ctx,
+      testFire,
+      error: errorMessage(err),
+      customMissing,
+    });
   }
 }

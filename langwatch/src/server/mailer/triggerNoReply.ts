@@ -1,5 +1,8 @@
 import { createHmac } from "crypto";
 import { env } from "../../env.mjs";
+import { createLogger } from "../../utils/logger/server";
+
+const logger = createLogger("langwatch:mailer:triggerNoReply");
 
 /**
  * Build the To: address used on outbound trigger emails. We don't put the real
@@ -32,6 +35,11 @@ const HMAC_BYTES = 6;
 
 function shortHash(triggerId: string): string {
   const secret = env.NEXTAUTH_SECRET ?? "";
+  if (!secret) {
+    logger.warn(
+      "NEXTAUTH_SECRET is not set; no-reply trigger tags are forgeable and not unguessable. Set NEXTAUTH_SECRET to secure trigger email addresses."
+    );
+  }
   return createHmac("sha256", secret)
     .update(triggerId)
     .digest("hex")

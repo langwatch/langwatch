@@ -15,8 +15,29 @@ export const liveTriggerNotifier: TriggerNotifier = {
     await sendEmail({ to, bcc, subject, html });
   },
   async sendSlack({ webhook, payload }) {
+    // Defense-in-depth SSRF guard: even though the persisted webhook is
+    // validated at save time, the test-fire path can supply an arbitrary URL,
+    // so re-enforce the same Slack-host allow-list here before posting.
+    if (!isSlackWebhookUrl(webhook)) {
+      throw new Error(
+        "Slack webhook must be a valid https://hooks.slack.com/ URL.",
+      );
+    }
     await new IncomingWebhook(webhook).send(
       payload as IncomingWebhookSendArguments,
     );
   },
 };
+
+function isSlackWebhookUrl(webhook: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(webhook);
+  } catch {
+    return false;
+  }
+  return (
+    parsed.protocol === "https:" &&
+    (parsed.host === "hooks.slack.com" || parsed.host === "hooks.slack.com:443")
+  );
+}

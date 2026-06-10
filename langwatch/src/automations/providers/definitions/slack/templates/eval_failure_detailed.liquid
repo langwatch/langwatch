@@ -1,21 +1,21 @@
 {%- capture _md_input -%}
 ## Input
-{{ match.trace.input | truncate: 1500 }}
+{{ match.trace.input | truncate: 1500 | replace: "&", "&amp;" | replace: "<", "&lt;" | replace: ">", "&gt;" }}
 {%- endcapture -%}
 {%- capture _md_output -%}
 ## Output
-{{ match.trace.output | truncate: 1500 }}
+{{ match.trace.output | truncate: 1500 | replace: "&", "&amp;" | replace: "<", "&lt;" | replace: ">", "&gt;" }}
 {%- endcapture -%}
 {%- capture _header_text -%}
 {% if match.evaluation.passed == false %}🛑 {% else %}🔔 {% endif %}{{ trigger.name }}
 {%- endcapture -%}
 {%- capture _ctx_eval -%}
-{%- if match.evaluation %}*{{ match.evaluation.evaluatorName | default: "Evaluation" }}* `{{ match.evaluation.score | default: "—" }}`{% if match.evaluation.label %} · {{ match.evaluation.label }}{% endif %}{% if match.evaluation.passed == false %} · *failed*{% elsif match.evaluation.passed == true %} · *passed*{% endif %}{%- endif -%}
+{%- if match.evaluation %}*{{ match.evaluation.evaluatorName | default: "Evaluation" | replace: "&", "&amp;" | replace: "<", "&lt;" | replace: ">", "&gt;" }}* `{{ match.evaluation.score | default: "—" }}`{% if match.evaluation.label %} · {{ match.evaluation.label | replace: "&", "&amp;" | replace: "<", "&lt;" | replace: ">", "&gt;" }}{% endif %}{% if match.evaluation.passed == false %} · *failed*{% elsif match.evaluation.passed == true %} · *passed*{% endif %}{%- endif -%}
 {%- if match.evaluation and trigger.alertType %} · {% endif -%}
 {%- if trigger.alertType %}_{{ trigger.alertType }}_{%- endif -%}
 {%- endcapture -%}
 {%- capture _footer -%}
-`{{ match.trace.id | truncate: 12 }}`{% if match.trace.metadata.model %} · {{ match.trace.metadata.model }}{% endif %}{% if match.trace.metadata.duration_ms %} · {{ match.trace.metadata.duration_ms }}ms{% endif %}{% if match.trace.metadata.cost %} · ${{ match.trace.metadata.cost }}{% endif %} · <{{ match.trace.url }}|View in LangWatch ↗>
+`{{ match.trace.id | truncate: 12 }}`{% if match.trace.metadata.model %} · {{ match.trace.metadata.model | replace: "&", "&amp;" | replace: "<", "&lt;" | replace: ">", "&gt;" }}{% endif %}{% if match.trace.metadata.duration_ms %} · {{ match.trace.metadata.duration_ms }}ms{% endif %}{% if match.trace.metadata.cost %} · ${{ match.trace.metadata.cost }}{% endif %} · <{{ match.trace.url }}|View in LangWatch ↗>
 {%- endcapture -%}
 [
   { "type": "header", "text": { "type": "plain_text", "text": {{ _header_text | truncate: 140 | json }}, "emoji": true } }

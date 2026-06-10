@@ -11,24 +11,27 @@ export const DEFAULT_EMAIL_SUBJECT_TEMPLATE =
 
 export const DEFAULT_EMAIL_BODY_TEMPLATE = `# {% if trigger.alertType %}({{ trigger.alertType }}) {% endif %}{{ trigger.name }}
 
-This automation fired against a matching trace.
-{% if match.evaluation and match.evaluation.evaluatorName %}
+This automation fired against {% if matches.size == 1 %}a matching trace{% else %}{{ matches.size }} matching traces{% endif %}.
+{% for m in matches %}{% if m.evaluation and m.evaluation.evaluatorName %}
 
-**{{ match.evaluation.evaluatorName }}**{% if match.evaluation.score != null %} — score {{ match.evaluation.score }}{% endif %}{% if match.evaluation.label %} ({{ match.evaluation.label }}){% endif %}{% if match.evaluation.passed == false %} — **failed**{% endif %}
+**{{ m.evaluation.evaluatorName }}**{% if m.evaluation.score != null %} — score {{ m.evaluation.score }}{% endif %}{% if m.evaluation.label %} ({{ m.evaluation.label }}){% endif %}{% if m.evaluation.passed == false %} — **failed**{% endif %}
 {% endif %}
 
 **Input**
-> {{ match.trace.input | truncate: 400 }}
+> {{ m.trace.input | truncate: 400 }}
 
 **Output**
-> {{ match.trace.output | truncate: 400 }}
+> {{ m.trace.output | truncate: 400 }}
 
-[View matched trace ↗]({{ match.trace.url }})`;
+[View matched trace ↗]({{ m.trace.url }})
+{% endfor %}`;
 
 export const DEFAULT_SLACK_TEMPLATE = `{% if trigger.alertType == 'INFO' %}ℹ️{% elsif trigger.alertType == 'WARNING' %}⚠️{% elsif trigger.alertType == 'CRITICAL' %}🔴{% else %}🔔{% endif %} *{{ trigger.name }}*{% if trigger.alertType %} _({{ trigger.alertType }})_{% endif %}
-*Input:* {{ match.trace.input | truncate: 200 }}
-*Output:* {{ match.trace.output | truncate: 200 }}{% if match.evaluation and match.evaluation.evaluatorName %}
-*{{ match.evaluation.evaluatorName }}:*{% if match.evaluation.score != null %} {{ match.evaluation.score }}{% endif %}{% if match.evaluation.label %} ({{ match.evaluation.label }}){% endif %}{% endif %}`;
+{% for m in matches %}*Input:* {{ m.trace.input | truncate: 200 }}
+*Output:* {{ m.trace.output | truncate: 200 }}{% if m.evaluation and m.evaluation.evaluatorName %}
+*{{ m.evaluation.evaluatorName }}:*{% if m.evaluation.score != null %} {{ m.evaluation.score }}{% endif %}{% if m.evaluation.label %} ({{ m.evaluation.label }}){% endif %}{% endif %}
+<{{ m.trace.url }}|View trace>{% unless forloop.last %}
+{% endunless %}{% endfor %}`;
 
 /**
  * Block Kit starter — a valid Block Kit JSON document with Liquid variables
@@ -58,28 +61,37 @@ export const DEFAULT_SLACK_BLOCK_KIT_TEMPLATE = `[
     ]
   },
   {% endif %}
+  {% for m in matches %}
   {
     "type": "section",
-    "text": { "type": "mrkdwn", "text": {{ match.trace.input | truncate: 300 | prepend: "*Input:* " | json }} }
+    "text": { "type": "mrkdwn", "text": {{ m.trace.input | truncate: 300 | prepend: "*Input:* " | json }} }
   },
   {
     "type": "section",
-    "text": { "type": "mrkdwn", "text": {{ match.trace.output | truncate: 300 | prepend: "*Output:* " | json }} }
+    "text": { "type": "mrkdwn", "text": {{ m.trace.output | truncate: 300 | prepend: "*Output:* " | json }} }
   },
-  {% if match.evaluation and match.evaluation.evaluatorName %}
+  {% if m.evaluation and m.evaluation.evaluatorName %}
   {
     "type": "context",
     "elements": [
-      { "type": "mrkdwn", "text": {{ match.evaluation.evaluatorName | prepend: "*" | append: "*" | json }} }{% if match.evaluation.score != null %},
-      { "type": "mrkdwn", "text": "score {{ match.evaluation.score }}" }{% endif %}{% if match.evaluation.label %},
-      { "type": "mrkdwn", "text": {{ match.evaluation.label | json }} }{% endif %}
+      { "type": "mrkdwn", "text": {{ m.evaluation.evaluatorName | prepend: "*" | append: "*" | json }} }{% if m.evaluation.score != null %},
+      { "type": "mrkdwn", "text": "score {{ m.evaluation.score }}" }{% endif %}{% if m.evaluation.label %},
+      { "type": "mrkdwn", "text": {{ m.evaluation.label | json }} }{% endif %}
     ]
   },
   {% endif %}
+  {%- capture _trace_link -%}<{{ m.trace.url }}|View trace>{%- endcapture -%}
+  {
+    "type": "context",
+    "elements": [
+      { "type": "mrkdwn", "text": {{ _trace_link | json }} }
+    ]
+  },
+  {% endfor %}
   {
     "type": "divider"
   },
-  {%- capture _footer_text -%}<{{ match.trace.url }}|View trace> · <{{ trigger.editUrl }}|Edit automation>{%- endcapture -%}
+  {%- capture _footer_text -%}<{{ trigger.editUrl }}|Edit automation>{%- endcapture -%}
   {
     "type": "context",
     "elements": [

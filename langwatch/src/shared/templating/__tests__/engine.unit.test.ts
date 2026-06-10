@@ -62,6 +62,28 @@ describe("renderLiquid", () => {
     });
   });
 
+  describe("when the template contains a hostile CPU-bound loop", () => {
+    it("rejects instead of running the loop to completion", async () => {
+      await expect(
+        renderLiquid({
+          template: "{% for i in (1..100000000) %}x{% endfor %}",
+          context: {},
+          timeoutMs: 50,
+        }),
+      ).rejects.toBeDefined();
+    }, 5_000);
+  });
+
+  describe("when the template accesses a prototype property of a variable", () => {
+    it("renders empty because ownPropertyOnly hides the prototype chain", async () => {
+      const { output } = await renderLiquid({
+        template: "[{{ name.constructor }}]",
+        context: { name: "Acme" },
+      });
+      expect(output).toBe("[]");
+    });
+  });
+
   describe("when the template has a syntax error", () => {
     it("rejects", async () => {
       await expect(
