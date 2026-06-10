@@ -144,6 +144,7 @@ export function FieldsDefinition({
           <Button
             size="xs"
             variant="ghost"
+            data-testid={`add-${field}-field-button`}
             onClick={() => append({ identifier: "", type: "str" })}
           >
             <Plus size={16} />
@@ -255,6 +256,7 @@ export function FieldsDefinition({
                   colorPalette="gray"
                   size="sm"
                   height="40px"
+                  data-testid={`remove-${field}-field`}
                   onClick={() => {
                     remove(index);
                     void handleSubmit(onSubmit)();

@@ -13,7 +13,7 @@ export const entryNode = () => ({
   },
   deletable: false,
   data: {
-    name: "Entry",
+    name: "Entry point",
     outputs: [{ identifier: "question", type: "str" }],
     entry_selection: "random",
     train_size: 0.8,

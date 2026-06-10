@@ -12,7 +12,7 @@ export const entryNode = () => ({
   },
   deletable: false,
   data: {
-    name: "Entry",
+    name: "Entry point",
     outputs: [
       { identifier: "question", type: "str" },
       { identifier: "answer", type: "str" },
@@ -243,8 +243,14 @@ Return your judgment as either TRUE (no significant cognitive biases) or FALSE (
       data: {
         name: "End",
         behave_as: "evaluator",
+        // The fixed evaluator result vocabulary — see
+        // EVALUATOR_RESULT_FIELDS in EndPropertiesPanel. Unconnected
+        // fields are simply omitted from the evaluator's result.
         inputs: [
-          { identifier: "passed", type: "bool" },
+          { identifier: "passed", type: "bool", optional: true },
+          { identifier: "score", type: "float", optional: true },
+          { identifier: "details", type: "str", optional: true },
+          { identifier: "label", type: "str", optional: true },
         ],
       } satisfies End,
     },

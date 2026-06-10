@@ -41,7 +41,9 @@ export function DatasetModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  const { setNode } = useWorkflowStore(({ setNode }) => ({ setNode }));
+  const { attachEntryDataset } = useWorkflowStore(
+    ({ attachEntryDataset }) => ({ attachEntryDataset }),
+  );
 
   const updateNodeInternals = useUpdateNodeInternals();
 
@@ -110,20 +112,21 @@ export function DatasetModal({
       columnTypes: DatasetColumns,
       close: boolean,
     ) => {
-      setNode({
-        id: node.id,
-        data: {
-          ...node.data,
-          outputs: datasetColumnsToFields(columnTypes),
-          dataset: dataset,
-        } as Entry,
-      });
+      // Merge semantics: dataset columns are added to the entry's
+      // fields without clobbering user-defined inputs (see
+      // attachEntryDataset). The dataset is a data source, not the
+      // definition of the workflow's inputs.
+      attachEntryDataset(
+        node.id,
+        dataset,
+        datasetColumnsToFields(columnTypes),
+      );
       updateNodeInternals(node.id);
       if (close) {
         onClose();
       }
     },
-    [setNode, node.id, node.data, updateNodeInternals, onClose],
+    [attachEntryDataset, node.id, updateNodeInternals, onClose],
   );
 
   return (

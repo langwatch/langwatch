@@ -16,6 +16,7 @@ import { snakeCaseToPascalCase } from "../../utils/stringCasing";
 import type {
   BaseComponent,
   Component,
+  Entry,
   Field,
   LLMConfig,
   Workflow,
@@ -116,6 +117,19 @@ export type WorkflowStore = State & {
     optimizationState: Partial<Workflow["state"]["optimization"]>,
   ) => void;
   setHoveredNodeId: (nodeId: string | undefined) => void;
+  /**
+   * Attach (or replace) the dataset on an entry node, merging its
+   * columns into the node's fields instead of overwriting them.
+   * User-defined inputs survive a dataset attach; columns already
+   * present (by identifier) are not duplicated. The user can then
+   * remove dataset-derived fields they don't care about — the dataset
+   * stays attached either way.
+   */
+  attachEntryDataset: (
+    nodeId: string,
+    dataset: Entry["dataset"],
+    columns: Field[],
+  ) => void;
   setSelectedNode: (nodeId: string) => void;
   deselectAllNodes: () => void;
   setPropertiesExpanded: (expanded: boolean) => void;
@@ -452,6 +466,18 @@ export const store = (
   ) => {
     const resolved =
       typeof workflow === "function" ? workflow(get().getWorkflow()) : workflow;
+    // The entry node was historically named "Entry" and styled as a
+    // dataset grid, which made dataset columns read as the workflow's
+    // inputs. It now presents as "Entry point" everywhere — normalize
+    // legacy names on load so canvas and drawer agree (persisted on the
+    // next autosave).
+    if ("nodes" in resolved && resolved.nodes) {
+      resolved.nodes = resolved.nodes.map((node) =>
+        node.type === "entry" && node.data.name === "Entry"
+          ? { ...node, data: { ...node.data, name: "Entry point" } }
+          : node,
+      );
+    }
     const keys = Object.keys(resolved);
     logger.debug({ keys }, "setWorkflow: updating workflow");
     if ("edges" in resolved) {
@@ -934,6 +960,27 @@ export const store = (
   },
   setHoveredNodeId: (nodeId: string | undefined) => {
     set({ hoveredNodeId: nodeId });
+  },
+  attachEntryDataset: (
+    nodeId: string,
+    dataset: Entry["dataset"],
+    columns: Field[],
+  ) => {
+    set({
+      nodes: get().nodes.map((node) => {
+        if (node.id !== nodeId) return node;
+        const existing = node.data.outputs ?? [];
+        const existingIds = new Set(existing.map((f) => f.identifier));
+        const merged = [
+          ...existing,
+          ...columns.filter((c) => !existingIds.has(c.identifier)),
+        ];
+        return {
+          ...node,
+          data: { ...node.data, outputs: merged, dataset } as Component,
+        };
+      }),
+    });
   },
   setSelectedNode: (nodeId: string) => {
     set({

@@ -13,10 +13,10 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { Node } from "@xyflow/react";
 import { useCallback, useEffect, useState } from "react";
-import { Folder, Info } from "react-feather";
+import { ArrowRight, Database, Folder, Info, X } from "react-feather";
 import { useForm } from "react-hook-form";
+import { useShallow } from "zustand/react/shallow";
 import { z } from "zod";
-import { DatasetPreview } from "../../../components/datasets/DatasetPreview";
 import { Tooltip } from "../../../components/ui/tooltip";
 import { useGetDatasetData } from "../../hooks/useGetDatasetData";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
@@ -24,24 +24,50 @@ import type { Entry } from "../../types/dsl";
 import { DatasetModal } from "../DatasetModal";
 import {
   BasePropertiesPanel,
+  FieldsDefinition,
   PropertySectionTitle,
 } from "./BasePropertiesPanel";
 
+/**
+ * Drawer for the workflow's entry point.
+ *
+ * The fields here are the workflow's INPUTS — user-owned and editable.
+ * A dataset is an optional attachment that seeds those inputs with its
+ * columns (merge + dedup, see attachEntryDataset) and provides the rows
+ * for evaluations/optimizations; it is rendered as a compact card, not
+ * a data grid, so it never reads as "the inputs".
+ */
 export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
   const { open, onOpen, onClose } = useDisclosure();
   const [editingDataset, setEditingDataset] = useState<
     Entry["dataset"] | undefined
   >();
-  const {
-    rows,
-    columns,
-    total: total_,
-  } = useGetDatasetData({
+  const { total } = useGetDatasetData({
     dataset: "dataset" in node.data ? node.data.dataset : undefined,
     preview: true,
   });
-  const total = total_ ?? 0;
-  const { setNode } = useWorkflowStore(({ setNode }) => ({ setNode }));
+  const { setNode, setSelectedNode, endNodeId } = useWorkflowStore(
+    useShallow((state) => ({
+      setNode: state.setNode,
+      setSelectedNode: state.setSelectedNode,
+      endNodeId: state.nodes.find((n) => n.type === "end")?.id,
+    })),
+  );
+
+  const dataset = node.data.dataset;
+
+  const detachDataset = useCallback(() => {
+    setNode({
+      id: node.id,
+      data: { ...node.data, dataset: undefined },
+    });
+  }, [setNode, node.id, node.data]);
+
+  const goToEndNode = useCallback(() => {
+    if (endNodeId) {
+      setSelectedNode(endNodeId);
+    }
+  }, [endNodeId, setSelectedNode]);
 
   type FormData = {
     train_size: number;
@@ -120,53 +146,92 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
   return (
     <BasePropertiesPanel
       node={node}
-      outputsTitle="Fields"
-      outputsReadOnly
+      hideOutputs
       hideInputs
       hideParameters
     >
-      <VStack
-        as="form"
-        width="full"
-        align="start"
-        // eslint-disable-next-line @typescript-eslint/no-misused-promises
-        onSubmit={form.handleSubmit(onSubmit)}
-      >
+      {/* The entry fields are the workflow inputs — fully editable.
+          DSL-wise they live on the node's `outputs` (they're emitted to
+          downstream nodes), the user-facing language is "Inputs". */}
+      <FieldsDefinition node={node} title="Inputs" field="outputs" />
+
+      <VStack width="full" align="start">
         <HStack width="full">
-          <PropertySectionTitle>
-            Dataset{" "}
-            {total && (
-              <Text as="span" color="fg.subtle">
+          <PropertySectionTitle>Dataset</PropertySectionTitle>
+          <Spacer />
+          {!dataset && (
+            <Button
+              size="xs"
+              variant="ghost"
+              marginBottom={-1}
+              data-testid="attach-dataset-button"
+              onClick={() => {
+                setEditingDataset(undefined);
+                onOpen();
+              }}
+            >
+              <Folder size={14} />
+              <Text>Attach...</Text>
+            </Button>
+          )}
+        </HStack>
+        {dataset ? (
+          <HStack
+            width="full"
+            paddingX={3}
+            paddingY={2}
+            borderRadius="md"
+            border="1px solid"
+            borderColor="border"
+            data-testid="entry-dataset-card"
+          >
+            <Database size={14} style={{ flexShrink: 0 }} />
+            <Text fontSize="13px" truncate>
+              {dataset.name ?? "Dataset"}
+            </Text>
+            {total !== undefined && total !== null && (
+              <Text fontSize="13px" color="fg.subtle" flexShrink={0}>
                 ({total} rows)
               </Text>
             )}
-          </PropertySectionTitle>
-          <Spacer />
-          <Button
-            size="xs"
-            variant="ghost"
-            marginBottom={-1}
-            onClick={() => {
-              setEditingDataset(undefined);
-              onOpen();
-            }}
-          >
-            <Folder size={14} />
-            <Text>Choose...</Text>
-          </Button>
-        </HStack>
-        <DatasetPreview
-          rows={rows}
-          columns={columns.map((column) => ({
-            name: column.name,
-            type: "string",
-          }))}
-          onClick={() => {
-            setEditingDataset(node.data.dataset);
-            onOpen();
-          }}
-          minHeight={`${36 + 29 * (rows?.length ?? 0)}px`}
-        />
+            <Spacer />
+            <Button
+              size="xs"
+              variant="ghost"
+              onClick={() => {
+                setEditingDataset(node.data.dataset);
+                onOpen();
+              }}
+            >
+              Open
+            </Button>
+            <Button
+              size="xs"
+              variant="ghost"
+              onClick={() => {
+                setEditingDataset(undefined);
+                onOpen();
+              }}
+            >
+              Replace
+            </Button>
+            <Tooltip content="Detach dataset (inputs are kept)">
+              <Button
+                size="xs"
+                variant="ghost"
+                data-testid="detach-dataset-button"
+                onClick={detachDataset}
+              >
+                <X size={14} />
+              </Button>
+            </Tooltip>
+          </HStack>
+        ) : (
+          <Text fontSize="13px" color="fg.muted">
+            Optional. Attaching a dataset adds its columns to the inputs
+            and provides the rows for evaluations and optimizations.
+          </Text>
+        )}
       </VStack>
       <DatasetModal
         open={open}
@@ -174,221 +239,247 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
         node={node}
         editingDataset={editingDataset}
       />
-      <HStack width="full">
-        <VStack width="full" align="start">
-          <HStack width="full" gap={2} paddingBottom={2}>
-            <PropertySectionTitle>Optimization/Test Split</PropertySectionTitle>
-            <Tooltip
-              content="During optimization, a bigger part of the dataset is used for optimization and a smaller part for testing, this guarantees that the test set is not leaked into the optimization, preventing the LLM to 'cheat' it's way into a better score."
-              positioning={{ placement: "top" }}
-            >
-              <Box paddingTop={1}>
-                <Info size={14} />
-              </Box>
-            </Tooltip>
-          </HStack>
-          <HStack width="full" gap={0}>
-            <HStack width="full">
-              <Text
-                fontSize="13px"
-                fontWeight="600"
-                paddingLeft={4}
-                color="fg.muted"
+      {dataset && (
+        <HStack width="full">
+          <VStack
+            as="form"
+            width="full"
+            align="start"
+            // eslint-disable-next-line @typescript-eslint/no-misused-promises
+            onSubmit={form.handleSubmit(onSubmit)}
+          >
+            <HStack width="full" gap={2} paddingBottom={2}>
+              <PropertySectionTitle>
+                Optimization/Test Split
+              </PropertySectionTitle>
+              <Tooltip
+                content="During optimization, a bigger part of the dataset is used for optimization and a smaller part for testing, this guarantees that the test set is not leaked into the optimization, preventing the LLM to 'cheat' it's way into a better score."
+                positioning={{ placement: "top" }}
               >
-                Optimization Set
-              </Text>
-            </HStack>
-            <HStack width="full">
-              <Field.Root
-                width="45%"
-                invalid={!!form.formState.errors.train_size}
-              >
-                <Input
-                  {...form.register("train_size", { valueAsNumber: true })}
-                  type="number"
-                  required
-                  min={0}
-                  max={unit === "percent" ? 100 : undefined}
-                  step={1}
-                  size="sm"
-                  paddingRight={1}
-                />
-              </Field.Root>
-              <NativeSelect.Root width="55%" size="sm">
-                <NativeSelect.Field {...unitField}>
-                  <option value="percent">%</option>
-                  <option value="entries">entries</option>
-                </NativeSelect.Field>
-                <NativeSelect.Indicator />
-              </NativeSelect.Root>
-            </HStack>
-          </HStack>
-          {form.formState.errors.train_size && (
-            <Text
-              color="red.700"
-              fontSize="13px"
-              paddingLeft={4}
-              textAlign="right"
-              width="full"
-            >
-              {form.formState.errors.train_size.message}
-            </Text>
-          )}
-          <HStack width="full" gap={0}>
-            <HStack width="full">
-              <Text
-                fontSize="13px"
-                fontWeight="600"
-                paddingLeft={4}
-                color="fg.muted"
-              >
-                Test Set
-              </Text>
-            </HStack>
-            <HStack width="full">
-              <Field.Root
-                width="45%"
-                invalid={!!form.formState.errors.test_size}
-              >
-                <Input
-                  {...form.register("test_size", { valueAsNumber: true })}
-                  type="number"
-                  required
-                  min={0}
-                  max={unit === "percent" ? 100 : undefined}
-                  step={1}
-                  size="sm"
-                  paddingRight={1}
-                />
-              </Field.Root>
-              <NativeSelect.Root width="55%" size="sm">
-                <NativeSelect.Field
-                  value={unit}
-                  onChange={(e) => {
-                    form.setValue(
-                      "unit",
-                      e.target.value as "percent" | "entries",
-                    );
-                  }}
-                >
-                  <option value="percent">%</option>
-                  <option value="entries">entries</option>
-                </NativeSelect.Field>
-                <NativeSelect.Indicator />
-              </NativeSelect.Root>
-            </HStack>
-          </HStack>
-          {form.formState.errors.test_size && (
-            <Text
-              color="red.700"
-              fontSize="13px"
-              paddingLeft={4}
-              textAlign="right"
-              width="full"
-            >
-              {form.formState.errors.test_size.message}
-            </Text>
-          )}
-          <HStack width="full">
-            <HStack width="full">
-              <Text
-                fontSize="13px"
-                fontWeight="600"
-                paddingLeft={4}
-                color="fg.muted"
-              >
-                Shuffle Seed
-              </Text>
-              <Tooltip content="For making sure the original dataset order does not affect performance, a seed is used to shuffle it before the split. Use -1 if you want to disable shuffling.">
                 <Box paddingTop={1}>
                   <Info size={14} />
                 </Box>
               </Tooltip>
             </HStack>
-            <Field.Root invalid={!!form.formState.errors.seed}>
-              <Input
-                {...form.register("seed", { valueAsNumber: true })}
-                type="number"
-                size="sm"
-                required
-                value={node.data.seed ?? "42"}
-                min={-1}
-              />
-            </Field.Root>
-          </HStack>
-          {form.formState.errors.seed && (
-            <Text
-              color="red.700"
-              fontSize="13px"
-              paddingLeft={4}
-              textAlign="right"
-              width="full"
-            >
-              {form.formState.errors.seed.message}
-            </Text>
-          )}
-        </VStack>
-      </HStack>
-      <VStack width="full" align="start">
-        <HStack width="full">
-          <PropertySectionTitle>Manual Test Entry</PropertySectionTitle>
-          <Tooltip content="When manually running the full workflow, a single entry from the dataset will be used, choose which one to pick.">
-            <Box paddingTop={1}>
-              <Info size={14} />
-            </Box>
-          </Tooltip>
+            <HStack width="full" gap={0}>
+              <HStack width="full">
+                <Text
+                  fontSize="13px"
+                  fontWeight="600"
+                  paddingLeft={4}
+                  color="fg.muted"
+                >
+                  Optimization Set
+                </Text>
+              </HStack>
+              <HStack width="full">
+                <Field.Root
+                  width="45%"
+                  invalid={!!form.formState.errors.train_size}
+                >
+                  <Input
+                    {...form.register("train_size", { valueAsNumber: true })}
+                    type="number"
+                    required
+                    min={0}
+                    max={unit === "percent" ? 100 : undefined}
+                    step={1}
+                    size="sm"
+                    paddingRight={1}
+                  />
+                </Field.Root>
+                <NativeSelect.Root width="55%" size="sm">
+                  <NativeSelect.Field {...unitField}>
+                    <option value="percent">%</option>
+                    <option value="entries">entries</option>
+                  </NativeSelect.Field>
+                  <NativeSelect.Indicator />
+                </NativeSelect.Root>
+              </HStack>
+            </HStack>
+            {form.formState.errors.train_size && (
+              <Text
+                color="red.700"
+                fontSize="13px"
+                paddingLeft={4}
+                textAlign="right"
+                width="full"
+              >
+                {form.formState.errors.train_size.message}
+              </Text>
+            )}
+            <HStack width="full" gap={0}>
+              <HStack width="full">
+                <Text
+                  fontSize="13px"
+                  fontWeight="600"
+                  paddingLeft={4}
+                  color="fg.muted"
+                >
+                  Test Set
+                </Text>
+              </HStack>
+              <HStack width="full">
+                <Field.Root
+                  width="45%"
+                  invalid={!!form.formState.errors.test_size}
+                >
+                  <Input
+                    {...form.register("test_size", { valueAsNumber: true })}
+                    type="number"
+                    required
+                    min={0}
+                    max={unit === "percent" ? 100 : undefined}
+                    step={1}
+                    size="sm"
+                    paddingRight={1}
+                  />
+                </Field.Root>
+                <NativeSelect.Root width="55%" size="sm">
+                  <NativeSelect.Field
+                    value={unit}
+                    onChange={(e) => {
+                      form.setValue(
+                        "unit",
+                        e.target.value as "percent" | "entries",
+                      );
+                    }}
+                  >
+                    <option value="percent">%</option>
+                    <option value="entries">entries</option>
+                  </NativeSelect.Field>
+                  <NativeSelect.Indicator />
+                </NativeSelect.Root>
+              </HStack>
+            </HStack>
+            {form.formState.errors.test_size && (
+              <Text
+                color="red.700"
+                fontSize="13px"
+                paddingLeft={4}
+                textAlign="right"
+                width="full"
+              >
+                {form.formState.errors.test_size.message}
+              </Text>
+            )}
+            <HStack width="full">
+              <HStack width="full">
+                <Text
+                  fontSize="13px"
+                  fontWeight="600"
+                  paddingLeft={4}
+                  color="fg.muted"
+                >
+                  Shuffle Seed
+                </Text>
+                <Tooltip content="For making sure the original dataset order does not affect performance, a seed is used to shuffle it before the split. Use -1 if you want to disable shuffling.">
+                  <Box paddingTop={1}>
+                    <Info size={14} />
+                  </Box>
+                </Tooltip>
+              </HStack>
+              <Field.Root invalid={!!form.formState.errors.seed}>
+                <Input
+                  {...form.register("seed", { valueAsNumber: true })}
+                  type="number"
+                  size="sm"
+                  required
+                  value={node.data.seed ?? "42"}
+                  min={-1}
+                />
+              </Field.Root>
+            </HStack>
+            {form.formState.errors.seed && (
+              <Text
+                color="red.700"
+                fontSize="13px"
+                paddingLeft={4}
+                textAlign="right"
+                width="full"
+              >
+                {form.formState.errors.seed.message}
+              </Text>
+            )}
+          </VStack>
         </HStack>
-        <VStack width="full" align="start" gap={2}>
-          <NativeSelect.Root>
-            <NativeSelect.Field
-              value={
-                typeof node.data.entry_selection === "number"
-                  ? "specific"
-                  : node.data.entry_selection
-              }
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
-                const value = e.target.value;
-                setNode({
-                  id: node.id,
-                  data: {
-                    ...node.data,
-                    entry_selection: value === "specific" ? 0 : value,
-                  },
-                });
-              }}
-            >
-              <option value="first">First</option>
-              <option value="last">Last</option>
-              <option value="random">Random</option>
-              <option value="specific">Specific Row ID</option>
-            </NativeSelect.Field>
-            <NativeSelect.Indicator />
-          </NativeSelect.Root>
-          {typeof node.data.entry_selection === "number" && (
-            <Field.Root width="full">
-              <Input
-                type="number"
-                size="sm"
-                min={0}
-                value={node.data.entry_selection}
-                onChange={(e) => {
-                  const value = e.target.value
-                    ? parseInt(e.target.value, 10)
-                    : 0;
+      )}
+      {dataset && (
+        <VStack width="full" align="start">
+          <HStack width="full">
+            <PropertySectionTitle>Manual Test Entry</PropertySectionTitle>
+            <Tooltip content="When manually running the full workflow, a single entry from the dataset will be used, choose which one to pick.">
+              <Box paddingTop={1}>
+                <Info size={14} />
+              </Box>
+            </Tooltip>
+          </HStack>
+          <VStack width="full" align="start" gap={2}>
+            <NativeSelect.Root>
+              <NativeSelect.Field
+                value={
+                  typeof node.data.entry_selection === "number"
+                    ? "specific"
+                    : node.data.entry_selection
+                }
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                  const value = e.target.value;
                   setNode({
                     id: node.id,
                     data: {
                       ...node.data,
-                      entry_selection: value,
+                      entry_selection: value === "specific" ? 0 : value,
                     },
                   });
                 }}
-                placeholder="Enter row ID"
-              />
-            </Field.Root>
-          )}
+              >
+                <option value="first">First</option>
+                <option value="last">Last</option>
+                <option value="random">Random</option>
+                <option value="specific">Specific Row ID</option>
+              </NativeSelect.Field>
+              <NativeSelect.Indicator />
+            </NativeSelect.Root>
+            {typeof node.data.entry_selection === "number" && (
+              <Field.Root width="full">
+                <Input
+                  type="number"
+                  size="sm"
+                  min={0}
+                  value={node.data.entry_selection}
+                  onChange={(e) => {
+                    const value = e.target.value
+                      ? parseInt(e.target.value, 10)
+                      : 0;
+                    setNode({
+                      id: node.id,
+                      data: {
+                        ...node.data,
+                        entry_selection: value,
+                      },
+                    });
+                  }}
+                  placeholder="Enter row ID"
+                />
+              </Field.Root>
+            )}
+          </VStack>
         </VStack>
-      </VStack>
+      )}
+      {endNodeId && (
+        <HStack width="full">
+          <Spacer />
+          <Button
+            size="xs"
+            variant="ghost"
+            data-testid="go-to-end-node"
+            onClick={goToEndNode}
+          >
+            <Text>End node</Text>
+            <ArrowRight size={14} />
+          </Button>
+        </HStack>
+      )}
     </BasePropertiesPanel>
   );
 }
