@@ -1,20 +1,24 @@
-import { Box, chakra, Flex, Icon } from "@chakra-ui/react";
-import { Search } from "lucide-react";
-import { AnimatePresence } from "motion/react";
+import { Box, chakra, Flex, HStack, Icon, IconButton, Text, VStack } from "@chakra-ui/react";
+import { AlertCircle, ChevronDown, ChevronUp, Search, X } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import type { AiActionError } from "~/server/app-layer/traces/ai-query";
 import { SEARCH_FIELDS } from "~/server/app-layer/traces/query-language/metadata";
-import { useTraceFacets } from "../../hooks/useTraceFacets";
 import { analyzeOrGroups } from "~/server/app-layer/traces/query-language/queries";
+import { useTraceFacets } from "../../hooks/useTraceFacets";
+import { usePreviewTracesActive } from "../../onboarding/hooks/usePreviewTracesActive";
 import { useFacetHoverStore } from "../../stores/facetHoverStore";
 import { useFilterStore } from "../../stores/filterStore";
+import { AiErrorDetails, hasAiErrorDetails } from "./ErrorBannerDetail";
 import { AskAiButton } from "../ai/AskAiButton";
 import { ActiveSearchEditor } from "./ActiveSearchEditor";
 import { editorStyles } from "./editorStyles";
 import { FloatingAiBar } from "./FloatingAiBar";
+import { setFilterChipLabels } from "./filterHighlight";
 import { PlaceholderEditor } from "./PlaceholderEditor";
 import {
   ClearButton,
@@ -35,20 +39,35 @@ import { useGlobalAiShortcut } from "./useGlobalAiShortcut";
 
 const MAX_DYNAMIC_ITEMS = 10;
 
-function rankAndSlice(
-  values: readonly { value: string; count: number }[],
-  query: string,
-): { items: string[]; counts: Record<string, number> } | null {
+type RankedValue = { value: string; count: number; label?: string };
+
+function rankAndSlice({
+  values,
+  query,
+}: {
+  values: readonly RankedValue[];
+  query: string;
+}): {
+  items: string[];
+  counts: Record<string, number>;
+  labels?: Record<string, string>;
+} | null {
   if (values.length === 0) return null;
   const q = query.toLowerCase();
-  const prefix: { value: string; count: number }[] = [];
-  const contains: { value: string; count: number }[] = [];
+  const prefix: RankedValue[] = [];
+  const contains: RankedValue[] = [];
   for (const v of values) {
     if (!q) {
       prefix.push(v);
       continue;
     }
     const lower = v.value.toLowerCase();
+    // Match against the id only — never the label. The user has
+    // explicitly asked that names are display-only and the query
+    // language stay ID-rooted, which keeps the chip and the typed
+    // query in lock-step: if the user types "gpt-4o" they get a chip
+    // whose underlying value is `gpt-4o`, not whichever evaluator
+    // happens to be named "GPT-4o today".
     if (lower.startsWith(q)) prefix.push(v);
     else if (lower.includes(q)) contains.push(v);
   }
@@ -56,13 +75,24 @@ function rankAndSlice(
   if (top.length === 0) return null;
   const items = top.map((v) => v.value);
   const counts: Record<string, number> = {};
-  for (const v of top) counts[v.value] = v.count;
-  return { items, counts };
+  const labels: Record<string, string> = {};
+  let hasLabel = false;
+  for (const v of top) {
+    counts[v.value] = v.count;
+    if (v.label && v.label !== v.value) {
+      labels[v.value] = v.label;
+      hasLabel = true;
+    }
+  }
+  return hasLabel ? { items, counts, labels } : { items, counts };
 }
 
 export const SearchBar: React.FC = () => {
   const queryText = useFilterStore((s) => s.queryText);
   const parseError = useFilterStore((s) => s.parseError);
+  const aiError = useFilterStore((s) => s.aiError);
+  const setAiError = useFilterStore((s) => s.setAiError);
+  const dismissParseError = useFilterStore((s) => s.dismissParseError);
   const applyQueryText = useFilterStore((s) => s.applyQueryText);
   const clearAll = useFilterStore((s) => s.clearAll);
   const lastAiTranslation = useFilterStore((s) => s.lastAiTranslation);
@@ -83,8 +113,18 @@ export const SearchBar: React.FC = () => {
   const { project } = useOrganizationTeamProject();
   const { hasEnabledProviders, isLoading: isLoadingProviders } =
     useModelProvidersSettings({ projectId: project?.id });
-  const askAiNeedsProviderPrimer =
-    !isLoadingProviders && !hasEnabledProviders;
+  const askAiNeedsProviderPrimer = !isLoadingProviders && !hasEnabledProviders;
+  // Ask AI hits a real LLM against the user's real traces. In sample
+  // mode the rows are hardcoded client-side fixtures with no server
+  // footprint, so any AI query would either error or hallucinate.
+  // Surface the button as gated with a one-line tooltip so the user
+  // knows the affordance is real, just unavailable here. The ⌘I /
+  // ⌘+⏎ shortcuts also bail in this mode so we don't dump them into
+  // a composer they can't submit from.
+  const isSamplePreview = usePreviewTracesActive();
+  const askAiSampleDisabledReason = isSamplePreview
+    ? "Ask AI works on your real traces — not on the sample data."
+    : undefined;
 
   // Defer TipTap mount until the user actually focuses the search bar — the
   // ProseMirror init reflow used to dominate LCP.
@@ -104,8 +144,9 @@ export const SearchBar: React.FC = () => {
   // SearchBar so the popover can portal into document.body and share
   // the same instance whether the click came from PlaceholderEditor or
   // the live ProseMirror editor.
-  const [tokenAnchor, setTokenAnchor] =
-    useState<TokenValuePickerAnchor | null>(null);
+  const [tokenAnchor, setTokenAnchor] = useState<TokenValuePickerAnchor | null>(
+    null,
+  );
 
   const requestEditor = useCallback(() => setEditorMounted(true), []);
 
@@ -190,8 +231,9 @@ export const SearchBar: React.FC = () => {
   // the gradient activation feels identical from key or click.
   const handleAiShortcut = useCallback(() => {
     if (askAiNeedsProviderPrimer) return;
+    if (isSamplePreview) return;
     setAiMode(true);
-  }, [askAiNeedsProviderPrimer]);
+  }, [askAiNeedsProviderPrimer, isSamplePreview]);
   useGlobalAiShortcut(handleAiShortcut);
 
   // ⌘+⏎ / Ctrl+⏎ from inside the editor: punt the typed text into AI
@@ -201,13 +243,14 @@ export const SearchBar: React.FC = () => {
   const handleEditorAiShortcut = useCallback(
     (currentText: string) => {
       if (askAiNeedsProviderPrimer) return;
+      if (isSamplePreview) return;
       const trimmed = currentText.trim();
       // Empty input still opens the composer (parity with the button),
       // it just doesn't auto-submit a blank prompt.
       setAiAutoSubmitSeed(trimmed.length > 0 ? trimmed : null);
       setAiMode(true);
     },
-    [askAiNeedsProviderPrimer],
+    [askAiNeedsProviderPrimer, isSamplePreview],
   );
 
   const handleAiBarClose = useCallback(() => {
@@ -221,13 +264,35 @@ export const SearchBar: React.FC = () => {
   // refreshSuggestion so each keystroke produces one render, not two.
   const { data: facets } = useTraceFacets();
   const valueSourceByField = useMemo(() => {
-    const map = new Map<string, readonly { value: string; count: number }[]>();
+    const map = new Map<
+      string,
+      readonly { value: string; count: number; label?: string }[]
+    >();
     for (const facet of facets) {
       if (facet.kind === "categorical") {
         map.set(facet.key, facet.topValues);
       }
     }
     return map;
+  }, [facets]);
+
+  // Publish the (field → value → label) lookup the chip overlay reads
+  // from. The editor's FilterHighlight plugin watches this via a
+  // module-level ref; we ping it with a LABEL_REFRESH meta so chips
+  // re-render with their new overlays the moment facets land. Without
+  // the meta the plugin's cached decorations would stay stale until
+  // the next keystroke.
+  useEffect(() => {
+    const map: Record<string, Record<string, string>> = {};
+    for (const facet of facets) {
+      if (facet.kind !== "categorical") continue;
+      const fieldMap: Record<string, string> = {};
+      for (const v of facet.topValues) {
+        if (v.label && v.label !== v.value) fieldMap[v.value] = v.label;
+      }
+      if (Object.keys(fieldMap).length > 0) map[facet.key] = fieldMap;
+    }
+    setFilterChipLabels(map);
   }, [facets]);
   const valueResolver = useCallback<ValueResolver>(
     (field, query) => {
@@ -236,7 +301,7 @@ export const SearchBar: React.FC = () => {
       if (!facetField) return null;
       const source = valueSourceByField.get(facetField);
       if (!source) return null;
-      return rankAndSlice(source, query.replace(/\*+$/, ""));
+      return rankAndSlice({ values: source, query: query.replace(/\*+$/, "") });
     },
     [valueSourceByField],
   );
@@ -249,6 +314,7 @@ export const SearchBar: React.FC = () => {
       flexShrink={0}
       zIndex={20}
       minHeight="38px"
+      data-spotlight="search-bar"
     >
       <SyntaxHelpDrawerHost />
       <AnimatePresence>
@@ -275,77 +341,197 @@ export const SearchBar: React.FC = () => {
         )}
       </AnimatePresence>
       {!aiMode && (
-        <Flex
-          align="center"
-          width="full"
-          gap={2}
-          paddingX={3}
-          paddingY={1.5}
-          borderBottomWidth="1px"
-          borderColor={statusBorderColor(status)}
-          minHeight="38px"
-          bg={statusBackgroundColor(status)}
-          transition="background 120ms ease, border-color 120ms ease"
-          position="relative"
-          zIndex={1}
-        >
-          <AskAiButton
-            onClick={() => setAiMode(true)}
-            needsProviderPrimer={askAiNeedsProviderPrimer}
-          />
-          <Icon color="fg.subtle" flexShrink={0} boxSize="14px">
-            <Search />
-          </Icon>
+        <>
+          <Flex
+            align="center"
+            width="full"
+            gap={2}
+            paddingX={3}
+            paddingY={1.5}
+            borderBottomWidth={status.kind === "error" ? "0" : "1px"}
+            borderColor={statusBorderColor(status)}
+            minHeight="38px"
+            bg={statusBackgroundColor(status)}
+            transition="background 120ms ease, border-color 120ms ease"
+            position="relative"
+            zIndex={1}
+          >
+            <AskAiButton
+              onClick={() => setAiMode(true)}
+              needsProviderPrimer={askAiNeedsProviderPrimer}
+              disabledReason={askAiSampleDisabledReason}
+            />
+            <Icon color="fg.subtle" flexShrink={0} boxSize="14px">
+              <Search />
+            </Icon>
 
-          <Box flex={1} minWidth={0} position="relative" css={editorStyles}>
-            {editorMounted ? (
-              <ActiveSearchEditor
-                queryText={queryText}
-                applyQueryText={applyQueryText}
-                autoFocus
-                onHasContentChange={setEditorHasContent}
-                valueResolver={valueResolver}
-                onTokenClick={setTokenAnchor}
-                onAiShortcut={handleEditorAiShortcut}
-                onSuggestionOpenChange={setSuggestionOpen}
-                onCursorAnchorChange={setCursorAnchorX}
-                onFocusChange={setEditorFocused}
-              />
-            ) : (
-              <PlaceholderEditor
-                queryText={queryText}
-                onActivate={requestEditor}
-                onApplyQueryText={applyQueryText}
-                onTokenClick={setTokenAnchor}
-              />
-            )}
-            {hasContent &&
-              editorFocused &&
-              !suggestionOpen &&
-              !askAiNeedsProviderPrimer && (
-                <SearchSubmitHint anchorX={cursorAnchorX} />
+            <Box flex={1} minWidth={0} position="relative" css={editorStyles}>
+              {editorMounted ? (
+                <ActiveSearchEditor
+                  queryText={queryText}
+                  applyQueryText={applyQueryText}
+                  autoFocus
+                  onHasContentChange={setEditorHasContent}
+                  valueResolver={valueResolver}
+                  onTokenClick={setTokenAnchor}
+                  onAiShortcut={handleEditorAiShortcut}
+                  onSuggestionOpenChange={setSuggestionOpen}
+                  onCursorAnchorChange={setCursorAnchorX}
+                  onFocusChange={setEditorFocused}
+                />
+              ) : (
+                <PlaceholderEditor
+                  queryText={queryText}
+                  onActivate={requestEditor}
+                  onApplyQueryText={applyQueryText}
+                  onTokenClick={setTokenAnchor}
+                />
               )}
-          </Box>
+              {hasContent &&
+                editorFocused &&
+                !suggestionOpen &&
+                !askAiNeedsProviderPrimer && (
+                  <SearchSubmitHint anchorX={cursorAnchorX} />
+                )}
+            </Box>
 
-          <StatusBadge status={status} />
-          <SearchTipsPopover />
-          {hasContent ? (
-            <ClearButton onClear={handleClear} />
-          ) : (
-            <Kbd>{"/"}</Kbd>
-          )}
-          <TokenValuePicker
-            anchor={tokenAnchor}
-            onClose={() => setTokenAnchor(null)}
+            {/* Only render the badge for non-error statuses — parse errors
+                get the full inline banner below, which is far more visible
+                and positioned right under the input where the user is
+                looking. Showing the badge *and* the banner would be
+                redundant and noisy. */}
+            {status.kind !== "error" && <StatusBadge status={status} />}
+            <SearchTipsPopover />
+            {hasContent ? (
+              <ClearButton onClear={handleClear} />
+            ) : (
+              <Kbd>{"/"}</Kbd>
+            )}
+            <TokenValuePicker
+              anchor={tokenAnchor}
+              onClose={() => setTokenAnchor(null)}
+            />
+          </Flex>
+          {/* Unified error banner — handles both parse errors and AI errors.
+              AI error takes priority when both are present (AI mode is the
+              active flow). Rendered outside the Flex row so it spans the
+              full bar width without fighting the row's gap/padding. */}
+          <UnifiedErrorBanner
+            parseError={parseError}
+            aiError={aiError}
+            onDismissAiError={() => setAiError(null)}
+            onDismissParseError={dismissParseError}
           />
-        </Flex>
+        </>
       )}
     </Box>
   );
 };
 
+/**
+ * Unified error banner rendered flush below the search bar.
+ * Shows AI errors (with expand/collapse for structured details) or parse
+ * errors (plain message only). AI error takes priority when both are set.
+ * Each error type has its own dismiss button.
+ */
+const UnifiedErrorBanner: React.FC<{
+  parseError: string | null;
+  aiError: AiActionError | null;
+  onDismissAiError: () => void;
+  onDismissParseError: () => void;
+}> = ({ parseError, aiError, onDismissAiError, onDismissParseError }) => {
+  const [expanded, setExpanded] = useState(false);
+
+  // When the active error changes, collapse so stale expand state doesn't
+  // show a mismatched detail section.
+  useEffect(() => {
+    setExpanded(false);
+  }, [aiError, parseError]);
+
+  // AI error wins when both are present.
+  const activeAiError = aiError;
+  const activeParseError = !aiError ? parseError : null;
+
+  const showBanner = Boolean(activeAiError ?? activeParseError);
+  const canExpand = Boolean(activeAiError && hasAiErrorDetails(activeAiError));
+  const message = activeAiError ? activeAiError.message : activeParseError;
+  const handleDismiss = activeAiError ? onDismissAiError : onDismissParseError;
+
+  return (
+    <AnimatePresence>
+      {showBanner && message && (
+        <motion.div
+          key="error-banner"
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <VStack
+            gap={0}
+            bg="red.subtle"
+            borderBottomWidth="1px"
+            borderColor="red.muted"
+            align="stretch"
+          >
+            <HStack
+              gap={2}
+              paddingX={3}
+              paddingY={1.5}
+              align="flex-start"
+            >
+              <Icon
+                color="red.fg"
+                boxSize="13px"
+                flexShrink={0}
+                marginTop="1px"
+              >
+                <AlertCircle />
+              </Icon>
+              <Text
+                textStyle="xs"
+                color="red.fg"
+                fontWeight="500"
+                flex={1}
+              >
+                {message}
+              </Text>
+              {canExpand && (
+                <IconButton
+                  aria-label={expanded ? "Collapse error details" : "Expand error details"}
+                  size="2xs"
+                  variant="ghost"
+                  color="red.fg"
+                  onClick={() => setExpanded((e) => !e)}
+                >
+                  {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                </IconButton>
+              )}
+              <IconButton
+                aria-label="Dismiss error"
+                size="2xs"
+                variant="ghost"
+                color="red.fg"
+                onClick={handleDismiss}
+              >
+                <X size={12} />
+              </IconButton>
+            </HStack>
+            {expanded && activeAiError && canExpand && (
+              <Box paddingX={3} paddingBottom={2}>
+                <AiErrorDetails error={activeAiError} />
+              </Box>
+            )}
+          </VStack>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};
+
 const IS_MAC =
-  typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+  typeof navigator !== "undefined" &&
+  /Mac|iPhone|iPad/.test(navigator.platform);
 const MOD_KEY_SYMBOL = IS_MAC ? "⌘" : "Ctrl";
 
 /**
@@ -365,7 +551,7 @@ const SearchSubmitHint: React.FC<{ anchorX: number }> = ({ anchorX }) => (
     // the editor's typing line on light mode.
     top="calc(50% - 1px)"
     transform="translateY(-50%)"
-    color={{ base: "gray.400", _dark: "gray.500" }}
+    color="fg.subtle"
     fontSize="xs"
     fontWeight="normal"
     whiteSpace="nowrap"

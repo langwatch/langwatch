@@ -64,20 +64,20 @@ export class SimulationRunnerService {
         throw new Error(`Project ${projectId} not found or has no API key`);
       }
 
-      // 3. Resolve the project's DEFAULT model for the scenario generator
-      //    via the cascade. Throws ModelNotConfiguredError if no scope has
-      //    one configured; the surrounding catch logs and bails so the
-      //    user is prompted to add a default before retrying.
-      const simulatorModel = await getVercelAIModel(
+      // 3. Resolve the user-simulator and judge models via the cascade.
+      //    Each defaults to its own DEFAULT-role feature key so the
+      //    role-play and evaluation use a smart model. Throws
+      //    ModelNotConfiguredError if no scope has one configured; the
+      //    surrounding catch logs and bails so the user is prompted to add
+      //    a default before retrying.
+      const simulatorModel = await getVercelAIModel({
         projectId,
-        undefined,
-        "scenarios.generator",
-      );
-      const judgeModel = await getVercelAIModel(
+        featureKey: "scenarios.user_simulator",
+      });
+      const judgeModel = await getVercelAIModel({
         projectId,
-        undefined,
-        "scenarios.generator",
-      );
+        featureKey: "scenarios.judge",
+      });
 
       // 4. Resolve target to adapter
       logger.debug(

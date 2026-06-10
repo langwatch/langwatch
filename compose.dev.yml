@@ -102,7 +102,11 @@ services:
     deploy:
       resources:
         limits:
-          memory: 64m
+          # Bulk-trace seeding piles 25–30k queue / event keys into
+          # Redis; the 64m ceiling was triggering an OOM kill during
+          # BGSAVE fork. 512m gives the dev stack headroom while still
+          # being a fraction of what prod would use.
+          memory: 512m
           cpus: "0.25"
 
   clickhouse:
@@ -121,7 +125,12 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2g
+          # Eval-rich seed loads (1–4 evaluation_runs per trace, async
+          # inserts queued up via the customEvaluationSync reactor) were
+          # pushing CH past the 2g ceiling during BGSAVE / merges and
+          # the OvercommitTracker started killing inserts. 4g keeps the
+          # dev stack stable under the worst seed we've thrown at it.
+          memory: 4g
           cpus: "1.0"
 
   # =============================================================================

@@ -100,7 +100,7 @@ export const StatusBadge: React.FC<{
             >
               <AlertTriangle size={11} />
             </Box>
-            <VStack align="start" gap={0.5}>
+            <VStack align="start" gap={0.5} minWidth={0} flex={1}>
               <Text
                 textStyle="xs"
                 fontWeight="700"
@@ -110,7 +110,14 @@ export const StatusBadge: React.FC<{
               >
                 {status.kind === "error" ? "Invalid query" : "Heads up"}
               </Text>
-              <Text textStyle="sm" color="fg">
+              <Text
+                textStyle="sm"
+                color="fg"
+                wordBreak="break-word"
+                maxHeight="120px"
+                overflowY="auto"
+                width="full"
+              >
                 {status.message}
               </Text>
             </VStack>
@@ -168,4 +175,3 @@ export const ClearButton: React.FC<{
     <X size={12} />
   </Button>
 );
-

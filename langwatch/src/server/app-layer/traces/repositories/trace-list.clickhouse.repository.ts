@@ -883,6 +883,17 @@ type FacetRow = {
   facet_label?: string;
   cnt: number;
   total_distinct: number;
+  // Optional per-value aggregates carried by the evaluator facet's
+  // custom queryBuilder so the sidebar can render the inline drilldown
+  // (verdict pills + score range + hasLabel indicator) without firing
+  // a second query per evaluator.
+  passed_count?: string | number;
+  failed_count?: string | number;
+  errored_count?: string | number;
+  score_min?: number | null;
+  score_max?: number | null;
+  has_score?: boolean | number;
+  has_label?: boolean | number;
 };
 
 function mapFacetRows(rows: FacetRow[]): CategoricalFacetResult {
@@ -891,8 +902,46 @@ function mapFacetRows(rows: FacetRow[]): CategoricalFacetResult {
       value: r.facet_value,
       ...(r.facet_label ? { label: r.facet_label } : {}),
       count: Number(r.cnt),
+      ...extractFacetAggregates(r),
     })),
     totalDistinct: rows.length > 0 ? Number(rows[0]!.total_distinct) : 0,
+  };
+}
+
+function extractFacetAggregates(r: FacetRow): {
+  aggregates?: {
+    passedCount: number;
+    failedCount: number;
+    erroredCount: number;
+    scoreMin: number | null;
+    scoreMax: number | null;
+    hasScore: boolean;
+    hasLabel: boolean;
+  };
+} {
+  // Only the evaluator facet's queryBuilder emits these columns. Other
+  // facets (status, model, …) return undefined for all of them, so the
+  // discriminator below avoids attaching an empty aggregates object to
+  // every facet value.
+  if (
+    r.passed_count === undefined &&
+    r.failed_count === undefined &&
+    r.errored_count === undefined &&
+    r.has_score === undefined &&
+    r.has_label === undefined
+  ) {
+    return {};
+  }
+  return {
+    aggregates: {
+      passedCount: Number(r.passed_count ?? 0),
+      failedCount: Number(r.failed_count ?? 0),
+      erroredCount: Number(r.errored_count ?? 0),
+      scoreMin: r.score_min == null ? null : Number(r.score_min),
+      scoreMax: r.score_max == null ? null : Number(r.score_max),
+      hasScore: Boolean(r.has_score),
+      hasLabel: Boolean(r.has_label),
+    },
   };
 }
 

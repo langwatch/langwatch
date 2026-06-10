@@ -51,6 +51,7 @@ export function buildSpanAttributeKeysFacetQuery(
           AND length(SpanAttributes.keys) > 0
       )
       WHERE key != ''
+        AND NOT startsWith(key, 'langwatch.reserved.')
         ${prefixFilter}
       GROUP BY key
       ORDER BY cnt DESC

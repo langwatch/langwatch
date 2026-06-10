@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   estimateCost,
   matchModelCostWithFallbacks,
+  normalizeBedrockModelId,
   normalizeModelName,
 } from "../cost";
 import { getStaticModelCosts } from "../../../../modelProviders/llmModelCost";
@@ -195,6 +196,56 @@ describe("normalizeModelName", () => {
   });
 });
 
+describe("normalizeBedrockModelId", () => {
+  describe("when given a regional Bedrock model id", () => {
+    it("strips the region and converts vendor-dot to vendor-slash", () => {
+      expect(normalizeBedrockModelId("eu.anthropic.claude-sonnet-4-6")).toBe(
+        "anthropic/claude-sonnet-4-6",
+      );
+    });
+  });
+
+  describe("when given a versioned Bedrock model id", () => {
+    it("strips the revision marker and version suffix", () => {
+      expect(
+        normalizeBedrockModelId("us.anthropic.claude-haiku-4-5-20251001-v1:0"),
+      ).toBe("anthropic/claude-haiku-4-5-20251001");
+    });
+  });
+
+  describe("when given a litellm-style bedrock/ prefixed id (@regression)", () => {
+    it("strips the bedrock/ envelope along with the region", () => {
+      expect(
+        normalizeBedrockModelId("bedrock/eu.anthropic.claude-sonnet-4-6"),
+      ).toBe("anthropic/claude-sonnet-4-6");
+    });
+
+    it("strips the bedrock/ envelope on versioned ids", () => {
+      expect(
+        normalizeBedrockModelId(
+          "bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0",
+        ),
+      ).toBe("anthropic/claude-haiku-4-5-20251001");
+    });
+
+    it("strips the bedrock/ envelope when no region prefix is present", () => {
+      expect(
+        normalizeBedrockModelId("bedrock/anthropic.claude-sonnet-4-6"),
+      ).toBe("anthropic/claude-sonnet-4-6");
+    });
+  });
+
+  describe("when given a non-Bedrock model id", () => {
+    it("leaves a vendor-slash model untouched", () => {
+      expect(normalizeBedrockModelId("openai/gpt-4o")).toBe("openai/gpt-4o");
+    });
+
+    it("leaves a bare model name untouched", () => {
+      expect(normalizeBedrockModelId("gpt-4o")).toBe("gpt-4o");
+    });
+  });
+});
+
 describe("matchModelCostWithFallbacks", () => {
   describe("when model name matches exactly", () => {
     it("finds cost for model name without vendor prefix", () => {
@@ -357,6 +408,55 @@ describe("matchModelCostWithFallbacks", () => {
       expect(
         matchModelCostWithFallbacks("minimaxai/minimax-m2.1", realCosts)?.model
       ).toBe("minimax/minimax-m2.1");
+    });
+  });
+
+  describe("when model id comes from Bedrock (@regression)", () => {
+    const realCosts = getStaticModelCosts();
+
+    /** @scenario A bare regional Bedrock model id keeps resolving registry pricing */
+    it("matches eu.anthropic.claude-sonnet-4-6 to anthropic/claude-sonnet-4-6", () => {
+      expect(
+        matchModelCostWithFallbacks("eu.anthropic.claude-sonnet-4-6", realCosts)
+          ?.model
+      ).toBe("anthropic/claude-sonnet-4-6");
+    });
+
+    /** @scenario A bedrock/-prefixed regional model id resolves registry pricing */
+    it("matches bedrock/eu.anthropic.claude-sonnet-4-6 to anthropic/claude-sonnet-4-6", () => {
+      expect(
+        matchModelCostWithFallbacks(
+          "bedrock/eu.anthropic.claude-sonnet-4-6",
+          realCosts
+        )?.model
+      ).toBe("anthropic/claude-sonnet-4-6");
+    });
+
+    /** @scenario A bedrock/-prefixed versioned model id resolves registry pricing */
+    it("matches bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0 to anthropic/claude-haiku-4-5", () => {
+      expect(
+        matchModelCostWithFallbacks(
+          "bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0",
+          realCosts
+        )?.model
+      ).toBe("anthropic/claude-haiku-4-5");
+    });
+
+    /** @scenario A custom cost regex written against the bedrock/-prefixed spelling still wins */
+    it("prefers a custom cost regex anchored on the bedrock/ spelling over the registry", () => {
+      const customCost: MaybeStoredLLMModelCost = {
+        projectId: "proj1",
+        model: "bedrock/eu.anthropic.claude-sonnet-4-6",
+        regex: "^bedrock\\/eu\\.anthropic\\.claude-sonnet-4-6$",
+        inputCostPerToken: 0.000003,
+        outputCostPerToken: 0.000015,
+      };
+      expect(
+        matchModelCostWithFallbacks("bedrock/eu.anthropic.claude-sonnet-4-6", [
+          customCost,
+          ...realCosts,
+        ])?.model
+      ).toBe("bedrock/eu.anthropic.claude-sonnet-4-6");
     });
   });
 

@@ -1,46 +1,34 @@
-"""
-Core PromptData structure for prompts.
+from typing import Any, Dict, List, Literal, Optional, Union
 
-This module contains the PromptData Pydantic model with conversion methods,
-following the TypeScript PromptData interface structure.
-"""
+from pydantic import BaseModel, ConfigDict, Field
 
-from typing import Literal, Optional, List, Union
-
-from pydantic import BaseModel, ConfigDict
-
-from langwatch.generated.langwatch_rest_api_client.types import Unset
 from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_200 import (
     GetApiPromptsByIdResponse200,
-)
-from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_response_200 import (
-    PutApiPromptsByIdResponse200,
 )
 from langwatch.generated.langwatch_rest_api_client.models.post_api_prompts_response_200 import (
     PostApiPromptsResponse200,
 )
+from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_response_200 import (
+    PutApiPromptsByIdResponse200,
+)
+from langwatch.generated.langwatch_rest_api_client.types import Unset
 
 from .structures import Message, ResponseFormat
 
 
 class PromptData(BaseModel):
-    """
-    Core data structure for prompts, matching the TypeScript PromptData interface.
-
-    Contains both core functionality fields and optional metadata for identification/tracing.
-    """
-
     model_config = ConfigDict(extra="ignore")
 
     # === Core functionality (required) ===
     model: str = ""
-    messages: List[Message] = []
+    messages: List[Message] = Field(default_factory=list)
 
     # === Optional core fields ===
     prompt: Optional[str] = None
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
     response_format: Optional[ResponseFormat] = None
+    parameters: Dict[str, Any] = Field(default_factory=dict)
 
     # === Optional identification (for tracing) ===
     id: Optional[str] = None
@@ -89,6 +77,7 @@ class PromptData(BaseModel):
             )
 
         raw_version = _unset_to_none(response.version)
+        raw_parameters = _read_runtime_parameters(response)
 
         return PromptData(
             id=_unset_to_none(response.id),
@@ -99,7 +88,26 @@ class PromptData(BaseModel):
             temperature=_unset_to_none(response.temperature),
             max_tokens=_unset_to_none(response.max_tokens),
             response_format=response_format,
+            parameters=raw_parameters,
             version=int(raw_version) if raw_version is not None else None,
             version_id=_unset_to_none(response.version_id),
             scope=response.scope.value if response.scope and not isinstance(response.scope, Unset) else None,
         )
+
+
+def _read_runtime_parameters(response: object) -> Dict[str, Any]:
+    # Prefer a first-class `parameters` attribute. Generated response models
+    # don't declare it yet (the recursive runtime-parameters schema can't be
+    # serialized by the OpenAPI generator), so the value arrives in the
+    # generator's `additional_properties` extras bag — fall back to that.
+    # Checking first-class first keeps reads correct if the field is later
+    # promoted by a regeneration.
+    params = getattr(response, "parameters", None)
+    if params is None or isinstance(params, Unset):
+        additional_properties = getattr(response, "additional_properties", None)
+        if isinstance(additional_properties, dict):
+            params = additional_properties.get("parameters")
+
+    if isinstance(params, dict):
+        return params
+    return {}

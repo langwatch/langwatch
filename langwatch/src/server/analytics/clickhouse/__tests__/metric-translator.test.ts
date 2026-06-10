@@ -180,6 +180,41 @@ describe("metric-translator", () => {
         expect(result.selectExpression).toContain("TotalPromptTokenCount");
         expect(result.selectExpression).toContain("TotalCompletionTokenCount");
       });
+
+      it("translates performance.cache_read_tokens from the reserved attribute key", () => {
+        const result = translateMetric("performance.cache_read_tokens", "sum", 0);
+        expect(result.selectExpression).toContain(
+          "Attributes['langwatch.reserved.cache_read_tokens']",
+        );
+        expect(result.selectExpression).toContain("toUInt64OrZero");
+      });
+
+      it("translates performance.cache_write_tokens from the reserved attribute key", () => {
+        const result = translateMetric(
+          "performance.cache_write_tokens",
+          "sum",
+          0,
+        );
+        expect(result.selectExpression).toContain(
+          "Attributes['langwatch.reserved.cache_creation_tokens']",
+        );
+      });
+
+      it("translates performance.total_processed_tokens as input+output+cache", () => {
+        const result = translateMetric(
+          "performance.total_processed_tokens",
+          "sum",
+          0,
+        );
+        expect(result.selectExpression).toContain("TotalPromptTokenCount");
+        expect(result.selectExpression).toContain("TotalCompletionTokenCount");
+        expect(result.selectExpression).toContain(
+          "Attributes['langwatch.reserved.cache_read_tokens']",
+        );
+        expect(result.selectExpression).toContain(
+          "Attributes['langwatch.reserved.cache_creation_tokens']",
+        );
+      });
     });
 
     describe("evaluation metrics", () => {

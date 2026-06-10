@@ -20,6 +20,13 @@ interface SpanDetailPaneProps {
    * stacked below, on the left when side-by-side.
    */
   layout: "vertical" | "horizontal";
+  /**
+   * Forwarded to TraceAccordions so it can render a span-shaped
+   * skeleton while the spanTree query is in flight. Without this we'd
+   * fall back to the trace summary on every cold open of the trace
+   * pane — see the comment in TraceAccordions for the full story.
+   */
+  isSpansLoading?: boolean;
 }
 
 /**
@@ -47,6 +54,7 @@ export const SpanDetailPane = memo(function SpanDetailPane({
   spans,
   selectedSpan,
   layout,
+  isSpansLoading,
 }: SpanDetailPaneProps) {
   const selectedSpanId = useDrawerStore((s) => s.selectedSpanId);
   const selectSpan = useDrawerStore((s) => s.selectSpan);
@@ -106,6 +114,8 @@ export const SpanDetailPane = memo(function SpanDetailPane({
               spans={spans}
               selectedSpan={selectedSpan}
               activeTab="span"
+              selectedSpanId={selectedSpanId}
+              isSpansLoading={isSpansLoading}
               onSelectSpan={selectSpan}
             />
           </IsolatedErrorBoundary>

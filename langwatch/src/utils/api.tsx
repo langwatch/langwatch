@@ -4,42 +4,46 @@
  *
  * We also create a few inference helpers for input and output types.
  */
-import {
-  createWSClient,
-  httpBatchLink,
-  httpLink,
-  loggerLink,
-  splitLink,
-  TRPCClientError,
-  createTRPCClient,
-  wsLink,
-} from "@trpc/client";
-import { createTRPCReact } from "@trpc/react-query";
+
 import {
   MutationCache,
   QueryCache,
   QueryClient,
   QueryClientProvider,
 } from "@tanstack/react-query";
+import {
+  createTRPCClient,
+  createWSClient,
+  httpBatchLink,
+  httpLink,
+  loggerLink,
+  splitLink,
+  TRPCClientError,
+  wsLink,
+} from "@trpc/client";
+import { createTRPCReact } from "@trpc/react-query";
 import type { inferRouterInputs, inferRouterOutputs } from "@trpc/server";
+import { type ReactNode, useState } from "react";
 import superjson from "superjson";
 import type { AppRouter } from "~/server/api/root";
-import { sseLink } from "./sseLink";
-import {
-  extractLimitExceededInfo,
-  extractLiteMemberRestrictionInfo,
-  extractMissingModelInfo,
-  markAsHandledByLicenseHandler,
-  markAsHandledByLiteMemberHandler,
-  markAsHandledByMissingModelHandler,
-} from "./trpcError";
 import {
   showAiCallFailedToast,
   showMissingModelToast,
+  showProviderDisabledToast,
 } from "../components/MissingModelToast";
 import { useUpgradeModalStore } from "../stores/upgradeModalStore";
-import { extractAiCallFailedInfo } from "./trpcError";
-import { useState, type ReactNode } from "react";
+import { sseLink } from "./sseLink";
+import {
+  extractAiCallFailedInfo,
+  extractLimitExceededInfo,
+  extractLiteMemberRestrictionInfo,
+  extractMissingModelInfo,
+  extractProviderDisabledInfo,
+  markAsHandledByLicenseHandler,
+  markAsHandledByLiteMemberHandler,
+  markAsHandledByMissingModelHandler,
+  markAsHandledByProviderDisabledHandler,
+} from "./trpcError";
 
 const getBaseUrl = () => {
   if (typeof window !== "undefined") return window.location.origin; // browser should use origin for full URLs
@@ -126,6 +130,46 @@ function createTRPCLinks() {
   ];
 }
 
+/**
+ * Returns the `onSwapToAlternate` callback the provider-disabled toast
+ * needs — but only when the swap is actually performable from this
+ * client:
+ *   1. The disabled scope is "project" — clearing team/org defaults
+ *      requires team/org-level permission this user may not have.
+ *   2. The cascade has an alternate, and that alternate's provider is
+ *      currently enabled, so the swap actually unblocks the feature
+ *      instead of trading one disabled provider for another.
+ *
+ * When either check fails, returns `undefined` so the toast falls back
+ * to its "Open settings" deep-link variant — still actionable, just not
+ * one-click.
+ *
+ * The toast doesn't cache the AI failure, so we don't need to manually
+ * invalidate after swapping — the user's next AI action re-resolves
+ * the cascade and picks the now-reachable alternate.
+ */
+function providerDisabledSwapHandler(
+  info: ReturnType<typeof extractProviderDisabledInfo>,
+): (() => Promise<void>) | undefined {
+  if (!info) return undefined;
+  if (info.resolvedScope !== "project") return undefined;
+  if (!info.alternate?.providerEnabled) return undefined;
+  return async () => {
+    // v10 path-type inference collapses on this router (the `subscription`
+    // sub-router collides with the client's built-in method, poisoning the
+    // whole path union to `never`). The runtime call is the plain dotted-path
+    // mutation the non-proxy client supports; cast past the broken inference.
+    await (
+      trpcClient.mutation as (path: string, input: unknown) => Promise<unknown>
+    )("modelProvider.setFeatureOverrideForScope", {
+      scopeType: "PROJECT",
+      scopeId: info.projectId,
+      featureKey: info.featureKey,
+      model: null,
+    });
+  };
+}
+
 function createQueryClientConfig() {
   return {
     /**
@@ -188,6 +232,22 @@ function createQueryClientConfig() {
         if (aiFailedInfo) {
           showAiCallFailedToast(aiFailedInfo);
         }
+        // Cascade DID resolve, but the chosen model's provider is
+        // disabled. Open a toast offering a one-click swap to the
+        // parent-scope default (when there is one) — the swap calls
+        // back into modelProviders.setFeatureOverrideForScope to clear
+        // the disabled-scope key so the next resolve falls through.
+        const providerDisabledInfo = extractProviderDisabledInfo(error);
+        if (providerDisabledInfo) {
+          if (error instanceof Error) {
+            markAsHandledByProviderDisabledHandler(error);
+          }
+          showProviderDisabledToast({
+            ...providerDisabledInfo,
+            onSwapToAlternate:
+              providerDisabledSwapHandler(providerDisabledInfo),
+          });
+        }
         // Non-license/non-restriction errors bubble up to component-level handlers
       },
     }),
@@ -214,6 +274,17 @@ function createQueryClientConfig() {
         const aiFailedInfo = extractAiCallFailedInfo(error);
         if (aiFailedInfo) {
           showAiCallFailedToast(aiFailedInfo);
+        }
+        const providerDisabledInfo = extractProviderDisabledInfo(error);
+        if (providerDisabledInfo) {
+          if (error instanceof Error) {
+            markAsHandledByProviderDisabledHandler(error);
+          }
+          showProviderDisabledToast({
+            ...providerDisabledInfo,
+            onSwapToAlternate:
+              providerDisabledSwapHandler(providerDisabledInfo),
+          });
         }
       },
     }),
@@ -249,7 +320,10 @@ function createQueryClientConfig() {
 export const api = createTRPCReact<AppRouter>();
 
 /**
- * Vanilla tRPC client for use outside of React components.
+ * Vanilla tRPC client for use outside of React components. Non-proxy
+ * variant calling via dotted paths — `createTRPCProxyClient` can't be
+ * used on this router because the `subscription` router name collides
+ * with the proxy client's built-in method in tRPC v10.
  */
 export const trpcClient = createTRPCClient<AppRouter>({
   links: createTRPCLinks(),
@@ -261,12 +335,14 @@ export const trpcClient = createTRPCClient<AppRouter>({
  * Provides QueryClient and tRPC client to the React tree.
  */
 export function TRPCProvider({ children }: { children: ReactNode }) {
-  const [queryClient] = useState(() => new QueryClient(createQueryClientConfig()));
+  const [queryClient] = useState(
+    () => new QueryClient(createQueryClientConfig()),
+  );
   const [trpcClientInstance] = useState(() =>
     api.createClient({
       links: createTRPCLinks(),
       transformer: superjson,
-    })
+    }),
   );
 
   return (

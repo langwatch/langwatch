@@ -171,7 +171,9 @@ export function applySpanToSummary({
   // The merged attribute map only carries identity/metadata keys, so the
   // raw gen_ai.usage.cache_* numbers never reach the drawer — fold the sums
   // in under reserved keys the popover reads directly.
-  const cacheTokens = spanCostService.extractCacheTokens(span);
+  const cacheTokens = spanCostService.isTokenAccumulationSkipped(span)
+    ? { cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 }
+    : spanCostService.extractCacheTokens(span);
   addReservedTokenSum(
     attributes,
     RESERVED_CACHE_READ_TOKENS,
@@ -605,4 +607,5 @@ export class TraceSummaryFoldProjection
       traceNameFromFallback: false,
     };
   }
+
 }

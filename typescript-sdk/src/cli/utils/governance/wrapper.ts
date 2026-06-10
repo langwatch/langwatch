@@ -24,7 +24,14 @@ import { runDeviceFlowLogin } from "./login-flow";
 import { resolvePlatformToolPolicy } from "./platform-tool-policy";
 import { maybeOfferIngestionShellRcPersist } from "./shell-rc";
 import { resolveWrapperMode } from "./wrapper-mode";
+import { createCodexIOStreamer } from "./codex-rollout-otlp";
 import { parseToolModeFlag, resolveWrapperPath } from "./wrapper-path-choice";
+
+/**
+ * How often the wrapper polls codex's append-only rollout while the session
+ * runs, streaming each completed turn's I/O instead of one burst on exit.
+ */
+const CODEX_IO_POLL_MS = 2_500;
 
 export interface ToolEnv {
   /** Env-var name → value pairs to inject into the child process. */
@@ -300,23 +307,45 @@ export async function preflightWrapper(
     };
   }
 
+  // The gateway program is opt-in per tool: an org enables it for a coding
+  // assistant by publishing that tool's coding-assistant tile in the AI Tools
+  // catalog. Without a tile for THIS tool the org hasn't turned the gateway on
+  // for it (direct OTLP ingestion stays available separately), so don't route
+  // a virtual key through it. `tools` undefined => legacy server that can't
+  // report the catalog; skip the gate for back-compat.
+  if (Array.isArray(bootstrap?.tools)) {
+    const published = bootstrap.tools.some((t) => t.slug === tool);
+    if (!published) {
+      return {
+        ok: false,
+        message:
+          `The gateway isn't enabled for \`${tool}\` in your organization.\n` +
+          `An admin needs to publish a ${tool} coding-assistant tile in the\n` +
+          `AI Tools catalog (with the gateway path enabled):\n` +
+          `  ${cp}/settings/governance/tool-catalog\n` +
+          renderContactFooter(adminEmail),
+      };
+    }
+  }
+
+  // The gateway routes through CONFIGURED provider credentials, not the curated
+  // model_provider catalog tiles (those only gate the /me one-click "mint your
+  // own VK" surface). Prefer the credential-derived families; fall back to the
+  // tile list only on legacy servers that don't send `gatewayProviders`.
   const need = TOOL_PROVIDER_FAMILIES[tool];
-  if (
-    need &&
-    need.length > 0 &&
-    bootstrap &&
-    Array.isArray(bootstrap.providers)
-  ) {
-    const have = new Set(bootstrap.providers.map((p) => p.name.toLowerCase()));
+  const configured =
+    bootstrap?.gatewayProviders ?? bootstrap?.providers?.map((p) => p.name);
+  if (need && need.length > 0 && Array.isArray(configured)) {
+    const have = new Set(configured.map((n) => n.toLowerCase()));
     const matches = need.filter((n) => have.has(n));
     if (matches.length === 0) {
       const list = need.map((n) => `\`${n}\``).join(" or ");
       return {
         ok: false,
         message:
-          `No ${list} provider is configured for your organization.\n` +
-          `\`langwatch ${tool}\` needs at least one to route requests through the gateway.\n` +
-          `If you're an admin, configure one at\n` +
+          `No ${list} provider credential is configured for your organization.\n` +
+          `\`langwatch ${tool}\` needs at least one enabled provider to route\n` +
+          `requests through the gateway. If you're an admin, add one at\n` +
           `  ${cp}/settings/model-providers\n` +
           renderContactFooter(adminEmail),
       };
@@ -571,6 +600,48 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 
   const notFoundMessage = `${tool} not found in PATH - install it first (https://docs.langwatch.ai/ai-gateway/governance/admin-setup#cli-device-flow-rest-api)`;
 
+  // Stamp the session start so the codex rollout harvest only reads rollout
+  // files this run produced (codex names them by start time + mtime).
+  const sessionStartMs = Date.now();
+
+  // Codex never puts the prompt or the assistant reply on the wire (its OTLP
+  // spans carry tokens + model only), but it writes the full transcript to an
+  // append-only rollout file whose per-turn `task_started` records the exact
+  // OTLP trace_id. Poll it WHILE codex runs and emit each turn the moment it
+  // completes, so content streams in per turn instead of one multi-megabyte
+  // burst on exit. The poll plus a final sweep on close are idempotent (the
+  // per-turn span id is trace_id-derived), so overlap dedups server-side.
+  const codexStreamer =
+    tool === "codex" &&
+    modeResult.mode === "ingestion" &&
+    modeResult.endpoint &&
+    modeResult.ingestionToken
+      ? createCodexIOStreamer({
+          sinceMs: sessionStartMs,
+          endpoint: `${modeResult.endpoint.replace(/\/+$/, "")}/v1/traces`,
+          token: modeResult.ingestionToken,
+        })
+      : null;
+  let codexPoll: ReturnType<typeof setInterval> | null = null;
+  if (codexStreamer) {
+    let inFlight = false;
+    codexPoll = setInterval(() => {
+      // Skip a tick if the previous harvest (file read + POST, ≤5s) is still
+      // running so slow ticks can't pile up.
+      if (inFlight) return;
+      inFlight = true;
+      void codexStreamer
+        .harvest(Date.now())
+        .catch(() => 0)
+        .finally(() => {
+          inFlight = false;
+        });
+    }, CODEX_IO_POLL_MS);
+    // The child process drives the lifecycle; never let the poll keep the event
+    // loop alive on its own.
+    codexPoll.unref?.();
+  }
+
   let child;
   if (aliasShell) {
     const q = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
@@ -605,12 +676,21 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
     process.stderr.write(`exec ${tool}: ${err.message}\n`);
     process.exit(1);
   });
-  await new Promise<void>((resolve) => {
-    child.on("close", (code) => {
-      process.exit(code ?? 1);
-      resolve();
-    });
+  const exitCode = await new Promise<number>((resolve) => {
+    child.on("close", (code) => resolve(code ?? 1));
   });
-  // unreachable
-  process.exit(0);
+
+  // Stop polling and do one final sweep so the last turn (completed between the
+  // last poll and exit) still lands. Best-effort: a coding session must never
+  // fail or stall on the content harvest.
+  if (codexPoll) clearInterval(codexPoll);
+  if (codexStreamer) {
+    try {
+      await codexStreamer.harvest(Date.now());
+    } catch {
+      /* content recovery is non-essential; never block exit on it */
+    }
+  }
+
+  process.exit(exitCode);
 }

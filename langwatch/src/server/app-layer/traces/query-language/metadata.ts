@@ -431,6 +431,14 @@ const HAS_NONE_VALUES: string[] = [
   "topic",
   "subtopic",
   "label",
+  // Round-3 additions — "is this field set on the trace?" is a useful
+  // filter for AI observability cohort triage. Each one maps to a
+  // single column / Attributes key in trace_summaries; see the matching
+  // cases in `meta-handlers.ts`.
+  "model",
+  "service",
+  "traceName",
+  "rootSpanType",
 ];
 
 /** Known values for autocomplete suggestions. */

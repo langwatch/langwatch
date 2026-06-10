@@ -29,12 +29,16 @@
  *   - model
  *   - codex.turn.token_usage.input_tokens / output_tokens
  *   - codex.turn.token_usage.cached_input_tokens (a.k.a. cache_read)
+ *   - codex.turn.token_usage.reasoning_output_tokens (a.k.a. reasoning)
  *   - codex.turn.token_usage.total_tokens
+ *   - codex.turn.reasoning_effort (the request setting, e.g. "high")
  *   - turn.id (a.k.a. thread / turn identifier)
- * This extractor lifts those to langwatch.* canonical so the trace
+ * This extractor lifts those to gen_ai.* canonical so the trace
  * summary fold mirrors them to the top-level columns and the
  * receiver-side pricing lookup computes cost (codex never emits cost
- * on the wire).
+ * on the wire). The known per-response span that reports the same usage
+ * natively (`handle_responses`) is flagged so the fold does not
+ * double-count it.
  *
  * Canonical attributes produced (only when the corresponding wire
  * field is present):
@@ -57,6 +61,15 @@ import type {
 const CODEX_EVENT_NAME_PREFIX = "codex.";
 const CODEX_RUST_SCOPE_NAME = "codex_cli_rs";
 const CODEX_TURN_SPAN_NAME = "session_task.turn";
+
+// codex's per-response model-call span. Its gen_ai.usage.* is already summed
+// into the `session_task.turn` rollup, so the fold must count the usage on
+// exactly one of the two or the trace totals double. We keep the rollup and
+// skip this known duplicate. Any OTHER usage-bearing span under the scope is
+// deliberately NOT skipped: if a future codex release emits a model call whose
+// usage is not folded into the turn rollup, counting it (a visible total) is
+// safer than silently dropping its tokens, cost, and cache.
+const CODEX_REDUNDANT_USAGE_SPAN_NAMES = new Set(["handle_responses"]);
 
 const asNumber = (raw: unknown): number | null => {
   if (raw === undefined || raw === null || raw === "") return null;
@@ -92,7 +105,24 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
     // span path's. Mastra + Vercel + the rest of the extractors all
     // target gen_ai.* on the span side.
     if (ctx.span.instrumentationScope?.name !== CODEX_RUST_SCOPE_NAME) return;
-    if (ctx.span.name !== CODEX_TURN_SPAN_NAME) return;
+
+    // codex emits ONE authoritative per-turn rollup span
+    // (`session_task.turn`) carrying codex.turn.token_usage.*, AND a
+    // lower-level response span (`handle_responses`) that natively reports
+    // the SAME usage under gen_ai.usage.*. The rollup is the source of
+    // truth; without intervention the fold sums both and the trace's token
+    // totals double. Flag the known-redundant response span so the fold skips
+    // its token math — its own per-span detail is left untouched.
+    if (ctx.span.name !== CODEX_TURN_SPAN_NAME) {
+      this.markRedundantUsageSpan(ctx);
+      return;
+    }
+
+    // The turn rollup is the agentic step that contains the model call(s).
+    // Without a type the drawer renders it as a generic span; "agent" gives
+    // it the right icon + grouping so a codex trace reads as an agent turn
+    // rather than two untyped orphan rows.
+    ctx.setAttrIfAbsent(ATTR_KEYS.SPAN_TYPE, "agent");
 
     const { attrs } = ctx.bag;
     const model = asString(attrs.take("model"));
@@ -105,6 +135,10 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
     const cacheReadTokens = asNumber(
       attrs.take("codex.turn.token_usage.cached_input_tokens"),
     );
+    const reasoningTokens = asNumber(
+      attrs.take("codex.turn.token_usage.reasoning_output_tokens"),
+    );
+    const reasoningEffort = asString(attrs.take("codex.turn.reasoning_effort"));
     const turnId = asString(attrs.take("turn.id"));
 
     let fired = false;
@@ -128,11 +162,54 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
       );
       fired = true;
     }
+    if (reasoningTokens !== null) {
+      ctx.setAttrIfAbsent(
+        ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS,
+        reasoningTokens,
+      );
+      fired = true;
+    }
+    if (reasoningEffort !== null) {
+      ctx.setAttrIfAbsent(
+        ATTR_KEYS.GEN_AI_REQUEST_REASONING_EFFORT,
+        reasoningEffort,
+      );
+      fired = true;
+    }
     if (turnId !== null) {
       ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_CONVERSATION_ID, turnId);
       fired = true;
     }
     if (fired) ctx.recordRule("codex/session_task.turn");
+  }
+
+  /**
+   * Handles a non-turn `codex_cli_rs` span that carries token usage.
+   * GenAIExtractor runs before this one and lifts native gen_ai.usage.* into
+   * `out`, so we look there as well as the still-unconsumed bag.
+   *
+   * Two distinct effects, deliberately decoupled:
+   * - Typing: any usage-bearing span is a model call, so it gets `llm` so the
+   *   drawer renders it under the agent turn with the model icon.
+   * - Skip marker: only KNOWN duplicates of the turn rollup
+   *   (`handle_responses`) get `skip_token_accumulation`. An unrecognised
+   *   usage-bearing span keeps its tokens so a future codex span whose usage is
+   *   NOT folded into the rollup is counted rather than silently dropped.
+   * Nothing is removed from the span itself either way.
+   */
+  private markRedundantUsageSpan(ctx: ExtractorContext): void {
+    const hasUsage =
+      ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS] !== undefined ||
+      ctx.out[ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS] !== undefined ||
+      ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS) ||
+      ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS);
+    if (!hasUsage) return;
+
+    ctx.setAttrIfAbsent(ATTR_KEYS.SPAN_TYPE, "llm");
+
+    if (!CODEX_REDUNDANT_USAGE_SPAN_NAMES.has(ctx.span.name)) return;
+    ctx.setAttr(ATTR_KEYS.LANGWATCH_RESERVED_SKIP_TOKEN_ACCUMULATION, "true");
+    ctx.recordRule("codex/skip-redundant-usage");
   }
 
   applyLog(ctx: LogExtractorContext): void {

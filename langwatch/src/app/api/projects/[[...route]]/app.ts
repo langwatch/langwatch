@@ -3,6 +3,7 @@ import { describeRoute } from "hono-openapi";
 import { validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
 import {
+  DestinationTeamNotFoundError,
   ProjectNotFoundError,
   ProjectSlugConflictError,
   TeamNotInOrganizationError,
@@ -11,6 +12,8 @@ import {
 import type { ApiKeyService } from "~/server/api-key/api-key.service";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createOrgApp, requires } from "~/server/api/security";
+import { prisma } from "~/server/db";
+import { generateApiKey } from "~/server/utils/apiKeyGenerator";
 import type { ApiKeyServiceMiddlewareVariables } from "../../middleware/api-key-service";
 import { apiKeyServiceMiddleware } from "../../middleware/api-key-service";
 import type { ProjectServiceMiddlewareVariables } from "../../middleware/project-service";
@@ -45,6 +48,7 @@ const updateProjectSchema = z.object({
   language: z.string().optional(),
   framework: z.string().optional(),
   piiRedactionLevel: z.enum(["STRICT", "ESSENTIAL", "DISABLED"]).optional(),
+  teamId: z.string().min(1).optional(),
 });
 
 function validationHook(
@@ -129,7 +133,7 @@ secured
     projectServiceMiddleware,
     apiKeyServiceMiddleware,
     describeRoute({
-      description: "Create a new project",
+      description: "Create a new project in an existing team or create a new team inline",
     }),
     zValidator("json", createProjectSchema, validationHook),
     async (c) => {
@@ -217,7 +221,7 @@ secured
     "/:id",
     projectServiceMiddleware,
     describeRoute({
-      description: "Update a project by its id",
+      description: "Update a project by its id, including moving it to another team with teamId",
     }),
     zValidator("json", updateProjectSchema, validationHook),
     async (c) => {
@@ -238,11 +242,15 @@ secured
             ...(body.piiRedactionLevel !== undefined && {
               piiRedactionLevel: body.piiRedactionLevel,
             }),
+            ...(body.teamId !== undefined && { teamId: body.teamId }),
           },
         });
       } catch (error) {
         if (error instanceof ProjectNotFoundError) {
           throw new NotFoundError("Project not found");
+        }
+        if (error instanceof DestinationTeamNotFoundError) {
+          throw new BadRequestError(error.message);
         }
         throw error;
       }
@@ -282,6 +290,54 @@ secured
         name: project.name,
         archivedAt: project.archivedAt,
       });
+    },
+  );
+
+// ── API Key management ───────────────────────────────────────────────────────
+
+secured
+  .access(requires("project:view"))
+  .get(
+    "/:id/api-key",
+    projectServiceMiddleware,
+    describeRoute({ description: "Get the project API key" }),
+    async (c) => {
+      const { id } = c.req.param();
+      const organization = c.get("organization") as Organization;
+      const service = c.get("projectService") as ProjectService;
+
+      const project = await service.getWithTeam(id);
+      if (!project || project.team.organizationId !== organization.id) {
+        throw new NotFoundError("Project not found");
+      }
+
+      return c.json({ apiKey: project.apiKey });
+    },
+  );
+
+secured
+  .access(requires("project:manage"))
+  .post(
+    "/:id/regenerate-api-key",
+    projectServiceMiddleware,
+    describeRoute({ description: "Regenerate the project API key" }),
+    async (c) => {
+      const { id } = c.req.param();
+      const organization = c.get("organization") as Organization;
+      const service = c.get("projectService") as ProjectService;
+
+      const project = await service.getWithTeam(id);
+      if (!project || project.team.organizationId !== organization.id) {
+        throw new NotFoundError("Project not found");
+      }
+
+      const newApiKey = generateApiKey();
+      await prisma.project.update({
+        where: { id },
+        data: { apiKey: newApiKey },
+      });
+
+      return c.json({ apiKey: newApiKey });
     },
   );
 

@@ -92,6 +92,15 @@ interface StatusRowGroupProps {
   onClick?: (e: React.MouseEvent) => void;
   traceId?: string;
   isNew?: boolean;
+  /**
+   * When true, play a brief in-place update pulse animation. Used when
+   * an SSE event arrives for a row that's already visible — the row data
+   * was updated in the cache directly, so we don't need to refetch the
+   * list; just signal that something changed. Distinct from `isNew`
+   * (which fires for rows that just arrived in the viewport after a list
+   * invalidation). Both can be true simultaneously.
+   */
+  isPulsing?: boolean;
   children: React.ReactNode;
   ref?: React.Ref<HTMLTableSectionElement>;
   /** Set by virtualizer; used by `measureElement` to look up the row index. */
@@ -104,6 +113,7 @@ export const StatusRowGroup: React.FC<StatusRowGroupProps> = ({
   onClick,
   traceId,
   isNew = false,
+  isPulsing = false,
   children,
   ref,
   "data-index": dataIndex,
@@ -114,6 +124,7 @@ export const StatusRowGroup: React.FC<StatusRowGroupProps> = ({
     onClick={onClick}
     data-trace-id={traceId}
     data-new={isNew ? "true" : undefined}
+    data-pulsing={isPulsing ? "true" : undefined}
     data-row-variant={variant}
     css={{
       "& > tr > td": { transition: "none" },
@@ -136,6 +147,22 @@ export const StatusRowGroup: React.FC<StatusRowGroupProps> = ({
           "100%": { backgroundColor: "transparent" },
         },
       }),
+      ...(isPulsing &&
+        !isNew && {
+          // Subtle single-flash pulse for in-place row updates. Lighter
+          // than the `isNew` animation — the row isn't new, it just
+          // changed. One brief blue highlight to catch the eye without
+          // strobing.
+          "& > tr > td": {
+            transition: "none",
+            animation: "tracesV2RowPulse 1.2s ease-out",
+          },
+          "@keyframes tracesV2RowPulse": {
+            "0%": { backgroundColor: "rgba(59, 130, 246, 0.14)" },
+            "40%": { backgroundColor: "rgba(59, 130, 246, 0.06)" },
+            "100%": { backgroundColor: "transparent" },
+          },
+        }),
     }}
     _hover={{
       "& > tr > td": { bg: style.hoverBg },

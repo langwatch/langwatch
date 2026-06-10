@@ -303,10 +303,11 @@ export const projectRouter = createTRPCRouter({
       z
         .object({
           projectId: z.string(),
-          name: z.string(),
-          language: z.string(),
-          framework: z.string(),
-          piiRedactionLevel: z.enum(["STRICT", "ESSENTIAL", "DISABLED"]),
+          name: z.string().optional(),
+          language: z.string().optional(),
+          framework: z.string().optional(),
+          piiRedactionLevel: z.enum(["STRICT", "ESSENTIAL", "DISABLED"]).optional(),
+          teamId: z.string().optional(),
           capturedInputVisibility: z
             .enum(["REDACTED_TO_ALL", "VISIBLE_TO_ADMIN", "VISIBLE_TO_ALL"])
             .optional(),
@@ -350,6 +351,7 @@ export const projectRouter = createTRPCRouter({
       }
 
       if (
+        input.piiRedactionLevel !== undefined &&
         input.piiRedactionLevel === "DISABLED" &&
         !(
           env.NODE_ENV === "development" ||
@@ -363,14 +365,37 @@ export const projectRouter = createTRPCRouter({
         });
       }
 
+      if (input.teamId) {
+        const destinationTeam = await prisma.team.findFirst({
+          where: {
+            id: input.teamId,
+            organizationId: project.team.organizationId,
+            archivedAt: null,
+          },
+          select: { id: true },
+        });
+        if (!destinationTeam) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              "Destination team not found, is archived, or belongs to a different organization",
+          });
+        }
+      }
+
       const updatedProject = await prisma.project.update({
         where: { id: input.projectId },
         data: {
-          name: input.name,
-          language: input.language,
-          framework: input.framework,
-          piiRedactionLevel: input.piiRedactionLevel,
-          userLinkTemplate: input.userLinkTemplate,
+          ...(input.name !== undefined && { name: input.name }),
+          ...(input.language !== undefined && { language: input.language }),
+          ...(input.framework !== undefined && { framework: input.framework }),
+          ...(input.piiRedactionLevel !== undefined && {
+            piiRedactionLevel: input.piiRedactionLevel,
+          }),
+          ...(input.userLinkTemplate !== undefined && {
+            userLinkTemplate: input.userLinkTemplate,
+          }),
+          ...(input.teamId && { teamId: input.teamId }),
           capturedInputVisibility:
             input.capturedInputVisibility ?? project.capturedInputVisibility,
           capturedOutputVisibility:

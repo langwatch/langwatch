@@ -89,6 +89,7 @@ export const ATTR_KEYS = {
   AI_TOOL_CALL: "ai.toolCall",
   AI_TOOL_CALL_NAME: "ai.toolCall.name",
   AI_TOOL_CALL_ARGS: "ai.toolCall.args",
+  AI_TOOL_CALL_RESULT: "ai.toolCall.result",
 
   // OpenTelemetry LLM attributes
   LLM_MODEL_NAME: "llm.model_name",
@@ -211,6 +212,14 @@ export const ATTR_KEYS = {
   GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS:
     "gen_ai.usage.cache_creation.input_tokens",
   GEN_AI_USAGE_CACHED_INPUT_TOKENS: "gen_ai.usage.cached_input_tokens", // Mastra non-standard
+
+  // Set by an extractor on a span whose token usage is a redundant copy of
+  // another span's (e.g. codex emits one turn-rollup span AND a lower-level
+  // response span carrying the SAME usage). The fold skips token/cost/cache
+  // accumulation for marked spans so the trace total counts the usage once,
+  // while the per-span detail still shows it on each span.
+  LANGWATCH_RESERVED_SKIP_TOKEN_ACCUMULATION:
+    "langwatch.reserved.skip_token_accumulation",
 
   // Mastra attributes
   MASTRA_INPUT: "input",

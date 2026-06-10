@@ -529,6 +529,13 @@ export class AiToolEntryService {
       displayName: string;
       configured: boolean;
     }>;
+    /**
+     * Provider families with a live, enabled credential the caller can reach,
+     * independent of any catalog tile. The gateway routes through these, so
+     * the CLI gateway preflight gates on this rather than on published
+     * `model_provider` tiles (which only gate the mint-your-own-VK catalog).
+     */
+    configuredProviderKeys: string[];
   }> {
     const [assistantTiles, providerTiles, configuredProviders] =
       await Promise.all([
@@ -583,7 +590,7 @@ export class AiToolEntryService {
       });
     }
 
-    return { tools, providers };
+    return { tools, providers, configuredProviderKeys: configuredProviders };
   }
 
   /**

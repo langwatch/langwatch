@@ -20,8 +20,8 @@ export interface OnboardingEntryState {
    * End the active tour — flips the per-project dismissal flag on
    * and clears the `tourActive` override so the empty-state pane
    * unmounts immediately and the user lands in the clean (real)
-   * table. Invalidates the trace list cache so the first real fetch
-   * after the tour isn't satisfied by any pre-flight cached entries.
+   * table. Resets the trace list cache so the first real fetch
+   * shows a skeleton rather than stale sample rows.
    */
   onEndTour: () => void;
   /**
@@ -108,12 +108,18 @@ export function useTourEntryPoints(): OnboardingEntryState {
     if (!projectId) return;
     // Mirror what the old "Done exploring" banner button did: dismiss
     // for this project, drop the `tourActive` override so existing-
-    // customer re-entries also fall back to the real table, and
-    // invalidate the list cache so the first real fetch isn't served
-    // from a pre-flight cached entry.
+    // customer re-entries also fall back to the real table, and reset
+    // the list cache so the first real fetch flows through skeleton
+    // rather than lingering stale sample rows.
     setSetupDismissedForProject(projectId, true);
     setTourActive(false);
-    void utils.tracesV2.list.invalidate({ projectId });
+    // Use reset (not invalidate) so the cache is purged immediately —
+    // the next useTraceListQuery flows through isLoading=true → skeleton
+    // instead of keeping the stale sample rows visible until the real
+    // fetch lands. Called without args to match all cached entries for
+    // this procedure (tRPC v10 reset requires the full input shape when
+    // filtering, so broad reset is safer here).
+    void utils.tracesV2.list.reset();
   }, [projectId, setSetupDismissedForProject, setTourActive, utils]);
 
   return {
