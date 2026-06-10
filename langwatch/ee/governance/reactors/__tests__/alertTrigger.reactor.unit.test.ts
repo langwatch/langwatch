@@ -94,7 +94,10 @@ function createTrigger(overrides: Partial<TriggerSummary> = {}): TriggerSummary 
     projectId: "tenant-1",
     name: "Latency Alert",
     action: TriggerAction.ADD_TO_ANNOTATION_QUEUE,
-    actionParams: { annotators: [{ id: "annotator-1", name: "Ops" }] },
+    actionParams: {
+      annotators: [{ id: "annotator-1", name: "Ops" }],
+      createdByUserId: "user-1",
+    },
     filters: {},
     alertType: "WARNING",
     message: "",
