@@ -423,7 +423,3 @@ async function handleCadenceBatch(
     "Outbox cadence digest dispatched",
   );
 }
-
-// Re-export so callers building cadence payloads from outside (e.g. a
-// test) reach computeScheduledFor through the same module surface.
-export { computeScheduledFor };

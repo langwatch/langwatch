@@ -548,20 +548,45 @@ export class EventSourcing {
           // mismatch so the non-outbox job lands in the normal lane.
           const allOutbox = payloads.every((p) => isOutboxPayload(p));
           if (!allOutbox) {
+            // Isolate per-item failures: a single throwing payload must not
+            // fail the whole fastq job and re-stage already-dispatched
+            // siblings (which would re-fire outbox notifications on retry).
+            // Throw only when every item failed — then nothing was
+            // dispatched and a wholesale retry is safe.
+            let failures = 0;
+            let lastError: unknown;
             for (const p of payloads) {
-              if (isOutboxPayload(p)) {
-                await outbox.dispatcher.process(p);
-              } else {
-                const r = this.lookupEntry(p);
-                if (r) {
-                  await r.entry.process(r.clean);
+              try {
+                if (isOutboxPayload(p)) {
+                  await outbox.dispatcher.process(p);
                 } else {
-                  logger.warn(
-                    { payload: p },
-                    "Mixed outbox batch contained an unknown non-outbox payload; skipping",
-                  );
+                  const r = this.lookupEntry(p);
+                  if (r) {
+                    await r.entry.process(r.clean);
+                  } else {
+                    logger.warn(
+                      { payload: p },
+                      "Mixed outbox batch contained an unknown non-outbox payload; skipping",
+                    );
+                  }
                 }
+              } catch (error) {
+                failures++;
+                lastError = error;
+                logger.error(
+                  {
+                    payload: p,
+                    error:
+                      error instanceof Error ? error.message : String(error),
+                  },
+                  "Mixed outbox batch item failed; continuing with remaining items",
+                );
               }
+            }
+            if (failures === payloads.length && failures > 0) {
+              throw lastError instanceof Error
+                ? lastError
+                : new Error(String(lastError));
             }
             return;
           }

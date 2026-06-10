@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
-import type { Cluster, Redis } from "ioredis";
+import { Cluster, type Redis } from "ioredis";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
 import type { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
@@ -86,13 +86,17 @@ export function buildOutboxRuntime({
 
   // Shared trace fold store — settle stage cross-reads it to drive the
   // post-settle filter check against fresh state.
-  const traceSummaryStore: FoldProjectionStore<TraceSummaryData> = redis
-    ? new RedisCachedFoldStore(
-        new TraceSummaryStore(traceSummaryRepository),
-        redis as Redis,
-        { keyPrefix: "trace_summaries" },
-      )
-    : new TraceSummaryStore(traceSummaryRepository);
+  // RedisCachedFoldStore takes a standalone `Redis` client; a Cluster
+  // client falls back to the uncached store rather than being cast
+  // through and failing at runtime on an API mismatch.
+  const traceSummaryStore: FoldProjectionStore<TraceSummaryData> =
+    redis && !(redis instanceof Cluster)
+      ? new RedisCachedFoldStore(
+          new TraceSummaryStore(traceSummaryRepository),
+          redis,
+          { keyPrefix: "trace_summaries" },
+        )
+      : new TraceSummaryStore(traceSummaryRepository);
 
   const traceReadDerivation = new TraceReadDerivationService(traces.spans);
 
@@ -104,6 +108,28 @@ export function buildOutboxRuntime({
     current?: EventSourcedQueueProcessor<Record<string, unknown>>;
   } = {};
 
+  // Constructed once — `traceById` runs per trace per digest on the
+  // dispatch hot path, so per-call construction and per-call protections
+  // queries are pure waste. Concurrent lookups within one dispatch's
+  // Promise.all share a single in-flight protections query per project;
+  // the entry is dropped once settled so protections aren't cached stale
+  // across dispatch calls.
+  const traceService = TraceService.create(prisma);
+  const protectionsInFlight = new Map<
+    string,
+    ReturnType<typeof getProtectionsForProject>
+  >();
+  const getProtectionsDeduped = (projectId: string) => {
+    let promise = protectionsInFlight.get(projectId);
+    if (!promise) {
+      promise = getProtectionsForProject(prisma, { projectId }).finally(() => {
+        protectionsInFlight.delete(projectId);
+      });
+      protectionsInFlight.set(projectId, promise);
+    }
+    return promise;
+  };
+
   const dispatcher = createOutboxDispatcher({
     triggers,
     projects,
@@ -111,8 +137,7 @@ export function buildOutboxRuntime({
     evaluationRuns: evaluations.runs,
     deriveEvents: (params) => traceReadDerivation.deriveEvents(params),
     traceById: async (projectId, traceId) => {
-      const traceService = TraceService.create(prisma);
-      const protections = await getProtectionsForProject(prisma, { projectId });
+      const protections = await getProtectionsDeduped(projectId);
       return traceService.getById(projectId, traceId, protections);
     },
     enqueueCadence: async (

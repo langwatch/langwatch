@@ -46,6 +46,18 @@ import type { ResolvedRetention } from "../../data-retention/retentionPolicy.sch
 const DEFAULT_FOLD_COALESCE_MAX_BATCH = 100;
 
 /**
+ * The router only ever dispatches reactors on the live event path — the
+ * replay service (`replay/replayService.ts`) rebuilds fold projections and
+ * never invokes reactors, so no reactor context here can be a replay.
+ * Named constant so the `isReplay` plumbing in `ReactorContext` (consumed
+ * by `adaptOutboxReactor`'s replay short-circuit) is honestly "always
+ * false on this path" rather than looking like a forgotten TODO. If a
+ * replay path that reaches reactors is ever added, it must thread a real
+ * flag instead of this constant.
+ */
+const LIVE_DISPATCH_IS_REPLAY = false;
+
+/**
  * Central router that registers fold and map projections and dispatches events.
  *
  * - FoldProjections: enqueued to GroupQueue (per-aggregate ordering), incremental only
@@ -163,7 +175,7 @@ export class ProjectionRouter<
                 tenantId: payload.event.tenantId,
                 aggregateId: String(payload.event.aggregateId),
                 foldState: payload.foldState,
-                isReplay: false,
+                isReplay: LIVE_DISPATCH_IS_REPLAY,
               });
             },
           },
@@ -193,7 +205,7 @@ export class ProjectionRouter<
                 tenantId: payload.event.tenantId,
                 aggregateId: String(payload.event.aggregateId),
                 foldState: payload.foldState,
-                isReplay: false,
+                isReplay: LIVE_DISPATCH_IS_REPLAY,
               });
             },
           },
@@ -791,7 +803,7 @@ export class ProjectionRouter<
                 tenantId: event.tenantId,
                 aggregateId: String(event.aggregateId),
                 foldState,
-                isReplay: false,
+                isReplay: LIVE_DISPATCH_IS_REPLAY,
               }),
               onComplete: (ms) => { incrementEsReactorTotal(this.pipelineName, reactor.name, "completed"); observeEsReactorDuration(this.pipelineName, reactor.name, ms); },
               onFail: (ms) => { incrementEsReactorTotal(this.pipelineName, reactor.name, "failed"); observeEsReactorDuration(this.pipelineName, reactor.name, ms); },
@@ -820,7 +832,7 @@ export class ProjectionRouter<
               tenantId: event.tenantId,
               aggregateId: String(event.aggregateId),
               foldState,
-              isReplay: false,
+              isReplay: LIVE_DISPATCH_IS_REPLAY,
             }),
             onComplete: (ms) => { incrementEsReactorTotal(this.pipelineName, reactor.name, "completed"); observeEsReactorDuration(this.pipelineName, reactor.name, ms); },
             onFail: (ms) => { incrementEsReactorTotal(this.pipelineName, reactor.name, "failed"); observeEsReactorDuration(this.pipelineName, reactor.name, ms); },

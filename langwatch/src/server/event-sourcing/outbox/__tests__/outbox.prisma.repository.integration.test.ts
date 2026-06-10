@@ -111,6 +111,54 @@ describe("PrismaOutboxRepository", () => {
       });
     });
 
+    describe("when another project has a ready row", () => {
+      it("returns null instead of leasing across tenants", async () => {
+        const otherProject = await getTestProject("reactor-outbox-other");
+        await repo.insertIfAbsent({
+          projectId: otherProject.id,
+          reactorName,
+          dedupKey: "other-tenant-row",
+          groupKey: `${otherProject.id}/${reactorName}:trigger-A`,
+          payload: {},
+        });
+
+        try {
+          const leased = await repo.leaseNext({
+            projectId,
+            reactorName,
+            leasedUntil: new Date(Date.now() + 60_000),
+            now: new Date(),
+          });
+          expect(leased).toBeNull();
+        } finally {
+          await prisma.reactorOutbox.deleteMany({
+            where: { projectId: otherProject.id, reactorName },
+          });
+        }
+      });
+    });
+
+    describe("when only another group has a ready row", () => {
+      it("returns null for a group-scoped lease", async () => {
+        await repo.insertIfAbsent({
+          projectId,
+          reactorName,
+          dedupKey: "group-b-row",
+          groupKey: `${projectId}/${reactorName}:trigger-B`,
+          payload: {},
+        });
+
+        const leased = await repo.leaseNext({
+          projectId,
+          reactorName,
+          groupKey: `${projectId}/${reactorName}:trigger-A`,
+          leasedUntil: new Date(Date.now() + 60_000),
+          now: new Date(),
+        });
+        expect(leased).toBeNull();
+      });
+    });
+
     describe("when a row's nextAttemptAt is in the future", () => {
       it("does not lease it", async () => {
         const future = new Date(Date.now() + 60_000);

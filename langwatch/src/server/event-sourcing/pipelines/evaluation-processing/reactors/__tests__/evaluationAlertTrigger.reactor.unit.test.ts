@@ -137,7 +137,10 @@ function createTrigger(
     projectId: "tenant-1",
     name: "Quality Alert",
     action: TriggerAction.ADD_TO_ANNOTATION_QUEUE,
-    actionParams: { annotators: [{ id: "annotator-1", name: "Ops" }] },
+    actionParams: {
+      annotators: [{ id: "annotator-1", name: "Ops" }],
+      createdByUserId: "user-1",
+    },
     filters: {
       "evaluations.passed": { "evaluator-1": ["true"] },
     },

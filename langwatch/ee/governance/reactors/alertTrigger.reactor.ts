@@ -73,16 +73,20 @@ export function createAlertTriggerReactor(
       // pipeline. Pre-filtering here also lets us skip the
       // (potentially expensive) events derivation when the only
       // matching triggers are notify-class.
-      const persistTriggers = triggers.filter((t) => {
-        const { hasEvaluationFilters } = classifyTriggerFilters(t.filters);
-        return !hasEvaluationFilters && !NOTIFY_TRIGGER_ACTIONS.has(t.action);
-      });
+      const persistTriggers = triggers
+        .map((trigger) => ({
+          trigger,
+          ...classifyTriggerFilters(trigger.filters),
+        }))
+        .filter(
+          ({ trigger, hasEvaluationFilters }) =>
+            !hasEvaluationFilters && !NOTIFY_TRIGGER_ACTIONS.has(trigger.action),
+        );
       if (persistTriggers.length === 0) return;
 
-      const needsEvents = persistTriggers.some((t) => {
-        const { traceFilters } = classifyTriggerFilters(t.filters);
-        return triggerFiltersReferenceEvents(traceFilters);
-      });
+      const needsEvents = persistTriggers.some(({ traceFilters }) =>
+        triggerFiltersReferenceEvents(traceFilters),
+      );
       const events = needsEvents
         ? await deps.deriveEvents({
             tenantId,
@@ -97,10 +101,8 @@ export function createAlertTriggerReactor(
         events,
       );
 
-      for (const trigger of persistTriggers) {
+      for (const { trigger, traceFilters } of persistTriggers) {
         try {
-          const { traceFilters } = classifyTriggerFilters(trigger.filters);
-
           // Filter check against the current (possibly half-formed)
           // fold state. Persist actions don't pay the settle-stage
           // re-read because the side effect is idempotent at the

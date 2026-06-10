@@ -155,6 +155,8 @@ export async function dispatchTriggerAction({
   const triggerData = buildTriggerData(traceId, tenantId, foldState, fullTrace);
   const params = (trigger.actionParams ?? {}) as ActionParams;
 
+  let dispatched = true;
+
   switch (trigger.action) {
     case TriggerAction.SEND_EMAIL:
       await sendTriggerEmail({
@@ -180,16 +182,26 @@ export async function dispatchTriggerAction({
       break;
 
     case TriggerAction.ADD_TO_ANNOTATION_QUEUE:
+      if (!params.createdByUserId) {
+        // Mirror the missing-datasetId guard: an empty-string userId would
+        // create queue items attributed to no valid user.
+        logger.warn(
+          { tenantId, triggerId: trigger.id },
+          "ADD_TO_ANNOTATION_QUEUE trigger missing createdByUserId; skipping action",
+        );
+        dispatched = false;
+        break;
+      }
       await deps.addToAnnotationQueue({
         traceIds: [traceId],
         projectId: tenantId,
         annotators: (params.annotators ?? []).map((a) => a.id),
-        userId: params.createdByUserId ?? "",
+        userId: params.createdByUserId,
       });
       break;
 
     case TriggerAction.ADD_TO_DATASET:
-      await addTraceToDataset({
+      dispatched = await addTraceToDataset({
         deps,
         trigger,
         traceId,
@@ -198,6 +210,16 @@ export async function dispatchTriggerAction({
         fullTrace,
       });
       break;
+  }
+
+  if (!dispatched) {
+    // The action did not actually run (missing config / trace data) —
+    // don't record the trigger as having fired.
+    logger.warn(
+      { tenantId, traceId, triggerId: trigger.id, action: trigger.action },
+      "Trigger action skipped; not updating lastRunAt",
+    );
+    return;
   }
 
   await deps.triggers.updateLastRunAt(trigger.id, tenantId);

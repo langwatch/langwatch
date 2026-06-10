@@ -108,4 +108,34 @@ describe("computeScheduledFor", () => {
       ).toEqual(new Date(now.getTime() + CADENCE_WINDOW_MS.hourly_digest));
     });
   });
+
+  describe("when now falls inside a digest window (off-boundary)", () => {
+    it("snaps to the next wall-clock window boundary", () => {
+      const offBoundaryNow = new Date("2026-05-29T12:02:17.456Z");
+      expect(
+        computeScheduledFor({
+          action: TriggerAction.SEND_EMAIL,
+          cadence: "5min_digest",
+          now: offBoundaryNow,
+        }),
+      ).toEqual(new Date("2026-05-29T12:05:00.000Z"));
+    });
+
+    it("produces the same boundary for two different instants in the same window", () => {
+      const earlyInWindow = new Date("2026-05-29T12:00:00.001Z");
+      const lateInWindow = new Date("2026-05-29T12:04:59.999Z");
+      const early = computeScheduledFor({
+        action: TriggerAction.SEND_SLACK_MESSAGE,
+        cadence: "5min_digest",
+        now: earlyInWindow,
+      });
+      const late = computeScheduledFor({
+        action: TriggerAction.SEND_SLACK_MESSAGE,
+        cadence: "5min_digest",
+        now: lateInWindow,
+      });
+      expect(early).toEqual(late);
+      expect(early).toEqual(new Date("2026-05-29T12:05:00.000Z"));
+    });
+  });
 });

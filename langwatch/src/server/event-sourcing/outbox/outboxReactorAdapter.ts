@@ -36,11 +36,27 @@ export function adaptOutboxReactor<E extends Event, FoldState>(
   outbox: OutboxRuntime | undefined,
 ): ReactorDefinition<E, FoldState> {
   if (!outbox) {
+    logger.warn(
+      { reactorName: definition.name },
+      "Outbox reactor registered without an outbox runtime; events reaching this reactor on this process will be dropped (expected on web, a misconfiguration on a worker)",
+    );
     return {
       name: definition.name,
       options: definition.options,
-      async handle() {
-        // No-op: outbox runtime not wired for this process role.
+      async handle(event: E) {
+        // No outbox runtime wired for this process role. The handle only
+        // fires on processes that actually consume events, so reaching
+        // here means a NOTIFY-class trigger is being dropped — surface it
+        // loudly instead of failing silent.
+        logger.warn(
+          {
+            reactorName: definition.name,
+            eventId: event.id,
+            eventType: event.type,
+            tenantId: event.tenantId,
+          },
+          "Outbox reactor received an event but no outbox runtime is wired; dropping the dispatch (check LANGWATCH_SKIP_OUTBOX / worker outbox wiring)",
+        );
       },
     };
   }

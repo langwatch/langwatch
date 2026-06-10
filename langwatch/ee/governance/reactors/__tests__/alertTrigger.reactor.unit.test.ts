@@ -5,7 +5,6 @@ import type { TriggerSummary } from "~/server/app-layer/triggers/repositories/tr
 import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
 import type { ReactorContext } from "~/server/event-sourcing/reactors/reactor.types";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
-import { sendTriggerEmail } from "~/server/mailer/triggerEmail";
 import { captureException } from "~/utils/posthogErrorCapture";
 import {
   createAlertTriggerReactor,
@@ -23,14 +22,6 @@ vi.mock("~/utils/logger/server", () => ({
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
-}));
-
-vi.mock("~/server/mailer/triggerEmail", () => ({
-  sendTriggerEmail: vi.fn().mockResolvedValue(undefined),
-}));
-
-vi.mock("~/server/triggers/sendSlackWebhook", () => ({
-  sendSlackWebhook: vi.fn().mockResolvedValue(undefined),
 }));
 
 function createFoldState(
@@ -80,7 +71,7 @@ function createEvent(
     createdAt: Date.now(),
     occurredAt: Date.now(),
     type: "lw.obs.trace.span_received",
-    version: 1,
+    version: "2025-01-14",
     data: {},
     ...overrides,
   } as unknown as TraceProcessingEvent;
@@ -161,6 +152,53 @@ describe("alertTrigger reactor", () => {
         "trigger-1",
         "tenant-1",
       );
+    });
+  });
+
+  describe("when the only active triggers are notify-class", () => {
+    it("never claims a send (the notify outbox reactor owns them)", async () => {
+      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue([
+        createTrigger({ action: TriggerAction.SEND_EMAIL }),
+        createTrigger({
+          id: "trigger-slack",
+          action: TriggerAction.SEND_SLACK_MESSAGE,
+        }),
+      ]);
+
+      const reactor = createAlertTriggerReactor(deps);
+      await reactor.handle(createEvent(), createContext(createFoldState()));
+
+      expect(deps.triggers.claimSend).not.toHaveBeenCalled();
+      expect(deps.triggers.updateLastRunAt).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the only active triggers have evaluation filters", () => {
+    it("never claims a send (the evaluation pipeline owns them)", async () => {
+      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue([
+        createTrigger({
+          filters: { "evaluations.passed": { "evaluator-1": ["true"] } },
+        }),
+      ]);
+
+      const reactor = createAlertTriggerReactor(deps);
+      await reactor.handle(createEvent(), createContext(createFoldState()));
+
+      expect(deps.triggers.claimSend).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when no trigger filter references event fields", () => {
+    it("skips the events derivation entirely", async () => {
+      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue([
+        createTrigger(),
+      ]);
+
+      const reactor = createAlertTriggerReactor(deps);
+      await reactor.handle(createEvent(), createContext(createFoldState()));
+
+      expect(deps.deriveEvents).not.toHaveBeenCalled();
+      expect(deps.triggers.claimSend).toHaveBeenCalled();
     });
   });
 

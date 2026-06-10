@@ -1,7 +1,7 @@
 import type { EventSourcedQueueProcessor } from "../queues/queue.types";
-import { createLogger } from "../../../utils/logger/server";
-import { captureException } from "../../../utils/posthogErrorCapture";
-import { tenantIdFromGroupId } from "../../observability/tenantRateTracker";
+import { createLogger } from "~/utils/logger/server";
+import { captureException } from "~/utils/posthogErrorCapture";
+import { tenantIdFromGroupId } from "~/server/observability/tenantRateTracker";
 import { isDispatchError } from "./dispatchError";
 import type { OutboxService } from "./outbox.service";
 import type { OutboxRow } from "./outbox.types";

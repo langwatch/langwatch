@@ -131,13 +131,16 @@ export class PgOutboxAuditAdapter implements QueueAuditAdapter<OutboxJob> {
     // instead of incrementing — the queue's `attempt` is the source of
     // truth, and incrementing on every onLeased can drift if a hook
     // fires twice (sibling onLeased for coalesced batches replays the
-    // same row).
+    // same row). The `status` CAS keeps this transition race-safe like
+    // the terminal hooks: a late/stale onLeased can't flip a row that
+    // has already moved to dispatched/dead back to "dispatching".
     await this.write(() =>
       this.prisma.reactorOutbox.updateMany({
         where: {
           projectId: p.projectId,
           reactorName: p.reactorName,
           dedupKey: p.auditDedupKey,
+          status: { in: ["queued", "failed_retryable"] },
         },
         data: {
           status: "dispatching",

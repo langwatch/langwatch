@@ -122,6 +122,8 @@ import { createSpanStorageBroadcastReactor } from "./pipelines/trace-processing/
 import { createClaudeCodeSpanSyncReactor } from "./pipelines/trace-processing/reactors/claudeCodeSpanSync.reactor";
 import { createTraceUpdateBroadcastReactor } from "./pipelines/trace-processing/reactors/traceUpdateBroadcast.reactor";
 import type { AppendStore } from "./projections/mapProjection.types";
+import type { StaticPipelineDefinition } from "./pipeline/staticBuilder.types";
+import { getApp } from "../app-layer/app";
 import type { ClickHouseExperimentRunResultRecord } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.mapProjection";
 import type { ResolveOriginCommandData } from "./pipelines/trace-processing/schemas/commands";
 
@@ -780,13 +782,6 @@ export class PipelineRegistry {
 }
 
 export type AppCommands = ReturnType<PipelineRegistry["registerAll"]>;
-
-// ============================================================================
-// Introspection — derived from the live EventSourcing runtime
-// ============================================================================
-
-import type { StaticPipelineDefinition } from "./pipeline/staticBuilder.types";
-import { getApp } from "../app-layer/app";
 
 export interface ProjectionMetadata {
   projectionName: string;
