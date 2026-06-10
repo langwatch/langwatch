@@ -7,6 +7,11 @@ import {
   HTTP_METHODS,
 } from "~/optimization_studio/types/dsl";
 import type { DatasetColumnType } from "~/server/datasets/types";
+import type {
+  AutosaveState,
+  CellPosition,
+  RowHeightMode,
+} from "~/components/datasets/editor/DatasetTableContext";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
 
@@ -350,14 +355,6 @@ export type OverlayType =
   | "dataset-switch"
   | "dataset-add";
 
-export type CellPosition = {
-  row: number;
-  columnId: string;
-};
-
-export type RowHeightMode = "compact" | "fit";
-
-export type AutosaveState = "idle" | "saving" | "saved" | "error";
 
 export type AutosaveStatus = {
   evaluation: AutosaveState;

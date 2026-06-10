@@ -1,7 +1,7 @@
 import { Box, HStack, Spinner, Text } from "@chakra-ui/react";
 import { AlertCircle, Check, Cloud, RefreshCw } from "lucide-react";
 import { Tooltip } from "~/components/ui/tooltip";
-import type { AutosaveState } from "../types";
+import type { AutosaveState } from "~/components/datasets/editor/DatasetTableContext";
 
 type AutosaveStatusProps = {
   evaluationState: AutosaveState;

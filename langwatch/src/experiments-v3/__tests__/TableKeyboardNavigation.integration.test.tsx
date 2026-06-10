@@ -14,7 +14,7 @@ import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
-import { useTableKeyboardNavigation } from "../hooks/useTableKeyboardNavigation";
+import { useTableKeyboardNavigation } from "~/components/datasets/editor/useTableKeyboardNavigation";
 import type { DatasetColumn } from "../types";
 
 // Mock useDrawer

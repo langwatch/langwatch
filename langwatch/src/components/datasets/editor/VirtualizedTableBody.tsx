@@ -7,14 +7,13 @@
 import type { Row } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import React, { useCallback } from "react";
-import { DRAWER_WIDTH } from "../constants";
-import type { TableRowData } from "../types";
-import { TableCell } from "./DatasetSection/TableCell";
+import type { DatasetTableRowData } from "./DatasetTableContext";
+import { TableCell } from "./TableCell";
 // Fixed row height for compact mode
 const COMPACT_ROW_HEIGHT = 160;
 
-type VirtualizedTableBodyProps = {
-  rows: Row<TableRowData>[];
+type VirtualizedTableBodyProps<TData extends DatasetTableRowData> = {
+  rows: Row<TData>[];
   scrollContainer: HTMLElement | null;
   columnCount: number;
   selectedRows: Set<number>;
@@ -23,13 +22,17 @@ type VirtualizedTableBodyProps = {
   shouldVirtualize: boolean;
   disableVirtualization: boolean;
   displayRowCount: number;
+  /** Width of a trailing spacer column, e.g. to leave room for a side
+   *  drawer overlaying the table (the evaluations workbench passes its
+   *  drawer width). Omit for no spacer. */
+  trailingSpacerWidth?: number;
 };
 
 /**
  * Memoized table body component that manages its own virtualizer state.
  * This prevents the parent component from re-rendering on scroll.
  */
-export const VirtualizedTableBody = React.memo(function VirtualizedTableBody({
+function VirtualizedTableBodyImpl<TData extends DatasetTableRowData>({
   rows,
   scrollContainer,
   columnCount,
@@ -39,7 +42,8 @@ export const VirtualizedTableBody = React.memo(function VirtualizedTableBody({
   shouldVirtualize,
   disableVirtualization,
   displayRowCount,
-}: VirtualizedTableBodyProps) {
+  trailingSpacerWidth,
+}: VirtualizedTableBodyProps<TData>) {
   // Stable callbacks for virtualizer
   const getScrollElement = useCallback(
     () => scrollContainer,
@@ -79,8 +83,14 @@ export const VirtualizedTableBody = React.memo(function VirtualizedTableBody({
             ))}
             {/* Filler column - absorbs remaining space */}
             <td style={{ width: "auto" }} />
-            {/* Spacer column to match drawer width */}
-            <td style={{ width: DRAWER_WIDTH, minWidth: DRAWER_WIDTH }} />
+            {trailingSpacerWidth ? (
+              <td
+                style={{
+                  width: trailingSpacerWidth,
+                  minWidth: trailingSpacerWidth,
+                }}
+              />
+            ) : null}
           </tr>
         ))}
       </>
@@ -128,8 +138,11 @@ export const VirtualizedTableBody = React.memo(function VirtualizedTableBody({
                 isLoading={isLoading}
               />
             ))}
-            {/* Filler column - absorbs remaining space + spacer column to match drawer width */}
-            <td colSpan={2} style={{ width: "auto", minWidth: DRAWER_WIDTH }} />
+            {/* Filler column - absorbs remaining space (+ optional drawer spacer) */}
+            <td
+              colSpan={trailingSpacerWidth ? 2 : 1}
+              style={{ width: "auto", minWidth: trailingSpacerWidth }}
+            />
           </tr>
         );
       })}
@@ -144,4 +157,13 @@ export const VirtualizedTableBody = React.memo(function VirtualizedTableBody({
       )}
     </>
   );
-});
+}
+
+/**
+ * Memoized table body that manages its own virtualizer state so the parent
+ * table doesn't re-render on scroll. The cast keeps the generic row type,
+ * which React.memo would otherwise erase.
+ */
+export const VirtualizedTableBody = React.memo(
+  VirtualizedTableBodyImpl,
+) as typeof VirtualizedTableBodyImpl;

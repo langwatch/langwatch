@@ -5,13 +5,18 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { EditableCell } from "../components/DatasetSection/EditableCell";
+import { EditableCell } from "~/components/datasets/editor/EditableCell";
+import { EvaluationsV3DatasetTableProvider } from "../components/EvaluationsV3DatasetTableProvider";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { DEFAULT_TEST_DATA_ID } from "../types";
 
 // Wrapper with Chakra provider
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  <ChakraProvider value={defaultSystem}>
+    <EvaluationsV3DatasetTableProvider>
+      {children}
+    </EvaluationsV3DatasetTableProvider>
+  </ChakraProvider>
 );
 
 // Helper to render with store reset and Chakra provider

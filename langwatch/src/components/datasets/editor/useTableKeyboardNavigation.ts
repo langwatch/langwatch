@@ -1,5 +1,4 @@
 import { useEffect } from "react";
-import type { DatasetColumn, TargetConfig } from "../types";
 
 type ColumnType = "checkbox" | "dataset" | "target";
 
@@ -9,8 +8,8 @@ type NavigableColumn = {
 };
 
 type UseTableKeyboardNavigationParams = {
-  datasetColumns: DatasetColumn[];
-  targets: TargetConfig[];
+  datasetColumns: Array<{ id: string }>;
+  targets: Array<{ id: string }>;
   displayRowCount: number;
   editingCell: { row: number; columnId: string } | undefined;
   selectedCell: { row: number; columnId: string } | undefined;
@@ -25,8 +24,8 @@ type UseTableKeyboardNavigationParams = {
  * Builds the list of navigable columns in order: checkbox, dataset columns, target columns
  */
 export const buildNavigableColumns = (
-  datasetColumns: DatasetColumn[],
-  targets: TargetConfig[],
+  datasetColumns: Array<{ id: string }>,
+  targets: Array<{ id: string }>,
 ): NavigableColumn[] => {
   const cols: NavigableColumn[] = [];
 

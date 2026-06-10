@@ -37,7 +37,7 @@ import { SimpleSlider } from "~/components/ui/slider";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
-import type { RowHeightMode } from "../types";
+import type { RowHeightMode } from "~/components/datasets/editor/DatasetTableContext";
 import { DEFAULT_CONCURRENCY } from "../types";
 
 type ToggleOption = {

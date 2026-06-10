@@ -10,7 +10,7 @@ import {
 } from "react";
 import type { DatasetColumnType } from "~/server/datasets/types";
 import { ExternalImage, getImageUrl } from "~/components/ExternalImage";
-import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
+import { useDatasetTable } from "./DatasetTableContext";
 import { isTextLikelyOverflowing } from "~/utils/textOverflowHeuristic";
 
 // Max characters to display before truncating (for rendering performance)
@@ -146,20 +146,20 @@ export function EditableCell({
   datasetId,
   dataType,
 }: EditableCellProps) {
-  const { setCellValue, setEditingCell, ui, toggleCellExpanded } =
-    useEvaluationsV3Store((state) => ({
-      setCellValue: state.setCellValue,
-      setEditingCell: state.setEditingCell,
-      ui: state.ui,
-      toggleCellExpanded: state.toggleCellExpanded,
-    }));
+  const {
+    setCellValue,
+    setEditingCell,
+    rowHeightMode,
+    expandedCells,
+    editingCell,
+    toggleCellExpanded,
+  } = useDatasetTable();
 
-  const rowHeightMode = ui.rowHeightMode;
   const cellKey = `${row}-${columnId}`;
-  const isCellExpanded = ui.expandedCells.has(cellKey);
+  const isCellExpanded = expandedCells.has(cellKey);
 
   const isEditing =
-    ui.editingCell?.row === row && ui.editingCell?.columnId === columnId;
+    editingCell?.row === row && editingCell?.columnId === columnId;
 
   const [editValue, setEditValue] = useState(value);
   const [editorStyle, setEditorStyle] = useState<React.CSSProperties>({});

@@ -5,8 +5,8 @@ import { create, type StateCreator } from "zustand";
 
 import type { DatasetColumnType } from "~/server/datasets/types";
 
+import type { CellPosition } from "~/components/datasets/editor/DatasetTableContext";
 import {
-  type CellPosition,
   createInitialResults,
   createInitialState,
   type DatasetColumn,

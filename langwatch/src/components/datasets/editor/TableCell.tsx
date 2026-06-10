@@ -1,14 +1,19 @@
 import { Skeleton, VStack } from "@chakra-ui/react";
 import { type Cell, flexRender } from "@tanstack/react-table";
 import type { DatasetColumnType } from "~/server/datasets/types";
-import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
-import type { TableRowData } from "../../types";
+import { useDatasetTable } from "./DatasetTableContext";
+import type { DatasetTableRowData } from "./DatasetTableContext";
 import { EditableCell } from "./EditableCell";
 
 // ============================================================================
 // Types
 // ============================================================================
 
+/**
+ * How a column behaves in the shared dataset table. "dataset" cells are
+ * editable via EditableCell; "checkbox" toggles row selection; anything else
+ * (e.g. the workbench's "target" columns) renders through flexRender.
+ */
 export type ColumnType = "checkbox" | "dataset" | "target";
 
 type ColumnMeta = {
@@ -17,8 +22,8 @@ type ColumnMeta = {
   dataType?: DatasetColumnType; // The actual data type (string, json, list, etc.)
 };
 
-type TableCellProps = {
-  cell: Cell<TableRowData, unknown>;
+type TableCellProps<TData extends DatasetTableRowData> = {
+  cell: Cell<TData, unknown>;
   rowIndex: number;
   activeDatasetId: string;
   isLoading?: boolean;
@@ -32,19 +37,14 @@ type TableCellProps = {
  * Renders a single table cell with selection and interaction support.
  * Handles click/double-click for selection/editing, and applies visual styles.
  */
-export const TableCell = ({
+export const TableCell = <TData extends DatasetTableRowData>({
   cell,
   rowIndex,
   activeDatasetId,
   isLoading,
-}: TableCellProps) => {
+}: TableCellProps<TData>) => {
   const { selectedCell, setSelectedCell, setEditingCell, toggleRowSelection } =
-    useEvaluationsV3Store((state) => ({
-      selectedCell: state.ui.selectedCell,
-      setSelectedCell: state.setSelectedCell,
-      setEditingCell: state.setEditingCell,
-      toggleRowSelection: state.toggleRowSelection,
-    }));
+    useDatasetTable();
 
   const meta = cell.column.columnDef.meta as ColumnMeta | undefined;
 

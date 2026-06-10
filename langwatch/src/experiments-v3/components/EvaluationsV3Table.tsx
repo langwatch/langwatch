@@ -37,7 +37,7 @@ import {
   useOpenTargetEditor,
 } from "../hooks/useOpenTargetEditor";
 import { useDatasetSelectionLoader } from "../hooks/useSavedDatasetLoader";
-import { useTableKeyboardNavigation } from "../hooks/useTableKeyboardNavigation";
+import { useTableKeyboardNavigation } from "~/components/datasets/editor/useTableKeyboardNavigation";
 import type {
   DatasetColumn,
   DatasetReference,
@@ -58,7 +58,7 @@ import {
 } from "../utils/fieldMappingConverters";
 import { createPromptEditorCallbacks } from "../utils/promptEditorCallbacks";
 import { ColumnTypeIcon } from "./ColumnTypeIcon";
-import { type ColumnType } from "./DatasetSection/TableCell";
+import { type ColumnType } from "~/components/datasets/editor/TableCell";
 import { DatasetSuperHeader } from "./DatasetSuperHeader";
 import { SelectionToolbar } from "./SelectionToolbar";
 import {
@@ -68,7 +68,8 @@ import {
   TargetHeaderFromMeta,
 } from "./TableMetaWrappers";
 import { TargetSuperHeader } from "./TargetSuperHeader";
-import { VirtualizedTableBody } from "./VirtualizedTableBody";
+import { VirtualizedTableBody } from "~/components/datasets/editor/VirtualizedTableBody";
+import { EvaluationsV3DatasetTableProvider } from "./EvaluationsV3DatasetTableProvider";
 
 // Max rows for expanded mode (disable virtualization above this)
 const MAX_ROWS_FOR_FIT_MODE = 100;
@@ -1595,17 +1596,20 @@ export function EvaluationsV3Table({
           ))}
         </thead>
         <tbody>
-          <VirtualizedTableBody
-            rows={table.getRowModel().rows}
-            scrollContainer={scrollContainer}
-            columnCount={table.getAllColumns().length + 2}
-            selectedRows={selectedRows}
-            activeDatasetId={activeDatasetId}
-            isLoading={isLoadingExperiment || isLoadingDatasets}
-            shouldVirtualize={shouldVirtualize}
-            disableVirtualization={disableVirtualization}
-            displayRowCount={displayRowCount}
-          />
+          <EvaluationsV3DatasetTableProvider>
+            <VirtualizedTableBody
+              rows={table.getRowModel().rows}
+              scrollContainer={scrollContainer}
+              columnCount={table.getAllColumns().length + 2}
+              selectedRows={selectedRows}
+              activeDatasetId={activeDatasetId}
+              isLoading={isLoadingExperiment || isLoadingDatasets}
+              shouldVirtualize={shouldVirtualize}
+              disableVirtualization={disableVirtualization}
+              displayRowCount={displayRowCount}
+              trailingSpacerWidth={DRAWER_WIDTH}
+            />
+          </EvaluationsV3DatasetTableProvider>
         </tbody>
       </table>
 
