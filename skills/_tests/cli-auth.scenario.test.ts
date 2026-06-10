@@ -82,7 +82,7 @@ describe("LangWatch CLI Auth Discovery — bare CLI, no skill", () => {
  * snippet), the agent must use the project API key already in `.env` and must
  * never run the AI-tools / device login or target a personal project.
  */
-describe("LangWatch CLI Auth — skill setup stays on a real project", () => {
+describe("LangWatch CLI Auth: skill setup stays on a real project", () => {
   it.skipIf(isCI)(
     "uses the .env project key and never device / personal login",
     async () => {
@@ -144,7 +144,7 @@ describe("LangWatch CLI Auth — skill setup stays on a real project", () => {
               .join("\n")
               .toLowerCase();
             // Hard guardrail: the AI-tools / device login must never be invoked
-            // for evaluation setup — that is what routes to a personal project.
+            // for evaluation setup, that is what routes to a personal project.
             expect(
               transcript.includes("login --device"),
               "agent must not run `langwatch login --device` for evaluation setup",

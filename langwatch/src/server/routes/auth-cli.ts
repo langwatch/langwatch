@@ -1543,7 +1543,7 @@ secured.access(CLI_POLICY).post("/approve", async (c: Context) => {
       );
     }
 
-    // Project login must target a real, shared project — never a personal
+    // Project login must target a real, shared project, never a personal
     // workspace project. A coding agent that picked (or had auto-selected)
     // the personal project silently sent the user's evaluations there
     // (customer report). The browser picker hides personal projects; this
@@ -1620,7 +1620,7 @@ secured.access(CLI_POLICY).post("/approve", async (c: Context) => {
       {
         error: "governance_required",
         error_description:
-          "AI-tools (device) login needs governance enabled for your organization. Re-run `langwatch login` and choose project login — it writes a project API key to your .env.",
+          "AI-tools (device) login needs governance enabled for your organization. Re-run `langwatch login` and choose project login. It writes a project API key to your .env.",
       },
       403,
     );

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // The two login-flow entry points are the seam: project login goes through
 // runUnifiedLoginFlow({ kind: "project_api_key" }); AI-tools login goes
 // through runDeviceFlowLogin (a device_session). We assert which one the
-// command picks per context — no network, no browser.
+// command picks per context, no network, no browser.
 const runUnifiedLoginFlow = vi.fn().mockResolvedValue({});
 const runDeviceFlowLogin = vi.fn().mockResolvedValue({});
 vi.mock("@/cli/utils/governance/login-flow", () => ({

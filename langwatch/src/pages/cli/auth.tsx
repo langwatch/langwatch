@@ -107,9 +107,9 @@ export default function CliAuthPage() {
   }, [organizations, selectedOrgId]);
 
   // Projects offered in the project-login picker (project_api_key mode).
-  // resolveCliAuthProjects hides personal workspace projects — project login
+  // resolveCliAuthProjects hides personal workspace projects. Project login
   // must target a real, shared project, never a personal one (a coding agent
-  // that picked one silently routed evaluations there) — and the hidden
+  // that picked one silently routed evaluations there), and the hidden
   // internal_governance tenancy project. It also picks the default: the last
   // project the user worked in when it's offered, else the sole project.
   const lastProjectSlug = currentProject?.slug ?? null;

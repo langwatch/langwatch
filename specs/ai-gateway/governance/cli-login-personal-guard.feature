@@ -2,7 +2,7 @@ Feature: CLI login never lands a user on a personal project
 
   A customer used the LangWatch coding-assistant skills to set up experiments. Their
   agent ran `langwatch login`, which signed them into a personal project, and the
-  evaluations they then created were sent to that personal project — confusing, and
+  evaluations they then created were sent to that personal project, confusing, and
   wrong for shared / team work. Two backend guards make this impossible, paired with
   the CLI-side default-to-project behavior:
 

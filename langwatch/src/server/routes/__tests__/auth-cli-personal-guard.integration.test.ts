@@ -5,7 +5,7 @@
  * `POST /api/auth/cli/approve` (real Redis + real Prisma):
  *
  *   1. device-session (AI-tools) login is refused when governance is not
- *      enabled for the org — it would otherwise provision a personal
+ *      enabled for the org, since it would otherwise provision a personal
  *      workspace + VK and capture the user's evaluations (customer report).
  *   2. project-login (project_api_key) refuses a personal project id and only
  *      hands back a shared project's key.
@@ -20,7 +20,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 
 // vi.mock is hoisted above every top-level const, so the values the session
 // mock needs must come from vi.hoisted (hoisted alongside it). Math.random,
-// not nanoid — imports aren't available inside the hoisted block.
+// not nanoid, since imports aren't available inside the hoisted block.
 const ids = vi.hoisted(() => {
   const s = Math.random().toString(36).slice(2, 10);
   return {
@@ -124,7 +124,7 @@ describe("CLI login personal-project guards", () => {
 
   // Reset the governance baseline (off) before every test: the dev .env
   // force-enables the flag, so clearing it BEFORE each case is what guarantees
-  // isolation — and a failed assertion can never leak the forced flag forward.
+  // isolation, and a failed assertion can never leak the forced flag forward.
   // The one governance-on case opts in explicitly in its own body.
   beforeEach(() => {
     delete process.env.FEATURE_FLAG_FORCE_ENABLE;

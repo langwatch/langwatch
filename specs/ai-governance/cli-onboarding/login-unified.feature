@@ -119,7 +119,7 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
     Then the CLI renders a top banner BEFORE the first prompt — always visible,
       not optional:
       "Running interactively. For agents/CI, skip the prompts by passing:
-         --api-key <K>    project SDK key into .env (default — SDK, evals, prompts)
+         --api-key <K>    project SDK key into .env (default: SDK, evals, prompts)
          --device         AI tools / SSO (claude, codex, gemini, opencode)
          --token <T>      pre-minted device session
          --endpoint <U>   self-hosted instance URL"
@@ -130,8 +130,8 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
     And on selecting (2) the CLI prompts for the URL and validates http(s) scheme
     And the CLI then prompts, with project login as the default (option 1):
       "How do you want to use it?
-        1) Project / SDK API key     (langwatch eval, sync, prompts, SDK)        — API key into .env
-        2) AI tools / agentic flows  (claude, codex, cursor, gemini, opencode)   — device-flow SSO
+        1) Project / SDK API key     (langwatch eval, sync, prompts, SDK)        - API key into .env
+        2) AI tools / agentic flows  (claude, codex, cursor, gemini, opencode)   - device-flow SSO
         3) Both"
     And on selecting (1) it runs the project API-key device-code flow → `$CWD/.env`
     And on selecting (2) it runs the device-flow → `~/.langwatch/config.json`

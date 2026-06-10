@@ -29,7 +29,7 @@ function printAgentHintBanner(): void {
   );
   console.log(
     chalk.gray(
-      "  --api-key <KEY>            project SDK key into .env (default — SDK, evals, prompts)",
+      "  --api-key <KEY>            project SDK key into .env (default: SDK, evals, prompts)",
     ),
   );
   console.log(
@@ -178,7 +178,7 @@ export const loginCommand = async (
     if (!process.stdin.isTTY) {
       console.log(
         chalk.gray(
-          "No login mode given — defaulting to project login (writes LANGWATCH_API_KEY to .env).",
+          "No login mode given. Defaulting to project login (writes LANGWATCH_API_KEY to .env).",
         ),
       );
       console.log(
@@ -261,12 +261,12 @@ export const loginCommand = async (
       choices: [
         {
           title: "Project / SDK API key",
-          description: "langwatch eval, sync, prompts, SDK auto-instrumentation — writes .env",
+          description: "langwatch eval, sync, prompts, SDK auto-instrumentation - writes .env",
           value: "api-key",
         },
         {
           title: "AI tools / agentic flows",
-          description: "claude, codex, cursor, gemini, opencode — device-flow SSO",
+          description: "claude, codex, cursor, gemini, opencode - device-flow SSO",
           value: "device",
         },
         {
