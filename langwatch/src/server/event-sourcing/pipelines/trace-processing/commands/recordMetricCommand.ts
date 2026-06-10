@@ -34,6 +34,7 @@ export interface RecordMetricCommandDependencies {
         resourceAttributes: Record<string, string>;
       },
       piiRedactionLevel: PIIRedactionLevel,
+      tenantId?: string,
     ) => Promise<void>;
   };
 }
@@ -106,6 +107,7 @@ export class RecordMetricCommand
           await this.deps.piiRedactionService.redactMetricAttributes(
             metricToRedact,
             piiRedactionLevel,
+            tenantIdStr,
           );
         } catch (error) {
           this.logger.error(

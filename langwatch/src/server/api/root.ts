@@ -43,6 +43,7 @@ import { suiteRouter } from "./routers/suites";
 import { shareRouter } from "./routers/share";
 import { pinnedTraceRouter } from "./routers/pinnedTrace";
 import { dataRetentionRouter } from "./routers/dataRetention";
+import { dataPrivacyRouter } from "./routers/dataPrivacy";
 import { spansRouter } from "./routers/spans";
 import { teamRouter } from "./routers/team";
 import { topicsRouter } from "./routers/topics";
@@ -114,6 +115,7 @@ const coreRouters = {
   share: shareRouter,
   pinnedTrace: pinnedTraceRouter,
   dataRetention: dataRetentionRouter,
+  dataPrivacy: dataPrivacyRouter,
   translate: translateRouter,
   workflow: workflowRouter,
   optimization: optimizationRouter,

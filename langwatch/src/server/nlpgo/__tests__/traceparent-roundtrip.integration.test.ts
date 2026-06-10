@@ -309,6 +309,12 @@ describe.skipIf(!shouldRun)(
                 tokenEstimationService: {
                   estimateSpanTokens: async () => {},
                 } as any,
+                contentDropService: {
+                  dropSpanContent: async () => ({
+                    droppedCount: 0,
+                    droppedCategories: [],
+                  }),
+                } as any,
               });
             }
           } as any,

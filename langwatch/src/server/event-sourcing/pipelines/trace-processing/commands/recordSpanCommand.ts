@@ -25,6 +25,10 @@ import { OtlpSpanPiiRedactionService } from "~/server/app-layer/traces/span-pii-
 import { OtlpSpanTokenEstimationService } from "~/server/app-layer/traces/span-token-estimation.service";
 import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
 import { featureFlagService } from "~/server/featureFlag";
+import {
+  applyOtlpSpanContentDrop,
+  type SpanContentDropResult,
+} from "~/server/data-privacy/applyOtlpSpanContentDrop";
 import { TraceRequestUtils } from "../utils/traceRequest.utils";
 import { capOversizedAttributes } from "../utils/capOversizedAttributes";
 
@@ -38,6 +42,7 @@ export interface RecordSpanCommandDependencies {
       span: OtlpSpan,
       resource: OtlpResource | null,
       piiRedactionLevel: PIIRedactionLevel,
+      tenantId?: string,
     ) => Promise<void>;
   };
   /** Service for enriching spans with custom LLM cost rates. */
@@ -50,6 +55,13 @@ export interface RecordSpanCommandDependencies {
       span: OtlpSpan;
       tenantId?: string;
     }) => Promise<void>;
+  };
+  /** Service for dropping configured content categories per the data-privacy policy. */
+  contentDropService: {
+    dropSpanContent: (args: {
+      span: OtlpSpan;
+      projectId: string;
+    }) => Promise<SpanContentDropResult>;
   };
 }
 
@@ -66,6 +78,7 @@ function createDefaultDependencies(): RecordSpanCommandDependencies {
       tokenizer: new TiktokenClient(),
       featureFlagService,
     }),
+    contentDropService: { dropSpanContent: applyOtlpSpanContentDrop },
   };
 }
 
@@ -164,6 +177,7 @@ export class RecordSpanCommand implements CommandHandler<
             spanToProcess,
             resourceToProcess,
             piiRedactionLevel,
+            tenantIdStr,
           ),
           this.deps.costEnrichmentService.enrichSpan(
             spanToProcess,
@@ -200,6 +214,28 @@ export class RecordSpanCommand implements CommandHandler<
           throw piiResult.reason instanceof Error
             ? piiResult.reason
             : new Error(String(piiResult.reason));
+        }
+
+        // Apply the scoped data-privacy DROP at this single span choke point,
+        // AFTER redaction (dropping a whole category makes redacting it moot).
+        // Doing it here, before the event is emitted, means both the stored
+        // span and the trace-summary fold (which derives ComputedInput/Output
+        // from the same event) never see the dropped categories. Fails open.
+        const dropResult = await this.deps.contentDropService.dropSpanContent({
+          span: spanToProcess,
+          projectId: tenantIdStr,
+        });
+        if (dropResult.droppedCount > 0) {
+          this.logger.debug(
+            {
+              tenantId,
+              traceId,
+              spanId,
+              droppedCount: dropResult.droppedCount,
+              droppedCategories: dropResult.droppedCategories,
+            },
+            "Dropped span content per data-privacy policy",
+          );
         }
 
         const spanReceivedEvent = EventUtils.createEvent<SpanReceivedEvent>({

@@ -60,6 +60,10 @@ function toAppLayer(span: NormalizedSpan, retentionDays: number): SpanInsertData
  * are sync and the org-mode lookup is async (Prisma). The store layer
  * is async by contract, so this is the cleanest extension point that
  * still guarantees the policy fires BEFORE the ClickHouse write.
+ *
+ * The scoped data-privacy DROP is applied separately and EARLIER, in
+ * RecordSpanCommand (see applyOtlpSpanContentDrop), so it also covers the
+ * trace-summary fold that derives ComputedInput/Output from the same event.
  */
 async function applyGovernanceStrip(
   span: NormalizedSpan,
@@ -103,10 +107,10 @@ export class SpanAppendStore implements AppendStore<NormalizedSpan> {
     record: NormalizedSpan,
     context: ProjectionStoreContext,
   ): Promise<void> {
-    const transformed = await applyGovernanceStrip(record, this.stripService);
+    const stripped = await applyGovernanceStrip(record, this.stripService);
     const retentionDays =
       context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS;
-    await this.repo.insertSpan(toAppLayer(transformed, retentionDays));
+    await this.repo.insertSpan(toAppLayer(stripped, retentionDays));
   }
 
   async bulkAppend(
@@ -114,11 +118,11 @@ export class SpanAppendStore implements AppendStore<NormalizedSpan> {
     context: ProjectionStoreContext,
   ): Promise<void> {
     if (records.length === 0) return;
-    const transformed = await Promise.all(
+    const stripped = await Promise.all(
       records.map((r) => applyGovernanceStrip(r, this.stripService)),
     );
     const retentionDays =
       context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS;
-    await this.repo.insertSpans(transformed.map((r) => toAppLayer(r, retentionDays)));
+    await this.repo.insertSpans(stripped.map((r) => toAppLayer(r, retentionDays)));
   }
 }

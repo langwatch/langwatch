@@ -1,7 +1,6 @@
 import {
   type PrismaClient,
   OrganizationUserRole,
-  ProjectSensitiveDataVisibilityLevel,
   RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
@@ -9,6 +8,21 @@ import type { Session } from "~/server/auth";
 import type { Protections } from "../elasticsearch/protections";
 import { hasProjectPermission, isDemoProject } from "./rbac";
 import { getApp } from "~/server/app-layer/app";
+import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
+import {
+  PLATFORM_DEFAULT_DATA_PRIVACY,
+  type ResolvedAudience,
+  type ResolvedDataPrivacy,
+} from "~/server/data-privacy/dataPrivacy.types";
+import {
+  describeAudience,
+  effectiveCategoryRestriction,
+  isContentVisible,
+  isContentVisibleToPublic,
+  needsAudienceFacts,
+  type LegacyVisibility,
+  type ViewerFacts,
+} from "~/server/data-privacy/contentVisibility";
 
 export const extractCheckKeys = (
   inputObject: Record<string, any>,
@@ -76,6 +90,41 @@ export async function getInternalProtectionsForProject(
   };
 }
 
+/**
+ * Resolve a human label of who may see a restricted category, mapping the
+ * audience's group/department ids to names (the organization scopes the lookup).
+ */
+async function describeRestriction(
+  prisma: PrismaClient,
+  audience: ResolvedAudience,
+  organizationId: string | null,
+): Promise<string> {
+  let groups: Record<string, string> = {};
+  let departments: Record<string, string> = {};
+  if (
+    organizationId &&
+    (audience.groupIds.length > 0 || audience.departmentIds.length > 0)
+  ) {
+    const [groupRows, departmentRows] = await Promise.all([
+      audience.groupIds.length > 0
+        ? prisma.group.findMany({
+            where: { id: { in: audience.groupIds }, organizationId },
+            select: { id: true, name: true },
+          })
+        : Promise.resolve([]),
+      audience.departmentIds.length > 0
+        ? prisma.department.findMany({
+            where: { id: { in: audience.departmentIds }, organizationId },
+            select: { id: true, name: true },
+          })
+        : Promise.resolve([]),
+    ]);
+    groups = Object.fromEntries(groupRows.map((g) => [g.id, g.name]));
+    departments = Object.fromEntries(departmentRows.map((d) => [d.id, d.name]));
+  }
+  return describeAudience(audience, { groups, departments });
+}
+
 export async function getUserProtectionsForProject(
   ctx: {
     prisma: PrismaClient;
@@ -99,7 +148,30 @@ export async function getUserProtectionsForProject(
     },
   });
 
-  // For public shares or non-signed in users, we only check project settings
+  // The scoped data-privacy policy is authoritative; the legacy per-project
+  // enum still applies wherever the policy leaves a category at its default.
+  // The kill switch reverts to legacy-enum-only behavior (the platform default
+  // leaves every category at "capture", so reconciliation uses the enum alone).
+  let policy: ResolvedDataPrivacy = PLATFORM_DEFAULT_DATA_PRIVACY;
+  if (process.env.LANGWATCH_DATA_PRIVACY_ENFORCEMENT !== "off") {
+    try {
+      policy = await getDataPrivacyPolicyService().getResolvedForProject({
+        projectId,
+      });
+    } catch {
+      policy = PLATFORM_DEFAULT_DATA_PRIVACY;
+    }
+  }
+  const effInput = effectiveCategoryRestriction(
+    policy.categories.input,
+    project.capturedInputVisibility as LegacyVisibility,
+  );
+  const effOutput = effectiveCategoryRestriction(
+    policy.categories.output,
+    project.capturedOutputVisibility as LegacyVisibility,
+  );
+
+  // For public shares or non-signed in users, only captured content is visible.
   if (
     // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
     ctx.publiclyShared ||
@@ -108,69 +180,82 @@ export async function getUserProtectionsForProject(
   ) {
     return {
       canSeeCosts,
-      canSeeCapturedInput:
-        project.capturedInputVisibility ===
-        ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
-      canSeeCapturedOutput:
-        project.capturedOutputVisibility ===
-        ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
+      canSeeCapturedInput: isContentVisibleToPublic(effInput),
+      canSeeCapturedOutput: isContentVisibleToPublic(effOutput),
     };
   }
 
-  // Check team-level role bindings
+  const userId = ctx.session.user.id;
   const teamBindings = await ctx.prisma.roleBinding.findMany({
     where: {
-      userId: ctx.session.user.id,
+      userId,
       scopeType: RoleBindingScopeType.TEAM,
       scopeId: project.teamId,
     },
-    select: {
-      role: true,
-    },
+    select: { role: true },
   });
 
-  let isAdminForTeam = teamBindings.some(
-    (binding) => binding.role === TeamUserRole.ADMIN,
-  );
-  let isMemberOfTeam = teamBindings.length > 0;
-
-  if (!isMemberOfTeam) {
+  let isAdmin = teamBindings.some((b) => b.role === TeamUserRole.ADMIN);
+  let isMember = teamBindings.length > 0;
+  if (!isMember) {
     const orgRole = await getApp().organizations.getUserOrgRoleByTeamId({
-      userId: ctx.session.user.id,
+      userId,
       teamId: project.teamId,
     });
-
     if (orgRole === OrganizationUserRole.ADMIN) {
-      isMemberOfTeam = true;
-      isAdminForTeam = true;
+      isMember = true;
+      isAdmin = true;
     } else if (orgRole === OrganizationUserRole.MEMBER) {
-      isMemberOfTeam = true;
+      isMember = true;
     }
   }
 
-  const obtainVisibilityLevel = (
-    visibility: ProjectSensitiveDataVisibilityLevel,
-  ): boolean => {
-    switch (true) {
-      case !isMemberOfTeam:
-        return false;
-      case visibility === ProjectSensitiveDataVisibilityLevel.REDACTED_TO_ALL:
-        return false;
-      case visibility === ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL:
-        return true;
-      case visibility === ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ADMIN:
-        return isAdminForTeam;
-      default:
-        console.error("Unexpected state for visibility:", visibility);
-        return false;
+  // Group + department membership is only needed when a restrict audience names
+  // groups or departments; admins-only and no-one restrictions decide from the
+  // admin flag alone, keeping the common read path free of the extra queries.
+  let organizationId: string | null = null;
+  let groupIds: string[] = [];
+  let departmentId: string | null = null;
+  if (
+    isMember &&
+    (needsAudienceFacts(effInput) || needsAudienceFacts(effOutput))
+  ) {
+    const team = await ctx.prisma.team.findUnique({
+      where: { id: project.teamId },
+      select: { organizationId: true },
+    });
+    organizationId = team?.organizationId ?? null;
+    if (organizationId) {
+      const [memberships, orgUser] = await Promise.all([
+        ctx.prisma.groupMembership.findMany({
+          where: { userId, group: { organizationId } },
+          select: { groupId: true },
+        }),
+        ctx.prisma.organizationUser.findFirst({
+          where: { userId, organizationId },
+          select: { departmentId: true },
+        }),
+      ]);
+      groupIds = memberships.map((m) => m.groupId);
+      departmentId = orgUser?.departmentId ?? null;
     }
-  };
+  }
+
+  const viewer: ViewerFacts = { isAdmin, isMember, groupIds, departmentId };
+  const canSeeCapturedInput = isContentVisible(effInput, viewer);
+  const canSeeCapturedOutput = isContentVisible(effOutput, viewer);
 
   return {
     canSeeCosts,
-    canSeeCapturedInput: obtainVisibilityLevel(project.capturedInputVisibility),
-    canSeeCapturedOutput: obtainVisibilityLevel(
-      project.capturedOutputVisibility,
-    ),
+    canSeeCapturedInput,
+    canSeeCapturedOutput,
+    capturedInputVisibleTo:
+      !canSeeCapturedInput && effInput.disposition === "restrict"
+        ? await describeRestriction(ctx.prisma, effInput.audience, organizationId)
+        : null,
+    capturedOutputVisibleTo:
+      !canSeeCapturedOutput && effOutput.disposition === "restrict"
+        ? await describeRestriction(ctx.prisma, effOutput.audience, organizationId)
+        : null,
   };
 }

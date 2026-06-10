@@ -92,6 +92,9 @@ class TestRecordSpanCommand extends RecordSpanCommand {
       piiRedactionService: { redactSpan: async () => {} },
       costEnrichmentService: { enrichSpan: async () => {} },
       tokenEstimationService: { estimateSpanTokens: async () => {} },
+      contentDropService: {
+        dropSpanContent: async () => ({ droppedCount: 0, droppedCategories: [] }),
+      },
     });
   }
 }

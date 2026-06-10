@@ -32,6 +32,7 @@ export interface RecordLogCommandDependencies {
         resourceAttributes: Record<string, string>;
       },
       piiRedactionLevel: PIIRedactionLevel,
+      tenantId?: string,
     ) => Promise<void>;
   };
 }
@@ -125,6 +126,7 @@ export class RecordLogCommand
           await this.deps.piiRedactionService.redactLog(
             logToRedact,
             piiRedactionLevel,
+            tenantIdStr,
           );
         } catch (error) {
           this.logger.error(
