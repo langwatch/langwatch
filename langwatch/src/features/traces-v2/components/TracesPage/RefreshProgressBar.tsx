@@ -32,10 +32,13 @@ export const RefreshProgressBar: React.FC<RefreshProgressBarProps> = ({
   const { isRefreshing: fetching } = useTraceListRefresh();
   // Pipe the live isFetching signal into the store; the request/settle
   // lifecycle (including the saw-a-fetch latch) lives in the store
-  // action, not here.
+  // action, not here. `requested` is a dependency so a request that
+  // arrives while a fetch is ALREADY in flight still registers it —
+  // keyed on `fetching` alone, the latch would miss that fetch and
+  // only clear via the safety timeout.
   useEffect(() => {
     observeFetching(fetching);
-  }, [fetching, observeFetching]);
+  }, [fetching, requested, observeFetching]);
   const active = forceVisible || pulsed || requested;
   if (!active) return null;
 

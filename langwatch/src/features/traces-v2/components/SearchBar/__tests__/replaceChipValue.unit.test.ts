@@ -2,31 +2,49 @@ import { describe, expect, it } from "vitest";
 import { replaceChipValue } from "../PlaceholderEditor";
 
 describe("replaceChipValue", () => {
-  describe("when the value follows the field prefix", () => {
-    it("swaps the value for the label after the colon", () => {
-      expect(
-        replaceChipValue("evaluator:monitor_0005", "monitor_0005", "Ragas"),
-      ).toBe("evaluator:Ragas");
+  describe("given a field:value chip segment", () => {
+    describe("when the value follows the field prefix", () => {
+      it("swaps the value for the label after the colon", () => {
+        expect(
+          replaceChipValue({
+            segText: "evaluator:monitor_0005",
+            value: "monitor_0005",
+            label: "Ragas",
+          }),
+        ).toBe("evaluator:Ragas");
+      });
+
+      it("ignores a value substring inside the field name", () => {
+        expect(
+          replaceChipValue({
+            segText: "topics:topic",
+            value: "topic",
+            label: "Billing",
+          }),
+        ).toBe("topics:Billing");
+      });
     });
 
-    it("ignores a value substring inside the field name", () => {
-      expect(replaceChipValue("topics:topic", "topic", "Billing")).toBe(
-        "topics:Billing",
-      );
+    describe("when the label contains replace substitution patterns", () => {
+      it("inserts $-sequences verbatim", () => {
+        expect(
+          replaceChipValue({
+            segText: "evaluator:m1",
+            value: "m1",
+            label: "Cost $& $' check",
+          }),
+        ).toBe("evaluator:Cost $& $' check");
+      });
     });
   });
 
-  describe("when the label contains replace substitution patterns", () => {
-    it("inserts $-sequences verbatim", () => {
-      expect(replaceChipValue("evaluator:m1", "m1", "Cost $& $' check")).toBe(
-        "evaluator:Cost $& $' check",
-      );
-    });
-  });
-
-  describe("when the segment has no colon", () => {
-    it("falls back to a plain first-occurrence swap", () => {
-      expect(replaceChipValue("m1", "m1", "Ragas")).toBe("Ragas");
+  describe("given a bare segment with no colon", () => {
+    describe("when the value matches anywhere", () => {
+      it("falls back to a plain first-occurrence swap", () => {
+        expect(
+          replaceChipValue({ segText: "m1", value: "m1", label: "Ragas" }),
+        ).toBe("Ragas");
+      });
     });
   });
 });

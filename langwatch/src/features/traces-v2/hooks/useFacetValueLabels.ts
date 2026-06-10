@@ -9,10 +9,13 @@ import { useTraceFacets } from "./useTraceFacets";
  * value. Backed by the shared `discover` React Query cache, so this
  * costs no extra request.
  */
-export function useFacetValueLabelResolver(): (
-  field: string,
-  value: string,
-) => string | undefined {
+export function useFacetValueLabelResolver(): ({
+  field,
+  value,
+}: {
+  field: string;
+  value: string;
+}) => string | undefined {
   const { data } = useTraceFacets();
 
   const labelByFieldValue = useMemo(() => {
@@ -29,7 +32,7 @@ export function useFacetValueLabelResolver(): (
   }, [data]);
 
   return useCallback(
-    (field: string, value: string) =>
+    ({ field, value }: { field: string; value: string }) =>
       labelByFieldValue.get(`${field}|${value}`),
     [labelByFieldValue],
   );

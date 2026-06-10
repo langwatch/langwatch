@@ -302,47 +302,10 @@ export function pythonReprToJson(input: string): string | null {
   while (i < input.length) {
     const ch = input[i]!;
     if (ch === "'" || ch === '"') {
-      // String literal — re-emit double-quoted with JSON escaping.
-      const quote = ch;
-      let body = "";
-      i++;
-      while (i < input.length) {
-        const c = input[i]!;
-        if (c === "\\") {
-          const next = input[i + 1];
-          // \' has no meaning in JSON — unescape it. \xNN is a Python
-          // byte escape JSON.parse rejects — re-emit as \u00NN.
-          // Everything else passes through verbatim.
-          if (next === "'") {
-            body += "'";
-          } else if (next === "x" || next === "X") {
-            body += "\\u00" + input.slice(i + 2, i + 4);
-            i += 4;
-            continue;
-          } else {
-            body += "\\" + (next ?? "");
-          }
-          i += 2;
-          continue;
-        }
-        if (c === quote) break;
-        // Escape raw control characters JSON.parse rejects inside
-        // string literals — repr payloads carry literal tabs/CRs often.
-        body +=
-          c === '"'
-            ? '\\"'
-            : c === "\n"
-              ? "\\n"
-              : c === "\t"
-                ? "\\t"
-                : c === "\r"
-                  ? "\\r"
-                  : c;
-        i++;
-      }
-      if (i >= input.length) return null; // unterminated string
-      i++; // closing quote
-      out += `"${body}"`;
+      const scanned = scanReprString({ input, openIndex: i });
+      if (scanned === null) return null; // unterminated string
+      out += `"${scanned.body}"`;
+      i = scanned.nextIndex;
       continue;
     }
     if (input.startsWith("None", i)) {
@@ -367,6 +330,54 @@ export function pythonReprToJson(input: string): string | null {
 }
 
 /**
+ * Scan one repr string literal starting at `openIndex` (the opening
+ * quote) and re-emit its body with JSON escaping: `\'` unescaped, `\xNN`
+ * translated to `\u00NN`, raw control characters escaped (repr payloads
+ * carry literal tabs/CRs often), double quotes escaped. Returns null on
+ * an unterminated literal.
+ */
+function scanReprString({
+  input,
+  openIndex,
+}: {
+  input: string;
+  openIndex: number;
+}): { body: string; nextIndex: number } | null {
+  const quote = input[openIndex]!;
+  let body = "";
+  let i = openIndex + 1;
+  while (i < input.length) {
+    const c = input[i]!;
+    if (c === "\\") {
+      const next = input[i + 1];
+      if (next === "'") {
+        body += "'";
+      } else if (next === "x" || next === "X") {
+        body += "\\u00" + input.slice(i + 2, i + 4);
+        i += 4;
+        continue;
+      } else {
+        body += "\\" + (next ?? "");
+      }
+      i += 2;
+      continue;
+    }
+    if (c === quote) return { body, nextIndex: i + 1 };
+    body += escapeReprChar(c);
+    i++;
+  }
+  return null;
+}
+
+function escapeReprChar(c: string): string {
+  if (c === '"') return '\\"';
+  if (c === "\n") return "\\n";
+  if (c === "\t") return "\\t";
+  if (c === "\r") return "\\r";
+  return c;
+}
+
+/**
  * Typed content-part arrays that aren't chat messages — no `role`, just
  * `[{type: "text", text}, {type: "input_audio", ...}, ...]` (OpenAI
  * multi-modal user content logged bare). Joins the text parts and
@@ -376,7 +387,7 @@ export function pythonReprToJson(input: string): string | null {
  */
 function unwrapContentParts(arr: unknown[]): UnwrapResult | null {
   const pieces: string[] = [];
-  let sawTypedPart = false;
+  let hasTypedPart = false;
   for (const part of arr) {
     if (typeof part === "string") {
       pieces.push(part);
@@ -385,14 +396,14 @@ function unwrapContentParts(arr: unknown[]): UnwrapResult | null {
     if (!part || typeof part !== "object") return null;
     const p = part as { type?: unknown; text?: unknown };
     if (typeof p.type !== "string") return null;
-    sawTypedPart = true;
+    hasTypedPart = true;
     if (p.type === "text" && typeof p.text === "string") {
       pieces.push(p.text);
     } else if (p.type !== "text") {
       pieces.push(glyphForPartType(p.type));
     }
   }
-  if (!sawTypedPart || pieces.length === 0) return null;
+  if (!hasTypedPart || pieces.length === 0) return null;
   return { text: pieces.join(" ") };
 }
 

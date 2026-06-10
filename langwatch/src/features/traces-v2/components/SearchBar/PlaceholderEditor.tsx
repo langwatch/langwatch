@@ -99,11 +99,15 @@ function buildSegments(text: string): DecoratedSegment[] {
  * in tenant-controlled labels are inserted verbatim, not interpreted.
  * Exported for unit testing.
  */
-export function replaceChipValue(
-  segText: string,
-  value: string,
-  label: string,
-): string {
+export function replaceChipValue({
+  segText,
+  value,
+  label,
+}: {
+  segText: string;
+  value: string;
+  label: string;
+}): string {
   const colon = segText.indexOf(":");
   if (colon === -1) return segText.replace(value, () => label);
   return (
@@ -269,7 +273,10 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
             // simultaneously activate the heavier ProseMirror editor.
             if (seg.token && onTokenClick && seg.token.value !== null) {
               const tok = seg.token;
-              const richLabel = resolveLabel(tok.field, tok.value!);
+              const richLabel = resolveLabel({
+                field: tok.field,
+                value: tok.value!,
+              });
               // Swap the id for its display name in the rendered chip
               // only — token coords, data-attrs, and the query text all
               // keep the unique id. The replace is anchored after the
@@ -278,7 +285,11 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
               // the replacer-function form keeps `$&`-style patterns in
               // tenant-controlled labels from being interpreted.
               const display = richLabel
-                ? replaceChipValue(seg.text, tok.value!, richLabel)
+                ? replaceChipValue({
+                    segText: seg.text,
+                    value: tok.value!,
+                    label: richLabel,
+                  })
                 : seg.text;
               return (
                 <span
