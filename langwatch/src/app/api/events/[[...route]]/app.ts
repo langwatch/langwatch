@@ -1,18 +1,23 @@
 import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
-import { resolver, validator as zValidator } from "hono-openapi/zod";
+import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";
 
 import { badRequestSchema } from "~/app/api/shared/schemas";
 import { prisma } from "~/server/db";
-import { requirePatPermission } from "~/server/api/utils";
+import { requirePatPermission } from "~/server/pat/auth-middleware";
+import {
+  TRACK_EVENTS_QUEUE,
+  trackEventsQueue,
+} from "~/server/background/queues/trackEventsQueue";
 import {
   predefinedEventsSchemas,
   predefinedEventTypes,
   recordTrackedEventSpan,
   generateTrackedEventId,
 } from "~/server/app-layer/events/track-event.service";
+import type { TrackEventRESTParamsValidator } from "~/server/tracer/types";
 import { trackEventRESTParamsValidatorSchema } from "~/server/tracer/types.generated";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
@@ -49,10 +54,10 @@ export const app = new Hono<{ Variables: Variables }>()
   .use(authMiddleware)
   .onError(handleError)
 
-  // ── Track Event ────────────────────────────────────────────
   // Canonical replacement for the legacy `POST /api/track_event`. The legacy
   // URL still works (handled by `src/server/routes/misc.ts`); both routes go
-  // through `recordTrackedEventSpan` so behaviour stays in lockstep.
+  // through `recordTrackedEventSpan` and enqueue the same `trackEventsQueue`
+  // job so behaviour stays in lockstep.
   .post(
     "/track",
     requireTracesCreate,
@@ -84,10 +89,10 @@ export const app = new Hono<{ Variables: Variables }>()
       try {
         rawBody = (await c.req.json()) as Record<string, unknown>;
       } catch {
-        return c.json({ message: "Bad request" }, 400);
+        return c.json({ error: "Bad request" }, 400);
       }
 
-      let body;
+      let body: TrackEventRESTParamsValidator;
       try {
         body = trackEventRESTParamsValidatorSchema.parse(rawBody);
       } catch (error) {
@@ -126,6 +131,23 @@ export const app = new Hono<{ Variables: Variables }>()
       } catch (error) {
         logger.error({ error }, "unable to dispatch tracked event span");
       }
+
+      await trackEventsQueue.add(
+        TRACK_EVENTS_QUEUE.JOB,
+        {
+          project_id: project.id,
+          postpone_count: 0,
+          event: {
+            ...body,
+            event_id: eventId,
+            timestamp: body.timestamp ?? Date.now(),
+          },
+        },
+        {
+          jobId: `${project.id}_track_event_${eventId}`,
+          delay: process.env.VITEST_MODE ? 0 : 5000,
+        },
+      );
 
       return c.json({ message: "Event tracked" as const });
     },

@@ -1,6 +1,8 @@
-import { ESpanKind, SpanStatusCode } from "@opentelemetry/api";
+import { SpanStatusCode } from "@opentelemetry/api";
+import { ESpanKind } from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types";
+import type { PIIRedactionLevel } from "@prisma/client";
 import { createHash } from "crypto";
-import { generate } from "ksuid";
+import { generate } from "@langwatch/ksuid";
 import { z } from "zod";
 
 import { getApp } from "~/server/app-layer/app";
@@ -58,7 +60,7 @@ export const predefinedEventTypes = predefinedEventsSchemas.options.map(
  * URLs by routing both through this function.
  */
 export async function recordTrackedEventSpan(params: {
-  project: { id: string; piiRedactionLevel: string };
+  project: { id: string; piiRedactionLevel: PIIRedactionLevel };
   body: TrackEventRESTParamsValidator;
   eventId: string;
 }): Promise<void> {
