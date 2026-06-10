@@ -1,4 +1,5 @@
 import { Box, Flex, HStack, Icon, Text } from "@chakra-ui/react";
+import { memo, useCallback } from "react";
 import {
   LuChevronDown,
   LuChevronRight,
@@ -8,12 +9,12 @@ import {
 } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { LangwatchSignalBucket } from "~/server/api/routers/tracesV2.schemas";
+import { useSpanHoverStore } from "../../../stores/spanHoverStore";
 import { useSpanPulseStore } from "../../../stores/spanPulseStore";
 import {
   abbreviateModel,
   formatCost,
   formatDuration,
-  SPAN_TYPE_COLORS,
 } from "../../../utils/formatters";
 import { LangwatchSignalBadges } from "../LangwatchSignalBadges";
 import { TipCell } from "./TipCell";
@@ -26,12 +27,11 @@ import {
   type WaterfallTreeNode,
 } from "./types";
 
-export function TreeRow({
+export const TreeRow = memo(function TreeRow({
   node,
   rootStart,
   rootDuration,
   isSelected,
-  isHovered,
   isPinned,
   isCollapsed,
   hasChildren,
@@ -41,14 +41,11 @@ export function TreeRow({
   onToggleCollapse,
   onSelect,
   onTogglePin,
-  onHoverStart,
-  onHoverEnd,
 }: {
   node: WaterfallTreeNode;
   rootStart: number;
   rootDuration: number;
   isSelected: boolean;
-  isHovered: boolean;
   /** Whether this span is currently pinned in the SpanTabBar. */
   isPinned: boolean;
   isCollapsed: boolean;
@@ -60,21 +57,34 @@ export function TreeRow({
   hiddenDescendantCount: number;
   isDimmed: boolean;
   signals: readonly LangwatchSignalBucket[];
-  onToggleCollapse: () => void;
-  onSelect: () => void;
+  onToggleCollapse: (spanId: string) => void;
+  onSelect: (spanId: string) => void;
   /** Toggle pin state for this span — fired by the hover-revealed icon. */
-  onTogglePin: () => void;
-  onHoverStart: () => void;
-  onHoverEnd: () => void;
+  onTogglePin: (spanId: string) => void;
 }) {
   const { span, depth } = node;
+  // Hover highlight comes from a store with a per-row boolean selector
+  // so a hover change re-renders only the two affected rows (this row
+  // and its timeline twin), not every virtualized row on both panes.
+  const isHovered = useSpanHoverStore((s) => s.hoveredSpanId === span.spanId);
+  const setHoveredSpanId = useSpanHoverStore((s) => s.setHoveredSpanId);
+  const handleMouseEnter = useCallback(
+    () => setHoveredSpanId(span.spanId),
+    [setHoveredSpanId, span.spanId],
+  );
+  const handleMouseLeave = useCallback(
+    () => setHoveredSpanId(null),
+    [setHoveredSpanId],
+  );
+  const handleClick = useCallback(
+    () => onSelect(span.spanId),
+    [onSelect, span.spanId],
+  );
   // Subscribe just to *this* row's pulse state — the selector returns a
   // boolean so only the row whose pulse flips actually re-renders, the
   // rest of the virtualized list stays untouched.
   const isPulsing = useSpanPulseStore((s) => s.pulsingIds.has(span.spanId));
   const isError = span.status === "error";
-  const color =
-    (SPAN_TYPE_COLORS[span.type ?? "span"] as string) ?? "gray.solid";
   const isLlm = span.type === "llm" && span.model != null;
   const rowH = isLlm ? LLM_ROW_HEIGHT : ROW_HEIGHT;
   const TypeIcon =
@@ -104,11 +114,13 @@ export function TreeRow({
       <HStack gap={1.5} marginTop={1} flexWrap="wrap">
         <Text
           textStyle="2xs"
-          color={color}
+          colorPalette={palette}
+          color="colorPalette.fg"
+          bg="colorPalette.subtle"
           paddingX={1.5}
           borderRadius="sm"
           borderWidth="1px"
-          borderColor={color}
+          borderColor="colorPalette.muted"
           fontWeight="semibold"
         >
           {(span.type ?? "span").toUpperCase()}
@@ -189,15 +201,35 @@ export function TreeRow({
           <TipCell label="Hidden spans" value={`${hiddenDescendantCount}`} />
         )}
         <TipCell label="Span ID" value={span.spanId.slice(0, 16)} mono />
-        {span.parentSpanId && (
+        {/* Always rendered so the tooltip grid keeps a stable row count
+            between spans — root spans show "none" instead of dropping
+            the row, which made the grid jump while moving down the
+            list. */}
+        {span.parentSpanId ? (
           <TipCell label="Parent" value={span.parentSpanId.slice(0, 16)} mono />
+        ) : (
+          <TipCell label="Parent" value="none" subtle />
         )}
       </Box>
     </Box>
   );
 
   return (
-    <Tooltip content={tooltipContent} positioning={{ placement: "right" }}>
+    <Tooltip
+      content={tooltipContent}
+      positioning={{ placement: "right" }}
+      // The default tooltip surface is inverted (dark in light mode), but
+      // this rich tooltip's content uses panel-side tokens (`fg`,
+      // `fg.muted`, palette badges) — render it on a panel surface so
+      // every token resolves legibly in both colour modes.
+      contentProps={{
+        bg: "bg.panel",
+        color: "fg",
+        borderWidth: "1px",
+        borderColor: "border",
+        boxShadow: "md",
+      }}
+    >
       <Box position="relative">
         {/* Pulse layer: a one-shot orange wash that fades over 1.2s when
             a new span arrives via SSE. Sits absolutely above the row's
@@ -239,11 +271,16 @@ export function TreeRow({
           // the hover state without competing with the bar's own colour.
           // Dark mode keeps the existing blue tint, which reads well against
           // the dark panel.
+          // Hover paints a faint wash of the span's own palette rather
+          // than flat `bg.muted` — the full-width grey rectangle read as
+          // an unloaded skeleton row in light mode. The /40 alpha keeps
+          // it clearly a hover tint, not a fill.
+          colorPalette={isError ? "red" : palette}
           bg={
             isSelected
               ? { base: "bg.emphasized", _dark: "blue.subtle" }
               : isHovered
-                ? "bg.muted"
+                ? "colorPalette.subtle/40"
                 : undefined
           }
           // Dark mode keeps the pre-PR behaviour of fading non-selected
@@ -258,12 +295,12 @@ export function TreeRow({
           _hover={{
             bg: isSelected
               ? { base: "bg.emphasized", _dark: "blue.subtle" }
-              : "bg.muted",
+              : "colorPalette.subtle/40",
           }}
           cursor="pointer"
-          onClick={onSelect}
-          onMouseEnter={onHoverStart}
-          onMouseLeave={onHoverEnd}
+          onClick={handleClick}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
           flexShrink={0}
           transition="all 0.1s ease"
           borderLeftWidth={isSelected ? "2px" : "0px"}
@@ -283,7 +320,7 @@ export function TreeRow({
             onClick={(e) => {
               if (hasChildren) {
                 e.stopPropagation();
-                onToggleCollapse();
+                onToggleCollapse(span.spanId);
               }
             }}
             opacity={hasChildren ? 1 : 0}
@@ -445,7 +482,7 @@ export function TreeRow({
               cursor="pointer"
               onClick={(e) => {
                 e.stopPropagation();
-                onTogglePin();
+                onTogglePin(span.spanId);
               }}
               aria-label={isPinned ? "Unpin span tab" : "Pin span tab"}
               aria-pressed={isPinned}
@@ -489,4 +526,4 @@ export function TreeRow({
       </Box>
     </Tooltip>
   );
-}
+});

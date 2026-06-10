@@ -1,4 +1,5 @@
 import { Flex, HStack, Icon, Text } from "@chakra-ui/react";
+import { memo, useCallback } from "react";
 import { LuLayers, LuList } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { formatDuration, SPAN_TYPE_COLORS } from "../../../utils/formatters";
@@ -16,17 +17,24 @@ import {
  * left border (TreeRow's selection border is solid) — so the two
  * collapse kinds can't be mistaken for each other.
  */
-export function GroupRow({
+export const GroupRow = memo(function GroupRow({
   group,
+  groupKey,
   isExpanded,
   onToggle,
   onSwitchToSpanList,
 }: {
   group: SiblingGroup;
+  /** Stable identity for this fold — `parentSpanId::name`. */
+  groupKey: string;
   isExpanded: boolean;
-  onToggle: () => void;
+  onToggle: (groupKey: string) => void;
   onSwitchToSpanList?: (nameFilter: string, typeFilter: string) => void;
 }) {
+  const handleToggle = useCallback(
+    () => onToggle(groupKey),
+    [onToggle, groupKey],
+  );
   const color = (SPAN_TYPE_COLORS[group.type] as string) ?? "gray.solid";
   const palette = getSpanPalette(group.type);
 
@@ -45,7 +53,7 @@ export function GroupRow({
         bg="bg.subtle/40"
         _hover={{ bg: "bg.muted" }}
         cursor="pointer"
-        onClick={onToggle}
+        onClick={handleToggle}
         flexShrink={0}
         borderLeftWidth="2px"
         borderLeftStyle="dashed"
@@ -135,4 +143,4 @@ export function GroupRow({
       </HStack>
     </Tooltip>
   );
-}
+});

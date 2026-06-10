@@ -59,18 +59,11 @@ export const TimeRangePicker: React.FC = () => {
       <Popover.Trigger asChild>
         {/* Verbose label (`Last 30 days`) rather than the cryptic `30d`
             so the most-impactful control on the page actually reads.
-            Size matches the rest of the toolbar (`xs`) — the earlier
-            `sm` made this 4px taller than every sibling button and
-            broke the strip's horizontal rhythm. The verbose label
-            still carries its weight at xs because of the extra
-            paddingX. */}
-        <Button
-          size="xs"
-          variant="outline"
-          fontWeight="medium"
-          paddingX={3}
-          gap={1.5}
-        >
+            Size matches the rest of the toolbar (`xs`) — and so does
+            the horizontal padding: the earlier paddingX={3} override
+            made this trigger visibly wider-set than every sibling
+            button in the strip. */}
+        <Button size="xs" variant="outline" fontWeight="medium" gap={1.5}>
           <Clock size={14} />
           {formatTriggerLabel(timeRange)}
         </Button>

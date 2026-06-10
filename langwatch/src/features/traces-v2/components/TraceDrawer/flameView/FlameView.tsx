@@ -3,6 +3,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatDuration } from "../../../utils/formatters";
 import {
+  DENSE_SPAN_THRESHOLD,
   ROW_GAP,
   ROW_HEIGHT,
   ZOOM_FIT_PADDING,
@@ -15,8 +16,8 @@ import { Minimap } from "./Minimap";
 import { buildTree, computeSpanContext, generateTicks } from "./tree";
 import type { FlameNode, FlameViewProps, SpanContext, Viewport } from "./types";
 import { useFlameAxisZoom } from "./useFlameAxisZoom";
-import { useFlamePanDrag } from "./useFlamePanDrag";
 import { useFlameKeyboard } from "./useFlameKeyboard";
+import { useFlamePanDrag } from "./useFlamePanDrag";
 import { useFlameViewport } from "./useFlameViewport";
 
 export const FlameView = memo(function FlameView({
@@ -45,8 +46,14 @@ export const FlameView = memo(function FlameView({
   const flameAreaRef = useRef<HTMLDivElement>(null);
   const timeAxisRef = useRef<HTMLDivElement>(null);
 
-  const { viewport, setViewport, viewportRef, clampViewport, animateTo, cancelAnimation } =
-    useFlameViewport({ fullRange, flameAreaRef });
+  const {
+    viewport,
+    setViewport,
+    viewportRef,
+    clampViewport,
+    animateTo,
+    cancelAnimation,
+  } = useFlameViewport({ fullRange, flameAreaRef });
 
   const { isPanningRef, handlePointerDown } = useFlamePanDrag({
     flameAreaRef,
@@ -307,6 +314,10 @@ export const FlameView = memo(function FlameView({
         contextInfo={contextInfo}
         spanCount={spans.length}
         fullDur={fullDur}
+        // Dense traces at full extent get an active zoom prompt instead of
+        // the passive hover hint — once zoomed the Minimap takes over as
+        // the navigation affordance, so the prompt steps back down.
+        showZoomHint={spans.length > DENSE_SPAN_THRESHOLD && !isZoomed}
       />
 
       {/* Time axis: drag to zoom into a range */}
