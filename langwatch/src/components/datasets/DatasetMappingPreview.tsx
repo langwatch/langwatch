@@ -1,4 +1,3 @@
-import type { CustomCellRendererProps } from "@ag-grid-community/react";
 import {
   Badge,
   Box,
@@ -30,11 +29,7 @@ import {
   type ThreadMappingState,
 } from "../traces/ThreadMapping";
 import { TracesMapping } from "../traces/TracesMapping";
-import {
-  type DatasetColumnDef,
-  DatasetGrid,
-  HeaderCheckboxComponent,
-} from "./DatasetGrid";
+import { DatasetPreviewTable } from "./editor/DatasetPreviewTable";
 
 interface DatasetMappingPreviewProps {
   traces: Trace[]; // Replace 'any' with your trace type
@@ -94,49 +89,6 @@ export function DatasetMappingPreview({
     return traces;
   }, [isThreadMapping, threadTraces.data, traces]);
 
-  const columnDefs = useMemo(() => {
-    if (!selectedDataset) {
-      return [];
-    }
-
-    const headers: DatasetColumnDef[] = (
-      (selectedDataset.columnTypes as DatasetColumns) ?? []
-    ).map(({ name, type }) => ({
-      headerName: name,
-      field: name,
-      type_: type,
-      cellClass: "v-align",
-      sortable: false,
-      minWidth: ["trace_id", "total_cost"].includes(name)
-        ? 120
-        : ["timestamp"].includes(name)
-          ? 160
-          : 200,
-    }));
-
-    // Add row number column
-    headers.unshift({
-      headerName: " ",
-      field: "selected",
-      type_: "boolean",
-      width: 46,
-      pinned: "left",
-      sortable: false,
-      filter: false,
-      enableCellChangeFlash: false,
-      headerComponent: HeaderCheckboxComponent,
-      cellRenderer: (props: CustomCellRendererProps) => (
-        <Checkbox
-          marginLeft="3px"
-          {...props}
-          checked={props.value}
-          onChange={(e) => props.setValue?.(e.target.checked)}
-        />
-      ),
-    });
-
-    return headers;
-  }, [selectedDataset]);
 
   const trpc = api.useContext();
   const updateStoredMapping_ = api.dataset.updateMapping.useMutation();
@@ -347,19 +299,28 @@ export function DatasetMappingPreview({
                 console.error(error);
               }}
             >
-              <DatasetGrid
-                columnDefs={columnDefs}
-                rowData={rowData}
-                onCellValueChanged={({
-                  data,
-                }: {
-                  data: DatasetRecordEntry;
-                }) => {
-                  onRowDataChange(
-                    rowData.map((row) => (row.id === data.id ? data : row)),
-                  );
-                }}
-              />
+              <Box maxHeight="400px" overflow="auto" width="full">
+                <DatasetPreviewTable
+                  rows={rowData}
+                  columns={
+                    (selectedDataset.columnTypes as DatasetColumns) ?? []
+                  }
+                  maxColumns={50}
+                  selectable
+                  onToggleRow={(rowIndex, selected) => {
+                    onRowDataChange(
+                      rowData.map((row, index) =>
+                        index === rowIndex ? { ...row, selected } : row,
+                      ),
+                    );
+                  }}
+                  onToggleAll={(selected) => {
+                    onRowDataChange(
+                      rowData.map((row) => ({ ...row, selected })),
+                    );
+                  }}
+                />
+              </Box>
             </ErrorBoundary>
           </Box>
         </VStack>

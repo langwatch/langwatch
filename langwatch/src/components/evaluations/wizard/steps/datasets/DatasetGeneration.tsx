@@ -12,7 +12,7 @@ import { AddModelProviderKey } from "../../../../../optimization_studio/componen
 import type { DatasetColumns } from "../../../../../server/datasets/types";
 import { api } from "../../../../../utils/api";
 import { isHandledByGlobalHandler } from "../../../../../utils/trpcError";
-import { datasetValueToGridValue } from "../../../../datasets/DatasetGrid";
+import { datasetValueToString } from "~/components/datasets/editor/datasetValueToString";
 import { AISparklesLoader } from "../../../../icons/AISparklesLoader";
 import { Markdown } from "../../../../Markdown";
 import {
@@ -67,7 +67,7 @@ export function DatasetGeneration() {
         record.id,
         ...columnTypes.map((col) => {
           const value = (record.entry as any)?.[col.name];
-          return datasetValueToGridValue(value, col.type);
+          return datasetValueToString(value);
         }),
       ]) ?? [];
 
@@ -101,12 +101,23 @@ export function DatasetGeneration() {
     },
     onToolCall: async ({ toolCall }) => {
       if (!datasetGridRef?.current) return;
-      const gridApi = datasetGridRef.current.api;
+      const editor = datasetGridRef.current;
 
       // Ensure database data is loaded
       if (!databaseDataset.data) {
         console.warn("Database data not loaded yet, fallback will be used...");
       }
+
+      // Column names come from the database when loaded, with the editor's
+      // live columns as fallback (mirrors the data the table is rendering)
+      const resolveColumnNames = (): string[] => {
+        const currentColumnTypes =
+          (databaseDataset.data?.columnTypes as DatasetColumns) || [];
+        if (currentColumnTypes.length > 0) {
+          return ["id", ...currentColumnTypes.map((col) => col.name)];
+        }
+        return ["id", ...editor.getColumns().map((col) => col.name)];
+      };
 
       const toolExecutor: {
         addRow: (args: { row: Record<string, string> }) => Promise<any>;
@@ -119,52 +130,11 @@ export function DatasetGeneration() {
         addRow: async (args) => {
           const { row } = args;
 
-          // Get column types directly from database data to ensure we have the latest
-          const currentColumnTypes =
-            (databaseDataset.data?.columnTypes as DatasetColumns) || [];
-
-          // If database data is not available, try to get column names from grid API
-          let columnNames = ["id"];
-          if (currentColumnTypes.length > 0) {
-            columnNames = ["id", ...currentColumnTypes.map((col) => col.name)];
-          } else {
-            // Fallback: try to get column names from the grid
-            try {
-              const gridColumns = gridApi.getColumnDefs();
-              if (gridColumns && gridColumns.length > 1) {
-                // Filter out internal columns and get only data columns
-                const dataColumns = gridColumns
-                  .filter((col: any) => {
-                    // Skip internal columns like 'selected', row index columns, etc.
-                    return (
-                      col.field &&
-                      col.field !== "selected" &&
-                      !col.field.match(/^\d+$/) && // Skip numeric-only field names
-                      col.colId !== "selected" &&
-                      col.colId !== "0"
-                    );
-                  })
-                  .map((col: any) => col.field || col.colId);
-
-                columnNames = ["id", ...dataColumns];
-              }
-            } catch {
-              toaster.create({
-                title: "Error",
-                description: "Failed to get grid columns via fallback",
-                type: "error",
-                duration: 5000,
-                meta: { closable: true },
-              });
-              return;
-            }
-          }
-
-          // If we still don't have column names, create generic ones based on row length
+          const columnNames = resolveColumnNames();
           if (columnNames.length === 1 && Object.keys(row).length > 1) {
             toaster.create({
               title: "Error",
-              description: "Failed to get grid columns",
+              description: "Failed to resolve dataset columns",
               type: "error",
               duration: 5000,
               meta: { closable: true },
@@ -179,73 +149,27 @@ export function DatasetGeneration() {
             rowData.id = nanoid();
           }
 
-          gridApi.applyTransaction({
-            add: [rowData],
-          });
+          editor.addRow(rowData as { id: string } & Record<string, string>);
           upsertRecord(rowData.id, rowData);
 
           return { success: true };
         },
         updateRow: async (args) => {
           const { id, row } = args;
-          // Get column types directly from database data to ensure we have the latest
-          const currentColumnTypes =
-            (databaseDataset.data?.columnTypes as DatasetColumns) || [];
 
-          // If database data is not available, try to get column names from grid API
-          let columnNames = ["id"];
-          if (currentColumnTypes.length > 0) {
-            columnNames = ["id", ...currentColumnTypes.map((col) => col.name)];
-          } else {
-            // Fallback: try to get column names from the grid
-            try {
-              const gridColumns = gridApi.getColumnDefs();
-              if (gridColumns && gridColumns.length > 1) {
-                // Filter out internal columns and get only data columns
-                const dataColumns = gridColumns
-                  .filter((col: any) => {
-                    // Skip internal columns like 'selected', row index columns, etc.
-                    return (
-                      col.field &&
-                      col.field !== "selected" &&
-                      !col.field.match(/^\d+$/) && // Skip numeric-only field names
-                      col.colId !== "selected" &&
-                      col.colId !== "0"
-                    );
-                  })
-                  .map((col: any) => col.field || col.colId);
-
-                columnNames = ["id", ...dataColumns];
-              }
-            } catch {
-              toaster.create({
-                title: "Error",
-                description: "Failed to get grid columns via fallback",
-                type: "error",
-                duration: 5000,
-                meta: { closable: true },
-              });
-
-              return;
-            }
-          }
-
+          const columnNames = resolveColumnNames();
           const rowData = Object.fromEntries(
             columnNames.map((col) => [col, row[col] ?? ""]),
           );
           rowData.id = id;
 
-          gridApi.applyTransaction({
-            update: [rowData],
-          });
+          editor.updateRow(rowData as { id: string } & Record<string, string>);
           upsertRecord(rowData.id, rowData);
           return { success: true };
         },
         deleteRow: async (args) => {
           const { id } = args;
-          gridApi.applyTransaction({
-            remove: [id],
-          });
+          editor.removeRow(id);
           deleteRecord(id);
 
           return { success: true };

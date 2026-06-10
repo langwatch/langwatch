@@ -1,4 +1,4 @@
-import type { AgGridReact } from "@ag-grid-community/react";
+import type { DatasetEditorController } from "~/components/datasets/editor/DatasetEditorTable";
 import type { RefObject } from "react";
 import { z } from "zod";
 import { create } from "zustand";
@@ -122,7 +122,7 @@ export type State = {
   isAutosaving: boolean;
   autosaveDisabled: boolean;
   workflowStore: WorkflowStoreState;
-  datasetGridRef?: RefObject<AgGridReact<any> | null>;
+  datasetGridRef?: RefObject<DatasetEditorController | null>;
 };
 
 export type EvaluationWizardStore = State & {

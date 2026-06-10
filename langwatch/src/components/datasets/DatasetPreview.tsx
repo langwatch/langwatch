@@ -1,12 +1,12 @@
 import { Box, Center, HStack, Text } from "@chakra-ui/react";
-import { type ComponentProps, useMemo } from "react";
+import { type ComponentProps } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { Edit2 } from "react-feather";
 import type {
   DatasetColumns,
   DatasetRecordInput,
 } from "../../server/datasets/types";
-import { type DatasetColumnDef, DatasetGrid } from "./DatasetGrid";
+import { DatasetPreviewTable } from "./editor/DatasetPreviewTable";
 
 export function DatasetPreview({
   rows,
@@ -19,31 +19,6 @@ export function DatasetPreview({
   columns: DatasetColumns;
   onClick?: () => void;
 } & Omit<ComponentProps<typeof Box>, "columns" | "rows">) {
-  const columnDefs = useMemo(() => {
-    const headers: DatasetColumnDef[] = columns.slice(0, 8).map((column) => ({
-      headerName: column.name,
-      field: column.name,
-      type_: column.type,
-      cellClass: "v-align",
-      sortable: false,
-      editable: false,
-    }));
-
-    // Add row number column
-    headers.unshift({
-      headerName: "#",
-      valueGetter: "node.rowIndex + 1",
-      type_: "number",
-      initialWidth: 48,
-      pinned: "left",
-      sortable: false,
-      filter: false,
-      editable: false,
-    });
-
-    return headers;
-  }, [columns]);
-
   if (!rows) {
     return null;
   }
@@ -115,7 +90,7 @@ export function DatasetPreview({
           console.error("DatasetPreview Error", error);
         }}
       >
-        <DatasetGrid columnDefs={columnDefs} rowData={rows} />
+        <DatasetPreviewTable rows={rows} columns={columns} />
       </ErrorBoundary>
     </Box>
   );

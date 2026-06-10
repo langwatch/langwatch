@@ -1,4 +1,4 @@
-import type { AgGridReact } from "@ag-grid-community/react";
+import type { DatasetEditorController } from "~/components/datasets/editor/DatasetEditorTable";
 import type { Node } from "@xyflow/react";
 import type { RefObject } from "react";
 import type { StateCreator } from "zustand";
@@ -46,9 +46,9 @@ export interface DatasetSlice {
 
   /**
    * Set the dataset grid reference
-   * @param gridRef Reference to the AG Grid component
+   * @param gridRef Reference to the dataset editor controller
    */
-  setDatasetGridRef: (gridRef: RefObject<AgGridReact<any> | null>) => void;
+  setDatasetGridRef: (gridRef: RefObject<DatasetEditorController | null>) => void;
 }
 
 /**
@@ -60,7 +60,7 @@ export interface DatasetSlice {
 export const createDatasetSlice: StateCreator<
   {
     workflowStore: WorkflowStore;
-    datasetGridRef?: RefObject<AgGridReact<any> | null>;
+    datasetGridRef?: RefObject<DatasetEditorController | null>;
   } & DatasetSlice,
   [],
   [],

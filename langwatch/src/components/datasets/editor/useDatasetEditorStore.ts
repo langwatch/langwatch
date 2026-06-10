@@ -51,6 +51,12 @@ export type DatasetEditorActions = {
     records: EditorRecord[];
     dbDatasetId?: string;
   }) => void;
+  /** Display-sync upsert from an external writer (e.g. AI dataset
+   *  generation) that persists records itself — bypasses the pending
+   *  queue on purpose. Matches by record id; appends when absent. */
+  upsertExternalRecord: (record: EditorRecord) => void;
+  /** Display-sync removal counterpart to upsertExternalRecord. */
+  removeExternalRecord: (recordId: string) => void;
   setCellValue: (
     datasetId: string,
     row: number,
@@ -101,6 +107,22 @@ export function createDatasetEditorStore(): StoreApi<DatasetEditorStore> {
         selectedCell: undefined,
         expandedCells: new Set(),
       });
+    },
+
+    upsertExternalRecord: (record) => {
+      const { records } = get();
+      const index = records.findIndex((r) => r.id === record.id);
+      const updated = [...records];
+      if (index === -1) {
+        updated.push(record);
+      } else {
+        updated[index] = { ...updated[index], ...record };
+      }
+      set({ records: updated });
+    },
+
+    removeExternalRecord: (recordId) => {
+      set({ records: get().records.filter((r) => r.id !== recordId) });
     },
 
     setCellValue: (_datasetId, row, columnId, value) => {

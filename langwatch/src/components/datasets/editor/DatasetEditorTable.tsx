@@ -76,6 +76,18 @@ export type InMemoryDataset = {
   columnTypes: DatasetColumns;
 };
 
+/**
+ * Imperative surface for external writers that stream changes into the
+ * table (the wizard's AI dataset generation). Rows changed through the
+ * controller are display-synced only — the caller owns persistence.
+ */
+export type DatasetEditorController = {
+  addRow: (record: EditorRecord) => void;
+  updateRow: (record: EditorRecord) => void;
+  removeRow: (recordId: string) => void;
+  getColumns: () => EditorColumn[];
+};
+
 const CHECKBOX_WIDTH_PX = 36;
 const MAX_ROWS_WITHOUT_VIRTUALIZATION = 100;
 
@@ -115,6 +127,7 @@ export function DatasetEditorTable({
   isEmbedded = false,
   canEditDatasetRecord = true,
   bottomSpace,
+  controllerRef,
 }: {
   datasetId?: string;
   inMemoryDataset?: InMemoryDataset;
@@ -125,6 +138,7 @@ export function DatasetEditorTable({
   /** Disable editing the dataset definition (columns) in the database. */
   canEditDatasetRecord?: boolean;
   bottomSpace?: string;
+  controllerRef?: React.MutableRefObject<DatasetEditorController | null>;
 }) {
   const { project } = useOrganizationTeamProject();
   const [store] = useState(() => createDatasetEditorStore());
@@ -199,6 +213,21 @@ export function DatasetEditorTable({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [datasetId, databaseDataset.data, store]);
+
+  // Imperative controller for external writers (AI generation streams)
+  useEffect(() => {
+    if (!controllerRef) return;
+    controllerRef.current = {
+      addRow: (record) => store.getState().upsertExternalRecord(record),
+      updateRow: (record) => store.getState().upsertExternalRecord(record),
+      removeRow: (recordId) =>
+        store.getState().removeExternalRecord(recordId),
+      getColumns: () => store.getState().columns,
+    };
+    return () => {
+      controllerRef.current = null;
+    };
+  }, [controllerRef, store]);
 
   // ── Store subscriptions ───────────────────────────────────────────
 

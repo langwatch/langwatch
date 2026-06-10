@@ -1,4 +1,3 @@
-import type { AgGridReact } from "@ag-grid-community/react";
 import { Box, Button, Card, HStack, Tabs, VStack } from "@chakra-ui/react";
 import { Controls, useUpdateNodeInternals } from "@xyflow/react";
 import { memo, useEffect, useMemo, useRef } from "react";
@@ -15,7 +14,10 @@ import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamPr
 import { OptimizationStudioCanvas } from "../../../optimization_studio/components/OptimizationStudio";
 import { EvaluationResults } from "../../../optimization_studio/components/ResultsPanel";
 import { EvaluationManualIntegration } from "../../checks/EvaluationManualIntegration";
-import { DatasetTable } from "../../datasets/DatasetTable";
+import {
+  DatasetEditorTable,
+  type DatasetEditorController,
+} from "~/components/datasets/editor/DatasetEditorTable";
 import { useColorMode } from "../../ui/color-mode";
 import { Link } from "../../ui/link";
 import { toaster } from "../../ui/toaster";
@@ -61,7 +63,7 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
     })),
   );
 
-  const datasetGridRef = useRef<AgGridReact<any>>(null);
+  const datasetGridRef = useRef<DatasetEditorController | null>(null);
   const { project } = useOrganizationTeamProject();
   const { colorMode } = useColorMode();
   const bgPattern = colorMode === "dark" ? DARK_PATTERN : LIGHT_PATTERN;
@@ -176,10 +178,9 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
               <Card.Root width="full" position="sticky" top={6}>
                 <Card.Body width="full" paddingBottom={6}>
                   <Box width="full" position="relative">
-                    <DatasetTable
+                    <DatasetEditorTable
                       datasetId={getDatasetId()}
-                      insideWizard
-                      gridRef={datasetGridRef}
+                      controllerRef={datasetGridRef}
                       onUpdateDataset={handleDatasetUpdate}
                     />
                   </Box>
