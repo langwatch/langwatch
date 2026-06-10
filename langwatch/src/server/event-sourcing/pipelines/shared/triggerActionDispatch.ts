@@ -3,8 +3,7 @@ import type { TriggerSummary } from "~/server/app-layer/triggers/repositories/tr
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
 import type { TriggerService } from "~/server/app-layer/triggers/trigger.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import { sendTriggerEmail } from "~/server/mailer/triggerEmail";
-import { sendSlackWebhook } from "~/server/triggers/sendSlackWebhook";
+import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
 import type { DatasetRecordEntry } from "~/server/datasets/types";
 import {
   mapTraceToDatasetEntry,
@@ -79,25 +78,6 @@ export function computeScheduledFor({
   return new Date(nextBoundaryMs);
 }
 
-/**
- * Wired by the registry on the worker (composition root), `undefined`
- * on the web process and in unit tests that don't care about the
- * outbox. When set, NOTIFY-class matches route through the unified
- * outbox queue (`stage: "settle"`) so the settle dispatcher does the
- * filter recheck + claim + cadence enqueue. Persist-class actions
- * always run inline regardless of this setting — they want every
- * match to land immediately.
- */
-export type EnqueueSettle = (params: {
-  projectId: string;
-  triggerId: string;
-  traceId: string;
-  foldState: TraceSummaryData;
-  /** Per-trigger settle-window TTL (ADR-026). When omitted, the registry
-   *  falls back to `DEFAULT_TRACE_DEBOUNCE_MS`. */
-  traceDebounceMs?: number;
-}) => Promise<void>;
-
 export interface TriggerActionDispatchDeps {
   triggers: TriggerService;
   projects: ProjectService;
@@ -113,7 +93,6 @@ export interface TriggerActionDispatchDeps {
     projectId: string;
     datasetRecords: DatasetRecordEntry[];
   }) => Promise<void>;
-  enqueueSettle?: EnqueueSettle;
 }
 
 interface ActionParams {
@@ -159,27 +138,16 @@ export async function dispatchTriggerAction({
 
   switch (trigger.action) {
     case TriggerAction.SEND_EMAIL:
-      await sendTriggerEmail({
-        triggerEmails: params.members ?? [],
-        triggerData: [triggerData],
-        triggerName: trigger.name,
-        triggerId: trigger.id,
-        projectSlug: project.slug,
-        triggerType: trigger.alertType,
-        triggerMessage: trigger.message ?? "",
-      });
-      break;
-
     case TriggerAction.SEND_SLACK_MESSAGE:
-      await sendSlackWebhook({
-        triggerWebhook: params.slackWebhook ?? "",
-        triggerData: [triggerData],
-        triggerName: trigger.name,
-        projectSlug: project.slug,
-        triggerType: trigger.alertType,
-        triggerMessage: trigger.message ?? "",
+      // Notify-class actions never dispatch inline — they ride the outbox
+      // (settle → cadence) so debounce, cadence coalescing, and the typed
+      // retry contract apply. Both callers pre-filter on
+      // NOTIFY_TRIGGER_ACTIONS; reaching this case means a caller dropped
+      // its filter, and sending here would bypass the entire timing model.
+      throw new DispatchError({
+        message: `dispatchTriggerAction cannot dispatch notify action ${trigger.action} inline — notify actions ride the outbox (trigger ${trigger.id})`,
+        retryable: false,
       });
-      break;
 
     case TriggerAction.ADD_TO_ANNOTATION_QUEUE:
       if (!params.createdByUserId) {

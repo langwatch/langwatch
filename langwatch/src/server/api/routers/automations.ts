@@ -502,13 +502,27 @@ export const automationRouter = createTRPCRouter({
         throw toTemplateTRPCError(err);
       }
 
+      // Annotation-queue dispatch attributes created queue items to a user
+      // and skips the action when `createdByUserId` is absent. The drawer's
+      // provider slice doesn't carry it, so stamp the caller here — same as
+      // the legacy create mutation — or an edit would silently strip it and
+      // disable dispatch for the trigger.
+      const actionParams =
+        input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE
+          ? {
+              ...input.actionParams,
+              createdByUserId:
+                input.actionParams.createdByUserId ?? ctx.session?.user.id,
+            }
+          : input.actionParams;
+
       const data = {
         name: input.name,
         action: input.action,
         alertType: input.alertType ?? null,
         filters: JSON.stringify(input.filters),
         customGraphId: input.customGraphId ?? null,
-        actionParams: input.actionParams,
+        actionParams,
         slackTemplateType: input.templates.slackTemplateType ?? null,
         slackTemplate: input.templates.slackTemplate ?? null,
         emailSubjectTemplate: input.templates.emailSubjectTemplate ?? null,
