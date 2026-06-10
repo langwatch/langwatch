@@ -212,7 +212,8 @@
                   "platform/rbac",
                   "platform/audit-log",
                   "platform/scim",
-                  "platform/model-providers"
+                  "platform/model-providers",
+                  "platform/data-retention"
                 ]
               }
             ]
@@ -245,6 +246,7 @@
           {
             "group": "Help",
             "pages": [
+              "pricing",
               "support",
               "status"
             ]
