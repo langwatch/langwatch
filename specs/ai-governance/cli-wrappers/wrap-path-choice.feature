@@ -128,3 +128,27 @@ Feature: CLI wrapper asks the user which path to run when both are allowed
       When the user runs `langwatch claude`
       Then the wrapper does NOT prompt
       And it proceeds in ingestion mode
+
+  Rule: the gateway path is gated on a coding-assistant tile plus a configured provider credential
+
+    The gateway program is opt-in per tool: an org enables it for a coding
+    assistant by publishing that tool's coding-assistant tile (with the gateway
+    path on). Once enabled, the wrapper routes a virtual key through the org's
+    CONFIGURED provider credentials - it does NOT require a model_provider
+    catalog tile (those gate only the /me one-click mint-your-own-VK surface).
+
+    @unit
+    Scenario: Gateway works from a configured credential without a provider tile
+      Given the org has published a "codex" coding-assistant tile with the gateway path enabled
+      And the org has a configured, enabled "openai" provider credential
+      And the org has NOT published any model_provider catalog tile
+      When the wrapper runs its gateway preflight for `langwatch codex`
+      Then the preflight passes and the wrapper routes through the gateway
+
+    @unit
+    Scenario: Gateway is blocked when the tool has no coding-assistant tile
+      Given the org has a configured, enabled "openai" provider credential
+      And the org has NOT published a "codex" coding-assistant tile
+      When the wrapper runs its gateway preflight for `langwatch codex`
+      Then the preflight fails
+      And it points the admin at the AI Tools catalog to publish the tile

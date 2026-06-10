@@ -233,6 +233,16 @@ export interface CliBootstrapResponse {
    */
   tools?: CliBootstrapTool[];
   providers: CliBootstrapProvider[];
+  /**
+   * Provider families (e.g. "openai") for which the org has a live, enabled
+   * credential the caller can reach - independent of whether a model_provider
+   * catalog tile was published. This is what the gateway can actually route
+   * through, so the wrapper preflight gates the gateway path on this, NOT on
+   * `providers` (which is the admin-curated mint-your-own-VK catalog).
+   * `undefined` on legacy servers without the field; the wrapper then falls
+   * back to the `providers` tile list for the check.
+   */
+  gatewayProviders?: string[];
   budget: CliBootstrapBudget;
   /**
    * Server-authoritative gateway base URL. Sourced from the backend's

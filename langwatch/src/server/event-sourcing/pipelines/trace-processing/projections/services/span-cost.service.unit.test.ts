@@ -93,6 +93,7 @@ describe("SpanCostService — bundled (non-billable) cost classification", () =>
     });
 
     describe("when the span is bundled (resource marker set)", () => {
+      /** @scenario "The bundled cost split is preserved when the non-billable marker is hidden" */
       it("routes the whole span cost into nonBilledCost", () => {
         const result = service.accumulateTokens({
           state: emptyState(),

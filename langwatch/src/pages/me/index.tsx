@@ -18,6 +18,10 @@ import { AiToolsPortal } from "~/components/me/AiToolsPortal";
 import { BudgetExceededBanner } from "~/components/me/BudgetExceededBanner";
 import MyLayout from "~/components/me/MyLayout";
 import { PersonalRecentTracesTable } from "~/components/me/PersonalRecentTracesTable";
+import {
+  PERSONAL_AI_TOOLS_ANCHOR,
+  PERSONAL_TRACE_INGEST_ANCHOR,
+} from "~/components/me/PersonalTracesEmptyState";
 import { TraceIngestSection } from "~/components/me/TraceIngestSection";
 import { usePersonalContext } from "~/components/me/usePersonalContext";
 
@@ -90,7 +94,12 @@ function MyUsagePage() {
       </Head>
 
       <VStack align="stretch" gap={6} width="full">
-        <VStack align="stretch" gap={3}>
+        <VStack
+          id={PERSONAL_AI_TOOLS_ANCHOR}
+          align="stretch"
+          gap={3}
+          scrollMarginTop={4}
+        >
           <Heading as="h2" size="lg">
             Your AI tools
           </Heading>
@@ -101,7 +110,9 @@ function MyUsagePage() {
           <AiToolsPortal />
         </VStack>
 
-        <TraceIngestSection />
+        <Box id={PERSONAL_TRACE_INGEST_ANCHOR} scrollMarginTop={4}>
+          <TraceIngestSection />
+        </Box>
 
         <HStack alignItems="end" paddingTop={4}>
           <VStack align="start" gap={0}>

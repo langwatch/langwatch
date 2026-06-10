@@ -258,4 +258,48 @@ describe("VercelExtractor", () => {
       );
     });
   });
+
+  describe("when the span is an ai.toolCall tool span under the opencode scope", () => {
+    /** @scenario "Opencode tool-call spans capture the tool name, arguments, and result" */
+    it("lifts ai.toolCall.{name,args,result} to the tool name + input/output", () => {
+      const ctx = createExtractorContext(
+        {
+          [ATTR_KEYS.AI_TOOL_CALL_NAME]: "bash",
+          [ATTR_KEYS.AI_TOOL_CALL_ARGS]: '{"command":"ls -la"}',
+          [ATTR_KEYS.AI_TOOL_CALL_RESULT]: "total 4\ndrwxr-xr-x",
+        },
+        {
+          name: "ai.toolCall",
+          instrumentationScope: { name: "opencode", version: null },
+        },
+      );
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.SPAN_TYPE]).toBe("tool");
+      expect(ctx.out[ATTR_KEYS.GEN_AI_TOOL_NAME]).toBe("bash");
+      expect(ctx.out[ATTR_KEYS.LANGWATCH_INPUT]).toBe('{"command":"ls -la"}');
+      expect(ctx.out[ATTR_KEYS.GEN_AI_TOOL_CALL_ARGUMENTS]).toBe(
+        '{"command":"ls -la"}',
+      );
+      expect(ctx.out[ATTR_KEYS.LANGWATCH_OUTPUT]).toBe("total 4\ndrwxr-xr-x");
+      expect(ctx.out[ATTR_KEYS.GEN_AI_TOOL_CALL_RESULT]).toBe(
+        "total 4\ndrwxr-xr-x",
+      );
+    });
+
+    it("detects the tool span even though the scope is not 'ai'", () => {
+      const ctx = createExtractorContext(
+        { [ATTR_KEYS.AI_TOOL_CALL_NAME]: "read_file" },
+        {
+          name: "ai.toolCall",
+          instrumentationScope: { name: "opencode", version: null },
+        },
+      );
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_TOOL_NAME]).toBe("read_file");
+    });
+  });
 });

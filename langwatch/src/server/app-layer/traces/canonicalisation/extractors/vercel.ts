@@ -12,16 +12,18 @@
  * or ai.usage attributes
  *
  * Canonical attributes produced:
- * - langwatch.span.type (llm)
+ * - langwatch.span.type (llm / tool)
  * - gen_ai.request.model / gen_ai.response.model (from ai.model)
  * - gen_ai.usage.input_tokens / gen_ai.usage.output_tokens (from ai.usage)
  * - gen_ai.input.messages (from ai.prompt / ai.prompt.messages)
  * - gen_ai.output.messages (from ai.response / ai.response.text)
+ * - gen_ai.tool.name + langwatch.input/output (from ai.toolCall.* on tool spans)
  *
  * Special handling:
  * - ai.model is an object with { id, provider } structure
  * - ai.usage contains { promptTokens, completionTokens }
  * - ai.response may contain toolCalls array
+ * - ai.toolCall spans carry ai.toolCall.{name,args,result} for the call
  * - span.name is mapped to langwatch.span.type
  */
 
@@ -84,7 +86,8 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
       attrs.has(ATTR_KEYS.AI_PROMPT) ||
       attrs.has(ATTR_KEYS.AI_RESPONSE) ||
       attrs.has(ATTR_KEYS.AI_RESPONSE_TEXT) ||
-      attrs.has(ATTR_KEYS.AI_USAGE);
+      attrs.has(ATTR_KEYS.AI_USAGE) ||
+      attrs.has(ATTR_KEYS.AI_TOOL_CALL_NAME);
     if (!scopeMatches && !attrsMatch) return;
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -95,6 +98,16 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
     if (proposedSpanType) {
       ctx.setAttr(ATTR_KEYS.SPAN_TYPE, proposedSpanType);
       ctx.recordRule(`${this.id}:span.name->langwatch.span.type`);
+    }
+
+    // Tool-call spans carry the call's identity + payload under the
+    // ai.toolCall.* namespace. Lift them to the canonical tool name plus
+    // langwatch.input/output (and the gen_ai.tool.call.* semconv keys) so the
+    // span detail reads like a real tool call, matching the synthesized claude
+    // tool spans. The trace-IO fold skips span_type=tool, so these never
+    // hijack the trace-level input/output.
+    if (ctx.span.name === ATTR_KEYS.AI_TOOL_CALL) {
+      this.liftToolCall(ctx);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -288,5 +301,44 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
       // Output already exists, just consume to reduce leftovers
       attrs.take(ATTR_KEYS.AI_RESPONSE);
     }
+  }
+
+  private liftToolCall(ctx: ExtractorContext): void {
+    const { attrs } = ctx.bag;
+    const toolName = attrs.take(ATTR_KEYS.AI_TOOL_CALL_NAME);
+    if (isNonEmptyString(toolName)) {
+      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_TOOL_NAME, toolName);
+      ctx.recordRule(`${this.id}:ai.toolCall.name->gen_ai.tool.name`);
+    }
+
+    const args = stringifyToolPayload(attrs.take(ATTR_KEYS.AI_TOOL_CALL_ARGS));
+    if (args !== null) {
+      ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_INPUT, args);
+      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_TOOL_CALL_ARGUMENTS, args);
+      ctx.recordRule(`${this.id}:ai.toolCall.args->input`);
+    }
+
+    const result = stringifyToolPayload(
+      attrs.take(ATTR_KEYS.AI_TOOL_CALL_RESULT),
+    );
+    if (result !== null) {
+      ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_OUTPUT, result);
+      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_TOOL_CALL_RESULT, result);
+      ctx.recordRule(`${this.id}:ai.toolCall.result->output`);
+    }
+  }
+}
+
+/**
+ * Tool-call args/result arrive as a JSON string or an already-parsed object.
+ * Normalise to a non-empty string for langwatch.input/output.
+ */
+function stringifyToolPayload(raw: unknown): string | null {
+  if (raw === undefined || raw === null) return null;
+  if (typeof raw === "string") return raw.length > 0 ? raw : null;
+  try {
+    return JSON.stringify(raw);
+  } catch {
+    return null;
   }
 }

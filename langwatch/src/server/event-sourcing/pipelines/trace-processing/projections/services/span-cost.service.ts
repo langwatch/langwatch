@@ -124,6 +124,20 @@ export class SpanCostService {
     return markerIsTrue(span.resourceAttributes[NON_BILLABLE_ATTR]);
   }
 
+  /**
+   * Whether this span's token usage is a redundant copy of another span's
+   * and must be excluded from the trace-level token/cost/cache totals. An
+   * extractor sets the marker when an emitter reports the same usage on two
+   * spans (e.g. codex's lower-level response span repeats the turn rollup's
+   * counts). The per-span detail is untouched — only the fold's
+   * accumulation skips it, so the trace total counts the usage once.
+   */
+  isTokenAccumulationSkipped(span: NormalizedSpan): boolean {
+    return markerIsTrue(
+      span.spanAttributes[ATTR_KEYS.LANGWATCH_RESERVED_SKIP_TOKEN_ACCUMULATION],
+    );
+  }
+
   extractTokenTiming(span: NormalizedSpan): {
     timeToFirstToken: number | null;
     timeToLastToken: number | null;
@@ -178,7 +192,12 @@ export class SpanCostService {
     timeToLastTokenMs: number | null;
     tokensPerSecond: number | null;
   } {
-    const metrics = this.extractTokenMetrics(span);
+    // A span flagged as a redundant usage copy (e.g. codex's lower-level
+    // response span echoing the turn rollup) contributes nothing to the
+    // trace totals, so its tokens/cost are counted exactly once.
+    const metrics = this.isTokenAccumulationSkipped(span)
+      ? { promptTokens: 0, completionTokens: 0, cost: 0, estimated: false }
+      : this.extractTokenMetrics(span);
     const totalPromptTokenCount =
       (state.totalPromptTokenCount ?? 0) + metrics.promptTokens;
     const totalCompletionTokenCount =

@@ -42,6 +42,16 @@ export interface TraceListItem {
   totalTokens: number;
   inputTokens: number | null;
   outputTokens: number | null;
+  /**
+   * Cache + reasoning token sums folded onto the trace summary's reserved
+   * attribute keys. Null when the trace's model never reported them (no prompt
+   * caching, or a provider like Anthropic that emits no reasoning count). The
+   * list cell keeps showing the input+output delta; these drive the hover
+   * breakdown so a cached turn's true processed-token count is one hover away.
+   */
+  cacheReadTokens: number | null;
+  cacheCreationTokens: number | null;
+  reasoningTokens: number | null;
   models: string[];
   status: "ok" | "error" | "warning";
   spanCount: number;
@@ -1083,6 +1093,17 @@ export class TraceListService {
   }
 }
 
+/**
+ * Parse a reserved-key token sum off the trace attribute map. The fold parks
+ * these as strings; a non-finite or absent value reads as "not reported" (null)
+ * so the hover hides the row rather than showing a zero.
+ */
+function parseTokenCount(raw: string | undefined): number | null {
+  if (raw == null || raw === "") return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
 function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
   const status = deriveTraceStatus(row);
 
@@ -1108,6 +1129,15 @@ function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
     totalTokens,
     inputTokens: row.totalPromptTokenCount,
     outputTokens: row.totalCompletionTokenCount,
+    cacheReadTokens: parseTokenCount(
+      row.attributes["langwatch.reserved.cache_read_tokens"],
+    ),
+    cacheCreationTokens: parseTokenCount(
+      row.attributes["langwatch.reserved.cache_creation_tokens"],
+    ),
+    reasoningTokens: parseTokenCount(
+      row.attributes["langwatch.reserved.reasoning_tokens"],
+    ),
     models: row.models,
     status,
     spanCount: row.spanCount,

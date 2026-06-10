@@ -1,10 +1,11 @@
-import { Box, HStack, Spinner, Text } from "@chakra-ui/react";
+import { Box, HStack, Spinner } from "@chakra-ui/react";
 import {
   type ColumnDef,
   getCoreRowModel,
   useReactTable,
 } from "@tanstack/react-table";
 import { useMemo } from "react";
+import { PersonalTracesEmptyState } from "~/components/me/PersonalTracesEmptyState";
 import { buildTraceColumns } from "~/features/traces-v2/components/TraceTable/columns";
 import {
   RegistryRow,
@@ -147,11 +148,7 @@ export function PersonalRecentTracesTable({
   }
 
   if (rows.length === 0) {
-    return (
-      <Text fontSize="sm" color="fg.muted" paddingY={4} textAlign="center">
-        No requests yet
-      </Text>
-    );
+    return <PersonalTracesEmptyState projectSlug={projectSlug} />;
   }
 
   return (
