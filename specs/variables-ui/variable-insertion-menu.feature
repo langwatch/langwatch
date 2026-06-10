@@ -258,14 +258,14 @@ Feature: Variable insertion menu
   # the user finishes typing the name they wanted to create. The create
   # affordance must survive brace completion for unknown variables.
 
-  @integration @unimplemented
+  @integration
   Scenario: Create suggestion persists after typing the closing braces
     Given no variable "myvar" exists
     When I type "{{myvar}}" without selecting from the menu
     Then the insertion menu remains open on the completed variable
     And it offers "Create variable 'myvar'"
 
-  @integration @unimplemented
+  @integration
   Scenario: Creating from the persisted menu fixes the reference
     Given the menu is offering to create "myvar" after brace completion
     When I choose "Create variable 'myvar'"
@@ -273,7 +273,7 @@ Feature: Variable insertion menu
     And "{{myvar}}" renders as a valid variable
     And the menu closes
 
-  @integration @unimplemented
+  @integration
   Scenario: Menu does not persist for known variables after closing braces
     Given a variable "input" exists
     When I type "{{input}}"

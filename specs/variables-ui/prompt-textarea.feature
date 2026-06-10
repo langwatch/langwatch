@@ -230,21 +230,21 @@ Feature: Prompt textarea with variable chips
   # editor must always reserve room for the banner so every line stays
   # readable, and the banner itself should offer the one-click fix.
 
-  @integration @unimplemented
+  @integration
   Scenario: Error banner never covers the last line of the prompt
     Given the textarea value ends with a line referencing "{{missing}}"
     And no variable "missing" exists
     Then the variable-not-found banner is visible
     And the last line of the prompt remains fully visible above the banner
 
-  @integration @unimplemented
+  @integration
   Scenario: Variable-not-found banner offers a Create action
     Given the textarea value is "Judge this: {{response}}"
     And no variable "response" exists
     Then the banner reads that "response" is not defined
     And a "Create" button renders on the right side of the banner
 
-  @integration @unimplemented
+  @integration
   Scenario: Create button defines the missing variable
     Given the variable-not-found banner shows for "response"
     When I click the banner's "Create" button
@@ -252,7 +252,7 @@ Feature: Prompt textarea with variable chips
     And the banner disappears
     And "{{response}}" renders as a valid variable
 
-  @integration @unimplemented
+  @integration
   Scenario: Create resolves one missing variable at a time
     Given the textarea references missing variables "query" and "context"
     When I click the banner's "Create" button
