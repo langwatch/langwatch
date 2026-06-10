@@ -4,7 +4,15 @@
  * dataset node. Renders search, loading, empty states, and one card per
  * dataset with entry/column counts and last-edit date.
  */
-import { Box, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  chakra,
+  HStack,
+  Input,
+  Spinner,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { formatDistanceToNow } from "date-fns";
 import { useMemo, useState } from "react";
 import { Database, Search } from "react-feather";
@@ -129,8 +137,7 @@ function DatasetCard({
   onClick: () => void;
 }) {
   return (
-    <Box
-      as="button"
+    <chakra.button
       type="button"
       onClick={onClick}
       padding={4}
@@ -164,6 +171,6 @@ function DatasetCard({
           </HStack>
         </VStack>
       </HStack>
-    </Box>
+    </chakra.button>
   );
 }
