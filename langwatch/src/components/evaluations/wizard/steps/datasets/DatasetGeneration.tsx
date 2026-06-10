@@ -158,6 +158,17 @@ export function DatasetGeneration() {
           const { id, row } = args;
 
           const columnNames = resolveColumnNames();
+          if (columnNames.length === 1 && Object.keys(row).length > 0) {
+            toaster.create({
+              title: "Error",
+              description: "Failed to resolve dataset columns",
+              type: "error",
+              duration: 5000,
+              meta: { closable: true },
+            });
+            return;
+          }
+
           const rowData = Object.fromEntries(
             columnNames.map((col) => [col, row[col] ?? ""]),
           );

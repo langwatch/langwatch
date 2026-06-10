@@ -10,7 +10,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import * as crypto from "node:crypto";
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import { migrateUp } from "~/server/clickhouse/goose";
 
 const TEST_DATABASE = "test_langwatch";
@@ -209,15 +209,22 @@ function ensureLocalPostgresDatabase(databaseUrl: string): void {
   adminUrl.pathname = "/postgres";
   adminUrl.search = "";
 
-  const exists = execSync(
-    `psql "${adminUrl.toString()}" -tAc "SELECT 1 FROM pg_database WHERE datname='${dbName}'"`,
+  const exists = execFileSync(
+    "psql",
+    [
+      adminUrl.toString(),
+      "-tAc",
+      `SELECT 1 FROM pg_database WHERE datname='${dbName}'`,
+    ],
     { encoding: "utf-8" },
   ).trim();
   if (exists !== "1") {
     console.log(`[globalSetup] Creating Postgres database ${dbName}...`);
-    execSync(`psql "${adminUrl.toString()}" -c 'CREATE DATABASE "${dbName}"'`, {
-      stdio: "inherit",
-    });
+    execFileSync(
+      "psql",
+      [adminUrl.toString(), "-c", `CREATE DATABASE "${dbName}"`],
+      { stdio: "inherit" },
+    );
   }
 }
 

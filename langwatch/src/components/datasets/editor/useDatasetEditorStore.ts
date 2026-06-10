@@ -27,6 +27,45 @@ export type EditorColumn = {
 
 export type EditorRecord = { id: string } & Record<string, string>;
 
+/**
+ * Maps records onto a new column set after a column edit. Values follow
+ * column names; a pure in-place rename (same column count, the old name
+ * gone, the new name fresh at the same position) carries values over by
+ * position. Added columns start empty, removed columns drop their values.
+ */
+export function rekeyEditorRecords(
+  records: EditorRecord[],
+  prevColumns: EditorColumn[],
+  nextColumns: Array<{ name: string }>,
+): EditorRecord[] {
+  const prevNames = prevColumns.map((c) => c.name);
+  const nextNames = nextColumns.map((c) => c.name);
+  const renamedByNewName = new Map<string, string>();
+  if (prevNames.length === nextNames.length) {
+    for (let i = 0; i < nextNames.length; i++) {
+      const prevName = prevNames[i]!;
+      const nextName = nextNames[i]!;
+      if (
+        prevName !== nextName &&
+        !nextNames.includes(prevName) &&
+        !prevNames.includes(nextName)
+      ) {
+        renamedByNewName.set(nextName, prevName);
+      }
+    }
+  }
+  return records.map((record) => {
+    const next: EditorRecord = { id: record.id };
+    for (const name of nextNames) {
+      const value = record[renamedByNewName.get(name) ?? name];
+      if (value !== undefined) {
+        next[name] = value;
+      }
+    }
+    return next;
+  });
+}
+
 let newRecordSeq = 0;
 const generateRecordId = () =>
   `new_${Date.now()}_${(newRecordSeq += 1)}`;

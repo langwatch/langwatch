@@ -62,6 +62,7 @@ import {
 } from "./DatasetTableContext";
 import {
   createDatasetEditorStore,
+  rekeyEditorRecords,
   type EditorColumn,
   type EditorRecord,
 } from "./useDatasetEditorStore";
@@ -718,18 +719,23 @@ export function DatasetEditorTable({
               void databaseDataset.refetch();
               onColumnsChanged?.(updated.columnTypes);
             } else {
-              // Re-key in-memory records onto the new columns
-              const prevRecords = store.getState().records;
-              store.getState().setData({
-                columns: toEditorColumns(updated.columnTypes),
-                records: prevRecords,
-                dbDatasetId: undefined,
-              });
-              onUpdateDatasetRef.current?.({
+              // Re-key the records onto the new columns and refresh the
+              // propagation meta BEFORE setData: the store subscription
+              // emits the update upward and must carry the new name.
+              const state = store.getState();
+              const rekeyedRecords = rekeyEditorRecords(
+                state.records,
+                state.columns,
+                updated.columnTypes,
+              );
+              inMemoryMetaRef.current = {
                 datasetId: inMemoryDataset?.datasetId,
                 name: updated.name,
-                columnTypes: updated.columnTypes,
-                datasetRecords: prevRecords.map((r) => ({ ...r })),
+              };
+              state.setData({
+                columns: toEditorColumns(updated.columnTypes),
+                records: rekeyedRecords,
+                dbDatasetId: undefined,
               });
             }
           }}

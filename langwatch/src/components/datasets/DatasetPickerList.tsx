@@ -46,26 +46,7 @@ export function DatasetPickerList({
 
   return (
     <VStack gap={4} align="stretch" flex={1} overflow="hidden" width="full">
-      <Box position="relative">
-        <Box
-          position="absolute"
-          left={3}
-          top="50%"
-          transform="translateY(-50%)"
-          color="fg.subtle"
-          zIndex={1}
-        >
-          <Search size={16} />
-        </Box>
-        <Input
-          placeholder="Search datasets..."
-          data-testid="dataset-picker-search"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          paddingLeft={10}
-        />
-      </Box>
-
+      <DatasetSearchInput value={searchQuery} onChange={setSearchQuery} />
       <VStack gap={2} align="stretch" flex={1} overflowY="auto">
         {datasetsQuery.isLoading ? (
           <HStack justify="center" paddingY={8}>
@@ -104,6 +85,36 @@ export function DatasetPickerList({
   );
 }
 
+function DatasetSearchInput({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <Box position="relative">
+      <Box
+        position="absolute"
+        left={3}
+        top="50%"
+        transform="translateY(-50%)"
+        color="fg.subtle"
+        zIndex={1}
+      >
+        <Search size={16} />
+      </Box>
+      <Input
+        placeholder="Search datasets..."
+        data-testid="dataset-picker-search"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        paddingLeft={10}
+      />
+    </Box>
+  );
+}
+
 function DatasetCard({
   name,
   columnCount,
@@ -120,6 +131,7 @@ function DatasetCard({
   return (
     <Box
       as="button"
+      type="button"
       onClick={onClick}
       padding={4}
       borderRadius="md"

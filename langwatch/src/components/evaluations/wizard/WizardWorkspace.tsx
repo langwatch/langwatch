@@ -182,6 +182,12 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
                       datasetId={getDatasetId()}
                       controllerRef={datasetGridRef}
                       onUpdateDataset={handleDatasetUpdate}
+                      onColumnsChanged={(columnTypes) =>
+                        handleDatasetUpdate({
+                          datasetId: getDatasetId(),
+                          columnTypes,
+                        })
+                      }
                     />
                   </Box>
                 </Card.Body>
