@@ -31572,6 +31572,13 @@ Both search and get-trace endpoints support a `format` parameter:
 - **`digest`** (default), Returns an AI-readable formatted trace with hierarchical span tree, timing, inputs/outputs, and errors. Optimized for LLM consumption.
 - **`json`**, Returns the full raw trace data with all fields.
 
+For data-team ETL, `POST /api/traces/search` also accepts a **projection DSL**
+(`from` + `select`) that returns exactly the fields you ask for — including
+nested events, annotations, and evaluations joined server-side — so a daily pull
+becomes one paginated loop instead of a per-trace fan-out. It pairs with a
+`dateField` option to page by when traces were **last modified** rather than when
+they occurred. See [Projection DSL & field catalog](/api-reference/traces/projection-dsl).
+
 ## Authentication
 
 Pass your LangWatch API key in the `X-Auth-Token` header. Your API key can be found on the setup page under settings.
@@ -31590,6 +31597,229 @@ Pass your LangWatch API key in the `X-Auth-Token` header. Your API key can be fo
 <Info>
 The older `/api/trace/search` and `/api/trace/{id}` endpoints still work but are deprecated. Migrate to `/api/traces/search` and `/api/traces/{traceId}` for the improved `format` parameter and AI-readable digests.
 </Info>
+
+---
+
+# FILE: ./api-reference/traces/projection-dsl.mdx
+
+---
+title: 'Projection DSL & field catalog'
+description: 'Declare exactly which trace fields to return from POST /api/traces/search — including nested events, annotations, and evaluations — so a daily ETL becomes one paginated loop instead of a per-trace fan-out.'
+---
+
+## Why
+
+By default `POST /api/traces/search` returns the full trace shape. For an ETL
+pipeline that only needs a handful of fields across thousands of traces, that is
+both more data than required and forces a second call per trace to read
+event-level feedback. The projection DSL lets a caller declare the columns of
+interest up front; the server returns exactly that shape — with nested events,
+annotations, and evaluations joined server-side — in one paginated response.
+
+The feature is fully additive: a request without `from`/`select` behaves exactly
+as before.
+
+## The contract
+
+Two optional fields on the search request body:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `from` | `"traces"` | Entity root to read from. Only `traces` is supported today; defaults to `traces` when `select` is present. |
+| `select` | `string[]` | Flat list of dotted-path columns to project. Must be non-empty when present. |
+
+```bash
+curl -X POST https://app.langwatch.ai/api/traces/search \
+  -H "X-Auth-Token: $LANGWATCH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "startDate": 1717200000000,
+    "endDate":   1717286400000,
+    "from": "traces",
+    "select": [
+      "trace_id",
+      "started_at",
+      "metadata.user_id",
+      "metrics.total_cost",
+      "evaluations.name", "evaluations.score",
+      "events.type", "events.metrics",
+      "annotations.is_thumbs_up", "annotations.scores"
+    ]
+  }'
+```
+
+## How paths map to the response
+
+Paths group by their root, so the response mirrors the selection:
+
+- **Scalar fields** (`trace_id`, `started_at`, `input`, …) stay at the top level
+  of each row.
+- **`metadata.*`** nests under a `metadata` object.
+- **`metrics.*`** nests under a `metrics` object.
+- **`events.*`**, **`annotations.*`**, **`evaluations.*`** return as **nested
+  arrays** — one row per trace, with each child record projected to the
+  requested sub-fields.
+
+A request for the `select` above yields rows shaped like:
+
+```jsonc
+{
+  "trace_id": "abc123…",
+  "started_at": 1717200001234,
+  "metadata": { "user_id": "u_42" },
+  "metrics": { "total_cost": 0.0031 },
+  "evaluations": [
+    { "name": "Faithfulness", "score": 0.91 }
+  ],
+  "events": [
+    { "type": "thumbs_up_down", "metrics": { "vote": 1 } }
+  ],
+  "annotations": [
+    { "is_thumbs_up": true, "scores": { "quality": { "value": "5" } } }
+  ]
+}
+```
+
+## The `schema` response field
+
+When `select` is present, the response envelope gains a top-level `schema`
+object listing the resolved columns — their dotted path, value type, and whether
+they belong to a nested collection. Use it to pre-allocate a typed reader
+(pandas, a Parquet writer, a warehouse table) without inferring types from the
+data:
+
+```jsonc
+{
+  "traces": [ /* projected rows */ ],
+  "pagination": { "totalHits": 3120, "scrollId": "…" },
+  "schema": {
+    "from": "traces",
+    "columns": [
+      { "path": "trace_id",         "type": "string",  "collection": false },
+      { "path": "metrics.total_cost","type": "number", "collection": false },
+      { "path": "evaluations.score","type": "number",  "collection": true  }
+    ]
+  }
+}
+```
+
+## Field catalog
+
+Every selectable path is listed below. A path outside this catalog is rejected
+at request time with **HTTP 400** and the offending path named in the error, so
+you can correct the whole `select` in one round-trip.
+
+### Trace scalars
+
+| Path | Type | Notes |
+|------|------|-------|
+| `trace_id` | string | |
+| `project_id` | string | |
+| `started_at` | number | Epoch ms — when the trace occurred. |
+| `inserted_at` | number | Epoch ms — when first stored. |
+| `updated_at` | number | Epoch ms — when last modified. |
+| `input` | string | Captured input. Requires input-visibility permission; redacted to `null` otherwise. |
+| `output` | string | Captured output. Requires output-visibility permission; redacted to `null` otherwise. |
+
+### `metadata.<key>`
+
+Any metadata key (e.g. `metadata.user_id`, `metadata.customer_id`,
+`metadata.thread_id`, or your own custom keys). Returned under a `metadata`
+object.
+
+### `metrics.<key>`
+
+| Path | Type |
+|------|------|
+| `metrics.first_token_ms` | number |
+| `metrics.total_time_ms` | number |
+| `metrics.prompt_tokens` | number |
+| `metrics.completion_tokens` | number |
+| `metrics.reasoning_tokens` | number |
+| `metrics.cache_read_input_tokens` | number |
+| `metrics.cache_creation_input_tokens` | number |
+| `metrics.total_cost` | number — requires cost-visibility permission; redacted to `null` otherwise |
+| `metrics.tokens_estimated` | boolean |
+
+### `evaluations.<field>` (nested array)
+
+| Path | Type |
+|------|------|
+| `evaluations.name` | string |
+| `evaluations.score` | number |
+| `evaluations.passed` | boolean |
+| `evaluations.label` | string |
+| `evaluations.details` | string |
+| `evaluations.status` | string |
+| `evaluations.evaluator_id` | string |
+| `evaluations.type` | string |
+| `evaluations.is_guardrail` | boolean |
+
+### `events.<field>` (nested array)
+
+| Path | Type | Notes |
+|------|------|-------|
+| `events.type` | string | The event name, e.g. `thumbs_up_down`, `star_rating`. |
+| `events.timestamp` | number | Epoch ms. |
+| `events.metrics` | json | All numeric metrics for the event. |
+| `events.metrics.<key>` | number | A single named metric. |
+| `events.details` | json | All string details for the event. |
+| `events.details.<key>` | string | A single named detail. |
+
+### `annotations.<field>` (nested array)
+
+| Path | Type | Notes |
+|------|------|-------|
+| `annotations.is_thumbs_up` | boolean | |
+| `annotations.comment` | string | |
+| `annotations.expected_output` | string | |
+| `annotations.created_at` | number | Epoch ms. |
+| `annotations.scores` | json | All named score values. |
+| `annotations.scores.<name>` | json | A single named score. |
+
+<Info>
+Annotations are manual reviews captured in the LangWatch UI (thumbs, scores,
+comments). They live alongside SDK-emitted `events` and are joined into the same
+response — no separate annotations call needed.
+</Info>
+
+## Choosing the date axis
+
+By default the `startDate`/`endDate` window filters traces by **when they
+occurred**. For incremental ETL you usually want **everything changed since your
+last pull** — a trace can occur weeks before it gains a later evaluation or
+annotation. Set `dateField` to switch the axis:
+
+| `dateField` | Window applies to | Use for |
+|-------------|-------------------|---------|
+| `occurred` (default) | When the trace happened | Time-bucketed reporting. |
+| `updated` | When the trace was last modified | Incremental / CDC pulls. |
+
+```jsonc
+{
+  "startDate": 1717200000000,   // last watermark
+  "endDate":   1717286400000,   // now
+  "dateField": "updated",
+  "select": ["trace_id", "updated_at", "annotations.is_thumbs_up"]
+}
+```
+
+On the `updated` axis, pagination is **at-least-once**: a trace modified again
+while you are paging may reappear on a later page, but nothing changed in the
+window is ever missed — exactly what a change-data-capture loop wants.
+
+## Performance
+
+The projection drives column selection, so asking for only lightweight fields
+keeps the query lightweight. In particular, the heavy captured `input`/`output`
+columns are only read when you `select` them — omit them and a wide window stays
+fast. Each page is capped at 1000 rows; keep following `pagination.scrollId`
+until it is absent to sweep a full window.
+
+## Backwards compatibility
+
+A request with neither `from` nor `select` returns the existing full-trace shape
+and **no** `schema` field. Existing integrations are unaffected.
 
 ---
 
