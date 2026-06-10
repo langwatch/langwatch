@@ -69,6 +69,23 @@ func TestEvaluateCondition(t *testing.T) {
 		assert.True(t, got)
 	})
 
+	t.Run("double quotes embed in single-quoted literals", func(t *testing.T) {
+		// Liquid's supported way to put a double quote inside a string
+		// literal is the other quote style; words inside must still not
+		// register as input references.
+		got, err := EvaluateCondition(`label == 'say "hello"'`, map[string]any{"label": `say "hello"`})
+		require.NoError(t, err)
+		assert.True(t, got)
+	})
+
+	t.Run("backslash-escaped quotes error loudly", func(t *testing.T) {
+		// Liquid string literals have no escape sequences, so this is a
+		// syntax error in the engine itself. The validator tokenizes the
+		// same way the parser does and must reject it, never route on it.
+		_, err := EvaluateCondition(`label == "say \"hello\""`, map[string]any{"label": `say "hello"`})
+		require.Error(t, err)
+	})
+
 	t.Run("undefined input errors instead of silently passing", func(t *testing.T) {
 		// Liquid would treat the unknown variable as nil and evaluate
 		// `nil != ""` to true - the gating condition must fail loudly.

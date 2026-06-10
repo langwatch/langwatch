@@ -234,7 +234,7 @@ describe("EntryPointPropertiesPanel", () => {
     });
   });
 
-  describe("navigation", () => {
+  describe("when the workflow has an end node", () => {
     beforeEach(() => {
       mockUseGetDatasetData.mockReturnValue({
         rows: undefined,

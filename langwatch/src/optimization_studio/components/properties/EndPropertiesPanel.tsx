@@ -50,8 +50,7 @@ export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
         data: { ...node.data, inputs: EVALUATOR_RESULT_FIELDS },
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEvaluator, node.id]);
+  }, [isEvaluator, node.id, node.data, setNode]);
 
   const hasResultConnected = edges.some(
     (edge) =>

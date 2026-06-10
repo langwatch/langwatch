@@ -60,6 +60,11 @@ func EvaluateCondition(condition string, inputs map[string]any) (bool, error) {
 
 // stripStringLiterals blanks out quoted strings so words inside them
 // (`label == "not relevant"`) don't register as input references.
+// Liquid string literals have no escape sequences (a double quote
+// embeds in a single-quoted literal and vice versa; `\"` is a syntax
+// error in the engine), so this deliberately tokenizes the same way
+// the parser does. Do not add backslash handling here: the validator
+// would then disagree with the parser about where strings end.
 func stripStringLiterals(s string) string {
 	var b strings.Builder
 	inQuote := byte(0)

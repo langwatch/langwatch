@@ -21,11 +21,17 @@ import (
 
 // newRowTraceID mints a random W3C trace id for one evaluated dataset
 // row. Crypto randomness keeps collisions out of the question across
-// concurrent evaluations; the all-zero (invalid) id is re-rolled.
+// concurrent evaluations. crypto/rand.Read never returns an error (it
+// aborts the process when entropy is unavailable), so the retry only
+// guards the 2^-128 all-zero draw, which W3C deems invalid; bounded
+// so a hypothetically broken source cannot spin forever.
 func newRowTraceID() trace.TraceID {
 	var tid trace.TraceID
-	for !tid.IsValid() {
+	for attempt := 0; attempt < 4 && !tid.IsValid(); attempt++ {
 		_, _ = cryptorand.Read(tid[:])
+	}
+	if !tid.IsValid() {
+		panic("crypto/rand produced repeated all-zero trace ids")
 	}
 	return tid
 }
