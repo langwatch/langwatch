@@ -261,8 +261,6 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                     minWidth={0}
                     direction="column"
                     bg={{ base: "bg.surface", _dark: "bg.panel" }}
-                    opacity={headerQuery.isFetching ? 0.55 : 1}
-                    transition="opacity 120ms ease-out"
                   >
                     <ScenarioRoleProvider
                       isScenario={

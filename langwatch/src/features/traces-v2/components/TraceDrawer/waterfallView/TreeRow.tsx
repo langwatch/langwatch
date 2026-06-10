@@ -71,13 +71,19 @@ export function TreeRow({
     (SPAN_TYPE_COLORS[span.type ?? "span"] as string) ?? "gray.solid";
   const isLlm = span.type === "llm" && span.model != null;
   const rowH = isLlm ? LLM_ROW_HEIGHT : ROW_HEIGHT;
-  const TypeIcon = SPAN_TYPE_ICONS[span.type ?? "span"] ?? SPAN_TYPE_ICONS.span!;
+  const TypeIcon =
+    SPAN_TYPE_ICONS[span.type ?? "span"] ?? SPAN_TYPE_ICONS.span!;
   const palette = getSpanPalette(span.type);
   const duration = span.durationMs;
   const isZeroDuration = duration === 0;
   const offsetMs = Math.max(0, span.startTimeMs - rootStart);
   const sharePct =
     rootDuration > 0 ? Math.round((duration / rootDuration) * 100) : 0;
+  const totalTokens =
+    (span.inputTokens ?? 0) +
+    (span.outputTokens ?? 0) +
+    (span.cacheReadTokens ?? 0) +
+    (span.cacheCreationTokens ?? 0);
 
   const tooltipContent = (
     <Box minWidth="240px" maxWidth="340px">
@@ -119,6 +125,44 @@ export function TreeRow({
           </Text>
         )}
       </HStack>
+      {/* Token breakdown — same rows the header Tokens pill shows on
+          hover, scoped to this span. Only rendered when the span
+          actually reported usage. */}
+      {totalTokens > 0 && (
+        <Box
+          marginTop={1.5}
+          display="grid"
+          gridTemplateColumns="auto 1fr"
+          gap={0.5}
+          columnGap={3}
+        >
+          {span.inputTokens != null && (
+            <TipCell label="Input" value={span.inputTokens.toLocaleString()} />
+          )}
+          {span.outputTokens != null && (
+            <TipCell
+              label="Output"
+              value={span.outputTokens.toLocaleString()}
+            />
+          )}
+          {span.cacheReadTokens != null && (
+            <TipCell
+              label="Cache read"
+              value={span.cacheReadTokens.toLocaleString()}
+            />
+          )}
+          {span.cacheCreationTokens != null && (
+            <TipCell
+              label="Cache write"
+              value={span.cacheCreationTokens.toLocaleString()}
+            />
+          )}
+          <TipCell label="Total" value={totalTokens.toLocaleString()} />
+          {span.cost != null && span.cost > 0 && (
+            <TipCell label="Cost" value={formatCost(span.cost)} />
+          )}
+        </Box>
+      )}
       <Box
         marginTop={1.5}
         display="grid"
@@ -284,14 +328,26 @@ export function TreeRow({
               {span.name}
             </Text>
             {isLlm && (
-              <Text
-                textStyle="xs"
-                color="fg.subtle"
-                truncate
-                lineHeight={1.2}
-              >
-                {abbreviateModel(span.model!)}
-              </Text>
+              // Model as a compact pill (one per span) rather than a bare
+              // text line — matches the header's Chip-based Models pill
+              // idiom. The rich detail (full model name, token breakdown,
+              // cost) lives in the row tooltip, which covers the pill.
+              <HStack gap={1} marginTop="1px">
+                <Text
+                  textStyle="2xs"
+                  color="fg.muted"
+                  borderWidth="1px"
+                  borderColor="border.muted"
+                  borderRadius="full"
+                  paddingX={1.5}
+                  lineHeight={1.4}
+                  truncate
+                  maxWidth="100%"
+                  bg="bg.subtle"
+                >
+                  {abbreviateModel(span.model!)}
+                </Text>
+              </HStack>
             )}
           </Flex>
 
@@ -371,32 +427,34 @@ export function TreeRow({
             </Flex>
           </Tooltip>
 
-          {/* Cost — only shown for spans that actually carry one
-              (LLM spans with a measured `gen_ai.usage.cost`). Sits to
-              the left of the duration so the cost line lines up
-              vertically with the model line on LLM rows. Muted tone
-              keeps it a secondary read; clicks fall through to the
-              row's select handler. */}
-          {span.cost != null && span.cost > 0 && (
-            <Text
-              textStyle="xs"
-              color="fg.muted"
-              flexShrink={0}
-              marginLeft={2}
-              whiteSpace="nowrap"
-              fontVariantNumeric="tabular-nums"
-            >
-              {formatCost(span.cost)}
-            </Text>
-          )}
-
-          {/* Duration */}
+          {/* Cost + duration render as fixed-width right-aligned columns
+              (tabular numerals) so every row's trailing figures line up
+              vertically — variable-width text here made the whole right
+              edge of the list read as ragged. The cost slot is always
+              present (empty for spans without one) so the duration
+              column can't drift between LLM and non-LLM rows. */}
           <Text
             textStyle="xs"
             color="fg.muted"
             flexShrink={0}
             marginLeft={2}
+            width="52px"
+            textAlign="right"
             whiteSpace="nowrap"
+            fontVariantNumeric="tabular-nums"
+          >
+            {span.cost != null && span.cost > 0 ? formatCost(span.cost) : ""}
+          </Text>
+
+          <Text
+            textStyle="xs"
+            color="fg.muted"
+            flexShrink={0}
+            marginLeft={2}
+            width="52px"
+            textAlign="right"
+            whiteSpace="nowrap"
+            fontVariantNumeric="tabular-nums"
           >
             {isZeroDuration ? "<1ms" : formatDuration(duration)}
           </Text>
