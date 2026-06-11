@@ -48,10 +48,21 @@ const teaserOfSpanIO = (
   io: SpanInputOutput | null | undefined,
 ): SpanInputOutput | null | undefined => {
   if (!io) return io;
+  // Real-world payloads don't always honor the declared type (e.g. a
+  // chat_messages value that isn't an array) — serialize-and-tease those.
+  const teaserAsRaw = (): SpanInputOutput => ({
+    type: "raw",
+    value: teaserOf(
+      typeof io.value === "string" ? io.value : JSON.stringify(io.value ?? null),
+    ),
+  });
   switch (io.type) {
     case "text":
-      return { ...io, value: teaserOf(io.value) };
+      return typeof io.value === "string"
+        ? { ...io, value: teaserOf(io.value) }
+        : teaserAsRaw();
     case "chat_messages":
+      if (!Array.isArray(io.value)) return teaserAsRaw();
       return {
         ...io,
         value: io.value.map((message) => ({
@@ -67,6 +78,7 @@ const teaserOfSpanIO = (
         })),
       };
     case "list":
+      if (!Array.isArray(io.value)) return teaserAsRaw();
       return { ...io, value: io.value.map((item) => teaserOfSpanIO(item)!) };
     default:
       // json / raw / guardrail / evaluation results: tease the serialized

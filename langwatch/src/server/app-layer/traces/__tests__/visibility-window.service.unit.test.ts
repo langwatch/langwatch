@@ -210,3 +210,25 @@ describe("VisibilityWindowService.getVisibilityCutoffMs", () => {
     });
   });
 });
+
+describe("redactSpanContent with malformed payloads", () => {
+  it("teases a chat_messages value that is not an array as raw", () => {
+    const span = makeSpan({
+      input: { type: "chat_messages", value: "x".repeat(2000) } as never,
+    });
+    const redacted = redactSpanContent(span);
+    expect(redacted.input?.type).toBe("raw");
+    expect((redacted.input as { value: string }).value).toHaveLength(200);
+  });
+
+  it("teases a list value that is not an array as raw", () => {
+    const span = makeSpan({
+      input: { type: "list", value: { nested: "y".repeat(5000) } } as never,
+    });
+    const redacted = redactSpanContent(span);
+    expect(redacted.input?.type).toBe("raw");
+    expect(
+      (redacted.input as { value: string }).value.length,
+    ).toBeLessThanOrEqual(TEASER_MAX_CHARS);
+  });
+});
