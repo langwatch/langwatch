@@ -1,10 +1,10 @@
-# ADR-027: Per-organization stored-GB-hours billing to Stripe via global event-sourced projection
+# ADR-027: Per-organization stored-GiB-hours billing to Stripe via global event-sourced projection
 
 **Date:** 2026-06-11
 
 **Status:** Proposed
 
-> One-line: bill **GB-hours of stored bytes aged beyond the 30-day included window**, sampled per **sealed UTC hour** by a **global event-sourced projection**, reported additively to a **`sum`-formula Stripe meter**. Ingestion (flow) billing is explicitly rejected. No "current DB" snapshots — each sealed-window ClickHouse query is anchored to a past hour, not `now()`.
+> One-line: bill **GiB-hours of stored bytes aged beyond the 30-day included window**, sampled per **sealed UTC hour** by a **global event-sourced projection**, reported additively to a **`sum`-formula Stripe meter**. Ingestion (flow) billing is explicitly rejected. No "current DB" snapshots — each sealed-window ClickHouse query is anchored to a past hour, not `now()`.
 
 ## Context
 
@@ -14,7 +14,7 @@ The commercial model being encoded: **every paid plan includes 30 days of data r
 
 Forces shaping the design:
 
-1. **Deletion must lower the bill by construction.** If we report X GB and retention later deletes Y, the invoice cannot leave the customer wondering whether they paid for X or X−Y. The model has to answer that with no rebate logic and no dispute surface. Industry converged on time-weighted GB-hours for exactly this reason (AWS S3, GCS, R2, Snowflake, OpenObserve).
+1. **Deletion must lower the bill by construction.** If we report X GB and retention later deletes Y, the invoice cannot leave the customer wondering whether they paid for X or X−Y. The model has to answer that with no rebate logic and no dispute surface. Industry converged on time-weighted GiB-hours for exactly this reason (AWS S3, GCS, R2, Snowflake, OpenObserve).
 
 2. **Incremental reporting, not end-of-period.** A single monthly report is fragile: it can fail, and data arriving (or deleted) one minute before period close distorts it. Continuous hourly accrual makes every hour independently correct and independently retryable. All billing logic lives on our side; Stripe only ever receives "org X, hour H, N MiB".
 
@@ -30,7 +30,7 @@ Forces shaping the design:
 
 We will bill **per-organization stored-bytes-aged-beyond-30-days, integrated over hourly sealed windows, summed across the billing period, in binary GiB at €3/GiB-month using a 30-day-month convention**. One Stripe meter event per organization per sealed UTC hour, value sent additively (`reportUsageDelta`) into a new `STORAGE_GB` meter with `default_aggregation.formula = "sum"`.
 
-The hourly cadence + sum aggregation produces a true GB-hours integral: period total ÷ 24 = GB-days, ÷ 720 = GB-months. The Stripe Price encodes the conversion at €3 / 30 / 24 / 1024 per MiB-hour.
+The hourly cadence + sum aggregation produces a true GiB-hours integral: period total ÷ 24 = GiB-days, ÷ 720 = GiB-months. The Stripe Price encodes the conversion at €3 / 30 / 24 / 1024 per MiB-hour.
 
 Six load-bearing choices:
 
@@ -116,9 +116,11 @@ unit_amount_decimal = €3 / 30 days / 24 hours / 1024 MiB-per-GiB
                     = €0.10 per GiB-day
 ```
 
+**Unit vocabulary:** all quantities are binary — values are MiB (`bytes / 1_048_576`), prices are per GiB (1024 MiB). Identifier names (`STORAGE_GB` meter, `storage_mb:` prefix, `megabytes` columns) use GB/MB as opaque labels only — renaming Stripe meters later is painful, so the labels stay and this line is the contract. Marketing copy must say GiB or accept the ~2.4% decimal-GB gap.
+
 Stripe Price `unit_amount_decimal` is static — one fixed number applied to the period's summed MiB-hours. Holding 1 GiB all month therefore bills €3.10 in 31-day months, €2.80 in February, €3.00 in 30-day months (the AWS S3 / R2 convention; marketing copy must say so or switch to a flat per-day headline). Partial periods bill proportionally by construction.
 
-The retention length chosen (60 vs 90) does **not** change the unit price — longer retention costs more naturally because more bytes live longer (more GB-hours). One meter, one rate per plan; Enterprise rates are separate Prices on the same meter.
+The retention length chosen (60 vs 90) does **not** change the unit price — longer retention costs more naturally because more bytes live longer (more GiB-hours). One meter, one rate per plan; Enterprise rates are separate Prices on the same meter.
 
 ## Schema
 
@@ -162,7 +164,7 @@ No ClickHouse migration; `_size_bytes` exists.
 
 ## Rationale / Trade-offs
 
-**Stored (stock integral), not ingested (flow).** Helicone/Sentry bill ingest bytes; AWS S3/OpenObserve bill stored GB-hours. Stored wins here because (a) the measurement already exists, (b) deletion lowering the bill is the customer-facing answer to the "report X then delete Y" question, (c) it makes retention a visible cost lever rather than a hidden internal optimization. Trade-off accepted: a customer who ingests 1 TB and deletes it within the hour pays ~€0 for it (S3 has the same property); ingestion cost we incur is unpriced. If that becomes an acquisition vector, an ingest fee is a *separate additional* line, never a replacement.
+**Stored (stock integral), not ingested (flow).** Helicone/Sentry bill ingest bytes; AWS S3/OpenObserve bill stored GiB-hours. Stored wins here because (a) the measurement already exists, (b) deletion lowering the bill is the customer-facing answer to the "report X then delete Y" question, (c) it makes retention a visible cost lever rather than a hidden internal optimization. Trade-off accepted: a customer who ingests 1 TB and deletes it within the hour pays ~€0 for it (S3 has the same property); ingestion cost we incur is unpriced. If that becomes an acquisition vector, an ingest fee is a *separate additional* line, never a replacement.
 
 **Hourly additive accrual, not end-of-period reporting.** Each hour is independently correct, independently retryable (35-day backdate window), and immune to period-edge timing games. Data arriving one minute before month-end contributes one hour-sample (~0.001 GiB-month) — negligible and exactly fair. The failure mode of a monthly job (one failed run = one wrong invoice) becomes "some hours retry later".
 
@@ -178,7 +180,7 @@ No ClickHouse migration; `_size_bytes` exists.
 
 **Rejected: ingested-GB priced by retention tier (SigNoz model).** Most sophisticated, but blocks shipping and double-charges the retention lever (more hours *and* a higher rate).
 
-**Rejected: usage-billing middleware (Metronome, Orb, Lago).** Would erase the GB-hours integration work, but adds a third party in the billing critical path and net-new operational surface while we already run the meter→Stripe pipeline. Reconsider if billing complexity grows (commitments, credits, multi-currency tiers).
+**Rejected: usage-billing middleware (Metronome, Orb, Lago).** Would erase the GiB-hours integration work, but adds a third party in the billing critical path and net-new operational surface while we already run the meter→Stripe pipeline. Reconsider if billing complexity grows (commitments, credits, multi-currency tiers).
 
 ## Consequences
 
