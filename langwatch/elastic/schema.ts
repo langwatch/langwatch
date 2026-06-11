@@ -261,6 +261,11 @@ export const traceMapping: ElasticSearchMappingFrom<ElasticSearchTrace> = {
   indexing_md5s: {
     type: "keyword",
   },
+  // ADR-028: response-only flag, never persisted — present here only because
+  // the legacy ES mapping type is derived from the Trace schema.
+  redacted_by_visibility_window: {
+    type: "boolean",
+  },
   contexts: {
     type: "nested",
     properties: {

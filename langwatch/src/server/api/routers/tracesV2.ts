@@ -1,6 +1,7 @@
 import { on } from "node:events";
 import { z } from "zod";
 import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution";
+import { getVisibilityCutoffMsForProject } from "~/server/api/utils";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { ValidationError } from "~/server/app-layer/domain-error";
@@ -399,6 +400,9 @@ export const tracesV2Router = createTRPCRouter({
         page: input.page,
         pageSize: input.pageSize,
         filterWhere: buildFilterWhere(input),
+        visibilityCutoffMs: await getVisibilityCutoffMsForProject(
+          input.projectId,
+        ),
       });
     }),
 
@@ -492,6 +496,9 @@ export const tracesV2Router = createTRPCRouter({
         page: 1,
         pageSize: 200,
         filterWhere,
+        visibilityCutoffMs: await getVisibilityCutoffMsForProject(
+          input.projectId,
+        ),
       });
       const turns = page.items.map((t) => ({
         traceId: t.traceId,
@@ -797,6 +804,9 @@ export const tracesV2Router = createTRPCRouter({
       return app.traces.spans.getSpansPaginated({
         tenantId: input.projectId,
         traceId: input.traceId,
+        visibilityCutoffMs: await getVisibilityCutoffMsForProject(
+          input.projectId,
+        ),
         limit: input.limit,
         offset: input.offset,
         ...occurredAtFromInput(input),
@@ -819,6 +829,9 @@ export const tracesV2Router = createTRPCRouter({
         tenantId: input.projectId,
         traceId: input.traceId,
         sinceStartTimeMs: input.sinceStartTimeMs,
+        visibilityCutoffMs: await getVisibilityCutoffMsForProject(
+          input.projectId,
+        ),
         ...occurredAtFromInput(input),
       });
     }),
@@ -935,6 +948,9 @@ export const tracesV2Router = createTRPCRouter({
       const spans = await app.traces.spans.getSpansByTraceId({
         tenantId: input.projectId,
         traceId: input.traceId,
+        visibilityCutoffMs: await getVisibilityCutoffMsForProject(
+          input.projectId,
+        ),
         ...occurredAtFromInput(input),
       });
       return spans.map((span) => mapSpanToDetail(span, []));
@@ -963,6 +979,9 @@ export const tracesV2Router = createTRPCRouter({
           tenantId: input.projectId,
           traceId: input.traceId,
           spanId: input.spanId,
+          visibilityCutoffMs: await getVisibilityCutoffMsForProject(
+            input.projectId,
+          ),
           ...hint,
         }),
         app.traces.spans.getSpanEvents({
