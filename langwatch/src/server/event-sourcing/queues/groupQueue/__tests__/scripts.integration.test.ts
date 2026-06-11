@@ -117,7 +117,7 @@ describe("GroupStagingScripts", () => {
       });
 
       it("returns true for new job", async () => {
-        const result = await scripts.stage(makeJob());
+        const { isNew: result } = await scripts.stage(makeJob());
         expect(result).toBe(true);
       });
     });
@@ -125,7 +125,7 @@ describe("GroupStagingScripts", () => {
     describe("when staging with deduplication", () => {
       describe("when dedup key exists", () => {
         it("squashes onto original job, returns false", async () => {
-          const first = await scripts.stage(
+          const { isNew: first } = await scripts.stage(
             makeJob({
               stagedJobId: "j1",
               dedupId: "dedup-1",
@@ -135,7 +135,7 @@ describe("GroupStagingScripts", () => {
           );
           expect(first).toBe(true);
 
-          const second = await scripts.stage(
+          const { isNew: second } = await scripts.stage(
             makeJob({
               stagedJobId: "j2",
               dedupId: "dedup-1",
@@ -169,7 +169,7 @@ describe("GroupStagingScripts", () => {
           // Wait for TTL to expire
           await new Promise((r) => setTimeout(r, 10));
 
-          const result = await scripts.stage(
+          const { isNew: result } = await scripts.stage(
             makeJob({
               stagedJobId: "j2",
               dedupId: "dedup-exp",
@@ -199,7 +199,7 @@ describe("GroupStagingScripts", () => {
           }),
         );
 
-        const result = await scripts.stage(
+        const { isNew: result } = await scripts.stage(
           makeJob({
             stagedJobId: "j2",
             dedupId: "squash-1",
@@ -280,7 +280,7 @@ describe("GroupStagingScripts", () => {
         const jobsAfterDispatch = await inspectGroupJobs("group-a");
         expect(jobsAfterDispatch).toEqual([]);
 
-        const result = await scripts.stage(
+        const { isNew: result } = await scripts.stage(
           makeJob({
             stagedJobId: "j2",
             dedupId: "race-1",
@@ -314,7 +314,7 @@ describe("GroupStagingScripts", () => {
         await scripts.dispatch({ nowMs: Date.now(), activeTtlSec: 300 });
 
         // j2 is new (j1 dispatched)
-        const r2 = await scripts.stage(
+        const { isNew: r2 } = await scripts.stage(
           makeJob({
             stagedJobId: "j2",
             dedupId: "multi-race",
@@ -329,7 +329,7 @@ describe("GroupStagingScripts", () => {
         await scripts.dispatch({ nowMs: Date.now(), activeTtlSec: 300 });
 
         // j3 is new (j2 dispatched)
-        const r3 = await scripts.stage(
+        const { isNew: r3 } = await scripts.stage(
           makeJob({
             stagedJobId: "j3",
             dedupId: "multi-race",
@@ -458,7 +458,7 @@ describe("GroupStagingScripts", () => {
           }),
         );
 
-        const result = await scripts.stage(
+        const { isNew: result } = await scripts.stage(
           makeJob({
             stagedJobId: "j2",
             dedupId: "both-false",
@@ -514,6 +514,121 @@ describe("GroupStagingScripts", () => {
       });
     });
 
+    // A dedup squash drops one payload on the floor. When that payload carried
+    // an offloaded blob (ADR-026) the blob would leak until its 7-day TTL (the
+    // 2026-06-11 Redis capacity incident). stage()/stageBatch() report the
+    // displaced value so GroupQueue can reclaim its blob; these lock the
+    // reporting contract at the script layer (which is itself blob-agnostic).
+    describe("given stage scripts report displaced values for blob reclamation", () => {
+      describe("when a genuinely new job is staged", () => {
+        it("reports no orphan", async () => {
+          const { isNew, orphanedValue } = await scripts.stage(
+            makeJob({
+              stagedJobId: "j1",
+              jobDataJson: JSON.stringify({ v: 1 }),
+            }),
+          );
+
+          expect(isNew).toBe(true);
+          expect(orphanedValue).toBe("");
+        });
+      });
+
+      describe("when a dedup squash displaces a staged payload", () => {
+        it("reports the displaced OLD value on replace", async () => {
+          const oldValue = JSON.stringify({ v: 1 });
+          await scripts.stage(
+            makeJob({
+              stagedJobId: "j1",
+              dedupId: "orphan-replace",
+              dedupTtlMs: 60000,
+              jobDataJson: oldValue,
+              shouldReplace: true,
+            }),
+          );
+
+          const { isNew, orphanedValue } = await scripts.stage(
+            makeJob({
+              stagedJobId: "j2",
+              dedupId: "orphan-replace",
+              dedupTtlMs: 60000,
+              jobDataJson: JSON.stringify({ v: 2 }),
+              shouldReplace: true,
+            }),
+          );
+
+          // v2 now occupies the field; v1 is dropped → its blob reclaims.
+          expect(isNew).toBe(false);
+          expect(orphanedValue).toBe(oldValue);
+        });
+
+        it("reports the discarded NEW value when the existing payload is kept", async () => {
+          await scripts.stage(
+            makeJob({
+              stagedJobId: "j1",
+              dedupId: "orphan-keep",
+              dedupTtlMs: 60000,
+              jobDataJson: JSON.stringify({ kept: true }),
+              shouldExtend: false,
+              shouldReplace: false,
+            }),
+          );
+
+          const discardedValue = JSON.stringify({ discarded: true });
+          const { isNew, orphanedValue } = await scripts.stage(
+            makeJob({
+              stagedJobId: "j2",
+              dedupId: "orphan-keep",
+              dedupTtlMs: 60000,
+              jobDataJson: discardedValue,
+              shouldExtend: false,
+              shouldReplace: false,
+            }),
+          );
+
+          // The existing payload stays; the new value never lands → ITS blob reclaims.
+          expect(isNew).toBe(false);
+          expect(orphanedValue).toBe(discardedValue);
+        });
+
+        it("reports per-job orphans index-aligned in a batch", async () => {
+          // Pre-stage j0 so the first batch entry squash-replaces it in place.
+          await scripts.stage(
+            makeJob({
+              stagedJobId: "j0",
+              groupId: "group-a",
+              dedupId: "batch-orphan",
+              dedupTtlMs: 60000,
+              jobDataJson: JSON.stringify({ v: 1 }),
+              shouldReplace: true,
+            }),
+          );
+
+          const { newStagedCount, orphanedValues } = await scripts.stageBatch([
+            makeJob({
+              stagedJobId: "j1",
+              groupId: "group-a",
+              dedupId: "batch-orphan",
+              dedupTtlMs: 60000,
+              jobDataJson: JSON.stringify({ v: 2 }),
+              shouldReplace: true,
+            }),
+            makeJob({
+              stagedJobId: "j2",
+              groupId: "group-b",
+              dedupId: "batch-fresh",
+              dedupTtlMs: 60000,
+              jobDataJson: JSON.stringify({ fresh: true }),
+            }),
+          ]);
+
+          // Entry 0 squashed j0 (orphan = old v1); entry 1 is fresh (no orphan).
+          expect(newStagedCount).toBe(1);
+          expect(orphanedValues).toEqual([JSON.stringify({ v: 1 }), ""]);
+        });
+      });
+    });
+
     describe("edge cases", () => {
       it("creates genuinely new job after dedup TTL expires", async () => {
         await scripts.stage(
@@ -527,7 +642,7 @@ describe("GroupStagingScripts", () => {
 
         await new Promise((r) => setTimeout(r, 10));
 
-        const result = await scripts.stage(
+        const { isNew: result } = await scripts.stage(
           makeJob({
             stagedJobId: "j2",
             dedupId: "exp-1",
@@ -544,7 +659,7 @@ describe("GroupStagingScripts", () => {
       });
 
       it("does not interfere across different dedup IDs in different groups", async () => {
-        const r1 = await scripts.stage(
+        const { isNew: r1 } = await scripts.stage(
           makeJob({
             stagedJobId: "j1",
             groupId: "group-a",
@@ -552,7 +667,7 @@ describe("GroupStagingScripts", () => {
             dedupTtlMs: 60000,
           }),
         );
-        const r2 = await scripts.stage(
+        const { isNew: r2 } = await scripts.stage(
           makeJob({
             stagedJobId: "j2",
             groupId: "group-b",
@@ -708,7 +823,7 @@ describe("GroupStagingScripts", () => {
         );
 
         // Batch includes a dedup replacement and a new job
-        const count = await scripts.stageBatch([
+        const { newStagedCount: count } = await scripts.stageBatch([
           makeJob({
             stagedJobId: "j1",
             groupId: "group-x",
@@ -738,7 +853,7 @@ describe("GroupStagingScripts", () => {
         await scripts.dispatch({ nowMs: Date.now(), activeTtlSec: 300 });
 
         // Batch: j1 has same dedup (race — j0 already dispatched), j2 is no dedup
-        const count = await scripts.stageBatch([
+        const { newStagedCount: count } = await scripts.stageBatch([
           makeJob({
             stagedJobId: "j1",
             groupId: "group-x",
@@ -792,7 +907,7 @@ describe("GroupStagingScripts", () => {
         await scripts.dispatch({ nowMs: Date.now(), activeTtlSec: 300 });
 
         // Batch: j2 squashes onto j0 (mix-a), j3 is new (mix-b race)
-        const count = await scripts.stageBatch([
+        const { newStagedCount: count } = await scripts.stageBatch([
           makeJob({
             stagedJobId: "j2",
             groupId: "group-a",
