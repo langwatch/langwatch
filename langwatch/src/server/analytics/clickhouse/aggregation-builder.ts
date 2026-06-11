@@ -2517,6 +2517,8 @@ export function buildTopDocumentsQuery(
       WHERE ${ts}.TenantId = {tenantId:String}
         AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
         AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
+        AND ${ss}.StartTime >= {startDate:DateTime64(3)} - INTERVAL 2 DAY
+        AND ${ss}.StartTime < {endDate:DateTime64(3)} + INTERVAL 2 DAY
         AND ${ss}.SpanAttributes['langwatch.rag.contexts'] != ''
         ${filterWhere}
     )
@@ -2540,6 +2542,8 @@ export function buildTopDocumentsQuery(
     WHERE ${ts}.TenantId = {tenantId:String}
       AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
       AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
+      AND ${ss}.StartTime >= {startDate:DateTime64(3)} - INTERVAL 2 DAY
+      AND ${ss}.StartTime < {endDate:DateTime64(3)} + INTERVAL 2 DAY
       AND ${ss}.SpanAttributes['langwatch.rag.contexts'] != ''
       ${filterWhere}
   `;
@@ -2613,6 +2617,8 @@ export function buildFeedbacksQuery(
     WHERE ${ts}.TenantId = {tenantId:String}
       AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
       AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
+      AND ${ss}.StartTime >= {startDate:DateTime64(3)} - INTERVAL 2 DAY
+      AND ${ss}.StartTime < {endDate:DateTime64(3)} + INTERVAL 2 DAY
       AND event_name = 'thumbs_up_down'
       AND mapContains(event_attrs, 'event.metrics.vote')
       ${filterWhere}
