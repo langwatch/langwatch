@@ -1,12 +1,8 @@
 import type { Node } from "@xyflow/react";
 import isDeepEqual from "fast-deep-equal";
 import debounce from "lodash-es/debounce";
-import React from "react";
 import { temporal } from "zundo";
 import { create } from "zustand";
-import { useShallow } from "zustand/react/shallow";
-import { useEvaluationWizardStore } from "../../components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
-import { WizardContext } from "../../components/evaluations/wizard/hooks/useWizardContext";
 // Re-export everything from workflowStoreCore so existing imports keep working
 export {
   type SocketStatus,
@@ -77,19 +73,8 @@ type UseWorkflowStoreType = typeof _useWorkflowStore;
 export const useWorkflowStore = ((
   ...args: Parameters<UseWorkflowStoreType>
 ) => {
-  const { isInsideWizard } = React.useContext(WizardContext);
-
   const selector = args[0] ?? ((state) => state);
   const equalityFn = args[1];
-
-  if (isInsideWizard) {
-    return useEvaluationWizardStore(
-      useShallow(({ workflowStore }) => {
-        return selector(workflowStore);
-      }),
-      equalityFn,
-    );
-  }
 
   return _useWorkflowStore(selector, equalityFn);
 }) as UseWorkflowStoreType;

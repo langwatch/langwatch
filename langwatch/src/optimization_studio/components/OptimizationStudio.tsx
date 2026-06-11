@@ -34,7 +34,6 @@ import {
 import { useShallow } from "zustand/react/shallow";
 import { CurrentDrawer } from "../../components/CurrentDrawer";
 import { GlobalUpgradeModal } from "../../components/UpgradeModal";
-import { WizardProvider } from "../../components/evaluations/wizard/hooks/useWizardContext";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import { useColorMode, useColorModeValue, useColorRawValue } from "../../components/ui/color-mode";
 import { Link } from "../../components/ui/link";
@@ -199,8 +198,7 @@ export default function OptimizationStudio() {
       </Head>
       <ReactFlowProvider>
         <DndProvider backend={HTML5Backend}>
-          <WizardProvider isInsideWizard={false}>
-            <PostEventProvider>
+          <PostEventProvider>
               <CustomDragLayer />
               <VStack width="full" height="full" gap={0}>
                 <HStack
@@ -390,7 +388,6 @@ export default function OptimizationStudio() {
                 </Box>
               </VStack>
             </PostEventProvider>
-          </WizardProvider>
         </DndProvider>
       </ReactFlowProvider>
 

@@ -33,7 +33,6 @@ import {
 import { PulseLoader } from "react-spinners";
 import { useDebounceValue } from "usehooks-ts";
 import { useShallow } from "zustand/react/shallow";
-import { useWizardContext } from "../../../components/evaluations/wizard/hooks/useWizardContext";
 import { LLMModelDisplay } from "../../../components/llmPromptConfigs/LLMModelDisplay";
 import { useColorModeValue } from "../../../components/ui/color-mode";
 import { Menu } from "../../../components/ui/menu";
@@ -261,8 +260,6 @@ export const ComponentNode = forwardRef(function ComponentNode(
   const llmParams =
     props.data.parameters?.filter((p) => p.type === "llm") ?? [];
 
-  const { isInsideWizard } = useWizardContext();
-
   const nodeShadow = useColorModeValue(
     `0px 0px 4px 0px rgba(0, 0, 0, ${isHovered ? "0.2" : "0.1"})`,
     `0px 0px 4px 0px rgba(0, 0, 0, ${isHovered ? "0.5" : "0.3"})`,
@@ -301,8 +298,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
       }}
     >
       {props.selected &&
-        !["entry", "end"].includes(props.type) &&
-        !isInsideWizard && (
+        !["entry", "end"].includes(props.type) && (
           <Menu.Root positioning={{ placement: "top-start" }}>
             <Menu.Trigger asChild>
               <Button
@@ -362,7 +358,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
             <Circle size="8px" bg="orange.solid" flexShrink={0} data-testid="unsaved-changes-indicator" />
           </Tooltip>
         )}
-        {node && isExecutableComponent(node) && !isInsideWizard ? (
+        {node && isExecutableComponent(node) ? (
           <ComponentExecutionButton
             node={node}
             marginRight="-6px"

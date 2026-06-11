@@ -2,7 +2,6 @@ import { VStack } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
 
 import { PromptConfigProvider } from "~/prompts/providers/PromptConfigProvider";
-import { useWizardContext } from "../../../../../components/evaluations/wizard/hooks/useWizardContext";
 import type {
   LlmPromptConfigComponent,
   Signature,
@@ -19,8 +18,6 @@ export function SignaturePropertiesPanel({
 }: {
   node: Node<Signature | LlmPromptConfigComponent>;
 }) {
-  const { isInsideWizard } = useWizardContext();
-
   // Render the main panel
   return (
     <BasePropertiesPanel
@@ -29,12 +26,6 @@ export function SignaturePropertiesPanel({
       hideInputs
       hideOutputs
       hideDescription
-      {...(isInsideWizard && {
-        hideHeader: true,
-        width: "full",
-        maxWidth: "full",
-        paddingX: "0",
-      })}
     >
       <PromptConfigProvider>
         <VStack width="full" gap={4}>

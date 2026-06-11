@@ -12,9 +12,6 @@ vi.mock("usehooks-ts", () => ({ useDebounceValue: (v: unknown) => [v] }));
 vi.mock("zustand/react/shallow", () => ({
   useShallow: (fn: unknown) => fn,
 }));
-vi.mock("../../../../components/evaluations/wizard/hooks/useWizardContext", () => ({
-  useWizardContext: () => ({ isInsideWizard: false }),
-}));
 vi.mock("../../../../components/llmPromptConfigs/LLMModelDisplay", () => ({
   LLMModelDisplay: () => null,
 }));

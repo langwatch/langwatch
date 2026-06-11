@@ -23,7 +23,6 @@ import {
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
 } from "~/prompts/utils/llmPromptConfigUtils";
 import { api } from "~/utils/api";
-import { useWizardContext } from "../../../../../components/evaluations/wizard/hooks/useWizardContext";
 import { useWorkflowStore } from "../../../../hooks/useWorkflowStore";
 import type { LlmPromptConfigComponent } from "../../../../types/dsl";
 import { PromptSourceHeader } from "../promptSourceSelect/PromptSourceHeader";
@@ -66,8 +65,6 @@ export function SignaturePropertiesPanelForm({
       setEdges: state.setEdges,
     })),
   );
-
-  const { isInsideWizard } = useWizardContext();
 
   // Initialize form with values from node data
   const initialConfigValues = useMemo(
@@ -402,7 +399,7 @@ export function SignaturePropertiesPanelForm({
             mappings={variableMappings}
             onMappingChange={onMappingChange}
           />
-          {!isInsideWizard && <DemonstrationsField />}
+          <DemonstrationsField />
         </VStack>
       </form>
     </FormProvider>
