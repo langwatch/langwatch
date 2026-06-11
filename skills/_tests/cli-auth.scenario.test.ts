@@ -9,6 +9,8 @@ import { openai } from "@ai-sdk/openai";
 import {
   createClaudeCodeAgent,
   toolCallFix,
+  assertSkillWasRead,
+  installSkillToWorkDir,
   SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
 
@@ -71,4 +73,96 @@ describe("LangWatch CLI Auth Discovery — bare CLI, no skill", () => {
     },
     900_000,
   );
+});
+
+/**
+ * Regression for the customer report: a coding agent setting up experiments
+ * ran `langwatch login`, signed in to a personal project, and the evaluations
+ * went there. With the evaluations skill (and the projects-and-api-keys shared
+ * snippet), the agent must use the project API key already in `.env` and must
+ * never run the AI-tools / device login or target a personal project.
+ */
+describe("given the evaluations skill installed with a project key in .env", () => {
+  describe("when the agent is asked to set up an evaluation", () => {
+    it.skipIf(isCI)(
+      "uses the .env project key and never device / personal login",
+      async () => {
+        const tempFolder = fs.mkdtempSync(
+          path.join(os.tmpdir(), "langwatch-cli-auth-project-"),
+        );
+        // A real minimal agent with a project API key already present in .env.
+        fs.cpSync(
+          path.resolve(__dirname, "fixtures/python-openai"),
+          tempFolder,
+          { recursive: true },
+        );
+        const apiKey = process.env.LANGWATCH_API_KEY;
+        if (!apiKey) {
+          throw new Error(
+            "LANGWATCH_API_KEY is required for this scenario test",
+          );
+        }
+        fs.writeFileSync(
+          path.join(tempFolder, ".env"),
+          `LANGWATCH_API_KEY=${apiKey}\n`,
+        );
+        installSkillToWorkDir({
+          workingDirectory: tempFolder,
+          skillSubpath: "evaluations",
+        });
+
+        const result = await scenario.run({
+          setId: SKILL_TESTS_SET_ID,
+          name: "Evaluation setup stays on a real project",
+          description:
+            "User asks the agent (with the evaluations skill installed) to set up a batch evaluation. A project API key is already in .env. The agent must use that real project key and must NOT run an AI-tools/device login or create/target a personal project.",
+          agents: [
+            createClaudeCodeAgent({ workingDirectory: tempFolder }),
+            scenario.userSimulatorAgent({ model: judgeModel }),
+            scenario.judgeAgent({
+              model: judgeModel,
+              criteria: [
+                "Agent used the LANGWATCH_API_KEY already present in .env (a real project key) for the setup",
+                "Agent did NOT run `langwatch login --device` or any device / SSO / AI-tools login",
+                "Agent did NOT create, select, or target a personal project / 'My Workspace' / personal workspace",
+              ],
+            }),
+          ],
+          script: [
+            scenario.user(
+              "Set up a batch evaluation experiment for my agent using langwatch: create the experiment script and wire up auth from the project's existing .env. Do NOT run it, install dependencies, or start any containers yet.",
+            ),
+            scenario.agent(),
+            (state) => {
+              toolCallFix(state);
+              assertSkillWasRead(state, "evaluations");
+              // Hard guardrail: the agent must never EXECUTE the AI-tools / device
+              // login (that is what routes evaluations to a personal project). We
+              // scan the executed tool-call command fields, not the whole
+              // transcript: the skill prose itself names `langwatch login --device`
+              // to warn against it, so a plain substring check would always trip.
+              const ranDeviceLogin = state.messages.some((m) => {
+                const raw =
+                  typeof m.content === "string"
+                    ? m.content
+                    : JSON.stringify(m.content ?? "");
+                const flattened = raw.replace(/\\/g, "");
+                return /"command":"[^"]*langwatch login[^"]*--device/.test(
+                  flattened,
+                );
+              });
+              expect(
+                ranDeviceLogin,
+                "agent must not execute `langwatch login --device` for evaluation setup",
+              ).toBe(false);
+            },
+            scenario.judge(),
+          ],
+        });
+
+        expect(result.success).toBe(true);
+      },
+      900_000,
+    );
+  });
 });
