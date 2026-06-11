@@ -3,6 +3,7 @@ import type { UIMessage } from "ai";
 import { ArrowRight, Check } from "lucide-react";
 import React from "react";
 import { Markdown } from "~/components/Markdown";
+import { LangyGitHubConnectCard } from "./github/LangyGitHubConnectCard";
 import {
   AI_SHADOW,
   GradientSparkle,
@@ -30,15 +31,25 @@ export type ProposalHandlers = Record<
   (payload: Record<string, unknown>) => Promise<AppliedOutcome>
 >;
 
+// Sentinel the assistant emits when it wants the sidebar to render the
+// in-chat "Connect GitHub" card. Cheaper than inventing a structured message
+// type for v0; stripped from the displayed text before rendering. The
+// services/langy-agent/skills/github.md skill teaches the assistant to emit
+// this when a PR request comes in for an unconnected user.
+const CONNECT_GITHUB_SENTINEL = "[langy:connect-github]";
+
 export function MessageContent({
   message,
+  organizationId,
   appliedOutcomes,
   discardedProposals,
   applyingProposals,
   onApply,
   onDiscard,
+  onConnectedGithub,
 }: {
   message: UIMessage;
+  organizationId?: string | null;
   appliedOutcomes: Record<
     string,
     { href?: string; label?: string; onOpen?: () => void }
@@ -47,17 +58,24 @@ export function MessageContent({
   applyingProposals: Set<string>;
   onApply: (proposalId: string, proposal: LangyProposal) => Promise<void>;
   onDiscard: (proposalId: string) => void;
+  onConnectedGithub?: (login: string) => void;
 }) {
   const isUser = message.role === "user";
-  const text = message.parts
+  const rawText = message.parts
     .filter(
       (part): part is { type: "text"; text: string } => part.type === "text",
     )
     .map((part) => part.text)
     .join("");
 
+  const showConnectCard =
+    !isUser && rawText.includes(CONNECT_GITHUB_SENTINEL);
+  const text = showConnectCard
+    ? rawText.split(CONNECT_GITHUB_SENTINEL).join("").trim()
+    : rawText;
+
   const proposals = extractProposals(message);
-  if (!text && proposals.length === 0) return null;
+  if (!text && proposals.length === 0 && !showConnectCard) return null;
 
   if (isUser) {
     return (
@@ -105,6 +123,12 @@ export function MessageContent({
             <Markdown>{text}</Markdown>
           </Box>
         )}
+        {showConnectCard && organizationId ? (
+          <LangyGitHubConnectCard
+            organizationId={organizationId}
+            onConnected={onConnectedGithub}
+          />
+        ) : null}
         {proposals.map(({ id, proposal }) => (
           <ProposalCard
             key={id}
