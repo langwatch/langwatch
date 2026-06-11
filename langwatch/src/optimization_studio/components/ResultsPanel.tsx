@@ -46,6 +46,7 @@ import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Field, Signature, Workflow } from "../types/dsl";
 import { simpleRecordListToNodeDataset } from "../utils/datasetUtils";
 import { isExperimentQueryEnabled } from "./evaluationQueryEnabled";
+import { OpenFullResultsButton } from "./OpenFullResultsButton";
 import { OptimizationProgressBar } from "./ProgressToast";
 
 export function ResultsPanel({
@@ -317,6 +318,15 @@ export function EvaluationResults({
               stopEvaluation({
                 run_id: evaluationStateRunId ?? "",
               })
+            }
+            actions={
+              selectedRunId_ && (
+                <OpenFullResultsButton
+                  projectSlug={project.slug}
+                  experimentSlug={experiment.data.slug}
+                  runId={selectedRunId_}
+                />
+              )
             }
           />
         )}
