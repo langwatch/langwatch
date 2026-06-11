@@ -622,11 +622,8 @@ export class EEWebhookService implements WebhookService {
       hasSubscription: !!remainingActive,
     });
 
-    // Retention-policy removal on cancellation is deactivated until
-    // the paid-retention feature is released. Re-enable by restoring this call.
-    // if (!remainingActive) {
-    //   await this.removeSeatRetentionPolicy(existingSubscription.organizationId);
-    // }
+    // Cancellation deliberately leaves the org's retention policies in place
+    // until the paid-retention feature is released.
   }
 
   async handleSubscriptionUpdated({
@@ -666,11 +663,8 @@ export class EEWebhookService implements WebhookService {
         hasSubscription: !!remainingActive,
       });
 
-      // Retention-policy removal on cancellation is deactivated until
-      // the paid-retention feature is released. Re-enable by restoring this call.
-      // if (!remainingActive) {
-      //   await this.removeSeatRetentionPolicy(existingSubForUpdate.organizationId);
-      // }
+      // Cancellation deliberately leaves the org's retention policies in place
+      // until the paid-retention feature is released.
     } else if (subscription.status === "active") {
       const shouldNotify =
         existingSubForUpdate.status !== SubscriptionStatus.ACTIVE;
@@ -883,30 +877,6 @@ export class EEWebhookService implements WebhookService {
         logger.error(
           { organizationId, category, err },
           "[stripeWebhook] Failed to apply seat retention policy",
-        );
-      }
-    }
-  }
-
-  /**
-   * Mirror of {@link applySeatRetentionPolicy}: once an organization has no
-   * active subscription left, drop every organization-scoped override (one per
-   * category) so retention reverts to the platform default. Callers must only
-   * invoke this after confirming no active subscription remains (a still-paying
-   * org keeps its window). Idempotent (no-op when no override exists) and
-   * best-effort, per category, for the same reason as provisioning.
-   */
-  private async removeSeatRetentionPolicy(organizationId: string): Promise<void> {
-    for (const category of RETENTION_CATEGORIES) {
-      try {
-        await getApp().dataRetention.policy.removeForScope({
-          scope: { scopeType: "ORGANIZATION", scopeId: organizationId },
-          category,
-        });
-      } catch (err) {
-        logger.error(
-          { organizationId, category, err },
-          "[stripeWebhook] Failed to remove seat retention policy",
         );
       }
     }

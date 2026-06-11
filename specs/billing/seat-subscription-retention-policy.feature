@@ -1,9 +1,9 @@
 Feature: Seat subscription provisions an organization retention policy
 
-  When an organization starts paying for a Growth Seat subscription, the
-  platform records its data-retention entitlement as an explicit
-  organization-scoped policy, and removes that policy once the organization
-  no longer has any active subscription.
+  When an organization starts paying — via a Growth Seat subscription or by
+  activating a self-hosted license — the platform records its data-retention
+  entitlement as explicit organization-scoped policies. Cancellation leaves
+  the policies in place until the paid-retention feature is released.
 
   # Retention is default-on (ADR-021): with no override anywhere in a project's
   # scope cascade, every category resolves to the platform default window
