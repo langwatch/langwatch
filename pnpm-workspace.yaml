@@ -7,5 +7,9 @@ packages:
   # ~/.langwatch/app on first boot. Treating it as a peer workspace would
   # double-install React/Next/etc. across the dev environment.
 
+overrides:
+  # Security: shell-quote quote() newline escaping (CRITICAL)
+  shell-quote@<1.8.4: '>=1.8.4'
+
 onlyBuiltDependencies:
   - esbuild
