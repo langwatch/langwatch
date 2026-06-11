@@ -19,6 +19,13 @@ export const DEFAULT_LIMIT = Number.MAX_SAFE_INTEGER;
 export const DEFAULT_MEMBERS_LITE = 1;
 
 /**
+ * Free-tier read-path visibility window (ADR-028): trace content older than
+ * this many days is teaser-redacted for free plans. Visibility, not
+ * retention — deletion stays at the org's retention policy.
+ */
+export const FREE_VISIBILITY_DAYS = 14;
+
+/**
  * LICENSE_ERRORS: Standardized error messages for license validation.
  * Used across validation.ts and types.ts to ensure consistency.
  */
@@ -138,6 +145,8 @@ export const FREE_PLAN: PlanInfo = {
   type: "FREE",
   name: "Free",
   free: true,
+  // ADR-028: self-hosted unlicensed gets the Free visibility experience.
+  visibilityDays: FREE_VISIBILITY_DAYS,
   overrideAddingLimitations: false,
 
   maxMessagesPerMonth: FREE_TIER_LIMITS.MESSAGES_PER_MONTH,
