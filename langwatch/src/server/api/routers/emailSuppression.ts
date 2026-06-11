@@ -3,10 +3,42 @@ import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
 import {
   confirmUnsubscribe,
+  InvalidUnsubscribeTokenError,
   resolveUnsubscribe,
 } from "~/server/mailer/unsubscribe.read";
+import { getClientIp } from "~/utils/getClientIp";
+import { rateLimit } from "../../rateLimit";
 import { checkProjectPermission, skipPermissionCheck } from "../rbac";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
+
+/**
+ * ADR-031: the unsubscribe procedures are public (the token is the only
+ * authorization), so they are an unauthenticated surface an attacker can
+ * hammer to brute-force tokens or exhaust the mail/DB path. Keyed by client
+ * IP — falls back to a shared bucket when the IP is unknown so a missing
+ * header still throttles rather than bypasses.
+ */
+async function enforceUnsubscribeRateLimit({
+  ip,
+  action,
+  max,
+}: {
+  ip: string | undefined;
+  action: string;
+  max: number;
+}): Promise<void> {
+  const limit = await rateLimit({
+    key: `unsubscribe:${action}:${ip ?? "unknown"}`,
+    windowSeconds: 60,
+    max,
+  });
+  if (!limit.allowed) {
+    throw new TRPCError({
+      code: "TOO_MANY_REQUESTS",
+      message: "Too many requests. Please try again shortly.",
+    });
+  }
+}
 
 export const emailSuppressionRouter = createTRPCRouter({
   /**
@@ -19,6 +51,11 @@ export const emailSuppressionRouter = createTRPCRouter({
     .input(z.object({ token: z.string().min(1) }))
     .use(skipPermissionCheck)
     .query(async ({ input, ctx }) => {
+      await enforceUnsubscribeRateLimit({
+        ip: getClientIp(ctx.req),
+        action: "resolve",
+        max: 30,
+      });
       const view = await resolveUnsubscribe({
         token: input.token,
         deps: {
@@ -61,7 +98,12 @@ export const emailSuppressionRouter = createTRPCRouter({
       }),
     )
     .use(skipPermissionCheck)
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      await enforceUnsubscribeRateLimit({
+        ip: getClientIp(ctx.req),
+        action: "confirm",
+        max: 10,
+      });
       try {
         await confirmUnsubscribe({
           token: input.token,
@@ -76,10 +118,19 @@ export const emailSuppressionRouter = createTRPCRouter({
               }),
           },
         });
-      } catch {
+      } catch (err) {
+        // A bad/tampered token is the recipient's problem (4xx); a downstream
+        // persistence failure is ours (5xx) and must not masquerade as an
+        // "invalid link".
+        if (err instanceof InvalidUnsubscribeTokenError) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "This unsubscribe link is invalid.",
+          });
+        }
         throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "This unsubscribe link is invalid.",
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Could not process unsubscribe. Please try again.",
         });
       }
       return { ok: true };

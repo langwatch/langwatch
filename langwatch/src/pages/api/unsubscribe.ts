@@ -1,6 +1,11 @@
 import { getApp } from "~/server/app-layer/app";
-import { confirmUnsubscribe } from "~/server/mailer/unsubscribe.read";
+import {
+  confirmUnsubscribe,
+  InvalidUnsubscribeTokenError,
+} from "~/server/mailer/unsubscribe.read";
+import { rateLimit } from "~/server/rateLimit";
 import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
+import { getClientIp } from "~/utils/getClientIp";
 import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:unsubscribe:one-click");
@@ -23,6 +28,16 @@ export default async function handler(
     return res.status(405).json({ error: "Method not allowed" });
   }
 
+  const ip = getClientIp(req);
+  const limit = await rateLimit({
+    key: `unsubscribe:one-click:${ip ?? "unknown"}`,
+    windowSeconds: 60,
+    max: 10,
+  });
+  if (!limit.allowed) {
+    return res.status(429).json({ error: "Too many requests" });
+  }
+
   const token = typeof req.query.token === "string" ? req.query.token : null;
   if (!token) {
     return res.status(400).json({ error: "Missing token" });
@@ -42,8 +57,15 @@ export default async function handler(
           }),
       },
     });
-  } catch {
-    return res.status(400).json({ error: "Invalid token" });
+  } catch (err) {
+    // Distinguish a bad/tampered token (4xx) from a downstream persistence
+    // failure (5xx) — a DB blip must not be reported to the mail client as an
+    // invalid link.
+    if (err instanceof InvalidUnsubscribeTokenError) {
+      return res.status(400).json({ error: "Invalid token" });
+    }
+    logger.error({ error: err }, "One-click unsubscribe failed");
+    return res.status(500).json({ error: "Internal server error" });
   }
 
   logger.info("One-click unsubscribe processed");

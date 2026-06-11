@@ -379,12 +379,30 @@ async function handleCadenceBatch(
   try {
     switch (trigger.action) {
       case TriggerAction.SEND_EMAIL: {
-        // ADR-031: per-trigger hourly hard cap. Gate BEFORE either the
-        // custom-template or legacy send path. Over the cap the dispatch is
-        // a terminal drop: log loudly, fall through to claimSend below (so a
-        // replay no-ops instead of re-sending), and return WITHOUT sending
-        // and WITHOUT throwing — throwing would let the outbox retry the
-        // spam. The cap counts dispatches, not traces or recipients.
+        // ADR-031: drop unsubscribed recipients FIRST. An all-suppressed
+        // dispatch has nothing to send — record the claim (so a replay
+        // no-ops), log at info, and skip without throwing AND without burning
+        // a cap slot (the cap is for emails actually sent, not for dispatches
+        // that resolve to zero recipients).
+        const recipients = await deps.filterSuppressedEmails({
+          projectId,
+          triggerId,
+          emails: params.members ?? [],
+        });
+        if (recipients.length === 0) {
+          logger.info(
+            { projectId, triggerId },
+            "All trigger email recipients are suppressed — skipping send",
+          );
+          break;
+        }
+        // ADR-031: per-trigger hourly hard cap. Only consumed once we know
+        // there is a real send to make. Gate BEFORE either the custom-template
+        // or legacy send path. Over the cap the dispatch is a terminal drop:
+        // log loudly, fall through to claimSend below (so a replay no-ops
+        // instead of re-sending), and return WITHOUT sending and WITHOUT
+        // throwing — throwing would let the outbox retry the spam. The cap
+        // counts dispatches, not traces or recipients.
         const capSlot = await deps.consumeEmailCapSlot({
           projectId,
           triggerId,
@@ -400,21 +418,6 @@ async function handleCadenceBatch(
             },
             "Trigger exceeded its hourly email cap — dropping this dispatch. " +
               "Switch this trigger to a digest cadence to coalesce its volume.",
-          );
-          break;
-        }
-        // ADR-031: drop unsubscribed recipients before the provider call. If
-        // every recipient is suppressed there is nothing to send — record the
-        // claim (so a replay no-ops), log at info, and skip without throwing.
-        const recipients = await deps.filterSuppressedEmails({
-          projectId,
-          triggerId,
-          emails: params.members ?? [],
-        });
-        if (recipients.length === 0) {
-          logger.info(
-            { projectId, triggerId },
-            "All trigger email recipients are suppressed — skipping send",
           );
           break;
         }

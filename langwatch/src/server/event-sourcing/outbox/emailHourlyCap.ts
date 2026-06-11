@@ -1,4 +1,7 @@
 import { connection } from "~/server/redis";
+import { createLogger } from "~/utils/logger/server";
+
+const logger = createLogger("langwatch:outbox:emailHourlyCap");
 
 /**
  * ADR-031: per-trigger hourly hard cap on dispatched trigger emails.
@@ -55,11 +58,22 @@ export async function consumeEmailCapSlot({
   const key = `trigger-email-cap:${projectId}:${triggerId}:${hourBucket}`;
 
   if (connection) {
-    const count = await connection.incr(key);
-    if (count === 1) {
-      await connection.expire(key, EXPIRE_SECONDS);
+    try {
+      const count = await connection.incr(key);
+      if (count === 1) {
+        await connection.expire(key, EXPIRE_SECONDS);
+      }
+      return { allowed: count <= cap, count };
+    } catch (error) {
+      // A Redis blip must not let the cap silently fail open. The dispatcher
+      // catches throws as retryable and would retry the spam; instead, fall
+      // back to the in-memory counter (same path as connection-undefined) so
+      // the cap keeps working approximately while Redis recovers.
+      logger.warn(
+        { key, error: error instanceof Error ? error.message : String(error) },
+        "Redis error consuming email cap slot — falling back to in-memory counter",
+      );
     }
-    return { allowed: count <= cap, count };
   }
 
   const nowMs = now.getTime();

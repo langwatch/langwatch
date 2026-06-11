@@ -368,7 +368,7 @@ describe("createOutboxDispatcher cadence stage", () => {
     });
 
     describe("when every recipient is suppressed", () => {
-      it("skips the send entirely and records the claim without throwing", async () => {
+      it("skips the send entirely and records the claim without throwing or burning a cap slot", async () => {
         const deps = makeDeps();
         deps.filterSuppressedEmails.mockResolvedValueOnce([]);
         const dispatcher = createOutboxDispatcher(deps);
@@ -379,7 +379,39 @@ describe("createOutboxDispatcher cadence stage", () => {
 
         expect(sendTriggerEmail).not.toHaveBeenCalled();
         expect(sendRenderedTriggerEmail).not.toHaveBeenCalled();
+        // Suppression runs before the cap — an all-suppressed dispatch must
+        // not consume a slot.
+        expect(deps.consumeEmailCapSlot).not.toHaveBeenCalled();
         expect(deps.triggers.claimSend).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when a custom-template trigger has some recipients suppressed", () => {
+      it("renders and sends to only the filtered recipients", async () => {
+        const trigger = makeTrigger({
+          action: TriggerAction.SEND_EMAIL,
+          name: "Latency alert",
+          actionParams: {
+            members: ["keep@example.com", "gone@example.com"],
+          },
+          templates: {
+            slackTemplateType: null,
+            slackTemplate: null,
+            emailSubjectTemplate: null,
+            emailBodyTemplate: "Hi {{ trigger.name }}",
+          },
+        });
+        const deps = makeDeps(trigger);
+        deps.filterSuppressedEmails.mockResolvedValueOnce(["keep@example.com"]);
+        const dispatcher = createOutboxDispatcher(deps);
+
+        await dispatcher.process(makeCadencePayload());
+
+        expect(sendTriggerEmail).not.toHaveBeenCalled();
+        expect(sendRenderedTriggerEmail).toHaveBeenCalledTimes(1);
+        expect(sendRenderedTriggerEmail).toHaveBeenCalledWith(
+          expect.objectContaining({ triggerEmails: ["keep@example.com"] }),
+        );
       });
     });
   });

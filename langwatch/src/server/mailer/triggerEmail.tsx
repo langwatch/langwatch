@@ -5,15 +5,19 @@ import { Heading } from "@react-email/heading";
 import { Html } from "@react-email/html";
 import { Img } from "@react-email/img";
 import { render } from "@react-email/render";
+import { EMAIL_RX } from "~/automations/providers/definitions/email/shared";
 import type { TriggerData } from "~/pages/api/cron/triggers/types";
 import { toDispatchError } from "~/server/event-sourcing/outbox/dispatchError";
 import { env } from "../../env.mjs";
+import { createLogger } from "../../utils/logger/server";
 import { computeDefaultFrom, sendEmail } from "./emailSender";
 import {
   buildTriggerNoReplyAddress,
   TEST_FIRE_TRIGGER_ID_SENTINEL,
 } from "./triggerNoReply";
 import { signUnsubscribeToken } from "./unsubscribeToken";
+
+const logger = createLogger("langwatch:mailer:triggerEmail");
 
 /**
  * ADR-031: every trigger email carries an unsubscribe footer appended OUTSIDE
@@ -163,7 +167,7 @@ async function sendPerRecipient({
   subject: string;
   html: string;
 }): Promise<void> {
-  const baseHost = env.BASE_HOST ?? "";
+  const baseHost = env.BASE_HOST;
   const noReplyTo = buildTriggerNoReplyAddress({
     defaultFrom: computeDefaultFrom(),
     triggerId,
@@ -171,6 +175,16 @@ async function sendPerRecipient({
   const isSentinel = triggerId === TEST_FIRE_TRIGGER_ID_SENTINEL;
 
   for (const recipient of recipients) {
+    // Defense in depth: actionParams is free-form JSON, so a recipient may not
+    // have been validated against the email schema. Skip malformed addresses
+    // before they reach the provider's `bcc` slot (also blocks CRLF smuggling).
+    if (!EMAIL_RX.test(recipient)) {
+      logger.warn(
+        { triggerId, projectId },
+        "Skipping malformed trigger email recipient",
+      );
+      continue;
+    }
     if (isSentinel) {
       await sendEmail({ to: noReplyTo, bcc: [recipient], subject, html });
       continue;

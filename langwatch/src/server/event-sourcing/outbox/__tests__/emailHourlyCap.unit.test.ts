@@ -1,8 +1,24 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   _resetMemoryEmailCapStore,
   consumeEmailCapSlot,
 } from "../emailHourlyCap";
+
+// `connection` is a mutable module-level binding; the mock lets each test
+// drive it (undefined = in-memory path, an object = Redis path).
+const redisMock = vi.hoisted(() => ({
+  connection: undefined as unknown,
+}));
+vi.mock("~/server/redis", () => redisMock);
+
+vi.mock("~/utils/logger/server", () => ({
+  createLogger: () => ({
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  }),
+}));
 
 // Redis `connection` is undefined under vitest (BUILD_TIME set in
 // vitest.config.ts), so these exercise the in-memory fallback path.
@@ -13,6 +29,32 @@ const TRIGGER_ID = "trig-1";
 describe("consumeEmailCapSlot in-memory fallback", () => {
   beforeEach(() => {
     _resetMemoryEmailCapStore();
+  });
+
+  describe("given Redis is connected but errors mid-call", () => {
+    afterEach(() => {
+      redisMock.connection = undefined;
+    });
+
+    describe("when incr throws", () => {
+      it("falls back to the in-memory counter and still returns a sane slot", async () => {
+        redisMock.connection = {
+          incr: vi.fn().mockRejectedValue(new Error("READONLY blip")),
+          expire: vi.fn(),
+        };
+
+        const now = new Date("2026-06-11T10:15:00Z");
+        const result = await consumeEmailCapSlot({
+          projectId: PROJECT_ID,
+          triggerId: TRIGGER_ID,
+          now,
+          cap: 3,
+        });
+
+        // Redis path threw → memory fallback started a fresh count.
+        expect(result).toEqual({ allowed: true, count: 1 });
+      });
+    });
   });
 
   describe("given a fresh hour bucket", () => {
@@ -87,6 +129,28 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
         });
 
         expect(rolledOver).toEqual({ allowed: true, count: 1 });
+      });
+    });
+  });
+
+  describe("given a dispatch lands exactly at the cap", () => {
+    describe("when count equals cap", () => {
+      it("reports the slot as allowed (<= boundary)", async () => {
+        const now = new Date("2026-06-11T10:15:00Z");
+        await consumeEmailCapSlot({
+          projectId: PROJECT_ID,
+          triggerId: TRIGGER_ID,
+          now,
+          cap: 2,
+        });
+        const atCap = await consumeEmailCapSlot({
+          projectId: PROJECT_ID,
+          triggerId: TRIGGER_ID,
+          now,
+          cap: 2,
+        });
+
+        expect(atCap).toEqual({ allowed: true, count: 2 });
       });
     });
   });

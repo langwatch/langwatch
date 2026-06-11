@@ -219,6 +219,19 @@ const sendWithSendGrid = async (content: EmailContent, defaultFrom: string) => {
 
   const bccAddresses = toArray(content.bcc);
 
+  // Same CRLF/header-injection hardening as the SES raw-MIME path: strip
+  // line breaks from custom header names and values before they reach the
+  // provider.
+  const sanitizedHeaders =
+    content.headers && Object.keys(content.headers).length > 0
+      ? Object.fromEntries(
+          Object.entries(content.headers).map(([name, value]) => [
+            sanitizeHeaderValue(name),
+            sanitizeHeaderValue(value),
+          ]),
+        )
+      : undefined;
+
   const msg = {
     to: content.to,
     from: content.from ?? defaultFrom,
@@ -226,10 +239,9 @@ const sendWithSendGrid = async (content: EmailContent, defaultFrom: string) => {
     html: content.html,
     ...(bccAddresses.length > 0 && { bcc: bccAddresses }),
     ...(content.replyTo && { replyTo: content.replyTo }),
-    ...(content.headers &&
-      Object.keys(content.headers).length > 0 && {
-        headers: content.headers,
-      }),
+    ...(sanitizedHeaders && {
+      headers: sanitizedHeaders,
+    }),
     ...(content.attachments &&
       content.attachments.length > 0 && {
         attachments: content.attachments.map((att) => ({

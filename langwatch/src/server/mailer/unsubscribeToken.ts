@@ -1,8 +1,5 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { env } from "../../env.mjs";
-import { createLogger } from "../../utils/logger/server";
-
-const logger = createLogger("langwatch:mailer:unsubscribeToken");
 
 /**
  * Signed, forge-proof unsubscribe tokens (ADR-031). Each trigger email carries
@@ -28,8 +25,11 @@ export interface UnsubscribePayload {
 function secret(): string {
   const value = env.NEXTAUTH_SECRET ?? "";
   if (!value) {
-    logger.warn(
-      "NEXTAUTH_SECRET is not set; unsubscribe tokens are forgeable. Set NEXTAUTH_SECRET to secure unsubscribe links.",
+    // An empty secret makes tokens forgeable — anyone could mint a valid
+    // unsubscribe link for any address. Fail closed rather than sign/verify
+    // with an empty key.
+    throw new Error(
+      "NEXTAUTH_SECRET is not set; refusing to sign/verify unsubscribe tokens with an empty key.",
     );
   }
   return value;

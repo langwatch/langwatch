@@ -1,10 +1,30 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { env } from "../../../env.mjs";
 import {
   signUnsubscribeToken,
   verifyUnsubscribeToken,
 } from "../unsubscribeToken";
 
 describe("unsubscribeToken", () => {
+  describe("given NEXTAUTH_SECRET is empty", () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    describe("when signing or verifying", () => {
+      it("throws rather than minting forgeable tokens", () => {
+        vi.spyOn(env, "NEXTAUTH_SECRET", "get").mockReturnValue("");
+        expect(() =>
+          signUnsubscribeToken({
+            projectId: "p",
+            triggerId: "t",
+            email: "a@b.com",
+          }),
+        ).toThrow(/NEXTAUTH_SECRET/);
+      });
+    });
+  });
+
   describe("given a freshly signed token", () => {
     describe("when it is verified unchanged", () => {
       it("round-trips the payload", () => {

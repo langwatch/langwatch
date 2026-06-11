@@ -27,6 +27,7 @@ import {
 } from "~/server/app-layer/triggers/trigger-template.service";
 import { enforceLicenseLimit } from "../../license-enforcement";
 import { rateLimit } from "../../rateLimit";
+import { buildRetryAfterMessage } from "./rateLimitMessage";
 import {
   sanitizeTriggerFilters,
   triggerFiltersSchema,
@@ -439,15 +440,12 @@ export const automationRouter = createTRPCRouter({
         max: 10,
       });
       if (!limit.allowed) {
-        const retryInSeconds = Math.max(
-          1,
-          Math.ceil((limit.resetAt - Date.now()) / 1000),
-        );
         throw new TRPCError({
           code: "TOO_MANY_REQUESTS",
-          message: `Too many test fires. Try again in ${retryInSeconds} second${
-            retryInSeconds === 1 ? "" : "s"
-          }.`,
+          message: buildRetryAfterMessage({
+            prefix: "Too many test fires.",
+            resetAt: limit.resetAt,
+          }),
         });
       }
 

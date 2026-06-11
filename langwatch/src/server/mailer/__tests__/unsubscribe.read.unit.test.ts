@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   confirmUnsubscribe,
   maskEmail,
@@ -21,9 +21,11 @@ describe("maskEmail", () => {
 });
 
 describe("resolveUnsubscribe", () => {
-  const deps = {
-    lookupNames: vi.fn(),
-  };
+  let deps: { lookupNames: ReturnType<typeof vi.fn> };
+
+  beforeEach(() => {
+    deps = { lookupNames: vi.fn() };
+  });
 
   describe("given a valid trigger-scoped token", () => {
     it("returns masked email plus project and trigger names", async () => {
@@ -51,7 +53,6 @@ describe("resolveUnsubscribe", () => {
 
   describe("given a tampered token", () => {
     it("returns null without looking anything up", async () => {
-      deps.lookupNames.mockClear();
       const result = await resolveUnsubscribe({ token: "garbage.sig", deps });
       expect(result).toBeNull();
       expect(deps.lookupNames).not.toHaveBeenCalled();

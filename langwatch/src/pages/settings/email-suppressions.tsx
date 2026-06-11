@@ -56,6 +56,20 @@ function EmailSuppressionsPage({ projectId }: { projectId: string }) {
             <HStack justify="center" padding={8}>
               <Spinner />
             </HStack>
+          ) : suppressions.isError ? (
+            <VStack align="center" gap={3} padding={8}>
+              <Text color="fg.error">
+                Could not load suppressions. Please try again.
+              </Text>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void suppressions.refetch()}
+                loading={suppressions.isRefetching}
+              >
+                Retry
+              </Button>
+            </VStack>
           ) : !suppressions.data || suppressions.data.length === 0 ? (
             <EmptyState.Root>
               <EmptyState.Content>

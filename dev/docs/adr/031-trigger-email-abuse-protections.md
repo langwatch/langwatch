@@ -197,10 +197,10 @@ price, bounded by the hourly cap.
   can still aggregate a large hourly volume; a per-project ceiling is a
   follow-up knob if provider costs warrant it.
 - **Suppression management ships in v1.** A project-settings view lists
-  suppression rows (email, scope, when) and lets an operator with
-  `triggers:update` permission remove one — e.g. a recipient who unsubscribed
-  by accident and asked to be re-added. Removal is a deliberate operator
-  action; nothing re-suppresses automatically.
+  suppression rows (email, scope, when) to operators with `triggers:view`
+  and lets an operator with `triggers:manage` permission remove one — e.g. a
+  recipient who unsubscribed by accident and asked to be re-added. Removal is
+  a deliberate operator action; nothing re-suppresses automatically.
 - **Non-goals:** no Slack capping, no verification-email gate, no bounce
   ingestion (schema-ready via `reason`), no per-project volume ceiling.
 

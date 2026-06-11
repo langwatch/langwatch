@@ -8,6 +8,18 @@ import { verifyUnsubscribeToken } from "./unsubscribeToken";
 
 export type UnsubscribeScope = "trigger" | "project";
 
+/**
+ * ADR-031: thrown when a token is missing, malformed, or fails its HMAC check.
+ * Distinct from a downstream persistence failure so transports can map it to a
+ * 4xx ("invalid link") rather than masking a 5xx DB blip as a bad token.
+ */
+export class InvalidUnsubscribeTokenError extends Error {
+  constructor() {
+    super("Invalid or tampered unsubscribe token");
+    this.name = "InvalidUnsubscribeTokenError";
+  }
+}
+
 export interface UnsubscribeView {
   projectName: string;
   /** Null when the link is project-wide (token's triggerId is null). */
@@ -73,7 +85,7 @@ export async function confirmUnsubscribe({
 }): Promise<void> {
   const payload = verifyUnsubscribeToken(token);
   if (!payload) {
-    throw new Error("Invalid or tampered unsubscribe token");
+    throw new InvalidUnsubscribeTokenError();
   }
   await deps.suppress({
     projectId: payload.projectId,
