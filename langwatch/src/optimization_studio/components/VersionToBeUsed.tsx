@@ -1,4 +1,12 @@
-import { Field, HStack, Input, Text, VStack } from "@chakra-ui/react";
+import {
+  Field,
+  HStack,
+  IconButton,
+  Input,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 import { useFormContext } from "react-hook-form";
 import { useDebounceCallback } from "usehooks-ts";
@@ -77,10 +85,11 @@ export function NewVersionFields({
     form,
   });
 
-  // Cascade-resolved model for studio LLM defaults (used to gate
-  // auto-generated commit messages).
+  // Cascade-resolved Fast model for commit-message autogen: null when
+  // nothing is configured at any scope, so the doomed generation call
+  // (and the missing-model toast it would surface) never auto-fires.
   const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
-    { projectId: project?.id ?? "", featureKey: "studio.autocomplete" },
+    { projectId: project?.id ?? "", featureKey: "workflows.commit_message" },
     { enabled: !!project?.id },
   );
 
@@ -91,6 +100,8 @@ export function NewVersionFields({
     "chat",
   );
   const isDefaultModelDisabled = modelOption?.isDisabled ?? false;
+  const isModelConfigured =
+    resolvedDefault.data != null && !isDefaultModelDisabled;
 
   const generateCommitMessage =
     api.workflow.generateCommitMessage.useMutation();
@@ -99,8 +110,10 @@ export function NewVersionFields({
   const hasTriggeredGeneration = useRef(false);
 
   const generateCommitMessageCallback = useCallback(
-    (prevDsl: Workflow, newDsl: Workflow) => {
-      if (isDefaultModelDisabled) {
+    (prevDsl: Workflow, newDsl: Workflow, options?: { force?: boolean }) => {
+      // The explicit sparkles click forces through: failing there is
+      // user-initiated, and the missing-model toast is the answer.
+      if (!isModelConfigured && !options?.force) {
         return;
       }
 
@@ -124,7 +137,7 @@ export function NewVersionFields({
         },
       );
     },
-    [form, generateCommitMessage, project?.id, isDefaultModelDisabled],
+    [form, generateCommitMessage, project?.id, isModelConfigured],
   );
 
   const debouncedGenerateCommitMessage = useDebounceCallback(
@@ -137,15 +150,20 @@ export function NewVersionFields({
 
   useEffect(() => {
     if (canSave && previousVersion?.dsl && !hasTriggeredGeneration.current) {
+      // Hold the one-shot trigger until the model resolution answers,
+      // so a slow query doesn't read as "not configured".
+      if (!resolvedDefault.isFetched) return;
       hasTriggeredGeneration.current = true;
       userEditedCommitMessage.current = false;
       form.setValue("commitMessage", "", {
         shouldDirty: true,
         shouldValidate: true,
       });
-      setTimeout(() => {
-        debouncedGenerateCommitMessage(previousVersion.dsl!, getWorkflow());
-      }, 0);
+      if (isModelConfigured) {
+        setTimeout(() => {
+          debouncedGenerateCommitMessage(previousVersion.dsl!, getWorkflow());
+        }, 0);
+      }
     } else if (canSave && !previousVersion) {
       form.setValue("commitMessage", "First version", {
         shouldDirty: true,
@@ -153,7 +171,12 @@ export function NewVersionFields({
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canSave, previousVersion?.dsl]);
+  }, [
+    canSave,
+    previousVersion?.dsl,
+    resolvedDefault.isFetched,
+    isModelConfigured,
+  ]);
 
   return (
     <HStack width="full">
@@ -182,7 +205,33 @@ export function NewVersionFields({
           <InputGroup
             width="full"
             endElement={
-              generateCommitMessage.isLoading ? <AISparklesLoader /> : undefined
+              generateCommitMessage.isLoading ? (
+                <AISparklesLoader />
+              ) : canSave &&
+                resolvedDefault.isFetched &&
+                !isModelConfigured &&
+                previousVersion?.dsl ? (
+                // No model to auto-generate with: degrade to an explicit
+                // generate affordance. Clicking it runs the doomed call on
+                // purpose, and the missing-model toast becomes the answer
+                // to a question the user actually asked.
+                <IconButton
+                  size="xs"
+                  variant="ghost"
+                  color="blue.400"
+                  aria-label="Generate description"
+                  data-testid="generate-commit-message-button"
+                  onClick={() =>
+                    generateCommitMessageCallback(
+                      previousVersion.dsl!,
+                      getWorkflow(),
+                      { force: true },
+                    )
+                  }
+                >
+                  <Sparkles size={16} />
+                </IconButton>
+              ) : undefined
             }
           >
             <Input

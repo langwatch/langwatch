@@ -23,7 +23,7 @@ const COMPACT_MAX_HEIGHT = 160 - 17;
 const EXPANDED_DEFAULT_MAX_HEIGHT = 600;
 
 // Column types that should be formatted as JSON
-const JSON_LIKE_TYPES: DatasetColumnType[] = [
+export const JSON_LIKE_TYPES: DatasetColumnType[] = [
   "json",
   "list",
   "chat_messages",

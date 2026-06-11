@@ -114,21 +114,32 @@ Feature: Span field mapping when adding traces to a dataset
     Then it produces a single row whose spans field is the array of all spans
 
   # ============================================================================
-  # The mapping preview stays readable for heavy values. Mapping a span-heavy
-  # trace (for example a hundred spans serialized to JSON) into a column used to
-  # dump the whole blob into the cell, making the preview unreadable and slow.
-  # The cell now shows a capped value and the full value opens on double-click.
+  # The mapping preview renders with the SAME cells as the evaluations
+  # workbench dataset table: same heights, JSON values formatted, double-click
+  # opens the editor. Mapping a span-heavy trace into a column used to dump
+  # the whole blob as one flat line, unreadable and slow.
   # ============================================================================
 
-  Scenario: A heavy mapped value is capped in the preview cell
-    Given a column is mapped to a value far larger than the cell can show
+  Scenario: JSON values render formatted in the preview
+    Given a column is mapped to a JSON value such as a span list
     When the mapping preview renders that row
-    Then the cell shows a truncated value, not the entire blob
+    Then the cell shows the value as indented JSON, not one flat line
 
-  Scenario: Double-clicking a preview cell expands the full value
-    Given a preview cell holds a value too large to read inline
+  Scenario: A heavy mapped value stays bounded in the preview cell
+    Given a column is mapped to a value far larger than the display cap
+    When the mapping preview renders that row
+    Then the cell renders a bounded, truncated view of the value
+
+  Scenario: Double-clicking a preview cell opens it for editing
+    Given a preview cell holds a mapped value
     When I double-click that cell
-    Then the full untruncated value opens in an expanded dialog
+    Then an editor opens with the full value
+    And saving it updates the row that will be added
+
+  Scenario: Preview cells without an edit handler stay read-only
+    Given a dataset preview that does not allow editing
+    When I double-click a cell
+    Then no editor opens
 
   Scenario: Selecting a single preview row toggles only that row
     Given the mapping preview lists rows with selection checkboxes

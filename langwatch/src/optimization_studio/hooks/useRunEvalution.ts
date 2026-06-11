@@ -51,6 +51,19 @@ export const useRunEvalution = () => {
   const generateCommitMessage =
     api.workflow.generateCommitMessage.useMutation();
 
+  // Cascade-resolved Fast model for commit-message autogen: null when
+  // nothing is configured at any scope. Gates the generation call so a
+  // missing model never auto-fires a doomed request (and its
+  // missing-model toast) from a background autosave.
+  const resolvedCommitMessageModel =
+    api.modelProvider.getResolvedDefault.useQuery(
+      {
+        projectId: project?.id ?? "",
+        featureKey: "workflows.commit_message",
+      },
+      { enabled: !!project?.id },
+    );
+
   const trpc = api.useContext();
 
   const [triggerTimeout, setTriggerTimeout] = useState<{
@@ -136,7 +149,7 @@ export const useRunEvalution = () => {
       // Automatically generate a new version if there are changes and no version id was provided (e.g. when running from the wizard)
       if (hasChanges && !workflow_version_id) {
         let commitMessage = previousVersion ? "autosaved" : "first version";
-        if (previousVersion?.dsl) {
+        if (previousVersion?.dsl && resolvedCommitMessageModel.data != null) {
           try {
             const commitMessageResponse =
               await generateCommitMessage.mutateAsync({
@@ -220,6 +233,7 @@ export const useRunEvalution = () => {
       setEvaluationState,
       postEvent,
       generateCommitMessage,
+      resolvedCommitMessageModel.data,
       commitVersion,
       nextVersion,
       setWorkflow,

@@ -40,6 +40,8 @@ interface DatasetMappingPreviewProps {
   onRowDataChange: (entries: DatasetRecordEntry[]) => void;
   paragraph?: string;
   setDatasetTriggerMapping?: (mapping: MappingState) => void;
+  /** Portal target for the floating cell editor when hosted in a drawer. */
+  editorPortalRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 /**
@@ -55,6 +57,7 @@ export function DatasetMappingPreview({
   paragraph,
   selectedDataset,
   setDatasetTriggerMapping,
+  editorPortalRef,
 }: DatasetMappingPreviewProps) {
   const [isThreadMapping, setIsThreadMapping] = useState(false);
   const [, setThreadMappingState] = useState<ThreadMappingState>();
@@ -280,7 +283,7 @@ export function DatasetMappingPreview({
               <Field.HelperText margin={0} fontSize="13px">
                 {paragraph
                   ? paragraph
-                  : "Those are the rows that are going to be added, double click a cell to expand it"}
+                  : "Those are the rows that are going to be added, double click a cell to edit it"}
               </Field.HelperText>
             </VStack>
             <Spacer />
@@ -324,6 +327,16 @@ export function DatasetMappingPreview({
                       rowData.map((row) => ({ ...row, selected })),
                     );
                   }}
+                  onCellEdit={(rowIndex, columnName, value) => {
+                    onRowDataChange(
+                      rowData.map((row, index) =>
+                        index === rowIndex
+                          ? { ...row, [columnName]: value }
+                          : row,
+                      ),
+                    );
+                  }}
+                  editorPortalRef={editorPortalRef}
                 />
               </Box>
             </ErrorBoundary>
