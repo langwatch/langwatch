@@ -112,3 +112,30 @@ Feature: Span field mapping when adding traces to a dataset
     And no expansion is enabled
     When the trace is converted to dataset rows
     Then it produces a single row whose spans field is the array of all spans
+
+  # ============================================================================
+  # The mapping preview stays readable for heavy values. Mapping a span-heavy
+  # trace (for example a hundred spans serialized to JSON) into a column used to
+  # dump the whole blob into the cell, making the preview unreadable and slow.
+  # The cell now shows a capped value and the full value opens on double-click.
+  # ============================================================================
+
+  Scenario: A heavy mapped value is capped in the preview cell
+    Given a column is mapped to a value far larger than the cell can show
+    When the mapping preview renders that row
+    Then the cell shows a truncated value, not the entire blob
+
+  Scenario: Double-clicking a preview cell expands the full value
+    Given a preview cell holds a value too large to read inline
+    When I double-click that cell
+    Then the full untruncated value opens in an expanded dialog
+
+  Scenario: Selecting a single preview row toggles only that row
+    Given the mapping preview lists rows with selection checkboxes
+    When I check the checkbox for one row
+    Then only that row's selection is toggled
+
+  Scenario: The header checkbox toggles every preview row
+    Given the mapping preview lists rows with selection checkboxes
+    When I check the header select-all checkbox
+    Then every row's selection is toggled

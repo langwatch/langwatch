@@ -275,7 +275,7 @@ export function DatasetMappingPreview({
               <Field.HelperText margin={0} fontSize="13px">
                 {paragraph
                   ? paragraph
-                  : "Those are the rows that are going to be added, double click on the cell to edit them"}
+                  : "Those are the rows that are going to be added, double click a cell to expand it"}
               </Field.HelperText>
             </VStack>
             <Spacer />
