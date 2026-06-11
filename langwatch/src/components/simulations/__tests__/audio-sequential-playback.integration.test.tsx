@@ -178,6 +178,7 @@ describe("<ScenarioMessageRenderer/> audio sequential playback", () => {
 
   describe("given a renderer with audio messages", () => {
     describe("when the component mounts", () => {
+      /** @scenario No audio plays on initial render without user interaction */
       it("does not call play() on any audio element without user interaction", () => {
         renderMessages([audioMsg("a1"), audioMsg("a2"), audioMsg("a3")]);
         expect(playCalls).toHaveLength(0);
@@ -187,6 +188,7 @@ describe("<ScenarioMessageRenderer/> audio sequential playback", () => {
 
   describe("given two audio messages rendered in the same instance", () => {
     describe("when audio B fires a play event while audio A is playing", () => {
+      /** @scenario Starting a new audio pauses any currently playing audio */
       it("pauses audio A", () => {
         renderMessages([audioMsg("a1"), audioMsg("a2")]);
 
@@ -208,6 +210,7 @@ describe("<ScenarioMessageRenderer/> audio sequential playback", () => {
 
   describe("given two separate renderer instances", () => {
     describe("when audio plays in the first instance", () => {
+      /** @scenario Playing audio in one renderer instance does not pause audio in another instance */
       it("does not pause audio in the second instance", () => {
         // Render both renderers into the default document.body (cleanup()
         // in afterEach handles removal). We separate them conceptually by
@@ -237,6 +240,8 @@ describe("<ScenarioMessageRenderer/> audio sequential playback", () => {
 
   describe("given audio followed by a text message followed by another audio", () => {
     describe("when the first audio ends", () => {
+      /** @scenario Audio auto-advances to the next audio item when the current one ends */
+      /** @scenario Interleaved text items between audio messages are skipped during auto-advance */
       it("calls play() on the second audio item (skipping the text item)", async () => {
         renderMessages([audioMsg("a1"), textMsg("t1"), audioMsg("a2")]);
 
@@ -258,6 +263,8 @@ describe("<ScenarioMessageRenderer/> audio sequential playback", () => {
 
   describe("given three audio messages and playback starts at the second", () => {
     describe("when the second audio ends", () => {
+      /** @scenario Chain continues from the second audio to the third */
+      /** @scenario Starting playback mid-list advances from that position onward */
       it("plays the third audio, not the first", async () => {
         renderMessages([audioMsg("a1"), audioMsg("a2"), audioMsg("a3")]);
 
@@ -276,6 +283,8 @@ describe("<ScenarioMessageRenderer/> audio sequential playback", () => {
 
   describe("given a single audio message", () => {
     describe("when that audio ends", () => {
+      /** @scenario Chain stops at the last audio message */
+      /** @scenario The last audio ending does not trigger any further play */
       it("does not call play() again (chain stops at last item)", async () => {
         renderMessages([audioMsg("a1")]);
         const [audio] = document.querySelectorAll<HTMLAudioElement>("audio");
@@ -309,6 +318,7 @@ describe("<ScenarioMessageRenderer/> audio sequential playback", () => {
 
   describe("given two audio messages and the second audio's play() rejects", () => {
     describe("when the first audio ends", () => {
+      /** @scenario A failed play() during auto-advance does not throw an unhandled rejection */
       it("does not throw an unhandled rejection", async () => {
         const unhandled = vi.fn();
         window.addEventListener("unhandledrejection", unhandled);
