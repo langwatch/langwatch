@@ -254,6 +254,10 @@ export type Entry = BaseComponent & {
   test_size: number;
   seed: number;
   dataset?: NodeDataset;
+  /** Values from the last run-until-here dialog submission, used to
+   *  prefill the next one. Persisted with the workflow like any node
+   *  data. */
+  manual_run_values?: Record<string, string>;
 };
 
 export type Evaluator = Omit<BaseComponent, "cls"> & {

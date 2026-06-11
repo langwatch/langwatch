@@ -136,8 +136,6 @@ describe("EntryPointPropertiesPanel", () => {
       expect(
         screen.queryByTestId("entry-dataset-card"),
       ).not.toBeInTheDocument();
-      // No manual-entry config without a dataset to pick rows from.
-      expect(screen.queryByText("Manual Test Entry")).not.toBeInTheDocument();
     });
 
     /** @scenario Adding an input on the entry point */
@@ -238,10 +236,13 @@ describe("EntryPointPropertiesPanel", () => {
     });
 
     /** @scenario The entry panel offers no optimization split */
-    it("shows the manual test entry section and no optimization split", () => {
+    /** @scenario The entry drawer offers no manual test entry picker */
+    it("offers no manual test entry picker and no optimization split", () => {
       renderPanel(datasetNode());
 
-      expect(screen.getByText("Manual Test Entry")).toBeInTheDocument();
+      // Manual run values are picked in the run-until-here dialog, not
+      // configured as a hidden global on the entry drawer.
+      expect(screen.queryByText("Manual Test Entry")).not.toBeInTheDocument();
       // Optimization does not exist on the Go engine, so no train/test
       // split configuration is offered.
       expect(

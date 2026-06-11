@@ -67,6 +67,7 @@ import { Optimize } from "./Optimize";
 import { ProgressToast } from "./ProgressToast";
 import { Publish } from "./Publish";
 import { ResultsPanel } from "./ResultsPanel";
+import { RunUntilHereDialog } from "./RunUntilHereDialog";
 import { UndoRedo } from "./UndoRedo";
 import { WorkflowNamePopover } from "./WorkflowNamePopover";
 
@@ -395,6 +396,7 @@ export default function OptimizationStudio() {
       </ReactFlowProvider>
 
       <CurrentDrawer marginTop={56} />
+      <RunUntilHereDialog />
       {/* The studio route doesn't use DashboardLayout, so the v2 trace
           explorer needs its own mount here - without it, view-trace from
           the evaluations panel routes to traceV2Details (per the device

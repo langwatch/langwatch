@@ -1,10 +1,6 @@
 import {
-  Box,
   Button,
-  Field,
   HStack,
-  Input,
-  NativeSelect,
   Spacer,
   Text,
   useDisclosure,
@@ -12,7 +8,7 @@ import {
 } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
 import { useCallback, useState } from "react";
-import { ArrowRight, Database, Folder, Info, X } from "react-feather";
+import { ArrowRight, Database, Folder, X } from "react-feather";
 import { useShallow } from "zustand/react/shallow";
 import { Tooltip } from "../../../components/ui/tooltip";
 import { useGetDatasetData } from "../../hooks/useGetDatasetData";
@@ -157,68 +153,6 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
         node={node}
         editingDataset={editingDataset}
       />
-      {dataset && (
-        <VStack width="full" align="start">
-          <HStack width="full">
-            <PropertySectionTitle>Manual Test Entry</PropertySectionTitle>
-            <Tooltip content="When manually running the full workflow, a single entry from the dataset will be used, choose which one to pick.">
-              <Box paddingTop={1}>
-                <Info size={14} />
-              </Box>
-            </Tooltip>
-          </HStack>
-          <VStack width="full" align="start" gap={2}>
-            <NativeSelect.Root>
-              <NativeSelect.Field
-                value={
-                  typeof node.data.entry_selection === "number"
-                    ? "specific"
-                    : node.data.entry_selection
-                }
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
-                  const value = e.target.value;
-                  setNode({
-                    id: node.id,
-                    data: {
-                      ...node.data,
-                      entry_selection: value === "specific" ? 0 : value,
-                    },
-                  });
-                }}
-              >
-                <option value="first">First</option>
-                <option value="last">Last</option>
-                <option value="random">Random</option>
-                <option value="specific">Specific Row ID</option>
-              </NativeSelect.Field>
-              <NativeSelect.Indicator />
-            </NativeSelect.Root>
-            {typeof node.data.entry_selection === "number" && (
-              <Field.Root width="full">
-                <Input
-                  type="number"
-                  size="sm"
-                  min={0}
-                  value={node.data.entry_selection}
-                  onChange={(e) => {
-                    const value = e.target.value
-                      ? parseInt(e.target.value, 10)
-                      : 0;
-                    setNode({
-                      id: node.id,
-                      data: {
-                        ...node.data,
-                        entry_selection: value,
-                      },
-                    });
-                  }}
-                  placeholder="Enter row ID"
-                />
-              </Field.Root>
-            )}
-          </VStack>
-        </VStack>
-      )}
       {endNodeId && (
         <HStack width="full">
           <Spacer />

@@ -75,5 +75,6 @@ Feature: Entry point node with optional dataset and user-defined inputs
   Scenario: The entry panel offers no optimization split
     Given a dataset is attached to the entry point
     When I open the entry point drawer
-    Then I see the manual test entry section
-    And no optimization or train/test split configuration is offered
+    Then no optimization or train/test split configuration is offered
+    # Manual run values are picked in the run-until-here dialog instead:
+    # specs/workflows/run-until-here-dialog.feature

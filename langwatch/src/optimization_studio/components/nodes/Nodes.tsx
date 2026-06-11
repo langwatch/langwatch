@@ -38,7 +38,7 @@ import { useColorModeValue } from "../../../components/ui/color-mode";
 import { Menu } from "../../../components/ui/menu";
 import { Tooltip } from "../../../components/ui/tooltip";
 import { useComponentExecution } from "../../hooks/useComponentExecution";
-import { useWorkflowExecution } from "../../hooks/useWorkflowExecution";
+import { useRunUntilHereDialogStore } from "../../hooks/useRunUntilHereDialogStore";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import type {
   Component,
@@ -432,7 +432,9 @@ export function ComponentExecutionButton({
   const { startComponentExecution, stopComponentExecution } =
     useComponentExecution();
 
-  const { startWorkflowExecution } = useWorkflowExecution();
+  const openRunUntilHereDialog = useRunUntilHereDialogStore(
+    (state) => state.open,
+  );
 
   const [isWaitingLong] = useDebounceValue(
     node?.data.execution_state?.status === "waiting",
@@ -568,9 +570,7 @@ export function ComponentExecutionButton({
             </Menu.Item>
             <Menu.Item
               value="run-workflow"
-              onClick={() =>
-                node && startWorkflowExecution({ untilNodeId: node.id })
-              }
+              onClick={() => node && openRunUntilHereDialog(node.id)}
             >
               <Play size={14} />
               Run workflow until here
