@@ -326,7 +326,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       span.setAttributes({ ...customAttributes });
     }
 
-    const isNew = await this.scripts.stage({
+    const { isNew, orphanedValue } = await this.scripts.stage({
       stagedJobId,
       groupId,
       dispatchAfterMs,
@@ -339,6 +339,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       shouldExtend,
       shouldReplace,
     });
+
+    // A dedup squash displaced a staged payload; reclaim its offloaded blob so
+    // it does not leak until the 7-day TTL (the 2026-06-11 capacity incident).
+    // No-op for inline payloads (readEnvelopeBlobId yields null) and new stages
+    // (orphanedValue is "").
+    if (orphanedValue) {
+      await this.deleteEnvelopeBlobs([orphanedValue]);
+    }
 
     if (isNew) {
       gqJobsStagedTotal.inc({ queue_name: this.queueName });
@@ -429,7 +437,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       }),
     );
 
-    const newStagedCount = await this.scripts.stageBatch(jobsToStage);
+    const { newStagedCount, orphanedValues } =
+      await this.scripts.stageBatch(jobsToStage);
+
+    // Reclaim blobs displaced by any in-batch dedup squashes (see send()).
+    const orphans = orphanedValues.filter((value) => value.length > 0);
+    if (orphans.length > 0) {
+      await this.deleteEnvelopeBlobs(orphans);
+    }
 
     const dedupedCount = payloads.length - newStagedCount;
     if (newStagedCount > 0) {
@@ -495,7 +510,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       );
       // Complete the group slot so it's not stuck
       await this.scripts.complete({ groupId, stagedJobId });
-      this.deleteEnvelopeBlobs([jobDataJson]);
+      void this.deleteEnvelopeBlobs([jobDataJson]);
       return;
     }
 
@@ -642,7 +657,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
               // removed from staging during the drain, so completing the
               // dispatched job is enough to free the group.
               await this.scripts.complete({ groupId, stagedJobId, jobName });
-              this.deleteEnvelopeBlobs([
+              void this.deleteEnvelopeBlobs([
                 jobDataJson,
                 ...drainedSiblings.map((sibling) => sibling.jobDataJson),
               ]);
@@ -699,7 +714,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                 // the dispatched value's blob is now unreferenced. Drained
                 // siblings were re-staged with their ORIGINAL values, so
                 // their blobs stay.
-                this.deleteEnvelopeBlobs([jobDataJson]);
+                void this.deleteEnvelopeBlobs([jobDataJson]);
 
                 this.logger.warn(
                   {
@@ -741,7 +756,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                   contextMetadata,
                   routingLabels,
                 });
-                this.deleteEnvelopeBlobs([jobDataJson]);
+                void this.deleteEnvelopeBlobs([jobDataJson]);
               }
             }
           },
@@ -781,17 +796,29 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   }
 
   /**
-   * Best-effort deletion of offloaded bodies whose staged values are retired.
-   * Fire-and-forget: the blob TTL is the correctness backstop, so a failed
-   * delete only means the blob lingers until expiry.
+   * Best-effort reclamation of offloaded bodies whose staged values are retired
+   * (drained, completed, retried, or displaced by a dedup squash). Inline and
+   * legacy values yield no blob id and are skipped. Errors are swallowed: the
+   * blob TTL is the correctness backstop.
+   *
+   * Awaitable so the producer paths (send/sendBatch) can reclaim a squash-
+   * displaced blob synchronously with the enqueue — that round-trip only happens
+   * when a blob actually exists, so inline traffic pays nothing. The worker
+   * drain/complete/retry paths call it fire-and-forget (`void`) to avoid adding
+   * latency to the processing loop.
    */
-  private deleteEnvelopeBlobs(values: string[]): void {
-    for (const value of values) {
-      const blobId = readEnvelopeBlobId(value);
-      if (blobId) {
-        void this.blobs.delete({ id: blobId }).catch(() => {});
-      }
-    }
+  private async deleteEnvelopeBlobs(values: string[]): Promise<void> {
+    await Promise.all(
+      values.map(async (value) => {
+        const blobId = readEnvelopeBlobId(value);
+        if (!blobId) return;
+        try {
+          await this.blobs.delete({ id: blobId });
+        } catch {
+          // Best-effort: the blob TTL is the correctness backstop.
+        }
+      }),
+    );
   }
 
   /**
