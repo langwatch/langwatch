@@ -11,6 +11,7 @@
 import { Badge, Box, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "~/utils/api";
+import type { AudioPlaybackProps } from "./useSequentialAudioPlayback";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -77,13 +78,23 @@ interface MediaPartProps {
   part: MediaPartData;
   /** Project that owns this stored object. Required for the server-side existence probe. */
   projectId: string;
+  /**
+   * Playback coordination — supplied by ScenarioMessageRenderer via
+   * `useSequentialAudioPlayback().getAudioProps(id)`. When omitted the
+   * <audio> element renders without coordination (standalone usage).
+   */
+  audioPlayback?: AudioPlaybackProps;
 }
 
 /**
  * Renders a single AG-UI media content part as a native HTML5 media element,
  * a data: URI, or a missing-badge placeholder.
  */
-export function MediaPart({ part, projectId }: MediaPartProps) {
+export function MediaPart({
+  part,
+  projectId,
+  audioPlayback,
+}: MediaPartProps) {
   // Resolve src and category from the part shape
   let src: string;
   let mimeType: string | undefined;
@@ -238,6 +249,9 @@ export function MediaPart({ part, projectId }: MediaPartProps) {
           // setting status="ok" here reflects what the user can do.
           onLoadedData={handleLoad}
           onError={handleError}
+          onPlay={audioPlayback?.onPlay}
+          onEnded={audioPlayback?.onEnded}
+          ref={audioPlayback?.ref ?? null}
           style={{ width: "100%", maxWidth: "400px" }}
         />
       </VStack>
