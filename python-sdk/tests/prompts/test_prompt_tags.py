@@ -1371,3 +1371,65 @@ class TestLangwatchPromptsGlobalInterface:
         """langwatch.prompts.tags exists and has an assign method."""
         assert hasattr(langwatch.prompts, "tags")
         assert callable(getattr(langwatch.prompts.tags, "assign", None))
+
+
+# ---------------------------------------------------------------------------
+# PromptsFacade.create() / update() -- parameters passthrough
+# ---------------------------------------------------------------------------
+
+
+class TestPromptsFacadeParameters:
+    """Tests for PromptsFacade forwarding runtime parameters to the API service."""
+
+    def _make_facade_with_mock_api(self) -> PromptsFacade:
+        mock_client = Mock()
+        return PromptsFacade(mock_client)
+
+    def _mock_prompt_data(self, parameters):
+        from langwatch.prompts.types import PromptData, Message
+
+        return PromptData(
+            id="pizza-prompt", handle="pizza-prompt", scope="PROJECT",
+            version=1, version_id="v1_id", model="openai/gpt-4",
+            messages=[Message(role="system", content="v1")], prompt="v1",
+            parameters=parameters,
+        )
+
+    def test_create_forwards_parameters_to_api_service(self):
+        """
+        When create() is called with parameters
+        Then the API service receives the same parameters dict
+        """
+        facade = self._make_facade_with_mock_api()
+        facade._api_service.create = Mock(
+            return_value=self._mock_prompt_data({"max_iterations": 3})
+        )
+
+        result = facade.create("pizza-prompt", parameters={"max_iterations": 3})
+
+        assert facade._api_service.create.call_args[1]["parameters"] == {
+            "max_iterations": 3
+        }
+        assert result.parameters == {"max_iterations": 3}
+
+    def test_update_forwards_parameters_to_api_service(self):
+        """
+        When update() is called with parameters
+        Then the API service receives the same parameters dict
+        """
+        facade = self._make_facade_with_mock_api()
+        facade._api_service.update = Mock(
+            return_value=self._mock_prompt_data({"confidence_threshold": 0.8})
+        )
+
+        result = facade.update(
+            "pizza-prompt",
+            scope="PROJECT",
+            parameters={"confidence_threshold": 0.8},
+            commit_message="set threshold",
+        )
+
+        assert facade._api_service.update.call_args[1]["parameters"] == {
+            "confidence_threshold": 0.8
+        }
+        assert result.parameters == {"confidence_threshold": 0.8}

@@ -20,7 +20,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
+exclude-newer = "2026-06-04T14:12:04.922681Z"
 exclude-newer-span = "P7D"
 
 [[package]]
@@ -3206,7 +3206,7 @@ wheels = [
 
 [[package]]
 name = "langwatch"
-version = "0.24.0"
+version = "0.25.0"
 source = { editable = "." }
 dependencies = [
     { name = "attrs" },
