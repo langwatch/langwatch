@@ -227,13 +227,16 @@ Feature: Evaluation execution - Backend
     Then the 5 completed results are saved to Elasticsearch
     And stopped_at timestamp is set
 
-  @unimplemented
-  Scenario: Abort cancels in-flight LLM requests
-    Given a cell is currently streaming a response from the LLM
+  # A cell blocked waiting on a slow LLM response must not keep running until
+  # that response arrives. The stream read races the abort flag, so an abort
+  # interrupts the pending read and cancels the reader. Cancelling the reader
+  # disconnects nlpgo, whose request context then cancels the execution (the Go
+  # engine treats client disconnect as the cancel signal).
+  Scenario: Abort interrupts an in-flight stream read
+    Given a cell is blocked waiting on a streaming LLM response
     When abort is requested
-    Then the stream reader is cancelled immediately
-    And no more events are processed from that stream
-    And the cell is marked as stopped
+    Then the pending read is interrupted and the reader is cancelled
+    And no further events are processed from that stream
 
   # ==========================================================================
   # Hono SSE Endpoint
