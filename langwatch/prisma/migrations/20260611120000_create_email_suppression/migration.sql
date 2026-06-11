@@ -17,7 +17,14 @@ CREATE TABLE "EmailSuppression" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "EmailSuppression_projectId_email_triggerId_key" ON "EmailSuppression"("projectId", "email", "triggerId");
+-- Postgres treats NULLs as distinct, so a plain composite unique on a nullable
+-- triggerId would allow duplicate project-wide rows. Use two partial unique
+-- indexes: one enforces a single (projectId, email) project-wide suppression
+-- (triggerId IS NULL), the other enforces per-trigger uniqueness.
+CREATE UNIQUE INDEX "EmailSuppression_projectId_email_triggerId_key" ON "EmailSuppression"("projectId", "email", "triggerId") WHERE "triggerId" IS NOT NULL;
+
+-- CreateIndex
+CREATE UNIQUE INDEX "EmailSuppression_projectId_email_null_trigger_key" ON "EmailSuppression"("projectId", "email") WHERE "triggerId" IS NULL;
 
 -- CreateIndex
 CREATE INDEX "EmailSuppression_projectId_idx" ON "EmailSuppression"("projectId");

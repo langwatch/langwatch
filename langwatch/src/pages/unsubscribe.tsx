@@ -37,7 +37,11 @@ export default function UnsubscribePage() {
         maxW="480px"
         width="full"
       >
-        {!token || resolved.isError ? (
+        {!router.isReady ? (
+          <VStack gap={3}>
+            <Spinner />
+          </VStack>
+        ) : !token || resolved.isError ? (
           <VStack align="start" gap={2}>
             <Heading size="md">Link not valid</Heading>
             <Text color="fg.muted">

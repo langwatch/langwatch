@@ -164,7 +164,11 @@ export default function SettingsLayout({
             paths={["/settings/annotation-scores", "/settings/topic-clustering", "/settings/data-retention", "/settings/email-suppressions"]}
           >
             <MenuLink href="/settings/data-retention">Data Retention</MenuLink>
-            <MenuLink href="/settings/email-suppressions">Email Suppressions</MenuLink>
+            {hasPermission("triggers:view") && (
+              <MenuLink href="/settings/email-suppressions">
+                Email Suppressions
+              </MenuLink>
+            )}
             <MenuLink href="/settings/annotation-scores">Annotation Scores</MenuLink>
             {!isLiteMember && project?.slug && (
               <MenuLink href={`/${project.slug}/automations`}>Automations</MenuLink>

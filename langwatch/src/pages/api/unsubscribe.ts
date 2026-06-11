@@ -16,8 +16,9 @@ const logger = createLogger("langwatch:unsubscribe:one-click");
  * "unsubscribe" affordance. The token in `?token=` is the authorization — its
  * HMAC binds it to one recipient — so this route needs no session. One-click
  * is trigger-scoped (the link the `List-Unsubscribe` header carries). Always
- * returns 200 to a valid token so the mail client shows success; only a
- * malformed/missing token is a 4xx.
+ * returns 200 to a valid token so the mail client shows success; a
+ * malformed/missing token is a 400, non-POST methods get 405, and
+ * rate-limited callers get 429.
  */
 export default async function handler(
   req: NextApiRequest,

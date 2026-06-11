@@ -1042,6 +1042,10 @@ model EmailSuppression {
   reason    String   @default("unsubscribe")
   createdAt DateTime @default(now())
 
+  // Prisma cannot express partial indexes. The migration replaces this with two
+  // partial unique indexes (triggerId IS NULL / IS NOT NULL) so that project-wide
+  // suppression rows (null triggerId) are deduped despite Postgres treating NULLs
+  // as distinct. Keep this @@unique for per-trigger uniqueness intent.
   @@unique([projectId, email, triggerId])
   @@index([projectId])
 }

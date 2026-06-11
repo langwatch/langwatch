@@ -12,7 +12,8 @@ const logger = createLogger("langwatch:outbox:emailHourlyCap");
  * at this granularity; it buys a single Redis round-trip per dispatch.
  *
  *   key:    trigger-email-cap:{projectId}:{triggerId}:{floor(now / 1h)}
- *   INCR + EXPIRE 2h (only on the first hit, so the TTL doesn't slide)
+ *   INCR + EXPIRE 2h NX (set TTL only when absent, so it never slides but a
+ *   transient first-hit failure can't leak an immortal key)
  *   allowed = count <= cap
  *
  * Mirrors `src/server/rateLimit.ts`: Redis when available, an in-memory Map
@@ -60,9 +61,10 @@ export async function consumeEmailCapSlot({
   if (connection) {
     try {
       const count = await connection.incr(key);
-      if (count === 1) {
-        await connection.expire(key, EXPIRE_SECONDS);
-      }
+      // Always set TTL with NX semantics (only when no TTL exists yet) so a
+      // transient first-hit EXPIRE failure can't leave an immortal key — every
+      // subsequent hit re-attempts it without sliding an existing window.
+      await connection.expire(key, EXPIRE_SECONDS, "NX");
       return { allowed: count <= cap, count };
     } catch (error) {
       // A Redis blip must not let the cap silently fail open. The dispatcher

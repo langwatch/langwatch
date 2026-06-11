@@ -304,6 +304,9 @@ describe("createOutboxDispatcher cadence stage", () => {
         expect(sendRenderedTriggerEmail).not.toHaveBeenCalled();
         // Claim is recorded so an outbox replay is a no-op, not a re-send.
         expect(deps.triggers.claimSend).toHaveBeenCalledTimes(1);
+        // ...but the drop must NOT run delivery-only bookkeeping: the
+        // "last-fired" cosmetic would misrepresent a dropped no-op as a send.
+        expect(deps.triggers.updateLastRunAt).not.toHaveBeenCalled();
       });
     });
 
@@ -383,6 +386,8 @@ describe("createOutboxDispatcher cadence stage", () => {
         // not consume a slot.
         expect(deps.consumeEmailCapSlot).not.toHaveBeenCalled();
         expect(deps.triggers.claimSend).toHaveBeenCalledTimes(1);
+        // Drop must not run the delivery-only "last-fired" bookkeeping.
+        expect(deps.triggers.updateLastRunAt).not.toHaveBeenCalled();
       });
     });
 

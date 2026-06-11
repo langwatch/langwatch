@@ -88,5 +88,7 @@ export function verifyUnsubscribeToken(
   const { projectId, triggerId, email } = parsed as Record<string, unknown>;
   if (typeof projectId !== "string" || typeof email !== "string") return null;
   if (triggerId !== null && typeof triggerId !== "string") return null;
-  return { projectId, triggerId, email };
+  // Normalize on verify too (matching the sign-side normalization) so the
+  // returned email is always lowercased/trimmed regardless of token casing.
+  return normalize({ projectId, triggerId, email });
 }

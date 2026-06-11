@@ -18,16 +18,27 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
 function EmailSuppressionsSettings() {
-  const { project } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
   if (!project) return null;
-  return <EmailSuppressionsPage projectId={project.id} />;
+  return (
+    <EmailSuppressionsPage
+      projectId={project.id}
+      canManage={hasPermission("triggers:manage")}
+    />
+  );
 }
 
 export default withPermissionGuard("triggers:view", {
   layoutComponent: SettingsLayout,
 })(EmailSuppressionsSettings);
 
-function EmailSuppressionsPage({ projectId }: { projectId: string }) {
+function EmailSuppressionsPage({
+  projectId,
+  canManage,
+}: {
+  projectId: string;
+  canManage: boolean;
+}) {
   const utils = api.useUtils();
   const suppressions = api.emailSuppression.getAll.useQuery({ projectId });
   const remove = api.emailSuppression.remove.useMutation({
@@ -110,17 +121,21 @@ function EmailSuppressionsPage({ projectId }: { projectId: string }) {
                       {new Date(row.createdAt).toLocaleDateString()}
                     </Table.Cell>
                     <Table.Cell textAlign="end">
-                      <Button
-                        size="xs"
-                        variant="ghost"
-                        loading={
-                          remove.isPending && remove.variables?.id === row.id
-                        }
-                        onClick={() => remove.mutate({ projectId, id: row.id })}
-                        aria-label="Remove suppression"
-                      >
-                        <Trash2 size={14} />
-                      </Button>
+                      {canManage && (
+                        <Button
+                          size="xs"
+                          variant="ghost"
+                          loading={
+                            remove.isPending && remove.variables?.id === row.id
+                          }
+                          onClick={() =>
+                            remove.mutate({ projectId, id: row.id })
+                          }
+                          aria-label="Remove suppression"
+                        >
+                          <Trash2 size={14} />
+                        </Button>
+                      )}
                     </Table.Cell>
                   </Table.Row>
                 ))}

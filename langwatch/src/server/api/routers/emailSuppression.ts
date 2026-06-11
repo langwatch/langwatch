@@ -7,6 +7,7 @@ import {
   resolveUnsubscribe,
 } from "~/server/mailer/unsubscribe.read";
 import { getClientIp } from "~/utils/getClientIp";
+import { auditLog } from "../../auditLog";
 import { rateLimit } from "../../rateLimit";
 import { checkProjectPermission, skipPermissionCheck } from "../rbac";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
@@ -161,6 +162,12 @@ export const emailSuppressionRouter = createTRPCRouter({
             })
           : [];
       const nameById = new Map(triggers.map((t) => [t.id, t.name]));
+      void auditLog({
+        userId: ctx.session.user.id,
+        projectId: input.projectId,
+        action: "emailSuppression.getAll",
+        args: { recordCount: rows.length, triggerIds },
+      });
       return rows.map((r) => ({
         id: r.id,
         email: r.email,
@@ -175,10 +182,16 @@ export const emailSuppressionRouter = createTRPCRouter({
   remove: protectedProcedure
     .input(z.object({ projectId: z.string(), id: z.string() }))
     .use(checkProjectPermission("triggers:manage"))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       await getApp().emailSuppressions.remove({
         projectId: input.projectId,
         id: input.id,
+      });
+      void auditLog({
+        userId: ctx.session.user.id,
+        projectId: input.projectId,
+        action: "emailSuppression.remove",
+        args: { suppressionId: input.id },
       });
       return { ok: true };
     }),

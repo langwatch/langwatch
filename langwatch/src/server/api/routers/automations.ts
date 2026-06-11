@@ -433,25 +433,27 @@ export const automationRouter = createTRPCRouter({
       // trust or validate. The email recipient is resolved server-side as the
       // authenticated session user. A light per-user rate limit guards the
       // mail provider against a stuck client loop (hygiene, not anti-abuse:
-      // the recipient is always the requester). Slack (webhook) is unchanged.
-      const limit = await rateLimit({
-        key: `testfire:${ctx.session.user.id}`,
-        windowSeconds: 60,
-        max: 10,
-      });
-      if (!limit.allowed) {
-        throw new TRPCError({
-          code: "TOO_MANY_REQUESTS",
-          message: buildRetryAfterMessage({
-            prefix: "Too many test fires.",
-            resetAt: limit.resetAt,
-          }),
-        });
-      }
-
+      // the recipient is always the requester). Slack (webhook) is unchanged
+      // and intentionally exempt from the rate limit — it fires to the
+      // customer's own webhook, not our mail provider.
       try {
         let recipients: string[] = [];
         if (input.channel === "email") {
+          const limit = await rateLimit({
+            key: `testfire:${ctx.session.user.id}`,
+            windowSeconds: 60,
+            max: 10,
+          });
+          if (!limit.allowed) {
+            throw new TRPCError({
+              code: "TOO_MANY_REQUESTS",
+              message: buildRetryAfterMessage({
+                prefix: "Too many test fires.",
+                resetAt: limit.resetAt,
+              }),
+            });
+          }
+
           const email = ctx.session.user.email;
           if (!email) {
             throw new TRPCError({

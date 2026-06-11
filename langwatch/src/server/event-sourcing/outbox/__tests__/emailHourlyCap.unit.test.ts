@@ -57,6 +57,46 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
     });
   });
 
+  describe("given Redis is connected", () => {
+    afterEach(() => {
+      redisMock.connection = undefined;
+    });
+
+    describe("when consecutive dispatches hit the same key", () => {
+      it("re-applies the TTL with NX on every hit (no immortal-key leak)", async () => {
+        const expire = vi.fn().mockResolvedValue(1);
+        let counter = 0;
+        redisMock.connection = {
+          incr: vi.fn().mockImplementation(async () => ++counter),
+          expire,
+        };
+
+        const now = new Date("2026-06-11T10:15:00Z");
+        await consumeEmailCapSlot({
+          projectId: PROJECT_ID,
+          triggerId: TRIGGER_ID,
+          now,
+          cap: 3,
+        });
+        await consumeEmailCapSlot({
+          projectId: PROJECT_ID,
+          triggerId: TRIGGER_ID,
+          now,
+          cap: 3,
+        });
+
+        // expire is attempted on BOTH hits, with the NX flag, so a transient
+        // first-hit failure can't leave the key without a TTL.
+        expect(expire).toHaveBeenCalledTimes(2);
+        for (const call of expire.mock.calls) {
+          expect(call[0]).toMatch(/^trigger-email-cap:/);
+          expect(call[1]).toBe(7200);
+          expect(call[2]).toBe("NX");
+        }
+      });
+    });
+  });
+
   describe("given a fresh hour bucket", () => {
     describe("when dispatches arrive under the cap", () => {
       it("allows them and counts up monotonically", async () => {

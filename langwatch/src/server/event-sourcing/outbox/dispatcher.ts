@@ -376,6 +376,13 @@ async function handleCadenceBatch(
     });
   };
 
+  // Tracks whether a provider send actually happened. Suppression / over-cap
+  // drops still run `claimSend` below (ADR-031: a replay must no-op), but they
+  // must NOT run the delivery-only bookkeeping — `updateLastRunAt` (the
+  // operator "last-fired" column) and the "dispatched" success log — which
+  // would misrepresent a dropped no-op as a real notification.
+  let didSend = false;
+
   try {
     switch (trigger.action) {
       case TriggerAction.SEND_EMAIL: {
@@ -440,6 +447,7 @@ async function handleCadenceBatch(
             subject: rendered.subject,
             html: rendered.html,
           });
+          didSend = true;
           break;
         }
         await sendTriggerEmail({
@@ -452,6 +460,7 @@ async function handleCadenceBatch(
           triggerType: trigger.alertType,
           triggerMessage: trigger.message ?? "",
         });
+        didSend = true;
         break;
       }
       case TriggerAction.SEND_SLACK_MESSAGE:
@@ -473,6 +482,7 @@ async function handleCadenceBatch(
             triggerName: trigger.name,
             payload: rendered.payload,
           });
+          didSend = true;
           break;
         }
         await sendSlackWebhook({
@@ -483,6 +493,7 @@ async function handleCadenceBatch(
           triggerType: trigger.alertType,
           triggerMessage: trigger.message ?? "",
         });
+        didSend = true;
         break;
       default:
         throw new DispatchError({
@@ -541,6 +552,23 @@ async function handleCadenceBatch(
         },
       });
     }
+  }
+
+  // Delivery-only bookkeeping. A suppression / over-cap drop still claimed its
+  // sends above (replay no-op), but never actually delivered — so skip the
+  // "last-fired" cosmetic and the success log, which would otherwise report a
+  // dropped dispatch as a notification.
+  if (!didSend) {
+    logger.info(
+      {
+        projectId,
+        triggerId,
+        action: trigger.action,
+        cadence: trigger.notificationCadence,
+      },
+      "Outbox cadence digest dropped (no recipients or over cap) — claimed but not sent",
+    );
+    return;
   }
 
   // `updateLastRunAt` is a soft-state cosmetic for the operator UI

@@ -27,6 +27,20 @@ const logger = createLogger("langwatch:mailer:triggerEmail");
  * with null triggerId). Per-recipient sends make the link forge-proof: the
  * token's HMAC binds the link to one recipient address.
  */
+/**
+ * `render()` returns a full HTML document, so tail-concatenating the footer
+ * would land it after `</body></html>` and some mail clients drop content
+ * outside the body. Insert the footer immediately before the closing `</body>`
+ * tag (case-insensitive) when present; otherwise append (fragments, plain HTML).
+ */
+export function injectFooterIntoBody(html: string, footerHtml: string): string {
+  const bodyClose = /<\/body>/i;
+  if (bodyClose.test(html)) {
+    return html.replace(bodyClose, `${footerHtml}</body>`);
+  }
+  return `${html}${footerHtml}`;
+}
+
 function buildUnsubscribe({
   projectId,
   triggerId,
@@ -199,7 +213,7 @@ async function sendPerRecipient({
       to: noReplyTo,
       bcc: [recipient],
       subject,
-      html: html + footerHtml,
+      html: injectFooterIntoBody(html, footerHtml),
       headers,
     });
   }

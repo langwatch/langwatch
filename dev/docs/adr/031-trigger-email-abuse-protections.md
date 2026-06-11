@@ -55,7 +55,7 @@ is the requester — this is hygiene, not anti-abuse.
 In the outbox dispatcher's cadence stage (`handleCadenceBatch`), the email
 branch consults a Redis fixed-hour counter before sending:
 
-```
+```text
 key:    trigger-email-cap:{projectId}:{triggerId}:{floor(now / 1h)}
 INCR + EXPIRE 2h; if count > cap → drop
 ```

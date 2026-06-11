@@ -11,7 +11,7 @@ describe("unsubscribeToken", () => {
       vi.restoreAllMocks();
     });
 
-    describe("when signing or verifying", () => {
+    describe("when signing", () => {
       it("throws rather than minting forgeable tokens", () => {
         vi.spyOn(env, "NEXTAUTH_SECRET", "get").mockReturnValue("");
         expect(() =>
