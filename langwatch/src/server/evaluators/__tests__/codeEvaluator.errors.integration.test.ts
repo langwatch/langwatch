@@ -9,7 +9,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { prisma } from "../../db";
-import { runCodeEvaluator } from "../codeEvaluator";
+import { runCodeEvaluator } from "../runCodeEvaluator";
 
 const { nlpgoFetchMock } = vi.hoisted(() => ({ nlpgoFetchMock: vi.fn() }));
 

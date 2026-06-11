@@ -15,8 +15,8 @@ import {
 import {
   codeEvaluatorIdFromCheckType,
   isCodeEvaluatorCheckType,
-  runCodeEvaluator,
 } from "~/server/evaluators/codeEvaluator";
+import { runCodeEvaluator } from "~/server/evaluators/runCodeEvaluator";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
 import {
   type MappingState,

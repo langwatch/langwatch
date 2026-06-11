@@ -262,8 +262,18 @@ function EvaluatorCard({
 
   return (
     <Box
-      as="button"
+      // role+tabIndex instead of as="button": the card hosts the Actions
+      // menu trigger, and nested native buttons are invalid HTML.
+      role="button"
+      tabIndex={0}
+      cursor="pointer"
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
       padding={4}
       borderRadius="md"
       border="1px solid"

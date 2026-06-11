@@ -60,8 +60,8 @@ import {
 import {
   codeEvaluatorIdFromCheckType,
   isCodeEvaluatorCheckType,
-  runCodeEvaluator,
 } from "../../evaluators/codeEvaluator";
+import { runCodeEvaluator } from "../../evaluators/runCodeEvaluator";
 import {
   evaluationDurationHistogram,
   getEvaluationStatusCounter,
