@@ -89,7 +89,6 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 import { encrypt } from "~/utils/encryption";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
-import { slugify } from "~/utils/slugify";
 import { validateInternalSecret } from "./_lib/internal-secret";
 
 const logger = createLogger("langwatch:misc");

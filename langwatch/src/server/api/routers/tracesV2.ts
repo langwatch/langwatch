@@ -15,7 +15,6 @@ import { deriveUnmappedCostSuggestion } from "~/server/app-layer/traces/model-co
 import type { SpanSummaryRow } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
-import { prisma } from "~/server/db";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import {
   changeTraceNameInputSchema,

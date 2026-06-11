@@ -4,6 +4,16 @@ import {
   googleDLPClearPII,
   type PIICheckOptions,
 } from "~/server/background/workers/collector/piiCheck";
+import type {
+  PiiLevel,
+  ResolvedDataPrivacy,
+} from "~/server/data-privacy/dataPrivacy.types";
+import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
+import {
+  compilePolicySecretPatterns,
+  redactAttributeNative,
+  redactStringNative,
+} from "~/server/data-privacy/redaction/applyContentRedaction";
 import { featureFlagService } from "~/server/featureFlag";
 import { createLogger } from "~/utils/logger/server";
 import {
@@ -17,16 +27,6 @@ import type {
   OtlpSpan,
 } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
-import type {
-  PiiLevel,
-  ResolvedDataPrivacy,
-} from "~/server/data-privacy/dataPrivacy.types";
-import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
-import {
-  compilePolicySecretPatterns,
-  redactAttributeNative,
-  redactStringNative,
-} from "~/server/data-privacy/redaction/applyContentRedaction";
 
 /**
  * Maximum attribute value length (in characters) for PII redaction.
@@ -113,7 +113,7 @@ const PII_DEFAULTS: OtlpSpanPiiRedactionServiceDependencies = {
   piiRedactionMaxAttributeLength: DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH,
 };
 
-function legacyToPiiLevel(level: PIIRedactionLevel): PiiLevel {
+function requestLevelToPiiLevel(level: PIIRedactionLevel): PiiLevel {
   switch (level) {
     case "STRICT":
       return "strict";
@@ -125,18 +125,18 @@ function legacyToPiiLevel(level: PIIRedactionLevel): PiiLevel {
 }
 
 /**
- * The PII level to enforce, reconciling the resolved policy with the project's
- * legacy piiRedactionLevel during the migration window. A resolved level other
+ * The PII level to enforce, reconciling the resolved policy with the optional
+ * per-request level carried on the ingestion command. A resolved level other
  * than the platform default ("essential") can only come from an explicit rule,
- * so it wins; at the default we honor the legacy field so pre-migration STRICT/
- * DISABLED projects keep their level until the backfill writes an explicit rule.
+ * so it wins; at the default we honor the per-request level, so a single
+ * ingestion call can still escalate or relax redaction without a policy rule.
  */
 function reconcilePiiLevel(
   policyLevel: PiiLevel,
-  legacyLevel: PIIRedactionLevel,
+  requestLevel: PIIRedactionLevel,
 ): PiiLevel {
   if (policyLevel !== "essential") return policyLevel;
-  return legacyToPiiLevel(legacyLevel);
+  return requestLevelToPiiLevel(requestLevel);
 }
 
 /**
@@ -169,7 +169,7 @@ type RedactionBatch = {
  * (the normal ingestion path), the secrets scrubber and the native essential-PII
  * recognizers run in-process with no external call; only the strict level still
  * escalates to the analysis-service batch. Without a tenant, or with the
- * LANGWATCH_DATA_PRIVACY_ENFORCEMENT kill switch set, the legacy batch path runs
+ * LANGWATCH_DATA_PRIVACY_ENFORCEMENT kill switch set, the analysis-service batch path runs
  * unchanged. This service is applied BEFORE creating immutable events in the
  * event sourcing pipeline.
  */
@@ -191,14 +191,14 @@ export class OtlpSpanPiiRedactionService {
 
   /**
    * Resolve the native-redaction context for a tenant: the effective policy
-   * (PII level reconciled with the legacy field) and that level. Returns null
-   * when native enforcement is skipped — the kill switch is set, no tenant is
-   * known (older callers), or resolution failed — so the caller runs the legacy
-   * batch path and PII is never silently left in.
+   * (PII level reconciled with the per-request level) and that level. Returns
+   * null when native enforcement is skipped — the kill switch is set, no tenant
+   * is known (older callers), or resolution failed — so the caller runs the
+   * analysis-service batch path and PII is never silently left in.
    */
   private async resolveNativeContext(
     tenantId: string | undefined,
-    legacyLevel: PIIRedactionLevel,
+    requestLevel: PIIRedactionLevel,
   ): Promise<{ policy: ResolvedDataPrivacy; level: PiiLevel } | null> {
     if (process.env.LANGWATCH_DATA_PRIVACY_ENFORCEMENT === "off") return null;
     if (!tenantId) return null;
@@ -210,11 +210,11 @@ export class OtlpSpanPiiRedactionService {
     } catch (error) {
       this.logger.warn(
         { error, tenantId },
-        "Data-privacy resolution failed; falling back to the legacy PII path",
+        "Data-privacy resolution failed; falling back to the analysis-service PII path",
       );
       return null;
     }
-    const level = reconcilePiiLevel(resolved.pii.level, legacyLevel);
+    const level = reconcilePiiLevel(resolved.pii.level, requestLevel);
     return { policy: { ...resolved, pii: { level } }, level };
   }
 
@@ -329,7 +329,7 @@ export class OtlpSpanPiiRedactionService {
    * Redacts the span + resource in place. Native secrets + essential PII run
    * in-process when a policy is resolvable for the tenant; only the strict level
    * escalates to the analysis-service batch. Without a tenant (or with the kill
-   * switch set) the legacy batch path runs unchanged.
+   * switch set) the analysis-service batch path runs unchanged.
    */
   async redactSpan(
     span: OtlpSpan,
