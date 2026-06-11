@@ -2,7 +2,7 @@
  * Public API types for the ExperimentRunService.
  *
  * All types use camelCase naming convention. Backend-specific mappers
- * convert from PascalCase (ClickHouse) or snake_case (Elasticsearch)
+ * convert from PascalCase (ClickHouse) or legacy snake_case
  * into these canonical types.
  */
 

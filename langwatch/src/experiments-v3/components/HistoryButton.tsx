@@ -2,7 +2,7 @@
  * HistoryButton - Navigate to evaluation results
  *
  * Shows a button in the V3 workbench header that links to the experiment
- * results page showing all past runs stored in Elasticsearch.
+ * results page showing all stored past runs.
  *
  * Enabled when:
  * - User has run an evaluation this session, OR

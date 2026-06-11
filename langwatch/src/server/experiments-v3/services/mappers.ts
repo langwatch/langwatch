@@ -1,6 +1,6 @@
 /**
  * Mapper functions that convert backend-specific data shapes
- * (ClickHouse PascalCase, Elasticsearch snake_case) into the
+ * (ClickHouse PascalCase, legacy snake_case) into the
  * canonical camelCase service types.
  */
 
@@ -277,10 +277,10 @@ export function mapClickHouseItemsToRunWithItems({
 }
 
 // ---------------------------------------------------------------------------
-// Elasticsearch mappers
+// Legacy snake_case mappers
 // ---------------------------------------------------------------------------
 
-/** Elasticsearch run aggregation bucket (from `getExperimentBatchEvaluationRuns`). */
+/** Legacy run aggregation bucket (from `getExperimentBatchEvaluationRuns`). */
 export interface ESRunAggregationBucket {
   key: string;
   dataset_cost: { value: number | null };
@@ -439,7 +439,7 @@ export function mapEsBatchEvaluationToRunWithItems(
 // ---------------------------------------------------------------------------
 
 /**
- * Maps Elasticsearch snake_case targets to the canonical camelCase shape.
+ * Maps legacy snake_case targets to the canonical camelCase shape.
  */
 export function mapEsTargetsToTargets(
   targets: ESBatchEvaluationTarget[],

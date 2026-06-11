@@ -50,7 +50,7 @@ interface MemberClassificationContext {
  * and follows Dependency Inversion Principle (DIP).
  *
  * Note: Message/trace counting is NOT included here because it queries
- * Elasticsearch (via TraceUsageService), not Prisma. Repositories should
+ * ClickHouse (via TraceUsageService), not Prisma. Repositories should
  * only do database queries - delegation to other services violates SRP.
  */
 export interface ILicenseEnforcementRepository {

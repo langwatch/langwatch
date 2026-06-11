@@ -4,7 +4,7 @@ import type { ExperimentRunWorkflowVersion } from "./types";
 /**
  * Fetch workflow version metadata from Prisma for a set of version IDs.
  *
- * Shared between ClickHouse and Elasticsearch experiment run backends
+ * Shared across experiment run read paths
  * to avoid duplication.
  *
  * @param prisma - PrismaClient instance

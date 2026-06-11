@@ -49,7 +49,7 @@ function buildEvaluatorIdClickHouseFilter(
 /**
  * ClickHouse filter definitions for each filter field.
  * Each definition specifies how to query filter options from ClickHouse.
- * Set to null for filters not supported in ClickHouse (will fall back to Elasticsearch).
+ * Set to null for filters with no ClickHouse options query.
  */
 export const clickHouseFilters: Record<
   FilterField,

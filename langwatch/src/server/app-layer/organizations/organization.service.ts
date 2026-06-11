@@ -243,7 +243,6 @@ export class OrganizationService {
 
   /**
    * Persists updated organization settings. Encryption is applied in the repository.
-   * The router triggers elasticsearch migration after calling this method.
    */
   async update(input: UpdateOrganizationInput): Promise<void> {
     return this.repo.update(input);

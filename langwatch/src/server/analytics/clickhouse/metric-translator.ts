@@ -22,7 +22,7 @@ import {
  *
  * WHY: Sessions longer than 3 hours are capped to prevent outliers
  * (e.g., tabs left open overnight) from skewing average duration metrics.
- * This matches the Elasticsearch behavior for consistency during migration.
+ * This matches the legacy analytics behavior for consistency.
  */
 const MAX_THREAD_SESSION_DURATION_MS = 3 * 60 * 60 * 1000; // 10800000ms = 3 hours
 

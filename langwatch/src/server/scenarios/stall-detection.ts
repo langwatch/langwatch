@@ -13,8 +13,8 @@ export const STALL_THRESHOLD_MS = CHILD_PROCESS.TIMEOUT_MS * 2;
  * at read time when a run has no RUN_FINISHED event and enough time
  * has passed since the last event.
  *
- * This is a pure function with no side effects -- it does not write
- * any new events to ElasticSearch.
+ * This is a pure function with no side effects -- it does not emit
+ * any new events.
  *
  * @param params.finishedStatus - The status from RUN_FINISHED event, or undefined if none exists
  * @param params.lastEventTimestamp - Timestamp (ms) of the most recent event of any type

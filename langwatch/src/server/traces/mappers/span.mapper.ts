@@ -455,7 +455,7 @@ export function unflattenDotNotation(
 
 /**
  * Maps a NormalizedSpan (from ClickHouse stored_spans) to the legacy Span type
- * used by the Elasticsearch-based trace system.
+ * used by the pre-ClickHouse trace system.
  */
 export function mapNormalizedSpanToSpan(normalizedSpan: NormalizedSpan): Span {
   const timestamps: SpanTimestamps = {
