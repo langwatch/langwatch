@@ -41,7 +41,7 @@ const makeTrace = (startedDaysAgo: number): Trace =>
     ],
   }) as Trace;
 
-describe("applyTraceProtections with a visibility window", () => {
+describe("given a plan with a visibility window", () => {
   describe("when the trace is older than the cutoff", () => {
     const protections: Protections = {
       ...FULL_ACCESS,

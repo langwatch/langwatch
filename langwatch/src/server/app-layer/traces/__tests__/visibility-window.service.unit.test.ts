@@ -50,7 +50,7 @@ const makeSpan = (overrides: Partial<Span> = {}): Span =>
     ...overrides,
   }) as Span;
 
-describe("teaserOf", () => {
+describe("given the teaser truncation rule", () => {
   describe("when the text is long", () => {
     it("caps the teaser at TEASER_MAX_CHARS", () => {
       expect(teaserOf("a".repeat(5000))).toHaveLength(TEASER_MAX_CHARS);
@@ -78,98 +78,151 @@ describe("teaserOf", () => {
   });
 });
 
-describe("redactTraceContent", () => {
-  it("truncates input, output, and error bodies to the teaser", () => {
-    const redacted = redactTraceContent(makeTrace());
-    expect(redacted.input?.value).toHaveLength(TEASER_MAX_CHARS);
-    expect(redacted.output?.value).toHaveLength(TEASER_MAX_CHARS);
-    expect(redacted.error?.message).toHaveLength(TEASER_MAX_CHARS);
-    // joined stacktrace is 503 chars -> ceil(10%) = 51 kept
-    expect(redacted.error?.stacktrace.join("")).toHaveLength(51);
-  });
+describe("given a trace beyond the visibility window", () => {
+  describe("when redactTraceContent runs", () => {
+    it("truncates input, output, and error bodies to the teaser", () => {
+      const redacted = redactTraceContent(makeTrace());
+      expect(redacted.input?.value).toHaveLength(TEASER_MAX_CHARS);
+      expect(redacted.output?.value).toHaveLength(TEASER_MAX_CHARS);
+      expect(redacted.error?.message).toHaveLength(TEASER_MAX_CHARS);
+      // joined stacktrace is 503 chars -> ceil(10%) = 51 kept
+      expect(redacted.error?.stacktrace.join("")).toHaveLength(51);
+    });
 
-  it("marks the trace as redacted by the visibility window", () => {
-    expect(redactTraceContent(makeTrace()).redacted_by_visibility_window).toBe(
-      true,
-    );
-  });
+    it("marks the trace as redacted by the visibility window", () => {
+      expect(
+        redactTraceContent(makeTrace()).redacted_by_visibility_window,
+      ).toBe(true);
+    });
 
-  it("keeps metadata, metrics, and timestamps unchanged", () => {
-    const trace = makeTrace();
-    const redacted = redactTraceContent(trace);
-    expect(redacted.metadata).toEqual(trace.metadata);
-    expect(redacted.metrics).toEqual(trace.metrics);
-    expect(redacted.timestamps).toEqual(trace.timestamps);
-    expect(redacted.trace_id).toBe(trace.trace_id);
-  });
+    it("keeps metadata, metrics, and timestamps unchanged", () => {
+      const trace = makeTrace();
+      const redacted = redactTraceContent(trace);
+      expect(redacted.metadata).toEqual(trace.metadata);
+      expect(redacted.metrics).toEqual(trace.metrics);
+      expect(redacted.timestamps).toEqual(trace.timestamps);
+      expect(redacted.trace_id).toBe(trace.trace_id);
+    });
 
-  it("does not mutate the original trace", () => {
-    const trace = makeTrace();
-    redactTraceContent(trace);
-    expect(trace.input?.value).toHaveLength(5000);
+    it("does not mutate the original trace", () => {
+      const trace = makeTrace();
+      redactTraceContent(trace);
+      expect(trace.input?.value).toHaveLength(5000);
+    });
   });
 });
 
-describe("redactSpanContent", () => {
-  it("truncates text input and output values to the teaser", () => {
-    const redacted = redactSpanContent(makeSpan());
-    expect((redacted.input as { value: string }).value).toHaveLength(
-      TEASER_MAX_CHARS,
-    );
-    expect((redacted.output as { value: string }).value).toHaveLength(
-      TEASER_MAX_CHARS,
-    );
-  });
-
-  it("truncates string param values but keeps non-string params", () => {
-    const redacted = redactSpanContent(makeSpan());
-    const params = redacted.params as Record<string, unknown>;
-    expect((params.system_prompt as string).length).toBeLessThanOrEqual(
-      TEASER_MAX_CHARS,
-    );
-    expect(params.temperature).toBe(0.2);
-  });
-
-  it("truncates chat-message contents individually", () => {
-    const span = makeSpan({
-      input: {
-        type: "chat_messages",
-        value: [
-          { role: "system", content: "s".repeat(4000) },
-          { role: "user", content: "hi" },
-        ],
-      },
+describe("given a span beyond the visibility window", () => {
+  describe("when redactSpanContent runs on well-formed payloads", () => {
+    it("truncates text input and output values to the teaser", () => {
+      const redacted = redactSpanContent(makeSpan());
+      expect((redacted.input as { value: string }).value).toHaveLength(
+        TEASER_MAX_CHARS,
+      );
+      expect((redacted.output as { value: string }).value).toHaveLength(
+        TEASER_MAX_CHARS,
+      );
     });
-    const redacted = redactSpanContent(span);
-    const messages = (redacted.input as { value: { content?: string | null }[] })
-      .value;
-    expect(messages[0]?.content).toHaveLength(TEASER_MAX_CHARS);
-    expect(messages[1]?.content).toBe("hi");
-  });
 
-  it("keeps span name, type, timestamps, and metrics visible", () => {
-    const span = makeSpan();
-    const redacted = redactSpanContent(span);
-    expect(redacted.name).toBe(span.name);
-    expect(redacted.type).toBe(span.type);
-    expect(redacted.timestamps).toEqual(span.timestamps);
-  });
-
-  it("truncates error message and stacktrace", () => {
-    const span = makeSpan({
-      error: {
-        has_error: true,
-        message: "e".repeat(2000),
-        stacktrace: ["t".repeat(2000)],
-      },
+    it("truncates string param values but keeps non-string params", () => {
+      const redacted = redactSpanContent(makeSpan());
+      const params = redacted.params as Record<string, unknown>;
+      expect((params.system_prompt as string).length).toBeLessThanOrEqual(
+        TEASER_MAX_CHARS,
+      );
+      expect(params.temperature).toBe(0.2);
     });
-    const redacted = redactSpanContent(span);
-    // 2000-char message -> ceil(10%) = 200 kept
-    expect(redacted.error?.message).toHaveLength(200);
+
+    it("truncates chat-message contents individually", () => {
+      const span = makeSpan({
+        input: {
+          type: "chat_messages",
+          value: [
+            { role: "system", content: "s".repeat(4000) },
+            { role: "user", content: "hi" },
+          ],
+        },
+      });
+      const redacted = redactSpanContent(span);
+      const messages = (
+        redacted.input as { value: { content?: string | null }[] }
+      ).value;
+      expect(messages[0]?.content).toHaveLength(TEASER_MAX_CHARS);
+      expect(messages[1]?.content).toBe("hi");
+    });
+
+    it("keeps span name, type, timestamps, and metrics visible", () => {
+      const span = makeSpan();
+      const redacted = redactSpanContent(span);
+      expect(redacted.name).toBe(span.name);
+      expect(redacted.type).toBe(span.type);
+      expect(redacted.timestamps).toEqual(span.timestamps);
+    });
+
+    it("truncates error message and stacktrace", () => {
+      const span = makeSpan({
+        error: {
+          has_error: true,
+          message: "e".repeat(2000),
+          stacktrace: ["t".repeat(2000)],
+        },
+      });
+      const redacted = redactSpanContent(span);
+      // 2000-char message -> ceil(10%) = 200 kept
+      expect(redacted.error?.message).toHaveLength(200);
+    });
+  });
+
+  describe("when redactSpanContent runs on malformed or rich payloads", () => {
+    it("teases a chat_messages value that is not an array as raw", () => {
+      const span = makeSpan({
+        input: { type: "chat_messages", value: "x".repeat(2000) } as never,
+      });
+      const redacted = redactSpanContent(span);
+      expect(redacted.input?.type).toBe("raw");
+      expect((redacted.input as { value: string }).value).toHaveLength(200);
+    });
+
+    it("recursively teases rich chat content parts (text, tool args)", () => {
+      const span = makeSpan({
+        input: {
+          type: "chat_messages",
+          value: [
+            {
+              role: "assistant",
+              content: [
+                { type: "text", text: "T".repeat(4000) },
+                { type: "tool_call", args: { query: "Q".repeat(2000) } },
+              ],
+            },
+          ],
+        } as never,
+      });
+      const redacted = redactSpanContent(span);
+      const content = (redacted.input as { value: { content: unknown[] }[] })
+        .value[0]!.content as Record<string, unknown>[];
+      expect((content[0]!.text as string).length).toBeLessThanOrEqual(
+        TEASER_MAX_CHARS,
+      );
+      expect(
+        (content[1]!.args as Record<string, string>).query!.length,
+      ).toBeLessThanOrEqual(TEASER_MAX_CHARS);
+    });
+
+    it("teases a list value that is not an array as raw", () => {
+      const span = makeSpan({
+        input: { type: "list", value: { nested: "y".repeat(5000) } } as never,
+      });
+      const redacted = redactSpanContent(span);
+      expect(redacted.input?.type).toBe("raw");
+      expect(
+        (redacted.input as { value: string }).value.length,
+      ).toBeLessThanOrEqual(TEASER_MAX_CHARS);
+    });
   });
 });
 
-describe("VisibilityWindowService.getVisibilityCutoffMs", () => {
+describe("given the visibility window service", () => {
   const makeService = (plan: unknown, shouldThrow = false) => {
     const planProvider = {
       getActivePlan: shouldThrow
@@ -200,35 +253,11 @@ describe("VisibilityWindowService.getVisibilityCutoffMs", () => {
   });
 
   describe("when plan resolution throws", () => {
-    it("fails closed with the free-tier cutoff", async () => {
+    it("propagates the error so the caller can fail closed without caching", async () => {
       const service = makeService(null, true);
-      const cutoff = await service.getVisibilityCutoffMs({
-        organizationId: "org-1",
-      });
-      expect(cutoff).not.toBeNull();
-      expect(cutoff).toBeLessThanOrEqual(Date.now() - 14 * DAY_MS + 5000);
+      await expect(
+        service.getVisibilityCutoffMs({ organizationId: "org-1" }),
+      ).rejects.toThrow("db down");
     });
-  });
-});
-
-describe("redactSpanContent with malformed payloads", () => {
-  it("teases a chat_messages value that is not an array as raw", () => {
-    const span = makeSpan({
-      input: { type: "chat_messages", value: "x".repeat(2000) } as never,
-    });
-    const redacted = redactSpanContent(span);
-    expect(redacted.input?.type).toBe("raw");
-    expect((redacted.input as { value: string }).value).toHaveLength(200);
-  });
-
-  it("teases a list value that is not an array as raw", () => {
-    const span = makeSpan({
-      input: { type: "list", value: { nested: "y".repeat(5000) } } as never,
-    });
-    const redacted = redactSpanContent(span);
-    expect(redacted.input?.type).toBe("raw");
-    expect(
-      (redacted.input as { value: string }).value.length,
-    ).toBeLessThanOrEqual(TEASER_MAX_CHARS);
   });
 });

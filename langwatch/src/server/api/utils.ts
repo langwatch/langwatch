@@ -9,6 +9,7 @@ import type { Session } from "~/server/auth";
 import { VisibilityWindowService } from "~/server/app-layer/traces/visibility-window.service";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { TtlCache } from "~/server/utils/ttlCache";
+import { createLogger } from "~/utils/logger/server";
 import { FREE_VISIBILITY_DAYS } from "../../../ee/licensing/constants";
 import type { Protections } from "../elasticsearch/protections";
 import { hasProjectPermission, isDemoProject } from "./rbac";
@@ -25,6 +26,8 @@ const visibilityDaysCache = new TtlCache<number | "none">(
   60 * 1000,
   "ttlcache:visibility-days:",
 );
+
+const visibilityLogger = createLogger("langwatch:visibility-window");
 
 /**
  * Resolves the plan-based visibility cutoff for a project's organization.
@@ -44,7 +47,15 @@ export async function getVisibilityCutoffMsForProject(
 
   try {
     const organizationId = await resolveOrganizationId(projectId);
-    if (!organizationId) return failClosedCutoff();
+    if (!organizationId) {
+      visibilityLogger.error(
+        { projectId },
+        "visibility window failing closed: project resolves to no organization",
+      );
+      return failClosedCutoff();
+    }
+    // Throws on plan-resolution failure — only real plan answers reach the
+    // cache below.
     const cutoffMs = await new VisibilityWindowService(
       getApp().planProvider,
     ).getVisibilityCutoffMs({ organizationId });
@@ -54,9 +65,13 @@ export async function getVisibilityCutoffMsForProject(
         : Math.round((Date.now() - cutoffMs) / dayMs);
     await visibilityDaysCache.set(projectId, visibilityDays);
     return cutoffMs;
-  } catch {
+  } catch (error) {
     // Fail-closed results are NOT cached — a transient plan-store error
     // should not pin paying customers to the free window for the TTL.
+    visibilityLogger.error(
+      { projectId, error },
+      "visibility window failing closed: plan resolution failed",
+    );
     return failClosedCutoff();
   }
 }

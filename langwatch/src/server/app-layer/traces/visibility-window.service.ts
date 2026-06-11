@@ -5,11 +5,6 @@ import type {
   SpanInputOutput,
   Trace,
 } from "~/server/tracer/types";
-import { FREE_VISIBILITY_DAYS } from "../../../../ee/licensing/constants";
-import { createLogger } from "~/utils/logger/server";
-
-const logger = createLogger("langwatch:traces:visibility-window");
-
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
@@ -72,8 +67,10 @@ const teaserOfSpanIO = (
               ? teaserOf(message.content)
               : message.content === null || message.content === undefined
                 ? message.content
-                : (JSON.parse(
-                    JSON.stringify(message.content),
+                : // Rich content (ChatRichContent[]): recursively tease every
+                  // string field — text parts, tool-call args, tool results.
+                  (deepTeaseStrings(
+                    message.content,
                   ) as typeof message.content),
         })),
       };
@@ -89,6 +86,25 @@ const teaserOfSpanIO = (
         value: teaserOf(JSON.stringify(io.value ?? null)),
       };
   }
+};
+
+/**
+ * Recursively truncates every string value inside an arbitrary structure to
+ * the teaser. Used for rich/nested content (ChatRichContent parts, tool-call
+ * args, tool results) where content hides below the top level.
+ */
+const deepTeaseStrings = (value: unknown): unknown => {
+  if (typeof value === "string") return teaserOf(value);
+  if (Array.isArray(value)) return value.map(deepTeaseStrings);
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([k, v]) => [
+        k,
+        deepTeaseStrings(v),
+      ]),
+    );
+  }
+  return value;
 };
 
 const teaserOfParams = (
@@ -148,10 +164,10 @@ export const redactSpanContent = <T extends Span>(span: T): T => ({
  * Design rationale: dev/docs/adr/028-visibility-blur-teaser-redaction.md.
  *
  * Stateless by design: every call evaluates the CURRENT plan, so upgrades
- * unblur on the next read and downgrades re-blur the same way. Fails CLOSED —
- * if plan resolution throws, the free-tier window applies (a leak is
- * irreversible; over-blur is a refresh away) and the event is logged for
- * alerting.
+ * unblur on the next read and downgrades re-blur the same way. Plan-resolution
+ * failures PROPAGATE — the caller owns the fail-closed fallback (free-tier
+ * window + alert + no caching), so a transient plan-store error is never
+ * mistaken for a real plan answer.
  */
 export class VisibilityWindowService {
   constructor(private readonly planProvider: PlanProvider) {}
@@ -159,24 +175,17 @@ export class VisibilityWindowService {
   /**
    * Returns the epoch-ms cutoff before which content must be teased, or
    * `null` when the plan has no visibility window (all paid/licensed plans).
+   * Throws when plan resolution fails — callers must fail closed.
    */
   async getVisibilityCutoffMs({
     organizationId,
   }: {
     organizationId: string;
   }): Promise<number | null> {
-    try {
-      const plan = await this.planProvider.getActivePlan({ organizationId });
-      const visibilityDays = plan?.visibilityDays;
-      if (visibilityDays === null || visibilityDays === undefined) return null;
-      return Date.now() - visibilityDays * DAY_MS;
-    } catch (error) {
-      logger.error(
-        { organizationId, error },
-        "plan resolution failed — visibility window failing closed to free tier",
-      );
-      return Date.now() - FREE_VISIBILITY_DAYS * DAY_MS;
-    }
+    const plan = await this.planProvider.getActivePlan({ organizationId });
+    const visibilityDays = plan?.visibilityDays;
+    if (visibilityDays === null || visibilityDays === undefined) return null;
+    return Date.now() - visibilityDays * DAY_MS;
   }
 
   /** True when a trace/span started before the cutoff (content must be teased). */

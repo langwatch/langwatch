@@ -31,8 +31,8 @@ const makeService = (spans: Span[]) =>
     findSpansSince: vi.fn().mockResolvedValue(spans),
   } as never);
 
-describe("SpanStorageService visibility gate", () => {
-  describe("when a cutoff is passed and the span is older", () => {
+describe("given a span storage read with a visibility gate", () => {
+  describe("when a cutoff is passed and the span is older than it", () => {
     it("teases span content on getSpansByTraceId", async () => {
       const service = makeService([makeSpan(15)]);
       const spans = await service.getSpansByTraceId({

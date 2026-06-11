@@ -492,6 +492,7 @@ export class TraceListService {
                   ...item,
                   input: item.input ? teaserOf(item.input) : item.input,
                   output: item.output ? teaserOf(item.output) : item.output,
+                  error: item.error ? teaserOf(item.error) : item.error,
                 }
               : item,
           );

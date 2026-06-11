@@ -1,0 +1,141 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e5]:
+        - link [ref=e6] [cursor=pointer]:
+          - /url: /
+          - img [ref=e7]
+        - 'button "Switch workspace (current: test@langwatch.ai)" [ref=e11] [cursor=pointer]':
+          - generic [ref=e12]:
+            - generic [ref=e14]: t
+            - paragraph [ref=e15]: test@langwatch.ai
+            - img [ref=e16]
+      - generic [ref=e18]:
+        - paragraph [ref=e19]: DEV
+        - button "Open command bar" [ref=e20] [cursor=pointer]:
+          - img [ref=e21]
+          - paragraph [ref=e24]: Search
+          - generic [ref=e25]: ⌘K
+        - button "t" [ref=e26] [cursor=pointer]:
+          - generic [ref=e28]: t
+    - generic [ref=e29]:
+      - generic [ref=e32]:
+        - generic [ref=e33]:
+          - link "Home" [ref=e34] [cursor=pointer]:
+            - /url: /testlangwatchai-MdT1dr
+            - img [ref=e37]
+          - paragraph [ref=e40]
+          - link "Analytics" [ref=e41] [cursor=pointer]:
+            - /url: /testlangwatchai-MdT1dr/analytics
+            - img [ref=e44]
+          - link "Traces" [ref=e47] [cursor=pointer]:
+            - /url: /testlangwatchai-MdT1dr/messages?view=table
+            - img [ref=e50]
+          - link "Trace Explorer" [ref=e53] [cursor=pointer]:
+            - /url: /testlangwatchai-MdT1dr/traces
+            - img [ref=e56]
+          - paragraph [ref=e60]
+          - button "Expand Simulations" [ref=e63] [cursor=pointer]:
+            - img [ref=e66]
+          - link "Evaluations" [ref=e68] [cursor=pointer]:
+            - /url: /testlangwatchai-MdT1dr/evaluations
+            - img [ref=e71]
+          - link "Annotations" [ref=e74] [cursor=pointer]:
+            - /url: /testlangwatchai-MdT1dr/annotations
+            - img [ref=e77]
+          - paragraph [ref=e80]
+          - link "Prompts" [ref=e81] [cursor=pointer]:
+            - /url: /testlangwatchai-MdT1dr/prompts
+            - img [ref=e84]
+          - link "Agents" [ref=e86] [cursor=pointer]:
+            - /url: /testlangwatchai-MdT1dr/agents
+            - img [ref=e89]
+          - link "Workflows" [ref=e92] [cursor=pointer]:
+            - /url: /testlangwatchai-MdT1dr/workflows
+            - img [ref=e95]
+          - link "Evaluators" [ref=e99] [cursor=pointer]:
+            - /url: /testlangwatchai-MdT1dr/evaluators
+            - img [ref=e102]
+          - link "Datasets" [ref=e106] [cursor=pointer]:
+            - /url: /testlangwatchai-MdT1dr/datasets
+            - img [ref=e109]
+          - paragraph [ref=e111]
+          - link "AI Gateway" [ref=e112] [cursor=pointer]:
+            - /url: /settings/gateway/virtual-keys
+            - img [ref=e115]
+        - generic [ref=e122]:
+          - link [ref=e123] [cursor=pointer]:
+            - /url: /settings/usage
+            - img [ref=e126]
+          - link "Settings" [ref=e128] [cursor=pointer]:
+            - /url: /settings
+            - img [ref=e131]
+          - generic [ref=e134]:
+            - button "Chat" [ref=e135] [cursor=pointer]:
+              - img [ref=e138]
+            - button "Support" [ref=e140] [cursor=pointer]:
+              - img [ref=e143]
+          - 'button "Current theme: light. Click to change." [ref=e151] [cursor=pointer]':
+            - img [ref=e152]
+      - generic [ref=e161]:
+        - heading "Settings" [level=1] [ref=e163]
+        - generic [ref=e164]:
+          - generic [ref=e165]:
+            - link "General Settings" [ref=e166] [cursor=pointer]:
+              - /url: /settings
+              - paragraph [ref=e168]: General Settings
+            - link "API Keys" [ref=e170] [cursor=pointer]:
+              - /url: /settings/api-keys
+              - paragraph [ref=e172]: API Keys
+            - generic [ref=e175] [cursor=pointer]:
+              - paragraph [ref=e176]: Models
+              - img [ref=e178]
+            - generic [ref=e181] [cursor=pointer]:
+              - paragraph [ref=e182]: Teams & Access
+              - img [ref=e184]
+            - generic [ref=e187] [cursor=pointer]:
+              - paragraph [ref=e188]: Features
+              - img [ref=e190]
+            - generic [ref=e192]:
+              - generic [ref=e193] [cursor=pointer]:
+                - paragraph [ref=e194]: Billing
+                - img [ref=e196]
+              - generic [ref=e198]:
+                - link "Usage & Billing" [ref=e199] [cursor=pointer]:
+                  - /url: /settings/usage
+                  - paragraph [ref=e201]: Usage & Billing
+                - link "Subscription" [ref=e203] [cursor=pointer]:
+                  - /url: /settings/subscription
+                  - paragraph [ref=e205]: Subscription
+          - generic [ref=e208]:
+            - generic [ref=e209]:
+              - heading "License" [level=2] [ref=e210]
+              - button "New License" [ref=e212] [cursor=pointer]:
+                - img [ref=e213]
+                - text: New License
+            - paragraph [ref=e214]: Manage your LangWatch license for self-hosted deployments. A valid license is required for commercial use and enables specific plan limits.
+            - generic [ref=e217]:
+              - generic [ref=e218]:
+                - paragraph [ref=e219]: No license installed
+                - paragraph [ref=e220]: Running without a license. Some features may be limited.
+              - generic [ref=e221]:
+                - paragraph [ref=e222]: "Activate a license:"
+                - radiogroup [ref=e223]:
+                  - generic [ref=e224]:
+                    - generic [ref=e225]:
+                      - radio "Upload license file" [checked] [ref=e226]
+                      - generic [ref=e229] [cursor=pointer]: Upload license file
+                    - generic [ref=e230]:
+                      - radio "Enter license key" [ref=e231]
+                      - generic [ref=e233] [cursor=pointer]: Enter license key
+                - generic [ref=e236] [cursor=pointer]:
+                  - img [ref=e237]
+                  - paragraph [ref=e240]: Drop your license here
+                  - paragraph [ref=e241]: Click to browse
+                - generic [ref=e242]:
+                  - button "Activate License" [disabled] [ref=e243]
+                  - link "Purchase license" [ref=e244] [cursor=pointer]:
+                    - /url: https://buy.stripe.com/dRm3cwaIDgXs6yK6sX0480f
+                  - link "Contact sales" [ref=e245] [cursor=pointer]:
+                    - /url: https://langwatch.ai/get-a-demo
+  - region "Notifications, top-end (alt+T)"
