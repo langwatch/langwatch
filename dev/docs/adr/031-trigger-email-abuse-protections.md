@@ -67,7 +67,7 @@ is recorded so replays stay no-ops. The counter increments per email
 *dispatch* (one digest of 100 traces = 1), not per trace and not per
 recipient.
 
-The cap default is **60 emails per trigger per hour**, env-configurable
+The cap default is **100 emails per trigger per hour**, env-configurable
 (`TRIGGER_EMAIL_HOURLY_CAP`). Digest cadences cannot exceed 12/hour, so the
 cap only ever bites `immediate`-cadence triggers — by design.
 
@@ -196,9 +196,11 @@ price, bounded by the hourly cap.
 - **The cap is per-trigger, not per-project.** A project with many triggers
   can still aggregate a large hourly volume; a per-project ceiling is a
   follow-up knob if provider costs warrant it.
-- **Suppression is permanent until manually removed.** No UI to manage the
-  suppression list ships in v1; rows are removable via support. A
-  project-settings suppression list view is a natural follow-up.
+- **Suppression management ships in v1.** A project-settings view lists
+  suppression rows (email, scope, when) and lets an operator with
+  `triggers:update` permission remove one — e.g. a recipient who unsubscribed
+  by accident and asked to be re-added. Removal is a deliberate operator
+  action; nothing re-suppresses automatically.
 - **Non-goals:** no Slack capping, no verification-email gate, no bounce
   ingestion (schema-ready via `reason`), no per-project volume ceiling.
 

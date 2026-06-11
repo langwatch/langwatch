@@ -108,3 +108,15 @@ Feature: Trigger email spam prevention
       When a matching trace settles
       Then no email is sent
       And the dispatch completes without error
+
+  Rule: Operators can manage the suppression list
+
+    Scenario: Suppressions are listed in project settings
+      Given recipients who have unsubscribed from the project's notifications
+      When an operator opens the suppression list in project settings
+      Then they see each suppressed address with its scope and date
+
+    Scenario: Removing a suppression resumes delivery
+      Given a recipient who unsubscribed by accident and asked to be re-added
+      When an operator removes their suppression entry
+      Then the recipient receives subsequent notifications again
