@@ -12,6 +12,9 @@ import (
 // @scenario "Upstream requests get a 14 minute timeout for every provider"
 func TestGetConfigForProviderSetsFourteenMinuteRequestTimeout(t *testing.T) {
 	a := &account{}
+	// 14*60 is intentionally an independent literal, not the exported
+	// constant: this pins the BEHAVIOR (14 minutes) so a fat-fingered
+	// constant fails here instead of self-verifying.
 	for _, provider := range []bfschemas.ModelProvider{bfschemas.OpenAI, bfschemas.Anthropic, bfschemas.Bedrock} {
 		cfg, err := a.GetConfigForProvider(provider)
 		require.NoError(t, err)
@@ -34,5 +37,8 @@ func TestGetConfigForProviderAlignsStreamIdleTimeout(t *testing.T) {
 
 // @scenario "Direct embedding requests share the same ceiling"
 func TestVoyageClientSharesTimeoutCeiling(t *testing.T) {
-	assert.Equal(t, 14*60*time.Second, newVoyageClient().Timeout)
+	// The contract here is the relationship: the direct Voyage client uses
+	// the same ceiling as the routed providers. The absolute 14m value is
+	// pinned by the request-timeout tests above with independent literals.
+	assert.Equal(t, ProviderRequestTimeoutSeconds*time.Second, newVoyageClient().Timeout)
 }
