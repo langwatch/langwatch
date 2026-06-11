@@ -22,6 +22,7 @@ import {
   createUIMessageStream,
   createUIMessageStreamResponse,
 } from "ai";
+import type { Context } from "hono";
 import { z } from "zod";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { hasProjectPermission } from "~/server/api/rbac";
@@ -34,12 +35,17 @@ import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.cl
 import {
   LangyConversationNotOwnedError,
   LangyConversationService,
+} from "~/server/services/langy/LangyConversationService";
+import {
   LangyCredentialResolutionError,
   LangyCredentialService,
+} from "~/server/services/langy/LangyCredentialService";
+import {
+  extractTextFromParts,
   LangyMessageService,
-} from "~/server/services/langy";
+} from "~/server/services/langy/LangyMessageService";
 import { checkLangyMessageRateLimit } from "~/server/middleware/rate-limit-langy";
-import type { NextRequestShim as any } from "./types";
+import type { NextRequestShim } from "./types";
 
 const logger = createLogger("langwatch:api:langy");
 
@@ -72,62 +78,31 @@ const chatRequestSchema = z.object({
     .max(200)
     .optional(),
 });
-type ChatMessage = z.infer<typeof chatMessageSchema>;
-
-function extractAssistantText(
-  parts: Array<Record<string, unknown>> | undefined,
-): string {
-  if (!Array.isArray(parts)) return "";
-  return parts
-    .map((p) => (typeof p?.text === "string" ? (p.text as string) : ""))
-    .filter(Boolean)
-    .join("\n");
-}
-
-async function persistAssistantMessage(opts: {
+async function persistMessage(opts: {
   conversationId: string;
   projectId: string;
+  role: "user" | "assistant";
   parts: unknown;
-  text: string;
   model: string;
 }) {
-  const tokenizer = new TiktokenClient();
-  const tokenCount = (await tokenizer.countTokens(opts.model, opts.text)) ?? null;
-  const messageService = LangyMessageService.create(prisma);
-  await messageService.append({
-    conversationId: opts.conversationId,
-    projectId: opts.projectId,
-    role: "assistant",
-    parts: opts.parts ?? [],
-    tokenCount,
-  });
-  const conversationService = LangyConversationService.create(prisma);
-  await conversationService.touch({
-    id: opts.conversationId,
-    projectId: opts.projectId,
-  });
-}
-
-async function persistUserMessage(opts: {
-  conversationId: string;
-  projectId: string;
-  message: ChatMessage;
-  model: string;
-}) {
-  const text =
-    Array.isArray(opts.message.parts) && opts.message.parts.length
-      ? extractAssistantText(opts.message.parts)
-      : "";
+  const text = extractTextFromParts(opts.parts);
   const tokenizer = new TiktokenClient();
   const tokenCount = (await tokenizer.countTokens(opts.model, text)) ?? null;
   const messageService = LangyMessageService.create(prisma);
   await messageService.append({
     conversationId: opts.conversationId,
     projectId: opts.projectId,
-    role: "user",
-    parts: opts.message.parts ?? [],
+    role: opts.role,
+    parts: opts.parts ?? [],
     tokenCount,
   });
+  if (opts.role === "assistant") {
+    const conversationService = LangyConversationService.create(prisma);
+    await conversationService.touch({
+      id: opts.conversationId,
+      projectId: opts.projectId,
+    });
+  }
 }
 
 // Every Langy route does its own authentication in-handler: the app-level
@@ -143,7 +118,15 @@ const LANGY_HANDLER_AUTH_REASON =
 const secured = createServiceApp({ basePath: "/api" });
 
 secured.hono.use("/langy/*", async (c, next) => {
-  await getServerAuthSession({ req: c.req.raw as any });
+  const session = await getServerAuthSession({
+    req: c.req.raw as NextRequestShim,
+  });
+  if (!session) {
+    return c.json(
+      { error: "You must be logged in to access this endpoint." },
+      { status: 401 },
+    );
+  }
   await next();
 });
 
@@ -152,7 +135,9 @@ const langyRoute = () =>
   secured.access(handlerManagedAuth(LANGY_HANDLER_AUTH_REASON));
 
 langyRoute().post("/langy/chat", async (c) => {
-  const session = await getServerAuthSession({ req: c.req.raw as any });
+  const session = await getServerAuthSession({
+    req: c.req.raw as NextRequestShim,
+  });
   if (!session) {
     return c.json(
       { error: "You must be logged in to access this endpoint." },
@@ -221,10 +206,7 @@ langyRoute().post("/langy/chat", async (c) => {
       projectId,
       userId: session.user.id,
       conversationId: requestedConversationId ?? null,
-      title:
-        messages[0] && extractAssistantText(messages[0].parts)
-          ? extractAssistantText(messages[0].parts).slice(0, 80)
-          : null,
+      title: extractTextFromParts(messages[0]?.parts).slice(0, 80) || null,
     });
   } catch (error) {
     if (error instanceof LangyConversationNotOwnedError) {
@@ -253,15 +235,16 @@ langyRoute().post("/langy/chat", async (c) => {
   }
 
   if (lastUserMessage?.role === "user") {
-    await persistUserMessage({
+    await persistMessage({
       conversationId: conversation.id,
       projectId,
-      message: lastUserMessage,
+      role: "user",
+      parts: lastUserMessage.parts,
       model: LANGY_FALLBACK_MODEL,
     });
   }
 
-  const userText = extractAssistantText(lastUserMessage?.parts);
+  const userText = extractTextFromParts(lastUserMessage?.parts);
 
   // The pod's AGENTS.md is written for CLI/codebase instrumentation
   // (the OpenCode default), not in-product Langy. We override with a
@@ -303,10 +286,10 @@ langyRoute().post("/langy/chat", async (c) => {
   // returned it) so we don't refetch the project — no risk of a TOCTOU race
   // silently skipping the check between calls.
   if (modelOverride) {
-    const modelsAllowed = await credentialService.getModelsAllowed(
+    const modelsAllowed = await credentialService.getModelsAllowed({
       projectId,
-      credentials.organizationId,
-    );
+      organizationId: credentials.organizationId,
+    });
     if (modelsAllowed && !modelsAllowed.includes(modelOverride)) {
       // Don't log the full allowlist on every reject — it's the project's
       // configured-model list and travels further than the user's UI does
@@ -414,12 +397,12 @@ langyRoute().post("/langy/chat", async (c) => {
       writer.write({ type: "text-end", id: textId });
 
       try {
-        await persistAssistantMessage({
+        await persistMessage({
           conversationId: conversation.id,
           projectId,
+          role: "assistant",
           parts: [{ type: "text", text: fullText, role: "assistant" }],
-          text: fullText,
-          model: "opencode",
+          model: LANGY_FALLBACK_MODEL,
         });
       } catch (error) {
         logger.error({ error }, "failed to persist langy assistant message");
@@ -444,8 +427,13 @@ langyRoute().post("/langy/chat", async (c) => {
 // Conversation management
 // ============================================================================
 
-async function requireSessionAndPermission(c: any, projectId: string | undefined) {
-  const session = await getServerAuthSession({ req: c.req.raw as any });
+async function requireSessionAndPermission(
+  c: Context,
+  projectId: string | undefined,
+) {
+  const session = await getServerAuthSession({
+    req: c.req.raw as NextRequestShim,
+  });
   if (!session) return { error: c.json({ error: "Unauthorized" }, { status: 401 }) };
   if (!projectId) return { error: c.json({ error: "Missing projectId" }, { status: 400 }) };
   const ok = await hasProjectPermission(

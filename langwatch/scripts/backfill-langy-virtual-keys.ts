@@ -15,7 +15,7 @@
  */
 
 import { PrismaClient } from "@prisma/client";
-import { backfillLangyVirtualKeys } from "../src/server/services/langy/LangyCredentialService";
+import { backfillLangyVirtualKeys } from "../src/server/services/langy/langyVirtualKey";
 
 const DRY_RUN = process.argv.includes("--dry-run");
 

@@ -13,7 +13,7 @@ import {
 import { connection } from "../../redis";
 import { prisma } from "../../db";
 import { LANGY_RETENTION_QUEUE } from "../queues/constants";
-import { LangyConversationService } from "../../services/langy";
+import { LangyConversationService } from "../../services/langy/LangyConversationService";
 
 const logger = createLogger("langwatch:workers:langyRetentionWorker");
 

@@ -7,6 +7,8 @@ import {
 } from "~/server/api-key/permission-categories";
 import { encrypt, decrypt } from "~/utils/encryption";
 import { createLogger } from "~/utils/logger/server";
+import { resolveAttributionUserId } from "./langyAttribution";
+import { backfillLangyCredentialPerProject } from "./langyBackfill";
 
 const logger = createLogger("langwatch:langy:api-key");
 
@@ -44,10 +46,13 @@ const LANGY_PERMISSIONS = computePermissionsFromSelections(
  * or null if it hasn't been provisioned yet. This is the token the worker's MCP
  * server uses as LANGWATCH_API_KEY.
  */
-export async function getLangyApiKeyToken(
-  prisma: PrismaClient,
-  projectId: string,
-): Promise<string | null> {
+export async function getLangyApiKeyToken({
+  prisma,
+  projectId,
+}: {
+  prisma: PrismaClient;
+  projectId: string;
+}): Promise<string | null> {
   // findFirst with an explicit `projectId` (NOT findUnique-by-`projectId_name`):
   // the request-scoped prisma client runs a multitenancy guard that recognizes a
   // plain `projectId` predicate but NOT the `projectId_name` compound key, and
@@ -59,25 +64,6 @@ export async function getLangyApiKeyToken(
     select: { encryptedValue: true },
   });
   return secret ? decrypt(secret.encryptedValue) : null;
-}
-
-/**
- * ProjectSecret.createdById is non-null, so the stored token must be attributed
- * to a user: the explicit actor when we have one (project creation / runtime),
- * else the organization's first admin (the backfill path, which has no actor).
- */
-async function resolveCreatorId(
-  prisma: PrismaClient,
-  organizationId: string,
-  createdByUserId: string | null,
-): Promise<string | null> {
-  if (createdByUserId) return createdByUserId;
-  const admin = await prisma.organizationUser.findFirst({
-    where: { organizationId, role: "ADMIN" },
-    orderBy: { createdAt: "asc" },
-    select: { userId: true },
-  });
-  return admin?.userId ?? null;
 }
 
 /**
@@ -101,13 +87,13 @@ export async function provisionLangyApiKey({
   organizationId: string;
   createdByUserId?: string | null;
 }): Promise<void> {
-  if (await getLangyApiKeyToken(prisma, projectId)) return;
+  if (await getLangyApiKeyToken({ prisma, projectId })) return;
 
-  const creatorId = await resolveCreatorId(
+  const creatorId = await resolveAttributionUserId({
     prisma,
     organizationId,
-    createdByUserId,
-  );
+    explicitUserId: createdByUserId,
+  });
   if (!creatorId) {
     logger.warn(
       { projectId },
@@ -161,46 +147,21 @@ export async function provisionLangyApiKey({
 export async function backfillLangyApiKeys(
   prisma: PrismaClient,
   { dryRun = false }: { dryRun?: boolean } = {},
-): Promise<{ provisioned: number; skipped: number; failed: number }> {
-  // Only real user workspaces. Hidden "internal_governance" routing projects
-  // are not user-facing and must never receive a Langy key.
-  const projects = await prisma.project.findMany({
-    where: { kind: "application" },
-    select: { id: true, team: { select: { organizationId: true } } },
-  });
-
-  let provisioned = 0;
-  let skipped = 0;
-  let failed = 0;
-
-  for (const project of projects) {
-    if (await getLangyApiKeyToken(prisma, project.id)) {
-      skipped++;
-      continue;
-    }
-    if (dryRun) {
-      provisioned++; // would-provision count
-      continue;
-    }
-    try {
+) {
+  return await backfillLangyCredentialPerProject({
+    prisma,
+    dryRun,
+    label: "Langy key",
+    logger,
+    isProvisioned: async (project) =>
+      Boolean(await getLangyApiKeyToken({ prisma, projectId: project.id })),
+    provision: async (project) => {
       await provisionLangyApiKey({
         prisma,
         projectId: project.id,
-        organizationId: project.team.organizationId,
+        organizationId: project.organizationId,
       });
-      provisioned++;
-    } catch (err) {
-      failed++;
-      logger.error(
-        { err, projectId: project.id },
-        "failed to backfill Langy key for project",
-      );
-    }
-  }
-
-  logger.info(
-    { provisioned, skipped, failed, dryRun },
-    "Langy key backfill complete",
-  );
-  return { provisioned, skipped, failed };
+      return "provisioned";
+    },
+  });
 }

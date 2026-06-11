@@ -37,7 +37,7 @@ import {
 } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
 import { provisionLangyApiKey } from "~/server/services/langy/langyApiKey";
-import { provisionLangyVirtualKey } from "~/server/services/langy/LangyCredentialService";
+import { provisionLangyVirtualKey } from "~/server/services/langy/langyVirtualKey";
 
 export const projectRouter = createTRPCRouter({
   publicGetById: publicProcedure

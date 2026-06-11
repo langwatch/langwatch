@@ -21,7 +21,7 @@ export type LangyMessageRecord = {
   content: string;
 };
 
-function extractText(parts: unknown): string {
+export function extractTextFromParts(parts: unknown): string {
   if (!Array.isArray(parts)) return "";
   return parts
     .map((p) =>
@@ -61,18 +61,6 @@ export class LangyMessageRepository {
     });
   }
 
-  async createMany(inputs: CreateMessageInput[]) {
-    if (inputs.length === 0) return { count: 0 };
-    return await this.prisma.langyMessage.createMany({
-      data: inputs.map((i) => ({
-        conversationId: i.conversationId,
-        projectId: i.projectId,
-        role: i.role,
-        parts: i.parts as never,
-        tokenCount: i.tokenCount ?? null,
-      })),
-    });
-  }
 }
 
 export class LangyMessageService {
@@ -109,15 +97,11 @@ export class LangyMessageService {
     return rows.map((r) => ({
       id: r.id,
       role: r.role as MessageRole,
-      content: extractText(r.parts),
+      content: extractTextFromParts(r.parts),
     }));
   }
 
   async append(input: CreateMessageInput): Promise<LangyMessage> {
     return await this.repository.create(input);
-  }
-
-  async appendMany(inputs: CreateMessageInput[]) {
-    return await this.repository.createMany(inputs);
   }
 }

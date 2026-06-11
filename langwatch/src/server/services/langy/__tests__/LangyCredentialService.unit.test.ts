@@ -6,6 +6,29 @@ vi.mock("~/utils/encryption", () => ({
   decrypt: vi.fn((value: string) => value.replace(/^enc:/, "")),
 }));
 
+// The VK provisioning path creates its own VirtualKeyService internally;
+// intercept the factory so assertions can observe `create` calls.
+const vkCreate = vi.fn();
+vi.mock("~/server/gateway/virtualKey.service", () => ({
+  VirtualKeyService: {
+    create: vi.fn(() => ({ create: vkCreate })),
+  },
+}));
+
+// No model default configured unless a test says otherwise — provisioning
+// must tolerate that (modelsAllowed stays null).
+vi.mock("~/server/modelProviders/modelDefaults.read", () => ({
+  getResolvedDefaultForFeature: vi.fn().mockResolvedValue(null),
+}));
+
+// The dedicated Langy API key has its own unit suite; here it is a
+// collaborator. getLangyApiKeyToken → null makes getOrProvision fall back
+// to the project ingestion key, which the assertions below rely on.
+vi.mock("../langyApiKey", () => ({
+  provisionLangyApiKey: vi.fn().mockResolvedValue(undefined),
+  getLangyApiKeyToken: vi.fn().mockResolvedValue(null),
+}));
+
 import {
   LangyCredentialResolutionError,
   LangyCredentialService,
@@ -21,23 +44,19 @@ function makePrisma(overrides: any = {}) {
       ...overrides.project,
     },
     projectSecret: {
-      findUnique: vi.fn().mockResolvedValue(null),
+      findFirst: vi.fn().mockResolvedValue(null),
       create: vi.fn().mockResolvedValue({}),
       ...overrides.projectSecret,
     },
   } as any;
 }
 
-function makeVkService(overrides: any = {}) {
-  return {
-    create: vi
-      .fn()
-      .mockResolvedValue({ secret: "lw_vk_live_provisioned", virtualKey: { id: "vk-1" } }),
-    ...overrides,
-  } as any;
-}
-
 beforeEach(() => {
+  vkCreate.mockReset();
+  vkCreate.mockResolvedValue({
+    secret: "lw_vk_live_provisioned",
+    virtualKey: { id: "vk-1" },
+  });
   process.env.LANGWATCH_API_URL = "https://api.langwatch.test";
   process.env.LW_GATEWAY_BASE_URL = "http://gateway.test:5563/v1";
 });
@@ -48,13 +67,13 @@ describe("LangyCredentialService", () => {
       it("returns the decrypted secret without re-provisioning", async () => {
         const prisma = makePrisma({
           projectSecret: {
-            findUnique: vi
+            findFirst: vi
               .fn()
               .mockResolvedValue({ encryptedValue: "enc:lw_vk_live_stored" }),
+            create: vi.fn().mockResolvedValue({}),
           },
         });
-        const vk = makeVkService();
-        const svc = new LangyCredentialService(prisma, vk);
+        const svc = new LangyCredentialService(prisma);
 
         const creds = await svc.getOrProvision({
           projectId: "p1",
@@ -65,7 +84,7 @@ describe("LangyCredentialService", () => {
         expect(creds.langwatchApiKey).toBe("sk-lw-test-project-key");
         expect(creds.langwatchEndpoint).toBe("https://api.langwatch.test");
         expect(creds.gatewayBaseUrl).toBe("http://gateway.test:5563/v1");
-        expect(vk.create).not.toHaveBeenCalled();
+        expect(vkCreate).not.toHaveBeenCalled();
         expect(prisma.projectSecret.create).not.toHaveBeenCalled();
       });
 
@@ -76,12 +95,13 @@ describe("LangyCredentialService", () => {
         process.env.LW_GATEWAY_BASE_URL = "http://langwatch-gateway:80";
         const prisma = makePrisma({
           projectSecret: {
-            findUnique: vi
+            findFirst: vi
               .fn()
               .mockResolvedValue({ encryptedValue: "enc:lw_vk_live_stored" }),
+            create: vi.fn().mockResolvedValue({}),
           },
         });
-        const svc = new LangyCredentialService(prisma, makeVkService());
+        const svc = new LangyCredentialService(prisma);
 
         const creds = await svc.getOrProvision({
           projectId: "p1",
@@ -95,12 +115,13 @@ describe("LangyCredentialService", () => {
         process.env.LW_GATEWAY_BASE_URL = "http://langwatch-gateway:80/v1/";
         const prisma = makePrisma({
           projectSecret: {
-            findUnique: vi
+            findFirst: vi
               .fn()
               .mockResolvedValue({ encryptedValue: "enc:lw_vk_live_stored" }),
+            create: vi.fn().mockResolvedValue({}),
           },
         });
-        const svc = new LangyCredentialService(prisma, makeVkService());
+        const svc = new LangyCredentialService(prisma);
 
         const creds = await svc.getOrProvision({
           projectId: "p1",
@@ -116,8 +137,7 @@ describe("LangyCredentialService", () => {
     describe("when getOrProvision is called", () => {
       it("provisions a project-scoped VK, stores the encrypted secret, returns the plaintext", async () => {
         const prisma = makePrisma();
-        const vk = makeVkService();
-        const svc = new LangyCredentialService(prisma, vk);
+        const svc = new LangyCredentialService(prisma);
 
         const creds = await svc.getOrProvision({
           projectId: "p1",
@@ -125,7 +145,7 @@ describe("LangyCredentialService", () => {
         });
 
         expect(creds.llmVirtualKey).toBe("lw_vk_live_provisioned");
-        expect(vk.create).toHaveBeenCalledWith(
+        expect(vkCreate).toHaveBeenCalledWith(
           expect.objectContaining({
             organizationId: "org-1",
             name: "Langy",
@@ -153,8 +173,7 @@ describe("LangyCredentialService", () => {
         const prisma = makePrisma({
           project: { findUnique: vi.fn().mockResolvedValue(null) },
         });
-        const vk = makeVkService();
-        const svc = new LangyCredentialService(prisma, vk);
+        const svc = new LangyCredentialService(prisma);
 
         await expect(
           svc.getOrProvision({ projectId: "missing", actorUserId: "u1" }),
@@ -168,13 +187,12 @@ describe("LangyCredentialService", () => {
       it("throws LangyCredentialResolutionError before any provisioning", async () => {
         delete process.env.LW_GATEWAY_BASE_URL;
         const prisma = makePrisma();
-        const vk = makeVkService();
-        const svc = new LangyCredentialService(prisma, vk);
+        const svc = new LangyCredentialService(prisma);
 
         await expect(
           svc.getOrProvision({ projectId: "p1", actorUserId: "u1" }),
         ).rejects.toThrow(/LW_GATEWAY_BASE_URL/);
-        expect(vk.create).not.toHaveBeenCalled();
+        expect(vkCreate).not.toHaveBeenCalled();
       });
     });
   });
@@ -188,18 +206,18 @@ describe("LangyCredentialService", () => {
         );
         const prisma = makePrisma({
           projectSecret: {
-            // First lookup misses (we race to provision).
-            findUnique: vi
+            findFirst: vi
               .fn()
               // First call: race-loser sees no secret yet
               .mockResolvedValueOnce(null)
               // Recovery call after P2002: winner's row is now visible
-              .mockResolvedValueOnce({ encryptedValue: "enc:lw_vk_live_winner" }),
+              .mockResolvedValueOnce({
+                encryptedValue: "enc:lw_vk_live_winner",
+              }),
             create: vi.fn().mockRejectedValue(p2002),
           },
         });
-        const vk = makeVkService();
-        const svc = new LangyCredentialService(prisma, vk);
+        const svc = new LangyCredentialService(prisma);
 
         const creds = await svc.getOrProvision({
           projectId: "p1",
@@ -209,7 +227,7 @@ describe("LangyCredentialService", () => {
         expect(creds.llmVirtualKey).toBe("lw_vk_live_winner");
         // We still attempted to provision (the orphan VK we just created
         // is acceptable v1 collateral — comment in the service explains).
-        expect(vk.create).toHaveBeenCalledOnce();
+        expect(vkCreate).toHaveBeenCalledOnce();
       });
     });
   });
@@ -236,9 +254,12 @@ describe("LangyCredentialService", () => {
         const prisma = makePrismaWithVk({
           config: { modelsAllowed: ["anthropic/claude-opus-4-7"] },
         });
-        const svc = new LangyCredentialService(prisma, makeVkService());
+        const svc = new LangyCredentialService(prisma);
 
-        const result = await svc.getModelsAllowed("p1", "org-1");
+        const result = await svc.getModelsAllowed({
+          projectId: "p1",
+          organizationId: "org-1",
+        });
 
         expect(result).toEqual(["anthropic/claude-opus-4-7"]);
         // Tenancy (org), identity (name + null principal), and reachability
@@ -261,18 +282,22 @@ describe("LangyCredentialService", () => {
     describe("when the Langy VK has modelsAllowed=null", () => {
       it("returns null — caller treats as 'no allowlist, gateway enforces'", async () => {
         const prisma = makePrismaWithVk({ config: { modelsAllowed: null } });
-        const svc = new LangyCredentialService(prisma, makeVkService());
+        const svc = new LangyCredentialService(prisma);
 
-        expect(await svc.getModelsAllowed("p1", "org-1")).toBeNull();
+        expect(
+          await svc.getModelsAllowed({ projectId: "p1", organizationId: "org-1" }),
+        ).toBeNull();
       });
     });
 
     describe("when the Langy VK has modelsAllowed=[] (empty)", () => {
       it("returns null — empty arrays are equivalent to 'unset' for this check", async () => {
         const prisma = makePrismaWithVk({ config: { modelsAllowed: [] } });
-        const svc = new LangyCredentialService(prisma, makeVkService());
+        const svc = new LangyCredentialService(prisma);
 
-        expect(await svc.getModelsAllowed("p1", "org-1")).toBeNull();
+        expect(
+          await svc.getModelsAllowed({ projectId: "p1", organizationId: "org-1" }),
+        ).toBeNull();
       });
     });
 
@@ -282,9 +307,11 @@ describe("LangyCredentialService", () => {
         // a VK that's never been project-scoped. All three states collapse
         // to "findFirst returns null" because the WHERE filters them out.
         const prisma = makePrismaWithVk(null);
-        const svc = new LangyCredentialService(prisma, makeVkService());
+        const svc = new LangyCredentialService(prisma);
 
-        expect(await svc.getModelsAllowed("p1", "org-1")).toBeNull();
+        expect(
+          await svc.getModelsAllowed({ projectId: "p1", organizationId: "org-1" }),
+        ).toBeNull();
       });
     });
 
@@ -293,12 +320,12 @@ describe("LangyCredentialService", () => {
         const prisma = makePrismaWithVk({
           config: { modelsAllowed: "not-an-array" as unknown as string[] },
         });
-        const svc = new LangyCredentialService(prisma, makeVkService());
+        const svc = new LangyCredentialService(prisma);
 
         // We don't care what the error type is — only that it's not "null"
         // (the silent-disable footgun the Zod parse is here to prevent).
         await expect(
-          svc.getModelsAllowed("p1", "org-1"),
+          svc.getModelsAllowed({ projectId: "p1", organizationId: "org-1" }),
         ).rejects.toThrow();
       });
     });
