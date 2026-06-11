@@ -1,4 +1,4 @@
-# ADR-026: Per-organization stored-GB-hours billing to Stripe via global event-sourced projection
+# ADR-027: Per-organization stored-GB-hours billing to Stripe via global event-sourced projection
 
 **Date:** 2026-06-11
 
