@@ -1436,11 +1436,13 @@ describe("GroupStagingScripts", () => {
     ): Promise<string> {
       // >1 KiB so the body is gzip+base64 — proves Lua reads the header only.
       return await encodeJobEnvelope({
-        __pipelineName: "ingestion",
-        __jobType: "projection",
-        __jobName: "traceProjection",
-        bulk: "x".repeat(4096),
-        ...overrides,
+        jobData: {
+          __pipelineName: "ingestion",
+          __jobType: "projection",
+          __jobName: "traceProjection",
+          bulk: "x".repeat(4096),
+          ...overrides,
+        },
       });
     }
 

@@ -25,6 +25,25 @@ Feature: GroupQueue payload envelope
     When a staged payload would grow under gzip plus base64
     Then the stored value is an envelope with a raw JSON body
 
+  # Large-payload blob offload
+
+  Scenario: Very large payloads are offloaded out of the queue hash
+    When a job whose payload exceeds the blob offload threshold is staged
+    Then the body is stored under a standalone blob key as compressed binary
+    And the queued value is a tiny envelope referencing the blob
+    And the handler receives the payload intact
+
+  Scenario: Offloaded blobs are cleaned up when the job completes
+    Given an offloaded job has been processed successfully
+    Then its blob key is deleted
+    And any blob that escapes deletion expires via its TTL safety net
+
+  Scenario: A missing blob does not wedge the group
+    Given an offloaded job whose blob has expired or been deleted
+    When dispatch delivers it to the worker
+    Then the job is completed without invoking the handler
+    And the group continues processing subsequent jobs
+
   # Two-phase format rollout
 
   Scenario: Envelope writes stay off until the whole fleet reads envelopes

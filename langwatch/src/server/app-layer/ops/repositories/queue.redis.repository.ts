@@ -20,6 +20,7 @@ import {
   decodeJobEnvelope,
   readJobRoutingMeta,
 } from "~/server/event-sourcing/queues/groupQueue/jobEnvelope";
+import { RedisJobBlobStore } from "~/server/event-sourcing/queues/groupQueue/redisJobBlobStore";
 
 const logger = createLogger("langwatch:ops:queue-redis-repository");
 
@@ -546,12 +547,16 @@ export class QueueRedisRepository implements QueueRepository {
       }
       const dataResults = await dataPipeline.exec();
 
+      const blobs = new RedisJobBlobStore({
+        redis: this.redis,
+        queueName: params.queueName,
+      });
       await Promise.all(
         jobIds.map(async (_, i) => {
           const raw = dataResults?.[i]?.[1] as string | null;
           if (raw) {
             try {
-              jobs[i]!.data = await decodeJobEnvelope(raw);
+              jobs[i]!.data = await decodeJobEnvelope({ value: raw, blobs });
             } catch {
               // ignore undecodable values
             }

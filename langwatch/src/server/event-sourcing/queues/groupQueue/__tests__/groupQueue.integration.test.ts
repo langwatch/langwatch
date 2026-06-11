@@ -209,6 +209,90 @@ describe.skipIf(!hasTestcontainers)(
       });
     });
 
+    describe("envelope blob offload", () => {
+      describe("when a payload exceeds the blob offload threshold", () => {
+        it("stores the body under a blob key, delivers it intact, and deletes the blob on completion", async () => {
+          process.env.GROUP_QUEUE_ENVELOPE_WRITES_ENABLED = "true";
+          try {
+            const queueName = `{test/gq/blob-${crypto.randomUUID().slice(0, 8)}}`;
+            const blobKeysDuringProcessing: string[] = [];
+            const processed = vi.fn(async (_payload: TestPayload) => {
+              blobKeysDuringProcessing.push(
+                ...(await redis.keys(`${queueName}:gq:blob:*`)),
+              );
+            });
+
+            const queue = createQueue(processed, { name: queueName });
+            await queue.waitUntilReady();
+
+            const bigValue = "z".repeat(64 * 1024);
+            await queue.send({
+              id: "big-1",
+              groupId: "group-a",
+              value: bigValue,
+            });
+
+            await vi.waitFor(
+              () => {
+                expect(processed).toHaveBeenCalledTimes(1);
+              },
+              { timeout: 5000, interval: 50 },
+            );
+
+            expect(processed.mock.calls[0]![0].value).toBe(bigValue);
+            expect(blobKeysDuringProcessing).toHaveLength(1);
+
+            await vi.waitFor(
+              async () => {
+                expect(await redis.keys(`${queueName}:gq:blob:*`)).toHaveLength(
+                  0,
+                );
+              },
+              { timeout: 5000, interval: 50 },
+            );
+          } finally {
+            delete process.env.GROUP_QUEUE_ENVELOPE_WRITES_ENABLED;
+          }
+        });
+
+        it("sets a TTL safety net on the blob key", async () => {
+          process.env.GROUP_QUEUE_ENVELOPE_WRITES_ENABLED = "true";
+          try {
+            const queueName = `{test/gq/blob-${crypto.randomUUID().slice(0, 8)}}`;
+            let release: () => void;
+            const gate = new Promise<void>((resolve) => {
+              release = resolve;
+            });
+            const processed = vi.fn(async (_payload: TestPayload) => {
+              await gate;
+            });
+
+            const queue = createQueue(processed, { name: queueName });
+            await queue.waitUntilReady();
+            await queue.send({
+              id: "big-2",
+              groupId: "group-a",
+              value: "z".repeat(64 * 1024),
+            });
+
+            await vi.waitFor(
+              async () => {
+                expect(await redis.keys(`${queueName}:gq:blob:*`)).toHaveLength(
+                  1,
+                );
+              },
+              { timeout: 5000, interval: 50 },
+            );
+            const [blobKey] = await redis.keys(`${queueName}:gq:blob:*`);
+            expect(await redis.ttl(blobKey!)).toBeGreaterThan(0);
+            release!();
+          } finally {
+            delete process.env.GROUP_QUEUE_ENVELOPE_WRITES_ENABLED;
+          }
+        });
+      });
+    });
+
     describe("per-group sequential processing", () => {
       describe("when multiple jobs share the same group key", () => {
         it("processes them one at a time, not in parallel", async () => {

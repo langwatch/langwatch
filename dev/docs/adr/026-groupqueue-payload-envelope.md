@@ -49,11 +49,31 @@ GQ1|<headerLen>|<headerJson><body>
   (body encoding: `"j"` raw JSON or `"gz"` gzip+base64), and the routing
   fields `p`/`t`/`n` (pipelineName/jobType/jobName).
 - `<body>` is the full payload JSON (including `__context`, `__attempt`,
-  and the routing fields, unchanged) — gzip-compressed and
-  base64-encoded when the JSON exceeds a 1 KiB threshold **and**
-  compression actually shrinks it; high-entropy payloads (inline
-  base64-ish data below the S3 spool threshold) grow under gzip+base64
-  and stay raw.
+  and the routing fields, unchanged), encoded by size tier:
+  - **≤1 KiB:** raw JSON (`e:"j"`) — gzip+base64 of small JSON is
+    frequently larger than the input.
+  - **1–32 KiB:** gzip+base64 inline (`e:"gz"`), but only when
+    compression actually shrinks it; high-entropy payloads (inline
+    base64-ish data) grow under gzip+base64 and stay raw.
+  - **>32 KiB:** offloaded (`e:"ref"`). The body is empty; the header
+    carries a blob id pointing at a standalone key
+    `{queueName}:gq:blob:<id>` holding the gzipped JSON as **raw
+    binary** (no base64 — the key is read/written directly by the
+    client, never through a Lua script reply, so ioredis's UTF-8
+    decoding is not a constraint). The bulk of a large payload thus
+    transits Redis exactly twice (one `SET` at stage, one `GETBUFFER`
+    at processing) and never flows through the dispatch, drain, or
+    restage Lua scripts or sits in the group hash.
+
+Blob lifecycle: the worker deletes the blob best-effort after the job
+completes, exhausts, or is re-encoded for retry (a retry writes a fresh
+envelope and blob; drained siblings re-staged after a batch failure
+keep their original values and blobs). A 7-day TTL on every blob key is
+the correctness backstop for orphans — dedup-squashed jobs, crashes
+between stage and delete — so a missed delete only lingers, never
+leaks forever. A missing blob at decode time is treated like a corrupt
+value: the slot is completed and the job is recoverable via event
+replay.
 
 **Rollout is two-phase.** Readers (TS decode, Lua routing helper, ops
 repository) are always envelope-aware, but writes stay legacy bare JSON
@@ -80,15 +100,29 @@ GroupQueue serialization boundary.
 
 ## Rationale / Trade-offs
 
-**Why gzip+base64 inside a string, not raw binary?** Lua strings and
-Redis bulk strings are binary-safe, but ioredis decodes script replies
-as UTF-8 strings by default; carrying raw binary through the dispatch,
-drain, retry, and ops paths would require switching every reply path to
-`evalBuffer`/Buffer variants and would render the data hash unreadable
-to existing ops tooling. Base64 surrenders ~25% of the compression win
-but keeps the entire pipeline string-safe with zero changes to the
-eval plumbing. Net effect on span JSON is still roughly 4–6×. Raw-binary
-storage remains open as a follow-up if the residual size matters.
+**Why gzip+base64 for mid-size bodies, not raw binary?** Lua strings
+and Redis bulk strings are binary-safe, but ioredis decodes script
+replies as UTF-8 strings by default; carrying raw binary through the
+dispatch, drain, retry, and ops paths would require switching every
+reply path to `evalBuffer`/Buffer variants and would render the data
+hash unreadable to existing ops tooling. Base64 surrenders ~25% of the
+compression win but keeps the entire pipeline string-safe with zero
+changes to the eval plumbing. Net effect on span JSON is still roughly
+4–6×.
+
+**Why offload large bodies to a standalone key instead of a companion
+hash field?** Above ~32 KiB the dominant cost is no longer format
+overhead but the bytes themselves transiting Redis's single thread on
+every Lua touch (dispatch HGET+return, drain, restage). A standalone
+key read/written only by the client sidesteps that entirely — and
+because the *reference travels inside the envelope value*, every Lua
+path (stage, dedup-replace, dispatch, drain, retry, exhaust, DLQ move)
+keeps moving one small string exactly as before, with zero script
+changes. A companion hash field, by contrast, would need lockstep
+handling in all of those scripts. The TTL makes orphaned blobs
+self-cleaning, so no path is *required* to delete in lockstep either.
+Blob keys share the queue name's hash tag, so they stay in the queue's
+cluster slot.
 
 **Why gzip, not zstd?** `node:zlib` gzip is available and stable on our
 Node 24 baseline with no new dependency; zstd's ratio/speed edge is not
@@ -105,15 +139,19 @@ exhaust, DLQ move). A prefix on the existing value keeps every
 frequently *larger* than the input. Small routing events stay raw.
 
 **What is compromised:** payloads in the data hash are no longer
-human-readable via `redis-cli` for compressed jobs; debugging requires
-the decode helper. Stage/processing paths pay a small async
-gzip/gunzip CPU cost (microseconds to low milliseconds per job, off
-Redis's thread — which is the point).
+human-readable via `redis-cli` for compressed or offloaded jobs;
+debugging requires the decode helper. Stage/processing paths pay a
+small async gzip/gunzip CPU cost (microseconds to low milliseconds per
+job, off Redis's thread — which is the point). Offloaded jobs pay one
+extra Redis round trip at stage and at processing, and orphaned blobs
+can occupy memory for up to the 7-day TTL.
 
 ## Consequences
 
 - Redis memory per span-sized job drops ~4–6×; the queue absorbs
-  proportionally larger bursts before memory pressure.
+  proportionally larger bursts before memory pressure. Large payloads
+  additionally stop transiting the Lua scripts at all, and gain the
+  base64-free ~25% on top of compression.
 - Dispatch-time Lua decodes ~100-byte headers instead of full payloads;
   the failed-counter path likewise. Redis CPU per dispatch batch falls
   accordingly.

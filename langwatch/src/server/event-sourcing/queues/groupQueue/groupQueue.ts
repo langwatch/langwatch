@@ -18,7 +18,12 @@ import {
   runWithContext,
 } from "../../../context/asyncContext";
 import { connection } from "../../../redis";
-import { decodeJobEnvelope, encodeJobEnvelope } from "./jobEnvelope";
+import {
+  decodeJobEnvelope,
+  encodeJobEnvelope,
+  readEnvelopeBlobId,
+} from "./jobEnvelope";
+import { RedisJobBlobStore } from "./redisJobBlobStore";
 import type {
   DeduplicationConfig,
   EventSourcedQueueDefinition,
@@ -125,6 +130,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   private readonly redisConnection: IORedis | Cluster;
   private readonly blockingConnection: IORedis | Cluster;
   private readonly scripts: GroupStagingScripts;
+  private readonly blobs: RedisJobBlobStore;
   private readonly rateTracker!: TenantRateTracker;
   private readonly globalConcurrency: number;
   private readonly consumerEnabled: boolean;
@@ -197,6 +203,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       this.redisConnection,
       this.queueName,
     );
+
+    // Offloaded envelope bodies (ADR-026): large payloads live under
+    // standalone blob keys so their bulk never transits the Lua scripts.
+    this.blobs = new RedisJobBlobStore({
+      redis: this.redisConnection,
+      queueName: this.queueName,
+    });
 
     // Advertise this queue in the registry set so the ops dashboard enumerates
     // it via SMEMBERS instead of an O(keyspace) `SCAN MATCH *:gq:ready`.
@@ -319,7 +332,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       dispatchAfterMs,
       dedupId,
       dedupTtlMs,
-      jobDataJson: await encodeJobEnvelope(payloadWithContext),
+      jobDataJson: await encodeJobEnvelope({
+        jobData: payloadWithContext,
+        blobs: this.blobs,
+      }),
       shouldExtend,
       shouldReplace,
     });
@@ -403,7 +419,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           dispatchAfterMs,
           dedupId,
           dedupTtlMs,
-          jobDataJson: await encodeJobEnvelope(payloadWithContext),
+          jobDataJson: await encodeJobEnvelope({
+            jobData: payloadWithContext,
+            blobs: this.blobs,
+          }),
           shouldExtend,
           shouldReplace,
         };
@@ -465,7 +484,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     // Parse the stored job data
     let jobData: Record<string, unknown>;
     try {
-      jobData = await decodeJobEnvelope(jobDataJson);
+      jobData = await decodeJobEnvelope({
+        value: jobDataJson,
+        blobs: this.blobs,
+      });
     } catch {
       this.logger.error(
         { queueName: this.queueName, stagedJobId, groupId },
@@ -473,6 +495,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       );
       // Complete the group slot so it's not stuck
       await this.scripts.complete({ groupId, stagedJobId });
+      this.deleteEnvelopeBlobs([jobDataJson]);
       return;
     }
 
@@ -619,6 +642,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
               // removed from staging during the drain, so completing the
               // dispatched job is enough to free the group.
               await this.scripts.complete({ groupId, stagedJobId, jobName });
+              this.deleteEnvelopeBlobs([
+                jobDataJson,
+                ...drainedSiblings.map((sibling) => sibling.jobDataJson),
+              ]);
               gqJobsCompletedTotal.inc(routingLabels);
 
               this.logger.debug(
@@ -652,9 +679,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                 gqRetryBackoffMilliseconds.observe(routingLabels, backoffMs);
                 const newStagedJobId = `${stagedJobId}/r/${attempt}`;
                 const retryJobData = await encodeJobEnvelope({
-                  ...(payload as Record<string, unknown>),
-                  __context: contextMetadata,
-                  __attempt: attempt + 1,
+                  jobData: {
+                    ...(payload as Record<string, unknown>),
+                    __context: contextMetadata,
+                    __attempt: attempt + 1,
+                  },
+                  blobs: this.blobs,
                 });
 
                 await this.scripts.retryRestage({
@@ -665,6 +695,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                   jobDataJson: retryJobData,
                   backoffMs,
                 });
+                // The re-stage wrote a fresh envelope (and blob, if large);
+                // the dispatched value's blob is now unreferenced. Drained
+                // siblings were re-staged with their ORIGINAL values, so
+                // their blobs stay.
+                this.deleteEnvelopeBlobs([jobDataJson]);
 
                 this.logger.warn(
                   {
@@ -706,6 +741,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                   contextMetadata,
                   routingLabels,
                 });
+                this.deleteEnvelopeBlobs([jobDataJson]);
               }
             }
           },
@@ -745,6 +781,20 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   }
 
   /**
+   * Best-effort deletion of offloaded bodies whose staged values are retired.
+   * Fire-and-forget: the blob TTL is the correctness backstop, so a failed
+   * delete only means the blob lingers until expiry.
+   */
+  private deleteEnvelopeBlobs(values: string[]): void {
+    for (const value of values) {
+      const blobId = readEnvelopeBlobId(value);
+      if (blobId) {
+        void this.blobs.delete({ id: blobId }).catch(() => {});
+      }
+    }
+  }
+
+  /**
    * Strips internal metadata fields from job data, returning the clean payload.
    */
   private stripInternalFields(jobData: Record<string, unknown>): Payload {
@@ -769,7 +819,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     groupId: string;
   }): Promise<Payload | null> {
     try {
-      const jobData = await decodeJobEnvelope(sibling.jobDataJson);
+      const jobData = await decodeJobEnvelope({
+        value: sibling.jobDataJson,
+        blobs: this.blobs,
+      });
       return this.stripInternalFields(jobData);
     } catch {
       this.logger.error(
@@ -881,8 +934,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     // Re-stage with a new ID
     const newStagedJobId = `${stagedJobId}/r/${Date.now()}`;
     const jobDataJson = await encodeJobEnvelope({
-      ...(payload as Record<string, unknown>),
-      __context: contextMetadata,
+      jobData: {
+        ...(payload as Record<string, unknown>),
+        __context: contextMetadata,
+      },
+      blobs: this.blobs,
     });
 
     // Atomically: block the group, re-stage the job, update ready score, store error
