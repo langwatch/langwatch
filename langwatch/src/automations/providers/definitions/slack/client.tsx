@@ -77,7 +77,7 @@ function toActionParams(slice: SlackSlice): SlackActionParams {
 }
 
 function testFireTarget(slice: SlackSlice) {
-  return { recipients: [], webhook: slice.webhook || null };
+  return { webhook: slice.webhook || null };
 }
 
 function templatesFromSlice(slice: SlackSlice) {

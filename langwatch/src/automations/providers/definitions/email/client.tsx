@@ -71,8 +71,10 @@ function toActionParams(slice: EmailSlice): EmailActionParams {
   return { members: slice.members };
 }
 
-function testFireTarget(slice: EmailSlice) {
-  return { recipients: slice.members, webhook: null };
+function testFireTarget(_slice: EmailSlice) {
+  // ADR-031: email test fires deliver only to the requesting user, resolved
+  // server-side. The configured recipient list is irrelevant to a test.
+  return { webhook: null };
 }
 
 function templatesFromSlice(slice: EmailSlice) {
