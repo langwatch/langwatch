@@ -208,6 +208,14 @@ export function createEnvConfig() {
       GITHUB_CLIENT_ID: z.string().optional(),
       GITHUB_CLIENT_SECRET: z.string().optional(),
 
+      // GitHub App used by Langy to open PRs as the requesting user.
+      // Separate from the GITHUB_CLIENT_* identity-login app above. All
+      // optional: when unset, the Langy GitHub feature is silently off and
+      // unconnected users get a "Connect GitHub" reply. Issue #4747.
+      GITHUB_LANGY_APP_ID: z.string().optional(),
+      GITHUB_LANGY_CLIENT_ID: z.string().optional(),
+      GITHUB_LANGY_CLIENT_SECRET: z.string().optional(),
+
       // Gitlab
       GITLAB_CLIENT_ID: z.string().optional(),
       GITLAB_CLIENT_SECRET: z.string().optional(),
@@ -364,6 +372,9 @@ export function createEnvConfig() {
       LANGWATCH_NLP_LAMBDA_CONFIG: process.env.LANGWATCH_NLP_LAMBDA_CONFIG,
       GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
       GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
+      GITHUB_LANGY_APP_ID: process.env.GITHUB_LANGY_APP_ID,
+      GITHUB_LANGY_CLIENT_ID: process.env.GITHUB_LANGY_CLIENT_ID,
+      GITHUB_LANGY_CLIENT_SECRET: process.env.GITHUB_LANGY_CLIENT_SECRET,
       GITLAB_CLIENT_ID: process.env.GITLAB_CLIENT_ID,
       GITLAB_CLIENT_SECRET: process.env.GITLAB_CLIENT_SECRET,
       GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
