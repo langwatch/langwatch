@@ -9,6 +9,7 @@ import {
 } from "@chakra-ui/react";
 import { useMemo, useRef } from "react";
 import { LuCircleX } from "react-icons/lu";
+import { RedactedField } from "~/components/ui/RedactedField";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { useSpanDetail } from "../../../hooks/useSpanDetail";
 import { useTraceResources } from "../../../hooks/useTraceResources";
@@ -147,29 +148,31 @@ export function SpanAccordions({
                 >
                   {detailQuery.isLoading ? (
                     <EmptyHint>Loading…</EmptyHint>
-                  ) : hasIO ? (
-                    <VStack align="stretch" gap={2}>
-                      {detail?.input && (
-                        <IOViewer
-                          label="Input"
-                          content={detail.input}
-                          mode="input"
-                          spanId={detail.spanId}
-                          spanType={detail.type}
-                        />
-                      )}
-                      {detail?.output && (
-                        <IOViewer
-                          label="Output"
-                          content={detail.output}
-                          mode="output"
-                          spanId={detail.spanId}
-                          spanType={detail.type}
-                        />
-                      )}
-                    </VStack>
                   ) : (
-                    <EmptyHint>No I/O captured for this span</EmptyHint>
+                    <VStack align="stretch" gap={2}>
+                      <RedactedField field="input">
+                        {detail?.input ? (
+                          <IOViewer
+                            label="Input"
+                            content={detail.input}
+                            mode="input"
+                            spanId={detail.spanId}
+                            spanType={detail.type}
+                          />
+                        ) : null}
+                      </RedactedField>
+                      <RedactedField field="output">
+                        {detail?.output ? (
+                          <IOViewer
+                            label="Output"
+                            content={detail.output}
+                            mode="output"
+                            spanId={detail.spanId}
+                            spanType={detail.type}
+                          />
+                        ) : null}
+                      </RedactedField>
+                    </VStack>
                   )}
                 </Section>
               );

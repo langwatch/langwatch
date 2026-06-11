@@ -100,6 +100,15 @@ const traceHeaderSchema = z.object({
   lastUsedPromptVersionId: z.string().nullable().default(null),
   lastUsedPromptSpanId: z.string().nullable().default(null),
   attributes: z.record(z.string()),
+  /**
+   * Read-time privacy markers for the trace. `droppedCategories` lists content
+   * categories (`input` / `output`) that a `drop` data-privacy policy stripped
+   * at ingestion, so the drawer can surface the "dropped, cannot be recovered"
+   * banner. Absent/null when nothing was dropped.
+   */
+  privacy: z
+    .object({ droppedCategories: z.array(z.string()).optional() })
+    .nullish(),
 });
 
 export type TraceHeader = z.infer<typeof traceHeaderSchema>;

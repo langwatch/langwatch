@@ -13,6 +13,7 @@ import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
 import type { SpanSummaryRow } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
 import { prisma } from "~/server/db";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import {
@@ -36,6 +37,7 @@ import {
   type PromptLookupSpan,
 } from "~/server/traces/findPromptReferenceInAncestors";
 import { checkProjectPermission } from "../rbac";
+import { getUserProtectionsForProject } from "../utils";
 import { withoutHiddenResourceAttrs } from "./tracesV2.resourceAttrs";
 import type {
   SpanDetail,
@@ -360,6 +362,31 @@ async function enrichLlmSpanWithAncestorPrompt({
   return next;
 }
 
+/**
+ * Read-time content visibility gate. Mirrors the legacy `applyTraceProtections`
+ * path: the v2 router otherwise returns trace/span input & output to the client
+ * with no enforcement. Nulls out `input`/`output` unless the resolved
+ * data-privacy policy grants the viewer captured-content access. The UI then
+ * shows the `RedactedField` placeholder instead of the raw content.
+ */
+function redactV2Content<
+  T extends { input?: string | null; output?: string | null },
+>(
+  dto: T,
+  protections: {
+    canSeeCapturedInput?: boolean | null;
+    canSeeCapturedOutput?: boolean | null;
+  },
+): T {
+  return {
+    ...dto,
+    input:
+      protections.canSeeCapturedInput === true ? (dto.input ?? null) : null,
+    output:
+      protections.canSeeCapturedOutput === true ? (dto.output ?? null) : null,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Input schemas
 // ---------------------------------------------------------------------------
@@ -392,9 +419,12 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("traces:view"))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const app = getApp();
-      return app.traces.list.getList({
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
+      const page = await app.traces.list.getList({
         tenantId: input.projectId,
         timeRange: input.timeRange,
         sort: input.sort,
@@ -402,6 +432,10 @@ export const tracesV2Router = createTRPCRouter({
         pageSize: input.pageSize,
         filterWhere: buildFilterWhere(input),
       });
+      return {
+        ...page,
+        items: page.items.map((it) => redactV2Content(it, protections)),
+      };
     }),
 
   facets: protectedProcedure
@@ -477,8 +511,11 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("traces:view"))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const app = getApp();
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
       // Window: conversation membership is timeless; cap at 1y to keep
       // partition pruning effective.
       const now = Date.now();
@@ -495,15 +532,20 @@ export const tracesV2Router = createTRPCRouter({
         pageSize: 200,
         filterWhere,
       });
-      const turns = page.items.map((t) => ({
-        traceId: t.traceId,
-        timestamp: t.timestamp,
-        name: t.traceName || t.name,
-        rootSpanType: t.rootSpanType ?? null,
-        status: t.status,
-        input: t.input ?? null,
-        output: t.output ?? null,
-      }));
+      const turns = page.items.map((t) =>
+        redactV2Content(
+          {
+            traceId: t.traceId,
+            timestamp: t.timestamp,
+            name: t.traceName || t.name,
+            rootSpanType: t.rootSpanType ?? null,
+            status: t.status,
+            input: t.input ?? null,
+            output: t.output ?? null,
+          },
+          protections,
+        ),
+      );
       // Position/previous/next are derived client-side from the active
       // traceId so the cache key doesn't churn on J/K navigation.
       return {
@@ -635,8 +677,11 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("traces:view"))
-    .query(async ({ input }): Promise<TraceHeader> => {
+    .query(async ({ input, ctx }): Promise<TraceHeader> => {
       const app = getApp();
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
       const summary = await app.traces.summary.getByTraceId(
         input.projectId,
         input.traceId,
@@ -647,7 +692,41 @@ export const tracesV2Router = createTRPCRouter({
       if (!summary) {
         throw new TraceNotFoundError(input.traceId);
       }
-      return mapTraceSummaryToHeader(summary);
+      const rawHeader = mapTraceSummaryToHeader(summary);
+      const header = redactV2Content(rawHeader, protections);
+
+      // Trace-level DROP banner. A `drop` disposition strips the category at
+      // ingestion, so the computed content was never stored and is empty. The
+      // check uses the ORIGINAL computed content (rawHeader), not the redacted
+      // one: an old pre-rule trace still has its content, so the banner won't
+      // show even though the now-`drop` policy hides it; restricted content has
+      // disposition "restrict" (not "drop") so it can't be mislabeled here.
+      // Resolution failures must not break the header — skip the derivation.
+      try {
+        const policy =
+          await getDataPrivacyPolicyService().getResolvedForProject({
+            projectId: input.projectId,
+          });
+        const droppedCategories: string[] = [];
+        if (
+          policy.categories.input.disposition === "drop" &&
+          !rawHeader.input
+        ) {
+          droppedCategories.push("input");
+        }
+        if (
+          policy.categories.output.disposition === "drop" &&
+          !rawHeader.output
+        ) {
+          droppedCategories.push("output");
+        }
+        header.privacy =
+          droppedCategories.length > 0 ? { droppedCategories } : null;
+      } catch {
+        // Skip the drop derivation on resolver/cache/db failure.
+      }
+
+      return header;
     }),
 
   /**
@@ -927,14 +1006,19 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("traces:view"))
-    .query(async ({ input }): Promise<SpanDetail[]> => {
+    .query(async ({ input, ctx }): Promise<SpanDetail[]> => {
       const app = getApp();
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
       const spans = await app.traces.spans.getSpansByTraceId({
         tenantId: input.projectId,
         traceId: input.traceId,
         ...occurredAtFromInput(input),
       });
-      return spans.map((span) => mapSpanToDetail(span, []));
+      return spans.map((span) =>
+        redactV2Content(mapSpanToDetail(span, []), protections),
+      );
     }),
 
   spanDetail: protectedProcedure
@@ -947,8 +1031,11 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("traces:view"))
-    .query(async ({ input }): Promise<SpanDetail> => {
+    .query(async ({ input, ctx }): Promise<SpanDetail> => {
       const app = getApp();
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
       const hint = occurredAtFromInput(input);
       // One narrow span fetch + one narrow events fetch in parallel —
       // both keyed by SpanId (and partition-pruned by occurredAtMs when
@@ -1011,7 +1098,7 @@ export const tracesV2Router = createTRPCRouter({
         }
       }
 
-      return detail;
+      return redactV2Content(detail, protections);
     }),
 
   /**
