@@ -45,6 +45,36 @@ Feature: Seat subscription provisions an organization retention policy
     When the subscription is activated by a successful payment
     Then the activation still completes and the confirmation notification is sent
 
+  # Activating a self-hosted license is the second paid entry point and
+  # provisions the same organization-scoped policies — but create-if-absent
+  # only: a category that already has an organization-level override is never
+  # overridden, so a manually-tuned window survives license activation.
+
+  @unit
+  Scenario: Activating a valid license provisions the missing organization policies
+    Given a valid license is activated for the organization
+    When the license is successfully stored
+    Then an organization-scoped retention policy is created for every category that has none
+
+  @unit
+  Scenario: License activation never overrides an existing organization policy
+    Given the organization already has an organization-level traces retention policy
+    When a valid license is successfully activated
+    Then the existing traces policy is left untouched
+    And policies are created only for the categories that have none
+
+  @unit
+  Scenario: An invalid license provisions no retention policies
+    Given an invalid or expired license is submitted
+    When activation is rejected
+    Then no retention policy is created
+
+  @unit
+  Scenario: A retention failure never fails license activation
+    Given provisioning the retention policy will fail
+    When a valid license is activated
+    Then the license is still stored and activation succeeds
+
   # Removal-on-cancellation is deactivated until the paid-retention
   # feature is released. Cancelling currently leaves the policies in place.
   @unit
