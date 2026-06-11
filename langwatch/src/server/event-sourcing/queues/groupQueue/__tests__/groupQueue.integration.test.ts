@@ -422,11 +422,15 @@ describe.skipIf(!hasTestcontainers)(
             value: "second",
           });
 
+          // Both sends signal the dispatcher before the 200ms delay elapses,
+          // so pickup of the squashed job rides on the BRPOP fallback poll
+          // (signalTimeoutSec = 5s). The window must absorb several poll
+          // cycles on a CPU-starved CI runner.
           await vi.waitFor(
             () => {
               expect(processed).toHaveBeenCalledTimes(1);
             },
-            { timeout: 10000, interval: 50 },
+            { timeout: 30000, interval: 50 },
           );
 
           const receivedPayload = processed.mock.calls[0]![0];
@@ -655,11 +659,15 @@ describe.skipIf(!hasTestcontainers)(
 
           // Despite the first batch throwing, every event is eventually
           // processed — the drained siblings were re-staged, not lost.
+          // The retry re-stages with a future score and no signal, so the
+          // dispatcher only picks it up on its BRPOP fallback poll
+          // (signalTimeoutSec = 5s, plus the active-key backoff TTL). The
+          // window must absorb several poll cycles on a CPU-starved CI runner.
           await vi.waitFor(
             () => {
               expect(new Set(succeeded.map((p) => p.id)).size).toBe(4);
             },
-            { timeout: 20000, interval: 100 },
+            { timeout: 45000, interval: 100 },
           );
         });
       });
