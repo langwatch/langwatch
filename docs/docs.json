@@ -172,6 +172,7 @@
                   "prompt-management/features/essential/version-control",
                   "prompts/template-syntax",
                   "prompt-management/data-model",
+                  "prompt-management/features/essential/runtime-parameters",
                   "prompt-management/scope",
                   "prompt-management/features/essential/analytics",
                   "prompt-management/features/essential/github-integration",
