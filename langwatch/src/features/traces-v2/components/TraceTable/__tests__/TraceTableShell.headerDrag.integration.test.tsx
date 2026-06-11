@@ -168,15 +168,17 @@ describe("TraceTableShell header drag/sort interplay", () => {
             new FakePointerEvent("pointermove", { clientX: 40, clientY: 10 }),
           );
         });
+        // The browser delivers the synthetic click in the same task as
+        // pointerup, BEFORE the setTimeout(0) that releases the
+        // suppression — so fire it inside the same act() rather than
+        // after the await, where a slow event loop (CI) could let the
+        // release timer run first and turn this test flaky.
         await act(async () => {
           document.dispatchEvent(
             new FakePointerEvent("pointerup", { clientX: 40, clientY: 10 }),
           );
+          fireEvent.click(screen.getByText("Name"));
         });
-
-        // The synthetic click fires synchronously after pointerup,
-        // BEFORE the setTimeout(0) that releases the suppression.
-        fireEvent.click(screen.getByText("Name"));
         expect(lastTable!.getColumn("name")!.getIsSorted()).toBe(false);
 
         // Once the suppression ref clears (next tick) AND dnd-kit drops
