@@ -194,6 +194,12 @@ export const spanDetailSchema = z.object({
       attributes: z.record(z.unknown()),
     }),
   ),
+  /**
+   * Present when the span names a model and carries token usage but nothing
+   * (custom rule or static registry) prices it, the UI offers to create a
+   * model cost mapping for `model`. Only computed by `spanDetail`.
+   */
+  costSuggestion: z.object({ model: z.string() }).nullish(),
 });
 
 export type SpanDetail = z.infer<typeof spanDetailSchema>;
