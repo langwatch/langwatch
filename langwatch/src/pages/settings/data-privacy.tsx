@@ -22,15 +22,19 @@ import {
   Shield,
   Users,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import SettingsLayout from "~/components/SettingsLayout";
 import {
   buildRuleConfig,
+  configsEqual,
   configToFormState,
+  inheritedFormState,
   isEmptyRuleConfig,
   type RuleAudience,
   ruleSummary,
+  type TouchedControls,
+  touchedFromConfig,
 } from "~/components/settings/dataPrivacyRuleConfig";
 import {
   type AvailableScopes,
@@ -380,7 +384,7 @@ function DataPrivacyPage({ projectId }: { projectId: string }) {
           )
         )}
 
-        {available && (
+        {available && snapshot && (
           <PrivacyRuleDrawer
             open={drawerOpen}
             editingRule={editingRule}
@@ -389,6 +393,8 @@ function DataPrivacyPage({ projectId }: { projectId: string }) {
               setEditingRule(null);
             }}
             available={available}
+            effective={snapshot.effective}
+            projectId={projectId}
             isSaving={setForScope.isLoading}
             onSave={async (scope, personalOnly, config) => {
               try {
@@ -474,11 +480,19 @@ const audienceCollection = createListCollection({
   ],
 });
 
+const NO_CONTROLS_TOUCHED: TouchedControls = {
+  categories: {},
+  pii: false,
+  secrets: false,
+};
+
 function PrivacyRuleDrawer({
   open,
   editingRule,
   onClose,
   available,
+  effective,
+  projectId,
   isSaving,
   onSave,
 }: {
@@ -486,6 +500,8 @@ function PrivacyRuleDrawer({
   editingRule: DataPrivacyRule | null;
   onClose: () => void;
   available: DataPrivacyScopeAvailable;
+  effective: ResolvedDataPrivacy;
+  projectId: string;
   isSaving: boolean;
   onSave: (
     scope: {
@@ -518,31 +534,68 @@ function PrivacyRuleDrawer({
   const [audience, setAudience] = useState<RuleAudience>("admins");
   const [piiLevel, setPiiLevel] = useState<PiiLevel>("essential");
   const [secretsEnabled, setSecretsEnabled] = useState(true);
+  // Controls the user explicitly changed, so they persist as overrides. On an
+  // edit it starts as the rule's existing fields, so they re-persist untouched.
+  const [touched, setTouched] = useState<TouchedControls>(NO_CONTROLS_TOUCHED);
+  // Read inside the scope-change effect without re-deriving on every touch.
+  const touchedRef = useRef(touched);
+  touchedRef.current = touched;
 
+  const touchCategory = (category: ContentCategory) =>
+    setTouched((prev) => ({
+      ...prev,
+      categories: { ...prev.categories, [category]: true },
+    }));
+
+  const isCurrentProjectScope = scopeKey === `PROJECT:${projectId}`;
+  const applyForm = (form: ReturnType<typeof configToFormState>) => {
+    setDispositions(form.dispositions);
+    setAudience(form.audience);
+    setPiiLevel(form.piiLevel);
+    setSecretsEnabled(form.secretsEnabled);
+  };
+
+  // Open transition: seed the drawer. Edit prefills from the rule and marks its
+  // existing fields touched so they re-persist. Add prefills from the values the
+  // new rule would inherit (the current-project scope shows the resolved
+  // effective; any other scope the platform defaults), with nothing touched yet,
+  // so the user sees the parent restriction they're about to override.
   useEffect(() => {
     if (!open) return;
     if (editingRule) {
       setScopeKey(`${editingRule.scopeType}:${editingRule.scopeId}`);
       setPersonalOnly(editingRule.personalOnly);
-      const form = configToFormState(editingRule.config);
-      setDispositions(form.dispositions);
-      setAudience(form.audience);
-      setPiiLevel(form.piiLevel);
-      setSecretsEnabled(form.secretsEnabled);
+      applyForm(configToFormState(editingRule.config));
+      const editTouched = touchedFromConfig(editingRule.config);
+      setTouched(editTouched);
+      touchedRef.current = editTouched;
       return;
     }
-    setScopeKey(scopeOptions[0]?.key ?? "");
+    const firstKey = scopeOptions[0]?.key ?? "";
+    setScopeKey(firstKey);
     setPersonalOnly(false);
-    setDispositions({
-      input: "capture",
-      output: "capture",
-      system: "capture",
-      tools: "capture",
-    });
-    setAudience("admins");
-    setPiiLevel("essential");
-    setSecretsEnabled(true);
+    setTouched(NO_CONTROLS_TOUCHED);
+    touchedRef.current = NO_CONTROLS_TOUCHED;
+    applyForm(
+      inheritedFormState({
+        effective,
+        isCurrentProjectScope: firstKey === `PROJECT:${projectId}`,
+      }),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editingRule, scopeOptions]);
+
+  // Re-derive the Add baseline when the user switches scope before touching
+  // anything; once a control is touched their choices stand and aren't clobbered.
+  useEffect(() => {
+    if (!open || editingRule) return;
+    const t = touchedRef.current;
+    const anyTouched =
+      t.pii || t.secrets || Object.values(t.categories).some(Boolean);
+    if (anyTouched) return;
+    applyForm(inheritedFormState({ effective, isCurrentProjectScope }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCurrentProjectScope]);
 
   const scope = scopeOptions.find((o) => o.key === scopeKey);
   const anyRestrict = CONTENT_CATEGORIES.some(
@@ -552,11 +605,22 @@ function PrivacyRuleDrawer({
     scope?.scopeType === "ORGANIZATION" || scope?.scopeType === "DEPARTMENT";
 
   const config = useMemo<DataPrivacyConfig>(
-    () => buildRuleConfig({ dispositions, audience, piiLevel, secretsEnabled }),
-    [dispositions, audience, piiLevel, secretsEnabled],
+    () =>
+      buildRuleConfig({
+        dispositions,
+        audience,
+        piiLevel,
+        secretsEnabled,
+        touched,
+      }),
+    [dispositions, audience, piiLevel, secretsEnabled, touched],
   );
-  const isEmpty = isEmptyRuleConfig(config);
-  const canSave = !!scope && !isEmpty && !isSaving;
+  // Add: enabled once the built config persists at least one control. Edit:
+  // enabled once the built config differs from the rule being edited.
+  const hasChange = editingRule
+    ? !configsEqual(config, editingRule.config)
+    : !isEmptyRuleConfig(config);
+  const canSave = !!scope && hasChange && !isSaving;
 
   return (
     <Drawer.Root
@@ -619,12 +683,13 @@ function PrivacyRuleDrawer({
                   <Select.Root
                     collection={dispositionCollection}
                     value={[dispositions[category]]}
-                    onValueChange={(d) =>
+                    onValueChange={(d) => {
                       setDispositions((prev) => ({
                         ...prev,
                         [category]: (d.value[0] as Disposition) ?? "capture",
-                      }))
-                    }
+                      }));
+                      touchCategory(category);
+                    }}
                   >
                     <Select.Trigger background="bg">
                       <Select.ValueText />
@@ -645,9 +710,19 @@ function PrivacyRuleDrawer({
                   <Select.Root
                     collection={audienceCollection}
                     value={[audience]}
-                    onValueChange={(d) =>
-                      setAudience((d.value[0] as RuleAudience) ?? "admins")
-                    }
+                    onValueChange={(d) => {
+                      setAudience((d.value[0] as RuleAudience) ?? "admins");
+                      // The audience applies to every restrict category, so
+                      // changing it persists those categories as overrides.
+                      setTouched((prev) => {
+                        const categories = { ...prev.categories };
+                        for (const c of CONTENT_CATEGORIES) {
+                          if (dispositions[c] === "restrict")
+                            categories[c] = true;
+                        }
+                        return { ...prev, categories };
+                      });
+                    }}
                   >
                     <Select.Trigger background="bg">
                       <Select.ValueText />
@@ -668,9 +743,10 @@ function PrivacyRuleDrawer({
               <Field.Label>PII redaction</Field.Label>
               <RadioGroup.Root
                 value={piiLevel}
-                onValueChange={(d) =>
-                  setPiiLevel((d.value as PiiLevel) ?? "essential")
-                }
+                onValueChange={(d) => {
+                  setPiiLevel((d.value as PiiLevel) ?? "essential");
+                  setTouched((prev) => ({ ...prev, pii: true }));
+                }}
               >
                 <VStack align="start" gap={1}>
                   <RadioGroup.Item value="disabled">
@@ -700,9 +776,10 @@ function PrivacyRuleDrawer({
             <HStack gap={3} align="start">
               <Switch
                 checked={secretsEnabled}
-                onCheckedChange={({ checked }) =>
-                  setSecretsEnabled(checked === true)
-                }
+                onCheckedChange={({ checked }) => {
+                  setSecretsEnabled(checked === true);
+                  setTouched((prev) => ({ ...prev, secrets: true }));
+                }}
               />
               <VStack align="start" gap={0}>
                 <Text fontWeight="600" fontSize="sm">
