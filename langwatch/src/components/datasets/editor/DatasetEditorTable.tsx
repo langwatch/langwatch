@@ -131,6 +131,7 @@ export function DatasetEditorTable({
   controllerRef,
   onColumnsChanged,
   editorPortalRef,
+  headerActions,
 }: {
   datasetId?: string;
   inMemoryDataset?: InMemoryDataset;
@@ -138,6 +139,8 @@ export function DatasetEditorTable({
   title?: ReactNode;
   hideButtons?: boolean;
   isEmbedded?: boolean;
+  /** Page-specific actions rendered at the end of the chrome button row. */
+  headerActions?: ReactNode;
   /** Disable editing the dataset definition (columns) in the database. */
   canEditDatasetRecord?: boolean;
   bottomSpace?: string;
@@ -622,6 +625,7 @@ export function DatasetEditorTable({
             )}
           </>
         )}
+        {headerActions}
       </HStack>
 
       <Box

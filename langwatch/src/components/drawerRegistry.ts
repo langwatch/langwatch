@@ -25,7 +25,6 @@ import {
 } from "./agents/drawerFromUrl";
 import { AlertDrawer } from "./analytics/AlertDrawer";
 import { DashboardNameDrawer } from "./analytics/DashboardNameDrawer";
-import { BatchEvaluationDrawer } from "./BatchEvaluationDrawer";
 import { SelectDatasetDrawer } from "./datasets/SelectDatasetDrawer";
 import { UploadCSVModal } from "./datasets/UploadCSVModal";
 import { EditModelProviderDrawer } from "./EditModelProviderDrawer";
@@ -80,7 +79,6 @@ import { TargetTypeSelectorDrawer } from "./targets/TargetTypeSelectorDrawer";
 export const drawers = {
   traceDetails: TraceDetailsDrawer,
   traceV2Details: TraceV2DrawerNoop,
-  batchEvaluation: BatchEvaluationDrawer,
   automation: AutomationDrawer,
   editModelProvider: EditModelProviderDrawer,
   defaultModelOverride: DefaultModelOverrideDrawer,

@@ -1,5 +1,6 @@
 import {
   Badge,
+  Box,
   Button,
   HStack,
   Input,
@@ -18,7 +19,6 @@ import {
   Copy,
   Edit,
   MoreVertical,
-  Play,
   Search,
   Table as TableIcon,
   Trash2,
@@ -28,7 +28,6 @@ import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useDeleteDatasetConfirmation } from "~/hooks/useDeleteDatasetConfirmation";
-import { useDrawer } from "~/hooks/useDrawer";
 import { AddOrEditDatasetDrawer } from "../../components/AddOrEditDatasetDrawer";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { CopyDatasetDialog } from "../../components/datasets/CopyDatasetDialog";
@@ -49,7 +48,6 @@ function DatasetsPage() {
   const { project } = useOrganizationTeamProject();
   const { isLiteMember } = useLiteMemberGuard();
   const router = useRouter();
-  const { openDrawer } = useDrawer();
   const queryClient = api.useContext();
 
   const datasets = api.dataset.getAll.useQuery(
@@ -184,24 +182,15 @@ function DatasetsPage() {
           />
         </InputGroup>
         <PageLayout.HeaderButton
-          onClick={() => {
-            openDrawer("batchEvaluation", {
-              selectDataset: true,
-            });
-          }}
-        >
-          <Play height={16} /> Batch Evaluation
-        </PageLayout.HeaderButton>
-        <PageLayout.HeaderButton
           onClick={() => uploadCSVModal.onOpen()}
         >
           <Upload height={17} width={17} strokeWidth={2.5} /> Upload or Create
           Dataset
         </PageLayout.HeaderButton>
       </PageLayout.Header>
-      <PageLayout.Container maxW={"calc(100vw - 200px)"}>
-        <PageLayout.Content>
-          {datasets.data && datasets.data.length === 0 ? (
+      <Box width="full" maxW="calc(100vw - 200px)">
+        {datasets.data && datasets.data.length === 0 ? (
+          <Box paddingX={6} paddingY={6}>
             <NoDataInfoBlock
               title="No datasets yet"
               description="Upload or create datasets on your messages to do further analysis or to train your own models."
@@ -229,8 +218,9 @@ function DatasetsPage() {
               }
               icon={<TableIcon />}
             />
-          ) : (
-            <Table.Root variant="line">
+          </Box>
+        ) : (
+          <Table.Root variant="line">
               <Table.Header>
                 <Table.Row>
                   <Table.ColumnHeader>Name</Table.ColumnHeader>
@@ -358,9 +348,8 @@ function DatasetsPage() {
                     : null}
               </Table.Body>
             </Table.Root>
-          )}
-        </PageLayout.Content>
-      </PageLayout.Container>
+        )}
+      </Box>
       <AddOrEditDatasetDrawer
         open={addEditDatasetDrawer.open}
         onClose={() => {

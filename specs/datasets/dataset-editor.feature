@@ -127,3 +127,16 @@ Feature: Dataset editor
   Scenario: Download the dataset as CSV
     When I download the dataset as CSV
     Then I get a CSV file with all columns and records
+
+  # ============================================================================
+  # Running an experiment
+  # ============================================================================
+  # The legacy Batch Evaluation drawer is gone. The editor offers a single
+  # Run experiment action that seeds the evaluations workbench with this
+  # dataset, the same workbench used everywhere else.
+
+  @integration
+  Scenario: Run an experiment from a dataset
+    Given I am editing a saved dataset
+    When I click "Run experiment"
+    Then I am taken to a new experiment workbench seeded with this dataset
