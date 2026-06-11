@@ -168,3 +168,79 @@ func TestPatternIfElse_UndefinedConditionInputFailsTheGate(t *testing.T) {
 	assert.Contains(t, gateErr["message"], "tool_called",
 		"error must name the undefined input")
 }
+
+// pythonGateParams swaps the gate's liquid condition for a python one.
+// The user code returns a plain bool; the engine adapts it to the
+// sandbox runner's dict contract.
+func pythonGateParams(body string, pythonCode string) string {
+	return strings.Replace(body,
+		`"parameters":[{"identifier":"condition","type":"str","value":"context != \"\""}]`,
+		`"parameters":[
+		  {"identifier":"condition_language","type":"str","value":"python"},
+		  {"identifier":"code","type":"code","value":"`+pythonCode+`"}
+		]`, 1)
+}
+
+/** @scenario A python condition routes the true branch */
+func TestPatternIfElse_PythonConditionRoutesTrueBranch(t *testing.T) {
+	llm := &fakeLLMClient{}
+	url, _ := setupPatternStack(t, llm, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	body := pythonGateParams(
+		ifElseWorkflowBody("tool produced this"),
+		`def execute(context=''):\n    return len(context) > 0\n`,
+	)
+	require.Contains(t, body, "condition_language", "python swap must apply")
+
+	res := postSync(t, &stack{url: url}, body)
+	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
+
+	assert.Equal(t, "success", nodeStatus(t, res, "gate"))
+	assert.Equal(t, "success", nodeStatus(t, res, "codeA"))
+	assert.Equal(t, "skipped", nodeStatus(t, res, "codeB"))
+}
+
+/** @scenario A python condition routes the false branch */
+func TestPatternIfElse_PythonConditionRoutesFalseBranch(t *testing.T) {
+	llm := &fakeLLMClient{}
+	url, _ := setupPatternStack(t, llm, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	body := pythonGateParams(
+		ifElseWorkflowBody(""),
+		`def execute(context=''):\n    return len(context) > 0\n`,
+	)
+
+	res := postSync(t, &stack{url: url}, body)
+	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
+
+	assert.Equal(t, "skipped", nodeStatus(t, res, "codeA"))
+	assert.Equal(t, "skipped", nodeStatus(t, res, "codeA2"))
+	assert.Equal(t, "success", nodeStatus(t, res, "codeB"))
+}
+
+/** @scenario A python condition that returns a non-boolean fails the gate */
+func TestPatternIfElse_PythonConditionNonBoolFailsTheGate(t *testing.T) {
+	llm := &fakeLLMClient{}
+	url, _ := setupPatternStack(t, llm, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	body := pythonGateParams(
+		ifElseWorkflowBody("anything"),
+		`def execute(context=''):\n    return 'yes'\n`,
+	)
+
+	res := postSync(t, &stack{url: url}, body)
+	require.Equal(t, "error", res.Status)
+
+	assert.Equal(t, "error", nodeStatus(t, res, "gate"))
+	gateNode := res.Nodes["gate"].(map[string]any)
+	gateErr, _ := gateNode["error"].(map[string]any)
+	require.NotNil(t, gateErr, "gate must carry the condition error")
+	assert.Contains(t, gateErr["message"], "True or False",
+		"error must state the bool contract")
+}

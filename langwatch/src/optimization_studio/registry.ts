@@ -177,6 +177,11 @@ const ifElse: BaseComponent = {
       type: "str",
       value: 'input != ""',
     },
+    {
+      identifier: "condition_language",
+      type: "str",
+      value: "liquid",
+    },
   ],
   inputs: [{ identifier: "input", type: "str" }] as Field[],
   // The branch handles are the contract the engine gates on - fixed

@@ -35,7 +35,7 @@ import type {
  * Use Monaco's bundled VS Code themes verbatim — `vs` for light, `vs-dark`
  * for dark. Matches what users get in VS Code out of the box.
  */
-function vscodeThemeName(colorMode: "light" | "dark"): string {
+export function vscodeThemeName(colorMode: "light" | "dark"): string {
   return colorMode === "dark" ? "vs-dark" : "vs";
 }
 

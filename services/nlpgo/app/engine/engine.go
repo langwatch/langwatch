@@ -303,22 +303,77 @@ func (e *Engine) dispatch(ctx context.Context, req ExecuteRequest, node *dsl.Nod
 	case dsl.ComponentCustom:
 		return e.runCustom(ctx, req, node, inputs, ns)
 	case dsl.ComponentIfElse:
-		return runIfElse(node, inputs)
+		return e.runIfElse(ctx, node, inputs, ns, req.Workflow.Secrets)
 	default:
 		return nil, &NodeError{Type: "unsupported_node_kind", Message: "node kind not supported on Go engine: " + string(node.Type)}
 	}
 }
 
-// runIfElse evaluates the node's `condition` parameter (a Liquid
-// boolean expression over its inputs) and emits the two branch
-// outputs. The engine's branch gating (runState.shouldSkip) reads the
-// emitted booleans through the node's `outputs.true` / `outputs.false`
-// edges to decide which downstream nodes to skip.
-func runIfElse(node *dsl.Node, inputs map[string]any) (map[string]any, *NodeError) {
+// runIfElse decides the branch and emits the two branch outputs. The
+// engine's branch gating (runState.shouldSkip) reads the emitted
+// booleans through the node's `outputs.true` / `outputs.false` edges
+// to decide which downstream nodes to skip.
+//
+// Two condition languages, picked by the `condition_language`
+// parameter: "liquid" (default) evaluates the `condition` parameter as
+// a Liquid boolean expression over the inputs; "python" runs the
+// `code` parameter through the code-block sandbox and requires its
+// execute() to return True or False.
+func (e *Engine) runIfElse(ctx context.Context, node *dsl.Node, inputs map[string]any, ns *NodeState, secrets map[string]string) (map[string]any, *NodeError) {
+	if paramString(node.Data.Parameters, "condition_language") == "python" {
+		return e.runIfElsePython(ctx, node, inputs, ns, secrets)
+	}
 	condition := paramString(node.Data.Parameters, "condition")
 	result, err := template.EvaluateCondition(condition, inputs)
 	if err != nil {
 		return nil, &NodeError{Type: "invalid_condition", Message: err.Error()}
+	}
+	return map[string]any{"true": result, "false": !result}, nil
+}
+
+// conditionResultAdapter renames the user's execute and wraps it: the
+// sandbox runner requires a dict return, while condition code promises
+// a plain True/False. The wrapper enforces the bool contract loudly
+// and adapts it to the runner's shape.
+const conditionResultAdapter = `
+
+__condition_execute = execute
+
+def execute(**inputs):
+    result = __condition_execute(**inputs)
+    if not isinstance(result, bool):
+        raise TypeError(
+            "condition code must return True or False, got "
+            + type(result).__name__
+        )
+    return {"result": result}
+`
+
+func (e *Engine) runIfElsePython(ctx context.Context, node *dsl.Node, inputs map[string]any, ns *NodeState, secrets map[string]string) (map[string]any, *NodeError) {
+	if e.code == nil {
+		return nil, &NodeError{Type: "code_runner_unavailable", Message: "no code runner configured"}
+	}
+	code := paramString(node.Data.Parameters, "code")
+	if strings.TrimSpace(code) == "" {
+		return nil, &NodeError{Type: "invalid_condition", Message: "condition code is empty"}
+	}
+	res, err := e.code.Execute(ctx, codeblock.Request{
+		Code:            code + conditionResultAdapter,
+		Inputs:          inputs,
+		DeclaredOutputs: []string{"result"},
+		Secrets:         secrets,
+	})
+	if err != nil {
+		return nil, &NodeError{Type: "code_runner_error", Message: err.Error()}
+	}
+	ns.Stdout = res.Stdout
+	ns.Stderr = res.Stderr
+	if res.Error != nil {
+		return nil, &NodeError{Type: res.Error.Type, Message: res.Error.Message, Traceback: res.Error.Traceback}
+	}
+	result, ok := res.Outputs["result"].(bool)
+	if !ok {
+		return nil, &NodeError{Type: "invalid_condition", Message: "condition code did not produce a boolean result"}
 	}
 	return map[string]any{"true": result, "false": !result}, nil
 }

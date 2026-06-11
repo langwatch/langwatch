@@ -93,3 +93,56 @@ Feature: If/Else conditional branch node in workflows
     Given a workflow run where the false branch was skipped
     Then skipped nodes render with a muted "skipped" status indicator
     And the taken branch shows normal success states
+
+  # ============================================================================
+  # Condition authoring (liquid editor + python code mode)
+  # ============================================================================
+
+  @integration
+  Scenario: The condition help links to the Liquid documentation
+    Given an if/else node drawer is open
+    Then the condition help text is a single short line
+    And it links to the Liquid operators documentation
+
+  @integration
+  Scenario: Toggling Code seeds a python template from the inputs
+    Given an if/else node with input "context"
+    When I enable the Code toggle
+    Then the condition language becomes python
+    And the code parameter is seeded with an execute function taking "context"
+    And the template returns a boolean
+
+  @integration
+  Scenario: Code mode renders the python editor instead of the expression input
+    Given an if/else node with condition language python
+    When I open the drawer
+    Then I see the python code editor
+    And no liquid expression input
+
+  @integration
+  Scenario: Toggling Code off returns to the liquid expression
+    Given an if/else node in code mode
+    When I disable the Code toggle
+    Then the condition language becomes liquid
+    And the stored python code is kept
+
+  @integration
+  Scenario: A python condition routes the true branch
+    Given an if/else gate with condition language python
+    And code that returns True when the context is non-empty
+    When the workflow runs with a non-empty context
+    Then only the true branch executes
+
+  @integration
+  Scenario: A python condition routes the false branch
+    Given an if/else gate with condition language python
+    And code that returns True when the context is non-empty
+    When the workflow runs with an empty context
+    Then only the false branch executes
+
+  @integration
+  Scenario: A python condition that returns a non-boolean fails the gate
+    Given an if/else gate whose python code returns a string
+    When the workflow runs
+    Then the gate errors stating the True or False contract
+    And no branch executes
