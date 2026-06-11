@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.33.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.32.0...typescript-sdk@v0.33.0) (2026-06-11)
+
+
+### Features
+
+* **prompts:** add versioned runtime parameters to prompt versions ([#4043](https://github.com/langwatch/langwatch/issues/4043)) ([8bc5fa5](https://github.com/langwatch/langwatch/commit/8bc5fa5cf64ab8091cf28084207bc170bcb5806f))
+* **traces:** codex/opencode trace fidelity, reasoning effort, and infra-span noise filter ([#4669](https://github.com/langwatch/langwatch/issues/4669)) ([fedb1a7](https://github.com/langwatch/langwatch/commit/fedb1a78d728501ea20e1fbe57abf0c3da2bb3ce))
+
+
+### Bug Fixes
+
+* **cli:** default login to project, guard against personal-project confusion ([#4728](https://github.com/langwatch/langwatch/issues/4728)) ([0e355ce](https://github.com/langwatch/langwatch/commit/0e355ce4b488334c63bd8a172ce669ca30fcaf8b))
+* **deps:** close CRITICAL shell-quote alerts across 3 langwatch manifests ([#4732](https://github.com/langwatch/langwatch/issues/4732)) ([a4406c2](https://github.com/langwatch/langwatch/commit/a4406c2619345e5fb99f5cbc8acaf1719959b5b4))
+
 ## [0.32.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.31.0...typescript-sdk@v0.32.0) (2026-06-08)
 
 
