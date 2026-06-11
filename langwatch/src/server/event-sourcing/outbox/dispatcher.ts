@@ -91,6 +91,17 @@ export interface OutboxDispatcherDeps {
   }) => Promise<{ allowed: boolean; count: number }>;
   /** The configured cap, for operator-facing drop logs (ADR-031). */
   emailHourlyCap: number;
+  /**
+   * ADR-031: drops recipients who unsubscribed before the provider call.
+   * Returns `emails` minus any address suppressed for this trigger
+   * (trigger-scoped OR project-wide rows). Injected so tests can fake it.
+   * Slack never calls it.
+   */
+  filterSuppressedEmails: (args: {
+    projectId: string;
+    triggerId: string;
+    emails: string[];
+  }) => Promise<string[]>;
 }
 
 /**
@@ -392,6 +403,21 @@ async function handleCadenceBatch(
           );
           break;
         }
+        // ADR-031: drop unsubscribed recipients before the provider call. If
+        // every recipient is suppressed there is nothing to send — record the
+        // claim (so a replay no-ops), log at info, and skip without throwing.
+        const recipients = await deps.filterSuppressedEmails({
+          projectId,
+          triggerId,
+          emails: params.members ?? [],
+        });
+        if (recipients.length === 0) {
+          logger.info(
+            { projectId, triggerId },
+            "All trigger email recipients are suppressed — skipping send",
+          );
+          break;
+        }
         if (hasCustomEmail) {
           const rendered = await renderTriggerEmail({
             subjectTemplate: t.emailSubjectTemplate,
@@ -405,18 +431,20 @@ async function handleCadenceBatch(
             );
           }
           await sendRenderedTriggerEmail({
-            triggerEmails: params.members ?? [],
+            triggerEmails: recipients,
             triggerId,
+            projectId,
             subject: rendered.subject,
             html: rendered.html,
           });
           break;
         }
         await sendTriggerEmail({
-          triggerEmails: params.members ?? [],
+          triggerEmails: recipients,
           triggerData,
           triggerName: trigger.name,
           triggerId,
+          projectId,
           projectSlug: project.slug,
           triggerType: trigger.alertType,
           triggerMessage: trigger.message ?? "",

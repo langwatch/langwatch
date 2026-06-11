@@ -13,6 +13,7 @@ export const handleSendEmail = async (context: TriggerContext) => {
       triggerData,
       triggerName: trigger.name,
       triggerId: trigger.id,
+      projectId: trigger.projectId,
       projectSlug,
       triggerType: trigger.alertType ?? null,
       triggerMessage: trigger.message ?? "",

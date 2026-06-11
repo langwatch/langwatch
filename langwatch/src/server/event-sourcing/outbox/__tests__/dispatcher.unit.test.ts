@@ -116,6 +116,11 @@ function makeDeps(trigger: TriggerSummary = makeTrigger()) {
     consumeEmailCapSlot: vi
       .fn()
       .mockResolvedValue({ allowed: true, count: 1 }),
+    filterSuppressedEmails: vi
+      .fn()
+      .mockImplementation(
+        async ({ emails }: { emails: string[] }) => emails,
+      ),
   };
 }
 
@@ -336,6 +341,45 @@ describe("createOutboxDispatcher cadence stage", () => {
           }),
         );
         expect(sendTriggerEmail).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
+
+  describe("given recipient suppression (ADR-031)", () => {
+    describe("when some but not all recipients are suppressed", () => {
+      it("sends only to the recipients the filter returns", async () => {
+        const trigger = makeTrigger({
+          action: TriggerAction.SEND_EMAIL,
+          actionParams: {
+            members: ["keep@example.com", "gone@example.com"],
+          },
+        });
+        const deps = makeDeps(trigger);
+        deps.filterSuppressedEmails.mockResolvedValueOnce(["keep@example.com"]);
+        const dispatcher = createOutboxDispatcher(deps);
+
+        await dispatcher.process(makeCadencePayload());
+
+        expect(sendTriggerEmail).toHaveBeenCalledTimes(1);
+        expect(sendTriggerEmail).toHaveBeenCalledWith(
+          expect.objectContaining({ triggerEmails: ["keep@example.com"] }),
+        );
+      });
+    });
+
+    describe("when every recipient is suppressed", () => {
+      it("skips the send entirely and records the claim without throwing", async () => {
+        const deps = makeDeps();
+        deps.filterSuppressedEmails.mockResolvedValueOnce([]);
+        const dispatcher = createOutboxDispatcher(deps);
+
+        await expect(
+          dispatcher.process(makeCadencePayload()),
+        ).resolves.toBeUndefined();
+
+        expect(sendTriggerEmail).not.toHaveBeenCalled();
+        expect(sendRenderedTriggerEmail).not.toHaveBeenCalled();
+        expect(deps.triggers.claimSend).toHaveBeenCalledTimes(1);
       });
     });
   });

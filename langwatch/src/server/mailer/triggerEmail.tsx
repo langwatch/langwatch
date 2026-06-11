@@ -9,13 +9,62 @@ import type { TriggerData } from "~/pages/api/cron/triggers/types";
 import { toDispatchError } from "~/server/event-sourcing/outbox/dispatchError";
 import { env } from "../../env.mjs";
 import { computeDefaultFrom, sendEmail } from "./emailSender";
-import { buildTriggerNoReplyAddress } from "./triggerNoReply";
+import {
+  buildTriggerNoReplyAddress,
+  TEST_FIRE_TRIGGER_ID_SENTINEL,
+} from "./triggerNoReply";
+import { signUnsubscribeToken } from "./unsubscribeToken";
+
+/**
+ * ADR-031: every trigger email carries an unsubscribe footer appended OUTSIDE
+ * the customer template (so a template author cannot strip it) plus one-click
+ * `List-Unsubscribe` headers. The footer offers two scopes — this notification
+ * only (token with triggerId) and all notifications from the project (token
+ * with null triggerId). Per-recipient sends make the link forge-proof: the
+ * token's HMAC binds the link to one recipient address.
+ */
+function buildUnsubscribe({
+  projectId,
+  triggerId,
+  email,
+  baseHost,
+}: {
+  projectId: string;
+  triggerId: string;
+  email: string;
+  baseHost: string;
+}): { footerHtml: string; headers: Record<string, string> } {
+  const link = (token: string) =>
+    `${baseHost}/unsubscribe?token=${encodeURIComponent(token)}`;
+  const triggerUrl = link(
+    signUnsubscribeToken({ projectId, triggerId, email }),
+  );
+  const projectUrl = link(
+    signUnsubscribeToken({ projectId, triggerId: null, email }),
+  );
+
+  const footerHtml = `
+    <div style="margin-top:24px;padding-top:12px;border-top:1px solid #F2F4F8;color:#8B96A5;font-size:12px;line-height:18px;">
+      <a href="${triggerUrl}" style="color:#8B96A5;text-decoration:underline;">Stop receiving this notification</a>
+      &nbsp;·&nbsp;
+      <a href="${projectUrl}" style="color:#8B96A5;text-decoration:underline;">Stop all notifications from this project</a>
+    </div>`;
+
+  return {
+    footerHtml,
+    headers: {
+      "List-Unsubscribe": `<${triggerUrl}>`,
+      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    },
+  };
+}
 
 export const sendTriggerEmail = async ({
   triggerEmails,
   triggerData,
   triggerName,
   triggerId,
+  projectId,
   projectSlug,
   triggerType,
   triggerMessage,
@@ -26,6 +75,9 @@ export const sendTriggerEmail = async ({
   /** Stable identifier of the trigger that produced this notification. Used
    *  to derive the per-trigger no-reply local part — see `triggerNoReply.ts`. */
   triggerId: string;
+  /** Project that owns the trigger — needed to sign per-recipient unsubscribe
+   *  tokens (ADR-031). */
+  projectId: string;
   projectSlug: string;
   triggerType: AlertType | null;
   triggerMessage: string;
@@ -72,17 +124,15 @@ export const sendTriggerEmail = async ({
     });
   }
 
+  const subject = `${
+    triggerType ? `(${triggerType}) ` : ""
+  }Trigger - ${triggerName}`;
   try {
-    const noReplyTo = buildTriggerNoReplyAddress({
-      defaultFrom: computeDefaultFrom(),
+    await sendPerRecipient({
+      recipients: triggerEmails,
       triggerId,
-    });
-    await sendEmail({
-      to: noReplyTo,
-      bcc: triggerEmails,
-      subject: `${
-        triggerType ? `(${triggerType}) ` : ""
-      }Trigger - ${triggerName}`,
+      projectId,
+      subject,
       html: emailHtml,
     });
   } catch (err) {
@@ -93,6 +143,55 @@ export const sendTriggerEmail = async ({
 };
 
 /**
+ * Sends one envelope per recipient (ADR-031). Each recipient gets the
+ * no-reply To (so addresses can't be enumerated), the rendered body with a
+ * recipient-specific unsubscribe footer appended, and one-click
+ * `List-Unsubscribe` headers. The test-fire sentinel skips the footer/headers:
+ * a test to your own inbox needs no suppression context, and the token
+ * requires a real trigger id.
+ */
+async function sendPerRecipient({
+  recipients,
+  triggerId,
+  projectId,
+  subject,
+  html,
+}: {
+  recipients: string[];
+  triggerId: string;
+  projectId: string;
+  subject: string;
+  html: string;
+}): Promise<void> {
+  const baseHost = env.BASE_HOST ?? "";
+  const noReplyTo = buildTriggerNoReplyAddress({
+    defaultFrom: computeDefaultFrom(),
+    triggerId,
+  });
+  const isSentinel = triggerId === TEST_FIRE_TRIGGER_ID_SENTINEL;
+
+  for (const recipient of recipients) {
+    if (isSentinel) {
+      await sendEmail({ to: noReplyTo, bcc: [recipient], subject, html });
+      continue;
+    }
+    const { footerHtml, headers } = buildUnsubscribe({
+      projectId,
+      triggerId,
+      email: recipient,
+      baseHost,
+    });
+    await sendEmail({
+      to: noReplyTo,
+      bcc: [recipient],
+      subject,
+      html: html + footerHtml,
+      headers,
+    });
+  }
+}
+
+/**
  * Sends a pre-rendered (customer-authored, ADR-028) trigger email. Mirrors the
  * send block of `sendTriggerEmail` exactly — same no-reply `to`, `bcc`
  * recipients, and DispatchError classification — but takes the subject/html as
@@ -101,22 +200,23 @@ export const sendTriggerEmail = async ({
 export const sendRenderedTriggerEmail = async ({
   triggerEmails,
   triggerId,
+  projectId,
   subject,
   html,
 }: {
   triggerEmails: string[];
   triggerId: string;
+  /** Project that owns the trigger — needed to sign per-recipient unsubscribe
+   *  tokens (ADR-031). */
+  projectId: string;
   subject: string;
   html: string;
 }) => {
   try {
-    const noReplyTo = buildTriggerNoReplyAddress({
-      defaultFrom: computeDefaultFrom(),
+    await sendPerRecipient({
+      recipients: triggerEmails,
       triggerId,
-    });
-    await sendEmail({
-      to: noReplyTo,
-      bcc: triggerEmails,
+      projectId,
       subject,
       html,
     });

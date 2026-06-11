@@ -27,6 +27,10 @@ type EmailContent = {
   /** Optional `Reply-To` header. Lets the To: be a no-reply while still
    *  routing inbound replies somewhere useful. */
   replyTo?: string;
+  /** Extra MIME headers (e.g. `List-Unsubscribe`). Passed through to whichever
+   *  provider is active. SES needs SendRawEmail to carry custom headers, so a
+   *  send with non-empty `headers` always takes the raw-MIME path. */
+  headers?: Record<string, string>;
   attachments?: EmailAttachment[];
 };
 
@@ -89,6 +93,7 @@ const buildRawMimeMessage = ({
   replyTo,
   subject,
   html,
+  headers,
   attachments,
 }: {
   from: string;
@@ -96,6 +101,7 @@ const buildRawMimeMessage = ({
   replyTo?: string;
   subject: string;
   html: string;
+  headers?: Record<string, string>;
   attachments: EmailAttachment[];
 }): string => {
   const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -104,6 +110,10 @@ const buildRawMimeMessage = ({
     `From: ${sanitizeHeaderValue(from)}`,
     `To: ${to.map(sanitizeHeaderValue).join(", ")}`,
     ...(replyTo ? [`Reply-To: ${sanitizeHeaderValue(replyTo)}`] : []),
+    ...Object.entries(headers ?? {}).map(
+      ([name, value]) =>
+        `${sanitizeHeaderValue(name)}: ${sanitizeHeaderValue(value)}`,
+    ),
     `Subject: ${sanitizeHeaderValue(subject)}`,
     `MIME-Version: 1.0`,
     `Content-Type: multipart/mixed; boundary="${boundary}"`,
@@ -139,19 +149,28 @@ const sendWithSES = async (content: EmailContent, defaultFrom: string) => {
   const bccAddresses = toArray(content.bcc);
   const replyToAddresses = content.replyTo ? [content.replyTo] : undefined;
 
+  const hasCustomHeaders =
+    content.headers != null && Object.keys(content.headers).length > 0;
+
   try {
-    if (content.attachments && content.attachments.length > 0) {
+    if (
+      (content.attachments && content.attachments.length > 0) ||
+      hasCustomHeaders
+    ) {
       // BCC recipients are NOT written into the MIME headers — SES uses the
       // envelope `Destinations` from `SendRawEmail` to deliver them invisibly,
       // so `buildRawMimeMessage` intentionally receives no bcc and renders no
-      // `Bcc:` header. Recipients only see the public To list.
+      // `Bcc:` header. Recipients only see the public To list. Custom headers
+      // (List-Unsubscribe) also force this raw path — SendEmail can't carry
+      // arbitrary headers.
       const rawMessage = buildRawMimeMessage({
         from,
         to: toAddresses,
         replyTo: content.replyTo,
         subject: content.subject,
         html: content.html,
-        attachments: content.attachments,
+        headers: content.headers,
+        attachments: content.attachments ?? [],
       });
 
       // SES routes envelope to `Destinations`, which is the union of
@@ -207,6 +226,10 @@ const sendWithSendGrid = async (content: EmailContent, defaultFrom: string) => {
     html: content.html,
     ...(bccAddresses.length > 0 && { bcc: bccAddresses }),
     ...(content.replyTo && { replyTo: content.replyTo }),
+    ...(content.headers &&
+      Object.keys(content.headers).length > 0 && {
+        headers: content.headers,
+      }),
     ...(content.attachments &&
       content.attachments.length > 0 && {
         attachments: content.attachments.map((att) => ({
