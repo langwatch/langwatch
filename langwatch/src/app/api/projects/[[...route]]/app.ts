@@ -47,7 +47,6 @@ const updateProjectSchema = z.object({
   name: z.string().min(1).max(255).optional(),
   language: z.string().optional(),
   framework: z.string().optional(),
-  piiRedactionLevel: z.enum(["STRICT", "ESSENTIAL", "DISABLED"]).optional(),
   teamId: z.string().min(1).optional(),
 });
 
@@ -78,7 +77,6 @@ function projectResponse(project: {
   teamId: string;
   createdAt: Date;
   updatedAt: Date;
-  piiRedactionLevel: string;
 }) {
   return {
     id: project.id,
@@ -87,7 +85,6 @@ function projectResponse(project: {
     language: project.language,
     framework: project.framework,
     teamId: project.teamId,
-    piiRedactionLevel: project.piiRedactionLevel,
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
   };
@@ -239,9 +236,6 @@ secured
             ...(body.name !== undefined && { name: body.name }),
             ...(body.language !== undefined && { language: body.language }),
             ...(body.framework !== undefined && { framework: body.framework }),
-            ...(body.piiRedactionLevel !== undefined && {
-              piiRedactionLevel: body.piiRedactionLevel,
-            }),
             ...(body.teamId !== undefined && { teamId: body.teamId }),
           },
         });

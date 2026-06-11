@@ -16,11 +16,9 @@ import {
 } from "~/server/data-privacy/dataPrivacy.types";
 import {
   describeAudience,
-  effectiveCategoryRestriction,
   isContentVisible,
   isContentVisibleToPublic,
   needsAudienceFacts,
-  type LegacyVisibility,
   type ViewerFacts,
 } from "~/server/data-privacy/contentVisibility";
 import { createLogger } from "~/utils/logger/server";
@@ -146,15 +144,12 @@ export async function getUserProtectionsForProject(
     where: { id: projectId, archivedAt: null },
     select: {
       teamId: true,
-      capturedInputVisibility: true,
-      capturedOutputVisibility: true,
     },
   });
 
-  // The scoped data-privacy policy is authoritative; the legacy per-project
-  // enum still applies wherever the policy leaves a category at its default.
-  // The kill switch reverts to legacy-enum-only behavior (the platform default
-  // leaves every category at "capture", so reconciliation uses the enum alone).
+  // The scoped data-privacy policy is the single source of truth for content
+  // visibility. The kill switch falls back to the platform default (every
+  // category captured and visible to the team).
   let policy: ResolvedDataPrivacy = PLATFORM_DEFAULT_DATA_PRIVACY;
   if (process.env.LANGWATCH_DATA_PRIVACY_ENFORCEMENT !== "off") {
     try {
@@ -180,14 +175,8 @@ export async function getUserProtectionsForProject(
       };
     }
   }
-  const effInput = effectiveCategoryRestriction(
-    policy.categories.input,
-    project.capturedInputVisibility as LegacyVisibility,
-  );
-  const effOutput = effectiveCategoryRestriction(
-    policy.categories.output,
-    project.capturedOutputVisibility as LegacyVisibility,
-  );
+  const effInput = policy.categories.input;
+  const effOutput = policy.categories.output;
 
   // For public shares or non-signed in users, only captured content is visible.
   if (

@@ -11,6 +11,7 @@ import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
 import { getLangWatchTracer } from "langwatch";
 import { getApp } from "~/server/app-layer/app";
+import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import { prisma } from "~/server/db";
 import {
   parseOtlpLogs,
@@ -384,7 +385,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/traces", async (c) => {
         await getApp().traces.collection.handleOtlpTraceRequest(
           project.id,
           traceRequest,
-          project.piiRedactionLevel,
+          DEFAULT_PII_REDACTION_LEVEL,
         );
 
       return c.json({
@@ -479,7 +480,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/logs", async (c) => {
       await getApp().traces.logCollection.handleOtlpLogRequest({
         tenantId: project.id,
         logRequest,
-        piiRedactionLevel: project.piiRedactionLevel,
+        piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
       });
 
       return c.json({ message: "OK" });
@@ -562,7 +563,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/metrics", async (c) => {
       await getApp().traces.metricCollection.handleOtlpMetricRequest({
         tenantId: project.id,
         metricRequest: metricsRequest,
-        piiRedactionLevel: project.piiRedactionLevel,
+        piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
       });
 
       return c.json({ message: "OK" });

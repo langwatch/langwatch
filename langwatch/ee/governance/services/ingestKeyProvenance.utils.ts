@@ -55,9 +55,7 @@ export const PROVENANCE_ATTR_NON_BILLABLE = "langwatch.cost.non_billable" as con
  * `ingestSourceType`. A CLI coding assistant (claude code / codex / gemini /
  * opencode / cursor) becomes `coding_agent`; every other ingest source
  * (claude_cowork, otel_generic, compliance pulls, admin templates, …) becomes
- * the generic `ai_tool`. Both values MUST be present in the GOVERNED_ORIGINS
- * set in GovernanceContentStripService, otherwise ingest-key traces silently
- * bypass the org's no-spy / strip-IO policy.
+ * the generic `ai_tool`.
  */
 export const CODING_AGENT_ORIGIN_VALUE = "coding_agent" as const;
 export const AI_TOOL_ORIGIN_VALUE = "ai_tool" as const;

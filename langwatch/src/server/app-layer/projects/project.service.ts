@@ -1,8 +1,6 @@
 import type { Project } from "@prisma/client";
-import { ProjectSensitiveDataVisibilityLevel } from "@prisma/client";
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
-import { env } from "~/env.mjs";
 import { generateApiKey } from "~/server/utils/apiKeyGenerator";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
@@ -139,14 +137,6 @@ export class ProjectService {
       framework: params.framework,
       teamId,
       apiKey: generateApiKey(),
-      piiRedactionLevel:
-        env.NODE_ENV === "development" || !env.IS_SAAS
-          ? "DISABLED"
-          : "ESSENTIAL",
-      capturedInputVisibility:
-        ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
-      capturedOutputVisibility:
-        ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
     });
   }
 

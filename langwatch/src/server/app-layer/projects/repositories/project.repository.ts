@@ -1,4 +1,4 @@
-import type { Project, PIIRedactionLevel, ProjectSensitiveDataVisibilityLevel, Team } from "@prisma/client";
+import type { Project, Team } from "@prisma/client";
 
 export type ProjectWithTeam = Project & { team: Team };
 
@@ -15,9 +15,6 @@ export interface CreateProjectInput {
   framework: string;
   teamId: string;
   apiKey: string;
-  piiRedactionLevel: PIIRedactionLevel;
-  capturedInputVisibility: ProjectSensitiveDataVisibilityLevel;
-  capturedOutputVisibility: ProjectSensitiveDataVisibilityLevel;
 }
 
 export interface CreateTeamWithBindingInput {
@@ -33,7 +30,6 @@ export interface UpdateProjectInput {
   name?: string;
   language?: string;
   framework?: string;
-  piiRedactionLevel?: PIIRedactionLevel;
   teamId?: string;
 }
 

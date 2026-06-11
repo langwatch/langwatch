@@ -40,6 +40,7 @@ import type {
 import type { IngestionSource } from "@prisma/client";
 
 import { getApp } from "~/server/app-layer/app";
+import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import { prisma } from "~/server/db";
 import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
 import { ensureHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
@@ -397,7 +398,7 @@ secured.access(ingestAuth).post("/otel/:sourceId", async (c: Context) => {
         const result = await getApp().traces.collection.handleOtlpTraceRequest(
           govProject.id,
           parsed.request,
-          govProject.piiRedactionLevel,
+          DEFAULT_PII_REDACTION_LEVEL,
         );
         rejectedSpans = result?.rejectedSpans ?? 0;
       }
@@ -503,7 +504,7 @@ secured.access(ingestAuth).post("/webhook/:sourceId", async (c: Context) => {
       await getApp().traces.logCollection.handleOtlpLogRequest({
         tenantId: govProject.id,
         logRequest,
-        piiRedactionLevel: govProject.piiRedactionLevel,
+        piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
       });
       handoffOk = true;
     }
@@ -606,7 +607,7 @@ secured.access(ingestAuth).post("/otel/:sourceId/v1/logs", async (c: Context) =>
           await getApp().traces.logCollection.handleOtlpLogRequest({
             tenantId: govProject.id,
             logRequest: parsed.request,
-            piiRedactionLevel: govProject.piiRedactionLevel,
+            piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
           });
         } catch (handoffErr) {
           logger.warn(

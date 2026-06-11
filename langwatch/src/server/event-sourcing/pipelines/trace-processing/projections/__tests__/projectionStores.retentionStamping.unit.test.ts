@@ -9,7 +9,6 @@ import type { MetricRecordStorageRepository } from "~/server/app-layer/traces/re
 import type { SpanStorageRepository } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TraceSummaryRepository } from "~/server/app-layer/traces/repositories/trace-summary.repository";
-import type { GovernanceContentStripService } from "@ee/governance/services/governanceContentStrip.service";
 import { EvaluationRunStore } from "../../../evaluation-processing/projections/evaluationRun.store";
 import { LogRecordAppendStore } from "../logRecordStorage.store";
 import { MetricRecordAppendStore } from "../metricRecordStorage.store";
@@ -77,14 +76,8 @@ describe("trace-pipeline projection stores retention stamping", () => {
   describe("when the projection context carries no resolved policy", () => {
     it("stamps stored_spans with the platform default, not indefinite", async () => {
       const insertSpan = vi.fn().mockResolvedValue(undefined);
-      // No governance target attribute on the span, so the strip transform is a
-      // passthrough and never dereferences the injected service.
-      const stripService = {
-        modeForOrganization: vi.fn(),
-      } as unknown as GovernanceContentStripService;
       const store = new SpanAppendStore(
         { insertSpan } as unknown as SpanStorageRepository,
-        stripService,
       );
 
       await store.append(makeSpan(), nullPolicyContext);

@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   describeAudience,
-  effectiveCategoryRestriction,
   isContentVisible,
   isContentVisibleToPublic,
   needsAudienceFacts,
@@ -13,7 +12,6 @@ import {
   EMPTY_AUDIENCE,
   type Disposition,
   type ResolvedAudience,
-  type ResolvedCategory,
 } from "../dataPrivacy.types";
 
 function audience(partial: Partial<ResolvedAudience>): ResolvedAudience {
@@ -30,15 +28,6 @@ function eff(
 function viewer(partial: Partial<ViewerFacts>): ViewerFacts {
   return { isAdmin: false, isMember: true, groupIds: [], departmentId: null, ...partial };
 }
-
-const restrictCategory = (a: Partial<ResolvedAudience>): ResolvedCategory => ({
-  disposition: "restrict",
-  audience: audience(a),
-});
-const captureCategory: ResolvedCategory = {
-  disposition: "capture",
-  audience: { ...EMPTY_AUDIENCE },
-};
 
 describe("isContentVisible", () => {
   describe("given content restricted to admins", () => {
@@ -94,35 +83,6 @@ describe("isContentVisible", () => {
     it("treats dropped content as not visible", () => {
       expect(isContentVisible(eff("drop"), viewer({ isAdmin: true }))).toBe(false);
     });
-  });
-});
-
-describe("effectiveCategoryRestriction", () => {
-  it("lets an explicit restrict policy win over the legacy enum", () => {
-    const result = effectiveCategoryRestriction(
-      restrictCategory({ admins: true }),
-      "VISIBLE_TO_ALL",
-    );
-    expect(result.disposition).toBe("restrict");
-    expect(result.audience.admins).toBe(true);
-  });
-
-  it("falls back to the legacy VISIBLE_TO_ADMIN at the default disposition", () => {
-    const result = effectiveCategoryRestriction(captureCategory, "VISIBLE_TO_ADMIN");
-    expect(result.disposition).toBe("restrict");
-    expect(result.audience.admins).toBe(true);
-  });
-
-  it("falls back to the legacy REDACTED_TO_ALL as a no-one restriction", () => {
-    const result = effectiveCategoryRestriction(captureCategory, "REDACTED_TO_ALL");
-    expect(result.disposition).toBe("restrict");
-    expect(result.audience).toEqual(EMPTY_AUDIENCE);
-  });
-
-  it("stays captured when the legacy enum is VISIBLE_TO_ALL", () => {
-    expect(
-      effectiveCategoryRestriction(captureCategory, "VISIBLE_TO_ALL").disposition,
-    ).toBe("capture");
   });
 });
 

@@ -1,21 +1,20 @@
-import {
-  ProjectSensitiveDataVisibilityLevel,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "@prisma/client";
+import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getUserProtectionsForProject } from "../utils";
 import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
-import { PLATFORM_DEFAULT_DATA_PRIVACY } from "~/server/data-privacy/dataPrivacy.types";
+import {
+  EMPTY_AUDIENCE,
+  PLATFORM_DEFAULT_DATA_PRIVACY,
+  type Audience,
+  type Disposition,
+  type ResolvedDataPrivacy,
+} from "~/server/data-privacy/dataPrivacy.types";
 
 vi.mock("../rbac", () => ({
   hasProjectPermission: vi.fn(() => Promise.resolve(true)),
   isDemoProject: vi.fn(() => false),
 }));
 
-// Mock the scoped policy resolver so this test exercises only the legacy-enum +
-// RoleBinding visibility path; the platform default leaves every category at
-// "capture", so reconciliation falls through to the legacy enum.
 vi.mock("~/server/data-privacy/dataPrivacyPolicy.service", () => ({
   getDataPrivacyPolicyService: vi.fn(),
 }));
@@ -41,47 +40,75 @@ const mockSession = {
   user: { id: "user-rolebinding-only" },
 } as any;
 
+/**
+ * The data-privacy policy is the single source of truth for content visibility.
+ * Build a resolved policy that sets input/output to a given disposition + audience
+ * so the tests drive visibility purely from the policy, not any legacy column.
+ */
+function policyRestricting(args: {
+  input?: { disposition: Disposition; audience?: Audience };
+  output?: { disposition: Disposition; audience?: Audience };
+}): ResolvedDataPrivacy {
+  const toCategory = (setting?: {
+    disposition: Disposition;
+    audience?: Audience;
+  }) =>
+    setting
+      ? {
+          disposition: setting.disposition,
+          audience: { ...EMPTY_AUDIENCE, ...setting.audience },
+        }
+      : {
+          disposition: "capture" as Disposition,
+          audience: { ...EMPTY_AUDIENCE },
+        };
+  return {
+    ...PLATFORM_DEFAULT_DATA_PRIVACY,
+    categories: {
+      ...PLATFORM_DEFAULT_DATA_PRIVACY.categories,
+      input: toCategory(args.input),
+      output: toCategory(args.output),
+    },
+  };
+}
+
+function mockPolicy(policy: ResolvedDataPrivacy) {
+  vi.mocked(getDataPrivacyPolicyService).mockReturnValue({
+    getResolvedForProject: vi.fn().mockResolvedValue(policy),
+  } as unknown as ReturnType<typeof getDataPrivacyPolicyService>);
+}
+
+const ADMINS: Audience = { admins: true };
+const NO_ONE: Audience = {};
+
 describe("getUserProtectionsForProject", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(getDataPrivacyPolicyService).mockReturnValue({
-      getResolvedForProject: vi
-        .fn()
-        .mockResolvedValue(PLATFORM_DEFAULT_DATA_PRIVACY),
-    } as unknown as ReturnType<typeof getDataPrivacyPolicyService>);
+    mockPrisma.project.findUniqueOrThrow.mockResolvedValue({ teamId: "team-1" });
+    mockPolicy(PLATFORM_DEFAULT_DATA_PRIVACY);
   });
 
-  describe("when user has RoleBinding but no TeamUser row", () => {
-    beforeEach(() => {
-      mockPrisma.project.findUniqueOrThrow.mockResolvedValue({
-        teamId: "team-1",
-        capturedInputVisibility:
-          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
-        capturedOutputVisibility:
-          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
-      });
+  const protections = () =>
+    getUserProtectionsForProject(
+      { prisma: mockPrisma, session: mockSession },
+      { projectId: "project-1" },
+    );
 
+  describe("when the user has a team RoleBinding", () => {
+    beforeEach(() => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
         { role: TeamUserRole.MEMBER },
       ]);
     });
 
-    it("grants visibility for VISIBLE_TO_ALL", async () => {
-      const result = await getUserProtectionsForProject(
-        { prisma: mockPrisma, session: mockSession },
-        { projectId: "project-1" },
-      );
-
+    it("grants visibility for captured content (platform default)", async () => {
+      const result = await protections();
       expect(result.canSeeCapturedInput).toBe(true);
       expect(result.canSeeCapturedOutput).toBe(true);
     });
 
-    it("queries roleBinding table with team scope", async () => {
-      await getUserProtectionsForProject(
-        { prisma: mockPrisma, session: mockSession },
-        { projectId: "project-1" },
-      );
-
+    it("queries roleBinding with the project's team scope", async () => {
+      await protections();
       expect(mockPrisma.roleBinding.findMany).toHaveBeenCalledWith({
         where: {
           userId: "user-rolebinding-only",
@@ -91,217 +118,95 @@ describe("getUserProtectionsForProject", () => {
         select: { role: true },
       });
     });
+
+    it("hides input restricted to admins from a plain member and names the audience", async () => {
+      mockPolicy(
+        policyRestricting({
+          input: { disposition: "restrict", audience: ADMINS },
+        }),
+      );
+      const result = await protections();
+      expect(result.canSeeCapturedInput).toBe(false);
+      expect(result.capturedInputVisibleTo).toBe("Admins");
+      expect(result.canSeeCapturedOutput).toBe(true);
+    });
   });
 
-  describe("when user has ADMIN RoleBinding", () => {
+  describe("when the user has an ADMIN team RoleBinding", () => {
     beforeEach(() => {
-      mockPrisma.project.findUniqueOrThrow.mockResolvedValue({
-        teamId: "team-1",
-        capturedInputVisibility:
-          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ADMIN,
-        capturedOutputVisibility:
-          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ADMIN,
-      });
-
       mockPrisma.roleBinding.findMany.mockResolvedValue([
         { role: TeamUserRole.ADMIN },
       ]);
     });
 
-    it("grants visibility for VISIBLE_TO_ADMIN", async () => {
-      const result = await getUserProtectionsForProject(
-        { prisma: mockPrisma, session: mockSession },
-        { projectId: "project-1" },
+    it("shows input restricted to admins", async () => {
+      mockPolicy(
+        policyRestricting({
+          input: { disposition: "restrict", audience: ADMINS },
+        }),
       );
-
+      const result = await protections();
       expect(result.canSeeCapturedInput).toBe(true);
-      expect(result.canSeeCapturedOutput).toBe(true);
-    });
-  });
-
-  describe("when user has MEMBER RoleBinding and visibility is VISIBLE_TO_ADMIN", () => {
-    beforeEach(() => {
-      mockPrisma.project.findUniqueOrThrow.mockResolvedValue({
-        teamId: "team-1",
-        capturedInputVisibility:
-          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ADMIN,
-        capturedOutputVisibility:
-          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ADMIN,
-      });
-
-      mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { role: TeamUserRole.MEMBER },
-      ]);
+      expect(result.capturedInputVisibleTo).toBeNull();
     });
 
-    it("denies visibility for non-admin member", async () => {
-      const result = await getUserProtectionsForProject(
-        { prisma: mockPrisma, session: mockSession },
-        { projectId: "project-1" },
+    it("hides content restricted to no one even from an admin", async () => {
+      mockPolicy(
+        policyRestricting({
+          input: { disposition: "restrict", audience: NO_ONE },
+          output: { disposition: "restrict", audience: NO_ONE },
+        }),
       );
-
+      const result = await protections();
       expect(result.canSeeCapturedInput).toBe(false);
       expect(result.canSeeCapturedOutput).toBe(false);
     });
   });
 
-  describe("when user has no team RoleBinding and no org membership", () => {
+  describe("when the user has no team RoleBinding", () => {
     beforeEach(() => {
-      mockPrisma.project.findUniqueOrThrow.mockResolvedValue({
-        teamId: "team-1",
-        capturedInputVisibility:
-          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
-        capturedOutputVisibility:
-          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
-      });
-
       mockPrisma.roleBinding.findMany.mockResolvedValue([]);
+    });
+
+    it("denies captured content for a non-member", async () => {
       mockOrgService.getUserOrgRoleByTeamId.mockResolvedValue(null);
-    });
-
-    it("denies visibility for VISIBLE_TO_ALL", async () => {
-      const result = await getUserProtectionsForProject(
-        { prisma: mockPrisma, session: mockSession },
-        { projectId: "project-1" },
-      );
-
+      const result = await protections();
       expect(result.canSeeCapturedInput).toBe(false);
       expect(result.canSeeCapturedOutput).toBe(false);
     });
-  });
 
-  describe("when user has no team RoleBinding but is org MEMBER", () => {
-    beforeEach(() => {
-      mockPrisma.project.findUniqueOrThrow.mockResolvedValue({
-        teamId: "team-1",
-        capturedInputVisibility:
-          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
-        capturedOutputVisibility:
-          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
-      });
-
-      mockPrisma.roleBinding.findMany.mockResolvedValue([]);
+    it("grants captured content via the org MEMBER fallback", async () => {
       mockOrgService.getUserOrgRoleByTeamId.mockResolvedValue("MEMBER");
-    });
-
-    it("grants visibility for VISIBLE_TO_ALL via org fallback", async () => {
-      const result = await getUserProtectionsForProject(
-        { prisma: mockPrisma, session: mockSession },
-        { projectId: "project-1" },
-      );
-
+      const result = await protections();
       expect(result.canSeeCapturedInput).toBe(true);
       expect(result.canSeeCapturedOutput).toBe(true);
     });
 
-    it("denies visibility for VISIBLE_TO_ADMIN", async () => {
-      mockPrisma.project.findUniqueOrThrow.mockResolvedValue({
-        teamId: "team-1",
-        capturedInputVisibility:
-          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ADMIN,
-        capturedOutputVisibility:
-          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ADMIN,
-      });
-
-      const result = await getUserProtectionsForProject(
-        { prisma: mockPrisma, session: mockSession },
-        { projectId: "project-1" },
+    it("treats an org MEMBER as a non-admin for admin-only restrictions", async () => {
+      mockOrgService.getUserOrgRoleByTeamId.mockResolvedValue("MEMBER");
+      mockPolicy(
+        policyRestricting({
+          input: { disposition: "restrict", audience: ADMINS },
+        }),
       );
-
+      const result = await protections();
       expect(result.canSeeCapturedInput).toBe(false);
-      expect(result.canSeeCapturedOutput).toBe(false);
     });
-  });
 
-  describe("when user has no team RoleBinding but is org ADMIN", () => {
-    beforeEach(() => {
-      mockPrisma.project.findUniqueOrThrow.mockResolvedValue({
-        teamId: "team-1",
-        capturedInputVisibility:
-          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ADMIN,
-        capturedOutputVisibility:
-          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ADMIN,
-      });
-
-      mockPrisma.roleBinding.findMany.mockResolvedValue([]);
+    it("treats an org ADMIN as an admin for admin-only restrictions", async () => {
       mockOrgService.getUserOrgRoleByTeamId.mockResolvedValue("ADMIN");
-    });
-
-    it("grants visibility for VISIBLE_TO_ADMIN via org admin fallback", async () => {
-      const result = await getUserProtectionsForProject(
-        { prisma: mockPrisma, session: mockSession },
-        { projectId: "project-1" },
+      mockPolicy(
+        policyRestricting({
+          input: { disposition: "restrict", audience: ADMINS },
+        }),
       );
-
+      const result = await protections();
       expect(result.canSeeCapturedInput).toBe(true);
-      expect(result.canSeeCapturedOutput).toBe(true);
     });
 
-    it("denies visibility for REDACTED_TO_ALL even as org admin", async () => {
-      mockPrisma.project.findUniqueOrThrow.mockResolvedValue({
-        teamId: "team-1",
-        capturedInputVisibility:
-          ProjectSensitiveDataVisibilityLevel.REDACTED_TO_ALL,
-        capturedOutputVisibility:
-          ProjectSensitiveDataVisibilityLevel.REDACTED_TO_ALL,
-      });
-
-      const result = await getUserProtectionsForProject(
-        { prisma: mockPrisma, session: mockSession },
-        { projectId: "project-1" },
-      );
-
-      expect(result.canSeeCapturedInput).toBe(false);
-      expect(result.canSeeCapturedOutput).toBe(false);
-    });
-  });
-
-  describe("when user has no team RoleBinding but is org EXTERNAL", () => {
-    beforeEach(() => {
-      mockPrisma.project.findUniqueOrThrow.mockResolvedValue({
-        teamId: "team-1",
-        capturedInputVisibility:
-          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
-        capturedOutputVisibility:
-          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
-      });
-
-      mockPrisma.roleBinding.findMany.mockResolvedValue([]);
+    it("denies captured content for an org EXTERNAL", async () => {
       mockOrgService.getUserOrgRoleByTeamId.mockResolvedValue("EXTERNAL");
-    });
-
-    it("denies visibility even for VISIBLE_TO_ALL", async () => {
-      const result = await getUserProtectionsForProject(
-        { prisma: mockPrisma, session: mockSession },
-        { projectId: "project-1" },
-      );
-
-      expect(result.canSeeCapturedInput).toBe(false);
-      expect(result.canSeeCapturedOutput).toBe(false);
-    });
-  });
-
-  describe("when visibility is REDACTED_TO_ALL", () => {
-    beforeEach(() => {
-      mockPrisma.project.findUniqueOrThrow.mockResolvedValue({
-        teamId: "team-1",
-        capturedInputVisibility:
-          ProjectSensitiveDataVisibilityLevel.REDACTED_TO_ALL,
-        capturedOutputVisibility:
-          ProjectSensitiveDataVisibilityLevel.REDACTED_TO_ALL,
-      });
-
-      mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { role: TeamUserRole.ADMIN },
-      ]);
-    });
-
-    it("denies visibility even for admin", async () => {
-      const result = await getUserProtectionsForProject(
-        { prisma: mockPrisma, session: mockSession },
-        { projectId: "project-1" },
-      );
-
+      const result = await protections();
       expect(result.canSeeCapturedInput).toBe(false);
       expect(result.canSeeCapturedOutput).toBe(false);
     });

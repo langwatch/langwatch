@@ -32,6 +32,7 @@ import { fromZodError } from "zod-validation-error";
 import { TRPCError } from "@trpc/server";
 import { env } from "~/env.mjs";
 import { getApp } from "~/server/app-layer/app";
+import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import type { DspyStepData } from "~/server/app-layer/dspy-steps/types";
 import { getAnalyticsService } from "~/server/analytics/analytics.service";
 import {
@@ -845,7 +846,7 @@ secured.access(inRouteAuth).post("/track_event", authMiddleware, requireTracesCr
       },
       resource: { attributes: [] },
       instrumentationScope: { name: TRACK_EVENT_SPAN_NAME },
-      piiRedactionLevel: project.piiRedactionLevel,
+      piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
     });
   } catch (error) {
     logger.error({ error }, "unable to dispatch tracked event span");

@@ -13,6 +13,7 @@ import {
   TraceService,
 } from "~/server/traces/trace.service";
 import { getApp } from "~/server/app-layer/app";
+import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import { CollectorSpanUtils } from "~/server/traces/collectorSpan.utils";
 import type { ReservedTraceMetadata, CustomMetadata } from "~/server/tracer/types";
 import { createLogger } from "~/utils/logger/server";
@@ -444,7 +445,7 @@ export function registerTracesRoutes(
         },
         resource,
         instrumentationScope: { name: "langwatch.api.metadata_update" },
-        piiRedactionLevel: project.piiRedactionLevel,
+        piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
         occurredAt: now,
       });
 

@@ -1,8 +1,6 @@
 import {
-  EMPTY_AUDIENCE,
   type Disposition,
   type ResolvedAudience,
-  type ResolvedCategory,
 } from "./dataPrivacy.types";
 
 /**
@@ -10,17 +8,7 @@ import {
  * category stores the content but hides it from anyone outside its audience;
  * this module decides, for one viewer, whether a category is visible and (when
  * not) who it is visible to, so the trace view can explain the redaction.
- *
- * During the migration window the project's legacy
- * `capturedInput/OutputVisibility` enum still applies wherever the new policy
- * has not set an explicit disposition — see `effectiveCategoryRestriction`.
  */
-
-/** The legacy per-project visibility enum, reconciled below. */
-export type LegacyVisibility =
-  | "VISIBLE_TO_ALL"
-  | "VISIBLE_TO_ADMIN"
-  | "REDACTED_TO_ALL";
 
 /** What we know about the viewer for an audience check. */
 export interface ViewerFacts {
@@ -30,39 +18,13 @@ export interface ViewerFacts {
   departmentId: string | null;
 }
 
+/**
+ * The resolved disposition + audience a viewer is checked against. Structurally
+ * a `ResolvedCategory`, kept as its own name for the read-side call sites.
+ */
 export interface EffectiveRestriction {
   disposition: Disposition;
   audience: ResolvedAudience;
-}
-
-const ADMINS_ONLY: ResolvedAudience = {
-  admins: true,
-  allMembers: false,
-  groupIds: [],
-  departmentIds: [],
-};
-
-/**
- * Reconcile a resolved category with the project's legacy visibility enum. An
- * explicit policy (restrict or drop) always wins; at the platform default
- * ("capture") we honor the legacy field so a project that set VISIBLE_TO_ADMIN
- * or REDACTED_TO_ALL keeps that behavior until the backfill writes a rule.
- */
-export function effectiveCategoryRestriction(
-  category: ResolvedCategory,
-  legacy: LegacyVisibility,
-): EffectiveRestriction {
-  if (category.disposition !== "capture") {
-    return { disposition: category.disposition, audience: category.audience };
-  }
-  switch (legacy) {
-    case "VISIBLE_TO_ADMIN":
-      return { disposition: "restrict", audience: { ...ADMINS_ONLY } };
-    case "REDACTED_TO_ALL":
-      return { disposition: "restrict", audience: { ...EMPTY_AUDIENCE } };
-    default:
-      return { disposition: "capture", audience: { ...EMPTY_AUDIENCE } };
-  }
 }
 
 /**

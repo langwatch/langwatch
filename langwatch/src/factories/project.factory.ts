@@ -1,8 +1,4 @@
-import {
-  PIIRedactionLevel,
-  type Project,
-  ProjectSensitiveDataVisibilityLevel,
-} from "@prisma/client";
+import { type Project } from "@prisma/client";
 import { Factory } from "fishery";
 import { nanoid } from "nanoid";
 
@@ -26,9 +22,6 @@ export const projectFactory = Factory.define<
   createdAt: new Date(),
   updatedAt: new Date(),
   userLinkTemplate: null,
-  piiRedactionLevel: PIIRedactionLevel.ESSENTIAL,
-  capturedInputVisibility: ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
-  capturedOutputVisibility: ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
   traceSharingEnabled: true,
   s3Endpoint: null,
   s3AccessKeyId: null,

@@ -2,7 +2,6 @@ import {
   Prisma,
   type PrismaClient,
   type Project,
-  ProjectSensitiveDataVisibilityLevel,
   RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
@@ -78,7 +77,6 @@ export const projectRouter = createTRPCRouter({
         teamId: "",
         createdAt: new Date(),
         updatedAt: new Date(),
-        piiRedactionLevel: "STRICT",
       } as Project;
     }),
   create: protectedProcedure
@@ -211,14 +209,6 @@ export const projectRouter = createTRPCRouter({
           framework: input.framework,
           teamId: teamId,
           apiKey: generateApiKey(),
-          piiRedactionLevel:
-            env.NODE_ENV === "development" || !env.IS_SAAS
-              ? "DISABLED"
-              : "ESSENTIAL",
-          capturedInputVisibility:
-            ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
-          capturedOutputVisibility:
-            ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
         },
       });
 
@@ -306,14 +296,7 @@ export const projectRouter = createTRPCRouter({
           name: z.string().optional(),
           language: z.string().optional(),
           framework: z.string().optional(),
-          piiRedactionLevel: z.enum(["STRICT", "ESSENTIAL", "DISABLED"]).optional(),
           teamId: z.string().optional(),
-          capturedInputVisibility: z
-            .enum(["REDACTED_TO_ALL", "VISIBLE_TO_ADMIN", "VISIBLE_TO_ALL"])
-            .optional(),
-          capturedOutputVisibility: z
-            .enum(["REDACTED_TO_ALL", "VISIBLE_TO_ADMIN", "VISIBLE_TO_ALL"])
-            .optional(),
           traceSharingEnabled: z.boolean().optional(),
           presenceEnabled: z.boolean().optional(),
           userLinkTemplate: z.string().optional(),
@@ -350,21 +333,6 @@ export const projectRouter = createTRPCRouter({
         });
       }
 
-      if (
-        input.piiRedactionLevel !== undefined &&
-        input.piiRedactionLevel === "DISABLED" &&
-        !(
-          env.NODE_ENV === "development" ||
-          !env.IS_SAAS ||
-          project.team.organization.signedDPA
-        )
-      ) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "PII redation cannot be disabled",
-        });
-      }
-
       if (input.teamId) {
         const destinationTeam = await prisma.team.findFirst({
           where: {
@@ -389,17 +357,10 @@ export const projectRouter = createTRPCRouter({
           ...(input.name !== undefined && { name: input.name }),
           ...(input.language !== undefined && { language: input.language }),
           ...(input.framework !== undefined && { framework: input.framework }),
-          ...(input.piiRedactionLevel !== undefined && {
-            piiRedactionLevel: input.piiRedactionLevel,
-          }),
           ...(input.userLinkTemplate !== undefined && {
             userLinkTemplate: input.userLinkTemplate,
           }),
           ...(input.teamId && { teamId: input.teamId }),
-          capturedInputVisibility:
-            input.capturedInputVisibility ?? project.capturedInputVisibility,
-          capturedOutputVisibility:
-            input.capturedOutputVisibility ?? project.capturedOutputVisibility,
           traceSharingEnabled:
             input.traceSharingEnabled ?? project.traceSharingEnabled,
           presenceEnabled:
@@ -517,22 +478,17 @@ async function checkCapturedDataVisibilityPermission({
   ctx: { prisma: PrismaClient; session: Session; permissionChecked: boolean };
   input: {
     projectId: string;
-    capturedInputVisibility?: string;
-    capturedOutputVisibility?: string;
     traceSharingEnabled?: boolean;
   };
   next: () => Promise<any>;
 }) {
   if (
-    (input.capturedInputVisibility !== void 0 ||
-      input.capturedOutputVisibility !== void 0 ||
-      input.traceSharingEnabled !== void 0) &&
+    input.traceSharingEnabled !== void 0 &&
     !(await hasProjectPermission(ctx, input.projectId, "project:manage"))
   ) {
     throw new TRPCError({
       code: "FORBIDDEN",
-      message:
-        "You don't have permission to change captured data visibility settings",
+      message: "You don't have permission to change trace sharing settings",
     });
   }
   return next();

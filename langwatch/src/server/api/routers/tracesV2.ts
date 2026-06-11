@@ -16,7 +16,10 @@ import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
 import type { SpanSummaryRow } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import { changeTraceNameInputSchema } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
+import {
+  changeTraceNameInputSchema,
+  DEFAULT_PII_REDACTION_LEVEL,
+} from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import { withoutHiddenResourceAttrs } from "./tracesV2.resourceAttrs";
 import {
@@ -732,11 +735,6 @@ export const tracesV2Router = createTRPCRouter({
         customMetadata: custom,
       });
 
-      const project = await prisma.project.findUniqueOrThrow({
-        where: { id: input.projectId },
-        select: { piiRedactionLevel: true },
-      });
-
       const now = Date.now();
       const nowNano = String(now * 1_000_000);
       const spanId = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
@@ -764,7 +762,7 @@ export const tracesV2Router = createTRPCRouter({
         },
         resource,
         instrumentationScope: { name: "langwatch.api.metadata_update" },
-        piiRedactionLevel: project.piiRedactionLevel,
+        piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
         occurredAt: now,
       });
 

@@ -22,6 +22,7 @@ import {
   type Span,
 } from "../tracer/types";
 import { CollectorSpanUtils } from "../traces/collectorSpan.utils";
+import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import { createLogger } from "../../utils/logger/server";
 import { TokenResolver } from "../api-key/token-resolver";
 import {
@@ -537,7 +538,7 @@ secured.access(handlerManagedAuth("ingestion API key resolved in-handler")).post
             span: CollectorSpanUtils.convertSpanToOtlp(span),
             resource,
             instrumentationScope: { name: "langwatch.rest.collector" },
-            piiRedactionLevel: project.piiRedactionLevel,
+            piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
           }),
         ),
       );
