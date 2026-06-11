@@ -446,6 +446,13 @@ export const projectRouter = createTRPCRouter({
           input: !protections.canSeeCapturedInput,
           output: !protections.canSeeCapturedOutput,
         },
+        // Human label of who CAN see a restricted field (e.g. "Admins, Security"
+        // or "no one"), so the redaction placeholder can explain why content is
+        // hidden and who to ask. Null when the field is visible.
+        visibleTo: {
+          input: protections.capturedInputVisibleTo ?? null,
+          output: protections.capturedOutputVisibleTo ?? null,
+        },
       };
     }),
   archiveById: protectedProcedure

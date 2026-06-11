@@ -31,6 +31,7 @@ import { isPythonRepr } from "../../utils/parsePythonInsideJson";
 import { getExtractedInput } from "../../utils/traceExtraction";
 import { SmallLabel } from "../SmallLabel";
 import { PIIRedactionNotice } from "../ui/PIIRedactionNotice";
+import { PrivacyDroppedNotice } from "../ui/PrivacyDroppedNotice";
 import { RedactedField } from "../ui/RedactedField";
 import { Tooltip } from "../ui/tooltip";
 import {
@@ -152,6 +153,9 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
             )}
             <PIIRedactionNotice
               content={`${getExtractedInput(trace) ?? ""}\n${stringifyIfObject(trace.output?.value) ?? ""}`}
+            />
+            <PrivacyDroppedNotice
+              categories={trace.privacy?.droppedCategories}
             />
             <Message
               author="Input"

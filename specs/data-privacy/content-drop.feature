@@ -74,3 +74,16 @@ Feature: Dropping trace content at ingestion
     Given a trace already stored for "web-app" with input
     When a rule that drops trace input is added for "web-app"
     Then the already-stored trace still has its input
+
+  # Dropped content is gone from storage, so the trace view marks its absence to
+  # tell it apart from content that was simply never instrumented: the view names
+  # the categories a privacy policy dropped and makes clear they were never
+  # stored. This is read from a marker the drop stamps on the span, so it follows
+  # the data and is not a guess from the project's current settings.
+
+  @integration
+  Scenario: The trace view marks content a privacy policy dropped
+    Given a rule on "web-app" that drops trace input
+    And a trace ingested for "web-app" while the rule is in place
+    When someone opens that trace
+    Then the trace view marks the input as dropped by a privacy policy
