@@ -188,6 +188,32 @@ export function EditableCell({
     undefined,
   );
 
+  // Where the editor should land in viewport coordinates. position:fixed
+  // resolves against the nearest transformed ancestor instead of the viewport
+  // when the editor portals into an animated dialog/drawer, so after render
+  // we measure the miss and shift once.
+  const intendedPositionRef = useRef<{ top: number; left: number } | null>(
+    null,
+  );
+
+  useLayoutEffect(() => {
+    if (!isEditing || !intendedPositionRef.current) return;
+    const el = textareaRef.current?.closest(
+      "[data-floating-cell-editor]",
+    ) as HTMLElement | null;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const dx = rect.left - intendedPositionRef.current.left;
+    const dy = rect.top - intendedPositionRef.current.top;
+    if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+      setEditorStyle((prev) => ({
+        ...prev,
+        left: (typeof prev.left === "number" ? prev.left : 0) - dx,
+        top: (typeof prev.top === "number" ? prev.top : 0) - dy,
+      }));
+    }
+  }, [isEditing, editorStyle]);
+
   // Position editor and focus when editing starts
   useLayoutEffect(() => {
     if (isEditing && cellRef.current) {
@@ -205,11 +231,19 @@ export function EditableCell({
           rect.height + padding - footerHeight,
         );
         setTextareaHeight(calculatedHeight);
+        // Clamp into the viewport: the min-width can push editors opened on
+        // last-column cells past the right edge.
+        const width = Math.max(rect.width + padding, 250);
+        const left = Math.max(
+          8,
+          Math.min(rect.left - 8, window.innerWidth - width - 8),
+        );
+        intendedPositionRef.current = { top: rect.top - 8, left };
         setEditorStyle({
           position: "fixed",
           top: rect.top - 8,
-          left: rect.left - 8,
-          width: Math.max(rect.width + padding, 250),
+          left,
+          width,
           minHeight: rect.height + padding,
           zIndex: 1000,
         });
@@ -567,6 +601,7 @@ export function EditableCell({
       {isEditing && (
         <Portal container={editorPortalRef ?? undefined}>
           <Box
+            data-floating-cell-editor
             style={editorStyle}
             bg="bg.panel"
             borderRadius="md"

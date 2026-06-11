@@ -320,6 +320,13 @@ export function AutomationDrawer() {
     <Drawer.Root
       open={true}
       onOpenChange={({ open }) => !open && closeDrawer()}
+      onEscapeKeyDown={(e) => {
+        // Escape while the floating cell editor is open should only close
+        // the editor (its own handler), never the whole drawer.
+        if (editorPortalRef.current?.querySelector("[data-floating-cell-editor]")) {
+          e.preventDefault();
+        }
+      }}
       placement="end"
     >
       <Drawer.Content bg="bg" maxWidth="1200px">
