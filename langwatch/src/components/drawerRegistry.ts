@@ -7,13 +7,13 @@
  * - `DrawerProps<T>`: Props type for a specific drawer
  * - `DrawerCallbacks<T>`: Callback props (functions) for a specific drawer
  */
-import { lazy, type ComponentProps, type FC } from "react";
+import { type ComponentProps, type FC, lazy } from "react";
 
 import { AddAnnotationQueueDrawer } from "./AddAnnotationQueueDrawer";
+import { AutomationDrawer } from "./AddAutomationDrawer";
 import { AddDatasetRecordDrawerV2 } from "./AddDatasetRecordDrawer";
 import { AddOrEditAnnotationScoreDrawer } from "./AddOrEditAnnotationScoreDrawer";
 import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
-import { AutomationDrawer } from "./AddAutomationDrawer";
 import { AgentHistoryDrawer } from "./agents/AgentHistoryDrawer";
 import { AgentListDrawer } from "./agents/AgentListDrawer";
 import { AgentTypeSelectorDrawer } from "./agents/AgentTypeSelectorDrawer";
@@ -27,8 +27,10 @@ import { AlertDrawer } from "./analytics/AlertDrawer";
 import { DashboardNameDrawer } from "./analytics/DashboardNameDrawer";
 import { SelectDatasetDrawer } from "./datasets/SelectDatasetDrawer";
 import { UploadCSVModal } from "./datasets/UploadCSVModal";
-import { EditModelProviderDrawer } from "./EditModelProviderDrawer";
+import { FeatureFlagsDrawer } from "./drawers/FeatureFlagsDrawer";
+import { SdkRadarDrawer } from "./drawers/SdkRadarDrawer";
 import { EditAutomationFilterDrawer } from "./EditAutomationFilterDrawer";
+import { EditModelProviderDrawer } from "./EditModelProviderDrawer";
 import { GuardrailsDrawer } from "./evaluations/GuardrailsDrawer";
 // Online Evaluations (Monitors) drawers
 import { OnlineEvaluationDrawer } from "./evaluations/OnlineEvaluationDrawer";
@@ -38,13 +40,25 @@ import { EvaluatorHistoryDrawer } from "./evaluators/EvaluatorHistoryDrawer";
 import { EvaluatorListDrawer } from "./evaluators/EvaluatorListDrawer";
 import { EvaluatorTypeSelectorDrawer } from "./evaluators/EvaluatorTypeSelectorDrawer";
 import { WorkflowSelectorForEvaluatorDrawer } from "./evaluators/WorkflowSelectorForEvaluatorDrawer";
-import { FeatureFlagsDrawer } from "./drawers/FeatureFlagsDrawer";
-import { SdkRadarDrawer } from "./drawers/SdkRadarDrawer";
+
 // Lazy-loaded: FoundryDrawer transitively imports the OTel SDK which has
 // side effects that break React if evaluated eagerly at app startup.
-const FoundryDrawer = lazy(
-  () => import("./ops/foundry/FoundryDrawer").then((m) => ({ default: m.FoundryDrawer })),
+const FoundryDrawer = lazy(() =>
+  import("./ops/foundry/FoundryDrawer").then((m) => ({
+    default: m.FoundryDrawer,
+  })),
 );
+
+// Traces V2 drawers — the real shell is mounted from `TracesPage` based
+// on the drawer store (so a click → drawer-open is synchronous, no
+// round-trip through the URL). The registry entry stays as a noop so
+// the `DrawerType` union still contains `"traceV2Details"` and every
+// `openDrawer("traceV2Details", …)` call still typechecks; CurrentDrawer
+// rendering it would just double-mount on top of the page-level mount.
+// The prop shape mirrors `TraceV2DrawerShellProps` exactly so
+// `openDrawer("traceV2Details", { traceId, t, ... })` still typechecks
+// at every call site.
+import type { TraceV2DrawerShellProps } from "../features/traces-v2/components/TraceDrawer";
 import { CreateProjectDrawer } from "./projects/CreateProjectDrawer";
 import { EditProjectDrawer } from "./projects/EditProjectDrawer";
 import { PromptEditorDrawer } from "./prompts/PromptEditorDrawer";
@@ -57,18 +71,9 @@ import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
 import { ScenarioRunDetailDrawer } from "./simulations/ScenarioRunDetailDrawer";
 import { SuiteFormDrawer } from "./suites/SuiteFormDrawer";
 import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
-// Traces V2 drawers — the real shell is mounted from `TracesPage` based
-// on the drawer store (so a click → drawer-open is synchronous, no
-// round-trip through the URL). The registry entry stays as a noop so
-// the `DrawerType` union still contains `"traceV2Details"` and every
-// `openDrawer("traceV2Details", …)` call still typechecks; CurrentDrawer
-// rendering it would just double-mount on top of the page-level mount.
-// The prop shape mirrors `TraceV2DrawerShellProps` exactly so
-// `openDrawer("traceV2Details", { traceId, t, ... })` still typechecks
-// at every call site.
-import type { TraceV2DrawerShellProps } from "../features/traces-v2/components/TraceDrawer";
 
 const TraceV2DrawerNoop: FC<TraceV2DrawerShellProps> = () => null;
+
 // Evaluations V3 drawers
 import { TargetTypeSelectorDrawer } from "./targets/TargetTypeSelectorDrawer";
 

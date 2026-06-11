@@ -19,23 +19,25 @@ let mockEdges: Array<{
   targetHandle?: string;
 }> = [];
 
-vi.mock("~/optimization_studio/hooks/useWorkflowStore", async (
-  importOriginal,
-) => {
-  const actual = await importOriginal<
-    typeof import("~/optimization_studio/hooks/useWorkflowStore")
-  >();
-  return {
-    ...actual,
-    useWorkflowStore: (selector: (state: unknown) => unknown) =>
-      selector({
-        setNode: mockSetNode,
-        nodes: [currentNode],
-        edges: mockEdges,
-        getWorkflow: () => ({ nodes: [currentNode], edges: mockEdges }),
-      }),
-  };
-});
+vi.mock(
+  "~/optimization_studio/hooks/useWorkflowStore",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/optimization_studio/hooks/useWorkflowStore")
+      >();
+    return {
+      ...actual,
+      useWorkflowStore: (selector: (state: unknown) => unknown) =>
+        selector({
+          setNode: mockSetNode,
+          nodes: [currentNode],
+          edges: mockEdges,
+          getWorkflow: () => ({ nodes: [currentNode], edges: mockEdges }),
+        }),
+    };
+  },
+);
 
 // Capture the props the panel hands to the shell - the read-only
 // results contract is expressed through them.
@@ -143,9 +145,7 @@ describe("EndPropertiesPanel", () => {
         }),
       );
 
-      expect(
-        screen.getByText(/Connect either a/i),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Connect either a/i)).toBeInTheDocument();
     });
 
     /** @scenario Unconnected fixed fields are allowed */

@@ -47,8 +47,8 @@ import type { Field, Signature, Workflow } from "../types/dsl";
 import { simpleRecordListToNodeDataset } from "../utils/datasetUtils";
 import { isExperimentQueryEnabled } from "./evaluationQueryEnabled";
 import { OpenFullResultsButton } from "./OpenFullResultsButton";
-import { RunViaApiButton } from "./RunViaApiButton";
 import { OptimizationProgressBar } from "./ProgressToast";
+import { RunViaApiButton } from "./RunViaApiButton";
 
 export function ResultsPanel({
   isCollapsed,

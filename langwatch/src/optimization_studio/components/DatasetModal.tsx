@@ -16,7 +16,14 @@
  * columns into the entry fields without clobbering user-added inputs; the
  * dataset is a data source, not the definition of the workflow's inputs.
  */
-import { Box, Button, HStack, Spacer, Text, useDisclosure } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  HStack,
+  Spacer,
+  Text,
+  useDisclosure,
+} from "@chakra-ui/react";
 import type { Node, NodeProps } from "@xyflow/react";
 import { useUpdateNodeInternals } from "@xyflow/react";
 import { useEffect, useRef, useState } from "react";
@@ -68,19 +75,15 @@ export function DatasetModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  const { attachEntryDataset } = useWorkflowStore(
-    ({ attachEntryDataset }) => ({ attachEntryDataset }),
-  );
+  const { attachEntryDataset } = useWorkflowStore(({ attachEntryDataset }) => ({
+    attachEntryDataset,
+  }));
 
   const attachDataset = (
     dataset: Entry["dataset"],
     columnTypes: DatasetColumns,
   ) => {
-    attachEntryDataset(
-      node.id,
-      dataset,
-      datasetColumnsToFields(columnTypes),
-    );
+    attachEntryDataset(node.id, dataset, datasetColumnsToFields(columnTypes));
     updateNodeInternals(node.id);
   };
 
@@ -134,7 +137,10 @@ export function DatasetModal({
         name: string;
         columnTypes: DatasetColumns;
       }) => {
-        attachDataset({ id: saved.datasetId, name: saved.name }, saved.columnTypes);
+        attachDataset(
+          { id: saved.datasetId, name: saved.name },
+          saved.columnTypes,
+        );
         onClose();
       },
     });

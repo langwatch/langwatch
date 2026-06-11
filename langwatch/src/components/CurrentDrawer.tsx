@@ -47,7 +47,9 @@ export function CurrentDrawer({ marginTop }: { marginTop?: number }) {
   // Instead of rendering the drawer, show the restriction modal
   // and clear the drawer from the URL. This protects ALL entry points:
   // direct clicks, command bar, deep links, and any future call sites.
-  const restrictedResource = drawerType ? restrictedDrawers[drawerType] : undefined;
+  const restrictedResource = drawerType
+    ? restrictedDrawers[drawerType]
+    : undefined;
   const isRestricted =
     !!restrictedResource && organizationRole === OrganizationUserRole.EXTERNAL;
 

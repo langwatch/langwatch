@@ -1,11 +1,11 @@
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
-import { useRouter } from "~/utils/compat/next-router";
 import qs from "qs";
 import { X } from "react-feather";
+import { useRouter } from "~/utils/compat/next-router";
 import { type FilterParam, useFilterParams } from "../../hooks/useFilterParams";
 import { filterOutEmptyFilters } from "../../server/analytics/utils";
-import { URL_QS_PARSE_OPTIONS } from "../../utils/qsParseOptions";
 import type { FilterField } from "../../server/filters/types";
+import { URL_QS_PARSE_OPTIONS } from "../../utils/qsParseOptions";
 import { Tooltip } from "../ui/tooltip";
 import { FilterIconWithBadge } from "./FilterIconWithBadge";
 

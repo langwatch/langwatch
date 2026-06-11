@@ -12,7 +12,6 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { EvaluationExecutionMode } from "@prisma/client";
-import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
 import { AlertTriangle, ArrowLeft, HelpCircle, Spool, X } from "lucide-react";
 import {
   useCallback,
@@ -24,6 +23,16 @@ import {
 } from "react";
 import { useForm } from "react-hook-form";
 import { LuListTree } from "react-icons/lu";
+import {
+  DEFAULT_PRECONDITION,
+  fieldRequiresKey,
+  getAllowedRulesForField,
+  getFieldOptionsByCategory,
+  getFieldValueType,
+  isDefaultOnlyPrecondition,
+  isRuleAllowedForField,
+  RULE_LABELS,
+} from "~/components/preconditions/preconditionFieldUtils";
 import { Drawer } from "~/components/ui/drawer";
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
 import { createEvaluatorEditorCallbacks } from "~/experiments-v3/utils/evaluatorEditorCallbacks";
@@ -44,22 +53,11 @@ import type {
   CheckPreconditionFields,
   CheckPreconditionRule,
 } from "~/server/evaluations/types";
-import {
-  DEFAULT_PRECONDITION,
-  RULE_LABELS,
-  getAllowedRulesForField,
-  fieldRequiresKey,
-  getFieldOptionsByCategory,
-  getFieldValueType,
-  isDefaultOnlyPrecondition,
-  isRuleAllowedForField,
-} from "~/components/preconditions/preconditionFieldUtils";
-import {
-  type MappingState,
+import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
+import type {
+  MappingState,
   TRACE_MAPPINGS,
 } from "~/server/tracer/tracesMapping";
-import { deserializeMappingStateToUI } from "./utils/deserializeMappingStateToUI";
-import { serializeMappingsToMappingState } from "./utils/serializeMappingsToMappingState";
 import { api } from "~/utils/api";
 import type { EvaluatorMappingsConfig } from "../evaluators/EvaluatorEditorShared";
 import { HorizontalFormControl } from "../HorizontalFormControl";
@@ -67,6 +65,8 @@ import { SmallLabel } from "../SmallLabel";
 import { Tooltip } from "../ui/tooltip";
 import { EvaluatorSelectionBox } from "./EvaluatorSelectionBox";
 import { StepRadio } from "./StepButton";
+import { deserializeMappingStateToUI } from "./utils/deserializeMappingStateToUI";
+import { serializeMappingsToMappingState } from "./utils/serializeMappingsToMappingState";
 
 export type EvaluationLevel = "trace" | "thread" | null;
 
@@ -178,8 +178,7 @@ function isInActiveEvaluationFlow(): boolean {
   const stack = getDrawerStack();
   return stack.some(
     (entry) =>
-      entry.drawer === "onlineEvaluation" ||
-      FLOW_SUB_DRAWERS.has(entry.drawer),
+      entry.drawer === "onlineEvaluation" || FLOW_SUB_DRAWERS.has(entry.drawer),
   );
 }
 
@@ -647,13 +646,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       evaluatorId: selectedEvaluator.id,
       mappingsConfig,
     });
-  }, [
-    selectedEvaluator,
-    level,
-    mappings,
-    handleMappingChange,
-    openDrawer,
-  ]);
+  }, [selectedEvaluator, level, mappings, handleMappingChange, openDrawer]);
 
   // Open evaluator editor when clicking on already-selected evaluator
   // This opens the editor directly with mappings config
@@ -692,7 +685,9 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
         // mappingsConfig (ephemeral complexProps, lost on ErrorBoundary remount).
         setFlowCallbacks(
           "evaluatorEditor",
-          createEvaluatorEditorCallbacks({ onMappingChange: handleMappingChange }),
+          createEvaluatorEditorCallbacks({
+            onMappingChange: handleMappingChange,
+          }),
         );
 
         const newMappingsConfig: EvaluatorMappingsConfig = {
@@ -773,7 +768,9 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       // mappingsConfig (ephemeral complexProps, lost on ErrorBoundary remount).
       setFlowCallbacks(
         "evaluatorEditor",
-        createEvaluatorEditorCallbacks({ onMappingChange: handleMappingChange }),
+        createEvaluatorEditorCallbacks({
+          onMappingChange: handleMappingChange,
+        }),
       );
 
       // Build mappings config for the evaluator editor

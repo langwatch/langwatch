@@ -147,7 +147,11 @@ const http: Code = {
   name: "HTTP Call",
   description: "Make an HTTP request to an external API",
   parameters: [
-    { identifier: "url", type: "str", value: "https://api.example.com/endpoint" },
+    {
+      identifier: "url",
+      type: "str",
+      value: "https://api.example.com/endpoint",
+    },
     { identifier: "method", type: "str", value: "POST" },
     {
       identifier: "body_template",

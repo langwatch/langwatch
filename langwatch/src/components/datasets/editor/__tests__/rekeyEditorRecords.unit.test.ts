@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  rekeyEditorRecords,
   type EditorColumn,
+  rekeyEditorRecords,
 } from "../useDatasetEditorStore";
 
 const columns = (...names: string[]): EditorColumn[] =>
-  names.map((name, index) => ({ id: `${name}_${index}`, name, type: "string" }));
+  names.map((name, index) => ({
+    id: `${name}_${index}`,
+    name,
+    type: "string",
+  }));
 
 describe("rekeyEditorRecords", () => {
   describe("given records keyed by the current column names", () => {

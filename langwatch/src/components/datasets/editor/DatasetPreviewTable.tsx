@@ -11,10 +11,7 @@ import { useMemo, useState } from "react";
 import type { DatasetColumns } from "~/server/datasets/types";
 import { ExpandedTextDialog } from "../../HoverableBigText";
 
-type PreviewRow = { id?: string; selected?: boolean } & Record<
-  string,
-  unknown
->;
+type PreviewRow = { id?: string; selected?: boolean } & Record<string, unknown>;
 
 /** Cap the text rendered per cell so heavy payloads do not bloat the DOM. */
 const PREVIEW_DISPLAY_MAX = 300;

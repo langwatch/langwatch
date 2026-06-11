@@ -8,10 +8,10 @@ import {
   useRef,
   useState,
 } from "react";
-import type { DatasetColumnType } from "~/server/datasets/types";
 import { ExternalImage, getImageUrl } from "~/components/ExternalImage";
-import { useDatasetTable } from "./DatasetTableContext";
+import type { DatasetColumnType } from "~/server/datasets/types";
 import { isTextLikelyOverflowing } from "~/utils/textOverflowHeuristic";
+import { useDatasetTable } from "./DatasetTableContext";
 
 // Max characters to display before truncating (for rendering performance)
 const MAX_DISPLAY_CHARS = 5000;
@@ -255,7 +255,15 @@ export function EditableCell({
     // Other types: save as-is
     setCellValue(datasetId, row, columnId, editValue);
     setEditingCell(undefined);
-  }, [datasetId, row, columnId, editValue, dataType, setCellValue, setEditingCell]);
+  }, [
+    datasetId,
+    row,
+    columnId,
+    editValue,
+    dataType,
+    setCellValue,
+    setEditingCell,
+  ]);
 
   const handleCancel = useCallback(() => {
     setEditValue(value);
@@ -588,15 +596,12 @@ export function EditableCell({
               _focus={{ outline: "none", boxShadow: "none" }}
             />
             {dataType === "boolean" && (
-              <HStack
-                position="absolute"
-                bottom="32px"
-                left={2}
-                gap={1}
-              >
+              <HStack position="absolute" bottom="32px" left={2} gap={1}>
                 <Button
                   size="xs"
-                  variant={editValue.toLowerCase() === "true" ? "solid" : "outline"}
+                  variant={
+                    editValue.toLowerCase() === "true" ? "solid" : "outline"
+                  }
                   colorPalette="green"
                   onClick={() => {
                     setCellValue(datasetId, row, columnId, "true");
@@ -608,7 +613,9 @@ export function EditableCell({
                 </Button>
                 <Button
                   size="xs"
-                  variant={editValue.toLowerCase() === "false" ? "solid" : "outline"}
+                  variant={
+                    editValue.toLowerCase() === "false" ? "solid" : "outline"
+                  }
                   colorPalette="red"
                   onClick={() => {
                     setCellValue(datasetId, row, columnId, "false");
@@ -629,15 +636,11 @@ export function EditableCell({
               borderColor={validationError ? "red.muted" : "border.muted"}
               bg={validationError ? "red.subtle" : "bg.subtle"}
             >
-              {validationError ? (
-                dataType === "boolean" ? (
-                  "Invalid value. Use: true, false, 1, or 0"
-                ) : (
-                  "Invalid number"
-                )
-              ) : (
-                "Enter to save • Escape to cancel • Shift+Enter for newline"
-              )}
+              {validationError
+                ? dataType === "boolean"
+                  ? "Invalid value. Use: true, false, 1, or 0"
+                  : "Invalid number"
+                : "Enter to save • Escape to cancel • Shift+Enter for newline"}
             </Box>
           </Box>
         </Portal>

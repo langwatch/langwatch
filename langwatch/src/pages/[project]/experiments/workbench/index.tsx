@@ -1,7 +1,5 @@
 import { Alert, Box, Center, VStack } from "@chakra-ui/react";
-import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useRef } from "react";
-
 import { DashboardLayout } from "~/components/DashboardLayout";
 import {
   createInitialState,
@@ -13,6 +11,7 @@ import { extractPersistedState } from "~/experiments-v3/types/persistence";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { DatasetColumns } from "~/server/datasets/types";
 import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 
 /**
  * Builds a saved dataset reference from a loaded dataset, mirroring the
@@ -118,7 +117,14 @@ export default function NewExperimentWorkbench() {
         // Error will be shown in the UI via createExperiment.isError
       }
     })();
-  }, [project, router, createExperiment, isDatasetReady, datasetId, datasetQuery.data]);
+  }, [
+    project,
+    router,
+    createExperiment,
+    isDatasetReady,
+    datasetId,
+    datasetQuery.data,
+  ]);
 
   return (
     <DashboardLayout backgroundColor="bg.panel" compactMenu={true}>

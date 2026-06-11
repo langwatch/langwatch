@@ -22,7 +22,6 @@ import { DndProvider, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 
 import "@xyflow/react/dist/style.css";
-import Head from "~/utils/compat/next-head";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BarChart2 } from "react-feather";
 import {
@@ -32,22 +31,28 @@ import {
   PanelResizeHandle,
 } from "react-resizable-panels";
 import { useShallow } from "zustand/react/shallow";
+import Head from "~/utils/compat/next-head";
 import { CurrentDrawer } from "../../components/CurrentDrawer";
-import { GlobalTraceV2DrawerMount } from "../../features/traces-v2/components/GlobalTraceV2DrawerMount";
-import { GlobalUpgradeModal } from "../../components/UpgradeModal";
 import { LogoIcon } from "../../components/icons/LogoIcon";
-import { useColorMode, useColorModeValue, useColorRawValue } from "../../components/ui/color-mode";
+import { GlobalUpgradeModal } from "../../components/UpgradeModal";
+import {
+  useColorMode,
+  useColorModeValue,
+  useColorRawValue,
+} from "../../components/ui/color-mode";
 import { Link } from "../../components/ui/link";
 import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { GlobalTraceV2DrawerMount } from "../../features/traces-v2/components/GlobalTraceV2DrawerMount";
 import { useDrawer } from "../../hooks/useDrawer";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { titleCase } from "../../utils/stringCasing";
 import { useAskBeforeLeaving } from "../hooks/useAskBeforeLeaving";
 import { PostEventProvider, usePostEvent } from "../hooks/usePostEvent";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { AutoSave } from "./AutoSave";
 import { PlaygroundButton } from "./ChatWindow";
+import { StudioNodeDrawer } from "./drawers/StudioNodeDrawer";
 import DefaultEdge from "./Edge";
 import { Evaluate } from "./Evaluate";
 import { RunningStatus } from "./ExecutionState";
@@ -61,7 +66,6 @@ import { NodeComponents } from "./nodes";
 import { Optimize } from "./Optimize";
 import { ProgressToast } from "./ProgressToast";
 import { Publish } from "./Publish";
-import { StudioNodeDrawer } from "./drawers/StudioNodeDrawer";
 import { ResultsPanel } from "./ResultsPanel";
 import { UndoRedo } from "./UndoRedo";
 import { WorkflowNamePopover } from "./WorkflowNamePopover";
@@ -190,8 +194,6 @@ export default function OptimizationStudio() {
 
   useAskBeforeLeaving();
 
-
-
   return (
     <div style={{ width: "100vw", height: "100vh" }}>
       <Head>
@@ -200,195 +202,195 @@ export default function OptimizationStudio() {
       <ReactFlowProvider>
         <DndProvider backend={HTML5Backend}>
           <PostEventProvider>
-              <CustomDragLayer />
-              <VStack width="full" height="full" gap={0}>
-                <HStack
-                  width="full"
-                  background="bg"
-                  padding={2}
-                  borderBottom="1px solid"
-                  borderColor="border.emphasized"
-                >
-                  <HStack width="full">
-                    <Link href={`/${project?.slug}/workflows`}>
-                      <LogoIcon width={24} height={24} />
-                    </Link>
-                    <RunningStatus />
-                    {!["waiting", "running"].includes(
-                      executionStatus ?? "",
-                    ) && <AutoSave />}
-                  </HStack>
-                  <HStack width="full" justify="center">
-                    <WorkflowNamePopover />
-                    <StatusCircle
-                      status={socketStatus}
-                      tooltip={
-                        socketStatus === "connecting-python" ? (
-                          <VStack align="start" gap={1} padding={2}>
-                            <HStack>
-                              <StatusCircle
-                                status={
-                                  socketStatus === "connecting-python"
-                                    ? "connected"
-                                    : "connecting"
-                                }
-                              />
-                              <Text>Socket Connection</Text>
-                            </HStack>
-                            <HStack>
-                              <StatusCircle status="connecting" />
-                              <Text>Python Runtime</Text>
-                            </HStack>
-                          </VStack>
-                        ) : (
-                          titleCase(socketStatus)
-                        )
-                      }
-                    />
-                  </HStack>
-                  <HStack width="full" justify="end">
-                    <UndoRedo />
-                    <History />
-                    <Box />
-                    <Evaluate />
-
-                    <Optimize />
-                    <Publish isDisabled={socketStatus !== "connected"} />
-                  </HStack>
+            <CustomDragLayer />
+            <VStack width="full" height="full" gap={0}>
+              <HStack
+                width="full"
+                background="bg"
+                padding={2}
+                borderBottom="1px solid"
+                borderColor="border.emphasized"
+              >
+                <HStack width="full">
+                  <Link href={`/${project?.slug}/workflows`}>
+                    <LogoIcon width={24} height={24} />
+                  </Link>
+                  <RunningStatus />
+                  {!["waiting", "running"].includes(executionStatus ?? "") && (
+                    <AutoSave />
+                  )}
                 </HStack>
-                <Box width="full" height="full" position="relative">
-                  <Flex width="full" height="full">
-                    <NodeSelectionPanel
-                      isOpen={nodeSelectionPanelIsOpen}
-                      setIsOpen={setNodeSelectionPanelIsOpen}
-                    />
-                    <PanelGroup direction="vertical">
-                      <Panel style={{ position: "relative" }}>
-                        <HStack
-                          position="absolute"
-                          bottom={3}
-                          left={3}
-                          zIndex={100}
-                        >
-                          <NodeSelectionPanelButton
-                            isOpen={nodeSelectionPanelIsOpen}
-                            setIsOpen={setNodeSelectionPanelIsOpen}
-                          />
-                          <Button
-                            size="sm"
-                            display={isResultsPanelCollapsed ? "block" : "none"}
-                            background="bg"
-                            borderRadius={4}
-                            borderColor="border.emphasized"
-                            variant="outline"
-                            onClick={() => {
-                              panelRef.current?.expand(70);
-                            }}
-                          >
-                            <HStack>
-                              <BarChart2 size={14} />
-                              <Text>Results</Text>
-                            </HStack>
-                          </Button>
-                        </HStack>
-                        {isResultsPanelCollapsed && <ProgressToast />}
-                        <DragDropArea>
-                          <OptimizationStudioCanvas
-                            nodes={nodes}
-                            edges={edges}
-                            onNodesChange={onNodesChange}
-                            onEdgesChange={onEdgesChange}
-                            onNodesDelete={() => setTimeout(onNodesDelete, 0)}
-                            onConnect={(connection) => {
-                              const result = onConnect(connection);
-                              if (result?.error) {
-                                toaster.create({
-                                  title: "Error",
-                                  description: result.error,
-                                  type: "error",
-                                  duration: 5000,
-                                  meta: {
-                                    closable: true,
-                                  },
-                                });
+                <HStack width="full" justify="center">
+                  <WorkflowNamePopover />
+                  <StatusCircle
+                    status={socketStatus}
+                    tooltip={
+                      socketStatus === "connecting-python" ? (
+                        <VStack align="start" gap={1} padding={2}>
+                          <HStack>
+                            <StatusCircle
+                              status={
+                                socketStatus === "connecting-python"
+                                  ? "connected"
+                                  : "connecting"
                               }
-                            }}
-                            selectNodesOnDrag={false}
-                            onNodeDragStart={() => {
-                              setIsDraggingNode(true);
-                            }}
-                            onNodeDragStop={() => {
-                              setIsDraggingNode(false);
-                            }}
-                            onPaneClick={() => {
-                              if (currentDrawer) closeDrawer();
-                            }}
-                            onNodeClick={(_event, node) => {
-                              if (currentDrawer) closeDrawer();
-                              setClickedNodeId(node.id);
-                            }}
-                            fitView
-                            fitViewOptions={{
-                              maxZoom: 1.2,
-                            }}
-                          >
-                            <Controls
-                              position="bottom-left"
-                              orientation="horizontal"
-                              style={{
-                                marginLeft: nodeSelectionPanelIsOpen
-                                  ? !isResultsPanelCollapsed
-                                    ? "16px"
-                                    : "122px"
-                                  : !isResultsPanelCollapsed
-                                    ? "180px"
-                                    : "262px",
-                                marginBottom: "15px",
-                              }}
                             />
+                            <Text>Socket Connection</Text>
+                          </HStack>
+                          <HStack>
+                            <StatusCircle status="connecting" />
+                            <Text>Python Runtime</Text>
+                          </HStack>
+                        </VStack>
+                      ) : (
+                        titleCase(socketStatus)
+                      )
+                    }
+                  />
+                </HStack>
+                <HStack width="full" justify="end">
+                  <UndoRedo />
+                  <History />
+                  <Box />
+                  <Evaluate />
 
-                            <FlowPanel position="bottom-right">
-                              <PlaygroundButton
-                                nodes={nodes}
-                                edges={edges}
-                                executionStatus={executionStatus ?? ""}
-                              />
-                            </FlowPanel>
-                          </OptimizationStudioCanvas>
-                        </DragDropArea>
-                      </Panel>
-                      <PanelResizeHandle
-                        style={{ position: "relative", marginTop: "-20px" }}
+                  <Optimize />
+                  <Publish isDisabled={socketStatus !== "connected"} />
+                </HStack>
+              </HStack>
+              <Box width="full" height="full" position="relative">
+                <Flex width="full" height="full">
+                  <NodeSelectionPanel
+                    isOpen={nodeSelectionPanelIsOpen}
+                    setIsOpen={setNodeSelectionPanelIsOpen}
+                  />
+                  <PanelGroup direction="vertical">
+                    <Panel style={{ position: "relative" }}>
+                      <HStack
+                        position="absolute"
+                        bottom={3}
+                        left={3}
+                        zIndex={100}
                       >
-                        <Center paddingY={2}>
-                          <Box
-                            width="30px"
-                            height="3px"
-                            borderRadius="full"
-                            background="bg.emphasized"
-                          />
-                        </Center>
-                      </PanelResizeHandle>
-                      <Panel
-                        collapsible
-                        minSize={6}
-                        ref={panelRef}
-                        onCollapse={() => setIsResultsPanelCollapsed(true)}
-                        onExpand={() => setIsResultsPanelCollapsed(false)}
-                        defaultSize={0}
-                      >
-                        <ResultsPanel
-                          isCollapsed={isResultsPanelCollapsed}
-                          collapsePanel={collapsePanel}
-                          defaultTab={defaultTab}
+                        <NodeSelectionPanelButton
+                          isOpen={nodeSelectionPanelIsOpen}
+                          setIsOpen={setNodeSelectionPanelIsOpen}
                         />
-                      </Panel>
-                    </PanelGroup>
-                    <StudioNodeDrawer />
-                  </Flex>
-                </Box>
-              </VStack>
-            </PostEventProvider>
+                        <Button
+                          size="sm"
+                          display={isResultsPanelCollapsed ? "block" : "none"}
+                          background="bg"
+                          borderRadius={4}
+                          borderColor="border.emphasized"
+                          variant="outline"
+                          onClick={() => {
+                            panelRef.current?.expand(70);
+                          }}
+                        >
+                          <HStack>
+                            <BarChart2 size={14} />
+                            <Text>Results</Text>
+                          </HStack>
+                        </Button>
+                      </HStack>
+                      {isResultsPanelCollapsed && <ProgressToast />}
+                      <DragDropArea>
+                        <OptimizationStudioCanvas
+                          nodes={nodes}
+                          edges={edges}
+                          onNodesChange={onNodesChange}
+                          onEdgesChange={onEdgesChange}
+                          onNodesDelete={() => setTimeout(onNodesDelete, 0)}
+                          onConnect={(connection) => {
+                            const result = onConnect(connection);
+                            if (result?.error) {
+                              toaster.create({
+                                title: "Error",
+                                description: result.error,
+                                type: "error",
+                                duration: 5000,
+                                meta: {
+                                  closable: true,
+                                },
+                              });
+                            }
+                          }}
+                          selectNodesOnDrag={false}
+                          onNodeDragStart={() => {
+                            setIsDraggingNode(true);
+                          }}
+                          onNodeDragStop={() => {
+                            setIsDraggingNode(false);
+                          }}
+                          onPaneClick={() => {
+                            if (currentDrawer) closeDrawer();
+                          }}
+                          onNodeClick={(_event, node) => {
+                            if (currentDrawer) closeDrawer();
+                            setClickedNodeId(node.id);
+                          }}
+                          fitView
+                          fitViewOptions={{
+                            maxZoom: 1.2,
+                          }}
+                        >
+                          <Controls
+                            position="bottom-left"
+                            orientation="horizontal"
+                            style={{
+                              marginLeft: nodeSelectionPanelIsOpen
+                                ? !isResultsPanelCollapsed
+                                  ? "16px"
+                                  : "122px"
+                                : !isResultsPanelCollapsed
+                                  ? "180px"
+                                  : "262px",
+                              marginBottom: "15px",
+                            }}
+                          />
+
+                          <FlowPanel position="bottom-right">
+                            <PlaygroundButton
+                              nodes={nodes}
+                              edges={edges}
+                              executionStatus={executionStatus ?? ""}
+                            />
+                          </FlowPanel>
+                        </OptimizationStudioCanvas>
+                      </DragDropArea>
+                    </Panel>
+                    <PanelResizeHandle
+                      style={{ position: "relative", marginTop: "-20px" }}
+                    >
+                      <Center paddingY={2}>
+                        <Box
+                          width="30px"
+                          height="3px"
+                          borderRadius="full"
+                          background="bg.emphasized"
+                        />
+                      </Center>
+                    </PanelResizeHandle>
+                    <Panel
+                      collapsible
+                      minSize={6}
+                      ref={panelRef}
+                      onCollapse={() => setIsResultsPanelCollapsed(true)}
+                      onExpand={() => setIsResultsPanelCollapsed(false)}
+                      defaultSize={0}
+                    >
+                      <ResultsPanel
+                        isCollapsed={isResultsPanelCollapsed}
+                        collapsePanel={collapsePanel}
+                        defaultTab={defaultTab}
+                      />
+                    </Panel>
+                  </PanelGroup>
+                  <StudioNodeDrawer />
+                </Flex>
+              </Box>
+            </VStack>
+          </PostEventProvider>
         </DndProvider>
       </ReactFlowProvider>
 

@@ -1,8 +1,4 @@
 import { Box, HStack, Link, Text } from "@chakra-ui/react";
-import type {
-  EvaluatorField,
-  EvaluatorWithFields,
-} from "~/server/evaluators/evaluator.service";
 import {
   type ColumnDef,
   type ColumnSizingState,
@@ -15,21 +11,27 @@ import { nanoid } from "nanoid";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { AddOrEditDatasetDrawer } from "~/components/AddOrEditDatasetDrawer";
+import { datasetTableCss } from "~/components/datasets/editor/datasetTableStyles";
+import type { ColumnType } from "~/components/datasets/editor/TableCell";
+import { useTableKeyboardNavigation } from "~/components/datasets/editor/useTableKeyboardNavigation";
+import { VirtualizedTableBody } from "~/components/datasets/editor/VirtualizedTableBody";
+import type { FieldMapping as UIFieldMapping } from "~/components/variables";
 import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import type {
+  Field,
+  HttpComponentConfig,
+} from "~/optimization_studio/types/dsl";
 import type { TypedAgent } from "~/server/agents/agent.repository";
-import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
-import { api } from "~/utils/api";
-
-import type { FieldMapping as UIFieldMapping } from "~/components/variables";
-import type { Field, HttpComponentConfig } from "~/optimization_studio/types/dsl";
 import type { DatasetColumnType } from "~/server/datasets/types";
+import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
+import type {
+  EvaluatorField,
+  EvaluatorWithFields,
+} from "~/server/evaluators/evaluator.service";
+import { api } from "~/utils/api";
 import { DRAWER_WIDTH } from "../constants";
 import { useDatasetSync } from "../hooks/useDatasetSync";
-import {
-  buildInputsFromBodyTemplate,
-  convertHttpComponentConfig,
-} from "../utils/httpAgentUtils";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { useExecuteEvaluation } from "../hooks/useExecuteEvaluation";
 import {
@@ -37,7 +39,6 @@ import {
   useOpenTargetEditor,
 } from "../hooks/useOpenTargetEditor";
 import { useDatasetSelectionLoader } from "../hooks/useSavedDatasetLoader";
-import { useTableKeyboardNavigation } from "~/components/datasets/editor/useTableKeyboardNavigation";
 import type {
   DatasetColumn,
   DatasetReference,
@@ -56,10 +57,14 @@ import {
   convertFromUIMapping,
   convertToUIMapping,
 } from "../utils/fieldMappingConverters";
+import {
+  buildInputsFromBodyTemplate,
+  convertHttpComponentConfig,
+} from "../utils/httpAgentUtils";
 import { createPromptEditorCallbacks } from "../utils/promptEditorCallbacks";
 import { ColumnTypeIcon } from "./ColumnTypeIcon";
-import { type ColumnType } from "~/components/datasets/editor/TableCell";
 import { DatasetSuperHeader } from "./DatasetSuperHeader";
+import { EvaluationsV3DatasetTableProvider } from "./EvaluationsV3DatasetTableProvider";
 import { SelectionToolbar } from "./SelectionToolbar";
 import {
   CheckboxCellFromMeta,
@@ -68,9 +73,6 @@ import {
   TargetHeaderFromMeta,
 } from "./TableMetaWrappers";
 import { TargetSuperHeader } from "./TargetSuperHeader";
-import { VirtualizedTableBody } from "~/components/datasets/editor/VirtualizedTableBody";
-import { datasetTableCss } from "~/components/datasets/editor/datasetTableStyles";
-import { EvaluationsV3DatasetTableProvider } from "./EvaluationsV3DatasetTableProvider";
 
 // Max rows for expanded mode (disable virtualization above this)
 const MAX_ROWS_FOR_FIT_MODE = 100;
@@ -236,9 +238,7 @@ export function EvaluationsV3Table({
     (targetId: string): boolean => {
       const outputs = results.targetOutputs[targetId];
       if (!outputs) return false;
-      return outputs.some(
-        (output) => output !== undefined && output !== null,
-      );
+      return outputs.some((output) => output !== undefined && output !== null);
     },
     [results.targetOutputs],
   );
@@ -314,7 +314,9 @@ export function EvaluationsV3Table({
       if (isHttpAgent) {
         // HTTP agent: extract inputs from body template
         const httpComponentConfig = config as HttpComponentConfig;
-        targetInputs = buildInputsFromBodyTemplate(httpComponentConfig.bodyTemplate);
+        targetInputs = buildInputsFromBodyTemplate(
+          httpComponentConfig.bodyTemplate,
+        );
         httpConfig = convertHttpComponentConfig(httpComponentConfig);
 
         // Fall back to default input if bodyTemplate has no variables
@@ -331,7 +333,9 @@ export function EvaluationsV3Table({
       const targetConfig: TargetConfig = {
         id: `target_${Date.now()}`, // Generate unique ID for the workbench
         type: "agent", // This is a target of type "agent" (code/workflow/http)
-        agentType: isHttpAgent ? "http" : (savedAgent.type as TargetConfig["agentType"]),
+        agentType: isHttpAgent
+          ? "http"
+          : (savedAgent.type as TargetConfig["agentType"]),
         dbAgentId: savedAgent.id, // Reference to the database agent
         inputs: targetInputs,
         outputs: (config.outputs as TargetConfig["outputs"]) ?? [
@@ -741,7 +745,12 @@ export function EvaluationsV3Table({
         openDrawer("evaluatorList");
       }
     },
-    [openDrawer, handleSelectPrompt, handleSelectSavedAgent, handleSelectEvaluatorAsTarget],
+    [
+      openDrawer,
+      handleSelectPrompt,
+      handleSelectSavedAgent,
+      handleSelectEvaluatorAsTarget,
+    ],
   );
 
   // Dataset handlers for drawer integration
@@ -1307,7 +1316,9 @@ export function EvaluationsV3Table({
   const handleResizeDoubleClick = useCallback(
     (columnId: string, columnType: string) => {
       const defaultPct =
-        columnType === "dataset" ? DATASET_COL_DEFAULT_PCT : TARGET_COL_DEFAULT_PCT;
+        columnType === "dataset"
+          ? DATASET_COL_DEFAULT_PCT
+          : TARGET_COL_DEFAULT_PCT;
 
       setColumnSizing((prev) => ({
         ...prev,
@@ -1510,7 +1521,11 @@ export function EvaluationsV3Table({
                   <th
                     key={header.id}
                     style={{
-                      width: getColumnWidth(header.id, columnType, isFixedWidth),
+                      width: getColumnWidth(
+                        header.id,
+                        columnType,
+                        isFixedWidth,
+                      ),
                     }}
                     // Add data attribute for target columns to enable scroll-to behavior
                     {...(targetId && { "data-target-column": targetId })}
@@ -1526,7 +1541,10 @@ export function EvaluationsV3Table({
                     {!isFixedWidth && header.id !== "select" && (
                       <div
                         onMouseDown={createResizeHandler(header.id, columnType)}
-                        onTouchStart={createResizeHandler(header.id, columnType)}
+                        onTouchStart={createResizeHandler(
+                          header.id,
+                          columnType,
+                        )}
                         onDoubleClick={() =>
                           handleResizeDoubleClick(header.id, columnType)
                         }
@@ -1558,7 +1576,10 @@ export function EvaluationsV3Table({
               ) : (
                 <>
                   {/* Filler column - absorbs remaining space */}
-                  <th colSpan={2} style={{ width: "auto", minWidth: DRAWER_WIDTH }}></th>
+                  <th
+                    colSpan={2}
+                    style={{ width: "auto", minWidth: DRAWER_WIDTH }}
+                  ></th>
                 </>
               )}
             </tr>

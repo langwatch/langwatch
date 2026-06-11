@@ -46,7 +46,11 @@ export type EvaluatorResultChipProps = {
 /**
  * Sub-tooltip content for displaying evaluator inputs data
  */
-const DataTooltipContent = ({ inputs }: { inputs: Record<string, unknown> }) => (
+const DataTooltipContent = ({
+  inputs,
+}: {
+  inputs: Record<string, unknown>;
+}) => (
   <VStack align="stretch" gap={1} padding={2} maxWidth="300px">
     <Text fontSize="12px" fontWeight="semibold" color="fg" marginBottom={1}>
       Evaluator Inputs
@@ -271,4 +275,4 @@ export function EvaluatorResultChip({
 /**
  * Re-export utilities for convenience
  */
-export { parseEvaluationResult, EVALUATION_STATUS_COLORS, getStatusLabel };
+export { EVALUATION_STATUS_COLORS, getStatusLabel, parseEvaluationResult };

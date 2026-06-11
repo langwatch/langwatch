@@ -2,17 +2,17 @@ import { nanoid } from "nanoid";
 import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useShallow } from "zustand/react/shallow";
+import { createLogger } from "~/utils/logger";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import { createLogger } from "~/utils/logger";
 import { useVersionState } from "../components/History";
 import type { StudioClientEvent } from "../types/events";
 import { hasDSLChanged } from "../utils/dslUtils";
 import { mergeLocalConfigsIntoDsl } from "../utils/mergeLocalConfigs";
 import { usePostEvent } from "./usePostEvent";
 
-import { useWorkflowStore, serializeWorkflow } from "./useWorkflowStore";
+import { serializeWorkflow, useWorkflowStore } from "./useWorkflowStore";
 
 const logger = createLogger("langwatch:studio:evaluation");
 

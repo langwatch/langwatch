@@ -3,8 +3,8 @@ import { z } from "zod";
 
 import type { LocalPromptConfig } from "~/experiments-v3/types";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
-import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
 import { FieldMappingSchema } from "~/server/scenarios/execution/types";
+import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
 
 import { datasetColumnTypeSchema } from "../../server/datasets/types";
 import type { ChatMessage } from "../../server/tracer/types";

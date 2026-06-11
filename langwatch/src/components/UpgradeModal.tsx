@@ -1,5 +1,3 @@
-import { useRouter } from "~/utils/compat/next-router";
-import { useState } from "react";
 import {
   Badge,
   Button,
@@ -10,17 +8,19 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Crown, ShieldX } from "lucide-react";
-import { Dialog } from "./ui/dialog";
+import { useState } from "react";
+import { useRouter } from "~/utils/compat/next-router";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { usePlanManagementUrl } from "../hooks/usePlanManagementUrl";
-import { trackEvent } from "../utils/tracking";
 import { LIMIT_TYPE_LABELS } from "../server/license-enforcement/constants";
-import { api } from "../utils/api";
-import { toaster } from "./ui/toaster";
 import {
-  useUpgradeModalStore,
   type UpgradeModalVariant,
+  useUpgradeModalStore,
 } from "../stores/upgradeModalStore";
+import { api } from "../utils/api";
+import { trackEvent } from "../utils/tracking";
+import { Dialog } from "./ui/dialog";
+import { toaster } from "./ui/toaster";
 
 interface UpgradeModalProps {
   open: boolean;

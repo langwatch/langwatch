@@ -7,8 +7,8 @@
 import type { PropsWithChildren } from "react";
 
 import {
-  DatasetTableProvider,
   type DatasetTableContextValue,
+  DatasetTableProvider,
 } from "~/components/datasets/editor/DatasetTableContext";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 

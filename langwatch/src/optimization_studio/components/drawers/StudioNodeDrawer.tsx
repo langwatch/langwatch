@@ -1,7 +1,13 @@
 import type { Node } from "@xyflow/react";
 import { useShallow } from "zustand/react/shallow";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
-import type { AgentComponent, Component, ComponentType, Evaluator } from "../../types/dsl";
+import type {
+  AgentComponent,
+  Component,
+  ComponentType,
+  Evaluator,
+} from "../../types/dsl";
 import { AgentPropertiesPanel } from "../properties/AgentPropertiesPanel";
 import { CodePropertiesPanel } from "../properties/CodePropertiesPanel";
 import { CustomPropertiesPanel } from "../properties/CustomPropertiesPanel";
@@ -15,7 +21,6 @@ import { RetrievePropertiesPanel } from "../properties/RetrievePropertiesPanel";
 import { SignaturePromptEditorBridge } from "./SignaturePromptEditorBridge";
 import { StudioDrawerWrapper } from "./StudioDrawerWrapper";
 import { InsideDrawerProvider } from "./useInsideDrawer";
-import { useDrawer } from "~/hooks/useDrawer";
 
 /**
  * Panel map for all node types. Every node type goes through

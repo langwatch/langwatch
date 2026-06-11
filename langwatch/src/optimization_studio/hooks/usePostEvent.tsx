@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { fetchSSE } from "~/utils/sse/fetchSSE";
 import { toaster } from "../../components/ui/toaster";
-import { isHandledByGlobalHandler } from "../../utils/trpcError";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { createLogger } from "../../utils/logger";
+import { isHandledByGlobalHandler } from "../../utils/trpcError";
 import type { BaseComponent } from "../types/dsl";
 import type { StudioClientEvent, StudioServerEvent } from "../types/events";
 import { useWorkflowStore, type WorkflowStore } from "./useWorkflowStore";
@@ -269,8 +269,7 @@ export const useHandleServerMessage = ({
             message.payload.execution_state?.status === "success" ||
             message.payload.execution_state?.status === "error"
           ) {
-            const untilNodeId =
-              getWorkflow().state.execution?.until_node_id;
+            const untilNodeId = getWorkflow().state.execution?.until_node_id;
             if (untilNodeId) {
               workflowStore.setSelectedNode(untilNodeId);
               workflowStore.setPropertiesExpanded(true);

@@ -67,12 +67,7 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
   }, [endNodeId, setSelectedNode]);
 
   return (
-    <BasePropertiesPanel
-      node={node}
-      hideOutputs
-      hideInputs
-      hideParameters
-    >
+    <BasePropertiesPanel node={node} hideOutputs hideInputs hideParameters>
       {/* The entry fields are the workflow inputs - fully editable.
           DSL-wise they live on the node's `outputs` (they're emitted to
           downstream nodes), the user-facing language is "Inputs". */}
@@ -151,8 +146,8 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
           </HStack>
         ) : (
           <Text fontSize="13px" color="fg.muted">
-            Optional. Attaching a dataset adds its columns to the inputs
-            and provides the rows for evaluations.
+            Optional. Attaching a dataset adds its columns to the inputs and
+            provides the rows for evaluations.
           </Text>
         )}
       </VStack>

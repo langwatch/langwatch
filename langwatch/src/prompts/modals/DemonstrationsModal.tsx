@@ -29,7 +29,8 @@ export function DemonstrationsModal({
 
   return (
     <Dialog.Root open={open} onOpenChange={({ open }) => !open && onClose()}>
-      <Dialog.Content bg="bg"
+      <Dialog.Content
+        bg="bg"
         marginX="32px"
         marginTop="32px"
         maxWidth="calc(100vw - 64px)"
@@ -45,25 +46,25 @@ export function DemonstrationsModal({
         </Dialog.Header>
         <Dialog.Body paddingBottom="16px">
           <Box ref={editorPortalRef} width="full" height="full">
-          <DatasetEditorTable
-            editorPortalRef={editorPortalRef}
-            inMemoryDataset={{
-              name: "Demonstrations",
-              datasetRecords: transposedRecords,
-              columnTypes: demonstrations?.inline?.columnTypes ?? [],
-            }}
-            onUpdateDataset={(dataset) =>
-              onChange({
-                inline: {
-                  columnTypes: dataset.columnTypes,
-                  records: transpostRowsFirstToColumnsFirstWithoutId(
-                    dataset.datasetRecords,
-                  ),
-                },
-              })
-            }
-            canEditDatasetRecord={false}
-          />
+            <DatasetEditorTable
+              editorPortalRef={editorPortalRef}
+              inMemoryDataset={{
+                name: "Demonstrations",
+                datasetRecords: transposedRecords,
+                columnTypes: demonstrations?.inline?.columnTypes ?? [],
+              }}
+              onUpdateDataset={(dataset) =>
+                onChange({
+                  inline: {
+                    columnTypes: dataset.columnTypes,
+                    records: transpostRowsFirstToColumnsFirstWithoutId(
+                      dataset.datasetRecords,
+                    ),
+                  },
+                })
+              }
+              canEditDatasetRecord={false}
+            />
           </Box>
         </Dialog.Body>
         <Dialog.Footer>

@@ -13,7 +13,6 @@ import type { TRPCClientErrorLike } from "@trpc/react-query";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import { CopyIcon } from "lucide-react";
-import { useRouter } from "~/utils/compat/next-router";
 import { useMemo, useState } from "react";
 import {
   LuChevronDown,
@@ -25,6 +24,7 @@ import {
   LuTrash,
   LuTrendingUp,
 } from "react-icons/lu";
+import { useRouter } from "~/utils/compat/next-router";
 import { Menu } from "../../components/ui/menu";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useDrawer } from "../../hooks/useDrawer";
@@ -53,7 +53,7 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
     evaluationName: string;
   } | null>(null);
 
-  const { project, hasPermission } = useOrganizationTeamProject();
+  const { project } = useOrganizationTeamProject();
   const router = useRouter();
   const { openDrawer } = useDrawer();
 
@@ -186,27 +186,26 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
                           Edit
                         </Menu.Item>
                         {monitor.experimentId && (
-                            <Menu.Item
-                              value="copy"
-                              onClick={() => {
-                                if (!project || !monitor.experimentId) return;
-                                const experiment =
-                                  experiments.data?.experiments?.find(
-                                    (e) => e.id === monitor.experimentId,
-                                  );
-                                if (experiment) {
-                                  setCopyDialogState({
-                                    open: true,
-                                    experimentId: experiment.id,
-                                    evaluationName:
-                                      experiment.name ?? experiment.slug,
-                                  });
-                                }
-                              }}
-                            >
-                              <CopyIcon size={16} /> Replicate to another
-                              project
-                            </Menu.Item>
+                          <Menu.Item
+                            value="copy"
+                            onClick={() => {
+                              if (!project || !monitor.experimentId) return;
+                              const experiment =
+                                experiments.data?.experiments?.find(
+                                  (e) => e.id === monitor.experimentId,
+                                );
+                              if (experiment) {
+                                setCopyDialogState({
+                                  open: true,
+                                  experimentId: experiment.id,
+                                  evaluationName:
+                                    experiment.name ?? experiment.slug,
+                                });
+                              }
+                            }}
+                          >
+                            <CopyIcon size={16} /> Replicate to another project
+                          </Menu.Item>
                         )}
                         <Menu.Item
                           value="toggle"

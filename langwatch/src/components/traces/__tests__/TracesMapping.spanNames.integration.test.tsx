@@ -22,7 +22,10 @@ import { TracesMapping } from "../TracesMapping";
 // "Research.aexecute_stream" is NOT present on the loaded trace below.
 const PROJECT_SPAN_NAMES = [
   { key: "Research.aexecute_stream", label: "Research.aexecute_stream" },
-  { key: "Classification.aexecute_stream", label: "Classification.aexecute_stream" },
+  {
+    key: "Classification.aexecute_stream",
+    label: "Classification.aexecute_stream",
+  },
 ];
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -41,13 +44,16 @@ vi.mock("~/hooks/useProjectSpanNames", () => ({
 }));
 
 vi.mock("~/hooks/useProjectEventTypes", () => ({
-  useProjectEventTypes: () => ({ eventTypes: [], isLoading: false, error: null }),
+  useProjectEventTypes: () => ({
+    eventTypes: [],
+    isLoading: false,
+    error: null,
+  }),
 }));
 
 vi.mock("~/hooks/useAnnotationsByTraceIds", () => ({
   useAnnotationsByTraceIds: () => ({ data: [] }),
 }));
-
 
 vi.mock("~/utils/api", () => ({
   api: {

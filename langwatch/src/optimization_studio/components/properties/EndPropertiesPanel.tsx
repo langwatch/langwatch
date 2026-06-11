@@ -69,9 +69,8 @@ export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
     >
       {isEvaluator && (
         <Text fontSize="13px" color="fg.muted">
-          Evaluators return up to these four results. Connect the ones
-          your workflow produces - unconnected results are simply
-          omitted.
+          Evaluators return up to these four results. Connect the ones your
+          workflow produces - unconnected results are simply omitted.
         </Text>
       )}
       {isEvaluator && !hasResultConnected && (
@@ -79,8 +78,8 @@ export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
           <Alert.Indicator />
           <Alert.Content>
             <Text>
-              Connect either a <b>score</b> or a <b>passed</b> result for
-              this evaluator to be useful.
+              Connect either a <b>score</b> or a <b>passed</b> result for this
+              evaluator to be useful.
             </Text>
           </Alert.Content>
         </Alert.Root>

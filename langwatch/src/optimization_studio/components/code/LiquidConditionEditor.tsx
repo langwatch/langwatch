@@ -101,8 +101,7 @@ export function LiquidConditionEditor({
           hideCursorInOverviewRuler: true,
           wordWrap: "off",
           fontSize: 13,
-          fontFamily:
-            "ui-monospace, SFMono-Regular, Menlo, Monaco, monospace",
+          fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, monospace",
           placeholder,
           fixedOverflowWidgets: true,
           contextmenu: false,

@@ -565,9 +565,7 @@ describe("PromptTextAreaWithVariables", () => {
         target: { value: "{{myvar}}", selectionStart: 9 },
       });
 
-      expect(
-        await screen.findByText(/Create variable/),
-      ).toBeInTheDocument();
+      expect(await screen.findByText(/Create variable/)).toBeInTheDocument();
     });
 
     /** @scenario Creating from the persisted menu fixes the reference */

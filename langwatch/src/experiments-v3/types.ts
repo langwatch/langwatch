@@ -1,17 +1,17 @@
 import { z } from "zod";
-import type { Field } from "~/optimization_studio/types/dsl";
-import {
-  fieldSchema,
-  httpAuthSchema,
-  httpHeaderSchema,
-  HTTP_METHODS,
-} from "~/optimization_studio/types/dsl";
-import type { DatasetColumnType } from "~/server/datasets/types";
 import type {
   AutosaveState,
   CellPosition,
   RowHeightMode,
 } from "~/components/datasets/editor/DatasetTableContext";
+import type { Field } from "~/optimization_studio/types/dsl";
+import {
+  fieldSchema,
+  HTTP_METHODS,
+  httpAuthSchema,
+  httpHeaderSchema,
+} from "~/optimization_studio/types/dsl";
+import type { DatasetColumnType } from "~/server/datasets/types";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
 
@@ -355,7 +355,6 @@ export type OverlayType =
   | "dataset-switch"
   | "dataset-add";
 
-
 export type AutosaveStatus = {
   evaluation: AutosaveState;
   dataset: AutosaveState;
@@ -631,10 +630,7 @@ export type TableMeta = {
     evaluatorId: string,
   ) => void;
   /** Run an evaluator on all rows that have target outputs */
-  handleRunEvaluatorOnAllRows?: (
-    targetId: string,
-    evaluatorId: string,
-  ) => void;
+  handleRunEvaluatorOnAllRows?: (targetId: string, evaluatorId: string) => void;
   /** Check if any row has a target output for a given target */
   hasAnyTargetOutputs?: (targetId: string) => boolean;
   handleStopExecution?: () => void;

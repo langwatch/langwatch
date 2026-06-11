@@ -217,7 +217,10 @@ export const serializeWorkflow = <T extends { nodes: Node[]; edges: Edge[] }>(
     ...workflow,
     nodes: workflow.nodes.map((node) => {
       const { selected, dragging, ...rest } = node;
-      const { execution_state, ...dataRest } = rest.data as Record<string, unknown>;
+      const { execution_state, ...dataRest } = rest.data as Record<
+        string,
+        unknown
+      >;
       return { ...rest, data: dataRest };
     }) as T["nodes"],
     edges: workflow.edges.map((edge) => {
@@ -292,7 +295,6 @@ export const removeInvalidEdges = ({
           },
           "dropping edge: handle identifier missing",
         );
-
       }
 
       return sourceValid && targetValid;
@@ -396,8 +398,7 @@ export const updateInputFields = (parameters: Field[], inputs: Field[]) => {
   });
 };
 
-const escapeRegex = (str: string) =>
-  str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 export const updateOutputFields = (
   parameters: Field[],
@@ -412,13 +413,9 @@ export const updateOutputFields = (
     if (p.identifier === "code") {
       let code = p.value as string;
       for (const [index, output] of outputs.entries()) {
-        const escapedId = escapeRegex(
-          previousOutputs[index]?.identifier ?? "",
-        );
+        const escapedId = escapeRegex(previousOutputs[index]?.identifier ?? "");
         code = code.replace(
-          new RegExp(
-            `(return[\\s\\n\\t]+?\\{[^\\}]*?)"${escapedId}"`,
-          ),
+          new RegExp(`(return[\\s\\n\\t]+?\\{[^\\}]*?)"${escapedId}"`),
           `$1"${output.identifier}"`,
         );
       }
@@ -498,7 +495,6 @@ export const store = (
           },
           "setWorkflow: edges count decreased",
         );
-
       }
     }
     set(resolved);
@@ -531,11 +527,7 @@ export const store = (
   onNodesChange: (changes: NodeChange[]) => {
     const removeChanges = changes.filter((c) => c.type === "remove");
     if (removeChanges.length > 0) {
-      logger.warn(
-        { removeChanges },
-        "onNodesChange: REMOVING nodes",
-      );
-
+      logger.warn({ removeChanges }, "onNodesChange: REMOVING nodes");
     }
     const hasDeselection = changes.some(
       (c) => c.type === "select" && !c.selected,
@@ -560,7 +552,6 @@ export const store = (
         },
         "onEdgesChange: REMOVING edges",
       );
-
     }
     set({
       edges: applyEdgeChanges(changes, get().edges),
@@ -607,7 +598,6 @@ export const store = (
         },
         "setEdges: edges count decreased",
       );
-
     }
     set({ edges });
   },
@@ -720,8 +710,7 @@ export const store = (
                 ),
               }
             : {}),
-          ...((node.data?.inputs || node.data?.outputs) &&
-          n.type === "code"
+          ...((node.data?.inputs || node.data?.outputs) && n.type === "code"
             ? {
                 parameters: updateOutputFields(
                   updateInputFields(

@@ -26,18 +26,18 @@ import {
   SlidersHorizontal,
   Terminal,
 } from "lucide-react";
-import NextLink from "~/utils/compat/next-link";
 import React, { useMemo, useState } from "react";
 import { LuGauge } from "react-icons/lu";
 import { RenderCode } from "~/components/code/RenderCode";
+import type { RowHeightMode } from "~/components/datasets/editor/DatasetTableContext";
 import { Dialog } from "~/components/ui/dialog";
 import { Menu } from "~/components/ui/menu";
 import { Popover } from "~/components/ui/popover";
 import { SimpleSlider } from "~/components/ui/slider";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import NextLink from "~/utils/compat/next-link";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
-import type { RowHeightMode } from "~/components/datasets/editor/DatasetTableContext";
 import { DEFAULT_CONCURRENCY } from "../types";
 
 type ToggleOption = {
@@ -249,14 +249,15 @@ export function TableSettingsMenu({
               <HStack gap={2}>
                 {rowHeightOptions.map((option) => {
                   const isActive = rowHeightMode === option.value;
-                  const isDisabled =
-                    option.value === "fit" && isFitDisabled;
+                  const isDisabled = option.value === "fit" && isFitDisabled;
 
                   const button = (
                     <Button
                       key={option.value}
                       variant={isActive ? "surface" : "ghost"}
-                      onClick={() => !isDisabled && setRowHeightMode(option.value)}
+                      onClick={() =>
+                        !isDisabled && setRowHeightMode(option.value)
+                      }
                       display="flex"
                       flexDirection="column"
                       alignItems="center"

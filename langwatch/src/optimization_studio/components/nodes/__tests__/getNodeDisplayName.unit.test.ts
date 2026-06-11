@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 // Mock the heavy UI dependencies so we can import getNodeDisplayName in isolation
 vi.mock("@xyflow/react", () => ({

@@ -1,4 +1,5 @@
 import { Box, type BoxProps } from "@chakra-ui/react";
+import { Bot } from "lucide-react";
 import {
   BookOpen,
   Box as BoxIcon,
@@ -10,11 +11,10 @@ import {
   Home,
   Shield,
 } from "react-feather";
-import { Bot } from "lucide-react";
-import { useColorModeValue } from "../../components/ui/color-mode";
 import { EqualsIcon } from "../../components/icons/EqualsIcon";
 import { LLMIcon } from "../../components/icons/LLMIcon";
 import { WeaviateIcon } from "../../components/icons/WeaviateIcon";
+import { useColorModeValue } from "../../components/ui/color-mode";
 import type { ComponentType } from "../types/dsl";
 
 const sizeMap = {

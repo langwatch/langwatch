@@ -89,7 +89,6 @@ export function DatasetMappingPreview({
     return traces;
   }, [isThreadMapping, threadTraces.data, traces]);
 
-
   const trpc = api.useContext();
   const updateStoredMapping_ = api.dataset.updateMapping.useMutation();
   const updateStoredMapping = useCallback(
@@ -180,7 +179,10 @@ export function DatasetMappingPreview({
           >
             <Box
               as="button"
-              onClick={(e: React.MouseEvent) => { e.preventDefault(); setIsThreadMapping(false); }}
+              onClick={(e: React.MouseEvent) => {
+                e.preventDefault();
+                setIsThreadMapping(false);
+              }}
               bg={!isThreadMapping ? "white" : "transparent"}
               _dark={{
                 bg: !isThreadMapping ? "gray.700" : "transparent",
@@ -199,7 +201,10 @@ export function DatasetMappingPreview({
             </Box>
             <Box
               as="button"
-              onClick={(e: React.MouseEvent) => { e.preventDefault(); setIsThreadMapping(true); }}
+              onClick={(e: React.MouseEvent) => {
+                e.preventDefault();
+                setIsThreadMapping(true);
+              }}
               bg={isThreadMapping ? "white" : "transparent"}
               _dark={{
                 bg: isThreadMapping ? "gray.700" : "transparent",

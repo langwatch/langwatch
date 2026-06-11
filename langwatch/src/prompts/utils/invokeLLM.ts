@@ -1,13 +1,12 @@
 import type { Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
-
-import { LlmSignatureNodeFactory } from "~/optimization_studio/utils/llmSignatureNodeFactory";
 import type {
   ExecutionState,
   LlmPromptConfigComponent,
   Workflow,
 } from "~/optimization_studio/types/dsl";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
+import { LlmSignatureNodeFactory } from "~/optimization_studio/utils/llmSignatureNodeFactory";
 import { createLogger } from "~/utils/logger";
 import { fetchSSE } from "~/utils/sse/fetchSSE";
 

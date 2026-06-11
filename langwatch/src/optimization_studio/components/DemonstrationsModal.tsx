@@ -86,27 +86,27 @@ export function DemonstrationsModal({
         </Dialog.Header>
         <Dialog.Body paddingBottom="16px">
           <Box ref={editorPortalRef} width="full" height="full">
-          {open && editingDataset?.inline && (
-            <DatasetEditorTable
-              title="Demonstrations"
-              hideButtons
-              editorPortalRef={editorPortalRef}
-              inMemoryDataset={{
-                name: "Demonstrations",
-                columnTypes: editingDataset.inline.columnTypes,
-                datasetRecords: transposeColumnsFirstToRowsFirstWithId(
-                  editingDataset.inline.records,
-                ),
-              }}
-              onUpdateDataset={(dataset) => {
-                setNodeParameter(node.id, {
-                  identifier: "demonstrations",
-                  type: "dataset",
-                  value: inMemoryDatasetToNodeDataset(dataset),
-                });
-              }}
-            />
-          )}
+            {open && editingDataset?.inline && (
+              <DatasetEditorTable
+                title="Demonstrations"
+                hideButtons
+                editorPortalRef={editorPortalRef}
+                inMemoryDataset={{
+                  name: "Demonstrations",
+                  columnTypes: editingDataset.inline.columnTypes,
+                  datasetRecords: transposeColumnsFirstToRowsFirstWithId(
+                    editingDataset.inline.records,
+                  ),
+                }}
+                onUpdateDataset={(dataset) => {
+                  setNodeParameter(node.id, {
+                    identifier: "demonstrations",
+                    type: "dataset",
+                    value: inMemoryDatasetToNodeDataset(dataset),
+                  });
+                }}
+              />
+            )}
           </Box>
         </Dialog.Body>
         <Dialog.Footer>

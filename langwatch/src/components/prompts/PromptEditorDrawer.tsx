@@ -11,12 +11,11 @@ import debounce from "lodash-es/debounce";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FormProvider, useFieldArray } from "react-hook-form";
 import { LuArrowLeft, LuPencil } from "react-icons/lu";
+import { getMaxTokenLimit } from "~/components/llmPromptConfigs/utils/tokenUtils";
+import { FormOutputsSection } from "~/components/outputs/FormOutputsSection";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
-import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
-import { useRegisterDrawerFooter } from "~/optimization_studio/components/drawers/useInsideDrawer";
-import { FormOutputsSection } from "~/components/outputs/FormOutputsSection";
 import {
   type AvailableSource,
   type FieldMapping,
@@ -30,8 +29,10 @@ import {
   useDrawer,
   useDrawerParams,
 } from "~/hooks/useDrawer";
+import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useRegisterDrawerFooter } from "~/optimization_studio/components/drawers/useInsideDrawer";
 import { PromptEditorFooter } from "~/prompts/components/PromptEditorFooter";
 import { PromptEditorHeader } from "~/prompts/components/PromptEditorHeader";
 import { VersionBadge } from "~/prompts/components/ui/VersionBadge";
@@ -47,17 +48,16 @@ import { usePromptConfigForm } from "~/prompts/hooks/usePromptConfigForm";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import { areFormValuesEqual } from "~/prompts/utils/areFormValuesEqual";
 import { buildDefaultFormValues } from "~/prompts/utils/buildDefaultFormValues";
-import { localConfigToFormValues } from "./utils/localConfigToFormValues";
 import {
   formValuesToTriggerSaveVersionParams,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
 } from "~/prompts/utils/llmPromptConfigUtils";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
+import { useUpgradeModalStore } from "~/stores/upgradeModalStore";
 import type { LlmConfigInputType } from "~/types";
 import { api } from "~/utils/api";
-import { useUpgradeModalStore } from "~/stores/upgradeModalStore";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
-import { getMaxTokenLimit } from "~/components/llmPromptConfigs/utils/tokenUtils";
+import { localConfigToFormValues } from "./utils/localConfigToFormValues";
 
 export type PromptEditorDrawerProps = {
   open?: boolean;
@@ -164,7 +164,9 @@ const extractLocalConfig = (
  */
 export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   const { project, hasPermission } = useOrganizationTeamProject();
-  const { modelMetadata } = useModelProvidersSettings({ projectId: project?.id });
+  const { modelMetadata } = useModelProvidersSettings({
+    projectId: project?.id,
+  });
 
   // Cascade-resolved model for new prompts created in this drawer.
   const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
@@ -275,7 +277,9 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     props.promptVersionId ??
     drawerParams.promptVersionId ??
     (complexProps.promptVersionId as string | undefined);
-  const isOpen = props.headless ? true : (props.open !== false && props.open !== undefined);
+  const isOpen = props.headless
+    ? true
+    : props.open !== false && props.open !== undefined;
 
   // Load existing prompt if editing
   // If promptVersionId is provided, fetch that specific version instead of latest
@@ -306,8 +310,8 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   // first synchronous fire carries the caller's edits, not defaults. Without
   // this seed, the subscription fires on defaults before the init useEffect
   // runs and clobbers the caller's local edits (#3155).
-  const [configValues, setConfigValues] = useState<PromptConfigFormValues>(
-    () => localConfigToFormValues(props.initialLocalConfig),
+  const [configValues, setConfigValues] = useState<PromptConfigFormValues>(() =>
+    localConfigToFormValues(props.initialLocalConfig),
   );
   const [isFormInitialized, setIsFormInitialized] = useState(false);
   // Ref set directly in init/reset effects so the watch subscription
@@ -393,9 +397,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       // sync after that so the bridge receives the full config with inputs,
       // allowing it to update node handles and edges to match the prompt.
       if (onLocalConfigChange) {
-        const config = extractLocalConfig(
-          formValues as PromptConfigFormValues,
-        );
+        const config = extractLocalConfig(formValues as PromptConfigFormValues);
         queueMicrotask(() => {
           onLocalConfigChangeRef.current?.(config);
           // If there are no actual unsaved changes (no initialLocalConfig),
@@ -408,8 +410,10 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
           }
         });
       }
-
-    } else if ((!promptId || (!promptQuery.data && !promptQuery.isLoading)) && modelMetadata) {
+    } else if (
+      (!promptId || (!promptQuery.data && !promptQuery.isLoading)) &&
+      modelMetadata
+    ) {
       // New prompt OR prompt referenced by ID but not found in DB (e.g. after
       // importing a workflow from another project). Use defaults with model's
       // max tokens, merging initialLocalConfig if available.
@@ -1087,13 +1091,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   // Extract the form body into a variable for reuse in both headless and drawer modes
   const formBodyContent = (
     <FormProvider {...methods}>
-      <VStack
-        as="form"
-        gap={4}
-        align="stretch"
-        flex={1}
-        overflowY="auto"
-      >
+      <VStack as="form" gap={4} align="stretch" flex={1} overflowY="auto">
         {/* Header bar - shared with prompt playground */}
         <Box
           borderBottomWidth="1px"
@@ -1157,9 +1155,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
         <Box paddingX={4}>
           <FormVariablesSection
             title="Variables"
-            showMappings={
-              !!availableSources && availableSources.length > 0
-            }
+            showMappings={!!availableSources && availableSources.length > 0}
             availableSources={availableSources}
             mappings={inputMappings}
             onMappingChange={onInputMappingsChange}
@@ -1184,11 +1180,12 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   );
 
   // Handle loading state (shared between headless and drawer modes)
-  const loadingContent = promptId && promptQuery.isLoading ? (
-    <HStack justify="center" paddingY={8}>
-      <Spinner size="md" />
-    </HStack>
-  ) : null;
+  const loadingContent =
+    promptId && promptQuery.isLoading ? (
+      <HStack justify="center" paddingY={8}>
+        <Spinner size="md" />
+      </HStack>
+    ) : null;
 
   // Headless mode - render without Drawer shell (for embedding in external drawer)
   if (props.headless) {

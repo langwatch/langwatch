@@ -19,7 +19,6 @@ vi.mock("~/optimization_studio/hooks/useWorkflowStore", () => ({
   useWorkflowStore: () => ({}),
 }));
 
-
 vi.mock("~/optimization_studio/hooks/useComponentExecution", () => ({
   useComponentExecution: () => ({}),
 }));

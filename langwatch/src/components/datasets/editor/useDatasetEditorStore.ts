@@ -67,8 +67,7 @@ export function rekeyEditorRecords(
 }
 
 let newRecordSeq = 0;
-const generateRecordId = () =>
-  `new_${Date.now()}_${(newRecordSeq += 1)}`;
+const generateRecordId = () => `new_${Date.now()}_${(newRecordSeq += 1)}`;
 
 export type DatasetEditorState = {
   /** Database dataset id: set in saved mode, undefined for in-memory. */
@@ -225,12 +224,7 @@ export function createDatasetEditorStore(): StoreApi<DatasetEditorStore> {
     },
 
     deleteSelectedRows: () => {
-      const {
-        records,
-        selectedRows,
-        dbDatasetId,
-        pendingSavedChanges,
-      } = get();
+      const { records, selectedRows, dbDatasetId, pendingSavedChanges } = get();
       if (selectedRows.size === 0) return;
 
       const remaining = records.filter((_, idx) => !selectedRows.has(idx));

@@ -297,44 +297,43 @@ export const ComponentNode = forwardRef(function ComponentNode(
         }
       }}
     >
-      {props.selected &&
-        !["entry", "end"].includes(props.type) && (
-          <Menu.Root positioning={{ placement: "top-start" }}>
-            <Menu.Trigger asChild>
-              <Button
-                background="bg"
-                position="absolute"
-                top="-28px"
-                right={1}
-                paddingX={1}
-                paddingY={1}
-                borderRadius={6}
-                minWidth="auto"
-                minHeight="auto"
-                boxShadow="sm"
-                width="auto"
-                height="auto"
+      {props.selected && !["entry", "end"].includes(props.type) && (
+        <Menu.Root positioning={{ placement: "top-start" }}>
+          <Menu.Trigger asChild>
+            <Button
+              background="bg"
+              position="absolute"
+              top="-28px"
+              right={1}
+              paddingX={1}
+              paddingY={1}
+              borderRadius={6}
+              minWidth="auto"
+              minHeight="auto"
+              boxShadow="sm"
+              width="auto"
+              height="auto"
+            >
+              <MoreHorizontal size={11} />
+            </Button>
+          </Menu.Trigger>
+          <NodeToolbar>
+            <Menu.Content>
+              <Menu.Item
+                value="duplicate"
+                onClick={() => duplicateNode(props.id)}
               >
-                <MoreHorizontal size={11} />
-              </Button>
-            </Menu.Trigger>
-            <NodeToolbar>
-              <Menu.Content>
-                <Menu.Item
-                  value="duplicate"
-                  onClick={() => duplicateNode(props.id)}
-                >
-                  <Copy size={14} />
-                  Duplicate
-                </Menu.Item>
-                <Menu.Item value="delete" onClick={() => deleteNode(props.id)}>
-                  <Trash2 size={14} />
-                  Delete
-                </Menu.Item>
-              </Menu.Content>
-            </NodeToolbar>
-          </Menu.Root>
-        )}
+                <Copy size={14} />
+                Duplicate
+              </Menu.Item>
+              <Menu.Item value="delete" onClick={() => deleteNode(props.id)}>
+                <Trash2 size={14} />
+                Delete
+              </Menu.Item>
+            </Menu.Content>
+          </NodeToolbar>
+        </Menu.Root>
+      )}
       <HStack gap={2} width="full">
         <ComponentIcon
           type={props.type as ComponentType}
@@ -354,8 +353,18 @@ export const ComponentNode = forwardRef(function ComponentNode(
           {getNodeDisplayName(props)}
         </Text>
         {hasUnsavedChanges(props.data) && (
-          <Tooltip content="Unsaved changes" positioning={{ placement: "top" }} openDelay={0} showArrow>
-            <Circle size="8px" bg="orange.solid" flexShrink={0} data-testid="unsaved-changes-indicator" />
+          <Tooltip
+            content="Unsaved changes"
+            positioning={{ placement: "top" }}
+            openDelay={0}
+            showArrow
+          >
+            <Circle
+              size="8px"
+              bg="orange.solid"
+              flexShrink={0}
+              data-testid="unsaved-changes-indicator"
+            />
           </Tooltip>
         )}
         {node && isExecutableComponent(node) ? (
@@ -363,7 +372,6 @@ export const ComponentNode = forwardRef(function ComponentNode(
             node={node}
             marginRight="-6px"
             marginLeft="-4px"
-
           />
         ) : (
           <Box width="54px" />

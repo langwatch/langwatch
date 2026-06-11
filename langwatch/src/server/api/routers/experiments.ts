@@ -6,15 +6,10 @@ import {
 } from "@prisma/client";
 import type { JsonValue } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
-import { DomainError } from "../../app-layer/domain-error";
 import type { Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import {
-  type WizardState,
-  workbenchStateSchema,
-} from "../../experiments/workbenchState";
 import { persistedEvaluationsV3StateSchema } from "../../../experiments-v3/types/persistence";
 import {
   type Entry,
@@ -23,20 +18,26 @@ import {
   workflowJsonSchema,
 } from "../../../optimization_studio/types/dsl";
 import { slugify } from "../../../utils/slugify";
-import { coerceMonitorMappings } from "../../tracer/tracesMapping";
+import { getApp } from "../../app-layer/app";
+import { DomainError } from "../../app-layer/domain-error";
+import { DspyStepNotFoundError } from "../../app-layer/dspy-steps/errors";
 import { DatasetService } from "../../datasets/dataset.service";
 import { prisma } from "../../db";
 import { ExperimentService } from "../../experiments/experiment.service";
-import { getApp } from "../../app-layer/app";
-import { DspyStepNotFoundError } from "../../app-layer/dspy-steps/errors";
-import { ExperimentRunService } from "../../experiments-v3/services/experiment-run.service";
-import { getVersionMap } from "../../experiments-v3/services/getVersionMap";
 import type {
   DSPyRunsSummary,
   DSPyStep,
   DSPyStepSummary,
   ESBatchEvaluation,
 } from "../../experiments/types";
+import {
+  type WizardState,
+  workbenchStateSchema,
+} from "../../experiments/workbenchState";
+import { ExperimentRunService } from "../../experiments-v3/services/experiment-run.service";
+import { getVersionMap } from "../../experiments-v3/services/getVersionMap";
+import { enforceLicenseLimit } from "../../license-enforcement";
+import { coerceMonitorMappings } from "../../tracer/tracesMapping";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import {
   type createInnerTRPCContext,
@@ -47,16 +48,12 @@ import {
   copyWorkflowWithDatasets,
   saveOrCommitWorkflowVersion,
 } from "./workflows";
-import { enforceLicenseLimit } from "../../license-enforcement";
 
 type TRPCContext = ReturnType<typeof createInnerTRPCContext>;
 
 /** Maps experiment domain errors to TRPCError using kind discriminant. */
 const mapExperimentError = (error: unknown): never => {
-  if (
-    error instanceof DomainError &&
-    error.kind === "experiment_not_found"
-  ) {
+  if (error instanceof DomainError && error.kind === "experiment_not_found") {
     throw new TRPCError({ code: "NOT_FOUND", message: error.message });
   }
   throw error;
@@ -357,10 +354,11 @@ export const experimentsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("workflows:create"))
     .mutation(async ({ input }) => {
-      const experiment = await experimentService().findByIdWithWorkflowCurrentVersion({
-        projectId: input.projectId,
-        id: input.experimentId,
-      });
+      const experiment =
+        await experimentService().findByIdWithWorkflowCurrentVersion({
+          projectId: input.projectId,
+          id: input.experimentId,
+        });
 
       if (!experiment) {
         throw new TRPCError({
@@ -379,7 +377,7 @@ export const experimentsRouter = createTRPCRouter({
         | Node<Evaluator>
         | undefined;
 
-      if (!workbenchState || !dsl || !evaluator || !evaluator.data.evaluator) {
+      if (!workbenchState || !dsl || !evaluator?.data.evaluator) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Experiment is not ready to be saved as a monitor",
@@ -519,10 +517,9 @@ export const experimentsRouter = createTRPCRouter({
       // then filter/paginate in JS. Prisma JSON-path filtering is unreliable
       // for the `task` field inside `workbenchState`, so the count and the
       // page slice both run off the same in-memory array.
-      const allExperiments =
-        await experimentService().listForEvaluationsBoard({
-          projectId: input.projectId,
-        });
+      const allExperiments = await experimentService().listForEvaluationsBoard({
+        projectId: input.projectId,
+      });
       const totalHits = allExperiments.filter(
         (e) => !isRealTimeEvaluation(e.workbenchState),
       ).length;
@@ -591,8 +588,7 @@ export const experimentsRouter = createTRPCRouter({
                 getDatasetId(experiment.workflow?.currentVersion?.dsl) ?? ""
               ],
             updatedAt:
-              latestRun?.timestamps.createdAt ??
-              experiment.updatedAt.getTime(),
+              latestRun?.timestamps.createdAt ?? experiment.updatedAt.getTime(),
           };
         })
         .sort((a, b) => b.updatedAt - a.updatedAt);
@@ -623,7 +619,11 @@ export const experimentsRouter = createTRPCRouter({
         .map((s) => s.workflowVersionId)
         .filter((id): id is string => Boolean(id));
 
-      const versionsMap = await getVersionMap({ prisma, projectId: input.projectId, versionIds });
+      const versionsMap = await getVersionMap({
+        prisma,
+        projectId: input.projectId,
+        versionIds,
+      });
 
       // Group by runId
       const runMap = new Map<string, typeof steps>();
@@ -638,25 +638,34 @@ export const experimentsRouter = createTRPCRouter({
 
       const result: DSPyRunsSummary[] = Array.from(runMap.entries())
         .map(([runId, runSteps]) => {
-          const versionId = runSteps.find((s) => s.workflowVersionId)?.workflowVersionId;
+          const versionId = runSteps.find(
+            (s) => s.workflowVersionId,
+          )?.workflowVersionId;
           return {
             runId,
-            workflow_version: (versionId ? versionsMap[versionId] : undefined) as DSPyRunsSummary["workflow_version"],
+            workflow_version: (versionId
+              ? versionsMap[versionId]
+              : undefined) as DSPyRunsSummary["workflow_version"],
             steps: runSteps
-              .map((s) => ({
-                run_id: s.runId,
-                index: s.stepIndex,
-                score: s.score,
-                label: s.label,
-                optimizer: { name: s.optimizerName },
-                llm_calls_summary: {
-                  total: s.llmCallsTotal,
-                  total_tokens: s.llmCallsTotalTokens,
-                  total_cost: s.llmCallsTotalCost,
-                },
-                timestamps: { created_at: s.createdAt },
-              } as DSPyStepSummary))
-              .sort((a, b) => a.timestamps.created_at - b.timestamps.created_at),
+              .map(
+                (s) =>
+                  ({
+                    run_id: s.runId,
+                    index: s.stepIndex,
+                    score: s.score,
+                    label: s.label,
+                    optimizer: { name: s.optimizerName },
+                    llm_calls_summary: {
+                      total: s.llmCallsTotal,
+                      total_tokens: s.llmCallsTotalTokens,
+                      total_cost: s.llmCallsTotalCost,
+                    },
+                    timestamps: { created_at: s.createdAt },
+                  }) as DSPyStepSummary,
+              )
+              .sort(
+                (a, b) => a.timestamps.created_at - b.timestamps.created_at,
+              ),
             created_at: Math.min(...runSteps.map((s) => s.createdAt)),
           };
         })
@@ -837,11 +846,12 @@ export const experimentsRouter = createTRPCRouter({
         });
       }
 
-      const experiment = await ExperimentService.create(ctx.prisma)
-        .findByIdWithWorkflowLatestVersion({
-          projectId: input.sourceProjectId,
-          id: input.experimentId,
-        });
+      const experiment = await ExperimentService.create(
+        ctx.prisma,
+      ).findByIdWithWorkflowLatestVersion({
+        projectId: input.sourceProjectId,
+        id: input.experimentId,
+      });
 
       if (!experiment) {
         throw new TRPCError({

@@ -54,7 +54,6 @@ vi.mock("~/hooks/useAnnotationsByTraceIds", () => ({
   useAnnotationsByTraceIds: () => ({ data: [] }),
 }));
 
-
 vi.mock("~/utils/api", () => ({
   api: {
     annotationScore: {

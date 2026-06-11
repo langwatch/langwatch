@@ -1,7 +1,7 @@
 import { useCallback } from "react";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { useDatasetRecordSync } from "~/components/datasets/editor/useDatasetRecordSync";
 import type { AutosaveState } from "~/components/datasets/editor/DatasetTableContext";
+import { useDatasetRecordSync } from "~/components/datasets/editor/useDatasetRecordSync";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { DatasetReference } from "../types";
 import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
 
@@ -14,13 +14,17 @@ import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
 export const useDatasetSync = () => {
   const { project } = useOrganizationTeamProject();
 
-  const { datasets, pendingSavedChanges, clearPendingChange, setAutosaveStatus } =
-    useEvaluationsV3Store((state) => ({
-      datasets: state.datasets,
-      pendingSavedChanges: state.pendingSavedChanges,
-      clearPendingChange: state.clearPendingChange,
-      setAutosaveStatus: state.setAutosaveStatus,
-    }));
+  const {
+    datasets,
+    pendingSavedChanges,
+    clearPendingChange,
+    setAutosaveStatus,
+  } = useEvaluationsV3Store((state) => ({
+    datasets: state.datasets,
+    pendingSavedChanges: state.pendingSavedChanges,
+    clearPendingChange: state.clearPendingChange,
+    setAutosaveStatus: state.setAutosaveStatus,
+  }));
 
   const resolveFullRecord = useCallback(
     (dbDatasetId: string, recordId: string) => {

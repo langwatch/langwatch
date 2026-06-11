@@ -1,4 +1,10 @@
-import type { Organization, Project, Team, User, Workflow } from "@prisma/client";
+import type {
+  Organization,
+  Project,
+  Team,
+  User,
+  Workflow,
+} from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
@@ -288,7 +294,10 @@ describe("Workflows REST API", () => {
           id: "end",
           type: "end",
           position: { x: 300, y: 0 },
-          data: { name: "End", inputs: [{ identifier: "output", type: "str" }] },
+          data: {
+            name: "End",
+            inputs: [{ identifier: "output", type: "str" }],
+          },
         },
       ],
       edges: [
@@ -437,9 +446,9 @@ describe("Workflows REST API", () => {
           outputs: Array<{ identifier: string }>;
           dataset: { inline: { records: Record<string, unknown[]> } };
         };
-        expect(
-          entry.outputs.some((o) => o.identifier === "feature_flag"),
-        ).toBe(true);
+        expect(entry.outputs.some((o) => o.identifier === "feature_flag")).toBe(
+          true,
+        );
         expect(entry.dataset.inline.records.feature_flag).toEqual([
           "variant-b",
           "variant-b",

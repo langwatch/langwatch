@@ -15,7 +15,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import numeral from "numeral";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { formatCost, formatLatency } from "~/components/shared/formatters";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { BatchRunSummary } from "./BatchRunsSidebar";

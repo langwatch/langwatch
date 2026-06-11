@@ -1,5 +1,5 @@
 import { Box, Center, HStack, Text } from "@chakra-ui/react";
-import { type ComponentProps } from "react";
+import type { ComponentProps } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { Edit2 } from "react-feather";
 import type {

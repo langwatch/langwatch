@@ -1,5 +1,5 @@
-import { useRouter } from "~/utils/compat/next-router";
 import qs from "qs";
+import { useRouter } from "~/utils/compat/next-router";
 import { URL_QS_PARSE_OPTIONS } from "~/utils/qsParseOptions";
 import { usePeriodSelector } from "../components/PeriodSelector";
 import { filterOutEmptyFilters } from "../server/analytics/utils";
@@ -88,9 +88,7 @@ export const useFilterParams = () => {
   if (!hasUrlFilterOrDateParams && project?.id) {
     try {
       const viewId =
-        localStorage.getItem(
-          `langwatch-saved-views-selected-${project.id}`,
-        ) ??
+        localStorage.getItem(`langwatch-saved-views-selected-${project.id}`) ??
         localStorage.getItem(`langwatch-selected-view-${project.id}`);
 
       if (viewId && viewId !== "all-traces") {
@@ -162,8 +160,7 @@ export const useFilterParams = () => {
         {
           ...Object.fromEntries(
             Object.entries(queryParams).filter(
-              ([key]) =>
-                key !== filterUrl && !key.startsWith(filterUrl + "."),
+              ([key]) => key !== filterUrl && !key.startsWith(filterUrl + "."),
             ),
           ),
           [filterUrl]: params,

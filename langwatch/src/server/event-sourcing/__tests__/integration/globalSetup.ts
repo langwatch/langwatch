@@ -1,3 +1,8 @@
+import { execFileSync, execSync } from "node:child_process";
+import * as crypto from "node:crypto";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import {
   ClickHouseContainer,
   type StartedClickHouseContainer,
@@ -6,11 +11,6 @@ import {
   RedisContainer,
   type StartedRedisContainer,
 } from "@testcontainers/redis";
-import * as fs from "node:fs";
-import * as path from "node:path";
-import * as os from "node:os";
-import * as crypto from "node:crypto";
-import { execFileSync, execSync } from "node:child_process";
 import { migrateUp } from "~/server/clickhouse/goose";
 
 const TEST_DATABASE = "test_langwatch";
@@ -82,9 +82,15 @@ const MIGRATIONS_HASH_FILE = path.join(
  * migrations are added and need to be applied to the reused container.
  */
 function computeMigrationsHash(): string {
-  const migrationsDir = path.join(__dirname, "../../../../server/clickhouse/migrations");
+  const migrationsDir = path.join(
+    __dirname,
+    "../../../../server/clickhouse/migrations",
+  );
   if (!fs.existsSync(migrationsDir)) return "";
-  const files = fs.readdirSync(migrationsDir).filter(f => f.endsWith(".sql")).sort();
+  const files = fs
+    .readdirSync(migrationsDir)
+    .filter((f) => f.endsWith(".sql"))
+    .sort();
   const hash = crypto.createHash("md5");
   for (const file of files) {
     hash.update(file);
@@ -190,7 +196,9 @@ async function setupLocalServices(urls: LocalServiceUrls): Promise<void> {
   if (urls.databaseUrl) {
     console.log(`[globalSetup] Postgres URL: ${urls.databaseUrl}`);
   }
-  console.log(`[globalSetup] Container info written to: ${CONTAINER_INFO_FILE}`);
+  console.log(
+    `[globalSetup] Container info written to: ${CONTAINER_INFO_FILE}`,
+  );
 }
 
 /**
@@ -257,14 +265,21 @@ export async function setup(): Promise<void> {
   }
 
   // Generate sdk-versions.json (normally done by start:prepare:files)
-  const sdkVersionsPath = path.join(__dirname, "../../../../server/sdk-radar/sdk-versions.json");
+  const sdkVersionsPath = path.join(
+    __dirname,
+    "../../../../server/sdk-radar/sdk-versions.json",
+  );
   if (!fs.existsSync(sdkVersionsPath)) {
     console.log("[globalSetup] Generating sdk-versions.json...");
     execSync("pnpm run generate:sdk-versions", { stdio: "inherit" });
   }
 
   // Skip if using CI service containers
-  if (process.env.CI_CLICKHOUSE_URL && process.env.CI_REDIS_URL && process.env.CI) {
+  if (
+    process.env.CI_CLICKHOUSE_URL &&
+    process.env.CI_REDIS_URL &&
+    process.env.CI
+  ) {
     console.log("[globalSetup] Using CI service containers");
     return;
   }
@@ -281,7 +296,9 @@ export async function setup(): Promise<void> {
   // Start ClickHouse container (reusable to speed up subsequent test runs)
   const storagePolicyConfigPath = createStoragePolicyConfigFile();
 
-  clickHouseContainer = await new ClickHouseContainer("clickhouse/clickhouse-server:25.10.2.65")
+  clickHouseContainer = await new ClickHouseContainer(
+    "clickhouse/clickhouse-server:25.10.2.65",
+  )
     .withLabels(CONTAINER_LABELS)
     .withReuse()
     .withCopyFilesToContainer([
@@ -306,7 +323,9 @@ export async function setup(): Promise<void> {
   // With reusable containers, only re-run if migration files changed.
   const migrationsChanged = needsMigrationRerun();
   if (migrationsChanged) {
-    console.log("[globalSetup] Migration files changed, running ClickHouse migrations...");
+    console.log(
+      "[globalSetup] Migration files changed, running ClickHouse migrations...",
+    );
     await migrateUp({
       connectionUrl: clickHouseBaseUrl,
       database: TEST_DATABASE,
@@ -314,7 +333,9 @@ export async function setup(): Promise<void> {
     });
     saveMigrationsHash();
   } else {
-    console.log("[globalSetup] Migration files unchanged, skipping migrations.");
+    console.log(
+      "[globalSetup] Migration files unchanged, skipping migrations.",
+    );
   }
 
   // Create URL with the correct database name for test workers
@@ -331,7 +352,9 @@ export async function setup(): Promise<void> {
 
   console.log(`[globalSetup] ClickHouse URL: ${clickHouseUrl}`);
   console.log(`[globalSetup] Redis URL: ${redisUrl}`);
-  console.log(`[globalSetup] Container info written to: ${CONTAINER_INFO_FILE}`);
+  console.log(
+    `[globalSetup] Container info written to: ${CONTAINER_INFO_FILE}`,
+  );
   console.log("[globalSetup] Testcontainers started successfully");
 }
 
@@ -342,7 +365,11 @@ export async function setup(): Promise<void> {
  */
 export async function teardown(): Promise<void> {
   // Skip if using CI service containers
-  if (process.env.CI_CLICKHOUSE_URL && process.env.CI_REDIS_URL && process.env.CI) {
+  if (
+    process.env.CI_CLICKHOUSE_URL &&
+    process.env.CI_REDIS_URL &&
+    process.env.CI
+  ) {
     return;
   }
 
@@ -356,7 +383,9 @@ export async function teardown(): Promise<void> {
   // To force cleanup, set STOP_TEST_CONTAINERS=true or run:
   //   docker rm -f $(docker ps -q --filter "label=langwatch.test=true")
   if (process.env.STOP_TEST_CONTAINERS !== "true") {
-    console.log("[globalSetup] Keeping reusable containers running for faster subsequent runs");
+    console.log(
+      "[globalSetup] Keeping reusable containers running for faster subsequent runs",
+    );
     return;
   }
 

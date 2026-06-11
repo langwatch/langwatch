@@ -16,7 +16,9 @@ const mockGoBack = vi.fn();
 // Mock useUpgradeModalStore
 const mockOpenUpgradeModal = vi.fn();
 vi.mock("~/stores/upgradeModalStore", () => ({
-  useUpgradeModalStore: (selector: (state: { open: typeof mockOpenUpgradeModal }) => unknown) => {
+  useUpgradeModalStore: (
+    selector: (state: { open: typeof mockOpenUpgradeModal }) => unknown,
+  ) => {
     if (typeof selector === "function") {
       return selector({ open: mockOpenUpgradeModal });
     }
@@ -283,9 +285,7 @@ vi.mock("~/components/outputs", () => ({
 
 // Mock buildDefaultFormValues — supports overrides to test initialLocalConfig seeding
 vi.mock("~/prompts/utils/buildDefaultFormValues", () => ({
-  buildDefaultFormValues: (
-    overrides?: Record<string, unknown>,
-  ) => {
+  buildDefaultFormValues: (overrides?: Record<string, unknown>) => {
     if (!overrides) return mockDefaultFormValues;
     // Deep merge overrides into defaults (simplified for test)
     const merged = JSON.parse(JSON.stringify(mockDefaultFormValues));
@@ -1116,7 +1116,10 @@ describe("PromptEditorDrawer", () => {
 
   describe("License enforcement (prompts limit)", () => {
     beforeEach(() => {
-      mockGetByIdOrHandle.mockReturnValue({ data: undefined, isLoading: false });
+      mockGetByIdOrHandle.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+      });
     });
 
     // Skipped: The save button for new prompts is disabled (shows "Saved") until

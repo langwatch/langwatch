@@ -90,8 +90,8 @@ vi.mock("~/utils/api", () => ({
 }));
 
 import { _useWorkflowStore } from "../../hooks/useWorkflowStore";
-import { DatasetModal } from "../DatasetModal";
 import type { Entry } from "../../types/dsl";
+import { DatasetModal } from "../DatasetModal";
 
 const ENTRY_NODE = {
   id: "entry",
@@ -142,10 +142,9 @@ describe("Workflow dataset dialog", () => {
   describe("when choosing a dataset", () => {
     /** @scenario Choose opens the shared dataset picker */
     it("opens the shared picker with search and dataset facts", () => {
-      render(
-        <DatasetModal open={true} onClose={vi.fn()} node={ENTRY_NODE} />,
-        { wrapper: Wrapper },
-      );
+      render(<DatasetModal open={true} onClose={vi.fn()} node={ENTRY_NODE} />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByTestId("dataset-picker-search")).toBeInTheDocument();
       expect(screen.getByTestId("dataset-card-turn 10")).toBeInTheDocument();
@@ -158,10 +157,9 @@ describe("Workflow dataset dialog", () => {
     it("attaches the picked dataset to the node and merges its columns into the outputs", async () => {
       const user = userEvent.setup();
       const onClose = vi.fn();
-      render(
-        <DatasetModal open={true} onClose={onClose} node={ENTRY_NODE} />,
-        { wrapper: Wrapper },
-      );
+      render(<DatasetModal open={true} onClose={onClose} node={ENTRY_NODE} />, {
+        wrapper: Wrapper,
+      });
 
       await user.click(screen.getByTestId("dataset-card-turn 10"));
 
@@ -183,10 +181,9 @@ describe("Workflow dataset dialog", () => {
     /** @scenario New dataset button opens the dataset editor directly */
     it("drafts an inline dataset and opens the editor, no CSV upload required", async () => {
       const user = userEvent.setup();
-      render(
-        <DatasetModal open={true} onClose={vi.fn()} node={ENTRY_NODE} />,
-        { wrapper: Wrapper },
-      );
+      render(<DatasetModal open={true} onClose={vi.fn()} node={ENTRY_NODE} />, {
+        wrapper: Wrapper,
+      });
 
       await user.click(screen.getByTestId("new-draft-dataset"));
 
@@ -202,10 +199,9 @@ describe("Workflow dataset dialog", () => {
     /** @scenario Creating a dataset sets it as the active dataset */
     it("attaches the draft to the node as its active dataset", async () => {
       const user = userEvent.setup();
-      render(
-        <DatasetModal open={true} onClose={vi.fn()} node={ENTRY_NODE} />,
-        { wrapper: Wrapper },
-      );
+      render(<DatasetModal open={true} onClose={vi.fn()} node={ENTRY_NODE} />, {
+        wrapper: Wrapper,
+      });
 
       await user.click(screen.getByTestId("new-draft-dataset"));
 
@@ -232,10 +228,9 @@ describe("Workflow dataset dialog", () => {
         ] as never,
       });
       const user = userEvent.setup();
-      render(
-        <DatasetModal open={true} onClose={vi.fn()} node={ENTRY_NODE} />,
-        { wrapper: Wrapper },
-      );
+      render(<DatasetModal open={true} onClose={vi.fn()} node={ENTRY_NODE} />, {
+        wrapper: Wrapper,
+      });
 
       await user.click(screen.getByTestId("new-draft-dataset"));
 
@@ -288,9 +283,9 @@ describe("Workflow dataset dialog", () => {
       // The change landed in the workflow DSL, not in any database
       await waitFor(() => {
         const entry = getEntryNode();
-        expect(
-          (entry?.data as Entry).dataset?.inline?.records.input?.[0],
-        ).toBe("bonjour");
+        expect((entry?.data as Entry).dataset?.inline?.records.input?.[0]).toBe(
+          "bonjour",
+        );
       });
 
       // Promotion to a real dataset is offered

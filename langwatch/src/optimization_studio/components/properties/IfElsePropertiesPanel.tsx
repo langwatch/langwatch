@@ -1,7 +1,7 @@
 import { HStack, Link, Spacer, Text, VStack } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
-import { ExternalLink } from "react-feather";
 import { useCallback } from "react";
+import { ExternalLink } from "react-feather";
 import { useShallow } from "zustand/react/shallow";
 import { CodeBlockEditor } from "~/components/blocks/CodeBlockEditor";
 import { Switch } from "~/components/ui/switch";
@@ -13,7 +13,8 @@ import {
   PropertySectionTitle,
 } from "./BasePropertiesPanel";
 
-const LIQUID_OPERATORS_DOCS = "https://shopify.github.io/liquid/basics/operators/";
+const LIQUID_OPERATORS_DOCS =
+  "https://shopify.github.io/liquid/basics/operators/";
 
 function pythonAnnotation(type: Field["type"]): string {
   switch (type) {
@@ -58,8 +59,9 @@ export function IfElsePropertiesPanel({ node }: { node: Node<Component> }) {
 
   const param = useCallback(
     (identifier: string) =>
-      (node.data.parameters?.find((p) => p.identifier === identifier)
-        ?.value as string | undefined) ?? "",
+      (node.data.parameters?.find((p) => p.identifier === identifier)?.value as
+        | string
+        | undefined) ?? "",
     [node.data.parameters],
   );
 
@@ -140,8 +142,8 @@ export function IfElsePropertiesPanel({ node }: { node: Node<Component> }) {
               viewStateKey={`if-else-condition:${node.id}`}
             />
             <Text fontSize="12px" color="fg.muted">
-              Python over the inputs, must return True or False. The
-              not-taken branch is skipped.
+              Python over the inputs, must return True or False. The not-taken
+              branch is skipped.
             </Text>
           </>
         ) : (

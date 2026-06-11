@@ -5,7 +5,6 @@ import type {
 } from "@copilotkit/runtime";
 import { randomUUID } from "@copilotkit/shared";
 import type z from "zod";
-import { LlmSignatureNodeFactory } from "~/optimization_studio/utils/llmSignatureNodeFactory";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
 import type {
@@ -16,6 +15,7 @@ import type {
   StudioClientEvent,
   StudioServerEvent,
 } from "~/optimization_studio/types/events";
+import { LlmSignatureNodeFactory } from "~/optimization_studio/utils/llmSignatureNodeFactory";
 import type { runtimeInputsSchema } from "~/prompts/schemas";
 import { versionMetadataToNodeFormat } from "~/prompts/schemas/version-metadata-schema";
 import type { PromptConfigFormValues } from "~/prompts/types";
@@ -232,7 +232,10 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
         this.projectId,
       );
     } catch (earlyError: any) {
-      logger.error({ err: earlyError }, "early error preparing prompt workflow");
+      logger.error(
+        { err: earlyError },
+        "early error preparing prompt workflow",
+      );
       // Use the pre-allocated traceId so the frontend's TraceMessage queries
       // the same id the backend would have used for tracing (issue #853).
       const messageId = traceId;
@@ -440,10 +443,14 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
       // omit the keys, mirroring the python-sdk omission convention.
       // versionMetadata uses the canonical form→node converter
       // (versionCreatedAt is a Date in form state, ISO string on the wire).
-      ...(formValues.configId !== undefined && { configId: formValues.configId }),
+      ...(formValues.configId !== undefined && {
+        configId: formValues.configId,
+      }),
       ...(formValues.handle !== undefined && { handle: formValues.handle }),
       ...(formValues.versionMetadata !== undefined && {
-        versionMetadata: versionMetadataToNodeFormat(formValues.versionMetadata),
+        versionMetadata: versionMetadataToNodeFormat(
+          formValues.versionMetadata,
+        ),
       }),
       parameters: [
         {

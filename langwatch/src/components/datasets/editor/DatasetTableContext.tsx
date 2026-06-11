@@ -5,7 +5,7 @@
  * zustand store, the standalone dataset editor backs it with its own store)
  * and only ever talk to this interface.
  */
-import { createContext, useContext, type RefObject } from "react";
+import { createContext, type RefObject, useContext } from "react";
 
 export type CellPosition = {
   row: number;

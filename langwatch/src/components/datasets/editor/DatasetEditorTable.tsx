@@ -24,28 +24,28 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import {
+  type ColumnDef,
   createColumnHelper,
   flexRender,
   getCoreRowModel,
   useReactTable,
-  type ColumnDef,
 } from "@tanstack/react-table";
 import Parse from "papaparse";
 import {
+  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
-  type ReactNode,
 } from "react";
 import { Check, Cloud, Download, Edit2, Plus, Upload, X } from "react-feather";
 import { useStore } from "zustand";
 
 import { AddOrEditDatasetDrawer } from "~/components/AddOrEditDatasetDrawer";
 import { ColumnTypeIcon } from "~/components/shared/ColumnTypeIcon";
-import { Tooltip } from "~/components/ui/tooltip";
 import { toaster } from "~/components/ui/toaster";
+import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type {
   DatasetColumns,
@@ -55,18 +55,18 @@ import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { AddRowsFromCSVModal } from "../AddRowsFromCSVModal";
 import {
-  DatasetTableProvider,
   type AutosaveState,
   type DatasetTableContextValue,
+  DatasetTableProvider,
   type DatasetTableRowData,
 } from "./DatasetTableContext";
+import { datasetTableCss } from "./datasetTableStyles";
 import {
   createDatasetEditorStore,
-  rekeyEditorRecords,
   type EditorColumn,
   type EditorRecord,
+  rekeyEditorRecords,
 } from "./useDatasetEditorStore";
-import { datasetTableCss } from "./datasetTableStyles";
 import { useDatasetRecordSync } from "./useDatasetRecordSync";
 import { useTableKeyboardNavigation } from "./useTableKeyboardNavigation";
 import { VirtualizedTableBody } from "./VirtualizedTableBody";
@@ -234,8 +234,7 @@ export function DatasetEditorTable({
     controllerRef.current = {
       addRow: (record) => store.getState().upsertExternalRecord(record),
       updateRow: (record) => store.getState().upsertExternalRecord(record),
-      removeRow: (recordId) =>
-        store.getState().removeExternalRecord(recordId),
+      removeRow: (recordId) => store.getState().removeExternalRecord(recordId),
       getColumns: () => store.getState().columns,
     };
     return () => {
@@ -573,7 +572,9 @@ export function DatasetEditorTable({
         <Text fontSize="13px" color="fg.muted" data-testid="dataset-row-count">
           {rowCount} {rowCount === 1 ? "record" : "records"}
         </Text>
-        {datasetId && <SaveStatusChip state={autosave.state} error={autosave.error} />}
+        {datasetId && (
+          <SaveStatusChip state={autosave.state} error={autosave.error} />
+        )}
         <Spacer />
         {selectedRows.size > 0 && (
           <Button

@@ -9,25 +9,25 @@ import {
   useRef,
   useState,
 } from "react";
-import { RichTextarea, type RichTextareaHandle } from "rich-textarea";
 import type { CaretPosition } from "rich-textarea";
+import { RichTextarea, type RichTextareaHandle } from "rich-textarea";
 import { useLayoutMode } from "~/prompts/prompt-playground/components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent";
 import { VariableInsertMenu } from "../variables/VariableInsertMenu";
 import type { AvailableSource } from "../variables/VariableMappingInput";
 import { AddLogicButton } from "./components/AddLogicButton";
 import { AddVariableButton } from "./components/AddVariableButton";
-import { TemplateLogicMenu } from "./components/TemplateLogicMenu";
 import { GripHandles, LineHighlights } from "./components/ParagraphOverlay";
+import { TemplateLogicMenu } from "./components/TemplateLogicMenu";
 import { useDebouncedTextarea } from "./hooks/useDebouncedTextarea";
 import { useParagraphDragDrop } from "./hooks/useParagraphDragDrop";
 import { useTemplateLogicMenu } from "./hooks/useTemplateLogicMenu";
 import { useTextareaResize } from "./hooks/useTextareaResize";
 import { useVariableMenu } from "./hooks/useVariableMenu";
-import type { PromptTextAreaWithVariablesProps } from "./types";
 import {
   extractLiquidVariables,
   tokenizeLiquidTemplate,
 } from "./liquidTokenizer";
+import type { PromptTextAreaWithVariablesProps } from "./types";
 import {
   findJustCompletedVariable,
   findUnclosedBraces,
@@ -335,10 +335,7 @@ export const PromptTextAreaWithVariables = ({
         if (!variableMenu.menuOpen) {
           setTimeout(
             () =>
-              variableMenu.openMenu(
-                unclosedBraces.start,
-                unclosedBraces.query,
-              ),
+              variableMenu.openMenu(unclosedBraces.start, unclosedBraces.query),
             0,
           );
         } else {
@@ -436,9 +433,7 @@ export const PromptTextAreaWithVariables = ({
             style={{
               color: tagColor,
               fontWeight: borderless ? undefined : 600,
-              textShadow: borderless
-                ? `0px 0px 1px ${tagColor}`
-                : undefined,
+              textShadow: borderless ? `0px 0px 1px ${tagColor}` : undefined,
             }}
           >
             {token.value}
@@ -645,9 +640,7 @@ export const PromptTextAreaWithVariables = ({
           availableSources={availableSources}
           query={variableMenu.menuQuery}
           onQueryChange={
-            variableMenu.buttonMenuMode
-              ? variableMenu.setMenuQuery
-              : undefined
+            variableMenu.buttonMenuMode ? variableMenu.setMenuQuery : undefined
           }
           highlightedIndex={variableMenu.highlightedIndex}
           onHighlightChange={variableMenu.setHighlightedIndex}

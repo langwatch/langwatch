@@ -9,6 +9,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import React, { useCallback } from "react";
 import type { DatasetTableRowData } from "./DatasetTableContext";
 import { TableCell } from "./TableCell";
+
 // Fixed row height for compact mode
 const COMPACT_ROW_HEIGHT = 160;
 

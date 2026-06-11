@@ -12,12 +12,12 @@ import { Box, Button, HStack } from "@chakra-ui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import numeral from "numeral";
 import {
+  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
-  type ReactNode,
 } from "react";
 import { TraceIdPeek } from "~/features/traces-v2/components/TraceIdPeek";
 import { useDrawer } from "~/hooks/useDrawer";
@@ -162,8 +162,7 @@ export function BatchEvaluationV2EvaluationResult({
           minWidth: 150,
           render: (row) => formatValue(predictedValue(row)),
           text: (row) => stringify(predictedValue(row) ?? "-"),
-          cellState: (row) =>
-            row.datasetEntry?.error ? "error" : undefined,
+          cellState: (row) => (row.datasetEntry?.error ? "error" : undefined),
         });
       }
     });
@@ -194,8 +193,7 @@ export function BatchEvaluationV2EvaluationResult({
               row.evaluationsForEntry[evaluator]?.inputs?.[column] ?? "-",
             );
           },
-          cellState: (row) =>
-            row.datasetEntry?.error ? "error" : undefined,
+          cellState: (row) => (row.datasetEntry?.error ? "error" : undefined),
         });
       }
     }
@@ -481,15 +479,11 @@ export function BatchEvaluationV2EvaluationResult({
                       <td
                         key={column.id}
                         title={
-                          tooltip && tooltip.length < 1000
-                            ? tooltip
-                            : undefined
+                          tooltip && tooltip.length < 1000 ? tooltip : undefined
                         }
                         style={{
                           minWidth: column.minWidth,
-                          background: state
-                            ? CELL_STATE_BG[state]
-                            : undefined,
+                          background: state ? CELL_STATE_BG[state] : undefined,
                         }}
                         onClick={() => handleCellClick(column, row)}
                       >
