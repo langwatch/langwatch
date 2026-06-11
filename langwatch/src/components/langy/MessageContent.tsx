@@ -5,6 +5,10 @@ import React from "react";
 import { Markdown } from "~/components/Markdown";
 import { LangyGitHubConnectCard } from "./github/LangyGitHubConnectCard";
 import {
+  LangyGitHubPrCard,
+  extractPrLinks,
+} from "./github/LangyGitHubPrCard";
+import {
   AI_SHADOW,
   GradientSparkle,
   MeshGradientLayer,
@@ -75,7 +79,14 @@ export function MessageContent({
     : rawText;
 
   const proposals = extractProposals(message);
-  if (!text && proposals.length === 0 && !showConnectCard) return null;
+  const prLinks = isUser ? [] : extractPrLinks(text);
+  if (
+    !text &&
+    proposals.length === 0 &&
+    !showConnectCard &&
+    prLinks.length === 0
+  )
+    return null;
 
   if (isUser) {
     return (
@@ -129,6 +140,12 @@ export function MessageContent({
             onConnected={onConnectedGithub}
           />
         ) : null}
+        {prLinks.map((pr) => (
+          <LangyGitHubPrCard
+            key={`${pr.owner}/${pr.repo}#${pr.number}`}
+            {...pr}
+          />
+        ))}
         {proposals.map(({ id, proposal }) => (
           <ProposalCard
             key={id}
