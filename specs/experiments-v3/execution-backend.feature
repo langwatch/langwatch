@@ -271,12 +271,17 @@ Feature: Evaluation execution - Backend
     Then the response Content-Type is "text/event-stream"
     And I receive SSE events as execution progresses
 
-  @unimplemented
-  Scenario: Endpoint handles abort request
-    Given a running execution "run-123"
+  # An interactive workbench run streams over SSE and never creates a polling
+  # run-state record. Abort authorization therefore reads the owner that the
+  # orchestrator registers when it marks the run as running, not the polling
+  # run-state. Without this, every workbench abort 404s and the Stop button
+  # reports "Abort Failed".
+  Scenario: Abort authorizes an interactive run by its registered owner
+    Given a running execution "run-123" owned by my project
+    And the run was started over SSE with no polling run-state record
     When I POST to /api/experiments/abort with runId="run-123"
-    Then the abort flag is set
-    And I receive 200 OK
+    Then I receive 200 OK
+    And the abort flag is set for "run-123"
 
   # ==========================================================================
   # Error Cases - Integration
