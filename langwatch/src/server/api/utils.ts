@@ -23,6 +23,9 @@ import {
   type LegacyVisibility,
   type ViewerFacts,
 } from "~/server/data-privacy/contentVisibility";
+import { createLogger } from "~/utils/logger/server";
+
+const logger = createLogger("langwatch:api:protections");
 
 export const extractCheckKeys = (
   inputObject: Record<string, any>,
@@ -158,8 +161,23 @@ export async function getUserProtectionsForProject(
       policy = await getDataPrivacyPolicyService().getResolvedForProject({
         projectId,
       });
-    } catch {
-      policy = PLATFORM_DEFAULT_DATA_PRIVACY;
+    } catch (error) {
+      // Fail closed: a resolver/cache/db failure must not expose content that a
+      // restrict rule would otherwise hide. Deny captured input/output (the
+      // viewer sees the redacted placeholder) until resolution recovers; cost
+      // visibility keeps its own permission check. The kill switch path above
+      // skips this and keeps the legacy-enum behavior.
+      logger.error(
+        { error, projectId },
+        "data-privacy policy resolution failed; hiding captured content (fail-closed)",
+      );
+      return {
+        canSeeCosts,
+        canSeeCapturedInput: false,
+        canSeeCapturedOutput: false,
+        capturedInputVisibleTo: null,
+        capturedOutputVisibleTo: null,
+      };
     }
   }
   const effInput = effectiveCategoryRestriction(

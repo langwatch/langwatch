@@ -324,7 +324,9 @@ export class RecordSpanCommand implements CommandHandler<
         // AFTER redaction (dropping a whole category makes redacting it moot).
         // Doing it here, before the event is emitted, means both the stored
         // span and the trace-summary fold (which derives ComputedInput/Output
-        // from the same event) never see the dropped categories. Fails open.
+        // from the same event) never see the dropped categories. The drop fails
+        // open internally (a policy-resolution error keeps the span intact and
+        // is logged), so this call never aborts span processing.
         const dropResult = await this.deps.contentDropService.dropSpanContent({
           span: spanToProcess,
           projectId: tenantIdStr,

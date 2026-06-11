@@ -123,3 +123,41 @@ export async function resolveDataPrivacyScopeOrganizationId(
   });
   return project?.team?.organizationId ?? null;
 }
+
+/**
+ * Asserts the target scope belongs to the same organization as the project the
+ * caller is acting from. `assertCanWriteDataPrivacyScope` already authorizes the
+ * scope itself (so no caller can write a scope they lack permission on), but the
+ * project-scoped mutations also carry a `projectId`; this guard rejects a
+ * request that pairs a project with a scope in an unrelated organization, so the
+ * contract stays meaningful and a write can never be aimed at another org's
+ * scope from a project the caller happens to read. Throws NOT_FOUND when the
+ * scope target is missing, BAD_REQUEST on an organization mismatch.
+ */
+export async function assertScopeBelongsToProjectOrganization(
+  ctx: RBACContext,
+  projectId: string,
+  scope: DataPrivacyScope,
+): Promise<void> {
+  const [scopeOrganizationId, project] = await Promise.all([
+    resolveDataPrivacyScopeOrganizationId(ctx, scope),
+    ctx.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { team: { select: { organizationId: true } } },
+    }),
+  ]);
+  if (!scopeOrganizationId) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "The data privacy scope target does not exist.",
+    });
+  }
+  const projectOrganizationId = project?.team?.organizationId ?? null;
+  if (!projectOrganizationId || projectOrganizationId !== scopeOrganizationId) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message:
+        "The data privacy scope must belong to the same organization as the project.",
+    });
+  }
+}

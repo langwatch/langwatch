@@ -18,7 +18,7 @@ const REPLACEMENT = "[REDACTED]";
 const MAX_SCAN_LENGTH = 250_000;
 const CONTEXT_WINDOW = 50;
 
-export const ESSENTIAL_PII_ENTITIES: readonly string[] = [
+export const ESSENTIAL_PII_ENTITIES = [
   "EMAIL_ADDRESS",
   "IP_ADDRESS",
   "CREDIT_CARD",
@@ -37,7 +37,7 @@ export const ESSENTIAL_PII_ENTITIES: readonly string[] = [
   "AU_TFN",
   "IN_PAN",
   "IN_AADHAAR",
-];
+] as const;
 
 interface Recognizer {
   entity: string;

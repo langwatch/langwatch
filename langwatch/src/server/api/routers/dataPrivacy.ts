@@ -2,7 +2,10 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { dataPrivacyConfigSchema } from "~/server/data-privacy/dataPrivacy.types";
-import { assertCanWriteDataPrivacyScope } from "~/server/data-privacy/dataPrivacyPolicy.authz";
+import {
+  assertCanWriteDataPrivacyScope,
+  assertScopeBelongsToProjectOrganization,
+} from "~/server/data-privacy/dataPrivacyPolicy.authz";
 import { getDataPrivacySnapshot } from "~/server/data-privacy/dataPrivacyPolicy.read";
 import {
   getDataPrivacyPolicyService,
@@ -51,10 +54,13 @@ export const dataPrivacyRouter = createTRPCRouter({
     )
     .use(authorizeInResolver)
     .mutation(async ({ input, ctx }) => {
-      await assertCanWriteDataPrivacyScope(
-        { prisma: ctx.prisma, session: ctx.session },
+      const authCtx = { prisma: ctx.prisma, session: ctx.session };
+      await assertScopeBelongsToProjectOrganization(
+        authCtx,
+        input.projectId,
         input.scope,
       );
+      await assertCanWriteDataPrivacyScope(authCtx, input.scope);
       try {
         return await getDataPrivacyPolicyService().setForScope({
           scope: input.scope,
@@ -83,10 +89,13 @@ export const dataPrivacyRouter = createTRPCRouter({
     )
     .use(authorizeInResolver)
     .mutation(async ({ input, ctx }) => {
-      await assertCanWriteDataPrivacyScope(
-        { prisma: ctx.prisma, session: ctx.session },
+      const authCtx = { prisma: ctx.prisma, session: ctx.session };
+      await assertScopeBelongsToProjectOrganization(
+        authCtx,
+        input.projectId,
         input.scope,
       );
+      await assertCanWriteDataPrivacyScope(authCtx, input.scope);
       await getDataPrivacyPolicyService().removeForScope({
         scope: input.scope,
         personalOnly: input.personalOnly,

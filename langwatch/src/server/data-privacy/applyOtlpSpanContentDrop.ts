@@ -1,4 +1,5 @@
 import type { OtlpSpan } from "../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import { createLogger } from "../../utils/logger/server";
 import type { ResolvedDataPrivacy } from "./dataPrivacy.types";
 import { getDataPrivacyPolicyService } from "./dataPrivacyPolicy.service";
 import {
@@ -6,6 +7,8 @@ import {
   droppedCategories,
   PRIVACY_DROPPED_MARKER_ATTR,
 } from "./dropKeyCatalog";
+
+const logger = createLogger("langwatch:data-privacy:content-drop");
 
 export interface SpanContentDropResult {
   /** How many attribute entries were removed across the span and its events. */
@@ -22,7 +25,8 @@ export interface SpanContentDropResult {
  * so they always survive. When any category is dropped a marker attribute is
  * stamped listing them so the trace view can explain the absence.
  *
- * Pure given the policy (no I/O) so it can be unit-tested directly.
+ * Deterministic and free of I/O: it mutates the passed `span` in place rather
+ * than returning a copy, so it can be unit-tested directly without a database.
  */
 export function stripOtlpSpanContent({
   span,
@@ -75,8 +79,12 @@ export function stripOtlpSpanContent({
  * span store AND the trace-summary fold that derives ComputedInput/Output —
  * sees the already-dropped span, so dropped content never lands anywhere.
  *
- * Gated by the LANGWATCH_DATA_PRIVACY_ENFORCEMENT=off kill switch. Resolution
- * failures fail open (the span is kept intact) rather than dropping the event.
+ * Gated by the LANGWATCH_DATA_PRIVACY_ENFORCEMENT=off kill switch. Any failure
+ * (policy resolution or the strip itself) fails open: the span is kept intact
+ * rather than dropping the event, because dropping on a transient error would
+ * be permanent content loss. The kept content is still subject to read-time
+ * visibility, which fails closed. The failure is logged so a policy-resolution
+ * outage is visible rather than silently skipping enforcement.
  */
 export async function applyOtlpSpanContentDrop({
   span,
@@ -88,13 +96,15 @@ export async function applyOtlpSpanContentDrop({
   if (process.env.LANGWATCH_DATA_PRIVACY_ENFORCEMENT === "off") {
     return { droppedCount: 0, droppedCategories: [] };
   }
-  let policy: ResolvedDataPrivacy;
   try {
-    policy = await getDataPrivacyPolicyService().getResolvedForProject({
-      projectId,
-    });
-  } catch {
+    const policy: ResolvedDataPrivacy =
+      await getDataPrivacyPolicyService().getResolvedForProject({ projectId });
+    return stripOtlpSpanContent({ span, policy });
+  } catch (error) {
+    logger.error(
+      { error, projectId },
+      "data-privacy content drop skipped: policy resolution or strip failed; keeping span content intact (fail-open, still subject to read-time visibility)",
+    );
     return { droppedCount: 0, droppedCategories: [] };
   }
-  return stripOtlpSpanContent({ span, policy });
 }

@@ -123,89 +123,102 @@ const IO_ATTRS = {
 
 describe("RecordSpanCommand content drop", () => {
   describe("given a rule that drops trace input", () => {
-    /** @scenario Dropped input never reaches storage from the OpenTelemetry endpoint */
-    it("drops input but keeps output for an OpenTelemetry-ingested span", async () => {
-      const events = await makeHandler(policy({ input: "drop" })).handle(
-        command({ attributes: IO_ATTRS }),
-      );
+    describe("when the span is ingested through the OpenTelemetry endpoint", () => {
+      /** @scenario Dropped input never reaches storage from the OpenTelemetry endpoint */
+      it("drops input but keeps output for an OpenTelemetry-ingested span", async () => {
+        const events = await makeHandler(policy({ input: "drop" })).handle(
+          command({ attributes: IO_ATTRS }),
+        );
 
-      expect(spanKeys(events[0]!)).not.toContain("langwatch.input");
-      expect(spanKeys(events[0]!)).toContain("langwatch.output");
-      expect(spanKeys(events[0]!)).toContain("gen_ai.request.model");
+        expect(spanKeys(events[0]!)).not.toContain("langwatch.input");
+        expect(spanKeys(events[0]!)).toContain("langwatch.output");
+        expect(spanKeys(events[0]!)).toContain("gen_ai.request.model");
+      });
     });
 
-    /** @scenario Dropping applies to traces from the REST collector too */
-    it("drops input for a span ingested through the REST collector", async () => {
-      const events = await makeHandler(policy({ input: "drop" })).handle(
-        command({
-          attributes: IO_ATTRS,
-          resourceAttributes: { "telemetry.sdk.name": "langwatch-rest" },
-        }),
-      );
+    describe("when the span is ingested through the REST collector", () => {
+      /** @scenario Dropping applies to traces from the REST collector too */
+      it("drops input for a span ingested through the REST collector", async () => {
+        const events = await makeHandler(policy({ input: "drop" })).handle(
+          command({
+            attributes: IO_ATTRS,
+            resourceAttributes: { "telemetry.sdk.name": "langwatch-rest" },
+          }),
+        );
 
-      expect(spanKeys(events[0]!)).not.toContain("langwatch.input");
+        expect(spanKeys(events[0]!)).not.toContain("langwatch.input");
+      });
     });
   });
 
   describe("given a rule that drops input and output", () => {
-    /** @scenario Dropping applies to gateway traffic */
-    it("drops both input and output for a gateway-origin span", async () => {
-      const events = await makeHandler(
-        policy({ input: "drop", output: "drop" }),
-      ).handle(
-        command({
-          attributes: IO_ATTRS,
-          resourceAttributes: { "langwatch.origin": "gateway" },
-        }),
-      );
+    describe("when a gateway-origin span is recorded", () => {
+      /** @scenario Dropping applies to gateway traffic */
+      it("drops both input and output for a gateway-origin span", async () => {
+        const events = await makeHandler(
+          policy({ input: "drop", output: "drop" }),
+        ).handle(
+          command({
+            attributes: IO_ATTRS,
+            resourceAttributes: { "langwatch.origin": "gateway" },
+          }),
+        );
 
-      expect(spanKeys(events[0]!)).not.toContain("langwatch.input");
-      expect(spanKeys(events[0]!)).not.toContain("langwatch.output");
-      expect(spanKeys(events[0]!)).toContain(PRIVACY_DROPPED_MARKER_ATTR);
+        expect(spanKeys(events[0]!)).not.toContain("langwatch.input");
+        expect(spanKeys(events[0]!)).not.toContain("langwatch.output");
+        expect(spanKeys(events[0]!)).toContain(PRIVACY_DROPPED_MARKER_ATTR);
+      });
     });
   });
 
   describe("given input is dropped and the trace summary is folded", () => {
-    /** @scenario The trace-level computed input is cleared when input is dropped */
-    it("yields no computed input from the fold but keeps the computed output", async () => {
-      const fold = new TraceSummaryFoldProjection({
-        store: { store: async () => undefined, get: async () => null },
+    describe("when the fold derives the computed input and output", () => {
+      /** @scenario The trace-level computed input is cleared when input is dropped */
+      it("yields no computed input from the fold but keeps the computed output", async () => {
+        const fold = new TraceSummaryFoldProjection({
+          store: { store: async () => undefined, get: async () => null },
+        });
+
+        // Control: no drop policy — the fold derives a computed input.
+        const captured = await makeHandler(null).handle(
+          command({ project: "project-keep", attributes: IO_ATTRS }),
+        );
+        const keptState = fold.handleTraceSpanReceived(captured[0]!, fold.init());
+        expect(keptState.computedInput).toBeTruthy();
+
+        // Drop input — the same fold path now sees no input on the event.
+        const dropped = await makeHandler(policy({ input: "drop" })).handle(
+          command({ project: "project-drop", attributes: IO_ATTRS }),
+        );
+        expect(spanKeys(dropped[0]!)).not.toContain("langwatch.input");
+
+        const droppedState = fold.handleTraceSpanReceived(
+          dropped[0]!,
+          fold.init(),
+        );
+        expect(droppedState.computedInput).toBeNull();
+        expect(droppedState.computedOutput).toBeTruthy();
       });
-
-      // Control: no drop policy — the fold derives a computed input.
-      const captured = await makeHandler(null).handle(
-        command({ project: "project-keep", attributes: IO_ATTRS }),
-      );
-      const keptState = fold.handleTraceSpanReceived(captured[0]!, fold.init());
-      expect(keptState.computedInput).toBeTruthy();
-
-      // Drop input — the same fold path now sees no input on the event.
-      const dropped = await makeHandler(policy({ input: "drop" })).handle(
-        command({ project: "project-drop", attributes: IO_ATTRS }),
-      );
-      expect(spanKeys(dropped[0]!)).not.toContain("langwatch.input");
-
-      const droppedState = fold.handleTraceSpanReceived(dropped[0]!, fold.init());
-      expect(droppedState.computedInput).toBeNull();
-      expect(droppedState.computedOutput).toBeTruthy();
     });
   });
 
   describe("given a span was already processed before the rule existed", () => {
-    /** @scenario Dropping does not scrub already-stored traces */
-    it("leaves the earlier span's input intact, dropping only later spans", async () => {
-      const before = await makeHandler(null).handle(
-        command({ project: "project-retro", attributes: IO_ATTRS }),
-      );
-      expect(spanKeys(before[0]!)).toContain("langwatch.input");
+    describe("when a later span is recorded under the new rule", () => {
+      /** @scenario Dropping does not scrub already-stored traces */
+      it("leaves the earlier span's input intact, dropping only later spans", async () => {
+        const before = await makeHandler(null).handle(
+          command({ project: "project-retro", attributes: IO_ATTRS }),
+        );
+        expect(spanKeys(before[0]!)).toContain("langwatch.input");
 
-      const after = await makeHandler(policy({ input: "drop" })).handle(
-        command({ project: "project-retro", attributes: IO_ATTRS }),
-      );
-      expect(spanKeys(after[0]!)).not.toContain("langwatch.input");
+        const after = await makeHandler(policy({ input: "drop" })).handle(
+          command({ project: "project-retro", attributes: IO_ATTRS }),
+        );
+        expect(spanKeys(after[0]!)).not.toContain("langwatch.input");
 
-      // The already-emitted event is untouched by the later rule.
-      expect(spanKeys(before[0]!)).toContain("langwatch.input");
+        // The already-emitted event is untouched by the later rule.
+        expect(spanKeys(before[0]!)).toContain("langwatch.input");
+      });
     });
   });
 });
