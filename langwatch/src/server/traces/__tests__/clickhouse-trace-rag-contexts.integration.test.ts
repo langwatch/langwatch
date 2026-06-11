@@ -22,7 +22,7 @@ import {
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
 import { SpanStorageClickHouseRepository } from "../repositories/span-storage.clickhouse.repository";
 import type { Protections } from "../../elasticsearch/protections";
-import type { RAGSpan } from "~/server/tracer/types";
+import type { RAGSpan, Span } from "~/server/tracer/types";
 
 const tenantId = `test-rag-contexts-${nanoid()}`;
 const now = Date.now();
@@ -164,11 +164,17 @@ afterAll(async () => {
   await stopTestContainers();
 });
 
+function findRagSpan(spans: readonly Span[] | undefined): RAGSpan {
+  const ragSpan = spans?.find((s) => s.type === "rag");
+  expect(ragSpan).toBeDefined();
+  return ragSpan as RAGSpan;
+}
+
 describe("RAG contexts read path (integration)", () => {
   describe("getTracesWithSpans()", () => {
     const traceId = `trace-rag-${nanoid()}`;
 
-    it("returns the stored contexts on the RAG span", async () => {
+    beforeAll(async () => {
       await ch.insert({
         table: "trace_summaries",
         values: [makeTraceSummaryRow({ TraceId: traceId })],
@@ -181,19 +187,18 @@ describe("RAG contexts read path (integration)", () => {
         format: "JSONEachRow",
         clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
       });
+    });
 
+    it("returns the stored contexts on the RAG span", async () => {
       const traces = await service.getTracesWithSpans(
         tenantId,
         [traceId],
         openProtections,
       );
 
-      expect(traces).not.toBeNull();
-      const ragSpan = traces![0]!.spans!.find((s) => s.type === "rag") as
-        | RAGSpan
-        | undefined;
-      expect(ragSpan).toBeDefined();
-      expect(ragSpan!.contexts).toEqual(ragChunks);
+      expect(traces).toHaveLength(1);
+      const ragSpan = findRagSpan(traces?.[0]?.spans);
+      expect(ragSpan.contexts).toEqual(ragChunks);
     });
 
     it("returns JSON-typed attributes as structured params, not strings", async () => {
@@ -203,10 +208,13 @@ describe("RAG contexts read path (integration)", () => {
         openProtections,
       );
 
-      const ragSpan = traces![0]!.spans!.find((s) => s.type === "rag")!;
-      const params = ragSpan.params as Record<string, any>;
+      expect(traces).toHaveLength(1);
+      const ragSpan = findRagSpan(traces?.[0]?.spans);
+      const params = ragSpan.params as {
+        langwatch?: { timestamps?: unknown };
+      };
       // Was previously the raw string '{"started_at":...}'
-      expect(params.langwatch.timestamps).toEqual({ started_at: now });
+      expect(params.langwatch?.timestamps).toEqual({ started_at: now });
     });
   });
 
@@ -224,11 +232,8 @@ describe("RAG contexts read path (integration)", () => {
       const repo = new SpanStorageClickHouseRepository(ch);
       const spans = await repo.getSpansByTraceId(tenantId, traceId);
 
-      const ragSpan = spans.find((s) => s.type === "rag") as
-        | RAGSpan
-        | undefined;
-      expect(ragSpan).toBeDefined();
-      expect(ragSpan!.contexts).toEqual(ragChunks);
+      const ragSpan = findRagSpan(spans);
+      expect(ragSpan.contexts).toEqual(ragChunks);
     });
   });
 });
