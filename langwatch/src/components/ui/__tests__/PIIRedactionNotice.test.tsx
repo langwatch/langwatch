@@ -49,10 +49,10 @@ describe("PIIRedactionNotice", () => {
         </Wrapper>,
       );
       expect(
-        screen.getByText(/redacted by this project's PII redaction/i),
+        screen.getByText(/redacted by this project's privacy settings/i),
       ).toBeTruthy();
       const link = screen.getByRole("link", {
-        name: /Settings → PII Redaction/i,
+        name: /Settings/i,
       });
       expect(link.getAttribute("href")).toBe("/acme/settings");
     });
