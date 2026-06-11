@@ -159,8 +159,8 @@ export function usePersonalContext(): PersonalContext {
 
   const switcherData = useWorkspaceData();
   const switcher = useMemo<WorkspaceSwitcherProps>(
-    () => ({ ...switcherData, current: { kind: "personal" } }),
-    [switcherData],
+    () => ({ ...switcherData, current: { kind: "personal", orgId } }),
+    [switcherData, orgId],
   );
 
   return {

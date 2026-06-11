@@ -37,7 +37,7 @@ export function useTraceNewCount(): TraceNewCountResult {
   const timeRange = useFilterStore((s) => s.debouncedTimeRange);
   const queryText = useFilterStore((s) => s.debouncedQueryText);
   const [since, setSince] = useState(() => Date.now());
-  const refresh = useTraceListRefresh();
+  const { refresh } = useTraceListRefresh();
 
   const isVisible = usePageVisibility();
   const [intervalMs, setIntervalMs] = useState(FAST_MS);

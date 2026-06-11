@@ -172,6 +172,7 @@
                   "prompt-management/features/essential/version-control",
                   "prompts/template-syntax",
                   "prompt-management/data-model",
+                  "prompt-management/features/essential/runtime-parameters",
                   "prompt-management/scope",
                   "prompt-management/features/essential/analytics",
                   "prompt-management/features/essential/github-integration",
@@ -212,7 +213,8 @@
                   "platform/rbac",
                   "platform/audit-log",
                   "platform/scim",
-                  "platform/model-providers"
+                  "platform/model-providers",
+                  "platform/data-retention"
                 ]
               }
             ]
@@ -245,6 +247,7 @@
           {
             "group": "Help",
             "pages": [
+              "pricing",
               "support",
               "status"
             ]
@@ -1231,7 +1234,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1781031520",
+      "source": "/ci/cache/busted/1781208445",
       "destination": "/"
     },
     {

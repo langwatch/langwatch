@@ -29,10 +29,8 @@ export function formatVerboseRelative(timestamp: number): string {
   // that are really just landing live.
   const diffMs = Math.max(0, Date.now() - timestamp);
   if (diffMs < MS_PER_MINUTE) return "just now";
-  const pick = (
-    n: number,
-    singular: string,
-  ): string => `${n} ${singular}${n === 1 ? "" : "s"} ago`;
+  const pick = (n: number, singular: string): string =>
+    `${n} ${singular}${n === 1 ? "" : "s"} ago`;
   if (diffMs < MS_PER_HOUR) {
     return pick(Math.floor(diffMs / MS_PER_MINUTE), "minute");
   }
@@ -136,6 +134,25 @@ export function formatRelativeTimeAgo(timestamp: number): string {
     return `${Math.floor(diffMs / MS_PER_HOUR)}h ago`;
   }
   return `${Math.floor(diffMs / MS_PER_DAY)}d ago`;
+}
+
+/**
+ * Compact absolute-time form for inline use in the TIME / SINCE cells
+ * when the column is in "Sum" mode. Local time, drops the year for
+ * recent traces. Examples: "Jun 4 18:32", "Jun 4 2025 18:32".
+ */
+export function formatCompactAbsolute(timestamp: number): string {
+  const d = new Date(timestamp);
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const month = d.toLocaleString(undefined, { month: "short" });
+  const day = d.getDate();
+  const hh = pad(d.getHours());
+  const mm = pad(d.getMinutes());
+  if (d.getFullYear() === now.getFullYear()) {
+    return `${month} ${day} ${hh}:${mm}`;
+  }
+  return `${month} ${day} ${d.getFullYear()} ${hh}:${mm}`;
 }
 
 export function formatAbsoluteTime(timestamp: number): string {

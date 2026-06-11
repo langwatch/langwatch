@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { Evaluation } from "~/server/tracer/types";
 import { api } from "~/utils/api";
+import { isPreviewTraceId } from "../onboarding/data/samplePreviewTraces";
 import { useDrawerStore } from "../stores/drawerStore";
 import type { EvalSummary } from "../types/trace";
 
@@ -80,10 +81,18 @@ export function useTraceEvaluations(): TraceEvaluationsResult {
   // surfaces all three. Until then, keep the v1 endpoint but split it off
   // the drawer batch so it doesn't block the 7 other v2 procedures the
   // drawer fires on open.
+  // Preview traces live entirely client-side — sending them to the
+  // real evaluations endpoint either errors (unknown trace id) or
+  // returns nothing useful. Match the other v2 drawer hooks that
+  // already gate on `!isPreviewTraceId(traceId)`; the drawer's
+  // evaluations tab will read whatever was seeded into the cache by
+  // `useOpenTraceDrawer` instead (empty for synthesised previews,
+  // a hand-built set for the rich arrival trace).
+  const isPreview = !!traceId && isPreviewTraceId(traceId);
   const query = api.traces.getEvaluations.useQuery(
     { projectId: project?.id ?? "", traceId: traceId ?? "" },
     {
-      enabled: !!project?.id && !!traceId,
+      enabled: !!project?.id && !!traceId && !isPreview,
       staleTime: 30_000,
       refetchOnWindowFocus: false,
       trpc: { context: { skipBatch: true } },

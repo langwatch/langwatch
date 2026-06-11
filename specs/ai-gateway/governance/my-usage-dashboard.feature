@@ -90,6 +90,15 @@ Feature: AI Gateway Governance — My Usage personal dashboard
     And clicking a row navigates to the trace detail page (existing route)
     And a "View all →" link goes to the personal project's traces page
 
+  @integration @dashboard @recent @empty
+  Scenario: Recent activity with no traces points to the on-page setup tiles, not SDK integration
+    Given the personal project has no traces yet
+    When I navigate to "/me"
+    Then the "Recent activity" section shows a getting-started empty state
+    And it offers to set up a coding assistant, mint an ingestion key, or create an API key
+    And each offer links to the matching tile or settings page already on /me
+    And it does not pitch the generic agent / MCP / SDK integration guide used on the project traces page
+
   # ---------------------------------------------------------------------------
   # Workspace switcher integration
   # ---------------------------------------------------------------------------

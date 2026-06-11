@@ -162,3 +162,55 @@ Feature: Missing-model toast when a feature can't resolve a model
     Then the next time the user lands anywhere in LangWatch they see a notification
     And the notification carries the same "Configure {role} model" CTA the toast would
     And the failure is recorded so the user can see which jobs were skipped while the model was missing
+
+  # ============================================================================
+  # Provider-disabled variant (cascade DID resolve, but the chosen
+  # provider is currently disabled)
+  # ============================================================================
+  #
+  # Distinct from MODEL_NOT_CONFIGURED: the cascade picked a model, but
+  # the backing provider has been toggled off. This is the common case
+  # the user hit with the project-scope `traces.ai_search` set to a
+  # broken openai default while their org-level Azure default was the
+  # one they intended to use. The toast offers a one-click swap to
+  # the cascade-next candidate (when one exists with an enabled
+  # provider) by clearing the disabled scope's feature key — the
+  # next resolve then falls through to the alternate.
+
+  Rule: Provider-disabled toast
+    A typed `ModelProviderDisabledError` (cause code MODEL_PROVIDER_DISABLED)
+    surfaces a swap-to-parent toast distinct from the missing-model one.
+
+    @integration
+    Scenario: Project-scope override with disabled provider and an org alternate
+      Given the project sets "traces.ai_search" to "openai/gpt-4o"
+      And the project's openai provider is disabled
+      And the organization sets "traces.ai_search" to "azure/gpt-4o" with azure enabled
+      When the user triggers an AI search
+      Then a "Model unavailable for AI search" toast appears
+      And the toast names the disabled project default
+      And the toast's primary action reads "Use organization default (azure/gpt-4o)"
+      And clicking the action clears the project-scope key via setFeatureOverrideForScope(model: null)
+      And the next AI search resolves to azure/gpt-4o
+
+    @integration
+    Scenario: No alternate falls back to settings deep-link
+      Given the only configured default for "traces.ai_search" is at project scope
+      And the project's provider for that model is disabled
+      When the AI search fails
+      Then the toast's primary action reads "Open settings"
+      And clicking it navigates to /settings/model-providers
+
+    @integration
+    Scenario: Disabled scope above project is not user-clearable from the toast
+      Given the team default for "traces.ai_search" resolves to a disabled provider
+      And the cascade has an organization alternate with an enabled provider
+      When the AI search fails for a project-level user without team:manage
+      Then the toast still names the team-scope disabled default
+      But the primary action falls back to "Open settings" (no inline swap)
+
+    @integration
+    Scenario: Repeated failures within the same scope coalesce into one toast
+      Given AI Search retries five times in two seconds
+      And every attempt throws MODEL_PROVIDER_DISABLED for the same scope/feature
+      Then exactly one toast renders for that error signature

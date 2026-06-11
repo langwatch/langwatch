@@ -28,11 +28,24 @@ export interface ExperimentMetricsSyncReactorDeps {
  * Filtering: only fires for traces with evaluation.run_id
  * in their hoisted span attributes.
  */
+/**
+ * Pure relevance guard, shared by shouldReact (pre-enqueue) and handle
+ * (fail-open path): only experiment traces (evaluation.run_id present)
+ * with actual cost data need this reactor. The experiment-ID lookup is
+ * stateful and stays in handle.
+ */
+function hasExperimentCostMetrics(foldState: TraceSummaryData): boolean {
+  if (!foldState.attributes["evaluation.run_id"]) return false;
+  return foldState.totalCost !== null && foldState.totalCost !== 0;
+}
+
 export function createExperimentMetricsSyncReactor(
   deps: ExperimentMetricsSyncReactorDeps,
 ): ReactorDefinition<TraceProcessingEvent, TraceSummaryData> {
   return {
     name: "experimentMetricsSync",
+    shouldReact: (_event, context) =>
+      hasExperimentCostMetrics(context.foldState),
     options: {
       makeJobId: (payload) =>
         `exp-metrics:${payload.event.tenantId}:${payload.event.aggregateId}`,
@@ -45,14 +58,9 @@ export function createExperimentMetricsSyncReactor(
       context: ReactorContext<TraceSummaryData>,
     ): Promise<void> {
       const { tenantId, foldState } = context;
-      const runId = foldState.attributes["evaluation.run_id"];
+      if (!hasExperimentCostMetrics(foldState)) return;
 
-      if (!runId) return;
-
-      // Only dispatch if there's actual cost data
-      if (foldState.totalCost === null || foldState.totalCost === 0) {
-        return;
-      }
+      const runId = foldState.attributes["evaluation.run_id"]!;
 
       const traceId = foldState.traceId;
 
@@ -77,7 +85,7 @@ export function createExperimentMetricsSyncReactor(
           experimentId,
           runId,
           traceId,
-          totalCost: foldState.totalCost,
+          totalCost: foldState.totalCost!,
           occurredAt: Date.now(),
         });
       } catch (error) {

@@ -654,6 +654,10 @@ func writeSSE(ctx context.Context, w http.ResponseWriter, iter domain.StreamIter
 // writeError sends a herr directly to the client. For unexpected (non-herr)
 // errors it logs the details and returns a generic internal error.
 func writeError(logger *zap.Logger, w http.ResponseWriter, ctx context.Context, err error) {
+	// Every error response is logged with fault attribution before it is
+	// written, so failures are visible in CloudWatch even when the response
+	// correctly forwards the provider's error to the client.
+	logWriteError(logger, ctx, err)
 	var ue *domain.UpstreamError
 	if errors.As(err, &ue) {
 		writeUpstreamError(w, ue)
@@ -664,7 +668,6 @@ func writeError(logger *zap.Logger, w http.ResponseWriter, ctx context.Context, 
 		herr.WriteHTTP(w, e)
 		return
 	}
-	logger.Error("unhandled error", zap.Error(err))
 	herr.WriteHTTP(w, herr.New(ctx, domain.ErrInternal, nil))
 }
 

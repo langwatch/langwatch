@@ -25,6 +25,15 @@ interface CodePreviewProps {
   isVisible?: boolean;
   onToggleVisibility?: () => void;
   llmPrompt?: string;
+  /**
+   * When true, the header action buttons (copy / eye / llm-prompt) are
+   * suppressed. Used by empty-state surfaces where the rendered code
+   * still includes a placeholder value (e.g. `sk-lw-xxxxx...`) and
+   * letting the user copy it would just create a broken curl that
+   * silently fails. The canonical mint CTA lives in the surrounding
+   * surface (banner / panel) instead.
+   */
+  disableActions?: boolean;
 }
 
 export function CodePreview({
@@ -38,6 +47,7 @@ export function CodePreview({
   isVisible: controlledIsVisible,
   onToggleVisibility,
   llmPrompt,
+  disableActions,
 }: CodePreviewProps): React.ReactElement | null {
   const { colorMode } = useColorMode();
   const [internalIsVisible, setInternalIsVisible] = useState(false);
@@ -136,7 +146,13 @@ export function CodePreview({
               </CodeBlock.Title>
 
               <HStack gap="0" mr="-3px">
-                {enableVisibilityToggle && (
+                {/* `disableActions` is set by empty-state surfaces where
+                    the rendered code still includes a placeholder value
+                    (e.g. `sk-lw-xxxxx...`). Showing copy / eye / llm
+                    prompt would just let the user export a broken
+                    snippet — the canonical mint CTA lives in the
+                    surrounding banner instead. */}
+                {!disableActions && enableVisibilityToggle && (
                   <Tooltip
                     content={
                       isVisible
@@ -160,7 +176,7 @@ export function CodePreview({
                     </IconButton>
                   </Tooltip>
                 )}
-                {llmPrompt && (
+                {!disableActions && llmPrompt && (
                   <Tooltip
                     content="Copy LLM-optimized integration prompt"
                     openDelay={0}
@@ -176,13 +192,15 @@ export function CodePreview({
                     </IconButton>
                   </Tooltip>
                 )}
-                <CodeBlock.CopyTrigger asChild>
-                  <IconButton variant="ghost" size="2xs" aria-label="Copy">
-                    <CodeBlock.CopyIndicator copied={<Check size={14} />}>
-                      <Copy size={14} />
-                    </CodeBlock.CopyIndicator>
-                  </IconButton>
-                </CodeBlock.CopyTrigger>
+                {!disableActions && (
+                  <CodeBlock.CopyTrigger asChild>
+                    <IconButton variant="ghost" size="2xs" aria-label="Copy">
+                      <CodeBlock.CopyIndicator copied={<Check size={14} />}>
+                        <Copy size={14} />
+                      </CodeBlock.CopyIndicator>
+                    </IconButton>
+                  </CodeBlock.CopyTrigger>
+                )}
               </HStack>
             </CodeBlock.Header>
             <CodeBlock.Content

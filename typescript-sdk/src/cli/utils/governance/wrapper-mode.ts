@@ -75,6 +75,14 @@ export interface WrapperModeResult {
   /** True when the wrapper minted a fresh ingest key (vs reused a cached one). */
   newKeyMinted?: boolean;
   /**
+   * Path B (ingestion) only: the OTLP base endpoint (`.../api/otel`) and the
+   * ingest key. The wrapper uses these AFTER the child exits to POST codex's
+   * recovered turn input/output (from the rollout transcript) onto codex's own
+   * trace_ids, since codex never puts content on the wire itself.
+   */
+  endpoint?: string;
+  ingestionToken?: string;
+  /**
    * Optional one-line notice for the wrapper to print to stderr, set when
    * the platform policy changed the resolved path (e.g. the org admin turned
    * direct OTLP off for this tool, so the wrapper routed through the gateway
@@ -294,7 +302,15 @@ export async function resolveWrapperMode(
     // Best-effort cache - failure to persist doesn't block this run.
   }
 
-  return { mode, vars, codexConfigPath, newKeyMinted: minted, notice };
+  return {
+    mode,
+    vars,
+    codexConfigPath,
+    newKeyMinted: minted,
+    notice,
+    endpoint,
+    ingestionToken: token,
+  };
 }
 
 function buildOtelEnvBlock(

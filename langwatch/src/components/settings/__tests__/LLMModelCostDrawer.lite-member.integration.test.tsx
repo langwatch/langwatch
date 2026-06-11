@@ -80,7 +80,10 @@ vi.mock("~/utils/api", () => ({
       },
       createOrUpdate: {
         useMutation: () => ({
-          mutate: (data: unknown, options: { onError?: (error: unknown) => void }) => {
+          mutate: (
+            data: unknown,
+            options: { onError?: (error: unknown) => void },
+          ) => {
             mockCreateOrUpdateMutate(data, options);
 
             if (mockMutationError.current) {
@@ -93,6 +96,18 @@ vi.mock("~/utils/api", () => ({
       delete: {
         useMutation: () => ({
           mutate: vi.fn(),
+          isLoading: false,
+        }),
+      },
+      previewMatchingSpans: {
+        useQuery: () => ({
+          data: {
+            windowDays: 7,
+            totalMatchedSpans: 0,
+            matchedModels: [],
+            sampleSpans: [],
+            unmatchedModels: [],
+          },
           isLoading: false,
         }),
       },
@@ -115,10 +130,7 @@ const Wrapper = ({ children }: { children?: ReactNode }) => (
 );
 
 function renderDrawer(props: { id?: string; cloneModel?: string } = {}) {
-  return render(
-    <LLMModelCostDrawer {...props} />,
-    { wrapper: Wrapper },
-  );
+  return render(<LLMModelCostDrawer {...props} />, { wrapper: Wrapper });
 }
 
 async function submitStoredModelCost() {

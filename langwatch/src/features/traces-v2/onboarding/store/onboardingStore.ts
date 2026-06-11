@@ -72,6 +72,44 @@ interface OnboardingState {
    * path clears it so we don't sticky-trap real users in the demo.
    */
   tourActive: boolean;
+  /**
+   * Per-project epoch-ms timestamp of when the integration CTA card
+   * was dismissed. The card reappears after 14 days so users who
+   * integrate later still get a reminder if they haven't sent traces
+   * yet. Keyed on projectId. Persisted to localStorage.
+   */
+  integrationCtaDismissedAtByProject: Record<string, number>;
+  /**
+   * In-memory toggle for the "See sample data" toolbar button. When
+   * true, sample preview traces are injected into the table alongside
+   * (or instead of) real ones, with a SampleDataBanner ribbon as the
+   * marker. Defaults to false. Not persisted — the toolbar button is
+   * the explicit opt-in each session.
+   */
+  showSamplePreview: boolean;
+  /**
+   * Phase 2 spotlight tour — whether the contextual spotlight overlay
+   * is currently rendered. Decoupled from `tourActive` (the legacy
+   * journey state-machine flag, now dormant). Flipped on by the
+   * "Show me around" toolbar button or by parsing `#sp=<id>` from the
+   * URL fragment on mount.
+   */
+  spotlightsActive: boolean;
+  /**
+   * The id of the spotlight currently shown. Must match one of the
+   * `id` fields in `TRACE_EXPLORER_SPOTLIGHTS`. When `spotlightsActive`
+   * is true and this is null, the overlay starts from the first entry.
+   */
+  currentSpotlightId: string | null;
+  /**
+   * Per-project flag: has the spotlight tour been auto-started for
+   * this project's first real trace yet? Flipped to true the moment
+   * `hasAnyTraces` transitions false → true so the user gets a
+   * contextual tour of their freshly-arrived data. Persisted so a
+   * page refresh during the tour doesn't replay it from the top, and
+   * so dismissing it stays dismissed.
+   */
+  firstTraceSpotlightFiredByProject: Record<string, boolean>;
 
   setStage: (stage: StageId) => void;
   goBack: () => void;
@@ -86,6 +124,19 @@ interface OnboardingState {
   setSetupDismissedForProject: (projectId: string, dismissed: boolean) => void;
   setSetupDisengaged: (disengaged: boolean) => void;
   setTourActive: (active: boolean) => void;
+  setIntegrationCtaDismissedAt: (projectId: string, ts: number) => void;
+  clearIntegrationCtaDismissed: (projectId: string) => void;
+  setShowSamplePreview: (show: boolean) => void;
+  setSpotlightsActive: (active: boolean) => void;
+  setCurrentSpotlightId: (id: string | null) => void;
+  /**
+   * One-shot per-project: call when `hasAnyTraces` transitions
+   * false → true so we can auto-start the spotlight tour on the
+   * user's first real trace. Idempotent — re-calling is safe; the
+   * consumer should still gate on the current map state to avoid
+   * re-triggering the overlay every render.
+   */
+  markFirstTraceSpotlightFired: (projectId: string) => void;
 }
 
 const STORAGE_KEY = "langwatch:traces-v2:onboarding:state:v1";
@@ -100,10 +151,14 @@ const LEGACY_UI_STORE_KEY = "langwatch:traces-v2:ui";
 
 interface PersistedShape {
   setupDismissedByProject: Record<string, boolean>;
+  integrationCtaDismissedAtByProject: Record<string, number>;
+  firstTraceSpotlightFiredByProject: Record<string, boolean>;
 }
 
 const DEFAULT_PERSISTED: PersistedShape = {
   setupDismissedByProject: {},
+  integrationCtaDismissedAtByProject: {},
+  firstTraceSpotlightFiredByProject: {},
 };
 
 function loadPersisted(): PersistedShape {
@@ -117,7 +172,19 @@ function loadPersisted(): PersistedShape {
         parsed.setupDismissedByProject &&
         typeof parsed.setupDismissedByProject === "object"
       ) {
-        return { setupDismissedByProject: parsed.setupDismissedByProject };
+        return {
+          setupDismissedByProject: parsed.setupDismissedByProject,
+          integrationCtaDismissedAtByProject:
+            parsed.integrationCtaDismissedAtByProject &&
+            typeof parsed.integrationCtaDismissedAtByProject === "object"
+              ? parsed.integrationCtaDismissedAtByProject
+              : {},
+          firstTraceSpotlightFiredByProject:
+            parsed.firstTraceSpotlightFiredByProject &&
+            typeof parsed.firstTraceSpotlightFiredByProject === "object"
+              ? parsed.firstTraceSpotlightFiredByProject
+              : {},
+        };
       }
     }
     // Migrate from the old uiStore shape on first load. The old
@@ -131,7 +198,11 @@ function loadPersisted(): PersistedShape {
         parsed.setupDismissedByProject &&
         typeof parsed.setupDismissedByProject === "object"
       ) {
-        return { setupDismissedByProject: parsed.setupDismissedByProject };
+        return {
+          setupDismissedByProject: parsed.setupDismissedByProject,
+          integrationCtaDismissedAtByProject: {},
+          firstTraceSpotlightFiredByProject: {},
+        };
       }
     }
   } catch {
@@ -140,10 +211,21 @@ function loadPersisted(): PersistedShape {
   return DEFAULT_PERSISTED;
 }
 
-function persist(snapshot: PersistedShape): void {
+function persist({
+  setupDismissedByProject,
+  integrationCtaDismissedAtByProject,
+  firstTraceSpotlightFiredByProject,
+}: PersistedShape): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        setupDismissedByProject,
+        integrationCtaDismissedAtByProject,
+        firstTraceSpotlightFiredByProject,
+      }),
+    );
   } catch {
     // storage may be full / disabled
   }
@@ -159,6 +241,13 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   setupDismissedByProject: initial.setupDismissedByProject,
   setupDisengaged: false,
   tourActive: false,
+  integrationCtaDismissedAtByProject:
+    initial.integrationCtaDismissedAtByProject,
+  showSamplePreview: false,
+  spotlightsActive: false,
+  currentSpotlightId: null,
+  firstTraceSpotlightFiredByProject:
+    initial.firstTraceSpotlightFiredByProject,
 
   setStage: (stage) =>
     set((s) =>
@@ -206,12 +295,59 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
       // time the card renders.
       ...(dismissed ? {} : { setupDisengaged: false }),
     });
-    persist({ setupDismissedByProject: next });
+    persist({
+      setupDismissedByProject: next,
+      integrationCtaDismissedAtByProject:
+        get().integrationCtaDismissedAtByProject,
+      firstTraceSpotlightFiredByProject:
+        get().firstTraceSpotlightFiredByProject,
+    });
   },
 
   setSetupDisengaged: (disengaged) => set({ setupDisengaged: disengaged }),
 
   setTourActive: (active) => set({ tourActive: active }),
+
+  setIntegrationCtaDismissedAt: (projectId, ts) => {
+    const next = { ...get().integrationCtaDismissedAtByProject, [projectId]: ts };
+    set({ integrationCtaDismissedAtByProject: next });
+    persist({
+      setupDismissedByProject: get().setupDismissedByProject,
+      integrationCtaDismissedAtByProject: next,
+      firstTraceSpotlightFiredByProject:
+        get().firstTraceSpotlightFiredByProject,
+    });
+  },
+
+  clearIntegrationCtaDismissed: (projectId) => {
+    const next = { ...get().integrationCtaDismissedAtByProject };
+    delete next[projectId];
+    set({ integrationCtaDismissedAtByProject: next });
+    persist({
+      setupDismissedByProject: get().setupDismissedByProject,
+      integrationCtaDismissedAtByProject: next,
+      firstTraceSpotlightFiredByProject:
+        get().firstTraceSpotlightFiredByProject,
+    });
+  },
+
+  setShowSamplePreview: (show) => set({ showSamplePreview: show }),
+
+  setSpotlightsActive: (active) => set({ spotlightsActive: active }),
+  setCurrentSpotlightId: (id) => set({ currentSpotlightId: id }),
+
+  markFirstTraceSpotlightFired: (projectId) => {
+    const current = get().firstTraceSpotlightFiredByProject;
+    if (current[projectId]) return;
+    const next = { ...current, [projectId]: true };
+    set({ firstTraceSpotlightFiredByProject: next });
+    persist({
+      setupDismissedByProject: get().setupDismissedByProject,
+      integrationCtaDismissedAtByProject:
+        get().integrationCtaDismissedAtByProject,
+      firstTraceSpotlightFiredByProject: next,
+    });
+  },
 }));
 
 // ---------------------------------------------------------------------------

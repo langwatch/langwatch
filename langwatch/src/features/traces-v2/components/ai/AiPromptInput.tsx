@@ -1,18 +1,11 @@
-import {
-  Box,
-  Flex,
-  HStack,
-  Icon,
-  IconButton,
-  Input,
-  Text,
-} from "@chakra-ui/react";
+import { Box, Flex, IconButton, Input } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
-import { AlertCircle, Sparkles, X } from "lucide-react";
+import { Sparkles, X } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
+import type { AiActionError } from "~/server/app-layer/traces/ai-query";
 import { aiBrandPalette } from "./aiBrandPalette";
 import { DEFAULT_THINKING_VERBS, useCyclingVerb } from "./useCyclingVerb";
 
@@ -124,8 +117,8 @@ export interface AiPromptInputProps {
   onClose: () => void;
   /** Whether a request is in flight — disables editing, shows shimmer text. */
   isPending: boolean;
-  /** Optional error message to surface in a small badge. */
-  error?: string | null;
+  /** Optional structured error to surface in a small badge. */
+  error?: AiActionError | null;
   /** Cycling placeholder examples. Defaults are filter-flavoured. */
   placeholderExamples?: readonly string[];
   /** Cycling verbs while pending ("Thinking about", "Researching", …). */
@@ -156,7 +149,6 @@ export const AiPromptInput: React.FC<AiPromptInputProps> = ({
   onSubmit,
   onClose,
   isPending,
-  error,
   placeholderExamples = DEFAULT_PLACEHOLDER_EXAMPLES,
   thinkingVerbs = DEFAULT_THINKING_VERBS,
 }) => {
@@ -262,29 +254,6 @@ export const AiPromptInput: React.FC<AiPromptInputProps> = ({
           minWidth={0}
         />
       )}
-      {error && (
-        <Tooltip content={error} openDelay={100}>
-          <HStack
-            gap={1}
-            paddingX={2}
-            paddingY={0.5}
-            borderRadius="sm"
-            bg="red.subtle"
-            color="red.fg"
-            flexShrink={0}
-            maxWidth="40%"
-            minWidth={0}
-            cursor="help"
-          >
-            <Icon boxSize="12px" flexShrink={0}>
-              <AlertCircle />
-            </Icon>
-            <Text textStyle="2xs" fontWeight="600" truncate>
-              {error}
-            </Text>
-          </HStack>
-        </Tooltip>
-      )}
       <Tooltip
         content={isPending ? "Cancel (Esc)" : "Exit AI mode (Esc)"}
         openDelay={200}
@@ -302,3 +271,4 @@ export const AiPromptInput: React.FC<AiPromptInputProps> = ({
     </Flex>
   );
 };
+

@@ -1,5 +1,6 @@
 import { Box, HStack, Image, Text, VStack } from "@chakra-ui/react";
 import { useMemo, useRef, useEffect } from "react";
+import { useSequentialAudioPlayback } from "./useSequentialAudioPlayback";
 import { Settings } from "react-feather";
 import type { StreamingMessage } from "~/hooks/useSimulationStreamingState";
 import type { ScenarioMessageSnapshotEvent } from "~/server/scenarios/scenario-event.types";
@@ -46,6 +47,27 @@ export function ScenarioMessageRenderer({
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [items]);
+
+  // Ordered list of audio-only item ids — the single source of ordering truth
+  // for the sequential playback hook. Filters to audio media only (not video /
+  // binary) so the hook's "next" index is never off by a non-audio item.
+  const orderedAudioIds = useMemo(
+    () =>
+      items
+        .filter(
+          (item): item is Extract<DisplayItem, { kind: "media" }> =>
+            item.kind === "media" && item.part.type === "audio",
+        )
+        .map((item) => item.id),
+    [items],
+  );
+
+  // Per-renderer-instance sequential audio playback coordinator.
+  // Each instance of ScenarioMessageRenderer owns its own hook invocation,
+  // so grid cells are fully isolated from one another.
+  const { getAudioProps } = useSequentialAudioPlayback({
+    orderedIds: orderedAudioIds,
+  });
 
   return (
     <VStack
@@ -119,7 +141,7 @@ export function ScenarioMessageRenderer({
               </VStack>
             );
 
-          case "media":
+          case "media": {
             return (
               <VStack
                 key={item.id}
@@ -131,7 +153,15 @@ export function ScenarioMessageRenderer({
                   gap={1}
                   width={{ base: "100%", md: "min(420px, 95%)" }}
                 >
-                  <MediaPart part={item.part} projectId={projectId} />
+                  <MediaPart
+                    part={item.part}
+                    projectId={projectId}
+                    audioPlayback={
+                      item.part.type === "audio"
+                        ? getAudioProps(item.id)
+                        : undefined
+                    }
+                  />
                   {item.transcript && (
                     <Text
                       fontSize="xs"
@@ -151,6 +181,7 @@ export function ScenarioMessageRenderer({
                 )}
               </VStack>
             );
+          }
 
           case "tool_call":
             return (

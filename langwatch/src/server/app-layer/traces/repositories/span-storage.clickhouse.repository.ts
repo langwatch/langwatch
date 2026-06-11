@@ -15,6 +15,8 @@ import { createLogger } from "~/utils/logger/server";
 import type { SpanInsertData } from "../types";
 import type {
   LangwatchSignalBucket,
+  ModelSpanSampleRow,
+  ModelUsageStatsRow,
   OccurredAtHint,
   SpanLangwatchSignalsRow,
   SpanResourceInfo,
@@ -172,6 +174,67 @@ const SUMMARY_SPAN_SELECT = `
 `;
 
 /**
+ * Canonical model-name expression, response model wins over request model,
+ * mirroring `extractModel` in span.mapper.ts so the cost-rule preview sees
+ * the same model string the cost pipeline matches against. Map subscripts
+ * return '' for missing keys, hence the nullIf/coalesce dance.
+ */
+const MODEL_ATTR_SELECT = `coalesce(
+    nullIf(SpanAttributes['gen_ai.response.model'], ''),
+    SpanAttributes['gen_ai.request.model']
+  )`;
+
+/**
+ * How many recent candidate traces the model-cost sample read pulls from
+ * `trace_summaries` before scanning their spans. Large enough that per-model
+ * token-bearing samples reliably resolve, small enough that the `TraceId IN`
+ * set still prunes `stored_spans` granules hard.
+ */
+const SAMPLE_CANDIDATE_TRACE_POOL = 500;
+
+interface ModelSpanSampleQueryRow {
+  TraceId: string;
+  SpanId: string;
+  SpanName: string;
+  Model: string;
+  InputTokensRaw: string;
+  PromptTokensRaw: string;
+  OutputTokensRaw: string;
+  CompletionTokensRaw: string;
+  CacheReadTokensRaw: string;
+  CacheCreationTokensRaw: string;
+  StartTimeMs: number | string;
+}
+
+/** Map-subscript token values arrive as strings ('' when absent). */
+function tokenCount(...raws: string[]): number | null {
+  for (const raw of raws) {
+    if (raw === "") continue;
+    const num = Number(raw);
+    return Number.isFinite(num) ? num : null;
+  }
+  return null;
+}
+
+function mapModelSpanSampleRow(
+  row: ModelSpanSampleQueryRow,
+): ModelSpanSampleRow {
+  return {
+    traceId: row.TraceId,
+    spanId: row.SpanId,
+    spanName: row.SpanName,
+    model: row.Model,
+    // Canonical key first, legacy alias as fallback, same coalesce order
+    // as extractMetrics in span.mapper.ts.
+    inputTokens: tokenCount(row.InputTokensRaw, row.PromptTokensRaw),
+    outputTokens: tokenCount(row.OutputTokensRaw, row.CompletionTokensRaw),
+    cacheReadTokens: tokenCount(row.CacheReadTokensRaw),
+    cacheCreationTokens: tokenCount(row.CacheCreationTokensRaw),
+    startTimeMs: Number(row.StartTimeMs),
+  };
+}
+
+/**
  * IN-tuple dedup subquery body. Renders the inner `SELECT … GROUP BY` that
  * picks the latest version (max UpdatedAt) per spanId. Caller assembles the
  * surrounding `AND (TenantId, TraceId, SpanId, UpdatedAt) IN (…)`.
@@ -204,8 +267,7 @@ const SIGNAL_BUCKET_PREDICATES: Record<LangwatchSignalBucket, string> = {
   user: "arrayExists(k -> k = 'langwatch.user_id' OR startsWith(k, 'langwatch.user.'), keys)",
   thread:
     "arrayExists(k -> k = 'gen_ai.conversation.id' OR k = 'langgraph.thread_id' OR startsWith(k, 'langwatch.thread.'), keys)",
-  evaluation:
-    "arrayExists(k -> startsWith(k, 'langwatch.evaluation'), keys)",
+  evaluation: "arrayExists(k -> startsWith(k, 'langwatch.evaluation'), keys)",
   rag: "arrayExists(k -> startsWith(k, 'langwatch.rag.'), keys)",
   metadata: "arrayExists(k -> startsWith(k, 'langwatch.metadata.'), keys)",
   genai: "arrayExists(k -> startsWith(k, 'gen_ai.'), keys)",
@@ -1492,6 +1554,142 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         return rows.map(mapSpanSummaryRow);
       },
     );
+  }
+
+  async findModelUsageStats({
+    tenantId,
+    fromMs,
+    limit,
+  }: {
+    tenantId: string;
+    fromMs: number;
+    limit: number;
+  }): Promise<ModelUsageStatsRow[]> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "SpanStorageClickHouseRepository.findModelUsageStats",
+    );
+
+    const client = await this.resolveClient(tenantId);
+    // Cross-trace scan bounded by the StartTime window (partition pruning)
+    // and reading only two Map subscripts, no heavy attribute values.
+    // `uniq` (approximate) instead of count() so ReplacingMergeTree row
+    // versions don't inflate the per-model span counts.
+    const result = await client.query({
+      query: `
+        SELECT
+          ${MODEL_ATTR_SELECT} AS Model,
+          uniq(TraceId, SpanId) AS SpanCount,
+          toUnixTimestamp64Milli(max(StartTime)) AS LastSeenMs
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND StartTime >= fromUnixTimestamp64Milli({fromMs:Int64})
+          AND Model != ''
+        GROUP BY Model
+        ORDER BY SpanCount DESC, Model ASC
+        LIMIT {limit:UInt32}
+      `,
+      query_params: { tenantId, fromMs, limit },
+      format: "JSONEachRow",
+    });
+
+    const rows = await result.json<{
+      Model: string;
+      SpanCount: number | string;
+      LastSeenMs: number | string;
+    }>();
+    return rows.map((row) => ({
+      model: row.Model,
+      spanCount: Number(row.SpanCount),
+      lastSeenMs: Number(row.LastSeenMs),
+    }));
+  }
+
+  async findRecentSpansByModels({
+    tenantId,
+    models,
+    fromMs,
+    perModelLimit,
+    limit,
+  }: {
+    tenantId: string;
+    models: string[];
+    fromMs: number;
+    perModelLimit: number;
+    limit: number;
+  }): Promise<ModelSpanSampleRow[]> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "SpanStorageClickHouseRepository.findRecentSpansByModels",
+    );
+    if (models.length === 0) return [];
+
+    const client = await this.resolveClient(tenantId);
+    // The `Model IN` filter is computed from the SpanAttributes map, so on its
+    // own this read decodes that heavy map for every span in the window just to
+    // evaluate the predicate. Instead, first narrow to the recent traces that
+    // use one of these models via `trace_summaries.Models` (a small, deduped,
+    // bloom-indexed Array(String) populated at fold time), then constrain the
+    // span scan to `TraceId IN (...)`. `stored_spans` is
+    // `ORDER BY (TenantId, TraceId, SpanId)`, so the TraceId set prunes granules
+    // to just those traces' spans rather than the whole partition window.
+    //
+    // The candidate pool is generous so per-model token-bearing samples still
+    // resolve. Models is complete per trace, so the candidate set cannot drop a
+    // model the rule matches (a just-folded trace may lag by seconds, which is
+    // acceptable for a best-effort preview). Within `stored_spans` the read is
+    // unchanged: light columns, argMax dedup over ReplacingMergeTree versions,
+    // token-bearing spans first, then recency, and `LIMIT BY` so one chatty
+    // model can't crowd out the rest of the sample.
+    const result = await client.query({
+      query: `
+        WITH candidate_traces AS (
+          SELECT TraceId
+          FROM trace_summaries
+          WHERE TenantId = {tenantId:String}
+            AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
+            AND hasAny(Models, {models:Array(String)})
+          GROUP BY TraceId
+          ORDER BY max(OccurredAt) DESC
+          LIMIT {candidatePool:UInt32}
+        )
+        SELECT
+          TraceId,
+          SpanId,
+          ${MODEL_ATTR_SELECT} AS Model,
+          argMax(SpanName, UpdatedAt) AS SpanName,
+          argMax(SpanAttributes['gen_ai.usage.input_tokens'], UpdatedAt) AS InputTokensRaw,
+          argMax(SpanAttributes['gen_ai.usage.prompt_tokens'], UpdatedAt) AS PromptTokensRaw,
+          argMax(SpanAttributes['gen_ai.usage.output_tokens'], UpdatedAt) AS OutputTokensRaw,
+          argMax(SpanAttributes['gen_ai.usage.completion_tokens'], UpdatedAt) AS CompletionTokensRaw,
+          argMax(SpanAttributes['gen_ai.usage.cache_read.input_tokens'], UpdatedAt) AS CacheReadTokensRaw,
+          argMax(SpanAttributes['gen_ai.usage.cache_creation.input_tokens'], UpdatedAt) AS CacheCreationTokensRaw,
+          argMax(toUnixTimestamp64Milli(StartTime), UpdatedAt) AS StartTimeMs,
+          (InputTokensRaw != '' OR PromptTokensRaw != ''
+            OR OutputTokensRaw != '' OR CompletionTokensRaw != '') AS HasTokens
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND StartTime >= fromUnixTimestamp64Milli({fromMs:Int64})
+          AND TraceId IN (SELECT TraceId FROM candidate_traces)
+          AND Model IN {models:Array(String)}
+        GROUP BY TraceId, SpanId, Model
+        ORDER BY HasTokens DESC, StartTimeMs DESC
+        LIMIT {perModelLimit:UInt32} BY Model
+        LIMIT {limit:UInt32}
+      `,
+      query_params: {
+        tenantId,
+        models,
+        fromMs,
+        perModelLimit,
+        limit,
+        candidatePool: SAMPLE_CANDIDATE_TRACE_POOL,
+      },
+      format: "JSONEachRow",
+    });
+
+    const rows = await result.json<ModelSpanSampleQueryRow>();
+    return rows.map(mapModelSpanSampleRow);
   }
 
   private toClickHouseRecord(span: SpanInsertData): ClickHouseSpanWriteRecord {

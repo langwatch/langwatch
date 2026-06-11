@@ -21,7 +21,7 @@ interface PaneLayoutProps {
   trace: TraceHeader;
   spans: SpanTreeNode[];
   selectedSpan: SpanTreeNode | null;
-  spansLoading: boolean;
+  isSpansLoading: boolean;
   layout: DrawerLayout;
 }
 
@@ -66,7 +66,7 @@ export function PaneLayout({
   trace,
   spans,
   selectedSpan,
-  spansLoading,
+  isSpansLoading,
   layout,
 }: PaneLayoutProps) {
   const vizTab = useDrawerStore((s) => s.vizTab);
@@ -385,7 +385,7 @@ export function PaneLayout({
           onVizTabChange={setVizTab}
           trace={trace}
           spans={spans}
-          isLoading={spansLoading}
+          isLoading={isSpansLoading}
           selectedSpanId={selectedSpanId}
           onSelectSpan={selectSpan}
           onClearSpan={clearSpan}
@@ -406,6 +406,7 @@ export function PaneLayout({
       spans={spans}
       selectedSpan={selectedSpan}
       layout={layout}
+      isSpansLoading={isSpansLoading}
     />
   );
 

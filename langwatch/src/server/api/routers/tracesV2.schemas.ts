@@ -19,6 +19,9 @@ const traceListItemSchema = z.object({
   totalTokens: z.number(),
   inputTokens: z.number().nullable().optional(),
   outputTokens: z.number().nullable().optional(),
+  cacheReadTokens: z.number().nullable().optional(),
+  cacheCreationTokens: z.number().nullable().optional(),
+  reasoningTokens: z.number().nullable().optional(),
   models: z.array(z.string()),
   status: z.enum(["ok", "error", "warning"]),
   spanCount: z.number().int().nonnegative().default(0),
@@ -191,6 +194,12 @@ export const spanDetailSchema = z.object({
       attributes: z.record(z.unknown()),
     }),
   ),
+  /**
+   * Present when the span names a model and carries token usage but nothing
+   * (custom rule or static registry) prices it, the UI offers to create a
+   * model cost mapping for `model`. Only computed by `spanDetail`.
+   */
+  costSuggestion: z.object({ model: z.string() }).nullish(),
 });
 
 export type SpanDetail = z.infer<typeof spanDetailSchema>;

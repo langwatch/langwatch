@@ -3,32 +3,38 @@ import { z } from "zod";
 import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
-import { CollectorSpanUtils } from "~/server/traces/collectorSpan.utils";
-import type { ReservedTraceMetadata, CustomMetadata } from "~/server/tracer/types";
-import { prisma } from "~/server/db";
+import { ValidationError } from "~/server/app-layer/domain-error";
 import {
   generateTraceAction,
   generateTraceQueryFromPrompt,
 } from "~/server/app-layer/traces/ai-query";
-import { ValidationError } from "~/server/app-layer/domain-error";
 import { deriveTraceStatus } from "~/server/app-layer/traces/derive-trace-status";
 import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
+import { deriveUnmappedCostSuggestion } from "~/server/app-layer/traces/model-cost-span-preview.service";
 import type { SpanSummaryRow } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import { changeTraceNameInputSchema } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
+import { prisma } from "~/server/db";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
+import { changeTraceNameInputSchema } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import {
   TRACE_NAME_MAX_LENGTH,
   TRACE_NAME_MIN_LENGTH,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+import type {
+  CustomMetadata,
+  ReservedTraceMetadata,
+  Span,
+  SpanInputOutput,
+} from "~/server/tracer/types";
+import { CollectorSpanUtils } from "~/server/traces/collectorSpan.utils";
 import {
   findPromptReferenceInAncestors,
   flattenParamsToPromptAttributes,
   type PromptLookupSpan,
 } from "~/server/traces/findPromptReferenceInAncestors";
-import type { Span, SpanInputOutput } from "~/server/tracer/types";
 import { checkProjectPermission } from "../rbac";
+import { withoutHiddenResourceAttrs } from "./tracesV2.resourceAttrs";
 import type {
   SpanDetail,
   SpanLangwatchSignals,
@@ -161,6 +167,54 @@ function mapSpanSummaryToTreeNode(row: SpanSummaryRow): SpanTreeNode {
   };
 }
 
+/**
+ * The OTel gen_ai semconv (and our canonicaliser, see `_extraction.ts`) split
+ * the system prompt out of `gen_ai.input.messages` into the separate
+ * `gen_ai.system_instructions` attribute. Reads it back, tolerating both the
+ * flat-dotted (`"gen_ai.system_instructions"`) and nested
+ * (`{ gen_ai: { system_instructions } }`) param shapes.
+ */
+function readSystemInstructions(
+  params: Record<string, unknown> | null | undefined,
+): string | null {
+  if (!params) return null;
+  const flat = params["gen_ai.system_instructions"];
+  if (typeof flat === "string" && flat.trim().length > 0) return flat;
+  const genAi = params.gen_ai;
+  if (genAi && typeof genAi === "object" && !Array.isArray(genAi)) {
+    const nested = (genAi as Record<string, unknown>).system_instructions;
+    if (typeof nested === "string" && nested.trim().length > 0) return nested;
+  }
+  return null;
+}
+
+/**
+ * Build the display string for a span's input. The canonicaliser strips the
+ * system prompt out of the chat transcript into `gen_ai.system_instructions`,
+ * so a faithfully-rendered Input panel would silently drop it — the
+ * conversation reads as if nothing steered the model. For display we
+ * recombine them: when the input is a chat transcript with no system message
+ * of its own and the span carries system instructions, prepend them as a
+ * leading `system` message. Doing it here (not in the canonicaliser) keeps
+ * the stored attribute split semconv-correct while every view mode (pretty /
+ * text / json / copy) stays consistent. All other shapes fall through.
+ */
+export function buildDisplayInput(
+  span: Pick<Span, "input" | "params">,
+): string | null {
+  const io = span.input;
+  if (io && io.type === "chat_messages" && Array.isArray(io.value)) {
+    const system = readSystemInstructions(span.params ?? null);
+    const alreadyHasSystem = io.value.some(
+      (m) => !!m && typeof m === "object" && "role" in m && m.role === "system",
+    );
+    if (system && !alreadyHasSystem) {
+      return JSON.stringify([{ role: "system", content: system }, ...io.value]);
+    }
+  }
+  return stringifySpanIO(io);
+}
+
 function stringifySpanIO(
   io: SpanInputOutput | null | undefined,
 ): string | null {
@@ -207,7 +261,7 @@ function mapSpanToDetail(
     status,
     model: "model" in span ? (span.model ?? null) : null,
     vendor: "vendor" in span ? (span.vendor ?? null) : null,
-    input: stringifySpanIO(span.input),
+    input: buildDisplayInput(span),
     output: stringifySpanIO(span.output),
     error: span.error
       ? { message: span.error.message, stacktrace: span.error.stacktrace }
@@ -236,9 +290,7 @@ const PROMPT_ATTR_KEYS = [
   "langwatch.prompt.variables",
 ] as const;
 
-function hasOwnPromptAttrs(
-  params: Record<string, unknown> | null,
-): boolean {
+function hasOwnPromptAttrs(params: Record<string, unknown> | null): boolean {
   if (!params) return false;
   const flat = flattenParamsToPromptAttributes(params);
   return PROMPT_ATTR_KEYS.some((k) => flat[k] !== undefined);
@@ -648,26 +700,31 @@ export const tracesV2Router = createTRPCRouter({
       z.object({
         projectId: z.string(),
         traceId: z.string(),
-        metadata: z.record(
-          z.union([
-            z.string().max(4096),
-            z.number(),
-            z.boolean(),
-            z.array(z.string()),
-            z.record(z.unknown()),
-          ]),
-        ).refine((obj) => Object.keys(obj).length > 0, {
-          message: "metadata must contain at least one key",
-        }).refine(
-          (obj) => JSON.stringify(obj).length <= 32768,
-          { message: "total metadata payload must not exceed 32KB" },
-        ),
+        metadata: z
+          .record(
+            z.union([
+              z.string().max(4096),
+              z.number(),
+              z.boolean(),
+              z.array(z.string()),
+              z.record(z.unknown()),
+            ]),
+          )
+          .refine((obj) => Object.keys(obj).length > 0, {
+            message: "metadata must contain at least one key",
+          })
+          .refine((obj) => JSON.stringify(obj).length <= 32768, {
+            message: "total metadata payload must not exceed 32KB",
+          }),
       }),
     )
     .use(checkProjectPermission("traces:update"))
     .mutation(async ({ input }) => {
       const RESERVED_METADATA_KEYS = new Set([
-        "user_id", "customer_id", "thread_id", "labels",
+        "user_id",
+        "customer_id",
+        "thread_id",
+        "labels",
       ]);
 
       const reserved: ReservedTraceMetadata = {};
@@ -957,6 +1014,17 @@ export const tracesV2Router = createTRPCRouter({
         }
       }
 
+      // Token usage with no price on it, offer the user a cost mapping.
+      // The cheap guards run first; the rule lookup only fires for spans
+      // that actually present the unmapped-cost symptom.
+      detail.costSuggestion = await deriveUnmappedCostSuggestion({
+        projectId: input.projectId,
+        model: detail.model ?? null,
+        cost: detail.metrics?.cost,
+        promptTokens: detail.metrics?.promptTokens,
+        completionTokens: detail.metrics?.completionTokens,
+      });
+
       return detail;
     }),
 
@@ -985,7 +1053,7 @@ export const tracesV2Router = createTRPCRouter({
       const spans = rows.map((r) => ({
         spanId: r.spanId,
         parentSpanId: r.parentSpanId,
-        resourceAttributes: r.resourceAttributes,
+        resourceAttributes: withoutHiddenResourceAttrs(r.resourceAttributes),
         scope: { name: r.scopeName ?? "", version: r.scopeVersion },
       }));
 
@@ -994,7 +1062,9 @@ export const tracesV2Router = createTRPCRouter({
 
       return {
         rootSpanId: root?.spanId ?? null,
-        resourceAttributes: root?.resourceAttributes ?? {},
+        resourceAttributes: withoutHiddenResourceAttrs(
+          root?.resourceAttributes ?? {},
+        ),
         scope: root
           ? { name: root.scopeName ?? "", version: root.scopeVersion }
           : null,

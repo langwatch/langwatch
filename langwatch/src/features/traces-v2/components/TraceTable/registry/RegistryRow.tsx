@@ -2,6 +2,7 @@ import type { Row } from "@tanstack/react-table";
 import React, { useMemo } from "react";
 import { useDensityTokens } from "../../../hooks/useDensityTokens";
 import { useDensityStore } from "../../../stores/densityStore";
+import { useRowPulseStore } from "../../../stores/rowPulseStore";
 import type { TraceStatus } from "../../../types/trace";
 import {
   SkeletonAddonRow,
@@ -78,6 +79,9 @@ function RegistryRowComponent<TRow>({
 }: RegistryRowProps<TRow>): React.ReactElement {
   const tokens = useDensityTokens();
   const densityMode = useDensityStore((s) => s.density);
+  const isPulsing = useRowPulseStore(
+    (s) => !isLoading && !!rowDomId && s.pulsingIds.has(rowDomId),
+  );
 
   const variant = rowVariantFor({ isSelected, status });
   const style = ROW_STYLES[variant];
@@ -318,6 +322,7 @@ function RegistryRowComponent<TRow>({
         onClick={onSelect}
         traceId={rowDomId}
         isNew={isNew}
+        isPulsing={isPulsing}
       >
         {mainRow}
         {addonRows}
@@ -345,6 +350,11 @@ function areRegistryRowPropsEqual<TRow>(
   // that are recreated each render but call into stable handlers, so their
   // identity doesn't affect what the row paints. Everything that does affect
   // paint is explicitly compared.
+  //
+  // NOTE: `isPulsing` is intentionally excluded here — it is derived
+  // inside the component via `useRowPulseStore` so changes to the store
+  // already trigger a re-render through React's subscription machinery.
+  // Including it in the props equality check would be redundant.
   return (
     prev.tanstackRow.original === next.tanstackRow.original &&
     prev.tanstackRow.id === next.tanstackRow.id &&
