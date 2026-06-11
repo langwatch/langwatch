@@ -153,7 +153,13 @@ export async function assertScopeBelongsToProjectOrganization(
     });
   }
   const projectOrganizationId = project?.team?.organizationId ?? null;
-  if (!projectOrganizationId || projectOrganizationId !== scopeOrganizationId) {
+  if (!projectOrganizationId) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "The project does not exist.",
+    });
+  }
+  if (projectOrganizationId !== scopeOrganizationId) {
     throw new TRPCError({
       code: "BAD_REQUEST",
       message:

@@ -79,14 +79,8 @@ export interface RecordSpanCommandDependencies {
       tenantId?: string;
     }) => Promise<void>;
   };
-  /**
-   * Service for dropping configured content categories per the data-privacy
-   * policy. Optional: production always injects it via
-   * `createDefaultDependencies()`, but tests that pass a complete set of
-   * enrichment services (to skip the prisma-requiring default path) may omit it,
-   * in which case the drop step is simply skipped.
-   */
-  contentDropService?: {
+  /** Service for dropping configured content categories per the data-privacy policy. */
+  contentDropService: {
     dropSpanContent: (args: {
       span: OtlpSpan;
       projectId: string;
@@ -157,12 +151,10 @@ export class RecordSpanCommand implements CommandHandler<
     } else if (
       deps.piiRedactionService &&
       deps.costEnrichmentService &&
-      deps.tokenEstimationService
+      deps.tokenEstimationService &&
+      deps.contentDropService
     ) {
-      // Caller provided the enrichment services — use as-is, skip the prisma
-      // require. contentDropService is optional here: production reaches this
-      // class through the no-deps / partial paths above (which fill it in), so
-      // only tests land here, and they opt out of the drop by omitting it.
+      // Caller provided every required field — use as-is, skip the prisma require.
       resolved = deps as RecordSpanCommandDependencies;
     } else {
       // Partial deps — fill in missing required fields from defaults.
@@ -335,12 +327,10 @@ export class RecordSpanCommand implements CommandHandler<
         // from the same event) never see the dropped categories. The drop fails
         // open internally (a policy-resolution error keeps the span intact and
         // is logged), so this call never aborts span processing.
-        const dropResult = this.deps.contentDropService
-          ? await this.deps.contentDropService.dropSpanContent({
-              span: spanToProcess,
-              projectId: tenantIdStr,
-            })
-          : { droppedCount: 0, droppedCategories: [] };
+        const dropResult = await this.deps.contentDropService.dropSpanContent({
+          span: spanToProcess,
+          projectId: tenantIdStr,
+        });
         if (dropResult.droppedCount > 0) {
           this.logger.debug(
             {
