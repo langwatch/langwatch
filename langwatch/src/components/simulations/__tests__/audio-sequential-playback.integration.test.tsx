@@ -1,0 +1,357 @@
+/**
+ * @vitest-environment jsdom
+ *
+ * Integration tests for sequential audio playback coordination in
+ * ScenarioMessageRenderer.
+ *
+ * Tests verify:
+ *  - No auto-play on mount
+ *  - Exclusivity: starting B pauses A
+ *  - Instance isolation: two renderer instances are independent
+ *  - Auto-advance skips interleaved non-audio items
+ *  - Mid-list start advances from that position onward (not from 0)
+ *  - Last audio ending triggers no further play
+ *  - Rejected play() is caught and does not propagate as unhandledrejection
+ */
+
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { cleanup, render } from "@testing-library/react";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
+import { ScenarioMessageRenderer } from "../ScenarioMessageRenderer";
+import type { ScenarioMessageSnapshotEvent } from "~/server/scenarios/scenario-event.types";
+
+// ---------------------------------------------------------------------------
+// tRPC / TraceMessage mocks (keep renderer lightweight in jsdom)
+// ---------------------------------------------------------------------------
+
+vi.mock("~/utils/api", () => ({
+  api: {
+    storedObjects: {
+      headById: {
+        useQuery: () => ({ data: undefined }),
+      },
+    },
+  },
+}));
+
+vi.mock("../../copilot-kit/TraceMessage", () => ({
+  TraceMessage: ({ traceId }: { traceId: string }) => (
+    <button data-testid="trace-message" data-trace-id={traceId}>
+      View Trace
+    </button>
+  ),
+}));
+
+// ---------------------------------------------------------------------------
+// jsdom HTMLMediaElement stubs
+//
+// jsdom does not implement HTMLMediaElement.play/pause. We stub them on the
+// prototype and track which element instance called each method so tests can
+// assert "pause was called on audioA" without needing toHaveBeenCalledOn
+// (which does not exist in vitest's expect).
+// ---------------------------------------------------------------------------
+
+type LwEl = HTMLMediaElement & {
+  _lw_paused?: boolean;
+  _lw_reject_play?: boolean;
+};
+
+/** Elements that called .play() in the current test, in call order. */
+const playCalls: LwEl[] = [];
+/** Elements that called .pause() in the current test, in call order. */
+const pauseCalls: LwEl[] = [];
+
+beforeAll(() => {
+  Element.prototype.scrollIntoView = vi.fn();
+
+  Object.defineProperty(HTMLMediaElement.prototype, "play", {
+    configurable: true,
+    writable: true,
+    value: function (this: LwEl) {
+      playCalls.push(this);
+      if (this._lw_reject_play) {
+        return Promise.reject(new Error("NotAllowedError"));
+      }
+      this._lw_paused = false;
+      return Promise.resolve();
+    },
+  });
+
+  Object.defineProperty(HTMLMediaElement.prototype, "pause", {
+    configurable: true,
+    writable: true,
+    value: function (this: LwEl) {
+      pauseCalls.push(this);
+      this._lw_paused = true;
+    },
+  });
+
+  Object.defineProperty(HTMLMediaElement.prototype, "paused", {
+    configurable: true,
+    get() {
+      // All jsdom audio elements start "paused" unless explicitly played.
+      return (this as LwEl)._lw_paused !== false;
+    },
+  });
+});
+
+beforeEach(() => {
+  playCalls.length = 0;
+  pauseCalls.length = 0;
+});
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const Wrapper = ({ children }: { children: React.ReactNode }) => (
+  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+);
+
+const PROJECT_ID = "proj_test";
+
+/** Build a minimal audio message fixture. */
+function audioMsg(
+  id: string,
+  role: "user" | "assistant" = "user",
+): ScenarioMessageSnapshotEvent["messages"][number] {
+  return {
+    id,
+    role,
+    content: JSON.stringify([
+      {
+        type: "input_audio",
+        input_audio: { data: "UklGRg==", format: "wav" },
+      },
+    ]),
+  } as ScenarioMessageSnapshotEvent["messages"][number];
+}
+
+/** Build a minimal text message fixture. */
+function textMsg(
+  id: string,
+  text = "hello",
+  role: "user" | "assistant" = "assistant",
+): ScenarioMessageSnapshotEvent["messages"][number] {
+  return {
+    id,
+    role,
+    content: text,
+  } as ScenarioMessageSnapshotEvent["messages"][number];
+}
+
+function renderMessages(
+  messages: ScenarioMessageSnapshotEvent["messages"],
+  opts?: { container?: HTMLElement },
+) {
+  return render(
+    <Wrapper>
+      <ScenarioMessageRenderer
+        messages={messages}
+        variant="drawer"
+        projectId={PROJECT_ID}
+      />
+    </Wrapper>,
+    opts,
+  );
+}
+
+/** Fire a synthetic event on an HTMLAudioElement. */
+function fireAudioEvent(el: HTMLAudioElement, eventType: string) {
+  el.dispatchEvent(new Event(eventType, { bubbles: true }));
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe("<ScenarioMessageRenderer/> audio sequential playback", () => {
+  afterEach(() => cleanup());
+
+  describe("given a renderer with audio messages", () => {
+    describe("when the component mounts", () => {
+      it("does not call play() on any audio element without user interaction", () => {
+        renderMessages([audioMsg("a1"), audioMsg("a2"), audioMsg("a3")]);
+        expect(playCalls).toHaveLength(0);
+      });
+    });
+  });
+
+  describe("given two audio messages rendered in the same instance", () => {
+    describe("when audio B fires a play event while audio A is playing", () => {
+      it("pauses audio A", () => {
+        renderMessages([audioMsg("a1"), audioMsg("a2")]);
+
+        const [audioA, audioB] = document.querySelectorAll<LwEl>("audio");
+        expect(audioA).toBeDefined();
+        expect(audioB).toBeDefined();
+
+        // Mark A as "playing"
+        audioA!._lw_paused = false;
+
+        // Simulate user starting B — fires the React `onPlay` handler
+        fireAudioEvent(audioB!, "play");
+
+        expect(pauseCalls).toHaveLength(1);
+        expect(pauseCalls[0]).toBe(audioA);
+      });
+    });
+  });
+
+  describe("given two separate renderer instances", () => {
+    describe("when audio plays in the first instance", () => {
+      it("does not pause audio in the second instance", () => {
+        // Render both renderers into the default document.body (cleanup()
+        // in afterEach handles removal). We separate them conceptually by
+        // their message ids so we can find each audio element.
+        renderMessages([audioMsg("inst1-a1")]);
+        renderMessages([audioMsg("inst2-a1")]);
+
+        // Both renderers produce an <audio> element; find each by source
+        // (data URIs are identical here, so rely on DOM order instead).
+        const allAudios = document.querySelectorAll<LwEl>("audio");
+        expect(allAudios).toHaveLength(2);
+        const [audioInA, audioInB] = allAudios;
+
+        // Mark B as playing so pause WOULD be called if instance A's handler
+        // incorrectly reached into instance B.
+        audioInB!._lw_paused = false;
+
+        // Play event fires in instance A's audio element.
+        fireAudioEvent(audioInA!, "play");
+
+        // Instance A's exclusivity handler must NOT have paused audioInB.
+        // (It would only pause elements registered in the SAME hook instance.)
+        expect(pauseCalls).not.toContain(audioInB);
+      });
+    });
+  });
+
+  describe("given audio followed by a text message followed by another audio", () => {
+    describe("when the first audio ends", () => {
+      it("calls play() on the second audio item (skipping the text item)", async () => {
+        renderMessages([audioMsg("a1"), textMsg("t1"), audioMsg("a2")]);
+
+        const audios = document.querySelectorAll<HTMLAudioElement>("audio");
+        expect(audios).toHaveLength(2);
+        const [audioA, audioB] = audios;
+
+        playCalls.length = 0;
+        fireAudioEvent(audioA!, "ended");
+
+        // Allow microtask queue to flush (play() is async Promise)
+        await Promise.resolve();
+
+        expect(playCalls).toHaveLength(1);
+        expect(playCalls[0]).toBe(audioB);
+      });
+    });
+  });
+
+  describe("given three audio messages and playback starts at the second", () => {
+    describe("when the second audio ends", () => {
+      it("plays the third audio, not the first", async () => {
+        renderMessages([audioMsg("a1"), audioMsg("a2"), audioMsg("a3")]);
+
+        const [, audioB, audioC] = document.querySelectorAll<HTMLAudioElement>("audio");
+
+        playCalls.length = 0;
+        fireAudioEvent(audioB!, "ended");
+
+        await Promise.resolve();
+
+        expect(playCalls).toHaveLength(1);
+        expect(playCalls[0]).toBe(audioC);
+      });
+    });
+  });
+
+  describe("given a single audio message", () => {
+    describe("when that audio ends", () => {
+      it("does not call play() again (chain stops at last item)", async () => {
+        renderMessages([audioMsg("a1")]);
+        const [audio] = document.querySelectorAll<HTMLAudioElement>("audio");
+
+        playCalls.length = 0;
+        fireAudioEvent(audio!, "ended");
+
+        await Promise.resolve();
+        expect(playCalls).toHaveLength(0);
+      });
+
+      it("does not throw an unhandled rejection", async () => {
+        const unhandled = vi.fn();
+        window.addEventListener("unhandledrejection", unhandled);
+
+        try {
+          renderMessages([audioMsg("a1")]);
+          const [audio] = document.querySelectorAll<HTMLAudioElement>("audio");
+
+          playCalls.length = 0;
+          fireAudioEvent(audio!, "ended");
+
+          await Promise.resolve();
+          expect(unhandled).not.toHaveBeenCalled();
+        } finally {
+          window.removeEventListener("unhandledrejection", unhandled);
+        }
+      });
+    });
+  });
+
+  describe("given two audio messages and the second audio's play() rejects", () => {
+    describe("when the first audio ends", () => {
+      it("does not throw an unhandled rejection", async () => {
+        const unhandled = vi.fn();
+        window.addEventListener("unhandledrejection", unhandled);
+
+        try {
+          renderMessages([audioMsg("a1"), audioMsg("a2")]);
+          const [, audioB] = document.querySelectorAll<LwEl>("audio");
+
+          // Mark audioB to reject on play
+          audioB!._lw_reject_play = true;
+
+          const [audioA] = document.querySelectorAll<HTMLAudioElement>("audio");
+          playCalls.length = 0;
+          fireAudioEvent(audioA!, "ended");
+
+          // Flush microtask queue — the rejection must be caught internally
+          await Promise.resolve();
+          await Promise.resolve();
+
+          expect(unhandled).not.toHaveBeenCalled();
+        } finally {
+          window.removeEventListener("unhandledrejection", unhandled);
+        }
+      });
+
+      it("does not call play() on any audio after the rejected one", async () => {
+        renderMessages([audioMsg("a1"), audioMsg("a2")]);
+        const [audioA, audioB] = document.querySelectorAll<LwEl>("audio");
+
+        // Mark audioB to reject on play
+        audioB!._lw_reject_play = true;
+
+        playCalls.length = 0;
+        fireAudioEvent(audioA!, "ended");
+
+        await Promise.resolve();
+        await Promise.resolve();
+
+        // Only one play() call total — on audioB (which rejected).
+        // No further cascading to a hypothetical third audio.
+        expect(playCalls).toHaveLength(1);
+        expect(playCalls[0]).toBe(audioB);
+      });
+    });
+  });
+});

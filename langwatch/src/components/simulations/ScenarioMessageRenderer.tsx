@@ -1,5 +1,6 @@
 import { Box, HStack, Image, Text, VStack } from "@chakra-ui/react";
-import { useMemo, useRef, useEffect } from "react";
+import { useMemo, useRef, useEffect, useCallback } from "react";
+import { useSequentialAudioPlayback } from "./useSequentialAudioPlayback";
 import { Settings } from "react-feather";
 import type { StreamingMessage } from "~/hooks/useSimulationStreamingState";
 import type { ScenarioMessageSnapshotEvent } from "~/server/scenarios/scenario-event.types";
@@ -46,6 +47,43 @@ export function ScenarioMessageRenderer({
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [items]);
+
+  // Per-renderer-instance sequential audio playback coordinator.
+  // Each instance of ScenarioMessageRenderer owns its own hook invocation,
+  // so grid cells are fully isolated from one another.
+  const { registerAudio, unregisterAudio, handlePlay, handleEnded } =
+    useSequentialAudioPlayback();
+
+  // Enumerate the audio items in order to assign stable orderIndex values.
+  // Computed alongside `items` so the index matches the render order.
+  const audioItemIds = useMemo(
+    () =>
+      items
+        .filter((item) => item.kind === "media")
+        .map((item) => item.id),
+    [items],
+  );
+
+  const makeAudioRef = useCallback(
+    (id: string, orderIndex: number) => (el: HTMLAudioElement | null) => {
+      if (el) {
+        registerAudio({ id, element: el, orderIndex });
+      } else {
+        unregisterAudio({ id });
+      }
+    },
+    [registerAudio, unregisterAudio],
+  );
+
+  const makeOnPlay = useCallback(
+    (id: string) => () => handlePlay({ id }),
+    [handlePlay],
+  );
+
+  const makeOnEnded = useCallback(
+    (id: string) => () => handleEnded({ id }),
+    [handleEnded],
+  );
 
   return (
     <VStack
@@ -119,7 +157,8 @@ export function ScenarioMessageRenderer({
               </VStack>
             );
 
-          case "media":
+          case "media": {
+            const audioOrderIndex = audioItemIds.indexOf(item.id);
             return (
               <VStack
                 key={item.id}
@@ -131,7 +170,13 @@ export function ScenarioMessageRenderer({
                   gap={1}
                   width={{ base: "100%", md: "min(420px, 95%)" }}
                 >
-                  <MediaPart part={item.part} projectId={projectId} />
+                  <MediaPart
+                    part={item.part}
+                    projectId={projectId}
+                    onAudioRef={makeAudioRef(item.id, audioOrderIndex)}
+                    onAudioPlay={makeOnPlay(item.id)}
+                    onAudioEnded={makeOnEnded(item.id)}
+                  />
                   {item.transcript && (
                     <Text
                       fontSize="xs"
@@ -151,6 +196,7 @@ export function ScenarioMessageRenderer({
                 )}
               </VStack>
             );
+          }
 
           case "tool_call":
             return (

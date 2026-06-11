@@ -77,13 +77,27 @@ interface MediaPartProps {
   part: MediaPartData;
   /** Project that owns this stored object. Required for the server-side existence probe. */
   projectId: string;
+  /**
+   * Playback coordination — supplied by ScenarioMessageRenderer when the
+   * sequential-audio-playback hook is active. All three must be provided
+   * together or omitted together.
+   */
+  onAudioRef?: (el: HTMLAudioElement | null) => void;
+  onAudioPlay?: () => void;
+  onAudioEnded?: () => void;
 }
 
 /**
  * Renders a single AG-UI media content part as a native HTML5 media element,
  * a data: URI, or a missing-badge placeholder.
  */
-export function MediaPart({ part, projectId }: MediaPartProps) {
+export function MediaPart({
+  part,
+  projectId,
+  onAudioRef,
+  onAudioPlay,
+  onAudioEnded,
+}: MediaPartProps) {
   // Resolve src and category from the part shape
   let src: string;
   let mimeType: string | undefined;
@@ -238,6 +252,9 @@ export function MediaPart({ part, projectId }: MediaPartProps) {
           // setting status="ok" here reflects what the user can do.
           onLoadedData={handleLoad}
           onError={handleError}
+          onPlay={onAudioPlay}
+          onEnded={onAudioEnded}
+          ref={onAudioRef ?? null}
           style={{ width: "100%", maxWidth: "400px" }}
         />
       </VStack>
