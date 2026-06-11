@@ -8,7 +8,6 @@ function makeRepo(overrides?: Partial<LangyMessageRepository>) {
   const repo = {
     findAllByConversation: vi.fn(),
     create: vi.fn(),
-    createMany: vi.fn(),
     ...overrides,
   } as unknown as LangyMessageRepository;
   return repo;

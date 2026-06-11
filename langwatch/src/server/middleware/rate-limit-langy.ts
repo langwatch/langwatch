@@ -1,7 +1,6 @@
 import { connection } from "../redis";
 
 export const LANGY_MESSAGES_PER_MINUTE = 30;
-export const LANGY_TOOL_CALLS_PER_MESSAGE = 8;
 
 export type RateLimitResult = {
   allowed: boolean;

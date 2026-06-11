@@ -130,3 +130,6 @@ langwatch/src/tests/langy/scenario-logs/
 # Agent scratch + dogfood evidence (never track)
 **/.claude/dogfood-evidence/
 **/.claude/tmp/
+
+# Dev server logs
+server.log
