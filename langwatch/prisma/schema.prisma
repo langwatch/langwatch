@@ -415,6 +415,7 @@ model Project {
   gatewayGuardrails        GatewayGuardrail[]                  @relation("ProjectGatewayGuardrails")
   gatewayChangeEvents      GatewayChangeEvent[]
   pinnedTraces             PinnedTrace[]
+  emailSuppressions        EmailSuppression[]
 
   // Denormalised mirror of parent Team's personal flag for fast
   // lookup at trace ingest time without a Team join. Always equals
@@ -1026,6 +1027,23 @@ model TriggerSent {
   @@index([projectId])
   @@index([customGraphId])
   @@index([resolvedAt])
+}
+
+// ADR-031: recipient unsubscribe / suppression list for trigger emails. A row
+// suppresses delivery of trigger email to `email` within `projectId`. A null
+// `triggerId` suppresses every trigger in the project; a set `triggerId`
+// suppresses only that one. `reason` leaves room for future "bounce" rows.
+model EmailSuppression {
+  id        String   @id @default(nanoid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id])
+  email     String
+  triggerId String? // null = suppressed for every trigger in the project
+  reason    String   @default("unsubscribe")
+  createdAt DateTime @default(now())
+
+  @@unique([projectId, email, triggerId])
+  @@index([projectId])
 }
 
 enum AnnotationScoreDataType {

@@ -36,6 +36,9 @@ import { TriggerService } from "./triggers/trigger.service";
 import { TriggerTemplateService } from "./triggers/trigger-template.service";
 import { PrismaTriggerRepository } from "./triggers/repositories/trigger.prisma.repository";
 import { NullTriggerRepository } from "./triggers/repositories/trigger.repository";
+import { EmailSuppressionService } from "./triggers/emailSuppression.service";
+import { PrismaEmailSuppressionRepository } from "./triggers/repositories/emailSuppression.prisma.repository";
+import { NullEmailSuppressionRepository } from "./triggers/repositories/emailSuppression.repository";
 import { liveTriggerNotifier } from "~/server/triggers/triggerNotifier";
 import { ExperimentService } from "../experiments/experiment.service";
 import { OrganizationService } from "./organizations/organization.service";
@@ -379,6 +382,9 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     "MonitorService",
   );
   const triggers = new TriggerService(new PrismaTriggerRepository(prisma));
+  const emailSuppressions = new EmailSuppressionService(
+    new PrismaEmailSuppressionRepository(prisma),
+  );
   const triggerTemplates = new TriggerTemplateService({
     baseHost: config.baseHost ?? env.BASE_HOST,
     notifier: liveTriggerNotifier,
@@ -503,6 +509,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
           prisma,
           redis: redis ?? null,
           triggers,
+          emailSuppressions,
           projects,
           evaluations: { runs: evaluations.runs },
           traces: { spans: spanStorage },
@@ -699,6 +706,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     experiments,
     triggers,
     triggerTemplates,
+    emailSuppressions,
     dspySteps: { steps: dspySteps },
     simulations: { runs: simulationReads },
     suiteRuns: { runs: suiteRunService },
@@ -810,6 +818,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     dspySteps: { steps: new DspyStepService(new NullDspyStepRepository()) },
     experiments: ExperimentService.create(testPrisma),
     triggers: new TriggerService(new NullTriggerRepository()),
+    emailSuppressions: new EmailSuppressionService(
+      new NullEmailSuppressionRepository(),
+    ),
     triggerTemplates: new TriggerTemplateService({
       baseHost: config.baseHost ?? env.BASE_HOST,
       notifier: {
