@@ -10,6 +10,7 @@ import {
 } from "../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { useUpgradeModalStore } from "../stores/upgradeModalStore";
+import { URL_QS_PARSE_OPTIONS } from "../utils/qsParseOptions";
 import { drawers } from "./drawerRegistry";
 import { DrawerOffsetProvider } from "./ui/drawer";
 
@@ -33,11 +34,10 @@ export function CurrentDrawer({ marginTop }: { marginTop?: number }) {
   // handing the rendered drawer a fresh props object each time and cascading
   // a re-render through its subtree even when nothing drawer-relevant changed.
   const queryDrawer = useMemo<DrawerProps | undefined>(() => {
-    const parsed = qs.parse(queryString.replaceAll("%2C", ","), {
-      allowDots: true,
-      comma: true,
-      allowEmptyArrays: true,
-    });
+    const parsed = qs.parse(
+      queryString.replaceAll("%2C", ","),
+      URL_QS_PARSE_OPTIONS,
+    );
     return parsed.drawer as DrawerProps | undefined;
   }, [queryString]);
 

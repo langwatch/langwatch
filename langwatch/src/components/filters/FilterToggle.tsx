@@ -4,6 +4,7 @@ import qs from "qs";
 import { X } from "react-feather";
 import { type FilterParam, useFilterParams } from "../../hooks/useFilterParams";
 import { filterOutEmptyFilters } from "../../server/analytics/utils";
+import { URL_QS_PARSE_OPTIONS } from "../../utils/qsParseOptions";
 import type { FilterField } from "../../server/filters/types";
 import { Tooltip } from "../ui/tooltip";
 import { FilterIconWithBadge } from "./FilterIconWithBadge";
@@ -40,11 +41,10 @@ export const useFilterToggle = (
   const setShowFilters = (show: boolean) => {
     const currentPath = router.asPath.split("?")[0] ?? router.asPath;
     const queryString = router.asPath.split("?")[1] ?? "";
-    const queryParams = qs.parse(queryString.replaceAll("%2C", ","), {
-      allowDots: true,
-      comma: true,
-      allowEmptyArrays: true,
-    });
+    const queryParams = qs.parse(
+      queryString.replaceAll("%2C", ","),
+      URL_QS_PARSE_OPTIONS,
+    );
 
     const showFiltersValue = show
       ? defaultShowFilters
@@ -77,11 +77,7 @@ export const useFilterToggle = (
     const routeParams = Object.fromEntries(
       Object.entries(router.query).filter(([key]) => pathParamKeys.has(key)),
     );
-    const parsed = qs.parse(newQs, {
-      allowDots: true,
-      comma: true,
-      allowEmptyArrays: true,
-    });
+    const parsed = qs.parse(newQs, URL_QS_PARSE_OPTIONS);
 
     void router.push(
       { pathname: router.pathname, query: { ...routeParams, ...parsed } },

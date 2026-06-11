@@ -139,3 +139,8 @@ Feature: Span field mapping when adding traces to a dataset
     Given the mapping preview lists rows with selection checkboxes
     When I check the header select-all checkbox
     Then every row's selection is toggled
+
+  Scenario: Bulk-selecting more than twenty traces still opens the preview
+    Given I selected twenty-five traces in the traces table
+    When I open the "Add to Dataset" drawer
+    Then the mapping preview loads rows for all twenty-five traces
