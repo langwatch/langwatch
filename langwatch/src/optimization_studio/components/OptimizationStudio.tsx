@@ -33,6 +33,7 @@ import {
 } from "react-resizable-panels";
 import { useShallow } from "zustand/react/shallow";
 import { CurrentDrawer } from "../../components/CurrentDrawer";
+import { GlobalTraceV2DrawerMount } from "../../features/traces-v2/components/GlobalTraceV2DrawerMount";
 import { GlobalUpgradeModal } from "../../components/UpgradeModal";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import { useColorMode, useColorModeValue, useColorRawValue } from "../../components/ui/color-mode";
@@ -392,11 +393,16 @@ export default function OptimizationStudio() {
       </ReactFlowProvider>
 
       <CurrentDrawer marginTop={56} />
-      {/* The studio route doesn't use DashboardLayout, so the
-          limit-exceeded dialog needs its own mount here - without it,
-          plan-limited saves fired from inside the studio fail silently
-          (the dialog only shows after navigating back to a dashboard
-          page). See specs/workflows/studio-usage-limits.feature. */}
+      {/* The studio route doesn't use DashboardLayout, so the v2 trace
+          explorer needs its own mount here - without it, view-trace from
+          the evaluations panel routes to traceV2Details (per the device
+          opt-in) and renders nothing.
+          See specs/traces-v2/drawer-opt-in-routing.feature. */}
+      <GlobalTraceV2DrawerMount />
+      {/* Same reason: the limit-exceeded dialog needs its own mount here -
+          without it, plan-limited saves fired from inside the studio fail
+          silently (the dialog only shows after navigating back to a
+          dashboard page). See specs/workflows/studio-usage-limits.feature. */}
       <GlobalUpgradeModal />
     </div>
   );
