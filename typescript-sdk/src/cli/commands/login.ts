@@ -29,12 +29,12 @@ function printAgentHintBanner(): void {
   );
   console.log(
     chalk.gray(
-      "  --api-key <KEY>            project SDK key into .env (default: SDK, evals, prompts)",
+      "  --device                   AI tools / SSO (claude, codex, gemini, opencode)",
     ),
   );
   console.log(
     chalk.gray(
-      "  --device                   AI tools / SSO (claude, codex, gemini, opencode)",
+      "  --api-key <KEY>            project SDK key into .env (SDK, evals, prompts)",
     ),
   );
   console.log(
@@ -260,14 +260,14 @@ export const loginCommand = async (
       message: "How do you want to use LangWatch?",
       choices: [
         {
-          title: "Project / SDK API key",
-          description: "langwatch eval, sync, prompts, SDK auto-instrumentation - writes .env",
-          value: "api-key",
-        },
-        {
           title: "AI tools / agentic flows",
           description: "claude, codex, cursor, gemini, opencode - device-flow SSO",
           value: "device",
+        },
+        {
+          title: "Project / SDK API key",
+          description: "langwatch eval, sync, prompts, SDK auto-instrumentation - writes .env",
+          value: "api-key",
         },
         {
           title: "Both",

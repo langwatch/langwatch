@@ -116,11 +116,11 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
   Scenario: `langwatch login` (no flags, TTY) prompts for endpoint + auth mode with always-on agent-hint banner
     Given the user is in an interactive terminal (`process.stdin.isTTY === true`)
     When the user runs `langwatch login` with no flags
-    Then the CLI renders a top banner BEFORE the first prompt — always visible,
+    Then the CLI renders a top banner BEFORE the first prompt, always visible,
       not optional:
-      "Running interactively. For agents/CI, skip the prompts by passing:
-         --api-key <K>    project SDK key into .env (default: SDK, evals, prompts)
+      "Running interactively. To skip these prompts (CI / agents that already have a credential):
          --device         AI tools / SSO (claude, codex, gemini, opencode)
+         --api-key <K>    project SDK key into .env (SDK, evals, prompts)
          --token <T>      pre-minted device session
          --endpoint <U>   self-hosted instance URL"
     And the CLI prompts:
@@ -128,13 +128,15 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
         1) LangWatch Cloud (app.langwatch.ai)
         2) Self-hosted instance (custom URL)"
     And on selecting (2) the CLI prompts for the URL and validates http(s) scheme
-    And the CLI then prompts, with project login as the default (option 1):
+    And the CLI then prompts, with AI tools as the default (option 1) since a
+      human running this interactively most likely wants to track their own
+      coding-assistant usage:
       "How do you want to use it?
-        1) Project / SDK API key     (langwatch eval, sync, prompts, SDK)        - API key into .env
-        2) AI tools / agentic flows  (claude, codex, cursor, gemini, opencode)   - device-flow SSO
+        1) AI tools / agentic flows  (claude, codex, cursor, gemini, opencode)   - device-flow SSO
+        2) Project / SDK API key     (langwatch eval, sync, prompts, SDK)        - API key into .env
         3) Both"
-    And on selecting (1) it runs the project API-key device-code flow → `$CWD/.env`
-    And on selecting (2) it runs the device-flow → `~/.langwatch/config.json`
+    And on selecting (1) it runs the device-flow → `~/.langwatch/config.json`
+    And on selecting (2) it runs the project API-key device-code flow → `$CWD/.env`
     And on selecting (3) it runs both flows in sequence
 
   @bdd @cli @login @agent-aware @fake-tty

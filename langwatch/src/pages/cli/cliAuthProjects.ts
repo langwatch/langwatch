@@ -15,7 +15,13 @@ export interface CliAuthProjectOption {
   id: string;
   name: string;
   slug: string;
+  teamId: string;
   teamName: string;
+}
+
+export interface CliAuthTeamOption {
+  id: string;
+  name: string;
 }
 
 interface ProjectLike {
@@ -27,6 +33,7 @@ interface ProjectLike {
 }
 
 interface TeamLike {
+  id: string;
   name: string;
   projects?: ProjectLike[] | null;
 }
@@ -34,7 +41,11 @@ interface TeamLike {
 export function resolveCliAuthProjects(args: {
   teams: TeamLike[] | null | undefined;
   lastProjectSlug?: string | null;
-}): { projects: CliAuthProjectOption[]; defaultProjectId: string | null } {
+}): {
+  projects: CliAuthProjectOption[];
+  teams: CliAuthTeamOption[];
+  defaultProjectId: string | null;
+} {
   const projects = (args.teams ?? []).flatMap((team) =>
     (team.projects ?? [])
       .filter((p) => !p.isPersonal && p.kind !== "internal_governance")
@@ -42,9 +53,17 @@ export function resolveCliAuthProjects(args: {
         id: p.id,
         name: p.name,
         slug: p.slug,
+        teamId: team.id,
         teamName: team.name,
       })),
   );
+
+  // Only teams that actually have an offered project, so the grouped picker
+  // never renders an empty team header.
+  const offeredTeamIds = new Set(projects.map((p) => p.teamId));
+  const teams = (args.teams ?? [])
+    .filter((team) => offeredTeamIds.has(team.id))
+    .map((team) => ({ id: team.id, name: team.name }));
 
   const lastProject = args.lastProjectSlug
     ? projects.find((p) => p.slug === args.lastProjectSlug)
@@ -53,5 +72,5 @@ export function resolveCliAuthProjects(args: {
   const defaultProjectId =
     lastProject?.id ?? (projects.length === 1 ? projects[0]!.id : null);
 
-  return { projects, defaultProjectId };
+  return { projects, teams, defaultProjectId };
 }
