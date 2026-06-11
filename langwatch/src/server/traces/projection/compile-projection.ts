@@ -122,8 +122,12 @@ function buildPlan({
   };
 }
 
-/** The per-trace projector: shapes one trace into the requested nested row. */
-function buildProjector({
+/**
+ * The per-trace projector: shapes one trace into the requested nested row.
+ * Exported for unit-testing the collection-path RBAC redaction with a synthetic
+ * protected collection field (the catalog has none today).
+ */
+export function buildProjector({
   fields,
   protections,
 }: {
@@ -154,10 +158,15 @@ function buildProjector({
         (element) => {
           const projected: ProjectedRow = {};
           for (const f of collFields) {
+            // Redact gated values on the collection path too — the catalog has
+            // no protected collection field today, but this keeps RBAC symmetric
+            // with the scalar path so a future protected field can't leak here.
             setPath({
               target: projected,
               path: f.outPath,
-              value: f.read(element),
+              value: isPermitted({ field: f, protections })
+                ? f.read(element)
+                : null,
             });
           }
           return projected;

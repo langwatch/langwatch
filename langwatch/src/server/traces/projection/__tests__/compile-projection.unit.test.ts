@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { Protections } from "~/server/elasticsearch/protections";
 import type { Trace } from "~/server/tracer/types";
-import { compileProjection } from "../compile-projection";
+import type { ResolvedField } from "../catalog";
+import { buildProjector, compileProjection } from "../compile-projection";
 import type { ProjectableTrace } from "../types";
 import { ProjectionValidationError } from "../types";
 
@@ -338,6 +339,49 @@ describe("compileProjection", () => {
           evaluations: [{ score: 0.9 }],
           events: [{ type: "thumbs_up_down" }],
           annotations: [{ is_thumbs_up: true }],
+        });
+      });
+    });
+  });
+});
+
+describe("buildProjector", () => {
+  // The catalog has no protected collection field today, so exercise the
+  // collection-path RBAC redaction with a synthetic one.
+  const protectedAnnotationComment: ResolvedField = {
+    path: "annotations.comment",
+    type: "string",
+    collection: "annotations",
+    protection: "input",
+    outPath: ["comment"],
+    read: (a) => a.comment ?? null,
+  };
+
+  describe("given a protected collection field", () => {
+    describe("when the gating permission is denied", () => {
+      it("redacts the value on the collection path", () => {
+        const project = buildProjector({
+          fields: [protectedAnnotationComment],
+          protections: {
+            canSeeCosts: true,
+            canSeeCapturedInput: false,
+            canSeeCapturedOutput: true,
+          },
+        });
+        expect(project(sampleTrace())).toEqual({
+          annotations: [{ comment: null }],
+        });
+      });
+    });
+
+    describe("when the gating permission is granted", () => {
+      it("emits the value", () => {
+        const project = buildProjector({
+          fields: [protectedAnnotationComment],
+          protections: fullAccess,
+        });
+        expect(project(sampleTrace())).toEqual({
+          annotations: [{ comment: "nice" }],
         });
       });
     });
