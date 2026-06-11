@@ -63,7 +63,7 @@ describe("POST /api/experiments/abort for an interactive run", () => {
   });
 
   describe("when the run is registered only by the orchestrator running-owner", () => {
-    /** @scenario "Abort authorizes an interactive run by its registered owner" */
+    /** @scenario "Project members can stop their own running workbench execution" */
     it("returns 200 and signals the abort even with no polling run-state", async () => {
       // The orchestrator recorded the owner via setRunning; runStateManager has nothing.
       getRunningProjectId.mockResolvedValue("project_MINE");

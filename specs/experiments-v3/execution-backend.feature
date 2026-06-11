@@ -227,16 +227,14 @@ Feature: Evaluation execution - Backend
     Then the 5 completed results are saved to Elasticsearch
     And stopped_at timestamp is set
 
-  # A cell blocked waiting on a slow LLM response must not keep running until
-  # that response arrives. The stream read races the abort flag, so an abort
-  # interrupts the pending read and cancels the reader. Cancelling the reader
-  # disconnects nlpgo, whose request context then cancels the execution (the Go
-  # engine treats client disconnect as the cancel signal).
-  Scenario: Abort interrupts an in-flight stream read
-    Given a cell is blocked waiting on a streaming LLM response
-    When abort is requested
-    Then the pending read is interrupted and the reader is cancelled
-    And no further events are processed from that stream
+  # A cell blocked waiting on a slow model must not keep running until that
+  # response finally arrives. Stopping the run interrupts it promptly rather
+  # than only between streamed results.
+  Scenario: Stopping a running workbench execution halts it mid-stream
+    Given a workbench execution is streaming results from a slow model
+    When the user requests stop
+    Then no further results are delivered for that run
+    And the run stops
 
   # ==========================================================================
   # Hono SSE Endpoint
@@ -274,17 +272,14 @@ Feature: Evaluation execution - Backend
     Then the response Content-Type is "text/event-stream"
     And I receive SSE events as execution progresses
 
-  # An interactive workbench run streams over SSE and never creates a polling
-  # run-state record. Abort authorization therefore reads the owner that the
-  # orchestrator registers when it marks the run as running, not the polling
-  # run-state. Without this, every workbench abort 404s and the Stop button
-  # reports "Abort Failed".
-  Scenario: Abort authorizes an interactive run by its registered owner
-    Given a running execution "run-123" owned by my project
-    And the run was started over SSE with no polling run-state record
-    When I POST to /api/experiments/abort with runId="run-123"
-    Then I receive 200 OK
-    And the abort flag is set for "run-123"
+  # An interactive workbench run streams its results directly rather than being
+  # polled, which is why stopping it used to fail with "Abort Failed". Stopping
+  # a run the project owns must now succeed and actually stop it.
+  Scenario: Project members can stop their own running workbench execution
+    Given my project has a running workbench execution "run-123"
+    When I request to stop "run-123"
+    Then the request succeeds
+    And the execution stops
 
   # ==========================================================================
   # Error Cases - Integration

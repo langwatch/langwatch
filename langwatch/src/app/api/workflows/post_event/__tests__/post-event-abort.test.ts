@@ -48,7 +48,7 @@ describe("studioBackendPostEvent abort during an in-flight read", () => {
   });
 
   describe("when abort is requested while a read is pending", () => {
-    /** @scenario "Abort interrupts an in-flight stream read" */
+    /** @scenario "Stopping a running workbench execution halts it mid-stream" */
     it("interrupts the pending read and cancels the reader", async () => {
       const cancel = vi.fn(async () => {});
       // A read that never resolves: only the abort race can end the loop, so
