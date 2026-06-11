@@ -82,7 +82,9 @@ func executeSyncHandler(application *app.App) http.HandlerFunc {
 		result, err := executor.Execute(ctx, *req)
 		if err != nil {
 			span.RecordError(err)
-			writeHandlerError(r.Context(), w, herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+			// Use the enriched ctx so the request_failed line carries
+			// project_id / trace_id / origin for per-customer filtering.
+			writeHandlerError(ctx, w, herr.New(ctx, domain.ErrBadRequest, herr.M{
 				"reason": "engine_error",
 			}, err))
 			return
@@ -456,7 +458,7 @@ func executeStreamHandler(application *app.App) http.HandlerFunc {
 		if err != nil {
 			// The SSE error frame reaches the client; this line is the
 			// server-side trail for it (the engine stream failed to start).
-			clog.Get(r.Context()).Error("studio_stream_failed",
+			clog.Get(ctx).Error("studio_stream_failed",
 				zap.String("fault", "platform"), zap.String("message", err.Error()))
 			writeSSE(w, flusher, "error", map[string]any{"message": err.Error()})
 			return
