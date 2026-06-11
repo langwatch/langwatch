@@ -11,6 +11,7 @@
 import { Badge, Box, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "~/utils/api";
+import type { AudioPlaybackProps } from "./useSequentialAudioPlayback";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -78,13 +79,11 @@ interface MediaPartProps {
   /** Project that owns this stored object. Required for the server-side existence probe. */
   projectId: string;
   /**
-   * Playback coordination — supplied by ScenarioMessageRenderer when the
-   * sequential-audio-playback hook is active. All three must be provided
-   * together or omitted together.
+   * Playback coordination — supplied by ScenarioMessageRenderer via
+   * `useSequentialAudioPlayback().getAudioProps(id)`. When omitted the
+   * <audio> element renders without coordination (standalone usage).
    */
-  onAudioRef?: (el: HTMLAudioElement | null) => void;
-  onAudioPlay?: () => void;
-  onAudioEnded?: () => void;
+  audioPlayback?: AudioPlaybackProps;
 }
 
 /**
@@ -94,9 +93,7 @@ interface MediaPartProps {
 export function MediaPart({
   part,
   projectId,
-  onAudioRef,
-  onAudioPlay,
-  onAudioEnded,
+  audioPlayback,
 }: MediaPartProps) {
   // Resolve src and category from the part shape
   let src: string;
@@ -252,9 +249,9 @@ export function MediaPart({
           // setting status="ok" here reflects what the user can do.
           onLoadedData={handleLoad}
           onError={handleError}
-          onPlay={onAudioPlay}
-          onEnded={onAudioEnded}
-          ref={onAudioRef ?? null}
+          onPlay={audioPlayback?.onPlay}
+          onEnded={audioPlayback?.onEnded}
+          ref={audioPlayback?.ref ?? null}
           style={{ width: "100%", maxWidth: "400px" }}
         />
       </VStack>

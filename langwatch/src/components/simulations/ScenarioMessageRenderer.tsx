@@ -1,5 +1,5 @@
 import { Box, HStack, Image, Text, VStack } from "@chakra-ui/react";
-import { useMemo, useRef, useEffect, useCallback } from "react";
+import { useMemo, useRef, useEffect } from "react";
 import { useSequentialAudioPlayback } from "./useSequentialAudioPlayback";
 import { Settings } from "react-feather";
 import type { StreamingMessage } from "~/hooks/useSimulationStreamingState";
@@ -48,42 +48,26 @@ export function ScenarioMessageRenderer({
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [items]);
 
-  // Per-renderer-instance sequential audio playback coordinator.
-  // Each instance of ScenarioMessageRenderer owns its own hook invocation,
-  // so grid cells are fully isolated from one another.
-  const { registerAudio, unregisterAudio, handlePlay, handleEnded } =
-    useSequentialAudioPlayback();
-
-  // Enumerate the audio items in order to assign stable orderIndex values.
-  // Computed alongside `items` so the index matches the render order.
-  const audioItemIds = useMemo(
+  // Ordered list of audio-only item ids — the single source of ordering truth
+  // for the sequential playback hook. Filters to audio media only (not video /
+  // binary) so the hook's "next" index is never off by a non-audio item.
+  const orderedAudioIds = useMemo(
     () =>
       items
-        .filter((item) => item.kind === "media")
+        .filter(
+          (item): item is Extract<DisplayItem, { kind: "media" }> =>
+            item.kind === "media" && item.part.type === "audio",
+        )
         .map((item) => item.id),
     [items],
   );
 
-  const makeAudioRef = useCallback(
-    (id: string, orderIndex: number) => (el: HTMLAudioElement | null) => {
-      if (el) {
-        registerAudio({ id, element: el, orderIndex });
-      } else {
-        unregisterAudio({ id });
-      }
-    },
-    [registerAudio, unregisterAudio],
-  );
-
-  const makeOnPlay = useCallback(
-    (id: string) => () => handlePlay({ id }),
-    [handlePlay],
-  );
-
-  const makeOnEnded = useCallback(
-    (id: string) => () => handleEnded({ id }),
-    [handleEnded],
-  );
+  // Per-renderer-instance sequential audio playback coordinator.
+  // Each instance of ScenarioMessageRenderer owns its own hook invocation,
+  // so grid cells are fully isolated from one another.
+  const { getAudioProps } = useSequentialAudioPlayback({
+    orderedIds: orderedAudioIds,
+  });
 
   return (
     <VStack
@@ -158,7 +142,6 @@ export function ScenarioMessageRenderer({
             );
 
           case "media": {
-            const audioOrderIndex = audioItemIds.indexOf(item.id);
             return (
               <VStack
                 key={item.id}
@@ -173,9 +156,11 @@ export function ScenarioMessageRenderer({
                   <MediaPart
                     part={item.part}
                     projectId={projectId}
-                    onAudioRef={makeAudioRef(item.id, audioOrderIndex)}
-                    onAudioPlay={makeOnPlay(item.id)}
-                    onAudioEnded={makeOnEnded(item.id)}
+                    audioPlayback={
+                      item.part.type === "audio"
+                        ? getAudioProps(item.id)
+                        : undefined
+                    }
                   />
                   {item.transcript && (
                     <Text

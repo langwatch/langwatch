@@ -12,11 +12,13 @@
  *  - Mid-list start advances from that position onward (not from 0)
  *  - Last audio ending triggers no further play
  *  - Rejected play() is caught and does not propagate as unhandledrejection
+ *  - Streaming append: new audio appended after mount is played when chain reaches it
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render } from "@testing-library/react";
 import {
+  afterAll,
   afterEach,
   beforeAll,
   beforeEach,
@@ -57,6 +59,9 @@ vi.mock("../../copilot-kit/TraceMessage", () => ({
 // prototype and track which element instance called each method so tests can
 // assert "pause was called on audioA" without needing toHaveBeenCalledOn
 // (which does not exist in vitest's expect).
+//
+// Original descriptors are saved before `beforeAll` stubs and restored in
+// `afterAll` so the stubs don't bleed into other test files sharing the worker.
 // ---------------------------------------------------------------------------
 
 type LwEl = HTMLMediaElement & {
@@ -68,6 +73,20 @@ type LwEl = HTMLMediaElement & {
 const playCalls: LwEl[] = [];
 /** Elements that called .pause() in the current test, in call order. */
 const pauseCalls: LwEl[] = [];
+
+// Save originals so afterAll can restore them.
+const origPlay = Object.getOwnPropertyDescriptor(
+  HTMLMediaElement.prototype,
+  "play",
+);
+const origPause = Object.getOwnPropertyDescriptor(
+  HTMLMediaElement.prototype,
+  "pause",
+);
+const origPaused = Object.getOwnPropertyDescriptor(
+  HTMLMediaElement.prototype,
+  "paused",
+);
 
 beforeAll(() => {
   Element.prototype.scrollIntoView = vi.fn();
@@ -101,6 +120,19 @@ beforeAll(() => {
       return (this as LwEl)._lw_paused !== false;
     },
   });
+});
+
+afterAll(() => {
+  // Restore original descriptors so stubs don't bleed into other suites.
+  if (origPlay) {
+    Object.defineProperty(HTMLMediaElement.prototype, "play", origPlay);
+  }
+  if (origPause) {
+    Object.defineProperty(HTMLMediaElement.prototype, "pause", origPause);
+  }
+  if (origPaused) {
+    Object.defineProperty(HTMLMediaElement.prototype, "paused", origPaused);
+  }
 });
 
 beforeEach(() => {
@@ -212,28 +244,38 @@ describe("<ScenarioMessageRenderer/> audio sequential playback", () => {
     describe("when audio plays in the first instance", () => {
       /** @scenario Playing audio in one renderer instance does not pause audio in another instance */
       it("does not pause audio in the second instance", () => {
-        // Render both renderers into the default document.body (cleanup()
-        // in afterEach handles removal). We separate them conceptually by
-        // their message ids so we can find each audio element.
-        renderMessages([audioMsg("inst1-a1")]);
-        renderMessages([audioMsg("inst2-a1")]);
+        // Each instance renders into its own container so DOM queries are
+        // unambiguous and the test is self-contained.
+        const containerA = document.createElement("div");
+        const containerB = document.createElement("div");
+        document.body.appendChild(containerA);
+        document.body.appendChild(containerB);
 
-        // Both renderers produce an <audio> element; find each by source
-        // (data URIs are identical here, so rely on DOM order instead).
-        const allAudios = document.querySelectorAll<LwEl>("audio");
-        expect(allAudios).toHaveLength(2);
-        const [audioInA, audioInB] = allAudios;
+        try {
+          renderMessages([audioMsg("inst1-a1")], { container: containerA });
+          renderMessages([audioMsg("inst2-a1")], { container: containerB });
 
-        // Mark B as playing so pause WOULD be called if instance A's handler
-        // incorrectly reached into instance B.
-        audioInB!._lw_paused = false;
+          const audioInA = containerA.querySelector<LwEl>("audio")!;
+          const audioInB = containerB.querySelector<LwEl>("audio")!;
 
-        // Play event fires in instance A's audio element.
-        fireAudioEvent(audioInA!, "play");
+          expect(audioInA).toBeDefined();
+          expect(audioInB).toBeDefined();
 
-        // Instance A's exclusivity handler must NOT have paused audioInB.
-        // (It would only pause elements registered in the SAME hook instance.)
-        expect(pauseCalls).not.toContain(audioInB);
+          // Mark B as playing so pause WOULD be called if instance A's handler
+          // incorrectly reached into instance B.
+          audioInB._lw_paused = false;
+
+          // Play event fires in instance A's audio element.
+          fireAudioEvent(audioInA, "play");
+
+          // Instance A's exclusivity handler must not have paused anything —
+          // audioInA is the only element registered in that hook instance and
+          // it is the one that just started (so it is skipped).
+          expect(pauseCalls).toHaveLength(0);
+        } finally {
+          document.body.removeChild(containerA);
+          document.body.removeChild(containerB);
+        }
       });
     });
   });
@@ -316,7 +358,7 @@ describe("<ScenarioMessageRenderer/> audio sequential playback", () => {
     });
   });
 
-  describe("given two audio messages and the second audio's play() rejects", () => {
+  describe("given three audio messages and the second audio's play() rejects", () => {
     describe("when the first audio ends", () => {
       /** @scenario A failed play() during auto-advance does not throw an unhandled rejection */
       it("does not throw an unhandled rejection", async () => {
@@ -324,7 +366,7 @@ describe("<ScenarioMessageRenderer/> audio sequential playback", () => {
         window.addEventListener("unhandledrejection", unhandled);
 
         try {
-          renderMessages([audioMsg("a1"), audioMsg("a2")]);
+          renderMessages([audioMsg("a1"), audioMsg("a2"), audioMsg("a3")]);
           const [, audioB] = document.querySelectorAll<LwEl>("audio");
 
           // Mark audioB to reject on play
@@ -345,7 +387,9 @@ describe("<ScenarioMessageRenderer/> audio sequential playback", () => {
       });
 
       it("does not call play() on any audio after the rejected one", async () => {
-        renderMessages([audioMsg("a1"), audioMsg("a2")]);
+        // 3-audio fixture: A → B(rejects) → C. When A ends, B is attempted.
+        // B rejects. C must never be played.
+        renderMessages([audioMsg("a1"), audioMsg("a2"), audioMsg("a3")]);
         const [audioA, audioB] = document.querySelectorAll<LwEl>("audio");
 
         // Mark audioB to reject on play
@@ -358,9 +402,42 @@ describe("<ScenarioMessageRenderer/> audio sequential playback", () => {
         await Promise.resolve();
 
         // Only one play() call total — on audioB (which rejected).
-        // No further cascading to a hypothetical third audio.
+        // audioC must never have been attempted.
         expect(playCalls).toHaveLength(1);
         expect(playCalls[0]).toBe(audioB);
+      });
+    });
+  });
+
+  describe("given two audio messages already rendered", () => {
+    describe("when a third audio message is appended via streaming and the second audio ends", () => {
+      it("plays the appended (third) audio", async () => {
+        // Initial render: two audio items
+        const { rerender } = renderMessages([audioMsg("a1"), audioMsg("a2")]);
+
+        // Streaming append: re-render with a third audio message added
+        rerender(
+          <ChakraProvider value={defaultSystem}>
+            <ScenarioMessageRenderer
+              messages={[audioMsg("a1"), audioMsg("a2"), audioMsg("a3")]}
+              variant="drawer"
+              projectId={PROJECT_ID}
+            />
+          </ChakraProvider>,
+        );
+
+        const [, audioB, audioC] = document.querySelectorAll<HTMLAudioElement>("audio");
+        expect(audioC).toBeDefined();
+
+        playCalls.length = 0;
+        fireAudioEvent(audioB!, "ended");
+
+        await Promise.resolve();
+
+        // The hook must have picked up the appended id from the updated
+        // orderedIds list — not a stale index captured at mount time.
+        expect(playCalls).toHaveLength(1);
+        expect(playCalls[0]).toBe(audioC);
       });
     });
   });

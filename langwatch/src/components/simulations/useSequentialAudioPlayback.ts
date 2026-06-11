@@ -3,105 +3,100 @@
  *
  * Responsibilities:
  *  - Exclusivity: when any registered audio starts playing, all others are paused.
- *  - Sequential auto-advance: when an audio ends, the next audio in registration
- *    order is played. "Next" is resolved by `orderIndex` at the time the `ended`
- *    event fires so that mid-list starts advance from that position onward.
- *  - Isolation: each call to this hook is independent (no module-level or global
- *    state); two renderer instances that each call this hook do not interfere.
+ *  - Sequential auto-advance: when an audio ends, the next audio in `orderedIds`
+ *    is played. The ordered list is passed each render so appended messages are
+ *    always reflected without requiring ref re-fire.
+ *  - Isolation: each call to this hook is independent; two renderer instances do
+ *    not interfere.
  *
- * Usage (inside ScenarioMessageRenderer):
- *   const { registerAudio, unregisterAudio, handlePlay, handleEnded } =
- *     useSequentialAudioPlayback();
+ * Usage (canonical caller: ScenarioMessageRenderer):
+ *   const orderedIds = useMemo(
+ *     () => items.filter((i) => i.kind === "media" && i.part.type === "audio").map((i) => i.id),
+ *     [items],
+ *   );
+ *   const { getAudioProps } = useSequentialAudioPlayback({ orderedIds });
  *
  *   // Wire into each <MediaPart>:
- *   <MediaPart
- *     ...
- *     audioId={item.id}
- *     onAudioPlay={() => handlePlay(item.id)}
- *     onAudioEnded={() => handleEnded(item.id)}
- *     onAudioRef={(el) => {
- *       if (el) registerAudio(item.id, el, index);
- *       else unregisterAudio(item.id);
- *     }}
- *   />
+ *   <MediaPart part={item.part} projectId={projectId} audioPlayback={getAudioProps(item.id)} />
  */
 
 import { useRef, useCallback } from "react";
 
-interface AudioEntry {
-  element: HTMLAudioElement;
-  orderIndex: number;
+interface SequentialAudioPlaybackOptions {
+  /**
+   * Stable-ordered list of audio item ids, updated each render.
+   * "Next" is resolved by position in this list, so streaming appends are
+   * automatically handled without requiring the <audio> ref to re-fire.
+   */
+  orderedIds: string[];
 }
 
-interface SequentialAudioPlayback {
-  /** Called by MediaPart's ref callback when an <audio> element mounts or unmounts. */
-  registerAudio: (params: {
-    id: string;
-    element: HTMLAudioElement;
-    orderIndex: number;
-  }) => void;
-  unregisterAudio: (params: { id: string }) => void;
-  /** Called when any audio fires its `onPlay` event (including programmatic play). */
-  handlePlay: (params: { id: string }) => void;
-  /** Called when any audio fires its `onEnded` event. */
-  handleEnded: (params: { id: string }) => void;
+export interface AudioPlaybackProps {
+  ref: (el: HTMLAudioElement | null) => void;
+  onPlay: () => void;
+  onEnded: () => void;
 }
 
-export function useSequentialAudioPlayback(): SequentialAudioPlayback {
-  // Map from stable audio id → { element, orderIndex }
-  const registryRef = useRef<Map<string, AudioEntry>>(new Map());
+export interface SequentialAudioPlayback {
+  /**
+   * Returns the ref/event props to spread onto a <MediaPart audioPlayback={...}>.
+   * Stable across renders — the closures capture refs, not closed-over values.
+   */
+  getAudioProps: (id: string) => AudioPlaybackProps;
+}
 
-  const registerAudio = useCallback(
-    ({
-      id,
-      element,
-      orderIndex,
-    }: {
-      id: string;
-      element: HTMLAudioElement;
-      orderIndex: number;
-    }) => {
-      registryRef.current.set(id, { element, orderIndex });
-    },
-    [],
-  );
+export function useSequentialAudioPlayback({
+  orderedIds,
+}: SequentialAudioPlaybackOptions): SequentialAudioPlayback {
+  // Single source of ordering truth — updated every render via the ref trick,
+  // so handleEnded always sees the latest list even after streaming appends.
+  const orderedIdsRef = useRef<string[]>(orderedIds);
+  orderedIdsRef.current = orderedIds;
 
-  const unregisterAudio = useCallback(({ id }: { id: string }) => {
-    registryRef.current.delete(id);
-  }, []);
+  // Map from stable audio id → registered HTMLAudioElement.
+  const registryRef = useRef<Map<string, HTMLAudioElement>>(new Map());
 
-  const handlePlay = useCallback(({ id }: { id: string }) => {
+  const handlePlay = useCallback((id: string) => {
     // Pause every registered audio that isn't the one that just started.
-    for (const [entryId, entry] of registryRef.current.entries()) {
-      if (entryId !== id && !entry.element.paused) {
-        entry.element.pause();
+    for (const [entryId, el] of registryRef.current.entries()) {
+      if (entryId !== id && !el.paused) {
+        el.pause();
       }
     }
   }, []);
 
-  const handleEnded = useCallback(({ id }: { id: string }) => {
-    const current = registryRef.current.get(id);
-    if (!current) return;
+  const handleEnded = useCallback((id: string) => {
+    const list = orderedIdsRef.current;
+    const idx = list.indexOf(id);
+    if (idx === -1) return; // id not in list (unmounted) — stop
 
-    // Find the entry with the smallest orderIndex that is strictly greater
-    // than the current one — i.e. the immediately next audio in message order.
-    let nextEntry: AudioEntry | null = null;
-    for (const [, entry] of registryRef.current.entries()) {
-      if (entry.orderIndex > current.orderIndex) {
-        if (nextEntry === null || entry.orderIndex < nextEntry.orderIndex) {
-          nextEntry = entry;
-        }
-      }
-    }
+    const nextId = list[idx + 1];
+    if (!nextId) return; // last audio — chain stops
 
-    if (!nextEntry) return; // last audio — do nothing
+    const nextEl = registryRef.current.get(nextId);
+    if (!nextEl) return;
 
     // Kick off the next audio. Reject gracefully so we don't throw an
     // unhandledrejection (e.g. if the source is unloadable).
-    nextEntry.element.play().catch(() => {
+    nextEl.play().catch(() => {
       // Chain stops here; no further auto-advance is triggered.
     });
   }, []);
 
-  return { registerAudio, unregisterAudio, handlePlay, handleEnded };
+  const getAudioProps = useCallback(
+    (id: string): AudioPlaybackProps => ({
+      ref: (el: HTMLAudioElement | null) => {
+        if (el) {
+          registryRef.current.set(id, el);
+        } else {
+          registryRef.current.delete(id);
+        }
+      },
+      onPlay: () => handlePlay(id),
+      onEnded: () => handleEnded(id),
+    }),
+    [handlePlay, handleEnded],
+  );
+
+  return { getAudioProps };
 }
