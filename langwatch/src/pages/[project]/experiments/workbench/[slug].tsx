@@ -4,7 +4,7 @@ import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useMemo } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { useRegisterLangyHandlers } from "~/components/langy/LangyContext";
-import type { ProposalHandlers } from "~/components/langy/LangySidebar";
+import type { ProposalHandlers } from "~/components/langy/MessageContent";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { AutosaveStatus } from "~/experiments-v3/components/AutosaveStatus";
 import { EditableHeading } from "~/experiments-v3/components/EditableHeading";

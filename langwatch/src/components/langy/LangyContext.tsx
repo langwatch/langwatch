@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { ProposalHandlers } from "./LangySidebar";
+import type { ProposalHandlers } from "./MessageContent";
 
 interface LangyContextValue {
   isOpen: boolean;
