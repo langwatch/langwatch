@@ -41,7 +41,7 @@ interface ClickHouseCountRow {
  * ClickHouse backend for experiment run queries.
  *
  * Returns `null` from public methods when ClickHouse is not enabled
- * for the given project, allowing the facade to fall back to Elasticsearch.
+ * for the given project.
  *
  * Follows the same pattern as `ClickHouseTraceService`.
  */

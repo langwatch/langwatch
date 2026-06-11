@@ -48,5 +48,5 @@ export { PRO_TEMPLATE, ENTERPRISE_TEMPLATE, getPlanTemplate } from "./planTempla
 // from 'ee/licensing/signing' for server-side usage.
 
 // NOTE: Server-side factory (createLicenseHandler) is in ./server.ts to avoid
-// bundling Node.js-only dependencies (Elasticsearch, etc.) in client code.
+// bundling Node.js-only dependencies in client code.
 // Import from 'ee/licensing/server' for server-side usage.

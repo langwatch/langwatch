@@ -1,6 +1,6 @@
 /**
  * Creates a synthetic ReadableSpan representing an infrastructure error
- * during span collection from Elasticsearch.
+ * during span collection.
  *
  * This span surfaces the failure reason in the judge's trace digest
  * so the judge can distinguish "no spans available" from

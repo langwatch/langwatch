@@ -11,7 +11,7 @@ import { LicenseEnforcementRepository } from "../license-enforcement.repository"
  * - Validates query structure for all 8 Prisma-based methods
  *
  * Note: Message/trace counting is NOT tested here because it uses
- * Elasticsearch via TraceUsageService, not Prisma. That's tested
+ * ClickHouse via TraceUsageService, not Prisma. That's tested
  * in the UsageStatsService tests.
  *
  * Note: Classification function tests (isViewOnlyPermission, isViewOnlyCustomRole,
