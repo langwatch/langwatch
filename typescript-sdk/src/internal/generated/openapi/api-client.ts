@@ -558,7 +558,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/evaluations/v3/runs/{runId}": {
+    "/api/experiments/runs/{runId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -575,7 +575,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/evaluations/v3/{slug}/run": {
+    "/api/experiments/{slug}/run": {
         parameters: {
             query?: never;
             header?: never;
@@ -1207,7 +1207,7 @@ export interface paths {
         put?: never;
         /** @description Create a new scenario event */
         post: operations["postApiScenario-events"];
-        /** @description Delete all events */
+        /** @description Archive the simulation runs for a batch run and/or scenario set. Requires at least one of batchRunId or scenarioSetId — archiving every run in the project in one call is not supported. */
         delete: operations["deleteApiScenario-events"];
         options?: never;
         head?: never;
@@ -1877,6 +1877,167 @@ export interface paths {
         head?: never;
         /** @description Update a workflow's metadata (name, icon, description) */
         patch: operations["patchApiWorkflowsById"];
+        trace?: never;
+    };
+    "/api/model-defaults": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Snapshot of the default-model cascade for this project: effective resolution per role, plus the configs the caller can read. */
+        get: operations["getApiModel-defaults"];
+        put?: never;
+        /** @description Create a default-model config attached to one or more scopes. JSON keys may be roles (DEFAULT, FAST, EMBEDDINGS) or registered feature keys; missing keys inherit from a higher scope. */
+        post: operations["postApiModel-defaults"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/model-defaults/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Update a config's JSON payload and/or its scope attachments. Sending `scopes: []` deletes the config. */
+        put: operations["putApiModel-defaultsById"];
+        post?: never;
+        /** @description Delete a default-model config. Scope attachments cascade. */
+        delete: operations["deleteApiModel-defaultsById"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/governance/ingestion-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List ingestion templates
+         * @description Returns the union of platform-published default templates and any org-authored templates visible to the caller's organization. Disabled / archived rows are filtered out. `ottl_rules` is empty in this end-user shape; admins use GET /ingestion-templates/admin to read the canonical OTTL.
+         */
+        get: operations["getApiGovernanceIngestion-templates"];
+        put?: never;
+        /**
+         * Create org-authored ingestion template
+         * @description Creates a brand-new template scoped to the caller's organization. Slug is auto-generated. Platform rows (organizationId IS NULL) are NEVER created via this endpoint — admins customize platform defaults via POST /ingestion-templates/clone instead.
+         */
+        post: operations["postApiGovernanceIngestion-templates"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/governance/ingestion-templates/admin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List ingestion templates (admin shape, includes OTTL)
+         * @description Same union as the user list but includes the canonical `ottl_rules` source for every row. Used by admin tooling to render the transparency block / authoring drawer.
+         */
+        get: operations["getApiGovernanceIngestion-templatesAdmin"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/governance/ingestion-templates/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get ingestion template
+         * @description Single-template lookup by id, scoped to the caller's organization. Cross-org probes collapse to 404 (no enumeration vector).
+         */
+        get: operations["getApiGovernanceIngestion-templatesById"];
+        put?: never;
+        post?: never;
+        /**
+         * Soft-archive an org-authored template
+         * @description Marks the row archived; existing ingestion keys continue to land traces but the row disappears from list views. Platform-published rows reject with 403.
+         */
+        delete: operations["deleteApiGovernanceIngestion-templatesById"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/governance/ingestion-templates/{id}/ottl-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Replace ottl_rules on an org-authored template
+         * @description Audit-logged with line counts pre/post. Platform-published rows reject with 403. Admins must clone a platform row before editing it.
+         */
+        patch: operations["patchApiGovernanceIngestion-templatesByIdOttl-rules"];
+        trace?: never;
+    };
+    "/api/governance/ingestion-templates/clone": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Clone a platform-published template into the caller's org
+         * @description Forks the source row's source_type / display_name / OTTL into a fresh org-authored row that the admin can then edit via PATCH /ingestion-templates/:id/ottl-rules.
+         */
+        post: operations["postApiGovernanceIngestion-templatesClone"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/track": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Record a user event (e.g. thumbs up/down, selected text) attached to a trace. Predefined event types validate against their schemas; custom event types pass through `trackEventRESTParamsValidatorSchema`. */
+        post: operations["postApiEventsTrack"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
 }
@@ -3357,7 +3518,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description The run ID returned from POST /api/evaluations/v3/{slug}/run */
+                /** @description The run ID returned from POST /api/experiments/{slug}/run */
                 runId: string;
             };
             cookie?: never;
@@ -5123,8 +5284,6 @@ export interface operations {
                             name: string;
                             description: string | null;
                             /** @enum {string} */
-                            environment: "live" | "test";
-                            /** @enum {string} */
                             status: "active" | "revoked";
                             principal_user_id: string | null;
                             provider_credential_ids: string[];
@@ -5206,8 +5365,6 @@ export interface operations {
                             display_prefix: string;
                             name: string;
                             description: string | null;
-                            /** @enum {string} */
-                            environment: "live" | "test";
                             /** @enum {string} */
                             status: "active" | "revoked";
                             principal_user_id: string | null;
@@ -5296,8 +5453,6 @@ export interface operations {
                             display_prefix: string;
                             name: string;
                             description: string | null;
-                            /** @enum {string} */
-                            environment: "live" | "test";
                             /** @enum {string} */
                             status: "active" | "revoked";
                             principal_user_id: string | null;
@@ -5398,8 +5553,6 @@ export interface operations {
                             name: string;
                             description: string | null;
                             /** @enum {string} */
-                            environment: "live" | "test";
-                            /** @enum {string} */
                             status: "active" | "revoked";
                             principal_user_id: string | null;
                             provider_credential_ids: string[];
@@ -5487,8 +5640,6 @@ export interface operations {
                             name: string;
                             description: string | null;
                             /** @enum {string} */
-                            environment: "live" | "test";
-                            /** @enum {string} */
                             status: "active" | "revoked";
                             principal_user_id: string | null;
                             provider_credential_ids: string[];
@@ -5572,8 +5723,6 @@ export interface operations {
                             display_prefix: string;
                             name: string;
                             description: string | null;
-                            /** @enum {string} */
-                            environment: "live" | "test";
                             /** @enum {string} */
                             status: "active" | "revoked";
                             principal_user_id: string | null;
@@ -7358,7 +7507,7 @@ export interface operations {
                             versionId: string;
                         }[];
                         /** @default {} */
-                        config: {
+                        parameters: {
                             [key: string]: unknown;
                         };
                     }[];
@@ -7459,7 +7608,7 @@ export interface operations {
                     /** @enum {string} */
                     schemaVersion?: "1.0";
                     tags?: string[];
-                    config?: {
+                    parameters?: {
                         [key: string]: unknown;
                     };
                 };
@@ -7560,7 +7709,7 @@ export interface operations {
                             versionId: string;
                         }[];
                         /** @default {} */
-                        config: {
+                        parameters: {
                             [key: string]: unknown;
                         };
                     };
@@ -8037,7 +8186,7 @@ export interface operations {
                             versionId: string;
                         }[];
                         /** @default {} */
-                        config: {
+                        parameters: {
                             [key: string]: unknown;
                         };
                     };
@@ -8146,7 +8295,7 @@ export interface operations {
                     /** @enum {string} */
                     schemaVersion?: "1.0";
                     tags?: string[];
-                    config?: {
+                    parameters?: {
                         [key: string]: unknown;
                     };
                     /** @enum {string} */
@@ -8250,7 +8399,7 @@ export interface operations {
                             versionId: string;
                         }[];
                         /** @default {} */
-                        config: {
+                        parameters: {
                             [key: string]: unknown;
                         };
                     };
@@ -8508,7 +8657,7 @@ export interface operations {
                             } | null;
                         };
                     };
-                    config?: {
+                    parameters?: {
                         [key: string]: unknown;
                     };
                     localVersion?: number;
@@ -8614,7 +8763,7 @@ export interface operations {
                                 versionId: string;
                             }[];
                             /** @default {} */
-                            config: {
+                            parameters: {
                                 [key: string]: unknown;
                             };
                         };
@@ -8961,7 +9110,7 @@ export interface operations {
                             versionId: string;
                         }[];
                         /** @default {} */
-                        config: {
+                        parameters: {
                             [key: string]: unknown;
                         };
                     }[];
@@ -9135,7 +9284,7 @@ export interface operations {
                             versionId: string;
                         }[];
                         /** @default {} */
-                        config: {
+                        parameters: {
                             [key: string]: unknown;
                         };
                     };
@@ -9422,6 +9571,14 @@ export interface operations {
                             toolName?: string;
                             toolCallId?: string;
                             result?: unknown;
+                        } | {
+                            /** @constant */
+                            type: "binary";
+                            mimeType: string;
+                            data?: string;
+                            url?: string;
+                            id?: string;
+                            filename?: string;
                         })[] | null;
                         parts?: ({
                             /** @constant */
@@ -9452,6 +9609,14 @@ export interface operations {
                             toolName?: string;
                             toolCallId?: string;
                             result?: unknown;
+                        } | {
+                            /** @constant */
+                            type: "binary";
+                            mimeType: string;
+                            data?: string;
+                            url?: string;
+                            id?: string;
+                            filename?: string;
                         })[];
                         function_call?: {
                             name?: string;
@@ -9623,14 +9788,17 @@ export interface operations {
     };
     "deleteApiScenario-events": {
         parameters: {
-            query?: never;
+            query?: {
+                batchRunId?: string;
+                scenarioSetId?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Events deleted successfully */
+            /** @description Matching runs archived successfully */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -9642,7 +9810,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Bad Request */
+            /** @description No scope provided — a batchRunId or scenarioSetId is required */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -9650,7 +9818,6 @@ export interface operations {
                 content: {
                     "application/json": {
                         error: string;
-                        message?: string;
                     };
                 };
             };
@@ -12765,6 +12932,1077 @@ export interface operations {
             };
             /** @description Workflow not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "getApiModel-defaults": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        scope: {
+                            projectId: string;
+                            teamId: string | null;
+                            organizationId: string | null;
+                            organizationName: string | null;
+                        };
+                        effective: {
+                            DEFAULT: {
+                                model: string;
+                                source: string;
+                                scope: string | null;
+                            } | null;
+                            FAST: {
+                                model: string;
+                                source: string;
+                                scope: string | null;
+                            } | null;
+                            EMBEDDINGS: {
+                                model: string;
+                                source: string;
+                                scope: string | null;
+                            } | null;
+                        };
+                        configs: {
+                            id: string;
+                            config: {
+                                [key: string]: string;
+                            };
+                            scopes: {
+                                /** @enum {string} */
+                                type: "ORGANIZATION" | "TEAM" | "PROJECT";
+                                id: string;
+                                name: string;
+                            }[];
+                            createdAt: string;
+                            updatedAt: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "postApiModel-defaults": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    config: {
+                        [key: string]: string;
+                    };
+                    scopes: {
+                        /** @enum {string} */
+                        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                        scopeId: string;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "putApiModel-defaultsById": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    config?: {
+                        [key: string]: string;
+                    };
+                    scopes?: {
+                        /** @enum {string} */
+                        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                        scopeId: string;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description Updated */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "deleteApiModel-defaultsById": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "getApiGovernanceIngestion-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Templates visible to the caller */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            id: string;
+                            slug: string;
+                            source_type: string;
+                            display_name: string;
+                            description: string | null;
+                            icon_asset: string | null;
+                            credential_schema: string | null;
+                            ottl_rules: string;
+                            platform_published: boolean;
+                            enabled: boolean;
+                            organization_id: string | null;
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "postApiGovernanceIngestion-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Template created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        ingestion_template: {
+                            id: string;
+                            slug: string;
+                            source_type: string;
+                            display_name: string;
+                            description: string | null;
+                            icon_asset: string | null;
+                            credential_schema: string | null;
+                            ottl_rules: string;
+                            platform_published: boolean;
+                            enabled: boolean;
+                            organization_id: string | null;
+                        };
+                    };
+                };
+            };
+            /** @description Validation error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "getApiGovernanceIngestion-templatesAdmin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Admin templates */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            id: string;
+                            slug: string;
+                            source_type: string;
+                            display_name: string;
+                            description: string | null;
+                            icon_asset: string | null;
+                            credential_schema: string | null;
+                            ottl_rules: string;
+                            platform_published: boolean;
+                            enabled: boolean;
+                            organization_id: string | null;
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "getApiGovernanceIngestion-templatesById": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Template detail */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        ingestion_template: {
+                            id: string;
+                            slug: string;
+                            source_type: string;
+                            display_name: string;
+                            description: string | null;
+                            icon_asset: string | null;
+                            credential_schema: string | null;
+                            ottl_rules: string;
+                            platform_published: boolean;
+                            enabled: boolean;
+                            organization_id: string | null;
+                        };
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "deleteApiGovernanceIngestion-templatesById": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Archived */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        archived: true;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Platform template immutable */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                        };
+                    };
+                };
+            };
+            /** @description Template not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "patchApiGovernanceIngestion-templatesByIdOttl-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        ingestion_template: {
+                            id: string;
+                            slug: string;
+                            source_type: string;
+                            display_name: string;
+                            description: string | null;
+                            icon_asset: string | null;
+                            credential_schema: string | null;
+                            ottl_rules: string;
+                            platform_published: boolean;
+                            enabled: boolean;
+                            organization_id: string | null;
+                        };
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Platform template immutable */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                        };
+                    };
+                };
+            };
+            /** @description Template not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "postApiGovernanceIngestion-templatesClone": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cloned */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        ingestion_template: {
+                            id: string;
+                            slug: string;
+                            source_type: string;
+                            display_name: string;
+                            description: string | null;
+                            icon_asset: string | null;
+                            credential_schema: string | null;
+                            ottl_rules: string;
+                            platform_published: boolean;
+                            enabled: boolean;
+                            organization_id: string | null;
+                        };
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Source template not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    postApiEventsTrack: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Event tracked */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        message: "Event tracked";
+                    };
+                };
+            };
+            /** @description Invalid event payload */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

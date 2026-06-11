@@ -34,6 +34,7 @@ import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 
 import { app } from "../auth-cli";
+import { IngestionKeyService } from "@ee/governance/services/ingestionKey.service";
 
 // Phase 4b-6 added a 402 license gate on every /api/auth/cli/governance/*
 // route. This test pins read-and-tenancy behavior, not license behavior, so
@@ -413,6 +414,159 @@ describe("GET /api/auth/cli/governance/*", () => {
         expect(typeof body.health.events7d).toBe("number");
         expect(typeof body.health.events30d).toBe("number");
         // lastSuccessIso is `string | null` — both acceptable.
+      });
+    });
+  });
+
+  // ── GET /governance/ingestion-keys ─────────────────────────────────────────
+  // Issue #4755: revoking an ingestion key on the platform must be reflected by
+  // the new list endpoint so the CLI can detect stale cache entries and re-mint.
+  // The endpoint returns snake_case { keys: [{ source_type, lookup_id,
+  // ingestion_template_id }] }. Revoked keys must NOT appear. lookupId must be
+  // included so the CLI can match against the cached token prefix.
+  describe("GET /governance/ingestion-keys", () => {
+    const INGEST_KEY_USER = `usr-cli-ik-${suffix}`;
+    const INGEST_KEY_ORG = `org-cli-ik-${suffix}`;
+    const INGEST_KEY_TOKEN = `lw_at_${"k".repeat(43)}-${suffix}`;
+    let ingestionKeyLookupId: string | undefined;
+    let revokedKeyLookupId: string | undefined;
+
+    beforeAll(async () => {
+      await prisma.organization.create({
+        data: {
+          id: INGEST_KEY_ORG,
+          name: `IK Org ${suffix}`,
+          slug: `ik-org-${suffix}`,
+        },
+      });
+      await prisma.user.create({
+        data: {
+          id: INGEST_KEY_USER,
+          email: `ik-user-${suffix}@example.com`,
+          name: "IK Tester",
+        },
+      });
+      await prisma.organizationUser.create({
+        data: { organizationId: INGEST_KEY_ORG, userId: INGEST_KEY_USER, role: "ADMIN" },
+      });
+      await prisma.roleBinding.create({
+        data: {
+          organizationId: INGEST_KEY_ORG,
+          userId: INGEST_KEY_USER,
+          role: "ADMIN",
+          scopeType: "ORGANIZATION",
+          scopeId: INGEST_KEY_ORG,
+        },
+      });
+
+      if (!redisConnection) throw new Error("Redis unavailable");
+      await redisConnection.set(
+        `lwcli:access:${INGEST_KEY_TOKEN}`,
+        JSON.stringify({
+          user_id: INGEST_KEY_USER,
+          organization_id: INGEST_KEY_ORG,
+          issued_at: Date.now(),
+          expires_at: Date.now() + 60 * 60 * 1000,
+        }),
+        "EX",
+        60 * 60,
+      );
+
+      // Mint a live key via the service so we can verify it appears in the list
+      const service = IngestionKeyService.create(prisma);
+      const result = await service.ensureForPersonalProject({
+        userId: INGEST_KEY_USER,
+        organizationId: INGEST_KEY_ORG,
+        sourceType: "codex",
+        createdByDeviceLabel: null,
+      });
+      ingestionKeyLookupId = result.token.split("_")[0]?.replace("ik-lw-", "");
+
+      // Mint a second key then revoke it immediately — it must not appear
+      const revokedResult = await service.ensureForPersonalProject({
+        userId: INGEST_KEY_USER,
+        organizationId: INGEST_KEY_ORG,
+        sourceType: "claude_code",
+        createdByDeviceLabel: null,
+      });
+      revokedKeyLookupId = revokedResult.token.split("_")[0]?.replace("ik-lw-", "");
+      // Revoke by setting revokedAt directly to avoid needing full admin context
+      await prisma.apiKey.updateMany({
+        where: {
+          id: revokedResult.apiKeyId,
+          organizationId: INGEST_KEY_ORG,
+        },
+        data: { revokedAt: new Date() },
+      });
+    });
+
+    afterAll(async () => {
+      if (redisConnection) {
+        await redisConnection.del(`lwcli:access:${INGEST_KEY_TOKEN}`);
+      }
+      await prisma.apiKey.deleteMany({
+        where: { organizationId: INGEST_KEY_ORG },
+      });
+      await prisma.organizationUser.deleteMany({
+        where: { organizationId: INGEST_KEY_ORG },
+      });
+      await prisma.roleBinding.deleteMany({
+        where: { organizationId: INGEST_KEY_ORG },
+      });
+      await prisma.user.deleteMany({ where: { id: INGEST_KEY_USER } });
+      await prisma.organization.deleteMany({ where: { id: INGEST_KEY_ORG } });
+    });
+
+    describe("when called with a valid Bearer token", () => {
+      it("returns 200 with keys array containing only live (non-revoked) entries", async () => {
+        const res = await app.request(
+          "/api/auth/cli/governance/ingestion-keys",
+          {
+            method: "GET",
+            headers: { Authorization: `Bearer ${INGEST_KEY_TOKEN}` },
+          },
+        );
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as {
+          keys: Array<{
+            source_type: string;
+            lookup_id: string;
+            ingestion_template_id: string | null;
+          }>;
+        };
+        expect(Array.isArray(body.keys)).toBe(true);
+        const sourceTypes = body.keys.map((k) => k.source_type);
+        expect(sourceTypes).toContain("codex");
+        // Revoked claude_code key must NOT appear
+        expect(sourceTypes).not.toContain("claude_code");
+      });
+
+      it("includes lookup_id so the CLI can detect stale cached tokens", async () => {
+        const res = await app.request(
+          "/api/auth/cli/governance/ingestion-keys",
+          {
+            method: "GET",
+            headers: { Authorization: `Bearer ${INGEST_KEY_TOKEN}` },
+          },
+        );
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as {
+          keys: Array<{ source_type: string; lookup_id: string }>;
+        };
+        const codexEntry = body.keys.find((k) => k.source_type === "codex");
+        expect(codexEntry).toBeDefined();
+        expect(typeof codexEntry!.lookup_id).toBe("string");
+        expect(codexEntry!.lookup_id.length).toBeGreaterThan(0);
+      });
+    });
+
+    describe("when called without a Bearer token", () => {
+      it("returns 401", async () => {
+        const res = await app.request(
+          "/api/auth/cli/governance/ingestion-keys",
+          { method: "GET" },
+        );
+        expect(res.status).toBe(401);
       });
     });
   });
