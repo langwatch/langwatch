@@ -17,9 +17,9 @@ import { getApp } from "~/server/app-layer/app";
 /**
  * Cache: projectId -> visibilityDays sentinel ("none" = no window). Plan
  * resolution is an uncached Prisma read; a short TTL keeps the per-request
- * cost near zero while plan changes still apply within a minute — well
- * inside ADR-028's "next read" intent. The CUTOFF itself is computed fresh
- * per call (it moves with `now`), only the plan lookup is cached.
+ * cost near zero while plan changes still apply within a minute. The CUTOFF
+ * itself is computed fresh per call (it moves with `now`), only the plan
+ * lookup is cached.
  */
 const visibilityDaysCache = new TtlCache<number | "none">(
   60 * 1000,
@@ -27,7 +27,7 @@ const visibilityDaysCache = new TtlCache<number | "none">(
 );
 
 /**
- * Resolves the ADR-028 visibility cutoff for a project's organization.
+ * Resolves the plan-based visibility cutoff for a project's organization.
  * Fails CLOSED: unresolvable org or plan errors apply the free-tier window
  * (a leak is irreversible; over-blur is a refresh away).
  */
@@ -141,7 +141,7 @@ export async function getUserProtectionsForProject(
     ctx.publiclyShared ||
     (await hasProjectPermission(ctx, projectId, "cost:view"));
 
-  // ADR-028: plan-based visibility window applies to every user-facing read,
+  // The plan-based visibility window applies to every user-facing read,
   // including public shares — sharing must not be the bypass.
   const visibilityCutoffMs = await getVisibilityCutoffMsForProject(projectId);
 

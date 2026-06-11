@@ -19,9 +19,9 @@ export const DEFAULT_LIMIT = Number.MAX_SAFE_INTEGER;
 export const DEFAULT_MEMBERS_LITE = 1;
 
 /**
- * Free-tier read-path visibility window (ADR-028): trace content older than
- * this many days is teaser-redacted for free plans. Visibility, not
- * retention — deletion stays at the org's retention policy.
+ * Free-tier read-path visibility window: trace content older than this many
+ * days is teaser-redacted for free plans. Visibility, not retention —
+ * deletion stays at the org's retention policy.
  */
 export const FREE_VISIBILITY_DAYS = 14;
 
@@ -145,7 +145,7 @@ export const FREE_PLAN: PlanInfo = {
   type: "FREE",
   name: "Free",
   free: true,
-  // ADR-028: self-hosted unlicensed gets the Free visibility experience.
+  // Self-hosted unlicensed gets the Free visibility experience.
   visibilityDays: FREE_VISIBILITY_DAYS,
   overrideAddingLimitations: false,
 

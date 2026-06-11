@@ -91,7 +91,7 @@ export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {
     type: PlanTypes.FREE,
     name: "Free",
     free: true,
-    // ADR-028: SaaS Free gets the 14-day content visibility window.
+    // SaaS Free gets the 14-day content visibility window.
     visibilityDays: FREE_VISIBILITY_DAYS,
     maxMembers: 2,
     maxProjects: 2,

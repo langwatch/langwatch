@@ -95,7 +95,7 @@ interface ListParams {
   pageSize: number;
   filterWhere?: { sql: string; params: Record<string, unknown> };
   /**
-   * ADR-028 visibility gate: list items older than this cutoff get their
+   * Visibility gate: list items older than this cutoff get their
    * input/output previews teaser-redacted. Omitted/null = ungated.
    */
   visibilityCutoffMs?: number | null;
@@ -480,8 +480,8 @@ export class TraceListService {
       params.timeRange.from,
     );
 
-    // ADR-028: tease input/output previews of items beyond the caller's
-    // visibility window — existence, counts, and metadata stay untouched.
+    // Tease input/output previews of items beyond the caller's visibility
+    // window — existence, counts, and metadata stay untouched.
     const gatedItems =
       params.visibilityCutoffMs === null ||
       params.visibilityCutoffMs === undefined

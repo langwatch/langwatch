@@ -180,7 +180,7 @@ export function applySpanProtections(
     metrics: transformedMetrics,
   };
 
-  // ADR-028: teaser-redact content of spans beyond the plan's visibility window
+  // Teaser-redact content of spans beyond the plan's visibility window
   if (
     protections.visibilityCutoffMs !== null &&
     protections.visibilityCutoffMs !== undefined &&
@@ -302,8 +302,8 @@ export function applyTraceProtections(
     events: transformedEvents,
   };
 
-  // ADR-028: teaser-redact content of traces beyond the plan's visibility
-  // window. Spans were already age-checked and teased individually in
+  // Teaser-redact content of traces beyond the plan's visibility window.
+  // Spans were already age-checked and teased individually in
   // applySpanProtections — exclude them here so they are not double-teased;
   // this pass covers the trace-level content fields and stamps the redacted
   // flag for the upgrade CTA.

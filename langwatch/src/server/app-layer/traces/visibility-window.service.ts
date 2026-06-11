@@ -13,7 +13,7 @@ const logger = createLogger("langwatch:traces:visibility-window");
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Teaser truncation rule (ADR-028): keep the first
+ * Teaser truncation rule: keep the first
  * max(TEASER_MIN_CHARS, min(TEASER_MAX_CHARS, ceil(len * TEASER_FRACTION)))
  * characters of each content field. The floor keeps tiny traces legible as
  * teasers; the cap stops large payloads from leaking meaningful content.
@@ -34,7 +34,7 @@ const teaserOfError = (
   error: ErrorCapture | null | undefined,
 ): ErrorCapture | null | undefined => {
   if (!error) return error;
-  // The stacktrace is content too (ADR-028: errors routinely embed prompts) —
+  // The stacktrace is content too (errors routinely embed prompts) —
   // tease the joined trace, not each frame, so N frames can't leak N teasers.
   const joined = error.stacktrace.join("\n");
   return {
@@ -98,7 +98,7 @@ const teaserOfParams = (
 /**
  * Redacts a trace's content fields to teasers (pure — returns a copy).
  * Metadata, metrics, timestamps, ids, and evaluations stay untouched:
- * existence and signal are never gated, only content (ADR-028).
+ * existence and signal are never gated, only content.
  */
 export const redactTraceContent = (trace: Trace): Trace => ({
   ...trace,
@@ -132,7 +132,8 @@ export const redactSpanContent = <T extends Span>(span: T): T => ({
 });
 
 /**
- * Resolves the plan-based visibility cutoff for an organization (ADR-028).
+ * Resolves the plan-based visibility cutoff for an organization.
+ * Design rationale: dev/docs/adr/028-visibility-blur-teaser-redaction.md.
  *
  * Stateless by design: every call evaluates the CURRENT plan, so upgrades
  * unblur on the next read and downgrades re-blur the same way. Fails CLOSED —

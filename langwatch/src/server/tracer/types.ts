@@ -595,8 +595,8 @@ export const traceSchema = z.object({
   events: z.array(eventSchema).optional(),
   evaluations: z.array(evaluationSchema).optional(),
   spans: z.array(spanSchema),
-  // ADR-028: set server-side when content was teaser-redacted by the
-  // plan's visibility window — the UI renders the upgrade CTA off this flag.
+  // Set server-side when content was teaser-redacted by the plan's
+  // visibility window — the UI renders the upgrade CTA off this flag.
   redacted_by_visibility_window: z.boolean().optional(),
 });
 

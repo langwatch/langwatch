@@ -11,9 +11,9 @@ export type PlanInfo = {
   name: string;
   free: boolean;
   /**
-   * Read-path visibility window in days (ADR-028). Trace content older than
-   * this is teaser-redacted server-side. `null`/`undefined` = no blur — all
-   * paid, enterprise, and licensed plans. Only free plans carry a number.
+   * Read-path visibility window in days. Trace content older than this is
+   * teaser-redacted server-side. `null`/`undefined` = no blur — all paid,
+   * enterprise, and licensed plans. Only free plans carry a number.
    */
   visibilityDays?: number | null;
   trialDays?: number;

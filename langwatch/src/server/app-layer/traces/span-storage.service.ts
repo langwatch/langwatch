@@ -40,10 +40,10 @@ type Paginated = ByTraceId & { limit: number; offset: number };
 type Since = ByTraceId & { sinceStartTimeMs: number };
 
 /**
- * ADR-028 read-side visibility gate. Read routes pass the caller's plan
- * cutoff (from `getVisibilityCutoffMsForProject`); spans started before it
- * get their content teaser-redacted. Omitted/null = ungated — internal
- * callers (ingestion, enrichment, derivations) never pass it.
+ * Read-side visibility gate. Read routes pass the caller's plan cutoff
+ * (from `getVisibilityCutoffMsForProject`); spans started before it get
+ * their content teaser-redacted. Omitted/null = ungated — internal callers
+ * (ingestion, enrichment, derivations) never pass it.
  */
 type VisibilityGate = { visibilityCutoffMs?: number | null };
 
