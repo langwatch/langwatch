@@ -155,9 +155,11 @@ export function NewVersionFields({
       if (!resolvedDefault.isFetched) return;
       hasTriggeredGeneration.current = true;
       userEditedCommitMessage.current = false;
+      // No shouldValidate here: with no model to auto-fill the field,
+      // validating the freshly-cleared value paints the required ring
+      // before the user has done anything. Submit still validates.
       form.setValue("commitMessage", "", {
         shouldDirty: true,
-        shouldValidate: true,
       });
       if (isModelConfigured) {
         setTimeout(() => {
