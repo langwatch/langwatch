@@ -117,6 +117,59 @@ describe("DataPrivacyPolicyService integration", () => {
       });
     });
 
+    describe("when an admin saves one rule targeting two sibling projects", () => {
+      /** @scenario One save can target several scopes at once */
+      it("writes an independent rule per selected scope", async () => {
+        const sibling =
+          (await prisma.project.findUnique({
+            where: { slug: `--test-project-${NAMESPACE}-sibling`, teamId },
+          })) ??
+          (await prisma.project.create({
+            data: {
+              name: "Test Project Sibling",
+              slug: `--test-project-${NAMESPACE}-sibling`,
+              language: "python",
+              framework: "openai",
+              apiKey: `test-auth-token-${nanoid()}`,
+              teamId,
+            },
+          }));
+
+        const config = {
+          categories: { input: { disposition: "drop" as const } },
+        };
+        await Promise.all(
+          [project.id, sibling.id].map((scopeId) =>
+            service.setForScope({
+              scope: { scopeType: "PROJECT", scopeId },
+              personalOnly: false,
+              config,
+            }),
+          ),
+        );
+
+        const [resolved, siblingResolved] = await Promise.all([
+          service.getResolvedForProject({ projectId: project.id }),
+          service.getResolvedForProject({ projectId: sibling.id }),
+        ]);
+        expect(resolved.categories.input.disposition).toBe("drop");
+        expect(siblingResolved.categories.input.disposition).toBe("drop");
+
+        // Each scope got its own row, so one can be removed without
+        // touching the other.
+        await service.removeForScope({
+          scope: { scopeType: "PROJECT", scopeId: sibling.id },
+          personalOnly: false,
+        });
+        const [keptResolved, removedResolved] = await Promise.all([
+          service.getResolvedForProject({ projectId: project.id }),
+          service.getResolvedForProject({ projectId: sibling.id }),
+        ]);
+        expect(keptResolved.categories.input.disposition).toBe("drop");
+        expect(removedResolved.categories.input.disposition).toBe("capture");
+      });
+    });
+
     describe("when a project rule is written after the policy was resolved", () => {
       it("serves the updated policy immediately after setForScope invalidates the cache", async () => {
         await service.setForScope({
