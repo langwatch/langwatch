@@ -11,6 +11,7 @@ import {
 import { deriveTraceStatus } from "~/server/app-layer/traces/derive-trace-status";
 import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
+import { deriveUnmappedCostSuggestion } from "~/server/app-layer/traces/model-cost-span-preview.service";
 import type { SpanSummaryRow } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
@@ -1097,6 +1098,17 @@ export const tracesV2Router = createTRPCRouter({
           detail.params = enriched;
         }
       }
+
+      // Token usage with no price on it, offer the user a cost mapping.
+      // The cheap guards run first; the rule lookup only fires for spans
+      // that actually present the unmapped-cost symptom.
+      detail.costSuggestion = await deriveUnmappedCostSuggestion({
+        projectId: input.projectId,
+        model: detail.model ?? null,
+        cost: detail.metrics?.cost,
+        promptTokens: detail.metrics?.promptTokens,
+        completionTokens: detail.metrics?.completionTokens,
+      });
 
       return redactV2Content(detail, protections);
     }),

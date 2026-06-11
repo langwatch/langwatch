@@ -1,4 +1,12 @@
-import { Badge, Box, HoverCard, HStack, Portal, Text, VStack } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  HoverCard,
+  HStack,
+  Portal,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import type React from "react";
 import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
 import type { TraceListItem } from "../../../../../types/trace";
@@ -93,7 +101,7 @@ const MONOCHROME_PROVIDER_ICONS = new Set<ProviderKey>([
  * icon stays at 12px / 14px so it complements the mono label without
  * dominating it.
  */
-function ProviderIcon({
+export function ProviderIcon({
   model,
   size,
 }: {
@@ -127,9 +135,7 @@ function ProviderIcon({
         // away from neutral. We want neutral white-ish, so just
         // invert. brightness(0.92) tones the result to off-white so
         // it doesn't hard-burn against the dark surface.
-        isMonochrome
-          ? { filter: "invert(1) brightness(0.92)" }
-          : undefined
+        isMonochrome ? { filter: "invert(1) brightness(0.92)" } : undefined
       }
       aria-hidden="true"
     >

@@ -1,6 +1,6 @@
-import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
-import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
+import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
 import type { SpanInsertData } from "../types";
 
 /**
@@ -23,7 +23,9 @@ export const MAX_DERIVATION_SPANS = 512;
  * ceiling so the value never propagates into a ClickHouse `UInt32` param.
  */
 export function clampSpanReadLimit(limit?: number): number {
-  const requested = Number.isFinite(limit) ? (limit as number) : MAX_DERIVATION_SPANS;
+  const requested = Number.isFinite(limit)
+    ? (limit as number)
+    : MAX_DERIVATION_SPANS;
   return Math.min(Math.max(1, Math.trunc(requested)), MAX_DERIVATION_SPANS);
 }
 
@@ -88,6 +90,33 @@ export interface OccurredAtHint {
   occurredAtMs?: number;
 }
 
+/**
+ * Per-model usage rollup over a recent window, feeds the model cost rule
+ * preview ("which models would this regex match, and how much traffic do
+ * they carry").
+ */
+export interface ModelUsageStatsRow {
+  model: string;
+  spanCount: number;
+  lastSeenMs: number;
+}
+
+/**
+ * Light per-span sample for the model cost rule preview list. Token counts
+ * are null when the span carries no usage attributes.
+ */
+export interface ModelSpanSampleRow {
+  traceId: string;
+  spanId: string;
+  spanName: string;
+  model: string;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  cacheReadTokens: number | null;
+  cacheCreationTokens: number | null;
+  startTimeMs: number;
+}
+
 export interface SpanStorageRepository {
   insertSpan(span: SpanInsertData): Promise<void>;
   insertSpans(spans: SpanInsertData[]): Promise<void>;
@@ -97,7 +126,11 @@ export interface SpanStorageRepository {
    * trace_id. `limit` may only lower the bound.
    */
   getSpansByTraceId(
-    params: { tenantId: string; traceId: string; limit?: number } & OccurredAtHint,
+    params: {
+      tenantId: string;
+      traceId: string;
+      limit?: number;
+    } & OccurredAtHint,
   ): Promise<Span[]>;
   /**
    * Normalized spans for a trace, used by read-time derivations (trace events
@@ -106,7 +139,11 @@ export interface SpanStorageRepository {
    * trace can't make the derivation read unbounded.
    */
   getNormalizedSpansByTraceId(
-    params: { tenantId: string; traceId: string; limit?: number } & OccurredAtHint,
+    params: {
+      tenantId: string;
+      traceId: string;
+      limit?: number;
+    } & OccurredAtHint,
   ): Promise<NormalizedSpan[]>;
   getSpanByIds(
     params: {
@@ -179,11 +216,37 @@ export interface SpanStorageRepository {
       sinceStartTimeMs: number;
     } & OccurredAtHint,
   ): Promise<Span[]>;
+  /**
+   * Distinct model names seen on the tenant's spans since `fromMs`, with
+   * span counts, ordered by traffic. Cross-trace by design (no traceId),
+   * the model cost rule preview needs the project-wide model inventory.
+   */
+  findModelUsageStats(params: {
+    tenantId: string;
+    fromMs: number;
+    limit: number;
+  }): Promise<ModelUsageStatsRow[]>;
+  /**
+   * Most recent spans whose model is one of `models`, capped per model so a
+   * single chatty model can't crowd the sample list. Spans carrying token
+   * usage are preferred over token-less ones.
+   */
+  findRecentSpansByModels(params: {
+    tenantId: string;
+    models: string[];
+    fromMs: number;
+    perModelLimit: number;
+    limit: number;
+  }): Promise<ModelSpanSampleRow[]>;
 }
 
 export class NullSpanStorageRepository implements SpanStorageRepository {
-  async insertSpan(_span: SpanInsertData): Promise<void> {}
-  async insertSpans(_spans: SpanInsertData[]): Promise<void> {}
+  async insertSpan(_span: SpanInsertData): Promise<void> {
+    // No-op storage.
+  }
+  async insertSpans(_spans: SpanInsertData[]): Promise<void> {
+    // No-op storage.
+  }
 
   async getSpansByTraceId(
     _params: { tenantId: string; traceId: string } & OccurredAtHint,
@@ -192,7 +255,11 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
   }
 
   async getNormalizedSpansByTraceId(
-    _params: { tenantId: string; traceId: string; limit?: number } & OccurredAtHint,
+    _params: {
+      tenantId: string;
+      traceId: string;
+      limit?: number;
+    } & OccurredAtHint,
   ): Promise<NormalizedSpan[]> {
     return [];
   }
@@ -286,6 +353,24 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
       sinceStartTimeMs: number;
     } & OccurredAtHint,
   ): Promise<Span[]> {
+    return [];
+  }
+
+  async findModelUsageStats(_params: {
+    tenantId: string;
+    fromMs: number;
+    limit: number;
+  }): Promise<ModelUsageStatsRow[]> {
+    return [];
+  }
+
+  async findRecentSpansByModels(_params: {
+    tenantId: string;
+    models: string[];
+    fromMs: number;
+    perModelLimit: number;
+    limit: number;
+  }): Promise<ModelSpanSampleRow[]> {
     return [];
   }
 }
