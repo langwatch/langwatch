@@ -15436,6 +15436,129 @@ For complete documentation on all CLI commands, advanced workflows, conflict res
 
 ---
 
+# FILE: ./prompt-management/features/essential/runtime-parameters.mdx
+
+---
+title: "Runtime Parameters"
+description: "Version arbitrary application settings alongside your prompts and fetch them via the SDK or REST API."
+---
+
+# Runtime Parameters
+
+Every prompt version can carry a `parameters` object: arbitrary JSON that is versioned, tagged, and fetched together with the prompt itself. Use it for application settings that should change in lockstep with the prompt — search iteration limits, confidence thresholds, structured output schemas, metadata field lists, feature switches.
+
+<Note>
+Available since Python SDK `0.26.0` and TypeScript SDK `0.33.0` (reading `prompt.parameters` works from Python SDK `0.25.0`; writing via `create`/`update` requires `0.26.0`). Changing `parameters` creates a new prompt version, just like changing the prompt text.
+</Note>
+
+## Why
+
+Prompts rarely live alone. The code around them has knobs — how many retrieval rounds to run, what score counts as confident, which fields to extract. When those knobs are hardcoded, a prompt rollback doesn't roll them back. Storing them in `parameters` means one versioned unit: deploy, tag, and revert prompt + settings together.
+
+## Shape
+
+`parameters` is an object with arbitrary JSON values (nested objects and arrays included). It defaults to `{}`. LangWatch does not interpret its contents — your application owns the schema.
+
+```json
+{
+  "max_search_iterations": 3,
+  "confidence_threshold": 0.8,
+  "extraction": {
+    "metadata_fields": ["category", "priority"],
+    "response_schema": { "type": "object", "properties": { "answer": { "type": "string" } } }
+  }
+}
+```
+
+## Reading parameters
+
+### Python SDK
+
+```python
+import langwatch
+
+prompt = langwatch.prompts.get("qa-extractor", tag="production")
+
+prompt.parameters
+# {"max_search_iterations": 3, "confidence_threshold": 0.8, ...}
+
+iterations = prompt.parameters.get("max_search_iterations", 1)
+```
+
+### TypeScript SDK
+
+```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+const prompt = await langwatch.prompts.get("qa-extractor", { tag: "production" });
+
+prompt.parameters;
+// { max_search_iterations: 3, confidence_threshold: 0.8, ... }
+```
+
+### REST API
+
+```bash
+curl -s "https://app.langwatch.ai/api/prompts/qa-extractor" \
+  -H "X-Auth-Token: $LANGWATCH_API_KEY" | jq .parameters
+```
+
+## Writing parameters
+
+### Python SDK
+
+```python
+import langwatch
+
+# On create
+langwatch.prompts.create(
+    "qa-extractor",
+    prompt="Extract the answer from {{document}}",
+    parameters={"max_search_iterations": 3, "confidence_threshold": 0.8},
+)
+
+# On update — creates a new version
+langwatch.prompts.update(
+    "qa-extractor",
+    scope="PROJECT",
+    parameters={"max_search_iterations": 5, "confidence_threshold": 0.9},
+    commit_message="raise threshold for production",
+)
+```
+
+### TypeScript SDK
+
+```typescript
+await langwatch.prompts.update("qa-extractor", {
+  parameters: { max_search_iterations: 5, confidence_threshold: 0.9 },
+  commitMessage: "raise threshold for production",
+});
+```
+
+### REST API
+
+```bash
+curl -X PUT "https://app.langwatch.ai/api/prompts/qa-extractor" \
+  -H "X-Auth-Token: $LANGWATCH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"parameters": {"max_search_iterations": 5, "confidence_threshold": 0.9}}'
+```
+
+## Versioning behavior
+
+- Updating `parameters` (even with no other change) creates a new prompt version with its own `versionId`.
+- Restoring an older version restores that version's `parameters` too.
+- Tags (`production`, `staging`, custom) resolve to a version, so fetching by tag always returns the matching `parameters`.
+- Explicit updates (`PUT`, SDK `update`) always create a new version, even if the content is unchanged.
+- The sync endpoint (`POST /api/prompts/{id}/sync`, used by the CLI) compares content key-order independently — re-syncing the same parameters with keys in a different order reports `up_to_date` and does not create a new version.
+
+## In the UI
+
+In the prompt editor, the collapsible **Config** section lets you edit the parameters JSON for a draft, and the version history shows a read-only **Config** tab per version.
+
+---
+
 # FILE: ./prompt-management/features/essential/tags.mdx
 
 ---

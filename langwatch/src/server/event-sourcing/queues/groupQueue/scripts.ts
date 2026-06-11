@@ -125,7 +125,9 @@ end
 //
 // Prepends TENANT_ACTIVE_HELPER_LUA so reconcileParked can read the self-healing
 // in-flight count; every script that includes PARK_HELPER_LUA gets both.
-export const PARK_HELPER_LUA = TENANT_ACTIVE_HELPER_LUA + `
+export const PARK_HELPER_LUA =
+  TENANT_ACTIVE_HELPER_LUA +
+  `
 -- Tenant segment of a groupId (everything before the first '/'), else the id.
 local function parkTenantOf(groupId)
   local slashPos = string.find(groupId, "/", 1, true)
@@ -370,7 +372,37 @@ local function unparkLeastServedParked(readyKey, keyPrefix, pausedJobKey, nowMs,
 end
 `;
 
-const STAGE_LUA = TTL_HELPER_LUA + PARK_HELPER_LUA + `
+// Reads routing metadata (pipelineName, jobType, jobName) from a stored job
+// value. Envelope values (ADR-026, "GQ1|<headerLen>|<headerJson><body>") expose
+// it in the tiny header so the payload body is never decoded on Redis's
+// thread; legacy bare-JSON values fall back to a full decode.
+const ROUTING_META_HELPER_LUA = `
+local function gqRoutingMeta(jobDataJson)
+  if string.sub(jobDataJson, 1, 4) == "GQ1|" then
+    local barIdx = string.find(jobDataJson, "|", 5, true)
+    if barIdx then
+      local headerLen = tonumber(string.sub(jobDataJson, 5, barIdx - 1))
+      if headerLen and headerLen > 0 then
+        local ok, header = pcall(cjson.decode, string.sub(jobDataJson, barIdx + 1, barIdx + headerLen))
+        if ok and type(header) == "table" then
+          return header["p"], header["t"], header["n"]
+        end
+      end
+    end
+    return nil, nil, nil
+  end
+  local ok, data = pcall(cjson.decode, jobDataJson)
+  if ok and type(data) == "table" then
+    return data["__pipelineName"], data["__jobType"], data["__jobName"]
+  end
+  return nil, nil, nil
+end
+`;
+
+const STAGE_LUA =
+  TTL_HELPER_LUA +
+  PARK_HELPER_LUA +
+  `
 local groupJobsKey    = KEYS[1]
 local readyKey        = KEYS[2]
 local signalKey       = KEYS[3]
@@ -459,7 +491,10 @@ redis.call("INCR", totalPendingKey)
 return 1
 `;
 
-const STAGE_BATCH_LUA = TTL_HELPER_LUA + PARK_HELPER_LUA + `
+const STAGE_BATCH_LUA =
+  TTL_HELPER_LUA +
+  PARK_HELPER_LUA +
+  `
 local readyKey        = KEYS[1]
 local signalKey       = KEYS[2]
 local totalPendingKey = KEYS[3]
@@ -557,7 +592,11 @@ end
 return newStagedCount
 `;
 
-const DISPATCH_LUA = PARK_HELPER_LUA + WATER_LEVEL_HELPER_LUA + `
+const DISPATCH_LUA =
+  PARK_HELPER_LUA +
+  WATER_LEVEL_HELPER_LUA +
+  ROUTING_META_HELPER_LUA +
+  `
 local readyKey         = KEYS[1]
 local blockedKey       = KEYS[2]
 local pausedJobKey     = KEYS[3]
@@ -698,19 +737,14 @@ local function scanAndDispatch(effCap, bypassPark)
                 local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
                 local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
                 if jobDataJson then
-                  local ok, data = pcall(cjson.decode, jobDataJson)
-                  if ok and type(data) == "table" then
-                    local p = data["__pipelineName"]
-                    local t = data["__jobType"]
-                    local n = data["__jobName"]
-                    local pIsStr = type(p) == "string"
-                    local tIsStr = type(t) == "string"
-                    local nIsStr = type(n) == "string"
-                    if pIsStr then
-                      if redis.call("SISMEMBER", pausedJobKey, p) == 1 then paused = true
-                      elseif tIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t) == 1 then paused = true
-                      elseif tIsStr and nIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t .. "/" .. n) == 1 then paused = true
-                      end
+                  local p, t, n = gqRoutingMeta(jobDataJson)
+                  local pIsStr = type(p) == "string"
+                  local tIsStr = type(t) == "string"
+                  local nIsStr = type(n) == "string"
+                  if pIsStr then
+                    if redis.call("SISMEMBER", pausedJobKey, p) == 1 then paused = true
+                    elseif tIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t) == 1 then paused = true
+                    elseif tIsStr and nIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t .. "/" .. n) == 1 then paused = true
                     end
                   end
                 end
@@ -779,7 +813,11 @@ end
 return nil
 `;
 
-const DISPATCH_BATCH_LUA = PARK_HELPER_LUA + WATER_LEVEL_HELPER_LUA + `
+const DISPATCH_BATCH_LUA =
+  PARK_HELPER_LUA +
+  WATER_LEVEL_HELPER_LUA +
+  ROUTING_META_HELPER_LUA +
+  `
 local readyKey         = KEYS[1]
 local blockedKey       = KEYS[2]
 local pausedJobKey     = KEYS[3]
@@ -910,19 +948,14 @@ local function scanBatch(effCap, bypassPark, dispatched)
                 local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
                 local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
                 if jobDataJson then
-                  local ok, data = pcall(cjson.decode, jobDataJson)
-                  if ok and type(data) == "table" then
-                    local p = data["__pipelineName"]
-                    local t = data["__jobType"]
-                    local n = data["__jobName"]
-                    local pIsStr = type(p) == "string"
-                    local tIsStr = type(t) == "string"
-                    local nIsStr = type(n) == "string"
-                    if pIsStr then
-                      if redis.call("SISMEMBER", pausedJobKey, p) == 1 then paused = true
-                      elseif tIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t) == 1 then paused = true
-                      elseif tIsStr and nIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t .. "/" .. n) == 1 then paused = true
-                      end
+                  local p, t, n = gqRoutingMeta(jobDataJson)
+                  local pIsStr = type(p) == "string"
+                  local tIsStr = type(t) == "string"
+                  local nIsStr = type(n) == "string"
+                  if pIsStr then
+                    if redis.call("SISMEMBER", pausedJobKey, p) == 1 then paused = true
+                    elseif tIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t) == 1 then paused = true
+                    elseif tIsStr and nIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t .. "/" .. n) == 1 then paused = true
                     end
                   end
                 end
@@ -1043,7 +1076,10 @@ end
 return results
 `;
 
-const COMPLETE_LUA = PARK_HELPER_LUA + WATER_LEVEL_HELPER_LUA + `
+const COMPLETE_LUA =
+  PARK_HELPER_LUA +
+  WATER_LEVEL_HELPER_LUA +
+  `
 local activeKey       = KEYS[1]
 local jobsKey         = KEYS[2]
 local readyKey        = KEYS[3]
@@ -1130,7 +1166,9 @@ redis.call("DEL", errorKey)
 return 1
 `;
 
-const REFRESH_LUA = TTL_HELPER_LUA + `
+const REFRESH_LUA =
+  TTL_HELPER_LUA +
+  `
 local activeKey    = KEYS[1]
 local readyKey     = KEYS[2]
 local stagedJobId           = ARGV[1]
@@ -1173,7 +1211,9 @@ end
 return 0
 `;
 
-const RESTAGE_AND_BLOCK_LUA = `
+const RESTAGE_AND_BLOCK_LUA =
+  ROUTING_META_HELPER_LUA +
+  `
 local blockedKey      = KEYS[1]
 local readyKey        = KEYS[2]
 local statsKey        = KEYS[3]
@@ -1238,18 +1278,18 @@ end
 redis.call("INCR", statsKey)
 
 -- 7. Increment per-job-name failed counter
-local ok, data = pcall(cjson.decode, jobDataJson)
-if ok and data then
-  local jn = data["__jobName"]
-  if jn and jn ~= "" then
-    redis.call("INCR", statsKey .. ":" .. jn)
-  end
+local _, _, jn = gqRoutingMeta(jobDataJson)
+if jn and jn ~= "" then
+  redis.call("INCR", statsKey .. ":" .. jn)
 end
 
 return 1
 `;
 
-const RETRY_RESTAGE_LUA = TTL_HELPER_LUA + PARK_HELPER_LUA + `
+const RETRY_RESTAGE_LUA =
+  TTL_HELPER_LUA +
+  PARK_HELPER_LUA +
+  `
 local activeKey       = KEYS[1]
 local totalPendingKey = KEYS[2]
 
@@ -1468,7 +1508,9 @@ export class GroupStagingScripts {
     const readyKey = `${this.keyPrefix}ready`;
     const signalKey = `${this.keyPrefix}signal`;
     const dedupKey =
-      dedupId !== "" ? `${this.keyPrefix}dedup:${dedupId}` : `${this.keyPrefix}dedup:__none__`;
+      dedupId !== ""
+        ? `${this.keyPrefix}dedup:${dedupId}`
+        : `${this.keyPrefix}dedup:__none__`;
 
     const dataKey = `${this.keyPrefix}group:${groupId}:data`;
     const totalPendingKey = `${this.keyPrefix}stats:total-pending`;
@@ -1543,7 +1585,14 @@ export class GroupStagingScripts {
     args.push(String(Date.now()));
     args.push(String(readGlobalBudget()));
 
-    const result = await this.redis.eval(STAGE_BATCH_LUA, 3, readyKey, signalKey, totalPendingKey, ...args);
+    const result = await this.redis.eval(
+      STAGE_BATCH_LUA,
+      3,
+      readyKey,
+      signalKey,
+      totalPendingKey,
+      ...args,
+    );
 
     return Number(result);
   }
@@ -1924,4 +1973,3 @@ export class GroupStagingScripts {
     return this.keyPrefix;
   }
 }
-

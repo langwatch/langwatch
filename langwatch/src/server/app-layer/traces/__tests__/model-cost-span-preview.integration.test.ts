@@ -90,12 +90,81 @@ function makeSpanRow({
   };
 }
 
+// The sample-span read narrows to candidate traces via `trace_summaries.Models`
+// before scanning spans, so each span's trace needs a summary row carrying the
+// model in `Models` (exactly what the fold projection writes in production).
+function makeTraceSummaryRow({
+  tenant,
+  traceId,
+  startMs,
+  model,
+}: {
+  tenant: string;
+  traceId: string;
+  startMs: number;
+  model: string;
+}) {
+  return {
+    ProjectionId: `tsproj-${nanoid()}`,
+    TenantId: tenant,
+    TraceId: traceId,
+    OccurredAt: new Date(startMs),
+    CreatedAt: new Date(startMs),
+    UpdatedAt: new Date(startMs),
+    Models: [model],
+  };
+}
+
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
   spans = new SpanStorageService(
     new SpanStorageClickHouseRepository(async () => ch),
   );
+
+  await ch.insert({
+    table: "trace_summaries",
+    values: [
+      makeTraceSummaryRow({
+        tenant: tenantId,
+        traceId: `trace-bedrock-${ns}`,
+        startMs: recentMs,
+        model: "bedrock/eu.anthropic.claude-sonnet-4-6",
+      }),
+      makeTraceSummaryRow({
+        tenant: tenantId,
+        traceId: `trace-raw-bedrock-${ns}`,
+        startMs: recentMs - 1000,
+        model: "eu.anthropic.claude-sonnet-4-6-v1:0",
+      }),
+      makeTraceSummaryRow({
+        tenant: tenantId,
+        traceId: `trace-mini-${ns}`,
+        startMs: recentMs - 2000,
+        model: "gpt-5-mini",
+      }),
+      makeTraceSummaryRow({
+        tenant: tenantId,
+        traceId: `trace-respmodel-${ns}`,
+        startMs: recentMs - 3000,
+        model: `response-model-${ns}`,
+      }),
+      makeTraceSummaryRow({
+        tenant: tenantId,
+        traceId: `trace-old-${ns}`,
+        startMs: beyondWindowMs,
+        model: `stale-model-${ns}`,
+      }),
+      makeTraceSummaryRow({
+        tenant: otherTenantId,
+        traceId: `trace-foreign-${ns}`,
+        startMs: recentMs,
+        model: "bedrock/eu.anthropic.claude-sonnet-4-6",
+      }),
+    ],
+    format: "JSONEachRow",
+    clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
+  });
 
   await ch.insert({
     table: "stored_spans",
@@ -179,6 +248,11 @@ afterAll(async () => {
     await ch.exec({
       query:
         "ALTER TABLE stored_spans DELETE WHERE TenantId IN ({a:String}, {b:String})",
+      query_params: { a: tenantId, b: otherTenantId },
+    });
+    await ch.exec({
+      query:
+        "ALTER TABLE trace_summaries DELETE WHERE TenantId IN ({a:String}, {b:String})",
       query_params: { a: tenantId, b: otherTenantId },
     });
   }

@@ -15,6 +15,9 @@ import (
 	"net/http"
 	"strings"
 
+	"go.uber.org/zap"
+
+	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/gatewayproxy"
@@ -71,7 +74,7 @@ func playgroundProxyDispatch(proxy PlaygroundProxy) http.HandlerFunc {
 
 		cred, err := gatewayproxy.ParseCredentialFromHeaders(r.Header)
 		if err != nil {
-			herr.WriteHTTP(w, herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
+			writeHandlerError(ctx, w, herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
 				"reason": "missing_provider",
 			}, err))
 			return
@@ -79,7 +82,7 @@ func playgroundProxyDispatch(proxy PlaygroundProxy) http.HandlerFunc {
 
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			herr.WriteHTTP(w, herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
+			writeHandlerError(ctx, w, herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
 				"reason": "read_body",
 			}, err))
 			return
@@ -89,7 +92,7 @@ func playgroundProxyDispatch(proxy PlaygroundProxy) http.HandlerFunc {
 		// caller to duplicate that information in headers.
 		model, isStream, err := peekBodyMetadata(body)
 		if err != nil {
-			herr.WriteHTTP(w, herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
+			writeHandlerError(ctx, w, herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
 				"reason": "invalid_json_body",
 			}, err))
 			return
@@ -111,7 +114,7 @@ func playgroundProxyDispatch(proxy PlaygroundProxy) http.HandlerFunc {
 		if model != "" && bareModel != model {
 			body, err = rewriteBodyModel(body, bareModel)
 			if err != nil {
-				herr.WriteHTTP(w, herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
+				writeHandlerError(ctx, w, herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
 					"reason": "rewrite_body_model",
 				}, err))
 				return
@@ -131,7 +134,7 @@ func playgroundProxyDispatch(proxy PlaygroundProxy) http.HandlerFunc {
 		if litellm.IsReasoningModel(bareModel) {
 			body, err = applyReasoningOverridesToBody(body, bareModel)
 			if err != nil {
-				herr.WriteHTTP(w, herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
+				writeHandlerError(ctx, w, herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
 					"reason": "apply_reasoning_overrides",
 				}, err))
 				return
@@ -302,7 +305,7 @@ func classifyPath(urlPath string) (domain.RequestType, string) {
 func handleSync(ctx context.Context, w http.ResponseWriter, proxy PlaygroundProxy, req playgroundProxyRequest) {
 	resp, err := proxy.Dispatch(ctx, req)
 	if err != nil {
-		herr.WriteHTTP(w, herr.New(ctx, nlpgodomain.ErrGatewayUnavailable, herr.M{
+		writeHandlerError(ctx, w, herr.New(ctx, nlpgodomain.ErrGatewayUnavailable, herr.M{
 			"reason": "dispatcher_error",
 		}, err))
 		return
@@ -332,7 +335,7 @@ func handleSync(ctx context.Context, w http.ResponseWriter, proxy PlaygroundProx
 func handleStream(ctx context.Context, w http.ResponseWriter, proxy PlaygroundProxy, req playgroundProxyRequest) {
 	iter, err := proxy.DispatchStream(ctx, req)
 	if err != nil {
-		herr.WriteHTTP(w, herr.New(ctx, nlpgodomain.ErrGatewayUnavailable, herr.M{
+		writeHandlerError(ctx, w, herr.New(ctx, nlpgodomain.ErrGatewayUnavailable, herr.M{
 			"reason": "dispatcher_stream_error",
 		}, err))
 		return
@@ -366,6 +369,8 @@ func handleStream(ctx context.Context, w http.ResponseWriter, proxy PlaygroundPr
 		// Stream errored mid-flight — emit a final event the playground
 		// parser will surface as a banner. We don't set an HTTP status
 		// because headers are already on the wire.
+		clog.Get(ctx).Warn("playground_stream_failed",
+			zap.String("fault", "provider"), zap.String("message", err.Error()))
 		errFrame := fmt.Sprintf("event: error\ndata: %s\n\n", jsonEscape(err.Error()))
 		_, _ = w.Write([]byte(errFrame))
 		if flusher != nil {

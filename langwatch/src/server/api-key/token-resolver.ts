@@ -1,7 +1,7 @@
 import type { PrismaClient, Project } from "@prisma/client";
 import { RoleBindingScopeType } from "@prisma/client";
 
-import { getTokenType } from "./api-key-token.utils";
+import { API_KEY_PREFIX, getTokenType } from "./api-key-token.utils";
 import { ApiKeyService } from "./api-key.service";
 
 /**
@@ -45,8 +45,9 @@ export type OrgResolvedToken = {
  * path based on prefix and structure:
  *   - pat-lw-* → API key lookup (old PAT format, backward compat)
  *   - sk-lw-{id}_{secret} → API key lookup (new format; ingestion keys
- *     are ordinary API keys carrying ingestSourceType)
- *   - sk-lw-* (no underscore) → legacy project key lookup
+ *     are ordinary API keys carrying ingestSourceType), with a legacy
+ *     project key fallback for look-alike legacy keys
+ *   - any other sk-lw-* → legacy project key lookup
  */
 export class TokenResolver {
   private readonly apiKeyService: ApiKeyService;
@@ -80,8 +81,18 @@ export class TokenResolver {
     switch (tokenType) {
       case "legacyProjectKey":
         return this.resolveLegacyProjectKey(token);
-      case "apiKey":
-        return this.resolveApiKey(token, projectId ?? null);
+      case "apiKey": {
+        const resolved = await this.resolveApiKey(token, projectId ?? null);
+        // A legacy project key can be shaped exactly like a new API key
+        // (its random body may contain an underscore), so when API key
+        // resolution misses for an sk-lw- token, fall back to the legacy
+        // lookup. The fallback only grants access when the full token
+        // matches a stored project key, so misses stay a 401.
+        if (!resolved && token.startsWith(API_KEY_PREFIX)) {
+          return this.resolveLegacyProjectKey(token);
+        }
+        return resolved;
+      }
       default:
         // Unknown prefix — try legacy lookup as fallback
         return this.resolveLegacyProjectKey(token);

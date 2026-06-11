@@ -354,4 +354,38 @@ describe("createProjectMetadataReactor()", () => {
 
     expect(reactor.options!.runIn).toEqual(["worker"]);
   });
+
+  describe("when deciding whether to react", () => {
+    describe("when the trace is a real ingest", () => {
+      it("returns true", () => {
+        const reactor = createProjectMetadataReactor(deps);
+        const foldState = createFoldState({
+          attributes: { "langwatch.origin": "application" },
+        });
+
+        expect(
+          reactor.shouldReact!(
+            createEvent("tenant-1"),
+            createContext("tenant-1", foldState),
+          ),
+        ).toBe(true);
+      });
+    });
+
+    describe("when the trace is a seeded sample", () => {
+      it("returns false", () => {
+        const reactor = createProjectMetadataReactor(deps);
+        const foldState = createFoldState({
+          attributes: { "langwatch.origin": "sample" },
+        });
+
+        expect(
+          reactor.shouldReact!(
+            createEvent("tenant-1"),
+            createContext("tenant-1", foldState),
+          ),
+        ).toBe(false);
+      });
+    });
+  });
 });

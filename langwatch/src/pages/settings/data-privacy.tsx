@@ -844,7 +844,7 @@ function PrivacyRuleDrawer({
                         collection={attributeDispositionCollection}
                         value={[row.disposition]}
                         size="sm"
-                        width="140px"
+                        width="160px"
                         onValueChange={(d) =>
                           setCustomAttributes((prev) =>
                             prev.map((r, i) =>

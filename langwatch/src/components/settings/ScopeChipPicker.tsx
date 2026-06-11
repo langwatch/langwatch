@@ -323,6 +323,8 @@ export function ScopeChipPicker<
   showQuickPicks = false,
   singleSelect = false,
   personalScopes = false,
+  variant = "chips",
+  placeholder,
   currentOrganizationId,
   currentTeamId,
   currentProjectId,
@@ -365,6 +367,21 @@ export function ScopeChipPicker<
    *  more than one, so the single-scope contract holds even if a caller passes
    *  a longer array. */
   singleSelect?: boolean;
+  /** Rendering variant.
+   *  - "chips" (default): the chip + multi-select / quick-pick UI, governed by
+   *    `singleSelect` / `showQuickPicks`.
+   *  - "single-select": a single-value dropdown over the full option list. The
+   *    component guarantees exactly one selection (or none), so callers never
+   *    constrain `onChange` themselves. PROJECT options nest under their team
+   *    (using `availableProjects[].teamId` + `availableTeams`) so the list
+   *    stays organised, and the trigger collapses to the picked option. Use
+   *    this to pick one concrete scope (e.g. the project an SDK key is minted
+   *    for) rather than choose a scope level for a config. */
+  variant?: "chips" | "single-select";
+  /** Placeholder for the single-select trigger when nothing is picked yet.
+   *  Defaults to "Select an option". Only consulted by the single-select
+   *  variant. */
+  placeholder?: string;
   /** When true, render the Organization/Team/Project quick-pick chip
    *  row above the field and collapse the multi-select dropdown by
    *  default. Clicking the 4th "Multiple" chip (CheckCheck icon)
@@ -571,6 +588,155 @@ export function ScopeChipPicker<
   const dropdownVisible = singleSelect
     ? false
     : !showQuickPicks || multipleMode;
+
+  if (variant === "single-select") {
+    const selected = scopes[0] ?? null;
+    const selectedOption = selected
+      ? options.find(
+          (o) =>
+            o.scopeType === selected.scopeType &&
+            o.scopeId === selected.scopeId,
+        )
+      : null;
+
+    // Group PROJECT options under their parent team so the list stays organised
+    // even with many projects across teams. Non-project options (org / team /
+    // department) keep their own flat groups.
+    const teamNameById = new Map(
+      (availableTeams ?? []).map((t) => [t.id, t.name] as const),
+    );
+    const teamIdByProjectId = new Map(
+      (availableProjects ?? []).map((p) => [p.id, p.teamId] as const),
+    );
+    const projectsByTeam = new Map<string, ScopeOption[]>();
+    const orphanProjects: ScopeOption[] = [];
+    for (const option of options.filter((o) => o.scopeType === "PROJECT")) {
+      const teamId = teamIdByProjectId.get(option.scopeId);
+      if (teamId && teamNameById.has(teamId)) {
+        const bucket = projectsByTeam.get(teamId) ?? [];
+        bucket.push(option);
+        projectsByTeam.set(teamId, bucket);
+      } else {
+        orphanProjects.push(option);
+      }
+    }
+    const teamGroups = Array.from(projectsByTeam.entries())
+      .map(([teamId, projects]) => ({
+        teamId,
+        teamName: teamNameById.get(teamId) ?? "Team",
+        projects,
+      }))
+      .sort((a, b) => a.teamName.localeCompare(b.teamName));
+    const orgOptions = options.filter((o) => o.scopeType === "ORGANIZATION");
+    const deptOptions = options.filter((o) => o.scopeType === "DEPARTMENT");
+    const teamScopeOptions = options.filter((o) => o.scopeType === "TEAM");
+    const fallbackPlaceholder = placeholder ?? "Select an option";
+
+    return (
+      <VStack align="start" width="full" gap={1.5}>
+        {label && <SmallLabel>{label}</SmallLabel>}
+        <Select.Root
+          collection={collection}
+          value={selected ? [`${selected.scopeType}:${selected.scopeId}`] : []}
+          onValueChange={(details) => {
+            const pickedValue = details.value[0];
+            const option = pickedValue
+              ? options.find((o) => o.value === pickedValue)
+              : undefined;
+            onChange(
+              option
+                ? [{ scopeType: option.scopeType, scopeId: option.scopeId }]
+                : [],
+            );
+          }}
+        >
+          <Select.Trigger>
+            <Select.ValueText placeholder={fallbackPlaceholder}>
+              {() =>
+                selectedOption ? (
+                  <HStack gap={2}>
+                    <ScopeIcon scopeType={selectedOption.scopeType} />
+                    <Text>{selectedOption.label}</Text>
+                  </HStack>
+                ) : (
+                  fallbackPlaceholder
+                )
+              }
+            </Select.ValueText>
+          </Select.Trigger>
+          <Select.Content>
+            {orgOptions.length > 0 && (
+              <Select.ItemGroup label="Organization">
+                {orgOptions.map((option) => (
+                  <Select.Item key={option.value} item={option}>
+                    <HStack gap={2}>
+                      <ScopeIcon scopeType="ORGANIZATION" />
+                      <Text>{option.label}</Text>
+                    </HStack>
+                  </Select.Item>
+                ))}
+              </Select.ItemGroup>
+            )}
+            {deptOptions.length > 0 && (
+              <Select.ItemGroup label="Departments">
+                {deptOptions.map((option) => (
+                  <Select.Item key={option.value} item={option}>
+                    <HStack gap={2}>
+                      <ScopeIcon scopeType="DEPARTMENT" />
+                      <Text>{option.label}</Text>
+                    </HStack>
+                  </Select.Item>
+                ))}
+              </Select.ItemGroup>
+            )}
+            {teamScopeOptions.length > 0 && (
+              <Select.ItemGroup label="Teams">
+                {teamScopeOptions.map((option) => (
+                  <Select.Item key={option.value} item={option}>
+                    <HStack gap={2}>
+                      <ScopeIcon scopeType="TEAM" />
+                      <Text>{option.label}</Text>
+                    </HStack>
+                  </Select.Item>
+                ))}
+              </Select.ItemGroup>
+            )}
+            {teamGroups.map((group) => (
+              <Select.ItemGroup key={group.teamId} label={group.teamName}>
+                {group.projects.map((option) => (
+                  <Select.Item key={option.value} item={option}>
+                    <HStack gap={2} paddingLeft={2}>
+                      <ScopeIcon scopeType="PROJECT" />
+                      <Text>{option.label}</Text>
+                    </HStack>
+                  </Select.Item>
+                ))}
+              </Select.ItemGroup>
+            ))}
+            {orphanProjects.length > 0 && (
+              <Select.ItemGroup label="Projects">
+                {orphanProjects.map((option) => (
+                  <Select.Item key={option.value} item={option}>
+                    <HStack gap={2}>
+                      <ScopeIcon scopeType="PROJECT" />
+                      <Text>{option.label}</Text>
+                    </HStack>
+                  </Select.Item>
+                ))}
+              </Select.ItemGroup>
+            )}
+          </Select.Content>
+        </Select.Root>
+        {showSummary && (
+          <Box>
+            <Text fontSize="xs" color="gray.600">
+              {summariseSelection(scopes)}
+            </Text>
+          </Box>
+        )}
+      </VStack>
+    );
+  }
 
   return (
     <VStack align="start" width="full" gap={1.5}>

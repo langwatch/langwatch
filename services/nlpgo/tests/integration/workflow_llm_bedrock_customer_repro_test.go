@@ -139,11 +139,11 @@ func TestSync_RealWorkflowEndToEnd_BedrockCustomerReproVerbatim(t *testing.T) {
 	// one of them somewhere upstream; for this e2e replay we drop top_p
 	// because temperature is the more authoritative knob.
 	llmValue := map[string]any{
-		"model":             "bedrock/" + model,
-		"max_tokens":        8192,
-		"temperature":       1,
-		"reasoning_effort":  "medium",
-		"litellm_params":    litellmParams,
+		"model":            "bedrock/" + model,
+		"max_tokens":       8192,
+		"temperature":      1,
+		"reasoning_effort": "medium",
+		"litellm_params":   litellmParams,
 	}
 
 	// Customer-exact inputs (screenshot 2026-05-31): the failing case is
