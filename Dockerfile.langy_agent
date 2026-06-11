@@ -52,6 +52,14 @@ COPY services/langy-agent/entrypoint.sh /entrypoint.sh
 COPY services/langy-agent/server.js /server.js
 RUN chmod +x /entrypoint.sh
 
+# Static templates the entrypoint seeds into /workspace at pod startup.
+# They live under /opt (not /workspace) because /workspace is an emptyDir
+# volume in k8s, which would shadow any image content placed there.
+# AGENTS.md keeps the literal ${LANGWATCH_ENDPOINT} placeholder — the
+# manager (server.js) substitutes it per-worker at spawn time.
+COPY services/langy-agent/skills/ /opt/langy-templates/skills/
+COPY services/langy-agent/AGENTS.md.template /opt/langy-templates/AGENTS.md
+
 # Non-root user so the pod can run with runAsNonRoot: true + readOnlyRootFilesystem.
 # ubuntu:24.04 ships a default `ubuntu` user already at UID 1000, so we remove
 # it first — otherwise `useradd -u 1000` fails with "UID already in use".
