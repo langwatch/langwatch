@@ -265,5 +265,5 @@ Feature: Evaluator management
   Scenario: Mappings stored in evaluation state only
     Given I add evaluator "Exact Match" to agent "GPT-4" in an evaluation
     When I configure the input mapping: output -> agent.response
-    Then this mapping is stored in the evaluation's wizard state
+    Then this mapping is stored in the evaluation's workbench state
     And the evaluator database record remains unchanged
