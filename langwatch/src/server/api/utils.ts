@@ -6,9 +6,33 @@ import {
   TeamUserRole,
 } from "@prisma/client";
 import type { Session } from "~/server/auth";
+import { VisibilityWindowService } from "~/server/app-layer/traces/visibility-window.service";
+import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
+import { FREE_VISIBILITY_DAYS } from "../../../ee/licensing/constants";
 import type { Protections } from "../elasticsearch/protections";
 import { hasProjectPermission, isDemoProject } from "./rbac";
 import { getApp } from "~/server/app-layer/app";
+
+/**
+ * Resolves the ADR-028 visibility cutoff for a project's organization.
+ * Fails CLOSED: unresolvable org or plan errors apply the free-tier window
+ * (a leak is irreversible; over-blur is a refresh away).
+ */
+export async function getVisibilityCutoffMsForProject(
+  projectId: string,
+): Promise<number | null> {
+  const failClosedCutoff = () =>
+    Date.now() - FREE_VISIBILITY_DAYS * 24 * 60 * 60 * 1000;
+  try {
+    const organizationId = await resolveOrganizationId(projectId);
+    if (!organizationId) return failClosedCutoff();
+    return await new VisibilityWindowService(
+      getApp().planProvider,
+    ).getVisibilityCutoffMs({ organizationId });
+  } catch {
+    return failClosedCutoff();
+  }
+}
 
 export const extractCheckKeys = (
   inputObject: Record<string, any>,
@@ -90,6 +114,10 @@ export async function getUserProtectionsForProject(
     ctx.publiclyShared ||
     (await hasProjectPermission(ctx, projectId, "cost:view"));
 
+  // ADR-028: plan-based visibility window applies to every user-facing read,
+  // including public shares — sharing must not be the bypass.
+  const visibilityCutoffMs = await getVisibilityCutoffMsForProject(projectId);
+
   const project = await ctx.prisma.project.findUniqueOrThrow({
     where: { id: projectId, archivedAt: null },
     select: {
@@ -114,6 +142,7 @@ export async function getUserProtectionsForProject(
       canSeeCapturedOutput:
         project.capturedOutputVisibility ===
         ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
+      visibilityCutoffMs,
     };
   }
 
@@ -172,5 +201,6 @@ export async function getUserProtectionsForProject(
     canSeeCapturedOutput: obtainVisibilityLevel(
       project.capturedOutputVisibility,
     ),
+    visibilityCutoffMs,
   };
 }
