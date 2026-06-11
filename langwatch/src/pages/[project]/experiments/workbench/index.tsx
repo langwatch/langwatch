@@ -77,10 +77,10 @@ export default function NewExperimentWorkbench() {
   const createExperiment = api.experiments.saveEvaluationsV3.useMutation();
 
   // Wait for the seeding dataset to load before creating the experiment.
-  const datasetReady = !datasetId || !!datasetQuery.data;
+  const isDatasetReady = !datasetId || !!datasetQuery.data;
 
   useEffect(() => {
-    if (!project || hasCreatedRef.current || !datasetReady) return;
+    if (!project || hasCreatedRef.current || !isDatasetReady) return;
 
     hasCreatedRef.current = true;
 
@@ -118,7 +118,7 @@ export default function NewExperimentWorkbench() {
         // Error will be shown in the UI via createExperiment.isError
       }
     })();
-  }, [project, router, createExperiment, datasetReady, datasetId, datasetQuery.data]);
+  }, [project, router, createExperiment, isDatasetReady, datasetId, datasetQuery.data]);
 
   return (
     <DashboardLayout backgroundColor="bg.panel" compactMenu={true}>

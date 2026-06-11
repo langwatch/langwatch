@@ -108,7 +108,7 @@ export function DatasetPreviewTable({
                 return (
                   <td
                     key={column.name}
-                    style={previewCellStyle({ expandable: full.length > 0 })}
+                    style={previewCellStyle({ isExpandable: full.length > 0 })}
                     title={full ? "Double-click to expand" : undefined}
                     onDoubleClick={
                       full ? () => setExpandedValue(full) : undefined
@@ -184,11 +184,11 @@ const previewCheckboxCellStyle = ({
 const previewCellStyle = ({
   width,
   muted,
-  expandable,
+  isExpandable,
 }: {
   width?: number;
   muted?: boolean;
-  expandable?: boolean;
+  isExpandable?: boolean;
 }): React.CSSProperties => ({
   borderBottom: "1px solid var(--chakra-colors-border-muted)",
   borderRight: "1px solid var(--chakra-colors-border-muted)",
@@ -201,5 +201,5 @@ const previewCellStyle = ({
   width,
   minWidth: width,
   color: muted ? "var(--chakra-colors-fg-muted)" : undefined,
-  cursor: expandable ? "pointer" : undefined,
+  cursor: isExpandable ? "pointer" : undefined,
 });
