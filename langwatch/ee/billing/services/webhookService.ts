@@ -857,8 +857,10 @@ export class EEWebhookService implements WebhookService {
    * would drift down if that default were ever lowered, whereas explicit
    * overrides hold the window. Today the value equals the platform default, so
    * this has no observable effect yet — it is the mechanism the paid retention
-   * tier hangs off once the default diverges. TODO(#4745): per-plan windows
-   * below the 49-day floor (the pricing page's 14d/30d tiers).
+   * tier hangs off once the default diverges. The 49-day window is deliberate:
+   * pricing tiers are visibility (blur) thresholds on top of it, not shorter
+   * deletion windows — free-tier content blurs after 14d but stays recoverable
+   * until the 49d policy deletes it. TODO(#4745): the blur layer.
    *
    * Each category is upserted independently (idempotent on scope + category)
    * and best-effort: a retention failure must never fail the Stripe webhook —
