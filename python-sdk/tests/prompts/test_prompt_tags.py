@@ -1385,7 +1385,7 @@ class TestPromptsFacadeParameters:
         mock_client = Mock()
         return PromptsFacade(mock_client)
 
-    def _mock_prompt_data(self, parameters):
+    def _mock_prompt_data(self, parameters) -> "PromptData":
         from langwatch.prompts.types import PromptData, Message
 
         return PromptData(
