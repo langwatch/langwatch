@@ -1329,4 +1329,48 @@ describe("Langy via HTTP wrapper", () => {
     expect(result.success).toBe(true);
   });
   });
+
+  describe("when user asks to open a GitHub PR", () => {
+    // Unconnected: the worker's github.md skill instructs Langy to emit the
+    // `[langy:connect-github]` sentinel so the sidebar can render the in-chat
+    // Connect card. We assert the assistant's BEHAVIOR, not the literal
+    // sentinel — the judge tolerates wording but rejects "report an error",
+    // "give up", or "ask for a PAT".
+    //
+    // Connected end-to-end (clone → branch → commit → push → PR) is gated
+    // behind real credentials + a sandbox repo, so we mark that scenario @e2e
+    // in specs/assistant/langy-github-prs.feature and run it manually for
+    // now. The unconnected path is what regresses if the skill drifts.
+
+    it("renders the connect card for an unconnected user instead of erroring", async () => {
+      const langy = makeLangyAdapter();
+      const result = await runScenarioAndLog({
+        name: "github unconnected → connect card",
+        description:
+          "The user wants to open a PR on a repo but hasn't connected GitHub yet. Langy should surface the connect affordance, not error out or ask for a personal access token.",
+        agents: [
+          langy,
+          scenario.userSimulatorAgent({ model }),
+          scenario.judgeAgent({
+            model,
+            criteria: [
+              "Langy surfaces the in-chat Connect GitHub card or otherwise prompts the user to connect — it does NOT just say 'I can't do that'.",
+              "Langy does NOT ask the user to paste a personal access token.",
+              "Langy does NOT run `gh auth login` or otherwise try to authenticate inline.",
+              "Langy does NOT report an error or stack trace.",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "fix the prompt drift in acme/service-x and open a PR for it",
+          ),
+          scenario.agent(),
+          scenario.judge(),
+        ],
+      });
+      if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
+      expect(result.success).toBe(true);
+    });
+  });
 });
