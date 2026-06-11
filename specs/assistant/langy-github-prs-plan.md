@@ -62,7 +62,53 @@ an error. Tokens never touch disk.
 | Token expiry | Keep GitHub App token expiration ON (8h access / 6mo refresh, rotating) | Short blast radius; refresh handled server-side in `langyGithubToken.ts`. |
 | New REST surface | One OAuth callback route (`/api/github-langy/callback`) + connect/disconnect via existing tRPC settings routers | Callback is unavoidable for OAuth; everything else stays in existing routers. |
 
-## Phased delivery (5 PRs, each independently shippable)
+## UX: auth + PR live inside the conversation (claude.design-style)
+
+The settings page exists, but the **primary** auth and PR experience happens inside the
+Langy sidebar — no context switch to a settings tab, no raw URLs in chat.
+
+```
+ ┌─ Langy chat ───────────────────────────────────────────────┐
+ │ you  > fix the prompt drift in acme/service-x, open a PR   │
+ │                                                            │
+ │ langy ─ Acme/service-x isn't connected to your GitHub yet. │
+ │ ┌─────────────────────────────────────────────┐            │
+ │ │  Connect GitHub                             │            │
+ │ │  We'll open the PR as @aryansharma28        │            │
+ │ │  [ Connect GitHub ]                         │ ← card     │
+ │ └─────────────────────────────────────────────┘            │
+ │                                                            │
+ │ langy ─ Connected as @aryansharma28. Working on it.        │
+ │ ─ cloning acme/service-x …                                 │
+ │ ─ branch langy/fix-prompt-drift …                          │
+ │ ─ committing 2 files …                                     │
+ │ ─ opening PR …                                             │
+ │                                                            │
+ │ ┌─────────────────────────────────────────────┐            │
+ │ │ ◍  acme/service-x #482                      │            │
+ │ │ Fix prompt drift in checkout-eval            │            │
+ │ │ +47 −12  ·  by @aryansharma28               │            │
+ │ │ [ View on GitHub ]                          │ ← PR card  │
+ │ └─────────────────────────────────────────────┘            │
+ │                                                            │
+ │ sidebar footer:  ◉ Acting as @aryansharma28  ↗            │
+ └────────────────────────────────────────────────────────────┘
+```
+
+Five UX primitives drive this:
+
+1. **In-chat connect card** — a structured message type `connect_github` rendered by `LangySidebar`, not raw markdown. Worker emits it when `GH_TOKEN` is absent.
+2. **Popup OAuth flow** — `/api/github-langy/connect?mode=popup` opens a small window; callback shim posts `window.opener.postMessage({type:"github-connected", login})` and closes itself. Chat state preserved. Same endpoint serves `mode=redirect` for the settings-page flow.
+3. **Live progress events** — worker emits structured status events (`cloning|branching|committing|opening_pr`) that the manager streams as system-style chat lines, not free-text.
+4. **PR card** — structured `github_pr` message (title, repo, +/- stats, author, URL) returned as a tool result, not a URL pasted in the reply.
+5. **"Acting as" chip** — sidebar footer shows the connected GitHub identity. Hover → Disconnect. Eliminates "did this PR really land as me?" anxiety.
+
+**Tradeoff acknowledged:** the OAuth callback is a new public REST endpoint
+(`/api/github-langy/callback`). The "no new Langy REST endpoints" rule was about MCP
+plumbing; OAuth callbacks can't be tunneled through tRPC, so this is a conscious
+exception.
+
+## Phased delivery (6 PRs, each independently shippable)
 
 ### PR 1 — Spec + data model
 *Branch `langy/github-prs-1-model`, base `langy/per-session-manager`*
@@ -91,11 +137,11 @@ an error. Tokens never touch disk.
 - [ ] Register model with the multitenancy guard (`langwatch/src/utils/dbMultiTenancyProtection.ts`): org-scoped via `organizationId`, plus always-filter-by-`userId` predicate. **Gotcha:** guard rejects compound-key `findUnique` — use `findFirst({ where: { userId, organizationId } })` like `langyApiKey.ts:62` does.
 - [ ] Env plumbing: `GITHUB_LANGY_APP_ID`, `GITHUB_LANGY_CLIENT_ID`, `GITHUB_LANGY_CLIENT_SECRET` in `env.mjs` + `.env.example` (all optional — feature silently off when unset)
 
-### PR 2 — Connect/disconnect flow (settings UI + OAuth callback)
+### PR 2 — Connect/disconnect (settings + popup) + OAuth callback
 *Branch `langy/github-prs-2-connect`*
 
-- [ ] `GET /api/github-langy/connect` — redirects to `https://github.com/login/oauth/authorize` with the App's client_id + CSRF `state` (signed, short-lived)
-- [ ] `GET /api/github-langy/callback` — exchanges code → `{access_token, refresh_token, expires_in}`; fetches `/user` for `githubLogin`/`githubUserId`; upserts `UserGitHubCredential` with `encrypt(refresh_token)`; redirects back to settings
+- [ ] `GET /api/github-langy/connect?mode=popup|redirect&return=...` — redirects to `https://github.com/login/oauth/authorize` with the App's client_id + CSRF `state` (signed, short-lived, carries `mode`)
+- [ ] `GET /api/github-langy/callback` — exchanges code → `{access_token, refresh_token, expires_in}`; fetches `/user` for `githubLogin`/`githubUserId`; upserts `UserGitHubCredential` with `encrypt(refresh_token)`. **`mode=popup`** → tiny HTML shim that calls `window.opener.postMessage({type:"github-connected", login})` and closes; **`mode=redirect`** → 302 back to `return` URL (defaults to settings deep link).
 - [ ] Settings UI in `langwatch/src/pages/settings/` — "Connect GitHub" card: connected state shows `githubLogin` + Disconnect button; disconnect deletes the row AND calls GitHub's token-revocation API (`DELETE /applications/{client_id}/grant`)
 - [ ] `auditLog` on connect (`langy.github.connect`) and disconnect (`langy.github.disconnect`)
 - [ ] Deep link constant (e.g. `/settings/integrations#github`) exported for the skill to reference
@@ -134,6 +180,19 @@ an error. Tokens never touch disk.
   - Hard rules: never `gh auth login`, never echo `$GH_TOKEN`, never write it to any file, clone only inside `$HOME`
 - [ ] `AGENTS.md.template` — one line announcing the github capability + skill pointer
 - [ ] `charts/langy-agent/templates/networkpolicy.yaml` + `values.yaml` — `networkPolicy.allowGithub` toggle. **Reality check:** the chart already ships `allowExternalHttps: true` (0.0.0.0/0:443) so GitHub works today; the new toggle matters for hardened installs that turn that off. NetworkPolicy is L3/L4 — true FQDN-bounded egress needs the issue's follow-up, document as such.
+
+### PR 6 — Sidebar UX (chat cards + popup + acting-as chip)
+*Branch `langy/github-prs-6-ux`, depends on PR 2 (endpoints) + PR 4 (structured events)*
+
+- [ ] Structured message types in the Langy chat protocol:
+  - `connect_github` — `{repoHint?, attribution: githubLogin}` → rendered as a card with a Connect button
+  - `github_pr` — `{owner, repo, number, title, url, additions, deletions, authorLogin}` → rendered as a PR card
+  - `status` — `{phase: "cloning"|"branching"|"committing"|"opening_pr", detail?}` → rendered as a muted progress line
+- [ ] `LangyGitHubConnectCard.tsx` + `LangyGitHubPrCard.tsx` (under `langwatch/src/components/langy/`); existing `LangySidebar` switches on message type
+- [ ] `useGitHubConnectPopup()` hook — opens `/api/github-langy/connect?mode=popup`, listens for `postMessage`, resolves with `{login}`; the connect card calls it on click
+- [ ] After successful connect, the sidebar replays the user's last prompt automatically (so "open a PR" → connect → PR opens, all in one flow)
+- [ ] "Acting as @login" chip in the sidebar footer (tRPC `langy.getGithubConnection` returns `{login} | null`); hover → Disconnect
+- [ ] Tests: storybook + a scenario where the user goes connect-card → popup-resolved → PR-card without losing chat state
 
 ### PR 5 — Tests, verification, docs
 *Branch `langy/github-prs-5-tests`*
