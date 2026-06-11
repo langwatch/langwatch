@@ -127,6 +127,57 @@ function remapScoreOptionsToNames(
 }
 
 /**
+ * Bound the events stored_spans scan to the partitions the page's traces
+ * actually occurred in. Occurrence times are clustered (a new cluster starts on
+ * a gap larger than the merge window), and each cluster contributes one tight
+ * [min - window, max + window] range OR'd into the filter — so a page mixing old
+ * and recent traces (common on the updated axis) scans a few small ranges rather
+ * than one range spanning every weekly partition between them.
+ */
+function buildEventOccurrenceWindows(occurredAts: number[]): {
+  outer: string;
+  inner: string;
+  params: Record<string, number>;
+} {
+  if (occurredAts.length === 0) return { outer: "", inner: "", params: {} };
+
+  const sorted = [...occurredAts].sort((a, b) => a - b);
+  // Merge points whose ±window ranges would overlap; split when farther apart.
+  const clusterGap = 2 * EVENT_PARTITION_WINDOW_MS;
+  const clusters: Array<{ from: number; to: number }> = [];
+  for (const ts of sorted) {
+    const last = clusters[clusters.length - 1];
+    if (last && ts - last.to <= clusterGap) {
+      last.to = ts;
+    } else {
+      clusters.push({ from: ts, to: ts });
+    }
+  }
+
+  const params: Record<string, number> = {};
+  const outerParts: string[] = [];
+  const innerParts: string[] = [];
+  clusters.forEach((c, i) => {
+    const fromKey = `spanFrom${i}`;
+    const toKey = `spanTo${i}`;
+    params[fromKey] = c.from - EVENT_PARTITION_WINDOW_MS;
+    params[toKey] = c.to + EVENT_PARTITION_WINDOW_MS;
+    outerParts.push(
+      `(t.StartTime >= fromUnixTimestamp64Milli({${fromKey}:Int64}) AND t.StartTime <= fromUnixTimestamp64Milli({${toKey}:Int64}))`,
+    );
+    innerParts.push(
+      `(StartTime >= fromUnixTimestamp64Milli({${fromKey}:Int64}) AND StartTime <= fromUnixTimestamp64Milli({${toKey}:Int64}))`,
+    );
+  });
+
+  return {
+    outer: ` AND (${outerParts.join(" OR ")})`,
+    inner: ` AND (${innerParts.join(" OR ")})`,
+    params,
+  };
+}
+
+/**
  * Service for fetching traces from ClickHouse.
  *
  * Fetches trace summaries and, when needed, span rows via separate ClickHouse
@@ -1822,19 +1873,16 @@ export class ClickHouseTraceService {
     const occurredAts = traces
       .map((t) => t.timestamps?.started_at)
       .filter((t): t is number => typeof t === "number" && t > 0);
-    const hasWindow = occurredAts.length > 0;
-    const spanTimeFilterOuter = hasWindow
-      ? "AND t.StartTime >= fromUnixTimestamp64Milli({spanFromMs:Int64}) AND t.StartTime <= fromUnixTimestamp64Milli({spanToMs:Int64})"
-      : "";
-    const spanTimeFilterInner = hasWindow
-      ? "AND StartTime >= fromUnixTimestamp64Milli({spanFromMs:Int64}) AND StartTime <= fromUnixTimestamp64Milli({spanToMs:Int64})"
-      : "";
-    const spanTimeParams = hasWindow
-      ? {
-          spanFromMs: Math.min(...occurredAts) - EVENT_PARTITION_WINDOW_MS,
-          spanToMs: Math.max(...occurredAts) + EVENT_PARTITION_WINDOW_MS,
-        }
-      : {};
+    // Cluster the occurrence times so the stored_spans scan is bounded to the
+    // partitions the page's traces ACTUALLY occurred in. The updated axis can
+    // put traces months apart on one page; a single min/max window would span
+    // every weekly partition between them — so OR per-cluster windows instead,
+    // each tight, with no single range crossing unrelated history.
+    const {
+      outer: spanTimeFilterOuter,
+      inner: spanTimeFilterInner,
+      params: spanTimeParams,
+    } = buildEventOccurrenceWindows(occurredAts);
 
     const result = await clickHouseClient.query({
       query: `
