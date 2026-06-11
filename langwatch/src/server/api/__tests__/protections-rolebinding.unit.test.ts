@@ -5,10 +5,19 @@ import {
 } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getUserProtectionsForProject } from "../utils";
+import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
+import { PLATFORM_DEFAULT_DATA_PRIVACY } from "~/server/data-privacy/dataPrivacy.types";
 
 vi.mock("../rbac", () => ({
   hasProjectPermission: vi.fn(() => Promise.resolve(true)),
   isDemoProject: vi.fn(() => false),
+}));
+
+// Mock the scoped policy resolver so this test exercises only the legacy-enum +
+// RoleBinding visibility path; the platform default leaves every category at
+// "capture", so reconciliation falls through to the legacy enum.
+vi.mock("~/server/data-privacy/dataPrivacyPolicy.service", () => ({
+  getDataPrivacyPolicyService: vi.fn(),
 }));
 
 const mockOrgService = {
@@ -35,6 +44,11 @@ const mockSession = {
 describe("getUserProtectionsForProject", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getDataPrivacyPolicyService).mockReturnValue({
+      getResolvedForProject: vi
+        .fn()
+        .mockResolvedValue(PLATFORM_DEFAULT_DATA_PRIVACY),
+    } as unknown as ReturnType<typeof getDataPrivacyPolicyService>);
   });
 
   describe("when user has RoleBinding but no TeamUser row", () => {
