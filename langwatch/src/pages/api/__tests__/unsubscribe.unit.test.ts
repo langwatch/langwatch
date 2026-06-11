@@ -1,4 +1,4 @@
-import { createMocks } from "node-mocks-http";
+import { createMocks, type RequestMethod } from "node-mocks-http";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 
@@ -35,7 +35,7 @@ function invoke({
   method = "POST",
   token,
 }: {
-  method?: string;
+  method?: RequestMethod;
   token?: string;
 }) {
   const { req, res } = createMocks({

@@ -3,6 +3,7 @@ import {
   confirmUnsubscribe,
   maskEmail,
   resolveUnsubscribe,
+  type ResolveDeps,
 } from "../unsubscribe.read";
 import { signUnsubscribeToken } from "../unsubscribeToken";
 
@@ -21,10 +22,10 @@ describe("maskEmail", () => {
 });
 
 describe("resolveUnsubscribe", () => {
-  let deps: { lookupNames: ReturnType<typeof vi.fn> };
+  let deps: { lookupNames: ReturnType<typeof vi.fn<ResolveDeps["lookupNames"]>> };
 
   beforeEach(() => {
-    deps = { lookupNames: vi.fn() };
+    deps = { lookupNames: vi.fn<ResolveDeps["lookupNames"]>() };
   });
 
   describe("given a valid trigger-scoped token", () => {
