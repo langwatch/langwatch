@@ -13,7 +13,7 @@
  *
  * Spec: specs/assistant/langy-github-prs.feature. Issue: #4747.
  */
-import { createHmac, randomBytes, timingSafeEqual } from "crypto";
+import { randomBytes } from "crypto";
 
 import {
   createServiceApp,
@@ -25,6 +25,11 @@ import { auditLog } from "~/server/auditLog";
 import { encrypt } from "~/utils/encryption";
 import { env } from "~/env.mjs";
 import { createLogger } from "~/utils/logger/server";
+import {
+  signGithubOauthState,
+  verifyGithubOauthState,
+  type GithubOauthStatePayload,
+} from "~/server/services/langy/githubOauthState";
 
 import type { NextRequestShim } from "./types";
 
@@ -34,25 +39,11 @@ const GITHUB_AUTHORIZE_URL = "https://github.com/login/oauth/authorize";
 const GITHUB_TOKEN_URL = "https://github.com/login/oauth/access_token";
 const GITHUB_USER_URL = "https://api.github.com/user";
 
-// State carries (userId, organizationId, mode, return path, nonce) signed with
-// CREDENTIALS_SECRET. Short TTL so a stolen state token can't be replayed
-// later. Encoded as base64url to survive the URL.
-const STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
-
 const PUBLIC_REASON =
   "GitHub App OAuth redirect URI — protocol-mandated public endpoint; " +
   "all sensitive state is signed and bound to the session that started the flow.";
 
 const secured = createServiceApp({ basePath: "/api" });
-
-type StatePayload = {
-  userId: string;
-  organizationId: string;
-  mode: "popup" | "redirect";
-  returnTo: string;
-  issuedAt: number;
-  nonce: string;
-};
 
 function signingKey(): string {
   const secret = env.CREDENTIALS_SECRET ?? env.NEXTAUTH_SECRET;
@@ -62,45 +53,12 @@ function signingKey(): string {
   return secret;
 }
 
-function signState(payload: StatePayload): string {
-  const body = Buffer.from(JSON.stringify(payload), "utf8").toString(
-    "base64url",
-  );
-  const sig = createHmac("sha256", signingKey())
-    .update(body)
-    .digest("base64url");
-  return `${body}.${sig}`;
+function signState(payload: GithubOauthStatePayload): string {
+  return signGithubOauthState(payload, signingKey());
 }
 
-function verifyState(token: string | null): StatePayload | null {
-  if (!token) return null;
-  const dot = token.indexOf(".");
-  if (dot < 0) return null;
-  const body = token.slice(0, dot);
-  const sig = token.slice(dot + 1);
-  const expected = createHmac("sha256", signingKey())
-    .update(body)
-    .digest("base64url");
-  const a = Buffer.from(sig, "base64url");
-  const b = Buffer.from(expected, "base64url");
-  if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
-  let payload: StatePayload;
-  try {
-    payload = JSON.parse(
-      Buffer.from(body, "base64url").toString("utf8"),
-    ) as StatePayload;
-  } catch {
-    return null;
-  }
-  if (
-    typeof payload?.userId !== "string" ||
-    typeof payload?.organizationId !== "string" ||
-    typeof payload?.issuedAt !== "number"
-  ) {
-    return null;
-  }
-  if (Date.now() - payload.issuedAt > STATE_TTL_MS) return null;
-  return payload;
+function verifyState(token: string | null): GithubOauthStatePayload | null {
+  return verifyGithubOauthState(token, signingKey());
 }
 
 // Only allow internal relative paths as returnTo, to prevent open-redirects.
