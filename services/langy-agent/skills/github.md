@@ -8,7 +8,15 @@
 
 The user's GitHub token rides into your env as `GH_TOKEN` (and their login as `GITHUB_LOGIN`). If `GH_TOKEN` is empty or unset:
 
-> Reply with: "GitHub isn't connected for your account yet. Open the Connect GitHub card in the sidebar to authorize LangWatch as you — once connected I'll pick this up automatically." Then stop. Do NOT try to clone, do NOT prompt for a PAT, do NOT call `gh auth login`.
+> Reply with EXACTLY this (the sentinel `[langy:connect-github]` is rendered as the in-chat Connect card by the sidebar; the rest is plain text):
+>
+> ```
+> GitHub isn't connected for your account yet — connect it and I'll pick this up automatically.
+>
+> [langy:connect-github]
+> ```
+>
+> Then stop. Do NOT try to clone, do NOT prompt for a PAT, do NOT call `gh auth login`.
 
 If `GH_TOKEN` is present, continue.
 

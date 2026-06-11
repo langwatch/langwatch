@@ -34,6 +34,7 @@ import { allModelOptions } from "~/components/ModelSelector";
 import { isLangyManagedVk } from "~/components/gateway/langyVk";
 import { Composer } from "./Composer";
 import { EmptyState } from "./EmptyState";
+import { LangyGitHubChip } from "./github/LangyGitHubChip";
 import {
   MessageContent,
   type LangyProposal,
@@ -195,6 +196,7 @@ function LangyPanel({
   const { organization, project } = useOrganizationTeamProject();
   const projectId = project?.id;
   const organizationId = organization?.id;
+  const utils = api.useUtils();
 
   const [input, setInput] = useState("");
   // Per-session model override for the next send. Empty string = "use whatever
@@ -520,11 +522,17 @@ function LangyPanel({
                 <MessageContent
                   key={message.id}
                   message={message}
+                  organizationId={organizationId}
                   appliedOutcomes={appliedOutcomes}
                   discardedProposals={discardedProposals}
                   applyingProposals={applyingProposals}
                   onApply={applyProposal}
                   onDiscard={discardProposal}
+                  onConnectedGithub={() =>
+                    void utils.langyGithub.getConnection.invalidate({
+                      organizationId: organizationId ?? "",
+                    })
+                  }
                 />
               ))}
               {isBusy && <ThinkingIndicator messages={messages} />}
@@ -543,6 +551,11 @@ function LangyPanel({
           disabled={!projectId}
           canSend={!!input.trim() && !isBusy && !!projectId}
         />
+        {organizationId ? (
+          <Box px={3} pb={2}>
+            <LangyGitHubChip organizationId={organizationId} />
+          </Box>
+        ) : null}
       </VStack>
     </Box>
   );
