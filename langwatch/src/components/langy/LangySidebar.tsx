@@ -213,8 +213,27 @@ function LangyPanel({
   );
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Filled in below once useLangyConversations runs; the transport's fetch
+  // closes over the ref so the transport itself never needs recreating.
+  const adoptConversationRef = useRef<(id: string) => void>(() => undefined);
+
   const transport = useMemo(
-    () => new DefaultChatTransport({ api: "/api/langy/chat" }),
+    () =>
+      new DefaultChatTransport({
+        api: "/api/langy/chat",
+        // The chat route returns the conversation it created (or reused) in
+        // this header. Adopt it so the NEXT send carries `conversationId` —
+        // without this every message forks a fresh conversation (and a fresh
+        // OpenCode worker, which is keyed by conversation id).
+        fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
+          const response = await fetch(input, init);
+          const conversationId = response.headers.get(
+            "x-langy-conversation-id",
+          );
+          if (conversationId) adoptConversationRef.current(conversationId);
+          return response;
+        }) as typeof fetch,
+      }),
     [],
   );
 
@@ -323,16 +342,19 @@ function LangyPanel({
 
   const {
     conversations,
+    currentConversationId,
     isLoading: isLoadingConversations,
     hasListError,
     select: selectConversation,
     startNew: startNewConversation,
     remove: removeConversation,
+    adopt: adoptConversation,
   } = useLangyConversations({
     projectId,
     setMessages: applyMessagesFromHistory,
     onError: surfaceConversationError,
   });
+  adoptConversationRef.current = adoptConversation;
 
   useEffect(() => {
     if (!scrollRef.current) return;
@@ -353,6 +375,11 @@ function LangyPanel({
       {
         body: {
           projectId,
+          // Stay in the active conversation; null/absent means "start a new
+          // one" and the transport adopts the id the server returns.
+          ...(currentConversationId
+            ? { conversationId: currentConversationId }
+            : {}),
           ...(modelOverride ? { modelOverride } : {}),
         },
       },
