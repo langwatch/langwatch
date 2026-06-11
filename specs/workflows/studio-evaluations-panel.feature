@@ -25,3 +25,12 @@ Feature: Studio evaluations panel
       When I click the open-full-results button in the run summary footer
       Then the experiment results page opens in a new tab
       And the page is scoped to the selected run
+
+  Rule: The panel shows how to trigger the same evaluation from the API
+
+    @integration
+    Scenario: The run-via-API dialog shows a copyable snippet for this workflow
+      Given the evaluations panel shows a selected run
+      When I click the run-via-API button in the run summary footer
+      Then a dialog shows a curl snippet for the workflow's evaluate endpoint
+      And the snippet authenticates with the project API key header

@@ -47,6 +47,7 @@ import type { Field, Signature, Workflow } from "../types/dsl";
 import { simpleRecordListToNodeDataset } from "../utils/datasetUtils";
 import { isExperimentQueryEnabled } from "./evaluationQueryEnabled";
 import { OpenFullResultsButton } from "./OpenFullResultsButton";
+import { RunViaApiButton } from "./RunViaApiButton";
 import { OptimizationProgressBar } from "./ProgressToast";
 
 export function ResultsPanel({
@@ -320,13 +321,16 @@ export function EvaluationResults({
               })
             }
             actions={
-              selectedRunId_ && (
-                <OpenFullResultsButton
-                  projectSlug={project.slug}
-                  experimentSlug={experiment.data.slug}
-                  runId={selectedRunId_}
-                />
-              )
+              <HStack gap={2}>
+                {workflowId && <RunViaApiButton workflowId={workflowId} />}
+                {selectedRunId_ && (
+                  <OpenFullResultsButton
+                    projectSlug={project.slug}
+                    experimentSlug={experiment.data.slug}
+                    runId={selectedRunId_}
+                  />
+                )}
+              </HStack>
             }
           />
         )}
