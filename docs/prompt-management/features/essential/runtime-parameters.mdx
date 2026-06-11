@@ -110,7 +110,8 @@ curl -X PUT "https://app.langwatch.ai/api/prompts/qa-extractor" \
 - Updating `parameters` (even with no other change) creates a new prompt version with its own `versionId`.
 - Restoring an older version restores that version's `parameters` too.
 - Tags (`production`, `staging`, custom) resolve to a version, so fetching by tag always returns the matching `parameters`.
-- Comparison is key-order independent — re-sending the same object with keys in a different order does not create a new version.
+- Explicit updates (`PUT`, SDK `update`) always create a new version, even if the content is unchanged.
+- The sync endpoint (`POST /api/prompts/{id}/sync`, used by the CLI) compares content key-order independently — re-syncing the same parameters with keys in a different order reports `up_to_date` and does not create a new version.
 
 ## In the UI
 
