@@ -1,5 +1,6 @@
 import {
   Badge,
+  Box,
   Button,
   Card,
   createListCollection,
@@ -7,6 +8,7 @@ import {
   Field,
   Heading,
   HStack,
+  Input,
   RadioGroup,
   Spacer,
   Spinner,
@@ -20,26 +22,36 @@ import {
   MoreVertical,
   Plus,
   Shield,
+  UserLock,
   Users,
+  X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import SettingsLayout from "~/components/SettingsLayout";
 import {
+  type AudienceFormState,
   buildRuleConfig,
+  type CustomAttributeFormRow,
   configsEqual,
   configToFormState,
+  EMPTY_AUDIENCE_FORM,
   inheritedFormState,
   isEmptyRuleConfig,
-  type RuleAudience,
   ruleSummary,
   type TouchedControls,
   touchedFromConfig,
 } from "~/components/settings/dataPrivacyRuleConfig";
 import {
+  ScopeChipPicker,
+  type ScopeChipPickerEntry,
+  type ScopeChipPickerScopeType,
+} from "~/components/settings/ScopeChipPicker";
+import {
   type AvailableScopes,
   ScopeFilter,
 } from "~/components/settings/ScopeFilter";
+import { Checkbox } from "~/components/ui/checkbox";
 import { Drawer } from "~/components/ui/drawer";
 import { Menu } from "~/components/ui/menu";
 import { Select } from "~/components/ui/select";
@@ -57,10 +69,12 @@ import {
   type ResolvedDataPrivacy,
 } from "~/server/data-privacy/dataPrivacy.types";
 import type {
+  DataPrivacyAudienceOptions,
   DataPrivacyRule,
   DataPrivacyScopeAvailable,
 } from "~/server/data-privacy/dataPrivacyPolicy.read";
 import { api } from "~/utils/api";
+import { isSafeRegex } from "~/utils/safeRegex";
 
 const CATEGORY_LABELS: Record<ContentCategory, string> = {
   input: "Input",
@@ -88,52 +102,6 @@ const SCOPE_ICON: Record<string, typeof Building2> = {
   PROJECT: Folder,
 };
 
-type ScopeOption = {
-  key: string;
-  scopeType: "ORGANIZATION" | "DEPARTMENT" | "TEAM" | "PROJECT";
-  scopeId: string;
-  label: string;
-};
-
-function buildScopeOptions(
-  available: DataPrivacyScopeAvailable,
-): ScopeOption[] {
-  const options: ScopeOption[] = [];
-  if (available.organization) {
-    options.push({
-      key: `ORGANIZATION:${available.organization.id}`,
-      scopeType: "ORGANIZATION",
-      scopeId: available.organization.id,
-      label: `${available.organization.name} (organization)`,
-    });
-  }
-  for (const d of available.departments) {
-    options.push({
-      key: `DEPARTMENT:${d.id}`,
-      scopeType: "DEPARTMENT",
-      scopeId: d.id,
-      label: `${d.name} (department)`,
-    });
-  }
-  for (const t of available.teams) {
-    options.push({
-      key: `TEAM:${t.id}`,
-      scopeType: "TEAM",
-      scopeId: t.id,
-      label: `${t.name} (team)`,
-    });
-  }
-  for (const p of available.projects) {
-    options.push({
-      key: `PROJECT:${p.id}`,
-      scopeType: "PROJECT",
-      scopeId: p.id,
-      label: `${p.name} (project)`,
-    });
-  }
-  return options;
-}
-
 function DataPrivacySettings() {
   const { project } = useOrganizationTeamProject();
   if (!project) return null;
@@ -146,7 +114,8 @@ export default withPermissionGuard("project:view", {
 
 function DataPrivacyPage({ projectId }: { projectId: string }) {
   const utils = api.useUtils();
-  const { project: currentProject } = useOrganizationTeamProject();
+  const { project: currentProject, organization } =
+    useOrganizationTeamProject();
   const snapshotQuery = api.dataPrivacy.getSnapshot.useQuery({ projectId });
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<DataPrivacyRule | null>(null);
@@ -323,7 +292,9 @@ function DataPrivacyPage({ projectId }: { projectId: string }) {
                       </Table.Row>
                     ) : (
                       filteredRules.map((rule) => {
-                        const Icon = SCOPE_ICON[rule.scopeType] ?? Folder;
+                        const Icon = rule.personalOnly
+                          ? UserLock
+                          : (SCOPE_ICON[rule.scopeType] ?? Folder);
                         return (
                           <Table.Row
                             key={`${rule.scopeType}:${rule.scopeId}:${rule.personalOnly}`}
@@ -393,25 +364,41 @@ function DataPrivacyPage({ projectId }: { projectId: string }) {
               setEditingRule(null);
             }}
             available={available}
+            audienceOptions={snapshot.audienceOptions}
             effective={snapshot.effective}
             projectId={projectId}
+            currentTeamId={currentProject?.teamId ?? null}
+            currentOrganizationId={organization?.id ?? null}
             isSaving={setForScope.isLoading}
-            onSave={async (scope, personalOnly, config) => {
+            onSave={async (scopes, config) => {
               try {
-                await setForScope.mutateAsync({
-                  projectId,
-                  scope,
-                  personalOnly,
-                  config,
-                });
+                await Promise.all(
+                  scopes.map((scope) =>
+                    setForScope.mutateAsync({
+                      projectId,
+                      scope: {
+                        scopeType: scope.scopeType,
+                        scopeId: scope.scopeId,
+                      },
+                      personalOnly: !!scope.personalOnly,
+                      config,
+                    }),
+                  ),
+                );
                 void invalidate();
                 toaster.create({
-                  title: "Privacy rule saved",
+                  title:
+                    scopes.length > 1
+                      ? `Privacy rule saved for ${scopes.length} scopes`
+                      : "Privacy rule saved",
                   type: "success",
                 });
                 setDrawerOpen(false);
                 setEditingRule(null);
               } catch (error) {
+                // Partial failure leaves the already-saved scopes in place;
+                // the snapshot refresh shows exactly which rows exist.
+                void invalidate();
                 toaster.create({
                   title: "Failed to save rule",
                   description: (error as Error).message,
@@ -447,13 +434,37 @@ function EffectiveCard({ effective }: { effective: ResolvedDataPrivacy }) {
               </Text>
             </HStack>
           ))}
+          {effective.customAttributes.length > 0 && (
+            <HStack justifyContent="space-between">
+              <Text color="fg.muted">Attribute rules</Text>
+              <Text>
+                {effective.customAttributes
+                  .map(
+                    (rule) =>
+                      `${rule.pattern} ${
+                        rule.disposition === "drop" ? "dropped" : "restricted"
+                      }`,
+                  )
+                  .join(" · ")}
+              </Text>
+            </HStack>
+          )}
           <HStack justifyContent="space-between">
             <Text color="fg.muted">PII redaction</Text>
             <Text>{PII_LABELS[effective.pii.level]}</Text>
           </HStack>
           <HStack justifyContent="space-between">
             <Text color="fg.muted">Secrets redaction</Text>
-            <Text>{effective.secrets.enabled ? "On" : "Off"}</Text>
+            <Text>
+              {effective.secrets.enabled ? "On" : "Off"}
+              {effective.secrets.customPatterns.length > 0
+                ? ` · ${effective.secrets.customPatterns.length} custom ${
+                    effective.secrets.customPatterns.length === 1
+                      ? "pattern"
+                      : "patterns"
+                  }`
+                : ""}
+            </Text>
           </HStack>
         </VStack>
       </Card.Body>
@@ -463,20 +474,16 @@ function EffectiveCard({ effective }: { effective: ResolvedDataPrivacy }) {
 
 const dispositionCollection = createListCollection({
   items: [
-    { value: "capture", label: "Captured (visible to your team)" },
-    {
-      value: "restrict",
-      label: "Restricted (hidden from outside the audience)",
-    },
-    { value: "drop", label: "Dropped (never stored)" },
+    { value: "capture", label: "Captured" },
+    { value: "restrict", label: "Restricted" },
+    { value: "drop", label: "Dropped" },
   ],
 });
 
-const audienceCollection = createListCollection({
+const attributeDispositionCollection = createListCollection({
   items: [
-    { value: "admins", label: "Admins only" },
-    { value: "allMembers", label: "All members" },
-    { value: "noOne", label: "No one (fully hidden)" },
+    { value: "restrict", label: "Restricted" },
+    { value: "drop", label: "Dropped" },
   ],
 });
 
@@ -486,13 +493,60 @@ const NO_CONTROLS_TOUCHED: TouchedControls = {
   secrets: false,
 };
 
+function describeAudienceSelection(
+  audience: AudienceFormState,
+  options: DataPrivacyAudienceOptions,
+): string {
+  const parts: string[] = [];
+  if (audience.admins) parts.push("Admins");
+  if (audience.allMembers) parts.push("All members");
+  if (audience.viewers) parts.push("Viewers");
+  if (audience.projectOwner) parts.push("the project owner");
+  for (const id of audience.groupIds) {
+    parts.push(options.groups.find((g) => g.id === id)?.name ?? "a group");
+  }
+  for (const id of audience.departmentIds) {
+    parts.push(
+      options.departments.find((d) => d.id === id)?.name ?? "a department",
+    );
+  }
+  return parts.length > 0
+    ? `Visible to: ${parts.join(", ")}`
+    : "No one (fully hidden)";
+}
+
+function secretPatternError(pattern: string): string | null {
+  if (pattern.trim().length === 0) return null;
+  try {
+    new RegExp(pattern);
+  } catch {
+    return "Invalid regular expression";
+  }
+  if (!isSafeRegex(pattern)) {
+    return "Pattern could backtrack catastrophically; simplify it";
+  }
+  return null;
+}
+
+function attributePatternError(pattern: string): string | null {
+  const trimmed = pattern.trim();
+  if (trimmed.length === 0) return null;
+  if (trimmed.replaceAll("*", "").length === 0) {
+    return "Name at least part of the key";
+  }
+  return null;
+}
+
 function PrivacyRuleDrawer({
   open,
   editingRule,
   onClose,
   available,
+  audienceOptions,
   effective,
   projectId,
+  currentTeamId,
+  currentOrganizationId,
   isSaving,
   onSave,
 }: {
@@ -500,29 +554,15 @@ function PrivacyRuleDrawer({
   editingRule: DataPrivacyRule | null;
   onClose: () => void;
   available: DataPrivacyScopeAvailable;
+  audienceOptions: DataPrivacyAudienceOptions;
   effective: ResolvedDataPrivacy;
   projectId: string;
+  currentTeamId: string | null;
+  currentOrganizationId: string | null;
   isSaving: boolean;
-  onSave: (
-    scope: {
-      scopeType: "ORGANIZATION" | "DEPARTMENT" | "TEAM" | "PROJECT";
-      scopeId: string;
-    },
-    personalOnly: boolean,
-    config: DataPrivacyConfig,
-  ) => void;
+  onSave: (scopes: ScopeChipPickerEntry[], config: DataPrivacyConfig) => void;
 }) {
-  const scopeOptions = useMemo(() => buildScopeOptions(available), [available]);
-  const scopeCollection = useMemo(
-    () =>
-      createListCollection({
-        items: scopeOptions.map((o) => ({ value: o.key, label: o.label })),
-      }),
-    [scopeOptions],
-  );
-
-  const [scopeKey, setScopeKey] = useState<string>("");
-  const [personalOnly, setPersonalOnly] = useState(false);
+  const [scopes, setScopes] = useState<ScopeChipPickerEntry[]>([]);
   const [dispositions, setDispositions] = useState<
     Record<ContentCategory, Disposition>
   >({
@@ -531,9 +571,16 @@ function PrivacyRuleDrawer({
     system: "capture",
     tools: "capture",
   });
-  const [audience, setAudience] = useState<RuleAudience>("admins");
+  const [audience, setAudience] = useState<AudienceFormState>({
+    ...EMPTY_AUDIENCE_FORM,
+    admins: true,
+  });
   const [piiLevel, setPiiLevel] = useState<PiiLevel>("essential");
   const [secretsEnabled, setSecretsEnabled] = useState(true);
+  const [secretsPatterns, setSecretsPatterns] = useState<string[]>([]);
+  const [customAttributes, setCustomAttributes] = useState<
+    CustomAttributeFormRow[]
+  >([]);
   // Controls the user explicitly changed, so they persist as overrides. On an
   // edit it starts as the rule's existing fields, so they re-persist untouched.
   const [touched, setTouched] = useState<TouchedControls>(NO_CONTROLS_TOUCHED);
@@ -546,13 +593,28 @@ function PrivacyRuleDrawer({
       ...prev,
       categories: { ...prev.categories, [category]: true },
     }));
+  const touchRestrictedCategories = () =>
+    setTouched((prev) => {
+      const categories = { ...prev.categories };
+      for (const c of CONTENT_CATEGORIES) {
+        if (dispositions[c] === "restrict") categories[c] = true;
+      }
+      return { ...prev, categories };
+    });
 
-  const isCurrentProjectScope = scopeKey === `PROJECT:${projectId}`;
+  const isCurrentProjectScope =
+    scopes.length === 1 &&
+    scopes[0]!.scopeType === "PROJECT" &&
+    scopes[0]!.scopeId === projectId &&
+    !scopes[0]!.personalOnly;
+
   const applyForm = (form: ReturnType<typeof configToFormState>) => {
     setDispositions(form.dispositions);
     setAudience(form.audience);
     setPiiLevel(form.piiLevel);
     setSecretsEnabled(form.secretsEnabled);
+    setSecretsPatterns(form.secretsPatterns);
+    setCustomAttributes(form.customAttributes);
   };
 
   // Open transition: seed the drawer. Edit prefills from the rule and marks its
@@ -563,27 +625,36 @@ function PrivacyRuleDrawer({
   useEffect(() => {
     if (!open) return;
     if (editingRule) {
-      setScopeKey(`${editingRule.scopeType}:${editingRule.scopeId}`);
-      setPersonalOnly(editingRule.personalOnly);
+      setScopes([
+        {
+          scopeType: editingRule.scopeType,
+          scopeId: editingRule.scopeId,
+          ...(editingRule.personalOnly ? { personalOnly: true } : {}),
+        },
+      ]);
       applyForm(configToFormState(editingRule.config));
       const editTouched = touchedFromConfig(editingRule.config);
       setTouched(editTouched);
       touchedRef.current = editTouched;
       return;
     }
-    const firstKey = scopeOptions[0]?.key ?? "";
-    setScopeKey(firstKey);
-    setPersonalOnly(false);
+    const projectInAvailable = available.projects.some(
+      (p) => p.id === projectId,
+    );
+    const initialScopes: ScopeChipPickerEntry[] = projectInAvailable
+      ? [{ scopeType: "PROJECT", scopeId: projectId }]
+      : [];
+    setScopes(initialScopes);
     setTouched(NO_CONTROLS_TOUCHED);
     touchedRef.current = NO_CONTROLS_TOUCHED;
     applyForm(
       inheritedFormState({
         effective,
-        isCurrentProjectScope: firstKey === `PROJECT:${projectId}`,
+        isCurrentProjectScope: projectInAvailable,
       }),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, editingRule, scopeOptions]);
+  }, [open, editingRule]);
 
   // Re-derive the Add baseline when the user switches scope before touching
   // anything; once a control is touched their choices stand and aren't clobbered.
@@ -597,12 +668,9 @@ function PrivacyRuleDrawer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCurrentProjectScope]);
 
-  const scope = scopeOptions.find((o) => o.key === scopeKey);
-  const anyRestrict = CONTENT_CATEGORIES.some(
-    (c) => dispositions[c] === "restrict",
-  );
-  const canTogglePersonal =
-    scope?.scopeType === "ORGANIZATION" || scope?.scopeType === "DEPARTMENT";
+  const anyRestrict =
+    CONTENT_CATEGORIES.some((c) => dispositions[c] === "restrict") ||
+    customAttributes.some((row) => row.disposition === "restrict");
 
   const config = useMemo<DataPrivacyConfig>(
     () =>
@@ -611,16 +679,39 @@ function PrivacyRuleDrawer({
         audience,
         piiLevel,
         secretsEnabled,
+        secretsPatterns,
+        customAttributes,
         touched,
       }),
-    [dispositions, audience, piiLevel, secretsEnabled, touched],
+    [
+      dispositions,
+      audience,
+      piiLevel,
+      secretsEnabled,
+      secretsPatterns,
+      customAttributes,
+      touched,
+    ],
   );
+
+  const hasInvalidPatterns =
+    secretsPatterns.some((p) => secretPatternError(p) !== null) ||
+    customAttributes.some((row) => attributePatternError(row.pattern) !== null);
+
   // Add: enabled once the built config persists at least one control. Edit:
   // enabled once the built config differs from the rule being edited.
   const hasChange = editingRule
     ? !configsEqual(config, editingRule.config)
     : !isEmptyRuleConfig(config);
-  const canSave = !!scope && hasChange && !isSaving;
+  const canSave =
+    scopes.length > 0 && hasChange && !hasInvalidPatterns && !isSaving;
+
+  const editIcon = editingRule
+    ? editingRule.personalOnly
+      ? UserLock
+      : (SCOPE_ICON[editingRule.scopeType] ?? Folder)
+    : null;
+  const EditIcon = editIcon;
 
   return (
     <Drawer.Root
@@ -640,49 +731,58 @@ function PrivacyRuleDrawer({
         </Drawer.Header>
         <Drawer.Body>
           <VStack gap={5} align="stretch">
-            <Field.Root>
-              <Field.Label>Scope</Field.Label>
-              <Select.Root
-                collection={scopeCollection}
-                value={scopeKey ? [scopeKey] : []}
-                onValueChange={(d) => setScopeKey(d.value[0] ?? "")}
-                disabled={!!editingRule}
-              >
-                <Select.Trigger background="bg">
-                  <Select.ValueText placeholder="Pick a scope" />
-                </Select.Trigger>
-                <Select.Content>
-                  {scopeCollection.items.map((item) => (
-                    <Select.Item key={item.value} item={item}>
-                      {item.label}
-                    </Select.Item>
-                  ))}
-                </Select.Content>
-              </Select.Root>
-              {canTogglePersonal && (
-                <HStack gap={3} marginTop={2}>
-                  <Switch
-                    checked={personalOnly}
-                    disabled={!!editingRule}
-                    onCheckedChange={({ checked }) =>
-                      setPersonalOnly(checked === true)
-                    }
-                  />
-                  <Text fontSize="sm">Personal projects only</Text>
+            {editingRule && EditIcon ? (
+              <VStack gap={1.5} align="start">
+                <Text fontWeight="600" fontSize="sm">
+                  Scope
+                </Text>
+                <HStack gap={2}>
+                  <EditIcon size={14} />
+                  <Text fontSize="sm">{editingRule.name}</Text>
+                  <Badge size="sm" colorPalette="gray">
+                    {editingRule.scopeType.toLowerCase()}
+                  </Badge>
+                  {editingRule.personalOnly && (
+                    <Badge size="sm" colorPalette="purple">
+                      personal
+                    </Badge>
+                  )}
                 </HStack>
-              )}
-            </Field.Root>
+              </VStack>
+            ) : (
+              <ScopeChipPicker<ScopeChipPickerScopeType>
+                value={scopes}
+                onChange={setScopes}
+                organizationId={available.organization?.id}
+                organizationName={available.organization?.name}
+                availableTeams={available.teams}
+                availableProjects={available.projects}
+                availableDepartments={available.departments}
+                allowedScopeTypes={[
+                  "ORGANIZATION",
+                  "DEPARTMENT",
+                  "TEAM",
+                  "PROJECT",
+                ]}
+                personalScopes
+                currentOrganizationId={currentOrganizationId}
+                currentTeamId={currentTeamId}
+                currentProjectId={projectId}
+              />
+            )}
 
-            <VStack gap={3} align="stretch">
+            <VStack gap={2.5} align="stretch">
               <Text fontWeight="600" fontSize="sm">
                 Content
               </Text>
               {CONTENT_CATEGORIES.map((category) => (
-                <Field.Root key={category}>
-                  <Field.Label>{CATEGORY_LABELS[category]}</Field.Label>
+                <HStack key={category} justifyContent="space-between" gap={4}>
+                  <Text fontSize="sm">{CATEGORY_LABELS[category]}</Text>
                   <Select.Root
                     collection={dispositionCollection}
                     value={[dispositions[category]]}
+                    size="sm"
+                    width="200px"
                     onValueChange={(d) => {
                       setDispositions((prev) => ({
                         ...prev,
@@ -691,7 +791,10 @@ function PrivacyRuleDrawer({
                       touchCategory(category);
                     }}
                   >
-                    <Select.Trigger background="bg">
+                    <Select.Trigger
+                      background="bg"
+                      aria-label={CATEGORY_LABELS[category]}
+                    >
                       <Select.ValueText />
                     </Select.Trigger>
                     <Select.Content>
@@ -702,42 +805,199 @@ function PrivacyRuleDrawer({
                       ))}
                     </Select.Content>
                   </Select.Root>
-                </Field.Root>
+                </HStack>
               ))}
-              {anyRestrict && (
-                <Field.Root>
-                  <Field.Label>Restricted content is visible to</Field.Label>
-                  <Select.Root
-                    collection={audienceCollection}
-                    value={[audience]}
-                    onValueChange={(d) => {
-                      setAudience((d.value[0] as RuleAudience) ?? "admins");
-                      // The audience applies to every restrict category, so
-                      // changing it persists those categories as overrides.
-                      setTouched((prev) => {
-                        const categories = { ...prev.categories };
-                        for (const c of CONTENT_CATEGORIES) {
-                          if (dispositions[c] === "restrict")
-                            categories[c] = true;
+              <Text fontSize="xs" color="fg.muted">
+                Captured content is stored and visible to the audience below
+                when restricted; dropped content is stripped at ingestion and
+                cannot be recovered.
+              </Text>
+            </VStack>
+
+            <VStack gap={2} align="stretch">
+              <Text fontWeight="600" fontSize="sm">
+                Custom attributes
+              </Text>
+              {customAttributes.map((row, index) => {
+                const error = attributePatternError(row.pattern);
+                return (
+                  <VStack key={index} gap={1} align="stretch">
+                    <HStack gap={2}>
+                      <Input
+                        size="sm"
+                        fontFamily="mono"
+                        placeholder="gen_ai.prompt.*"
+                        value={row.pattern}
+                        aria-label={`Attribute pattern ${index + 1}`}
+                        borderColor={error ? "red.500" : undefined}
+                        onChange={(e) =>
+                          setCustomAttributes((prev) =>
+                            prev.map((r, i) =>
+                              i === index
+                                ? { ...r, pattern: e.target.value }
+                                : r,
+                            ),
+                          )
                         }
-                        return { ...prev, categories };
-                      });
+                      />
+                      <Select.Root
+                        collection={attributeDispositionCollection}
+                        value={[row.disposition]}
+                        size="sm"
+                        width="140px"
+                        onValueChange={(d) =>
+                          setCustomAttributes((prev) =>
+                            prev.map((r, i) =>
+                              i === index
+                                ? {
+                                    ...r,
+                                    disposition:
+                                      (d.value[0] as "restrict" | "drop") ??
+                                      "restrict",
+                                  }
+                                : r,
+                            ),
+                          )
+                        }
+                      >
+                        <Select.Trigger
+                          background="bg"
+                          aria-label={`Attribute disposition ${index + 1}`}
+                        >
+                          <Select.ValueText />
+                        </Select.Trigger>
+                        <Select.Content>
+                          {attributeDispositionCollection.items.map((item) => (
+                            <Select.Item key={item.value} item={item}>
+                              {item.label}
+                            </Select.Item>
+                          ))}
+                        </Select.Content>
+                      </Select.Root>
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        aria-label={`Remove attribute rule ${index + 1}`}
+                        onClick={() =>
+                          setCustomAttributes((prev) =>
+                            prev.filter((_, i) => i !== index),
+                          )
+                        }
+                      >
+                        <X size={14} />
+                      </Button>
+                    </HStack>
+                    {error && (
+                      <Text fontSize="xs" color="red.500">
+                        {error}
+                      </Text>
+                    )}
+                  </VStack>
+                );
+              })}
+              <Box>
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  onClick={() =>
+                    setCustomAttributes((prev) => [
+                      ...prev,
+                      { pattern: "", disposition: "restrict" },
+                    ])
+                  }
+                >
+                  <Plus size={14} /> Add attribute rule
+                </Button>
+              </Box>
+              <Text fontSize="xs" color="fg.muted">
+                Match span attribute keys beyond the four categories, with *
+                wildcards: restricted attributes are hidden from outside the
+                audience, dropped ones are stripped at ingestion.
+              </Text>
+            </VStack>
+
+            {anyRestrict && (
+              <VStack gap={2} align="stretch">
+                <Text fontWeight="600" fontSize="sm">
+                  Restricted content is visible to
+                </Text>
+                <VStack gap={1.5} align="start">
+                  <Checkbox
+                    checked={audience.admins}
+                    onCheckedChange={({ checked }) => {
+                      setAudience((prev) => ({
+                        ...prev,
+                        admins: checked === true,
+                      }));
+                      touchRestrictedCategories();
                     }}
                   >
-                    <Select.Trigger background="bg">
-                      <Select.ValueText />
-                    </Select.Trigger>
-                    <Select.Content>
-                      {audienceCollection.items.map((item) => (
-                        <Select.Item key={item.value} item={item}>
-                          {item.label}
-                        </Select.Item>
-                      ))}
-                    </Select.Content>
-                  </Select.Root>
-                </Field.Root>
-              )}
-            </VStack>
+                    Admins
+                  </Checkbox>
+                  <Checkbox
+                    checked={audience.allMembers}
+                    onCheckedChange={({ checked }) => {
+                      setAudience((prev) => ({
+                        ...prev,
+                        allMembers: checked === true,
+                      }));
+                      touchRestrictedCategories();
+                    }}
+                  >
+                    All members
+                  </Checkbox>
+                  <Checkbox
+                    checked={audience.viewers}
+                    onCheckedChange={({ checked }) => {
+                      setAudience((prev) => ({
+                        ...prev,
+                        viewers: checked === true,
+                      }));
+                      touchRestrictedCategories();
+                    }}
+                  >
+                    Viewers
+                  </Checkbox>
+                  <Checkbox
+                    checked={audience.projectOwner}
+                    onCheckedChange={({ checked }) => {
+                      setAudience((prev) => ({
+                        ...prev,
+                        projectOwner: checked === true,
+                      }));
+                      touchRestrictedCategories();
+                    }}
+                  >
+                    Only the project owner (their own personal projects)
+                  </Checkbox>
+                </VStack>
+                {audienceOptions.groups.length > 0 && (
+                  <AudienceMultiSelect
+                    label="Groups"
+                    options={audienceOptions.groups}
+                    selected={audience.groupIds}
+                    onChange={(groupIds) => {
+                      setAudience((prev) => ({ ...prev, groupIds }));
+                      touchRestrictedCategories();
+                    }}
+                  />
+                )}
+                {audienceOptions.departments.length > 0 && (
+                  <AudienceMultiSelect
+                    label="Departments"
+                    options={audienceOptions.departments}
+                    selected={audience.departmentIds}
+                    onChange={(departmentIds) => {
+                      setAudience((prev) => ({ ...prev, departmentIds }));
+                      touchRestrictedCategories();
+                    }}
+                  />
+                )}
+                <Text fontSize="xs" color="fg.muted">
+                  {describeAudienceSelection(audience, audienceOptions)}
+                </Text>
+              </VStack>
+            )}
 
             <Field.Root>
               <Field.Label>PII redaction</Field.Label>
@@ -773,24 +1033,97 @@ function PrivacyRuleDrawer({
               </RadioGroup.Root>
             </Field.Root>
 
-            <HStack gap={3} align="start">
-              <Switch
-                checked={secretsEnabled}
-                onCheckedChange={({ checked }) => {
-                  setSecretsEnabled(checked === true);
-                  setTouched((prev) => ({ ...prev, secrets: true }));
-                }}
-              />
-              <VStack align="start" gap={0}>
-                <Text fontWeight="600" fontSize="sm">
-                  Secrets redaction
-                </Text>
-                <Text fontSize="xs" color="fg.muted">
-                  Scrubs API keys, tokens, private keys, and database URLs. On
-                  by default.
-                </Text>
-              </VStack>
-            </HStack>
+            <VStack gap={2} align="stretch">
+              <HStack gap={3} align="start">
+                <Switch
+                  checked={secretsEnabled}
+                  onCheckedChange={({ checked }) => {
+                    setSecretsEnabled(checked === true);
+                    setTouched((prev) => ({ ...prev, secrets: true }));
+                  }}
+                />
+                <VStack align="start" gap={0}>
+                  <Text fontWeight="600" fontSize="sm">
+                    Secrets redaction
+                  </Text>
+                  <Text fontSize="xs" color="fg.muted">
+                    Scrubs API keys, tokens, private keys, and database URLs. On
+                    by default.
+                  </Text>
+                </VStack>
+              </HStack>
+              {secretsEnabled && (
+                <VStack gap={2} align="stretch" paddingLeft={10}>
+                  {secretsPatterns.map((pattern, index) => {
+                    const error = secretPatternError(pattern);
+                    return (
+                      <VStack key={index} gap={1} align="stretch">
+                        <HStack gap={2}>
+                          <Input
+                            size="sm"
+                            fontFamily="mono"
+                            placeholder="acme_live_[a-z0-9]+"
+                            value={pattern}
+                            aria-label={`Custom secret pattern ${index + 1}`}
+                            borderColor={error ? "red.500" : undefined}
+                            onChange={(e) => {
+                              setSecretsPatterns((prev) =>
+                                prev.map((p, i) =>
+                                  i === index ? e.target.value : p,
+                                ),
+                              );
+                              setTouched((prev) => ({
+                                ...prev,
+                                secrets: true,
+                              }));
+                            }}
+                          />
+                          <Button
+                            size="xs"
+                            variant="ghost"
+                            aria-label={`Remove custom secret pattern ${
+                              index + 1
+                            }`}
+                            onClick={() => {
+                              setSecretsPatterns((prev) =>
+                                prev.filter((_, i) => i !== index),
+                              );
+                              setTouched((prev) => ({
+                                ...prev,
+                                secrets: true,
+                              }));
+                            }}
+                          >
+                            <X size={14} />
+                          </Button>
+                        </HStack>
+                        {error && (
+                          <Text fontSize="xs" color="red.500">
+                            {error}
+                          </Text>
+                        )}
+                      </VStack>
+                    );
+                  })}
+                  <Box>
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      onClick={() => {
+                        setSecretsPatterns((prev) => [...prev, ""]);
+                        setTouched((prev) => ({ ...prev, secrets: true }));
+                      }}
+                    >
+                      <Plus size={14} /> Add custom pattern
+                    </Button>
+                  </Box>
+                  <Text fontSize="xs" color="fg.muted">
+                    Extra regular expressions redacted on top of the built-in
+                    catalog.
+                  </Text>
+                </VStack>
+              )}
+            </VStack>
           </VStack>
         </Drawer.Body>
         <Drawer.Footer>
@@ -800,12 +1133,8 @@ function PrivacyRuleDrawer({
               disabled={!canSave}
               loading={isSaving}
               onClick={() => {
-                if (!scope) return;
-                onSave(
-                  { scopeType: scope.scopeType, scopeId: scope.scopeId },
-                  canTogglePersonal ? personalOnly : false,
-                  config,
-                );
+                if (scopes.length === 0) return;
+                onSave(scopes, config);
               }}
             >
               Save
@@ -814,5 +1143,48 @@ function PrivacyRuleDrawer({
         </Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>
+  );
+}
+
+function AudienceMultiSelect({
+  label,
+  options,
+  selected,
+  onChange,
+}: {
+  label: string;
+  options: { id: string; name: string }[];
+  selected: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  const collection = useMemo(
+    () =>
+      createListCollection({
+        items: options.map((o) => ({ value: o.id, label: o.name })),
+      }),
+    [options],
+  );
+  return (
+    <Field.Root>
+      <Field.Label fontSize="sm">{label}</Field.Label>
+      <Select.Root
+        collection={collection}
+        value={selected}
+        multiple
+        size="sm"
+        onValueChange={(d) => onChange(d.value)}
+      >
+        <Select.Trigger background="bg" aria-label={label}>
+          <Select.ValueText placeholder={`Pick ${label.toLowerCase()}`} />
+        </Select.Trigger>
+        <Select.Content>
+          {collection.items.map((item) => (
+            <Select.Item key={item.value} item={item}>
+              {item.label}
+            </Select.Item>
+          ))}
+        </Select.Content>
+      </Select.Root>
+    </Field.Root>
   );
 }

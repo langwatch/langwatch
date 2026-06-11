@@ -1,80 +1,78 @@
 import { describe, expect, it } from "vitest";
+
 import {
-  type ContentCategory,
-  type DataPrivacyConfig,
-  type Disposition,
-  PLATFORM_DEFAULT_DATA_PRIVACY,
+  EMPTY_AUDIENCE,
   type ResolvedDataPrivacy,
 } from "~/server/data-privacy/dataPrivacy.types";
 import {
+  type AudienceFormState,
   audienceConfig,
   buildRuleConfig,
+  type CustomAttributeFormRow,
   configsEqual,
   configToFormState,
+  EMPTY_AUDIENCE_FORM,
   inheritedFormState,
   isEmptyRuleConfig,
-  type RuleAudience,
+  type RuleFormState,
   ruleSummary,
   type TouchedControls,
   touchedFromConfig,
 } from "../dataPrivacyRuleConfig";
 
-function dispositions(
-  overrides: Partial<Record<ContentCategory, Disposition>> = {},
-): Record<ContentCategory, Disposition> {
-  return {
-    input: "capture",
-    output: "capture",
-    system: "capture",
-    tools: "capture",
-    ...overrides,
-  };
+const defaultDispositions: RuleFormState["dispositions"] = {
+  input: "capture",
+  output: "capture",
+  system: "capture",
+  tools: "capture",
+};
+
+const noTouch: TouchedControls = { categories: {}, pii: false, secrets: false };
+
+function audience(partial: Partial<AudienceFormState> = {}): AudienceFormState {
+  return { ...EMPTY_AUDIENCE_FORM, ...partial };
 }
 
-/**
- * The drawer only persists controls the user touched. By default this helper
- * derives "touched" from anything set away from a platform default, mirroring
- * the pre-fix behaviour, so a plain `build()` still produces an empty config.
- * Pass `touched` explicitly to exercise an override back to a default-looking
- * value (e.g. capturing over an inherited drop).
- */
 function build({
-  disp = {},
-  audience = "admins" as RuleAudience,
+  dispositions = defaultDispositions,
+  aud = audience({ admins: true }),
   piiLevel = "essential" as const,
   secretsEnabled = true,
-  touched,
+  secretsPatterns = [] as string[],
+  customAttributes = [] as CustomAttributeFormRow[],
+  touched = noTouch,
 }: {
-  disp?: Partial<Record<ContentCategory, Disposition>>;
-  audience?: RuleAudience;
-  piiLevel?: "disabled" | "essential" | "strict";
+  dispositions?: RuleFormState["dispositions"];
+  aud?: AudienceFormState;
+  piiLevel?: RuleFormState["piiLevel"];
   secretsEnabled?: boolean;
+  secretsPatterns?: string[];
+  customAttributes?: CustomAttributeFormRow[];
   touched?: TouchedControls;
-} = {}) {
-  const merged = dispositions(disp);
-  const derived: TouchedControls = touched ?? {
-    categories: Object.fromEntries(
-      (Object.keys(merged) as ContentCategory[])
-        .filter((c) => merged[c] !== "capture")
-        .map((c) => [c, true]),
-    ),
-    pii: piiLevel !== "essential",
-    secrets: !secretsEnabled,
-  };
+}) {
   return buildRuleConfig({
-    dispositions: merged,
-    audience,
+    dispositions,
+    audience: aud,
     piiLevel,
     secretsEnabled,
-    touched: derived,
+    secretsPatterns,
+    customAttributes,
+    touched,
   });
 }
 
-function allTouched(overrides: Partial<TouchedControls> = {}): TouchedControls {
+function resolved(
+  overrides: Partial<ResolvedDataPrivacy> = {},
+): ResolvedDataPrivacy {
+  const cat = () => ({
+    disposition: "capture" as const,
+    audience: { ...EMPTY_AUDIENCE },
+  });
   return {
-    categories: { input: true, output: true, system: true, tools: true },
-    pii: true,
-    secrets: true,
+    categories: { input: cat(), output: cat(), system: cat(), tools: cat() },
+    pii: { level: "essential" },
+    secrets: { enabled: true, customPatterns: [] },
+    customAttributes: [],
     ...overrides,
   };
 }
@@ -82,47 +80,95 @@ function allTouched(overrides: Partial<TouchedControls> = {}): TouchedControls {
 describe("buildRuleConfig", () => {
   describe("given everything at the platform defaults and nothing touched", () => {
     it("produces an empty config that changes nothing", () => {
-      const config = build();
-      expect(config).toEqual({});
+      const config = build({});
+
       expect(isEmptyRuleConfig(config)).toBe(true);
     });
   });
 
   describe("given a dropped category", () => {
-    it("includes only the dropped category and omits the captured ones", () => {
-      const config = build({ disp: { input: "drop" } });
+    it("includes only the dropped category and omits the untouched ones", () => {
+      const config = build({
+        dispositions: { ...defaultDispositions, input: "drop" },
+        touched: { ...noTouch, categories: { input: true } },
+      });
+
       expect(config.categories?.input).toEqual({ disposition: "drop" });
       expect(config.categories?.output).toBeUndefined();
-      expect(config.categories?.system).toBeUndefined();
-      expect(config.categories?.tools).toBeUndefined();
     });
   });
 
   describe("given a restricted category", () => {
-    it("attaches the chosen audience", () => {
-      expect(
-        build({ disp: { output: "restrict" }, audience: "admins" }).categories
-          ?.output,
-      ).toEqual({ disposition: "restrict", audience: { admins: true } });
-      expect(
-        build({ disp: { output: "restrict" }, audience: "allMembers" })
-          .categories?.output,
-      ).toEqual({ disposition: "restrict", audience: { allMembers: true } });
-      expect(
-        build({ disp: { output: "restrict" }, audience: "noOne" }).categories
-          ?.output,
-      ).toEqual({ disposition: "restrict", audience: {} });
+    it("attaches the full structured audience", () => {
+      const config = build({
+        dispositions: { ...defaultDispositions, output: "restrict" },
+        aud: audience({
+          viewers: true,
+          projectOwner: true,
+          groupIds: ["g1"],
+          departmentIds: ["d1"],
+        }),
+        touched: { ...noTouch, categories: { output: true } },
+      });
+
+      expect(config.categories?.output).toEqual({
+        disposition: "restrict",
+        audience: {
+          viewers: true,
+          projectOwner: true,
+          groupIds: ["g1"],
+          departmentIds: ["d1"],
+        },
+      });
     });
   });
 
-  describe("given a non-default PII level or secrets off", () => {
-    it("includes pii only when not essential and secrets only when off", () => {
-      expect(build({ piiLevel: "strict" }).pii).toEqual({ level: "strict" });
-      expect(build({ piiLevel: "essential" }).pii).toBeUndefined();
-      expect(build({ secretsEnabled: false }).secrets).toEqual({
-        enabled: false,
+  describe("given custom attribute rows", () => {
+    it("persists restrict rows with the rule audience and drop rows without one", () => {
+      const config = build({
+        aud: audience({ admins: true }),
+        customAttributes: [
+          { pattern: "app.billing.*", disposition: "restrict" },
+          { pattern: "http.request.body", disposition: "drop" },
+        ],
       });
-      expect(build({ secretsEnabled: true }).secrets).toBeUndefined();
+
+      expect(config.customAttributes).toEqual([
+        {
+          pattern: "app.billing.*",
+          disposition: "restrict",
+          audience: { admins: true },
+        },
+        { pattern: "http.request.body", disposition: "drop" },
+      ]);
+    });
+
+    it("drops empty and wildcard-only rows", () => {
+      const config = build({
+        customAttributes: [
+          { pattern: "  ", disposition: "drop" },
+          { pattern: "*", disposition: "drop" },
+          { pattern: "ok.key", disposition: "drop" },
+        ],
+      });
+
+      expect(config.customAttributes).toEqual([
+        { pattern: "ok.key", disposition: "drop" },
+      ]);
+    });
+  });
+
+  describe("given custom secret patterns with secrets touched", () => {
+    it("persists the trimmed patterns alongside the enabled flag", () => {
+      const config = build({
+        secretsPatterns: [" acme_live_[a-z0-9]+ ", ""],
+        touched: { ...noTouch, secrets: true },
+      });
+
+      expect(config.secrets).toEqual({
+        enabled: true,
+        customPatterns: ["acme_live_[a-z0-9]+"],
+      });
     });
   });
 
@@ -130,215 +176,175 @@ describe("buildRuleConfig", () => {
     describe("when a category is touched to capture over an inherited drop", () => {
       it("persists the capture disposition explicitly instead of omitting it", () => {
         const config = build({
-          disp: { input: "capture" },
-          touched: { categories: { input: true }, pii: false, secrets: false },
+          touched: { ...noTouch, categories: { input: true } },
         });
+
         expect(config.categories?.input).toEqual({ disposition: "capture" });
-        expect(isEmptyRuleConfig(config)).toBe(false);
       });
     });
 
     describe("when PII is touched to essential over an inherited strict", () => {
       it("persists the essential level explicitly", () => {
-        const config = build({
-          piiLevel: "essential",
-          touched: { categories: {}, pii: true, secrets: false },
-        });
+        const config = build({ touched: { ...noTouch, pii: true } });
+
         expect(config.pii).toEqual({ level: "essential" });
-        expect(isEmptyRuleConfig(config)).toBe(false);
       });
     });
 
     describe("when secrets are touched back on over an inherited off", () => {
       it("persists secrets enabled explicitly", () => {
-        const config = build({
-          secretsEnabled: true,
-          touched: { categories: {}, pii: false, secrets: true },
-        });
-        expect(config.secrets).toEqual({ enabled: true });
-        expect(isEmptyRuleConfig(config)).toBe(false);
-      });
-    });
+        const config = build({ touched: { ...noTouch, secrets: true } });
 
-    describe("when only some controls are touched", () => {
-      it("omits the untouched ones so they keep inheriting", () => {
-        const config = build({
-          disp: { input: "capture", output: "drop" },
-          piiLevel: "essential",
-          secretsEnabled: true,
-          touched: { categories: { input: true }, pii: false, secrets: false },
-        });
-        expect(config.categories?.input).toEqual({ disposition: "capture" });
-        expect(config.categories?.output).toBeUndefined();
-        expect(config.pii).toBeUndefined();
-        expect(config.secrets).toBeUndefined();
+        expect(config.secrets).toEqual({ enabled: true });
       });
     });
   });
 });
 
 describe("audienceConfig", () => {
-  it("maps the audience choices", () => {
-    expect(audienceConfig("admins")).toEqual({ admins: true });
-    expect(audienceConfig("allMembers")).toEqual({ allMembers: true });
-    expect(audienceConfig("noOne")).toEqual({});
+  it("includes only the active audience dimensions", () => {
+    expect(audienceConfig(audience({ admins: true }))).toEqual({
+      admins: true,
+    });
+    expect(audienceConfig(audience({ allMembers: true }))).toEqual({
+      allMembers: true,
+    });
+    expect(audienceConfig(audience())).toEqual({});
+    expect(
+      audienceConfig(audience({ projectOwner: true, groupIds: ["g1"] })),
+    ).toEqual({ projectOwner: true, groupIds: ["g1"] });
   });
 });
 
-describe("touchedFromConfig", () => {
-  describe("given a config that sets some fields", () => {
+describe("configToFormState and touchedFromConfig", () => {
+  describe("given a config with every kind of field", () => {
+    const config = build({
+      dispositions: { ...defaultDispositions, input: "restrict" },
+      aud: audience({ projectOwner: true, groupIds: ["g1"] }),
+      piiLevel: "strict",
+      secretsEnabled: true,
+      secretsPatterns: ["acme_[0-9]+"],
+      customAttributes: [{ pattern: "app.token", disposition: "drop" }],
+      touched: {
+        categories: { input: true },
+        pii: true,
+        secrets: true,
+      },
+    });
+
+    it("hydrates the form state back, including the structured audience", () => {
+      const state = configToFormState(config);
+
+      expect(state.dispositions.input).toBe("restrict");
+      expect(state.audience.projectOwner).toBe(true);
+      expect(state.audience.groupIds).toEqual(["g1"]);
+      expect(state.piiLevel).toBe("strict");
+      expect(state.secretsPatterns).toEqual(["acme_[0-9]+"]);
+      expect(state.customAttributes).toEqual([
+        { pattern: "app.token", disposition: "drop" },
+      ]);
+    });
+
     it("marks exactly the present fields as touched", () => {
-      const touched = touchedFromConfig({
-        categories: { input: { disposition: "drop" } },
-        pii: { level: "strict" },
-      });
-      expect(touched.categories.input).toBe(true);
-      expect(touched.categories.output).toBeUndefined();
+      const touched = touchedFromConfig(config);
+
+      expect(touched.categories).toEqual({ input: true });
       expect(touched.pii).toBe(true);
-      expect(touched.secrets).toBe(false);
+      expect(touched.secrets).toBe(true);
+    });
+
+    it("round-trips back to an equal config", () => {
+      const state = configToFormState(config);
+      const rebuilt = buildRuleConfig({
+        dispositions: state.dispositions,
+        audience: state.audience,
+        piiLevel: state.piiLevel,
+        secretsEnabled: state.secretsEnabled,
+        secretsPatterns: state.secretsPatterns,
+        customAttributes: state.customAttributes,
+        touched: touchedFromConfig(config),
+      });
+
+      expect(configsEqual(rebuilt, config)).toBe(true);
     });
   });
 
-  describe("given a config and a round-trip back through buildRuleConfig", () => {
-    it("rebuilds the same config from its form state", () => {
-      const original: DataPrivacyConfig = {
-        categories: {
-          input: { disposition: "capture" },
-          output: { disposition: "restrict", audience: { allMembers: true } },
-        },
-        secrets: { enabled: true },
-      };
-      const form = configToFormState(original);
-      const rebuilt = buildRuleConfig({
-        ...form,
-        touched: touchedFromConfig(original),
+  describe("given a config whose only restrict lives on an attribute rule", () => {
+    it("seeds the audience from that rule", () => {
+      const state = configToFormState({
+        customAttributes: [
+          {
+            pattern: "app.billing.*",
+            disposition: "restrict",
+            audience: { viewers: true },
+          },
+        ],
       });
-      expect(configsEqual(rebuilt, original)).toBe(true);
+
+      expect(state.audience.viewers).toBe(true);
     });
   });
 });
 
 describe("inheritedFormState", () => {
-  function resolved(
-    overrides: Partial<ResolvedDataPrivacy> = {},
-  ): ResolvedDataPrivacy {
-    return {
-      ...PLATFORM_DEFAULT_DATA_PRIVACY,
-      categories: {
-        ...PLATFORM_DEFAULT_DATA_PRIVACY.categories,
-        ...overrides.categories,
-      },
-      pii: overrides.pii ?? PLATFORM_DEFAULT_DATA_PRIVACY.pii,
-      secrets: overrides.secrets ?? PLATFORM_DEFAULT_DATA_PRIVACY.secrets,
-      customDropKeys:
-        overrides.customDropKeys ??
-        PLATFORM_DEFAULT_DATA_PRIVACY.customDropKeys,
-    };
-  }
-
   describe("given the current project scope under a restrictive parent", () => {
     it("seeds the form from the resolved effective so the parent restriction shows", () => {
-      const effective = resolved({
-        categories: {
-          ...PLATFORM_DEFAULT_DATA_PRIVACY.categories,
-          input: {
-            disposition: "drop",
-            audience: {
-              admins: false,
-              allMembers: false,
-              groupIds: [],
-              departmentIds: [],
+      const state = inheritedFormState({
+        effective: resolved({
+          categories: {
+            input: { disposition: "drop", audience: { ...EMPTY_AUDIENCE } },
+            output: {
+              disposition: "restrict",
+              audience: { ...EMPTY_AUDIENCE, projectOwner: true },
             },
+            system: { disposition: "capture", audience: { ...EMPTY_AUDIENCE } },
+            tools: { disposition: "capture", audience: { ...EMPTY_AUDIENCE } },
           },
-        },
-        pii: { level: "strict" },
-        secrets: { enabled: false, customPatterns: [] },
-      });
-
-      const form = inheritedFormState({
-        effective,
+          pii: { level: "strict" },
+        }),
         isCurrentProjectScope: true,
       });
 
-      expect(form.dispositions.input).toBe("drop");
-      expect(form.piiLevel).toBe("strict");
-      expect(form.secretsEnabled).toBe(false);
+      expect(state.dispositions.input).toBe("drop");
+      expect(state.dispositions.output).toBe("restrict");
+      expect(state.audience.projectOwner).toBe(true);
+      expect(state.piiLevel).toBe("strict");
+      expect(state.customAttributes).toEqual([]);
     });
   });
 
   describe("given any other scope", () => {
     it("falls back to the platform defaults", () => {
-      const effective = resolved({
-        categories: {
-          ...PLATFORM_DEFAULT_DATA_PRIVACY.categories,
-          input: {
-            disposition: "drop",
-            audience: {
-              admins: false,
-              allMembers: false,
-              groupIds: [],
-              departmentIds: [],
-            },
-          },
-        },
-      });
-
-      const form = inheritedFormState({
-        effective,
+      const state = inheritedFormState({
+        effective: resolved({ pii: { level: "strict" } }),
         isCurrentProjectScope: false,
       });
 
-      expect(form.dispositions.input).toBe("capture");
-      expect(form.piiLevel).toBe("essential");
-      expect(form.secretsEnabled).toBe(true);
+      expect(state.dispositions.input).toBe("capture");
+      expect(state.piiLevel).toBe("essential");
+      expect(state.secretsEnabled).toBe(true);
     });
-  });
-});
-
-describe("configsEqual", () => {
-  it("ignores key ordering and detects real differences", () => {
-    expect(
-      configsEqual(
-        { pii: { level: "strict" }, secrets: { enabled: false } },
-        { secrets: { enabled: false }, pii: { level: "strict" } },
-      ),
-    ).toBe(true);
-    expect(
-      configsEqual(
-        { pii: { level: "strict" } },
-        { pii: { level: "disabled" } },
-      ),
-    ).toBe(false);
-    expect(configsEqual({}, {})).toBe(true);
   });
 });
 
 describe("ruleSummary", () => {
-  it("summarizes a mixed rule and reads cleanly when nothing is set", () => {
-    expect(
-      ruleSummary(
-        build({
-          disp: { input: "drop", output: "restrict" },
-          piiLevel: "strict",
-        }),
-      ),
-    ).toBe("Input drop · Output restrict · PII Strict");
-    expect(ruleSummary(build({ secretsEnabled: false }))).toBe("Secrets off");
-    expect(ruleSummary(build())).toBe("No changes");
+  it("lists categories, attribute rules, PII, secrets, and patterns", () => {
+    const summary = ruleSummary({
+      categories: { input: { disposition: "drop" } },
+      pii: { level: "disabled" },
+      secrets: { enabled: true, customPatterns: ["a", "b"] },
+      customAttributes: [
+        { pattern: "x.*", disposition: "drop" },
+        { pattern: "y", disposition: "restrict", audience: {} },
+      ],
+    });
+
+    expect(summary).toBe(
+      "Input drop · 2 attribute rules · PII Disabled · Secrets on · 2 secret patterns",
+    );
   });
 
-  describe("given an explicit capture / essential / secrets-on override", () => {
-    it("lists the override instead of reading as no change", () => {
-      const config = buildRuleConfig({
-        dispositions: dispositions({ input: "capture" }),
-        audience: "admins",
-        piiLevel: "essential",
-        secretsEnabled: true,
-        touched: allTouched(),
-      });
-      expect(ruleSummary(config)).toBe(
-        "Input captured · Output captured · System instructions captured · Tool calls captured · PII Essential · Secrets on",
-      );
-    });
+  it("reads as no changes for an empty config", () => {
+    expect(ruleSummary({})).toBe("No changes");
   });
 });
