@@ -8,10 +8,23 @@ import {
 import type { Session } from "~/server/auth";
 import { VisibilityWindowService } from "~/server/app-layer/traces/visibility-window.service";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
+import { TtlCache } from "~/server/utils/ttlCache";
 import { FREE_VISIBILITY_DAYS } from "../../../ee/licensing/constants";
 import type { Protections } from "../elasticsearch/protections";
 import { hasProjectPermission, isDemoProject } from "./rbac";
 import { getApp } from "~/server/app-layer/app";
+
+/**
+ * Cache: projectId -> visibilityDays sentinel ("none" = no window). Plan
+ * resolution is an uncached Prisma read; a short TTL keeps the per-request
+ * cost near zero while plan changes still apply within a minute — well
+ * inside ADR-028's "next read" intent. The CUTOFF itself is computed fresh
+ * per call (it moves with `now`), only the plan lookup is cached.
+ */
+const visibilityDaysCache = new TtlCache<number | "none">(
+  60 * 1000,
+  "ttlcache:visibility-days:",
+);
 
 /**
  * Resolves the ADR-028 visibility cutoff for a project's organization.
@@ -21,15 +34,29 @@ import { getApp } from "~/server/app-layer/app";
 export async function getVisibilityCutoffMsForProject(
   projectId: string,
 ): Promise<number | null> {
-  const failClosedCutoff = () =>
-    Date.now() - FREE_VISIBILITY_DAYS * 24 * 60 * 60 * 1000;
+  const dayMs = 24 * 60 * 60 * 1000;
+  const failClosedCutoff = () => Date.now() - FREE_VISIBILITY_DAYS * dayMs;
+
+  const cached = await visibilityDaysCache.get(projectId);
+  if (cached !== undefined) {
+    return cached === "none" ? null : Date.now() - cached * dayMs;
+  }
+
   try {
     const organizationId = await resolveOrganizationId(projectId);
     if (!organizationId) return failClosedCutoff();
-    return await new VisibilityWindowService(
+    const cutoffMs = await new VisibilityWindowService(
       getApp().planProvider,
     ).getVisibilityCutoffMs({ organizationId });
+    const visibilityDays =
+      cutoffMs === null
+        ? ("none" as const)
+        : Math.round((Date.now() - cutoffMs) / dayMs);
+    await visibilityDaysCache.set(projectId, visibilityDays);
+    return cutoffMs;
   } catch {
+    // Fail-closed results are NOT cached — a transient plan-store error
+    // should not pin paying customers to the free window for the TTL.
     return failClosedCutoff();
   }
 }
