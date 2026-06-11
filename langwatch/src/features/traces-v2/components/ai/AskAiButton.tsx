@@ -1,5 +1,4 @@
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
-import { MeshGradient } from "@paper-design/shaders-react";
 import { Sparkles, Zap } from "lucide-react";
 import NextLink from "~/utils/compat/next-link";
 import React, { useCallback, useState } from "react";
@@ -12,8 +11,7 @@ import {
   PopoverTrigger,
 } from "~/components/ui/popover";
 import { Tooltip } from "~/components/ui/tooltip";
-import { useReducedMotion } from "~/hooks/useReducedMotion";
-import { aiBrandPalette } from "./aiBrandPalette";
+import { MeshGradientLayer } from "./aiBrandVisuals";
 
 interface AskAiButtonProps {
   onClick: () => void;
@@ -46,7 +44,6 @@ const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
   showLabel = true,
   needsProviderPrimer = false,
 }) => {
-  const reduceMotion = useReducedMotion();
   const button = (
     <Button
       aria-label={ariaLabel}
@@ -67,24 +64,7 @@ const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
       opacity={needsProviderPrimer ? 0.7 : 1}
       filter={needsProviderPrimer ? "saturate(0.7)" : undefined}
     >
-      <Box
-        position="absolute"
-        inset={0}
-        zIndex={0}
-        pointerEvents="none"
-        _dark={{ opacity: 0.7 }}
-      >
-        <MeshGradient
-          colors={aiBrandPalette}
-          distortion={0.5}
-          swirl={0.5}
-          grainMixer={0}
-          grainOverlay={0}
-          speed={reduceMotion ? 0 : 0.4}
-          scale={1.5}
-          style={{ width: "100%", height: "100%" }}
-        />
-      </Box>
+      <MeshGradientLayer speed={0.4} darkOpacity={0.7} zIndex={0} />
       <HStack gap={1} position="relative" zIndex={1}>
         <Sparkles size={11} />
         {showLabel && <Text textStyle="xs">Ask AI</Text>}
