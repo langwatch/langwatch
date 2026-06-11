@@ -519,106 +519,113 @@ describe("GroupStagingScripts", () => {
     // 2026-06-11 Redis capacity incident). stage()/stageBatch() report the
     // displaced value so GroupQueue can reclaim its blob; these lock the
     // reporting contract at the script layer (which is itself blob-agnostic).
-    describe("displaced-value reporting (blob reclamation contract)", () => {
-      it("reports no orphan for a genuinely new stage", async () => {
-        const { isNew, orphanedValue } = await scripts.stage(
-          makeJob({ stagedJobId: "j1", jobDataJson: JSON.stringify({ v: 1 }) }),
-        );
+    describe("given stage scripts report displaced values for blob reclamation", () => {
+      describe("when a genuinely new job is staged", () => {
+        it("reports no orphan", async () => {
+          const { isNew, orphanedValue } = await scripts.stage(
+            makeJob({
+              stagedJobId: "j1",
+              jobDataJson: JSON.stringify({ v: 1 }),
+            }),
+          );
 
-        expect(isNew).toBe(true);
-        expect(orphanedValue).toBe("");
+          expect(isNew).toBe(true);
+          expect(orphanedValue).toBe("");
+        });
       });
 
-      it("reports the displaced OLD value when a squash replaces in place", async () => {
-        const oldValue = JSON.stringify({ v: 1 });
-        await scripts.stage(
-          makeJob({
-            stagedJobId: "j1",
-            dedupId: "orphan-replace",
-            dedupTtlMs: 60000,
-            jobDataJson: oldValue,
-            shouldReplace: true,
-          }),
-        );
+      describe("when a dedup squash displaces a staged payload", () => {
+        it("reports the displaced OLD value on replace", async () => {
+          const oldValue = JSON.stringify({ v: 1 });
+          await scripts.stage(
+            makeJob({
+              stagedJobId: "j1",
+              dedupId: "orphan-replace",
+              dedupTtlMs: 60000,
+              jobDataJson: oldValue,
+              shouldReplace: true,
+            }),
+          );
 
-        const { isNew, orphanedValue } = await scripts.stage(
-          makeJob({
-            stagedJobId: "j2",
-            dedupId: "orphan-replace",
-            dedupTtlMs: 60000,
-            jobDataJson: JSON.stringify({ v: 2 }),
-            shouldReplace: true,
-          }),
-        );
+          const { isNew, orphanedValue } = await scripts.stage(
+            makeJob({
+              stagedJobId: "j2",
+              dedupId: "orphan-replace",
+              dedupTtlMs: 60000,
+              jobDataJson: JSON.stringify({ v: 2 }),
+              shouldReplace: true,
+            }),
+          );
 
-        // v2 now occupies the field; v1 is the value dropped → its blob reclaims.
-        expect(isNew).toBe(false);
-        expect(orphanedValue).toBe(oldValue);
-      });
+          // v2 now occupies the field; v1 is dropped → its blob reclaims.
+          expect(isNew).toBe(false);
+          expect(orphanedValue).toBe(oldValue);
+        });
 
-      it("reports the discarded NEW value when a squash keeps the existing payload", async () => {
-        await scripts.stage(
-          makeJob({
-            stagedJobId: "j1",
-            dedupId: "orphan-keep",
-            dedupTtlMs: 60000,
-            jobDataJson: JSON.stringify({ kept: true }),
-            shouldExtend: false,
-            shouldReplace: false,
-          }),
-        );
+        it("reports the discarded NEW value when the existing payload is kept", async () => {
+          await scripts.stage(
+            makeJob({
+              stagedJobId: "j1",
+              dedupId: "orphan-keep",
+              dedupTtlMs: 60000,
+              jobDataJson: JSON.stringify({ kept: true }),
+              shouldExtend: false,
+              shouldReplace: false,
+            }),
+          );
 
-        const discardedValue = JSON.stringify({ discarded: true });
-        const { isNew, orphanedValue } = await scripts.stage(
-          makeJob({
-            stagedJobId: "j2",
-            dedupId: "orphan-keep",
-            dedupTtlMs: 60000,
-            jobDataJson: discardedValue,
-            shouldExtend: false,
-            shouldReplace: false,
-          }),
-        );
+          const discardedValue = JSON.stringify({ discarded: true });
+          const { isNew, orphanedValue } = await scripts.stage(
+            makeJob({
+              stagedJobId: "j2",
+              dedupId: "orphan-keep",
+              dedupTtlMs: 60000,
+              jobDataJson: discardedValue,
+              shouldExtend: false,
+              shouldReplace: false,
+            }),
+          );
 
-        // The existing payload stays; the new value never lands → ITS blob reclaims.
-        expect(isNew).toBe(false);
-        expect(orphanedValue).toBe(discardedValue);
-      });
+          // The existing payload stays; the new value never lands → ITS blob reclaims.
+          expect(isNew).toBe(false);
+          expect(orphanedValue).toBe(discardedValue);
+        });
 
-      it("reports per-job orphans index-aligned in a batch", async () => {
-        // Pre-stage j0 so the first batch entry squash-replaces it in place.
-        await scripts.stage(
-          makeJob({
-            stagedJobId: "j0",
-            groupId: "group-a",
-            dedupId: "batch-orphan",
-            dedupTtlMs: 60000,
-            jobDataJson: JSON.stringify({ v: 1 }),
-            shouldReplace: true,
-          }),
-        );
+        it("reports per-job orphans index-aligned in a batch", async () => {
+          // Pre-stage j0 so the first batch entry squash-replaces it in place.
+          await scripts.stage(
+            makeJob({
+              stagedJobId: "j0",
+              groupId: "group-a",
+              dedupId: "batch-orphan",
+              dedupTtlMs: 60000,
+              jobDataJson: JSON.stringify({ v: 1 }),
+              shouldReplace: true,
+            }),
+          );
 
-        const { newStagedCount, orphanedValues } = await scripts.stageBatch([
-          makeJob({
-            stagedJobId: "j1",
-            groupId: "group-a",
-            dedupId: "batch-orphan",
-            dedupTtlMs: 60000,
-            jobDataJson: JSON.stringify({ v: 2 }),
-            shouldReplace: true,
-          }),
-          makeJob({
-            stagedJobId: "j2",
-            groupId: "group-b",
-            dedupId: "batch-fresh",
-            dedupTtlMs: 60000,
-            jobDataJson: JSON.stringify({ fresh: true }),
-          }),
-        ]);
+          const { newStagedCount, orphanedValues } = await scripts.stageBatch([
+            makeJob({
+              stagedJobId: "j1",
+              groupId: "group-a",
+              dedupId: "batch-orphan",
+              dedupTtlMs: 60000,
+              jobDataJson: JSON.stringify({ v: 2 }),
+              shouldReplace: true,
+            }),
+            makeJob({
+              stagedJobId: "j2",
+              groupId: "group-b",
+              dedupId: "batch-fresh",
+              dedupTtlMs: 60000,
+              jobDataJson: JSON.stringify({ fresh: true }),
+            }),
+          ]);
 
-        // Entry 0 squashed j0 (orphan = old v1); entry 1 is fresh (no orphan).
-        expect(newStagedCount).toBe(1);
-        expect(orphanedValues).toEqual([JSON.stringify({ v: 1 }), ""]);
+          // Entry 0 squashed j0 (orphan = old v1); entry 1 is fresh (no orphan).
+          expect(newStagedCount).toBe(1);
+          expect(orphanedValues).toEqual([JSON.stringify({ v: 1 }), ""]);
+        });
       });
     });
 

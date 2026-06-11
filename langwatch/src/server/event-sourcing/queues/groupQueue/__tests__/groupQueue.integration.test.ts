@@ -322,9 +322,16 @@ describe.skipIf(!hasTestcontainers)(
             // Squash-replace: a fresh blob is staged and the first is displaced.
             await queue.send(bigPayload("b"));
 
-            const blobs = await redis.keys(`${queueName}:gq:blob:*`);
-            expect(blobs).toHaveLength(1);
-            expect(blobs).not.toContain(firstBlob);
+            // The displaced blob is reclaimed fire-and-forget; only the new
+            // one survives.
+            await vi.waitFor(
+              async () => {
+                const blobs = await redis.keys(`${queueName}:gq:blob:*`);
+                expect(blobs).toHaveLength(1);
+                expect(blobs).not.toContain(firstBlob);
+              },
+              { timeout: 5000, interval: 50 },
+            );
             // Staging holds exactly the one squashed job, referencing the new blob.
             expect(
               await redis.hlen(`${queueName}:gq:group:group-a:data`),
@@ -355,12 +362,17 @@ describe.skipIf(!hasTestcontainers)(
             expect(keptBlob).toBeDefined();
 
             // Dedup hit without replace: the new value never lands, its blob is
-            // discarded and must be reclaimed; the original blob stays.
+            // discarded and reclaimed fire-and-forget; the original blob stays.
             await queue.send(bigPayload("b"));
 
-            expect(await redis.keys(`${queueName}:gq:blob:*`)).toEqual([
-              keptBlob,
-            ]);
+            await vi.waitFor(
+              async () => {
+                expect(await redis.keys(`${queueName}:gq:blob:*`)).toEqual([
+                  keptBlob,
+                ]);
+              },
+              { timeout: 5000, interval: 50 },
+            );
             expect(
               await redis.hlen(`${queueName}:gq:group:group-a:data`),
             ).toBe(1);
