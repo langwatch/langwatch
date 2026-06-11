@@ -1,7 +1,4 @@
-import {
-  type Disposition,
-  type ResolvedAudience,
-} from "./dataPrivacy.types";
+import type { Disposition, ResolvedAudience } from "./dataPrivacy.types";
 
 /**
  * Read-time content visibility for the scoped data-privacy policy. A `restrict`
@@ -79,7 +76,10 @@ export function needsAudienceFacts(eff: EffectiveRestriction): boolean {
  */
 export function describeAudience(
   audience: ResolvedAudience,
-  names: { groups: Record<string, string>; departments: Record<string, string> },
+  names: {
+    groups: Record<string, string>;
+    departments: Record<string, string>;
+  },
 ): string {
   const parts: string[] = [];
   if (audience.admins) parts.push("Admins");

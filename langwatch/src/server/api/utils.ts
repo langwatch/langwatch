@@ -1,19 +1,11 @@
 import {
-  type PrismaClient,
   OrganizationUserRole,
+  type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
-import type { Session } from "~/server/auth";
-import type { Protections } from "../elasticsearch/protections";
-import { hasProjectPermission, isDemoProject } from "./rbac";
 import { getApp } from "~/server/app-layer/app";
-import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
-import {
-  PLATFORM_DEFAULT_DATA_PRIVACY,
-  type ResolvedAudience,
-  type ResolvedDataPrivacy,
-} from "~/server/data-privacy/dataPrivacy.types";
+import type { Session } from "~/server/auth";
 import {
   describeAudience,
   isContentVisible,
@@ -21,7 +13,15 @@ import {
   needsAudienceFacts,
   type ViewerFacts,
 } from "~/server/data-privacy/contentVisibility";
+import {
+  PLATFORM_DEFAULT_DATA_PRIVACY,
+  type ResolvedAudience,
+  type ResolvedDataPrivacy,
+} from "~/server/data-privacy/dataPrivacy.types";
+import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
 import { createLogger } from "~/utils/logger/server";
+import type { Protections } from "../elasticsearch/protections";
+import { hasProjectPermission, isDemoProject } from "./rbac";
 
 const logger = createLogger("langwatch:api:protections");
 
@@ -258,11 +258,19 @@ export async function getUserProtectionsForProject(
     canSeeCapturedOutput,
     capturedInputVisibleTo:
       !canSeeCapturedInput && effInput.disposition === "restrict"
-        ? await describeRestriction(ctx.prisma, effInput.audience, organizationId)
+        ? await describeRestriction(
+            ctx.prisma,
+            effInput.audience,
+            organizationId,
+          )
         : null,
     capturedOutputVisibleTo:
       !canSeeCapturedOutput && effOutput.disposition === "restrict"
-        ? await describeRestriction(ctx.prisma, effOutput.audience, organizationId)
+        ? await describeRestriction(
+            ctx.prisma,
+            effOutput.audience,
+            organizationId,
+          )
         : null,
   };
 }

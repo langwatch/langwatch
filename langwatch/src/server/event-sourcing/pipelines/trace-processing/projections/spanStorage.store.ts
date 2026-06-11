@@ -8,7 +8,10 @@ import type { NormalizedSpan } from "../schemas/spans";
 /**
  * Maps a pipeline NormalizedSpan to the app-layer SpanInsertData.
  */
-function toAppLayer(span: NormalizedSpan, retentionDays: number): SpanInsertData {
+function toAppLayer(
+  span: NormalizedSpan,
+  retentionDays: number,
+): SpanInsertData {
   return {
     id: span.id,
     tenantId: span.tenantId,

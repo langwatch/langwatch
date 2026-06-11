@@ -56,6 +56,46 @@ export function buildRuleConfig({
   return config;
 }
 
+/**
+ * Reverse of `buildRuleConfig`: hydrate the drawer's form state from a stored
+ * config, for editing an existing rule. Unset categories fall back to the
+ * platform default (capture / essential PII / secrets on). The single audience
+ * control is seeded from the first restrict category, which is what the drawer
+ * applies to every restrict category.
+ */
+export function configToFormState(config: DataPrivacyConfig): {
+  dispositions: Record<ContentCategory, Disposition>;
+  audience: RuleAudience;
+  piiLevel: PiiLevel;
+  secretsEnabled: boolean;
+} {
+  const dispositions: Record<ContentCategory, Disposition> = {
+    input: "capture",
+    output: "capture",
+    system: "capture",
+    tools: "capture",
+  };
+  let audience: RuleAudience = "admins";
+  let sawRestrict = false;
+  for (const category of CONTENT_CATEGORIES) {
+    const setting = config.categories?.[category];
+    if (!setting) continue;
+    dispositions[category] = setting.disposition;
+    if (setting.disposition === "restrict" && !sawRestrict) {
+      sawRestrict = true;
+      if (setting.audience?.allMembers) audience = "allMembers";
+      else if (setting.audience?.admins) audience = "admins";
+      else audience = "noOne";
+    }
+  }
+  return {
+    dispositions,
+    audience,
+    piiLevel: config.pii?.level ?? "essential",
+    secretsEnabled: config.secrets?.enabled ?? true,
+  };
+}
+
 const CATEGORY_SUMMARY_LABELS: Record<ContentCategory, string> = {
   input: "Input",
   output: "Output",

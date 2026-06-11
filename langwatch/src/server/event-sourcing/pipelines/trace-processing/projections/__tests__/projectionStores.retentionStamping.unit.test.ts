@@ -1,24 +1,24 @@
 import { describe, expect, it, vi } from "vitest";
-import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
-import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { EvaluationRunRepository } from "~/server/app-layer/evaluations/repositories/evaluation-run.repository";
+import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { LogRecordStorageRepository } from "~/server/app-layer/traces/repositories/log-record-storage.repository";
 import type { MetricRecordStorageRepository } from "~/server/app-layer/traces/repositories/metric-record-storage.repository";
 import type { SpanStorageRepository } from "~/server/app-layer/traces/repositories/span-storage.repository";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TraceSummaryRepository } from "~/server/app-layer/traces/repositories/trace-summary.repository";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
+import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
+import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import { EvaluationRunStore } from "../../../evaluation-processing/projections/evaluationRun.store";
-import { LogRecordAppendStore } from "../logRecordStorage.store";
-import { MetricRecordAppendStore } from "../metricRecordStorage.store";
 import type { NormalizedLogRecord } from "../../schemas/logRecords";
 import type { NormalizedMetricRecord } from "../../schemas/metricRecords";
 import {
+  type NormalizedSpan,
   NormalizedSpanKind,
   NormalizedStatusCode,
-  type NormalizedSpan,
 } from "../../schemas/spans";
+import { LogRecordAppendStore } from "../logRecordStorage.store";
+import { MetricRecordAppendStore } from "../metricRecordStorage.store";
 import { SpanAppendStore } from "../spanStorage.store";
 import { TraceSummaryStore } from "../traceSummary.store";
 
@@ -76,9 +76,9 @@ describe("trace-pipeline projection stores retention stamping", () => {
   describe("when the projection context carries no resolved policy", () => {
     it("stamps stored_spans with the platform default, not indefinite", async () => {
       const insertSpan = vi.fn().mockResolvedValue(undefined);
-      const store = new SpanAppendStore(
-        { insertSpan } as unknown as SpanStorageRepository,
-      );
+      const store = new SpanAppendStore({
+        insertSpan,
+      } as unknown as SpanStorageRepository);
 
       await store.append(makeSpan(), nullPolicyContext);
 

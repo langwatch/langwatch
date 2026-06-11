@@ -14,22 +14,36 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Building2, Folder, Plus, Shield, Trash2, Users } from "lucide-react";
+import {
+  Building2,
+  Folder,
+  MoreVertical,
+  Plus,
+  Shield,
+  Users,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import SettingsLayout from "~/components/SettingsLayout";
+import {
+  buildRuleConfig,
+  configToFormState,
+  isEmptyRuleConfig,
+  type RuleAudience,
+  ruleSummary,
+} from "~/components/settings/dataPrivacyRuleConfig";
+import {
+  type AvailableScopes,
+  ScopeFilter,
+} from "~/components/settings/ScopeFilter";
 import { Drawer } from "~/components/ui/drawer";
+import { Menu } from "~/components/ui/menu";
 import { Select } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import {
-  buildRuleConfig,
-  isEmptyRuleConfig,
-  ruleSummary,
-  type RuleAudience,
-} from "~/components/settings/dataPrivacyRuleConfig";
+import { useUrlScopeFilter } from "~/hooks/useUrlScopeFilter";
 import {
   CONTENT_CATEGORIES,
   type ContentCategory,
@@ -77,7 +91,9 @@ type ScopeOption = {
   label: string;
 };
 
-function buildScopeOptions(available: DataPrivacyScopeAvailable): ScopeOption[] {
+function buildScopeOptions(
+  available: DataPrivacyScopeAvailable,
+): ScopeOption[] {
   const options: ScopeOption[] = [];
   if (available.organization) {
     options.push({
@@ -126,8 +142,28 @@ export default withPermissionGuard("project:view", {
 
 function DataPrivacyPage({ projectId }: { projectId: string }) {
   const utils = api.useUtils();
+  const { project: currentProject } = useOrganizationTeamProject();
   const snapshotQuery = api.dataPrivacy.getSnapshot.useQuery({ projectId });
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [editingRule, setEditingRule] = useState<DataPrivacyRule | null>(null);
+
+  const available = snapshotQuery.data?.available;
+  const filterAvailable = useMemo<AvailableScopes>(
+    () => ({
+      organization: available?.organization
+        ? { id: available.organization.id, name: available.organization.name }
+        : null,
+      teams: available?.teams.map((t) => ({ id: t.id, name: t.name })) ?? [],
+      projects:
+        available?.projects.map((p) => ({ id: p.id, name: p.name })) ?? [],
+    }),
+    [available],
+  );
+  const [scopeFilter, setScopeFilter] = useUrlScopeFilter({
+    filterAvailable,
+    teamId: currentProject?.teamId,
+    projectId,
+  });
 
   const invalidate = () =>
     utils.dataPrivacy.getSnapshot.invalidate({ projectId });
@@ -146,13 +182,38 @@ function DataPrivacyPage({ projectId }: { projectId: string }) {
   }
 
   const snapshot = snapshotQuery.data;
-  const available = snapshot?.available;
   const canWrite =
     !!available &&
     (!!available.organization ||
       available.departments.length > 0 ||
       available.teams.length > 0 ||
       available.projects.length > 0);
+
+  const matchesFilter = (rule: DataPrivacyRule): boolean => {
+    if (scopeFilter.kind === "all") return true;
+    if (scopeFilter.kind === "team-current") {
+      return (
+        rule.scopeType === "TEAM" && rule.scopeId === currentProject?.teamId
+      );
+    }
+    if (scopeFilter.kind === "project-current") {
+      return rule.scopeType === "PROJECT" && rule.scopeId === projectId;
+    }
+    return (
+      rule.scopeType === scopeFilter.scopeType &&
+      rule.scopeId === scopeFilter.scopeId
+    );
+  };
+  const filteredRules = snapshot ? snapshot.rules.filter(matchesFilter) : [];
+
+  const openAdd = () => {
+    setEditingRule(null);
+    setDrawerOpen(true);
+  };
+  const openEdit = (rule: DataPrivacyRule) => {
+    setEditingRule(rule);
+    setDrawerOpen(true);
+  };
 
   const removeRule = async (rule: DataPrivacyRule) => {
     try {
@@ -180,8 +241,17 @@ function DataPrivacyPage({ projectId }: { projectId: string }) {
             Data Privacy
           </Heading>
           <Spacer />
+          {snapshot && snapshot.rules.length > 0 && (
+            <ScopeFilter
+              value={scopeFilter}
+              onChange={setScopeFilter}
+              available={filterAvailable}
+              currentTeamId={currentProject?.teamId}
+              currentProjectId={projectId}
+            />
+          )}
           {canWrite && (
-            <Button colorPalette="blue" onClick={() => setDrawerOpen(true)}>
+            <Button colorPalette="blue" onClick={openAdd}>
               Add privacy rule
             </Button>
           )}
@@ -189,7 +259,8 @@ function DataPrivacyPage({ projectId }: { projectId: string }) {
 
         <Text fontSize="sm" color="fg.muted">
           Control what trace content LangWatch stores, who can see it, and how
-          secrets and PII are scrubbed, at any scope, inherited down to projects.
+          secrets and PII are scrubbed, at any scope, inherited down to
+          projects.
         </Text>
 
         {snapshot && <EffectiveCard effective={snapshot.effective} />}
@@ -215,7 +286,7 @@ function DataPrivacyPage({ projectId }: { projectId: string }) {
                       <Button
                         colorPalette="blue"
                         variant="outline"
-                        onClick={() => setDrawerOpen(true)}
+                        onClick={openAdd}
                       >
                         <Plus /> Add privacy rule
                       </Button>
@@ -238,42 +309,70 @@ function DataPrivacyPage({ projectId }: { projectId: string }) {
                     </Table.Row>
                   </Table.Header>
                   <Table.Body>
-                    {snapshot.rules.map((rule) => {
-                      const Icon = SCOPE_ICON[rule.scopeType] ?? Folder;
-                      return (
-                        <Table.Row key={`${rule.scopeType}:${rule.scopeId}:${rule.personalOnly}`}>
-                          <Table.Cell>
-                            <HStack gap={2}>
-                              <Icon size={14} />
-                              <Text>{rule.name}</Text>
-                              <Badge size="sm" colorPalette="gray">
-                                {rule.scopeType.toLowerCase()}
-                              </Badge>
-                              {rule.personalOnly && (
-                                <Badge size="sm" colorPalette="purple">
-                                  personal
+                    {filteredRules.length === 0 ? (
+                      <Table.Row>
+                        <Table.Cell colSpan={3}>
+                          <Text color="fg.muted" fontSize="sm" paddingY={2}>
+                            No privacy rules at the selected scope.
+                          </Text>
+                        </Table.Cell>
+                      </Table.Row>
+                    ) : (
+                      filteredRules.map((rule) => {
+                        const Icon = SCOPE_ICON[rule.scopeType] ?? Folder;
+                        return (
+                          <Table.Row
+                            key={`${rule.scopeType}:${rule.scopeId}:${rule.personalOnly}`}
+                          >
+                            <Table.Cell>
+                              <HStack gap={2}>
+                                <Icon size={14} />
+                                <Text>{rule.name}</Text>
+                                <Badge size="sm" colorPalette="gray">
+                                  {rule.scopeType.toLowerCase()}
                                 </Badge>
+                                {rule.personalOnly && (
+                                  <Badge size="sm" colorPalette="purple">
+                                    personal
+                                  </Badge>
+                                )}
+                              </HStack>
+                            </Table.Cell>
+                            <Table.Cell>{ruleSummary(rule.config)}</Table.Cell>
+                            <Table.Cell textAlign="end">
+                              {canWrite && (
+                                <Menu.Root>
+                                  <Menu.Trigger asChild>
+                                    <Button
+                                      size="xs"
+                                      variant="ghost"
+                                      aria-label={`Actions for ${rule.name} privacy rule`}
+                                    >
+                                      <MoreVertical size={14} />
+                                    </Button>
+                                  </Menu.Trigger>
+                                  <Menu.Content>
+                                    <Menu.Item
+                                      value="edit"
+                                      onClick={() => openEdit(rule)}
+                                    >
+                                      Edit
+                                    </Menu.Item>
+                                    <Menu.Item
+                                      value="delete"
+                                      color="red.500"
+                                      onClick={() => void removeRule(rule)}
+                                    >
+                                      Delete
+                                    </Menu.Item>
+                                  </Menu.Content>
+                                </Menu.Root>
                               )}
-                            </HStack>
-                          </Table.Cell>
-                          <Table.Cell>{ruleSummary(rule.config)}</Table.Cell>
-                          <Table.Cell textAlign="end">
-                            {canWrite && (
-                              <Button
-                                size="xs"
-                                variant="ghost"
-                                colorPalette="red"
-                                loading={removeForScope.isLoading}
-                                onClick={() => void removeRule(rule)}
-                                aria-label="Remove privacy rule"
-                              >
-                                <Trash2 size={14} />
-                              </Button>
-                            )}
-                          </Table.Cell>
-                        </Table.Row>
-                      );
-                    })}
+                            </Table.Cell>
+                          </Table.Row>
+                        );
+                      })
+                    )}
                   </Table.Body>
                 </Table.Root>
               </Card.Body>
@@ -282,9 +381,13 @@ function DataPrivacyPage({ projectId }: { projectId: string }) {
         )}
 
         {available && (
-          <AddPrivacyRuleDrawer
+          <PrivacyRuleDrawer
             open={drawerOpen}
-            onClose={() => setDrawerOpen(false)}
+            editingRule={editingRule}
+            onClose={() => {
+              setDrawerOpen(false);
+              setEditingRule(null);
+            }}
             available={available}
             isSaving={setForScope.isLoading}
             onSave={async (scope, personalOnly, config) => {
@@ -296,8 +399,12 @@ function DataPrivacyPage({ projectId }: { projectId: string }) {
                   config,
                 });
                 void invalidate();
-                toaster.create({ title: "Privacy rule saved", type: "success" });
+                toaster.create({
+                  title: "Privacy rule saved",
+                  type: "success",
+                });
                 setDrawerOpen(false);
+                setEditingRule(null);
               } catch (error) {
                 toaster.create({
                   title: "Failed to save rule",
@@ -329,7 +436,9 @@ function EffectiveCard({ effective }: { effective: ResolvedDataPrivacy }) {
           {CONTENT_CATEGORIES.map((category) => (
             <HStack key={category} justifyContent="space-between">
               <Text color="fg.muted">{CATEGORY_LABELS[category]}</Text>
-              <Text>{DISPOSITION_LABELS[effective.categories[category].disposition]}</Text>
+              <Text>
+                {DISPOSITION_LABELS[effective.categories[category].disposition]}
+              </Text>
             </HStack>
           ))}
           <HStack justifyContent="space-between">
@@ -349,7 +458,10 @@ function EffectiveCard({ effective }: { effective: ResolvedDataPrivacy }) {
 const dispositionCollection = createListCollection({
   items: [
     { value: "capture", label: "Captured (visible to your team)" },
-    { value: "restrict", label: "Restricted (hidden from outside the audience)" },
+    {
+      value: "restrict",
+      label: "Restricted (hidden from outside the audience)",
+    },
     { value: "drop", label: "Dropped (never stored)" },
   ],
 });
@@ -362,19 +474,24 @@ const audienceCollection = createListCollection({
   ],
 });
 
-function AddPrivacyRuleDrawer({
+function PrivacyRuleDrawer({
   open,
+  editingRule,
   onClose,
   available,
   isSaving,
   onSave,
 }: {
   open: boolean;
+  editingRule: DataPrivacyRule | null;
   onClose: () => void;
   available: DataPrivacyScopeAvailable;
   isSaving: boolean;
   onSave: (
-    scope: { scopeType: "ORGANIZATION" | "DEPARTMENT" | "TEAM" | "PROJECT"; scopeId: string },
+    scope: {
+      scopeType: "ORGANIZATION" | "DEPARTMENT" | "TEAM" | "PROJECT";
+      scopeId: string;
+    },
     personalOnly: boolean,
     config: DataPrivacyConfig,
   ) => void;
@@ -390,7 +507,9 @@ function AddPrivacyRuleDrawer({
 
   const [scopeKey, setScopeKey] = useState<string>("");
   const [personalOnly, setPersonalOnly] = useState(false);
-  const [dispositions, setDispositions] = useState<Record<ContentCategory, Disposition>>({
+  const [dispositions, setDispositions] = useState<
+    Record<ContentCategory, Disposition>
+  >({
     input: "capture",
     output: "capture",
     system: "capture",
@@ -401,19 +520,36 @@ function AddPrivacyRuleDrawer({
   const [secretsEnabled, setSecretsEnabled] = useState(true);
 
   useEffect(() => {
-    if (open) {
-      setScopeKey(scopeOptions[0]?.key ?? "");
-      setPersonalOnly(false);
-      setDispositions({ input: "capture", output: "capture", system: "capture", tools: "capture" });
-      setAudience("admins");
-      setPiiLevel("essential");
-      setSecretsEnabled(true);
+    if (!open) return;
+    if (editingRule) {
+      setScopeKey(`${editingRule.scopeType}:${editingRule.scopeId}`);
+      setPersonalOnly(editingRule.personalOnly);
+      const form = configToFormState(editingRule.config);
+      setDispositions(form.dispositions);
+      setAudience(form.audience);
+      setPiiLevel(form.piiLevel);
+      setSecretsEnabled(form.secretsEnabled);
+      return;
     }
-  }, [open, scopeOptions]);
+    setScopeKey(scopeOptions[0]?.key ?? "");
+    setPersonalOnly(false);
+    setDispositions({
+      input: "capture",
+      output: "capture",
+      system: "capture",
+      tools: "capture",
+    });
+    setAudience("admins");
+    setPiiLevel("essential");
+    setSecretsEnabled(true);
+  }, [open, editingRule, scopeOptions]);
 
   const scope = scopeOptions.find((o) => o.key === scopeKey);
-  const anyRestrict = CONTENT_CATEGORIES.some((c) => dispositions[c] === "restrict");
-  const canTogglePersonal = scope?.scopeType === "ORGANIZATION" || scope?.scopeType === "DEPARTMENT";
+  const anyRestrict = CONTENT_CATEGORIES.some(
+    (c) => dispositions[c] === "restrict",
+  );
+  const canTogglePersonal =
+    scope?.scopeType === "ORGANIZATION" || scope?.scopeType === "DEPARTMENT";
 
   const config = useMemo<DataPrivacyConfig>(
     () => buildRuleConfig({ dispositions, audience, piiLevel, secretsEnabled }),
@@ -433,7 +569,9 @@ function AddPrivacyRuleDrawer({
     >
       <Drawer.Content bg="bg">
         <Drawer.Header>
-          <Heading size="md">Add privacy rule</Heading>
+          <Heading size="md">
+            {editingRule ? "Edit privacy rule" : "Add privacy rule"}
+          </Heading>
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
@@ -444,6 +582,7 @@ function AddPrivacyRuleDrawer({
                 collection={scopeCollection}
                 value={scopeKey ? [scopeKey] : []}
                 onValueChange={(d) => setScopeKey(d.value[0] ?? "")}
+                disabled={!!editingRule}
               >
                 <Select.Trigger background="bg">
                   <Select.ValueText placeholder="Pick a scope" />
@@ -460,7 +599,10 @@ function AddPrivacyRuleDrawer({
                 <HStack gap={3} marginTop={2}>
                   <Switch
                     checked={personalOnly}
-                    onCheckedChange={({ checked }) => setPersonalOnly(checked === true)}
+                    disabled={!!editingRule}
+                    onCheckedChange={({ checked }) =>
+                      setPersonalOnly(checked === true)
+                    }
                   />
                   <Text fontSize="sm">Personal projects only</Text>
                 </HStack>
@@ -503,7 +645,9 @@ function AddPrivacyRuleDrawer({
                   <Select.Root
                     collection={audienceCollection}
                     value={[audience]}
-                    onValueChange={(d) => setAudience((d.value[0] as RuleAudience) ?? "admins")}
+                    onValueChange={(d) =>
+                      setAudience((d.value[0] as RuleAudience) ?? "admins")
+                    }
                   >
                     <Select.Trigger background="bg">
                       <Select.ValueText />
@@ -524,7 +668,9 @@ function AddPrivacyRuleDrawer({
               <Field.Label>PII redaction</Field.Label>
               <RadioGroup.Root
                 value={piiLevel}
-                onValueChange={(d) => setPiiLevel((d.value as PiiLevel) ?? "essential")}
+                onValueChange={(d) =>
+                  setPiiLevel((d.value as PiiLevel) ?? "essential")
+                }
               >
                 <VStack align="start" gap={1}>
                   <RadioGroup.Item value="disabled">
@@ -543,7 +689,8 @@ function AddPrivacyRuleDrawer({
                     <RadioGroup.ItemHiddenInput />
                     <RadioGroup.ItemIndicator />
                     <RadioGroup.ItemText>
-                      Strict (adds names and locations, uses the analysis service)
+                      Strict (adds names and locations, uses the analysis
+                      service)
                     </RadioGroup.ItemText>
                   </RadioGroup.Item>
                 </VStack>
@@ -553,25 +700,24 @@ function AddPrivacyRuleDrawer({
             <HStack gap={3} align="start">
               <Switch
                 checked={secretsEnabled}
-                onCheckedChange={({ checked }) => setSecretsEnabled(checked === true)}
+                onCheckedChange={({ checked }) =>
+                  setSecretsEnabled(checked === true)
+                }
               />
               <VStack align="start" gap={0}>
                 <Text fontWeight="600" fontSize="sm">
                   Secrets redaction
                 </Text>
                 <Text fontSize="xs" color="fg.muted">
-                  Scrubs API keys, tokens, private keys, and database URLs. On by
-                  default.
+                  Scrubs API keys, tokens, private keys, and database URLs. On
+                  by default.
                 </Text>
               </VStack>
             </HStack>
           </VStack>
         </Drawer.Body>
         <Drawer.Footer>
-          <HStack width="full" justify="end" gap={2}>
-            <Button variant="outline" onClick={onClose} disabled={isSaving}>
-              Cancel
-            </Button>
+          <HStack width="full" justify="end">
             <Button
               colorPalette="blue"
               disabled={!canSave}

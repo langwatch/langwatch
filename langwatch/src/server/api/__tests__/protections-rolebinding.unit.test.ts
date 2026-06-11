@@ -1,14 +1,14 @@
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getUserProtectionsForProject } from "../utils";
-import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
 import {
-  EMPTY_AUDIENCE,
-  PLATFORM_DEFAULT_DATA_PRIVACY,
   type Audience,
   type Disposition,
+  EMPTY_AUDIENCE,
+  PLATFORM_DEFAULT_DATA_PRIVACY,
   type ResolvedDataPrivacy,
 } from "~/server/data-privacy/dataPrivacy.types";
+import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
+import { getUserProtectionsForProject } from "../utils";
 
 vi.mock("../rbac", () => ({
   hasProjectPermission: vi.fn(() => Promise.resolve(true)),
@@ -84,7 +84,9 @@ const NO_ONE: Audience = {};
 describe("getUserProtectionsForProject", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockPrisma.project.findUniqueOrThrow.mockResolvedValue({ teamId: "team-1" });
+    mockPrisma.project.findUniqueOrThrow.mockResolvedValue({
+      teamId: "team-1",
+    });
     mockPolicy(PLATFORM_DEFAULT_DATA_PRIVACY);
   });
 

@@ -2,7 +2,6 @@ import {
   Badge,
   Button,
   Card,
-  createListCollection,
   Field,
   Heading,
   HStack,
@@ -12,7 +11,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { type Project } from "@prisma/client";
+import type { Project } from "@prisma/client";
 import isEqual from "lodash-es/isEqual";
 import { useState } from "react";
 import { Lock } from "react-feather";
@@ -20,9 +19,9 @@ import { Controller, type SubmitHandler, useForm } from "react-hook-form";
 import { HorizontalFormControl } from "~/components/HorizontalFormControl";
 import { Tooltip } from "~/components/ui/tooltip";
 import { ProjectSelector } from "../components/DashboardLayout";
+import SettingsLayout from "../components/SettingsLayout";
 import { DepartmentPicker } from "../components/settings/DepartmentPicker";
 import { useDepartmentColumn } from "../components/settings/useDepartmentColumn";
-import SettingsLayout from "../components/SettingsLayout";
 import {
   ProjectTechStackIcon,
   TechStackSelector,
@@ -32,10 +31,8 @@ import { Select } from "../components/ui/select";
 import { Switch } from "../components/ui/switch";
 import { toaster } from "../components/ui/toaster";
 import { withPermissionGuard } from "../components/WithPermissionGuard";
-import { useActivePlan } from "../hooks/useActivePlan";
 import { useLiteMemberGuard } from "../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
-import { usePublicEnv } from "../hooks/usePublicEnv";
 import type { FullyLoadedOrganization } from "../server/app-layer/organizations/repositories/organization.repository";
 import { api } from "../utils/api";
 
@@ -82,8 +79,7 @@ function SettingsForm({
     s3Bucket: organization.s3Bucket ?? "",
     presenceEnabled: organization.presenceEnabled,
     supportContact:
-      (organization as { supportContact?: string | null }).supportContact ??
-      "",
+      (organization as { supportContact?: string | null }).supportContact ?? "",
   });
   const { register, handleSubmit, getFieldState, control } = useForm({
     defaultValues,
@@ -192,12 +188,7 @@ function SettingsForm({
                 label="Project ID"
                 helper="Use this ID when authenticating with API Keys"
               >
-                <Input
-                  width="full"
-                  disabled
-                  type="text"
-                  value={project.id}
-                />
+                <Input width="full" disabled type="text" value={project.id} />
               </HorizontalFormControl>
 
               <HorizontalFormControl
@@ -372,8 +363,6 @@ type ProjectFormData = {
 
 function ProjectSettingsForm({ project }: { project: Project }) {
   const { organization, organizations } = useOrganizationTeamProject();
-  const publicEnv = usePublicEnv();
-  const { isFree } = useActivePlan();
   const department = useDepartmentColumn(organization?.id ?? "");
 
   const { hasPermission } = useOrganizationTeamProject({

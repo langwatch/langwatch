@@ -3,36 +3,40 @@ import { z } from "zod";
 import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
-import { CollectorSpanUtils } from "~/server/traces/collectorSpan.utils";
-import type { ReservedTraceMetadata, CustomMetadata } from "~/server/tracer/types";
-import { prisma } from "~/server/db";
+import { ValidationError } from "~/server/app-layer/domain-error";
 import {
   generateTraceAction,
   generateTraceQueryFromPrompt,
 } from "~/server/app-layer/traces/ai-query";
-import { ValidationError } from "~/server/app-layer/domain-error";
 import { deriveTraceStatus } from "~/server/app-layer/traces/derive-trace-status";
 import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
 import type { SpanSummaryRow } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import { prisma } from "~/server/db";
+import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import {
   changeTraceNameInputSchema,
   DEFAULT_PII_REDACTION_LEVEL,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
-import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
-import { withoutHiddenResourceAttrs } from "./tracesV2.resourceAttrs";
 import {
   TRACE_NAME_MAX_LENGTH,
   TRACE_NAME_MIN_LENGTH,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+import type {
+  CustomMetadata,
+  ReservedTraceMetadata,
+  Span,
+  SpanInputOutput,
+} from "~/server/tracer/types";
+import { CollectorSpanUtils } from "~/server/traces/collectorSpan.utils";
 import {
   findPromptReferenceInAncestors,
   flattenParamsToPromptAttributes,
   type PromptLookupSpan,
 } from "~/server/traces/findPromptReferenceInAncestors";
-import type { Span, SpanInputOutput } from "~/server/tracer/types";
 import { checkProjectPermission } from "../rbac";
+import { withoutHiddenResourceAttrs } from "./tracesV2.resourceAttrs";
 import type {
   SpanDetail,
   SpanLangwatchSignals,
@@ -197,7 +201,9 @@ function readSystemInstructions(
  * the stored attribute split semconv-correct while every view mode (pretty /
  * text / json / copy) stays consistent. All other shapes fall through.
  */
-export function buildDisplayInput(span: Pick<Span, "input" | "params">): string | null {
+export function buildDisplayInput(
+  span: Pick<Span, "input" | "params">,
+): string | null {
   const io = span.input;
   if (io && io.type === "chat_messages" && Array.isArray(io.value)) {
     const system = readSystemInstructions(span.params ?? null);
@@ -286,9 +292,7 @@ const PROMPT_ATTR_KEYS = [
   "langwatch.prompt.variables",
 ] as const;
 
-function hasOwnPromptAttrs(
-  params: Record<string, unknown> | null,
-): boolean {
+function hasOwnPromptAttrs(params: Record<string, unknown> | null): boolean {
   if (!params) return false;
   const flat = flattenParamsToPromptAttributes(params);
   return PROMPT_ATTR_KEYS.some((k) => flat[k] !== undefined);
@@ -698,26 +702,31 @@ export const tracesV2Router = createTRPCRouter({
       z.object({
         projectId: z.string(),
         traceId: z.string(),
-        metadata: z.record(
-          z.union([
-            z.string().max(4096),
-            z.number(),
-            z.boolean(),
-            z.array(z.string()),
-            z.record(z.unknown()),
-          ]),
-        ).refine((obj) => Object.keys(obj).length > 0, {
-          message: "metadata must contain at least one key",
-        }).refine(
-          (obj) => JSON.stringify(obj).length <= 32768,
-          { message: "total metadata payload must not exceed 32KB" },
-        ),
+        metadata: z
+          .record(
+            z.union([
+              z.string().max(4096),
+              z.number(),
+              z.boolean(),
+              z.array(z.string()),
+              z.record(z.unknown()),
+            ]),
+          )
+          .refine((obj) => Object.keys(obj).length > 0, {
+            message: "metadata must contain at least one key",
+          })
+          .refine((obj) => JSON.stringify(obj).length <= 32768, {
+            message: "total metadata payload must not exceed 32KB",
+          }),
       }),
     )
     .use(checkProjectPermission("traces:update"))
     .mutation(async ({ input }) => {
       const RESERVED_METADATA_KEYS = new Set([
-        "user_id", "customer_id", "thread_id", "labels",
+        "user_id",
+        "customer_id",
+        "thread_id",
+        "labels",
       ]);
 
       const reserved: ReservedTraceMetadata = {};

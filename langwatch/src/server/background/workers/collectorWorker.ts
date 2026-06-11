@@ -1,5 +1,5 @@
-import type { Project } from "@prisma/client";
 import { SpanStatusCode, trace } from "@opentelemetry/api";
+import type { Project } from "@prisma/client";
 import { Worker } from "bullmq";
 import { BullMQOtel } from "bullmq-otel";
 import type {
@@ -10,9 +10,9 @@ import {
   getTraceById,
   searchTracesWithInternals,
 } from "~/server/elasticsearch/traces";
+import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import { env } from "../../../env.mjs";
 import { createLogger } from "../../../utils/logger/server";
-import { withJobContext } from "../../context/asyncContext";
 import {
   captureException,
   getCurrentScope,
@@ -23,13 +23,15 @@ import {
   flattenObjectKeys,
   getInternalProtectionsForProject,
 } from "../../api/utils";
+import { withJobContext } from "../../context/asyncContext";
 import { prisma } from "../../db";
 import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
+import { featureFlagService } from "../../featureFlag";
 import {
-  recordJobWaitDuration,
   getJobProcessingCounter,
   getJobProcessingDurationHistogram,
   getPayloadSizeHistogram,
+  recordJobWaitDuration,
   traceSpanCountHistogram,
 } from "../../metrics";
 import { connection } from "../../redis";
@@ -53,8 +55,6 @@ import {
 } from "./collector/metrics";
 import { cleanupPIIs } from "./collector/piiCheck";
 import { addInputAndOutputForRAGs } from "./collector/rag";
-import { featureFlagService } from "../../featureFlag";
-import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 
 const logger = createLogger("langwatch:workers:collectorWorker");
 const tracer = trace.getTracer("langwatch:collector");
@@ -765,27 +765,25 @@ export const startCollectorWorker = () => {
 
   const collectorWorker = new Worker<CollectorJob, void, string>(
     COLLECTOR_QUEUE.NAME,
-    withJobContext(
-      async (job) => {
-        recordJobWaitDuration(job, "collector");
-        const jobLog = (message: string) => {
-          void job.log(message);
-        };
+    withJobContext(async (job) => {
+      recordJobWaitDuration(job, "collector");
+      const jobLog = (message: string) => {
+        void job.log(message);
+      };
 
-        jobLog(
-          `Processing trace ${job.data.traceId} (${job.data.spans?.length ?? 0} spans)`,
-        );
+      jobLog(
+        `Processing trace ${job.data.traceId} (${job.data.spans?.length ?? 0} spans)`,
+      );
 
-        try {
-          await processCollectorJob(job.id, job.data);
-          jobLog(`Completed successfully`);
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          jobLog(`Failed: ${message}`);
-          throw error;
-        }
-      },
-    ),
+      try {
+        await processCollectorJob(job.id, job.data);
+        jobLog(`Completed successfully`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        jobLog(`Failed: ${message}`);
+        throw error;
+      }
+    }),
     {
       connection,
       concurrency: 20,

@@ -1,7 +1,7 @@
 import {
-  dataPrivacyConfigSchema,
   type CategorySetting,
   type DataPrivacyConfig,
+  dataPrivacyConfigSchema,
   type PiiLevel,
 } from "./dataPrivacy.types";
 
