@@ -111,7 +111,7 @@ function buildPlan({
     needsIO: fields.some(
       (f) =>
         (f.protection === "input" || f.protection === "output") &&
-        isPermitted(f, protections),
+        isPermitted({ field: f, protections }),
     ),
     needsEvents: fields.some((f) => f.collection === "events"),
     eventPaths: subPaths("events"),
@@ -143,31 +143,39 @@ function buildProjector({
       setPath({
         target: row,
         path: f.outPath,
-        value: isPermitted(f, protections) ? f.read(source) : null,
+        value: isPermitted({ field: f, protections }) ? f.read(source) : null,
       });
     }
 
     for (const collection of COLLECTIONS) {
       const collFields = collectionFields[collection];
       if (collFields.length === 0) continue;
-      row[collection] = collectionElements(trace, collection).map((element) => {
-        const projected: ProjectedRow = {};
-        for (const f of collFields) {
-          setPath({
-            target: projected,
-            path: f.outPath,
-            value: f.read(element),
-          });
-        }
-        return projected;
-      });
+      row[collection] = collectionElements({ trace, collection }).map(
+        (element) => {
+          const projected: ProjectedRow = {};
+          for (const f of collFields) {
+            setPath({
+              target: projected,
+              path: f.outPath,
+              value: f.read(element),
+            });
+          }
+          return projected;
+        },
+      );
     }
 
     return row;
   };
 }
 
-function isPermitted(field: ResolvedField, protections: Protections): boolean {
+function isPermitted({
+  field,
+  protections,
+}: {
+  field: ResolvedField;
+  protections: Protections;
+}): boolean {
   switch (field.protection) {
     case "input":
       return !!protections.canSeeCapturedInput;
@@ -180,10 +188,13 @@ function isPermitted(field: ResolvedField, protections: Protections): boolean {
   }
 }
 
-function collectionElements(
-  trace: ProjectableTrace,
-  collection: ProjectionCollection,
-): ProjectionSource[] {
+function collectionElements({
+  trace,
+  collection,
+}: {
+  trace: ProjectableTrace;
+  collection: ProjectionCollection;
+}): ProjectionSource[] {
   const raw =
     collection === "events"
       ? trace.events

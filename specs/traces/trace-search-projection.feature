@@ -70,9 +70,9 @@ Feature: Trace search projection DSL
   # ==========================================================================
 
   Scenario: Select annotation fields returned as nested array
-    When I POST /api/traces/search with from "traces" and select ["trace_id", "annotations.is_thumbs_up", "annotations.score", "annotations.comment"]
+    When I POST /api/traces/search with from "traces" and select ["trace_id", "annotations.is_thumbs_up", "annotations.scores", "annotations.comment"]
     Then each trace contains "trace_id" and an "annotations" array
-    And each annotation object contains only "is_thumbs_up", "score", and "comment"
+    And each annotation object contains only "is_thumbs_up", "scores", and "comment"
 
   # ==========================================================================
   # Mixed projection — all sources in one request
