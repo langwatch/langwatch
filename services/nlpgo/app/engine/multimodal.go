@@ -10,7 +10,9 @@ import (
 // imageDataURLRe matches an inline image data URL. The base64 payload match
 // is greedy over the base64 alphabet so the whole image is captured as one
 // token; templates interpolate the URL as a single uninterrupted string.
-var imageDataURLRe = regexp.MustCompile(`data:image/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/]+={0,2}`)
+// Case-insensitive because RFC 2397 allows uppercase in the scheme, media
+// type, and the ";base64" extension token.
+var imageDataURLRe = regexp.MustCompile(`(?i)data:image/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/]+={0,2}`)
 
 // splitMessagesWithImages rewrites messages whose string content embeds image
 // data URLs into OpenAI multimodal content-part lists (text part, image part,

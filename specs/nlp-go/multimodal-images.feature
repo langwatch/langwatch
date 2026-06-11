@@ -13,7 +13,8 @@ Feature: Image inputs reach the LLM as image content parts
     providers) already forwards content-part arrays untouched.
 
     # Bindings: services/nlpgo/app/engine/multimodal_test.go
-    # Split: services/nlpgo/app/engine/multimodal.go (called from buildMessages)
+    # Split: services/nlpgo/app/engine/multimodal.go (runSignature applies it
+    # to the messages buildMessages returns)
 
   @unit
   Scenario: A message with an image in the middle becomes text and image parts

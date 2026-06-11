@@ -46,6 +46,22 @@ func TestSplitMessagesWithImagesSplitsTextImageText(t *testing.T) {
 	assert.Contains(t, block["text"], "Answer with one integer.")
 }
 
+// @scenario "A message with an image in the middle becomes text and image parts"
+// RFC 2397 allows uppercase in the media type and the ";base64" token.
+func TestSplitMessagesWithImagesMatchesUppercaseBase64(t *testing.T) {
+	upper := "data:image/PNG;BASE64,iVBORw0KGgo="
+	msgs := splitMessagesWithImages([]app.ChatMessage{
+		{Role: "user", Content: "Before " + upper + " after."},
+	})
+	parts, ok := msgs[0].Content.([]any)
+	require.True(t, ok, "uppercase data URL must still split into parts")
+	require.Len(t, parts, 3)
+	typ, block := partType(t, parts[1])
+	require.Equal(t, "image_url", typ)
+	img, _ := block["image_url"].(map[string]any)
+	assert.Equal(t, upper, img["url"])
+}
+
 // @scenario "Multiple images in one message each become their own image part"
 func TestSplitMessagesWithImagesHandlesMultipleImages(t *testing.T) {
 	msgs := splitMessagesWithImages([]app.ChatMessage{
