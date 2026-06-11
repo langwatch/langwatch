@@ -245,7 +245,13 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
                   />
                 </VStack>
               ) : (
-                <Text paddingY={2}>{"<empty>"}</Text>
+                // Restricting output nulls trace.output upstream, so the value
+                // branches above are skipped. Wrap the fallback in RedactedField
+                // so a restricted output still shows the redaction reason here
+                // instead of a bare "<empty>".
+                <RedactedField field="output">
+                  <Text paddingY={2}>{"<empty>"}</Text>
+                </RedactedField>
               )}
               {trace.expected_output && (
                 <Alert.Root status="warning">
