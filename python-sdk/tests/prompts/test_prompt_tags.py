@@ -18,7 +18,7 @@ import pytest
 import langwatch
 from langwatch.prompts.prompt_api_service import PromptApiService
 from langwatch.prompts.prompt_facade import PromptsFacade
-from langwatch.prompts.types import FetchPolicy
+from langwatch.prompts.types import FetchPolicy, Message, PromptData
 
 pytestmark = pytest.mark.unit
 
@@ -1385,9 +1385,7 @@ class TestPromptsFacadeParameters:
         mock_client = Mock()
         return PromptsFacade(mock_client)
 
-    def _mock_prompt_data(self, parameters) -> "PromptData":
-        from langwatch.prompts.types import PromptData, Message
-
+    def _mock_prompt_data(self, parameters) -> PromptData:
         return PromptData(
             id="pizza-prompt", handle="pizza-prompt", scope="PROJECT",
             version=1, version_id="v1_id", model="openai/gpt-4",

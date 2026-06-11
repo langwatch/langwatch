@@ -15448,7 +15448,7 @@ description: "Version arbitrary application settings alongside your prompts and 
 Every prompt version can carry a `parameters` object: arbitrary JSON that is versioned, tagged, and fetched together with the prompt itself. Use it for application settings that should change in lockstep with the prompt — search iteration limits, confidence thresholds, structured output schemas, metadata field lists, feature switches.
 
 <Note>
-Available since Python SDK `0.25.0` and TypeScript SDK `0.33.0`. Changing `parameters` creates a new prompt version, just like changing the prompt text.
+Available since Python SDK `0.26.0` and TypeScript SDK `0.33.0` (reading `prompt.parameters` works from Python SDK `0.25.0`; writing via `create`/`update` requires `0.26.0`). Changing `parameters` creates a new prompt version, just like changing the prompt text.
 </Note>
 
 ## Why
