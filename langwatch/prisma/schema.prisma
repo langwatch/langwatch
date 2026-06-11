@@ -107,6 +107,7 @@ model User {
   ingestionSourcesCreated IngestionSource[]        @relation("IngestionSourceCreatedBy")
   anomalyRulesCreated     AnomalyRule[]            @relation("AnomalyRuleCreatedBy")
   pinnedTraces            PinnedTrace[]
+  userGitHubCredentials   UserGitHubCredential[]
 }
 
 model VerificationToken {
@@ -285,6 +286,7 @@ model Organization {
   anomalyAlerts          AnomalyAlert[]
   aiToolEntries          AiToolEntry[]
   ingestionTemplates     IngestionTemplate[]
+  userGitHubCredentials  UserGitHubCredential[]
 
   @@index([ssoProvider])
 }
@@ -969,6 +971,39 @@ model ModelDefaultConfigScope {
     @@unique([configId, scopeType, scopeId])
     @@index([scopeType, scopeId])
     @@index([configId])
+}
+
+/// Per-user GitHub App connection used by Langy to open pull requests
+/// attributed to the requesting user. Stores ONLY the encrypted refresh
+/// token (long-lived but rotating); access tokens (8h TTL) are minted on
+/// demand by langyGithubToken.ts and never persisted.
+///
+/// Scoped (userId, organizationId): a user in two orgs connects twice so
+/// the installation context stays org-bounded. Issue: #4747. Spec:
+/// specs/assistant/langy-github-prs.feature.
+model UserGitHubCredential {
+  id                    String       @id @default(nanoid())
+  userId                String
+  user                  User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId        String
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// GitHub login (e.g. "aryansharma28"). Surfaced in the "Acting as @login"
+  /// sidebar chip and used as the commit author name in the worker.
+  githubLogin           String
+  /// GitHub numeric user id. Stable across renames; used for the
+  /// noreply commit email (<id>+<login>@users.noreply.github.com).
+  githubUserId          String
+  /// AES-256-GCM encrypted refresh token. Encrypted via
+  /// langwatch/src/utils/encryption.ts (same scheme as ProjectSecret).
+  encryptedRefreshToken String
+  /// Space-separated OAuth scopes granted (informational; the App installation
+  /// is the real authority on what the token can do).
+  scopes                String?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @default(now()) @updatedAt
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
 }
 
 model ProjectSecret {
