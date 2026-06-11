@@ -25,6 +25,25 @@ export function sliderStepForSpan(span: number): number {
   return span >= 100 ? 1 : span / 100;
 }
 
+/**
+ * Clamp both thumb values into the facet's current bounds. The slider value
+ * lives in local state while min/max stream in from the facet snapshot, so
+ * for a frame the two can disagree (stale committed filter, snapshot
+ * refresh moving the bounds). zag-js throws synchronously when a thumb sits
+ * fully outside [min, max], which used to take the whole filter section
+ * down with a "Couldn't render the cost filter" error card until a retry.
+ * Exported for unit testing.
+ */
+export function clampRangeToBounds(
+  value: [number, number],
+  min: number,
+  max: number,
+): [number, number] {
+  const clamp = (v: number) =>
+    Math.min(Math.max(Number.isFinite(v) ? v : min, min), max);
+  return [clamp(value[0]), clamp(value[1])];
+}
+
 /** Strip currency / unit suffixes so users can paste back the formatted
  * label and still get a parseable number. "1.5s" → 1.5, "$0.05" → 0.05,
  * "12,300" → 12300. Returns null for anything that doesn't yield a
@@ -239,7 +258,7 @@ const RangeSectionInner: React.FC<RangeSectionProps> = ({
                   min={min}
                   max={max}
                   step={sliderStepForSpan(max - min)}
-                  value={localValue}
+                  value={clampRangeToBounds(localValue, min, max)}
                   onValueChange={(d) => {
                     // Drop frames that would inject NaN into local state —
                     // zag-js can momentarily emit `undefined` on degenerate

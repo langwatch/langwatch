@@ -73,13 +73,14 @@ export function SpanAccordions({
   }, [hasError, hasIO, hasPrompt, hasScope]);
 
   // Same rule as the trace summary view: only auto-expand Attributes when
-  // the span itself has attributes — resource-only is rarely interesting
-  // and clutters the default view.
+  // the span itself has attributes (resource-only is rarely interesting
+  // and clutters the default view) or when an unmapped-cost suggestion
+  // needs surfacing there.
   const [openSections, setOpenSections] = useAutoOpenSections(span.spanId, {
     exceptions: hasError,
     io: hasIO,
     prompt: hasPrompt,
-    attributes: hasSpanAttrs,
+    attributes: hasSpanAttrs || !!detail?.costSuggestion,
     scope: hasScope,
     events: hasEvents,
   });
@@ -125,9 +126,6 @@ export function SpanAccordions({
           onDone={handleGlowDone}
         />
       ) : null}
-      {!detailQuery.isLoading && detail?.costSuggestion && (
-        <UnmappedCostSuggestion model={detail.costSuggestion.model} />
-      )}
       {detailQuery.isLoading ? (
         <VStack align="stretch" gap={2} padding={4}>
           <Skeleton height="32px" borderRadius="md" />
@@ -210,6 +208,11 @@ export function SpanAccordions({
                   isFirst={isFirst}
                   open={isOpen}
                 >
+                  {!detailQuery.isLoading && detail?.costSuggestion && (
+                    <UnmappedCostSuggestion
+                      model={detail.costSuggestion.model}
+                    />
+                  )}
                   {hasAttributes ? (
                     <AttributeTable
                       attributes={

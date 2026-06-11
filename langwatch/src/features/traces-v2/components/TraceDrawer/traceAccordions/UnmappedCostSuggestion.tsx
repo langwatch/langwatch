@@ -18,17 +18,17 @@ export function modelCostMappingUrl(model: string): string {
 }
 
 /**
- * Shown in the span detail pane when the span carries a model and token
- * usage but nothing priced it (`spanDetail.costSuggestion`). One click opens
- * the model costs page in a new window with the drawer prefilled for this
- * exact model, regex auto-generated.
+ * Shown at the top of the Attributes section of the span detail pane when
+ * the span carries a model and token usage but nothing priced it
+ * (`spanDetail.costSuggestion`). One click opens the model costs page in a
+ * new window with the drawer prefilled for this exact model, regex
+ * auto-generated.
  */
 export function UnmappedCostSuggestion({ model }: { model: string }) {
   return (
     <HStack
       gap={2}
-      marginX={4}
-      marginTop={3}
+      marginBottom={2}
       paddingX={3}
       paddingY={2}
       borderRadius="sm"

@@ -15,7 +15,11 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { RangeSection, sliderStepForSpan } from "../RangeSection";
+import {
+  clampRangeToBounds,
+  RangeSection,
+  sliderStepForSpan,
+} from "../RangeSection";
 
 describe("RangeSection", () => {
   afterEach(cleanup);
@@ -85,6 +89,47 @@ describe("sliderStepForSpan", () => {
       expect(sliderStepForSpan(0)).toBe(1);
       expect(sliderStepForSpan(-5)).toBe(1);
       expect(sliderStepForSpan(Number.NaN)).toBe(1);
+    });
+  });
+});
+
+describe("clampRangeToBounds", () => {
+  // The three thumb/bounds disagreement shapes that make zag-js throw
+  // synchronously at mount (verified against @zag-js/slider's normalize):
+  // a stale value entirely below the new min, entirely above the new max,
+  // or out of order. Clamping each thumb into [min, max] makes all of
+  // them representable.
+  describe("when a stale value disagrees with freshly-arrived bounds", () => {
+    it("clamps a range entirely below the bounds up to min", () => {
+      expect(clampRangeToBounds([0, 0.00001], 0.000032, 0.019895)).toEqual([
+        0.000032, 0.000032,
+      ]);
+    });
+
+    it("clamps a range entirely above the bounds down to max", () => {
+      expect(clampRangeToBounds([0.5, 0.9], 0.000032, 0.019895)).toEqual([
+        0.019895, 0.019895,
+      ]);
+    });
+
+    it("clamps out-of-order thumbs into the bounds", () => {
+      expect(clampRangeToBounds([0.9, 0.1], 0.000032, 0.019895)).toEqual([
+        0.019895, 0.019895,
+      ]);
+    });
+  });
+
+  describe("when the value already fits the bounds", () => {
+    it("passes it through unchanged", () => {
+      expect(clampRangeToBounds([0.001, 0.01], 0.000032, 0.019895)).toEqual([
+        0.001, 0.01,
+      ]);
+    });
+  });
+
+  describe("when a thumb is not a finite number", () => {
+    it("falls back to min instead of poisoning the slider", () => {
+      expect(clampRangeToBounds([Number.NaN, 0.01], 0, 1)).toEqual([0, 0.01]);
     });
   });
 });

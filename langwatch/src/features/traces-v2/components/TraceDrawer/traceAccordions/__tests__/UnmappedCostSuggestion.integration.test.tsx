@@ -95,12 +95,16 @@ describe("Feature: Unmapped model cost suggestion in span details", () => {
 
   describe("when the span has a model and tokens but no cost mapped", () => {
     /** @scenario Span with model and tokens but no cost shows a cost mapping suggestion */
-    it("shows the suggestion with the model name and an add button", () => {
+    it("shows the suggestion inside the Attributes section with the model name and an add button", () => {
       renderSpanDetail();
 
       const suggestion = screen.getByTestId("unmapped-cost-suggestion");
       expect(suggestion).toHaveTextContent("no cost mapped");
       expect(suggestion).toHaveTextContent("vertex_ai/gemini-3-pro-preview");
+      // The banner lives inside the span's Attributes accordion section,
+      // above the attribute table and its filter input.
+      expect(suggestion.closest('[data-section="attributes"]')).not.toBeNull();
+      expect(suggestion.closest('[data-section="io"]')).toBeNull();
       expect(
         screen.getByRole("button", { name: /add cost mapping/i }),
       ).toBeInTheDocument();
