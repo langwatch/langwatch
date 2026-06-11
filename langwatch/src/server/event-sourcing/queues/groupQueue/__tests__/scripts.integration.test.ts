@@ -1423,6 +1423,14 @@ describe("GroupStagingScripts", () => {
   // ADR-026: staged values are GQ1 envelopes whose routing fields live in a
   // tiny header so the Lua pause-check never decodes the (gzipped) body.
   describe("when head-of-line job is envelope-encoded", () => {
+    beforeEach(() => {
+      process.env.GROUP_QUEUE_ENVELOPE_WRITES_ENABLED = "true";
+    });
+
+    afterEach(() => {
+      delete process.env.GROUP_QUEUE_ENVELOPE_WRITES_ENABLED;
+    });
+
     async function makeEnvelopeJobData(
       overrides: Record<string, unknown> = {},
     ): Promise<string> {

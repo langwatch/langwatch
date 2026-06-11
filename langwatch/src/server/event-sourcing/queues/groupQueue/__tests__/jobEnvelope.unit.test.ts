@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   decodeJobEnvelope,
@@ -7,6 +7,45 @@ import {
 } from "../jobEnvelope";
 
 describe("jobEnvelope", () => {
+  beforeEach(() => {
+    process.env.GROUP_QUEUE_ENVELOPE_WRITES_ENABLED = "true";
+  });
+
+  afterEach(() => {
+    delete process.env.GROUP_QUEUE_ENVELOPE_WRITES_ENABLED;
+  });
+
+  describe("given envelope writes are not enabled", () => {
+    const payload = {
+      __pipelineName: "traces",
+      __jobType: "command",
+      __jobName: "recordSpan",
+      bulk: "x".repeat(4096),
+    };
+
+    beforeEach(() => {
+      delete process.env.GROUP_QUEUE_ENVELOPE_WRITES_ENABLED;
+    });
+
+    describe("when encoding", () => {
+      it("writes legacy bare JSON that a previous-release JSON.parse reader accepts", async () => {
+        const encoded = await encodeJobEnvelope(payload);
+        expect(encoded.startsWith("GQ1|")).toBe(false);
+        expect(JSON.parse(encoded)).toEqual(payload);
+      });
+
+      it("still decodes and exposes routing meta through the dual readers", async () => {
+        const encoded = await encodeJobEnvelope(payload);
+        expect(await decodeJobEnvelope(encoded)).toEqual(payload);
+        expect(readJobRoutingMeta(encoded)).toEqual({
+          pipelineName: "traces",
+          jobType: "command",
+          jobName: "recordSpan",
+        });
+      });
+    });
+  });
+
   describe("given a payload over the compression threshold", () => {
     const largePayload = {
       __pipelineName: "traces",
@@ -96,6 +135,28 @@ describe("jobEnvelope", () => {
       const payload = payloadOfJsonByteLength(1025);
       expect(Buffer.byteLength(JSON.stringify(payload))).toBe(1025);
       expect(await encodeJobEnvelope(payload)).toContain('"e":"gz"');
+    });
+  });
+
+  describe("given a large incompressible payload", () => {
+    it("keeps the body raw when gzip+base64 would grow it", async () => {
+      // Simulates inline base64-ish data below the S3 spool threshold:
+      // high-entropy strings gain ~37% through gzip+base64.
+      const bytes = Buffer.alloc(8192);
+      let state = 0x9e3779b9;
+      for (let i = 0; i < bytes.length; i++) {
+        state ^= state << 13;
+        state ^= state >>> 17;
+        state ^= state << 5;
+        bytes[i] = state & 0xff;
+      }
+      const payload = { __jobName: "media", blob: bytes.toString("base64") };
+      const json = JSON.stringify(payload);
+
+      const encoded = await encodeJobEnvelope(payload);
+      expect(encoded).toContain('"e":"j"');
+      expect(encoded.length).toBeLessThan(json.length + 64);
+      expect(await decodeJobEnvelope(encoded)).toEqual(payload);
     });
   });
 

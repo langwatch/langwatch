@@ -21,6 +21,18 @@ Feature: GroupQueue payload envelope
     When a job whose payload JSON is under the compression threshold is staged
     Then the stored value is an envelope with a raw JSON body
 
+  Scenario: Incompressible payloads stay uncompressed
+    When a staged payload would grow under gzip plus base64
+    Then the stored value is an envelope with a raw JSON body
+
+  # Two-phase format rollout
+
+  Scenario: Envelope writes stay off until the whole fleet reads envelopes
+    Given envelope writes have not been enabled for the deployment
+    When a job is staged
+    Then the stored value is legacy bare JSON readable by the previous release
+    And dispatch and the ops dashboard read it through the dual readers
+
   Scenario: A staged payload round-trips through the envelope unchanged
     When a job is staged and later dispatched to its handler
     Then the handler receives a payload deep-equal to the one that was sent

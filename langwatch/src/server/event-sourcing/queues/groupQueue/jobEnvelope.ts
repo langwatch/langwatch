@@ -17,6 +17,18 @@ const ENVELOPE_PREFIX = "GQ1|";
 /** gzip+base64 of sub-kilobyte JSON is frequently larger than the input. */
 const COMPRESSION_THRESHOLD_BYTES = 1024;
 
+/**
+ * Phase gate for the two-phase format rollout (ADR-026). Readers are always
+ * envelope-aware, but writes stay legacy bare JSON until every consumer in
+ * the fleet is known to read envelopes — a pod from the previous release
+ * drops any `GQ1|` value it dispatches (its JSON.parse failure path completes
+ * the group slot without running the handler). Read at call time so tests can
+ * toggle it without module reloads.
+ */
+function envelopeWritesEnabled(): boolean {
+  return process.env.GROUP_QUEUE_ENVELOPE_WRITES_ENABLED === "true";
+}
+
 export interface JobRoutingMeta {
   pipelineName: string | null;
   jobType: string | null;
@@ -35,6 +47,9 @@ export async function encodeJobEnvelope(
   jobData: Record<string, unknown>,
 ): Promise<string> {
   const json = JSON.stringify(jobData);
+  if (!envelopeWritesEnabled()) {
+    return json;
+  }
 
   const header: EnvelopeHeader = { v: 1, e: "j" };
   if (typeof jobData.__pipelineName === "string")
@@ -44,8 +59,14 @@ export async function encodeJobEnvelope(
 
   let body = json;
   if (Buffer.byteLength(json) > COMPRESSION_THRESHOLD_BYTES) {
-    header.e = "gz";
-    body = (await gzipAsync(json)).toString("base64");
+    const compressed = (await gzipAsync(json)).toString("base64");
+    // High-entropy payloads (inline base64-ish data) can come out LARGER
+    // after gzip+base64; keep raw JSON unless compression actually wins.
+    // `"gz"` costs one more header byte than `"j"`.
+    if (Buffer.byteLength(compressed) + 1 < Buffer.byteLength(json)) {
+      header.e = "gz";
+      body = compressed;
+    }
   }
 
   const headerJson = JSON.stringify(header);

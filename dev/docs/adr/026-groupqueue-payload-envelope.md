@@ -50,7 +50,20 @@ GQ1|<headerLen>|<headerJson><body>
   fields `p`/`t`/`n` (pipelineName/jobType/jobName).
 - `<body>` is the full payload JSON (including `__context`, `__attempt`,
   and the routing fields, unchanged) — gzip-compressed and
-  base64-encoded when the JSON exceeds a 1 KiB threshold, raw otherwise.
+  base64-encoded when the JSON exceeds a 1 KiB threshold **and**
+  compression actually shrinks it; high-entropy payloads (inline
+  base64-ish data below the S3 spool threshold) grow under gzip+base64
+  and stay raw.
+
+**Rollout is two-phase.** Readers (TS decode, Lua routing helper, ops
+repository) are always envelope-aware, but writes stay legacy bare JSON
+until `GROUP_QUEUE_ENVELOPE_WRITES_ENABLED=true` is set. A pod from the
+previous release drops any `GQ1|` value it dispatches — its
+`JSON.parse` failure path completes the group slot without invoking the
+handler — and app and worker Deployments roll independently, so a new
+producer can feed an old consumer mid-deploy. Phase 1 ships dual
+readers fleet-wide writing legacy JSON; the flag is flipped only once
+no pre-envelope pods remain.
 
 The dispatch/fail Lua scripts gain a shared helper that reads routing
 metadata from the header alone (a ~100-byte `cjson.decode`), with a
@@ -106,11 +119,14 @@ Redis's thread — which is the point).
   accordingly.
 - The ops dashboard's routing-field extraction gets cheaper (header
   parse) and must go through the shared envelope reader.
-- Rolling deploys are safe in the forward direction (new code reads
-  legacy values). **Rollback while envelope-encoded jobs are in flight
-  is not safe** — old code would fail to `JSON.parse` them and complete
-  the group slot without processing. Drain or accept replay if rolling
-  back.
+- Deploying the dual readers (phase 1) is safe in any direction and at
+  any rollout speed: nothing new is written. **Enabling
+  `GROUP_QUEUE_ENVELOPE_WRITES_ENABLED` is only safe once every
+  consumer pod runs envelope-aware code**, and rolling back to a
+  pre-envelope release while envelope-encoded jobs are in flight is not
+  safe — old code fails to `JSON.parse` them and completes the group
+  slot without processing. Disable the flag and drain (or accept
+  replay) before such a rollback.
 - The S3 offload path for oversized media payloads is unaffected and
   remains the mechanism for keeping large blobs out of Redis.
 
