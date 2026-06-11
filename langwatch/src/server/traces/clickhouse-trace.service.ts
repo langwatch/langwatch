@@ -7,6 +7,10 @@ import { LLM_PARAMETER_MAP } from "~/prompts/prompt-playground/llmParameterMap";
 import { HandledError } from "@langwatch/handled-error";
 import type { ExtractedIO } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import {
+  deserializeAttributes,
+  ensureStringRecord,
+} from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import {
   DEFAULT_PARTITION_WINDOW_MS,
@@ -3086,97 +3090,6 @@ export class ClickHouseTraceService {
   }
 
   /**
-   * Extract NormalizedSpan from a joined row.
-   * @internal
-   */
-  private extractSpanFromRow(
-    row: JoinedTraceSpanRow,
-    tenantId: string,
-  ): NormalizedSpan {
-    // Reconstruct events array with proper typing
-    const events = (row.ss_Events_Timestamp ?? []).map((timestamp, index) => ({
-      name: row.ss_Events_Name?.[index] ?? "",
-      timeUnixMs: timestamp,
-      attributes: (row.ss_Events_Attributes?.[index] ?? {}) as Record<
-        string,
-        | string
-        | number
-        | bigint
-        | boolean
-        | (string | number | bigint | boolean)[]
-      >,
-    }));
-
-    // Reconstruct links array with proper typing
-    const links = (row.ss_Links_TraceId ?? []).map((linkTraceId, index) => ({
-      traceId: linkTraceId,
-      spanId: row.ss_Links_SpanId?.[index] ?? "",
-      attributes: (row.ss_Links_Attributes?.[index] ?? {}) as Record<
-        string,
-        | string
-        | number
-        | bigint
-        | boolean
-        | (string | number | bigint | boolean)[]
-      >,
-    }));
-
-    // Map numeric status code to enum
-    const statusCode =
-      row.ss_StatusCode !== null
-        ? (row.ss_StatusCode as NormalizedStatusCode)
-        : null;
-
-    // Map numeric span kind to enum
-    const kind = (row.ss_SpanKind ?? 0) as NormalizedSpanKind;
-
-    return {
-      id: row.ss_Id ?? "",
-      traceId: row.ss_TraceId ?? "",
-      spanId: row.ss_SpanId ?? "",
-      tenantId,
-      parentSpanId: row.ss_ParentSpanId,
-      parentTraceId: row.ss_ParentTraceId,
-      parentIsRemote: row.ss_ParentIsRemote,
-      sampled: row.ss_Sampled ?? true,
-      startTimeUnixMs: row.ss_StartTime ?? 0,
-      endTimeUnixMs: row.ss_EndTime ?? 0,
-      durationMs: row.ss_DurationMs ?? 0,
-      name: row.ss_SpanName ?? "",
-      kind,
-      resourceAttributes: (row.ss_ResourceAttributes ?? {}) as Record<
-        string,
-        | string
-        | number
-        | bigint
-        | boolean
-        | (string | number | bigint | boolean)[]
-      >,
-      spanAttributes: (row.ss_SpanAttributes ?? {}) as Record<
-        string,
-        | string
-        | number
-        | bigint
-        | boolean
-        | (string | number | bigint | boolean)[]
-      >,
-      events,
-      links,
-      statusMessage: row.ss_StatusMessage,
-      statusCode,
-      instrumentationScope: {
-        name: row.ss_ScopeName ?? "",
-        version: row.ss_ScopeVersion,
-      },
-      droppedAttributesCount: 0,
-      droppedEventsCount: 0,
-      droppedLinksCount: 0,
-      cost: null,
-      nonBilledCost: null,
-    };
-  }
-
-  /**
    * Map a span row from a standalone spans query (no JOIN prefix) to NormalizedSpan.
    * @internal
    */
@@ -3212,27 +3125,17 @@ export class ClickHouseTraceService {
     const events = (row.Events_Timestamp ?? []).map((timestamp, index) => ({
       name: row.Events_Name?.[index] ?? "",
       timeUnixMs: timestamp,
-      attributes: (row.Events_Attributes?.[index] ?? {}) as Record<
-        string,
-        | string
-        | number
-        | bigint
-        | boolean
-        | (string | number | bigint | boolean)[]
-      >,
+      attributes: deserializeAttributes(
+        ensureStringRecord(row.Events_Attributes?.[index] ?? {}),
+      ) as NormalizedSpan["events"][number]["attributes"],
     }));
 
     const links = (row.Links_TraceId ?? []).map((linkTraceId, index) => ({
       traceId: linkTraceId,
       spanId: row.Links_SpanId?.[index] ?? "",
-      attributes: (row.Links_Attributes?.[index] ?? {}) as Record<
-        string,
-        | string
-        | number
-        | bigint
-        | boolean
-        | (string | number | bigint | boolean)[]
-      >,
+      attributes: deserializeAttributes(
+        ensureStringRecord(row.Links_Attributes?.[index] ?? {}),
+      ) as NormalizedSpan["links"][number]["attributes"],
     }));
 
     return {
@@ -3249,9 +3152,12 @@ export class ClickHouseTraceService {
       durationMs: row.DurationMs,
       name: row.SpanName,
       kind: row.SpanKind as NormalizedSpanKind,
-      resourceAttributes:
-        row.ResourceAttributes as NormalizedSpan["resourceAttributes"],
-      spanAttributes: row.SpanAttributes as NormalizedSpan["spanAttributes"],
+      resourceAttributes: deserializeAttributes(
+        ensureStringRecord(row.ResourceAttributes),
+      ) as NormalizedSpan["resourceAttributes"],
+      spanAttributes: deserializeAttributes(
+        ensureStringRecord(row.SpanAttributes),
+      ) as NormalizedSpan["spanAttributes"],
       statusCode: row.StatusCode as NormalizedStatusCode | null,
       statusMessage: row.StatusMessage,
       instrumentationScope: {
