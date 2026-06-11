@@ -622,9 +622,11 @@ export class EEWebhookService implements WebhookService {
       hasSubscription: !!remainingActive,
     });
 
-    if (!remainingActive) {
-      await this.removeSeatRetentionPolicy(existingSubscription.organizationId);
-    }
+    // Retention-policy removal on cancellation is deactivated until
+    // the paid-retention feature is released. Re-enable by restoring this call.
+    // if (!remainingActive) {
+    //   await this.removeSeatRetentionPolicy(existingSubscription.organizationId);
+    // }
   }
 
   async handleSubscriptionUpdated({
@@ -664,9 +666,11 @@ export class EEWebhookService implements WebhookService {
         hasSubscription: !!remainingActive,
       });
 
-      if (!remainingActive) {
-        await this.removeSeatRetentionPolicy(existingSubForUpdate.organizationId);
-      }
+      // Retention-policy removal on cancellation is deactivated until
+      // the paid-retention feature is released. Re-enable by restoring this call.
+      // if (!remainingActive) {
+      //   await this.removeSeatRetentionPolicy(existingSubForUpdate.organizationId);
+      // }
     } else if (subscription.status === "active") {
       const shouldNotify =
         existingSubForUpdate.status !== SubscriptionStatus.ACTIVE;

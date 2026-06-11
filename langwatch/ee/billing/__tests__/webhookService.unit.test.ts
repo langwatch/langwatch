@@ -892,9 +892,11 @@ describe("webhookService", () => {
       });
     });
 
+    // Removal-on-cancellation is deactivated until the
+    // paid-retention feature is released.
     describe("when no active subscription remains", () => {
-      /** @scenario Cancelling the last active subscription removes the organization policies */
-      it("removes the organization-scoped traces retention policy", async () => {
+      /** @scenario Cancelling a subscription leaves the retention policies in place */
+      it("does not remove the organization retention policies (removal deactivated)", async () => {
         subRepo.findByStripeId.mockResolvedValue(
           makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
         );
@@ -905,54 +907,9 @@ describe("webhookService", () => {
         });
 
         await vi.advanceTimersByTimeAsync(2000);
-        await promise;
-
-        for (const category of RETENTION_CATEGORIES) {
-          expect(mockRemoveForScope).toHaveBeenCalledWith({
-            scope: { scopeType: "ORGANIZATION", scopeId: "org_123" },
-            category,
-          });
-        }
-        expect(mockRemoveForScope).toHaveBeenCalledTimes(RETENTION_CATEGORIES.length);
-      });
-
-      /** @scenario A retention failure never fails the billing webhook */
-      it("still cancels when retention removal throws", async () => {
-        subRepo.findByStripeId.mockResolvedValue(
-          makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
-        );
-        subRepo.findLastNonCancelled.mockResolvedValue(null);
-        mockRemoveForScope.mockRejectedValueOnce(new Error("retention store down"));
-
-        const promise = service.handleSubscriptionDeleted({
-          stripeSubscriptionId: "sub_stripe_1",
-        });
-
-        await vi.advanceTimersByTimeAsync(2000);
-        // Should not throw — retention failure is swallowed
         await promise;
 
         expect(subRepo.cancel).toHaveBeenCalledWith({ id: "sub_db_1" });
-      });
-    });
-
-    describe("when another active subscription remains", () => {
-      /** @scenario Cancelling one of several subscriptions keeps the policies */
-      it("leaves the organization retention policy in place", async () => {
-        subRepo.findByStripeId.mockResolvedValue(
-          makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
-        );
-        subRepo.findLastNonCancelled.mockResolvedValue(
-          makeSubscription({ id: "sub_db_2", status: SubscriptionStatus.ACTIVE }),
-        );
-
-        const promise = service.handleSubscriptionDeleted({
-          stripeSubscriptionId: "sub_stripe_1",
-        });
-
-        await vi.advanceTimersByTimeAsync(2000);
-        await promise;
-
         expect(mockRemoveForScope).not.toHaveBeenCalled();
       });
     });
@@ -1148,9 +1105,11 @@ describe("webhookService", () => {
       });
     });
 
+    // Removal-on-cancellation is deactivated until the
+    // paid-retention feature is released.
     describe("when a cancel-by-update leaves no active subscription", () => {
-      /** @scenario Cancelling the last active subscription removes the organization policies */
-      it("removes the organization-scoped traces retention policy", async () => {
+      /** @scenario Cancelling a subscription leaves the retention policies in place */
+      it("does not remove the organization retention policies (removal deactivated)", async () => {
         subRepo.findByStripeId.mockResolvedValue(
           makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
         );
@@ -1169,13 +1128,7 @@ describe("webhookService", () => {
         await promise;
 
         expect(subRepo.cancel).toHaveBeenCalledWith({ id: "sub_db_1" });
-        for (const category of RETENTION_CATEGORIES) {
-          expect(mockRemoveForScope).toHaveBeenCalledWith({
-            scope: { scopeType: "ORGANIZATION", scopeId: "org_123" },
-            category,
-          });
-        }
-        expect(mockRemoveForScope).toHaveBeenCalledTimes(RETENTION_CATEGORIES.length);
+        expect(mockRemoveForScope).not.toHaveBeenCalled();
       });
     });
   });

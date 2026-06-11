@@ -45,15 +45,10 @@ Feature: Seat subscription provisions an organization retention policy
     When the subscription is activated by a successful payment
     Then the activation still completes and the confirmation notification is sent
 
+  # Removal-on-cancellation is deactivated until the paid-retention
+  # feature is released. Cancelling currently leaves the policies in place.
   @unit
-  Scenario: Cancelling the last active subscription removes the organization policies
+  Scenario: Cancelling a subscription leaves the retention policies in place
     Given an organization whose only active subscription is cancelled
     When the cancellation is finalized
-    Then every organization-scoped retention policy is removed
-    And retention reverts to the platform default
-
-  @unit
-  Scenario: Cancelling one of several subscriptions keeps the policies
-    Given an organization that still has another active subscription
-    When one subscription is cancelled
     Then the organization-scoped retention policies are left in place
