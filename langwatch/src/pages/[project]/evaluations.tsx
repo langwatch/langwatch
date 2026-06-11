@@ -32,7 +32,7 @@ import { Link } from "~/components/ui/link";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { CopyEvaluationDialog } from "../../components/evaluations/CopyEvaluationDialog";
 import { MonitorsSection } from "../../components/evaluations/MonitorsSection";
-import type { TASK_TYPES } from "../../components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
+import type { TASK_TYPES } from "../../server/experiments/workbenchState";
 import { formatEvaluationSummary } from "../../components/experiments/BatchEvaluationV2/BatchEvaluationSummary";
 import {
   NavigationFooter,
@@ -308,14 +308,15 @@ function EvaluationsV2() {
                                 <Table.Row
                                   cursor="pointer"
                                   onClick={() => {
-                                    // EVALUATIONS_V3 type goes to the experiments workbench page
-                                    if (experiment.type === "EVALUATIONS_V3") {
+                                    // Workbench-backed experiments (current and
+                                    // legacy wizard) open in the workbench;
+                                    // everything else in the experiment view.
+                                    if (
+                                      experiment.type === "EVALUATIONS_V3" ||
+                                      experiment.workbenchState
+                                    ) {
                                       void router.push({
                                         pathname: `/${project?.slug}/experiments/workbench/${experiment.slug}`,
-                                      });
-                                    } else if (experiment.workbenchState) {
-                                      void router.push({
-                                        pathname: `/${project?.slug}/evaluations/wizard/${experiment.slug}`,
                                       });
                                     } else {
                                       void router.push({
@@ -475,7 +476,7 @@ function EvaluationsV2() {
                                                 onClick={(e) => {
                                                   e.stopPropagation();
                                                   void router.push(
-                                                    `/${project?.slug}/evaluations/wizard/${experiment.slug}`,
+                                                    `/${project?.slug}/experiments/workbench/${experiment.slug}`,
                                                   );
                                                 }}
                                               >

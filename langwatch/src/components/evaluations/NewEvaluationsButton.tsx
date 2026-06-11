@@ -25,12 +25,12 @@ export function NewEvaluationButton() {
   const isLastExperimentADraft = lastExperiment?.name?.startsWith("Draft");
 
   const openNewEvaluation = () => {
-    void router.push(`/${project.slug}/evaluations/wizard`);
+    void router.push(`/${project.slug}/experiments/workbench`);
   };
 
   const handleContinueDraft = () => {
     void router.push(
-      `/${project.slug}/evaluations/wizard/${lastExperiment?.slug}`,
+      `/${project.slug}/experiments/workbench/${lastExperiment?.slug}`,
     );
   };
 

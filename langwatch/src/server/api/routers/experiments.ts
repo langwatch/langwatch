@@ -14,7 +14,7 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   type WizardState,
   workbenchStateSchema,
-} from "../../../components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
+} from "../../experiments/workbenchState";
 import { persistedEvaluationsV3StateSchema } from "../../../experiments-v3/types/persistence";
 import {
   type Entry,

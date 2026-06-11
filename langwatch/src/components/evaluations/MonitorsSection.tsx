@@ -170,7 +170,7 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
                               experimentsSlugMap[monitor.experimentId]
                             ) {
                               void router.push(
-                                `/${project.slug}/evaluations/wizard/${
+                                `/${project.slug}/experiments/workbench/${
                                   experimentsSlugMap[monitor.experimentId]
                                 }`,
                               );

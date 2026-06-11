@@ -28,7 +28,6 @@ import {
   TRACE_MAPPINGS,
 } from "../../server/tracer/tracesMapping";
 import { api } from "../../utils/api";
-import { useEvaluationWizardStore } from "../evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { Switch } from "../ui/switch";
 
 /** Trace field options for the threads sub-field selector, excluding thread sources themselves. */
@@ -167,9 +166,6 @@ export const TracesMapping = ({
   skipSettingDefaultEdges?: boolean;
 }) => {
   const { project } = useOrganizationTeamProject();
-  const { task } = useEvaluationWizardStore((state) => ({
-    task: state.workbenchState.task,
-  }));
 
   const annotationScores = useAnnotationsByTraceIds({
     projectId: project?.id ?? "",
@@ -544,7 +540,7 @@ export const TracesMapping = ({
     now,
   ]);
 
-  const isThreeColumns = task === "real_time" && !!dsl;
+  const isThreeColumns = !!dsl;
 
   return (
     <Grid

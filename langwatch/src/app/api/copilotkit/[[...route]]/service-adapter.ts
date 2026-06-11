@@ -5,7 +5,7 @@ import type {
 } from "@copilotkit/runtime";
 import { randomUUID } from "@copilotkit/shared";
 import type z from "zod";
-import { LlmSignatureNodeFactory } from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/slices/factories/llm-signature-node.factory";
+import { LlmSignatureNodeFactory } from "~/optimization_studio/utils/llmSignatureNodeFactory";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
 import type {

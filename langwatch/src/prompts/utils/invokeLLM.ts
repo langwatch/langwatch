@@ -1,7 +1,7 @@
 import type { Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
 
-import { LlmSignatureNodeFactory } from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/slices/factories/llm-signature-node.factory";
+import { LlmSignatureNodeFactory } from "~/optimization_studio/utils/llmSignatureNodeFactory";
 import type {
   ExecutionState,
   LlmPromptConfigComponent,

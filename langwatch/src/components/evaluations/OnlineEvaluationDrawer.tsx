@@ -66,7 +66,7 @@ import { HorizontalFormControl } from "../HorizontalFormControl";
 import { SmallLabel } from "../SmallLabel";
 import { Tooltip } from "../ui/tooltip";
 import { EvaluatorSelectionBox } from "./EvaluatorSelectionBox";
-import { StepRadio } from "./wizard/components/StepButton";
+import { StepRadio } from "./StepButton";
 
 export type EvaluationLevel = "trace" | "thread" | null;
 
