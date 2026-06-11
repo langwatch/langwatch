@@ -3,6 +3,7 @@ import type { LocalPromptConfig } from "~/experiments-v3/types";
 import { buildLLMConfig } from "~/server/prompt-config/llmConfigBuilder";
 import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
 import type {
+  AgentComponent,
   Component,
   Evaluator,
   Field,
@@ -39,6 +40,10 @@ export function mergeLocalConfigsIntoDsl(
       return mergeEvaluatorLocalConfig(node);
     }
 
+    if (node.type === "agent" && hasAgentLocalConfig(node.data)) {
+      return mergeAgentLocalConfig(node);
+    }
+
     return node;
   });
 }
@@ -47,10 +52,10 @@ export function mergeLocalConfigsIntoDsl(
 // Signature merge
 // ---------------------------------------------------------------------------
 
-function mergeSignatureLocalConfig(
-  node: Node<Component>,
-): Node<Component> {
-  const data = node.data as Signature & { localPromptConfig: LocalPromptConfig };
+function mergeSignatureLocalConfig(node: Node<Component>): Node<Component> {
+  const data = node.data as Signature & {
+    localPromptConfig: LocalPromptConfig;
+  };
   const local = data.localPromptConfig;
 
   const llmConfig = buildLLMConfig({
@@ -74,7 +79,11 @@ function mergeSignatureLocalConfig(
 
   const parameters: LlmPromptConfigComponent["parameters"] = [
     { identifier: "llm", type: "llm", value: llmConfig },
-    { identifier: "instructions", type: "str", value: systemMessage?.content ?? "" },
+    {
+      identifier: "instructions",
+      type: "str",
+      value: systemMessage?.content ?? "",
+    },
     {
       identifier: "messages",
       type: "chat_messages",
@@ -112,9 +121,7 @@ function mergeSignatureLocalConfig(
 // Evaluator merge
 // ---------------------------------------------------------------------------
 
-function mergeEvaluatorLocalConfig(
-  node: Node<Component>,
-): Node<Component> {
+function mergeEvaluatorLocalConfig(node: Node<Component>): Node<Component> {
   const data = node.data as Evaluator & {
     localConfig: NonNullable<Evaluator["localConfig"]>;
   };
@@ -129,6 +136,51 @@ function mergeEvaluatorLocalConfig(
   );
 
   const mergedData: Evaluator = {
+    ...data,
+    name: local.name ?? data.name,
+    parameters,
+    localConfig: undefined,
+  };
+
+  return { ...node, data: mergedData };
+}
+
+// ---------------------------------------------------------------------------
+// Agent merge
+// ---------------------------------------------------------------------------
+
+/**
+ * Identifiers in localConfig.settings that overlay same-named node
+ * parameters at dispatch time. The drawer writes editor-shaped keys
+ * (bodyTemplate), the engine reads parameter identifiers
+ * (body_template); this maps between them.
+ */
+const AGENT_SETTING_TO_PARAMETER: Record<string, string> = {
+  code: "code",
+  url: "url",
+  method: "method",
+  bodyTemplate: "body_template",
+  outputPath: "output_path",
+};
+
+function mergeAgentLocalConfig(node: Node<Component>): Node<Component> {
+  const data = node.data as AgentComponent & {
+    localConfig: NonNullable<AgentComponent["localConfig"]>;
+  };
+  const local = data.localConfig;
+  const settings = local.settings ?? {};
+
+  const parameters: Field[] = (data.parameters ?? []).map((parameter) => {
+    const settingKey = Object.entries(AGENT_SETTING_TO_PARAMETER).find(
+      ([, identifier]) => identifier === parameter.identifier,
+    )?.[0];
+    if (settingKey && settings[settingKey] !== undefined) {
+      return { ...parameter, value: settings[settingKey] };
+    }
+    return parameter;
+  });
+
+  const mergedData: AgentComponent = {
     ...data,
     name: local.name ?? data.name,
     parameters,
@@ -159,5 +211,15 @@ function hasLocalConfig(
     "localConfig" in data &&
     (data as Evaluator).localConfig !== undefined &&
     (data as Evaluator).localConfig !== null
+  );
+}
+
+function hasAgentLocalConfig(data: Component): data is AgentComponent & {
+  localConfig: NonNullable<AgentComponent["localConfig"]>;
+} {
+  return (
+    "localConfig" in data &&
+    (data as AgentComponent).localConfig !== undefined &&
+    (data as AgentComponent).localConfig !== null
   );
 }
