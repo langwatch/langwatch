@@ -48,7 +48,7 @@ export class NullEmailSuppressionRepository
     return {
       id: "null-suppression",
       projectId: params.projectId,
-      email: params.email,
+      email: params.email.trim().toLowerCase(),
       triggerId: params.triggerId,
       reason: params.reason,
       createdAt: new Date(),
