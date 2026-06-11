@@ -40,6 +40,12 @@ import {
   compileHiddenAttributeMatchers,
   redactHiddenAttributesCompiled,
 } from "~/server/traces/mappers/redactAttributes";
+import {
+  applySpanProtections,
+  extractRedactionsFromAllSpanInputs,
+  extractRedactionsFromAllSpanOutputs,
+  redactObject,
+} from "~/server/traces/mappers/redaction";
 import { checkProjectPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
 import { withoutHiddenResourceAttrs } from "./tracesV2.resourceAttrs";
@@ -373,6 +379,27 @@ async function enrichLlmSpanWithAncestorPrompt({
  * data-privacy policy grants the viewer captured-content access. The UI then
  * shows the `RedactedField` placeholder instead of the raw content.
  */
+/**
+ * The string values of hidden span content, so the legacy span protections can
+ * scrub them wherever they ride along (raw message attributes inside params).
+ */
+function buildSpanContentRedactions(
+  spans: Span[],
+  protections: {
+    canSeeCapturedInput?: boolean | null;
+    canSeeCapturedOutput?: boolean | null;
+  },
+): Set<string> {
+  return new Set<string>([
+    ...(protections.canSeeCapturedInput !== true
+      ? extractRedactionsFromAllSpanInputs(spans)
+      : []),
+    ...(protections.canSeeCapturedOutput !== true
+      ? extractRedactionsFromAllSpanOutputs(spans)
+      : []),
+  ]);
+}
+
 export function redactV2Content<
   T extends {
     input?: string | null;
@@ -913,15 +940,29 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("traces:view"))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const app = getApp();
-      return app.traces.spans.getSpansPaginated({
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
+      const page = await app.traces.spans.getSpansPaginated({
         tenantId: input.projectId,
         traceId: input.traceId,
         limit: input.limit,
         offset: input.offset,
         ...occurredAtFromInput(input),
       });
+      // These are full legacy spans (input/output/params/metrics), so the
+      // legacy span protections apply as-is: category visibility, cost,
+      // restricted custom attributes, and hidden content scrubbed wherever
+      // it rides along (e.g. raw gen_ai message attributes inside params).
+      const redactions = buildSpanContentRedactions(page.spans, protections);
+      return {
+        ...page,
+        spans: page.spans.map((span) =>
+          applySpanProtections(span, protections, redactions),
+        ),
+      };
     }),
 
   spansDelta: protectedProcedure
@@ -934,14 +975,21 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("traces:view"))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const app = getApp();
-      return app.traces.spans.getSpansSince({
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
+      const spans = await app.traces.spans.getSpansSince({
         tenantId: input.projectId,
         traceId: input.traceId,
         sinceStartTimeMs: input.sinceStartTimeMs,
         ...occurredAtFromInput(input),
       });
+      const redactions = buildSpanContentRedactions(spans, protections);
+      return spans.map((span) =>
+        applySpanProtections(span, protections, redactions),
+      );
     }),
 
   spanTreePaginated: protectedProcedure
@@ -1061,8 +1109,17 @@ export const tracesV2Router = createTRPCRouter({
         traceId: input.traceId,
         ...occurredAtFromInput(input),
       });
+      // Span-level protections first (category visibility, restricted custom
+      // attributes, hidden content scrubbed out of params), then the DTO pass.
+      const redactions = buildSpanContentRedactions(spans, protections);
       return spans.map((span) =>
-        redactV2Content(mapSpanToDetail(span, []), protections),
+        redactV2Content(
+          mapSpanToDetail(
+            applySpanProtections(span, protections, redactions),
+            [],
+          ),
+          protections,
+        ),
       );
     }),
 
@@ -1106,18 +1163,27 @@ export const tracesV2Router = createTRPCRouter({
         throw new TraceNotFoundError(input.spanId);
       }
 
+      // Span-level protections first (category visibility, restricted custom
+      // attributes, hidden content scrubbed out of params and events), then
+      // the DTO pass below.
+      const redactions = buildSpanContentRedactions([span], protections);
+      const protectedSpan = applySpanProtections(span, protections, redactions);
+
       const detail = mapSpanToDetail(
-        span,
+        protectedSpan,
         rawEvents.map((e) => ({
           name: e.event_type,
           timeUnixMs:
             typeof e.timestamps.started_at === "number"
               ? e.timestamps.started_at
               : parseInt(String(e.timestamps.started_at), 10),
-          attributes: Object.fromEntries([
-            ...e.event_details.map((d) => [d.key, d.value]),
-            ...e.metrics.map((m) => [m.key, m.value]),
-          ]),
+          attributes: redactObject(
+            Object.fromEntries([
+              ...e.event_details.map((d) => [d.key, d.value]),
+              ...e.metrics.map((m) => [m.key, m.value]),
+            ]),
+            redactions,
+          ),
         })),
       );
 

@@ -49,6 +49,24 @@ describe("redactHiddenAttributes", () => {
       expect(result.app!.public!.label).toBe("ok");
     });
 
+    it("walks null-prototype records like the span mapper produces", () => {
+      const inner: Record<string, unknown> = Object.create(null);
+      inner.card_token = "tok_123";
+      const mid: Record<string, unknown> = Object.create(null);
+      mid.billing = inner;
+      const value: Record<string, unknown> = Object.create(null);
+      value.app = mid;
+
+      const result = redactHiddenAttributes(value, hidden) as Record<
+        string,
+        Record<string, Record<string, unknown>>
+      >;
+
+      expect(result.app!.billing!.card_token).toBe(
+        "[REDACTED] (visible to Admins)",
+      );
+    });
+
     it("replaces a matched array whole instead of entering it", () => {
       const result = redactHiddenAttributes(
         { app: { billing: { items: [1, 2, 3] } }, other: [4, 5] },

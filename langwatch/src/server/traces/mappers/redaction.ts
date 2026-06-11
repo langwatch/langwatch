@@ -214,10 +214,14 @@ export function applySpanProtections(
   // Custom attribute rules with a restrict disposition: replace matched span
   // params (the mapper unflattens dotted keys into nested objects, so the
   // matcher walks the nested paths) with the placeholder naming who can see
-  // them.
-  const transformedParams = redactHiddenAttributes(
-    span.params as Record<string, unknown> | null | undefined,
-    protections.hiddenAttributes,
+  // them. Hidden input/output content riding along inside params (e.g. the
+  // raw gen_ai message attributes) is scrubbed by the redactions set.
+  const transformedParams = redactObject(
+    redactHiddenAttributes(
+      span.params as Record<string, unknown> | null | undefined,
+      protections.hiddenAttributes,
+    ),
+    redactions,
   );
 
   return {
