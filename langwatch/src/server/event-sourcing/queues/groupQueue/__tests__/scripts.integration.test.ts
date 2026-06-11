@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Redis } from "ioredis";
 import {
   startTestContainers,
@@ -1424,11 +1424,11 @@ describe("GroupStagingScripts", () => {
   // tiny header so the Lua pause-check never decodes the (gzipped) body.
   describe("when head-of-line job is envelope-encoded", () => {
     beforeEach(() => {
-      process.env.GROUP_QUEUE_ENVELOPE_WRITES_ENABLED = "true";
+      vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
     });
 
     afterEach(() => {
-      delete process.env.GROUP_QUEUE_ENVELOPE_WRITES_ENABLED;
+      vi.unstubAllEnvs();
     });
 
     async function makeEnvelopeJobData(

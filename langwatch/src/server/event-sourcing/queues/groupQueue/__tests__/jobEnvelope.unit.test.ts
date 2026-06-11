@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   decodeJobEnvelope,
@@ -26,11 +26,11 @@ class InMemoryBlobStore implements JobBlobStore {
 
 describe("jobEnvelope", () => {
   beforeEach(() => {
-    process.env.GROUP_QUEUE_ENVELOPE_WRITES_ENABLED = "true";
+    vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
   });
 
   afterEach(() => {
-    delete process.env.GROUP_QUEUE_ENVELOPE_WRITES_ENABLED;
+    vi.unstubAllEnvs();
   });
 
   describe("given envelope writes are not enabled", () => {
@@ -42,7 +42,7 @@ describe("jobEnvelope", () => {
     };
 
     beforeEach(() => {
-      delete process.env.GROUP_QUEUE_ENVELOPE_WRITES_ENABLED;
+      vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", undefined);
     });
 
     describe("when encoding", () => {

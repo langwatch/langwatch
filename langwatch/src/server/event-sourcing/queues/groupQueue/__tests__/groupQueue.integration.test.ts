@@ -212,7 +212,7 @@ describe.skipIf(!hasTestcontainers)(
     describe("envelope blob offload", () => {
       describe("when a payload exceeds the blob offload threshold", () => {
         it("stores the body under a blob key, delivers it intact, and deletes the blob on completion", async () => {
-          process.env.GROUP_QUEUE_ENVELOPE_WRITES_ENABLED = "true";
+          vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
           try {
             const queueName = `{test/gq/blob-${crypto.randomUUID().slice(0, 8)}}`;
             const blobKeysDuringProcessing: string[] = [];
@@ -251,12 +251,12 @@ describe.skipIf(!hasTestcontainers)(
               { timeout: 5000, interval: 50 },
             );
           } finally {
-            delete process.env.GROUP_QUEUE_ENVELOPE_WRITES_ENABLED;
+            vi.unstubAllEnvs();
           }
         });
 
         it("sets a TTL safety net on the blob key", async () => {
-          process.env.GROUP_QUEUE_ENVELOPE_WRITES_ENABLED = "true";
+          vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
           try {
             const queueName = `{test/gq/blob-${crypto.randomUUID().slice(0, 8)}}`;
             let release: () => void;
@@ -287,7 +287,7 @@ describe.skipIf(!hasTestcontainers)(
             expect(await redis.ttl(blobKey!)).toBeGreaterThan(0);
             release!();
           } finally {
-            delete process.env.GROUP_QUEUE_ENVELOPE_WRITES_ENABLED;
+            vi.unstubAllEnvs();
           }
         });
       });
