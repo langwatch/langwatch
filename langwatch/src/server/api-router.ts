@@ -40,6 +40,7 @@ import { app as gatewayInternalApp } from "./routes/gateway-internal";
 import { app as healthChecksApp } from "./routes/health-checks";
 import { app as otelApp } from "./routes/otel";
 import { app as langyApp } from "./routes/langy";
+import { app as githubLangyApp } from "./routes/github-langy";
 import { app as playgroundApp } from "./routes/playground";
 import { app as scenarioGenerateApp } from "./routes/scenario-generate";
 import { app as scimApp } from "./routes/scim";
@@ -139,6 +140,7 @@ export function createApiRouter() {
   api.route("/", otelApp);
   api.route("/", playgroundApp);
   api.route("/", langyApp);
+  api.route("/", githubLangyApp);
   api.route("/", scenarioGenerateApp);
   api.route("/", scimApp);
   api.route("/", webhooksApp);

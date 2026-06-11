@@ -24,6 +24,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl git ca-certificates unzip build-essential python3 \
     && rm -rf /var/lib/apt/lists/*
 
+# GitHub CLI (`gh`) is what Langy's github.md skill uses to open PRs
+# attributed to the requesting user. The user's short-lived user-to-server
+# token rides into the worker as GH_TOKEN; gh reads it from env, and
+# `gh auth git-credential` proxies it to git pushes so nothing is ever
+# written to disk. Issue #4747, spec specs/assistant/langy-github-prs.feature.
+RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+        | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+        > /etc/apt/sources.list.d/github-cli.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends gh \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*

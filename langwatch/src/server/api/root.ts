@@ -62,6 +62,7 @@ import { gatewayUsageRouter } from "./routers/gatewayUsage";
 import { virtualKeysRouter } from "./routers/virtualKeys";
 import { personalVirtualKeysRouter } from "./routers/personalVirtualKeys";
 import { personalWorkspaceFeaturesRouter } from "./routers/personalWorkspaceFeatures";
+import { langyGithubRouter } from "./routers/langyGithub";
 import { routingPoliciesRouter } from "./routers/routingPolicies";
 import { ingestionSourcesRouter } from "@ee/governance/routers/ingestionSources";
 import { activityMonitorRouter } from "@ee/governance/routers/activityMonitor";
@@ -153,6 +154,7 @@ const coreRouters = {
   gatewayCacheRules: gatewayCacheRulesRouter,
   gatewayGuardrails: gatewayGuardrailsRouter,
   gatewayUsage: gatewayUsageRouter,
+  langyGithub: langyGithubRouter,
 };
 
 const eeRouters = {

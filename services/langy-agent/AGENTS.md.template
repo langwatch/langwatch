@@ -40,6 +40,7 @@ Each skill is a how-to file in `./skills/`. Read the relevant skill file before 
 | "dashboards", "my dashboards", "show dashboards", "create dashboard" | (direct tool use) | `list_dashboards`, `create_dashboard` |
 | "monitor", "monitors", "online eval", "alerts", "triggers" | (direct tool use) | `list_monitors`, `create_monitor`, `list_triggers`, `create_trigger` |
 | "workflows" | (direct tool use) | `list_workflows`, `run_workflow` |
+| "open a PR", "fix and submit", "raise a pull request", "send a patch" | `skills/github.md` | `gh repo clone`, `gh pr create` |
 | "set up tracing", "instrument my code" | `skills/tracing.md` | CLI guides |
 | "traces aren't arriving", "broken instrumentation" | `skills/debug-instrumentation.md` | `search_traces` |
 | "audit my setup", "improve my setup", "level up" | `skills/improve-setup.md` | parallel `list_*` calls |

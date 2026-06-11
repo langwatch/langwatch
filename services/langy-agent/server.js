@@ -347,6 +347,18 @@ async function spawnWorker(conversationId, credentials) {
         OPENCODE_OTLP_PROTOCOL: "http/protobuf",
         OPENCODE_OTLP_HEADERS: `Authorization=Bearer ${credentials.langwatchApiKey}`,
         OPENCODE_RESOURCE_ATTRIBUTES: `tag.tags=langy,service.name=langy-agent,langwatch.thread.id=${conversationId}`,
+        // Per-user GitHub user-to-server token, minted server-side by
+        // LangyCredentialService and rotated every ~8h. Read by `gh` via
+        // GH_TOKEN; the github.md skill wires `credential.helper` to
+        // `!gh auth git-credential` so git pushes pick it up from env only.
+        // Absent when the user hasn't connected — the skill then tells them
+        // to connect instead of erroring.
+        ...(credentials.githubToken
+          ? {
+              GH_TOKEN: credentials.githubToken,
+              GITHUB_LOGIN: credentials.githubLogin ?? "",
+            }
+          : {}),
       },
       cwd: workerHome,
       stdio: ["ignore", "inherit", "inherit"],
