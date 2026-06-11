@@ -136,24 +136,36 @@ describe("EntryPointPropertiesPanel", () => {
       expect(
         screen.queryByTestId("entry-dataset-card"),
       ).not.toBeInTheDocument();
-      // No split/manual-entry config without a dataset to split.
-      expect(
-        screen.queryByText("Optimization/Test Split"),
-      ).not.toBeInTheDocument();
+      // No manual-entry config without a dataset to pick rows from.
+      expect(screen.queryByText("Manual Test Entry")).not.toBeInTheDocument();
     });
 
     /** @scenario Adding an input on the entry point */
-    it("lets the user add an input field", () => {
+    it("lets the user add an input field", async () => {
       renderPanel();
 
       expect(screen.getByText("Inputs")).toBeInTheDocument();
       fireEvent.click(screen.getByTestId("add-outputs-field-button"));
 
-      // FieldsDefinition appends an empty editable field and submits the
-      // node update on change.
-      expect(mockSetNode).toHaveBeenCalledWith(
-        expect.objectContaining({ id: "entry" }),
-      );
+      // The appended field starts empty (a blank identifier fails
+      // validation, so nothing submits yet); the update lands once the
+      // user names it.
+      const identifierInputs = screen.getAllByRole("textbox");
+      fireEvent.change(identifierInputs[identifierInputs.length - 1]!, {
+        target: { value: "context" },
+      });
+
+      await waitFor(() => {
+        const updates = mockSetNode.mock.calls.map(
+          (c) => c[0] as { id: string; data: { outputs?: unknown[] } },
+        );
+        const update = updates.find((u) =>
+          u.data.outputs?.some(
+            (o) => (o as { identifier: string }).identifier === "context",
+          ),
+        );
+        expect(update).toBeTruthy();
+      });
     });
   });
 
@@ -225,11 +237,16 @@ describe("EntryPointPropertiesPanel", () => {
       expect(call.data.outputs).toHaveLength(2);
     });
 
-    it("shows the split and manual test entry sections", () => {
+    /** @scenario The entry panel offers no optimization split */
+    it("shows the manual test entry section and no optimization split", () => {
       renderPanel(datasetNode());
 
-      expect(screen.getByText("Optimization/Test Split")).toBeInTheDocument();
       expect(screen.getByText("Manual Test Entry")).toBeInTheDocument();
+      // Optimization does not exist on the Go engine, so no train/test
+      // split configuration is offered.
+      expect(
+        screen.queryByText("Optimization/Test Split"),
+      ).not.toBeInTheDocument();
     });
   });
 

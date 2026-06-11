@@ -28,7 +28,7 @@ export const EntryNode = forwardRef(function EntryNode(
     <ComponentNode ref={ref} {...props} outputsTitle="Inputs" hidePlayButton>
       {data.dataset && (
         <>
-          <NodeSectionTitle>Dataset</NodeSectionTitle>
+          <NodeSectionTitle>Attached Dataset</NodeSectionTitle>
           <HStack
             gap={1.5}
             paddingX={2}
@@ -44,7 +44,7 @@ export const EntryNode = forwardRef(function EntryNode(
             </Text>
             {total !== undefined && total !== null && (
               <Text fontSize="11px" color="fg.subtle" flexShrink={0}>
-                ({total} rows)
+                ({total} {total === 1 ? "row" : "rows"})
               </Text>
             )}
           </HStack>

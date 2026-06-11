@@ -70,3 +70,10 @@ Feature: Entry point node with optional dataset and user-defined inputs
     When I open the entry point drawer
     And I click the "End node" link
     Then the End node drawer opens
+
+  @integration
+  Scenario: The entry panel offers no optimization split
+    Given a dataset is attached to the entry point
+    When I open the entry point drawer
+    Then I see the manual test entry section
+    And no optimization or train/test split configuration is offered
