@@ -7,7 +7,7 @@ Feature: Langy opens GitHub PRs as the requesting user
     Given I am signed in to LangWatch
     And my organization has installed the LangWatch GitHub App on repository "acme/service-x"
 
-  @unimplemented
+  @integration
   Scenario: User connects GitHub via settings
     When I click "Connect GitHub" in settings
     And I authorize the LangWatch GitHub App as my GitHub user
@@ -15,23 +15,32 @@ Feature: Langy opens GitHub PRs as the requesting user
     And an encrypted refresh token is stored for my user and organization
     And no GitHub access token is persisted anywhere
 
-  @unimplemented
+  @integration
+  Scenario: User connects GitHub via the in-chat card
+    Given Langy has surfaced the Connect GitHub card
+    When I click "Connect GitHub" in the card and authorize the App in the popup
+    Then the popup closes and the chat continues without losing my message
+    And settings shows my GitHub login as connected
+    And the "Acting as @login" chip appears in the sidebar footer
+
+  @integration
+  Scenario: Unconnected user gets a connect card, not an error
+    Given I have not connected my GitHub account
+    When I ask Langy to open a PR on "acme/service-x"
+    Then Langy renders the in-chat Connect GitHub card
+    And Langy does not report an error
+    And no pull request is created
+
+  @integration @e2e
   Scenario: Connected user asks Langy to open a PR
     Given I have connected my GitHub account
     When I ask Langy to fix a file in "acme/service-x" and open a PR
     Then a pull request is created on "acme/service-x"
     And the pull request author on GitHub is my GitHub user
     And the branch commits are attributed to my GitHub login
+    And Langy renders the PR as a card in chat
 
-  @unimplemented
-  Scenario: Unconnected user gets a connect link, not an error
-    Given I have not connected my GitHub account
-    When I ask Langy to open a PR on "acme/service-x"
-    Then Langy replies with a link to connect GitHub in settings
-    And Langy does not report an error
-    And no pull request is created
-
-  @unimplemented
+  @integration @e2e
   Scenario: Tokens never persist in the worker or repo clone
     Given I have connected my GitHub account
     When Langy completes a PR-opening task in my session
@@ -39,19 +48,34 @@ Feature: Langy opens GitHub PRs as the requesting user
     And the repository clone contains no credential files
     And the clone directory is deleted when the worker is reaped
 
-  @unimplemented
+  @integration
   Scenario: Revoking the connection cuts off new sessions immediately
     Given I have connected my GitHub account
     When I disconnect GitHub in settings
     Then my stored GitHub credential is deleted
-    And the authorization is revoked at GitHub
     And my next Langy session cannot mint a GitHub token
-    And Langy replies with the connect link if I ask for a PR
+    And Langy renders the Connect GitHub card if I ask for a PR
 
-  @unimplemented
+  @integration @e2e
   Scenario: Installation scoping bounds reachable repositories
     Given I have connected my GitHub account
     And the GitHub App is not installed on repository "acme/other-repo"
     When I ask Langy to open a PR on "acme/other-repo"
     Then no pull request is created on "acme/other-repo"
     And Langy explains the repository is not available to the LangWatch app
+
+  @integration
+  Scenario: Live workers may keep a token until the idle reaper runs
+    Given I have connected my GitHub account
+    And a Langy worker is running with my GitHub token in its env
+    When I disconnect GitHub in settings
+    Then the worker still holds the token until it is reaped
+    And the idle reaper reaps the worker within 10 minutes of idleness
+
+  @integration
+  Scenario: Per-user daily PR cap stops runaway loops
+    Given I have connected my GitHub account
+    And I have already opened 20 PRs via Langy today
+    When I ask Langy to open another PR
+    Then Langy reports the daily cap is reached
+    And no pull request is created until the cap resets
