@@ -188,6 +188,12 @@ function makeQueryInput(
 let ch: ClickHouseClient;
 let service: ClickHouseTraceService;
 let annotationFindMany: ReturnType<typeof vi.fn>;
+let annotationScoreFindMany: ReturnType<typeof vi.fn>;
+
+// The AnnotationScore id whose definition names it "quality". In production
+// scoreOptions is keyed by this id, NOT the name — the service joins
+// AnnotationScore to remap id -> name for the name-addressable public contract.
+const QUALITY_SCORE_ID = "annscore-quality-id";
 
 vi.mock("~/server/clickhouse/clickhouseClient", () => ({
   getClickHouseClientForProject: vi.fn(),
@@ -197,6 +203,7 @@ vi.mock("~/server/db", () => ({
   prisma: {
     project: { findUnique: vi.fn().mockResolvedValue({}) },
     annotation: { findMany: vi.fn().mockResolvedValue([]) },
+    annotationScore: { findMany: vi.fn().mockResolvedValue([]) },
   },
 }));
 
@@ -241,6 +248,7 @@ beforeAll(async () => {
   vi.mocked(getClickHouseClientForProject).mockResolvedValue(ch);
 
   annotationFindMany = vi.mocked(prisma.annotation.findMany);
+  annotationScoreFindMany = vi.mocked(prisma.annotationScore.findMany);
   service = new ClickHouseTraceService(
     prisma as ConstructorParameters<typeof ClickHouseTraceService>[0],
   );
@@ -274,6 +282,8 @@ beforeAll(async () => {
 
   // The Postgres annotations JOIN is mocked (no PG testcontainer here); the
   // service still maps these rows into ProjectedAnnotation[] for the projector.
+  // scoreOptions is keyed by the AnnotationScore id (as in production) — the
+  // service joins annotationScore to remap that id to the "quality" name.
   annotationFindMany.mockResolvedValue([
     {
       id: `annotation-${nanoid()}`,
@@ -281,9 +291,14 @@ beforeAll(async () => {
       isThumbsUp: true,
       comment: "looks right",
       expectedOutput: null,
-      scoreOptions: { quality: { value: "5", reason: "accurate" } },
+      scoreOptions: {
+        [QUALITY_SCORE_ID]: { value: "5", reason: "accurate" },
+      },
       createdAt: new Date(now),
     },
+  ]);
+  annotationScoreFindMany.mockResolvedValue([
+    { id: QUALITY_SCORE_ID, name: "quality" },
   ]);
 }, 60_000);
 

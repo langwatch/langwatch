@@ -31774,8 +31774,8 @@ object.
 | `annotations.comment` | string | |
 | `annotations.expected_output` | string | |
 | `annotations.created_at` | number | Epoch ms. |
-| `annotations.scores` | json | All named score values. |
-| `annotations.scores.<name>` | json | A single named score. |
+| `annotations.scores` | json | All score values, keyed by your AnnotationScore **name**. |
+| `annotations.scores.<name>` | json | A single score, addressed by its AnnotationScore **name** (e.g. `annotations.scores.quality`). |
 
 <Info>
 Annotations are manual reviews captured in the LangWatch UI (thumbs, scores,
@@ -31805,8 +31805,19 @@ annotation. Set `dateField` to switch the axis:
 ```
 
 On the `updated` axis, pagination is **at-least-once**: a trace modified again
-while you are paging may reappear on a later page, but nothing changed in the
-window is ever missed — exactly what a change-data-capture loop wants.
+while you are paging may reappear on a later page, but no ClickHouse-side change
+in the window is missed — exactly what a change-data-capture loop wants.
+
+<Note>
+The `updated` watermark advances on every ClickHouse-side change to a trace —
+evaluations, metadata updates, spans, and annotation **creates** and **deletes**.
+**One gap today:** an **in-place edit** to an existing annotation (e.g. changing a
+score from 3 to 5) writes Postgres only and does not advance the trace's
+ClickHouse `updated_at`, so `dateField: "updated"` does not pick it up until the
+trace changes again. New and removed annotations *are* caught. See
+[#4736](https://github.com/langwatch/langwatch/issues/4736) for the cross-store
+watermark follow-up.
+</Note>
 
 ## Performance
 

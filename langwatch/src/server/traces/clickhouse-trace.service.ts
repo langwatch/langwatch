@@ -100,6 +100,32 @@ const MAX_EVENTS_PER_TRACE = 1_000;
 /** Bounds the bounded events stored_spans scan to the page's occurrence weeks. */
 const EVENT_PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
 
+/** Object keys that would corrupt the prototype chain if assigned. */
+const FORBIDDEN_SCORE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+/**
+ * Annotation `scoreOptions` is keyed by AnnotationScore id; the public contract
+ * exposes `annotations.scores.<name>`, so remap id -> name. Score names are not
+ * unique per project — on a collision the last definition wins. An id with no
+ * matching score (e.g. a deleted definition) keeps its id as the key so data is
+ * never silently dropped. Prototype-polluting keys are skipped.
+ */
+function remapScoreOptionsToNames(
+  scoreOptions: unknown,
+  scoreNameById: Map<string, string>,
+): Record<string, unknown> {
+  if (!scoreOptions || typeof scoreOptions !== "object") return {};
+  const remapped: Record<string, unknown> = {};
+  for (const [scoreId, value] of Object.entries(
+    scoreOptions as Record<string, unknown>,
+  )) {
+    const key = scoreNameById.get(scoreId) ?? scoreId;
+    if (FORBIDDEN_SCORE_KEYS.has(key)) continue;
+    remapped[key] = value;
+  }
+  return remapped;
+}
+
 /**
  * Service for fetching traces from ClickHouse.
  *
@@ -1466,51 +1492,37 @@ export class ClickHouseTraceService {
           ? ` AND (${searchableColumns.map((col) => `${col} LIKE {searchQuery:String}`).join(" OR ")})`
           : "";
 
-        // Date axis. occurred (default) is the partition key — windowed in WHERE
-        // so partitions prune. updated is the last-mutation time for CDC: the
-        // version selector (_oa) computes each trace's GLOBAL max(UpdatedAt)
-        // over ALL versions first, then the window + cursor are applied to that
-        // aggregate (in HAVING). So "updated in [start,end]" means the trace's
-        // TRUE last modification — adjacent CDC windows stay mutually exclusive
-        // and never re-emit a trace whose later version moved past the window.
+        // Date axis.
+        //  occurred (default): windows + seeks on the immutable OccurredAt in
+        //    WHERE (prunes partitions). Keeps the pre-existing filter-then-dedup
+        //    structure verbatim — changing it would alter results for every
+        //    current client, so it stays byte-identical for backwards-compat.
+        //  updated (CDC): restricts ts to each trace's LATEST version first
+        //    (global max UpdatedAt, no window), THEN applies the window +
+        //    filters + cursor to THAT row. So a stale version can never satisfy
+        //    a filter the latest version doesn't, and "updated in [start,end]"
+        //    means the trace's TRUE last modification (adjacent CDC windows stay
+        //    mutually exclusive).
         const isUpdatedAxis = dateField === "updated";
         const dateColumn = isUpdatedAxis ? "UpdatedAt" : "OccurredAt";
         const cmp = sortDirection === "desc" ? "<" : ">";
         const orderDirection = sortDirection === "desc" ? "DESC" : "ASC";
 
-        // Per-trace sort key: occurred -> OccurredAt of the latest version;
-        // updated -> the global max UpdatedAt over all versions.
-        const oaExpr = isUpdatedAxis
-          ? "max(ts.UpdatedAt)"
-          : "argMax(ts.OccurredAt, ts.UpdatedAt)";
+        const occurredWindow =
+          " AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64}) AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})";
+        const updatedWindow =
+          " AND ts.UpdatedAt >= fromUnixTimestamp64Milli({startDate:UInt64}) AND ts.UpdatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})";
+        // Collapses ts to each trace's latest version (global max UpdatedAt) so
+        // the updated-axis window/filters/cursor evaluate on the latest row.
+        const latestVersionOnly =
+          " AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (SELECT TenantId, TraceId, max(UpdatedAt) FROM trace_summaries WHERE TenantId = {tenantId:String} GROUP BY TenantId, TraceId)";
 
-        // Date window placement: occurred -> WHERE (prunes partitions);
-        // updated -> HAVING on the aggregated _oa.
-        const windowWhere = isUpdatedAxis
-          ? ""
-          : " AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64}) AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})";
-        const windowHaving = isUpdatedAxis
-          ? "_oa >= fromUnixTimestamp64Milli({startDate:UInt64}) AND _oa <= fromUnixTimestamp64Milli({endDate:UInt64})"
-          : "";
-
-        // Keyset cursor: occurred -> WHERE on raw (immutable) OccurredAt (also
-        // prunes); updated -> HAVING on the aggregated _oa, so the seek matches
-        // the version the dedup keeps (a raw pre-aggregate seek would let a
-        // non-max version slip past the cursor and duplicate the trace).
-        let cursorWhere = "";
-        let cursorHavingExpr = "";
+        let occurredCursor = "";
+        let updatedCursor = "";
         if (cursor) {
-          if (isUpdatedAxis) {
-            cursorHavingExpr = `(toUnixTimestamp64Milli(_oa), TraceId) ${cmp} ({lastTimestamp:UInt64}, {lastTraceId:String})`;
-          } else {
-            cursorWhere = ` AND (toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) ${cmp} ({lastTimestamp:UInt64}, {lastTraceId:String})`;
-          }
+          occurredCursor = ` AND (toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) ${cmp} ({lastTimestamp:UInt64}, {lastTraceId:String})`;
+          updatedCursor = ` AND (toUnixTimestamp64Milli(ts.UpdatedAt), ts.TraceId) ${cmp} ({lastTimestamp:UInt64}, {lastTraceId:String})`;
         }
-
-        const havingClause = [windowHaving, cursorHavingExpr]
-          .filter(Boolean)
-          .join(" AND ");
-        const havingSql = havingClause ? ` HAVING ${havingClause}` : "";
 
         const sharedParams = {
           tenantId: projectId,
@@ -1538,24 +1550,57 @@ export class ClickHouseTraceService {
           ? `
               SELECT count() AS total
               FROM (
-                SELECT ts.TraceId AS TraceId, max(ts.UpdatedAt) AS _oa
+                SELECT ts.TraceId
                 FROM trace_summaries ts
                 WHERE ts.TenantId = {tenantId:String}
+                  ${latestVersionOnly}
+                  ${updatedWindow}
                   ${extraFilters}
                   ${traceIdFilter}
                   ${searchFilter}
                 GROUP BY ts.TraceId
-                HAVING ${windowHaving}
               )
             `
           : `
               SELECT uniq(ts.TraceId) as total
               FROM trace_summaries ts
               WHERE ts.TenantId = {tenantId:String}
-                ${windowWhere}
+                ${occurredWindow}
                 ${extraFilters}
                 ${traceIdFilter}
                 ${searchFilter}
+            `;
+        const idQuery = isUpdatedAxis
+          ? `
+              SELECT ts.TraceId
+              FROM trace_summaries ts
+              WHERE ts.TenantId = {tenantId:String}
+                ${latestVersionOnly}
+                ${updatedWindow}
+                ${extraFilters}
+                ${traceIdFilter}
+                ${searchFilter}
+                ${updatedCursor}
+              GROUP BY ts.TraceId
+              ORDER BY max(toUnixTimestamp64Milli(ts.UpdatedAt)) ${orderDirection}, ts.TraceId ${orderDirection}
+              LIMIT {pageSize:UInt32}
+            `
+          : `
+              SELECT s.TraceId
+              FROM (
+                SELECT ts.TraceId AS TraceId,
+                       argMax(ts.OccurredAt, ts.UpdatedAt) AS _oa
+                FROM trace_summaries ts
+                WHERE ts.TenantId = {tenantId:String}
+                  ${occurredWindow}
+                  ${extraFilters}
+                  ${traceIdFilter}
+                  ${searchFilter}
+                  ${occurredCursor}
+                GROUP BY ts.TraceId
+              ) s
+              ORDER BY s._oa ${orderDirection}, s.TraceId ${orderDirection}
+              LIMIT {pageSize:UInt32}
             `;
         const [countResult, idsResult] = await Promise.all([
           clickHouseClient.query({
@@ -1564,24 +1609,7 @@ export class ClickHouseTraceService {
             format: "JSONEachRow",
           }),
           clickHouseClient.query({
-            query: `
-              SELECT s.TraceId
-              FROM (
-                SELECT ts.TraceId AS TraceId,
-                       ${oaExpr} AS _oa
-                FROM trace_summaries ts
-                WHERE ts.TenantId = {tenantId:String}
-                  ${windowWhere}
-                  ${extraFilters}
-                  ${traceIdFilter}
-                  ${searchFilter}
-                  ${cursorWhere}
-                GROUP BY ts.TraceId
-                ${havingSql}
-              ) s
-              ORDER BY s._oa ${orderDirection}, s.TraceId ${orderDirection}
-              LIMIT {pageSize:UInt32}
-            `,
+            query: idQuery,
             query_params: {
               ...sharedParams,
               ...cursorParams,
@@ -1821,8 +1849,8 @@ export class ClickHouseTraceService {
           AND t.TraceId IN ({traceIds:Array(String)})
           ${spanTimeFilterOuter}
           AND mapContains(t.SpanAttributes, 'event.type')
-          AND (t.TenantId, t.TraceId, t.SpanId, t.StartTime) IN (
-            SELECT TenantId, TraceId, SpanId, max(StartTime)
+          AND (t.TenantId, t.TraceId, t.SpanId, t.UpdatedAt) IN (
+            SELECT TenantId, TraceId, SpanId, max(UpdatedAt)
             FROM stored_spans
             WHERE TenantId = {tenantId:String}
               AND TraceId IN ({traceIds:Array(String)})
@@ -1885,19 +1913,30 @@ export class ClickHouseTraceService {
     const traceIds = traces.map((t) => t.trace_id);
     if (traceIds.length === 0) return;
 
-    const rows = await this.prisma.annotation.findMany({
-      where: { projectId, traceId: { in: traceIds } },
-      select: {
-        id: true,
-        traceId: true,
-        isThumbsUp: true,
-        comment: true,
-        expectedOutput: true,
-        scoreOptions: true,
-        createdAt: true,
-      },
-      orderBy: { createdAt: "asc" },
-    });
+    // scoreOptions is keyed by AnnotationScore id, but the public contract is
+    // name-addressable (annotations.scores.<name>), so fetch the score
+    // definitions to remap id -> name. Deleted definitions are included so
+    // historical scoreOptions still resolve.
+    const [rows, scoreDefs] = await Promise.all([
+      this.prisma.annotation.findMany({
+        where: { projectId, traceId: { in: traceIds } },
+        select: {
+          id: true,
+          traceId: true,
+          isThumbsUp: true,
+          comment: true,
+          expectedOutput: true,
+          scoreOptions: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: "asc" },
+      }),
+      this.prisma.annotationScore.findMany({
+        where: { projectId },
+        select: { id: true, name: true },
+      }),
+    ]);
+    const scoreNameById = new Map(scoreDefs.map((s) => [s.id, s.name]));
 
     const byTrace = new Map<string, ProjectedAnnotation[]>();
     for (const row of rows) {
@@ -1907,10 +1946,7 @@ export class ClickHouseTraceService {
         is_thumbs_up: row.isThumbsUp ?? null,
         comment: row.comment ?? null,
         expected_output: row.expectedOutput ?? null,
-        scores:
-          row.scoreOptions && typeof row.scoreOptions === "object"
-            ? (row.scoreOptions as Record<string, unknown>)
-            : {},
+        scores: remapScoreOptionsToNames(row.scoreOptions, scoreNameById),
         created_at: row.createdAt.getTime(),
       });
       byTrace.set(row.traceId, list);

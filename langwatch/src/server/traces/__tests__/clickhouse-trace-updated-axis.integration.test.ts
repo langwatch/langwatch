@@ -66,6 +66,12 @@ const traceC = `trace-c-${nanoid()}`;
 // it. Global-max dedup must EXCLUDE it (in-window-max dedup would wrongly keep
 // it, re-emitting it in a later CDC window).
 const traceLateBumped = `trace-late-${nanoid()}`;
+// Isolated tenant for the filter-drift regression: a trace whose STALE version
+// matches a search term the LATEST version no longer does. On the updated axis
+// the filter must evaluate on the latest version (dedup-first-then-filter), so
+// the trace is excluded. Separate tenant to not perturb the ordering assertions.
+const filterTenant = `test-filter-drift-${nanoid()}`;
+const traceFilterDrift = `trace-drift-${nanoid()}`;
 
 // Latest UpdatedAt per in-window trace → expected updated-axis order (desc).
 const latest: Record<string, number> = {
@@ -183,15 +189,39 @@ beforeAll(async () => {
     makeTraceSummaryRow(traceLateBumped, now - 25 * SECOND),
     makeTraceSummaryRow(traceLateBumped, now + ONE_DAY),
   ]);
+
+  // Filter-drift trace (isolated tenant): stale version contains "needle", the
+  // latest version does not. Both in-window. On the updated axis the search
+  // must run on the LATEST version → "needle" excludes it, "moved" includes it.
+  await insert([
+    {
+      ...makeTraceSummaryRow(traceFilterDrift, now - 30 * SECOND),
+      TenantId: filterTenant,
+      ComputedInput: JSON.stringify({
+        type: "text",
+        value: "needle in the older version",
+      }),
+    },
+    {
+      ...makeTraceSummaryRow(traceFilterDrift, now - 10 * SECOND),
+      TenantId: filterTenant,
+      ComputedInput: JSON.stringify({
+        type: "text",
+        value: "moved on in the latest version",
+      }),
+    },
+  ]);
 }, 60_000);
 
 afterAll(async () => {
   if (ch) {
-    await ch.exec({
-      query:
-        "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
-      query_params: { tenantId },
-    });
+    for (const t of [tenantId, filterTenant]) {
+      await ch.exec({
+        query:
+          "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
+        query_params: { tenantId: t },
+      });
+    }
   }
   await stopTestContainers();
 });
@@ -239,6 +269,38 @@ describe("updated date-axis pagination (integration)", () => {
         expect(seen).toEqual(expectedOrder);
         expect(new Set(seen).size).toBe(seen.length);
         expect(seen).not.toContain(traceLateBumped);
+      });
+    });
+  });
+
+  // Regression for the dedup-then-filter fix: filters/search must evaluate on
+  // the trace's LATEST version, not any stale version. Before the fix, a stale
+  // version matching the search would wrongly include the trace.
+  describe("given a trace whose latest version no longer matches a search term", () => {
+    const fetchDrift = (query: string) =>
+      service.getAllTracesForProject(
+        makeQueryInput({ projectId: filterTenant, query }),
+        openProtections,
+        { downloadMode: true, dateField: "updated" },
+      );
+
+    describe("when the search term only matches the stale version", () => {
+      it("excludes the trace (search runs on the latest version)", async () => {
+        const res = await fetchDrift("needle");
+        expect(res).not.toBeNull();
+        expect(
+          (res as TracesForProjectResult).groups.flat().map((t) => t.trace_id),
+        ).not.toContain(traceFilterDrift);
+      });
+    });
+
+    describe("when the search term matches the latest version", () => {
+      it("includes the trace", async () => {
+        const res = await fetchDrift("moved");
+        expect(res).not.toBeNull();
+        expect(
+          (res as TracesForProjectResult).groups.flat().map((t) => t.trace_id),
+        ).toContain(traceFilterDrift);
       });
     });
   });
