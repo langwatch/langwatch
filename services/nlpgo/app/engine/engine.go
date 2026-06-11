@@ -422,7 +422,9 @@ func (e *Engine) runSignature(ctx context.Context, execReq ExecuteRequest, node 
 	// "(unsaved edits)".
 	emitPromptSpans(ctx, node, inputs)
 
-	messages := buildMessages(node, inputs)
+	// Re-shape any template-interpolated image data URLs into multimodal
+	// content parts so the model receives actual images, not base64 text.
+	messages := splitMessagesWithImages(buildMessages(node, inputs))
 	req := app.LLMRequest{
 		Model:    model,
 		Provider: provider,
