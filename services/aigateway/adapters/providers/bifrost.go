@@ -62,8 +62,15 @@ func NewBifrostRouter(ctx context.Context, opts BifrostOptions) (*BifrostRouter,
 	return &BifrostRouter{
 		bf:           bf,
 		logger:       opts.Logger,
-		voyageClient: &http.Client{Timeout: 60 * time.Second},
+		voyageClient: newVoyageClient(),
 	}, nil
+}
+
+// newVoyageClient builds the direct Voyage HTTP client. Shares the
+// gateway-wide request-timeout ceiling so no dispatch path keeps a shorter
+// hidden limit.
+func newVoyageClient() *http.Client {
+	return &http.Client{Timeout: ProviderRequestTimeoutSeconds * time.Second}
 }
 
 // Close releases the underlying Bifrost connection pool. Safe to call
@@ -744,8 +751,24 @@ func (a *account) GetKeysForProvider(ctx context.Context, provider bfschemas.Mod
 	return []bfschemas.Key{key}, nil
 }
 
+// ProviderRequestTimeoutSeconds is the gateway-wide upstream request timeout,
+// applied to every provider. Bifrost's built-in default is 30s, which long
+// LLM completions (reasoning models, large generations) regularly exceed —
+// in prod that surfaced as `upstream error (status 504): request timed out
+// (default is 30 seconds)` on evaluator LLM calls. The gateway's
+// longest-running callers are AWS Lambdas hard-capped at 15 minutes, so 14
+// minutes is the useful ceiling: long enough for any realistic completion,
+// one minute of margin under the caller's cap.
+const ProviderRequestTimeoutSeconds = 14 * 60
+
 func (a *account) GetConfigForProvider(provider bfschemas.ModelProvider) (*bfschemas.ProviderConfig, error) {
 	cfg := &bfschemas.ProviderConfig{}
+	// Whole-gateway timeout ceiling. StreamIdleTimeoutInSeconds gets the
+	// same value: its 60s default is a per-chunk gap limit, and reasoning
+	// models can think for minutes before the first token without emitting
+	// anything.
+	cfg.NetworkConfig.DefaultRequestTimeoutInSeconds = ProviderRequestTimeoutSeconds
+	cfg.NetworkConfig.StreamIdleTimeoutInSeconds = ProviderRequestTimeoutSeconds
 	if proxyURL := os.Getenv("LW_GATEWAY_OUTBOUND_PROXY"); proxyURL != "" {
 		// Debug-only: route outbound provider traffic through an HTTP proxy
 		// (e.g. `http://localhost:8888` for mitmproxy). Lets operators

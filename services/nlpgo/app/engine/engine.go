@@ -250,6 +250,7 @@ func (e *Engine) runLayer(ctx context.Context, req ExecuteRequest, plan *planner
 				ns.Error = derr
 				ns.Error.NodeID = nodeID
 				state.recordError(derr)
+				logNodeFailure(nodeCtx, node, derr)
 			} else {
 				ns.Status = "success"
 				ns.Outputs = outputs
@@ -455,7 +456,15 @@ func (e *Engine) runSignature(ctx context.Context, execReq ExecuteRequest, node 
 	resp, err := e.llm.Execute(llmCtx, req)
 	endLLMSpan(llmSpan, resp, err)
 	if err != nil {
-		return nil, &NodeError{Type: "llm_error", Message: err.Error()}
+		ne := &NodeError{Type: "llm_error", Message: err.Error()}
+		// Thread the upstream HTTP status through for fault attribution
+		// (4xx = caller's key/credits/request, 5xx = provider failure).
+		// Duck-typed so the engine doesn't import the gateway adapter.
+		var hs interface{ HTTPStatusCode() int }
+		if errors.As(err, &hs) {
+			ne.Status = hs.HTTPStatusCode()
+		}
+		return nil, ne
 	}
 	if useStructured {
 		out, warnings := extractSignatureOutputs(resp.Content, node.Data.Outputs)
