@@ -112,6 +112,10 @@ function makeDeps(trigger: TriggerSummary = makeTrigger()) {
     deriveEvents: vi.fn().mockResolvedValue([]),
     traceById: vi.fn().mockResolvedValue(undefined),
     enqueueCadence: vi.fn().mockResolvedValue(undefined),
+    emailHourlyCap: 100,
+    consumeEmailCapSlot: vi
+      .fn()
+      .mockResolvedValue({ allowed: true, count: 1 }),
   };
 }
 
@@ -257,6 +261,82 @@ describe("createOutboxDispatcher cadence stage", () => {
       expect(JSON.stringify(arg.payload)).toContain("Latency alert");
       expect(JSON.stringify(arg.payload)).toContain("1 match");
       expect(deps.triggers.claimSend).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("given the per-trigger hourly email cap (ADR-031)", () => {
+    describe("when the dispatch is under the cap", () => {
+      it("sends the email normally and records the claim", async () => {
+        const deps = makeDeps();
+        deps.consumeEmailCapSlot.mockResolvedValueOnce({
+          allowed: true,
+          count: 7,
+        });
+        const dispatcher = createOutboxDispatcher(deps);
+
+        await dispatcher.process(makeCadencePayload());
+
+        expect(deps.consumeEmailCapSlot).toHaveBeenCalledTimes(1);
+        expect(sendTriggerEmail).toHaveBeenCalledTimes(1);
+        expect(deps.triggers.claimSend).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when the dispatch is over the cap", () => {
+      it("drops without sending, without throwing, but still records the claim so replays no-op", async () => {
+        const deps = makeDeps();
+        deps.consumeEmailCapSlot.mockResolvedValueOnce({
+          allowed: false,
+          count: 101,
+        });
+        const dispatcher = createOutboxDispatcher(deps);
+
+        await expect(
+          dispatcher.process(makeCadencePayload()),
+        ).resolves.toBeUndefined();
+
+        expect(sendTriggerEmail).not.toHaveBeenCalled();
+        expect(sendRenderedTriggerEmail).not.toHaveBeenCalled();
+        // Claim is recorded so an outbox replay is a no-op, not a re-send.
+        expect(deps.triggers.claimSend).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when the trigger sends Slack rather than email", () => {
+      it("never consults the email cap", async () => {
+        const trigger = makeTrigger({
+          action: TriggerAction.SEND_SLACK_MESSAGE,
+          actionParams: { slackWebhook: "https://hooks.slack.com/services/x" },
+        });
+        const deps = makeDeps(trigger);
+        const dispatcher = createOutboxDispatcher(deps);
+
+        await dispatcher.process(makeCadencePayload());
+
+        expect(deps.consumeEmailCapSlot).not.toHaveBeenCalled();
+        expect(sendSlackWebhook).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when a fresh hour opens after the cap was exhausted", () => {
+      it("allows the email again because the slot consumer reports allowed", async () => {
+        const deps = makeDeps();
+        deps.consumeEmailCapSlot
+          .mockResolvedValueOnce({ allowed: false, count: 101 })
+          .mockResolvedValueOnce({ allowed: true, count: 1 });
+        const dispatcher = createOutboxDispatcher(deps);
+
+        await dispatcher.process(makeCadencePayload());
+        expect(sendTriggerEmail).not.toHaveBeenCalled();
+
+        await dispatcher.process(
+          makeCadencePayload({
+            match: { traceId: "trace-2", input: "in", output: "out" },
+            auditDedupKey: `${PROJECT_ID}/${TRIGGER_ID}:trace:trace-2`,
+          }),
+        );
+        expect(sendTriggerEmail).toHaveBeenCalledTimes(1);
+      });
     });
   });
 });

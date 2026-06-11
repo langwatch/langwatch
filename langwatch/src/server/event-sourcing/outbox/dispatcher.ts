@@ -78,6 +78,19 @@ export interface OutboxDispatcherDeps {
     payload: CadenceStagePayload,
     options: { delayMs: number },
   ) => Promise<void>;
+  /**
+   * ADR-031: per-trigger hourly hard cap on dispatched emails. Consults a
+   * fixed-hour Redis counter; `allowed: false` means the trigger has already
+   * sent `cap` emails this hour and this dispatch must be dropped (not sent,
+   * not retried). Injected so tests can fake it. Slack never calls it.
+   */
+  consumeEmailCapSlot: (args: {
+    projectId: string;
+    triggerId: string;
+    now: Date;
+  }) => Promise<{ allowed: boolean; count: number }>;
+  /** The configured cap, for operator-facing drop logs (ADR-031). */
+  emailHourlyCap: number;
 }
 
 /**
@@ -354,7 +367,31 @@ async function handleCadenceBatch(
 
   try {
     switch (trigger.action) {
-      case TriggerAction.SEND_EMAIL:
+      case TriggerAction.SEND_EMAIL: {
+        // ADR-031: per-trigger hourly hard cap. Gate BEFORE either the
+        // custom-template or legacy send path. Over the cap the dispatch is
+        // a terminal drop: log loudly, fall through to claimSend below (so a
+        // replay no-ops instead of re-sending), and return WITHOUT sending
+        // and WITHOUT throwing — throwing would let the outbox retry the
+        // spam. The cap counts dispatches, not traces or recipients.
+        const capSlot = await deps.consumeEmailCapSlot({
+          projectId,
+          triggerId,
+          now: new Date(),
+        });
+        if (!capSlot.allowed) {
+          logger.error(
+            {
+              projectId,
+              triggerId,
+              count: capSlot.count,
+              cap: deps.emailHourlyCap,
+            },
+            "Trigger exceeded its hourly email cap — dropping this dispatch. " +
+              "Switch this trigger to a digest cadence to coalesce its volume.",
+          );
+          break;
+        }
         if (hasCustomEmail) {
           const rendered = await renderTriggerEmail({
             subjectTemplate: t.emailSubjectTemplate,
@@ -385,6 +422,7 @@ async function handleCadenceBatch(
           triggerMessage: trigger.message ?? "",
         });
         break;
+      }
       case TriggerAction.SEND_SLACK_MESSAGE:
         if (hasCustomSlack) {
           const rendered = await renderTriggerSlack({

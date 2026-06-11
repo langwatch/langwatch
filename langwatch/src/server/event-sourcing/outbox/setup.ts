@@ -15,6 +15,7 @@ import type { FoldProjectionStore } from "../projections/foldProjection.types";
 import { RedisCachedFoldStore } from "../projections/redisCachedFoldStore";
 import type { EventSourcedQueueProcessor } from "../queues/queue.types";
 import { createOutboxDispatcher } from "./dispatcher";
+import { consumeEmailCapSlot } from "./emailHourlyCap";
 import {
   settleDedupId,
   type CadenceStagePayload,
@@ -138,6 +139,16 @@ export function buildOutboxRuntime({
     traceSummaryStore,
     evaluationRuns: evaluations.runs,
     deriveEvents: (params) => traceReadDerivation.deriveEvents(params),
+    // ADR-031: per-trigger hourly email cap, bound from env. The slot
+    // consumer reads the shared Redis connection internally.
+    emailHourlyCap: env.TRIGGER_EMAIL_HOURLY_CAP,
+    consumeEmailCapSlot: ({ projectId, triggerId, now }) =>
+      consumeEmailCapSlot({
+        projectId,
+        triggerId,
+        now,
+        cap: env.TRIGGER_EMAIL_HOURLY_CAP,
+      }),
     traceById: async (projectId, traceId) => {
       const protections = await getProtectionsDeduped(projectId);
       return traceService.getById(projectId, traceId, protections);
