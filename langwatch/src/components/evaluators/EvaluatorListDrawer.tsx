@@ -256,7 +256,9 @@ function EvaluatorCard({
   const displayName =
     evaluator.type === "workflow"
       ? "Workflow"
-      : getEvaluatorDisplayName(evaluatorType);
+      : evaluator.type === "code"
+        ? "Code"
+        : getEvaluatorDisplayName(evaluatorType);
 
   return (
     <Box
@@ -278,6 +280,8 @@ function EvaluatorCard({
         <Box color="green.fg" paddingTop={1}>
           {evaluator.type === "workflow" ? (
             <Workflow size={16} />
+          ) : evaluator.type === "code" ? (
+            <Code size={16} />
           ) : (
             <CheckCircle size={16} />
           )}

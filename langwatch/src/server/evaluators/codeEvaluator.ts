@@ -252,6 +252,7 @@ export async function runCodeEvaluator({
     const response = await nlpgoFetch<{
       result: Record<string, unknown>;
       status: ExecutionStatus;
+      error?: { message?: string; traceback?: string };
     }>({
       projectId,
       path: "/studio/execute_sync",
@@ -265,13 +266,17 @@ export async function runCodeEvaluator({
       throw new Error(`Error running code evaluator: ${response.statusText}`);
     }
 
-    const { result, status } = await response.json();
+    const { result, status, error } = await response.json();
 
     if (status !== "success") {
+      // The engine reports failures in the error envelope (the raised
+      // exception's message and traceback), not in result.
       return {
-        ...(result as object),
         status: "error",
-      } as SingleEvaluationResult;
+        details: error?.message ?? "Code evaluator execution failed",
+        error_type: "CODE_EVALUATOR_ERROR",
+        traceback: error?.traceback ? [error.traceback] : [],
+      };
     }
 
     return {
