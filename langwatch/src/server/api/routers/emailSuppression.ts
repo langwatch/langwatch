@@ -85,14 +85,39 @@ export const emailSuppressionRouter = createTRPCRouter({
       return { ok: true };
     }),
 
-  /** Operator-facing suppression list (ADR-031). */
+  /** Operator-facing suppression list (ADR-031). Each row is enriched with its
+   *  trigger name (null triggerId = project-wide) so the table can render the
+   *  scope without a second round-trip. */
   getAll: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("triggers:view"))
-    .query(async ({ input }) => {
-      return getApp().emailSuppressions.getAllForProject({
+    .query(async ({ input, ctx }) => {
+      const rows = await getApp().emailSuppressions.getAllForProject({
         projectId: input.projectId,
       });
+      const triggerIds = [
+        ...new Set(
+          rows
+            .map((r) => r.triggerId)
+            .filter((id): id is string => id != null),
+        ),
+      ];
+      const triggers =
+        triggerIds.length > 0
+          ? await ctx.prisma.trigger.findMany({
+              where: { id: { in: triggerIds }, projectId: input.projectId },
+              select: { id: true, name: true },
+            })
+          : [];
+      const nameById = new Map(triggers.map((t) => [t.id, t.name]));
+      return rows.map((r) => ({
+        id: r.id,
+        email: r.email,
+        triggerId: r.triggerId,
+        triggerName: r.triggerId != null ? nameById.get(r.triggerId) ?? null : null,
+        reason: r.reason,
+        createdAt: r.createdAt,
+      }));
     }),
 
   /** Removing a suppression resumes delivery — a deliberate operator action. */
