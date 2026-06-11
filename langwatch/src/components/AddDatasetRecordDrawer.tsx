@@ -258,13 +258,16 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
       onEscapeKeyDown={(e) => {
         // Escape while the floating cell editor is open should only close
         // the editor (its own handler), never the whole drawer.
-        if (editorPortalRef.current?.querySelector("[data-floating-cell-editor]")) {
+        if (
+          editorPortalRef.current?.querySelector("[data-floating-cell-editor]")
+        ) {
           e.preventDefault();
         }
       }}
       preventScroll={true}
     >
-      <Drawer.Content bg="bg"
+      <Drawer.Content
+        bg="bg"
         maxWidth="1400px"
         overflow="auto"
         ref={scrollRef}

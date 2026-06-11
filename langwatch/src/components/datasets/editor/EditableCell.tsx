@@ -191,13 +191,15 @@ export function EditableCell({
   // Where the editor should land in viewport coordinates. position:fixed
   // resolves against the nearest transformed ancestor instead of the viewport
   // when the editor portals into an animated dialog/drawer, so after render
-  // we measure the miss and shift once.
+  // we measure the miss and shift exactly once per edit session.
   const intendedPositionRef = useRef<{ top: number; left: number } | null>(
     null,
   );
+  const offsetCorrectedRef = useRef(false);
 
   useLayoutEffect(() => {
     if (!isEditing || !intendedPositionRef.current) return;
+    if (offsetCorrectedRef.current) return;
     const el = textareaRef.current?.closest(
       "[data-floating-cell-editor]",
     ) as HTMLElement | null;
@@ -206,6 +208,7 @@ export function EditableCell({
     const dx = rect.left - intendedPositionRef.current.left;
     const dy = rect.top - intendedPositionRef.current.top;
     if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+      offsetCorrectedRef.current = true;
       setEditorStyle((prev) => ({
         ...prev,
         left: (typeof prev.left === "number" ? prev.left : 0) - dx,
@@ -239,6 +242,7 @@ export function EditableCell({
           Math.min(rect.left - 8, window.innerWidth - width - 8),
         );
         intendedPositionRef.current = { top: rect.top - 8, left };
+        offsetCorrectedRef.current = false;
         setEditorStyle({
           position: "fixed",
           top: rect.top - 8,

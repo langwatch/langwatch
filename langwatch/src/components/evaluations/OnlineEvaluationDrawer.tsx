@@ -311,9 +311,6 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     },
   );
 
-  // Check if selected evaluator is a workflow evaluator (for checkType determination)
-  const isWorkflowEvaluator = selectedEvaluator?.type === "workflow";
-
   // Create mutation
   const createMutation = api.monitors.create.useMutation({
     onSuccess: () => {
@@ -345,12 +342,6 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       onClose();
     },
   });
-
-  // Get evaluator type info for display
-  const evaluatorType = selectedEvaluator
-    ? ((selectedEvaluator.config as { evaluatorType?: string } | null)
-        ?.evaluatorType as EvaluatorTypes | undefined)
-    : undefined;
 
   // Compute all fields from the evaluator (pre-computed by API for both built-in and workflow)
   const allFields = useMemo(

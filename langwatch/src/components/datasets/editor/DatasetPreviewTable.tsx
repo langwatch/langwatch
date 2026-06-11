@@ -23,18 +23,15 @@ import { ColumnTypeIcon } from "~/components/shared/ColumnTypeIcon";
 import type { DatasetColumns } from "~/server/datasets/types";
 import {
   type CellPosition,
-  DatasetTableProvider,
   type DatasetTableContextValue,
+  DatasetTableProvider,
   type DatasetTableRowData,
 } from "./DatasetTableContext";
 import { datasetTableCss } from "./datasetTableStyles";
 import { JSON_LIKE_TYPES } from "./EditableCell";
 import { TableCell } from "./TableCell";
 
-type PreviewRow = { id?: string; selected?: boolean } & Record<
-  string,
-  unknown
->;
+type PreviewRow = { id?: string; selected?: boolean } & Record<string, unknown>;
 
 const CHECKBOX_WIDTH_PX = 36;
 const ROW_NUMBER_WIDTH_PX = 48;
