@@ -1,7 +1,7 @@
 import {
   estimateCost,
   matchModelCostWithFallbacks,
-} from "~/server/background/workers/collector/cost";
+} from "~/server/tracer/collector/cost";
 import {
   getLLMModelCosts,
   type MaybeStoredLLMModelCost,
