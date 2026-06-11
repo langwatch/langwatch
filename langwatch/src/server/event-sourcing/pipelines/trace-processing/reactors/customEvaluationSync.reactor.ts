@@ -98,6 +98,36 @@ export function extractEvaluationsFromSpan(span: OtlpSpan): SdkEvaluation[] {
 }
 
 /**
+ * Cheap presence check — no JSON.parse. The predicate runs on the projection
+ * hot path with attacker-supplied span payloads, so it only looks for an
+ * evaluation event carrying a string payload; full parsing and validation
+ * stay in handle() off the hot path.
+ */
+function spanHasEvaluationEvents(span: OtlpSpan): boolean {
+  return (span.events ?? []).some(
+    (event) =>
+      event.name === EVAL_EVENT_NAME &&
+      event.attributes.some(
+        (attr) =>
+          attr.key === "json_encoded_event" &&
+          attr.value !== undefined &&
+          "stringValue" in attr.value,
+      ),
+  );
+}
+
+/**
+ * Pure relevance guard, shared by shouldReact (pre-enqueue) and handle
+ * (fail-open path): only span events that are recent (not a resync) and
+ * actually carry `langwatch.evaluation.custom` events need this reactor.
+ */
+function hasSyncableEvaluations(event: TraceProcessingEvent): boolean {
+  if (!isSpanReceivedEvent(event)) return false;
+  if (event.occurredAt < Date.now() - STALE_TRACE_THRESHOLD_MS) return false;
+  return spanHasEvaluationEvents(event.data.span);
+}
+
+/**
  * Reactor that syncs custom SDK evaluations to the evaluation-processing pipeline.
  *
  * Reads `langwatch.evaluation.custom` events directly from each SpanReceivedEvent's
@@ -110,6 +140,7 @@ export function createCustomEvaluationSyncReactor(
 ): ReactorDefinition<TraceProcessingEvent, TraceSummaryData> {
   return {
     name: "customEvaluationSync",
+    shouldReact: (event) => hasSyncableEvaluations(event),
     options: {
       makeJobId: (payload) =>
         `custom-eval-sync:${payload.event.tenantId}:${payload.event.aggregateId}:${payload.event.id}`,
@@ -122,11 +153,9 @@ export function createCustomEvaluationSyncReactor(
       context: ReactorContext<TraceSummaryData>,
     ): Promise<void> {
       if (!isSpanReceivedEvent(event)) return;
+      if (!hasSyncableEvaluations(event)) return;
 
       const { tenantId, aggregateId: traceId } = context;
-
-      // Guard: skip old traces (resyncing)
-      if (event.occurredAt < Date.now() - STALE_TRACE_THRESHOLD_MS) return;
 
       const evaluations = extractEvaluationsFromSpan(event.data.span);
       if (evaluations.length === 0) return;
