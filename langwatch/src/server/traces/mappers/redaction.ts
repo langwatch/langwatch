@@ -10,6 +10,7 @@ import type {
   TraceOutput,
 } from "~/server/tracer/types";
 import { parsePythonInsideJson } from "~/utils/parsePythonInsideJson";
+import { redactHiddenAttributes } from "./redactAttributes";
 
 // Stable display order for the content categories a drop policy can strip, so
 // the trace-view marker always lists them the same way ("input, output").
@@ -210,11 +211,21 @@ export function applySpanProtections(
     }
   }
 
+  // Custom attribute rules with a restrict disposition: replace matched span
+  // params (the mapper unflattens dotted keys into nested objects, so the
+  // matcher walks the nested paths) with the placeholder naming who can see
+  // them.
+  const transformedParams = redactHiddenAttributes(
+    span.params as Record<string, unknown> | null | undefined,
+    protections.hiddenAttributes,
+  );
+
   return {
     ...span,
     input: transformedInput,
     output: transformedOutput,
     metrics: transformedMetrics,
+    params: transformedParams as Span["params"],
   };
 }
 

@@ -36,6 +36,10 @@ import {
   flattenParamsToPromptAttributes,
   type PromptLookupSpan,
 } from "~/server/traces/findPromptReferenceInAncestors";
+import {
+  compileHiddenAttributeMatchers,
+  redactHiddenAttributesCompiled,
+} from "~/server/traces/mappers/redactAttributes";
 import { checkProjectPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
 import { withoutHiddenResourceAttrs } from "./tracesV2.resourceAttrs";
@@ -369,22 +373,63 @@ async function enrichLlmSpanWithAncestorPrompt({
  * data-privacy policy grants the viewer captured-content access. The UI then
  * shows the `RedactedField` placeholder instead of the raw content.
  */
-function redactV2Content<
-  T extends { input?: string | null; output?: string | null },
+export function redactV2Content<
+  T extends {
+    input?: string | null;
+    output?: string | null;
+    attributes?: Record<string, string>;
+    params?: Record<string, unknown> | null;
+  },
 >(
   dto: T,
   protections: {
     canSeeCapturedInput?: boolean | null;
     canSeeCapturedOutput?: boolean | null;
+    hiddenAttributes?: Array<{ pattern: string; visibleTo: string }>;
   },
 ): T {
-  return {
+  const redacted: T = {
     ...dto,
     input:
       protections.canSeeCapturedInput === true ? (dto.input ?? null) : null,
     output:
       protections.canSeeCapturedOutput === true ? (dto.output ?? null) : null,
   };
+  // Custom attribute rules with a restrict disposition: replace the matched
+  // attribute values (header attributes, span params, span-event attributes)
+  // with the placeholder naming who can see them.
+  const hidden = protections.hiddenAttributes;
+  if (hidden && hidden.length > 0) {
+    const matchers = compileHiddenAttributeMatchers(hidden);
+    if (dto.attributes) {
+      redacted.attributes = redactHiddenAttributesCompiled(
+        dto.attributes,
+        matchers,
+      );
+    }
+    if (dto.params) {
+      redacted.params = redactHiddenAttributesCompiled(dto.params, matchers);
+    }
+    // Span-detail events carry their own attribute records (list-item events
+    // do not, hence the localized cast instead of a constraint field).
+    const events = (
+      dto as { events?: Array<{ attributes?: Record<string, unknown> }> }
+    ).events;
+    if (events?.some((event) => event.attributes)) {
+      (redacted as Record<string, unknown>).events = events.map((event) =>
+        event.attributes
+          ? {
+              ...event,
+              attributes: redactHiddenAttributesCompiled(
+                event.attributes,
+                matchers,
+              ),
+            }
+          : event,
+      );
+    }
+  }
+  return redacted;
 }
 
 // ---------------------------------------------------------------------------
