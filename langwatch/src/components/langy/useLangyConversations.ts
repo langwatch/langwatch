@@ -58,6 +58,14 @@ export interface UseLangyConversationsResult {
   select: (id: string) => Promise<void>;
   startNew: () => void;
   remove: (id: string) => Promise<void>;
+  /**
+   * Mark a conversation the server just created (or confirmed) as the
+   * active one — without reloading its messages, which the chat stream
+   * already holds. Used by the chat transport when /langy/chat returns
+   * `x-langy-conversation-id`, so follow-up sends stay in the same
+   * conversation instead of forking a new one per message.
+   */
+  adopt: (id: string) => void;
 }
 
 export function useLangyConversations({
@@ -175,6 +183,36 @@ export function useLangyConversations({
     setMessages([]);
   }, [projectId, setMessages]);
 
+  const adopt = useCallback(
+    (id: string) => {
+      const currentProjectId = projectIdRef.current;
+      if (!currentProjectId) return;
+      setCurrentConversationId(id);
+      writeLastConversationId(currentProjectId, id);
+      // Refresh the list in the background so the adopted conversation (and
+      // its server-derived title) appears in the recents list. Best-effort:
+      // a failure here only leaves the list slightly stale.
+      void (async () => {
+        try {
+          const res = await fetch(
+            `/api/langy/conversations?projectId=${encodeURIComponent(currentProjectId)}`,
+          );
+          if (!res.ok) return;
+          const data = (await res.json()) as ConversationsListResponse;
+          if (projectIdRef.current !== currentProjectId) return;
+          setConversations(
+            [...data.conversations].sort((a, b) =>
+              b.lastActivityAt.localeCompare(a.lastActivityAt),
+            ),
+          );
+        } catch {
+          // ignore — recents list refresh is cosmetic
+        }
+      })();
+    },
+    [],
+  );
+
   const remove = useCallback(
     async (id: string) => {
       if (!projectId) return;
@@ -206,5 +244,6 @@ export function useLangyConversations({
     select,
     startNew,
     remove,
+    adopt,
   };
 }
