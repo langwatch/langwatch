@@ -1,11 +1,16 @@
 import type { PrismaClient } from "@prisma/client";
 
 import { parseVirtualKeyConfig } from "~/server/gateway/virtualKey.config";
+import { captureException } from "~/utils/posthogErrorCapture";
+import { createLogger } from "~/utils/logger/server";
 import { provisionLangyApiKey, getLangyApiKeyToken } from "./langyApiKey";
+import { getGithubTokenForUser } from "./langyGithubToken";
 import {
   LANGY_VK_DISPLAY_NAME,
   provisionLangyVirtualKey,
 } from "./langyVirtualKey";
+
+const githubLogger = createLogger("langwatch:langy:credentials:github");
 
 /**
  * The Langy worker hands `gatewayBaseUrl` straight to OpenCode as
@@ -52,6 +57,20 @@ export type LangyCredentials = {
    * race where the project disappeared between calls).
    */
   organizationId: string;
+  /**
+   * Short-lived GitHub user-to-server access token (~8h) for the requesting
+   * user. Absent when GitHub is not configured on the instance, the user has
+   * not connected, or the refresh failed. The worker injects this as
+   * `GH_TOKEN` so `gh` and the credential helper read it from env only —
+   * never written to disk.
+   */
+  githubToken?: string;
+  /**
+   * The user's GitHub login (e.g. "aryansharma28"). Used by the worker for
+   * commit attribution (`git config user.name`) and surfaced in the
+   * "Acting as @login" sidebar chip.
+   */
+  githubLogin?: string;
 };
 
 /**
@@ -124,12 +143,41 @@ export class LangyCredentialService {
       actorUserId,
     });
 
+    // Best-effort GitHub token mint. Never blocks chat — when absent the
+    // worker's github.md skill tells the user to connect, instead of erroring.
+    let githubToken: string | undefined;
+    let githubLogin: string | undefined;
+    try {
+      const gh = await getGithubTokenForUser({
+        prisma: this.prisma,
+        userId: actorUserId,
+        organizationId: project.team.organizationId,
+      });
+      if (gh) {
+        githubToken = gh.token;
+        githubLogin = gh.githubLogin;
+      }
+    } catch (error) {
+      githubLogger.warn(
+        { error, projectId, userId: actorUserId },
+        "github token mint failed; chat continues without it",
+      );
+      captureException(error, {
+        extra: {
+          projectId,
+          context: "getGithubTokenForUser:LangyCredentialService.getOrProvision",
+        },
+      });
+    }
+
     return {
       langwatchApiKey: langyApiKeyToken ?? project.apiKey,
       llmVirtualKey,
       langwatchEndpoint,
       gatewayBaseUrl: ensureGatewayV1BaseUrl(gatewayBaseUrl),
       organizationId: project.team.organizationId,
+      ...(githubToken ? { githubToken } : {}),
+      ...(githubLogin ? { githubLogin } : {}),
     };
   }
 

@@ -76,6 +76,7 @@ import { tracesV2Router } from "./routers/tracesV2";
 import { translateRouter } from "./routers/translate";
 import { userRouter } from "./routers/user";
 import { virtualKeysRouter } from "./routers/virtualKeys";
+import { langyGithubRouter } from "./routers/langyGithub";
 import { workflowRouter } from "./routers/workflows";
 
 const coreRouters = {
@@ -155,6 +156,7 @@ const coreRouters = {
   gatewayCacheRules: gatewayCacheRulesRouter,
   gatewayGuardrails: gatewayGuardrailsRouter,
   gatewayUsage: gatewayUsageRouter,
+  langyGithub: langyGithubRouter,
 };
 
 const eeRouters = {

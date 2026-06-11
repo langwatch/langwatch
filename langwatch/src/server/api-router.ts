@@ -47,6 +47,7 @@ import {
   legacyAliasApp as experimentsV3LegacyAliasApp,
 } from "./routes/experiments-v3";
 import { app as gatewayInternalApp } from "./routes/gateway-internal";
+import { app as githubLangyApp } from "./routes/github-langy";
 import { app as healthApp } from "./routes/health";
 import { app as healthChecksApp } from "./routes/health-checks";
 import { app as ingestionRoutesApp } from "./routes/ingest/ingestionRoutes";
@@ -143,6 +144,7 @@ export function createApiRouter() {
   api.route("/", otelApp);
   api.route("/", playgroundApp);
   api.route("/", langyApp);
+  api.route("/", githubLangyApp);
   api.route("/", scenarioGenerateApp);
   api.route("/", scimApp);
   api.route("/", webhooksApp);
