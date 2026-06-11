@@ -45,6 +45,7 @@ vi.mock("~/server/api/rbac", async (importActual) => {
 });
 
 import { prisma } from "~/server/db";
+import { hasProjectPermission } from "~/server/api/rbac";
 import {
   startTestContainers,
   stopTestContainers,
@@ -55,11 +56,15 @@ const suffix = ids.suffix;
 const ORG_ID = `org-guard-${suffix}`;
 const TEAM_ID = `team-guard-${suffix}`;
 const PTEAM_ID = `pteam-guard-${suffix}`;
+// A second team the user is an org admin over but holds NO TeamUser row on.
+const OTHER_TEAM_ID = `oteam-guard-${suffix}`;
 const USER_ID = ids.USER_ID;
 const SHARED_PROJECT_ID = `proj-shared-${suffix}`;
 const PERSONAL_PROJECT_ID = `proj-personal-${suffix}`;
+const OTHER_TEAM_PROJECT_ID = `proj-other-${suffix}`;
 const SHARED_API_KEY = `sk-lw-shared-${suffix}-${"a".repeat(36)}`;
 const PERSONAL_API_KEY = `sk-lw-personal-${suffix}-${"b".repeat(36)}`;
+const OTHER_TEAM_API_KEY = `sk-lw-other-${suffix}-${"c".repeat(36)}`;
 
 const GOV_FLAG = "release_ui_ai_governance_enabled";
 
@@ -120,6 +125,23 @@ describe("CLI login personal-project guards", () => {
         isPersonal: true, ownerUserId: USER_ID,
       },
     });
+    // A shared project on a team the user is NOT a direct member of. The user
+    // is an org ADMIN (organizationUser above), so they see it in the picker
+    // via organization.getAll and hold project:update through the org scope,
+    // but there is deliberately no TeamUser row for them on this team.
+    await prisma.team.create({
+      data: {
+        id: OTHER_TEAM_ID, name: `Other ${suffix}`, slug: `oteam-${suffix}`,
+        organizationId: ORG_ID,
+      },
+    });
+    await prisma.project.create({
+      data: {
+        id: OTHER_TEAM_PROJECT_ID, name: `Other ${suffix}`, slug: `other-${suffix}`,
+        apiKey: OTHER_TEAM_API_KEY, teamId: OTHER_TEAM_ID, language: "typescript",
+        framework: "openai", isPersonal: false,
+      },
+    });
   });
 
   // Reset the governance baseline (off) before every test: the dev .env
@@ -133,9 +155,9 @@ describe("CLI login personal-project guards", () => {
   afterAll(async () => {
     delete process.env.FEATURE_FLAG_FORCE_ENABLE;
     await prisma.virtualKey.deleteMany({ where: { principalUserId: USER_ID } }).catch(() => {});
-    await prisma.project.deleteMany({ where: { teamId: { in: [TEAM_ID, PTEAM_ID] } } }).catch(() => {});
+    await prisma.project.deleteMany({ where: { teamId: { in: [TEAM_ID, PTEAM_ID, OTHER_TEAM_ID] } } }).catch(() => {});
     await prisma.teamUser.deleteMany({ where: { userId: USER_ID } }).catch(() => {});
-    await prisma.team.deleteMany({ where: { id: { in: [TEAM_ID, PTEAM_ID] } } }).catch(() => {});
+    await prisma.team.deleteMany({ where: { id: { in: [TEAM_ID, PTEAM_ID, OTHER_TEAM_ID] } } }).catch(() => {});
     await prisma.organizationUser.deleteMany({ where: { userId: USER_ID } }).catch(() => {});
     await prisma.user.deleteMany({ where: { id: USER_ID } }).catch(() => {});
     await prisma.organization.deleteMany({ where: { id: ORG_ID } }).catch(() => {});
@@ -203,6 +225,44 @@ describe("CLI login personal-project guards", () => {
 
         expect(status).toBe(200);
         expect((json.project as { id: string }).id).toBe(SHARED_PROJECT_ID);
+      });
+    });
+
+    describe("when an org admin approves a project on a team they do not belong to", () => {
+      /** @scenario project-login approval allows an org admin who is not a direct team member */
+      it("does not pre-filter on team membership and defers to the write-permission check", async () => {
+        // Org admins see every team's projects in the picker but may hold
+        // project:update only through an org-scoped binding, not a TeamUser
+        // row. The approval lookup must not reject them before the real RBAC
+        // check (mocked true here) runs.
+        const userCode = await mintDeviceCode("project_api_key");
+
+        const { status, json } = await approve({
+          user_code: userCode,
+          project_id: OTHER_TEAM_PROJECT_ID,
+        });
+
+        expect(status).toBe(200);
+        expect((json.project as { id: string }).id).toBe(OTHER_TEAM_PROJECT_ID);
+      });
+    });
+
+    describe("when the caller lacks write access to the picked project", () => {
+      /** @scenario project-login approval denies a project the caller cannot write */
+      it("returns forbidden and never the project's API key", async () => {
+        // hasProjectPermission is the source of truth: a caller without
+        // project:update is denied even though the project is in their org.
+        vi.mocked(hasProjectPermission).mockResolvedValueOnce(false);
+        const userCode = await mintDeviceCode("project_api_key");
+
+        const { status, json } = await approve({
+          user_code: userCode,
+          project_id: OTHER_TEAM_PROJECT_ID,
+        });
+
+        expect(status).toBe(403);
+        expect(json.error).toBe("forbidden");
+        expect(JSON.stringify(json)).not.toContain(OTHER_TEAM_API_KEY);
       });
     });
   });

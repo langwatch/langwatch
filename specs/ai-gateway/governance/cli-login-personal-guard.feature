@@ -54,6 +54,21 @@ Feature: CLI login never lands a user on a personal project
       When the user approves with the shared team project's id
       Then the response is 200 and returns that project's API key
 
+    @integration @project-picker @rbac
+    Scenario: project-login approval allows an org admin who is not a direct team member
+      Given a pending device code with credential_type "project_api_key"
+      And a shared project on a team the org admin does not directly belong to
+      When the org admin who can write the project approves with its id
+      Then the response is 200 and returns that project's API key
+
+    @integration @project-picker @rbac
+    Scenario: project-login approval denies a project the caller cannot write
+      Given a pending device code with credential_type "project_api_key"
+      And the caller lacks write access to the picked shared project
+      When the user approves with that project's id
+      Then the response is 403 with error "forbidden"
+      And the project's API key is NOT returned
+
     @unit @project-picker
     Scenario: the project picker omits personal and internal-governance projects
       Given an org team with a personal project, an internal-governance project, and a shared project

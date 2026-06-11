@@ -1516,18 +1516,23 @@ secured.access(CLI_POLICY).post("/approve", async (c: Context) => {
         400,
       );
     }
-    // Verify the user actually has access to the project: the project must
-    // belong to a team in the chosen org, and the user must be a member of
-    // that team (PG schema enforces this via TeamUser; we re-check here so
-    // a hostile browser request can't be tricked into leaking another org's
-    // key by spoofing project_id).
+    // Resolve the picked project: it must live in the chosen org and not be
+    // archived. Authorization is NOT decided by this lookup. The
+    // `hasProjectPermission(..., "project:update")` check below is the source
+    // of truth, and it re-derives the org from the project id and inspects
+    // project-, team- and org-scoped role bindings plus the org role. So an
+    // org-level admin (or an org/team-scoped role-binding admin) who sees the
+    // project in the picker via `organization.getAll`, but is not a direct
+    // TeamUser member, is authorized by their real permission instead of
+    // being pre-filtered out. The org-scoping predicate here plus that RBAC
+    // check together stop a spoofed `project_id` from leaking another org's
+    // key.
     const project = await prisma.project.findFirst({
       where: {
         id: project_id,
         archivedAt: null,
         team: {
           organizationId: organization_id,
-          members: { some: { userId: session.user.id } },
         },
       },
       select: { id: true, slug: true, name: true, apiKey: true, isPersonal: true },
@@ -1537,7 +1542,7 @@ secured.access(CLI_POLICY).post("/approve", async (c: Context) => {
         {
           error: "forbidden",
           error_description:
-            "Project not found in this organization, or you do not have access to it",
+            "Project not found or unavailable in this organization",
         },
         403,
       );
