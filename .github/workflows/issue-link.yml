@@ -20,7 +20,7 @@ jobs:
         with:
           script: |
             const pr = context.payload.pull_request;
-            const match = pr.head.ref.match(/^issue(\d+)(?:[\/-]|$)/);
+            const match = pr.head.ref.match(/^issue(\d+)\//);
             if (!match) {
               core.info(`branch ${pr.head.ref} does not reference an issue, skipping`);
               return;
