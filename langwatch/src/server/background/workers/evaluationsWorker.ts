@@ -2,7 +2,6 @@ import { CostReferenceType, CostType } from "@prisma/client";
 import { type Job, Worker } from "bullmq";
 import { BullMQOtel } from "bullmq-otel";
 import { nanoid } from "nanoid";
-import { withJobContext } from "../../context/asyncContext";
 import { getProtectionsForProject } from "~/server/api/utils";
 import type { EvaluationJob } from "~/server/background/types";
 import type { Protections } from "~/server/elasticsearch/protections";
@@ -23,6 +22,7 @@ import {
   captureException,
   withScope,
 } from "../../../utils/posthogErrorCapture";
+import { withJobContext } from "../../context/asyncContext";
 
 /**
  * Error class for user configuration issues.
@@ -35,26 +35,42 @@ class UserConfigError extends Error {
     this.name = "UserConfigError";
   }
 }
+
 import { EvaluatorConfigError } from "~/server/app-layer/evaluations/errors";
 import { setupModelEnv } from "~/server/app-layer/evaluations/evaluation-execution.factories";
 import { stagedLangevalsFetch } from "~/server/langevals/stagedFetch";
+import {
+  AZURE_SAFETY_NOT_CONFIGURED_MESSAGE,
+  isAzureEvaluatorType,
+} from "../../app-layer/evaluations/azure-safety-env";
+import { getAzureSafetyEnvFromProject } from "../../app-layer/evaluations/azure-safety-env.server";
+import {
+  extractParentTraceForNlpgo,
+  maxCausalityDepthOfSpans,
+} from "../../app-layer/evaluations/evaluation-execution.service";
 import { prisma } from "../../db";
 import {
   DEFAULT_MAPPINGS,
   migrateLegacyMappings,
 } from "../../evaluations/evaluationMappings";
 import {
-  evaluationDurationHistogram,
-  recordJobWaitDuration,
-  getEvaluationStatusCounter,
-  getJobProcessingCounter,
-  getJobProcessingDurationHistogram,
-} from "../../metrics";
-import { connection } from "../../redis";
-import {
   hasThreadMappings,
   resolveThreadMappingsIntoData,
 } from "../../evaluations/threadMappingResolver";
+import {
+  codeEvaluatorIdFromCheckType,
+  isCodeEvaluatorCheckType,
+  runCodeEvaluator,
+} from "../../evaluators/codeEvaluator";
+import {
+  evaluationDurationHistogram,
+  getEvaluationStatusCounter,
+  getJobProcessingCounter,
+  getJobProcessingDurationHistogram,
+  recordJobWaitDuration,
+} from "../../metrics";
+import { connection } from "../../redis";
+import { formatSpansDigest } from "../../tracer/spanToReadableSpan";
 import {
   type MappingState,
   mapTraceToDatasetEntry,
@@ -64,17 +80,7 @@ import {
   type TRACE_MAPPINGS,
   tryAndConvertTo,
 } from "../../tracer/tracesMapping";
-import { formatSpansDigest } from "../../tracer/spanToReadableSpan";
-import {
-  AZURE_SAFETY_NOT_CONFIGURED_MESSAGE,
-  isAzureEvaluatorType,
-} from "../../app-layer/evaluations/azure-safety-env";
-import { getAzureSafetyEnvFromProject } from "../../app-layer/evaluations/azure-safety-env.server";
 import { runEvaluationWorkflow } from "../../workflows/runWorkflow";
-import {
-  extractParentTraceForNlpgo,
-  maxCausalityDepthOfSpans,
-} from "../../app-layer/evaluations/evaluation-execution.service";
 import {
   EVALUATIONS_QUEUE,
   updateEvaluationStatusInES,
@@ -195,12 +201,13 @@ const buildThreadData = async (
       }
 
       // Handle server-only thread sources (e.g. formatted_traces)
-      if (
-        (SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(source)
-      ) {
+      if ((SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(source)) {
         if (source === "formatted_traces") {
-          result[targetField] = (await Promise.all(threadTraces.map((t) => formatSpansDigest(t.spans ?? []))))
-            .join("\n\n---\n\n");
+          result[targetField] = (
+            await Promise.all(
+              threadTraces.map((t) => formatSpansDigest(t.spans ?? [])),
+            )
+          ).join("\n\n---\n\n");
         }
       } else {
         // Use the mapping function from THREAD_MAPPINGS dynamically
@@ -401,9 +408,13 @@ const buildDataForEvaluation = async (
     }
   }
 
-  // Workflow evaluators and custom evaluators pass data through as-is
+  // Workflow, code, and custom evaluators pass data through as-is
   // (they handle their own field mappings)
-  if (evaluatorType.startsWith("custom/") || evaluatorType === "workflow") {
+  if (
+    evaluatorType.startsWith("custom/") ||
+    evaluatorType === "workflow" ||
+    isCodeEvaluatorCheckType(evaluatorType)
+  ) {
     return {
       type: "custom",
       data,
@@ -486,7 +497,9 @@ export const runEvaluationForTrace = async ({
     trace,
     workflowId,
     parentCausalityDepth: maxCausalityDepthOfSpans(
-      trace.spans as unknown as Array<{ attributes?: Record<string, unknown> | null }>,
+      trace.spans as unknown as Array<{
+        attributes?: Record<string, unknown> | null;
+      }>,
     ),
   });
 
@@ -517,6 +530,17 @@ export const runEvaluation = async ({
   parentCausalityDepth?: number;
 }): Promise<SingleEvaluationResult> => {
   if (data.type === "custom") {
+    const codeEvaluatorId = codeEvaluatorIdFromCheckType(evaluatorType);
+    if (codeEvaluatorId) {
+      return runCodeEvaluator({
+        projectId,
+        evaluatorId: codeEvaluatorId,
+        data: data.data,
+        traceId: trace?.trace_id,
+        parentCausalityDepth,
+        parentTrace: extractParentTraceForNlpgo(trace),
+      });
+    }
     return customEvaluation(
       projectId,
       evaluatorType,
@@ -615,7 +639,10 @@ export const runEvaluation = async ({
     });
   } catch (error) {
     if (error instanceof Error && error.message.includes("fetch failed")) {
-      console.error({ error, path: `${env.LANGEVALS_ENDPOINT}/${builtInEvaluatorType}/evaluate` });
+      console.error({
+        error,
+        path: `${env.LANGEVALS_ENDPOINT}/${builtInEvaluatorType}/evaluate`,
+      });
       throw new Error("Evaluator cannot be reached");
     }
     throw error;
@@ -654,8 +681,12 @@ export const runEvaluation = async ({
 
   const result: typeof raw = {
     ...raw,
-    ...("score" in raw && { score: typeof raw.score === "number" ? raw.score : undefined }),
-    ...("passed" in raw && { passed: typeof raw.passed === "boolean" ? raw.passed : undefined }),
+    ...("score" in raw && {
+      score: typeof raw.score === "number" ? raw.score : undefined,
+    }),
+    ...("passed" in raw && {
+      passed: typeof raw.passed === "boolean" ? raw.passed : undefined,
+    }),
   };
 
   getEvaluationStatusCounter(builtInEvaluatorType, result.status).inc();
@@ -675,119 +706,117 @@ export const startEvaluationsWorker = (
 
   const traceChecksWorker = new Worker<EvaluationJob, any, EvaluatorTypes>(
     EVALUATIONS_QUEUE.NAME,
-    withJobContext(
-      async (job) => {
-        recordJobWaitDuration(job, "evaluations");
-        if (
-          env.NODE_ENV !== "test" &&
-          job.data.trace.trace_id.includes("test-trace")
-        ) {
-          return;
+    withJobContext(async (job) => {
+      recordJobWaitDuration(job, "evaluations");
+      if (
+        env.NODE_ENV !== "test" &&
+        job.data.trace.trace_id.includes("test-trace")
+      ) {
+        return;
+      }
+
+      getJobProcessingCounter("evaluations", "processing").inc();
+      const start = Date.now();
+
+      try {
+        logger.info({ jobId: job.id, data: job.data }, "processing job");
+
+        let processed = false;
+        const timeout = new Promise((resolve, reject) => {
+          setTimeout(
+            () => {
+              if (processed) {
+                resolve(undefined);
+              } else {
+                reject(new Error("Job timed out after 5 minutes"));
+              }
+            },
+            5 * 60 * 1000,
+          );
+        });
+
+        const result = (await Promise.race([
+          processFn(job),
+          timeout,
+        ])) as EvaluationResultWithThreadId;
+        processed = true;
+
+        if ("cost" in result && result.cost) {
+          await prisma.cost.create({
+            data: {
+              id: `cost_${nanoid()}`,
+              projectId: job.data.trace.project_id,
+              costType: CostType.TRACE_CHECK,
+              costName: job.data.check.name,
+              referenceType: CostReferenceType.CHECK,
+              referenceId: job.data.check.evaluator_id,
+              amount: result.cost.amount,
+              currency: result.cost.currency,
+              extraInfo: {
+                evaluation_id: job.data.check.evaluation_id,
+              },
+            },
+          });
         }
 
-        getJobProcessingCounter("evaluations", "processing").inc();
-        const start = Date.now();
-
-        try {
-          logger.info({ jobId: job.id, data: job.data }, "processing job");
-
-          let processed = false;
-          const timeout = new Promise((resolve, reject) => {
-            setTimeout(
-              () => {
-                if (processed) {
-                  resolve(undefined);
-                } else {
-                  reject(new Error("Job timed out after 5 minutes"));
-                }
-              },
-              5 * 60 * 1000,
-            );
-          });
-
-          const result = (await Promise.race([
-            processFn(job),
-            timeout,
-          ])) as EvaluationResultWithThreadId;
-          processed = true;
-
-          if ("cost" in result && result.cost) {
-            await prisma.cost.create({
-              data: {
-                id: `cost_${nanoid()}`,
-                projectId: job.data.trace.project_id,
-                costType: CostType.TRACE_CHECK,
-                costName: job.data.check.name,
-                referenceType: CostReferenceType.CHECK,
-                referenceId: job.data.check.evaluator_id,
-                amount: result.cost.amount,
-                currency: result.cost.currency,
-                extraInfo: {
-                  evaluation_id: job.data.check.evaluation_id,
+        await updateEvaluationStatusInES({
+          check: job.data.check,
+          trace: job.data.trace,
+          status: result.status,
+          ...(result.evaluation_thread_id && {
+            evaluation_thread_id: result.evaluation_thread_id,
+          }),
+          ...(result.inputs && { inputs: result.inputs }),
+          ...(result.status === "error"
+            ? {
+                error: {
+                  message: result.details,
+                  stack: result.traceback,
                 },
-              },
-            });
-          }
+              }
+            : {}),
+          ...(result.status === "processed"
+            ? {
+                score: result.score,
+                passed: result.passed,
+                label: result.label,
+              }
+            : {}),
+          details: "details" in result ? (result.details ?? "") : "",
+        });
+        logger.info({ jobId: job.id }, "successfully processed job");
 
-          await updateEvaluationStatusInES({
-            check: job.data.check,
-            trace: job.data.trace,
-            status: result.status,
-            ...(result.evaluation_thread_id && {
-              evaluation_thread_id: result.evaluation_thread_id,
-            }),
-            ...(result.inputs && { inputs: result.inputs }),
-            ...(result.status === "error"
-              ? {
-                  error: {
-                    message: result.details,
-                    stack: result.traceback,
-                  },
-                }
-              : {}),
-            ...(result.status === "processed"
-              ? {
-                  score: result.score,
-                  passed: result.passed,
-                  label: result.label,
-                }
-              : {}),
-            details: "details" in result ? (result.details ?? "") : "",
-          });
-          logger.info({ jobId: job.id }, "successfully processed job");
+        const duration = Date.now() - start;
+        getJobProcessingDurationHistogram("evaluations").observe(duration);
+        getJobProcessingCounter("evaluations", "completed").inc();
+      } catch (error) {
+        await updateEvaluationStatusInES({
+          check: job.data.check,
+          trace: job.data.trace,
+          status: "error",
+          error: error,
+        });
+        // Note: Logging is handled by the 'failed' event handler to avoid double logging
 
-          const duration = Date.now() - start;
-          getJobProcessingDurationHistogram("evaluations").observe(duration);
-          getJobProcessingCounter("evaluations", "completed").inc();
-        } catch (error) {
-          await updateEvaluationStatusInES({
-            check: job.data.check,
-            trace: job.data.trace,
-            status: "error",
-            error: error,
-          });
-          // Note: Logging is handled by the 'failed' event handler to avoid double logging
-
-          if (
-            typeof error === "object" &&
-            (error as any).message?.includes("504 Gateway Timeout")
-          ) {
-            throw error;
-          }
-
-          if (
-            (typeof (error as any).status === "number" &&
-              (error as any).status >= 400 &&
-              (error as any).status < 500) ||
-            (error as any).toString().startsWith("422")
-          ) {
-            throw error;
-          }
-
+        if (
+          typeof error === "object" &&
+          (error as any).message?.includes("504 Gateway Timeout")
+        ) {
           throw error;
         }
-      },
-    ),
+
+        if (
+          (typeof (error as any).status === "number" &&
+            (error as any).status >= 400 &&
+            (error as any).status < 500) ||
+          (error as any).toString().startsWith("422")
+        ) {
+          throw error;
+        }
+
+        throw error;
+      }
+    }),
     {
       connection,
       concurrency: 3,
@@ -803,7 +832,10 @@ export const startEvaluationsWorker = (
   traceChecksWorker.on("failed", async (job, err) => {
     getJobProcessingCounter("evaluations", "failed").inc();
     if (err instanceof UserConfigError || err instanceof EvaluatorConfigError) {
-      logger.warn({ jobId: job?.id, error: err }, "job failed due to user configuration");
+      logger.warn(
+        { jobId: job?.id, error: err },
+        "job failed due to user configuration",
+      );
     } else {
       logger.error({ jobId: job?.id, error: err }, "job failed");
       await withScope((scope) => {

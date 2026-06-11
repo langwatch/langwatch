@@ -962,11 +962,13 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       settings?: Record<string, unknown>;
     } | null;
 
-    // For workflow evaluators, use "workflow" as checkType
-    // For built-in evaluators, use the evaluatorType from config
+    // Workflow evaluators use "workflow" as checkType, code evaluators route
+    // by id, and built-in evaluators use the evaluatorType from config
     const checkType = isWorkflowEvaluator
       ? "workflow"
-      : (evaluatorConfig?.evaluatorType ?? "langevals/basic");
+      : selectedEvaluator.type === "code"
+        ? `code/${selectedEvaluator.id}`
+        : (evaluatorConfig?.evaluatorType ?? "langevals/basic");
     const settings = evaluatorConfig?.settings ?? {};
 
     // Convert UIFieldMapping to MappingState format

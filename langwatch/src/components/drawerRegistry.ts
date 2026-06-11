@@ -34,6 +34,7 @@ import { EditModelProviderDrawer } from "./EditModelProviderDrawer";
 import { GuardrailsDrawer } from "./evaluations/GuardrailsDrawer";
 // Online Evaluations (Monitors) drawers
 import { OnlineEvaluationDrawer } from "./evaluations/OnlineEvaluationDrawer";
+import { CodeEvaluatorEditorDrawer } from "./evaluators/CodeEvaluatorEditorDrawer";
 import { EvaluatorCategorySelectorDrawer } from "./evaluators/EvaluatorCategorySelectorDrawer";
 import { EvaluatorEditorDrawer } from "./evaluators/EvaluatorEditorDrawer";
 import { EvaluatorHistoryDrawer } from "./evaluators/EvaluatorHistoryDrawer";
@@ -114,6 +115,7 @@ export const drawers = {
   evaluatorCategorySelector: EvaluatorCategorySelectorDrawer,
   evaluatorTypeSelector: EvaluatorTypeSelectorDrawer,
   evaluatorEditor: EvaluatorEditorDrawer,
+  codeEvaluatorEditor: CodeEvaluatorEditorDrawer,
   // Workflow selector specifically for evaluators (creates evaluator, not agent)
   workflowSelectorForEvaluator: WorkflowSelectorForEvaluatorDrawer,
   // Scenarios

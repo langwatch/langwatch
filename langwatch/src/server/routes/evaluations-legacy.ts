@@ -9,26 +9,33 @@
  * - src/pages/api/guardrails/[evaluator]/evaluate.ts
  * - src/pages/api/dataset/evaluate.ts
  */
-import type { Context } from "hono";
+
 import { generate } from "@langwatch/ksuid";
-import { CostReferenceType, CostType, ExperimentType } from "@prisma/client";
 import type { Project } from "@prisma/client";
+import { CostReferenceType, CostType, ExperimentType } from "@prisma/client";
 import type { JsonArray } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
 import type { Edge, Node } from "@xyflow/react";
-import { nanoid } from "nanoid";
+import type { Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
+import { nanoid } from "nanoid";
 import { type ZodError, ZodError as ZodErrorClass, z } from "zod";
-import { fromZodError } from "zod-validation-error";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { KSUID_RESOURCES } from "~/utils/constants";
-import { captureException } from "~/utils/posthogErrorCapture";
-import { mapZodIssuesToLogContext } from "~/utils/zod";
-import { getInputsOutputs } from "~/optimization_studio/utils/nodeUtils";
-import type { Workflow } from "~/optimization_studio/types/dsl";
-import { getWorkflowEntryOutputs } from "~/optimization_studio/utils/workflowFields";
+import { fromZodError } from "zod-validation-error";
 import { evaluatorTempNameMap } from "~/components/checks/EvaluatorSelection";
+import type { Workflow } from "~/optimization_studio/types/dsl";
+import { getInputsOutputs } from "~/optimization_studio/utils/nodeUtils";
+import { getWorkflowEntryOutputs } from "~/optimization_studio/utils/workflowFields";
+import { findOrCreateExperiment } from "~/pages/api/experiment/init";
+import type { Permission } from "~/server/api/rbac";
 import { getCustomEvaluators } from "~/server/api/routers/evaluations";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import {
+  apiKeyCeilingDenialResponse,
+  enforceApiKeyCeiling,
+  extractCredentials,
+} from "~/server/api-key/auth-middleware";
+import { TokenResolver } from "~/server/api-key/token-resolver";
 import { getApp } from "~/server/app-layer/app";
 import { DomainError } from "~/server/app-layer/domain-error";
 import { evaluationNameAutoslug } from "~/server/background/workers/collector/evaluationNameAutoslug";
@@ -40,10 +47,10 @@ import {
 import { prisma } from "~/server/db";
 import {
   AVAILABLE_EVALUATORS,
-  evaluatorsSchema,
   type EvaluationResult,
   type EvaluatorDefinition,
   type EvaluatorTypes,
+  evaluatorsSchema,
   type SingleEvaluationResult,
 } from "~/server/evaluations/evaluators.generated";
 import { getEvaluatorDefaultSettings } from "~/server/evaluations/getEvaluator";
@@ -52,30 +59,28 @@ import {
   type EvaluationRESTResult,
   evaluationInputSchema,
 } from "~/server/evaluations/types";
-import { mapEsTargetsToTargets } from "~/server/experiments-v3/services/mappers";
 import {
-  eSBatchEvaluationRESTParamsSchema,
-  eSBatchEvaluationSchema,
-  eSBatchEvaluationTargetTypeSchema,
+  CODE_EVALUATOR_CHECK_PREFIX,
+  codeEvaluatorConfigSchema,
+} from "~/server/evaluators/codeEvaluator";
+import { ExperimentService } from "~/server/experiments/experiment.service";
+import {
   type ESBatchEvaluation,
   type ESBatchEvaluationRESTParams,
   type ESBatchEvaluationTarget,
   type ESBatchEvaluationTargetType,
+  eSBatchEvaluationRESTParamsSchema,
+  eSBatchEvaluationSchema,
+  eSBatchEvaluationTargetTypeSchema,
 } from "~/server/experiments/types";
-import { ExperimentService } from "~/server/experiments/experiment.service";
+import { mapEsTargetsToTargets } from "~/server/experiments-v3/services/mappers";
 import { getPayloadSizeHistogram } from "~/server/metrics";
 import { rAGChunkSchema } from "~/server/tracer/types";
 import { coerceEvaluatorScalar } from "~/server/utils/coerceEvaluatorScalar";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { createLogger } from "~/utils/logger/server";
-import { findOrCreateExperiment } from "~/pages/api/experiment/init";
-import type { Permission } from "~/server/api/rbac";
-import {
-  enforceApiKeyCeiling,
-  extractCredentials,
-  apiKeyCeilingDenialResponse,
-} from "~/server/api-key/auth-middleware";
-import { TokenResolver } from "~/server/api-key/token-resolver";
-import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { captureException } from "~/utils/posthogErrorCapture";
+import { mapZodIssuesToLogContext } from "~/utils/zod";
 
 const logger = createLogger("langwatch:evaluations-legacy");
 const tokenResolver = TokenResolver.create(prisma);
@@ -136,341 +141,352 @@ async function authenticateRequest(
 const secured = createServiceApp({ basePath: "/api" });
 
 // ---------- GET /api/evaluations/list ----------
-secured.access(handlerManagedAuth(AUTH_REASON)).get("/evaluations/list", async (c) => {
-  const evaluators = Object.fromEntries(
-    Object.entries(AVAILABLE_EVALUATORS)
-      .filter(
-        ([key]) =>
-          !key.startsWith("example/") &&
-          key !== "aws/comprehend_pii_detection" &&
-          key !== "google_cloud/dlp_pii_detection",
-      )
-      .map(([key, value]) => [
-        key,
-        {
-          ...value,
-          name: evaluatorTempNameMap[value.name] ?? value.name,
-          settings_json_schema: zodToJsonSchema(
-            // @ts-ignore
-            evaluatorsSchema.shape[key].shape.settings,
-          ),
-        },
-      ]),
-  );
+secured
+  .access(handlerManagedAuth(AUTH_REASON))
+  .get("/evaluations/list", async (c) => {
+    const evaluators = Object.fromEntries(
+      Object.entries(AVAILABLE_EVALUATORS)
+        .filter(
+          ([key]) =>
+            !key.startsWith("example/") &&
+            key !== "aws/comprehend_pii_detection" &&
+            key !== "google_cloud/dlp_pii_detection",
+        )
+        .map(([key, value]) => [
+          key,
+          {
+            ...value,
+            name: evaluatorTempNameMap[value.name] ?? value.name,
+            settings_json_schema: zodToJsonSchema(
+              // @ts-ignore
+              evaluatorsSchema.shape[key].shape.settings,
+            ),
+          },
+        ]),
+    );
 
-  return c.json({ evaluators });
-});
+    return c.json({ evaluators });
+  });
 
 // ---------- POST /api/evaluations/batch/log_results ----------
-secured.access(handlerManagedAuth(AUTH_REASON)).post(
-  "/evaluations/batch/log_results",
-  bodyLimit({ maxSize: 20 * 1024 * 1024 }),
-  async (c) => {
+secured
+  .access(handlerManagedAuth(AUTH_REASON))
+  .post(
+    "/evaluations/batch/log_results",
+    bodyLimit({ maxSize: 20 * 1024 * 1024 }),
+    async (c) => {
+      const auth = await authenticateRequest(c, "evaluations:manage");
+      if ("error" in auth) {
+        return c.json({ message: auth.error }, auth.status);
+      }
+      const { project, markUsed } = auth;
+
+      const contentType = c.req.header("content-type");
+      if (!contentType?.includes("application/json")) {
+        logger.warn(
+          {
+            contentType,
+          },
+          "log_results request body is not json",
+        );
+        return c.json({ message: "Invalid body, expecting json" }, 400);
+      }
+
+      let body: Record<string, any>;
+      try {
+        body = await c.req.json();
+      } catch {
+        return c.json({ message: "Invalid body, expecting json" }, 400);
+      }
+
+      getPayloadSizeHistogram("log_results").observe(
+        JSON.stringify(body).length,
+      );
+
+      let params: ESBatchEvaluationRESTParams;
+      try {
+        params = eSBatchEvaluationRESTParamsSchema.parse(body);
+      } catch (error) {
+        logger.error(
+          { error, body, projectId: project.id },
+          "invalid log_results data received",
+        );
+        captureException(error, { extra: { projectId: project.id } });
+        const validationError = fromZodError(error as ZodError);
+        return c.json({ error: validationError.message }, 400);
+      }
+
+      if (!params.experiment_id && !params.experiment_slug) {
+        logger.warn(
+          { runId: params.run_id },
+          "log_results missing experiment_id and experiment_slug",
+        );
+        return c.json(
+          { error: "Either experiment_id or experiment_slug is required" },
+          400,
+        );
+      }
+
+      if (
+        params.timestamps?.created_at &&
+        params.timestamps.created_at.toString().length === 10
+      ) {
+        return c.json(
+          {
+            error:
+              "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
+          },
+          400,
+        );
+      }
+
+      try {
+        await processBatchEvaluation(project, params);
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          logger.error(
+            { error, body: params, projectId: project.id },
+            "failed to validate data for batch evaluation",
+          );
+          captureException(error, {
+            extra: { projectId: project.id, param: params },
+          });
+          const validationError = fromZodError(error);
+          return c.json({ error: validationError.message }, 400);
+        } else if (DomainError.is(error)) {
+          logger.warn(
+            { kind: error.kind, meta: error.meta, projectId: project.id },
+            "domain error processing batch evaluation",
+          );
+          return c.json(
+            { error: error.kind, message: error.message },
+            error.httpStatus as 400,
+          );
+        } else {
+          logger.error(
+            { error, body: params, projectId: project.id },
+            "internal server error processing batch evaluation",
+          );
+          captureException(error, {
+            extra: { projectId: project.id, param: params },
+          });
+          return c.json(
+            {
+              error:
+                error instanceof Error
+                  ? error.message
+                  : "Internal server error",
+            },
+            500,
+          );
+        }
+      }
+
+      markUsed();
+      return c.json({ message: "ok" });
+    },
+  );
+
+// ---------- POST /api/evaluations/:evaluator/evaluate ----------
+secured
+  .access(handlerManagedAuth(AUTH_REASON))
+  .post(
+    "/evaluations/:evaluator/evaluate",
+    bodyLimit({ maxSize: 30 * 1024 * 1024 }),
+    async (c) => {
+      const evaluatorSlug = c.req.param("evaluator");
+      return handleEvaluatorCall(c, evaluatorSlug, false);
+    },
+  );
+
+// ---------- POST /api/evaluations/:evaluator/:subpath/evaluate ----------
+secured
+  .access(handlerManagedAuth(AUTH_REASON))
+  .post(
+    "/evaluations/:evaluator/:subpath/evaluate",
+    bodyLimit({ maxSize: 30 * 1024 * 1024 }),
+    async (c) => {
+      const evaluatorSlug = `${c.req.param("evaluator")}/${c.req.param("subpath")}`;
+      return handleEvaluatorCall(c, evaluatorSlug, false);
+    },
+  );
+
+// ---------- POST /api/guardrails/:evaluator/evaluate ----------
+secured
+  .access(handlerManagedAuth(AUTH_REASON))
+  .post(
+    "/guardrails/:evaluator/evaluate",
+    bodyLimit({ maxSize: 30 * 1024 * 1024 }),
+    async (c) => {
+      const evaluatorSlug = c.req.param("evaluator");
+      return handleEvaluatorCall(c, evaluatorSlug, true);
+    },
+  );
+
+// ---------- POST /api/dataset/evaluate ----------
+secured
+  .access(handlerManagedAuth(AUTH_REASON))
+  .post("/dataset/evaluate", async (c) => {
     const auth = await authenticateRequest(c, "evaluations:manage");
     if ("error" in auth) {
       return c.json({ message: auth.error }, auth.status);
     }
-    const { project, markUsed } = auth;
-
-    const contentType = c.req.header("content-type");
-    if (!contentType || !contentType.includes("application/json")) {
-      logger.warn(
-        {
-          contentType,
-        },
-        "log_results request body is not json",
-      );
-      return c.json({ message: "Invalid body, expecting json" }, 400);
+    const { markUsed } = auth;
+    // dataset/evaluate needs the full team relation for downstream queries.
+    const project = await prisma.project.findUnique({
+      where: { id: auth.project.id },
+      include: { team: true },
+    });
+    if (!project) {
+      return c.json({ message: "Invalid auth token." }, 401);
     }
 
     let body: Record<string, any>;
     try {
       body = await c.req.json();
     } catch {
-      return c.json({ message: "Invalid body, expecting json" }, 400);
+      return c.json({ message: "Bad request" }, 400);
     }
 
-    getPayloadSizeHistogram("log_results").observe(
-      JSON.stringify(body).length,
-    );
-
-    let params: ESBatchEvaluationRESTParams;
+    let params: BatchEvaluationRESTParams;
     try {
-      params = eSBatchEvaluationRESTParamsSchema.parse(body);
+      params = batchEvaluationInputSchema.parse(body);
     } catch (error) {
       logger.error(
         { error, body, projectId: project.id },
-        "invalid log_results data received",
+        "invalid evaluation params received",
       );
       captureException(error, { extra: { projectId: project.id } });
       const validationError = fromZodError(error as ZodError);
       return c.json({ error: validationError.message }, 400);
     }
 
-    if (!params.experiment_id && !params.experiment_slug) {
-      logger.warn(
-        { runId: params.run_id },
-        "log_results missing experiment_id and experiment_slug",
-      );
-      return c.json(
-        { error: "Either experiment_id or experiment_slug is required" },
-        400,
-      );
+    const { datasetSlug } = params;
+    const experimentSlug = params.experimentSlug ?? params.batchId ?? nanoid();
+    const evaluation = params.evaluation;
+    let settings = null;
+    let checkType;
+
+    const check = await prisma.monitor.findFirst({
+      where: { projectId: project.id, slug: evaluation },
+    });
+
+    if (check != null) {
+      checkType = check.checkType;
+      settings = check.parameters;
+    } else {
+      checkType = evaluation;
     }
 
-    if (
-      params.timestamps?.created_at &&
-      params.timestamps.created_at.toString().length === 10
-    ) {
-      return c.json(
-        {
-          error:
-            "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
-        },
-        400,
-      );
+    const evaluator = await getEvaluatorIncludingCustom(
+      project.id,
+      checkType as EvaluatorTypes,
+    );
+    if (!evaluator) {
+      return c.json({ error: `Evaluator not found: ${checkType}` }, 400);
     }
 
+    let data: DataForEvaluation;
     try {
-      await processBatchEvaluation(project, params);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        logger.error(
-          { error, body: params, projectId: project.id },
-          "failed to validate data for batch evaluation",
-        );
-        captureException(error, {
-          extra: { projectId: project.id, param: params },
-        });
-        const validationError = fromZodError(error);
-        return c.json({ error: validationError.message }, 400);
-      } else if (DomainError.is(error)) {
-        logger.warn(
-          { kind: error.kind, meta: error.meta, projectId: project.id },
-          "domain error processing batch evaluation",
-        );
-        return c.json(
-          { error: error.kind, message: error.message },
-          error.httpStatus as 400,
-        );
-      } else {
-        logger.error(
-          { error, body: params, projectId: project.id },
-          "internal server error processing batch evaluation",
-        );
-        captureException(error, {
-          extra: { projectId: project.id, param: params },
-        });
+      data = getEvaluatorDataForParams(
+        checkType,
+        params.data as Record<string, any>,
+      );
+      if (
+        !evaluator.requiredFields.every((field: string) => field in data.data)
+      ) {
         return c.json(
           {
-            error:
-              error instanceof Error ? error.message : "Internal server error",
+            error: `Missing required field for ${checkType}`,
+            requiredFields: evaluator.requiredFields,
           },
-          500,
+          400,
         );
       }
-    }
-
-    markUsed();
-    return c.json({ message: "ok" });
-  },
-);
-
-// ---------- POST /api/evaluations/:evaluator/evaluate ----------
-secured.access(handlerManagedAuth(AUTH_REASON)).post(
-  "/evaluations/:evaluator/evaluate",
-  bodyLimit({ maxSize: 30 * 1024 * 1024 }),
-  async (c) => {
-    const evaluatorSlug = c.req.param("evaluator");
-    return handleEvaluatorCall(c, evaluatorSlug, false);
-  },
-);
-
-// ---------- POST /api/evaluations/:evaluator/:subpath/evaluate ----------
-secured.access(handlerManagedAuth(AUTH_REASON)).post(
-  "/evaluations/:evaluator/:subpath/evaluate",
-  bodyLimit({ maxSize: 30 * 1024 * 1024 }),
-  async (c) => {
-    const evaluatorSlug = `${c.req.param("evaluator")}/${c.req.param("subpath")}`;
-    return handleEvaluatorCall(c, evaluatorSlug, false);
-  },
-);
-
-// ---------- POST /api/guardrails/:evaluator/evaluate ----------
-secured.access(handlerManagedAuth(AUTH_REASON)).post(
-  "/guardrails/:evaluator/evaluate",
-  bodyLimit({ maxSize: 30 * 1024 * 1024 }),
-  async (c) => {
-    const evaluatorSlug = c.req.param("evaluator");
-    return handleEvaluatorCall(c, evaluatorSlug, true);
-  },
-);
-
-// ---------- POST /api/dataset/evaluate ----------
-secured.access(handlerManagedAuth(AUTH_REASON)).post("/dataset/evaluate", async (c) => {
-  const auth = await authenticateRequest(c, "evaluations:manage");
-  if ("error" in auth) {
-    return c.json({ message: auth.error }, auth.status);
-  }
-  const { markUsed } = auth;
-  // dataset/evaluate needs the full team relation for downstream queries.
-  const project = await prisma.project.findUnique({
-    where: { id: auth.project.id },
-    include: { team: true },
-  });
-  if (!project) {
-    return c.json({ message: "Invalid auth token." }, 401);
-  }
-
-  let body: Record<string, any>;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ message: "Bad request" }, 400);
-  }
-
-  let params: BatchEvaluationRESTParams;
-  try {
-    params = batchEvaluationInputSchema.parse(body);
-  } catch (error) {
-    logger.error(
-      { error, body, projectId: project.id },
-      "invalid evaluation params received",
-    );
-    captureException(error, { extra: { projectId: project.id } });
-    const validationError = fromZodError(error as ZodError);
-    return c.json({ error: validationError.message }, 400);
-  }
-
-  const { datasetSlug } = params;
-  const experimentSlug =
-    params.experimentSlug ?? params.batchId ?? nanoid();
-  const evaluation = params.evaluation;
-  let settings = null;
-  let checkType;
-
-  const check = await prisma.monitor.findFirst({
-    where: { projectId: project.id, slug: evaluation },
-  });
-
-  if (check != null) {
-    checkType = check.checkType;
-    settings = check.parameters;
-  } else {
-    checkType = evaluation;
-  }
-
-  const evaluator = await getEvaluatorIncludingCustom(
-    project.id,
-    checkType as EvaluatorTypes,
-  );
-  if (!evaluator) {
-    return c.json({ error: `Evaluator not found: ${checkType}` }, 400);
-  }
-
-  let data: DataForEvaluation;
-  try {
-    data = getEvaluatorDataForParams(
-      checkType,
-      params.data as Record<string, any>,
-    );
-    if (
-      !evaluator.requiredFields.every(
-        (field: string) => field in data.data,
-      )
-    ) {
-      return c.json(
-        {
-          error: `Missing required field for ${checkType}`,
-          requiredFields: evaluator.requiredFields,
-        },
-        400,
+    } catch (error) {
+      logger.error(
+        { error, body, projectId: project.id },
+        "invalid evaluation data received",
       );
+      captureException(error, { extra: { projectId: project.id } });
+      const validationError = fromZodError(error as ZodError);
+      return c.json({ error: validationError.message }, 400);
     }
-  } catch (error) {
-    logger.error(
-      { error, body, projectId: project.id },
-      "invalid evaluation data received",
-    );
-    captureException(error, { extra: { projectId: project.id } });
-    const validationError = fromZodError(error as ZodError);
-    return c.json({ error: validationError.message }, 400);
-  }
 
-  const dataset = await prisma.dataset.findFirst({
-    where: { slug: datasetSlug, projectId: project.id },
-  });
-  if (!dataset) {
-    return c.json({ error: "Dataset not found" }, 404);
-  }
-
-  let result: SingleEvaluationResult;
-  try {
-    result = await runEvaluation({
-      projectId: project.id,
-      data,
-      evaluatorType: checkType as EvaluatorTypes,
-      settings: (settings as Record<string, unknown>) ?? {},
+    const dataset = await prisma.dataset.findFirst({
+      where: { slug: datasetSlug, projectId: project.id },
     });
-  } catch (error) {
-    result = {
-      status: "error",
-      error_type: "INTERNAL_ERROR",
-      details: error instanceof Error ? error.message : "Internal error",
-      traceback: [],
-    };
-  }
+    if (!dataset) {
+      return c.json({ error: "Dataset not found" }, 404);
+    }
 
-  const experiment = await ExperimentService.create(prisma).findBySlug({
-    projectId: project.id,
-    slug: experimentSlug,
-  });
-  if (!experiment) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Experiment not found",
-    });
-  }
-
-  if ("cost" in result && result.cost) {
-    await prisma.cost.create({
-      data: {
-        id: `cost_${nanoid()}`,
+    let result: SingleEvaluationResult;
+    try {
+      result = await runEvaluation({
         projectId: project.id,
-        costType: CostType.BATCH_EVALUATION,
-        costName: evaluation,
-        referenceType: CostReferenceType.BATCH,
-        referenceId: experiment.id,
-        amount: result.cost.amount,
-        currency: result.cost.currency,
+        data,
+        evaluatorType: checkType as EvaluatorTypes,
+        settings: (settings as Record<string, unknown>) ?? {},
+      });
+    } catch (error) {
+      result = {
+        status: "error",
+        error_type: "INTERNAL_ERROR",
+        details: error instanceof Error ? error.message : "Internal error",
+        traceback: [],
+      };
+    }
+
+    const experiment = await ExperimentService.create(prisma).findBySlug({
+      projectId: project.id,
+      slug: experimentSlug,
+    });
+    if (!experiment) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Experiment not found",
+      });
+    }
+
+    if ("cost" in result && result.cost) {
+      await prisma.cost.create({
+        data: {
+          id: `cost_${nanoid()}`,
+          projectId: project.id,
+          costType: CostType.BATCH_EVALUATION,
+          costName: evaluation,
+          referenceType: CostReferenceType.BATCH,
+          referenceId: experiment.id,
+          amount: result.cost.amount,
+          currency: result.cost.currency,
+        },
+      });
+    }
+
+    const { score, passed, details, cost, status, label } =
+      result as EvaluationResult;
+
+    await prisma.batchEvaluation.create({
+      data: {
+        id: nanoid(),
+        experimentId: experiment.id,
+        projectId: project.id,
+        data: data.data,
+        status,
+        score: score ?? 0,
+        passed: passed ?? false,
+        label,
+        details: details ?? "",
+        cost: cost?.amount ?? 0,
+        evaluation,
+        datasetSlug,
+        datasetId: dataset.id,
       },
     });
-  }
 
-  const { score, passed, details, cost, status, label } =
-    result as EvaluationResult;
-
-  await prisma.batchEvaluation.create({
-    data: {
-      id: nanoid(),
-      experimentId: experiment.id,
-      projectId: project.id,
-      data: data.data,
-      status,
-      score: score ?? 0,
-      passed: passed ?? false,
-      label,
-      details: details ?? "",
-      cost: cost?.amount ?? 0,
-      evaluation,
-      datasetSlug,
-      datasetId: dataset.id,
-    },
+    markUsed();
+    return c.json(result);
   });
-
-  markUsed();
-  return c.json(result);
-});
 
 export const app = secured.hono;
 
@@ -532,7 +548,10 @@ export const getEvaluatorDataForParams = (
   checkType: string,
   params: Record<string, any>,
 ): DataForEvaluation => {
-  if (checkType.startsWith("custom/")) {
+  if (
+    checkType.startsWith("custom/") ||
+    checkType.startsWith(CODE_EVALUATOR_CHECK_PREFIX)
+  ) {
     return { type: "custom", data: params };
   }
 
@@ -667,6 +686,21 @@ async function handleEvaluatorCall(
           name: savedEvaluator.name,
           requiredFields: entryOutputs.map((o) => o.identifier),
         };
+      } else if (savedEvaluator.type === "code") {
+        checkType = `${CODE_EVALUATOR_CHECK_PREFIX}${savedEvaluator.id}`;
+        const parsedConfig = codeEvaluatorConfigSchema.safeParse(
+          savedEvaluator.config,
+        );
+        if (!parsedConfig.success) {
+          return c.json(
+            { error: `Code evaluator has an invalid config: ${slugOrId}` },
+            400,
+          );
+        }
+        workflowEvaluatorDef = {
+          name: savedEvaluator.name,
+          requiredFields: parsedConfig.data.inputs.map((i) => i.identifier),
+        };
       } else {
         checkType = config?.evaluatorType ?? evaluatorSlug;
       }
@@ -758,16 +792,14 @@ async function handleEvaluatorCall(
     ? undefined
     : evaluatorsSchema.shape[checkType as EvaluatorTypes]?.shape.settings;
 
-  let settings: any =
-    ((evaluatorSettings ?? monitor?.parameters) as any) ?? {};
+  let settings: any = ((evaluatorSettings ?? monitor?.parameters) as any) ?? {};
 
   try {
     settings = evaluatorSettingSchema?.parse({
       ...(!workflowEvaluatorDef
         ? getEvaluatorDefaultSettings(evaluatorDefinition as any)
         : {}),
-      ...(evaluatorSettings ??
-        (monitor ? (monitor.parameters as object) : {})),
+      ...(evaluatorSettings ?? (monitor ? (monitor.parameters as object) : {})),
       ...(params.settings ? params.settings : {}),
     });
   } catch (error) {
@@ -845,8 +877,7 @@ async function handleEvaluatorCall(
   let costId: string | undefined;
 
   const evaluationId =
-    params.evaluation_id ??
-    generate(KSUID_RESOURCES.EVALUATION).toString();
+    params.evaluation_id ?? generate(KSUID_RESOURCES.EVALUATION).toString();
   const evaluatorId =
     savedEvaluatorId ??
     monitor?.id ??
@@ -987,8 +1018,7 @@ const processTargets = (
         if (parseResult.success) {
           targetType = parseResult.data;
           const { type: _, ...restMetadata } = metadata;
-          metadata =
-            Object.keys(restMetadata).length > 0 ? restMetadata : null;
+          metadata = Object.keys(restMetadata).length > 0 ? restMetadata : null;
         } else {
           throw new Error(
             `Invalid target type '${typeFromMetadata}'. Must be one of: ${VALID_TARGET_TYPES.join(", ")}`,
@@ -1114,9 +1144,7 @@ const dispatchToClickHouse = async (
           evaluatorName: evaluation.name ?? undefined,
           status: evaluation.status,
           score:
-            typeof evaluation.score === "number"
-              ? evaluation.score
-              : undefined,
+            typeof evaluation.score === "number" ? evaluation.score : undefined,
           label: evaluation.label ?? undefined,
           passed: evaluation.passed ?? undefined,
           details: evaluation.details ?? undefined,
@@ -1178,9 +1206,7 @@ const dispatchToClickHouse = async (
           evaluatorName: evaluation.name ?? undefined,
           status: evaluation.status,
           score:
-            typeof evaluation.score === "number"
-              ? evaluation.score
-              : undefined,
+            typeof evaluation.score === "number" ? evaluation.score : undefined,
           passed: evaluation.passed ?? undefined,
           label: evaluation.label ?? undefined,
           details: evaluation.details ?? undefined,

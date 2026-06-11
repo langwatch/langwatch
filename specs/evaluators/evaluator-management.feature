@@ -22,6 +22,7 @@ Feature: Evaluator management
     Then I can choose from the following types:
       | type      | description                              |
       | evaluator | Built-in evaluator with custom settings  |
+      | code      | Custom Python code evaluator             |
       | workflow  | Custom evaluator from a workflow         |
 
   # ============================================================================
@@ -240,6 +241,44 @@ Feature: Evaluator management
   Scenario: Custom workflow evaluator option is shown
     Given the EvaluatorCategorySelectorDrawer is open
     Then the option "Custom (from Workflow)" is rendered alongside the built-in evaluator categories
+
+  # ============================================================================
+  # Code evaluators: custom Python logic without creating a workflow.
+  # The category drawer offers "Custom (Code)" before the workflow option;
+  # picking it opens an editor with a Python code block plus its inputs and
+  # outputs, exactly like the studio code component. The code is stored on the
+  # evaluator itself and executes through the engine's code component at run
+  # time; no workflow record is ever created.
+  # ============================================================================
+
+  Scenario: Custom code evaluator option is shown before the workflow option
+    Given the EvaluatorCategorySelectorDrawer is open
+    Then the option "Custom (Code)" is rendered before "Custom (from Workflow)"
+
+  Scenario: Create a code evaluator from the drawer
+    Given the EvaluatorCategorySelectorDrawer is open
+    When I select "Custom (Code)"
+    Then a code evaluator editor opens with a Python code editor
+    And it seeds a typed evaluation template with default inputs and outputs
+    When I name it and save
+    Then the evaluator is stored with type "code" and the code in its config
+    And no workflow record is created
+
+  Scenario: Code evaluator inputs drive the mapping UI
+    Given a code evaluator whose code takes "output" and "expected_output"
+    When I use it in an evaluation
+    Then the mapping UI offers exactly those fields to map
+
+  Scenario: Code evaluator executes through the engine code component
+    Given a code evaluator that returns passed and score
+    When it runs against a row
+    Then the result carries the returned passed and score values
+    And the run creates no workflow record
+
+  Scenario: Code evaluator code errors surface per row
+    Given a code evaluator whose code raises an exception
+    When it runs against a row
+    Then the row records an error result with the exception message
 
   @unimplemented
   Scenario: Custom workflow evaluator skips category/type selection
