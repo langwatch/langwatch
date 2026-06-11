@@ -1,21 +1,28 @@
 import { describe, expect, it } from "vitest";
 
+import { compileAttributePatterns } from "../attributePatternMatcher";
 import {
+  type Disposition,
+  EMPTY_AUDIENCE,
+  type ResolvedDataPrivacy,
+} from "../dataPrivacy.types";
+import {
+  computeDropMatchers,
   computeDroppedKeys,
   droppedCategories,
   stripDroppedAttributes,
 } from "../dropKeyCatalog";
-import {
-  EMPTY_AUDIENCE,
-  type Disposition,
-  type ResolvedDataPrivacy,
-} from "../dataPrivacy.types";
 
 function policy(
-  dispositions: Partial<Record<"input" | "output" | "system" | "tools", Disposition>>,
-  customDropKeys: string[] = [],
+  dispositions: Partial<
+    Record<"input" | "output" | "system" | "tools", Disposition>
+  >,
+  customAttributes: ResolvedDataPrivacy["customAttributes"] = [],
 ): ResolvedDataPrivacy {
-  const cat = (d: Disposition = "capture") => ({ disposition: d, audience: { ...EMPTY_AUDIENCE } });
+  const cat = (d: Disposition = "capture") => ({
+    disposition: d,
+    audience: { ...EMPTY_AUDIENCE },
+  });
   return {
     categories: {
       input: cat(dispositions.input),
@@ -25,8 +32,14 @@ function policy(
     },
     pii: { level: "essential" },
     secrets: { enabled: true, customPatterns: [] },
-    customDropKeys,
+    customAttributes,
   };
+}
+
+function dropRule(
+  pattern: string,
+): ResolvedDataPrivacy["customAttributes"][number] {
+  return { pattern, disposition: "drop", audience: { ...EMPTY_AUDIENCE } };
 }
 
 describe("computeDroppedKeys", () => {
@@ -41,13 +54,6 @@ describe("computeDroppedKeys", () => {
     });
   });
 
-  describe("given custom drop keys", () => {
-    it("adds them to the set", () => {
-      const keys = computeDroppedKeys(policy({}, ["http.request.body"]));
-      expect(keys.has("http.request.body")).toBe(true);
-    });
-  });
-
   describe("given nothing is dropped", () => {
     it("returns an empty set", () => {
       expect(computeDroppedKeys(policy({})).size).toBe(0);
@@ -55,9 +61,30 @@ describe("computeDroppedKeys", () => {
   });
 });
 
+describe("computeDropMatchers", () => {
+  describe("given drop and restrict custom attribute rules", () => {
+    it("compiles only the drop-disposition patterns", () => {
+      const matchers = computeDropMatchers(
+        policy({}, [
+          dropRule("http.request.body"),
+          {
+            pattern: "app.billing.*",
+            disposition: "restrict",
+            audience: { ...EMPTY_AUDIENCE },
+          },
+        ]),
+      );
+
+      expect(matchers.map((m) => m.pattern)).toEqual(["http.request.body"]);
+    });
+  });
+});
+
 describe("droppedCategories", () => {
   it("lists only the categories set to drop", () => {
-    expect(droppedCategories(policy({ input: "drop", output: "restrict" }))).toEqual(["input"]);
+    expect(
+      droppedCategories(policy({ input: "drop", output: "restrict" })),
+    ).toEqual(["input"]);
   });
 });
 
@@ -78,6 +105,34 @@ describe("stripDroppedAttributes", () => {
       expect(next["gen_ai.usage.input_tokens"]).toBe(12);
       expect(next["gen_ai.request.model"]).toBe("gpt-5");
       expect(droppedCount).toBe(1);
+    });
+  });
+
+  describe("given a wildcard drop matcher", () => {
+    it("removes every matching key and reports their names", () => {
+      const attributes = {
+        "app.internal.session": "s-1",
+        "app.internal.token": "t-1",
+        "app.public.label": "ok",
+      };
+      const {
+        attributes: next,
+        droppedCount,
+        droppedAttributeKeys,
+      } = stripDroppedAttributes(
+        attributes,
+        new Set(),
+        compileAttributePatterns(["app.internal.*"]),
+      );
+
+      expect(next["app.internal.session"]).toBeUndefined();
+      expect(next["app.internal.token"]).toBeUndefined();
+      expect(next["app.public.label"]).toBe("ok");
+      expect(droppedCount).toBe(2);
+      expect(droppedAttributeKeys.sort()).toEqual([
+        "app.internal.session",
+        "app.internal.token",
+      ]);
     });
   });
 

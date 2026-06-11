@@ -1,9 +1,9 @@
 import {
   CONTENT_CATEGORIES,
-  PLATFORM_DEFAULT_DATA_PRIVACY,
-  resolveAudience,
   type DataPrivacyConfig,
+  PLATFORM_DEFAULT_DATA_PRIVACY,
   type ResolvedDataPrivacy,
+  resolveAudience,
 } from "./dataPrivacy.types";
 
 /**
@@ -50,21 +50,39 @@ interface Candidate {
  * the structural one); per-field merge makes conflicts rare. personalOnly
  * candidates rank just above their non-personal counterpart at the same tier.
  */
-export function buildDataPrivacyChain(facts: DataPrivacyScopeFacts): Candidate[] {
+export function buildDataPrivacyChain(
+  facts: DataPrivacyScopeFacts,
+): Candidate[] {
   const chain: Candidate[] = [
     { scopeType: "PROJECT", scopeId: facts.projectId, personalOnly: false },
   ];
   if (facts.departmentId) {
     if (facts.isPersonal) {
-      chain.push({ scopeType: "DEPARTMENT", scopeId: facts.departmentId, personalOnly: true });
+      chain.push({
+        scopeType: "DEPARTMENT",
+        scopeId: facts.departmentId,
+        personalOnly: true,
+      });
     }
-    chain.push({ scopeType: "DEPARTMENT", scopeId: facts.departmentId, personalOnly: false });
+    chain.push({
+      scopeType: "DEPARTMENT",
+      scopeId: facts.departmentId,
+      personalOnly: false,
+    });
   }
   chain.push({ scopeType: "TEAM", scopeId: facts.teamId, personalOnly: false });
   if (facts.isPersonal) {
-    chain.push({ scopeType: "ORGANIZATION", scopeId: facts.organizationId, personalOnly: true });
+    chain.push({
+      scopeType: "ORGANIZATION",
+      scopeId: facts.organizationId,
+      personalOnly: true,
+    });
   }
-  chain.push({ scopeType: "ORGANIZATION", scopeId: facts.organizationId, personalOnly: false });
+  chain.push({
+    scopeType: "ORGANIZATION",
+    scopeId: facts.organizationId,
+    personalOnly: false,
+  });
   return chain;
 }
 
@@ -73,10 +91,12 @@ export function buildDataPrivacyChain(facts: DataPrivacyScopeFacts): Candidate[]
  *
  * Each field resolves independently: walking the chain most-specific first, the
  * first rule that SETS a field wins; unset fields fall through to the platform
- * defaults. List fields (`customDropKeys`, `secrets.customPatterns`) instead
+ * defaults. List fields (`customAttributes`, `secrets.customPatterns`) instead
  * UNION across every matching rule in the chain (org baseline + narrower
- * additions both apply). The `secrets.enabled` flag is first-set-wins, but its
- * `customPatterns` accumulate regardless.
+ * additions both apply); for `customAttributes` the union is per pattern, the
+ * most-specific scope winning when two tiers set the same pattern. The
+ * `secrets.enabled` flag is first-set-wins, but its `customPatterns` accumulate
+ * regardless.
  */
 export function resolveDataPrivacy({
   rows,
@@ -95,14 +115,21 @@ export function resolveDataPrivacy({
       tools: { ...PLATFORM_DEFAULT_DATA_PRIVACY.categories.tools },
     },
     pii: { ...PLATFORM_DEFAULT_DATA_PRIVACY.pii },
-    secrets: { enabled: PLATFORM_DEFAULT_DATA_PRIVACY.secrets.enabled, customPatterns: [] },
-    customDropKeys: [],
+    secrets: {
+      enabled: PLATFORM_DEFAULT_DATA_PRIVACY.secrets.enabled,
+      customPatterns: [],
+    },
+    customAttributes: [],
   };
 
   const setCategory: Record<string, boolean> = {};
   let setPii = false;
   let setSecretsEnabled = false;
-  const dropKeys = new Set<string>();
+  // Per attribute pattern, the first (most-specific) entry in the chain wins.
+  const attributeRules = new Map<
+    string,
+    ResolvedDataPrivacy["customAttributes"][number]
+  >();
   const customPatterns = new Set<string>();
 
   for (const candidate of chain) {
@@ -136,11 +163,20 @@ export function resolveDataPrivacy({
       setSecretsEnabled = true;
     }
 
-    for (const key of config.customDropKeys ?? []) dropKeys.add(key);
-    for (const pattern of config.secrets?.customPatterns ?? []) customPatterns.add(pattern);
+    for (const rule of config.customAttributes ?? []) {
+      if (!attributeRules.has(rule.pattern)) {
+        attributeRules.set(rule.pattern, {
+          pattern: rule.pattern,
+          disposition: rule.disposition,
+          audience: resolveAudience(rule.audience),
+        });
+      }
+    }
+    for (const pattern of config.secrets?.customPatterns ?? [])
+      customPatterns.add(pattern);
   }
 
-  resolved.customDropKeys = [...dropKeys];
+  resolved.customAttributes = [...attributeRules.values()];
   resolved.secrets.customPatterns = [...customPatterns];
   return resolved;
 }

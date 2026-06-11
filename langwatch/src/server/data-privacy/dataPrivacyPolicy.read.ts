@@ -6,8 +6,8 @@ import {
 } from "~/server/api/rbac";
 import type { Session } from "~/server/auth";
 import {
-  dataPrivacyConfigSchema,
   type DataPrivacyConfig,
+  dataPrivacyConfigSchema,
   type ResolvedDataPrivacy,
 } from "./dataPrivacy.types";
 import type { DataPrivacyScopeTier } from "./dataPrivacyPolicy.repository";
@@ -35,6 +35,13 @@ export type DataPrivacyScopeAvailable = {
   projects: { id: string; name: string; teamId: string }[];
 };
 
+export type DataPrivacyAudienceOptions = {
+  /** The organization's custom RBAC groups (created on the enterprise plan;
+   *  an org without any simply shows no group control). */
+  groups: { id: string; name: string }[];
+  departments: { id: string; name: string }[];
+};
+
 export type DataPrivacySnapshot = {
   projectId: string;
   /** Effective privacy policy for this project, every field populated by the
@@ -44,6 +51,8 @@ export type DataPrivacySnapshot = {
   rules: DataPrivacyRule[];
   /** Scopes the caller can write to (RBAC-filtered), for the chip picker. */
   available: DataPrivacyScopeAvailable;
+  /** Choices for the restrict-audience picker. */
+  audienceOptions: DataPrivacyAudienceOptions;
 };
 
 /**
@@ -108,10 +117,11 @@ export async function getDataPrivacySnapshot(
           ? [{ id: projectId, name, teamId: project?.teamId ?? "" }]
           : [],
       },
+      audienceOptions: { groups: [], departments: [] },
     };
   }
 
-  const [orgDepartments, orgTeams, orgProjects, rows, canManageOrg] =
+  const [orgDepartments, orgTeams, orgProjects, orgGroups, rows, canManageOrg] =
     await Promise.all([
       ctx.prisma.department.findMany({
         where: { organizationId },
@@ -126,6 +136,11 @@ export async function getDataPrivacySnapshot(
       ctx.prisma.project.findMany({
         where: { team: { organizationId } },
         select: { id: true, name: true, teamId: true },
+        orderBy: { name: "asc" },
+      }),
+      ctx.prisma.group.findMany({
+        where: { organizationId },
+        select: { id: true, name: true },
         orderBy: { name: "asc" },
       }),
       service.listOrganizationRules({ organizationId }),
@@ -220,5 +235,12 @@ export async function getDataPrivacySnapshot(
       .map(({ id, name, teamId }) => ({ id, name, teamId })),
   };
 
-  return { projectId, effective, rules, available };
+  const audienceOptions: DataPrivacyAudienceOptions = {
+    groups: orgGroups,
+    departments: orgDepartments
+      .filter((d) => d.archivedAt === null)
+      .map(({ id, name }) => ({ id, name })),
+  };
+
+  return { projectId, effective, rules, available, audienceOptions };
 }

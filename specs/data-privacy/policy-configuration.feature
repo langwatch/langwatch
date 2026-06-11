@@ -94,12 +94,37 @@ Feature: Data privacy policy configuration
     When the privacy policy is resolved for project "bob-workspace"
     Then trace input is dropped for "bob-workspace"
 
+  # Custom attribute rules extend the four built-in categories: a rule names a
+  # span-attribute path (exact key or a "*" wildcard, e.g. "gen_ai.prompt.*")
+  # and either drops the matching attributes at ingestion or restricts them to
+  # an audience at read time. Distinct patterns accumulate down the cascade; the
+  # most-specific scope wins when the same pattern is set at two tiers.
+
   @unit
-  Scenario: Extra keys to drop accumulate down the cascade
-    Given an organization rule that also drops the attribute "http.request.body"
-    And a project rule on "web-app" that also drops the attribute "app.session_token"
+  Scenario: Custom attribute rules accumulate down the cascade
+    Given an organization rule that drops the attribute "http.request.body"
+    And a project rule on "web-app" that drops the attribute "app.session_token"
     When the privacy policy is resolved for project "web-app"
     Then both "http.request.body" and "app.session_token" are dropped for "web-app"
+
+  @unit
+  Scenario: A narrower scope overrides the same attribute pattern from a wider scope
+    Given an organization rule that drops the attribute "app.session_token"
+    And a project rule on "web-app" that restricts the attribute "app.session_token" to admins
+    When the privacy policy is resolved for project "web-app"
+    Then the attribute "app.session_token" is restricted to admins for "web-app"
+
+  # A rule can target several scopes in one save - two teams, a team and two
+  # projects, all personal projects plus a department - and each selected scope
+  # gets its own rule, resolving independently afterwards.
+
+  @integration
+  Scenario: One save can target several scopes at once
+    Given a second project "mobile-app" under the "platform" team
+    When an admin saves a privacy rule that drops trace input for both "web-app" and "mobile-app"
+    Then trace input is dropped for "web-app"
+    And trace input is dropped for "mobile-app"
+    And each project has its own rule that can be removed independently
 
   @integration
   Scenario: A rule is anchored to a single organization

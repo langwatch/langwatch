@@ -14,7 +14,9 @@ describe("redactEssentialPiiInText", () => {
 
   describe("given IP addresses", () => {
     it("redacts an IPv4 address", () => {
-      expect(redact("from 192.168.0.1 today").text).toBe("from [REDACTED] today");
+      expect(redact("from 192.168.0.1 today").text).toBe(
+        "from [REDACTED] today",
+      );
     });
 
     it("redacts an IPv6 address", () => {
@@ -32,7 +34,9 @@ describe("redactEssentialPiiInText", () => {
 
   describe("given a credit card number", () => {
     it("redacts a Luhn-valid number", () => {
-      expect(redact("card 4111111111111111 ok").text).toBe("card [REDACTED] ok");
+      expect(redact("card 4111111111111111 ok").text).toBe(
+        "card [REDACTED] ok",
+      );
     });
 
     it("leaves a Luhn-invalid 16-digit order id intact", () => {
@@ -43,7 +47,9 @@ describe("redactEssentialPiiInText", () => {
 
   describe("given an IBAN", () => {
     it("redacts a checksum-valid IBAN", () => {
-      expect(redact("iban DE89370400440532013000 here").text).toBe("iban [REDACTED] here");
+      expect(redact("iban DE89370400440532013000 here").text).toBe(
+        "iban [REDACTED] here",
+      );
     });
 
     it("leaves a checksum-invalid IBAN intact", () => {
@@ -80,7 +86,9 @@ describe("redactEssentialPiiInText", () => {
 
   describe("given a crypto wallet address", () => {
     it("redacts an Ethereum address", () => {
-      const { text } = redact("to 0x52908400098527886E0F7030069857D2E4169EE7 now");
+      const { text } = redact(
+        "to 0x52908400098527886E0F7030069857D2E4169EE7 now",
+      );
       expect(text).toContain("[REDACTED]");
     });
   });
@@ -112,7 +120,9 @@ describe("redactEssentialPiiInText", () => {
 
   describe("given several PII spans in one string", () => {
     it("redacts each and counts them", () => {
-      const { text, redactedCount } = redact("mail test@example.com ip 10.0.0.1 card 4111111111111111");
+      const { text, redactedCount } = redact(
+        "mail test@example.com ip 10.0.0.1 card 4111111111111111",
+      );
       expect(text).not.toContain("test@example.com");
       expect(text).not.toContain("10.0.0.1");
       expect(redactedCount).toBe(3);

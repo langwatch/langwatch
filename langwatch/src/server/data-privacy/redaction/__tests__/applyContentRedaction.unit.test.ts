@@ -1,24 +1,26 @@
 import { describe, expect, it } from "vitest";
-
+import type { PiiLevel, ResolvedDataPrivacy } from "../../dataPrivacy.types";
+import { EMPTY_AUDIENCE } from "../../dataPrivacy.types";
 import {
   compilePolicySecretPatterns,
   needsStrictAnalysis,
   redactStringNative,
 } from "../applyContentRedaction";
-import type { PiiLevel, ResolvedDataPrivacy } from "../../dataPrivacy.types";
-import { EMPTY_AUDIENCE } from "../../dataPrivacy.types";
 
 function policy({
   secretsEnabled = true,
   piiLevel = "essential" as PiiLevel,
   customPatterns = [] as string[],
 }): ResolvedDataPrivacy {
-  const cat = () => ({ disposition: "capture" as const, audience: { ...EMPTY_AUDIENCE } });
+  const cat = () => ({
+    disposition: "capture" as const,
+    audience: { ...EMPTY_AUDIENCE },
+  });
   return {
     categories: { input: cat(), output: cat(), system: cat(), tools: cat() },
     pii: { level: piiLevel },
     secrets: { enabled: secretsEnabled, customPatterns },
-    customDropKeys: [],
+    customAttributes: [],
   };
 }
 
@@ -29,14 +31,21 @@ describe("redactStringNative", () => {
   describe("given secrets enabled and essential PII", () => {
     it("redacts both a secret and an email", () => {
       const p = policy({});
-      expect(redactStringNative({ text: SECRET, policy: p }).text).toContain("[REDACTED]");
-      expect(redactStringNative({ text: EMAIL, policy: p }).text).toBe("mail [REDACTED] end");
+      expect(redactStringNative({ text: SECRET, policy: p }).text).toContain(
+        "[REDACTED]",
+      );
+      expect(redactStringNative({ text: EMAIL, policy: p }).text).toBe(
+        "mail [REDACTED] end",
+      );
     });
   });
 
   describe("given secrets disabled", () => {
     it("leaves a secret intact", () => {
-      const { text } = redactStringNative({ text: SECRET, policy: policy({ secretsEnabled: false }) });
+      const { text } = redactStringNative({
+        text: SECRET,
+        policy: policy({ secretsEnabled: false }),
+      });
       expect(text).toBe(SECRET);
     });
   });
@@ -45,7 +54,9 @@ describe("redactStringNative", () => {
     it("redacts the secret but keeps the email", () => {
       const p = policy({ piiLevel: "disabled" });
       expect(redactStringNative({ text: EMAIL, policy: p }).text).toBe(EMAIL);
-      expect(redactStringNative({ text: SECRET, policy: p }).text).toContain("[REDACTED]");
+      expect(redactStringNative({ text: SECRET, policy: p }).text).toContain(
+        "[REDACTED]",
+      );
     });
   });
 
@@ -53,7 +64,9 @@ describe("redactStringNative", () => {
     it("does not run essential natively (strict is batched elsewhere) but still scrubs secrets", () => {
       const p = policy({ piiLevel: "strict" });
       expect(redactStringNative({ text: EMAIL, policy: p }).text).toBe(EMAIL);
-      expect(redactStringNative({ text: SECRET, policy: p }).text).toContain("[REDACTED]");
+      expect(redactStringNative({ text: SECRET, policy: p }).text).toContain(
+        "[REDACTED]",
+      );
     });
   });
 

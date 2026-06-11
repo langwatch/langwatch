@@ -61,6 +61,14 @@ Feature: Dropping trace content at ingestion
     Then the stored span has no "http.request.body" attribute
 
   @integration
+  Scenario: A wildcard attribute rule drops every matching key
+    Given a rule on "web-app" that drops attributes matching "app.internal.*"
+    When a trace is ingested carrying "app.internal.session" and "app.public.label" attributes
+    Then the stored span has no "app.internal.session" attribute
+    And the stored span keeps its "app.public.label" attribute
+    And the stored span records which attribute keys were dropped
+
+  @integration
   Scenario: The trace-level computed input is cleared when input is dropped
     Given a rule on "web-app" that drops trace input
     When a trace is ingested with input

@@ -73,8 +73,7 @@ function ibanValid(raw: string): boolean {
   let remainder = 0;
   for (const ch of rearranged) {
     const code = ch.charCodeAt(0);
-    const value =
-      code >= 65 && code <= 90 ? (code - 55).toString() : ch; // A-Z -> 10..35
+    const value = code >= 65 && code <= 90 ? (code - 55).toString() : ch; // A-Z -> 10..35
     for (const digitChar of value) {
       remainder = (remainder * 10 + (digitChar.charCodeAt(0) - 48)) % 97;
     }
@@ -89,20 +88,35 @@ function ipv6Plausible(raw: string): boolean {
 }
 
 const RECOGNIZERS: Recognizer[] = [
-  { entity: "EMAIL_ADDRESS", regex: /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g },
+  {
+    entity: "EMAIL_ADDRESS",
+    regex: /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g,
+  },
   {
     entity: "IP_ADDRESS",
-    regex: /\b(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\b/g,
+    regex:
+      /\b(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\b/g,
   },
   {
     entity: "IP_ADDRESS",
     regex: /\b(?:[0-9A-Fa-f]{0,4}:){2,7}[0-9A-Fa-f]{0,4}\b/g,
     validate: ipv6Plausible,
   },
-  { entity: "CREDIT_CARD", regex: /\b\d(?:[ -]?\d){12,18}\b/g, validate: luhnValid },
-  { entity: "IBAN_CODE", regex: /\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b/g, validate: ibanValid },
+  {
+    entity: "CREDIT_CARD",
+    regex: /\b\d(?:[ -]?\d){12,18}\b/g,
+    validate: luhnValid,
+  },
+  {
+    entity: "IBAN_CODE",
+    regex: /\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b/g,
+    validate: ibanValid,
+  },
   { entity: "CRYPTO", regex: /\b0x[a-fA-F0-9]{40}\b/g },
-  { entity: "CRYPTO", regex: /\b(?:bc1[a-z0-9]{25,62}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})\b/g },
+  {
+    entity: "CRYPTO",
+    regex: /\b(?:bc1[a-z0-9]{25,62}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})\b/g,
+  },
   // Hyphenated US SSN is distinctive enough to fire without context.
   { entity: "US_SSN", regex: /\b\d{3}-\d{2}-\d{4}\b/g },
   // A bare nine-digit run is ambiguous (SSN / bank / passport); require context.
@@ -128,7 +142,13 @@ const RECOGNIZERS: Recognizer[] = [
     entity: "US_BANK_NUMBER",
     regex: /\b\d{8,17}\b/g,
     contextRequired: true,
-    contextWords: ["account number", "account #", "routing", "bank account", "iban"],
+    contextWords: [
+      "account number",
+      "account #",
+      "routing",
+      "bank account",
+      "iban",
+    ],
   },
   {
     entity: "US_DRIVER_LICENSE",
@@ -181,8 +201,15 @@ interface Span {
   end: number;
 }
 
-function hasContextWord(text: string, span: Span, words: readonly string[]): boolean {
-  const before = text.slice(Math.max(0, span.start - CONTEXT_WINDOW), span.start);
+function hasContextWord(
+  text: string,
+  span: Span,
+  words: readonly string[],
+): boolean {
+  const before = text.slice(
+    Math.max(0, span.start - CONTEXT_WINDOW),
+    span.start,
+  );
   const after = text.slice(span.end, span.end + CONTEXT_WINDOW);
   const window = (before + " " + after).toLowerCase();
   return words.some((word) => window.includes(word));
@@ -196,8 +223,16 @@ export interface PiiRedactionResult {
 /**
  * Redact essential PII from one string and report how many spans were replaced.
  */
-export function redactEssentialPiiInText({ text }: { text: string }): PiiRedactionResult {
-  if (typeof text !== "string" || text.length === 0 || text.length > MAX_SCAN_LENGTH) {
+export function redactEssentialPiiInText({
+  text,
+}: {
+  text: string;
+}): PiiRedactionResult {
+  if (
+    typeof text !== "string" ||
+    text.length === 0 ||
+    text.length > MAX_SCAN_LENGTH
+  ) {
     return { text, redactedCount: 0 };
   }
 
@@ -220,7 +255,9 @@ export function redactEssentialPiiInText({ text }: { text: string }): PiiRedacti
   }
 
   try {
-    for (const phone of findPhoneNumbersInText(text, { defaultCountry: "US" })) {
+    for (const phone of findPhoneNumbersInText(text, {
+      defaultCountry: "US",
+    })) {
       spans.push({ start: phone.startsAt, end: phone.endsAt });
     }
   } catch {

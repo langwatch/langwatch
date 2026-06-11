@@ -93,7 +93,7 @@ class TestRecordSpanCommand extends RecordSpanCommand {
       costEnrichmentService: { enrichSpan: async () => {} },
       tokenEstimationService: { estimateSpanTokens: async () => {} },
       contentDropService: {
-        dropSpanContent: async () => ({ droppedCount: 0, droppedCategories: [] }),
+        dropSpanContent: async () => ({ droppedCount: 0, droppedCategories: [], droppedAttributeKeys: [] }),
       },
     });
   }

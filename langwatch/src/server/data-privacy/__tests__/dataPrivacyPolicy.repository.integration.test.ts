@@ -230,9 +230,9 @@ describe("DataPrivacyPolicyRepository integration", () => {
         });
         const rowsAfterDelete = await repository.findForProjectChain(facts);
         expect(rowsAfterDelete).toHaveLength(2);
-        expect(
-          rowsAfterDelete.some((r) => r.scopeType === "PROJECT"),
-        ).toBe(false);
+        expect(rowsAfterDelete.some((r) => r.scopeType === "PROJECT")).toBe(
+          false,
+        );
 
         await prisma.dataPrivacyPolicy.deleteMany({
           where: { organizationId },

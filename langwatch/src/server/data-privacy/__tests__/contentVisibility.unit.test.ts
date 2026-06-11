@@ -29,6 +29,8 @@ function viewer(partial: Partial<ViewerFacts>): ViewerFacts {
   return {
     isAdmin: false,
     isMember: true,
+    isViewer: false,
+    isProjectOwner: false,
     groupIds: [],
     departmentId: null,
     ...partial,
@@ -93,6 +95,44 @@ describe("isContentVisible", () => {
     });
   });
 
+  describe("given content restricted to viewers", () => {
+    /** @scenario Content restricted to viewers is visible to a viewer-role holder */
+    it("shows it to a viewer-role holder and hides it from a plain member", () => {
+      const restriction = eff("restrict", { viewers: true });
+      expect(isContentVisible(restriction, viewer({ isViewer: true }))).toBe(
+        true,
+      );
+      expect(isContentVisible(restriction, viewer({ isViewer: false }))).toBe(
+        false,
+      );
+    });
+  });
+
+  describe("given content restricted to the project owner", () => {
+    /** @scenario Only the owner of a personal project sees its content */
+    it("shows it to the owner and hides it from an admin", () => {
+      const restriction = eff("restrict", { projectOwner: true });
+      expect(
+        isContentVisible(restriction, viewer({ isProjectOwner: true })),
+      ).toBe(true);
+      expect(isContentVisible(restriction, viewer({ isAdmin: true }))).toBe(
+        false,
+      );
+    });
+
+    /** @scenario The owner-only audience can be widened with a chosen group */
+    it("also shows it to a member of an extra chosen group", () => {
+      const restriction = eff("restrict", {
+        projectOwner: true,
+        groupIds: ["super-admins"],
+      });
+      expect(
+        isContentVisible(restriction, viewer({ groupIds: ["super-admins"] })),
+      ).toBe(true);
+      expect(isContentVisible(restriction, viewer({}))).toBe(false);
+    });
+  });
+
   describe("given all-members or captured content", () => {
     it("shows captured content to any member and hides everything from a non-member", () => {
       expect(isContentVisible(eff("capture"), viewer({ isMember: true }))).toBe(
@@ -126,6 +166,12 @@ describe("describeAudience", () => {
         departments: {},
       }),
     ).toBe("Admins, Security");
+    expect(
+      describeAudience(audience({ viewers: true, projectOwner: true }), {
+        groups: {},
+        departments: {},
+      }),
+    ).toBe("Viewers, the project owner");
     expect(
       describeAudience(audience({}), { groups: {}, departments: {} }),
     ).toBe("no one");

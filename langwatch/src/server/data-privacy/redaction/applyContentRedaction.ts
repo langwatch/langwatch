@@ -1,11 +1,11 @@
 import type { ResolvedDataPrivacy } from "../dataPrivacy.types";
+import { redactEssentialPiiInText } from "./essentialPii";
 import {
   compileSecretPatterns,
   isSensitiveAttributeKey,
   redactSecretsInText,
   SECRETS_REDACTION_MARKER,
 } from "./secretsRedaction";
-import { redactEssentialPiiInText } from "./essentialPii";
 
 /**
  * Compose the NATIVE (in-process) redaction passes for a resolved policy: the
@@ -31,7 +31,10 @@ export function redactStringNative({
   let redactedCount = 0;
 
   if (policy.secrets.enabled) {
-    const secrets = redactSecretsInText({ text: result, customPatterns: compiledSecretPatterns });
+    const secrets = redactSecretsInText({
+      text: result,
+      customPatterns: compiledSecretPatterns,
+    });
     result = secrets.text;
     redactedCount += secrets.redactedCount;
   }
@@ -63,7 +66,11 @@ export function redactAttributeNative({
   policy: ResolvedDataPrivacy;
   compiledSecretPatterns?: readonly RegExp[];
 }): { text: string; redactedCount: number } {
-  if (policy.secrets.enabled && value.length > 0 && isSensitiveAttributeKey(key)) {
+  if (
+    policy.secrets.enabled &&
+    value.length > 0 &&
+    isSensitiveAttributeKey(key)
+  ) {
     return { text: SECRETS_REDACTION_MARKER, redactedCount: 1 };
   }
   return redactStringNative({ text: value, policy, compiledSecretPatterns });
@@ -81,6 +88,8 @@ export function needsStrictAnalysis(policy: ResolvedDataPrivacy): boolean {
  * Compile a resolved policy's custom secret patterns once, for reuse across all
  * of a span's strings.
  */
-export function compilePolicySecretPatterns(policy: ResolvedDataPrivacy): RegExp[] {
+export function compilePolicySecretPatterns(
+  policy: ResolvedDataPrivacy,
+): RegExp[] {
   return compileSecretPatterns(policy.secrets.customPatterns);
 }

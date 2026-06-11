@@ -30,7 +30,7 @@ function policy({
   output = "capture" as Disposition,
   system = "capture" as Disposition,
   tools = "capture" as Disposition,
-  customDropKeys = [] as string[],
+  dropAttributes = [] as string[],
 }): ResolvedDataPrivacy {
   const cat = (disposition: Disposition) => ({
     disposition,
@@ -45,7 +45,11 @@ function policy({
     },
     pii: { level: "essential" },
     secrets: { enabled: true, customPatterns: [] },
-    customDropKeys,
+    customAttributes: dropAttributes.map((pattern) => ({
+      pattern,
+      disposition: "drop" as const,
+      audience: { ...EMPTY_AUDIENCE },
+    })),
   };
 }
 
@@ -58,7 +62,7 @@ function makeHandler(dropPolicy: ResolvedDataPrivacy | null): RecordSpanCommand 
       dropSpanContent: async ({ span }) =>
         dropPolicy
           ? stripOtlpSpanContent({ span, policy: dropPolicy })
-          : { droppedCount: 0, droppedCategories: [] },
+          : { droppedCount: 0, droppedCategories: [], droppedAttributeKeys: [] },
     },
   };
   return new RecordSpanCommand(deps);

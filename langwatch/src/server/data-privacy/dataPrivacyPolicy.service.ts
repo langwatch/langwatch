@@ -2,9 +2,9 @@ import type { DataPrivacyPolicy } from "@prisma/client";
 import { prisma } from "~/server/db";
 import { isSafeRegex } from "~/utils/safeRegex";
 import {
+  type DataPrivacyConfig,
   dataPrivacyConfigSchema,
   PLATFORM_DEFAULT_DATA_PRIVACY,
-  type DataPrivacyConfig,
   type ResolvedDataPrivacy,
 } from "./dataPrivacy.types";
 import { DataPrivacyPolicyCache } from "./dataPrivacyPolicy.cache";
@@ -44,6 +44,25 @@ function assertSafeCustomPatterns(patterns: string[]): void {
           pattern,
         )} could backtrack catastrophically (ReDoS) and was rejected. ` +
           "Simplify the pattern (avoid nested quantifiers).",
+      );
+    }
+  }
+}
+
+/**
+ * A custom attribute pattern of only wildcards would match every span
+ * attribute, and as a drop rule it would strip the observability metadata the
+ * feature promises to always keep. Require at least one literal character.
+ */
+function assertSafeAttributePatterns(
+  rules: Array<{ pattern: string }> | undefined,
+): void {
+  for (const rule of rules ?? []) {
+    if (rule.pattern.replaceAll("*", "").length === 0) {
+      throw new InvalidDataPrivacyConfigError(
+        `Custom attribute pattern ${JSON.stringify(
+          rule.pattern,
+        )} matches every attribute; name at least part of the key.`,
       );
     }
   }
@@ -108,6 +127,7 @@ export class DataPrivacyPolicyService {
       );
     }
     assertSafeCustomPatterns(parsed.data.secrets?.customPatterns ?? []);
+    assertSafeAttributePatterns(parsed.data.customAttributes);
 
     const organizationId =
       await this.repository.findOrganizationForScope(scope);

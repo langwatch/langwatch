@@ -20,7 +20,10 @@ describe("redactSecretsInText", () => {
       ["a Slack token", `xoxb-${"1".repeat(20)} here`],
       ["a Google API key", `AIza${"A".repeat(35)} here`],
       ["a Stripe secret key", `sk_live_${"a".repeat(24)} here`],
-      ["a JWT", "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcDEF123456"],
+      [
+        "a JWT",
+        "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcDEF123456",
+      ],
     ];
 
     for (const [label, input] of cases) {
@@ -83,7 +86,10 @@ describe("redactSecretsInText", () => {
   describe("given a custom pattern", () => {
     it("redacts a company-specific token shape", () => {
       const custom = compileSecretPatterns(["acme_live_[a-z0-9]{8,}"]);
-      const { text, redactedCount } = redact("token acme_live_abcd1234 end", custom);
+      const { text, redactedCount } = redact(
+        "token acme_live_abcd1234 end",
+        custom,
+      );
       expect(text).toBe("token [REDACTED] end");
       expect(redactedCount).toBe(1);
     });
@@ -101,7 +107,13 @@ describe("compileSecretPatterns", () => {
 
 describe("isSensitiveAttributeKey", () => {
   describe("given a sensitive attribute name", () => {
-    for (const key of ["Authorization", "x-api-key", "DB_PASSWORD", "client_secret", "set-cookie"]) {
+    for (const key of [
+      "Authorization",
+      "x-api-key",
+      "DB_PASSWORD",
+      "client_secret",
+      "set-cookie",
+    ]) {
       it(`flags ${key}`, () => {
         expect(isSensitiveAttributeKey(key)).toBe(true);
       });
@@ -109,7 +121,12 @@ describe("isSensitiveAttributeKey", () => {
   });
 
   describe("given an ordinary metadata key", () => {
-    for (const key of ["model", "latency", "gen_ai.usage.input_tokens", "span.name"]) {
+    for (const key of [
+      "model",
+      "latency",
+      "gen_ai.usage.input_tokens",
+      "span.name",
+    ]) {
       it(`does not flag ${key}`, () => {
         expect(isSensitiveAttributeKey(key)).toBe(false);
       });

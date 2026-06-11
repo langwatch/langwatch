@@ -11,6 +11,10 @@ import type { Disposition, ResolvedAudience } from "./dataPrivacy.types";
 export interface ViewerFacts {
   isAdmin: boolean;
   isMember: boolean;
+  /** Holds the built-in VIEWER role on the project's team. */
+  isViewer: boolean;
+  /** Owns the (personal) project the trace belongs to. */
+  isProjectOwner: boolean;
   groupIds: string[];
   departmentId: string | null;
 }
@@ -27,19 +31,22 @@ export interface EffectiveRestriction {
 /**
  * Whether a signed-in viewer may read content under an effective restriction.
  * Non-members see nothing; dropped content is not stored; captured content is
- * visible to every member; a restrict audience matches admins, all-members, any
- * of the viewer's groups, or the viewer's department.
+ * visible to every member; a restrict audience matches the built-in role groups
+ * (admins, all members, viewers), the project owner, any of the viewer's
+ * groups, or the viewer's department.
  */
 export function isContentVisible(
   eff: EffectiveRestriction,
   viewer: ViewerFacts,
 ): boolean {
-  if (!viewer.isMember) return false;
+  if (!viewer.isMember && !viewer.isProjectOwner) return false;
   if (eff.disposition === "drop") return false;
-  if (eff.disposition === "capture") return true;
+  if (eff.disposition === "capture") return viewer.isMember;
   const audience = eff.audience;
   if (audience.admins && viewer.isAdmin) return true;
   if (audience.allMembers && viewer.isMember) return true;
+  if (audience.viewers && viewer.isViewer) return true;
+  if (audience.projectOwner && viewer.isProjectOwner) return true;
   if (audience.groupIds.some((id) => viewer.groupIds.includes(id))) return true;
   if (
     viewer.departmentId != null &&
@@ -57,9 +64,9 @@ export function isContentVisibleToPublic(eff: EffectiveRestriction): boolean {
 
 /**
  * Whether deciding this restriction needs the viewer's groups/department (i.e.
- * the audience names specific groups or departments). Admins-only and no-one
- * restrictions are decided from the admin flag alone, so the read path can skip
- * the extra membership lookups in the common cases.
+ * the audience names specific groups or departments). Admin/viewer/owner-only
+ * and no-one restrictions are decided from facts the read path already holds,
+ * so it can skip the extra membership lookups in the common cases.
  */
 export function needsAudienceFacts(eff: EffectiveRestriction): boolean {
   return (
@@ -84,6 +91,8 @@ export function describeAudience(
   const parts: string[] = [];
   if (audience.admins) parts.push("Admins");
   if (audience.allMembers) parts.push("All members");
+  if (audience.viewers) parts.push("Viewers");
+  if (audience.projectOwner) parts.push("the project owner");
   for (const id of audience.groupIds) {
     parts.push(names.groups[id] ?? "a group");
   }

@@ -2,8 +2,8 @@ import type { DataPrivacyPolicy, Prisma, PrismaClient } from "@prisma/client";
 import { resolveOrganizationForScope } from "~/server/scopes/resolveOrganizationForScope";
 import { createLogger } from "~/utils/logger/server";
 import {
-  dataPrivacyConfigSchema,
   type DataPrivacyConfig,
+  dataPrivacyConfigSchema,
 } from "./dataPrivacy.types";
 import {
   buildDataPrivacyChain,

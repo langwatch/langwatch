@@ -95,8 +95,10 @@ const VALUE_RULES: ValueRule[] = [
 ];
 
 /** Public catalog of the built-in value rules, for UI chips and docs. */
-export const BUILTIN_SECRET_RULES: readonly { id: string; description: string }[] =
-  VALUE_RULES.map(({ id, description }) => ({ id, description }));
+export const BUILTIN_SECRET_RULES: readonly {
+  id: string;
+  description: string;
+}[] = VALUE_RULES.map(({ id, description }) => ({ id, description }));
 
 /**
  * Attribute names whose VALUE should always be scrubbed regardless of shape.
@@ -144,7 +146,11 @@ export function redactSecretsInText({
   text: string;
   customPatterns?: readonly RegExp[];
 }): SecretsRedactionResult {
-  if (typeof text !== "string" || text.length === 0 || text.length > MAX_SCAN_LENGTH) {
+  if (
+    typeof text !== "string" ||
+    text.length === 0 ||
+    text.length > MAX_SCAN_LENGTH
+  ) {
     return { text, redactedCount: 0 };
   }
 

@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
-
+import type { DataPrivacyConfig } from "../dataPrivacy.types";
 import {
-  resolveDataPrivacy,
   type DataPrivacyRow,
   type DataPrivacyScopeFacts,
+  resolveDataPrivacy,
 } from "../resolveDataPrivacy";
-import type { DataPrivacyConfig } from "../dataPrivacy.types";
 
 const teamProject: DataPrivacyScopeFacts = {
   organizationId: "acme",
@@ -45,7 +44,11 @@ describe("resolveDataPrivacy", () => {
   describe("given an organization rule", () => {
     /** @scenario An organization rule applies to every project in the org */
     it("applies to a project with no closer rule", () => {
-      const rows = [rule("ORGANIZATION", "acme", { categories: { input: { disposition: "drop" } } })];
+      const rows = [
+        rule("ORGANIZATION", "acme", {
+          categories: { input: { disposition: "drop" } },
+        }),
+      ];
 
       const resolved = resolveDataPrivacy({ rows, facts: teamProject });
 
@@ -57,8 +60,12 @@ describe("resolveDataPrivacy", () => {
     /** @scenario A project rule beats an organization rule */
     it("lets the project rule win", () => {
       const rows = [
-        rule("ORGANIZATION", "acme", { categories: { input: { disposition: "drop" } } }),
-        rule("PROJECT", "web-app", { categories: { input: { disposition: "capture" } } }),
+        rule("ORGANIZATION", "acme", {
+          categories: { input: { disposition: "drop" } },
+        }),
+        rule("PROJECT", "web-app", {
+          categories: { input: { disposition: "capture" } },
+        }),
       ];
 
       const resolved = resolveDataPrivacy({ rows, facts: teamProject });
@@ -71,8 +78,12 @@ describe("resolveDataPrivacy", () => {
     /** @scenario A team rule sits between organization and project */
     it("lets the team rule win over the organization rule", () => {
       const rows = [
-        rule("ORGANIZATION", "acme", { categories: { input: { disposition: "capture" } } }),
-        rule("TEAM", "platform", { categories: { input: { disposition: "drop" } } }),
+        rule("ORGANIZATION", "acme", {
+          categories: { input: { disposition: "capture" } },
+        }),
+        rule("TEAM", "platform", {
+          categories: { input: { disposition: "drop" } },
+        }),
       ];
 
       const resolved = resolveDataPrivacy({ rows, facts: teamProject });
@@ -86,7 +97,9 @@ describe("resolveDataPrivacy", () => {
     it("applies the department rule", () => {
       const rows = [
         rule("DEPARTMENT", "hr", {
-          categories: { output: { disposition: "restrict", audience: { admins: true } } },
+          categories: {
+            output: { disposition: "restrict", audience: { admins: true } },
+          },
         }),
       ];
 
@@ -99,8 +112,12 @@ describe("resolveDataPrivacy", () => {
     /** @scenario A department rule beats a team rule for the same project */
     it("lets the department rule win over the team rule", () => {
       const rows = [
-        rule("TEAM", "platform", { categories: { output: { disposition: "capture" } } }),
-        rule("DEPARTMENT", "hr", { categories: { output: { disposition: "drop" } } }),
+        rule("TEAM", "platform", {
+          categories: { output: { disposition: "capture" } },
+        }),
+        rule("DEPARTMENT", "hr", {
+          categories: { output: { disposition: "drop" } },
+        }),
       ];
 
       const resolved = resolveDataPrivacy({ rows, facts: hrProject });
@@ -114,9 +131,13 @@ describe("resolveDataPrivacy", () => {
     it("resolves each field from its own most-specific rule", () => {
       const rows = [
         rule("ORGANIZATION", "acme", { pii: { level: "strict" } }),
-        rule("TEAM", "platform", { categories: { input: { disposition: "drop" } } }),
+        rule("TEAM", "platform", {
+          categories: { input: { disposition: "drop" } },
+        }),
         rule("PROJECT", "web-app", {
-          categories: { output: { disposition: "restrict", audience: { admins: true } } },
+          categories: {
+            output: { disposition: "restrict", audience: { admins: true } },
+          },
         }),
       ];
 
@@ -140,15 +161,22 @@ describe("resolveDataPrivacy", () => {
     /** @scenario A rule for all personal projects covers a personal workspace but not a team project */
     it("covers a personal workspace but leaves a team project at the default", () => {
       const rows = [
-        rule("ORGANIZATION", "acme", { categories: { input: { disposition: "drop" } } }, true),
+        rule(
+          "ORGANIZATION",
+          "acme",
+          { categories: { input: { disposition: "drop" } } },
+          true,
+        ),
       ];
 
-      expect(resolveDataPrivacy({ rows, facts: aliceWorkspace }).categories.input.disposition).toBe(
-        "drop",
-      );
-      expect(resolveDataPrivacy({ rows, facts: teamProject }).categories.input.disposition).toBe(
-        "capture",
-      );
+      expect(
+        resolveDataPrivacy({ rows, facts: aliceWorkspace }).categories.input
+          .disposition,
+      ).toBe("drop");
+      expect(
+        resolveDataPrivacy({ rows, facts: teamProject }).categories.input
+          .disposition,
+      ).toBe("capture");
     });
   });
 
@@ -164,7 +192,12 @@ describe("resolveDataPrivacy", () => {
     /** @scenario A department rule narrowed to personal projects follows the owner's department */
     it("applies to a personal project whose owner is in that department", () => {
       const rows = [
-        rule("DEPARTMENT", "hr", { categories: { input: { disposition: "drop" } } }, true),
+        rule(
+          "DEPARTMENT",
+          "hr",
+          { categories: { input: { disposition: "drop" } } },
+          true,
+        ),
       ];
 
       const resolved = resolveDataPrivacy({ rows, facts: bobWorkspace });
@@ -173,18 +206,56 @@ describe("resolveDataPrivacy", () => {
     });
   });
 
-  describe("given custom drop-keys at two tiers", () => {
-    /** @scenario Extra keys to drop accumulate down the cascade */
-    it("unions the keys from every matching rule", () => {
+  describe("given custom attribute rules at two tiers", () => {
+    /** @scenario Custom attribute rules accumulate down the cascade */
+    it("unions the distinct patterns from every matching rule", () => {
       const rows = [
-        rule("ORGANIZATION", "acme", { customDropKeys: ["http.request.body"] }),
-        rule("PROJECT", "web-app", { customDropKeys: ["app.session_token"] }),
+        rule("ORGANIZATION", "acme", {
+          customAttributes: [
+            { pattern: "http.request.body", disposition: "drop" },
+          ],
+        }),
+        rule("PROJECT", "web-app", {
+          customAttributes: [
+            { pattern: "app.session_token", disposition: "drop" },
+          ],
+        }),
       ];
 
       const resolved = resolveDataPrivacy({ rows, facts: teamProject });
 
-      expect(resolved.customDropKeys).toContain("http.request.body");
-      expect(resolved.customDropKeys).toContain("app.session_token");
+      const patterns = resolved.customAttributes.map((r) => r.pattern);
+      expect(patterns).toContain("http.request.body");
+      expect(patterns).toContain("app.session_token");
+    });
+
+    /** @scenario A narrower scope overrides the same attribute pattern from a wider scope */
+    it("lets the most-specific scope win when both set the same pattern", () => {
+      const rows = [
+        rule("ORGANIZATION", "acme", {
+          customAttributes: [
+            { pattern: "app.session_token", disposition: "drop" },
+          ],
+        }),
+        rule("PROJECT", "web-app", {
+          customAttributes: [
+            {
+              pattern: "app.session_token",
+              disposition: "restrict",
+              audience: { admins: true },
+            },
+          ],
+        }),
+      ];
+
+      const resolved = resolveDataPrivacy({ rows, facts: teamProject });
+
+      const entry = resolved.customAttributes.find(
+        (r) => r.pattern === "app.session_token",
+      );
+      expect(resolved.customAttributes).toHaveLength(1);
+      expect(entry?.disposition).toBe("restrict");
+      expect(entry?.audience.admins).toBe(true);
     });
   });
 });

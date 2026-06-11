@@ -7,4 +7,9 @@ export interface Protections {
   // placeholder. Null/absent when the content is visible.
   capturedInputVisibleTo?: string | null;
   capturedOutputVisibleTo?: string | null;
+  // Custom attribute rules (restrict disposition) whose audience excludes THIS
+  // viewer: the read mappers replace matching attribute values with a redaction
+  // placeholder naming `visibleTo`. Patterns may carry `*` wildcards. Absent or
+  // empty when nothing is hidden for the viewer.
+  hiddenAttributes?: Array<{ pattern: string; visibleTo: string }>;
 }

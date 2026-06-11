@@ -1,23 +1,25 @@
 import { describe, expect, it } from "vitest";
-
-import { stripOtlpSpanContent } from "../applyOtlpSpanContentDrop";
-import { PRIVACY_DROPPED_MARKER_ATTR } from "../dropKeyCatalog";
-import {
-  EMPTY_AUDIENCE,
-  type Disposition,
-  type ResolvedDataPrivacy,
-} from "../dataPrivacy.types";
 import type {
   OtlpKeyValue,
   OtlpSpan,
 } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import { stripOtlpSpanContent } from "../applyOtlpSpanContentDrop";
+import {
+  type Disposition,
+  EMPTY_AUDIENCE,
+  type ResolvedDataPrivacy,
+} from "../dataPrivacy.types";
+import {
+  PRIVACY_DROPPED_ATTRIBUTES_MARKER_ATTR,
+  PRIVACY_DROPPED_MARKER_ATTR,
+} from "../dropKeyCatalog";
 
 function policy({
   input = "capture" as Disposition,
   output = "capture" as Disposition,
   system = "capture" as Disposition,
   tools = "capture" as Disposition,
-  customDropKeys = [] as string[],
+  dropAttributes = [] as string[],
 }): ResolvedDataPrivacy {
   const cat = (disposition: Disposition) => ({
     disposition,
@@ -32,7 +34,11 @@ function policy({
     },
     pii: { level: "essential" },
     secrets: { enabled: true, customPatterns: [] },
-    customDropKeys,
+    customAttributes: dropAttributes.map((pattern) => ({
+      pattern,
+      disposition: "drop" as const,
+      audience: { ...EMPTY_AUDIENCE },
+    })),
   };
 }
 
@@ -74,8 +80,10 @@ function keys(span: OtlpSpan): string[] {
 }
 
 function marker(span: OtlpSpan): string | undefined {
-  return span.attributes.find((a) => a.key === PRIVACY_DROPPED_MARKER_ATTR)
-    ?.value.stringValue ?? undefined;
+  return (
+    span.attributes.find((a) => a.key === PRIVACY_DROPPED_MARKER_ATTR)?.value
+      .stringValue ?? undefined
+  );
 }
 
 describe("stripOtlpSpanContent", () => {
@@ -159,7 +167,7 @@ describe("stripOtlpSpanContent", () => {
   });
 
   describe("given a span with a custom blacklisted attribute key", () => {
-    describe("when the policy lists that key in customDropKeys", () => {
+    describe("when the policy carries a drop rule for that key", () => {
       /** @scenario Extra blacklisted attribute keys are dropped */
       it("removes the custom key without touching captured categories", () => {
         const s = span({
@@ -169,7 +177,7 @@ describe("stripOtlpSpanContent", () => {
 
         stripOtlpSpanContent({
           span: s,
-          policy: policy({ customDropKeys: ["http.request.body"] }),
+          policy: policy({ dropAttributes: ["http.request.body"] }),
         });
 
         expect(keys(s)).not.toContain("http.request.body");
@@ -178,13 +186,45 @@ describe("stripOtlpSpanContent", () => {
         expect(marker(s)).toBeUndefined();
       });
     });
+
+    describe("when the policy carries a wildcard drop rule", () => {
+      /** @scenario A wildcard attribute rule drops every matching key */
+      it("removes every matching key, keeps the rest, and records the dropped key names", () => {
+        const s = span({
+          "app.internal.session": "s-1",
+          "app.internal.token": "t-1",
+          "app.public.label": "ok",
+        });
+
+        const result = stripOtlpSpanContent({
+          span: s,
+          policy: policy({ dropAttributes: ["app.internal.*"] }),
+        });
+
+        expect(keys(s)).not.toContain("app.internal.session");
+        expect(keys(s)).not.toContain("app.internal.token");
+        expect(keys(s)).toContain("app.public.label");
+        expect(result.droppedAttributeKeys.sort()).toEqual([
+          "app.internal.session",
+          "app.internal.token",
+        ]);
+        const attributesMarker = s.attributes.find(
+          (a) => a.key === PRIVACY_DROPPED_ATTRIBUTES_MARKER_ATTR,
+        )?.value.stringValue;
+        expect(attributesMarker).toContain("app.internal.session");
+        expect(attributesMarker).toContain("app.internal.token");
+      });
+    });
   });
 
   describe("given dropped content also lives on a span event", () => {
     describe("when input is dropped", () => {
       it("strips the dropped keys from event attributes too", () => {
         const s = span({ "gen_ai.request.model": "gpt-5-mini" }, [
-          { "gen_ai.input.messages": "hello", "gen_ai.usage.input_tokens": "5" },
+          {
+            "gen_ai.input.messages": "hello",
+            "gen_ai.usage.input_tokens": "5",
+          },
         ]);
 
         stripOtlpSpanContent({ span: s, policy: policy({ input: "drop" }) });

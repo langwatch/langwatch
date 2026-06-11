@@ -38,7 +38,7 @@ function mkPolicy({
     categories: { input: cat(), output: cat(), system: cat(), tools: cat() },
     pii: { level: piiLevel },
     secrets: { enabled: secretsEnabled, customPatterns },
-    customDropKeys: [],
+    customAttributes: [],
   };
 }
 

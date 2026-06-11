@@ -7,14 +7,7 @@
  */
 import type { Project } from "@prisma/client";
 import { nanoid } from "nanoid";
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-} from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { getTestProject } from "../../../utils/testUtils";
 import { prisma } from "../../db";
 import { PLATFORM_DEFAULT_DATA_PRIVACY } from "../dataPrivacy.types";

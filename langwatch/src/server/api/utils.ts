@@ -92,38 +92,44 @@ export async function getInternalProtectionsForProject(
 }
 
 /**
- * Resolve a human label of who may see a restricted category, mapping the
- * audience's group/department ids to names (the organization scopes the lookup).
+ * Resolve the group/department display names referenced by a set of audiences
+ * in one batched lookup (the organization scopes it), so several redaction
+ * labels can be built without one query per audience.
  */
-async function describeRestriction(
+async function resolveAudienceNames(
   prisma: PrismaClient,
-  audience: ResolvedAudience,
+  audiences: ResolvedAudience[],
   organizationId: string | null,
-): Promise<string> {
-  let groups: Record<string, string> = {};
-  let departments: Record<string, string> = {};
+): Promise<{
+  groups: Record<string, string>;
+  departments: Record<string, string>;
+}> {
+  const groupIds = [...new Set(audiences.flatMap((a) => a.groupIds))];
+  const departmentIds = [...new Set(audiences.flatMap((a) => a.departmentIds))];
   if (
-    organizationId &&
-    (audience.groupIds.length > 0 || audience.departmentIds.length > 0)
+    !organizationId ||
+    (groupIds.length === 0 && departmentIds.length === 0)
   ) {
-    const [groupRows, departmentRows] = await Promise.all([
-      audience.groupIds.length > 0
-        ? prisma.group.findMany({
-            where: { id: { in: audience.groupIds }, organizationId },
-            select: { id: true, name: true },
-          })
-        : Promise.resolve([]),
-      audience.departmentIds.length > 0
-        ? prisma.department.findMany({
-            where: { id: { in: audience.departmentIds }, organizationId },
-            select: { id: true, name: true },
-          })
-        : Promise.resolve([]),
-    ]);
-    groups = Object.fromEntries(groupRows.map((g) => [g.id, g.name]));
-    departments = Object.fromEntries(departmentRows.map((d) => [d.id, d.name]));
+    return { groups: {}, departments: {} };
   }
-  return describeAudience(audience, { groups, departments });
+  const [groupRows, departmentRows] = await Promise.all([
+    groupIds.length > 0
+      ? prisma.group.findMany({
+          where: { id: { in: groupIds }, organizationId },
+          select: { id: true, name: true },
+        })
+      : Promise.resolve([]),
+    departmentIds.length > 0
+      ? prisma.department.findMany({
+          where: { id: { in: departmentIds }, organizationId },
+          select: { id: true, name: true },
+        })
+      : Promise.resolve([]),
+  ]);
+  return {
+    groups: Object.fromEntries(groupRows.map((g) => [g.id, g.name])),
+    departments: Object.fromEntries(departmentRows.map((d) => [d.id, d.name])),
+  };
 }
 
 export async function getUserProtectionsForProject(
@@ -144,6 +150,7 @@ export async function getUserProtectionsForProject(
     where: { id: projectId, archivedAt: null },
     select: {
       teamId: true,
+      ownerUserId: true,
     },
   });
 
@@ -177,8 +184,12 @@ export async function getUserProtectionsForProject(
   }
   const effInput = policy.categories.input;
   const effOutput = policy.categories.output;
+  const restrictedAttributeRules = policy.customAttributes.filter(
+    (rule) => rule.disposition === "restrict",
+  );
 
-  // For public shares or non-signed in users, only captured content is visible.
+  // For public shares or non-signed in users, only captured content is visible,
+  // and every restricted custom attribute is hidden.
   if (
     // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
     ctx.publiclyShared ||
@@ -189,6 +200,10 @@ export async function getUserProtectionsForProject(
       canSeeCosts,
       canSeeCapturedInput: isContentVisibleToPublic(effInput),
       canSeeCapturedOutput: isContentVisibleToPublic(effOutput),
+      hiddenAttributes: restrictedAttributeRules.map((rule) => ({
+        pattern: rule.pattern,
+        visibleTo: "members of this project",
+      })),
     };
   }
 
@@ -204,6 +219,9 @@ export async function getUserProtectionsForProject(
 
   let isAdmin = teamBindings.some((b) => b.role === TeamUserRole.ADMIN);
   let isMember = teamBindings.length > 0;
+  const isViewer = teamBindings.some((b) => b.role === TeamUserRole.VIEWER);
+  const isProjectOwner =
+    project.ownerUserId != null && project.ownerUserId === userId;
   if (!isMember) {
     const orgRole = await getApp().organizations.getUserOrgRoleByTeamId({
       userId,
@@ -218,15 +236,18 @@ export async function getUserProtectionsForProject(
   }
 
   // Group + department membership is only needed when a restrict audience names
-  // groups or departments; admins-only and no-one restrictions decide from the
-  // admin flag alone, keeping the common read path free of the extra queries.
+  // groups or departments; the role-group and owner audiences decide from facts
+  // already in hand, keeping the common read path free of the extra queries.
   let organizationId: string | null = null;
   let groupIds: string[] = [];
   let departmentId: string | null = null;
-  if (
-    isMember &&
-    (needsAudienceFacts(effInput) || needsAudienceFacts(effOutput))
-  ) {
+  const needsFacts =
+    needsAudienceFacts(effInput) ||
+    needsAudienceFacts(effOutput) ||
+    restrictedAttributeRules.some((rule) =>
+      needsAudienceFacts({ disposition: "restrict", audience: rule.audience }),
+    );
+  if (isMember && needsFacts) {
     const team = await ctx.prisma.team.findUnique({
       where: { id: project.teamId },
       select: { organizationId: true },
@@ -248,9 +269,39 @@ export async function getUserProtectionsForProject(
     }
   }
 
-  const viewer: ViewerFacts = { isAdmin, isMember, groupIds, departmentId };
+  const viewer: ViewerFacts = {
+    isAdmin,
+    isMember,
+    isViewer,
+    isProjectOwner,
+    groupIds,
+    departmentId,
+  };
   const canSeeCapturedInput = isContentVisible(effInput, viewer);
   const canSeeCapturedOutput = isContentVisible(effOutput, viewer);
+  const hiddenAttributeRules = restrictedAttributeRules.filter(
+    (rule) =>
+      !isContentVisible(
+        { disposition: "restrict", audience: rule.audience },
+        viewer,
+      ),
+  );
+
+  // One batched name lookup serves every redaction label this viewer needs.
+  const audiencesNeedingLabels: ResolvedAudience[] = [
+    ...(!canSeeCapturedInput && effInput.disposition === "restrict"
+      ? [effInput.audience]
+      : []),
+    ...(!canSeeCapturedOutput && effOutput.disposition === "restrict"
+      ? [effOutput.audience]
+      : []),
+    ...hiddenAttributeRules.map((rule) => rule.audience),
+  ];
+  const names = await resolveAudienceNames(
+    ctx.prisma,
+    audiencesNeedingLabels,
+    organizationId,
+  );
 
   return {
     canSeeCosts,
@@ -258,19 +309,15 @@ export async function getUserProtectionsForProject(
     canSeeCapturedOutput,
     capturedInputVisibleTo:
       !canSeeCapturedInput && effInput.disposition === "restrict"
-        ? await describeRestriction(
-            ctx.prisma,
-            effInput.audience,
-            organizationId,
-          )
+        ? describeAudience(effInput.audience, names)
         : null,
     capturedOutputVisibleTo:
       !canSeeCapturedOutput && effOutput.disposition === "restrict"
-        ? await describeRestriction(
-            ctx.prisma,
-            effOutput.audience,
-            organizationId,
-          )
+        ? describeAudience(effOutput.audience, names)
         : null,
+    hiddenAttributes: hiddenAttributeRules.map((rule) => ({
+      pattern: rule.pattern,
+      visibleTo: describeAudience(rule.audience, names),
+    })),
   };
 }
