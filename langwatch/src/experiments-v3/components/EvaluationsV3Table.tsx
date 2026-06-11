@@ -69,6 +69,7 @@ import {
 } from "./TableMetaWrappers";
 import { TargetSuperHeader } from "./TargetSuperHeader";
 import { VirtualizedTableBody } from "~/components/datasets/editor/VirtualizedTableBody";
+import { datasetTableCss } from "~/components/datasets/editor/datasetTableStyles";
 import { EvaluationsV3DatasetTableProvider } from "./EvaluationsV3DatasetTableProvider";
 
 // Max rows for expanded mode (disable virtualization above this)
@@ -1396,6 +1397,7 @@ export function EvaluationsV3Table({
       minWidth={`calc(100vw - ${MENU_PLUS_PADDING}px + ${DRAWER_WIDTH}px)`}
       minHeight="full"
       css={{
+        ...datasetTableCss,
         "& table": {
           // Table width = max(100%, sum of column percentages) + fixed widths (checkbox + drawer)
           // This allows columns to exceed 100% and trigger horizontal scroll
@@ -1418,16 +1420,6 @@ export function EvaluationsV3Table({
           top: `${SUPER_HEADER_HEIGHT}px`,
           zIndex: 10,
           backgroundColor: "var(--chakra-colors-bg-panel)",
-        },
-        "& th": {
-          borderBottom: "1px solid var(--chakra-colors-border)",
-          borderRight: "1px solid var(--chakra-colors-border-muted)",
-          padding: "8px 12px",
-          textAlign: "left",
-          backgroundColor: "var(--chakra-colors-bg-panel)",
-          fontWeight: "medium",
-          fontSize: "13px",
-          position: "relative",
         },
         // Resize handle styles - wider hit area, narrow visible indicator
         "& .resizer": {
@@ -1456,29 +1448,6 @@ export function EvaluationsV3Table({
         // Only show indicator when hovering the resize area or actively resizing
         "& .resizer:hover::after, & .resizer.isResizing::after": {
           opacity: 1,
-        },
-        "& td": {
-          borderBottom: "1px solid var(--chakra-colors-border-muted)",
-          borderRight: "1px solid var(--chakra-colors-border-muted)",
-          padding: "8px 12px",
-          fontSize: "13px",
-          verticalAlign: "top",
-          // CSS variable for fade overlay gradient
-          "--cell-bg": "var(--chakra-colors-bg-panel)",
-        },
-        "& tr:hover td": {
-          backgroundColor: "var(--chakra-colors-bg-subtle)",
-          // Update CSS variable for fade overlay on hover
-          "--cell-bg": "var(--chakra-colors-bg-subtle)",
-        },
-        // Selected row styling
-        "& tr[data-selected='true'] td": {
-          backgroundColor: "var(--chakra-colors-blue-subtle)",
-          "--cell-bg": "var(--chakra-colors-blue-subtle)",
-          "border-color": "var(--chakra-colors-blue-muted)",
-        },
-        "& tr:has(+ tr[data-selected='true']) td": {
-          "border-bottom-color": "var(--chakra-colors-blue-muted)",
         },
       }}
     >

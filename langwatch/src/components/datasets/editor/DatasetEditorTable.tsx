@@ -66,6 +66,7 @@ import {
   type EditorColumn,
   type EditorRecord,
 } from "./useDatasetEditorStore";
+import { datasetTableCss } from "./datasetTableStyles";
 import { useDatasetRecordSync } from "./useDatasetRecordSync";
 import { useTableKeyboardNavigation } from "./useTableKeyboardNavigation";
 import { VirtualizedTableBody } from "./VirtualizedTableBody";
@@ -636,13 +637,19 @@ export function DatasetEditorTable({
         borderWidth="1px"
         borderColor="border.muted"
         borderRadius="md"
+        css={{
+          ...datasetTableCss,
+          "& table": {
+            width: "100%",
+            borderCollapse: "separate",
+            borderSpacing: 0,
+            tableLayout: "fixed",
+          },
+          "& thead th": { position: "sticky", top: 0, zIndex: 2 },
+        }}
       >
         <DatasetTableProvider value={contextValue}>
-          <table
-            ref={tableRef}
-            style={{ width: "100%", borderCollapse: "collapse" }}
-            data-testid="dataset-editor-grid"
-          >
+          <table ref={tableRef} data-testid="dataset-editor-grid">
             <colgroup>
               <col style={{ width: CHECKBOX_WIDTH_PX }} />
               {columns.map((col) => (
@@ -653,19 +660,7 @@ export function DatasetEditorTable({
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
                   {headerGroup.headers.map((header) => (
-                    <th
-                      key={header.id}
-                      style={{
-                        textAlign: "left",
-                        padding: "8px 12px",
-                        borderBottom:
-                          "1px solid var(--chakra-colors-border-muted)",
-                        background: "var(--chakra-colors-bg-subtle)",
-                        position: "sticky",
-                        top: 0,
-                        zIndex: 2,
-                      }}
-                    >
+                    <th key={header.id}>
                       {header.isPlaceholder
                         ? null
                         : flexRender(
