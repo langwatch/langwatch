@@ -184,6 +184,14 @@ const MODEL_ATTR_SELECT = `coalesce(
     SpanAttributes['gen_ai.request.model']
   )`;
 
+/**
+ * How many recent candidate traces the model-cost sample read pulls from
+ * `trace_summaries` before scanning their spans. Large enough that per-model
+ * token-bearing samples reliably resolve, small enough that the `TraceId IN`
+ * set still prunes `stored_spans` granules hard.
+ */
+const SAMPLE_CANDIDATE_TRACE_POOL = 500;
+
 interface ModelSpanSampleQueryRow {
   TraceId: string;
   SpanId: string;
@@ -1617,13 +1625,34 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     if (models.length === 0) return [];
 
     const client = await this.resolveClient(tenantId);
-    // Light columns only (scalars + token Map subscripts), grouped by span
-    // with argMax so ReplacingMergeTree versions dedup to the latest row.
-    // Spans carrying token usage sort first, a token-less span makes a
-    // poor cost example, then recency. `LIMIT BY` keeps one chatty model
-    // from crowding out the rest of the sample.
+    // The `Model IN` filter is computed from the SpanAttributes map, so on its
+    // own this read decodes that heavy map for every span in the window just to
+    // evaluate the predicate. Instead, first narrow to the recent traces that
+    // use one of these models via `trace_summaries.Models` (a small, deduped,
+    // bloom-indexed Array(String) populated at fold time), then constrain the
+    // span scan to `TraceId IN (...)`. `stored_spans` is
+    // `ORDER BY (TenantId, TraceId, SpanId)`, so the TraceId set prunes granules
+    // to just those traces' spans rather than the whole partition window.
+    //
+    // The candidate pool is generous so per-model token-bearing samples still
+    // resolve. Models is complete per trace, so the candidate set cannot drop a
+    // model the rule matches (a just-folded trace may lag by seconds, which is
+    // acceptable for a best-effort preview). Within `stored_spans` the read is
+    // unchanged: light columns, argMax dedup over ReplacingMergeTree versions,
+    // token-bearing spans first, then recency, and `LIMIT BY` so one chatty
+    // model can't crowd out the rest of the sample.
     const result = await client.query({
       query: `
+        WITH candidate_traces AS (
+          SELECT TraceId
+          FROM trace_summaries
+          WHERE TenantId = {tenantId:String}
+            AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
+            AND hasAny(Models, {models:Array(String)})
+          GROUP BY TraceId
+          ORDER BY max(OccurredAt) DESC
+          LIMIT {candidatePool:UInt32}
+        )
         SELECT
           TraceId,
           SpanId,
@@ -1641,13 +1670,21 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         FROM ${TABLE_NAME}
         WHERE TenantId = {tenantId:String}
           AND StartTime >= fromUnixTimestamp64Milli({fromMs:Int64})
+          AND TraceId IN (SELECT TraceId FROM candidate_traces)
           AND Model IN {models:Array(String)}
         GROUP BY TraceId, SpanId, Model
         ORDER BY HasTokens DESC, StartTimeMs DESC
         LIMIT {perModelLimit:UInt32} BY Model
         LIMIT {limit:UInt32}
       `,
-      query_params: { tenantId, models, fromMs, perModelLimit, limit },
+      query_params: {
+        tenantId,
+        models,
+        fromMs,
+        perModelLimit,
+        limit,
+        candidatePool: SAMPLE_CANDIDATE_TRACE_POOL,
+      },
       format: "JSONEachRow",
     });
 
