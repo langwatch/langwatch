@@ -27,9 +27,14 @@ import { env } from "~/env.mjs";
 import { createLogger } from "~/utils/logger/server";
 import {
   signGithubOauthState,
+  STATE_TTL_MS,
   verifyGithubOauthState,
   type GithubOauthStatePayload,
 } from "~/server/services/langy/githubOauthState";
+import {
+  consumeGithubOauthNonce,
+  registerGithubOauthNonce,
+} from "~/server/services/langy/langyGithubToken";
 
 import type { NextRequestShim } from "./types";
 
@@ -62,11 +67,35 @@ function verifyState(token: string | null): GithubOauthStatePayload | null {
 }
 
 // Only allow internal relative paths as returnTo, to prevent open-redirects.
+// We block:
+//  - schemes (http://, javascript:, data:) — they don't start with `/`
+//  - protocol-relative (`//evil.com`) — second-char `/`
+//  - backslash-prefixed (`/\evil.com`) — some browsers normalize `\` → `/`
+//  - CRLF (response-splitting if echoed into a header)
 function safeReturnTo(raw: string | null | undefined): string {
   const fallback = "/settings/integrations#github";
   if (!raw) return fallback;
-  if (!raw.startsWith("/") || raw.startsWith("//")) return fallback;
+  if (raw.length > 512) return fallback;
+  if (!raw.startsWith("/")) return fallback;
+  if (raw.startsWith("//") || raw.startsWith("/\\")) return fallback;
+  if (/[\r\n\t\0]/.test(raw)) return fallback;
   return raw;
+}
+
+// Origin used to construct the GitHub `redirect_uri`. Must match the App's
+// registered Callback URL EXACTLY, so derive it from server-side env, NOT a
+// client-controllable header. Falling back to the request URL only when env
+// isn't set keeps local dev usable.
+function appOrigin(reqUrl: string): string {
+  const fromEnv = env.NEXTAUTH_URL;
+  if (fromEnv) {
+    try {
+      return new URL(fromEnv).origin;
+    } catch {
+      // misconfigured NEXTAUTH_URL — fall through to request-derived
+    }
+  }
+  return new URL(reqUrl).origin;
 }
 
 function appConfigured() {
@@ -97,8 +126,36 @@ secured
         { status: 400 },
       );
     }
+
+    // Cross-tenant guard: the user must be a member of the org they're
+    // connecting GitHub for. Without this, the callback would upsert a
+    // UserGitHubCredential under (userId, OTHER-ORG) — which the partition
+    // guard accepts (single org per row) but is still a tenant-boundary
+    // violation: the row appears in OTHER-ORG's footprint, and the audit log
+    // says "user X connected GitHub in org Y" against an org X is not in.
+    const membership = await prisma.organizationUser.findUnique({
+      where: {
+        userId_organizationId: {
+          userId: session.user.id,
+          organizationId,
+        },
+      },
+    });
+    if (!membership) {
+      return c.json(
+        { error: "Not a member of this organization." },
+        { status: 403 },
+      );
+    }
+
     const mode = c.req.query("mode") === "popup" ? "popup" : "redirect";
     const returnTo = safeReturnTo(c.req.query("return"));
+    const nonce = randomBytes(16).toString("base64url");
+
+    // Register the nonce in Redis with the same TTL as the signed state. The
+    // callback consumes it once and rejects replays. When Redis isn't wired
+    // the check skips silently — the signature + session-rebind still defend.
+    await registerGithubOauthNonce(nonce, Math.ceil(STATE_TTL_MS / 1000));
 
     const state = signState({
       userId: session.user.id,
@@ -106,14 +163,10 @@ secured
       mode,
       returnTo,
       issuedAt: Date.now(),
-      nonce: randomBytes(16).toString("base64url"),
+      nonce,
     });
 
-    const origin =
-      c.req.header("x-forwarded-host")
-        ? `https://${c.req.header("x-forwarded-host")}`
-        : new URL(c.req.url).origin;
-    const redirectUri = `${origin}/api/github-langy/callback`;
+    const redirectUri = `${appOrigin(c.req.url)}/api/github-langy/callback`;
 
     const url = new URL(GITHUB_AUTHORIZE_URL);
     url.searchParams.set("client_id", env.GITHUB_LANGY_CLIENT_ID!);
@@ -235,11 +288,31 @@ secured
       return c.html(popupErrorHtml("Session changed mid-flow"), 401);
     }
 
-    const origin =
-      c.req.header("x-forwarded-host")
-        ? `https://${c.req.header("x-forwarded-host")}`
-        : new URL(c.req.url).origin;
-    const redirectUri = `${origin}/api/github-langy/callback`;
+    // Burn the nonce. If Redis is wired and the nonce is missing, the state
+    // was already used (replay) — reject. If Redis isn't wired, the nonce
+    // check returns null and we fall through to the signature + session
+    // defenses (already cleared above).
+    const nonceConsumed = await consumeGithubOauthNonce(state.nonce);
+    if (nonceConsumed === false) {
+      return c.html(popupErrorHtml("State already used"), 401);
+    }
+
+    // Re-check tenant membership on the callback too. Same threat as in
+    // /connect — defense in depth in case a stale state outlives a
+    // membership change between connect and callback.
+    const membership = await prisma.organizationUser.findUnique({
+      where: {
+        userId_organizationId: {
+          userId: state.userId,
+          organizationId: state.organizationId,
+        },
+      },
+    });
+    if (!membership) {
+      return c.html(popupErrorHtml("Not a member of this organization"), 403);
+    }
+
+    const redirectUri = `${appOrigin(c.req.url)}/api/github-langy/callback`;
 
     let token: GithubTokenResponse;
     let user: GithubUser;

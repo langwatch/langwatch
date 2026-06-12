@@ -45,10 +45,11 @@ const STAGE_VALUES: GithubProgressStage[] = [
 ];
 
 /**
- * Strip non-greedy across newlines so a stray opening `[langy:progress:` in
- * markdown prose can't swallow paragraphs.
+ * Bounded to a single line — non-greedy `[^\]]*?` would still consume `\n`s if
+ * it eventually finds a `]`, swallowing real prose between a typo'd opening
+ * marker and the next bracket. The detail capture excludes both `]` AND `\n`.
  */
-const PROGRESS_RE = /\[langy:progress:([a-z_]+)(?::([^\]]*?))?\]/g;
+const PROGRESS_RE = /\[langy:progress:([a-z_]+)(?::([^\]\n]*?))?\]/g;
 
 export type ProgressParse = {
   events: GithubProgressEvent[];
