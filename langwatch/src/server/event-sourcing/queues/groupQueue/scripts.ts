@@ -2011,6 +2011,30 @@ export class GroupStagingScripts {
   }
 
   /**
+   * Lowest score in the ready set (ms epoch) — the next moment the dispatcher
+   * could have work — or null when ready is empty. O(log N) via ZRANGE 0 0.
+   *
+   * The dispatcher is signal-driven, but a group's signal (LPUSH on the signal
+   * list) fires at STAGE time. For a job scheduled in the future (the `delay`
+   * option, a retry backoff, a debounced reactor re-fold) that signal arrives
+   * before the job is due, so it is consumed on an early poll and drained —
+   * nothing re-signals when the job actually becomes due. The dispatcher uses
+   * this to cap its BRPOP wait at the next due time so a delayed job is picked
+   * up on schedule instead of up to signalTimeoutSec late.
+   */
+  async peekEarliestReadyScore(): Promise<number | null> {
+    const res = (await this.redis.zrange(
+      `${this.keyPrefix}ready`,
+      0,
+      0,
+      "WITHSCORES",
+    )) as string[];
+    if (res.length < 2) return null;
+    const score = Number(res[1]);
+    return Number.isFinite(score) ? score : null;
+  }
+
+  /**
    * Get the key prefix for metrics/recovery scans.
    */
   getKeyPrefix(): string {

@@ -529,6 +529,37 @@ describe.skipIf(!hasTestcontainers)(
       });
     });
 
+    describe("delayed dispatch latency", () => {
+      describe("when a delayed job becomes due in an otherwise-idle queue", () => {
+        // Regression for #4742 (surfaced by #4726's squash-before-dispatch test):
+        // a future-scored job's signal fires at stage time, before it is due, so
+        // it is drained on an early poll and nothing re-signals at due time. Pre-
+        // fix the dispatcher slept the full signalTimeoutSec (~5s) BRPOP before
+        // its next poll; the fix caps the wait at the next due score.
+        it("dispatches at its due time, not signalTimeoutSec late", async () => {
+          const processed = vi
+            .fn<(payload: TestPayload) => Promise<void>>()
+            .mockResolvedValue(undefined);
+          const queue = createQueue(processed, { delay: 300 });
+          await queue.waitUntilReady();
+
+          const sentAt = Date.now();
+          await queue.send({ id: "delayed-1", groupId: "group-a", value: "v" });
+
+          await vi.waitFor(
+            () => {
+              expect(processed).toHaveBeenCalledTimes(1);
+            },
+            { timeout: 4000, interval: 25 },
+          );
+
+          // delay = 300ms, signalTimeoutSec = 5s. Pre-fix latency was ~5s; the
+          // due-time wake brings it well under a second even with scheduling slack.
+          expect(Date.now() - sentAt).toBeLessThan(2000);
+        });
+      });
+    });
+
     describe("cross-group parallel processing", () => {
       describe("when jobs have different group keys", () => {
         it("processes them concurrently", async () => {

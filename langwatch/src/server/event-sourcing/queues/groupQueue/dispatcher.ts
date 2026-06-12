@@ -104,11 +104,34 @@ export class GroupQueueDispatcher {
     const signalKey = this.params.scripts.getSignalKey();
     await this.params.blockingConnection.brpop(
       signalKey,
-      this.params.signalTimeoutSec,
+      await this.nextSignalTimeoutSec(),
     );
     // Drain remaining buffered signals — the upcoming dispatchBatch
     // handles multiple jobs in one Lua call, so N signals = 1 cycle.
     await this.params.blockingConnection.del(signalKey);
+  }
+
+  /**
+   * BRPOP timeout for the next wait: the heartbeat (signalTimeoutSec), but
+   * capped at the time until the earliest future-due job. A delayed/future-
+   * scored job's signal fires at stage time (before it is due) and is drained,
+   * so without this cap the dispatcher would sleep the full heartbeat and pick
+   * the job up to signalTimeoutSec late (#4742). Floored so an undispatchable
+   * due-now entry (e.g. work waiting on a freed concurrency slot, which a
+   * completion separately signals) can't busy-spin. Falls back to the full
+   * heartbeat on any peek error — never blocks forever, never misses a wakeup
+   * (a fresh stage still pushes a signal that wakes BRPOP immediately).
+   */
+  private async nextSignalTimeoutSec(): Promise<number> {
+    let earliest: number | null;
+    try {
+      earliest = await this.params.scripts.peekEarliestReadyScore();
+    } catch {
+      return this.params.signalTimeoutSec;
+    }
+    if (earliest === null) return this.params.signalTimeoutSec;
+    const waitSec = (earliest - Date.now()) / 1000;
+    return Math.min(this.params.signalTimeoutSec, Math.max(0.05, waitSec));
   }
 
   private async dispatchBatch(): Promise<number> {
