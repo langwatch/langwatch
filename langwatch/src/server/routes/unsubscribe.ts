@@ -16,10 +16,7 @@
 import type { Context } from "hono";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
-import {
-  confirmUnsubscribe,
-  InvalidUnsubscribeTokenError,
-} from "~/server/mailer/unsubscribe.read";
+import { InvalidUnsubscribeTokenError } from "~/server/app-layer/triggers/emailSuppression.service";
 import { rateLimit } from "~/server/rateLimit";
 import type { NextApiRequest } from "~/types/next-stubs";
 import { getClientIp } from "~/utils/getClientIp";
@@ -62,18 +59,9 @@ secured
     }
 
     try {
-      await confirmUnsubscribe({
+      await getApp().emailSuppressions.confirmUnsubscribe({
         token,
         scope: "trigger",
-        deps: {
-          suppress: ({ projectId, email, triggerId }) =>
-            getApp().emailSuppressions.suppress({
-              projectId,
-              email,
-              triggerId,
-              reason: "unsubscribe",
-            }),
-        },
       });
     } catch (err) {
       // Distinguish a bad/tampered token (4xx) from a downstream persistence

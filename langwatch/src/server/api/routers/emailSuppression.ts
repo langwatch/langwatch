@@ -1,11 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
-import {
-  confirmUnsubscribe,
-  InvalidUnsubscribeTokenError,
-  resolveUnsubscribe,
-} from "~/server/mailer/unsubscribe.read";
+import { InvalidUnsubscribeTokenError } from "~/server/app-layer/triggers/emailSuppression.service";
 import { getClientIp } from "~/utils/getClientIp";
 import { auditLog } from "../../auditLog";
 import { rateLimit } from "../../rateLimit";
@@ -57,12 +53,8 @@ export const emailSuppressionRouter = createTRPCRouter({
         action: "resolve",
         max: 30,
       });
-      const view = await resolveUnsubscribe({
+      const view = await getApp().emailSuppressions.resolveUnsubscribeView({
         token: input.token,
-        deps: {
-          lookupNames: ({ projectId, triggerId }) =>
-            getApp().emailSuppressions.lookupNames({ projectId, triggerId }),
-        },
       });
       if (!view) {
         throw new TRPCError({
@@ -90,18 +82,9 @@ export const emailSuppressionRouter = createTRPCRouter({
         max: 10,
       });
       try {
-        await confirmUnsubscribe({
+        await getApp().emailSuppressions.confirmUnsubscribe({
           token: input.token,
           scope: input.scope,
-          deps: {
-            suppress: ({ projectId, email, triggerId }) =>
-              getApp().emailSuppressions.suppress({
-                projectId,
-                email,
-                triggerId,
-                reason: "unsubscribe",
-              }),
-          },
         });
       } catch (err) {
         // A bad/tampered token is the recipient's problem (4xx); a downstream

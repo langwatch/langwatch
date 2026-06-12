@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { EmailSuppressionService } from "../emailSuppression.service";
+import { signUnsubscribeToken } from "~/server/mailer/unsubscribeToken";
+import {
+  EmailSuppressionService,
+  InvalidUnsubscribeTokenError,
+  maskEmail,
+} from "../emailSuppression.service";
 import type {
   EmailSuppressionNameLookupRepository,
   EmailSuppressionRepository,
@@ -101,6 +106,24 @@ class FakeNameLookup implements EmailSuppressionNameLookupRepository {
     return result;
   }
 }
+
+describe("maskEmail", () => {
+  describe("given an ordinary address", () => {
+    describe("when masking", () => {
+      it("keeps the first letter and the domain", () => {
+        expect(maskEmail("alice@example.com")).toBe("a***@example.com");
+      });
+    });
+  });
+
+  describe("given a single-character local part", () => {
+    describe("when masking", () => {
+      it("still masks without leaking the character count", () => {
+        expect(maskEmail("a@example.com")).toBe("a***@example.com");
+      });
+    });
+  });
+});
 
 describe("EmailSuppressionService", () => {
   let repo: FakeRepo;
@@ -267,6 +290,96 @@ describe("EmailSuppressionService", () => {
           triggerId: null,
         });
         expect(result).toBeNull();
+      });
+    });
+  });
+
+  describe("given an unsubscribe token is resolved for display", () => {
+    describe("when the token is valid and the project exists", () => {
+      it("returns the masked email with project and trigger names", async () => {
+        const token = signUnsubscribeToken({
+          projectId: "p1",
+          triggerId: "t1",
+          email: "alice@example.com",
+        });
+        const view = await service.resolveUnsubscribeView({ token });
+        expect(view).toEqual({
+          projectName: "Project One",
+          triggerName: "Trigger Alpha",
+          email: "a***@example.com",
+        });
+      });
+    });
+
+    describe("when the token is tampered", () => {
+      it("returns null", async () => {
+        const view = await service.resolveUnsubscribeView({
+          token: "garbage.sig",
+        });
+        expect(view).toBeNull();
+      });
+    });
+
+    describe("when the token's project no longer exists", () => {
+      it("returns null", async () => {
+        const token = signUnsubscribeToken({
+          projectId: "deleted-project",
+          triggerId: null,
+          email: "alice@example.com",
+        });
+        const view = await service.resolveUnsubscribeView({ token });
+        expect(view).toBeNull();
+      });
+    });
+  });
+
+  describe("given an unsubscribe is confirmed via token", () => {
+    describe("when the scope is trigger", () => {
+      it("records a trigger-scoped suppression with the unsubscribe reason", async () => {
+        const token = signUnsubscribeToken({
+          projectId: "p1",
+          triggerId: "t1",
+          email: "alice@example.com",
+        });
+        await service.confirmUnsubscribe({ token, scope: "trigger" });
+        expect(repo.rows).toEqual([
+          expect.objectContaining({
+            projectId: "p1",
+            triggerId: "t1",
+            email: "alice@example.com",
+            reason: "unsubscribe",
+          }),
+        ]);
+      });
+    });
+
+    describe("when the scope is project", () => {
+      it("records a project-wide suppression (null triggerId)", async () => {
+        const token = signUnsubscribeToken({
+          projectId: "p1",
+          triggerId: "t1",
+          email: "alice@example.com",
+        });
+        await service.confirmUnsubscribe({ token, scope: "project" });
+        expect(repo.rows).toEqual([
+          expect.objectContaining({
+            projectId: "p1",
+            triggerId: null,
+            reason: "unsubscribe",
+          }),
+        ]);
+      });
+    });
+
+    describe("when the token is tampered", () => {
+      it("throws InvalidUnsubscribeTokenError without persisting", async () => {
+        await expect(
+          service.confirmUnsubscribe({
+            token: "garbage.sig",
+            scope: "trigger",
+          }),
+        ).rejects.toBeInstanceOf(InvalidUnsubscribeTokenError);
+        expect(repo.rows).toEqual([]);
       });
     });
   });
