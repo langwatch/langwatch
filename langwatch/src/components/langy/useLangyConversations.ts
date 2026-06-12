@@ -25,6 +25,14 @@ interface UseLangyConversationsArgs {
   projectId: string | undefined;
   setMessages: (messages: LangyMessageRecord[]) => void;
   onError: (message: string) => void;
+  /**
+   * Called whenever the active conversation transitions to "none" — i.e.
+   * the user explicitly started a new chat, or deleted the conversation
+   * they were viewing. The panel uses this to wipe per-conversation local
+   * state (proposal caches) and abort any in-flight stream, so a fresh
+   * conversation isn't haunted by ghosts of the previous one.
+   */
+  onActiveCleared?: () => void;
 }
 
 function localStorageKey(projectId: string) {
@@ -72,6 +80,7 @@ export function useLangyConversations({
   projectId,
   setMessages,
   onError,
+  onActiveCleared,
 }: UseLangyConversationsArgs): UseLangyConversationsResult {
   const [conversations, setConversations] = useState<LangyConversationSummary[]>(
     [],
@@ -181,7 +190,8 @@ export function useLangyConversations({
     setCurrentConversationId(null);
     writeLastConversationId(projectId, null);
     setMessages([]);
-  }, [projectId, setMessages]);
+    onActiveCleared?.();
+  }, [projectId, setMessages, onActiveCleared]);
 
   const adopt = useCallback(
     (id: string) => {
@@ -228,12 +238,13 @@ export function useLangyConversations({
           setCurrentConversationId(null);
           writeLastConversationId(projectId, null);
           setMessages([]);
+          onActiveCleared?.();
         }
       } catch {
         onError("Failed to delete conversation.");
       }
     },
-    [projectId, currentConversationId, setMessages, onError],
+    [projectId, currentConversationId, setMessages, onError, onActiveCleared],
   );
 
   return {
