@@ -11,6 +11,10 @@
  * and cannot live behind tRPC. The two surfaces here are the only public bits;
  * everything else (read connection / disconnect) is tRPC.
  *
+ * The route is just HTTP plumbing — sign/verify state, validate query params,
+ * shape responses. Everything else (DB writes, GitHub HTTP, popup HTML) lives
+ * in services/langy/* siblings.
+ *
  * Spec: specs/assistant/langy-github-prs.feature. Issue: #4747.
  */
 import { randomBytes } from "crypto";
@@ -26,11 +30,25 @@ import { encrypt } from "~/utils/encryption";
 import { env } from "~/env.mjs";
 import { createLogger } from "~/utils/logger/server";
 import {
+  exchangeCode,
+  fetchGithubUser,
+  type GithubTokenResponse,
+  type GithubUser,
+} from "~/server/services/langy/githubOauthClient";
+import {
+  popupErrorHtml,
+  popupResponseHtml,
+} from "~/server/services/langy/githubOauthPopupHtml";
+import {
   signGithubOauthState,
   STATE_TTL_MS,
   verifyGithubOauthState,
   type GithubOauthStatePayload,
 } from "~/server/services/langy/githubOauthState";
+import {
+  isOrganizationMember,
+  upsertGithubCredential,
+} from "~/server/services/langy/langyGithubConnection";
 import {
   clearGithubTokenCache,
   consumeGithubOauthNonce,
@@ -42,8 +60,6 @@ import type { NextRequestShim } from "./types";
 const logger = createLogger("langwatch:api:github-langy");
 
 const GITHUB_AUTHORIZE_URL = "https://github.com/login/oauth/authorize";
-const GITHUB_TOKEN_URL = "https://github.com/login/oauth/access_token";
-const GITHUB_USER_URL = "https://api.github.com/user";
 
 const PUBLIC_REASON =
   "GitHub App OAuth redirect URI — protocol-mandated public endpoint; " +
@@ -162,15 +178,13 @@ secured
     // guard accepts (single org per row) but is still a tenant-boundary
     // violation: the row appears in OTHER-ORG's footprint, and the audit log
     // says "user X connected GitHub in org Y" against an org X is not in.
-    const membership = await prisma.organizationUser.findUnique({
-      where: {
-        userId_organizationId: {
-          userId: session.user.id,
-          organizationId,
-        },
-      },
-    });
-    if (!membership) {
+    if (
+      !(await isOrganizationMember({
+        prisma,
+        userId: session.user.id,
+        organizationId,
+      }))
+    ) {
       return c.json(
         { error: "Not a member of this organization." },
         { status: 403 },
@@ -213,98 +227,6 @@ secured
     return c.redirect(url.toString(), 302);
   });
 
-type GithubTokenResponse = {
-  access_token?: string;
-  refresh_token?: string;
-  refresh_token_expires_in?: number;
-  expires_in?: number;
-  token_type?: string;
-  scope?: string;
-  error?: string;
-  error_description?: string;
-};
-
-type GithubUser = {
-  id: number;
-  login: string;
-};
-
-async function exchangeCode(code: string, redirectUri: string) {
-  const res = await fetch(GITHUB_TOKEN_URL, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: new URLSearchParams({
-      client_id: env.GITHUB_LANGY_CLIENT_ID!,
-      client_secret: env.GITHUB_LANGY_CLIENT_SECRET!,
-      code,
-      redirect_uri: redirectUri,
-    }),
-  });
-  const body = (await res.json()) as GithubTokenResponse;
-  if (!res.ok || body.error || !body.access_token || !body.refresh_token) {
-    throw new Error(
-      `GitHub token exchange failed: ${body.error ?? res.statusText}`,
-    );
-  }
-  return body;
-}
-
-async function fetchGithubUser(accessToken: string): Promise<GithubUser> {
-  const res = await fetch(GITHUB_USER_URL, {
-    headers: {
-      Accept: "application/vnd.github+json",
-      Authorization: `Bearer ${accessToken}`,
-      "User-Agent": "langwatch-langy",
-    },
-  });
-  if (!res.ok) {
-    throw new Error(`GitHub /user failed: ${res.status}`);
-  }
-  return (await res.json()) as GithubUser;
-}
-
-function popupResponseHtml(login: string) {
-  const safe = login.replace(/[^a-zA-Z0-9_-]/g, "");
-  return `<!doctype html>
-<html><head><meta charset="utf-8"><title>Connected</title></head>
-<body style="font:14px system-ui;color:#444;padding:24px">
-<p>Connected as <strong>@${safe}</strong>. You can close this window.</p>
-<script>
-  try {
-    if (window.opener && !window.opener.closed) {
-      window.opener.postMessage(
-        { type: "langy-github-connected", login: ${JSON.stringify(safe)} },
-        window.location.origin,
-      );
-    }
-  } catch (e) {}
-  window.close();
-</script>
-</body></html>`;
-}
-
-function popupErrorHtml(message: string) {
-  const safe = message.replace(/[<>&]/g, "");
-  return `<!doctype html>
-<html><head><meta charset="utf-8"><title>Connection failed</title></head>
-<body style="font:14px system-ui;color:#a00;padding:24px">
-<p>GitHub connection failed: ${safe}</p>
-<script>
-  try {
-    if (window.opener && !window.opener.closed) {
-      window.opener.postMessage(
-        { type: "langy-github-error", message: ${JSON.stringify(safe)} },
-        window.location.origin,
-      );
-    }
-  } catch (e) {}
-</script>
-</body></html>`;
-}
-
 secured
   .access(publicEndpoint(PUBLIC_REASON))
   .get("/github-langy/callback", async (c) => {
@@ -338,15 +260,13 @@ secured
     // Re-check tenant membership on the callback too. Same threat as in
     // /connect — defense in depth in case a stale state outlives a
     // membership change between connect and callback.
-    const membership = await prisma.organizationUser.findUnique({
-      where: {
-        userId_organizationId: {
-          userId: state.userId,
-          organizationId: state.organizationId,
-        },
-      },
-    });
-    if (!membership) {
+    if (
+      !(await isOrganizationMember({
+        prisma,
+        userId: state.userId,
+        organizationId: state.organizationId,
+      }))
+    ) {
       return c.html(popupErrorHtml("Not a member of this organization"), 403);
     }
 
@@ -369,27 +289,14 @@ secured
         : c.redirect(withGithubError(returnTo, msg), 302);
     }
 
-    await prisma.userGitHubCredential.upsert({
-      where: {
-        userId_organizationId: {
-          userId: state.userId,
-          organizationId: state.organizationId,
-        },
-      },
-      create: {
-        userId: state.userId,
-        organizationId: state.organizationId,
-        githubLogin: user.login,
-        githubUserId: String(user.id),
-        encryptedRefreshToken: encrypt(token.refresh_token!),
-        scopes: token.scope ?? null,
-      },
-      update: {
-        githubLogin: user.login,
-        githubUserId: String(user.id),
-        encryptedRefreshToken: encrypt(token.refresh_token!),
-        scopes: token.scope ?? null,
-      },
+    await upsertGithubCredential({
+      prisma,
+      userId: state.userId,
+      organizationId: state.organizationId,
+      githubLogin: user.login,
+      githubUserId: String(user.id),
+      encryptedRefreshToken: encrypt(token.refresh_token!),
+      scopes: token.scope ?? null,
     });
 
     // A reconnect may follow a disconnect that revoked the previous grant;

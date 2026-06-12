@@ -6,7 +6,7 @@
  * Spec: specs/assistant/langy-github-prs.feature. Issue: #4747.
  */
 import { Button, HStack, Text } from "@chakra-ui/react";
-import { Github } from "react-feather";
+import { GitHub } from "react-feather";
 
 import { api } from "~/utils/api";
 
@@ -27,7 +27,7 @@ export function LangyGitHubChip({ organizationId }: LangyGitHubChipProps) {
 
   return (
     <HStack gap={2} fontSize="xs" color="gray.600">
-      <Github size={12} />
+      <GitHub size={12} />
       <Text>Acting as @{connection.data.githubLogin}</Text>
       <Button
         size="xs"

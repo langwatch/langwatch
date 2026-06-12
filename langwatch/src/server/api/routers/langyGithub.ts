@@ -17,9 +17,15 @@ import { z } from "zod";
 import { env } from "~/env.mjs";
 import { auditLog } from "~/server/auditLog";
 import {
+  deleteGithubConnection,
+  findGithubConnection,
+  isOrganizationMember,
+} from "~/server/services/langy/langyGithubConnection";
+import {
   clearGithubTokenCache,
   getGithubTokenForUser,
 } from "~/server/services/langy/langyGithubToken";
+import { authorizeInResolver } from "~/server/api/rbac";
 import { createLogger } from "~/utils/logger/server";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import type { PrismaClient } from "@prisma/client";
@@ -78,7 +84,7 @@ async function revokeAtGitHub({
   }
 }
 
-async function requireOrganizationMembership({
+async function ensureOrganizationMember({
   prisma,
   userId,
   organizationId,
@@ -87,10 +93,7 @@ async function requireOrganizationMembership({
   userId: string;
   organizationId: string;
 }): Promise<void> {
-  const membership = await prisma.organizationUser.findUnique({
-    where: { userId_organizationId: { userId, organizationId } },
-  });
-  if (!membership) {
+  if (!(await isOrganizationMember({ prisma, userId, organizationId }))) {
     throw new TRPCError({
       code: "FORBIDDEN",
       message: `Not a member of organization ${organizationId}`,
@@ -101,32 +104,25 @@ async function requireOrganizationMembership({
 export const langyGithubRouter = createTRPCRouter({
   getConnection: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
+    .use(authorizeInResolver)
     .query(async ({ ctx, input }) => {
-      await requireOrganizationMembership({
+      await ensureOrganizationMember({
         prisma: ctx.prisma,
         userId: ctx.session.user.id,
         organizationId: input.organizationId,
       });
-      const row = await ctx.prisma.userGitHubCredential.findUnique({
-        where: {
-          userId_organizationId: {
-            userId: ctx.session.user.id,
-            organizationId: input.organizationId,
-          },
-        },
-        select: {
-          githubLogin: true,
-          createdAt: true,
-          updatedAt: true,
-        },
+      return findGithubConnection({
+        prisma: ctx.prisma,
+        userId: ctx.session.user.id,
+        organizationId: input.organizationId,
       });
-      return row;
     }),
 
   disconnect: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
+    .use(authorizeInResolver)
     .mutation(async ({ ctx, input }) => {
-      await requireOrganizationMembership({
+      await ensureOrganizationMember({
         prisma: ctx.prisma,
         userId: ctx.session.user.id,
         organizationId: input.organizationId,
@@ -141,11 +137,10 @@ export const langyGithubRouter = createTRPCRouter({
         userId: ctx.session.user.id,
         organizationId: input.organizationId,
       });
-      const deleted = await ctx.prisma.userGitHubCredential.deleteMany({
-        where: {
-          userId: ctx.session.user.id,
-          organizationId: input.organizationId,
-        },
+      const deletedCount = await deleteGithubConnection({
+        prisma: ctx.prisma,
+        userId: ctx.session.user.id,
+        organizationId: input.organizationId,
       });
       // The revoke above just killed the access token GitHub-side, but the
       // mint path CACHED that very token (up to 7h). Drop it so a reconnect
@@ -154,13 +149,13 @@ export const langyGithubRouter = createTRPCRouter({
         userId: ctx.session.user.id,
         organizationId: input.organizationId,
       });
-      if (deleted.count > 0) {
+      if (deletedCount > 0) {
         await auditLog({
           userId: ctx.session.user.id,
           organizationId: input.organizationId,
           action: "langy.github.disconnect",
         });
       }
-      return { ok: true, deleted: deleted.count };
+      return { ok: true, deleted: deletedCount };
     }),
 });

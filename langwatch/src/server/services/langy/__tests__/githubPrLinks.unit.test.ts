@@ -54,6 +54,14 @@ describe("extractGithubPrLinks", () => {
     });
   });
 
+  describe("when a /pull/N URL is on a different host", () => {
+    it("is ignored — only github.com counts", () => {
+      expect(
+        extractGithubPrLinks("https://example.com/acme/foo/pull/1"),
+      ).toEqual([]);
+    });
+  });
+
   describe("when a github.com URL points to issues or compare", () => {
     it("does not match — only /pull/N counts as a PR", () => {
       expect(
