@@ -32,7 +32,12 @@ import {
 } from "./device-flow";
 import { loadConfig, saveConfig, type GovernanceConfig } from "./config";
 import { formatLoginCeremony } from "./login-ceremony";
-import { getCliBootstrap, listIngestionKeys, type CliBootstrapResponse } from "./cli-api";
+import {
+  extractLookupIdFromToken,
+  getCliBootstrap,
+  listIngestionKeys,
+  type CliBootstrapResponse,
+} from "./cli-api";
 
 export interface RunUnifiedLoginOptions {
   /** Credential type to mint. Defaults to 'device_session' for back-compat. */
@@ -141,8 +146,7 @@ export async function runUnifiedLoginFlow(
           const reconciled: GovernanceConfig["default_personal_ingest_keys"] = {};
           let changed = false;
           for (const [sourceType, entry] of Object.entries(cfg.default_personal_ingest_keys)) {
-            const tokenMatch = /^ik-lw-([^_]+)_/.exec(entry.secret ?? "");
-            const lookupId = tokenMatch?.[1];
+            const lookupId = extractLookupIdFromToken(entry.secret ?? "");
             if (lookupId && liveSet.has(`${sourceType}:${lookupId}`)) {
               reconciled[sourceType] = entry;
             } else {

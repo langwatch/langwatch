@@ -33,21 +33,14 @@ import { setOpencodeOpenTelemetryFlag } from "@/cli/utils/opencode-config-flag";
 import { lwTag } from "./brand";
 import type { GovernanceConfig } from "./config";
 import { saveConfig } from "./config";
-import { GovernanceCliError, listIngestionKeys, mintIngestionKey } from "./cli-api";
+import {
+  extractLookupIdFromToken,
+  GovernanceCliError,
+  listIngestionKeys,
+  mintIngestionKey,
+} from "./cli-api";
 import { warnIfGeminiOAuthSelected } from "./gemini-settings-preflight";
 import { resolvePlatformToolPolicy } from "./platform-tool-policy";
-
-/**
- * Extracts the 16-char lookupId from an ingestion token.
- * Token format: `ik-lw-{16-char lookupId}_{secret}`.
- * Returns the lookupId string, or undefined when the token doesn't match the
- * expected format (older token shapes, malformed cache entries).
- */
-function extractLookupIdFromToken(token: string): string | undefined {
-  // `ik-lw-` prefix + lookupId (up to first `_`)
-  const match = /^ik-lw-([^_]+)_/.exec(token);
-  return match?.[1];
-}
 
 export type WrapperMode = "gateway" | "ingestion";
 

@@ -416,6 +416,18 @@ export async function mintIngestionKey(
   );
 }
 
+
+/**
+ * Extracts the 16-char lookupId from an ingestion token.
+ * Token format: `ik-lw-{16-char lookupId}_{secret}`.
+ * Returns the lookupId string, or undefined when the token doesn't match the
+ * expected format (older token shapes, malformed cache entries).
+ */
+export function extractLookupIdFromToken(token: string): string | undefined {
+  const match = /^ik-lw-([^_]+)_/.exec(token);
+  return match?.[1];
+}
+
 // Ingestion key listing -------------------------------------------------------
 
 /**
