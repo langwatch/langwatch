@@ -314,40 +314,37 @@ export function DatasetMappingPreview({
                 console.error(error);
               }}
             >
-              <Box maxHeight="400px" overflow="auto" width="full">
-                <DatasetPreviewTable
-                  rows={previewRows}
-                  columns={
-                    (selectedDataset.columnTypes as DatasetColumns) ?? []
-                  }
-                  maxColumns={50}
-                  isSelectable
-                  onToggleRow={(rowIndex, isSelected) => {
-                    onRowDataChange(
-                      rowData.map((row, index) =>
-                        index === rowIndex
-                          ? { ...row, selected: isSelected }
-                          : row,
-                      ),
-                    );
-                  }}
-                  onToggleAll={(isSelected) => {
-                    onRowDataChange(
-                      rowData.map((row) => ({ ...row, selected: isSelected })),
-                    );
-                  }}
-                  onCellEdit={(rowIndex, columnName, value) => {
-                    onRowDataChange(
-                      rowData.map((row, index) =>
-                        index === rowIndex
-                          ? { ...row, [columnName]: value }
-                          : row,
-                      ),
-                    );
-                  }}
-                  editorPortalRef={editorPortalRef}
-                />
-              </Box>
+              <DatasetPreviewTable
+                rows={previewRows}
+                columns={(selectedDataset.columnTypes as DatasetColumns) ?? []}
+                maxColumns={50}
+                maxHeight="400px"
+                isSelectable
+                onToggleRow={(rowIndex, isSelected) => {
+                  onRowDataChange(
+                    rowData.map((row, index) =>
+                      index === rowIndex
+                        ? { ...row, selected: isSelected }
+                        : row,
+                    ),
+                  );
+                }}
+                onToggleAll={(isSelected) => {
+                  onRowDataChange(
+                    rowData.map((row) => ({ ...row, selected: isSelected })),
+                  );
+                }}
+                onCellEdit={(rowIndex, columnName, value) => {
+                  onRowDataChange(
+                    rowData.map((row, index) =>
+                      index === rowIndex
+                        ? { ...row, [columnName]: value }
+                        : row,
+                    ),
+                  );
+                }}
+                editorPortalRef={editorPortalRef}
+              />
             </ErrorBoundary>
           </Box>
         </VStack>

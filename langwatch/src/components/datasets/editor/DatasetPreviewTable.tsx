@@ -49,6 +49,7 @@ export function DatasetPreviewTable({
   rows,
   columns,
   maxColumns = 8,
+  maxHeight,
   isSelectable = false,
   onToggleRow,
   onToggleAll,
@@ -59,6 +60,8 @@ export function DatasetPreviewTable({
   rows: PreviewRow[];
   columns: DatasetColumns;
   maxColumns?: number;
+  /** Caps the table height; rows beyond it scroll inside the border. */
+  maxHeight?: string;
   /** Renders a leading checkbox column bound to each row's `isSelected`. */
   isSelectable?: boolean;
   onToggleRow?: (rowIndex: number, isSelected: boolean) => void;
@@ -269,6 +272,11 @@ export function DatasetPreviewTable({
   return (
     <Box
       width="full"
+      maxHeight={maxHeight}
+      overflowY="auto"
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="md"
       css={{
         ...datasetTableCss,
         "& table": {

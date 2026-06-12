@@ -25,7 +25,10 @@ type VirtualizedTableBodyProps<TData extends DatasetTableRowData> = {
   displayRowCount: number;
   /** Width of a trailing spacer column, e.g. to leave room for a side
    *  drawer overlaying the table (the evaluations workbench passes its
-   *  drawer width). Omit for no spacer. */
+   *  drawer width). When set, each row also gets a filler cell absorbing
+   *  the remaining width, and the host must declare the matching filler +
+   *  spacer entries in its colgroup and thead. Omit to let the data
+   *  columns share the full row width. */
   trailingSpacerWidth?: number;
 };
 
@@ -82,15 +85,17 @@ function VirtualizedTableBodyImpl<TData extends DatasetTableRowData>({
                 isLoading={isLoading}
               />
             ))}
-            {/* Filler column - absorbs remaining space */}
-            <td style={{ width: "auto" }} />
             {trailingSpacerWidth ? (
-              <td
-                style={{
-                  width: trailingSpacerWidth,
-                  minWidth: trailingSpacerWidth,
-                }}
-              />
+              <>
+                {/* Filler column - absorbs remaining space */}
+                <td style={{ width: "auto" }} />
+                <td
+                  style={{
+                    width: trailingSpacerWidth,
+                    minWidth: trailingSpacerWidth,
+                  }}
+                />
+              </>
             ) : null}
           </tr>
         ))}
@@ -139,11 +144,13 @@ function VirtualizedTableBodyImpl<TData extends DatasetTableRowData>({
                 isLoading={isLoading}
               />
             ))}
-            {/* Filler column - absorbs remaining space (+ optional drawer spacer) */}
-            <td
-              colSpan={trailingSpacerWidth ? 2 : 1}
-              style={{ width: "auto", minWidth: trailingSpacerWidth }}
-            />
+            {trailingSpacerWidth ? (
+              /* Filler column - absorbs remaining space (+ drawer spacer) */
+              <td
+                colSpan={2}
+                style={{ width: "auto", minWidth: trailingSpacerWidth }}
+              />
+            ) : null}
           </tr>
         );
       })}
