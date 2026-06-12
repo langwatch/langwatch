@@ -116,17 +116,21 @@ None. No Prisma migration, no ClickHouse migration, no new columns — the desig
 
 None blocking. Two implementation notes for the build PR: (a) the exact field list per payload type (span input/output, messages, log bodies, contexts) is enumerated at implementation against the response DTOs; (b) UI CTA copy and placement is a design task, not architecture.
 
-### 7. Presentation: progressive blur with fabricated filler and a centered upgrade card
+### 7. Presentation: whole-container progressive blur with a centered upgrade card
 
-The teaser alone reads as mysteriously cut-off text — the upsell needs a *presentation layer*. A shared `BlurredContentGate` component (used by BOTH the traces-v2 drawer — the strategic surface — and the legacy messages drawer) renders:
+Two pieces, both server-anchored:
 
-1. The real teaser, fully legible.
-2. **Client-side fabricated filler** (~70–90% visual volume of plausible garbage words), **deterministically seeded from the traceId** so it is stable across renders, fading and blurring over ~3 gradient steps. The server never sends filler — the API carries only the real teaser plus `redacted_by_visibility_window`, so programmatic consumers can never mistake fabricated words for data.
-3. A centered upgrade card over the blur: "Your data is still here — upgrade to see it" + Upgrade action to the plans page.
+1. **The truncation marker ships in the payload.** `teaserOf` appends `" …"` to every value it cuts, so *every* surface — platform UI, REST, SDKs, exports — shows "there is more data here" with zero client-side decoration. (Values short enough to survive untruncated carry no marker.)
+2. **The UI gate is a container overlay, not a per-field widget.** A shared `BlurredContentGate` wraps the whole content section of each tab (traces-v2 Summary, legacy thread view). The real teased content sits at the top and stays readable; a progressive backdrop blur — transparent at the top, maximal at the bottom — dissolves the rest of the container, with the centered card: "Your data is still here — Upgrade to unlock" → plans page. No fabricated text: the backdrop blur over real (teased) content replaces it.
 
-Rejected: server-side filler (pads every payload and feeds fabricated content to SDK/API consumers as if real); hard-cutoff lock banner (kills the "there is more here" illusion that drives the upgrade).
+Rejected: client-side fabricated filler (v3 of this section — superseded; an extra moving part whose only job the container blur does better); server-side filler (feeds fabricated content to SDK/API consumers as if real); hard-cutoff lock banner.
 
 ## Revisions
+
+- **v4** (2026-06-12, post design dogfood round 2) — presentation simplified, marker moved server-side:
+  1. **Ellipsis is part of the teaser** (`teaserOf` appends `" …"`): every consumer (UI/SDK/export/REST) gets the truncation signal — replaces per-render-site client decoration.
+  2. **Whole-container blur** replaces the per-field gate: `BlurredContentGate` now wraps each tab's content section; teased content stays readable at the top, backdrop blur ramps top→bottom, card centered.
+  3. **Fabricated filler removed** — the container blur over real content made it redundant.
 
 - **v3** (2026-06-12, post browser dogfood) — presentation layer + a found leak:
   1. **Leak: traces-v2 Summary tab showed full content for beyond-window traces** — `TraceSummaryService.getByTraceId` (ComputedInput/Output) was not gated while spans and list were. Caught by dogfooding the new UI; gated as part of this revision's implementation.

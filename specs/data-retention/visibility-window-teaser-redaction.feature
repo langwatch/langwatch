@@ -125,20 +125,20 @@ Feature: Plan-based visibility windows via teaser redaction
     Then the summary input and output are returned in full
     And the response is not marked as redacted
 
-  Scenario: Redacted content renders as a progressive blur with an upgrade call-to-action
+  Scenario: Teased values carry a truncation ellipsis in the payload itself
+    Given "acme" resolves to the free plan
+    When the trace detail for "old-trace" is fetched through any surface
+    Then every truncated content field ends with an ellipsis marker
+    And fields short enough to survive untruncated carry no marker
+
+  Scenario: Redacted content renders as a whole-container progressive blur with an upgrade call-to-action
     Given "acme" resolves to the free plan
     And the trace detail for "old-trace" returns redacted content
-    When the redacted content is rendered in the trace drawer
-    Then the real teaser text is fully legible at the top
-    And fabricated filler words fade and blur progressively below it
+    When the content section of the trace drawer renders
+    Then the teased content at the top of the container stays readable
+    And the rest of the container dissolves under a blur that deepens toward the bottom
     And an upgrade card saying the data is still here is centered over the blur
     And activating the upgrade action leads to the plans page
-
-  Scenario: Fabricated filler never comes from the server and is stable across renders
-    Given "acme" resolves to the free plan
-    When the trace detail for "old-trace" is fetched through the API
-    Then the response contains only the real teaser and the redacted flag, no filler
-    And rendering the same trace twice produces identical filler words
 
   Scenario: Both trace UIs render the same blurred-content treatment
     Given "acme" resolves to the free plan

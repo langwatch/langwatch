@@ -12,10 +12,7 @@ import { rankedErrorSpans } from "../../../utils/errorSpans";
 import { AttributeTable } from "../AttributeTable";
 import { EvalsList } from "../evalCards";
 import { ExceptionsContent } from "../ExceptionsContent";
-import {
-  BlurredContentGate,
-  withTeaserEllipsis,
-} from "../../BlurredContentGate";
+import { BlurredContentGate } from "../../BlurredContentGate";
 import { IOViewer } from "../IOViewer";
 import { ScopeBlock } from "../ScopeChip";
 import { AccordionShell, Section } from "./AccordionShell";
@@ -128,7 +125,7 @@ export function TraceSummaryAccordions({
     containerRef,
   });
 
-  return (
+  const content = (
     <Box ref={containerRef}>
       {/* The instrumentation scope used to render here as a small
           attribution row at the top of the summary panel. It's now
@@ -161,11 +158,7 @@ export function TraceSummaryAccordions({
                     {trace.input ? (
                       <IOViewer
                         label="Input"
-                        content={
-                          trace.redactedByVisibilityWindow
-                            ? withTeaserEllipsis(trace.input)
-                            : trace.input
-                        }
+                        content={trace.input}
                         traceId={trace.traceId}
                       />
                     ) : (
@@ -174,18 +167,9 @@ export function TraceSummaryAccordions({
                     {trace.output ? (
                       <IOViewer
                         label="Output"
-                        content={
-                          trace.redactedByVisibilityWindow
-                            ? withTeaserEllipsis(trace.output)
-                            : trace.output
-                        }
+                        content={trace.output}
                         mode="output"
                         traceId={trace.traceId}
-                        afterBody={
-                          trace.redactedByVisibilityWindow ? (
-                            <BlurredContentGate traceId={trace.traceId} fontFamily="mono" />
-                          ) : undefined
-                        }
                       />
                     ) : (
                       <MissingIORow label="Output" mode="output" />
@@ -342,6 +326,12 @@ export function TraceSummaryAccordions({
         })}
       </AccordionShell>
     </Box>
+  );
+
+  return trace.redactedByVisibilityWindow ? (
+    <BlurredContentGate>{content}</BlurredContentGate>
+  ) : (
+    content
   );
 }
 

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Span } from "~/server/tracer/types";
 
 import { SpanStorageService } from "../span-storage.service";
-import { TEASER_MAX_CHARS } from "../visibility-window.service";
+import { TEASER_ELLIPSIS, TEASER_MAX_CHARS } from "../visibility-window.service";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -41,7 +41,7 @@ describe("given a span storage read with a visibility gate", () => {
         visibilityCutoffMs: Date.now() - 14 * DAY_MS,
       });
       expect((spans[0]?.input as { value: string }).value).toHaveLength(
-        TEASER_MAX_CHARS,
+        TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
       );
     });
 
@@ -62,10 +62,10 @@ describe("given a span storage read with a visibility gate", () => {
         visibilityCutoffMs: cutoff,
       });
       expect((page.spans[0]?.input as { value: string }).value).toHaveLength(
-        TEASER_MAX_CHARS,
+        TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
       );
       expect((since[0]?.input as { value: string }).value).toHaveLength(
-        TEASER_MAX_CHARS,
+        TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
       );
     });
 
@@ -78,7 +78,7 @@ describe("given a span storage read with a visibility gate", () => {
         visibilityCutoffMs: Date.now() - 14 * DAY_MS,
       });
       expect((span?.input as { value: string }).value).toHaveLength(
-        TEASER_MAX_CHARS,
+        TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
       );
     });
   });

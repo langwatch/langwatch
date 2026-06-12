@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { TraceSummaryService } from "../trace-summary.service";
-import { TEASER_MAX_CHARS } from "../visibility-window.service";
+import { TEASER_ELLIPSIS, TEASER_MAX_CHARS } from "../visibility-window.service";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -29,10 +29,10 @@ describe("given a trace summary read with a visibility gate", () => {
       const summary = await service.getByTraceId("project-1", "trace-1", {
         visibilityCutoffMs: Date.now() - 14 * DAY_MS,
       });
-      expect(summary.computedInput).toHaveLength(TEASER_MAX_CHARS);
-      expect(summary.computedOutput).toHaveLength(TEASER_MAX_CHARS);
+      expect(summary.computedInput).toHaveLength(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
+      expect(summary.computedOutput).toHaveLength(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
       expect(summary.errorMessage!.length).toBeLessThanOrEqual(
-        TEASER_MAX_CHARS,
+        TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
       );
     });
 

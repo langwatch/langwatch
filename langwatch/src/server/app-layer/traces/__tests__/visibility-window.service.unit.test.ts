@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Span, Trace } from "~/server/tracer/types";
 
 import {
+  TEASER_ELLIPSIS,
   TEASER_FRACTION,
   TEASER_MAX_CHARS,
   TEASER_MIN_CHARS,
@@ -53,13 +54,13 @@ const makeSpan = (overrides: Partial<Span> = {}): Span =>
 describe("given the teaser truncation rule", () => {
   describe("when the text is long", () => {
     it("caps the teaser at TEASER_MAX_CHARS", () => {
-      expect(teaserOf("a".repeat(5000))).toHaveLength(TEASER_MAX_CHARS);
+      expect(teaserOf("a".repeat(5000))).toHaveLength(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
     });
 
     it("keeps 10% when that lands between the floor and the cap", () => {
       const text = "b".repeat(1000);
       expect(teaserOf(text)).toHaveLength(
-        Math.ceil(text.length * TEASER_FRACTION),
+        Math.ceil(text.length * TEASER_FRACTION) + TEASER_ELLIPSIS.length,
       );
     });
   });
@@ -72,8 +73,10 @@ describe("given the teaser truncation rule", () => {
   });
 
   describe("when the text length equals the floor boundary", () => {
-    it("keeps exactly TEASER_MIN_CHARS for a 60-char text", () => {
-      expect(teaserOf("d".repeat(60))).toHaveLength(TEASER_MIN_CHARS);
+    it("keeps TEASER_MIN_CHARS plus the ellipsis for a 60-char text", () => {
+      expect(teaserOf("d".repeat(60))).toHaveLength(
+        TEASER_MIN_CHARS + TEASER_ELLIPSIS.length,
+      );
     });
   });
 });
@@ -82,11 +85,11 @@ describe("given a trace beyond the visibility window", () => {
   describe("when redactTraceContent runs", () => {
     it("truncates input, output, and error bodies to the teaser", () => {
       const redacted = redactTraceContent(makeTrace());
-      expect(redacted.input?.value).toHaveLength(TEASER_MAX_CHARS);
-      expect(redacted.output?.value).toHaveLength(TEASER_MAX_CHARS);
-      expect(redacted.error?.message).toHaveLength(TEASER_MAX_CHARS);
+      expect(redacted.input?.value).toHaveLength(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
+      expect(redacted.output?.value).toHaveLength(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
+      expect(redacted.error?.message).toHaveLength(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
       // joined stacktrace is 503 chars -> ceil(10%) = 51 kept
-      expect(redacted.error?.stacktrace.join("")).toHaveLength(51);
+      expect(redacted.error?.stacktrace.join("")).toHaveLength(51 + TEASER_ELLIPSIS.length);
     });
 
     it("marks the trace as redacted by the visibility window", () => {
@@ -117,10 +120,10 @@ describe("given a span beyond the visibility window", () => {
     it("truncates text input and output values to the teaser", () => {
       const redacted = redactSpanContent(makeSpan());
       expect((redacted.input as { value: string }).value).toHaveLength(
-        TEASER_MAX_CHARS,
+        TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
       );
       expect((redacted.output as { value: string }).value).toHaveLength(
-        TEASER_MAX_CHARS,
+        TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
       );
     });
 
@@ -128,7 +131,7 @@ describe("given a span beyond the visibility window", () => {
       const redacted = redactSpanContent(makeSpan());
       const params = redacted.params as Record<string, unknown>;
       expect((params.system_prompt as string).length).toBeLessThanOrEqual(
-        TEASER_MAX_CHARS,
+        TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
       );
       expect(params.temperature).toBe(0.2);
     });
@@ -147,7 +150,7 @@ describe("given a span beyond the visibility window", () => {
       const messages = (
         redacted.input as { value: { content?: string | null }[] }
       ).value;
-      expect(messages[0]?.content).toHaveLength(TEASER_MAX_CHARS);
+      expect(messages[0]?.content).toHaveLength(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
       expect(messages[1]?.content).toBe("hi");
     });
 
@@ -169,7 +172,7 @@ describe("given a span beyond the visibility window", () => {
       });
       const redacted = redactSpanContent(span);
       // 2000-char message -> ceil(10%) = 200 kept
-      expect(redacted.error?.message).toHaveLength(200);
+      expect(redacted.error?.message).toHaveLength(200 + TEASER_ELLIPSIS.length);
     });
   });
 
@@ -180,7 +183,7 @@ describe("given a span beyond the visibility window", () => {
       });
       const redacted = redactSpanContent(span);
       expect(redacted.input?.type).toBe("raw");
-      expect((redacted.input as { value: string }).value).toHaveLength(200);
+      expect((redacted.input as { value: string }).value).toHaveLength(200 + TEASER_ELLIPSIS.length);
     });
 
     it("recursively teases rich chat content parts (text, tool args)", () => {
@@ -202,11 +205,11 @@ describe("given a span beyond the visibility window", () => {
       const content = (redacted.input as { value: { content: unknown[] }[] })
         .value[0]!.content as Record<string, unknown>[];
       expect((content[0]!.text as string).length).toBeLessThanOrEqual(
-        TEASER_MAX_CHARS,
+        TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
       );
       expect(
         (content[1]!.args as Record<string, string>).query!.length,
-      ).toBeLessThanOrEqual(TEASER_MAX_CHARS);
+      ).toBeLessThanOrEqual(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
     });
 
     it("teases a list value that is not an array as raw", () => {
@@ -217,7 +220,7 @@ describe("given a span beyond the visibility window", () => {
       expect(redacted.input?.type).toBe("raw");
       expect(
         (redacted.input as { value: string }).value.length,
-      ).toBeLessThanOrEqual(TEASER_MAX_CHARS);
+      ).toBeLessThanOrEqual(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
     });
   });
 });

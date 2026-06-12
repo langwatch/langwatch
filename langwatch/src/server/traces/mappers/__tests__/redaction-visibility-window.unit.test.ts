@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { Protections } from "~/server/elasticsearch/protections";
 import type { Trace } from "~/server/tracer/types";
 
-import { TEASER_MAX_CHARS } from "~/server/app-layer/traces/visibility-window.service";
+import { TEASER_ELLIPSIS, TEASER_MAX_CHARS } from "~/server/app-layer/traces/visibility-window.service";
 import { applyTraceProtections } from "../redaction";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -50,15 +50,15 @@ describe("given a plan with a visibility window", () => {
 
     it("teases trace content and stamps the redacted flag", () => {
       const result = applyTraceProtections(makeTrace(15), protections);
-      expect(result.input?.value).toHaveLength(TEASER_MAX_CHARS);
-      expect(result.output?.value).toHaveLength(TEASER_MAX_CHARS);
+      expect(result.input?.value).toHaveLength(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
+      expect(result.output?.value).toHaveLength(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
       expect(result.redacted_by_visibility_window).toBe(true);
     });
 
     it("teases span content through the same pass", () => {
       const result = applyTraceProtections(makeTrace(15), protections);
       const spanInput = result.spans?.[0]?.input as { value: string };
-      expect(spanInput.value).toHaveLength(TEASER_MAX_CHARS);
+      expect(spanInput.value).toHaveLength(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
     });
 
     it("keeps metadata, metrics, and timestamps intact", () => {

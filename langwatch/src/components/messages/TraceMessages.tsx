@@ -15,10 +15,7 @@ import { CornerDownRight } from "react-feather";
 import { stringifyIfObject } from "~/utils/stringifyIfObject";
 import { AnnotationExpectedOutputs } from "../../components/AnnotationExpectedOutputs";
 import { Annotations } from "../../components/Annotations";
-import {
-  BlurredContentGate,
-  withTeaserEllipsis,
-} from "~/features/traces-v2/components/BlurredContentGate";
+import { BlurredContentGate } from "~/features/traces-v2/components/BlurredContentGate";
 import { Markdown } from "../../components/Markdown";
 import { EventsCounter } from "../../components/messages/EventsCounter";
 import {
@@ -91,7 +88,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
     };
   }, [annotations.data]);
 
-  return (
+  const content = (
     <VStack ref={ref as any} align="start" width="full" gap={0}>
       <Grid
         templateColumns="repeat(4, 1fr)"
@@ -230,16 +227,10 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
                   >
                     <RedactedField field="output">
                       <Markdown>
-                        {(() => {
-                          const text =
-                            translationState.translatedTextOutput &&
-                            translationState.translationActive
-                              ? translationState.translatedTextOutput
-                              : stringifyIfObject(trace.output.value) ?? "";
-                          return trace.redacted_by_visibility_window
-                            ? withTeaserEllipsis(text)
-                            : text;
-                        })()}
+                        {translationState.translatedTextOutput &&
+                        translationState.translationActive
+                          ? translationState.translatedTextOutput
+                          : stringifyIfObject(trace.output.value)}
                       </Markdown>
                     </RedactedField>
                   </Box>
@@ -253,11 +244,6 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
               ) : (
                 <Text paddingY={2}>{"<empty>"}</Text>
               )}
-              {trace.redacted_by_visibility_window ? (
-                <Box width="80%" marginTop="-12px">
-                  <BlurredContentGate traceId={trace.trace_id} />
-                </Box>
-              ) : null}
               {trace.expected_output && (
                 <Alert.Root status="warning">
                   <Alert.Indicator>
@@ -303,6 +289,12 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
         )}
       </Grid>
     </VStack>
+  );
+
+  return trace.redacted_by_visibility_window ? (
+    <BlurredContentGate>{content}</BlurredContentGate>
+  ) : (
+    content
   );
 });
 

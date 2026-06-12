@@ -1,5 +1,4 @@
 import { Box, Button, HStack, Icon, Text } from "@chakra-ui/react";
-import type { ReactNode } from "react";
 import {
   forwardRef,
   memo,
@@ -52,12 +51,6 @@ const TRUNCATE_TAIL_MIN = 1_000;
 interface IOViewerProps {
   label: string;
   content: string;
-  /**
-   * Rendered inside the content box, directly under the body — used by the
-   * visibility-window gate so blurred filler reads as a continuation of the
-   * real text rather than a separate block (ADR-028 §7).
-   */
-  afterBody?: ReactNode;
   /**
    * "input" renders the full chat history (all messages, all roles, tool calls
    * inline). "output" — when the content happens to be a chat-history array —
@@ -218,7 +211,6 @@ function CopyButton({ text }: { text: string }) {
 export const IOViewer = memo(function IOViewer({
   label,
   content,
-  afterBody,
   mode = "input",
   traceId,
   spanId,
@@ -543,7 +535,6 @@ export const IOViewer = memo(function IOViewer({
                   expanded={expanded}
                   mode={mode}
                 />
-                {afterBody}
               </Box>
             </Box>
             {/*
