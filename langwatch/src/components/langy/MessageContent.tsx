@@ -10,6 +10,7 @@ import {
 } from "./github/LangyGitHubPrCard";
 import { LangyGitHubProgressCard } from "./github/LangyGitHubProgressCard";
 import { parseGithubProgressEvents } from "~/server/services/langy/githubProgressEvents";
+import { CONNECT_GITHUB_SENTINEL } from "~/server/services/langy/langySentinels";
 import {
   AI_SHADOW,
   GradientSparkle,
@@ -36,13 +37,6 @@ export type ProposalHandlers = Record<
   string,
   (payload: Record<string, unknown>) => Promise<AppliedOutcome>
 >;
-
-// Sentinel the assistant emits when it wants the sidebar to render the
-// in-chat "Connect GitHub" card. Cheaper than inventing a structured message
-// type for v0; stripped from the displayed text before rendering. The
-// services/langy-agent/skills/github.md skill teaches the assistant to emit
-// this when a PR request comes in for an unconnected user.
-const CONNECT_GITHUB_SENTINEL = "[langy:connect-github]";
 
 export function MessageContent({
   message,
