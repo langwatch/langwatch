@@ -57,6 +57,13 @@ export function RunUntilHereDialog() {
   );
   const userEditedValues = useRef(false);
 
+  // useGetDatasetData returns a fresh `rows` array reference on every render
+  // for saved datasets, so depending on `rows` directly re-fires this effect
+  // each render and the setValues below (always a new object) never settles -
+  // an infinite render loop. Key the prefill on the first row's CONTENT
+  // instead, which is stable across renders once the data has loaded.
+  const firstRowSignature = JSON.stringify(rows[0] ?? null);
+
   // Prefill on open: last submitted values win, then the first dataset
   // row (which may arrive async for saved datasets), then empty.
   useEffect(() => {
@@ -80,7 +87,7 @@ export function RunUntilHereDialog() {
       ),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [untilNodeId, rows]);
+  }, [untilNodeId, firstRowSignature]);
 
   const runWithValues = (runValues: Record<string, string>) => {
     if (!untilNodeId) return;

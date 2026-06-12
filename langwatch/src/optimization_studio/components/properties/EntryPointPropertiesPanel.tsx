@@ -8,7 +8,7 @@ import {
 } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
 import { useCallback, useState } from "react";
-import { ArrowRight, Database, Folder, X } from "react-feather";
+import { ArrowRight, Database, Flag, Folder, X } from "react-feather";
 import { useShallow } from "zustand/react/shallow";
 import { Tooltip } from "../../../components/ui/tooltip";
 import { useGetDatasetData } from "../../hooks/useGetDatasetData";
@@ -154,18 +154,31 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
         editingDataset={editingDataset}
       />
       {endNodeId && (
-        <HStack width="full">
-          <Spacer />
+        <VStack
+          align="start"
+          gap={2}
+          width="full"
+          border="1px solid"
+          borderColor="border"
+          borderRadius="md"
+          padding={3}
+        >
+          <Text fontSize="13px" color="fg.muted">
+            Define the outputs for this workflow
+          </Text>
           <Button
-            size="xs"
-            variant="ghost"
+            size="sm"
+            variant="outline"
+            width="full"
             data-testid="go-to-end-node"
             onClick={goToEndNode}
           >
-            <Text>End node</Text>
+            <Flag size={14} />
+            <Text>Go to end node</Text>
+            <Spacer />
             <ArrowRight size={14} />
           </Button>
-        </HStack>
+        </VStack>
       )}
     </BasePropertiesPanel>
   );

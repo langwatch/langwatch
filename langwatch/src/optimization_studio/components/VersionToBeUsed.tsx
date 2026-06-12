@@ -180,9 +180,18 @@ export function NewVersionFields({
     isModelConfigured,
   ]);
 
+  // Only redden the fields once the user has actually attempted to submit.
+  // The description is required and starts empty, so keying the ring on the
+  // error alone paints it red the moment the dialog opens, before anyone has
+  // typed anything.
+  const showValidation = form.formState.submitCount > 0;
+
   return (
     <HStack width="full">
-      <Field.Root width="fit-content" invalid={!!form.formState.errors.version}>
+      <Field.Root
+        width="fit-content"
+        invalid={showValidation && !!form.formState.errors.version}
+      >
         <VStack align="start">
           <Field.Label as={SmallLabel} color="fg.muted">
             Version
@@ -199,7 +208,10 @@ export function NewVersionFields({
           />
         </VStack>
       </Field.Root>
-      <Field.Root width="full" invalid={!!form.formState.errors.commitMessage}>
+      <Field.Root
+        width="full"
+        invalid={showValidation && !!form.formState.errors.commitMessage}
+      >
         <VStack align="start" width="full">
           <Field.Label as={SmallLabel} color="fg.muted">
             Description

@@ -114,15 +114,35 @@ export function FieldsDefinition({
     onSubmit(data);
   };
 
+  // Re-sync the form when the node's fields change from OUTSIDE the form:
+  // attaching a dataset merges its columns into the entry node, and the
+  // evaluator toggle swaps the end node's results. Keyed on a content
+  // signature, not the array reference, so a fresh reference each render
+  // can't loop; guarded against the form already matching so the user's own
+  // edits - which round-trip through setNode and return identical - never
+  // trigger a replace mid-typing.
+  const fieldsSignature = JSON.stringify(
+    (node.data[field] ?? []).map((f) => [
+      f.identifier,
+      f.type,
+      f.optional ?? false,
+    ]),
+  );
   useEffect(() => {
     const currentFields = node.data[field] ?? [];
+    const formSignature = JSON.stringify(
+      ((control._formValues.fields as FieldType[] | undefined) ?? []).map(
+        (f) => [f.identifier, f.type, f.optional ?? false],
+      ),
+    );
+    if (formSignature === fieldsSignature) return;
     replace(currentFields);
 
     setTimeout(() => {
       updateNodeInternals(node.id);
     }, 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [node.data.behave_as]);
+  }, [fieldsSignature]);
 
   const watchedFields = watch("fields");
 

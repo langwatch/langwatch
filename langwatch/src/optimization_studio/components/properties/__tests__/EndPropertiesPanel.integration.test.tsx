@@ -18,6 +18,7 @@ let mockEdges: Array<{
   target: string;
   targetHandle?: string;
 }> = [];
+let mockWorkflowType = "workflow";
 
 vi.mock(
   "~/optimization_studio/hooks/useWorkflowStore",
@@ -33,6 +34,7 @@ vi.mock(
           setNode: mockSetNode,
           nodes: [currentNode],
           edges: mockEdges,
+          workflow_type: mockWorkflowType,
           getWorkflow: () => ({ nodes: [currentNode], edges: mockEdges }),
         }),
     };
@@ -92,6 +94,7 @@ describe("EndPropertiesPanel", () => {
     vi.clearAllMocks();
     basePanelProps.length = 0;
     mockEdges = [];
+    mockWorkflowType = "workflow";
   });
 
   describe("when the workflow behaves as an evaluator", () => {
@@ -166,6 +169,45 @@ describe("EndPropertiesPanel", () => {
       );
 
       expect(screen.queryByText(/Connect either a/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the workflow type is evaluator but the end node lacks the flag", () => {
+    /** @scenario Evaluator workflows normalize the end node even without the node flag */
+    it("normalizes the hand-made fields to the fixed vocabulary and stamps the flag", () => {
+      mockWorkflowType = "evaluator";
+      renderPanel(
+        createEndNode({
+          inputs: [
+            { identifier: "score", type: "float" },
+            { identifier: "reasoning", type: "str" },
+          ],
+        }),
+      );
+
+      expect(mockSetNode).toHaveBeenCalledWith({
+        id: "end",
+        data: expect.objectContaining({
+          behave_as: "evaluator",
+          inputs: EVALUATOR_RESULT_FIELDS,
+        }),
+      });
+    });
+
+    /** @scenario Evaluator End node results cannot be added or removed */
+    it("renders the results read-only from the workflow-level signal alone", () => {
+      mockWorkflowType = "evaluator";
+      renderPanel(
+        createEndNode({
+          behave_as: "evaluator",
+          inputs: EVALUATOR_RESULT_FIELDS,
+        }),
+      );
+
+      expect(basePanelProps[0]).toMatchObject({
+        inputsTitle: "Results",
+        inputsReadOnly: true,
+      });
     });
   });
 

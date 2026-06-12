@@ -20,25 +20,35 @@ export const EVALUATOR_RESULT_FIELDS: Field[] = [
 ];
 
 export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
-  const { node, edges, setNode } = useWorkflowStore(
+  const { node, edges, setNode, workflowType } = useWorkflowStore(
     useShallow((state) => ({
       node: state.nodes.find((n) => n.id === initialNode.id) as Node<End>,
       edges: state.edges,
       setNode: state.setNode,
+      workflowType: state.workflow_type,
     })),
   );
 
-  const isEvaluator = node.data.behave_as === "evaluator";
+  // Treat the end node as an evaluator from EITHER signal: the node's own
+  // behave_as flag OR the workflow being an evaluator. Older evaluator
+  // workflows (and any where the two drifted) carry workflow_type without
+  // the node flag, and those were the ones still showing free-form fields
+  // where users hand-created "score"/"passed" - the exact confusion this
+  // contract removes.
+  const isEvaluator =
+    node.data.behave_as === "evaluator" || workflowType === "evaluator";
 
   // Pin the evaluator end node to the fixed result vocabulary. Existing
   // connections survive (identifiers passed/score keep their handles);
   // free-form fields users created by hand are replaced by the
   // contract, which is the point - the four options should be obvious,
-  // not discovered by renaming "output" to "score" on a call.
+  // not discovered by renaming "output" to "score" on a call. Also stamp
+  // behave_as so the node carries the flag forward once normalized.
   useEffect(() => {
     if (!isEvaluator) return;
     const current = node.data.inputs ?? [];
     const matchesContract =
+      node.data.behave_as === "evaluator" &&
       current.length === EVALUATOR_RESULT_FIELDS.length &&
       EVALUATOR_RESULT_FIELDS.every((f, i) => {
         const c = current[i];
@@ -47,7 +57,11 @@ export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
     if (!matchesContract) {
       setNode({
         id: node.id,
-        data: { ...node.data, inputs: EVALUATOR_RESULT_FIELDS },
+        data: {
+          ...node.data,
+          behave_as: "evaluator",
+          inputs: EVALUATOR_RESULT_FIELDS,
+        },
       });
     }
   }, [isEvaluator, node.id, node.data, setNode]);
