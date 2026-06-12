@@ -64,7 +64,22 @@ export function RecentChatsMenu({
           </IconButton>
         </Menu.Trigger>
       </Tooltip>
-      <Menu.Content minWidth="280px" maxHeight="320px" overflowY="auto">
+      <Menu.Content
+        minWidth="280px"
+        maxHeight="320px"
+        overflowY="auto"
+        // Liquid-glass: translucent panel + backdrop blur, with saturate<1
+        // draining the color out of whatever scrolls behind it so the list
+        // reads as a frosted layer floating over the conversation.
+        background="bg.panel/70"
+        borderWidth="1px"
+        borderColor="border.muted"
+        boxShadow="lg"
+        css={{
+          backdropFilter: "blur(18px) saturate(0.5)",
+          WebkitBackdropFilter: "blur(18px) saturate(0.5)",
+        }}
+      >
         {isLoading ? (
           <HStack
             gap={2}
