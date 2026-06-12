@@ -129,6 +129,22 @@ Feature: Langy in-product AI assistant — baseline (v1)
     And the partial response is preserved
 
   # ============================================================================
+  # Conversation history
+  # ============================================================================
+
+  Scenario: Deleting the active conversation resets the panel
+    Given I am viewing a conversation in the recent chats list
+    When I delete that conversation from the list
+    Then the panel returns to a fresh empty state
+    And any in-flight stream is stopped
+    And proposal state from the deleted conversation is cleared
+
+  Scenario: Deleting a non-active conversation leaves the current chat alone
+    Given I am viewing one conversation and another exists in the recent list
+    When I delete the other conversation
+    Then the conversation I am viewing remains open with its messages intact
+
+  # ============================================================================
   # Read-only boundary (v1)
   # ============================================================================
 

@@ -340,6 +340,17 @@ function LangyPanel({
     [setMessages],
   );
 
+  // Wipe everything tied to the previous conversation when the active one
+  // goes away (delete-active or "New chat"). Without this, proposal caches
+  // keyed by message id from the deleted chat survive into the fresh one,
+  // and an in-flight stream keeps writing into the empty messages array.
+  const resetActivePanelState = useCallback(() => {
+    setAppliedOutcomes({});
+    setDiscardedProposals(new Set());
+    setApplyingProposals(new Set());
+    void stop();
+  }, [stop]);
+
   const {
     conversations,
     currentConversationId,
@@ -353,6 +364,7 @@ function LangyPanel({
     projectId,
     setMessages: applyMessagesFromHistory,
     onError: surfaceConversationError,
+    onActiveCleared: resetActivePanelState,
   });
   adoptConversationRef.current = adoptConversation;
 
