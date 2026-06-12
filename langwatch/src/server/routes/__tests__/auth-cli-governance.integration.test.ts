@@ -35,6 +35,7 @@ import { createTestApp } from "~/server/app-layer/presets";
 
 import { app } from "../auth-cli";
 import { IngestionKeyService } from "@ee/governance/services/ingestionKey.service";
+import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 
 // Phase 4b-6 added a 402 license gate on every /api/auth/cli/governance/*
 // route. This test pins read-and-tenancy behavior, not license behavior, so
@@ -472,6 +473,13 @@ describe("GET /api/auth/cli/governance/*", () => {
         60 * 60,
       );
 
+      // The mint path resolves the caller's personal workspace and refuses to
+      // allocate one — create it first, as a real login would.
+      await new PersonalWorkspaceService(prisma).ensure({
+        userId: INGEST_KEY_USER,
+        organizationId: INGEST_KEY_ORG,
+      });
+
       // Mint a live key via the service so we can verify it appears in the list
       const service = IngestionKeyService.create(prisma);
       const result = await service.ensureForPersonalProject({
@@ -504,13 +512,27 @@ describe("GET /api/auth/cli/governance/*", () => {
       if (redisConnection) {
         await redisConnection.del(`lwcli:access:${INGEST_KEY_TOKEN}`);
       }
+      // RoleBindings reference ApiKeys (required relation), so they go first.
+      await prisma.roleBinding.deleteMany({
+        where: { organizationId: INGEST_KEY_ORG },
+      });
       await prisma.apiKey.deleteMany({
         where: { organizationId: INGEST_KEY_ORG },
       });
       await prisma.organizationUser.deleteMany({
         where: { organizationId: INGEST_KEY_ORG },
       });
-      await prisma.roleBinding.deleteMany({
+      await prisma.project.deleteMany({
+        where: { team: { organizationId: INGEST_KEY_ORG } },
+      });
+      await prisma.teamUser.deleteMany({
+        where: { team: { organizationId: INGEST_KEY_ORG } },
+      });
+      await prisma.team.deleteMany({
+        where: { organizationId: INGEST_KEY_ORG },
+      });
+      // Ingest-key mints allocate a CUSTOM role per key.
+      await prisma.customRole.deleteMany({
         where: { organizationId: INGEST_KEY_ORG },
       });
       await prisma.user.deleteMany({ where: { id: INGEST_KEY_USER } });

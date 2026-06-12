@@ -416,6 +416,33 @@ export async function mintIngestionKey(
   );
 }
 
+// Ingestion key listing -------------------------------------------------------
+
+/**
+ * Lists all live (non-revoked) personal-project ingestion keys for the
+ * caller's org. Used as a cache-liveness preflight (#4755): before reusing a
+ * locally cached token, the wrapper calls this to confirm the key is still
+ * active. If the server resolves and the cached lookupId is absent → the key
+ * was revoked → mint fresh. If the call rejects (offline / older server) →
+ * reuse the cache as-is (offline-first fallback).
+ */
+export async function listIngestionKeys(
+  cfg: GovernanceConfig,
+  options: CliApiOptions = {},
+): Promise<{ sourceType: string; lookupId: string }[]> {
+  const body = await requestREST<{
+    keys: Array<{
+      source_type: string;
+      lookup_id: string;
+      ingestion_template_id: string | null;
+    }>;
+  }>(cfg, "GET", "/api/auth/cli/governance/ingestion-keys", options);
+  return body.keys.map((k) => ({
+    sourceType: k.source_type,
+    lookupId: k.lookup_id,
+  }));
+}
+
 // IngestionTemplate verbs ----------------------------------------------------
 
 export async function adminListIngestionTemplates(

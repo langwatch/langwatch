@@ -32,7 +32,7 @@ import {
 } from "./device-flow";
 import { loadConfig, saveConfig, type GovernanceConfig } from "./config";
 import { formatLoginCeremony } from "./login-ceremony";
-import { getCliBootstrap, type CliBootstrapResponse } from "./cli-api";
+import { getCliBootstrap, listIngestionKeys, type CliBootstrapResponse } from "./cli-api";
 
 export interface RunUnifiedLoginOptions {
   /** Credential type to mint. Defaults to 'device_session' for back-compat. */
@@ -127,6 +127,36 @@ export async function runUnifiedLoginFlow(
       if (bootstrap?.toolPolicies) {
         cfg.tool_policies = bootstrap.toolPolicies;
         saveConfig(cfg);
+      }
+
+      // Reconcile cached ingestion keys (#4755): after a fresh login, drop
+      // any locally cached entries whose token was revoked on the platform.
+      // Errors are swallowed — a login must never fail on reconcile; the
+      // worst outcome is a stale cache entry that the per-invocation wrapper
+      // check will catch anyway.
+      if (cfg.default_personal_ingest_keys && Object.keys(cfg.default_personal_ingest_keys).length > 0) {
+        try {
+          const liveKeys = await listIngestionKeys(cfg);
+          const liveSet = new Set(liveKeys.map((k) => `${k.sourceType}:${k.lookupId}`));
+          const reconciled: GovernanceConfig["default_personal_ingest_keys"] = {};
+          let changed = false;
+          for (const [sourceType, entry] of Object.entries(cfg.default_personal_ingest_keys)) {
+            const tokenMatch = /^ik-lw-([^_]+)_/.exec(entry.secret ?? "");
+            const lookupId = tokenMatch?.[1];
+            if (lookupId && liveSet.has(`${sourceType}:${lookupId}`)) {
+              reconciled[sourceType] = entry;
+            } else {
+              // Entry is stale (revoked or lookupId missing) — omit from reconciled
+              changed = true;
+            }
+          }
+          if (changed) {
+            cfg.default_personal_ingest_keys = reconciled;
+            saveConfig(cfg);
+          }
+        } catch {
+          // Network error / older server: keep existing cache untouched
+        }
       }
 
       console.log();

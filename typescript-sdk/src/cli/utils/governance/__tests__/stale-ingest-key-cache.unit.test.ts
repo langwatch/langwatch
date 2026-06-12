@@ -55,7 +55,7 @@ function baseCfg(overrides: Partial<GovernanceConfig> = {}): GovernanceConfig {
     gateway_url: "http://gw.example.com",
     control_plane_url: "http://app.example.com",
     access_token: "tok",
-    user: { id: "u1", email: "u@example.com" },
+    user: { id: "u1", email: "u@example.com", name: "U" },
     organization: { id: "o1", slug: "acme" },
     ...overrides,
   };
@@ -258,10 +258,10 @@ describe("runUnifiedLoginFlow", () => {
           kind: "device_session",
           access_token: "tok-new",
           refresh_token: "rtok",
-          expires_at: 9999999999,
-          user: { id: "u1", email: "u@example.com" },
+          expires_in: 3600,
+          user: { id: "u1", email: "u@example.com", name: "U" },
           organization: { id: "o1", slug: "acme", name: "Acme" },
-          personal_vk: undefined,
+          default_personal_vk: undefined,
         });
 
         // listIngestionKeys returns only the live key
@@ -329,10 +329,10 @@ describe("runUnifiedLoginFlow", () => {
           kind: "device_session",
           access_token: "tok-new",
           refresh_token: "rtok",
-          expires_at: 9999999999,
-          user: { id: "u1", email: "u@example.com" },
+          expires_in: 3600,
+          user: { id: "u1", email: "u@example.com", name: "U" },
           organization: { id: "o1", slug: "acme", name: "Acme" },
-          personal_vk: undefined,
+          default_personal_vk: undefined,
         });
 
         (cliApi.listIngestionKeys as ReturnType<typeof vi.fn>).mockResolvedValue(
@@ -389,10 +389,10 @@ describe("runUnifiedLoginFlow", () => {
           kind: "device_session",
           access_token: "tok-new",
           refresh_token: "rtok",
-          expires_at: 9999999999,
-          user: { id: "u1", email: "u@example.com" },
+          expires_in: 3600,
+          user: { id: "u1", email: "u@example.com", name: "U" },
           organization: { id: "o1", slug: "acme", name: "Acme" },
-          personal_vk: undefined,
+          default_personal_vk: undefined,
         });
 
         // Network is down during reconcile
