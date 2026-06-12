@@ -297,7 +297,7 @@
     "babel-plugin-react-compiler": "^1.0.0",
     "concurrently": "^9.2.1",
     "encoding": "^0.1.13",
-    "esbuild": "^0.28.0",
+    "esbuild": "^0.28.1",
     "fishery": "^2.4.0",
     "jest-mock-extended": "^4.0.1",
     "jsdom": "^28.1.0",
