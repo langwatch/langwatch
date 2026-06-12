@@ -51,7 +51,7 @@ import {
   recordLangyGithubPr,
 } from "~/server/middleware/rate-limit-langy-github-prs";
 import { extractGithubPrLinks } from "~/server/services/langy/githubPrLinks";
-import { parseGithubProgressEvents } from "~/server/services/langy/githubProgressEvents";
+import { stripLangySentinels } from "~/server/services/langy/langySentinels";
 import type { NextRequestShim } from "./types";
 
 const logger = createLogger("langwatch:api:langy");
@@ -428,10 +428,12 @@ langyRoute().post("/langy/chat", async (c) => {
 
       writer.write({ type: "text-end", id: textId });
 
-      // Strip [langy:progress:...] sentinels from the persisted body — they
-      // are wire-protocol for the live UI, not history. Keep the text used
-      // for PR-URL extraction unchanged: PR URLs live in prose, not sentinels.
-      const persistedText = parseGithubProgressEvents(fullText).cleanedText;
+      // Strip every Langy sentinel ([langy:connect-github] + [langy:progress:...])
+      // from the persisted body — they're wire-protocol for the live UI, not
+      // history. Persisting them re-triggers the connect card on history reload
+      // and pollutes GDPR exports. Keep `fullText` unchanged for PR-URL
+      // extraction below: PR URLs live in prose, not sentinels.
+      const persistedText = stripLangySentinels(fullText);
       try {
         await persistMessage({
           conversationId: conversation.id,

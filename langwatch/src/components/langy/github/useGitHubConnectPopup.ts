@@ -80,9 +80,15 @@ export function useGitHubConnectPopup() {
     (organizationId: string): Promise<ConnectResult> => {
       return new Promise((resolve) => {
         // If a previous popup is still open from this hook, point at it again
-        // rather than spawning a second one.
+        // rather than spawning a second one. Settle the prior caller's promise
+        // first — overwriting resolverRef without calling it would hang the
+        // first connect() promise forever.
         if (popupRef.current && !popupRef.current.closed) {
           popupRef.current.focus();
+          resolverRef.current?.({
+            ok: false,
+            error: "Superseded by a new connect attempt",
+          });
           resolverRef.current = resolve;
           return;
         }
