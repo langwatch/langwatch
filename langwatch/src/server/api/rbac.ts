@@ -1016,17 +1016,19 @@ export async function hasOrganizationPermission(
   if (!orgMember) return false;
 
   // EXTERNAL (Lite Member) is a billing classification, not an access-control
-  // boundary, so it must NOT cap organization-permission resolution. Lite
-  // members resolve org permissions through the same path as every other
-  // member: the MEMBER base bag below (`organization:view` + `aiTools:view`,
-  // so the /me AI-tools portal renders), then ORGANIZATION-scoped
-  // RoleBindings, then the team union. Escalation to ADMIN-only org perms
-  // still requires a real ORGANIZATION-scoped RoleBinding, and the
-  // binding-level guards (`checkPermissionFromBindings`) keep a lite member
-  // from gaining those — so removing the old `organization:view`-only
-  // short-circuit here grants nothing beyond the member base bag.
+  // boundary, so it must NOT cap organization-permission resolution. Removing
+  // the old `organization:view`-only short-circuit lets a lite member reach the
+  // MEMBER base bag below (`organization:view` + `aiTools:view`), which is what
+  // the /me AI-tools portal needs to render. The binding-level guards in
+  // `checkPermissionFromBindings` are deliberately left in place: they still
+  // skip non-CUSTOM ORGANIZATION-scoped bindings for EXTERNAL and cap team
+  // bindings at EXTERNAL_MEMBER_PERMISSIONS, so a lite member still cannot
+  // escalate to ADMIN-only org perms through a binding. Net effect of this
+  // change: EXTERNAL gains exactly the MEMBER base bag and nothing more. (Fully
+  // retiring EXTERNAL as a permission gate is the follow-up for when it becomes
+  // a computed property.)
   //
-  // Regression: that short-circuit fired before the floor below and hid
+  // Regression: the short-circuit fired before the floor below and hid
   // `aiTools:view`, so a lite member's /me portal `aiTools.list` threw
   // UNAUTHORIZED and rendered the empty "your admin hasn't added any tools"
   // state even when an org-wide tool was published (customer report).

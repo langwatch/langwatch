@@ -361,16 +361,22 @@ describe("RBAC Integration Tests", () => {
       expect(manageResult).toBe(false);
     });
 
-    it("grants an EXTERNAL (lite) member the member base bag (aiTools:view) without escalating", async () => {
+    it("grants an EXTERNAL (lite) member the member base bag (aiTools:view) but never escalates via an org binding", async () => {
       // Regression: EXTERNAL is a billing classification, not an access
       // limiter. A hard short-circuit capped lite members at
       // `organization:view`, so `aiTools:view` was denied and the /me portal
-      // `aiTools.list` threw UNAUTHORIZED → empty portal. EXTERNAL now
-      // resolves through the same floor + bindings path as any member.
+      // `aiTools.list` threw UNAUTHORIZED → empty portal. EXTERNAL now reaches
+      // the MEMBER base bag floor (granting aiTools:view).
       mockPrisma.organizationUser.findFirst.mockResolvedValue({
         role: OrganizationUserRole.EXTERNAL,
       });
-      mockPrisma.roleBinding.findMany.mockResolvedValue([]);
+      // A stray ORGANIZATION-scoped ADMIN binding must NOT promote a lite
+      // member: the binding-level guard in checkPermissionFromBindings still
+      // skips non-CUSTOM org bindings for EXTERNAL. This exercises the binding
+      // path (not just the floor) and pins the no-escalation guarantee.
+      mockPrisma.roleBinding.findMany.mockResolvedValue([
+        { role: "ADMIN", customRoleId: null, scopeType: "ORGANIZATION" },
+      ]);
       mockPrisma.teamUser.findMany.mockResolvedValue([]);
 
       const aiToolsResult = await hasOrganizationPermission(
@@ -387,8 +393,8 @@ describe("RBAC Integration Tests", () => {
       );
       expect(viewResult).toBe(true);
 
-      // Not a limiter, but also not an escalation: ADMIN-only org perms stay
-      // denied without a real ORGANIZATION-scoped binding.
+      // Guard holds: even with an ORG-scoped ADMIN binding present, the
+      // ADMIN-only org perm stays denied for a lite member.
       const manageResult = await hasOrganizationPermission(
         { prisma: mockPrisma, session: mockSession },
         "org-123",

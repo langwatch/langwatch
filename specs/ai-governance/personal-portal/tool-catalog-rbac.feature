@@ -19,9 +19,8 @@ Feature: AI Tools Portal — RBAC enforcement
 
   @bdd @phase-7 @rbac @read @integration
   Scenario: External (lite) members can also list (portal must work for everyone)
-    # EXTERNAL is a billing classification, not an access limiter: a lite
-    # member resolves org permissions through the same RBAC path as any
-    # member, so aiTools:view is granted and the /me portal renders.
+    # A lite member is still a member of the org: an org-wide published tool
+    # is discoverable to them, the same as for any other member.
     Given the catalog has 1 enabled organization-scoped entry in "acme"
     When mallory calls `aiTools.list({ organizationId: "acme" })`
     Then the response contains the 1 enabled entry
