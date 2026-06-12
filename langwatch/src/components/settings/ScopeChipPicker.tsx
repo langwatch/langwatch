@@ -592,11 +592,7 @@ export function ScopeChipPicker<
   if (variant === "single-select") {
     const selected = scopes[0] ?? null;
     const selectedOption = selected
-      ? options.find(
-          (o) =>
-            o.scopeType === selected.scopeType &&
-            o.scopeId === selected.scopeId,
-        )
+      ? options.find((o) => entryKey(o) === entryKey(selected))
       : null;
 
     // Group PROJECT options under their parent team so the list stays organised
@@ -637,7 +633,7 @@ export function ScopeChipPicker<
         {label && <SmallLabel>{label}</SmallLabel>}
         <Select.Root
           collection={collection}
-          value={selected ? [`${selected.scopeType}:${selected.scopeId}`] : []}
+          value={selected ? [entryKey(selected)] : []}
           onValueChange={(details) => {
             const pickedValue = details.value[0];
             const option = pickedValue
@@ -645,7 +641,13 @@ export function ScopeChipPicker<
               : undefined;
             onChange(
               option
-                ? [{ scopeType: option.scopeType, scopeId: option.scopeId }]
+                ? [
+                    {
+                      scopeType: option.scopeType,
+                      scopeId: option.scopeId,
+                      ...(option.personalOnly ? { personalOnly: true } : {}),
+                    },
+                  ]
                 : [],
             );
           }}

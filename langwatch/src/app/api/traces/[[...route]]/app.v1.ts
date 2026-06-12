@@ -304,7 +304,7 @@ export function registerTracesRoutes(
           name: "format",
           in: "query",
           description:
-            "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)",
+            "Output format: 'digest' (AI-readable) or 'json' (full raw data, default)",
           required: false,
           schema: { type: "string", enum: ["digest", "json"] },
         },
