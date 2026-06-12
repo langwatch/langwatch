@@ -361,6 +361,42 @@ describe("RBAC Integration Tests", () => {
       expect(manageResult).toBe(false);
     });
 
+    it("grants an EXTERNAL (lite) member the member base bag (aiTools:view) without escalating", async () => {
+      // Regression: EXTERNAL is a billing classification, not an access
+      // limiter. A hard short-circuit capped lite members at
+      // `organization:view`, so `aiTools:view` was denied and the /me portal
+      // `aiTools.list` threw UNAUTHORIZED → empty portal. EXTERNAL now
+      // resolves through the same floor + bindings path as any member.
+      mockPrisma.organizationUser.findFirst.mockResolvedValue({
+        role: OrganizationUserRole.EXTERNAL,
+      });
+      mockPrisma.roleBinding.findMany.mockResolvedValue([]);
+      mockPrisma.teamUser.findMany.mockResolvedValue([]);
+
+      const aiToolsResult = await hasOrganizationPermission(
+        { prisma: mockPrisma, session: mockSession },
+        "org-123",
+        "aiTools:view" as Permission,
+      );
+      expect(aiToolsResult).toBe(true);
+
+      const viewResult = await hasOrganizationPermission(
+        { prisma: mockPrisma, session: mockSession },
+        "org-123",
+        "organization:view" as Permission,
+      );
+      expect(viewResult).toBe(true);
+
+      // Not a limiter, but also not an escalation: ADMIN-only org perms stay
+      // denied without a real ORGANIZATION-scoped binding.
+      const manageResult = await hasOrganizationPermission(
+        { prisma: mockPrisma, session: mockSession },
+        "org-123",
+        "organization:manage" as Permission,
+      );
+      expect(manageResult).toBe(false);
+    });
+
     it("should return false for organization member with manage permission", async () => {
       mockPrisma.organizationUser.findFirst.mockResolvedValue({
         role: OrganizationUserRole.MEMBER,

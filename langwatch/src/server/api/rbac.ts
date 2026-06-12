@@ -1015,10 +1015,21 @@ export async function hasOrganizationPermission(
 
   if (!orgMember) return false;
 
-  // EXTERNAL (Lite Member) users get organization:view only — no org-scoped binding exists for them
-  if (orgMember.role === OrganizationUserRole.EXTERNAL) {
-    return permission === "organization:view";
-  }
+  // EXTERNAL (Lite Member) is a billing classification, not an access-control
+  // boundary, so it must NOT cap organization-permission resolution. Lite
+  // members resolve org permissions through the same path as every other
+  // member: the MEMBER base bag below (`organization:view` + `aiTools:view`,
+  // so the /me AI-tools portal renders), then ORGANIZATION-scoped
+  // RoleBindings, then the team union. Escalation to ADMIN-only org perms
+  // still requires a real ORGANIZATION-scoped RoleBinding, and the
+  // binding-level guards (`checkPermissionFromBindings`) keep a lite member
+  // from gaining those — so removing the old `organization:view`-only
+  // short-circuit here grants nothing beyond the member base bag.
+  //
+  // Regression: that short-circuit fired before the floor below and hid
+  // `aiTools:view`, so a lite member's /me portal `aiTools.list` threw
+  // UNAUTHORIZED and rendered the empty "your admin hasn't added any tools"
+  // state even when an org-wide tool was published (customer report).
 
   // Universal personal-context floor: every org member, regardless of
   // role, gets MEMBER's base bag (`organization:view` + `aiTools:view`)

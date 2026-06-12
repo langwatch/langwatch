@@ -46,6 +46,7 @@ describe("aiToolsRouter integration", () => {
   let adminUserId: string;
   let memberPlatformUserId: string;
   let memberOrphanUserId: string;
+  let liteUserId: string;
 
   beforeAll(async () => {
     resetApp();
@@ -158,6 +159,22 @@ describe("aiToolsRouter integration", () => {
         scopeId: organizationId,
       },
     });
+
+    // EXTERNAL (lite) member: a bare org membership, no department, no
+    // RoleBinding, no team — exactly the prod shape that rendered an empty
+    // /me portal. EXTERNAL is a billing classification, not an access
+    // limiter, so this user must still discover org-wide published tools.
+    const lite = await prisma.user.create({
+      data: { name: "Lite Member", email: `ait-lite-${ns}@example.com` },
+    });
+    liteUserId = lite.id;
+    await prisma.organizationUser.create({
+      data: {
+        userId: lite.id,
+        organizationId,
+        role: OrganizationUserRole.EXTERNAL,
+      },
+    });
   });
 
   afterAll(async () => {
@@ -180,6 +197,7 @@ describe("aiToolsRouter integration", () => {
               `ait-admin-${ns}@example.com`,
               `ait-mp-${ns}@example.com`,
               `ait-mo-${ns}@example.com`,
+              `ait-lite-${ns}@example.com`,
             ],
           },
         },
@@ -213,6 +231,34 @@ describe("aiToolsRouter integration", () => {
           },
         }),
       ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    });
+
+    /** @scenario "External (lite) members can also list (portal must work for everyone)" */
+    it("EXTERNAL (lite) member can list org-wide entries", async () => {
+      // An org-wide tile every member should discover in their /me portal.
+      const orgWide = await prisma.aiToolEntry.create({
+        data: {
+          organizationId,
+          scope: "organization",
+          scopeId: organizationId,
+          type: "coding_assistant",
+          displayName: "Claude Code (lite-visible)",
+          slug: `claude-code-lite-${nanoid(6).toLowerCase()}`,
+          config: {
+            assistantKind: "claude_code",
+            setupCommand: "langwatch claude",
+            setupDocsUrl: "https://docs.langwatch.ai/claude",
+          },
+        },
+      });
+
+      // Regression: hasOrganizationPermission hard-capped EXTERNAL at
+      // organization:view, so aiTools:view was denied, list threw
+      // UNAUTHORIZED, and the portal rendered the empty state.
+      const liteList = await callerFor(liteUserId).aiTools.list({
+        organizationId,
+      });
+      expect(liteList.some((e) => e.id === orgWide.id)).toBe(true);
     });
 
     it("ADMIN can create + adminList", async () => {

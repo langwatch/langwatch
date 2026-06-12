@@ -17,8 +17,11 @@ Feature: AI Tools Portal — RBAC enforcement
     Then the response contains exactly the 2 enabled entries
     And the response status is 200
 
-  @bdd @phase-7 @rbac @read
+  @bdd @phase-7 @rbac @read @integration
   Scenario: External (lite) members can also list (portal must work for everyone)
+    # EXTERNAL is a billing classification, not an access limiter: a lite
+    # member resolves org permissions through the same RBAC path as any
+    # member, so aiTools:view is granted and the /me portal renders.
     Given the catalog has 1 enabled organization-scoped entry in "acme"
     When mallory calls `aiTools.list({ organizationId: "acme" })`
     Then the response contains the 1 enabled entry
