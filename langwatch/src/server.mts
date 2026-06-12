@@ -3,7 +3,16 @@ import dotenv from "dotenv";
 import events from "events";
 import Module from "module";
 
-dotenv.config();
+// `override: true` lets `.env` win over values that scripts/start.sh exported
+// before this entry runs. start.sh defaults LW_GATEWAY_BASE_URL,
+// LW_GATEWAY_PUBLIC_URL, LANGWATCH_API_URL etc. based on $PORT when those vars
+// are unset in the shell — without override, dotenv.config() sees them as set
+// and silently skips the .env value, so an explicit
+// LW_GATEWAY_PUBLIC_URL=http://host.minikube.internal:5563 in .env never
+// reaches the running process (and Langy can't reach the gateway from inside
+// the OpenCode pod). NODE_ENV / PORT / similar process-level vars stay
+// shell-only because .env shouldn't carry them.
+dotenv.config({ override: true });
 setEnvironment(process.env.ENVIRONMENT ?? "local");
 
 if (process.env.NODE_ENV === "production") {
