@@ -9,7 +9,6 @@ import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
-import { resourceLimitMiddleware } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
 
@@ -176,7 +175,6 @@ secured.access(requires("triggers:view")).get(
 // ── Create Trigger ─────────────────────────────────────────
 secured.access(requires("triggers:manage")).post(
   "/",
-  resourceLimitMiddleware("automations"),
   describeRoute({
     description: "Create a new trigger (automation)",
     responses: {

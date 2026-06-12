@@ -8,7 +8,6 @@ import {
 } from "../../../../server/agents/agent.repository";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
 import { createProjectApp, requires } from "~/server/api/security";
-import { resourceLimitMiddleware } from "../../middleware";
 import {
   type AgentServiceMiddlewareVariables,
   agentServiceMiddleware,
@@ -133,7 +132,6 @@ secured.access(requires("project:update")).post(
   describeRoute({
     description: "Create a new agent",
   }),
-  resourceLimitMiddleware("agents"),
   zValidator("json", createAgentSchema, validationHook),
   async (c) => {
       const project = c.get("project");

@@ -19,7 +19,6 @@ import { getTestUser } from "../../../utils/testUtils";
 import { prisma } from "../../db";
 import { ScenarioService } from "../scenario.service";
 import { ScenarioRepository } from "../scenario.repository";
-import { LicenseEnforcementRepository } from "../../license-enforcement/license-enforcement.repository";
 
 describe("ScenarioService", () => {
   const projectId = "test-project-id";
@@ -237,13 +236,11 @@ describe("ScenarioService", () => {
 
   describe("license limit counting", () => {
     describe("when scenarios are archived", () => {
-      it("excludes archived scenarios from license count", async () => {
+      it("excludes archived scenarios from a count of active scenarios", async () => {
         const organization = await prisma.organization.findUnique({
           where: { slug: "test-organization" },
         });
         expect(organization).not.toBeNull();
-
-        const licenseRepo = new LicenseEnforcementRepository(prisma);
 
         // Create 3 active scenarios
         await createScenario({ name: "Active 1" });
@@ -253,8 +250,14 @@ describe("ScenarioService", () => {
         // Archive one
         await service.archive({ id: toArchive.id, projectId });
 
-        // Count should only include active scenarios
-        const count = await licenseRepo.getActiveScenarioCount(organization!.id);
+        // Count should only include active (non-archived) scenarios.
+        // Scope by projectId so the multitenancy middleware accepts the query.
+        const count = await prisma.scenario.count({
+          where: {
+            projectId,
+            archivedAt: null,
+          },
+        });
         expect(count).toBe(2);
       });
     });

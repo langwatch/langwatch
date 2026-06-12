@@ -3,7 +3,6 @@ import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { type FilterField, filterFieldsEnum } from "../../filters/types";
-import { enforceLicenseLimit } from "../../license-enforcement";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -115,7 +114,6 @@ export const graphsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("analytics:create"))
     .mutation(async ({ ctx, input }) => {
-      await enforceLicenseLimit(ctx, input.projectId, "customGraphs");
       const graph = JSON.parse(input.graph);
 
       // If no gridRow provided, find the next available row

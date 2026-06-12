@@ -9,7 +9,6 @@ import { ScenarioNotFoundError } from "~/server/scenarios/errors";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
 import { createLogger } from "~/utils/logger/server";
 import type { AuthMiddlewareVariables } from "../../middleware";
-import { resourceLimitMiddleware } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
 
@@ -135,7 +134,6 @@ export function registerScenarioRoutes(
 
   secured.access(requires("scenarios:manage")).post(
   "/",
-  resourceLimitMiddleware("scenarios"),
   describeRoute({
     description: "Create a new scenario",
     responses: {

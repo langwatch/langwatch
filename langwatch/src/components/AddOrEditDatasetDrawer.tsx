@@ -15,7 +15,6 @@ import { useEffect, useState } from "react";
 import { Eye, EyeOff, Trash2 } from "react-feather";
 import { type FieldErrors, useFieldArray, useForm } from "react-hook-form";
 import { useDrawer } from "~/hooks/useDrawer";
-import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { Drawer } from "../components/ui/drawer";
 import { toaster } from "../components/ui/toaster";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
@@ -77,7 +76,6 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
   const { closeDrawer } = useDrawer();
   const onClose = props.onClose ?? closeDrawer;
   const isOpen = props.open ?? true;
-  const { checkAndProceed } = useLicenseEnforcement("datasets");
 
   const initialColumns: DatasetColumns = [
     { name: "trace_id", type: "string" },
@@ -253,13 +251,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
       return;
     }
 
-    // Only enforce limit when creating a new dataset (no datasetId provided)
-    const isNewDataset = !props.datasetToSave?.datasetId;
-    if (isNewDataset) {
-      checkAndProceed(() => performUpsert(data));
-    } else {
-      performUpsert(data);
-    }
+    performUpsert(data);
   };
 
   return (

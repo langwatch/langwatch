@@ -2,20 +2,34 @@ import { z } from "zod";
 import type { PlanInfo } from "./planInfo";
 import type { LicenseError } from "./constants";
 
-/** Plan limits embedded within a license */
+/**
+ * Plan limits embedded within a license (the signed payload).
+ *
+ * IMPORTANT: The workspace-structure fields (maxProjects, maxTeams) and the
+ * experimentation fields below (maxWorkflows, maxPrompts, maxEvaluators,
+ * maxScenarios, maxAgents, maxExperiments, maxOnlineEvaluations, maxDatasets,
+ * maxDashboards, maxCustomGraphs) are NO LONGER ENFORCED — those resources are
+ * OSS/Apache-2.0 and uncapped. They are retained in this schema purely for
+ * backward compatibility: `verifySignature` re-serializes the Zod-parsed
+ * `data`, and `z.object` strips unknown keys, so dropping a field here would
+ * change the JSON for already-issued licenses and break their signature
+ * verification. They are all optional (existing licenses that carry a value
+ * still parse and re-serialize byte-identically); they are simply ignored
+ * downstream.
+ */
 export const LicensePlanLimitsSchema = z.object({
   type: z.string(),
   name: z.string(),
   maxMembers: z.number(),
   maxMembersLite: z.number().optional(),
   maxTeams: z.number().optional(),
-  maxProjects: z.number(),
+  maxProjects: z.number().optional(),
   maxMessagesPerMonth: z.number(),
   // evaluationsCredit kept optional for backward compat: old signed licenses
   // include this field. Stripping it would change the JSON, breaking signature
   // verification. The field is otherwise unused (never enforced).
   evaluationsCredit: z.number().optional(),
-  maxWorkflows: z.number(),
+  maxWorkflows: z.number().optional(),
   // New fields - optional for backward compatibility with existing signed licenses
   maxPrompts: z.number().optional(),
   maxEvaluators: z.number().optional(),
@@ -87,32 +101,6 @@ type LicenseResourceLimits = {
   maxMembers: number;
   currentMembersLite: number;
   maxMembersLite: number;
-  currentTeams: number;
-  maxTeams: number;
-  currentProjects: number;
-  maxProjects: number;
-  currentPrompts: number;
-  maxPrompts: number;
-  currentWorkflows: number;
-  maxWorkflows: number;
-  currentScenarios: number;
-  maxScenarios: number;
-  currentEvaluators: number;
-  maxEvaluators: number;
-  currentAgents: number;
-  maxAgents: number;
-  currentExperiments: number;
-  maxExperiments: number;
-  currentOnlineEvaluations: number;
-  maxOnlineEvaluations: number;
-  currentDatasets: number;
-  maxDatasets: number;
-  currentDashboards: number;
-  maxDashboards: number;
-  currentCustomGraphs: number;
-  maxCustomGraphs: number;
-  currentAutomations: number;
-  maxAutomations: number;
   currentMessagesPerMonth: number;
   maxMessagesPerMonth: number;
 };

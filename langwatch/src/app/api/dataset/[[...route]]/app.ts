@@ -7,7 +7,6 @@ import { UploadValidationError } from "../../../../server/datasets/dataset.servi
 import type { DatasetColumns } from "../../../../server/datasets/types";
 import { datasetColumnTypeSchema } from "../../../../server/datasets/types";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
-import { resourceLimitMiddleware } from "../../middleware";
 import {
   type DatasetServiceMiddlewareVariables,
   datasetServiceMiddleware,
@@ -153,7 +152,6 @@ secured.access(requires("datasets:manage")).post(
   describeRoute({
     description: "Create a new dataset",
   }),
-  resourceLimitMiddleware("datasets"),
   zValidator("json", createDatasetSchema, validationHook),
   async (c) => {
     const project = c.get("project");
@@ -207,7 +205,6 @@ secured.access(requires("datasets:manage")).post(
     description:
       "Create a new dataset from an uploaded file (CSV, JSON, JSONL)",
   }),
-  resourceLimitMiddleware("datasets"),
   async (c) => {
     const project = c.get("project");
     const service = c.get("datasetService");

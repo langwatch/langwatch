@@ -47,7 +47,7 @@ Feature: License Lifecycle End-to-End
     Then the invite fails with message "Over the limit of invites allowed"
 
     When I try to create a 6th project
-    Then project creation fails with message "maximum number of projects"
+    Then the project is created successfully, because projects are uncapped (OSS)
 
     # Step 4: Remove the license
     When I navigate to the license settings page
@@ -75,7 +75,6 @@ Feature: License Lifecycle End-to-End
     When I check the active plan via API
     Then the plan type is "FREE"
     And maxMembers is 1
-    And maxProjects is 2
 
     When I try to invite a new member
     Then the invite fails because member limit is exceeded

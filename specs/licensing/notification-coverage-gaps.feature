@@ -8,18 +8,15 @@ Feature: Complete notification coverage for all limit enforcement paths
   Background:
     Given an organization "Acme Corp" on the "Launch" plan
 
-  # --- Backend: LicenseEnforcementService gains enforceLimitByOrganization ---
-  # enforceLicenseLimit(ctx, projectId, limitType) requires a projectId.
-  # Project and team creation don't have a projectId yet.
-  # Add enforceLimitByOrganization(organizationId, limitType, user) to
-  # LicenseEnforcementService. The existing enforceLicenseLimit middleware
-  # resolves projectId -> organizationId then delegates to this method.
-  # All limit checks go through the service, not direct Prisma calls.
+  # --- Backend: member-seat enforcement lives in InviteService ---
+  # Member and lite-member invite limits are the only creation limits left:
+  # InviteService.checkLicenseLimits resolves the org's seat counts and throws
+  # LimitExceededError, then the invite mutation fires the ops Slack alert.
+  # Projects, teams, and experimentation resources are OSS/uncapped and have no
+  # limit-notification path.
 
-  # KEPT @unimplemented: this scenario depends on
-  # enforceLimitByOrganization being added to LicenseEnforcementService
-  # (see file-level NOTE above). The notification end-to-end flow for
-  # member invites cannot be tested until the wiring exists.
+  # KEPT @unimplemented: the member-invite notification end-to-end flow is not
+  # yet wired to a test harness.
   @unimplemented
   Scenario: Member invite triggers notification when limit reached
     Given the organization has reached the maximum number of full members

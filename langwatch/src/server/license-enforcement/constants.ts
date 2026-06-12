@@ -13,21 +13,8 @@ import type { LimitType } from "./types";
  * // "You've reached the limit of team members"
  */
 export const LIMIT_TYPE_LABELS: Record<LimitType, string> = {
-  workflows: "workflows",
-  prompts: "prompts",
-  evaluators: "evaluators",
-  scenarios: "scenarios",
-  projects: "projects",
-  teams: "teams",
   members: "team members",
   membersLite: "lite members",
-  agents: "agents",
-  experiments: "experiments",
-  onlineEvaluations: "online evaluations",
-  datasets: "datasets",
-  dashboards: "dashboards",
-  customGraphs: "custom graphs",
-  automations: "automations",
 } as const;
 
 /**
@@ -41,19 +28,6 @@ export const LIMIT_TYPE_LABELS: Record<LimitType, string> = {
  * // "Team Members:"
  */
 export const LIMIT_TYPE_DISPLAY_LABELS: Record<LimitType, string> = {
-  workflows: "Workflows",
-  prompts: "Prompts",
-  evaluators: "Evaluators",
-  scenarios: "Scenarios",
-  projects: "Projects",
-  teams: "Teams",
   members: "Team Members",
   membersLite: "Lite Members",
-  agents: "Agents",
-  experiments: "Experiments",
-  onlineEvaluations: "Online Evaluations",
-  datasets: "Datasets",
-  dashboards: "Dashboards",
-  customGraphs: "Custom Graphs",
-  automations: "Automations",
 } as const;

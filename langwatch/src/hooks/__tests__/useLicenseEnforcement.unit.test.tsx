@@ -53,7 +53,7 @@ describe("useLicenseEnforcement", () => {
         isLoading: false,
       });
 
-      const { result } = renderHook(() => useLicenseEnforcement("workflows"));
+      const { result } = renderHook(() => useLicenseEnforcement("members"));
 
       expect(result.current.isAllowed).toBe(true);
       expect(result.current.limitInfo?.current).toBe(3);
@@ -66,7 +66,7 @@ describe("useLicenseEnforcement", () => {
         isLoading: false,
       });
 
-      const { result } = renderHook(() => useLicenseEnforcement("workflows"));
+      const { result } = renderHook(() => useLicenseEnforcement("members"));
 
       expect(result.current.isAllowed).toBe(false);
     });
@@ -77,7 +77,7 @@ describe("useLicenseEnforcement", () => {
         isLoading: false,
       });
 
-      const { result } = renderHook(() => useLicenseEnforcement("workflows"));
+      const { result } = renderHook(() => useLicenseEnforcement("members"));
 
       expect(result.current.isAllowed).toBe(false);
     });
@@ -88,7 +88,7 @@ describe("useLicenseEnforcement", () => {
         isLoading: true,
       });
 
-      const { result } = renderHook(() => useLicenseEnforcement("workflows"));
+      const { result } = renderHook(() => useLicenseEnforcement("members"));
 
       expect(result.current.isAllowed).toBe(true);
       expect(result.current.isLoading).toBe(true);
@@ -102,7 +102,7 @@ describe("useLicenseEnforcement", () => {
         isLoading: false,
       });
 
-      const { result } = renderHook(() => useLicenseEnforcement("workflows"));
+      const { result } = renderHook(() => useLicenseEnforcement("members"));
       const callback = vi.fn();
 
       act(() => {
@@ -118,7 +118,7 @@ describe("useLicenseEnforcement", () => {
         isLoading: false,
       });
 
-      const { result } = renderHook(() => useLicenseEnforcement("workflows"));
+      const { result } = renderHook(() => useLicenseEnforcement("members"));
       const callback = vi.fn();
 
       act(() => {
@@ -134,7 +134,7 @@ describe("useLicenseEnforcement", () => {
         isLoading: true,
       });
 
-      const { result } = renderHook(() => useLicenseEnforcement("workflows"));
+      const { result } = renderHook(() => useLicenseEnforcement("members"));
       const callback = vi.fn();
 
       act(() => {
@@ -152,7 +152,7 @@ describe("useLicenseEnforcement", () => {
         isLoading: false,
       });
 
-      const { result } = renderHook(() => useLicenseEnforcement("workflows"));
+      const { result } = renderHook(() => useLicenseEnforcement("members"));
 
       act(() => {
         result.current.checkAndProceed(() => {});
@@ -160,7 +160,7 @@ describe("useLicenseEnforcement", () => {
 
       // Verify the store's open function was called with correct parameters
       expect(mockOpenUpgradeModal).toHaveBeenCalledTimes(1);
-      expect(mockOpenUpgradeModal).toHaveBeenCalledWith("workflows", 10, 10);
+      expect(mockOpenUpgradeModal).toHaveBeenCalledWith("members", 10, 10);
     });
 
     it("does not open upgrade modal when allowed", () => {
@@ -169,7 +169,7 @@ describe("useLicenseEnforcement", () => {
         isLoading: false,
       });
 
-      const { result } = renderHook(() => useLicenseEnforcement("workflows"));
+      const { result } = renderHook(() => useLicenseEnforcement("members"));
 
       const callback = vi.fn();
       act(() => {
@@ -190,7 +190,7 @@ describe("useLicenseEnforcement", () => {
         isLoading: false,
       });
 
-      const { result } = renderHook(() => useLicenseEnforcement("workflows"));
+      const { result } = renderHook(() => useLicenseEnforcement("members"));
 
       act(() => {
         result.current.checkAndProceed(() => {});
@@ -198,7 +198,7 @@ describe("useLicenseEnforcement", () => {
 
       expect(mockMutate).toHaveBeenCalledWith({
         organizationId: "org-123",
-        limitType: "workflows",
+        limitType: "members",
       });
     });
 
@@ -208,7 +208,7 @@ describe("useLicenseEnforcement", () => {
         isLoading: false,
       });
 
-      const { result } = renderHook(() => useLicenseEnforcement("workflows"));
+      const { result } = renderHook(() => useLicenseEnforcement("members"));
 
       act(() => {
         result.current.checkAndProceed(() => {});
@@ -223,7 +223,7 @@ describe("useLicenseEnforcement", () => {
         isLoading: true,
       });
 
-      const { result } = renderHook(() => useLicenseEnforcement("workflows"));
+      const { result } = renderHook(() => useLicenseEnforcement("members"));
 
       act(() => {
         result.current.checkAndProceed(() => {});
@@ -240,10 +240,10 @@ describe("useLicenseEnforcement", () => {
         isLoading: false,
       });
 
-      renderHook(() => useLicenseEnforcement("prompts"));
+      renderHook(() => useLicenseEnforcement("members"));
 
       expect(mockUseQuery).toHaveBeenCalledWith(
-        { organizationId: "org-123", limitType: "prompts" },
+        { organizationId: "org-123", limitType: "members" },
         { enabled: true }
       );
     });
@@ -263,7 +263,7 @@ describe("useLicenseEnforcement", () => {
 
       // The query should be called with enabled: false when org is undefined
       // This test verifies the hook handles missing organization gracefully
-      const { result } = renderHook(() => useLicenseEnforcement("workflows"));
+      const { result } = renderHook(() => useLicenseEnforcement("members"));
 
       // Should default to allowed when no data
       expect(result.current.isAllowed).toBe(true);
@@ -272,17 +272,8 @@ describe("useLicenseEnforcement", () => {
 
   describe("different limit types", () => {
     const limitTypes = [
-      "workflows",
-      "prompts",
-      "evaluators",
-      "scenarios",
-      "projects",
       "members",
-      "teams",
       "membersLite",
-      "agents",
-      "experiments",
-      "onlineEvaluations",
     ] as const;
 
     limitTypes.forEach((limitType) => {

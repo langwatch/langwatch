@@ -47,7 +47,6 @@ import {
   copyWorkflowWithDatasets,
   saveOrCommitWorkflowVersion,
 } from "./workflows";
-import { enforceLicenseLimit } from "../../license-enforcement";
 
 type TRPCContext = ReturnType<typeof createInnerTRPCContext>;
 
@@ -79,11 +78,6 @@ export const experimentsRouter = createTRPCRouter({
     .use(checkProjectPermission("workflows:create"))
     .mutation(async ({ ctx, input }) => {
       const experiments = experimentService();
-
-      // Enforce experiment limit only when creating new experiments
-      if (!input.experimentId) {
-        await enforceLicenseLimit(ctx, input.projectId, "experiments");
-      }
 
       let workflowId = input.dsl.workflow_id;
       const name =
@@ -251,11 +245,6 @@ export const experimentsRouter = createTRPCRouter({
         })
         .catch(mapExperimentError);
       const isNewExperiment = existingSlug === null;
-
-      // Enforce experiment limit only when creating new experiments
-      if (isNewExperiment) {
-        await enforceLicenseLimit(ctx, input.projectId, "experiments");
-      }
 
       // For new experiments, deduplicate the slug to avoid constraint violations
       // For existing experiments, keep the same slug to avoid breaking URLs
@@ -819,9 +808,6 @@ export const experimentsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("evaluations:manage"))
     .mutation(async ({ ctx, input }) => {
-      // Enforce experiment limit - copy always creates a new experiment
-      await enforceLicenseLimit(ctx, input.projectId, "experiments");
-
       // Check that the user has at least evaluations:manage permission on the source project
       const hasSourcePermission = await hasProjectPermission(
         ctx,

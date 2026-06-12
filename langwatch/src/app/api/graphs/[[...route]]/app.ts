@@ -8,7 +8,6 @@ import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
 import { createProjectApp, requires } from "~/server/api/security";
-import { resourceLimitMiddleware } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 
 patchZodOpenapi();
@@ -147,7 +146,6 @@ secured.access(requires("analytics:view")).get(
 // ── Create Graph ───────────────────────────────────────────
 secured.access(requires("analytics:manage")).post(
   "/",
-  resourceLimitMiddleware("customGraphs"),
   describeRoute({
       description: "Create a custom graph on a dashboard",
       responses: {

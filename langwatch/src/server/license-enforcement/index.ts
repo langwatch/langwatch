@@ -14,11 +14,6 @@ export type { PlanProvider } from "../app-layer/subscription/plan-provider";
 
 // Re-export utilities for router usage
 export { getOrganizationIdForProject } from "./utils";
-export { enforceLicenseLimit } from "./enforcement.middleware";
-export type {
-  LicenseEnforcementContext,
-  LicenseEnforcementInput,
-} from "./enforcement.middleware";
 
 // Re-export license limit guard for member type changes
 export {

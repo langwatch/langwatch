@@ -4,7 +4,6 @@ import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
-import { enforceLicenseLimit } from "../../license-enforcement";
 import {
   sanitizeTriggerFilters,
   triggerFiltersSchema,
@@ -46,8 +45,6 @@ export const automationRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("triggers:create"))
     .mutation(async ({ ctx, input }) => {
-      await enforceLicenseLimit(ctx, input.projectId, "automations");
-
       const project = await ctx.prisma.project.findUnique({
         where: {
           id: input.projectId,

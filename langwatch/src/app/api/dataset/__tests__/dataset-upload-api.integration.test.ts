@@ -571,30 +571,6 @@ describe("Feature: Dataset File Upload REST API", () => {
       });
     });
 
-    describe("when the project has reached its dataset plan limit", () => {
-      beforeEach(async () => {
-        await createDataset({ name: "Existing", slug: "existing" });
-        mockGetActivePlan.mockResolvedValue({
-          ...FREE_PLAN,
-          maxDatasets: 1,
-          overrideAddingLimitations: false,
-        });
-      });
-
-      /** @scenario "Create + upload enforces dataset plan limits" */
-      it("returns 403 Forbidden", async () => {
-        const csv = "input\nhello";
-        const form = buildFormData({
-          file: { content: csv, filename: "data.csv" },
-          name: "Over Limit",
-        });
-        const res = await createAndUpload(form);
-
-        expect(res.status).toBe(403);
-        const body = await res.json();
-        expect(body.error).toBe("resource_limit_exceeded");
-      });
-    });
 
     describe("when slug conflicts with existing dataset", () => {
       beforeEach(async () => {

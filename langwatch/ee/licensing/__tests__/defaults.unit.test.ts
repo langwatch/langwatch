@@ -3,46 +3,68 @@ import {
   resolvePlanDefaults,
   type ResolvedPlanLimits,
 } from "../defaults";
-import { DEFAULT_LIMIT, DEFAULT_MEMBERS_LITE } from "../constants";
+import { DEFAULT_MEMBERS_LITE } from "../constants";
 import type { LicensePlanLimits } from "../types";
 
 /**
- * Tests for resolvePlanDefaults function.
- * Verifies that optional fields in LicensePlanLimits receive correct defaults.
+ * Tests for resolvePlanDefaults.
+ *
+ * Only the enforced levers (member seats, messages volume) + plan identity are
+ * resolved onto the active plan. Workspace structure (projects, teams) and
+ * experimentation resources are OSS/uncapped, so their license fields — even
+ * when present in an older signed payload — are ignored and never resolved.
  */
 
 describe("resolvePlanDefaults", () => {
-  it("applies defaults to all optional fields when not provided", () => {
+  it("passes through identity, seats, messages, and canPublish", () => {
     const plan: LicensePlanLimits = {
       type: "ENTERPRISE",
       name: "Enterprise",
       maxMembers: 100,
-      maxProjects: 50,
+      maxMembersLite: 50,
       maxMessagesPerMonth: 1_000_000,
-      maxWorkflows: 200,
       canPublish: true,
-      // Optional fields omitted: maxMembersLite, maxPrompts, maxEvaluators, maxScenarios
+      usageUnit: "events",
     };
 
     const resolved = resolvePlanDefaults(plan);
 
-    // Required fields pass through unchanged
     expect(resolved.type).toBe("ENTERPRISE");
     expect(resolved.name).toBe("Enterprise");
     expect(resolved.maxMembers).toBe(100);
-    expect(resolved.maxProjects).toBe(50);
+    expect(resolved.maxMembersLite).toBe(50);
     expect(resolved.maxMessagesPerMonth).toBe(1_000_000);
-    expect(resolved.maxWorkflows).toBe(200);
     expect(resolved.canPublish).toBe(true);
+    expect(resolved.usageUnit).toBe("events");
+  });
 
-    // Optional fields receive defaults
+  it("defaults maxMembersLite when not provided", () => {
+    const plan: LicensePlanLimits = {
+      type: "PRO",
+      name: "Pro",
+      maxMembers: 10,
+      maxMessagesPerMonth: 100_000,
+      canPublish: true,
+    };
+
+    const resolved = resolvePlanDefaults(plan);
+
     expect(resolved.maxMembersLite).toBe(DEFAULT_MEMBERS_LITE);
-    expect(resolved.maxPrompts).toBe(DEFAULT_LIMIT);
-    expect(resolved.maxEvaluators).toBe(DEFAULT_LIMIT);
-    expect(resolved.maxScenarios).toBe(DEFAULT_LIMIT);
-    expect(resolved.maxAgents).toBe(DEFAULT_LIMIT);
-    expect(resolved.maxOnlineEvaluations).toBe(DEFAULT_LIMIT);
-    expect(resolved.usageUnit).toBe("traces");
+  });
+
+  it("preserves an explicit maxMembersLite", () => {
+    const plan: LicensePlanLimits = {
+      type: "TEAM",
+      name: "Team",
+      maxMembers: 10,
+      maxMembersLite: 5,
+      maxMessagesPerMonth: 100_000,
+      canPublish: true,
+    };
+
+    const resolved = resolvePlanDefaults(plan);
+
+    expect(resolved.maxMembersLite).toBe(5);
   });
 
   it("defaults usageUnit to traces when not provided", () => {
@@ -50,9 +72,7 @@ describe("resolvePlanDefaults", () => {
       type: "PRO",
       name: "Pro",
       maxMembers: 10,
-      maxProjects: 20,
       maxMessagesPerMonth: 100_000,
-      maxWorkflows: 50,
       canPublish: true,
     };
 
@@ -61,14 +81,12 @@ describe("resolvePlanDefaults", () => {
     expect(resolved.usageUnit).toBe("traces");
   });
 
-  it("preserves explicit usageUnit events value", () => {
+  it("preserves an explicit usageUnit of events", () => {
     const plan: LicensePlanLimits = {
       type: "ENTERPRISE",
       name: "Enterprise",
       maxMembers: 100,
-      maxProjects: 50,
       maxMessagesPerMonth: 1_000_000,
-      maxWorkflows: 200,
       canPublish: true,
       usageUnit: "events",
     };
@@ -78,14 +96,12 @@ describe("resolvePlanDefaults", () => {
     expect(resolved.usageUnit).toBe("events");
   });
 
-  it("normalizes unknown usageUnit values to traces", () => {
+  it("normalizes an unknown usageUnit to traces", () => {
     const plan: LicensePlanLimits = {
       type: "ENTERPRISE",
       name: "Enterprise",
       maxMembers: 100,
-      maxProjects: 50,
       maxMessagesPerMonth: 1_000_000,
-      maxWorkflows: 200,
       canPublish: true,
       usageUnit: "spans",
     };
@@ -95,94 +111,55 @@ describe("resolvePlanDefaults", () => {
     expect(resolved.usageUnit).toBe("traces");
   });
 
-  it("preserves explicitly set optional fields", () => {
+  it("ignores workspace-structure and experimentation caps in the payload", () => {
+    // An older license that still encodes these caps must resolve cleanly,
+    // surfacing only the enforced levers.
     const plan: LicensePlanLimits = {
-      type: "TEAM",
-      name: "Team",
+      type: "LEGACY",
+      name: "Legacy",
       maxMembers: 10,
-      maxMembersLite: 5,
-      maxProjects: 10,
-      maxMessagesPerMonth: 100_000,
-      maxWorkflows: 50,
-      maxPrompts: 25,
-      maxEvaluators: 30,
-      maxScenarios: 20,
-      maxAgents: 15,
-      canPublish: true,
-    };
-
-    const resolved = resolvePlanDefaults(plan);
-
-    // All fields preserved from input
-    expect(resolved.maxMembersLite).toBe(5);
-    expect(resolved.maxPrompts).toBe(25);
-    expect(resolved.maxEvaluators).toBe(30);
-    expect(resolved.maxScenarios).toBe(20);
-    expect(resolved.maxAgents).toBe(15);
-  });
-
-  it("handles partial optional fields (some set, some not)", () => {
-    const plan: LicensePlanLimits = {
-      type: "STARTER",
-      name: "Starter",
-      maxMembers: 5,
-      maxMembersLite: 3, // Set
-      maxProjects: 5,
+      maxMembersLite: 3,
       maxMessagesPerMonth: 50_000,
+      maxProjects: 5,
+      maxTeams: 2,
       maxWorkflows: 20,
-      maxPrompts: 10, // Set
-      // maxEvaluators: omitted
-      // maxScenarios: omitted
-      // maxAgents: omitted
+      maxPrompts: 10,
       canPublish: false,
     };
 
     const resolved = resolvePlanDefaults(plan);
 
-    // Explicitly set values preserved
-    expect(resolved.maxMembersLite).toBe(3);
-    expect(resolved.maxPrompts).toBe(10);
-
-    // Omitted values get defaults
-    expect(resolved.maxEvaluators).toBe(DEFAULT_LIMIT);
-    expect(resolved.maxScenarios).toBe(DEFAULT_LIMIT);
-    expect(resolved.maxAgents).toBe(DEFAULT_LIMIT);
+    expect(resolved).toEqual({
+      type: "LEGACY",
+      name: "Legacy",
+      maxMembers: 10,
+      maxMembersLite: 3,
+      maxMessagesPerMonth: 50_000,
+      canPublish: false,
+      usageUnit: "traces",
+    });
+    expect("maxProjects" in resolved).toBe(false);
+    expect("maxWorkflows" in resolved).toBe(false);
   });
 
-  it("returns a type-safe ResolvedPlanLimits with all fields required", () => {
+  it("returns a ResolvedPlanLimits with exactly the enforced fields", () => {
     const plan: LicensePlanLimits = {
       type: "TEST",
       name: "Test",
       maxMembers: 1,
-      maxProjects: 1,
       maxMessagesPerMonth: 1000,
-      maxWorkflows: 10,
       canPublish: false,
     };
 
     const resolved: ResolvedPlanLimits = resolvePlanDefaults(plan);
 
-    // TypeScript enforces all these fields exist (no optional marker)
-    // If any field were missing, this would be a compile error
+    // TypeScript enforces these are exactly the fields on ResolvedPlanLimits.
     const allFields: ResolvedPlanLimits = {
       type: resolved.type,
       name: resolved.name,
       maxMembers: resolved.maxMembers,
       maxMembersLite: resolved.maxMembersLite,
-      maxTeams: resolved.maxTeams,
-      maxProjects: resolved.maxProjects,
       maxMessagesPerMonth: resolved.maxMessagesPerMonth,
-      maxWorkflows: resolved.maxWorkflows,
-      maxPrompts: resolved.maxPrompts,
-      maxEvaluators: resolved.maxEvaluators,
-      maxScenarios: resolved.maxScenarios,
-      maxAgents: resolved.maxAgents,
-      maxExperiments: resolved.maxExperiments,
-      maxOnlineEvaluations: resolved.maxOnlineEvaluations,
-      maxDatasets: resolved.maxDatasets,
-      maxDashboards: resolved.maxDashboards,
-      maxCustomGraphs: resolved.maxCustomGraphs,
-      maxAutomations: resolved.maxAutomations,
       canPublish: resolved.canPublish,
       usageUnit: resolved.usageUnit,
     };
