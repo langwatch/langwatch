@@ -12,6 +12,7 @@ import { rankedErrorSpans } from "../../../utils/errorSpans";
 import { AttributeTable } from "../AttributeTable";
 import { EvalsList } from "../evalCards";
 import { ExceptionsContent } from "../ExceptionsContent";
+import { BlurredContentGate } from "../../BlurredContentGate";
 import { IOViewer } from "../IOViewer";
 import { ScopeBlock } from "../ScopeChip";
 import { AccordionShell, Section } from "./AccordionShell";
@@ -173,6 +174,9 @@ export function TraceSummaryAccordions({
                     ) : (
                       <MissingIORow label="Output" mode="output" />
                     )}
+                    {trace.redactedByVisibilityWindow ? (
+                      <BlurredContentGate traceId={trace.traceId} />
+                    ) : null}
                   </VStack>
                 ) : (
                   <EmptyHint>No I/O captured for this trace</EmptyHint>
