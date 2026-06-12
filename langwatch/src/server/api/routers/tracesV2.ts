@@ -127,6 +127,7 @@ function mapTraceSummaryToHeader(summary: TraceSummaryData): TraceHeader {
     error: summary.errorMessage,
     input: summary.computedInput,
     output: summary.computedOutput,
+    redactedByVisibilityWindow: summary.redactedByVisibilityWindow,
     models: summary.models,
     totalCost: summary.totalCost,
     nonBilledCost,
@@ -645,9 +646,14 @@ export const tracesV2Router = createTRPCRouter({
       const summary = await app.traces.summary.getByTraceId(
         input.projectId,
         input.traceId,
-        input.occurredAtMs !== undefined
-          ? { occurredAtMs: input.occurredAtMs }
-          : undefined,
+        {
+          ...(input.occurredAtMs !== undefined
+            ? { occurredAtMs: input.occurredAtMs }
+            : {}),
+          visibilityCutoffMs: await getVisibilityCutoffMsForProject(
+            input.projectId,
+          ),
+        },
       );
       if (!summary) {
         throw new TraceNotFoundError(input.traceId);
