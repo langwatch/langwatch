@@ -159,16 +159,16 @@ object.
 | `events.timestamp` | number | Epoch ms. |
 | `events.metrics` | json | All numeric metrics for the event. |
 | `events.metrics.<key>` | number | A single named metric. |
-| `events.details` | json | All string details for the event. |
-| `events.details.<key>` | string | A single named detail. |
+| `events.details` | json | All string details for the event. Redacted without input-visibility permission. |
+| `events.details.<key>` | string | A single named detail. Redacted without input-visibility permission. |
 
 ### `annotations.<field>` (nested array)
 
 | Path | Type | Notes |
 |------|------|-------|
 | `annotations.is_thumbs_up` | boolean | |
-| `annotations.comment` | string | |
-| `annotations.expected_output` | string | |
+| `annotations.comment` | string | Requires output-visibility permission; redacted to `null` otherwise (reviewers routinely quote model output here). |
+| `annotations.expected_output` | string | Requires output-visibility permission; redacted to `null` otherwise. |
 | `annotations.created_at` | number | Epoch ms. |
 | `annotations.scores` | json | All score values, keyed by your AnnotationScore **name**. |
 | `annotations.scores.<name>` | json | A single score, addressed by its AnnotationScore **name** (e.g. `annotations.scores.quality`). |
@@ -200,9 +200,12 @@ annotation. Set `dateField` to switch the axis:
 }
 ```
 
-On the `updated` axis, pagination is **at-least-once**: a trace modified again
-while you are paging may reappear on a later page, but no ClickHouse-side change
-in the window is missed — exactly what a change-data-capture loop wants.
+Delivery contract on the `updated` axis: **at-least-once across pulls,
+at-most-once within a single scroll**. A trace modified again *while you are
+paging* moves past the cursor and is not re-delivered in the current scroll —
+but its new `updated_at` lands in your **next** pull's window (which starts at
+your last watermark), so no change is ever lost across pulls. A CDC loop that
+advances its watermark to the previous pull's start time gets every change.
 
 <Note>
 The `updated` watermark advances on every ClickHouse-side change to a trace —
