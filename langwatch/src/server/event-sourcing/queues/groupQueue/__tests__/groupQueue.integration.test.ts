@@ -419,7 +419,13 @@ describe.skipIf(!hasTestcontainers)(
             () => {
               expect(processed).toHaveBeenCalledTimes(3);
             },
-            { timeout: 10000, interval: 50 },
+            // Dispatch-latency waits use 20s, not 10s. Each same-group / delayed
+            // job needs its own dispatch cycle, and a wake-signal missed under
+            // load falls back to the 5s BRPOP poll (signalTimeoutSec) — a couple
+            // of misses on a saturated CI shard blow a 10s budget. The job lands
+            // in well under a second locally; the ceiling only absorbs shard
+            // contention. Matches the 20s re-stage test below.
+            { timeout: 20000, interval: 50 },
           );
 
           // Max concurrency within the same group must be 1
@@ -481,7 +487,7 @@ describe.skipIf(!hasTestcontainers)(
             () => {
               expect(processed).toHaveBeenCalledTimes(2);
             },
-            { timeout: 10000, interval: 50 },
+            { timeout: 20000, interval: 50 },
           );
         });
       });
@@ -516,7 +522,7 @@ describe.skipIf(!hasTestcontainers)(
             () => {
               expect(processed).toHaveBeenCalledTimes(1);
             },
-            { timeout: 10000, interval: 50 },
+            { timeout: 20000, interval: 50 },
           );
 
           const receivedPayload = processed.mock.calls[0]![0];
@@ -566,7 +572,7 @@ describe.skipIf(!hasTestcontainers)(
             () => {
               expect(processed).toHaveBeenCalledTimes(2);
             },
-            { timeout: 10000, interval: 50 },
+            { timeout: 20000, interval: 50 },
           );
 
           // Different groups should have been processed concurrently
@@ -609,7 +615,7 @@ describe.skipIf(!hasTestcontainers)(
               const total = batches.reduce((n, b) => n + b.length, 0) + singles.length;
               expect(total).toBe(10);
             },
-            { timeout: 10000, interval: 50 },
+            { timeout: 20000, interval: 50 },
           );
 
           // Coalescing actually happened: at least one multi-event batch.
@@ -640,7 +646,7 @@ describe.skipIf(!hasTestcontainers)(
             () => {
               expect(largest.length).toBe(5);
             },
-            { timeout: 10000, interval: 50 },
+            { timeout: 20000, interval: 50 },
           );
           expect(largest.map((p) => Number(p.value))).toEqual([0, 1, 2, 3, 4]);
         });
@@ -672,7 +678,7 @@ describe.skipIf(!hasTestcontainers)(
               const total = batches.reduce((n, b) => n + b.length, 0) + singles.length;
               expect(total).toBe(9);
             },
-            { timeout: 10000, interval: 50 },
+            { timeout: 20000, interval: 50 },
           );
 
           for (const batch of batches) {
@@ -710,7 +716,7 @@ describe.skipIf(!hasTestcontainers)(
             () => {
               expect(singles.length).toBe(5);
             },
-            { timeout: 10000, interval: 50 },
+            { timeout: 20000, interval: 50 },
           );
           expect(batches.length).toBe(0);
         });
