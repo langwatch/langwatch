@@ -271,7 +271,7 @@ export function AutomationDrawer({
     }
     const token = ++previewToken.current;
     const templates = templatesFromDraft(draft);
-    (async () => {
+    void (async () => {
       try {
         if (channel === "email") {
           const rendered = await renderTriggerEmail({

@@ -5,6 +5,7 @@ import { Heading } from "@react-email/heading";
 import { Html } from "@react-email/html";
 import { Img } from "@react-email/img";
 import { render } from "@react-email/render";
+import { createHash } from "crypto";
 import { EMAIL_RX } from "~/automations/providers/definitions/email/shared";
 import type { TriggerData } from "~/pages/api/cron/triggers/types";
 import { toDispatchError } from "~/server/event-sourcing/outbox/dispatchError";
@@ -52,26 +53,34 @@ function buildUnsubscribe({
   email: string;
   baseHost: string;
 }): { footerHtml: string; headers: Record<string, string> } {
-  const link = (token: string) =>
+  const footerLink = (token: string) =>
     `${baseHost}/unsubscribe?token=${encodeURIComponent(token)}`;
-  const triggerUrl = link(
-    signUnsubscribeToken({ projectId, triggerId, email }),
-  );
-  const projectUrl = link(
-    signUnsubscribeToken({ projectId, triggerId: null, email }),
-  );
+  const apiLink = (token: string) =>
+    `${baseHost}/api/unsubscribe?token=${encodeURIComponent(token)}`;
+
+  const triggerToken = signUnsubscribeToken({ projectId, triggerId, email });
+  const projectToken = signUnsubscribeToken({
+    projectId,
+    triggerId: null,
+    email,
+  });
+
+  const triggerFooterUrl = footerLink(triggerToken);
+  const projectFooterUrl = footerLink(projectToken);
+  // RFC 8058: one-click POST goes to /api/unsubscribe, not the human page.
+  const triggerOneClickUrl = apiLink(triggerToken);
 
   const footerHtml = `
     <div style="margin-top:24px;padding-top:12px;border-top:1px solid #F2F4F8;color:#8B96A5;font-size:12px;line-height:18px;">
-      <a href="${triggerUrl}" style="color:#8B96A5;text-decoration:underline;">Stop receiving this notification</a>
+      <a href="${triggerFooterUrl}" style="color:#8B96A5;text-decoration:underline;">Stop receiving this notification</a>
       &nbsp;·&nbsp;
-      <a href="${projectUrl}" style="color:#8B96A5;text-decoration:underline;">Stop all notifications from this project</a>
+      <a href="${projectFooterUrl}" style="color:#8B96A5;text-decoration:underline;">Stop all notifications from this project</a>
     </div>`;
 
   return {
     footerHtml,
     headers: {
-      "List-Unsubscribe": `<${triggerUrl}>`,
+      "List-Unsubscribe": `<${triggerOneClickUrl}>`,
       "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
     },
   };
@@ -86,6 +95,8 @@ export const sendTriggerEmail = async ({
   projectSlug,
   triggerType,
   triggerMessage,
+  isRecipientSent,
+  recordRecipientSent,
 }: {
   triggerEmails: string[];
   triggerData: TriggerData[];
@@ -99,6 +110,23 @@ export const sendTriggerEmail = async ({
   projectSlug: string;
   triggerType: AlertType | null;
   triggerMessage: string;
+  /**
+   * Optional per-recipient idempotency gate (ADR-031). Two callbacks work in
+   * tandem to make the fan-out idempotent at recipient granularity:
+   *
+   * - `isRecipientSent(hash)` — checked BEFORE sending; returns true if this
+   *   recipient hash was already delivered in a prior attempt, causing the
+   *   current attempt to skip it.
+   * - `recordRecipientSent(hash)` — called AFTER a successful provider call to
+   *   persist the delivery record so that future retries can skip it.
+   *
+   * Callers (outbox dispatcher) back these with TriggerService.isSendClaimed /
+   * claimSend (keyed with the recipient hash encoded into the traceId field)
+   * so dedup survives across outbox retries. Omitting either callback falls
+   * back to always-send behaviour (backward-compatible with existing callers).
+   */
+  isRecipientSent?: (recipientHash: string) => Promise<boolean>;
+  recordRecipientSent?: (recipientHash: string) => Promise<void>;
 }) => {
   // The render boundary belongs INSIDE the DispatchError wrap: a render
   // failure (bad React tree, oom, etc.) is a permanent fault for this
@@ -152,6 +180,8 @@ export const sendTriggerEmail = async ({
       projectId,
       subject,
       html: emailHtml,
+      isRecipientSent,
+      recordRecipientSent,
     });
   } catch (err) {
     throw toDispatchError(err, {
@@ -174,12 +204,16 @@ async function sendPerRecipient({
   projectId,
   subject,
   html,
+  isRecipientSent,
+  recordRecipientSent,
 }: {
   recipients: string[];
   triggerId: string;
   projectId: string;
   subject: string;
   html: string;
+  isRecipientSent?: (recipientHash: string) => Promise<boolean>;
+  recordRecipientSent?: (recipientHash: string) => Promise<void>;
 }): Promise<void> {
   const baseHost = env.BASE_HOST;
   const noReplyTo = buildTriggerNoReplyAddress({
@@ -199,8 +233,20 @@ async function sendPerRecipient({
       );
       continue;
     }
+
+    // Per-recipient idempotency: hash the address (privacy) and skip if this
+    // recipient was already successfully delivered in a prior attempt.
+    const recipientHash = createHash("sha256")
+      .update(recipient)
+      .digest("hex")
+      .slice(0, 16);
+    if (isRecipientSent && (await isRecipientSent(recipientHash))) {
+      continue;
+    }
+
     if (isSentinel) {
       await sendEmail({ to: noReplyTo, bcc: [recipient], subject, html });
+      // Sentinel sends don't participate in the dedup lifecycle.
       continue;
     }
     const { footerHtml, headers } = buildUnsubscribe({
@@ -216,6 +262,12 @@ async function sendPerRecipient({
       html: injectFooterIntoBody(html, footerHtml),
       headers,
     });
+
+    // Record delivery AFTER a successful provider call so that a retryable
+    // failure does not permanently suppress the retry for this recipient.
+    if (recordRecipientSent) {
+      await recordRecipientSent(recipientHash);
+    }
   }
 }
 
@@ -231,6 +283,8 @@ export const sendRenderedTriggerEmail = async ({
   projectId,
   subject,
   html,
+  isRecipientSent,
+  recordRecipientSent,
 }: {
   triggerEmails: string[];
   triggerId: string;
@@ -239,6 +293,10 @@ export const sendRenderedTriggerEmail = async ({
   projectId: string;
   subject: string;
   html: string;
+  /** Same per-recipient idempotency gate as `sendTriggerEmail` — see its
+   *  doc comment. */
+  isRecipientSent?: (recipientHash: string) => Promise<boolean>;
+  recordRecipientSent?: (recipientHash: string) => Promise<void>;
 }) => {
   try {
     await sendPerRecipient({
@@ -247,6 +305,8 @@ export const sendRenderedTriggerEmail = async ({
       projectId,
       subject,
       html,
+      isRecipientSent,
+      recordRecipientSent,
     });
   } catch (err) {
     throw toDispatchError(err, {

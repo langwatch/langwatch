@@ -17,6 +17,29 @@ vi.mock("../emailSender", () => ({
 import { injectFooterIntoBody, sendTriggerEmail } from "../triggerEmail";
 import { TEST_FIRE_TRIGGER_ID_SENTINEL } from "../triggerNoReply";
 
+function callEmailWithDedup(
+  sent: Set<string>,
+  overrides?: { triggerEmails?: string[] },
+) {
+  return sendTriggerEmail({
+    triggerEmails: overrides?.triggerEmails ?? [
+      "user@example.com",
+      "other@example.com",
+    ],
+    triggerData,
+    triggerName: "Quality Alert",
+    triggerId: "trigger_test123",
+    projectId: "project-1",
+    projectSlug: "demo",
+    triggerType: AlertType.WARNING,
+    triggerMessage: "",
+    isRecipientSent: async (hash: string) => sent.has(hash),
+    recordRecipientSent: async (hash: string) => {
+      sent.add(hash);
+    },
+  });
+}
+
 const triggerData: TriggerData[] = [
   {
     input: "in",
@@ -123,14 +146,12 @@ describe("sendTriggerEmail", () => {
         expect(args.html).toContain("Stop all notifications from this project");
         expect(args.html).toContain("/unsubscribe?token=");
         expect(args.headers["List-Unsubscribe"]).toMatch(
-          /^<.*\/unsubscribe\?token=/,
+          /^<.*\/api\/unsubscribe\?token=/,
         );
         expect(args.headers["List-Unsubscribe-Post"]).toBe(
           "List-Unsubscribe=One-Click",
         );
-        const match = args.headers["List-Unsubscribe"]!.match(
-          /token=([^>&]+)/,
-        );
+        const match = args.headers["List-Unsubscribe"]!.match(/token=([^>&]+)/);
         expect(match).not.toBeNull();
         tokens.push(match![1]!);
       });
@@ -140,13 +161,35 @@ describe("sendTriggerEmail", () => {
       expect(tokens[0]).not.toEqual(tokens[1]);
     });
 
+    it("routes one-click List-Unsubscribe to /api/unsubscribe while footer links stay on /unsubscribe", async () => {
+      sendEmailMock.mockResolvedValue(undefined);
+      await callEmail();
+
+      for (const call of sendEmailMock.mock.calls) {
+        const args = call[0] as {
+          html: string;
+          headers: Record<string, string>;
+        };
+        // RFC 8058: the machine-readable POST endpoint is /api/unsubscribe
+        expect(args.headers["List-Unsubscribe"]).toMatch(
+          /^<[^>]*\/api\/unsubscribe\?token=/,
+        );
+        // Human-readable footer link remains on the page route /unsubscribe
+        expect(args.html).toContain("/unsubscribe?token=");
+        // Footer must NOT point at the API endpoint
+        expect(args.html).not.toContain("/api/unsubscribe");
+      }
+    });
+
     describe("when the rendered html is a full document", () => {
       it("injects the footer inside the body, not after </body>", async () => {
         sendEmailMock.mockResolvedValue(undefined);
         await callEmail();
         const args = sendEmailMock.mock.calls[0]![0] as { html: string };
         if (/<\/body>/i.test(args.html)) {
-          const footerIdx = args.html.indexOf("Stop receiving this notification");
+          const footerIdx = args.html.indexOf(
+            "Stop receiving this notification",
+          );
           const bodyCloseIdx = args.html.search(/<\/body>/i);
           expect(footerIdx).toBeGreaterThanOrEqual(0);
           expect(footerIdx).toBeLessThan(bodyCloseIdx);
@@ -163,6 +206,39 @@ describe("sendTriggerEmail", () => {
       };
       expect(args.html).not.toContain("/unsubscribe?token=");
       expect(args.headers).toBeUndefined();
+    });
+
+    describe("given isRecipientSent / recordRecipientSent dedup callbacks", () => {
+      describe("when the first recipient succeeds but the second fails on the first attempt", () => {
+        it("does not re-deliver the first recipient on retry", async () => {
+          // First attempt: first recipient send resolves, second send rejects.
+          sendEmailMock
+            .mockResolvedValueOnce(undefined)
+            .mockRejectedValueOnce({ $metadata: { httpStatusCode: 500 } });
+
+          // Simulates a persistent delivered-set backed by TriggerSent rows.
+          const sent = new Set<string>();
+
+          // First dispatch — partial failure: second recipient throws.
+          await expect(callEmailWithDedup(sent)).rejects.toBeInstanceOf(Error);
+
+          expect(sendEmailMock).toHaveBeenCalledTimes(2); // attempted both
+
+          // Reset the provider mock — second recipient now succeeds.
+          sendEmailMock.mockReset();
+          sendEmailMock.mockResolvedValue(undefined);
+
+          // Second dispatch (outbox retry) — must skip the already-recorded first recipient.
+          await callEmailWithDedup(sent);
+
+          // Only the second recipient should be sent on retry.
+          expect(sendEmailMock).toHaveBeenCalledTimes(1);
+          const retrySentBcc = (
+            sendEmailMock.mock.calls[0]![0] as { bcc: string[] }
+          ).bcc;
+          expect(retrySentBcc).toEqual(["other@example.com"]);
+        });
+      });
     });
   });
 

@@ -1,7 +1,9 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import type {
+  EmailSuppressionNameLookupRepository,
   EmailSuppressionRepository,
   EmailSuppressionRow,
+  UnsubscribeNames,
 } from "./emailSuppression.repository";
 
 export class PrismaEmailSuppressionRepository
@@ -54,13 +56,27 @@ export class PrismaEmailSuppressionRepository
         throw error;
       }
     }
-    return this.prisma.emailSuppression.upsert({
-      where: {
-        projectId_email_triggerId: { projectId, email, triggerId },
-      },
-      update: {},
-      create: { projectId, email, triggerId, reason },
-    });
+    // Prisma's upsert cannot target a partial unique index (WHERE clause on a
+    // non-null column), which is what `projectId_email_triggerId` resolves to
+    // when triggerId IS NOT NULL. Using the same create + catch-P2002 +
+    // findFirst pattern as the null branch keeps idempotency without relying on
+    // Prisma's native INSERT … ON CONFLICT inference.
+    try {
+      return await this.prisma.emailSuppression.create({
+        data: { projectId, email, triggerId, reason },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        const existing = await this.prisma.emailSuppression.findFirst({
+          where: { projectId, email, triggerId },
+        });
+        if (existing) return existing;
+      }
+      throw error;
+    }
   }
 
   async delete({
@@ -86,5 +102,51 @@ export class PrismaEmailSuppressionRepository
         OR: [{ triggerId: null }, { triggerId }],
       },
     });
+  }
+}
+
+export class PrismaEmailSuppressionNameLookupRepository
+  implements EmailSuppressionNameLookupRepository
+{
+  constructor(private readonly prisma: PrismaClient) {}
+
+  async lookupNames({
+    projectId,
+    triggerId,
+  }: {
+    projectId: string;
+    triggerId: string | null;
+  }): Promise<UnsubscribeNames | null> {
+    const project = await this.prisma.project.findFirst({
+      where: { id: projectId },
+      select: { name: true },
+    });
+    if (!project) return null;
+    const trigger =
+      triggerId != null
+        ? await this.prisma.trigger.findFirst({
+            where: { id: triggerId, projectId },
+            select: { name: true },
+          })
+        : null;
+    return {
+      projectName: project.name,
+      triggerName: trigger?.name ?? null,
+    };
+  }
+
+  async findTriggerNames({
+    projectId,
+    triggerIds,
+  }: {
+    projectId: string;
+    triggerIds: string[];
+  }): Promise<Map<string, string>> {
+    if (triggerIds.length === 0) return new Map();
+    const triggers = await this.prisma.trigger.findMany({
+      where: { id: { in: triggerIds }, projectId },
+      select: { id: true, name: true },
+    });
+    return new Map(triggers.map((t) => [t.id, t.name]));
   }
 }

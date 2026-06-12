@@ -1,4 +1,5 @@
 import { TriggerAction } from "@prisma/client";
+import { createHash } from "crypto";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
@@ -428,6 +429,38 @@ async function handleCadenceBatch(
           );
           break;
         }
+        // Per-recipient idempotency (ADR-031): back the mailer's recipient
+        // gate with the same TriggerSent claim store used for the
+        // (trigger, trace) dedup below, encoding the recipient hash into the
+        // traceId field under a `rcpt:` prefix (real trace ids never carry
+        // it). The digest over the batch's traceIds keeps the key stable
+        // across outbox retries of THIS dispatch — so a partial provider
+        // failure retries only the unfinished recipients — while staying
+        // distinct from past and future dispatches to the same recipients.
+        const dispatchDigest = createHash("sha256")
+          .update(
+            candidatePayloads
+              .map((p) => p.match.traceId)
+              .sort()
+              .join(","),
+          )
+          .digest("hex")
+          .slice(0, 16);
+        const recipientClaimKey = (recipientHash: string) =>
+          `rcpt:${dispatchDigest}:${recipientHash}`;
+        const isRecipientSent = (recipientHash: string) =>
+          deps.triggers.isSendClaimed({
+            triggerId,
+            traceId: recipientClaimKey(recipientHash),
+            projectId,
+          });
+        const recordRecipientSent = async (recipientHash: string) => {
+          await deps.triggers.claimSend({
+            triggerId,
+            traceId: recipientClaimKey(recipientHash),
+            projectId,
+          });
+        };
         if (hasCustomEmail) {
           const rendered = await renderTriggerEmail({
             subjectTemplate: t.emailSubjectTemplate,
@@ -446,6 +479,8 @@ async function handleCadenceBatch(
             projectId,
             subject: rendered.subject,
             html: rendered.html,
+            isRecipientSent,
+            recordRecipientSent,
           });
           didSend = true;
           break;
@@ -459,6 +494,8 @@ async function handleCadenceBatch(
           projectSlug: project.slug,
           triggerType: trigger.alertType,
           triggerMessage: trigger.message ?? "",
+          isRecipientSent,
+          recordRecipientSent,
         });
         didSend = true;
         break;

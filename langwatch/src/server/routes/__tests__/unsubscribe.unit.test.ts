@@ -1,6 +1,4 @@
-import { createMocks, type RequestMethod } from "node-mocks-http";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 
 vi.mock("~/server/app-layer/app", () => ({
   getApp: vi.fn(),
@@ -16,9 +14,9 @@ vi.mock("~/utils/logger/server", () => ({
 }));
 
 import { getApp } from "~/server/app-layer/app";
-import { _resetMemoryRateLimitStore } from "~/server/rateLimit";
 import { signUnsubscribeToken } from "~/server/mailer/unsubscribeToken";
-import handler from "../unsubscribe";
+import { _resetMemoryRateLimitStore } from "~/server/rateLimit";
+import { app } from "../unsubscribe";
 
 const suppress = vi.fn();
 
@@ -31,54 +29,42 @@ beforeEach(() => {
   });
 });
 
-function invoke({
+function request({
   method = "POST",
   token,
 }: {
-  method?: RequestMethod;
+  method?: string;
   token?: string;
 }) {
-  const { req, res } = createMocks({
-    method,
-    query: token != null ? { token } : {},
-  });
-  return { req, res };
+  const url =
+    token != null
+      ? `/api/unsubscribe?token=${encodeURIComponent(token)}`
+      : "/api/unsubscribe";
+  return app.request(url, { method });
 }
 
-describe("one-click unsubscribe handler", () => {
+describe("POST /api/unsubscribe (one-click)", () => {
   describe("when the method is not POST", () => {
     it("rejects with 405 and an Allow header", async () => {
-      const { req, res } = invoke({ method: "GET", token: "anything" });
-      await handler(
-        req as unknown as NextApiRequest,
-        res as unknown as NextApiResponse,
-      );
-      expect(res._getStatusCode()).toBe(405);
-      expect(res.getHeader("Allow")).toBe("POST");
+      const res = await request({ method: "GET", token: "anything" });
+      expect(res.status).toBe(405);
+      expect(res.headers.get("Allow")).toBe("POST");
       expect(suppress).not.toHaveBeenCalled();
     });
   });
 
   describe("when the token query param is missing", () => {
     it("rejects with 400", async () => {
-      const { req, res } = invoke({});
-      await handler(
-        req as unknown as NextApiRequest,
-        res as unknown as NextApiResponse,
-      );
-      expect(res._getStatusCode()).toBe(400);
+      const res = await request({});
+      expect(res.status).toBe(400);
       expect(suppress).not.toHaveBeenCalled();
     });
   });
 
   describe("when the token is invalid or tampered", () => {
     it("rejects with 400 without persisting", async () => {
-      const { req, res } = invoke({ token: "garbage.sig" });
-      await handler(
-        req as unknown as NextApiRequest,
-        res as unknown as NextApiResponse,
-      );
-      expect(res._getStatusCode()).toBe(400);
+      const res = await request({ token: "garbage.sig" });
+      expect(res.status).toBe(400);
       expect(suppress).not.toHaveBeenCalled();
     });
   });
@@ -90,12 +76,8 @@ describe("one-click unsubscribe handler", () => {
         triggerId: "t1",
         email: "alice@example.com",
       });
-      const { req, res } = invoke({ token });
-      await handler(
-        req as unknown as NextApiRequest,
-        res as unknown as NextApiResponse,
-      );
-      expect(res._getStatusCode()).toBe(200);
+      const res = await request({ token });
+      expect(res.status).toBe(200);
       expect(suppress).toHaveBeenCalledWith({
         projectId: "p1",
         email: "alice@example.com",
@@ -113,12 +95,34 @@ describe("one-click unsubscribe handler", () => {
         triggerId: "t1",
         email: "alice@example.com",
       });
-      const { req, res } = invoke({ token });
-      await handler(
-        req as unknown as NextApiRequest,
-        res as unknown as NextApiResponse,
+      const res = await request({ token });
+      expect(res.status).toBe(500);
+    });
+  });
+
+  describe("when the caller exceeds the rate limit", () => {
+    it("returns 429 once the per-IP window is exhausted", async () => {
+      const token = signUnsubscribeToken({
+        projectId: "p1",
+        triggerId: "t1",
+        email: "alice@example.com",
+      });
+      const headers = { "x-forwarded-for": "203.0.113.7" };
+
+      // The limiter allows 10 requests per 60s window; the 11th is rejected.
+      for (let i = 0; i < 10; i++) {
+        const ok = await app.request(
+          `/api/unsubscribe?token=${encodeURIComponent(token)}`,
+          { method: "POST", headers },
+        );
+        expect(ok.status).toBe(200);
+      }
+
+      const limited = await app.request(
+        `/api/unsubscribe?token=${encodeURIComponent(token)}`,
+        { method: "POST", headers },
       );
-      expect(res._getStatusCode()).toBe(500);
+      expect(limited.status).toBe(429);
     });
   });
 });

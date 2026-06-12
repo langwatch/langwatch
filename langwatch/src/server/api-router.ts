@@ -59,6 +59,7 @@ import { app as opsApp } from "./routes/ops";
 import { app as sseApp } from "./routes/sse";
 import { app as tracesLegacyApp } from "./routes/traces-legacy";
 import { app as trpcApp } from "./routes/trpc";
+import { app as unsubscribeApp } from "./routes/unsubscribe";
 
 export function createApiRouter() {
   const api = new Hono();
@@ -159,6 +160,7 @@ export function createApiRouter() {
   api.route("/", sseApp);
   api.route("/", tracesLegacyApp);
   api.route("/", trpcApp);
+  api.route("/", unsubscribeApp); // /api/unsubscribe — RFC 8058 one-click POST
 
   return api;
 }

@@ -37,8 +37,14 @@ import { TriggerTemplateService } from "./triggers/trigger-template.service";
 import { PrismaTriggerRepository } from "./triggers/repositories/trigger.prisma.repository";
 import { NullTriggerRepository } from "./triggers/repositories/trigger.repository";
 import { EmailSuppressionService } from "./triggers/emailSuppression.service";
-import { PrismaEmailSuppressionRepository } from "./triggers/repositories/emailSuppression.prisma.repository";
-import { NullEmailSuppressionRepository } from "./triggers/repositories/emailSuppression.repository";
+import {
+  PrismaEmailSuppressionNameLookupRepository,
+  PrismaEmailSuppressionRepository,
+} from "./triggers/repositories/emailSuppression.prisma.repository";
+import {
+  NullEmailSuppressionNameLookupRepository,
+  NullEmailSuppressionRepository,
+} from "./triggers/repositories/emailSuppression.repository";
 import { liveTriggerNotifier } from "~/server/triggers/triggerNotifier";
 import { ExperimentService } from "../experiments/experiment.service";
 import { OrganizationService } from "./organizations/organization.service";
@@ -384,6 +390,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const triggers = new TriggerService(new PrismaTriggerRepository(prisma));
   const emailSuppressions = new EmailSuppressionService(
     new PrismaEmailSuppressionRepository(prisma),
+    new PrismaEmailSuppressionNameLookupRepository(prisma),
   );
   const triggerTemplates = new TriggerTemplateService({
     baseHost: config.baseHost ?? env.BASE_HOST,
@@ -820,12 +827,13 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     triggers: new TriggerService(new NullTriggerRepository()),
     emailSuppressions: new EmailSuppressionService(
       new NullEmailSuppressionRepository(),
+      new NullEmailSuppressionNameLookupRepository(),
     ),
     triggerTemplates: new TriggerTemplateService({
       baseHost: config.baseHost ?? env.BASE_HOST,
       notifier: {
-        sendEmail: async () => {},
-        sendSlack: async () => {},
+        sendEmail: async () => {/* test no-op */},
+        sendSlack: async () => {/* test no-op */},
       },
     }),
     simulations: { runs: SimulationRunService.create(null) },

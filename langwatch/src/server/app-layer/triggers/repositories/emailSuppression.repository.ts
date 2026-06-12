@@ -32,6 +32,43 @@ export interface EmailSuppressionRepository {
   }): Promise<EmailSuppressionRow[]>;
 }
 
+/** Resolved names for the unsubscribe display page (project + optional trigger). */
+export interface UnsubscribeNames {
+  projectName: string;
+  triggerName: string | null;
+}
+
+/**
+ * ADR-031: separate lookup port for project/trigger display names. Kept apart
+ * from EmailSuppressionRepository because the data lives in different Prisma
+ * models (Project, Trigger), not in EmailSuppression.
+ */
+export interface EmailSuppressionNameLookupRepository {
+  /** Returns null when the project no longer exists. */
+  lookupNames(params: {
+    projectId: string;
+    triggerId: string | null;
+  }): Promise<UnsubscribeNames | null>;
+
+  /** Returns a map of triggerId → name for the given set of trigger IDs. */
+  findTriggerNames(params: {
+    projectId: string;
+    triggerIds: string[];
+  }): Promise<Map<string, string>>;
+}
+
+export class NullEmailSuppressionNameLookupRepository
+  implements EmailSuppressionNameLookupRepository
+{
+  async lookupNames(): Promise<UnsubscribeNames | null> {
+    return null;
+  }
+
+  async findTriggerNames(): Promise<Map<string, string>> {
+    return new Map();
+  }
+}
+
 export class NullEmailSuppressionRepository
   implements EmailSuppressionRepository
 {

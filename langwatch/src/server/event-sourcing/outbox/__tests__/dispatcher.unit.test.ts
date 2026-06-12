@@ -113,14 +113,10 @@ function makeDeps(trigger: TriggerSummary = makeTrigger()) {
     traceById: vi.fn().mockResolvedValue(undefined),
     enqueueCadence: vi.fn().mockResolvedValue(undefined),
     emailHourlyCap: 100,
-    consumeEmailCapSlot: vi
-      .fn()
-      .mockResolvedValue({ allowed: true, count: 1 }),
+    consumeEmailCapSlot: vi.fn().mockResolvedValue({ allowed: true, count: 1 }),
     filterSuppressedEmails: vi
       .fn()
-      .mockImplementation(
-        async ({ emails }: { emails: string[] }) => emails,
-      ),
+      .mockImplementation(async ({ emails }: { emails: string[] }) => emails),
   };
 }
 
@@ -197,6 +193,36 @@ describe("createOutboxDispatcher cadence stage", () => {
     });
   });
 
+  describe("when the mailer consults the per-recipient idempotency gate", () => {
+    it("backs both callbacks with the TriggerSent claim store under a rcpt:-prefixed key stable across retries", async () => {
+      const deps = makeDeps();
+      const dispatcher = createOutboxDispatcher(deps);
+
+      await dispatcher.process(makeCadencePayload());
+
+      const args = vi.mocked(sendTriggerEmail).mock.calls[0]?.[0];
+      expect(args?.isRecipientSent).toBeTypeOf("function");
+      expect(args?.recordRecipientSent).toBeTypeOf("function");
+
+      deps.triggers.isSendClaimed.mockClear();
+      deps.triggers.claimSend.mockClear();
+
+      await args!.isRecipientSent!("a1b2c3");
+      await args!.recordRecipientSent!("a1b2c3");
+
+      const readKey = deps.triggers.isSendClaimed.mock.calls[0]?.[0];
+      const writeKey = deps.triggers.claimSend.mock.calls[0]?.[0];
+      expect(readKey).toEqual({
+        triggerId: TRIGGER_ID,
+        projectId: PROJECT_ID,
+        traceId: expect.stringMatching(/^rcpt:[0-9a-f]{16}:a1b2c3$/),
+      });
+      // Read and write must target the SAME key, or retries would never
+      // observe the recorded delivery.
+      expect(writeKey).toEqual(readKey);
+    });
+  });
+
   describe("when the same traceId appears twice in a coalesced batch", () => {
     it("dedupes in-batch before the dispatch so the digest carries one row per trace", async () => {
       const deps = makeDeps();
@@ -223,7 +249,8 @@ describe("createOutboxDispatcher cadence stage", () => {
           slackTemplateType: null,
           slackTemplate: null,
           emailSubjectTemplate: null,
-          emailBodyTemplate: "Hello {{ trigger.name }} — {{ matches.size }} match",
+          emailBodyTemplate:
+            "Hello {{ trigger.name }} — {{ matches.size }} match",
         },
       });
       const deps = makeDeps(trigger);

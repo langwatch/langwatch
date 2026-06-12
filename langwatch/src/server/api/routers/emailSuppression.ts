@@ -60,24 +60,8 @@ export const emailSuppressionRouter = createTRPCRouter({
       const view = await resolveUnsubscribe({
         token: input.token,
         deps: {
-          lookupNames: async ({ projectId, triggerId }) => {
-            const project = await ctx.prisma.project.findFirst({
-              where: { id: projectId },
-              select: { name: true },
-            });
-            if (!project) return null;
-            const trigger =
-              triggerId != null
-                ? await ctx.prisma.trigger.findFirst({
-                    where: { id: triggerId, projectId },
-                    select: { name: true },
-                  })
-                : null;
-            return {
-              projectName: project.name,
-              triggerName: trigger?.name ?? null,
-            };
-          },
+          lookupNames: ({ projectId, triggerId }) =>
+            getApp().emailSuppressions.lookupNames({ projectId, triggerId }),
         },
       });
       if (!view) {
@@ -144,35 +128,29 @@ export const emailSuppressionRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("triggers:view"))
     .query(async ({ input, ctx }) => {
-      const rows = await getApp().emailSuppressions.getAllForProject({
+      const rows = await getApp().emailSuppressions.getAllEnriched({
         projectId: input.projectId,
       });
-      const triggerIds = [
-        ...new Set(
-          rows
-            .map((r) => r.triggerId)
-            .filter((id): id is string => id != null),
-        ),
-      ];
-      const triggers =
-        triggerIds.length > 0
-          ? await ctx.prisma.trigger.findMany({
-              where: { id: { in: triggerIds }, projectId: input.projectId },
-              select: { id: true, name: true },
-            })
-          : [];
-      const nameById = new Map(triggers.map((t) => [t.id, t.name]));
       void auditLog({
         userId: ctx.session.user.id,
         projectId: input.projectId,
         action: "emailSuppression.getAll",
-        args: { recordCount: rows.length, triggerIds },
+        args: {
+          recordCount: rows.length,
+          triggerIds: [
+            ...new Set(
+              rows
+                .map((r) => r.triggerId)
+                .filter((id): id is string => id != null),
+            ),
+          ],
+        },
       });
       return rows.map((r) => ({
         id: r.id,
         email: r.email,
         triggerId: r.triggerId,
-        triggerName: r.triggerId != null ? nameById.get(r.triggerId) ?? null : null,
+        triggerName: r.triggerName,
         reason: r.reason,
         createdAt: r.createdAt,
       }));
