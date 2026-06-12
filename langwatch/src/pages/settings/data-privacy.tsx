@@ -18,11 +18,13 @@ import {
 } from "@chakra-ui/react";
 import {
   Building2,
+  Eye,
   Folder,
   HelpCircle,
   MoreVertical,
   Plus,
   Shield,
+  User,
   UserLock,
   Users,
   X,
@@ -31,7 +33,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import SettingsLayout from "~/components/SettingsLayout";
 import {
+  ALL_MEMBERS_VALUE,
+  applyAudienceSelection,
   type AudienceFormState,
+  audienceToSelection,
   buildRuleConfig,
   type CustomAttributeFormRow,
   configsEqual,
@@ -39,7 +44,10 @@ import {
   EMPTY_AUDIENCE_FORM,
   inheritedFormState,
   isEmptyRuleConfig,
+  PROJECT_OWNER_VALUE,
+  ROLE_VALUES,
   ruleSummary,
+  selectionToAudience,
   type TouchedControls,
   touchedFromConfig,
 } from "~/components/settings/dataPrivacyRuleConfig";
@@ -56,7 +64,6 @@ import {
   type AvailableScopes,
   ScopeFilter,
 } from "~/components/settings/ScopeFilter";
-import { Checkbox } from "~/components/ui/checkbox";
 import { Drawer } from "~/components/ui/drawer";
 import { Menu } from "~/components/ui/menu";
 import { Select } from "~/components/ui/select";
@@ -504,10 +511,11 @@ function describeAudienceSelection(
   options: DataPrivacyAudienceOptions,
 ): string {
   const parts: string[] = [];
-  if (audience.admins) parts.push("Admins");
   if (audience.allMembers) parts.push("All members");
+  if (audience.projectOwner) parts.push("project owners");
+  if (audience.admins) parts.push("Admins");
+  if (audience.members) parts.push("Members");
   if (audience.viewers) parts.push("Viewers");
-  if (audience.projectOwner) parts.push("the project owner");
   for (const id of audience.groupIds) {
     parts.push(options.groups.find((g) => g.id === id)?.name ?? "a group");
   }
@@ -922,63 +930,11 @@ function PrivacyRuleDrawer({
                 <Text fontWeight="600" fontSize="sm">
                   Restricted content is visible to
                 </Text>
-                <VStack gap={1.5} align="start">
-                  <Checkbox
-                    checked={audience.admins}
-                    onCheckedChange={({ checked }) => {
-                      setAudience((prev) => ({
-                        ...prev,
-                        admins: checked === true,
-                      }));
-                      touchRestrictedCategories();
-                    }}
-                  >
-                    Admins
-                  </Checkbox>
-                  <Checkbox
-                    checked={audience.allMembers}
-                    onCheckedChange={({ checked }) => {
-                      setAudience((prev) => ({
-                        ...prev,
-                        allMembers: checked === true,
-                      }));
-                      touchRestrictedCategories();
-                    }}
-                  >
-                    All members
-                  </Checkbox>
-                  <Checkbox
-                    checked={audience.viewers}
-                    onCheckedChange={({ checked }) => {
-                      setAudience((prev) => ({
-                        ...prev,
-                        viewers: checked === true,
-                      }));
-                      touchRestrictedCategories();
-                    }}
-                  >
-                    Viewers
-                  </Checkbox>
-                  <Checkbox
-                    checked={audience.projectOwner}
-                    onCheckedChange={({ checked }) => {
-                      setAudience((prev) => ({
-                        ...prev,
-                        projectOwner: checked === true,
-                      }));
-                      touchRestrictedCategories();
-                    }}
-                  >
-                    Only the project owner (their own personal projects)
-                  </Checkbox>
-                </VStack>
-                <AudienceMultiSelect
-                  label="Custom groups"
-                  options={audienceOptions.groups}
-                  selected={audience.groupIds}
-                  emptyPlaceholder="No custom groups in this organization yet"
-                  onChange={(groupIds) => {
-                    setAudience((prev) => ({ ...prev, groupIds }));
+                <AudiencePicker
+                  audience={audience}
+                  options={audienceOptions}
+                  onChange={(next) => {
+                    setAudience(next);
                     touchRestrictedCategories();
                   }}
                 />
@@ -1155,55 +1111,154 @@ function PrivacyRuleDrawer({
   );
 }
 
-function AudienceMultiSelect({
-  label,
-  options,
-  selected,
-  onChange,
-  emptyPlaceholder,
-}: {
+interface AudienceItem {
+  value: string;
   label: string;
-  options: { id: string; name: string }[];
-  selected: string[];
-  onChange: (ids: string[]) => void;
-  emptyPlaceholder?: string;
+  disabled?: boolean;
+}
+
+const AudienceItemIcon = ({ value }: { value: string }) => {
+  if (value === ALL_MEMBERS_VALUE) return <Users size={14} aria-hidden />;
+  if (value === PROJECT_OWNER_VALUE) return <UserLock size={14} aria-hidden />;
+  if (value === ROLE_VALUES.admins) return <Shield size={14} aria-hidden />;
+  if (value === ROLE_VALUES.viewers) return <Eye size={14} aria-hidden />;
+  if (value === ROLE_VALUES.members) return <User size={14} aria-hidden />;
+  return <Users size={14} aria-hidden />;
+};
+
+/**
+ * The restrict-audience picker: one multi-select of groups, in the same chip
+ * style as the scope picker. "All members" already covers everyone with
+ * access, so picking it replaces the selection and picking anything narrower
+ * drops it (see applyAudienceSelection).
+ */
+function AudiencePicker({
+  audience,
+  options,
+  onChange,
+}: {
+  audience: AudienceFormState;
+  options: DataPrivacyAudienceOptions;
+  onChange: (next: AudienceFormState) => void;
 }) {
+  const items = useMemo<AudienceItem[]>(
+    () => [
+      { value: ALL_MEMBERS_VALUE, label: "All members" },
+      {
+        value: PROJECT_OWNER_VALUE,
+        label: "Project owners (their own personal projects)",
+      },
+      { value: ROLE_VALUES.admins, label: "Admins" },
+      { value: ROLE_VALUES.members, label: "Members" },
+      { value: ROLE_VALUES.viewers, label: "Viewers" },
+      ...(options.groups.length > 0
+        ? options.groups.map((g) => ({
+            value: `group:${g.id}`,
+            label: g.name,
+          }))
+        : [
+            {
+              value: "group:__none",
+              label: "No custom groups in this organization yet",
+              disabled: true,
+            },
+          ]),
+    ],
+    [options.groups],
+  );
   const collection = useMemo(
     () =>
       createListCollection({
-        items: options.map((o) => ({ value: o.id, label: o.name })),
+        items,
+        isItemDisabled: (item) => item.disabled === true,
       }),
-    [options],
+    [items],
   );
-  const empty = options.length === 0;
+  const selected = audienceToSelection(audience);
+  const labelFor = (value: string) =>
+    value === PROJECT_OWNER_VALUE
+      ? "Project owners"
+      : (items.find((i) => i.value === value)?.label ?? value);
+  const roleItems = items.filter((i) =>
+    (Object.values(ROLE_VALUES) as string[]).includes(i.value),
+  );
+  const customItems = items.filter((i) => i.value.startsWith("group:"));
   return (
-    <Field.Root>
-      <Field.Label fontSize="sm">{label}</Field.Label>
-      <Select.Root
-        collection={collection}
-        value={selected}
-        multiple
-        size="sm"
-        disabled={empty}
-        onValueChange={(d) => onChange(d.value)}
+    <Select.Root
+      collection={collection}
+      value={selected}
+      multiple
+      size="sm"
+      onValueChange={(d) =>
+        onChange(selectionToAudience(applyAudienceSelection(selected, d.value)))
+      }
+    >
+      <Select.Trigger
+        background="bg"
+        aria-label="Restricted content is visible to"
       >
-        <Select.Trigger background="bg" aria-label={label}>
-          <Select.ValueText
-            placeholder={
-              empty && emptyPlaceholder
-                ? emptyPlaceholder
-                : `Pick ${label.toLowerCase()}`
-            }
-          />
-        </Select.Trigger>
-        <Select.Content>
-          {collection.items.map((item) => (
+        <Select.ValueText placeholder="No one (fully hidden)">
+          {() =>
+            selected.length > 0 ? (
+              <HStack gap={1.5} flexWrap="wrap">
+                {selected.map((value) => (
+                  <HStack
+                    key={value}
+                    gap={1}
+                    paddingX={1.5}
+                    borderWidth="1px"
+                    borderRadius="md"
+                    fontSize="xs"
+                  >
+                    <AudienceItemIcon value={value} />
+                    <Text>{labelFor(value)}</Text>
+                  </HStack>
+                ))}
+              </HStack>
+            ) : (
+              "No one (fully hidden)"
+            )
+          }
+        </Select.ValueText>
+      </Select.Trigger>
+      <Select.Content>
+        <Select.ItemGroup label="Everyone">
+          <Select.Item item={items[0]}>
+            <HStack gap={2}>
+              <AudienceItemIcon value={ALL_MEMBERS_VALUE} />
+              <Text>All members</Text>
+            </HStack>
+          </Select.Item>
+        </Select.ItemGroup>
+        <Select.ItemGroup label="Project owners">
+          <Select.Item item={items[1]}>
+            <HStack gap={2}>
+              <AudienceItemIcon value={PROJECT_OWNER_VALUE} />
+              <Text>Project owners (their own personal projects)</Text>
+            </HStack>
+          </Select.Item>
+        </Select.ItemGroup>
+        <Select.ItemGroup label="Role groups">
+          {roleItems.map((item) => (
             <Select.Item key={item.value} item={item}>
-              {item.label}
+              <HStack gap={2}>
+                <AudienceItemIcon value={item.value} />
+                <Text>{item.label}</Text>
+              </HStack>
             </Select.Item>
           ))}
-        </Select.Content>
-      </Select.Root>
-    </Field.Root>
+        </Select.ItemGroup>
+        <Select.ItemGroup label="Custom groups">
+          {customItems.map((item) => (
+            <Select.Item key={item.value} item={item}>
+              <HStack gap={2}>
+                <AudienceItemIcon value={item.value} />
+                <Text>{item.label}</Text>
+              </HStack>
+            </Select.Item>
+          ))}
+        </Select.ItemGroup>
+      </Select.Content>
+    </Select.Root>
   );
 }

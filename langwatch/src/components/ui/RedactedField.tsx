@@ -1,7 +1,9 @@
-import { HStack, Icon, Skeleton, Text } from "@chakra-ui/react";
+import { HStack, Icon, Link, Skeleton, Text, VStack } from "@chakra-ui/react";
+import NextLink from "~/utils/compat/next-link";
 import type React from "react";
 import { Lock } from "react-feather";
 import { useFieldRedaction } from "~/hooks/useFieldRedaction";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { Tooltip } from "./tooltip";
 
 interface RedactedFieldProps {
@@ -17,18 +19,18 @@ interface RedactedFieldProps {
  */
 function audienceHint(visibleTo: string | null): string | null {
   if (!visibleTo) return null;
-  if (visibleTo === "no one") return "hidden from everyone";
+  if (visibleTo === "no one") return "hidden by privacy settings";
   return `visible to ${visibleTo}`;
 }
 
-function tooltipFor(visibleTo: string | null): string {
+function explanationFor(visibleTo: string | null): string {
   if (!visibleTo) {
-    return "This field is redacted based on your permissions and project settings.";
+    return "This field is redacted based on your permissions and the project's privacy settings.";
   }
   if (visibleTo === "no one") {
-    return "Hidden by a privacy policy. No one can see this content.";
+    return "A privacy rule keeps this content hidden from everyone: it is stored, but no audience is allowed to read it.";
   }
-  return `Hidden by a privacy policy. Visible to: ${visibleTo}.`;
+  return `A privacy rule limits who can read this content. Visible to: ${visibleTo}.`;
 }
 
 export const RedactedField: React.FC<RedactedFieldProps> = ({
@@ -37,6 +39,7 @@ export const RedactedField: React.FC<RedactedFieldProps> = ({
   loadingComponent,
 }) => {
   const { isRedacted, isLoading, visibleTo } = useFieldRedaction(field);
+  const { hasPermission } = useOrganizationTeamProject();
 
   if (isLoading || isRedacted === undefined) {
     return <>{loadingComponent ?? <Skeleton height="20px" width="100%" />}</>;
@@ -44,8 +47,23 @@ export const RedactedField: React.FC<RedactedFieldProps> = ({
 
   if (isRedacted) {
     const hint = audienceHint(visibleTo);
+    const canOpenSettings = hasPermission("project:view");
     return (
-      <Tooltip content={tooltipFor(visibleTo)}>
+      <Tooltip
+        interactive
+        content={
+          <VStack align="start" gap={1}>
+            <Text>{explanationFor(visibleTo)}</Text>
+            {canOpenSettings && (
+              <Link asChild color="inherit" textDecoration="underline">
+                <NextLink href="/settings/data-privacy">
+                  Open privacy settings
+                </NextLink>
+              </Link>
+            )}
+          </VStack>
+        }
+      >
         <HStack
           color="fg.muted"
           fontStyle="italic"

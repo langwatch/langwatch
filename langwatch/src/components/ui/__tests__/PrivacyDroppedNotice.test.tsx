@@ -4,9 +4,16 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render } from "@testing-library/react";
 import type React from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PrivacyDroppedNotice } from "../PrivacyDroppedNotice";
+
+const hasPermission = vi.fn((_permission: string) => true);
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({
+    hasPermission: (permission: string) => hasPermission(permission),
+  }),
+}));
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -58,6 +65,32 @@ describe("PrivacyDroppedNotice", () => {
         "input, output, and tool calls were dropped",
       );
       expect(container.textContent).toContain("they are not shown here");
+    });
+  });
+
+  describe("when the viewer can open the privacy page", () => {
+    it("offers a privacy settings link", () => {
+      const { container } = render(
+        <Wrapper>
+          <PrivacyDroppedNotice categories={["input"]} />
+        </Wrapper>,
+      );
+      const link = container.querySelector(
+        'a[href="/settings/data-privacy"]',
+      );
+      expect(link?.textContent).toBe("Privacy settings");
+    });
+
+    it("hides the link without the permission", () => {
+      hasPermission.mockReturnValueOnce(false);
+      const { container } = render(
+        <Wrapper>
+          <PrivacyDroppedNotice categories={["input"]} />
+        </Wrapper>,
+      );
+      expect(
+        container.querySelector('a[href="/settings/data-privacy"]'),
+      ).toBeNull();
     });
   });
 });

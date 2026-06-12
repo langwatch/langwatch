@@ -27,18 +27,21 @@ export type PiiLevel = (typeof PII_LEVELS)[number];
 
 /**
  * Who may read a `restrict`-ed category. Built on the forward access model:
- * `admins` = passes the team/org admin check, `allMembers` = has team access,
- * `viewers` = holds the built-in VIEWER role, `projectOwner` = is the owner of
- * the (personal) project the trace belongs to, plus the organization's custom
- * RBAC groups (custom groups exist only on the enterprise plan, which is the
- * only plan that can create them). Departments scope where a rule applies,
- * never who can see content, so they are not an audience primitive.
+ * The audience is a set of groups: `allMembers` = everyone with project
+ * access (the one superset choice), the standard role groups (`admins`,
+ * `members`, `viewers` = holders of the built-in ADMIN / MEMBER / VIEWER
+ * roles), `projectOwner` = the owner of the (personal) project the trace
+ * belongs to, plus the organization's custom RBAC groups (custom groups exist
+ * only on the enterprise plan, which is the only plan that can create them).
+ * Any combination is allowed. Departments scope where a rule applies, never
+ * who can see content, so they are not an audience primitive.
  * Everything false/empty = "no one" (fully hidden).
  */
 export const audienceSchema = z
   .object({
     admins: z.boolean().optional(),
     allMembers: z.boolean().optional(),
+    members: z.boolean().optional(),
     viewers: z.boolean().optional(),
     projectOwner: z.boolean().optional(),
     groupIds: z.array(z.string()).optional(),
@@ -112,6 +115,7 @@ export type DataPrivacyConfig = z.infer<typeof dataPrivacyConfigSchema>;
 export interface ResolvedAudience {
   admins: boolean;
   allMembers: boolean;
+  members: boolean;
   viewers: boolean;
   projectOwner: boolean;
   groupIds: string[];
@@ -138,6 +142,7 @@ export interface ResolvedDataPrivacy {
 export const EMPTY_AUDIENCE: ResolvedAudience = {
   admins: false,
   allMembers: false,
+  members: false,
   viewers: false,
   projectOwner: false,
   groupIds: [],
@@ -164,6 +169,7 @@ export function resolveAudience(audience?: Audience): ResolvedAudience {
   return {
     admins: audience?.admins ?? false,
     allMembers: audience?.allMembers ?? false,
+    members: audience?.members ?? false,
     viewers: audience?.viewers ?? false,
     projectOwner: audience?.projectOwner ?? false,
     groupIds: audience?.groupIds ?? [],

@@ -10,7 +10,10 @@ import type { Disposition, ResolvedAudience } from "./dataPrivacy.types";
 /** What we know about the viewer for an audience check. */
 export interface ViewerFacts {
   isAdmin: boolean;
+  /** Has project access of any kind (any role on the project's team). */
   isMember: boolean;
+  /** Holds the built-in MEMBER role on the project's team. */
+  isMemberRole: boolean;
   /** Holds the built-in VIEWER role on the project's team. */
   isViewer: boolean;
   /** Owns the (personal) project the trace belongs to. */
@@ -30,9 +33,9 @@ export interface EffectiveRestriction {
 /**
  * Whether a signed-in viewer may read content under an effective restriction.
  * Non-members see nothing; dropped content is not stored; captured content is
- * visible to every member; a restrict audience matches the built-in role groups
- * (admins, all members, viewers), the project owner, or any of the viewer's
- * groups.
+ * visible to every member; a restrict audience matches everyone with access
+ * (all members), the standard role groups (admins, members, viewers), the
+ * project owner, or any of the viewer's groups.
  */
 export function isContentVisible(
   eff: EffectiveRestriction,
@@ -42,8 +45,9 @@ export function isContentVisible(
   if (eff.disposition === "drop") return false;
   if (eff.disposition === "capture") return viewer.isMember;
   const audience = eff.audience;
-  if (audience.admins && viewer.isAdmin) return true;
   if (audience.allMembers && viewer.isMember) return true;
+  if (audience.admins && viewer.isAdmin) return true;
+  if (audience.members && viewer.isMemberRole) return true;
   if (audience.viewers && viewer.isViewer) return true;
   if (audience.projectOwner && viewer.isProjectOwner) return true;
   if (audience.groupIds.some((id) => viewer.groupIds.includes(id))) return true;
@@ -78,8 +82,9 @@ export function describeAudience(
   },
 ): string {
   const parts: string[] = [];
-  if (audience.admins) parts.push("Admins");
   if (audience.allMembers) parts.push("All members");
+  if (audience.admins) parts.push("Admins");
+  if (audience.members) parts.push("Members");
   if (audience.viewers) parts.push("Viewers");
   if (audience.projectOwner) parts.push("the project owner");
   for (const id of audience.groupIds) {

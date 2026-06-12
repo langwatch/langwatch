@@ -93,6 +93,42 @@ describe("redactEssentialPiiInText", () => {
     });
   });
 
+  describe("given provider response ids", () => {
+    // A production analysis-service run flagged a MEDICAL_LICENSE inside an
+    // OpenAI response id. The native recognizers are word-boundary anchored
+    // and context-gated, so a letters+digits run inside one long token can
+    // never match, even with a context word nearby in the payload.
+    it("never matches inside a long alphanumeric id, even near a context word", () => {
+      const payload =
+        'license check for {"ai.response.id": "resp_0d34ab7ca006a2c21aab078819c9289f65178a3e10f"}';
+      const { text, redactedCount } = redact(payload);
+      expect(text).toBe(payload);
+      expect(redactedCount).toBe(0);
+    });
+
+    it("leaves chat completion and request ids intact", () => {
+      const payload =
+        "chatcmpl-Ab12Cd34Ef56Gh78 req_9f8e7d6c5b4a3210 trace_dp2_1781159836000";
+      const { text, redactedCount } = redact(payload);
+      expect(text).toBe(payload);
+      expect(redactedCount).toBe(0);
+    });
+  });
+
+  describe("given a medical license number", () => {
+    it("redacts a DEA-style number when context names it", () => {
+      const { text } = redact("DEA license AB1234567 on record");
+      expect(text).toContain("[REDACTED]");
+      expect(text).not.toContain("AB1234567");
+    });
+
+    it("leaves the same shape intact without context", () => {
+      const input = "booking code AB1234567 confirmed";
+      const { text } = redact(input);
+      expect(text).toBe(input);
+    });
+  });
+
   describe("given a person's name", () => {
     it("leaves it untouched (names are the strict level)", () => {
       const input = "John Smith lives here";

@@ -5,8 +5,11 @@ import {
   type ResolvedDataPrivacy,
 } from "~/server/data-privacy/dataPrivacy.types";
 import {
+  ALL_MEMBERS_VALUE,
+  applyAudienceSelection,
   type AudienceFormState,
   audienceConfig,
+  audienceToSelection,
   buildRuleConfig,
   type CustomAttributeFormRow,
   configsEqual,
@@ -14,8 +17,10 @@ import {
   EMPTY_AUDIENCE_FORM,
   inheritedFormState,
   isEmptyRuleConfig,
+  ROLE_VALUES,
   type RuleFormState,
   ruleSummary,
+  selectionToAudience,
   type TouchedControls,
   touchedFromConfig,
 } from "../dataPrivacyRuleConfig";
@@ -344,5 +349,47 @@ describe("ruleSummary", () => {
 
   it("reads as no changes for an empty config", () => {
     expect(ruleSummary({})).toBe("No changes");
+  });
+});
+
+describe("audience selection", () => {
+  describe("when All members is picked over a narrower selection", () => {
+    /** @scenario Picking All members replaces any narrower audience selection */
+    it("collapses to All members alone and drops it again on a narrower pick", () => {
+      const narrower = [ROLE_VALUES.admins, "group:security"];
+      const collapsed = applyAudienceSelection(narrower, [
+        ...narrower,
+        ALL_MEMBERS_VALUE,
+      ]);
+      expect(collapsed).toEqual([ALL_MEMBERS_VALUE]);
+
+      const widened = applyAudienceSelection(collapsed, [
+        ...collapsed,
+        "group:security",
+      ]);
+      expect(widened).toEqual(["group:security"]);
+    });
+
+    it("keeps any combination of narrower groups", () => {
+      const next = applyAudienceSelection(
+        ["projectOwner"],
+        ["projectOwner", ROLE_VALUES.admins, "group:auditors"],
+      );
+      expect(next).toEqual(["projectOwner", ROLE_VALUES.admins, "group:auditors"]);
+    });
+  });
+
+  describe("when the audience round-trips through picker values", () => {
+    it("maps every group kind both ways", () => {
+      const state = audience({
+        allMembers: false,
+        projectOwner: true,
+        admins: true,
+        members: true,
+        viewers: true,
+        groupIds: ["g1", "g2"],
+      });
+      expect(selectionToAudience(audienceToSelection(state))).toEqual(state);
+    });
   });
 });

@@ -29,6 +29,7 @@ function viewer(partial: Partial<ViewerFacts>): ViewerFacts {
   return {
     isAdmin: false,
     isMember: true,
+    isMemberRole: false,
     isViewer: false,
     isProjectOwner: false,
     groupIds: [],
@@ -69,6 +70,22 @@ describe("isContentVisible", () => {
       expect(
         isContentVisible(restriction, viewer({ groupIds: ["other"] })),
       ).toBe(false);
+    });
+  });
+
+  describe("given content restricted to the Members role group", () => {
+    /** @scenario Content restricted to the Members role group excludes admins and viewers */
+    it("shows it only to holders of the member role", () => {
+      const restriction = eff("restrict", { members: true });
+      expect(
+        isContentVisible(restriction, viewer({ isMemberRole: true })),
+      ).toBe(true);
+      expect(isContentVisible(restriction, viewer({ isAdmin: true }))).toBe(
+        false,
+      );
+      expect(isContentVisible(restriction, viewer({ isViewer: true }))).toBe(
+        false,
+      );
     });
   });
 

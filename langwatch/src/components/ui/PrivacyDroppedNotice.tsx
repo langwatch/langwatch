@@ -1,4 +1,6 @@
-import { Alert } from "@chakra-ui/react";
+import { Alert, Button } from "@chakra-ui/react";
+import NextLink from "~/utils/compat/next-link";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 /**
  * Banner shown when a trace is missing content because a `drop` privacy policy
@@ -33,6 +35,7 @@ export function PrivacyDroppedNotice({
 }: {
   categories?: string[] | null;
 }) {
+  const { hasPermission } = useOrganizationTeamProject();
   if (!categories || categories.length === 0) return null;
 
   const single = categories.length === 1;
@@ -50,6 +53,17 @@ export function PrivacyDroppedNotice({
           {itTheyWere} stored, so {itThey} not shown here and cannot be
           recovered.
         </Alert.Description>
+        {hasPermission("project:view") && (
+          <Button
+            asChild
+            size="xs"
+            variant="outline"
+            marginTop={1}
+            alignSelf="start"
+          >
+            <NextLink href="/settings/data-privacy">Privacy settings</NextLink>
+          </Button>
+        )}
       </Alert.Content>
     </Alert.Root>
   );

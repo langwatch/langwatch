@@ -13,6 +13,13 @@ vi.mock("~/hooks/useFieldRedaction", () => ({
   useFieldRedaction: vi.fn(),
 }));
 
+const hasPermission = vi.fn((_permission: string) => true);
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({
+    hasPermission: (permission: string) => hasPermission(permission),
+  }),
+}));
+
 const mockUseFieldRedaction = vi.mocked(useFieldRedaction);
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -65,7 +72,7 @@ describe("RedactedField", () => {
   });
 
   describe("when the field is restricted to no one", () => {
-    it("says it is hidden from everyone", () => {
+    it("points at privacy settings instead of a bare audience", () => {
       mockUseFieldRedaction.mockReturnValue({
         isRedacted: true,
         isLoading: false,
@@ -79,7 +86,7 @@ describe("RedactedField", () => {
       );
 
       expect(container.textContent).toContain("Redacted");
-      expect(container.textContent).toContain("hidden from everyone");
+      expect(container.textContent).toContain("hidden by privacy settings");
     });
   });
 

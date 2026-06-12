@@ -203,6 +203,7 @@ export async function getUserProtectionsForProject(
 
   let isAdmin = teamBindings.some((b) => b.role === TeamUserRole.ADMIN);
   let isMember = teamBindings.length > 0;
+  let isMemberRole = teamBindings.some((b) => b.role === TeamUserRole.MEMBER);
   const isViewer = teamBindings.some((b) => b.role === TeamUserRole.VIEWER);
   const isProjectOwner =
     project.ownerUserId != null && project.ownerUserId === userId;
@@ -216,6 +217,7 @@ export async function getUserProtectionsForProject(
       isAdmin = true;
     } else if (orgRole === OrganizationUserRole.MEMBER) {
       isMember = true;
+      isMemberRole = true;
     }
   }
 
@@ -248,6 +250,7 @@ export async function getUserProtectionsForProject(
   const viewer: ViewerFacts = {
     isAdmin,
     isMember,
+    isMemberRole,
     isViewer,
     isProjectOwner,
     groupIds,

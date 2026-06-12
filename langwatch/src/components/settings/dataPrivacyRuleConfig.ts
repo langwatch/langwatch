@@ -24,13 +24,15 @@ import {
  */
 
 /**
- * The drawer's audience selection: the built-in role groups, the
- * personal-project owner, plus the organization's custom RBAC groups.
- * Everything off/empty = "no one" (fully hidden).
+ * The drawer's audience selection: everyone with access (all members), the
+ * standard role groups (admins, members, viewers), the personal-project
+ * owners, plus the organization's custom RBAC groups. Everything off/empty =
+ * "no one" (fully hidden).
  */
 export interface AudienceFormState {
   admins: boolean;
   allMembers: boolean;
+  members: boolean;
   viewers: boolean;
   projectOwner: boolean;
   groupIds: string[];
@@ -39,10 +41,66 @@ export interface AudienceFormState {
 export const EMPTY_AUDIENCE_FORM: AudienceFormState = {
   admins: false,
   allMembers: false,
+  members: false,
   viewers: false,
   projectOwner: false,
   groupIds: [],
 };
+
+/**
+ * The audience as picker values, one entry per selected group:
+ * `allMembers`, `projectOwner`, `role:admins|members|viewers`, `group:<id>`.
+ */
+export const ALL_MEMBERS_VALUE = "allMembers";
+export const PROJECT_OWNER_VALUE = "projectOwner";
+export const ROLE_VALUES = {
+  admins: "role:admins",
+  members: "role:members",
+  viewers: "role:viewers",
+} as const;
+
+export function audienceToSelection(audience: AudienceFormState): string[] {
+  const values: string[] = [];
+  if (audience.allMembers) values.push(ALL_MEMBERS_VALUE);
+  if (audience.projectOwner) values.push(PROJECT_OWNER_VALUE);
+  if (audience.admins) values.push(ROLE_VALUES.admins);
+  if (audience.members) values.push(ROLE_VALUES.members);
+  if (audience.viewers) values.push(ROLE_VALUES.viewers);
+  for (const id of audience.groupIds) values.push(`group:${id}`);
+  return values;
+}
+
+export function selectionToAudience(values: string[]): AudienceFormState {
+  return {
+    allMembers: values.includes(ALL_MEMBERS_VALUE),
+    projectOwner: values.includes(PROJECT_OWNER_VALUE),
+    admins: values.includes(ROLE_VALUES.admins),
+    members: values.includes(ROLE_VALUES.members),
+    viewers: values.includes(ROLE_VALUES.viewers),
+    groupIds: values
+      .filter((v) => v.startsWith("group:"))
+      .map((v) => v.slice("group:".length)),
+  };
+}
+
+/**
+ * Collapse rule for the audience picker: "All members" already covers every
+ * other group, so picking it replaces the whole selection, and picking
+ * anything narrower drops it.
+ */
+export function applyAudienceSelection(
+  previous: string[],
+  next: string[],
+): string[] {
+  const pickedAllMembers =
+    next.includes(ALL_MEMBERS_VALUE) && !previous.includes(ALL_MEMBERS_VALUE);
+  if (pickedAllMembers) return [ALL_MEMBERS_VALUE];
+  const addedNarrower = next.some(
+    (v) => v !== ALL_MEMBERS_VALUE && !previous.includes(v),
+  );
+  if (addedNarrower) return next.filter((v) => v !== ALL_MEMBERS_VALUE);
+  return next;
+}
 
 /** A custom attribute rule row as edited in the drawer. */
 export interface CustomAttributeFormRow {
@@ -66,6 +124,7 @@ export function audienceConfig(audience: AudienceFormState): Audience {
   const out: Audience = {};
   if (audience.admins) out.admins = true;
   if (audience.allMembers) out.allMembers = true;
+  if (audience.members) out.members = true;
   if (audience.viewers) out.viewers = true;
   if (audience.projectOwner) out.projectOwner = true;
   if (audience.groupIds.length > 0) out.groupIds = [...audience.groupIds];
@@ -78,6 +137,7 @@ function audienceToFormState(
   return {
     admins: audience?.admins ?? false,
     allMembers: audience?.allMembers ?? false,
+    members: audience?.members ?? false,
     viewers: audience?.viewers ?? false,
     projectOwner: audience?.projectOwner ?? false,
     groupIds: [...(audience?.groupIds ?? [])],

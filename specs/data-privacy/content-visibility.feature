@@ -4,15 +4,18 @@ Feature: Restricting who can see trace content
   So that the data is kept for debugging but only the right people can read it
 
   # "Restrict" stores the content but hides it at read time from anyone outside
-  # the audience. The audience is built on the forward access model: the
-  # built-in role groups (Admins, All members, Viewers), the project owner for
-  # personal projects, plus any of the organization's custom RBAC groups
-  # (custom groups exist only on the enterprise plan, since only it can create
-  # them). Departments scope WHERE a rule applies, never WHO can see content.
-  # An empty audience means no one can see it. Unlike dropping, restricting is
-  # fully retroactive - changing the audience changes who can read existing
-  # traces immediately. A viewer outside the audience sees a redaction
-  # placeholder with the reason, not a blank field.
+  # the audience. The audience is a multi-selectable set of groups, picked with
+  # the same chip picker as scopes: the standard role groups (Admins, Members,
+  # Viewers), the organization's custom RBAC groups (enterprise is the only
+  # plan that can create them), and "Project owners" for personal projects.
+  # Any combination is allowed (for example project owners plus a super-admin
+  # group). "All members" is the one exclusive choice: it means everyone with
+  # project access, so picking it replaces any narrower selection. Departments
+  # scope WHERE a rule applies, never WHO can see content. An empty audience
+  # means no one can see it. Unlike dropping, restricting is fully retroactive
+  # - changing the audience changes who can read existing traces immediately.
+  # A viewer outside the audience sees a redaction placeholder with the
+  # reason, not a blank field.
 
   Background:
     Given an organization "acme" with a team "platform" and a project "web-app"
@@ -52,6 +55,20 @@ Feature: Restricting who can see trace content
     Then the trace input is visible to "grace"
     When "dave" opens a trace for "web-app"
     Then the trace input is redacted for "dave"
+
+  @unit
+  Scenario: Content restricted to the Members role group excludes admins and viewers
+    Given a rule on "web-app" that restricts trace input to the Members role group
+    Then a holder of the member role sees the trace input
+    And an admin without the member role does not
+    And a viewer does not
+
+  @unit
+  Scenario: Picking All members replaces any narrower audience selection
+    Given an audience selection of the Admins role group and the "security" group
+    When "All members" is picked
+    Then the selection becomes "All members" alone
+    And picking any group afterwards drops "All members" from the selection
 
   # Personal projects can be restricted to the person themselves: each member
   # sees the traces of their own workspace and nobody else's, with an optional
