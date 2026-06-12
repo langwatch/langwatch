@@ -42,7 +42,7 @@ bind_port() {
   run bash -c "source '$HELPER'; nlpgo_bind_port '$1' '$2'"
 }
 
-# @scenario "A bundled Go service auto-starts when Go is present and its port is free"
+# @scenario "A bundled service auto-starts when its runtime is available and its port is free"
 @test "starts when go is present and the port is free" {
   with_go
   should_start "" 5561 0
@@ -50,28 +50,28 @@ bind_port() {
   [ "$output" = "start" ]
 }
 
-# @scenario "A bundled Go service is reused when its port is already serving"
+# @scenario "An already-running service is reused instead of started twice"
 @test "skips (reuse) when the port is already serving" {
   with_go
   should_start "" 5561 1
   [ "$output" = "skip:port-in-use" ]
 }
 
-# @scenario "A bundled Go service is skipped when its skip flag is set"
+# @scenario "A bundled service does not start when the developer opted out of auto-start"
 @test "skips for opt-out when the skip flag is set" {
   with_go
   should_start "1" 5561 0
   [ "$output" = "skip:opted-out" ]
 }
 
-# @scenario "A bundled Go service is skipped when the Go toolchain is absent"
+# @scenario "A bundled service is not auto-started when its runtime is unavailable"
 @test "skips with a manual-run hint when go is absent" {
   # with_go intentionally not called: no `go` on the fake PATH.
   should_start "" 5561 0
   [ "$output" = "skip:no-go-toolchain" ]
 }
 
-# @scenario "nlpgo binds to the localhost port the app is configured to call"
+# @scenario "The NLP engine serves on the address the app calls"
 @test "binds the configured localhost port" {
   bind_port 5560 "http://localhost:5561"
   [ "$output" = "5561" ]
@@ -79,15 +79,19 @@ bind_port() {
   [ "$output" = "5599" ]
 }
 
-# @scenario "nlpgo binds to the derived app-port-plus-one when no NLP service URL is configured"
-@test "derives app-port-plus-one when the URL is unset" {
+# @scenario "The NLP engine gets a port of its own when none is configured"
+@test "derives app-port-plus-one when the URL is unset or has no port" {
   bind_port 5560 ""
   [ "$output" = "5561" ]
   bind_port 5580 ""
   [ "$output" = "5581" ]
+  # A local URL without an explicit port falls back to the derived slot;
+  # start.sh then rewrites the app-facing URL to that same port.
+  bind_port 5560 "http://localhost"
+  [ "$output" = "5561" ]
 }
 
-# @scenario "nlpgo local auto-start is skipped when the NLP service URL is remote"
+# @scenario "No local NLP engine starts when the app calls a remote NLP service"
 @test "returns remote for a non-localhost URL" {
   bind_port 5560 "https://nlp.example.com"
   [ "$output" = "remote" ]

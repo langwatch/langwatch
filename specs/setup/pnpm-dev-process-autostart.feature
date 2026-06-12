@@ -13,46 +13,50 @@ Feature: pnpm dev auto-starts the bundled Go services
   # gateway and nlpgo only differ in how their port is resolved.
 
   @unit
-  Scenario: A bundled Go service auto-starts when Go is present and its port is free
-    Given the Go toolchain is on PATH
+  Scenario: A bundled service auto-starts when its runtime is available and its port is free
+    Given the service's runtime is installed
     And nothing is listening on the service port
     When pnpm dev resolves the start plan
     Then the service is scheduled to start
 
   @unit
-  Scenario: A bundled Go service is reused when its port is already serving
-    Given another process is already listening on the service port
+  Scenario: An already-running service is reused instead of started twice
+    Given another process is already serving the service port
     When pnpm dev resolves the start plan
     Then the service is not started a second time
 
   @unit
-  Scenario: A bundled Go service is skipped when its skip flag is set
-    Given the developer set the service's skip flag
+  Scenario: A bundled service does not start when the developer opted out of auto-start
+    Given the developer opted out of auto-starting the service
     When pnpm dev resolves the start plan
     Then the service is not started
     And no skip warning is printed
 
   @unit
-  Scenario: A bundled Go service is skipped when the Go toolchain is absent
-    Given Go is not on PATH
+  Scenario: A bundled service is not auto-started when its runtime is unavailable
+    Given the service's runtime is not installed
     When pnpm dev resolves the start plan
     Then the service is not started
     And the developer is told to run it manually
 
   @unit
-  Scenario: nlpgo binds to the localhost port the app is configured to call
-    Given LANGWATCH_NLP_SERVICE points at a localhost port
-    When pnpm dev resolves the nlpgo bind port
-    Then nlpgo binds the same port the app will call
+  Scenario: The NLP engine serves on the address the app calls
+    Given the app is configured to call a local NLP address with an explicit port
+    When pnpm dev resolves the start plan
+    Then the NLP engine serves on that same port
 
   @unit
-  Scenario: nlpgo binds to the derived app-port-plus-one when no NLP service URL is configured
-    Given LANGWATCH_NLP_SERVICE is unset
-    When pnpm dev resolves the nlpgo bind port
-    Then nlpgo binds the app port plus one
+  Scenario: The NLP engine gets a port of its own when none is configured
+    Given the app has no explicit local NLP port configured
+    When pnpm dev resolves the start plan
+    Then the NLP engine serves on a port derived from the app's own port
+    And the app is pointed at that derived port
+    # Covers both a missing NLP address and a local one without a port:
+    # in either case the app and the engine must end up on the same port,
+    # never with the app calling port 80 while the engine serves elsewhere.
 
   @unit
-  Scenario: nlpgo local auto-start is skipped when the NLP service URL is remote
-    Given LANGWATCH_NLP_SERVICE points at a remote host
-    When pnpm dev resolves the nlpgo bind port
-    Then no local nlpgo is started
+  Scenario: No local NLP engine starts when the app calls a remote NLP service
+    Given the app is configured to call an NLP service on another host
+    When pnpm dev resolves the start plan
+    Then no local NLP engine is started

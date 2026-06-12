@@ -137,9 +137,17 @@ if [[ "$NODE_ENV" = "development" ]]; then
   if [ "$_NLPGO_PORT" = "remote" ]; then
     echo "  ✓ nlpgo: using configured LANGWATCH_NLP_SERVICE=$LANGWATCH_NLP_SERVICE, skipping local auto-start"
   else
-    if [ -z "$LANGWATCH_NLP_SERVICE" ]; then
-      export LANGWATCH_NLP_SERVICE="http://localhost:${_NLPGO_PORT}"
-    fi
+    # Point the app at the port nlpgo binds. Rewrites an empty URL AND a
+    # portless local one (e.g. http://localhost): nlpgo_bind_port already
+    # fell back to the derived port for those, so leaving the URL as-is
+    # would send app traffic to port 80 while nlpgo serves elsewhere.
+    # An explicit host:port is the developer's choice — left untouched.
+    _NLP_HOSTPORT="${LANGWATCH_NLP_SERVICE#*://}"
+    _NLP_HOSTPORT="${_NLP_HOSTPORT%%/*}"
+    case "$_NLP_HOSTPORT" in
+      *:[0-9]*) ;;
+      *) export LANGWATCH_NLP_SERVICE="http://localhost:${_NLPGO_PORT}" ;;
+    esac
     case "$(go_service_should_start "$LANGWATCH_SKIP_NLPGO" "$_NLPGO_PORT")" in
       start)
         START_NLPGO_COMMAND="SERVER_ADDR=:${_NLPGO_PORT} LANGWATCH_ENDPOINT=http://localhost:${_APP_PORT} make -C .. service svc=nlpgo"
