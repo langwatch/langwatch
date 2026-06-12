@@ -10,13 +10,12 @@
  */
 import { Box, HStack, Link, Text, VStack } from "@chakra-ui/react";
 import { GitPullRequest } from "react-feather";
+import {
+  extractGithubPrLinks,
+  type GithubPrLink,
+} from "~/server/services/langy/githubPrLinks";
 
-export type LangyGitHubPrCardProps = {
-  owner: string;
-  repo: string;
-  number: number;
-  url: string;
-};
+export type LangyGitHubPrCardProps = GithubPrLink;
 
 export function LangyGitHubPrCard({
   owner,
@@ -63,22 +62,7 @@ export function LangyGitHubPrCard({
 }
 
 /**
- * Extract zero-or-more PR references from an assistant text. The reply may
- * contain prose with one or more github.com PR URLs; we render a card per
- * unique URL and keep the surrounding prose in the markdown body.
+ * Re-export the shared extractor under the legacy name to keep existing call
+ * sites (MessageContent) working without a touch.
  */
-export function extractPrLinks(text: string): LangyGitHubPrCardProps[] {
-  const re =
-    /https?:\/\/github\.com\/([A-Za-z0-9._-]+)\/([A-Za-z0-9._-]+)\/pull\/(\d+)\b/g;
-  const seen = new Set<string>();
-  const out: LangyGitHubPrCardProps[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text)) !== null) {
-    const [url, owner, repo, numberStr] = m;
-    const key = `${owner}/${repo}#${numberStr}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push({ owner, repo, number: Number(numberStr), url });
-  }
-  return out;
-}
+export const extractPrLinks = extractGithubPrLinks;
