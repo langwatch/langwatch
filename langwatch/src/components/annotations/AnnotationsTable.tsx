@@ -39,7 +39,7 @@ function toOccurredAtMsHint(
 ): number | undefined {
   if (startedAt === null || startedAt === undefined) return undefined;
   const ms = typeof startedAt === "number" ? startedAt : Date.parse(startedAt);
-  return Number.isFinite(ms) && ms > 0 ? ms : undefined;
+  return Number.isFinite(ms) && ms > 0 ? Math.floor(ms) : undefined;
 }
 
 type ScoreOption = Record<
