@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DatasetReference, TargetConfig } from "../../../types";
@@ -224,6 +224,30 @@ describe("TargetVariablesPanel", () => {
           expect(screen.getByText("search_results")).toBeInTheDocument();
         });
       }
+    });
+
+    /** @scenario An image dataset column is badged as Image in the mapping dropdown */
+    it("badges an image dataset column as Image in the mapping dropdown", async () => {
+      const user = userEvent.setup();
+      const datasetWithImage: DatasetReference = {
+        ...mockDatasets[0]!,
+        columns: [
+          ...mockDatasets[0]!.columns,
+          { id: "col-3", name: "image", type: "image" },
+        ],
+      };
+      renderComponent({ datasets: [datasetWithImage] });
+
+      const inputs = screen.getAllByRole("textbox");
+      const emptyInput = inputs.find(
+        (input) => !(input as HTMLInputElement).value,
+      );
+      expect(emptyInput).toBeDefined();
+      await user.click(emptyInput!);
+
+      const imageOption = await screen.findByTestId("field-option-image");
+      expect(within(imageOption).getByText("Image")).toBeInTheDocument();
+      expect(within(imageOption).queryByText("Text")).not.toBeInTheDocument();
     });
 
     /** @scenario Chaining one target into another shows the upstream target name */
