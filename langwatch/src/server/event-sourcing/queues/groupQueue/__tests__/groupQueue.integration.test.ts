@@ -386,12 +386,16 @@ describe.skipIf(!hasTestcontainers)(
             value: "second",
           });
 
-          // Wait for both to complete
+          // Wait for both to complete. Generous ceiling: a delayed job
+          // produces no dispatcher signal when it becomes ready, so its
+          // dispatch waits for the next BRPOP timeout cycle
+          // (signalTimeoutSec), and container clock skew widens that
+          // further on CI runners.
           await vi.waitFor(
             () => {
               expect(processed).toHaveBeenCalledTimes(2);
             },
-            { timeout: 10000, interval: 50 },
+            { timeout: 30000, interval: 50 },
           );
         });
       });
@@ -422,11 +426,15 @@ describe.skipIf(!hasTestcontainers)(
             value: "second",
           });
 
+          // Generous ceiling: a delayed job produces no dispatcher signal
+          // when it becomes ready, so its dispatch waits for the next
+          // BRPOP timeout cycle (signalTimeoutSec), and container clock
+          // skew widens that further on CI runners.
           await vi.waitFor(
             () => {
               expect(processed).toHaveBeenCalledTimes(1);
             },
-            { timeout: 10000, interval: 50 },
+            { timeout: 30000, interval: 50 },
           );
 
           const receivedPayload = processed.mock.calls[0]![0];
