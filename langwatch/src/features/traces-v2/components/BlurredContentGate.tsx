@@ -1,4 +1,5 @@
 import { Box, Button, Text, VStack } from "@chakra-ui/react";
+import { keyframes } from "@emotion/react";
 import { Lock } from "lucide-react";
 import { memo } from "react";
 import type { ReactNode } from "react";
@@ -15,6 +16,27 @@ import { Link } from "~/components/ui/link";
  * it. No fabricated text: the ellipsis already ships in the API payload, so
  * every surface (UI, SDK, exports) sees the same truncation marker.
  */
+// Same rainbow recipe as ShikiCommandBox (PostHog's rainbow-scroll):
+// 5-stop gradient, background-clip: text, 3s background-position sweep.
+const lwRainbowScroll = keyframes`
+  0% { background-position-x: 0%; }
+  100% { background-position-x: 200%; }
+`;
+
+const RAINBOW_GRADIENT =
+  "linear-gradient(90deg, #0143cb 0%, #2b6ff4 24%, #d23401 47%, #ff651f 66%, #fba000 83%, #0143cb 100%)";
+
+// The lock is an SVG stroke — background-clip can't paint it, so cycle its
+// color through the same palette, synced to the text sweep's 3s period.
+const lwRainbowStroke = keyframes`
+  0% { color: #0143cb; }
+  24% { color: #2b6ff4; }
+  47% { color: #d23401; }
+  66% { color: #ff651f; }
+  83% { color: #fba000; }
+  100% { color: #0143cb; }
+`;
+
 export const BlurredContentGate = memo(function BlurredContentGate({
   children,
 }: {
@@ -37,31 +59,12 @@ export const BlurredContentGate = memo(function BlurredContentGate({
       {children}
       {/* Progressive backdrop blur over the container: top stays readable,
           bottom dissolves. Masked so the blur ramps instead of cutting. */}
-      {/* Blur starts at the very TOP of the gated content and deepens
-          downward in fixed pixels — the teaser sits in the light zone. */}
+      {/* Uniform blur over the whole gated container. */}
       <Box
         position="absolute"
         inset={0}
         pointerEvents="none"
-        backdropFilter="blur(2.5px)"
-        style={{
-          maskImage:
-            "linear-gradient(to bottom, transparent 0px, black 160px, black 100%)",
-          WebkitMaskImage:
-            "linear-gradient(to bottom, transparent 0px, black 160px, black 100%)",
-        }}
-      />
-      <Box
-        position="absolute"
-        inset={0}
-        pointerEvents="none"
-        backdropFilter="blur(8px)"
-        style={{
-          maskImage:
-            "linear-gradient(to bottom, transparent 220px, black 460px, black 100%)",
-          WebkitMaskImage:
-            "linear-gradient(to bottom, transparent 220px, black 460px, black 100%)",
-        }}
+        backdropFilter="blur(2px)"
       />
       {/* Soft wash so the deepest section reads as locked, not broken. */}
       <Box
@@ -98,7 +101,36 @@ export const BlurredContentGate = memo(function BlurredContentGate({
             alignItems="center"
             gap={1.5}
           >
-            <Lock size={13} /> Your data is still here
+            <Box
+              as="span"
+              display="inline-flex"
+              css={{
+                animation: `${lwRainbowStroke} 3s linear infinite`,
+                "@media (prefers-reduced-motion: reduce)": {
+                  animation: "none",
+                  color: "#2b6ff4",
+                },
+              }}
+            >
+              <Lock size={13} />
+            </Box>
+            <Box
+              as="span"
+              css={{
+                backgroundImage: RAINBOW_GRADIENT,
+                backgroundClip: "text",
+                WebkitBackgroundClip: "text",
+                color: "transparent",
+                WebkitTextFillColor: "transparent",
+                backgroundSize: "200% 100%",
+                animation: `${lwRainbowScroll} 3s linear infinite`,
+                "@media (prefers-reduced-motion: reduce)": {
+                  animation: "none",
+                },
+              }}
+            >
+              Your data is still here
+            </Box>
           </Text>
           <Text fontSize="xs" color="fg.muted" textAlign="center">
             Traces older than your plan&apos;s visibility window are hidden.
