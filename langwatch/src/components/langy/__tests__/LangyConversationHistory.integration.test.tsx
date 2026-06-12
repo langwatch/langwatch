@@ -401,6 +401,64 @@ describe("LangyPanel conversation history", () => {
           expect(lastCall?.[0]).toEqual([]);
         });
       });
+
+      it("aborts any in-flight stream when the active conversation is deleted", async () => {
+        installFetchMock({ conversations, messagesById });
+        chatRef.status = "streaming";
+        renderPanel();
+        await screen.findByRole("button", { name: /Newest chat/i });
+        const newestItem = screen.getByRole("button", {
+          name: /Newest chat/i,
+        });
+        await userEvent.hover(newestItem);
+        chatRef.stop.mockClear();
+        await userEvent.click(
+          within(newestItem.parentElement!).getByRole("button", {
+            name: /delete/i,
+          }),
+        );
+        await waitFor(() => {
+          expect(chatRef.stop).toHaveBeenCalled();
+        });
+      });
+
+      it("leaves the active conversation untouched when a different chat is deleted", async () => {
+        installFetchMock({ conversations, messagesById });
+        renderPanel();
+        // Wait for initial load to finish so we don't race the seed-load.
+        await screen.findByRole("button", { name: /Older chat/i });
+        await waitFor(() => {
+          const lastCall =
+            chatRef.setMessages.mock.calls[
+              chatRef.setMessages.mock.calls.length - 1
+            ];
+          // initial seed loaded Newest's messages
+          expect(
+            (lastCall?.[0] as UIMessageLike[] | undefined)?.[0]?.parts?.[0]
+              ?.text,
+          ).toBe("hello from newest");
+        });
+        // Delete the OLDER (non-active) chat.
+        const olderItem = screen.getByRole("button", { name: /Older chat/i });
+        await userEvent.hover(olderItem);
+        chatRef.setMessages.mockClear();
+        chatRef.stop.mockClear();
+        await userEvent.click(
+          within(olderItem.parentElement!).getByRole("button", {
+            name: /delete/i,
+          }),
+        );
+        // Wait until the older chat is removed from the list — proves the
+        // delete completed — before asserting we did NOT reset the active.
+        await waitFor(() => {
+          expect(
+            screen.queryByRole("button", { name: /Older chat/i }),
+          ).not.toBeInTheDocument();
+        });
+        // Active chat state must not be wiped.
+        expect(chatRef.setMessages).not.toHaveBeenCalledWith([]);
+        expect(chatRef.stop).not.toHaveBeenCalled();
+      });
     });
   });
 
