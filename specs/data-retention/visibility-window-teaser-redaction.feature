@@ -110,3 +110,37 @@ Feature: Plan-based visibility windows via teaser redaction
     When traces of the last 30 days are exported
     Then content columns of "old-trace" are truncated to the teaser
     And content columns of "fresh-trace" are exported in full
+
+  # --- v3: new-UI (traces-v2) parity and blur presentation (ADR-028 Decision 7) ---
+
+  Scenario: Traces-v2 drawer summary redacts old content the same as spans
+    Given "acme" resolves to the free plan
+    When the trace summary for "old-trace" is fetched through the traces-v2 drawer
+    Then the summary input and output are truncated to the teaser
+    And the response is marked as redacted with the plan's visibility window
+
+  Scenario: Traces-v2 drawer summary shows fresh traces in full
+    Given "acme" resolves to the free plan
+    When the trace summary for "fresh-trace" is fetched through the traces-v2 drawer
+    Then the summary input and output are returned in full
+    And the response is not marked as redacted
+
+  Scenario: Redacted content renders as a progressive blur with an upgrade call-to-action
+    Given "acme" resolves to the free plan
+    And the trace detail for "old-trace" returns redacted content
+    When the redacted content is rendered in the trace drawer
+    Then the real teaser text is fully legible at the top
+    And fabricated filler words fade and blur progressively below it
+    And an upgrade card saying the data is still here is centered over the blur
+    And activating the upgrade action leads to the plans page
+
+  Scenario: Fabricated filler never comes from the server and is stable across renders
+    Given "acme" resolves to the free plan
+    When the trace detail for "old-trace" is fetched through the API
+    Then the response contains only the real teaser and the redacted flag, no filler
+    And rendering the same trace twice produces identical filler words
+
+  Scenario: Both trace UIs render the same blurred-content treatment
+    Given "acme" resolves to the free plan
+    When "old-trace" is opened in the traces-v2 drawer and in the legacy messages drawer
+    Then both render the teaser, the progressive blur, and the upgrade card

@@ -116,7 +116,22 @@ None. No Prisma migration, no ClickHouse migration, no new columns — the desig
 
 None blocking. Two implementation notes for the build PR: (a) the exact field list per payload type (span input/output, messages, log bodies, contexts) is enumerated at implementation against the response DTOs; (b) UI CTA copy and placement is a design task, not architecture.
 
+### 7. Presentation: progressive blur with fabricated filler and a centered upgrade card
+
+The teaser alone reads as mysteriously cut-off text — the upsell needs a *presentation layer*. A shared `BlurredContentGate` component (used by BOTH the traces-v2 drawer — the strategic surface — and the legacy messages drawer) renders:
+
+1. The real teaser, fully legible.
+2. **Client-side fabricated filler** (~70–90% visual volume of plausible garbage words), **deterministically seeded from the traceId** so it is stable across renders, fading and blurring over ~3 gradient steps. The server never sends filler — the API carries only the real teaser plus `redacted_by_visibility_window`, so programmatic consumers can never mistake fabricated words for data.
+3. A centered upgrade card over the blur: "Your data is still here — upgrade to see it" + Upgrade action to the plans page.
+
+Rejected: server-side filler (pads every payload and feeds fabricated content to SDK/API consumers as if real); hard-cutoff lock banner (kills the "there is more here" illusion that drives the upgrade).
+
 ## Revisions
+
+- **v3** (2026-06-12, post browser dogfood) — presentation layer + a found leak:
+  1. **Leak: traces-v2 Summary tab showed full content for beyond-window traces** — `TraceSummaryService.getByTraceId` (ComputedInput/Output) was not gated while spans and list were. Caught by dogfooding the new UI; gated as part of this revision's implementation.
+  2. **Decision 7 added**: progressive blur presentation with client-side deterministic filler + centered upgrade card, one shared component across traces-v2 (primary) and legacy messages UI.
+  3. Spec extended with new-UI scenarios (traceV2 drawer Summary/Trace tabs), the summary-gate regression, and the blur-presentation behavior.
 
 - **v2** (2026-06-11, post devils-advocate red-team) — four corrections:
   1. **Two service stacks, not one (P0).** `tracesV2` reads spans via app-layer services without touching `TraceService`; the gate now explicitly covers both stacks, and enforcement is structural (per-surface no-escape tests as merge gate) rather than reviewer vigilance.
