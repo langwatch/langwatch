@@ -16,7 +16,7 @@
  */
 import {
   afterEach,
-  beforeEach,
+
   describe,
   expect,
   it,
@@ -277,7 +277,7 @@ describe("runUnifiedLoginFlow", () => {
         (configMod.loadConfig as ReturnType<typeof vi.fn>).mockReturnValue(cfg);
 
         // Suppress console output during test
-        vi.spyOn(console, "log").mockImplementation(() => {});
+        vi.spyOn(console, "log").mockImplementation(() => undefined);
 
         await loginFlow.runUnifiedLoginFlow({ kind: "device_session", cfg });
 
@@ -296,10 +296,10 @@ describe("runUnifiedLoginFlow", () => {
 
         expect(reconcileSave).toBeDefined();
         expect(
-          reconcileSave!.default_personal_ingest_keys!["codex"],
+          reconcileSave!.default_personal_ingest_keys!.codex,
         ).toBeDefined();
         expect(
-          reconcileSave!.default_personal_ingest_keys!["claude_code"],
+          reconcileSave!.default_personal_ingest_keys!.claude_code,
         ).toBeUndefined();
       });
 
@@ -345,7 +345,7 @@ describe("runUnifiedLoginFlow", () => {
 
         (configMod.loadConfig as ReturnType<typeof vi.fn>).mockReturnValue(cfg);
 
-        vi.spyOn(console, "log").mockImplementation(() => {});
+        vi.spyOn(console, "log").mockImplementation(() => undefined);
 
         await loginFlow.runUnifiedLoginFlow({ kind: "device_session", cfg });
 
@@ -359,7 +359,7 @@ describe("runUnifiedLoginFlow", () => {
           (c) => c.default_personal_ingest_keys !== undefined,
         );
         for (const saved of keySaves) {
-          expect(saved.default_personal_ingest_keys!["codex"]).toBeDefined();
+          expect(saved.default_personal_ingest_keys!.codex).toBeDefined();
         }
       });
 
@@ -406,7 +406,7 @@ describe("runUnifiedLoginFlow", () => {
 
         (configMod.loadConfig as ReturnType<typeof vi.fn>).mockReturnValue(cfg);
 
-        vi.spyOn(console, "log").mockImplementation(() => {});
+        vi.spyOn(console, "log").mockImplementation(() => undefined);
 
         // Must not throw even when listIngestionKeys fails
         await expect(
