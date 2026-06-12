@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.26.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.25.0...python-sdk@v0.26.0) (2026-06-12)
+
+
+### Features
+
+* **prompts:** expose runtime parameters in Python SDK facade + document the feature ([#4746](https://github.com/langwatch/langwatch/issues/4746)) ([7aa3b5f](https://github.com/langwatch/langwatch/commit/7aa3b5f3f508d9ec9c62de6c2009a6b333706aa0))
+
 ## [0.25.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.24.0...python-sdk@v0.25.0) (2026-06-11)
 
 
