@@ -1000,6 +1000,25 @@ func TestGatewayHTTPError_SurfacesProviderMessage(t *testing.T) {
 	}
 }
 
+// @scenario "A provider rejection names the provider in the user-facing message"
+// The body is the exact rejection OpenAI's edge intermittently returns
+// for ordinary-sized requests; surfaced bare it reads as a LangWatch
+// infrastructure failure (customer report, 2026-06-12).
+func TestGatewayHTTPError_PrefixesProviderName(t *testing.T) {
+	body := []byte(`{"error":{"message":"Request headers are too large.","type":"invalid_request_error"}}`)
+	err := &GatewayHTTPError{StatusCode: 400, Body: body, Provider: "openai"}
+	want := "openai: Request headers are too large."
+	if got := err.Error(); got != want {
+		t.Errorf("Error() = %q, want %q", got, want)
+	}
+	// Without a provider the message stays a bare verbatim passthrough —
+	// callers that cannot attribute must not invent an attribution.
+	bare := &GatewayHTTPError{StatusCode: 400, Body: body}
+	if got := bare.Error(); got != "Request headers are too large." {
+		t.Errorf("unattributed Error() = %q", got)
+	}
+}
+
 // TestGatewayHTTPError_HandlesAlternativeShapes covers the wire shapes
 // real gateways ship beyond the canonical OpenAI envelope:
 //   - top-level `message` (some LiteLLM passthroughs)
