@@ -143,9 +143,11 @@ jobs:
       matrix:
         shard: [1, 2, 3, 4, 5, 6]
     env:
-      # Some legacy integration suites still call FLUSHALL on the shared Redis.
-      # Keep files in one worker, matching vitest.integration.config.ts, so one
-      # suite cannot erase another suite's in-flight queue state.
+      # Integration suites share one Redis and call FLUSHALL in afterEach.
+      # vitest.integration.config.ts sets fileParallelism: false (no concurrent
+      # files) but does NOT cap the worker pool, so on CI multiple workers still
+      # raced on FLUSHALL and wiped each other's in-flight queue state. Force a
+      # single worker so suites are fully serialized.
       VITEST_MAX_WORKERS: "1"
       # Required environment variables for integration tests
       DATABASE_URL: "postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_test"
