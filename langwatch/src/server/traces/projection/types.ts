@@ -38,9 +38,14 @@ export const projectionRequestSchema = z.object({
     .describe(
       "Entity root to read from. Only 'traces' is supported today; defaults to 'traces' when omitted.",
     ),
+  // Bounded so a caller can't submit unbounded path counts/lengths: the
+  // projector loops paths × pageSize per request, so without a cap a single
+  // request could pin the event loop (metadata.* accepts arbitrary keys, so
+  // the catalog itself doesn't bound cardinality).
   select: z
-    .array(z.string().min(1))
+    .array(z.string().min(1).max(256))
     .min(1)
+    .max(200)
     .optional()
     .describe(
       "Flat list of dotted-path columns to project, e.g. ['trace_id','metadata.user_id','events.type','evaluations.score']. " +

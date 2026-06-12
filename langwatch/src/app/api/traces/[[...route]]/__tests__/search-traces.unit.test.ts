@@ -559,6 +559,26 @@ describe("POST /search", () => {
       expect(res.status).toBe(400);
       expect(mockCompileProjection).not.toHaveBeenCalled();
     });
+
+    it("rejects a select with more than 200 paths with 400", async () => {
+      const res = await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        select: Array.from({ length: 201 }, (_, i) => `metadata.key_${i}`),
+      });
+      expect(res.status).toBe(400);
+      expect(mockCompileProjection).not.toHaveBeenCalled();
+    });
+
+    it("rejects a select path longer than 256 characters with 400", async () => {
+      const res = await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        select: [`metadata.${"x".repeat(300)}`],
+      });
+      expect(res.status).toBe(400);
+      expect(mockCompileProjection).not.toHaveBeenCalled();
+    });
   });
 
   describe("when a date axis is specified", () => {
