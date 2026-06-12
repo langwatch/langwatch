@@ -60,14 +60,28 @@ export async function getGithubTokenForUser({
   }
 
   const lockKey = `langy:gh:refresh:${userId}:${organizationId}`;
-  const lockToken = await acquireLock(lockKey);
+  const lockResult = await acquireLock(lockKey);
   try {
-    // Re-check the cache: another caller may have refreshed while we waited.
-    if (lockToken !== "self-acquired") {
-      const fresh = await redisGet(cacheKey);
-      if (fresh) {
-        return { token: fresh, githubLogin: row.githubLogin };
-      }
+    // Re-check the cache after the lock dance — another caller may have
+    // refreshed while we waited. ALWAYS re-check (regardless of lock state):
+    //  - lock acquired: we held the lock; another caller already finished.
+    //  - lock timed out: another caller is still running; their write may
+    //    have just landed in the cache.
+    //  - no redis: the redisGet returns null anyway, so the re-check is free.
+    const fresh = await redisGet(cacheKey);
+    if (fresh) {
+      return { token: fresh, githubLogin: row.githubLogin };
+    }
+    if (lockResult.kind === "timeout") {
+      // Another caller is mid-refresh and hasn't surfaced a cached token in
+      // 5s. Racing the rotation would brick the credential (single-use refresh
+      // token). Give up cleanly — the user retries; one slow chat is better
+      // than a bricked credential.
+      logger.warn(
+        { userId, organizationId },
+        "github refresh lock timeout — yielding to other caller",
+      );
+      return null;
     }
 
     let refreshToken: string;
@@ -106,19 +120,27 @@ export async function getGithubTokenForUser({
       },
     });
 
-    await redisSetEx(
-      cacheKey,
-      Math.min(ACCESS_TOKEN_CACHE_TTL_SEC, Math.max(60, refreshed.expires_in - 60)),
-      refreshed.access_token,
-    );
+    // Cache a hair under expires_in. If GitHub returns a surprisingly small
+    // expires_in (<120s), cap the cache at 60s so we don't serve a token that's
+    // about to expire from a stale cache entry.
+    const cacheTtl =
+      refreshed.expires_in < 120
+        ? Math.min(60, Math.max(15, refreshed.expires_in - 30))
+        : Math.min(ACCESS_TOKEN_CACHE_TTL_SEC, refreshed.expires_in - 60);
+    await redisSetEx(cacheKey, cacheTtl, refreshed.access_token);
 
     return { token: refreshed.access_token, githubLogin: row.githubLogin };
   } finally {
-    if (lockToken && lockToken !== "self-acquired") {
-      await releaseLock(lockKey, lockToken);
+    if (lockResult.kind === "owned") {
+      await releaseLock(lockKey, lockResult.token);
     }
   }
 }
+
+type LockResult =
+  | { kind: "owned"; token: string }
+  | { kind: "no-redis" }
+  | { kind: "timeout" };
 
 type RefreshedToken = {
   access_token: string;
@@ -195,10 +217,11 @@ async function redisSetEx(
   }
 }
 
-// Acquire-or-wait. Returns the token to pass to releaseLock, or "self-acquired"
-// when Redis is unavailable (we skip locking but the caller still runs).
-async function acquireLock(key: string): Promise<string | null> {
-  if (!connection) return "self-acquired";
+// Acquire-or-wait. Distinguishes the three outcomes so the caller can decide
+// what to do (race the rotation when there's no Redis at all, yield when a
+// peer is mid-refresh).
+async function acquireLock(key: string): Promise<LockResult> {
+  if (!connection) return { kind: "no-redis" };
   const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
   const deadline = Date.now() + LOCK_MAX_WAIT_MS;
   while (Date.now() < deadline) {
@@ -214,15 +237,69 @@ async function acquireLock(key: string): Promise<string | null> {
           ) => Promise<string | null>;
         }
       ).set(key, token, "NX", "EX", LOCK_TTL_SEC);
-      if (ok === "OK") return token;
+      if (ok === "OK") return { kind: "owned", token };
     } catch {
-      return "self-acquired";
+      // Redis went away mid-wait; treat as no-redis so the caller still tries
+      // (it has nothing to lose — caches are gone too).
+      return { kind: "no-redis" };
     }
     await new Promise((r) => setTimeout(r, LOCK_RETRY_MS));
   }
-  // Timed out waiting — proceed anyway; worst case is a wasted refresh.
-  logger.warn({ key }, "github refresh lock timeout; proceeding without lock");
-  return "self-acquired";
+  return { kind: "timeout" };
+}
+
+/**
+ * Register a OAuth-state nonce so the callback can mark it consumed. Returns
+ * `true` if Redis is wired (caller should treat the nonce as authoritative);
+ * `false` when Redis is unavailable (caller should skip the nonce check —
+ * we fall back to the signature + session-rebind defenses).
+ */
+export async function registerGithubOauthNonce(
+  nonce: string,
+  ttlSec: number,
+): Promise<boolean> {
+  if (!connection) return false;
+  try {
+    await (
+      connection as {
+        set: (k: string, v: string, mode: string, ttl: number) => Promise<string>;
+      }
+    ).set(`langy:gh:nonce:${nonce}`, "1", "EX", ttlSec);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Atomically consume a registered nonce. Returns `true` if the nonce was
+ * present and consumed, `false` if it was missing (already used or never
+ * issued), or `null` when Redis is unavailable (caller skips the check).
+ */
+export async function consumeGithubOauthNonce(
+  nonce: string,
+): Promise<boolean | null> {
+  if (!connection) return null;
+  try {
+    // GETDEL is atomic on Redis ≥6.2. Fall back to a get+del transaction-ish
+    // sequence if the client doesn't support it.
+    const conn = connection as {
+      getdel?: (k: string) => Promise<string | null>;
+      get: (k: string) => Promise<string | null>;
+      del: (k: string) => Promise<number>;
+    };
+    const key = `langy:gh:nonce:${nonce}`;
+    if (typeof conn.getdel === "function") {
+      const v = await conn.getdel(key);
+      return v !== null;
+    }
+    const v = await conn.get(key);
+    if (v === null) return false;
+    await conn.del(key);
+    return true;
+  } catch {
+    return null;
+  }
 }
 
 async function releaseLock(key: string, token: string): Promise<void> {
