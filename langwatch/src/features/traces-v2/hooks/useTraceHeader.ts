@@ -55,7 +55,14 @@ export function useTraceHeader() {
   // (span tree, events, signals) and any header refetch prune partitions
   // instead of cold-scanning `stored_spans` on S3. No-op when a hint was
   // already present, so a correct opener-supplied value is never lost.
-  const resolvedTimestamp = query.data?.timestamp;
+  // Guard against `keepPreviousData`: on a trace switch the previous
+  // trace's header lingers in `query.data` until the new fetch lands, so
+  // only trust the timestamp when it belongs to the trace we're asking
+  // about — otherwise we'd backfill trace A's time onto trace B.
+  const resolvedTimestamp =
+    query.data?.traceId === queryArgs.traceId
+      ? query.data.timestamp
+      : undefined;
   useEffect(() => {
     if (occurredAtMs === null && typeof resolvedTimestamp === "number") {
       backfillOccurredAtMs(resolvedTimestamp);

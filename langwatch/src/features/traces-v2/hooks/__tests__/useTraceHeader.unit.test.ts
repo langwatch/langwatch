@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useDrawerStore } from "../../stores/drawerStore";
 import { useTraceHeader } from "../useTraceHeader";
 
-const headerData: { timestamp?: number } = {};
+const headerData: { traceId?: string; timestamp?: number } = {};
 
 vi.mock("~/utils/api", () => ({
   api: {
@@ -31,6 +31,7 @@ vi.mock("../../stores/sseStatusStore", () => ({
 
 describe("useTraceHeader", () => {
   beforeEach(() => {
+    headerData.traceId = undefined;
     headerData.timestamp = undefined;
     useDrawerStore.setState({ traceId: null, occurredAtMs: null });
   });
@@ -39,6 +40,7 @@ describe("useTraceHeader", () => {
     describe("when the header resolves with a trace timestamp", () => {
       it("backfills occurredAtMs from the resolved timestamp", () => {
         useDrawerStore.getState().openTrace("trace-1");
+        headerData.traceId = "trace-1";
         headerData.timestamp = 1_700_000_000_000;
 
         renderHook(() => useTraceHeader());
@@ -52,11 +54,28 @@ describe("useTraceHeader", () => {
     describe("when the header resolves with a different timestamp", () => {
       it("leaves the opener-supplied hint untouched", () => {
         useDrawerStore.getState().openTrace("trace-1", 1_700_000_000_000);
+        headerData.traceId = "trace-1";
         headerData.timestamp = 1_699_000_000_000;
 
         renderHook(() => useTraceHeader());
 
         expect(useDrawerStore.getState().occurredAtMs).toBe(1_700_000_000_000);
+      });
+    });
+  });
+
+  describe("given a trace switch leaves stale header data (keepPreviousData)", () => {
+    describe("when the lingering header belongs to the previous trace", () => {
+      it("does not backfill the new trace with the stale timestamp", () => {
+        // Drawer is now on trace-1 (no hint), but React Query still holds
+        // the previous trace's header until the new fetch lands.
+        useDrawerStore.getState().openTrace("trace-1");
+        headerData.traceId = "trace-OLD";
+        headerData.timestamp = 1_699_000_000_000;
+
+        renderHook(() => useTraceHeader());
+
+        expect(useDrawerStore.getState().occurredAtMs).toBeNull();
       });
     });
   });
