@@ -1,5 +1,7 @@
+import { useEffect } from "react";
 import { api } from "~/utils/api";
 import { LIVE_REFETCH_MS } from "../constants/freshness";
+import { useDrawerStore } from "../stores/drawerStore";
 import { useSseStatusStore } from "../stores/sseStatusStore";
 import { useTraceQueryArgs } from "./useTraceQueryArgs";
 
@@ -10,6 +12,8 @@ const PROMPTS_PENDING_REFETCH_MS = 8_000;
 
 export function useTraceHeader() {
   const { isLive, isReady, queryArgs } = useTraceQueryArgs();
+  const occurredAtMs = useDrawerStore((s) => s.occurredAtMs);
+  const backfillOccurredAtMs = useDrawerStore((s) => s.backfillOccurredAtMs);
   // SSE-aware polling: when `useTraceFreshness` has an active
   // subscription, `trace_summary_updated` events invalidate this query
   // push-style and any timer is redundant. The prompt-pending fallback
@@ -25,7 +29,7 @@ export function useTraceHeader() {
   // newly arrived spans show up without a manual refresh. Once the
   // trace is older than the window, the interval falls away and the
   // query goes back to its normal staleTime caching behaviour.
-  return api.tracesV2.header.useQuery(queryArgs, {
+  const query = api.tracesV2.header.useQuery(queryArgs, {
     enabled: isReady,
     staleTime: 300_000,
     cacheTime: 1_800_000,
@@ -43,4 +47,20 @@ export function useTraceHeader() {
       return false;
     },
   });
+
+  // When the drawer opened without a partition hint (deep link / refresh
+  // whose URL carried no `t`), the header itself runs an unconstrained
+  // by-id scan — but its result carries the trace's real timestamp. Feed
+  // that back into the store so the drawer's *other* per-trace reads
+  // (span tree, events, signals) and any header refetch prune partitions
+  // instead of cold-scanning `stored_spans` on S3. No-op when a hint was
+  // already present, so a correct opener-supplied value is never lost.
+  const resolvedTimestamp = query.data?.timestamp;
+  useEffect(() => {
+    if (occurredAtMs === null && typeof resolvedTimestamp === "number") {
+      backfillOccurredAtMs(resolvedTimestamp);
+    }
+  }, [occurredAtMs, resolvedTimestamp, backfillOccurredAtMs]);
+
+  return query;
 }
