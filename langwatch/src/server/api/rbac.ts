@@ -1020,13 +1020,15 @@ export async function hasOrganizationPermission(
   // the old `organization:view`-only short-circuit lets a lite member reach the
   // MEMBER base bag below (`organization:view` + `aiTools:view`), which is what
   // the /me AI-tools portal needs to render. The binding-level guards in
-  // `checkPermissionFromBindings` are deliberately left in place: they still
-  // skip non-CUSTOM ORGANIZATION-scoped bindings for EXTERNAL and cap team
-  // bindings at EXTERNAL_MEMBER_PERMISSIONS, so a lite member still cannot
-  // escalate to ADMIN-only org perms through a binding. Net effect of this
-  // change: EXTERNAL gains exactly the MEMBER base bag and nothing more. (Fully
-  // retiring EXTERNAL as a permission gate is the follow-up for when it becomes
-  // a computed property.)
+  // `checkPermissionFromBindings` are unchanged: they still skip non-CUSTOM
+  // ORGANIZATION-scoped bindings for EXTERNAL and cap non-CUSTOM team bindings
+  // at EXTERNAL_MEMBER_PERMISSIONS, so a lite member does not escalate through
+  // the default role bag. An explicit CUSTOM role binding is still honored for
+  // EXTERNAL — that is the intended admin delegation surface (see the
+  // EXTERNAL_MEMBER_PERMISSIONS docs), and it is unchanged here. So beyond the
+  // MEMBER base bag this change adds, a lite member only ever gains what a
+  // custom role was deliberately granted. (Fully retiring EXTERNAL as a
+  // permission gate is the follow-up for when it becomes a computed property.)
   //
   // Regression: the short-circuit fired before the floor below and hid
   // `aiTools:view`, so a lite member's /me portal `aiTools.list` threw
