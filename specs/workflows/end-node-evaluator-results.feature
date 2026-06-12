@@ -37,3 +37,11 @@ Feature: Fixed result fields on the evaluator End node
     Given a regular (non-evaluator) workflow
     When I open the End node drawer
     Then I can add and remove result fields freely
+
+  @integration
+  Scenario: Evaluator workflows normalize the end node even without the node flag
+    Given an older evaluator workflow whose End node has hand-made "score" and "reasoning" fields
+    And the End node does not carry the evaluator flag
+    When I open the End node drawer
+    Then the results normalize to the fixed "passed", "score", "details" and "label" vocabulary
+    And the evaluator flag is stamped onto the node

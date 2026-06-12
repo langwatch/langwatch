@@ -73,3 +73,11 @@ Feature: Run-until-here dialog
     Then the execution starts scoped to the target node
     And the entry point outputs are the selected row's values
     And the dialog remembers them as the last submitted values
+
+  @integration
+  Scenario: Opening run-until-here with a saved dataset does not loop
+    Given a saved multi-column dataset is attached to the entry point
+    And the dataset rows arrive as a fresh array reference on every render
+    When the run-until-here dialog renders on studio load
+    Then it settles without exceeding the maximum render depth
+    And the fields prefill from the first dataset row
