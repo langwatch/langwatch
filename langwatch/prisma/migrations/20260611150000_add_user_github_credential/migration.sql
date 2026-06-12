@@ -26,8 +26,6 @@ CREATE UNIQUE INDEX "UserGitHubCredential_userId_organizationId_key" ON "UserGit
 -- CreateIndex
 CREATE INDEX "UserGitHubCredential_organizationId_idx" ON "UserGitHubCredential"("organizationId");
 
--- AddForeignKey
-ALTER TABLE "UserGitHubCredential" ADD CONSTRAINT "UserGitHubCredential_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "UserGitHubCredential" ADD CONSTRAINT "UserGitHubCredential_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- Foreign keys intentionally omitted — referential integrity is handled by
+-- Prisma's @relation directives (User, Organization). The codebase convention
+-- is no DB-level FOREIGN KEY constraints in migrations.

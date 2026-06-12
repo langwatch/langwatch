@@ -11,7 +11,7 @@
  */
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
-import { Github } from "react-feather";
+import { GitHub } from "react-feather";
 
 import { useGitHubConnectPopup } from "./useGitHubConnectPopup";
 
@@ -55,7 +55,7 @@ export function LangyGitHubConnectCard({
     >
       <VStack align="stretch" gap={3}>
         <HStack gap={2}>
-          <Github size={18} />
+          <GitHub size={18} />
           <Text fontWeight="600">{headline}</Text>
         </HStack>
         <Text fontSize="sm" color="gray.600">

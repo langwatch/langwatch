@@ -18,7 +18,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Github } from "react-feather";
+import { GitHub } from "react-feather";
 
 import SettingsLayout from "../../components/SettingsLayout";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
@@ -59,7 +59,7 @@ function IntegrationsContent({ organizationId }: { organizationId: string }) {
           <Card.Body>
             <VStack align="stretch" gap={3}>
               <HStack gap={2}>
-                <Github size={18} />
+                <GitHub size={18} />
                 <Heading size="sm">GitHub</Heading>
                 {connection.data ? (
                   <Badge colorPalette="green" variant="subtle">

@@ -86,6 +86,32 @@ export async function getGithubTokenForUser({
     return { token: cached, githubLogin: row.githubLogin };
   }
 
+  const refreshed = await refreshAccessTokenUnderLock({
+    prisma,
+    userId,
+    organizationId,
+    cacheKey,
+  });
+  if (!refreshed) return null;
+  return { token: refreshed, githubLogin: row.githubLogin };
+}
+
+// Acquires the per-user refresh lock, re-reads the credential row, drives the
+// single-use refresh rotation through GitHub, persists the rotated refresh
+// token, caches the new access token, and returns it. The caller already
+// confirmed the row exists and the cache was cold — this helper owns
+// everything that needs the lock held.
+async function refreshAccessTokenUnderLock({
+  prisma,
+  userId,
+  organizationId,
+  cacheKey,
+}: {
+  prisma: PrismaClient;
+  userId: string;
+  organizationId: string;
+  cacheKey: string;
+}): Promise<string | null> {
   const lockKey = `langy:gh:refresh:${userId}:${organizationId}`;
   const lockResult = await acquireLock(lockKey);
   try {
@@ -96,9 +122,7 @@ export async function getGithubTokenForUser({
     //    have just landed in the cache.
     //  - no redis: the redisGet returns null anyway, so the re-check is free.
     const fresh = await redisGet(cacheKey);
-    if (fresh) {
-      return { token: fresh, githubLogin: row.githubLogin };
-    }
+    if (fresh) return fresh;
     if (lockResult.kind === "timeout") {
       // Another caller is mid-refresh and hasn't surfaced a cached token in
       // 5s. Racing the rotation would brick the credential (single-use refresh
@@ -172,8 +196,7 @@ export async function getGithubTokenForUser({
         ? Math.min(60, Math.max(15, refreshed.expires_in - 30))
         : Math.min(ACCESS_TOKEN_CACHE_TTL_SEC, refreshed.expires_in - 60);
     await redisSetEx(cacheKey, cacheTtl, refreshed.access_token);
-
-    return { token: refreshed.access_token, githubLogin: row.githubLogin };
+    return refreshed.access_token;
   } finally {
     if (lockResult.kind === "owned") {
       await releaseLock(lockKey, lockResult.token);

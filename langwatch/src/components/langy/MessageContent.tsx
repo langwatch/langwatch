@@ -4,11 +4,9 @@ import { ArrowRight, Check } from "lucide-react";
 import React from "react";
 import { Markdown } from "~/components/Markdown";
 import { LangyGitHubConnectCard } from "./github/LangyGitHubConnectCard";
-import {
-  LangyGitHubPrCard,
-  extractPrLinks,
-} from "./github/LangyGitHubPrCard";
+import { LangyGitHubPrCard } from "./github/LangyGitHubPrCard";
 import { LangyGitHubProgressCard } from "./github/LangyGitHubProgressCard";
+import { extractGithubPrLinks } from "~/server/services/langy/githubPrLinks";
 import { parseGithubProgressEvents } from "~/server/services/langy/githubProgressEvents";
 import { CONNECT_GITHUB_SENTINEL } from "~/server/services/langy/langySentinels";
 import {
@@ -82,7 +80,7 @@ export function MessageContent({
   const text = progress.cleanedText;
 
   const proposals = extractProposals(message);
-  const prLinks = isUser ? [] : extractPrLinks(text);
+  const prLinks = isUser ? [] : extractGithubPrLinks(text);
   if (
     !text &&
     proposals.length === 0 &&

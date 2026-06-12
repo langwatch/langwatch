@@ -10,10 +10,7 @@
  */
 import { Box, HStack, Link, Text, VStack } from "@chakra-ui/react";
 import { GitPullRequest } from "react-feather";
-import {
-  extractGithubPrLinks,
-  type GithubPrLink,
-} from "~/server/services/langy/githubPrLinks";
+import type { GithubPrLink } from "~/server/services/langy/githubPrLinks";
 
 export type LangyGitHubPrCardProps = GithubPrLink;
 
@@ -60,9 +57,3 @@ export function LangyGitHubPrCard({
     </Link>
   );
 }
-
-/**
- * Re-export the shared extractor under the legacy name to keep existing call
- * sites (MessageContent) working without a touch.
- */
-export const extractPrLinks = extractGithubPrLinks;
