@@ -4,11 +4,13 @@ import { useColorMode } from "~/components/ui/color-mode";
 import { Drawer } from "~/components/ui/drawer";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import { PeerCursorOverlay } from "~/features/presence/components/PeerCursorOverlay";
+import { DrawerSpotlights } from "../../onboarding/spotlights/DrawerSpotlights";
 import {
   DRAWER_DEFAULT_WIDTH_PX,
   DRAWER_MIN_WIDTH_PX,
   useDrawerStore,
 } from "../../stores/drawerStore";
+import { ConversationContext } from "./ConversationContext";
 import { ConversationView } from "./conversationView";
 import { DrawerHeader } from "./drawerHeader";
 import { KeyboardShortcutsHelp } from "./KeyboardShortcutsHelp";
@@ -65,6 +67,8 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
   const shortcutsOpen = useDrawerStore((s) => s.shortcutsOpen);
   const pinned = useDrawerStore((s) => s.pinned);
   const expectedSpanCount = useDrawerStore((s) => s.expectedSpanCount);
+  const ctxPaneState = useDrawerStore((s) => s.paneState.conversationContext);
+  const togglePaneCollapsed = useDrawerStore((s) => s.togglePaneCollapsed);
   const setShortcutsOpen = useDrawerStore((s) => s.setShortcutsOpen);
 
   // `open` is hardcoded `true` because the parent (`TracesPage`'s
@@ -258,8 +262,6 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                     minWidth={0}
                     direction="column"
                     bg={{ base: "bg.surface", _dark: "bg.panel" }}
-                    opacity={headerQuery.isFetching ? 0.55 : 1}
-                    transition="opacity 120ms ease-out"
                   >
                     <ScenarioRoleProvider
                       isScenario={
@@ -282,6 +284,11 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                           </Box>
                         </IsolatedErrorBoundary>
                       ) : viewMode === "summary" ? (
+                        // Summary mode shows the same conversation-context
+                        // strip the Trace view renders (via PaneLayout) so
+                        // multi-turn context isn't lost when reading the
+                        // summary. Same store-backed collapse state, so
+                        // collapsing it in one view collapses it in both.
                         // Summary mode: render the trace-scope accordion stack
                         // full-bleed (I/O, metadata, evals, events, exceptions
                         // — whatever the current `TraceSummaryAccordions`
@@ -293,6 +300,34 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                           scope="Couldn't render trace summary"
                           resetKeys={[trace.traceId]}
                         >
+                          {trace.conversationId && (
+                            <IsolatedErrorBoundary
+                              scope="Couldn't render conversation context"
+                              resetKeys={[trace.conversationId, trace.traceId]}
+                            >
+                              {/* ConversationContext's root is height=100%
+                                  (sized by PaneLayout's resizable Panel in
+                                  Trace view). Here it sits in a plain flex
+                                  column, where 100% would claim the whole
+                                  drawer and crush the accordions below —
+                                  the wrapper gives it a natural-height,
+                                  capped, scrollable slot instead. */}
+                              <Box
+                                flexShrink={0}
+                                maxHeight="48%"
+                                overflow="auto"
+                              >
+                                <ConversationContext
+                                  conversationId={trace.conversationId}
+                                  traceId={trace.traceId}
+                                  collapsed={ctxPaneState.collapsed}
+                                  onToggleCollapsed={() =>
+                                    togglePaneCollapsed("conversationContext")
+                                  }
+                                />
+                              </Box>
+                            </IsolatedErrorBoundary>
+                          )}
                           <Box flex={1} minHeight={0} overflow="auto">
                             <TraceAccordions
                               trace={trace}
@@ -323,6 +358,10 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
         open={shortcutsOpen}
         onClose={() => setShortcutsOpen(false)}
       />
+      {/* Show-once feature spotlights — only meaningful once a trace has
+          rendered (the anchors live in the drawer body). Keyed reads via
+          the traceId prop so the queue re-evaluates per trace. */}
+      {trace ? <DrawerSpotlights traceId={trace.traceId} /> : null}
     </Drawer.Root>
   );
 }

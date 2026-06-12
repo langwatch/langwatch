@@ -39,7 +39,15 @@ interface SectionRendererProps {
    * those rows get a coloured ring so the user can see which specific
    * values participate. */
   orMemberValues?: ReadonlySet<string>;
-  setRange: ({ field, from, to }: { field: string; from: string; to: string }) => void;
+  setRange: ({
+    field,
+    from,
+    to,
+  }: {
+    field: string;
+    from: string;
+    to: string;
+  }) => void;
   removeRange: ({ field }: { field: string }) => void;
   onShiftToggle: (nextOpen: boolean) => void;
   /** Called when the user clicks the X to remove this section from
@@ -169,11 +177,8 @@ const SectionRendererInner: React.FC<SectionRendererProps> = ({
                     toggleFacet={toggleFacetAndActivate}
                     setRange={({ field, from, to }) => {
                       if (
-                        getFacetValueState(
-                          ast,
-                          "evaluator",
-                          item.value,
-                        ) !== "include"
+                        getFacetValueState(ast, "evaluator", item.value) !==
+                        "include"
                       ) {
                         toggleFacet({ field: "evaluator", value: item.value });
                       }
@@ -187,7 +192,7 @@ const SectionRendererInner: React.FC<SectionRendererProps> = ({
           }
         : undefined;
 
-    return (
+    const facetSection = (
       <FacetSection
         title={section.label}
         icon={icon}
@@ -209,6 +214,14 @@ const SectionRendererInner: React.FC<SectionRendererProps> = ({
         synthetic={section.synthetic}
       />
     );
+
+    // Stable spotlight anchor for the tour's evaluator step — the
+    // drilldown anchor only exists while a row is expanded, so the
+    // tour falls back to the whole evaluator section.
+    if (section.key === "evaluator") {
+      return <Box data-spotlight="evaluator-section">{facetSection}</Box>;
+    }
+    return facetSection;
   }
 
   if (section.kind === "range") {

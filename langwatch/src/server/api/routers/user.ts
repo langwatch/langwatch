@@ -1,34 +1,33 @@
+import { CliBootstrapService } from "@ee/governance/services/cliBootstrap.service";
+import { PersonalUsageService } from "@ee/governance/services/personalUsage.service";
+import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
+import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
+import { RoutingPolicyService } from "@ee/governance/services/routingPolicy.service";
 import { TRPCError } from "@trpc/server";
 import { compare, hash } from "bcrypt";
 import { z } from "zod";
-import { env } from "../../../env.mjs";
-
-import { checkOrganizationPermission, skipPermissionCheck } from "../rbac";
-import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
-import { UserService } from "~/server/users/user.service";
-import { revokeOtherSessionsForUser } from "~/server/better-auth/revokeSessions";
-import { rateLimit } from "~/server/rateLimit";
-import { getClientIp } from "~/utils/getClientIp";
-import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
-import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
-import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
-import { RoutingPolicyService } from "@ee/governance/services/routingPolicy.service";
-import { PersonalUsageService } from "@ee/governance/services/personalUsage.service";
-import { GatewayBudgetService } from "~/server/gateway/budget.service";
-import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
-import {
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
-import { CliBootstrapService } from "@ee/governance/services/cliBootstrap.service";
 import {
   Auth0ApiError,
   changeAuth0Password,
 } from "~/server/auth0/passwordService";
+import { revokeOtherSessionsForUser } from "~/server/better-auth/revokeSessions";
+import {
+  getClickHouseClientForProject,
+  isClickHouseEnabled,
+} from "~/server/clickhouse/clickhouseClient";
+import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { sendBudgetIncreaseRequestEmail } from "~/server/mailer/budgetIncreaseRequestEmail";
-import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
 import { resolveOrgAdminEmail } from "~/server/organizations/resolveOrgAdminEmail";
+import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
+import { rateLimit } from "~/server/rateLimit";
+import { UserService } from "~/server/users/user.service";
+import { getClientIp } from "~/utils/getClientIp";
 import { createLogger } from "~/utils/logger/server";
+import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
+import { env } from "../../../env.mjs";
+import { checkOrganizationPermission, skipPermissionCheck } from "../rbac";
+import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 
 const logger = createLogger("langwatch:user-router");
 
@@ -56,9 +55,7 @@ export const userRouter = createTRPCRouter({
         // updated to align). Without this, the server accepted any
         // password (even a single character) while the form rejected
         // anything under 6, leading to a server/client validation gap.
-        password: z
-          .string()
-          .min(8, "Password must be at least 8 characters"),
+        password: z.string().min(8, "Password must be at least 8 characters"),
       }),
     )
     .use(skipPermissionCheck)
@@ -147,7 +144,17 @@ export const userRouter = createTRPCRouter({
     .input(z.object({}))
     .use(skipPermissionCheck)
     .query(async ({ ctx }) => {
-      return UserService.create(ctx.prisma).getSsoStatus({ id: ctx.session.user.id });
+      return UserService.create(ctx.prisma).getSsoStatus({
+        id: ctx.session.user.id,
+      });
+    }),
+  getAccountInfo: protectedProcedure
+    .input(z.object({}))
+    .use(skipPermissionCheck)
+    .query(async ({ ctx }) => {
+      return UserService.create(ctx.prisma).getAccountInfo({
+        id: ctx.session.user.id,
+      });
     }),
   getLinkedAccounts: protectedProcedure
     .input(z.object({}))
@@ -453,7 +460,10 @@ export const userRouter = createTRPCRouter({
       // Caller must be a member of the org.
       const membership = await ctx.prisma.organizationUser.findUnique({
         where: {
-          userId_organizationId: { userId, organizationId: input.organizationId },
+          userId_organizationId: {
+            userId,
+            organizationId: input.organizationId,
+          },
         },
       });
       if (!membership) {
@@ -509,7 +519,10 @@ export const userRouter = createTRPCRouter({
       const userId = ctx.session.user.id;
       const membership = await ctx.prisma.organizationUser.findUnique({
         where: {
-          userId_organizationId: { userId, organizationId: input.organizationId },
+          userId_organizationId: {
+            userId,
+            organizationId: input.organizationId,
+          },
         },
       });
       if (!membership) {
@@ -912,4 +925,3 @@ function requestIncreaseUrl(opts: {
   });
   return `${opts.baseUrl.replace(/\/$/, "")}/me/budget/request?${params.toString()}`;
 }
-

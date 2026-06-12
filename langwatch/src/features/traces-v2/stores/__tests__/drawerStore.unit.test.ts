@@ -229,3 +229,44 @@ describe("drawerStore persistence is idempotent", () => {
     expect(useDrawerStore.getState().widthPx).toBe(549);
   });
 });
+
+describe("drawerStore.backfillOccurredAtMs", () => {
+  /** @scenario Deep link / refresh opens the drawer without a `t` hint */
+  describe("given the drawer was opened without an occurredAtMs hint", () => {
+    describe("when the resolved header timestamp is backfilled", () => {
+      it("sets occurredAtMs so per-trace reads can prune", () => {
+        useDrawerStore.getState().openTrace("trace-1");
+        expect(useDrawerStore.getState().occurredAtMs).toBeNull();
+
+        useDrawerStore.getState().backfillOccurredAtMs(1_700_000_000_000);
+
+        expect(useDrawerStore.getState().occurredAtMs).toBe(1_700_000_000_000);
+      });
+    });
+  });
+
+  describe("given the drawer already has an occurredAtMs hint", () => {
+    describe("when a backfill is attempted", () => {
+      it("keeps the opener-supplied hint (no overwrite)", () => {
+        useDrawerStore.getState().openTrace("trace-1", 1_700_000_000_000);
+
+        useDrawerStore.getState().backfillOccurredAtMs(1_699_000_000_000);
+
+        expect(useDrawerStore.getState().occurredAtMs).toBe(1_700_000_000_000);
+      });
+    });
+  });
+
+  describe("given an invalid timestamp", () => {
+    describe("when a backfill is attempted", () => {
+      it("leaves occurredAtMs null", () => {
+        useDrawerStore.getState().openTrace("trace-1");
+
+        useDrawerStore.getState().backfillOccurredAtMs(0);
+        useDrawerStore.getState().backfillOccurredAtMs(Number.NaN);
+
+        expect(useDrawerStore.getState().occurredAtMs).toBeNull();
+      });
+    });
+  });
+});

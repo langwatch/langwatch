@@ -65,9 +65,7 @@ export function FlameBreadcrumbs({
                 borderRadius="sm"
                 cursor={isLast ? "default" : "pointer"}
                 _hover={isLast ? undefined : { bg: "bg.muted" }}
-                onClick={() =>
-                  !isLast && onSpanDoubleClick(node.span.spanId)
-                }
+                onClick={() => !isLast && onSpanDoubleClick(node.span.spanId)}
               >
                 <Text
                   textStyle="xs"

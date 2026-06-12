@@ -1,4 +1,4 @@
-import { Button, HStack, Heading, Icon, Text, VStack } from "@chakra-ui/react";
+import { Button, Heading, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { Filter, PanelRightOpen, Sparkles } from "lucide-react";
 import type React from "react";
 import type { StageId } from "../chapters/onboardingJourneyConfig";

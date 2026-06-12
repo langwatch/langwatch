@@ -1604,14 +1604,13 @@ function buildPreviewSpanDetail(trace: TraceListItem): SpanDetail {
     startTimeMs: trace.timestamp,
     endTimeMs: trace.timestamp + trace.durationMs,
     durationMs: trace.durationMs,
-    status: trace.status === "warning" ? "ok" : (trace.status as "ok" | "error"),
+    status:
+      trace.status === "warning" ? "ok" : (trace.status as "ok" | "error"),
     model: trace.models?.[0] ?? null,
     vendor: null,
     input: trace.input,
     output: trace.output,
-    error: trace.error
-      ? { message: trace.error, stacktrace: [] }
-      : null,
+    error: trace.error ? { message: trace.error, stacktrace: [] } : null,
     metrics: {
       promptTokens: trace.inputTokens ?? null,
       completionTokens: trace.outputTokens ?? null,
@@ -1632,7 +1631,8 @@ function buildPreviewSpanTreeNode(trace: TraceListItem): SpanTreeNode {
     startTimeMs: trace.timestamp,
     endTimeMs: trace.timestamp + trace.durationMs,
     durationMs: trace.durationMs,
-    status: trace.status === "warning" ? "ok" : (trace.status as "ok" | "error"),
+    status:
+      trace.status === "warning" ? "ok" : (trace.status as "ok" | "error"),
     model: trace.models?.[0] ?? null,
   };
 }
@@ -1715,12 +1715,11 @@ export function buildPreviewTraceDetail(
     // by `DrawerHeader`, so it stays disabled in that case. When the id
     // IS present we synthesise a single turn; without this seed the tab
     // is enabled but lands on "no turns found", which reads as broken.
-    conversation:
-      buildPreviewConversation(trace) ?? {
-        conversationId: trace.conversationId ?? "",
-        total: 0,
-        turns: [],
-      },
+    conversation: buildPreviewConversation(trace) ?? {
+      conversationId: trace.conversationId ?? "",
+      total: 0,
+      turns: [],
+    },
     // Trace-level evaluations on the list-item are TraceEvalResult[],
     // a different schema than EvaluationRunData[] (the evals tab feed).
     // Seeding an empty array is honest: the evaluations tab just

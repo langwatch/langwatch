@@ -6,12 +6,18 @@ import {
   NORMAL_CASE_FIELDS,
   SECTION_ORDER,
 } from "./constants";
+import { ORIGIN_DISPLAY, originLabel } from "../../utils/originDisplay";
 import type { SectionGroup } from "./types";
 
 const TOKEN_K = 1_000;
 const TOKEN_M = 1_000_000;
 
 export function facetLabel(value: string, field: string): string {
+  // Origin labels come from the shared display table so the sidebar
+  // facet rows and the Origin column badge agree on casing
+  // ("Coding Agent", "AI Tool" — not "Coding_agent"). Unknown origins
+  // fall through to the generic title-casing below.
+  if (field === "origin" && value in ORIGIN_DISPLAY) return originLabel(value);
   const override = FACET_LABELS[value];
   if (override) return override;
   if (NORMAL_CASE_FIELDS.has(field)) {

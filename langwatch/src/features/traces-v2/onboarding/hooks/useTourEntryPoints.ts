@@ -4,8 +4,8 @@ import { api } from "~/utils/api";
 import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
 import { INITIAL_TIME_RANGE, useFilterStore } from "../../stores/filterStore";
 import { useViewStore } from "../../stores/viewStore";
-import { useOnboardingActive } from "./useOnboardingActive";
 import { useOnboardingStore } from "../store/onboardingStore";
+import { useOnboardingActive } from "./useOnboardingActive";
 
 export interface OnboardingEntryState {
   /**

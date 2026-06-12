@@ -1,6 +1,6 @@
+import { CliTokenRevocationService } from "@ee/governance/services/cliTokenRevocation.service";
 import type { PrismaClient, User } from "@prisma/client";
 import { revokeAllSessionsForUser } from "../better-auth/revokeSessions";
-import { CliTokenRevocationService } from "@ee/governance/services/cliTokenRevocation.service";
 
 export class UserService {
   constructor(
@@ -20,7 +20,13 @@ export class UserService {
     return this.prisma.user.findUnique({ where: { email } });
   }
 
-  async create({ name, email }: { name: string; email: string }): Promise<User> {
+  async create({
+    name,
+    email,
+  }: {
+    name: string;
+    email: string;
+  }): Promise<User> {
     return this.prisma.user.create({ data: { name, email } });
   }
 
@@ -39,7 +45,15 @@ export class UserService {
    * Name-only changes do NOT trigger revocation — those are cosmetic
    * and don't warrant kicking the user out.
    */
-  async updateProfile({ id, name, email }: { id: string; name?: string; email?: string }): Promise<User> {
+  async updateProfile({
+    id,
+    name,
+    email,
+  }: {
+    id: string;
+    name?: string;
+    email?: string;
+  }): Promise<User> {
     // Normalize the incoming email the same way BetterAuth does for
     // signup/signin (`findUserByEmail` in
     // node_modules/better-auth/dist/db/internal-adapter.mjs:
@@ -82,7 +96,23 @@ export class UserService {
     return updated;
   }
 
-  async getSsoStatus({ id }: { id: string }): Promise<{ pendingSsoSetup: boolean }> {
+  async getAccountInfo({
+    id,
+  }: {
+    id: string;
+  }): Promise<{ createdAt: Date } | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: { createdAt: true },
+    });
+    return user ? { createdAt: user.createdAt } : null;
+  }
+
+  async getSsoStatus({
+    id,
+  }: {
+    id: string;
+  }): Promise<{ pendingSsoSetup: boolean }> {
     const user = await this.prisma.user.findUnique({
       where: { id },
       select: { pendingSsoSetup: true },
@@ -120,6 +150,9 @@ export class UserService {
   }
 
   async reactivate({ id }: { id: string }): Promise<User> {
-    return this.prisma.user.update({ where: { id }, data: { deactivatedAt: null } });
+    return this.prisma.user.update({
+      where: { id },
+      data: { deactivatedAt: null },
+    });
   }
 }

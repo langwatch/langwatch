@@ -1,6 +1,7 @@
 import { useIsFetching } from "@tanstack/react-query";
 import { useCallback, useRef } from "react";
 import { api } from "~/utils/api";
+import { useRefreshUIStore } from "../stores/refreshUIStore";
 
 /**
  * Smallest gap (ms) between two manual refresh clicks. Multiple clicks
@@ -64,10 +65,15 @@ export function useTraceListRefresh(): UseTraceListRefreshResult {
     },
   });
 
+  const requestRefresh = useRefreshUIStore((s) => s.requestRefresh);
   const refresh = useCallback(() => {
     const now = Date.now();
     if (now - lastClickRef.current < REFRESH_DEBOUNCE_MS) return;
     lastClickRef.current = now;
+    // Mark this as an *explicit* refresh so the aurora ribbon plays.
+    // Background refetches (SSE invalidations on span arrival / trace
+    // update) never pass through here and stay aurora-free.
+    requestRefresh();
     // Cancel before invalidate so a slow previous round-trip can't
     // race the fresh one and overwrite the view with stale data.
     void trpcUtils.tracesV2.list.cancel();
@@ -76,7 +82,7 @@ export function useTraceListRefresh(): UseTraceListRefreshResult {
     void trpcUtils.tracesV2.list.invalidate();
     void trpcUtils.tracesV2.discover.invalidate();
     void trpcUtils.tracesV2.newCount.invalidate();
-  }, [trpcUtils]);
+  }, [trpcUtils, requestRefresh]);
 
   return { refresh, isRefreshing: fetchingCount > 0 };
 }

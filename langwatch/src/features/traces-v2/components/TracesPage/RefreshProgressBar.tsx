@@ -1,5 +1,6 @@
 import { motion } from "motion/react";
 import type React from "react";
+import { useEffect } from "react";
 import { useTraceListRefresh } from "../../hooks/useTraceListRefresh";
 import { useRefreshUIStore } from "../../stores/refreshUIStore";
 import { AuroraSvg } from "./AuroraSvg";
@@ -16,18 +17,29 @@ export const RefreshProgressBar: React.FC<RefreshProgressBarProps> = ({
   forceVisible,
 }) => {
   // Two sources, OR-ed:
-  //  - pulse: short fixed-duration flash for view switches and other
-  //    transitions that don't kick a fetch (uiStore-driven).
-  //  - isFetching: every in-flight tracesV2 list/discover/newCount
-  //    query, tied directly to the React-Query cache. Without this the
-  //    aurora cleared after the 900ms pulse even while a slow project
-  //    was still mid-fetch, which read as "refresh failed silently."
+  //  - pulse: short fixed-duration flash for arrival moments that don't
+  //    kick a fetch (0→N new-trace transition, view switches).
+  //  - requested && fetching: an in-flight refetch, but ONLY when the
+  //    operator explicitly asked for it (refresh button, "N new" pill,
+  //    tab return). Keying off raw isFetching played the full aurora on
+  //    every SSE-invalidated background refetch — each arriving span or
+  //    trace update swept the table even though nothing the user asked
+  //    for was happening. Background updates keep their subtle per-row
+  //    pulse (rowPulseStore) as the signal instead.
   const pulsed = useRefreshUIStore((s) => s.isRefreshing);
+  const requested = useRefreshUIStore((s) => s.refreshRequested);
+  const observeFetching = useRefreshUIStore((s) => s.observeFetching);
   const { isRefreshing: fetching } = useTraceListRefresh();
-  // `??` would let `forceVisible={false}` mask a real in-flight refresh —
-  // the comment above promises OR semantics, so honour them: any truthy
-  // source flips active on.
-  const active = forceVisible || pulsed || fetching;
+  // Pipe the live isFetching signal into the store; the request/settle
+  // lifecycle (including the saw-a-fetch latch) lives in the store
+  // action, not here. `requested` is a dependency so a request that
+  // arrives while a fetch is ALREADY in flight still registers it —
+  // keyed on `fetching` alone, the latch would miss that fetch and
+  // only clear via the safety timeout.
+  useEffect(() => {
+    observeFetching(fetching);
+  }, [fetching, requested, observeFetching]);
+  const active = forceVisible || pulsed || requested;
   if (!active) return null;
 
   return (
