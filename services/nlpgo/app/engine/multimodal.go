@@ -29,11 +29,20 @@ func splitMessagesWithImages(messages []app.ChatMessage) []app.ChatMessage {
 	out := make([]app.ChatMessage, 0, len(messages))
 	for _, m := range messages {
 		s, ok := m.Content.(string)
-		if !ok || !strings.Contains(s, "data:image/") {
+		if !ok {
 			out = append(out, m)
 			continue
 		}
-		parts := splitImageDataURLs(s)
+		// One case-insensitive regex scan decides pass-through; a plain
+		// Contains guard would miss uppercase schemes (DATA:IMAGE/...),
+		// and content without images must stay a plain string, never
+		// become a single-element parts list.
+		matches := imageDataURLRe.FindAllStringIndex(s, -1)
+		if len(matches) == 0 {
+			out = append(out, m)
+			continue
+		}
+		parts := splitImageDataURLs(s, matches)
 		if m.Role == "system" {
 			systemText, rest := splitLeadingText(parts)
 			if systemText != "" {
@@ -51,11 +60,11 @@ func splitMessagesWithImages(messages []app.ChatMessage) []app.ChatMessage {
 }
 
 // splitImageDataURLs breaks text into a multimodal content-part list: every
-// image data URL becomes {type: image_url} and the text around it becomes
-// {type: text}. Whitespace-only text segments are dropped so adjacent images
-// don't produce empty parts.
-func splitImageDataURLs(text string) []any {
-	matches := imageDataURLRe.FindAllStringIndex(text, -1)
+// image data URL (located by the caller's imageDataURLRe matches) becomes
+// {type: image_url} and the text around it becomes {type: text}.
+// Whitespace-only text segments are dropped so adjacent images don't
+// produce empty parts.
+func splitImageDataURLs(text string, matches [][]int) []any {
 	parts := make([]any, 0, len(matches)*2+1)
 	last := 0
 	appendText := func(seg string) {

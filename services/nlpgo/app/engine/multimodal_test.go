@@ -47,8 +47,11 @@ func TestSplitMessagesWithImagesSplitsTextImageText(t *testing.T) {
 }
 
 // @scenario "An uppercase BASE64 data URL is split into image parts"
+// Fully uppercase, scheme included: RFC 2397 is case-insensitive end to
+// end, and the pass-through gate must not filter these out before the
+// case-insensitive regex sees them.
 func TestSplitMessagesWithImagesMatchesUppercaseBase64(t *testing.T) {
-	upper := "data:image/PNG;BASE64,iVBORw0KGgo="
+	upper := "DATA:IMAGE/PNG;BASE64,iVBORw0KGgo="
 	msgs := splitMessagesWithImages([]app.ChatMessage{
 		{Role: "user", Content: "Before " + upper + " after."},
 	})

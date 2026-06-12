@@ -25,7 +25,7 @@ Feature: Image inputs reach the LLM as image content parts
 
   @unit
   Scenario: An uppercase BASE64 data URL is split into image parts
-    Given a user message whose image data URL spells the media type and base64 token in uppercase
+    Given a user message whose image data URL spells the scheme, media type and base64 token in uppercase
     When the engine builds the LLM messages
     Then the content still becomes text and image parts
     # RFC 2397 allows uppercase in the scheme, media type, and ";base64" token.
