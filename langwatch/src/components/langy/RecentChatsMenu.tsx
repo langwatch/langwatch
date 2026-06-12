@@ -19,6 +19,7 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { History, Trash2 } from "lucide-react";
+import { useState } from "react";
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { LangyConversationSummary } from "./useLangyConversations";
@@ -36,11 +37,21 @@ export function RecentChatsMenu({
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
 }) {
+  // Controlled open state: the rows are plain buttons (not Menu.Items, so a
+  // nested delete button can live inside them), which means Chakra won't
+  // auto-close on selection. Close explicitly when a chat is picked; keep
+  // the menu open across deletes so cleaning up several chats is one visit.
+  const [open, setOpen] = useState(false);
+
   if (hasError) return null;
   if (!isLoading && conversations.length === 0) return null;
 
   return (
-    <Menu.Root positioning={{ placement: "bottom-end" }}>
+    <Menu.Root
+      open={open}
+      onOpenChange={(e) => setOpen(e.open)}
+      positioning={{ placement: "bottom-end" }}
+    >
       <Tooltip content="Recent chats" showArrow>
         <Menu.Trigger asChild>
           <IconButton
@@ -85,7 +96,10 @@ export function RecentChatsMenu({
                 <Button
                   size="xs"
                   variant="ghost"
-                  onClick={() => onSelect(conv.id)}
+                  onClick={() => {
+                    onSelect(conv.id);
+                    setOpen(false);
+                  }}
                   flex={1}
                   justifyContent="flex-start"
                   fontWeight="normal"
