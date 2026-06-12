@@ -233,20 +233,19 @@ export const ConversationContext = memo(function ConversationContext({
   );
 
   if (!conversationId) return null;
-  // Earlier this also bailed out on `!ctx.isLoading && ctx.total <= 1`
-  // ("don't show a context pane for a single-turn conversation"). That
-  // produced a worse failure mode in practice: while `ctx.isLoading`
-  // the header rendered, then a frame later the count resolved to 1
-  // and the entire pane vanished — leaving a blank band between the
-  // Trace tabs and the waterfall whose only resolution was a page
-  // reload. Since the pane defaults to collapsed
-  // (`DEFAULT_PANE_STATE.conversationContext.collapsed = true` in
-  // drawerStore.ts), keeping it always-rendered for any trace with a
-  // `conversationId` costs nothing visually — collapsed it's just a
-  // 36px header — and removes the load → unmount → blank-band flash.
+  // Single-turn conversation → render nothing at all (no header strip,
+  // no "turn 1 of 1"). PaneLayout gates its ctx Panel slot on the same
+  // `useConversationContext` query (cached, so both reads agree), which
+  // prevents the historical "blank band between the Trace tabs and the
+  // waterfall" failure mode when this returns null.
+  if (!ctx.isLoading && ctx.total <= 1) return null;
 
   return (
     <Box
+      // Drawer-spotlight anchor: only emitted for genuinely multi-turn
+      // conversations so the show-once "Conversation context" spotlight
+      // never fires while the thread count is still loading.
+      {...(ctx.total > 1 ? { "data-spotlight": "conversation-context" } : {})}
       display="flex"
       flexDirection="column"
       height="100%"
@@ -579,9 +578,7 @@ const ConversationRow = memo(function ConversationRow({
         cursor={isCurrent ? "default" : "pointer"}
         onClick={isCurrent ? undefined : handleClick}
         _hover={
-          isCurrent
-            ? undefined
-            : { bg: { base: "gray.50", _dark: "bg.muted" } }
+          isCurrent ? undefined : { bg: { base: "gray.50", _dark: "bg.muted" } }
         }
         transition="background 0.12s ease"
         textAlign="left"

@@ -1,11 +1,6 @@
 import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { useCallback, useState } from "react";
-import {
-  LuArrowUpRight,
-  LuFilter,
-  LuPin,
-  LuSparkles,
-} from "react-icons/lu";
+import { LuArrowUpRight, LuFilter, LuPin, LuSparkles } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { PinnedAttribute } from "../../../stores/pinnedAttributesStore";
 import { TooltipRow } from "../../shared/TooltipRow";

@@ -119,12 +119,20 @@ const spanTreeNodeSchema = z.object({
   status: z.enum(["ok", "error", "unset"]),
   model: z.string().nullable(),
   /**
-   * USD cost from `gen_ai.usage.cost` — null when the span had none.
+   * USD cost — `gen_ai.usage.cost` when the SDK reported one, otherwise
+   * computed server-side from token counts × model pricing (same cascade
+   * the trace-level fold uses). Null when neither yields a value.
    * `.nullish()` so older clients (or sample fixtures) that don't set
    * the field at all stay compatible; readers should treat `undefined`
    * and `null` identically.
    */
   cost: z.number().nullish(),
+  /** Token usage counts — surfaced so the waterfall's model pill can
+   * show the input/output/cache breakdown without a spanDetail call. */
+  inputTokens: z.number().nullish(),
+  outputTokens: z.number().nullish(),
+  cacheReadTokens: z.number().nullish(),
+  cacheCreationTokens: z.number().nullish(),
 });
 
 export type SpanTreeNode = z.infer<typeof spanTreeNodeSchema>;

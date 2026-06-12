@@ -65,8 +65,8 @@ export const SampleDataBanner: React.FC = () => {
         <Sparkles />
       </Icon>
       <Text textStyle="sm" fontWeight={600}>
-        Sample data — facets, filters, and the drawer all work, but nothing
-        here is real.
+        Sample data — facets, filters, and the drawer all work, but nothing here
+        is real.
       </Text>
     </Flex>
   );

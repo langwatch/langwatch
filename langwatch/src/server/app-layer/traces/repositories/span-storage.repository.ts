@@ -37,8 +37,18 @@ export interface SpanSummaryRow {
   statusCode: number | null;
   spanType: string | null;
   model: string | null;
-  /** USD cost from `gen_ai.usage.cost`, when present. */
+  /**
+   * USD cost: `gen_ai.usage.cost` when the SDK reported one, otherwise
+   * computed at read time from token counts × model pricing (same
+   * cascade the trace-level fold uses). Null when neither yields a
+   * value — most ingest paths only emit token counts, so without the
+   * computed fallback the waterfall never had a per-span cost to show.
+   */
   cost: number | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  cacheReadTokens: number | null;
+  cacheCreationTokens: number | null;
   startTimeMs: number;
 }
 

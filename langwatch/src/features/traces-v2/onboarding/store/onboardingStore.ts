@@ -110,6 +110,15 @@ interface OnboardingState {
    * so dismissing it stays dismissed.
    */
   firstTraceSpotlightFiredByProject: Record<string, boolean>;
+  /**
+   * Per-browser map of drawer spotlight ids that have been displayed at
+   * least once. Drawer spotlights are show-once: the moment one renders
+   * it's marked seen here, so it never repeats — even if the user
+   * dismisses the queue mid-way. Not keyed by project: the features
+   * being introduced (conversation strip, I/O section, …) are the same
+   * everywhere. Persisted to localStorage.
+   */
+  seenDrawerSpotlights: Record<string, boolean>;
 
   setStage: (stage: StageId) => void;
   goBack: () => void;
@@ -137,6 +146,11 @@ interface OnboardingState {
    * re-triggering the overlay every render.
    */
   markFirstTraceSpotlightFired: (projectId: string) => void;
+  /**
+   * Mark a drawer spotlight as displayed. Idempotent; persists to
+   * localStorage so the show-once guarantee survives reloads.
+   */
+  markDrawerSpotlightSeen: (id: string) => void;
 }
 
 const STORAGE_KEY = "langwatch:traces-v2:onboarding:state:v1";
@@ -153,12 +167,14 @@ interface PersistedShape {
   setupDismissedByProject: Record<string, boolean>;
   integrationCtaDismissedAtByProject: Record<string, number>;
   firstTraceSpotlightFiredByProject: Record<string, boolean>;
+  seenDrawerSpotlights: Record<string, boolean>;
 }
 
 const DEFAULT_PERSISTED: PersistedShape = {
   setupDismissedByProject: {},
   integrationCtaDismissedAtByProject: {},
   firstTraceSpotlightFiredByProject: {},
+  seenDrawerSpotlights: {},
 };
 
 function loadPersisted(): PersistedShape {
@@ -184,6 +200,11 @@ function loadPersisted(): PersistedShape {
             typeof parsed.firstTraceSpotlightFiredByProject === "object"
               ? parsed.firstTraceSpotlightFiredByProject
               : {},
+          seenDrawerSpotlights:
+            parsed.seenDrawerSpotlights &&
+            typeof parsed.seenDrawerSpotlights === "object"
+              ? parsed.seenDrawerSpotlights
+              : {},
         };
       }
     }
@@ -202,6 +223,7 @@ function loadPersisted(): PersistedShape {
           setupDismissedByProject: parsed.setupDismissedByProject,
           integrationCtaDismissedAtByProject: {},
           firstTraceSpotlightFiredByProject: {},
+          seenDrawerSpotlights: {},
         };
       }
     }
@@ -215,6 +237,7 @@ function persist({
   setupDismissedByProject,
   integrationCtaDismissedAtByProject,
   firstTraceSpotlightFiredByProject,
+  seenDrawerSpotlights,
 }: PersistedShape): void {
   if (typeof window === "undefined") return;
   try {
@@ -224,6 +247,7 @@ function persist({
         setupDismissedByProject,
         integrationCtaDismissedAtByProject,
         firstTraceSpotlightFiredByProject,
+        seenDrawerSpotlights,
       }),
     );
   } catch {
@@ -246,8 +270,8 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   showSamplePreview: false,
   spotlightsActive: false,
   currentSpotlightId: null,
-  firstTraceSpotlightFiredByProject:
-    initial.firstTraceSpotlightFiredByProject,
+  firstTraceSpotlightFiredByProject: initial.firstTraceSpotlightFiredByProject,
+  seenDrawerSpotlights: initial.seenDrawerSpotlights,
 
   setStage: (stage) =>
     set((s) =>
@@ -301,6 +325,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
         get().integrationCtaDismissedAtByProject,
       firstTraceSpotlightFiredByProject:
         get().firstTraceSpotlightFiredByProject,
+      seenDrawerSpotlights: get().seenDrawerSpotlights,
     });
   },
 
@@ -309,13 +334,17 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   setTourActive: (active) => set({ tourActive: active }),
 
   setIntegrationCtaDismissedAt: (projectId, ts) => {
-    const next = { ...get().integrationCtaDismissedAtByProject, [projectId]: ts };
+    const next = {
+      ...get().integrationCtaDismissedAtByProject,
+      [projectId]: ts,
+    };
     set({ integrationCtaDismissedAtByProject: next });
     persist({
       setupDismissedByProject: get().setupDismissedByProject,
       integrationCtaDismissedAtByProject: next,
       firstTraceSpotlightFiredByProject:
         get().firstTraceSpotlightFiredByProject,
+      seenDrawerSpotlights: get().seenDrawerSpotlights,
     });
   },
 
@@ -328,6 +357,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
       integrationCtaDismissedAtByProject: next,
       firstTraceSpotlightFiredByProject:
         get().firstTraceSpotlightFiredByProject,
+      seenDrawerSpotlights: get().seenDrawerSpotlights,
     });
   },
 
@@ -346,6 +376,22 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
       integrationCtaDismissedAtByProject:
         get().integrationCtaDismissedAtByProject,
       firstTraceSpotlightFiredByProject: next,
+      seenDrawerSpotlights: get().seenDrawerSpotlights,
+    });
+  },
+
+  markDrawerSpotlightSeen: (id) => {
+    const current = get().seenDrawerSpotlights;
+    if (current[id]) return;
+    const next = { ...current, [id]: true };
+    set({ seenDrawerSpotlights: next });
+    persist({
+      setupDismissedByProject: get().setupDismissedByProject,
+      integrationCtaDismissedAtByProject:
+        get().integrationCtaDismissedAtByProject,
+      firstTraceSpotlightFiredByProject:
+        get().firstTraceSpotlightFiredByProject,
+      seenDrawerSpotlights: next,
     });
   },
 }));
