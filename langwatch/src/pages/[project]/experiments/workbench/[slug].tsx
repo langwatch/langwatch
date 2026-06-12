@@ -79,7 +79,7 @@ export default function ExperimentsWorkbenchPage() {
   // Show 404 if experiment doesn't exist
   if (!slug || isNotFound) {
     return (
-      <DashboardLayout backgroundColor="bg.panel" compactMenu={true}>
+      <DashboardLayout backgroundColor="bg.panel">
         <Box padding={6}>
           <Alert.Root status="warning">
             <Alert.Indicator />
@@ -97,7 +97,7 @@ export default function ExperimentsWorkbenchPage() {
   // Show error for other failures (permissions, network, etc.)
   if (isError) {
     return (
-      <DashboardLayout backgroundColor="bg.panel" compactMenu={true}>
+      <DashboardLayout backgroundColor="bg.panel">
         <Box padding={6}>
           <Alert.Root status="error">
             <Alert.Indicator />
@@ -113,7 +113,7 @@ export default function ExperimentsWorkbenchPage() {
   }
 
   return (
-    <DashboardLayout backgroundColor="bg.panel" compactMenu={true}>
+    <DashboardLayout backgroundColor="bg.panel">
       <VStack
         width="full"
         height="calc(100vh - 50px)"
