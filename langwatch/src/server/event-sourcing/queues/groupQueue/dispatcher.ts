@@ -123,6 +123,17 @@ export class GroupQueueDispatcher {
    * (a fresh stage still pushes a signal that wakes BRPOP immediately).
    */
   private async nextSignalTimeoutSec(): Promise<number> {
+    // Saturated: every worker slot is in use (same check dispatchBatch uses), so
+    // there is nothing to dispatch into regardless of how overdue ready jobs are.
+    // A completion LPUSHes a signal when a slot frees, so wait the full heartbeat
+    // rather than poll — otherwise an overdue ready job (past score) would floor
+    // the wait to 50ms and busy-poll Redis (~80 cmd/s per dispatcher).
+    const inFlight =
+      this.params.processingQueue.length() +
+      this.params.processingQueue.running();
+    if (inFlight >= this.params.globalConcurrency) {
+      return this.params.signalTimeoutSec;
+    }
     let earliest: number | null;
     try {
       earliest = await this.params.scripts.peekEarliestReadyScore();

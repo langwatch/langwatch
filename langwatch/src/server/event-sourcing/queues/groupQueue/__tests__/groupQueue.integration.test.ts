@@ -15,6 +15,7 @@ import {
   getTestRedisConnection,
 } from "../../../__tests__/integration/testContainers";
 import { GroupQueueProcessor } from "../groupQueue";
+import { GroupStagingScripts } from "../scripts";
 import type { EventSourcedQueueDefinition } from "../../queue.types";
 
 // Skip when running without testcontainers (unit-only test runs)
@@ -556,6 +557,56 @@ describe.skipIf(!hasTestcontainers)(
           // delay = 300ms, signalTimeoutSec = 5s. Pre-fix latency was ~5s; the
           // due-time wake brings it well under a second even with scheduling slack.
           expect(Date.now() - sentAt).toBeLessThan(2000);
+        });
+      });
+
+      describe("when all worker slots are busy and a ready job is overdue", () => {
+        // Reviewer regression guard: capping the BRPOP wait by the next due
+        // score must NOT poll while saturated — there is no slot to dispatch
+        // into, and a completion signals a wake when one frees. Without the
+        // saturation guard an overdue ready job floors the wait to 50ms and
+        // busy-polls Redis (~80 cmd/s per dispatcher).
+        it("waits for a completion signal instead of busy-polling Redis", async () => {
+          let releaseA: () => void = () => {};
+          const aHeld = new Promise<void>((r) => (releaseA = r));
+          const processedIds: string[] = [];
+          const processFn = vi.fn(async (p: TestPayload) => {
+            processedIds.push(p.id);
+            if (p.id === "sat-a") await aHeld; // hold the only slot
+          });
+          const queue = createQueue(processFn, {
+            options: { globalConcurrency: 1 },
+          });
+          await queue.waitUntilReady();
+
+          await queue.send({ id: "sat-a", groupId: "g1", value: "a" });
+          await vi.waitFor(() => expect(processedIds).toContain("sat-a"), {
+            timeout: 5000,
+            interval: 25,
+          });
+
+          // Single slot saturated. A second group's job is overdue (due now) but
+          // cannot dispatch. Count the dispatcher's ready-peeks during a 1s
+          // saturation window. Spy the wrapper method (not the ioredis client
+          // method, which doesn't restore cleanly and would pollute later tests).
+          const peekSpy = vi.spyOn(
+            GroupStagingScripts.prototype,
+            "peekEarliestReadyScore",
+          );
+          await queue.send({ id: "sat-b", groupId: "g2", value: "b" });
+          await new Promise((r) => setTimeout(r, 1000));
+          const peeksWhileSaturated = peekSpy.mock.calls.length;
+          peekSpy.mockRestore();
+
+          // Guard: peek skipped while saturated -> ~0. Bug (50ms floor): ~20.
+          expect(peeksWhileSaturated).toBeLessThan(5);
+
+          // The overdue job still runs once the slot frees (completion signal).
+          releaseA();
+          await vi.waitFor(() => expect(processedIds).toContain("sat-b"), {
+            timeout: 5000,
+            interval: 25,
+          });
         });
       });
     });
