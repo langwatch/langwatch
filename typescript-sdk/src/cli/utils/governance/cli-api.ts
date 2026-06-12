@@ -416,6 +416,45 @@ export async function mintIngestionKey(
   );
 }
 
+
+/**
+ * Extracts the 16-char lookupId from an ingestion token.
+ * Token format: `ik-lw-{16-char lookupId}_{secret}`.
+ * Returns the lookupId string, or undefined when the token doesn't match the
+ * expected format (older token shapes, malformed cache entries).
+ */
+export function extractLookupIdFromToken(token: string): string | undefined {
+  const match = /^ik-lw-([^_]+)_/.exec(token);
+  return match?.[1];
+}
+
+// Ingestion key listing -------------------------------------------------------
+
+/**
+ * Lists all live (non-revoked) personal-project ingestion keys for the
+ * caller's org. Used as a cache-liveness preflight (#4755): before reusing a
+ * locally cached token, the wrapper calls this to confirm the key is still
+ * active. If the server resolves and the cached lookupId is absent → the key
+ * was revoked → mint fresh. If the call rejects (offline / older server) →
+ * reuse the cache as-is (offline-first fallback).
+ */
+export async function listIngestionKeys(
+  cfg: GovernanceConfig,
+  options: CliApiOptions = {},
+): Promise<{ sourceType: string; lookupId: string }[]> {
+  const body = await requestREST<{
+    keys: Array<{
+      source_type: string;
+      lookup_id: string;
+      ingestion_template_id: string | null;
+    }>;
+  }>(cfg, "GET", "/api/auth/cli/governance/ingestion-keys", options);
+  return body.keys.map((k) => ({
+    sourceType: k.source_type,
+    lookupId: k.lookup_id,
+  }));
+}
+
 // IngestionTemplate verbs ----------------------------------------------------
 
 export async function adminListIngestionTemplates(
