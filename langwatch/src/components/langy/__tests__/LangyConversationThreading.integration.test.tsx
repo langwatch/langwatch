@@ -94,6 +94,19 @@ vi.mock("@paper-design/shaders-react", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
+    useUtils: () => ({
+      langyGithub: {
+        getConnection: { invalidate: () => Promise.resolve() },
+      },
+    }),
+    langyGithub: {
+      getConnection: {
+        useQuery: () => ({ data: undefined, isLoading: false, isError: true }),
+      },
+      disconnect: {
+        useMutation: () => ({ mutate: () => undefined, isPending: false }),
+      },
+    },
     modelProvider: {
       getResolvedDefault: {
         useQuery: () => ({ data: undefined, isLoading: false }),

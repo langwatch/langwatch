@@ -96,6 +96,11 @@ vi.mock("@paper-design/shaders-react", () => ({
 // context" because no hook is wrapped in a tRPC provider.
 vi.mock("~/utils/api", () => ({
   api: {
+    useUtils: () => ({
+      langyGithub: {
+        getConnection: { invalidate: () => Promise.resolve() },
+      },
+    }),
     modelProvider: {
       getResolvedDefault: {
         useQuery: () => ({ data: undefined, isLoading: false }),
@@ -110,6 +115,16 @@ vi.mock("~/utils/api", () => ({
     virtualKeys: {
       list: {
         useQuery: () => ({ data: undefined, isLoading: false }),
+      },
+    },
+    langyGithub: {
+      getConnection: {
+        // Feature off in these tests — the header GitHub button hides
+        // itself (isLoading=false, data=undefined) and stays out of the way.
+        useQuery: () => ({ data: undefined, isLoading: false, isError: true }),
+      },
+      disconnect: {
+        useMutation: () => ({ mutate: () => undefined, isPending: false }),
       },
     },
   },
@@ -215,6 +230,18 @@ function renderPanel() {
   });
 }
 
+/**
+ * History moved behind a header dropdown (RecentChatsMenu) — conversations
+ * are only in the DOM while the menu is open. Tests that touch the list
+ * open it first. The trigger appearing also doubles as the "list fetch
+ * finished with >=1 conversation (or still loading)" signal.
+ */
+async function openHistory() {
+  await userEvent.click(
+    await screen.findByRole("button", { name: /recent chats/i }),
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Test suites
 // ---------------------------------------------------------------------------
@@ -279,6 +306,7 @@ describe("LangyPanel conversation history", () => {
       it("renders the recent list ordered by last activity (newest first)", async () => {
         installFetchMock({ conversations, messagesById });
         renderPanel();
+        await openHistory();
         const list = await screen.findByRole("list", { name: /recent/i });
         const items = within(list).getAllByRole("listitem");
         expect(items[0]).toHaveTextContent("Newest chat");
@@ -290,6 +318,7 @@ describe("LangyPanel conversation history", () => {
       it("switches the panel to that conversation's messages", async () => {
         installFetchMock({ conversations, messagesById });
         renderPanel();
+        await openHistory();
         const olderItem = await screen.findByRole("button", {
           name: /Older chat/i,
         });
@@ -310,7 +339,7 @@ describe("LangyPanel conversation history", () => {
       it("clears the message stream", async () => {
         installFetchMock({ conversations, messagesById });
         renderPanel();
-        await screen.findByRole("button", { name: /Newest chat/i });
+        await screen.findByRole("button", { name: /recent chats/i });
         chatRef.setMessages.mockClear();
         await userEvent.click(
           screen.getByRole("button", { name: /new chat/i }),
@@ -327,12 +356,13 @@ describe("LangyPanel conversation history", () => {
       it("keeps the prior conversation in the recent list", async () => {
         installFetchMock({ conversations, messagesById });
         renderPanel();
-        await screen.findByRole("button", { name: /Newest chat/i });
+        await screen.findByRole("button", { name: /recent chats/i });
         await userEvent.click(
           screen.getByRole("button", { name: /new chat/i }),
         );
+        await openHistory();
         expect(
-          screen.getByRole("button", { name: /Newest chat/i }),
+          await screen.findByRole("button", { name: /Newest chat/i }),
         ).toBeInTheDocument();
       });
     });
@@ -341,6 +371,7 @@ describe("LangyPanel conversation history", () => {
       it("calls DELETE /api/langy/conversations/:id with the projectId", async () => {
         const fetchMock = installFetchMock({ conversations, messagesById });
         renderPanel();
+        await openHistory();
         await screen.findByRole("button", { name: /Older chat/i });
         const olderItem = screen.getByRole("button", { name: /Older chat/i });
         await userEvent.hover(olderItem);
@@ -363,6 +394,7 @@ describe("LangyPanel conversation history", () => {
       it("removes the deleted conversation from the recent list", async () => {
         installFetchMock({ conversations, messagesById });
         renderPanel();
+        await openHistory();
         await screen.findByRole("button", { name: /Older chat/i });
         const olderItem = screen.getByRole("button", { name: /Older chat/i });
         await userEvent.hover(olderItem);
@@ -381,6 +413,7 @@ describe("LangyPanel conversation history", () => {
       it("switches to a fresh conversation if the deleted one was active", async () => {
         installFetchMock({ conversations, messagesById });
         renderPanel();
+        await openHistory();
         await screen.findByRole("button", { name: /Newest chat/i });
         // Newest is the active one (most recent). Delete it.
         const newestItem = screen.getByRole("button", {
@@ -406,6 +439,7 @@ describe("LangyPanel conversation history", () => {
         installFetchMock({ conversations, messagesById });
         chatRef.status = "streaming";
         renderPanel();
+        await openHistory();
         await screen.findByRole("button", { name: /Newest chat/i });
         const newestItem = screen.getByRole("button", {
           name: /Newest chat/i,
@@ -425,6 +459,7 @@ describe("LangyPanel conversation history", () => {
       it("leaves the active conversation untouched when a different chat is deleted", async () => {
         installFetchMock({ conversations, messagesById });
         renderPanel();
+        await openHistory();
         // Wait for initial load to finish so we don't race the seed-load.
         await screen.findByRole("button", { name: /Older chat/i });
         await waitFor(() => {
@@ -474,6 +509,7 @@ describe("LangyPanel conversation history", () => {
           messagesById: { "mine-1": [] },
         });
         renderPanel();
+        await openHistory();
         const list = await screen.findByRole("list", { name: /recent/i });
         const items = within(list).getAllByRole("listitem");
         expect(items).toHaveLength(1);
@@ -549,6 +585,7 @@ describe("LangyPanel conversation history", () => {
           messagesById: { c2: [] },
         });
         renderPanel();
+        await openHistory();
         await waitFor(() => {
           expect(
             screen.getByRole("button", { name: /other chat/i }),
@@ -565,7 +602,7 @@ describe("LangyPanel conversation history", () => {
           messagesById: { c1: [] },
         });
         const { unmount } = renderPanel();
-        await screen.findByRole("button", { name: /demo chat/i });
+        await screen.findByRole("button", { name: /recent chats/i });
         unmount();
 
         // Re-mount: project-other with empty list
@@ -625,6 +662,7 @@ describe("LangyPanel conversation history", () => {
           slowList: slow,
         });
         renderPanel();
+        await openHistory();
         expect(
           await screen.findByLabelText(/loading recent/i),
         ).toBeInTheDocument();
