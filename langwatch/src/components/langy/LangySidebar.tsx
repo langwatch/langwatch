@@ -34,16 +34,17 @@ import { allModelOptions } from "~/components/ModelSelector";
 import { isLangyManagedVk } from "~/components/gateway/langyVk";
 import { Composer } from "./Composer";
 import { EmptyState } from "./EmptyState";
-import { LangyGitHubChip } from "./github/LangyGitHubChip";
+import { LangyGitHubMenu } from "./github/LangyGitHubMenu";
 import {
   MessageContent,
   type LangyProposal,
   type ProposalHandlers,
 } from "./MessageContent";
-import { RecentList } from "./RecentList";
+import { RecentChatsMenu } from "./RecentChatsMenu";
 import { useGlobalLangyShortcut } from "./useGlobalLangyShortcut";
 import {
   useLangyConversations,
+  type LangyConversationSummary,
   type LangyMessageRecord,
 } from "./useLangyConversations";
 
@@ -124,6 +125,13 @@ function LangyHandle({
       width={`${PILL_WIDTH}px`}
       paddingY="14px"
       zIndex={1600}
+      // The ribbon exists to OPEN the panel. While the panel is open it's
+      // redundant chrome (the header ✕ and ⌘I both close) floating over page
+      // content — fade it out and let it slide away with the panel.
+      opacity={isOpen ? 0 : 1}
+      pointerEvents={isOpen ? "none" : "auto"}
+      aria-hidden={isOpen}
+      tabIndex={isOpen ? -1 : 0}
       cursor="pointer"
       borderTopLeftRadius="999px"
       borderBottomLeftRadius="999px"
@@ -135,7 +143,7 @@ function LangyHandle({
       color="white"
       boxShadow={hover ? AI_SHADOW : AI_SHADOW_SOFT}
       transform={hover ? "translate(-2px, -50%)" : "translateY(-50%)"}
-      transition={`right ${LANGY_TRANSITION}, transform 180ms ease, box-shadow 180ms ease`}
+      transition={`right ${LANGY_TRANSITION}, opacity ${LANGY_TRANSITION}, transform 180ms ease, box-shadow 180ms ease`}
       overflow="hidden"
     >
       <MeshGradientLayer active={hover} />
@@ -499,13 +507,12 @@ function LangyPanel({
           subtitle={subtitle}
           onNewChat={handleNewChat}
           onClose={onClose}
-        />
-        <RecentList
+          organizationId={organizationId}
           conversations={conversations}
-          isLoading={isLoadingConversations}
-          hasError={hasListError}
-          onSelect={handleSelectConversation}
-          onDelete={(id) => void removeConversation(id)}
+          isLoadingConversations={isLoadingConversations}
+          hasListError={hasListError}
+          onSelectConversation={handleSelectConversation}
+          onDeleteConversation={(id) => void removeConversation(id)}
         />
         <Box ref={scrollRef} flex={1} overflowY="auto" aria-live="polite">
           {isEmpty ? (
@@ -551,11 +558,6 @@ function LangyPanel({
           disabled={!projectId}
           canSend={!!input.trim() && !isBusy && !!projectId}
         />
-        {organizationId ? (
-          <Box px={3} pb={2}>
-            <LangyGitHubChip organizationId={organizationId} />
-          </Box>
-        ) : null}
       </VStack>
     </Box>
   );
@@ -565,10 +567,22 @@ function PanelHeader({
   subtitle,
   onNewChat,
   onClose,
+  organizationId,
+  conversations,
+  isLoadingConversations,
+  hasListError,
+  onSelectConversation,
+  onDeleteConversation,
 }: {
   subtitle: string;
   onNewChat: () => void;
   onClose: () => void;
+  organizationId?: string;
+  conversations: LangyConversationSummary[];
+  isLoadingConversations: boolean;
+  hasListError: boolean;
+  onSelectConversation: (id: string) => void;
+  onDeleteConversation: (id: string) => void;
 }) {
   return (
     <>
@@ -594,6 +608,16 @@ function PanelHeader({
             {subtitle}
           </Text>
         </VStack>
+        <RecentChatsMenu
+          conversations={conversations}
+          isLoading={isLoadingConversations}
+          hasError={hasListError}
+          onSelect={onSelectConversation}
+          onDelete={onDeleteConversation}
+        />
+        {organizationId ? (
+          <LangyGitHubMenu organizationId={organizationId} />
+        ) : null}
         <IconButton
           size="xs"
           variant="ghost"
