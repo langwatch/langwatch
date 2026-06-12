@@ -176,11 +176,21 @@ function unwrapJson(trimmed: string): UnwrapResult | null {
   try {
     parsed = JSON.parse(trimmed);
   } catch {
-    return null;
+    // Python SDKs sometimes log payloads via repr() — single-quoted
+    // strings, None/True/False — which JSON.parse rejects, leaving the
+    // raw dump in the preview. Convert repr to JSON and retry before
+    // giving up.
+    const converted = pythonReprToJson(trimmed);
+    if (converted === null) return null;
+    try {
+      parsed = JSON.parse(converted);
+    } catch {
+      return null;
+    }
   }
 
   if (Array.isArray(parsed)) {
-    return unwrapChatArray(parsed);
+    return unwrapChatArray(parsed) ?? unwrapContentParts(parsed);
   }
   if (parsed && typeof parsed === "object") {
     return unwrapObject(parsed as Record<string, unknown>);
@@ -274,6 +284,137 @@ function extractMessagePartsText(parts: unknown[]): string | null {
     }
   }
   return texts.length > 0 ? texts.join(" ") : null;
+}
+
+/**
+ * Convert a Python-repr literal (single-quoted strings, None/True/False)
+ * to JSON so the unwrap pipeline can read payloads logged via `repr()`.
+ * Character-scanning rather than regex so apostrophes escaped inside
+ * strings (`'it\\'s'`) and double quotes inside single-quoted strings
+ * survive. Returns null when the input doesn't look like repr output
+ * (no leading bracket/brace) so plain prose never gets mangled.
+ */
+export function pythonReprToJson(input: string): string | null {
+  const first = input[0];
+  if (first !== "[" && first !== "{") return null;
+  let out = "";
+  let i = 0;
+  while (i < input.length) {
+    const ch = input[i]!;
+    if (ch === "'" || ch === '"') {
+      const scanned = scanReprString({ input, openIndex: i });
+      if (scanned === null) return null; // unterminated string
+      out += `"${scanned.body}"`;
+      i = scanned.nextIndex;
+      continue;
+    }
+    if (input.startsWith("None", i)) {
+      out += "null";
+      i += 4;
+      continue;
+    }
+    if (input.startsWith("True", i)) {
+      out += "true";
+      i += 4;
+      continue;
+    }
+    if (input.startsWith("False", i)) {
+      out += "false";
+      i += 5;
+      continue;
+    }
+    out += ch;
+    i++;
+  }
+  return out;
+}
+
+/**
+ * Scan one repr string literal starting at `openIndex` (the opening
+ * quote) and re-emit its body with JSON escaping: `\'` unescaped, `\xNN`
+ * translated to `\u00NN`, literal newline/tab/CR characters escaped
+ * (the control characters repr payloads actually carry — other
+ * sub-0x20 bytes are left as-is and simply fail the JSON.parse retry,
+ * falling back to the raw preview), double quotes escaped. Returns
+ * null on an unterminated literal.
+ */
+function scanReprString({
+  input,
+  openIndex,
+}: {
+  input: string;
+  openIndex: number;
+}): { body: string; nextIndex: number } | null {
+  const quote = input[openIndex]!;
+  let body = "";
+  let i = openIndex + 1;
+  while (i < input.length) {
+    const c = input[i]!;
+    if (c === "\\") {
+      const next = input[i + 1];
+      if (next === "'") {
+        body += "'";
+      } else if (next === "x" || next === "X") {
+        body += "\\u00" + input.slice(i + 2, i + 4);
+        i += 4;
+        continue;
+      } else {
+        body += "\\" + (next ?? "");
+      }
+      i += 2;
+      continue;
+    }
+    if (c === quote) return { body, nextIndex: i + 1 };
+    body += escapeReprChar(c);
+    i++;
+  }
+  return null;
+}
+
+function escapeReprChar(c: string): string {
+  if (c === '"') return '\\"';
+  if (c === "\n") return "\\n";
+  if (c === "\t") return "\\t";
+  if (c === "\r") return "\\r";
+  return c;
+}
+
+/**
+ * Typed content-part arrays that aren't chat messages — no `role`, just
+ * `[{type: "text", text}, {type: "input_audio", ...}, ...]` (OpenAI
+ * multi-modal user content logged bare). Joins the text parts and
+ * renders non-text parts as a compact glyph so an audio/image payload
+ * reads as "🎙 [shouting] you charged me twice…" instead of a wall of
+ * base64.
+ */
+function unwrapContentParts(arr: unknown[]): UnwrapResult | null {
+  const pieces: string[] = [];
+  let hasTypedPart = false;
+  for (const part of arr) {
+    if (typeof part === "string") {
+      pieces.push(part);
+      continue;
+    }
+    if (!part || typeof part !== "object") return null;
+    const p = part as { type?: unknown; text?: unknown };
+    if (typeof p.type !== "string") return null;
+    hasTypedPart = true;
+    if (p.type === "text" && typeof p.text === "string") {
+      pieces.push(p.text);
+    } else if (p.type !== "text") {
+      pieces.push(glyphForPartType(p.type));
+    }
+  }
+  if (!hasTypedPart || pieces.length === 0) return null;
+  return { text: pieces.join(" ") };
+}
+
+function glyphForPartType(type: string): string {
+  if (type.includes("audio")) return "\u{1F399}️"; // 🎙️
+  if (type.includes("image")) return "\u{1F4F7}"; // 📷
+  if (type.includes("video")) return "\u{1F3AC}"; // 🎬
+  if (type.includes("file") || type.includes("document")) return "\u{1F4CE}"; // 📎
+  return `<${type}>`;
 }
 
 /**

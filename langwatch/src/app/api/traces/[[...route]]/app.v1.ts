@@ -17,6 +17,13 @@ import type {
 import { CollectorSpanUtils } from "~/server/traces/collectorSpan.utils";
 import { enrichTracesWithEvaluations } from "~/server/traces/enrich-evaluations";
 import {
+  type CompiledProjection,
+  compileProjection,
+  type ProjectableTrace,
+  ProjectionValidationError,
+  projectionRequestSchema,
+} from "~/server/traces/projection";
+import {
   AmbiguousTraceIdPrefixError,
   TraceService,
 } from "~/server/traces/trace.service";
@@ -35,6 +42,11 @@ const logger = createLogger("langwatch:api:traces");
 // Body schema for the search endpoint: reuses getAllForProjectInput but adjusts
 // startDate/endDate to accept ISO strings alongside epoch numbers, and adds
 // scrollId and format fields. llmMode is kept for backward compatibility.
+//
+// The projection DSL (`from` + `select`) and the date axis (`dateField`) are
+// additive: absent → the endpoint behaves exactly as before. `from`/`select`
+// come from the shared projection contract so the compiler and this surface
+// agree on one schema.
 const traceSearchBodySchema = getAllForProjectInput
   .omit({
     projectId: true,
@@ -58,7 +70,18 @@ const traceSearchBodySchema = getAllForProjectInput
         "When true, fetches full span data for each trace. Useful for bulk export. Default false.",
       ),
     llmMode: z.boolean().optional(),
-  });
+    dateField: z
+      .enum(["occurred", "updated"])
+      .default("occurred")
+      .describe(
+        "Which timestamp the startDate/endDate window filters on. 'occurred' (default) " +
+          "selects traces by when they happened. 'updated' selects traces by when they were " +
+          "last modified — use this for incremental ETL ('give me everything changed since my " +
+          "last pull'), since a trace can occur long before it gains a later evaluation or " +
+          "annotation.",
+      ),
+  })
+  .merge(projectionRequestSchema);
 
 export function registerTracesRoutes(
   secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
@@ -80,7 +103,30 @@ export function registerTracesRoutes(
                   pagination: z.object({
                     totalHits: z.number(),
                     scrollId: z.string().optional(),
+                    skipped: z
+                      .number()
+                      .optional()
+                      .describe(
+                        "Number of traces dropped from this page because they failed to serialize. Present only when non-zero, so a caller can tell that traces.length is below the page size for a reason other than reaching the end of the result set.",
+                      ),
                   }),
+                  schema: z
+                    .object({
+                      from: z.string(),
+                      columns: z.array(
+                        z.object({
+                          path: z.string(),
+                          type: z.string(),
+                          collection: z.boolean(),
+                        }),
+                      ),
+                    })
+                    .optional()
+                    .describe(
+                      "Present only when 'select' is provided. Describes the resolved columns — " +
+                        "the dotted path, its value type, and whether it belongs to a nested child " +
+                        "collection — so callers can pre-allocate a typed reader.",
+                    ),
                 }),
               ),
             },
@@ -93,6 +139,9 @@ export function registerTracesRoutes(
       const project = c.get("project");
       const params = c.req.valid("json");
       const {
+        from,
+        select,
+        dateField,
         format: formatParam,
         includeSpans,
         llmMode,
@@ -107,6 +156,23 @@ export function registerTracesRoutes(
       const protections = await getProtectionsForProject(prisma, {
         projectId: project.id,
       });
+
+      // When `select` is present, compile the projection up front. The compiled
+      // plan drives column pruning + child-collection joins in the ENGINE; the
+      // resolved schema goes into the response envelope; the projector replaces
+      // formatTrace per row. Invalid paths surface as a 400 with every offender.
+      let projection: CompiledProjection | undefined;
+      if (select && select.length > 0) {
+        try {
+          projection = compileProjection({ from, select, protections });
+        } catch (err) {
+          if (err instanceof ProjectionValidationError) {
+            throw new HTTPException(400, { message: err.message });
+          }
+          throw err;
+        }
+      }
+
       const traceService = TraceService.create(prisma);
       const results = await traceService.getAllTracesForProject(
         {
@@ -121,6 +187,8 @@ export function registerTracesRoutes(
           downloadMode: true,
           includeSpans: includeSpans ?? false,
           scrollId: scrollId ?? undefined,
+          dateField,
+          projection: projection?.plan,
         },
       );
 
@@ -156,16 +224,20 @@ export function registerTracesRoutes(
         };
       };
 
-      const pagination = JSON.stringify({
-        totalHits: results.totalHits,
-        scrollId: results.scrollId,
-      });
+      // A projection (when active) replaces the default formatTrace, shaping each
+      // row to mirror the caller's `select`. The ENGINE has already attached the
+      // Postgres-sourced annotations the projector reads.
+      const serializeTrace = projection
+        ? (trace: Trace) => projection.project(trace as ProjectableTrace)
+        : formatTrace;
 
       const serializedTraces: string[] = [];
+      let skippedCount = 0;
       for (const trace of enrichedTraces) {
         try {
-          serializedTraces.push(JSON.stringify(formatTrace(trace)));
+          serializedTraces.push(JSON.stringify(serializeTrace(trace)));
         } catch (err) {
+          skippedCount++;
           logger.error(
             {
               traceId: trace.trace_id,
@@ -175,6 +247,21 @@ export function registerTracesRoutes(
           );
         }
       }
+
+      // Surface dropped traces so a caller never silently sees fewer rows than
+      // totalHits with no signal. Emitted only when non-zero, so the common-case
+      // envelope stays byte-identical to before.
+      const pagination = JSON.stringify({
+        totalHits: results.totalHits,
+        scrollId: results.scrollId,
+        ...(skippedCount > 0 ? { skipped: skippedCount } : {}),
+      });
+
+      // When a projection is active the envelope gains a `schema` field describing
+      // the resolved columns so callers can pre-allocate a typed reader.
+      const schemaSuffix = projection
+        ? `,"schema":${JSON.stringify(projection.schema)}`
+        : "";
 
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
@@ -186,7 +273,9 @@ export function registerTracesRoutes(
             controller.enqueue(encoder.encode(prefix + serializedTraces[i]!));
           }
 
-          controller.enqueue(encoder.encode(`],"pagination":${pagination}}`));
+          controller.enqueue(
+            encoder.encode(`],"pagination":${pagination}${schemaSuffix}}`),
+          );
           controller.close();
         },
       });

@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.33.1](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.33.0...typescript-sdk@v0.33.1) (2026-06-12)
+
+
+### Bug Fixes
+
+* **ci:** unbreak clickhouse-serverless lint and dependabot update jobs ([#4740](https://github.com/langwatch/langwatch/issues/4740)) ([d082547](https://github.com/langwatch/langwatch/commit/d082547065da3f34d49e898e2a2318e31b455463))
+* **cli:** stale ingestion-key cache never invalidated after platform revoke ([#4762](https://github.com/langwatch/langwatch/issues/4762)) ([0bb64e1](https://github.com/langwatch/langwatch/commit/0bb64e1f0c4e878c94f8d3a96ec35e78e2fd5ea9))
+* **deps:** close HIGH @grpc/grpc-js alerts across 6 manifests ([#4763](https://github.com/langwatch/langwatch/issues/4763)) ([6acd16e](https://github.com/langwatch/langwatch/commit/6acd16e0ab471c78ac788772acaae71fcfddcc6d))
+
 ## [0.33.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.32.0...typescript-sdk@v0.33.0) (2026-06-11)
 
 

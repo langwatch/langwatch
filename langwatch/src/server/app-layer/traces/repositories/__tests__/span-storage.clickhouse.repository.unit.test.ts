@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  SpanStorageClickHouseRepository,
   deserializeAttributes,
+  mapSpanSummaryRow,
+  SpanStorageClickHouseRepository,
+  type SpanSummaryQueryRow,
   serializeAttributes,
 } from "../span-storage.clickhouse.repository";
 import {
@@ -229,11 +231,11 @@ describe("given a requested span-read limit", () => {
 describe("SpanStorageClickHouseRepository single-trace reads", () => {
   function repoWithSpyClient() {
     const query = vi.fn().mockResolvedValue({ json: async () => [] });
-    const repo = new SpanStorageClickHouseRepository(
-      (async () => ({ query })) as unknown as ConstructorParameters<
-        typeof SpanStorageClickHouseRepository
-      >[0],
-    );
+    const repo = new SpanStorageClickHouseRepository((async () => ({
+      query,
+    })) as unknown as ConstructorParameters<
+      typeof SpanStorageClickHouseRepository
+    >[0]);
     return { repo, query };
   }
 
@@ -248,7 +250,10 @@ describe("SpanStorageClickHouseRepository single-trace reads", () => {
 
     it("caps query memory on the normalized-spans read", async () => {
       const { repo, query } = repoWithSpyClient();
-      await repo.getNormalizedSpansByTraceId({ tenantId: "p-1", traceId: "t-1" });
+      await repo.getNormalizedSpansByTraceId({
+        tenantId: "p-1",
+        traceId: "t-1",
+      });
 
       const settings = query.mock.calls[0]?.[0]?.clickhouse_settings;
       expect(settings?.max_memory_usage).toBe(String(2 * 1024 * 1024 * 1024));
@@ -256,10 +261,140 @@ describe("SpanStorageClickHouseRepository single-trace reads", () => {
 
     it("caps query memory on the single-span read", async () => {
       const { repo, query } = repoWithSpyClient();
-      await repo.getSpanByIds({ tenantId: "p-1", traceId: "t-1", spanId: "s-1" });
+      await repo.getSpanByIds({
+        tenantId: "p-1",
+        traceId: "t-1",
+        spanId: "s-1",
+      });
 
       const settings = query.mock.calls[0]?.[0]?.clickhouse_settings;
       expect(settings?.max_memory_usage).toBe(String(2 * 1024 * 1024 * 1024));
+    });
+  });
+});
+
+describe("mapSpanSummaryRow", () => {
+  const baseRow = (
+    overrides: Partial<SpanSummaryQueryRow>,
+  ): SpanSummaryQueryRow => ({
+    SpanId: "s-1",
+    ParentSpanId: null,
+    SpanName: "llm call",
+    DurationMs: 12,
+    StatusCode: null,
+    SpanType: "llm",
+    Model: "",
+    ResponseModel: "",
+    Cost: "",
+    InputTokens: "",
+    OutputTokens: "",
+    CacheReadTokens: "",
+    CacheCreationTokens: "",
+    CustomInputRate: "",
+    CustomOutputRate: "",
+    CustomCacheReadRate: "",
+    CustomCacheCreationRate: "",
+    LwSpanCost: "",
+    StartTimeMs: 1700000000000,
+    ...overrides,
+  });
+
+  describe("given an explicit positive cost", () => {
+    it("uses the explicit cost over any computed value", () => {
+      const result = mapSpanSummaryRow(
+        baseRow({
+          Cost: "0.5",
+          Model: "gpt-5-mini",
+          InputTokens: "1000",
+          OutputTokens: "1000",
+        }),
+      );
+      expect(result.cost).toBe(0.5);
+    });
+  });
+
+  describe("given an explicit cost of '0'", () => {
+    it("falls through to the computed fallback", () => {
+      const result = mapSpanSummaryRow(
+        baseRow({
+          Cost: "0",
+          Model: "gpt-5-mini",
+          InputTokens: "1000",
+          OutputTokens: "1000",
+        }),
+      );
+      expect(result.cost).not.toBeNull();
+      expect(result.cost).toBeGreaterThan(0);
+    });
+
+    it("yields null cost when nothing is computable", () => {
+      const result = mapSpanSummaryRow(baseRow({ Cost: "0" }));
+      expect(result.cost).toBeNull();
+    });
+  });
+
+  describe("given empty or malformed numeric strings", () => {
+    it("maps them to null tokens and null cost", () => {
+      const result = mapSpanSummaryRow(
+        baseRow({
+          Cost: "not-a-number",
+          InputTokens: "",
+          OutputTokens: "abc",
+          CacheReadTokens: "NaN",
+          CacheCreationTokens: "",
+        }),
+      );
+      expect(result.inputTokens).toBeNull();
+      expect(result.outputTokens).toBeNull();
+      expect(result.cacheReadTokens).toBeNull();
+      expect(result.cacheCreationTokens).toBeNull();
+      expect(result.cost).toBeNull();
+    });
+  });
+
+  describe("given a tokens-only row with a known registry model", () => {
+    it("computes a positive cost from the static registry", () => {
+      const result = mapSpanSummaryRow(
+        baseRow({
+          Model: "gpt-5-mini",
+          InputTokens: "1000",
+          OutputTokens: "500",
+        }),
+      );
+      expect(result.cost).not.toBeNull();
+      expect(result.cost).toBeGreaterThan(0);
+    });
+  });
+
+  describe("given custom input/output rates", () => {
+    it("computes cost from the custom rates", () => {
+      const result = mapSpanSummaryRow(
+        baseRow({
+          Model: "my-custom-model",
+          InputTokens: "1000",
+          OutputTokens: "1000",
+          CustomInputRate: "0.001",
+          CustomOutputRate: "0.002",
+        }),
+      );
+      expect(result.cost).toBeCloseTo(1000 * 0.001 + 1000 * 0.002, 10);
+    });
+  });
+
+  describe("given a custom cache-read rate with cache tokens", () => {
+    it("applies the cache-read rate to cache tokens instead of the input rate", () => {
+      const result = mapSpanSummaryRow(
+        baseRow({
+          Model: "my-custom-model",
+          InputTokens: "1000",
+          OutputTokens: "0",
+          CacheReadTokens: "1000",
+          CustomInputRate: "0.001",
+          CustomOutputRate: "0.002",
+          CustomCacheReadRate: "0.0001",
+        }),
+      );
+      expect(result.cost).toBeCloseTo(1000 * 0.001 + 1000 * 0.0001, 10);
     });
   });
 });

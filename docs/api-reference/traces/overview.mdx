@@ -11,6 +11,13 @@ Both search and get-trace endpoints support a `format` parameter:
 - **`digest`** (default), Returns an AI-readable formatted trace with hierarchical span tree, timing, inputs/outputs, and errors. Optimized for LLM consumption.
 - **`json`**, Returns the full raw trace data with all fields.
 
+For data-team ETL, `POST /api/traces/search` also accepts a **projection DSL**
+(`from` + `select`) that returns exactly the fields you ask for — including
+nested events, annotations, and evaluations joined server-side — so a daily pull
+becomes one paginated loop instead of a per-trace fan-out. It pairs with a
+`dateField` option to page by when traces were **last modified** rather than when
+they occurred. See [Projection DSL & field catalog](/api-reference/traces/projection-dsl).
+
 ## Authentication
 
 Pass your LangWatch API key in the `X-Auth-Token` header. Your API key can be found on the setup page under settings.

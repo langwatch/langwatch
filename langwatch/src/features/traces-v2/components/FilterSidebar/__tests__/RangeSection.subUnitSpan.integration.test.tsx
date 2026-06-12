@@ -15,11 +15,8 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  clampRangeToBounds,
-  RangeSection,
-  sliderStepForSpan,
-} from "../RangeSection";
+import { clampRangeToBounds, RangeSection } from "../RangeSection";
+import { stepForSpan } from "../rangeControls";
 
 describe("RangeSection", () => {
   afterEach(cleanup);
@@ -55,7 +52,7 @@ describe("RangeSection", () => {
 
       await waitFor(() => {
         expect(Number(lowerThumb.getAttribute("aria-valuenow"))).toBeCloseTo(
-          sliderStepForSpan(0.0139),
+          stepForSpan(0.0139),
           6,
         );
       });
@@ -63,32 +60,32 @@ describe("RangeSection", () => {
   });
 });
 
-describe("sliderStepForSpan", () => {
+describe("stepForSpan", () => {
   describe("when the span is sub-unit", () => {
     it("returns a fraction of the span so the slider can express in-between values", () => {
-      expect(sliderStepForSpan(0.0139)).toBeLessThan(0.0139);
-      expect(sliderStepForSpan(0.0139)).toBeGreaterThan(0);
+      expect(stepForSpan(0.0139)).toBeLessThan(0.0139);
+      expect(stepForSpan(0.0139)).toBeGreaterThan(0);
     });
   });
 
   describe("when the span covers a few units", () => {
     it("still subdivides so narrow cost ranges stay draggable", () => {
-      expect(sliderStepForSpan(5)).toBe(0.05);
+      expect(stepForSpan(5)).toBe(0.01);
     });
   });
 
   describe("when the span covers 100 units or more", () => {
-    it("keeps the default step of 1", () => {
-      expect(sliderStepForSpan(2100)).toBe(1);
-      expect(sliderStepForSpan(100)).toBe(1);
+    it("rounds the step down to a power of ten so values land tidy", () => {
+      expect(stepForSpan(2100)).toBe(10);
+      expect(stepForSpan(100)).toBe(0.1);
     });
   });
 
   describe("when the span is degenerate", () => {
     it("falls back to 1 for zero, negative, and non-finite spans", () => {
-      expect(sliderStepForSpan(0)).toBe(1);
-      expect(sliderStepForSpan(-5)).toBe(1);
-      expect(sliderStepForSpan(Number.NaN)).toBe(1);
+      expect(stepForSpan(0)).toBe(1);
+      expect(stepForSpan(-5)).toBe(1);
+      expect(stepForSpan(Number.NaN)).toBe(1);
     });
   });
 });

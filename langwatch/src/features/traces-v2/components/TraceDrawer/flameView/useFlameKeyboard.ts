@@ -1,6 +1,5 @@
 import { useEffect } from "react";
-import type { Viewport } from "./types";
-import type { BuiltTree } from "./types";
+import type { BuiltTree, Viewport } from "./types";
 
 /**
  * Keyboard navigation for the flame view.

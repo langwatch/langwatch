@@ -151,6 +151,7 @@ export function TraceSummaryAccordions({
                 value="io"
                 title="Input and Output"
                 empty={!hasIO}
+                spotlightAnchor={hasIO ? "drawer-io" : undefined}
                 isFirst={isFirst}
                 open={isOpen}
               >
@@ -268,6 +269,7 @@ export function TraceSummaryAccordions({
                 key="evals"
                 value="evals"
                 title="Evals"
+                spotlightAnchor={hasEvalsContent ? "drawer-evals" : undefined}
                 count={
                   evalsForList.length > 0 ? evalsForList.length : undefined
                 }
@@ -304,6 +306,7 @@ export function TraceSummaryAccordions({
               key="events"
               value="events"
               title="Events"
+              spotlightAnchor={hasEventsContent ? "drawer-events" : undefined}
               count={traceEvents.length > 0 ? traceEvents.length : undefined}
               empty={traceEvents.length === 0}
               isFirst={isFirst}

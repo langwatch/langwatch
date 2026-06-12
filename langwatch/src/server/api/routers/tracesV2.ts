@@ -178,6 +178,10 @@ function mapSpanSummaryToTreeNode(row: SpanSummaryRow): SpanTreeNode {
     status,
     model: row.model,
     cost: row.cost,
+    inputTokens: row.inputTokens,
+    outputTokens: row.outputTokens,
+    cacheReadTokens: row.cacheReadTokens,
+    cacheCreationTokens: row.cacheCreationTokens,
   };
 }
 

@@ -1365,6 +1365,56 @@ secured.access(CLI_POLICY).post(
 );
 
 // ---------------------------------------------------------------------------
+// GET /api/auth/cli/governance/ingestion-keys
+// ---------------------------------------------------------------------------
+// Returns all live (non-revoked) personal-project ingestion keys for the
+// caller's org. The CLI uses this as a cache-liveness preflight (#4755) —
+// revoking a key on the platform silently bricks Path B telemetry because
+// the wrapper reuses a locally cached token forever. By calling this list
+// before reusing a cached key, the wrapper can detect the revocation and
+// re-mint rather than repeatedly sending unauthenticated spans.
+//
+// Response: { keys: [{ source_type, lookup_id, ingestion_template_id }] }
+//
+// lookup_id is the 16-char identifier embedded in the token prefix
+// (`ik-lw-{lookupId}_…`) so the CLI can match the cached token against a
+// live server entry without possessing the full secret.
+// ---------------------------------------------------------------------------
+secured.access(CLI_POLICY).get(
+  "/governance/ingestion-keys",
+  async (c: Context) => {
+    const tokenRecord = await validateAccessToken(
+      c.req.header("Authorization"),
+    );
+    if (!tokenRecord) {
+      return c.json(
+        {
+          error: "unauthorized",
+          error_description:
+            "Bearer access token is missing, malformed, or expired",
+        },
+        401,
+      );
+    }
+    const service = IngestionKeyService.create(prisma);
+    const keys = await service.listForPersonalProject({
+      userId: tokenRecord.user_id,
+      organizationId: tokenRecord.organization_id,
+    });
+    return c.json(
+      {
+        keys: keys.map((k) => ({
+          source_type: k.sourceType,
+          lookup_id: k.lookupId,
+          ingestion_template_id: k.ingestionTemplateId,
+        })),
+      },
+      200,
+    );
+  },
+);
+
+// ---------------------------------------------------------------------------
 // GET /api/auth/cli/lookup?user_code=XXXX-YYYY
 // ---------------------------------------------------------------------------
 // Used by the browser-side approval page to surface the device-code

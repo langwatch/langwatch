@@ -30,6 +30,7 @@ jobs:
           filters: |
             relevant:
               - 'clickhouse-serverless/**'
+              - 'charts/clickhouse-serverless/**'
               - '.github/workflows/clickhouse-serverless.yml'
 
   test:

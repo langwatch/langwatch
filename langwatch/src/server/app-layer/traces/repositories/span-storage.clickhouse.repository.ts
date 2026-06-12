@@ -1,8 +1,11 @@
+import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
+import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import {
+  type NormalizedAttributes,
   type NormalizedSpan,
   NormalizedSpanKind,
   NormalizedStatusCode,
@@ -169,7 +172,17 @@ const SUMMARY_SPAN_SELECT = `
   StatusCode,
   SpanAttributes['langwatch.span.type'] AS SpanType,
   SpanAttributes['gen_ai.request.model'] AS Model,
+  SpanAttributes['gen_ai.response.model'] AS ResponseModel,
   SpanAttributes['gen_ai.usage.cost'] AS Cost,
+  SpanAttributes['gen_ai.usage.input_tokens'] AS InputTokens,
+  SpanAttributes['gen_ai.usage.output_tokens'] AS OutputTokens,
+  SpanAttributes['gen_ai.usage.cache_read.input_tokens'] AS CacheReadTokens,
+  SpanAttributes['gen_ai.usage.cache_creation.input_tokens'] AS CacheCreationTokens,
+  SpanAttributes['langwatch.model.inputCostPerToken'] AS CustomInputRate,
+  SpanAttributes['langwatch.model.outputCostPerToken'] AS CustomOutputRate,
+  SpanAttributes['langwatch.model.cacheReadCostPerToken'] AS CustomCacheReadRate,
+  SpanAttributes['langwatch.model.cacheCreationCostPerToken'] AS CustomCacheCreationRate,
+  SpanAttributes['langwatch.span.cost'] AS LwSpanCost,
   toUnixTimestamp64Milli(StartTime) AS StartTimeMs
 `;
 
@@ -273,7 +286,7 @@ const SIGNAL_BUCKET_PREDICATES: Record<LangwatchSignalBucket, string> = {
   genai: "arrayExists(k -> startsWith(k, 'gen_ai.'), keys)",
 };
 
-interface SpanSummaryQueryRow {
+export interface SpanSummaryQueryRow {
   SpanId: string;
   ParentSpanId: string | null;
   SpanName: string;
@@ -281,19 +294,72 @@ interface SpanSummaryQueryRow {
   StatusCode: number | null;
   SpanType: string;
   Model: string;
-  // `SpanAttributes['gen_ai.usage.cost']` materialises as the raw map value;
-  // ClickHouse Map values are typed `String`, so the wire payload is the
-  // stringified number (or "" when absent). Parsed to a number in the
-  // mapper below.
+  ResponseModel: string;
+  // `SpanAttributes[...]` materialises as the raw map value; ClickHouse
+  // Map values are typed `String`, so each numeric attribute arrives as
+  // a stringified number (or "" when absent). Parsed in the mapper.
   Cost: string;
+  InputTokens: string;
+  OutputTokens: string;
+  CacheReadTokens: string;
+  CacheCreationTokens: string;
+  CustomInputRate: string;
+  CustomOutputRate: string;
+  CustomCacheReadRate: string;
+  CustomCacheCreationRate: string;
+  LwSpanCost: string;
   StartTimeMs: number;
 }
 
-function mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
-  // Cost arrives as a string (Map values are typed String in CH); empty
-  // means the span has no cost attribute, NaN means a malformed value.
-  // Either falls through to null so the renderer doesn't paint `$NaN`.
-  const costNum = row.Cost ? Number(row.Cost) : NaN;
+/** "" → null, malformed → null, otherwise the parsed number. */
+function attrNumber(raw: string): number | null {
+  if (!raw) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
+export function mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
+  const explicitCost = attrNumber(row.Cost);
+  const inputTokens = attrNumber(row.InputTokens);
+  const outputTokens = attrNumber(row.OutputTokens);
+  const cacheReadTokens = attrNumber(row.CacheReadTokens);
+  const cacheCreationTokens = attrNumber(row.CacheCreationTokens);
+
+  // Most ingest paths emit token counts but no `gen_ai.usage.cost` —
+  // trace-level cost is computed at fold time from tokens × pricing.
+  // Mirror that here so the waterfall can show a per-span cost: feed
+  // the same priority cascade (custom enrichment rates → static model
+  // registry → SDK span cost) with the attributes this summary query
+  // already selects.
+  // Some SDKs emit `gen_ai.usage.cost = 0` meaning "unknown" — treat any
+  // non-positive explicit cost as absent so the computed fallback runs.
+  let cost = explicitCost !== null && explicitCost > 0 ? explicitCost : null;
+  if (cost === null) {
+    const computed = computeSpanCost({
+      attrs: {
+        [ATTR_KEYS.GEN_AI_RESPONSE_MODEL]: row.ResponseModel || undefined,
+        [ATTR_KEYS.GEN_AI_REQUEST_MODEL]: row.Model || undefined,
+        [ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]:
+          row.CacheReadTokens || undefined,
+        [ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]:
+          row.CacheCreationTokens || undefined,
+        [ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN]:
+          row.CustomInputRate || undefined,
+        [ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN]:
+          row.CustomOutputRate || undefined,
+        [ATTR_KEYS.LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN]:
+          row.CustomCacheReadRate || undefined,
+        [ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN]:
+          row.CustomCacheCreationRate || undefined,
+        [ATTR_KEYS.LANGWATCH_SPAN_COST]: row.LwSpanCost || undefined,
+      } as NormalizedAttributes,
+      model: row.ResponseModel || row.Model || undefined,
+      promptTokens: inputTokens,
+      completionTokens: outputTokens,
+    });
+    cost = computed > 0 ? computed : null;
+  }
+
   return {
     spanId: row.SpanId,
     parentSpanId: row.ParentSpanId,
@@ -302,7 +368,11 @@ function mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
     statusCode: row.StatusCode,
     spanType: row.SpanType || null,
     model: row.Model || null,
-    cost: Number.isFinite(costNum) ? costNum : null,
+    cost,
+    inputTokens,
+    outputTokens,
+    cacheReadTokens,
+    cacheCreationTokens,
     startTimeMs: Number(row.StartTimeMs),
   };
 }

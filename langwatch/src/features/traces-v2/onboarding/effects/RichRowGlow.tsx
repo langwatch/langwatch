@@ -46,7 +46,10 @@ export const RichRowGlow: React.FC = () => {
   // the row under any of the three active stages, and CSS doesn't
   // let us factor that out — so we generate the cross-product here
   // once and pass it to every rule that needs it.
-  const each = (suffix: string, opts: { hover?: boolean; dark?: boolean } = {}) =>
+  const each = (
+    suffix: string,
+    opts: { hover?: boolean; dark?: boolean } = {},
+  ) =>
     ACTIVE_STAGES.map((stage) => {
       const dark = opts.dark ? "html.dark " : "";
       const hover = opts.hover ? ":hover" : "";

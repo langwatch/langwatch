@@ -18,8 +18,8 @@ import {
   LuShare2,
 } from "react-icons/lu";
 import { resetTracesV2PromoSnooze } from "~/components/messages/NewTracesPromo";
-import { toaster } from "~/components/ui/toaster";
 import { Menu } from "~/components/ui/menu";
+import { toaster } from "~/components/ui/toaster";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
