@@ -986,16 +986,16 @@ When providing `input` or `output` to `@langwatch.span()` or `span.update()`, yo
 
 ### `SpanTimestamps`
 
-A dictionary defining custom start and end times for a span, in nanoseconds since epoch.
+A dictionary defining custom timestamps for a span, in **milliseconds** since epoch.
 
 <ResponseField name="started_at" type="int" required>
-  Timestamp when the span started (nanoseconds since epoch).
+  Timestamp when the span started (milliseconds since epoch).
 </ResponseField>
 <ResponseField name="first_token_at" type="Optional[int]">
-  For LLM operations, timestamp when the first token was received (nanoseconds since epoch).
+  For LLM operations, timestamp when the first token was received (milliseconds since epoch). Powers the Time to First Token (TTFT) metric, see [Tracking Time to First Token](/integration/python/tutorials/tracking-time-to-first-token).
 </ResponseField>
 <ResponseField name="finished_at" type="int" required>
-  Timestamp when the span finished (nanoseconds since epoch).
+  Timestamp when the span finished (milliseconds since epoch).
 </ResponseField>
 
 ### `SpanTypes` (Semantic Span Types)

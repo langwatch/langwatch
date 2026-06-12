@@ -35,6 +35,8 @@ export const ATTR_KEYS = {
   GEN_AI_USAGE_OUTPUT_TOKENS: "gen_ai.usage.output_tokens",
   GEN_AI_USAGE_PROMPT_TOKENS: "gen_ai.usage.prompt_tokens",
   GEN_AI_USAGE_COMPLETION_TOKENS: "gen_ai.usage.completion_tokens",
+  // Time to first token in milliseconds, relative to the span start.
+  GEN_AI_SERVER_TIME_TO_FIRST_TOKEN: "gen_ai.server.time_to_first_token",
   GEN_AI_CONVERSATION_ID: "gen_ai.conversation.id",
   GEN_AI_AGENT_ID: "gen_ai.agent.id",
   GEN_AI_AGENT_DESCRIPTION: "gen_ai.agent.description",
@@ -113,6 +115,9 @@ export const ATTR_KEYS = {
   LANGWATCH_SPAN_COST: "langwatch.span.cost",
   LANGWATCH_TOKENS_ESTIMATED: "langwatch.tokens.estimated",
   LANGWATCH_METRICS: "langwatch.metrics",
+  // SDK span timing blob: { started_at, first_token_at, finished_at }
+  // in unix epoch milliseconds.
+  LANGWATCH_TIMESTAMPS: "langwatch.timestamps",
   LANGWATCH_MODEL_INPUT_COST_PER_TOKEN: "langwatch.model.inputCostPerToken",
   LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN: "langwatch.model.outputCostPerToken",
   LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN:
