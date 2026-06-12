@@ -1,4 +1,8 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import {
+  deserializeAttributes,
+  ensureStringRecord,
+} from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
 import type { Span } from "~/server/tracer/types";
 import { mapNormalizedSpansToSpans } from "~/server/traces/mappers/span.mapper";
 import type {
@@ -42,17 +46,17 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           \`Links.TraceId\` AS Links_TraceId,
           \`Links.SpanId\` AS Links_SpanId,
           \`Links.Attributes\` AS Links_Attributes
-        FROM stored_spans
-        WHERE TenantId = {tenantId:String}
-          AND TraceId = {traceId:String}
-          AND (TenantId, TraceId, SpanId, StartTime) IN (
+        FROM stored_spans AS t
+        WHERE t.TenantId = {tenantId:String}
+          AND t.TraceId = {traceId:String}
+          AND (t.TenantId, t.TraceId, t.SpanId, t.StartTime) IN (
             SELECT TenantId, TraceId, SpanId, max(StartTime)
             FROM stored_spans
             WHERE TenantId = {tenantId:String}
               AND TraceId = {traceId:String}
             GROUP BY TenantId, TraceId, SpanId
           )
-        ORDER BY StartTime ASC
+        ORDER BY t.StartTime ASC
       `,
       query_params: { tenantId, traceId },
       format: "JSONEachRow",
@@ -99,9 +103,12 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       durationMs: row.DurationMs,
       name: row.SpanName,
       kind: row.SpanKind as NormalizedSpanKind,
-      resourceAttributes:
-        row.ResourceAttributes as NormalizedSpan["resourceAttributes"],
-      spanAttributes: row.SpanAttributes as NormalizedSpan["spanAttributes"],
+      resourceAttributes: deserializeAttributes(
+        ensureStringRecord(row.ResourceAttributes),
+      ) as NormalizedSpan["resourceAttributes"],
+      spanAttributes: deserializeAttributes(
+        ensureStringRecord(row.SpanAttributes),
+      ) as NormalizedSpan["spanAttributes"],
       statusCode: row.StatusCode as NormalizedStatusCode | null,
       statusMessage: row.StatusMessage,
       instrumentationScope: {
@@ -111,14 +118,16 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       events: (row.Events_Timestamp ?? []).map((ts, i) => ({
         name: row.Events_Name?.[i] ?? "",
         timeUnixMs: ts,
-        attributes: (row.Events_Attributes?.[i] ??
-          {}) as NormalizedSpan["events"][number]["attributes"],
+        attributes: deserializeAttributes(
+          ensureStringRecord(row.Events_Attributes?.[i] ?? {}),
+        ) as NormalizedSpan["events"][number]["attributes"],
       })),
       links: (row.Links_TraceId ?? []).map((lt, i) => ({
         traceId: lt,
         spanId: row.Links_SpanId?.[i] ?? "",
-        attributes: (row.Links_Attributes?.[i] ??
-          {}) as NormalizedSpan["links"][number]["attributes"],
+        attributes: deserializeAttributes(
+          ensureStringRecord(row.Links_Attributes?.[i] ?? {}),
+        ) as NormalizedSpan["links"][number]["attributes"],
       })),
       droppedAttributesCount: 0,
       droppedEventsCount: 0,

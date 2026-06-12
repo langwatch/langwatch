@@ -403,6 +403,89 @@ describe("mapNormalizedSpanToSpan", () => {
     });
   });
 
+  describe("when extracting RAG contexts", () => {
+    const chunks = [
+      { document_id: "doc-1", chunk_id: "c-1", content: "first chunk" },
+      { document_id: "doc-2", content: "second chunk" },
+    ];
+
+    it("maps contexts when the attribute is a parsed array", () => {
+      const span = makeSpan({
+        spanAttributes: {
+          "langwatch.span.type": "rag",
+          "langwatch.rag.contexts": chunks,
+        },
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect(result.type).toBe("rag");
+      expect((result as { contexts: unknown }).contexts).toEqual([
+        { document_id: "doc-1", chunk_id: "c-1", content: "first chunk" },
+        { document_id: "doc-2", chunk_id: null, content: "second chunk" },
+      ]);
+    });
+
+    it("maps contexts when the attribute is a JSON string (ClickHouse Map round-trip)", () => {
+      const span = makeSpan({
+        spanAttributes: {
+          "langwatch.span.type": "rag",
+          "langwatch.rag.contexts": JSON.stringify(chunks),
+        },
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect(result.type).toBe("rag");
+      expect((result as { contexts: unknown }).contexts).toEqual([
+        { document_id: "doc-1", chunk_id: "c-1", content: "first chunk" },
+        { document_id: "doc-2", chunk_id: null, content: "second chunk" },
+      ]);
+    });
+
+    it("maps string-only contexts arrays", () => {
+      const span = makeSpan({
+        spanAttributes: {
+          "langwatch.span.type": "rag",
+          "langwatch.rag.contexts": JSON.stringify(["plain chunk"]),
+        },
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect((result as { contexts: unknown }).contexts).toEqual([
+        { content: "plain chunk" },
+      ]);
+    });
+
+    it("returns empty contexts for malformed JSON strings without throwing", () => {
+      const span = makeSpan({
+        spanAttributes: {
+          "langwatch.span.type": "rag",
+          "langwatch.rag.contexts": "[not valid json",
+        },
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect(result.type).toBe("rag");
+      expect((result as { contexts: unknown }).contexts).toEqual([]);
+    });
+
+    it("returns empty contexts for JSON strings that are not arrays", () => {
+      const span = makeSpan({
+        spanAttributes: {
+          "langwatch.span.type": "rag",
+          "langwatch.rag.contexts": JSON.stringify({ not: "an array" }),
+        },
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect((result as { contexts: unknown }).contexts).toEqual([]);
+    });
+  });
+
   describe("when extracting error information", () => {
     it("returns null when statusCode is not ERROR", () => {
       const span = makeSpan({

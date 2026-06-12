@@ -346,7 +346,16 @@ function extractVendor(spanAttributes: NormalizedAttributes): string | null {
 function extractContexts(
   spanAttributes: NormalizedAttributes,
 ): RAGChunk[] | undefined {
-  const contexts = spanAttributes["langwatch.rag.contexts"];
+  let contexts = spanAttributes["langwatch.rag.contexts"];
+
+  // ClickHouse Map(String, String) stores arrays as JSON strings
+  if (typeof contexts === "string") {
+    try {
+      contexts = JSON.parse(contexts);
+    } catch {
+      return undefined;
+    }
+  }
 
   if (!contexts || !Array.isArray(contexts)) {
     return undefined;

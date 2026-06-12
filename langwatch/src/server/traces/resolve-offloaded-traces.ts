@@ -137,7 +137,12 @@ export async function resolveOffloadedTraces({
         if (key.startsWith(EVENTREF_ATTR_PREFIX)) {
           const attrKey = key.slice(EVENTREF_ATTR_PREFIX.length);
           try {
-            const ref = JSON.parse(value) as {
+            // Read paths that run deserializeAttributes hand the ref over
+            // already parsed; raw Map(String, String) reads hand over the
+            // JSON string. Accept both.
+            const ref = (
+              typeof value === "string" ? JSON.parse(value) : value
+            ) as {
               field?: string;
               eventId?: string;
             };
