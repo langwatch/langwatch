@@ -3,20 +3,11 @@ import { Prisma } from "@prisma/client";
 
 import { encrypt, decrypt } from "~/utils/encryption";
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
-import { getResolvedDefaultForFeature } from "~/server/modelProviders/modelDefaults.read";
 import { createLogger } from "~/utils/logger/server";
 import { resolveAttributionUserId } from "./langyAttribution";
 import { backfillLangyCredentialPerProject } from "./langyBackfill";
 
 const logger = createLogger("langwatch:langy:virtual-key");
-
-/**
- * Feature key whose cascade-resolved model we seed onto the Langy VK's
- * `modelsAllowed` at provision time. Same key the sidebar picker seeds
- * itself from (LangySidebar's LANGY_GATE_FEATURE_KEY) so the VK and the
- * composer agree on "the model Langy uses by default".
- */
-const LANGY_VK_MODEL_FEATURE_KEY = "prompt.create_default";
 
 /**
  * Name under which the auto-provisioned Langy VK secret is stored in
@@ -81,27 +72,15 @@ export async function provisionLangyVirtualKey(args: {
     return null;
   }
 
-  // Seed the VK's model allowlist with whatever the project currently
-  // resolves as its default chat model, so the VK "has a model in it" from
-  // day 1 and the sidebar picker starts narrowed to it. At a fresh
-  // project.create there's usually no provider yet → this resolves to null
-  // and we leave modelsAllowed null (= "all eligible models"). It fires when
-  // an org/team default is inherited, and on the self-heal / backfill paths.
-  // getResolvedDefaultForFeature returns null instead of throwing when
-  // nothing is configured, so a missing default never breaks provisioning.
-  const resolvedDefault = await getResolvedDefaultForFeature(
-    // ReadCtx wants a session, but this resolver only reads ctx.prisma;
-    // provisioning runs without a user session, so null is correct.
-    { prisma, session: null },
-    { projectId, featureKey: LANGY_VK_MODEL_FEATURE_KEY },
-  );
-  const modelsAllowed = resolvedDefault?.model
-    ? [resolvedDefault.model]
-    : null;
-
-  // GatewayProviderCredential was removed in iter 110 — VKs route through the
-  // project's ModelProviders. The /chat route's model gate handles "no model
-  // configured" with a 409 before we get here, so we don't validate here.
+  // Leave modelsAllowed at the schema default (null = all eligible models).
+  // We used to seed it from getResolvedDefaultForFeature("prompt.create_default")
+  // so the VK "had a model in it" on day 1 — but that resolver can return a
+  // model id the gateway has no provider for (the SaaS dev cluster currently
+  // resolves to `openai/gpt-5.5`, which the gateway rejects as
+  // `model_not_allowed` since it isn't a real OpenAI model). The resulting
+  // single-item allowlist then blocks every actual chat. The sidebar picker
+  // continues to surface a default via its own feature-key resolution; the
+  // VK no longer needs to encode the allowlist defensively at provision time.
   const virtualKeyService = VirtualKeyService.create(prisma);
   const created = await virtualKeyService.create({
     organizationId,
@@ -111,9 +90,6 @@ export async function provisionLangyVirtualKey(args: {
     principalUserId: null,
     scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
     actorUserId,
-    // Omit config entirely when nothing resolved so the VK keeps the schema
-    // default (modelsAllowed: null = all). Only set it when we have a seed.
-    ...(modelsAllowed ? { config: { modelsAllowed } } : {}),
   });
 
   try {

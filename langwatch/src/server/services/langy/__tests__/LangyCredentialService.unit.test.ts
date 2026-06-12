@@ -59,6 +59,12 @@ beforeEach(() => {
   });
   process.env.LANGWATCH_API_URL = "https://api.langwatch.test";
   process.env.LW_GATEWAY_BASE_URL = "http://gateway.test:5563/v1";
+  // Clear LW_GATEWAY_PUBLIC_URL so it doesn't leak in from the developer's
+  // shell (`pnpm dev` setups pre-source .env to dodge the start.sh defaulting
+  // bug, and that .env now carries LW_GATEWAY_PUBLIC_URL on the WSL+minikube
+  // layout). The credential service prefers PUBLIC over BASE, so an inherited
+  // value would shadow whatever the test pins via LW_GATEWAY_BASE_URL above.
+  delete process.env.LW_GATEWAY_PUBLIC_URL;
 });
 
 describe("LangyCredentialService", () => {
