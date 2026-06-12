@@ -1339,16 +1339,23 @@ if inserted == 1 then
 end
 refreshGroupKeyTtl(groupJobsKey, groupDataKey, nowMs)
 
--- 3. Update ready set score = future dispatch time so the group becomes
---    eligible exactly when the backoff window expires. Route through the
+-- 3. Update ready set score = when dispatch can actually SUCCEED. The retry
+--    job becomes eligible at dispatchAfterMs (its jobs-zset score), but the
+--    group stays locked by the activeKey until retryTtlSec — which is rounded
+--    up + buffered, so it outlives dispatchAfterMs by up to ~3s. Scoring ready
+--    at dispatchAfterMs would advertise due-but-undispatchable work for that
+--    window; the dispatcher's due-time wake (#4800) would then floor its wait
+--    and busy-poll Redis until the lock expires. Score at the lock expiry
+--    instead: the wake lands exactly when dispatch can succeed, and the
+--    already-eligible job dispatches immediately. Route through the
 --    parked-aware write so the invariant holds (an active group entering retry
 --    is never itself parked, so this normally writes straight to ready).
 local readyKey = keyPrefix .. "ready"
-addToReadyOrParked(readyKey, groupId, dispatchAfterMs, false)
+addToReadyOrParked(readyKey, groupId, nowMs + retryTtlSec * 1000, false)
 
 -- 4. Set active key TTL to match backoff period.
 --    While the key exists the group is locked (preserves FIFO ordering).
---    When it expires the dispatcher picks up the retry job on its next poll.
+--    When it expires the ready score (aligned above) wakes the dispatcher.
 redis.call("EXPIRE", activeKey, retryTtlSec)
 
 -- 5. Bump this slot's expiry score in lockstep with the activeKey TTL so the

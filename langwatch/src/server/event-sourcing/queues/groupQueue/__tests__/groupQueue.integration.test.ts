@@ -609,6 +609,49 @@ describe.skipIf(!hasTestcontainers)(
           });
         });
       });
+
+      describe("when a failed job is in retry backoff with a live active lock", () => {
+        // Reviewer P2 on #4800: retry backoff frees the fastq slot (so the
+        // saturation guard does not apply) but holds the group's active lock
+        // for ceil(backoff)+2s, LONGER than the backoff itself. If the retry's
+        // ready score is the backoff due-time, the head turns due-but-locked
+        // for that window and the due-time wake floors to 50ms and busy-polls.
+        // RETRY_RESTAGE_LUA now scores ready at the lock expiry instead.
+        it("sleeps until the lock expires instead of busy-polling, then retries", async () => {
+          let attempts = 0;
+          const processFn = vi.fn(async (_p: TestPayload) => {
+            attempts++;
+            if (attempts === 1) throw new Error("simulated retryable failure");
+          });
+          const queue = createQueue(processFn);
+          await queue.waitUntilReady();
+
+          await queue.send({ id: "retry-1", groupId: "g1", value: "v" });
+          await vi.waitFor(() => expect(attempts).toBe(1), {
+            timeout: 5000,
+            interval: 25,
+          });
+
+          // attempt-1 backoff = 500ms, active lock = ceil(0.5)+2 = 3s. Enter
+          // the due-but-locked window (after +500ms) and count dispatcher
+          // peeks for 1s. Aligned score: ~1 (sleeps to lock expiry). Bug: ~20.
+          await new Promise((r) => setTimeout(r, 700));
+          const peekSpy = vi.spyOn(
+            GroupStagingScripts.prototype,
+            "peekEarliestReadyScore",
+          );
+          await new Promise((r) => setTimeout(r, 1000));
+          const peeksWhileLocked = peekSpy.mock.calls.length;
+          peekSpy.mockRestore();
+          expect(peeksWhileLocked).toBeLessThan(5);
+
+          // The retry still runs once the lock expires (~3s after failure).
+          await vi.waitFor(() => expect(attempts).toBe(2), {
+            timeout: 6000,
+            interval: 50,
+          });
+        });
+      });
     });
 
     describe("cross-group parallel processing", () => {
