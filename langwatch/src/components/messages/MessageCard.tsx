@@ -22,7 +22,6 @@ import {
   Shield,
   XCircle,
 } from "react-feather";
-import { BlurredContentGate } from "~/features/traces-v2/components/BlurredContentGate";
 import { useTraceDetailsDrawer } from "~/hooks/useTraceDetailsDrawer";
 import type {
   ElasticSearchEvaluation,
@@ -273,9 +272,6 @@ export function MessageCard({
             </VStack>
           )}
         </RedactedField>
-        {trace.redacted_by_visibility_window ? (
-          <BlurredContentGate traceId={trace.trace_id} />
-        ) : null}
       </VStack>
       <Spacer />
       <HStack width="full" alignItems="flex-end">
