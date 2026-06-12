@@ -9,7 +9,7 @@ import {
   chakra,
 } from "@chakra-ui/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { Plus, Sparkles, X } from "lucide-react";
+import { ChevronsRight, Plus, Sparkles, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { toaster } from "~/components/ui/toaster";
@@ -117,7 +117,7 @@ function LangyHandle({
       onClick={onToggle}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      aria-label={isOpen ? "Close Langy" : "Open Langy assistant"}
+      aria-label={isOpen ? "Hide Langy" : "Open Langy assistant"}
       aria-keyshortcuts="Meta+I Control+I"
       position="fixed"
       right={isOpen ? `${PANEL_WIDTH}px` : 0}
@@ -125,28 +125,27 @@ function LangyHandle({
       width={`${PILL_WIDTH}px`}
       paddingY="14px"
       zIndex={1600}
-      // The ribbon exists to OPEN the panel. While the panel is open it's
-      // redundant chrome (the header ✕ and ⌘I both close) floating over page
-      // content — fade it out and let it slide away with the panel.
-      opacity={isOpen ? 0 : 1}
-      pointerEvents={isOpen ? "none" : "auto"}
-      aria-hidden={isOpen}
-      tabIndex={isOpen ? -1 : 0}
       cursor="pointer"
       borderTopLeftRadius="999px"
       borderBottomLeftRadius="999px"
-      background="transparent"
+      // Two personalities. Closed: the loud branded opener (mesh gradient,
+      // LANGY wordmark). Open: a quiet collapse tab hugging the panel edge —
+      // still the biggest close target on screen, but it stops competing
+      // with the panel content for attention.
+      background={isOpen ? "bg.panel" : "transparent"}
       borderWidth="1px"
       borderStyle="solid"
-      borderColor="rgba(255,255,255,0.18)"
+      borderColor={isOpen ? "border.muted" : "rgba(255,255,255,0.18)"}
       borderRightWidth={0}
-      color="white"
-      boxShadow={hover ? AI_SHADOW : AI_SHADOW_SOFT}
+      color={isOpen ? "fg.muted" : "white"}
+      boxShadow={
+        isOpen ? "sm" : hover ? AI_SHADOW : AI_SHADOW_SOFT
+      }
       transform={hover ? "translate(-2px, -50%)" : "translateY(-50%)"}
-      transition={`right ${LANGY_TRANSITION}, opacity ${LANGY_TRANSITION}, transform 180ms ease, box-shadow 180ms ease`}
+      transition={`right ${LANGY_TRANSITION}, background 180ms ease, color 180ms ease, transform 180ms ease, box-shadow 180ms ease`}
       overflow="hidden"
     >
-      <MeshGradientLayer active={hover} />
+      {!isOpen && <MeshGradientLayer active={hover} />}
       <VStack
         gap={2}
         align="center"
@@ -154,19 +153,25 @@ function LangyHandle({
         position="relative"
         zIndex={1}
       >
-        <Sparkles size={14} color="white" />
-        <Text
-          textStyle="2xs"
-          fontWeight="700"
-          letterSpacing="0.12em"
-          color="white"
-          style={{
-            writingMode: "vertical-rl",
-            textOrientation: "mixed",
-          }}
-        >
-          LANGY
-        </Text>
+        {isOpen ? (
+          <ChevronsRight size={16} />
+        ) : (
+          <>
+            <Sparkles size={14} color="white" />
+            <Text
+              textStyle="2xs"
+              fontWeight="700"
+              letterSpacing="0.12em"
+              color="white"
+              style={{
+                writingMode: "vertical-rl",
+                textOrientation: "mixed",
+              }}
+            >
+              LANGY
+            </Text>
+          </>
+        )}
       </VStack>
     </chakra.button>
   );
@@ -175,7 +180,7 @@ function LangyHandle({
     <Tooltip
       content={
         <HStack gap={2}>
-          <Text>{isOpen ? "Close Langy" : "Open Langy"}</Text>
+          <Text>{isOpen ? "Hide Langy" : "Open Langy"}</Text>
           <HStack gap={1}>
             <Kbd>⌘</Kbd>
             <Kbd>I</Kbd>

@@ -105,7 +105,19 @@ export function LangyGitHubMenu({
           </IconButton>
         </Menu.Trigger>
       </Tooltip>
-      <Menu.Content minWidth="220px">
+      <Menu.Content
+        minWidth="220px"
+        // Liquid-glass — matches RecentChatsMenu so the two header dropdowns
+        // read as one material.
+        background="bg.panel/70"
+        borderWidth="1px"
+        borderColor="border.muted"
+        boxShadow="lg"
+        css={{
+          backdropFilter: "blur(18px) saturate(0.5)",
+          WebkitBackdropFilter: "blur(18px) saturate(0.5)",
+        }}
+      >
         <Menu.ItemGroup>
           <Box paddingX={2} paddingY={1} fontSize="xs" color="fg.muted">
             Acting as <strong>@{connection.data.githubLogin}</strong>
