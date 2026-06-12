@@ -22,6 +22,7 @@ const getServerAuthSession = vi.fn();
 const upsert = vi.fn();
 const auditLog = vi.fn();
 const encrypt = vi.fn((v: string) => `enc(${v})`);
+const membershipFindUnique = vi.fn();
 
 vi.mock("~/server/auth", () => ({
   getServerAuthSession: (...args: unknown[]) => getServerAuthSession(...args),
@@ -30,6 +31,9 @@ vi.mock("~/server/db", () => ({
   prisma: {
     userGitHubCredential: {
       upsert: (...args: unknown[]) => upsert(...args),
+    },
+    organizationUser: {
+      findUnique: (...args: unknown[]) => membershipFindUnique(...args),
     },
   },
 }));
@@ -52,6 +56,7 @@ async function makeState(
     mode: "popup" | "redirect";
     returnTo: string;
     issuedAt: number;
+    nonceRegistered: boolean;
   }> = {},
 ) {
   const { signGithubOauthState } = await import(
@@ -65,6 +70,9 @@ async function makeState(
       returnTo: payload.returnTo ?? "/settings/integrations#github",
       issuedAt: payload.issuedAt ?? Date.now(),
       nonce: "n",
+      // Redis isn't wired under unit test, so the connect leg couldn't have
+      // registered the nonce — the callback must skip consumption.
+      nonceRegistered: payload.nonceRegistered ?? false,
     },
     TEST_SIGNING_KEY,
   );
@@ -112,6 +120,43 @@ describe("GET /api/github-langy/callback", () => {
     vi.clearAllMocks();
     vi.unstubAllGlobals();
     getServerAuthSession.mockResolvedValue({ user: { id: "u1" } });
+    membershipFindUnique.mockResolvedValue({ userId: "u1", organizationId: "org1" });
+  });
+
+  describe("when the state user is not a member of the state organization", () => {
+    it("rejects with 403 without exchanging the code", async () => {
+      const state = await makeState();
+      membershipFindUnique.mockResolvedValue(null);
+      const fetchMock = mockGithubFetch();
+      const res = await callCallback(
+        `http://localhost/api/github-langy/callback?code=c&state=${encodeURIComponent(state)}`,
+      );
+      expect(res.status).toBe(403);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(upsert).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the exchange fails in redirect mode with a fragment returnTo", () => {
+    it("puts ?githubError before the #fragment so the page can read it", async () => {
+      const state = await makeState({
+        mode: "redirect",
+        returnTo: "/settings/integrations#github",
+      });
+      mockGithubFetch({
+        exchange: () =>
+          new Response(JSON.stringify({ error: "bad_verification_code" }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          }),
+      });
+      const res = await callCallback(
+        `http://localhost/api/github-langy/callback?code=c&state=${encodeURIComponent(state)}`,
+      );
+      expect(res.status).toBe(302);
+      const location = res.headers.get("location") ?? "";
+      expect(location).toMatch(/^\/settings\/integrations\?githubError=.+#github$/);
+    });
   });
 
   describe("when state is missing or malformed", () => {

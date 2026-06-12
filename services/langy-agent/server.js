@@ -315,10 +315,17 @@ async function spawnWorker(conversationId, credentials) {
   // AGENTS.md (with concrete URLs) and per-worker config (with the right
   // MCP env). Env vars carry the per-session credentials redundantly so
   // the MCP server gets them via env OR via config.json — defense in depth.
-  // Strip the manager's internal bearer secret from the worker env — workers
-  // never call back into the manager, and forwarding it would break the
-  // per-session isolation boundary this whole process model exists to enforce.
-  const { LANGY_INTERNAL_SECRET: _internalSecret, ...baseEnv } = process.env;
+  // Strip manager-side secrets from the worker env — workers never call back
+  // into the manager, and forwarding them would break the per-session
+  // isolation boundary this whole process model exists to enforce. Pattern-
+  // based so a secret added to the pod env later doesn't silently flow into
+  // every untrusted worker; the credentials a worker DOES need are injected
+  // explicitly below (after the spread, so they always win).
+  const SENSITIVE_ENV_RE =
+    /^(LANGY_INTERNAL_SECRET$|GITHUB_LANGY_|CREDENTIALS_SECRET$|NEXTAUTH_|DATABASE_URL$|AWS_SECRET_)/;
+  const baseEnv = Object.fromEntries(
+    Object.entries(process.env).filter(([k]) => !SENSITIVE_ENV_RE.test(k)),
+  );
 
   const child = spawn(
     "opencode",
@@ -370,6 +377,7 @@ async function spawnWorker(conversationId, credentials) {
       `worker ${conversationId} exited (code=${code}, signal=${signal})`,
     );
     workers.delete(conversationId);
+    removeWorkerHome(conversationId);
   });
 
   try {
@@ -391,6 +399,24 @@ async function spawnWorker(conversationId, credentials) {
   return info;
 }
 
+// Delete the per-worker home (config.json holds the plaintext LangWatch API
+// key; $HOME/work holds cloned repos). Without this, secrets and clones
+// accumulate on the pod volume forever — the github.md skill's "the idle
+// reaper cleans it with the session" guarantee lives HERE.
+function removeWorkerHome(conversationId) {
+  if (!isValidConversationId(conversationId)) return;
+  const workerHome = path.join(SESSIONS_ROOT, conversationId);
+  const resolvedRoot = path.resolve(SESSIONS_ROOT);
+  if (!path.resolve(workerHome).startsWith(`${resolvedRoot}${path.sep}`)) {
+    return;
+  }
+  try {
+    fs.rmSync(workerHome, { recursive: true, force: true });
+  } catch (err) {
+    console.error(`failed to remove worker home ${conversationId}:`, err.message);
+  }
+}
+
 function killWorker(conversationId, reason) {
   const w = workers.get(conversationId);
   if (!w) return;
@@ -400,6 +426,9 @@ function killWorker(conversationId, reason) {
   } catch {}
   // The exit handler removes from map; force-clean here in case it races.
   workers.delete(conversationId);
+  // The exit handler also rm's the home, but if SIGTERM is ignored or the
+  // child already died without firing it, clean up here too (idempotent).
+  removeWorkerHome(conversationId);
 }
 
 setInterval(() => {

@@ -50,7 +50,7 @@ import {
   LANGY_GITHUB_PRS_PER_DAY,
   recordLangyGithubPr,
 } from "~/server/middleware/rate-limit-langy-github-prs";
-import { extractGithubPrLinks } from "~/server/services/langy/githubPrLinks";
+import { extractOpenedPrLinks } from "~/server/services/langy/githubPrLinks";
 import { stripLangySentinels } from "~/server/services/langy/langySentinels";
 import type { NextRequestShim } from "./types";
 
@@ -446,13 +446,16 @@ langyRoute().post("/langy/chat", async (c) => {
         logger.error({ error }, "failed to persist langy assistant message");
       }
 
-      // Bump the per-user daily PR counter for each unique github.com PR URL
-      // the assistant mentioned in this turn. At-most-once: if the worker
-      // opens a PR but the URL never lands in the reply (worker crash mid-
-      // push, network blip), the cap under-counts. Preferred over double-
-      // counting on retries.
+      // Bump the per-user daily PR counter for each PR the assistant actually
+      // OPENED this turn — links are cross-referenced against the skill's
+      // `[langy:progress:opened:...]` sentinels so merely *mentioning* a PR
+      // ("summarize PR #4751") doesn't burn the cap or forge a `pr_opened`
+      // audit entry. At-most-once: if the worker opens a PR but the URL never
+      // lands in the reply (worker crash mid-push, network blip), the cap
+      // under-counts. Preferred over double-counting on retries. Parse from
+      // `fullText` (pre-strip) — sentinels are gone from `persistedText`.
       try {
-        const links = extractGithubPrLinks(fullText);
+        const links = extractOpenedPrLinks(fullText);
         for (const link of links) {
           await recordLangyGithubPr({ userId: session.user.id });
           await auditLog({

@@ -16,7 +16,10 @@ import { z } from "zod";
 
 import { env } from "~/env.mjs";
 import { auditLog } from "~/server/auditLog";
-import { getGithubTokenForUser } from "~/server/services/langy/langyGithubToken";
+import {
+  clearGithubTokenCache,
+  getGithubTokenForUser,
+} from "~/server/services/langy/langyGithubToken";
 import { createLogger } from "~/utils/logger/server";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import type { PrismaClient } from "@prisma/client";
@@ -143,6 +146,13 @@ export const langyGithubRouter = createTRPCRouter({
           userId: ctx.session.user.id,
           organizationId: input.organizationId,
         },
+      });
+      // The revoke above just killed the access token GitHub-side, but the
+      // mint path CACHED that very token (up to 7h). Drop it so a reconnect
+      // mints fresh instead of serving the revoked one to workers.
+      await clearGithubTokenCache({
+        userId: ctx.session.user.id,
+        organizationId: input.organizationId,
       });
       if (deleted.count > 0) {
         await auditLog({

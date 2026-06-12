@@ -32,6 +32,7 @@ import {
   type GithubOauthStatePayload,
 } from "~/server/services/langy/githubOauthState";
 import {
+  clearGithubTokenCache,
   consumeGithubOauthNonce,
   registerGithubOauthNonce,
 } from "~/server/services/langy/langyGithubToken";
@@ -104,12 +105,40 @@ function appConfigured() {
   );
 }
 
+// encrypt() (utils/encryption) requires a 32-byte hex CREDENTIALS_SECRET.
+// signingKey() above tolerates any string, so without this check a non-hex
+// secret lets the whole OAuth dance succeed at GitHub and then 500 at the
+// final upsert. Fail fast at /connect instead.
+function encryptionConfigured(): boolean {
+  const secret = env.CREDENTIALS_SECRET ?? env.NEXTAUTH_SECRET;
+  return typeof secret === "string" && /^[0-9a-fA-F]{64}$/.test(secret);
+}
+
+// Append ?githubError=... while preserving a fragment in returnTo (the
+// default is `/settings/integrations#github` — naive `${returnTo}?x=y`
+// would bury the query inside the fragment where nothing can read it).
+function withGithubError(returnTo: string, message: string): string {
+  const url = new URL(returnTo, "http://relative.invalid");
+  url.searchParams.set("githubError", message);
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
 secured
   .access(publicEndpoint(PUBLIC_REASON))
   .get("/github-langy/connect", async (c) => {
     if (!appConfigured()) {
       return c.json(
         { error: "GitHub integration is not configured on this instance." },
+        { status: 503 },
+      );
+    }
+    if (!encryptionConfigured()) {
+      return c.json(
+        {
+          error:
+            "CREDENTIALS_SECRET (or NEXTAUTH_SECRET) must be a 32-byte hex " +
+            "string to store GitHub credentials on this instance.",
+        },
         { status: 503 },
       );
     }
@@ -155,7 +184,13 @@ secured
     // Register the nonce in Redis with the same TTL as the signed state. The
     // callback consumes it once and rejects replays. When Redis isn't wired
     // the check skips silently — the signature + session-rebind still defend.
-    await registerGithubOauthNonce(nonce, Math.ceil(STATE_TTL_MS / 1000));
+    // Whether registration succeeded rides in the SIGNED state, so a Redis
+    // flap between connect (down — nonce never stored) and callback (up —
+    // "missing" looks like a replay) can't 401 a legitimate first use.
+    const nonceRegistered = await registerGithubOauthNonce(
+      nonce,
+      Math.ceil(STATE_TTL_MS / 1000),
+    );
 
     const state = signState({
       userId: session.user.id,
@@ -164,6 +199,7 @@ secured
       returnTo,
       issuedAt: Date.now(),
       nonce,
+      nonceRegistered,
     });
 
     const redirectUri = `${appOrigin(c.req.url)}/api/github-langy/callback`;
@@ -288,13 +324,15 @@ secured
       return c.html(popupErrorHtml("Session changed mid-flow"), 401);
     }
 
-    // Burn the nonce. If Redis is wired and the nonce is missing, the state
-    // was already used (replay) — reject. If Redis isn't wired, the nonce
-    // check returns null and we fall through to the signature + session
-    // defenses (already cleared above).
-    const nonceConsumed = await consumeGithubOauthNonce(state.nonce);
-    if (nonceConsumed === false) {
-      return c.html(popupErrorHtml("State already used"), 401);
+    // Burn the nonce. If the nonce was registered at /connect and is missing
+    // now, the state was already used (replay) — reject. If it was never
+    // registered (Redis down at /connect — the signed flag says so) or Redis
+    // is down now (null), fall through to the signature + session defenses.
+    if (state.nonceRegistered) {
+      const nonceConsumed = await consumeGithubOauthNonce(state.nonce);
+      if (nonceConsumed === false) {
+        return c.html(popupErrorHtml("State already used"), 401);
+      }
     }
 
     // Re-check tenant membership on the callback too. Same threat as in
@@ -314,6 +352,10 @@ secured
 
     const redirectUri = `${appOrigin(c.req.url)}/api/github-langy/callback`;
 
+    // The state is signed, but re-apply the returnTo allowlist anyway —
+    // defense in depth against a future signer that forgets to sanitize.
+    const returnTo = safeReturnTo(state.returnTo);
+
     let token: GithubTokenResponse;
     let user: GithubUser;
     try {
@@ -324,10 +366,7 @@ secured
       const msg = err instanceof Error ? err.message : String(err);
       return state.mode === "popup"
         ? c.html(popupErrorHtml(msg), 502)
-        : c.redirect(
-            `${state.returnTo}?githubError=${encodeURIComponent(msg)}`,
-            302,
-          );
+        : c.redirect(withGithubError(returnTo, msg), 302);
     }
 
     await prisma.userGitHubCredential.upsert({
@@ -353,6 +392,14 @@ secured
       },
     });
 
+    // A reconnect may follow a disconnect that revoked the previous grant;
+    // the mint cache could still hold a token from that dead grant. Clear it
+    // so the next chat mints from the refresh token we just stored.
+    await clearGithubTokenCache({
+      userId: state.userId,
+      organizationId: state.organizationId,
+    });
+
     await auditLog({
       userId: state.userId,
       organizationId: state.organizationId,
@@ -363,7 +410,7 @@ secured
     if (state.mode === "popup") {
       return c.html(popupResponseHtml(user.login), 200);
     }
-    return c.redirect(state.returnTo, 302);
+    return c.redirect(returnTo, 302);
   });
 
 export const app = secured.hono;

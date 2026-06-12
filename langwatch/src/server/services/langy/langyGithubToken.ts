@@ -34,6 +34,33 @@ export type LangyGithubToken = {
   githubLogin: string;
 };
 
+function accessTokenCacheKey(userId: string, organizationId: string): string {
+  return `langy:gh:at:${userId}:${organizationId}`;
+}
+
+/**
+ * Drop the cached access token for (user, org). MUST be called on disconnect
+ * (the token was just revoked at GitHub — serving it from cache for up to 7h
+ * would hand workers a dead credential) and on (re)connect (the cache may
+ * hold a token minted under the previous, now-revoked grant).
+ */
+export async function clearGithubTokenCache({
+  userId,
+  organizationId,
+}: {
+  userId: string;
+  organizationId: string;
+}): Promise<void> {
+  if (!connection) return;
+  try {
+    await (connection as { del: (k: string) => Promise<number> }).del(
+      accessTokenCacheKey(userId, organizationId),
+    );
+  } catch {
+    /* best-effort — the cache TTL bounds the damage if Redis hiccups */
+  }
+}
+
 export async function getGithubTokenForUser({
   prisma,
   userId,
@@ -53,7 +80,7 @@ export async function getGithubTokenForUser({
   });
   if (!row) return null;
 
-  const cacheKey = `langy:gh:at:${userId}:${organizationId}`;
+  const cacheKey = accessTokenCacheKey(userId, organizationId);
   const cached = await redisGet(cacheKey);
   if (cached) {
     return { token: cached, githubLogin: row.githubLogin };
@@ -84,9 +111,19 @@ export async function getGithubTokenForUser({
       return null;
     }
 
+    // Re-read the row INSIDE the lock. The pre-lock read can be stale when a
+    // peer rotated the refresh token but its best-effort cache write failed —
+    // refreshing with the burned token would look like a dead grant and
+    // delete a perfectly healthy credential.
+    const lockedRow = await prisma.userGitHubCredential.findUnique({
+      where: { userId_organizationId: { userId, organizationId } },
+      select: { encryptedRefreshToken: true, githubLogin: true },
+    });
+    if (!lockedRow) return null;
+
     let refreshToken: string;
     try {
-      refreshToken = decrypt(row.encryptedRefreshToken);
+      refreshToken = decrypt(lockedRow.encryptedRefreshToken);
     } catch (err) {
       logger.warn(
         { err, userId, organizationId },
@@ -98,16 +135,23 @@ export async function getGithubTokenForUser({
       return null;
     }
 
-    const refreshed = await refreshAtGitHub(refreshToken);
-    if (!refreshed) {
-      // Refresh failed in a way that indicates the grant is dead (revoked App,
-      // user revoked, expired refresh). Delete the row so the next chat tells
-      // the user to reconnect, instead of looping on a broken credential.
-      await prisma.userGitHubCredential.deleteMany({
-        where: { userId, organizationId },
-      });
+    const refreshOutcome = await refreshAtGitHub(refreshToken);
+    if (!refreshOutcome.ok) {
+      if (refreshOutcome.grantDead) {
+        // The grant is definitively dead (bad_refresh_token / 401 — revoked
+        // App, user revoked, expired refresh). Delete the row so the next
+        // chat tells the user to reconnect, instead of looping on a broken
+        // credential.
+        await prisma.userGitHubCredential.deleteMany({
+          where: { userId, organizationId },
+        });
+      }
+      // Transient failure (GitHub 5xx, rate limit, network) — keep the row
+      // and let the user retry. Deleting here would turn a GitHub blip into
+      // a forced re-OAuth for every connected user.
       return null;
     }
+    const refreshed = refreshOutcome.token;
 
     // Persist the rotated refresh token in the same transaction window. We
     // accept a tiny vulnerability: if the process crashes between GitHub
@@ -148,43 +192,74 @@ type RefreshedToken = {
   expires_in: number;
 };
 
+type RefreshOutcome =
+  | { ok: true; token: RefreshedToken }
+  /**
+   * grantDead distinguishes "this credential will never work again" (delete
+   * the row, surface the connect card) from a transient failure (GitHub
+   * 5xx / rate limit / network — keep the row, user retries).
+   */
+  | { ok: false; grantDead: boolean };
+
+// Bounded under the Redis lock TTL (10s) so a slow GitHub call can't outlive
+// the lock and let a second caller race the single-use rotation.
+const REFRESH_FETCH_TIMEOUT_MS = (LOCK_TTL_SEC - 2) * 1000;
+
 async function refreshAtGitHub(
   refreshToken: string,
-): Promise<RefreshedToken | null> {
-  const res = await fetch(GITHUB_TOKEN_URL, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: new URLSearchParams({
-      client_id: env.GITHUB_LANGY_CLIENT_ID!,
-      client_secret: env.GITHUB_LANGY_CLIENT_SECRET!,
-      grant_type: "refresh_token",
-      refresh_token: refreshToken,
-    }),
-  });
-  const body = (await res.json()) as {
+): Promise<RefreshOutcome> {
+  let res: Response;
+  let body: {
     access_token?: string;
     refresh_token?: string;
     expires_in?: number;
     error?: string;
   };
-  if (
-    !res.ok ||
-    body.error ||
-    !body.access_token ||
-    !body.refresh_token ||
-    typeof body.expires_in !== "number"
-  ) {
-    logger.warn({ status: res.status, error: body.error }, "refresh failed");
-    return null;
+  try {
+    res = await fetch(GITHUB_TOKEN_URL, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        client_id: env.GITHUB_LANGY_CLIENT_ID!,
+        client_secret: env.GITHUB_LANGY_CLIENT_SECRET!,
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+      }),
+      signal: AbortSignal.timeout(REFRESH_FETCH_TIMEOUT_MS),
+    });
+    body = (await res.json()) as typeof body;
+  } catch (err) {
+    logger.warn({ err }, "refresh failed (network/timeout) — keeping row");
+    return { ok: false, grantDead: false };
   }
-  return {
-    access_token: body.access_token,
-    refresh_token: body.refresh_token,
-    expires_in: body.expires_in,
-  };
+  if (
+    res.ok &&
+    !body.error &&
+    body.access_token &&
+    body.refresh_token &&
+    typeof body.expires_in === "number"
+  ) {
+    return {
+      ok: true,
+      token: {
+        access_token: body.access_token,
+        refresh_token: body.refresh_token,
+        expires_in: body.expires_in,
+      },
+    };
+  }
+  // GitHub's OAuth token endpoint reports grant errors as a JSON `error`
+  // field (often with HTTP 200). Anything 5xx — or a response with no error
+  // field at all — is treated as transient.
+  const grantDead = res.status < 500 && Boolean(body.error);
+  logger.warn(
+    { status: res.status, error: body.error, grantDead },
+    "refresh failed",
+  );
+  return { ok: false, grantDead };
 }
 
 // ---------- Redis helpers (no-op when unavailable) ----------
