@@ -112,7 +112,7 @@ const FORBIDDEN_SCORE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
  * matching score (e.g. a deleted definition) keeps its id as the key so data is
  * never silently dropped. Prototype-polluting keys are skipped.
  */
-function remapScoreOptionsToNames(
+export function remapScoreOptionsToNames(
   scoreOptions: unknown,
   scoreNameById: Map<string, string>,
 ): Record<string, unknown> {
@@ -121,7 +121,13 @@ function remapScoreOptionsToNames(
   for (const [scoreId, value] of Object.entries(
     scoreOptions as Record<string, unknown>,
   )) {
-    const key = scoreNameById.get(scoreId) ?? scoreId;
+    const name = scoreNameById.get(scoreId) ?? scoreId;
+    if (FORBIDDEN_SCORE_KEYS.has(name)) continue;
+    // AnnotationScore names are not unique. On a collision the first entry
+    // keeps the plain name and later ones get an id-suffixed key — deterministic
+    // (object iteration is insertion-ordered) and lossless, instead of the
+    // engine-defined last-write-wins this used to be.
+    const key = name in remapped ? `${name} (${scoreId})` : name;
     if (FORBIDDEN_SCORE_KEYS.has(key)) continue;
     remapped[key] = value;
   }
@@ -1743,6 +1749,13 @@ export class ClickHouseTraceService {
     /** Column the date window + ORDER BY run on (must match the page-ID query). */
     dateColumn?: "OccurredAt" | "UpdatedAt";
   }): Promise<TraceSummaryRow[]> {
+    // dateColumn is interpolated into SQL. The surface validates it via a zod
+    // enum, but this method is also reachable from tRPC/internal paths whose
+    // options are only TypeScript-narrowed — assert at the trust boundary so a
+    // non-enum value can never reach the query string (defense-in-depth).
+    if (dateColumn !== "OccurredAt" && dateColumn !== "UpdatedAt") {
+      throw new Error(`Invalid dateColumn: ${String(dateColumn)}`);
+    }
     const computedInputExpr = fetchIO ? "ts.ComputedInput" : "''";
     const computedOutputExpr = fetchIO ? "ts.ComputedOutput" : "''";
     const isUpdatedAxis = dateColumn === "UpdatedAt";
@@ -1875,9 +1888,21 @@ export class ClickHouseTraceService {
     const traceIds = traces.map((t) => t.trace_id);
     if (traceIds.length === 0) return;
 
+    // Occurrence anchor per trace: started_at, falling back to updated_at for
+    // legacy/corrupt rows missing it — the scan must NEVER run time-unbounded
+    // (that is the exact blowup the windowing prevents). Traces with no usable
+    // timestamp at all get an empty events[] rather than an unbounded scan.
     const occurredAts = traces
-      .map((t) => t.timestamps?.started_at)
+      .map((t) => t.timestamps?.started_at || t.timestamps?.updated_at)
       .filter((t): t is number => typeof t === "number" && t > 0);
+    if (occurredAts.length === 0) {
+      this.logger.warn(
+        { projectId, traceCount: traces.length },
+        "No usable timestamps on page traces; skipping events projection rather than scanning unbounded",
+      );
+      for (const trace of traces) trace.events = [];
+      return;
+    }
     // Cluster the occurrence times so the stored_spans scan is bounded to the
     // partitions the page's traces ACTUALLY occurred in. The updated axis can
     // put traces months apart on one page; a single min/max window would span

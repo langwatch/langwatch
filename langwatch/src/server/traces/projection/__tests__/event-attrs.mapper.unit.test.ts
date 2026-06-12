@@ -49,6 +49,23 @@ describe("mapEventAttrsToEvent", () => {
     });
   });
 
+  describe("when a metric value is empty, whitespace, or hex", () => {
+    it("drops it instead of coercing to a bogus number", () => {
+      const event = mapEventAttrsToEvent({
+        row: row({
+          "event.type": "thumbs_up_down",
+          "event.metrics.empty": "",
+          "event.metrics.blank": "   ",
+          "event.metrics.hex": "0x1f",
+          "event.metrics.valid": "-2.5",
+        }),
+        projectId: "project-1",
+      });
+
+      expect(event?.metrics).toEqual({ valid: -2.5 });
+    });
+  });
+
   describe("when the span has no event.type", () => {
     it("returns null so it is not counted as an event", () => {
       expect(

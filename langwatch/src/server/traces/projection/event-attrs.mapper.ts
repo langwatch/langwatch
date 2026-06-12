@@ -19,6 +19,8 @@ export interface EventSpanRow {
 }
 
 const METRICS_PREFIX = "event.metrics.";
+/** Plain decimal numbers only — rejects '', whitespace, hex, exponents-with-garbage. */
+const DECIMAL_RE = /^-?\d+(\.\d+)?([eE][+-]?\d+)?$/;
 const DETAILS_PREFIX = "event.details.";
 
 export function mapEventAttrsToEvent({
@@ -36,9 +38,11 @@ export function mapEventAttrsToEvent({
   const details: Record<string, string> = {};
   for (const [key, value] of Object.entries(attrs)) {
     if (key.startsWith(METRICS_PREFIX)) {
-      const num = Number(value);
-      if (Number.isFinite(num)) {
-        metrics[key.slice(METRICS_PREFIX.length)] = num;
+      // Strict decimal gate: Number('') / Number('   ') coerce to 0 and
+      // Number('0x1f') parses hex — all of which would silently project a
+      // bogus metric. An absent/garbled metric must stay absent, not become 0.
+      if (DECIMAL_RE.test(value.trim())) {
+        metrics[key.slice(METRICS_PREFIX.length)] = Number(value);
       }
     } else if (key.startsWith(DETAILS_PREFIX)) {
       details[key.slice(DETAILS_PREFIX.length)] = value;
