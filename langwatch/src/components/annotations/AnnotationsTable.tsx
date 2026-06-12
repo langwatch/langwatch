@@ -572,7 +572,13 @@ export const AnnotationsTable = ({
                                     item.trace?.timestamps.started_at ?? "",
                                   ).toLocaleDateString()}
                                 </Text>
-                                <TraceIdPeek traceId={item.traceId} />
+                                <TraceIdPeek
+                                  traceId={item.traceId}
+                                  occurredAtMs={
+                                    item.trace?.timestamps.started_at ||
+                                    undefined
+                                  }
+                                />
                               </HStack>
                             </Table.Cell>
                           </Table.Row>
