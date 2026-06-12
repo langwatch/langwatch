@@ -2275,8 +2275,11 @@ describe("GroupStagingScripts", () => {
         // Active key expires after the short backoff TTL
         await redis.del(`${keyPrefix()}group:g-retry:active`);
 
-        // Dispatch the retry job
-        const d2 = await scripts.dispatch({ nowMs: 400, activeTtlSec: 60 });
+        // Dispatch the retry job. The retry's ready score is the LOCK expiry
+        // (dispatchAfterMs - backoffMs + retryTtlSec*1000 = 300-1000+3000 =
+        // 2300), not the backoff due-time — see RETRY_RESTAGE_LUA step 3 —
+        // so the group only re-enters the scan from then on.
+        const d2 = await scripts.dispatch({ nowMs: 2400, activeTtlSec: 60 });
         expect(d2).not.toBeNull();
         expect(d2!.stagedJobId).toBe("j1/r/1");
 
@@ -2340,8 +2343,10 @@ describe("GroupStagingScripts", () => {
         });
         await redis.del(`${keyPrefix()}group:g-multi:active`);
 
-        // Attempt 2: dispatch → fail → retryRestage
-        const d2 = await scripts.dispatch({ nowMs: 400, activeTtlSec: 60 });
+        // Attempt 2 — each retry's ready score is its lock expiry
+        // (dispatchAfterMs - backoffMs + retryTtlSec*1000): here
+        // 300-500+3000 = 2800, so dispatch after that.
+        const d2 = await scripts.dispatch({ nowMs: 2900, activeTtlSec: 60 });
         expect(d2!.stagedJobId).toBe("j1/r/1");
         await scripts.retryRestage({
           groupId: "g-multi",
@@ -2353,8 +2358,8 @@ describe("GroupStagingScripts", () => {
         });
         await redis.del(`${keyPrefix()}group:g-multi:active`);
 
-        // Attempt 3: dispatch → fail → retryRestage
-        const d3 = await scripts.dispatch({ nowMs: 600, activeTtlSec: 60 });
+        // Attempt 3: lock expiry = 500-1000+3000 = 2500
+        const d3 = await scripts.dispatch({ nowMs: 3000, activeTtlSec: 60 });
         expect(d3!.stagedJobId).toBe("j1/r/2");
         await scripts.retryRestage({
           groupId: "g-multi",
@@ -2366,8 +2371,8 @@ describe("GroupStagingScripts", () => {
         });
         await redis.del(`${keyPrefix()}group:g-multi:active`);
 
-        // Attempt 4: dispatch → success
-        const d4 = await scripts.dispatch({ nowMs: 800, activeTtlSec: 60 });
+        // Attempt 4: lock expiry = 700-2000+4000 = 2700
+        const d4 = await scripts.dispatch({ nowMs: 3100, activeTtlSec: 60 });
         expect(d4!.stagedJobId).toBe("j1/r/3");
         await scripts.complete({ groupId: "g-multi", stagedJobId: "j1/r/3" });
 
@@ -2401,9 +2406,10 @@ describe("GroupStagingScripts", () => {
         });
         expect(await inspectTotalPending()).toBe(1);
 
-        // Active key expires, dispatch retry: DECR → counter = 0
+        // Active key expires, dispatch retry: DECR → counter = 0.
+        // Retry ready score = lock expiry (300-500+3000 = 2800).
         await redis.del(`${keyPrefix()}group:g-balanced:active`);
-        await scripts.dispatch({ nowMs: 400, activeTtlSec: 60 });
+        await scripts.dispatch({ nowMs: 2900, activeTtlSec: 60 });
         expect(await inspectTotalPending()).toBe(0);
 
         // Complete: no counter change → counter = 0

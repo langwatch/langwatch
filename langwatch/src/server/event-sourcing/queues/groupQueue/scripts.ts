@@ -1322,6 +1322,10 @@ local retryTtlSec           = tonumber(ARGV[7])
 -- in-flight retry's slot doesn't lapse out of the live count.
 local tenantCountKeyPrefix  = ARGV[8]
 local nowMs                 = tonumber(ARGV[9])
+-- When the active lock expires, on the CALLER's clock (derived from
+-- dispatchAfterMs/backoffMs in the wrapper, NOT this pod's Date.now(), so it
+-- shares a time base with every other score).
+local lockExpiresAtMs       = tonumber(ARGV[10])
 
 -- 1. Validate active key matches
 local currentActive = redis.call("GET", activeKey)
@@ -1351,7 +1355,7 @@ refreshGroupKeyTtl(groupJobsKey, groupDataKey, nowMs)
 --    parked-aware write so the invariant holds (an active group entering retry
 --    is never itself parked, so this normally writes straight to ready).
 local readyKey = keyPrefix .. "ready"
-addToReadyOrParked(readyKey, groupId, nowMs + retryTtlSec * 1000, false)
+addToReadyOrParked(readyKey, groupId, lockExpiresAtMs, false)
 
 -- 4. Set active key TTL to match backoff period.
 --    While the key exists the group is locked (preserves FIFO ordering).
@@ -1938,6 +1942,12 @@ export class GroupStagingScripts {
     const totalPendingKey = `${this.keyPrefix}stats:total-pending`;
     // TTL = backoff + 2s buffer so the key expires just after the job becomes eligible
     const retryTtlSec = Math.ceil(backoffMs / 1000) + 2;
+    // When the lock expires, on the CALLER's clock: dispatchAfterMs is
+    // callerNow + backoffMs, so callerNow = dispatchAfterMs - backoffMs. The
+    // ready score is set to this instant (the first moment dispatch can
+    // succeed); deriving it from caller inputs keeps it on the same time base
+    // as every other score instead of mixing in this wrapper's Date.now().
+    const lockExpiresAtMs = dispatchAfterMs - backoffMs + retryTtlSec * 1000;
 
     const result = await this.redis.eval(
       RETRY_RESTAGE_LUA,
@@ -1953,6 +1963,7 @@ export class GroupStagingScripts {
       String(retryTtlSec),
       `${this.keyPrefix}tenant_active_z:`,
       String(Date.now()),
+      String(lockExpiresAtMs),
     );
 
     return result === 1;

@@ -112,22 +112,36 @@ export class GroupQueueDispatcher {
   }
 
   /**
+   * Backstop poll cadence when the ready HEAD is already past due. We only
+   * reach waitForSignal after dispatchBatch returned 0, so everything
+   * dispatchable was just dispatched — a past-due head here is either
+   * UNDISPATCHABLE (a job-level paused pipeline that skips in place, a group
+   * mid-transition, or any case nobody has enumerated yet) or a job that
+   * became due/dispatchable in the race since that scan (e.g. a completion
+   * signal destroyed by the post-dispatch signal DEL). Polling such a head at
+   * a tight floor would busy-poll Redis for as long as the condition lasts
+   * (a paused pipeline = the whole mitigation window); waiting the full
+   * heartbeat would re-introduce the 5s latency for the race case. 1s bounds
+   * EVERY due-but-undispatchable case to ~1 cycle/sec without enumerating
+   * them, and recovers the race case 5x faster than the heartbeat.
+   */
+  private static readonly PAST_DUE_POLL_SEC = 1;
+
+  /**
    * BRPOP timeout for the next wait: the heartbeat (signalTimeoutSec), but
-   * capped at the time until the earliest future-due job. A delayed/future-
+   * capped at the time until the earliest FUTURE-due job. A delayed/future-
    * scored job's signal fires at stage time (before it is due) and is drained,
    * so without this cap the dispatcher would sleep the full heartbeat and pick
-   * the job up to signalTimeoutSec late (#4742). Floored so an undispatchable
-   * due-now entry (e.g. work waiting on a freed concurrency slot, which a
-   * completion separately signals) can't busy-spin. Falls back to the full
-   * heartbeat on any peek error — never blocks forever, never misses a wakeup
-   * (a fresh stage still pushes a signal that wakes BRPOP immediately).
+   * the job up to signalTimeoutSec late (#4742). A past-due head polls at the
+   * PAST_DUE_POLL_SEC backstop (see above). Falls back to the full heartbeat
+   * on any peek error — never blocks forever, never misses a wakeup (a fresh
+   * stage still pushes a signal that wakes BRPOP immediately).
    */
   private async nextSignalTimeoutSec(): Promise<number> {
     // Saturated: every worker slot is in use (same check dispatchBatch uses), so
     // there is nothing to dispatch into regardless of how overdue ready jobs are.
     // A completion LPUSHes a signal when a slot frees, so wait the full heartbeat
-    // rather than poll — otherwise an overdue ready job (past score) would floor
-    // the wait to 50ms and busy-poll Redis (~80 cmd/s per dispatcher).
+    // rather than poll.
     const inFlight =
       this.params.processingQueue.length() +
       this.params.processingQueue.running();
@@ -142,6 +156,7 @@ export class GroupQueueDispatcher {
     }
     if (earliest === null) return this.params.signalTimeoutSec;
     const waitSec = (earliest - Date.now()) / 1000;
+    if (waitSec <= 0) return GroupQueueDispatcher.PAST_DUE_POLL_SEC;
     return Math.min(this.params.signalTimeoutSec, Math.max(0.05, waitSec));
   }
 

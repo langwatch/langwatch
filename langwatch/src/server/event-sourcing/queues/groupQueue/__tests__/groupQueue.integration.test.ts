@@ -652,6 +652,55 @@ describe.skipIf(!hasTestcontainers)(
           });
         });
       });
+
+      describe("when a due job is held by a job-level pause", () => {
+        // A pipeline/jobType/jobName pause skips the job IN PLACE — unlike a
+        // tenant pause it does not park the group, so the ready head stays
+        // past-due for the whole pause window. This is the general
+        // due-but-undispatchable case (not enumerable in advance): the
+        // dispatcher must poll it at the bounded PAST_DUE_POLL_SEC backstop,
+        // not floor its wait and busy-poll Redis for the entire mitigation.
+        it("polls at the bounded backstop while paused, then dispatches after unpause", async () => {
+          const pipelineName = `paused-pipe-${crypto.randomUUID().slice(0, 8)}`;
+          const queueName = `{test/gq/pause-${crypto.randomUUID().slice(0, 8)}}`;
+          const processed = vi
+            .fn<(payload: TestPayload) => Promise<void>>()
+            .mockResolvedValue(undefined);
+          const queue = createQueue(processed, { name: queueName });
+          const scripts = new GroupStagingScripts(redis, queueName);
+          await queue.waitUntilReady();
+          await scripts.addPauseKey(pipelineName);
+
+          // __pipelineName rides the payload into the staged value, where the
+          // dispatch Lua's routing-meta pause check reads it.
+          await queue.send({
+            id: "paused-1",
+            groupId: "g1",
+            value: "v",
+            __pipelineName: pipelineName,
+          } as unknown as TestPayload);
+
+          // Let the initial stage signal settle, then count dispatcher peeks
+          // over 1.5s of pause. Backstop (1s): ~2. Bug (50ms floor): ~20+.
+          await new Promise((r) => setTimeout(r, 300));
+          const peekSpy = vi.spyOn(
+            GroupStagingScripts.prototype,
+            "peekEarliestReadyScore",
+          );
+          await new Promise((r) => setTimeout(r, 1500));
+          const peeksWhilePaused = peekSpy.mock.calls.length;
+          peekSpy.mockRestore();
+          expect(processed).not.toHaveBeenCalled();
+          expect(peeksWhilePaused).toBeLessThan(5);
+
+          // Unpause: the backstop poll re-scans and dispatches within ~1s.
+          await scripts.removePauseKey(pipelineName);
+          await vi.waitFor(() => expect(processed).toHaveBeenCalledTimes(1), {
+            timeout: 5000,
+            interval: 50,
+          });
+        });
+      });
     });
 
     describe("cross-group parallel processing", () => {
