@@ -14,18 +14,14 @@
  *      default_personal_ingest_keys — drop entries whose lookupId is not
  *      in the live list, keep ones that are.
  */
-import {
-  afterEach,
-
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import * as cliApi from "../cli-api";
 import * as configMod from "../config";
 import type { GovernanceConfig } from "../config";
+import * as deviceFlow from "../device-flow";
+import { runUnifiedLoginFlow } from "../login-flow";
+import { resolveWrapperMode } from "../wrapper-mode";
 
 // ─── Module mocks ────────────────────────────────────────────────────────────
 
@@ -85,7 +81,6 @@ describe("resolveWrapperMode", () => {
   describe("given a cached ingest key", () => {
     describe("when the key is no longer live on the platform", () => {
       it("mints a fresh key, uses the new token, and persists it over the stale cache entry", async () => {
-        const { resolveWrapperMode } = await import("../wrapper-mode.js");
 
         const staleLookupId = "aabbccdd11223344";
         const staleToken = makeToken({ lookupId: staleLookupId });
@@ -135,7 +130,6 @@ describe("resolveWrapperMode", () => {
       });
 
       it("mints a fresh key when the server returns a different lookupId for that sourceType", async () => {
-        const { resolveWrapperMode } = await import("../wrapper-mode.js");
 
         const cachedLookupId = "aabbccdd11223344";
         const liveLookupId = "zzzzzzzz99999999"; // different — the old one was revoked
@@ -167,7 +161,6 @@ describe("resolveWrapperMode", () => {
 
     describe("when the key is still live on the platform (lookupId matches)", () => {
       it("reuses the cached token and does NOT call mintIngestionKey", async () => {
-        const { resolveWrapperMode } = await import("../wrapper-mode.js");
 
         const lookupId = "aabbccdd11223344";
         const cachedToken = makeToken({ lookupId });
@@ -194,7 +187,6 @@ describe("resolveWrapperMode", () => {
 
     describe("when listIngestionKeys rejects (network error / older server)", () => {
       it("falls back to the cached token without minting (offline fallback)", async () => {
-        const { resolveWrapperMode } = await import("../wrapper-mode.js");
 
         const lookupId = "aabbccdd11223344";
         const cachedToken = makeToken({ lookupId });
@@ -228,8 +220,6 @@ describe("runUnifiedLoginFlow", () => {
       it("removes stale entries whose lookupId is absent from the live list", async () => {
         // We exercise the real login-flow code path with all external
         // dependencies mocked at module boundaries.
-        const deviceFlow = await import("../device-flow.js");
-        const loginFlow = await import("../login-flow.js");
 
         const liveLookupId = "live0000live0000";
         const staleLookupId = "dead0000dead0000";
@@ -279,7 +269,7 @@ describe("runUnifiedLoginFlow", () => {
         // Suppress console output during test
         vi.spyOn(console, "log").mockImplementation(() => undefined);
 
-        await loginFlow.runUnifiedLoginFlow({ kind: "device_session", cfg });
+        await runUnifiedLoginFlow({ kind: "device_session", cfg });
 
         // saveConfig must have been called with claude_code removed (stale)
         // and codex retained (live)
@@ -304,8 +294,6 @@ describe("runUnifiedLoginFlow", () => {
       });
 
       it("keeps live entries that are still valid on the platform", async () => {
-        const deviceFlow = await import("../device-flow.js");
-        const loginFlow = await import("../login-flow.js");
 
         const liveLookupId = "live0000live0000";
         const liveToken = makeToken({ lookupId: liveLookupId });
@@ -347,7 +335,7 @@ describe("runUnifiedLoginFlow", () => {
 
         vi.spyOn(console, "log").mockImplementation(() => undefined);
 
-        await loginFlow.runUnifiedLoginFlow({ kind: "device_session", cfg });
+        await runUnifiedLoginFlow({ kind: "device_session", cfg });
 
         const savedCfgs: GovernanceConfig[] = (
           configMod.saveConfig as ReturnType<typeof vi.fn>
@@ -364,8 +352,6 @@ describe("runUnifiedLoginFlow", () => {
       });
 
       it("silently ignores errors from listIngestionKeys during reconcile", async () => {
-        const deviceFlow = await import("../device-flow.js");
-        const loginFlow = await import("../login-flow.js");
 
         const lookupId = "live0000live0000";
         const token = makeToken({ lookupId });
@@ -410,7 +396,7 @@ describe("runUnifiedLoginFlow", () => {
 
         // Must not throw even when listIngestionKeys fails
         await expect(
-          loginFlow.runUnifiedLoginFlow({ kind: "device_session", cfg }),
+          runUnifiedLoginFlow({ kind: "device_session", cfg }),
         ).resolves.toBeDefined();
       });
     });
