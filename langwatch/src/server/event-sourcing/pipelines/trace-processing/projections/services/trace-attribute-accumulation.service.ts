@@ -177,6 +177,26 @@ export class TraceAttributeAccumulationService {
     else if (Array.isArray(labels))
       result["langwatch.labels"] = JSON.stringify(labels);
 
+    // `tag.tags` is the reserved labels key of the legacy OTLP path
+    // (otel.traces.ts maps it to reservedTraceMetadata.labels) and what the
+    // Langy worker emits via OPENCODE_RESOURCE_ATTRIBUTES (tag.tags=langy).
+    // Honor the same contract here: fold span- or resource-level tag.tags
+    // (comma-separated string or array) into langwatch.labels so the trace
+    // actually carries the tag in the UI/filters. langwatch.labels wins on
+    // conflict; tag.tags values are unioned in.
+    const tagTags = spanAttrs["tag.tags"] ?? resourceAttrs["tag.tags"];
+    const tagList = Array.isArray(tagTags)
+      ? tagTags.filter((t): t is string => typeof t === "string")
+      : typeof tagTags === "string"
+        ? tagTags.split(",").map((t) => t.trim()).filter(Boolean)
+        : [];
+    if (tagList.length > 0) {
+      const existing = parseJsonStringArray(result["langwatch.labels"]);
+      result["langwatch.labels"] = JSON.stringify([
+        ...new Set([...existing, ...tagList]),
+      ]);
+    }
+
     const promptId = stringAttr(spanAttrs, "langwatch.prompt.id");
     if (promptId && promptId.includes(":")) {
       result["langwatch.prompt.id"] = promptId;
