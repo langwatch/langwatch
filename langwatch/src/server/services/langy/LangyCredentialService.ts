@@ -90,7 +90,8 @@ export class LangyCredentialService {
     }
 
     const langwatchEndpoint = process.env.LANGWATCH_API_URL;
-    const gatewayBaseUrl = process.env.LW_GATEWAY_BASE_URL;
+    const gatewayBaseUrl =
+      process.env.LW_GATEWAY_PUBLIC_URL ?? process.env.LW_GATEWAY_BASE_URL;
     if (!langwatchEndpoint) {
       throw new LangyCredentialResolutionError(
         "LANGWATCH_API_URL is not configured on the control plane.",
