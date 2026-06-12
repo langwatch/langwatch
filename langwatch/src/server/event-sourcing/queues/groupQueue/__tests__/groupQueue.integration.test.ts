@@ -30,6 +30,10 @@ type TestPayload = {
   id: string;
   groupId: string;
   value: string;
+  // Routing metadata the dispatch Lua reads from the staged value's header
+  // (e.g. for job-level pause checks). Optional; only set where a test
+  // exercises that path.
+  __pipelineName?: string;
 };
 
 function createQueueDefinition(
@@ -678,7 +682,7 @@ describe.skipIf(!hasTestcontainers)(
             groupId: "g1",
             value: "v",
             __pipelineName: pipelineName,
-          } as unknown as TestPayload);
+          });
 
           // Let the initial stage signal settle, then count dispatcher peeks
           // over 1.5s of pause. Backstop (1s): ~2. Bug (50ms floor): ~20+.
