@@ -804,6 +804,7 @@
             "pages": [
               "api-reference/traces/overview",
               "api-reference/traces/search",
+              "api-reference/traces/projection-dsl",
               "api-reference/traces/get-trace",
               "api-reference/traces/update-metadata",
               "api-reference/traces/create-public-trace-path",

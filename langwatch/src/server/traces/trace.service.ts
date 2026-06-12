@@ -1,14 +1,14 @@
 import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
-import { prisma as defaultPrisma } from "~/server/db";
-import type { Protections } from "~/server/elasticsearch/protections";
-import { mapTraceEvaluationsToLegacyEvaluations } from "~/server/evaluations/evaluation-run.mappers";
-import { EvaluationService } from "~/server/evaluations/evaluation.service";
-import type { Evaluation, Trace } from "~/server/tracer/types";
-import { createLogger } from "~/utils/logger/server";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
+import { prisma as defaultPrisma } from "~/server/db";
+import type { Protections } from "~/server/elasticsearch/protections";
+import { EvaluationService } from "~/server/evaluations/evaluation.service";
+import { mapTraceEvaluationsToLegacyEvaluations } from "~/server/evaluations/evaluation-run.mappers";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { Evaluation, Trace } from "~/server/tracer/types";
+import { createLogger } from "~/utils/logger/server";
 import { ClickHouseTraceService } from "./clickhouse-trace.service";
 import { ElasticsearchTraceService } from "./elasticsearch-trace.service";
 import { resolveOffloadedTraces } from "./resolve-offloaded-traces";
@@ -73,11 +73,13 @@ export class AmbiguousTraceIdPrefixError extends Error {
  * short-circuit to 404 without scanning.
  */
 const HEX_ONLY = /^[0-9a-f]+$/i;
+
 import type {
   AggregationFiltersInput,
   CustomersAndLabelsResult,
   DistinctFieldNamesResult,
   GetAllTracesForProjectInput,
+  GetAllTracesForProjectOptions,
   PromptStudioSpanResult,
   TopicCountsResult,
   TracesForProjectResult,
@@ -164,7 +166,10 @@ export class TraceService {
     // the only level where spanAttributes carry the eventref keys.
     const resolveTraceSpansFn =
       blobResolutionDeps !== undefined
-        ? new OffloadedSpanResolver(blobResolutionDeps, this.logger).toResolverFn()
+        ? new OffloadedSpanResolver(
+            blobResolutionDeps,
+            this.logger,
+          ).toResolverFn()
         : undefined;
 
     this.clickHouseService = ClickHouseTraceService.create(
@@ -232,17 +237,18 @@ export class TraceService {
           HEX_ONLY.test(traceId)
         ) {
           const now = Date.now();
-          const candidates = await this.clickHouseService.resolveTraceIdByPrefix(
-            {
+          const candidates =
+            await this.clickHouseService.resolveTraceIdByPrefix({
               projectId,
               prefix: traceId,
               occurredAt: {
-                from: now - TRACE_ID_PREFIX_LOOKUP_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+                from:
+                  now -
+                  TRACE_ID_PREFIX_LOOKUP_WINDOW_DAYS * 24 * 60 * 60 * 1000,
                 to: now,
               },
               limit: TRACE_ID_PREFIX_CANDIDATE_LIMIT,
-            },
-          );
+            });
           if (candidates === null) {
             throw new Error(
               "ClickHouse is enabled but returned null for resolveTraceIdByPrefix — check ClickHouse client configuration",
@@ -351,11 +357,7 @@ export class TraceService {
   async getAllTracesForProject(
     input: GetAllTracesForProjectInput,
     protections: Protections,
-    options: {
-      downloadMode?: boolean;
-      includeSpans?: boolean;
-      scrollId?: string | null;
-    } = {},
+    options: GetAllTracesForProjectOptions = {},
   ): Promise<TracesForProjectResult> {
     return this.tracer.withActiveSpan(
       "TraceService.getAllTracesForProject",
@@ -554,12 +556,11 @@ export class TraceService {
       async (span) => {
         span.setAttribute("backend", "clickhouse");
 
-        const result =
-          await this.clickHouseService.getDistinctFieldNames(
-            projectId,
-            startDate,
-            endDate,
-          );
+        const result = await this.clickHouseService.getDistinctFieldNames(
+          projectId,
+          startDate,
+          endDate,
+        );
         if (result === null) {
           throw new Error(
             "ClickHouse is enabled but returned null for getDistinctFieldNames — check ClickHouse client configuration",

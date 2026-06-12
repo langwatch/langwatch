@@ -40,6 +40,21 @@ vi.mock("~/utils/logger/server", () => ({
   }),
 }));
 
+// Partially mock the projection module: keep the real request schema + error
+// class (so validation and the 400 path are exercised for real) and stub only
+// `compileProjection` so these surface tests stay independent of the compiler
+// implementation (owned separately). Each test drives the stub's behavior.
+const mockCompileProjection = vi.fn();
+
+vi.mock("~/server/traces/projection", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("~/server/traces/projection")>();
+  return {
+    ...actual,
+    compileProjection: (args: unknown) => mockCompileProjection(args),
+  };
+});
+
 vi.mock("~/server/api/routers/traces.schemas", () => {
   const { z } = require("zod");
   return {
@@ -56,19 +71,27 @@ vi.mock("~/server/api/routers/traces.schemas", () => {
 // strategy runs the real authMiddleware. Mock it to a passthrough so these
 // unit tests exercise the handler logic with an injected project, not real auth.
 vi.mock("~/app/api/middleware/auth", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("~/app/api/middleware/auth")>();
+  const actual =
+    await importOriginal<typeof import("~/app/api/middleware/auth")>();
   return {
     ...actual,
-    authMiddleware: async (c: { set: (k: string, v: unknown) => void }, next: () => Promise<void>) => {
+    authMiddleware: async (
+      c: { set: (k: string, v: unknown) => void },
+      next: () => Promise<void>,
+    ) => {
       c.set("project", { id: "project-123", apiKey: "key-123" });
       await next();
     },
-    requirePermission: () => async (_c: unknown, next: () => Promise<void>) => next(),
+    requirePermission: () => async (_c: unknown, next: () => Promise<void>) =>
+      next(),
   };
 });
 
 const { registerTracesRoutes } = await import("../app.v1");
 const { createProjectApp } = await import("~/server/api/security");
+const { ProjectionValidationError } = await import(
+  "~/server/traces/projection"
+);
 const securedTest = createProjectApp({ basePath: "/" });
 registerTracesRoutes(securedTest);
 const v1App = securedTest.hono;
@@ -120,7 +143,17 @@ describe("POST /search", () => {
       groups: [sampleTraces],
       totalHits: 2,
       traceChecks: {
-        "trace-1": [{ evaluation_id: "eval-1", evaluator_id: "evaluator-1", name: "sentiment", status: "processed", score: 0.95, label: "positive", timestamps: { started_at: 1000, finished_at: 2000 } }],
+        "trace-1": [
+          {
+            evaluation_id: "eval-1",
+            evaluator_id: "evaluator-1",
+            name: "sentiment",
+            status: "processed",
+            score: 0.95,
+            label: "positive",
+            timestamps: { started_at: 1000, finished_at: 2000 },
+          },
+        ],
         "trace-2": [],
       },
       scrollId: undefined,
@@ -149,7 +182,7 @@ describe("POST /search", () => {
       const body = await res.json();
       expect(body.traces).toHaveLength(2);
       expect(body.traces[0].formatted_trace).toBe(
-        "Input: hello\nOutput: world"
+        "Input: hello\nOutput: world",
       );
     });
 
@@ -260,7 +293,11 @@ describe("POST /search", () => {
         project_id: "project-123",
         input: { value: `input-${i}` },
         output: { value: `output-${i}` },
-        timestamps: { started_at: i * 100, inserted_at: i * 100, updated_at: i * 100 },
+        timestamps: {
+          started_at: i * 100,
+          inserted_at: i * 100,
+          updated_at: i * 100,
+        },
         metadata: {},
         spans: [],
       }));
@@ -268,7 +305,9 @@ describe("POST /search", () => {
       mockGetAllTracesForProject.mockResolvedValue({
         groups: [manyTraces],
         totalHits: 50,
-        traceChecks: Object.fromEntries(manyTraces.map((t) => [t.trace_id, []])),
+        traceChecks: Object.fromEntries(
+          manyTraces.map((t) => [t.trace_id, []]),
+        ),
         scrollId: "next-page-token",
       });
 
@@ -300,6 +339,274 @@ describe("POST /search", () => {
       const body = await res.json();
       expect(body.traces).toHaveLength(0);
       expect(body.pagination.totalHits).toBe(0);
+    });
+  });
+
+  describe("when a trace fails to serialize", () => {
+    it("drops it and surfaces a skipped count in pagination", async () => {
+      const circular: Record<string, unknown> = {
+        trace_id: "bad-trace",
+        project_id: "project-123",
+        timestamps: { started_at: 1, inserted_at: 1, updated_at: 1 },
+        metadata: {},
+        spans: [],
+      };
+      // A circular reference makes JSON.stringify throw in the serialize loop.
+      (circular.metadata as Record<string, unknown>).self = circular;
+
+      mockGetAllTracesForProject.mockResolvedValue({
+        groups: [[circular, sampleTraces[0]]],
+        totalHits: 2,
+        traceChecks: { "bad-trace": [], "trace-1": [] },
+        scrollId: undefined,
+      });
+
+      const res = await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        format: "json",
+      });
+
+      const body = await res.json();
+      expect(body.traces).toHaveLength(1);
+      expect(body.traces[0].trace_id).toBe("trace-1");
+      expect(body.pagination.skipped).toBe(1);
+    });
+
+    it("omits skipped from pagination when nothing is dropped", async () => {
+      const res = await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        format: "json",
+      });
+
+      const body = await res.json();
+      expect(body.pagination).not.toHaveProperty("skipped");
+    });
+  });
+
+  // The projector and plan shape come from the compiler (mocked here). These
+  // tests cover the SURFACE contract: when to compile, what to forward, how the
+  // response envelope changes.
+  const fakeProjection = () => ({
+    schema: {
+      from: "traces" as const,
+      columns: [
+        { path: "trace_id", type: "string" as const, collection: false },
+      ],
+    },
+    plan: {
+      from: "traces" as const,
+      needsInput: false,
+      needsOutput: false,
+      needsEvents: false,
+      eventPaths: [],
+      needsAnnotations: false,
+      annotationPaths: [],
+      needsEvaluations: false,
+      evaluationPaths: [],
+    },
+    project: (trace: { trace_id: string }) => ({ trace_id: trace.trace_id }),
+  });
+
+  describe("when no projection select is provided", () => {
+    it("does not compile a projection", async () => {
+      await searchRequest({ startDate: 1000, endDate: 5000, format: "json" });
+      expect(mockCompileProjection).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Request without from or select returns the current response shape" */
+    it("omits the schema field from the response", async () => {
+      const res = await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        format: "json",
+      });
+      const body = await res.json();
+      expect(body).not.toHaveProperty("schema");
+    });
+  });
+
+  describe("when a projection select is provided", () => {
+    beforeEach(() => {
+      mockCompileProjection.mockReturnValue(fakeProjection());
+    });
+
+    it("compiles the projection with from, select, and protections", async () => {
+      await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        from: "traces",
+        select: ["trace_id"],
+      });
+      expect(mockCompileProjection).toHaveBeenCalledWith({
+        from: "traces",
+        select: ["trace_id"],
+        protections: {},
+      });
+    });
+
+    it("forwards the compiled plan to the trace service", async () => {
+      await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        from: "traces",
+        select: ["trace_id"],
+      });
+      const options = mockGetAllTracesForProject.mock.calls[0]![2];
+      expect(options.projection).toEqual(fakeProjection().plan);
+    });
+
+    it("projects each trace through the compiled projector", async () => {
+      const res = await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        from: "traces",
+        select: ["trace_id"],
+      });
+      const body = await res.json();
+      expect(body.traces).toEqual([
+        { trace_id: "trace-1" },
+        { trace_id: "trace-2" },
+      ]);
+    });
+
+    /** @scenario "Response includes schema when select is present" */
+    it("includes the resolved schema in the response envelope", async () => {
+      const res = await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        from: "traces",
+        select: ["trace_id"],
+      });
+      const body = await res.json();
+      expect(body.schema).toEqual(fakeProjection().schema);
+    });
+
+    /** @scenario "Select without from defaults to the traces entity root" */
+    it("defaults from to traces when only select is provided", async () => {
+      const res = await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        select: ["trace_id"],
+      });
+      expect(mockCompileProjection).toHaveBeenCalledWith({
+        from: "traces",
+        select: ["trace_id"],
+        protections: {},
+      });
+      const body = await res.json();
+      expect(body).toHaveProperty("schema");
+    });
+  });
+
+  describe("when the projection select is invalid", () => {
+    beforeEach(() => {
+      mockCompileProjection.mockImplementation(() => {
+        throw new ProjectionValidationError(["nonexistent_field"]);
+      });
+    });
+
+    /** @scenario "Unknown select path returns 400" */
+    it("responds 400", async () => {
+      const res = await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        select: ["nonexistent_field"],
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it("names the invalid path in the error message", async () => {
+      const res = await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        select: ["nonexistent_field"],
+      });
+      const body = await res.json();
+      expect(body.message).toContain("nonexistent_field");
+    });
+
+    it("does not query the trace service", async () => {
+      await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        select: ["nonexistent_field"],
+      });
+      expect(mockGetAllTracesForProject).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the projection request fails schema validation", () => {
+    /** @scenario "Unknown from entity returns 400" */
+    it("rejects an unsupported from entity with 400", async () => {
+      const res = await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        from: "sessions",
+        select: ["trace_id"],
+      });
+      expect(res.status).toBe(400);
+      expect(mockCompileProjection).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Empty select array returns 400" */
+    it("rejects an empty select array with 400", async () => {
+      const res = await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        select: [],
+      });
+      expect(res.status).toBe(400);
+      expect(mockCompileProjection).not.toHaveBeenCalled();
+    });
+
+    it("rejects a select with more than 200 paths with 400", async () => {
+      const res = await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        select: Array.from({ length: 201 }, (_, i) => `metadata.key_${i}`),
+      });
+      expect(res.status).toBe(400);
+      expect(mockCompileProjection).not.toHaveBeenCalled();
+    });
+
+    it("rejects a select path longer than 256 characters with 400", async () => {
+      const res = await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        select: [`metadata.${"x".repeat(300)}`],
+      });
+      expect(res.status).toBe(400);
+      expect(mockCompileProjection).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a date axis is specified", () => {
+    it("forwards dateField 'updated' to the trace service", async () => {
+      await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        dateField: "updated",
+      });
+      const options = mockGetAllTracesForProject.mock.calls[0]![2];
+      expect(options.dateField).toBe("updated");
+    });
+
+    it("defaults dateField to occurred when not specified", async () => {
+      await searchRequest({ startDate: 1000, endDate: 5000 });
+      const options = mockGetAllTracesForProject.mock.calls[0]![2];
+      expect(options.dateField).toBe("occurred");
+    });
+
+    /** @scenario "Invalid dateField value returns 400" */
+    it("rejects an unsupported date axis with 400", async () => {
+      const res = await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        dateField: "created",
+      });
+      expect(res.status).toBe(400);
     });
   });
 });
