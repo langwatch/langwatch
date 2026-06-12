@@ -15,6 +15,7 @@ import { CornerDownRight } from "react-feather";
 import { stringifyIfObject } from "~/utils/stringifyIfObject";
 import { AnnotationExpectedOutputs } from "../../components/AnnotationExpectedOutputs";
 import { Annotations } from "../../components/Annotations";
+import { BlurredContentGate } from "~/features/traces-v2/components/BlurredContentGate";
 import { Markdown } from "../../components/Markdown";
 import { EventsCounter } from "../../components/messages/EventsCounter";
 import {
@@ -243,6 +244,11 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
               ) : (
                 <Text paddingY={2}>{"<empty>"}</Text>
               )}
+              {trace.redacted_by_visibility_window ? (
+                <Box width="80%" paddingY={2}>
+                  <BlurredContentGate traceId={trace.trace_id} />
+                </Box>
+              ) : null}
               {trace.expected_output && (
                 <Alert.Root status="warning">
                   <Alert.Indicator>
