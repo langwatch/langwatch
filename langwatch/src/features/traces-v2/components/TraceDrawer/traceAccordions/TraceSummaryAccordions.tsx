@@ -12,7 +12,6 @@ import { rankedErrorSpans } from "../../../utils/errorSpans";
 import { AttributeTable } from "../AttributeTable";
 import { EvalsList } from "../evalCards";
 import { ExceptionsContent } from "../ExceptionsContent";
-import { BlurredContentGate } from "../../BlurredContentGate";
 import { IOViewer } from "../IOViewer";
 import { ScopeBlock } from "../ScopeChip";
 import { AccordionShell, Section } from "./AccordionShell";
@@ -125,7 +124,7 @@ export function TraceSummaryAccordions({
     containerRef,
   });
 
-  const content = (
+  return (
     <Box ref={containerRef}>
       {/* The instrumentation scope used to render here as a small
           attribution row at the top of the summary panel. It's now
@@ -326,12 +325,6 @@ export function TraceSummaryAccordions({
         })}
       </AccordionShell>
     </Box>
-  );
-
-  return trace.redactedByVisibilityWindow ? (
-    <BlurredContentGate>{content}</BlurredContentGate>
-  ) : (
-    content
   );
 }
 

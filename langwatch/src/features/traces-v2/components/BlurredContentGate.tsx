@@ -18,10 +18,22 @@ import { Link } from "~/components/ui/link";
 export const BlurredContentGate = memo(function BlurredContentGate({
   children,
 }: {
-  children: ReactNode;
+  /**
+   * When provided, wraps the content in a relative box. When omitted, the
+   * gate renders as a pure absolute overlay — drop it as the LAST child of
+   * a `position: relative` container (e.g. the trace drawer's content
+   * pane) so one layer covers every tab.
+   */
+  children?: ReactNode;
 }) {
   return (
-    <Box position="relative" data-testid="blurred-content-gate">
+    <Box
+      position={children ? "relative" : "absolute"}
+      inset={children ? undefined : 0}
+      pointerEvents={children ? undefined : "none"}
+      zIndex={children ? undefined : 10}
+      data-testid="blurred-content-gate"
+    >
       {children}
       {/* Progressive backdrop blur over the container: top stays readable,
           bottom dissolves. Masked so the blur ramps instead of cutting. */}
