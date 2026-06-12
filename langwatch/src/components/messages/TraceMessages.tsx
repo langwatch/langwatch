@@ -15,7 +15,10 @@ import { CornerDownRight } from "react-feather";
 import { stringifyIfObject } from "~/utils/stringifyIfObject";
 import { AnnotationExpectedOutputs } from "../../components/AnnotationExpectedOutputs";
 import { Annotations } from "../../components/Annotations";
-import { BlurredContentGate } from "~/features/traces-v2/components/BlurredContentGate";
+import {
+  BlurredContentGate,
+  withTeaserEllipsis,
+} from "~/features/traces-v2/components/BlurredContentGate";
 import { Markdown } from "../../components/Markdown";
 import { EventsCounter } from "../../components/messages/EventsCounter";
 import {
@@ -227,10 +230,16 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
                   >
                     <RedactedField field="output">
                       <Markdown>
-                        {translationState.translatedTextOutput &&
-                        translationState.translationActive
-                          ? translationState.translatedTextOutput
-                          : stringifyIfObject(trace.output.value)}
+                        {(() => {
+                          const text =
+                            translationState.translatedTextOutput &&
+                            translationState.translationActive
+                              ? translationState.translatedTextOutput
+                              : stringifyIfObject(trace.output.value) ?? "";
+                          return trace.redacted_by_visibility_window
+                            ? withTeaserEllipsis(text)
+                            : text;
+                        })()}
                       </Markdown>
                     </RedactedField>
                   </Box>
@@ -245,7 +254,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
                 <Text paddingY={2}>{"<empty>"}</Text>
               )}
               {trace.redacted_by_visibility_window ? (
-                <Box width="80%" paddingY={2}>
+                <Box width="80%" marginTop="-12px">
                   <BlurredContentGate traceId={trace.trace_id} />
                 </Box>
               ) : null}

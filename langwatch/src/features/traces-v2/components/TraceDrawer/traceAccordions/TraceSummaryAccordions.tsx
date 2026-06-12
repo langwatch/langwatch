@@ -12,7 +12,10 @@ import { rankedErrorSpans } from "../../../utils/errorSpans";
 import { AttributeTable } from "../AttributeTable";
 import { EvalsList } from "../evalCards";
 import { ExceptionsContent } from "../ExceptionsContent";
-import { BlurredContentGate } from "../../BlurredContentGate";
+import {
+  BlurredContentGate,
+  withTeaserEllipsis,
+} from "../../BlurredContentGate";
 import { IOViewer } from "../IOViewer";
 import { ScopeBlock } from "../ScopeChip";
 import { AccordionShell, Section } from "./AccordionShell";
@@ -158,7 +161,11 @@ export function TraceSummaryAccordions({
                     {trace.input ? (
                       <IOViewer
                         label="Input"
-                        content={trace.input}
+                        content={
+                          trace.redactedByVisibilityWindow
+                            ? withTeaserEllipsis(trace.input)
+                            : trace.input
+                        }
                         traceId={trace.traceId}
                       />
                     ) : (
@@ -167,16 +174,22 @@ export function TraceSummaryAccordions({
                     {trace.output ? (
                       <IOViewer
                         label="Output"
-                        content={trace.output}
+                        content={
+                          trace.redactedByVisibilityWindow
+                            ? withTeaserEllipsis(trace.output)
+                            : trace.output
+                        }
                         mode="output"
                         traceId={trace.traceId}
+                        afterBody={
+                          trace.redactedByVisibilityWindow ? (
+                            <BlurredContentGate traceId={trace.traceId} fontFamily="mono" />
+                          ) : undefined
+                        }
                       />
                     ) : (
                       <MissingIORow label="Output" mode="output" />
                     )}
-                    {trace.redactedByVisibilityWindow ? (
-                      <BlurredContentGate traceId={trace.traceId} />
-                    ) : null}
                   </VStack>
                 ) : (
                   <EmptyHint>No I/O captured for this trace</EmptyHint>

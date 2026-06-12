@@ -7,11 +7,13 @@ import { Link } from "~/components/ui/link";
 /**
  * Upgrade treatment for visibility-window-redacted content (ADR-028 §7).
  *
- * The server sends only the real ~10% teaser; this component fabricates the
- * "rest" of the content as garbage words — deterministically seeded from the
- * traceId so renders are stable — and fades them through progressive blur,
- * with a centered upgrade card on top. The filler NEVER comes from (or goes
- * to) the server: it exists purely to make visible that there is more here.
+ * The server sends only the real ~10% teaser; this renders the "rest" as a
+ * single continuous paragraph of fabricated words — deterministically seeded
+ * from the traceId so renders are stable — styled exactly like the real
+ * content so the two read as one text. A progressive blur (light at the top,
+ * maximal at the bottom) plus a fade make it visibly locked, with the
+ * upgrade card centered over it. The filler NEVER comes from (or goes to)
+ * the server: it exists purely to make visible that there is more here.
  */
 
 const FILLER_WORDS = [
@@ -65,55 +67,81 @@ const hashString = (input: string): number => {
   return hash >>> 0;
 };
 
-const fillerLine = (rand: () => number, words: number): string =>
+const fillerParagraph = (rand: () => number, words: number): string =>
   Array.from(
     { length: words },
     () => FILLER_WORDS[Math.floor(rand() * FILLER_WORDS.length)],
   ).join(" ");
 
-/** Three progressively blurrier filler rows behind the upgrade card. */
-const BLUR_STEPS = [
-  { blur: "2px", opacity: 0.55 },
-  { blur: "4px", opacity: 0.4 },
-  { blur: "6px", opacity: 0.25 },
+/**
+ * The same paragraph stacked in three layers, each masked to a horizontal
+ * band with increasing blur — reads as ONE text that gets progressively
+ * blurrier from top to bottom (top light, bottom maximal).
+ */
+const BLUR_LAYERS = [
+  { blur: "1.5px", mask: "linear-gradient(to bottom, black 0%, black 30%, transparent 55%)" },
+  { blur: "3.5px", mask: "linear-gradient(to bottom, transparent 20%, black 45%, black 60%, transparent 85%)" },
+  { blur: "6px", mask: "linear-gradient(to bottom, transparent 50%, black 80%, black 100%)" },
 ] as const;
 
 export const BlurredContentGate = memo(function BlurredContentGate({
   traceId,
+  fontFamily = "inherit",
 }: {
   /** Seeds the fabricated filler so re-renders are stable per trace. */
   traceId: string;
+  /** Match the surrounding content's font (e.g. "mono" in pretty views). */
+  fontFamily?: string;
 }) {
-  const lines = useMemo(() => {
+  const paragraph = useMemo(() => {
     const rand = mulberry32(hashString(traceId));
-    return BLUR_STEPS.map(() => fillerLine(rand, 14 + Math.floor(rand() * 8)));
+    return fillerParagraph(rand, 60 + Math.floor(rand() * 20));
   }, [traceId]);
 
   return (
-    <Box position="relative" data-testid="blurred-content-gate">
-      <VStack align="stretch" gap={1.5} aria-hidden="true" userSelect="none">
-        {lines.map((line, i) => (
+    <Box
+      position="relative"
+      data-testid="blurred-content-gate"
+      marginTop="-2px"
+      paddingBottom={2}
+    >
+      {/* One continuous paragraph, three masked blur layers: light → max. */}
+      <Box position="relative" aria-hidden="true" userSelect="none" minHeight="120px">
+        {BLUR_LAYERS.map((layer, i) => (
           <Text
             key={i}
-            fontSize="sm"
-            color="fg.muted"
-            filter={`blur(${BLUR_STEPS[i]!.blur})`}
-            opacity={BLUR_STEPS[i]!.opacity}
-            lineClamp={1}
+            position={i === 0 ? "relative" : "absolute"}
+            inset={i === 0 ? undefined : 0}
+            fontSize="inherit"
+            lineHeight="inherit"
+            fontFamily={fontFamily}
+            color="fg"
+            filter={`blur(${layer.blur})`}
+            style={{
+              maskImage: layer.mask,
+              WebkitMaskImage: layer.mask,
+            }}
           >
-            {line}
+            {paragraph}
           </Text>
         ))}
-      </VStack>
+        {/* Fade the tail into the background so the text dissolves. */}
+        <Box
+          position="absolute"
+          inset={0}
+          bgGradient="to-b"
+          gradientFrom="transparent"
+          gradientVia="transparent"
+          gradientTo="bg.panel"
+          pointerEvents="none"
+        />
+      </Box>
       <Box
         position="absolute"
         inset={0}
         display="flex"
         alignItems="center"
         justifyContent="center"
-        bgGradient="to-b"
-        gradientFrom="transparent"
-        gradientTo="bg.panel"
       >
         <VStack
           gap={1}
@@ -124,7 +152,13 @@ export const BlurredContentGate = memo(function BlurredContentGate({
           backgroundColor="bg.panel"
           boxShadow="md"
         >
-          <Text fontSize="sm" fontWeight="semibold" display="flex" alignItems="center" gap={1.5}>
+          <Text
+            fontSize="sm"
+            fontWeight="semibold"
+            display="flex"
+            alignItems="center"
+            gap={1.5}
+          >
             <Lock size={13} /> Your data is still here
           </Text>
           <Text fontSize="xs" color="fg.muted" textAlign="center">
@@ -140,3 +174,11 @@ export const BlurredContentGate = memo(function BlurredContentGate({
     </Box>
   );
 });
+
+/**
+ * Appends a continuation ellipsis to teaser text so the visible cut reads
+ * as "…the text continues" instead of an abrupt stop. Client-side only —
+ * the API payload stays the pure teaser.
+ */
+export const withTeaserEllipsis = (content: string): string =>
+  content.endsWith("…") || content.endsWith("...") ? content : `${content} …`;
