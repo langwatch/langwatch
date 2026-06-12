@@ -8,6 +8,8 @@ import {
   LangyGitHubPrCard,
   extractPrLinks,
 } from "./github/LangyGitHubPrCard";
+import { LangyGitHubProgressCard } from "./github/LangyGitHubProgressCard";
+import { parseGithubProgressEvents } from "~/server/services/langy/githubProgressEvents";
 import {
   AI_SHADOW,
   GradientSparkle,
@@ -74,9 +76,16 @@ export function MessageContent({
 
   const showConnectCard =
     !isUser && rawText.includes(CONNECT_GITHUB_SENTINEL);
-  const text = showConnectCard
+  const afterConnectStrip = showConnectCard
     ? rawText.split(CONNECT_GITHUB_SENTINEL).join("").trim()
     : rawText;
+
+  // Strip [langy:progress:...] sentinels from the rendered text and surface
+  // them as a steps card above the prose. Skipping for user messages.
+  const progress = isUser
+    ? { events: [], cleanedText: afterConnectStrip }
+    : parseGithubProgressEvents(afterConnectStrip);
+  const text = progress.cleanedText;
 
   const proposals = extractProposals(message);
   const prLinks = isUser ? [] : extractPrLinks(text);
@@ -84,7 +93,8 @@ export function MessageContent({
     !text &&
     proposals.length === 0 &&
     !showConnectCard &&
-    prLinks.length === 0
+    prLinks.length === 0 &&
+    progress.events.length === 0
   )
     return null;
 
@@ -140,6 +150,9 @@ export function MessageContent({
             onConnected={onConnectedGithub}
           />
         ) : null}
+        {progress.events.length > 0 && (
+          <LangyGitHubProgressCard events={progress.events} />
+        )}
         {prLinks.map((pr) => (
           <LangyGitHubPrCard
             key={`${pr.owner}/${pr.repo}#${pr.number}`}

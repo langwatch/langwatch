@@ -45,6 +45,13 @@ import {
   LangyMessageService,
 } from "~/server/services/langy/LangyMessageService";
 import { checkLangyMessageRateLimit } from "~/server/middleware/rate-limit-langy";
+import {
+  getLangyGithubPrUsage,
+  LANGY_GITHUB_PRS_PER_DAY,
+  recordLangyGithubPr,
+} from "~/server/middleware/rate-limit-langy-github-prs";
+import { extractGithubPrLinks } from "~/server/services/langy/githubPrLinks";
+import { parseGithubProgressEvents } from "~/server/services/langy/githubProgressEvents";
 import type { NextRequestShim } from "./types";
 
 const logger = createLogger("langwatch:api:langy");
@@ -278,6 +285,31 @@ langyRoute().post("/langy/chat", async (c) => {
     throw error;
   }
 
+  // Per-user daily PR cap. Cheap Redis day-bucket counter; bumped AFTER the
+  // assistant reply lands when a github.com PR URL appears in the text.
+  // PRE-gate here so a capped user is told inline ("you've hit your daily
+  // cap of N PRs") rather than the worker silently succeeding on PR 21+ and
+  // tripping GitHub's abuse heuristics on their account.
+  //
+  // We don't try to detect PR intent — capped users get the system note on
+  // every chat turn until the bucket resets; the agent only mentions it
+  // if the user is in fact asking for a PR. Cheap and correct.
+  const githubPrUsage = await getLangyGithubPrUsage({ userId: session.user.id });
+  const capReachedNote = !githubPrUsage.allowed
+    ? [
+        "",
+        "USER PR CAP REACHED — the user has already opened the per-day maximum",
+        "of",
+        String(LANGY_GITHUB_PRS_PER_DAY),
+        "GitHub pull requests via Langy today.",
+        "If the user asks you to open a PR, refuse politely, say the daily cap",
+        "is reached, and that it resets at",
+        new Date(githubPrUsage.resetAt).toISOString(),
+        "UTC.",
+        "Do not call any tool that opens a PR.",
+      ].join(" ")
+    : "";
+
   // Defense in depth: when a `modelOverride` rides in, enforce the project's
   // Langy VK allowlist HERE — don't trust the picker UI to gate it. If the VK
   // has no allowlist (modelsAllowed=null), the gateway is still the final
@@ -316,7 +348,7 @@ langyRoute().post("/langy/chat", async (c) => {
     body: JSON.stringify({
       conversationId: conversation.id,
       prompt: userText,
-      system: langyOverride,
+      system: capReachedNote ? `${langyOverride}\n\n${capReachedNote}` : langyOverride,
       credentials,
       // Forwarded for the agent to thread through to the gateway as the
       // `model` parameter when its support lands. Today the agent ignores
@@ -396,16 +428,48 @@ langyRoute().post("/langy/chat", async (c) => {
 
       writer.write({ type: "text-end", id: textId });
 
+      // Strip [langy:progress:...] sentinels from the persisted body — they
+      // are wire-protocol for the live UI, not history. Keep the text used
+      // for PR-URL extraction unchanged: PR URLs live in prose, not sentinels.
+      const persistedText = parseGithubProgressEvents(fullText).cleanedText;
       try {
         await persistMessage({
           conversationId: conversation.id,
           projectId,
           role: "assistant",
-          parts: [{ type: "text", text: fullText, role: "assistant" }],
+          parts: [{ type: "text", text: persistedText, role: "assistant" }],
           model: LANGY_FALLBACK_MODEL,
         });
       } catch (error) {
         logger.error({ error }, "failed to persist langy assistant message");
+      }
+
+      // Bump the per-user daily PR counter for each unique github.com PR URL
+      // the assistant mentioned in this turn. At-most-once: if the worker
+      // opens a PR but the URL never lands in the reply (worker crash mid-
+      // push, network blip), the cap under-counts. Preferred over double-
+      // counting on retries.
+      try {
+        const links = extractGithubPrLinks(fullText);
+        for (const link of links) {
+          await recordLangyGithubPr({ userId: session.user.id });
+          await auditLog({
+            userId: session.user.id,
+            projectId,
+            action: "langy.github.pr_opened",
+            args: {
+              owner: link.owner,
+              repo: link.repo,
+              number: link.number,
+              url: link.url,
+            },
+          });
+        }
+      } catch (error) {
+        logger.error(
+          { error },
+          "failed to record langy github PR usage",
+        );
       }
     },
     onError: (error) => {

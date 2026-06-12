@@ -37,31 +37,43 @@ Do this once. Do not re-run on subsequent PRs in the same session.
 
 ## Workflow: open a PR
 
+Emit a `[langy:progress:<stage>:<short detail>]` line at the start of each step. The Langy sidebar parses these out and renders a live steps card; they are stripped from the persisted reply so they don't pollute history. Keep `detail` short (under 60 chars). Stages: `cloning`, `cloned`, `branched`, `edited`, `committed`, `pushed`, `opening_pr`, `opened`.
+
 1. **Pick a working directory inside `$HOME`** — never `/tmp`, never under `/workspace/skills`. Use `$HOME/work/<repo>` so the idle reaper cleans it with the session.
    ```bash
    mkdir -p "$HOME/work" && cd "$HOME/work"
    ```
-2. **Shallow clone** the target repo (App installation must include it; otherwise this fails with 404 and you should tell the user the LangWatch App isn't installed on that repo):
+2. **Shallow clone** the target repo (App installation must include it; otherwise this fails with 404 and you should tell the user the LangWatch App isn't installed on that repo).
+   - Print `[langy:progress:cloning:<owner>/<repo>]` BEFORE the clone.
    ```bash
    gh repo clone owner/name -- --depth 1
    cd name
    ```
+   - Then print `[langy:progress:cloned:<owner>/<repo>]`.
 3. **Branch** with a descriptive slug:
    ```bash
    git checkout -b langy/<short-slug>
    ```
+   - Then print `[langy:progress:branched:langy/<short-slug>]`.
 4. **Make the edits** — read existing files, write changes, follow the repo's conventions.
+   - Print `[langy:progress:edited:<short summary, e.g. "src/foo.ts">]` after the last edit.
 5. **Commit**:
    ```bash
    git add -A
    git commit -m "<concise message describing the change>"
    ```
+   - Print `[langy:progress:committed:<concise message>]`.
 6. **Push and open the PR**:
    ```bash
    git push -u origin HEAD
+   ```
+   - Print `[langy:progress:pushed:<branch>]`.
+   - Print `[langy:progress:opening_pr:<owner>/<repo>]`.
+   ```bash
    gh pr create --title "<title>" --body "<body>" --base main
    ```
    Use `--base` matching the repo's default branch (check via `gh repo view --json defaultBranchRef`).
+   - Print `[langy:progress:opened:<owner>/<repo>#<number>]` with the PR's number.
 7. **Report the PR URL** in your reply — the sidebar renders it as a PR card.
 
 ## Hard rules

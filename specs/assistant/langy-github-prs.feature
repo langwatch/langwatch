@@ -73,6 +73,15 @@ Feature: Langy opens GitHub PRs as the requesting user
     And the idle reaper reaps the worker within 10 minutes of idleness
 
   @integration
+  Scenario: Live steps card reflects the worker's progress
+    Given I have connected my GitHub account
+    When I ask Langy to open a PR on "acme/service-x"
+    Then a steps card appears in chat showing the cloning step
+    And the card progresses through branched, committed, pushed
+    And the steps card shows the opened step when the PR URL arrives
+    And no raw "[langy:progress:" markers appear in my chat history
+
+  @integration
   Scenario: Per-user daily PR cap stops runaway loops
     Given I have connected my GitHub account
     And I have already opened 20 PRs via Langy today
