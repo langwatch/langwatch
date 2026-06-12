@@ -110,6 +110,10 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/settings/data-retention")),
   },
   {
+    path: "/settings/integrations",
+    ...page(() => import("./pages/settings/integrations")),
+  },
+  {
     path: "/settings/audit-log",
     ...page(() => import("./pages/settings/audit-log")),
   },
