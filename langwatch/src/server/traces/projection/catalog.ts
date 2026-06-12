@@ -133,12 +133,21 @@ const EVALUATION_FIELDS: Record<string, ProjectionValueType> = {
   is_guardrail: "boolean",
 };
 
-/** Annotation element scalar fields (`annotations.<key>`), read off each annotation. */
-const ANNOTATION_FIELDS: Record<string, ProjectionValueType> = {
-  is_thumbs_up: "boolean",
-  comment: "string",
-  expected_output: "string",
-  created_at: "number",
+/**
+ * Annotation element scalar fields (`annotations.<key>`), read off each
+ * annotation. `comment` and `expected_output` are free-text fields where
+ * reviewers routinely quote the model's captured output, so they share the
+ * output-visibility gate — otherwise the projection would be a side-channel
+ * around the io redaction.
+ */
+const ANNOTATION_FIELDS: Record<
+  string,
+  { type: ProjectionValueType; protection: FieldProtection | null }
+> = {
+  is_thumbs_up: { type: "boolean", protection: null },
+  comment: { type: "string", protection: "output" },
+  expected_output: { type: "string", protection: "output" },
+  created_at: { type: "number", protection: null },
 };
 
 function field(
@@ -309,9 +318,9 @@ function resolveAnnotationField({
   if (scalar) {
     return field({
       path,
-      type: scalar,
+      type: scalar.type,
       collection: "annotations",
-      protection: null,
+      protection: scalar.protection,
       outPath: [rest],
       read: (a) => a[rest] ?? null,
     });

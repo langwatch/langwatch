@@ -335,6 +335,32 @@ describe("trace search projection (integration)", () => {
         });
       });
     });
+
+    describe("when captured input is not visible", () => {
+      /** @scenario "Projected event details are redacted when captured input is not visible" */
+      it("redacts event detail values but keeps types and metrics", async () => {
+        const rows = await projectedSearch({
+          select: ["trace_id", "events.type", "events.metrics", "events.details"],
+          protections: {
+            canSeeCosts: true,
+            canSeeCapturedInput: false,
+            canSeeCapturedOutput: true,
+          },
+        });
+
+        const row = rows.find((r) => r.trace_id === traceId);
+        expect(row).toEqual({
+          trace_id: traceId,
+          events: [
+            {
+              type: "thumbs_up_down",
+              metrics: { vote: 1 },
+              details: { reason: "[REDACTED]" },
+            },
+          ],
+        });
+      });
+    });
   });
 
   describe("given a select over annotation fields", () => {

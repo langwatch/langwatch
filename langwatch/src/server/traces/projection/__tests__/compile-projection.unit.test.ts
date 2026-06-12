@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Protections } from "~/server/elasticsearch/protections";
 import type { Trace } from "~/server/tracer/types";
-import type { ResolvedField } from "../catalog";
-import { buildProjector, compileProjection } from "../compile-projection";
+import { compileProjection } from "../compile-projection";
 import type { ProjectableTrace } from "../types";
 import { ProjectionValidationError } from "../types";
 
@@ -345,43 +344,47 @@ describe("compileProjection", () => {
   });
 });
 
-describe("buildProjector", () => {
-  // The catalog has no protected collection field today, so exercise the
-  // collection-path RBAC redaction with a synthetic one.
-  const protectedAnnotationComment: ResolvedField = {
-    path: "annotations.comment",
-    type: "string",
-    collection: "annotations",
-    protection: "input",
-    outPath: ["comment"],
-    read: (a) => a.comment ?? null,
-  };
+describe("collection-path RBAC redaction", () => {
+  // annotations.comment / annotations.expected_output are free text where
+  // reviewers quote the model's output, so the catalog gates them behind
+  // output visibility — the collection-path RBAC redaction must hold for
+  // real catalog fields, not just synthetic ones.
+  const annotationSelect = [
+    "annotations.is_thumbs_up",
+    "annotations.comment",
+    "annotations.expected_output",
+  ];
 
-  describe("given a protected collection field", () => {
-    describe("when the gating permission is denied", () => {
-      it("redacts the value on the collection path", () => {
-        const project = buildProjector({
-          fields: [protectedAnnotationComment],
+  describe("given a select over gated annotation fields", () => {
+    describe("when captured-output visibility is denied", () => {
+      /** @scenario "Annotation comments and expected output respect captured-output visibility" */
+      it("nulls comment and expected_output but keeps the annotation row", () => {
+        const { project } = compileProjection({
+          select: annotationSelect,
           protections: {
             canSeeCosts: true,
-            canSeeCapturedInput: false,
-            canSeeCapturedOutput: true,
+            canSeeCapturedInput: true,
+            canSeeCapturedOutput: false,
           },
         });
         expect(project(sampleTrace())).toEqual({
-          annotations: [{ comment: null }],
+          annotations: [
+            { is_thumbs_up: true, comment: null, expected_output: null },
+          ],
         });
       });
     });
 
-    describe("when the gating permission is granted", () => {
-      it("emits the value", () => {
-        const project = buildProjector({
-          fields: [protectedAnnotationComment],
+    describe("when captured-output visibility is granted", () => {
+      it("emits the comment and expected_output values", () => {
+        const { project } = compileProjection({
+          select: annotationSelect,
           protections: fullAccess,
         });
         expect(project(sampleTrace())).toEqual({
-          annotations: [{ comment: "nice" }],
+          annotations: [
+            { is_thumbs_up: true, comment: "nice", expected_output: null },
+          ],
         });
       });
     });

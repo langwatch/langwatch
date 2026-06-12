@@ -127,7 +127,7 @@ function buildPlan({
  * Exported for unit-testing the collection-path RBAC redaction with a synthetic
  * protected collection field (the catalog has none today).
  */
-export function buildProjector({
+function buildProjector({
   fields,
   protections,
 }: {

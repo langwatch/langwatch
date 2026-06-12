@@ -131,6 +131,18 @@ Feature: Trace search projection DSL
     When I POST /api/traces/search with from "traces" and select ["trace_id", "input", "output"]
     Then each trace contains "trace_id", "input", and "output" with actual values
 
+  Scenario: Projected event details are redacted when captured input is not visible
+    Given the API key's role does not permit seeing captured input
+    When I POST /api/traces/search with from "traces" and select ["trace_id", "events.details"]
+    Then event detail values are replaced with a redaction marker
+    And event types and metrics remain visible
+
+  Scenario: Annotation comments and expected output respect captured-output visibility
+    Given the API key's role does not permit seeing captured output
+    When I POST /api/traces/search with from "traces" and select ["trace_id", "annotations.comment", "annotations.expected_output"]
+    Then annotation comment and expected output values are null
+    And the annotation rows themselves are still returned
+
   # ==========================================================================
   # Performance and OOM safety
   # ==========================================================================

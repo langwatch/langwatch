@@ -23,7 +23,9 @@ import type { Event, Span, Trace } from "~/server/tracer/types";
 import { createLogger } from "~/utils/logger/server";
 import { findPromptReferenceInAncestors } from "./findPromptReferenceInAncestors";
 import {
+  applyEventProtections,
   applyTraceProtections,
+  extractRedactionsForObject,
   mapNormalizedSpansToSpans,
   mapTraceSummaryToTrace,
 } from "./mappers";
@@ -817,6 +819,7 @@ export class ClickHouseTraceService {
                 clickHouseClient,
                 projectId: input.projectId,
                 traces: pageTraces,
+                protections,
               });
             }
             if (projection.needsAnnotations) {
@@ -1862,10 +1865,12 @@ export class ClickHouseTraceService {
     clickHouseClient,
     projectId,
     traces,
+    protections,
   }: {
     clickHouseClient: ClickHouseClient;
     projectId: string;
     traces: ProjectableTrace[];
+    protections: Protections;
   }): Promise<void> {
     const traceIds = traces.map((t) => t.trace_id);
     if (traceIds.length === 0) return;
@@ -1939,8 +1944,23 @@ export class ClickHouseTraceService {
         `Projected events[] hit the per-trace cap (${MAX_EVENTS_PER_TRACE}); some events were not returned`,
       );
     }
+    // RBAC parity with the legacy read path: events attach AFTER
+    // applyTraceProtections ran, so they must get the same treatment —
+    // event_details are blanked when captured input is not visible, and
+    // otherwise scrubbed of any substring mirroring the trace's redacted io.
     for (const trace of traces) {
-      trace.events = byTrace.get(trace.trace_id) ?? [];
+      const rawEvents = byTrace.get(trace.trace_id) ?? [];
+      const redactions = new Set<string>([
+        ...(!protections.canSeeCapturedInput
+          ? extractRedactionsForObject(trace.input?.value)
+          : []),
+        ...(!protections.canSeeCapturedOutput
+          ? extractRedactionsForObject(trace.output?.value)
+          : []),
+      ]);
+      trace.events = rawEvents.map((event) =>
+        applyEventProtections(event, protections, redactions),
+      );
     }
   }
 
