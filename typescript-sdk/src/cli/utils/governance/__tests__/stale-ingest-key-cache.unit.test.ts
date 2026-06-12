@@ -25,6 +25,11 @@ import { resolveWrapperMode } from "../wrapper-mode";
 
 // ─── Module mocks ────────────────────────────────────────────────────────────
 
+// runUnifiedLoginFlow opens the device-approval URL in a real browser via the
+// `open` package. Stub it so the login-flow tests don't hijack the developer's
+// browser on every run.
+vi.mock("open", () => ({ default: vi.fn() }));
+
 vi.mock("../cli-api", async () => {
   const actual = await vi.importActual<typeof cliApi>("../cli-api");
   return {
