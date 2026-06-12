@@ -25,28 +25,30 @@ export const BlurredContentGate = memo(function BlurredContentGate({
       {children}
       {/* Progressive backdrop blur over the container: top stays readable,
           bottom dissolves. Masked so the blur ramps instead of cutting. */}
+      {/* Blur starts at the very TOP of the gated content and deepens
+          downward in fixed pixels — the teaser sits in the light zone. */}
       <Box
         position="absolute"
         inset={0}
         pointerEvents="none"
-        backdropFilter="blur(3px)"
+        backdropFilter="blur(2.5px)"
         style={{
           maskImage:
-            "linear-gradient(to bottom, transparent 0%, transparent 18%, black 45%, black 100%)",
+            "linear-gradient(to bottom, transparent 0px, black 160px, black 100%)",
           WebkitMaskImage:
-            "linear-gradient(to bottom, transparent 0%, transparent 18%, black 45%, black 100%)",
+            "linear-gradient(to bottom, transparent 0px, black 160px, black 100%)",
         }}
       />
       <Box
         position="absolute"
         inset={0}
         pointerEvents="none"
-        backdropFilter="blur(7px)"
+        backdropFilter="blur(8px)"
         style={{
           maskImage:
-            "linear-gradient(to bottom, transparent 0%, transparent 45%, black 75%, black 100%)",
+            "linear-gradient(to bottom, transparent 220px, black 460px, black 100%)",
           WebkitMaskImage:
-            "linear-gradient(to bottom, transparent 0%, transparent 45%, black 75%, black 100%)",
+            "linear-gradient(to bottom, transparent 220px, black 460px, black 100%)",
         }}
       />
       {/* Soft wash so the deepest section reads as locked, not broken. */}
