@@ -97,14 +97,17 @@ export type ProjectionCollection = "events" | "annotations" | "evaluations";
  * and by the bounded events / Postgres-annotations readers. Opaque to the
  * SURFACE — app.v1.ts just forwards it.
  *
- * The plan is the lever for the perf win: when no `io.*` path is selected,
- * `needsIO` is false and the heavy ComputedInput/ComputedOutput columns are
- * pruned from the trace_summaries read.
+ * The plan is the lever for the perf win: input and output are pruned
+ * independently, so an output-only select (the common "grab completions"
+ * ETL shape) never materializes the heavy ComputedInput column, and vice
+ * versa.
  */
 export interface ProjectionPlan {
   from: ProjectionFrom;
-  /** Heavy ComputedInput/ComputedOutput columns are needed (and permitted). */
-  needsIO: boolean;
+  /** Heavy ComputedInput column is needed (selected and permitted). */
+  needsInput: boolean;
+  /** Heavy ComputedOutput column is needed (selected and permitted). */
+  needsOutput: boolean;
   /** Build the nested events[] via a bounded stored_spans sub-query. */
   needsEvents: boolean;
   /** Event sub-paths requested, relative to the `events.` root (e.g. "type", "metrics.vote"). */

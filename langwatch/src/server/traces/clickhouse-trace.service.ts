@@ -613,9 +613,11 @@ export class ClickHouseTraceService {
           // legacy full-trace response. When present, it drives heavy-column
           // pruning and which child collections are JOINed (events, annotations).
           const projection = options.projection;
-          // Fetch the heavy ComputedInput/ComputedOutput columns only when the
-          // legacy path runs or the projection actually selects io fields.
-          const fetchIO = !projection || projection.needsIO;
+          // Fetch each heavy Computed* column only when the legacy path runs
+          // or the projection selects that io field — independently, so an
+          // output-only select never materializes ComputedInput.
+          const fetchInput = !projection || projection.needsInput;
+          const fetchOutput = !projection || projection.needsOutput;
 
           // Time axis the date window + keyset cursor page on. Default "occurred"
           // keeps the legacy OccurredAt behavior; "updated" pages by last
@@ -717,7 +719,8 @@ export class ClickHouseTraceService {
               filterParams,
               traceIds: input.traceIds,
               query: input.query,
-              fetchIO,
+              fetchInput,
+              fetchOutput,
               dateField,
             });
 
@@ -1485,7 +1488,8 @@ export class ClickHouseTraceService {
     filterParams,
     traceIds,
     query,
-    fetchIO = true,
+    fetchInput = true,
+    fetchOutput = true,
     dateField = "occurred",
   }: {
     projectId: string;
@@ -1499,8 +1503,10 @@ export class ClickHouseTraceService {
     filterParams?: Record<string, unknown>;
     traceIds?: string[];
     query?: string;
-    /** Fetch heavy ComputedInput/ComputedOutput columns. False prunes them. */
-    fetchIO?: boolean;
+    /** Fetch the heavy ComputedInput column. False prunes it. */
+    fetchInput?: boolean;
+    /** Fetch the heavy ComputedOutput column. False prunes it. */
+    fetchOutput?: boolean;
     /** Time axis for the date window + keyset cursor. Default "occurred". */
     dateField?: TraceDateField;
   }): Promise<{ traces: Trace[]; totalHits: number; lastTrace: Trace | null }> {
@@ -1701,7 +1707,8 @@ export class ClickHouseTraceService {
           endDate: endDate ?? Date.now(),
           traceIds: pageTraceIds,
           orderDirection,
-          fetchIO,
+          fetchInput,
+          fetchOutput,
           dateColumn,
         });
 
@@ -1734,7 +1741,8 @@ export class ClickHouseTraceService {
     endDate,
     traceIds,
     orderDirection,
-    fetchIO = true,
+    fetchInput = true,
+    fetchOutput = true,
     dateColumn = "OccurredAt",
   }: {
     clickHouseClient: ClickHouseClient;
@@ -1743,9 +1751,10 @@ export class ClickHouseTraceService {
     endDate: number;
     traceIds: string[];
     orderDirection: string;
-    /** Fetch heavy ComputedInput/ComputedOutput. False reads '' instead — the
-     * row shape is unchanged but ClickHouse never materializes the heavy column. */
-    fetchIO?: boolean;
+    /** Fetch the heavy Computed* columns independently. False reads '' instead —
+     * the row shape is unchanged but ClickHouse never materializes that column. */
+    fetchInput?: boolean;
+    fetchOutput?: boolean;
     /** Column the date window + ORDER BY run on (must match the page-ID query). */
     dateColumn?: "OccurredAt" | "UpdatedAt";
   }): Promise<TraceSummaryRow[]> {
@@ -1756,8 +1765,8 @@ export class ClickHouseTraceService {
     if (dateColumn !== "OccurredAt" && dateColumn !== "UpdatedAt") {
       throw new Error(`Invalid dateColumn: ${String(dateColumn)}`);
     }
-    const computedInputExpr = fetchIO ? "ts.ComputedInput" : "''";
-    const computedOutputExpr = fetchIO ? "ts.ComputedOutput" : "''";
+    const computedInputExpr = fetchInput ? "ts.ComputedInput" : "''";
+    const computedOutputExpr = fetchOutput ? "ts.ComputedOutput" : "''";
     const isUpdatedAxis = dateColumn === "UpdatedAt";
     const sortColumn = isUpdatedAxis ? "ts_UpdatedAt" : "ts_OccurredAt";
     // Updated axis dedups on the GLOBAL max(UpdatedAt) — the page IDs were

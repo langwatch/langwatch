@@ -108,10 +108,14 @@ function buildPlan({
 
   return {
     from,
-    needsIO: fields.some(
-      (f) =>
-        (f.protection === "input" || f.protection === "output") &&
-        isPermitted({ field: f, protections }),
+    // Keyed on the scalar io paths themselves (not on `protection`, which
+    // other fields — e.g. gated annotation text — now share), so each heavy
+    // column is fetched only when its own field is selected and permitted.
+    needsInput: fields.some(
+      (f) => f.path === "input" && isPermitted({ field: f, protections }),
+    ),
+    needsOutput: fields.some(
+      (f) => f.path === "output" && isPermitted({ field: f, protections }),
     ),
     needsEvents: fields.some((f) => f.collection === "events"),
     eventPaths: subPaths("events"),

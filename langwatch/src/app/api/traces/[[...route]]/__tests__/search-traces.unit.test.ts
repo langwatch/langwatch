@@ -397,7 +397,8 @@ describe("POST /search", () => {
     },
     plan: {
       from: "traces" as const,
-      needsIO: false,
+      needsInput: false,
+      needsOutput: false,
       needsEvents: false,
       eventPaths: [],
       needsAnnotations: false,

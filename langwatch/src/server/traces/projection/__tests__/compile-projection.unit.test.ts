@@ -116,7 +116,30 @@ describe("compileProjection", () => {
           select: ["trace_id", "metrics.total_cost"],
           protections: fullAccess,
         });
-        expect(compiled.plan.needsIO).toBe(false);
+        expect(compiled.plan.needsInput).toBe(false);
+        expect(compiled.plan.needsOutput).toBe(false);
+      });
+    });
+
+    describe("when only output is selected", () => {
+      it("flags ComputedOutput but not ComputedInput", () => {
+        const compiled = compileProjection({
+          select: ["trace_id", "output"],
+          protections: fullAccess,
+        });
+        expect(compiled.plan.needsInput).toBe(false);
+        expect(compiled.plan.needsOutput).toBe(true);
+      });
+    });
+
+    describe("when gated annotation text is selected without io", () => {
+      it("does not flag the heavy io columns despite the shared protection", () => {
+        const compiled = compileProjection({
+          select: ["annotations.comment"],
+          protections: fullAccess,
+        });
+        expect(compiled.plan.needsInput).toBe(false);
+        expect(compiled.plan.needsOutput).toBe(false);
       });
     });
   });
@@ -229,7 +252,8 @@ describe("compileProjection", () => {
           select: ["trace_id", "input", "output"],
           protections: noIO,
         });
-        expect(compiled.plan.needsIO).toBe(false);
+        expect(compiled.plan.needsInput).toBe(false);
+        expect(compiled.plan.needsOutput).toBe(false);
         expect(compiled.project(sampleTrace())).toEqual({
           trace_id: "trace-1",
           input: null,
@@ -245,7 +269,8 @@ describe("compileProjection", () => {
           select: ["input", "output"],
           protections: fullAccess,
         });
-        expect(compiled.plan.needsIO).toBe(true);
+        expect(compiled.plan.needsInput).toBe(true);
+        expect(compiled.plan.needsOutput).toBe(true);
         expect(compiled.project(sampleTrace())).toEqual({
           input: "the input",
           output: "the output",
