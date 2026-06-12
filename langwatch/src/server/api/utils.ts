@@ -92,9 +92,9 @@ export async function getInternalProtectionsForProject(
 }
 
 /**
- * Resolve the group/department display names referenced by a set of audiences
- * in one batched lookup (the organization scopes it), so several redaction
- * labels can be built without one query per audience.
+ * Resolve the group display names referenced by a set of audiences in one
+ * batched lookup (the organization scopes it), so several redaction labels can
+ * be built without one query per audience.
  */
 async function resolveAudienceNames(
   prisma: PrismaClient,
@@ -102,33 +102,17 @@ async function resolveAudienceNames(
   organizationId: string | null,
 ): Promise<{
   groups: Record<string, string>;
-  departments: Record<string, string>;
 }> {
   const groupIds = [...new Set(audiences.flatMap((a) => a.groupIds))];
-  const departmentIds = [...new Set(audiences.flatMap((a) => a.departmentIds))];
-  if (
-    !organizationId ||
-    (groupIds.length === 0 && departmentIds.length === 0)
-  ) {
-    return { groups: {}, departments: {} };
+  if (!organizationId || groupIds.length === 0) {
+    return { groups: {} };
   }
-  const [groupRows, departmentRows] = await Promise.all([
-    groupIds.length > 0
-      ? prisma.group.findMany({
-          where: { id: { in: groupIds }, organizationId },
-          select: { id: true, name: true },
-        })
-      : Promise.resolve([]),
-    departmentIds.length > 0
-      ? prisma.department.findMany({
-          where: { id: { in: departmentIds }, organizationId },
-          select: { id: true, name: true },
-        })
-      : Promise.resolve([]),
-  ]);
+  const groupRows = await prisma.group.findMany({
+    where: { id: { in: groupIds }, organizationId },
+    select: { id: true, name: true },
+  });
   return {
     groups: Object.fromEntries(groupRows.map((g) => [g.id, g.name])),
-    departments: Object.fromEntries(departmentRows.map((d) => [d.id, d.name])),
   };
 }
 
@@ -235,12 +219,11 @@ export async function getUserProtectionsForProject(
     }
   }
 
-  // Group + department membership is only needed when a restrict audience names
-  // groups or departments; the role-group and owner audiences decide from facts
-  // already in hand, keeping the common read path free of the extra queries.
+  // Group membership is only needed when a restrict audience names groups; the
+  // role-group and owner audiences decide from facts already in hand, keeping
+  // the common read path free of the extra queries.
   let organizationId: string | null = null;
   let groupIds: string[] = [];
-  let departmentId: string | null = null;
   const needsFacts =
     needsAudienceFacts(effInput) ||
     needsAudienceFacts(effOutput) ||
@@ -254,18 +237,11 @@ export async function getUserProtectionsForProject(
     });
     organizationId = team?.organizationId ?? null;
     if (organizationId) {
-      const [memberships, orgUser] = await Promise.all([
-        ctx.prisma.groupMembership.findMany({
-          where: { userId, group: { organizationId } },
-          select: { groupId: true },
-        }),
-        ctx.prisma.organizationUser.findFirst({
-          where: { userId, organizationId },
-          select: { departmentId: true },
-        }),
-      ]);
+      const memberships = await ctx.prisma.groupMembership.findMany({
+        where: { userId, group: { organizationId } },
+        select: { groupId: true },
+      });
       groupIds = memberships.map((m) => m.groupId);
-      departmentId = orgUser?.departmentId ?? null;
     }
   }
 
@@ -275,7 +251,6 @@ export async function getUserProtectionsForProject(
     isViewer,
     isProjectOwner,
     groupIds,
-    departmentId,
   };
   const canSeeCapturedInput = isContentVisible(effInput, viewer);
   const canSeeCapturedOutput = isContentVisible(effOutput, viewer);

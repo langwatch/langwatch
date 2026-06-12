@@ -32,7 +32,6 @@ function viewer(partial: Partial<ViewerFacts>): ViewerFacts {
     isViewer: false,
     isProjectOwner: false,
     groupIds: [],
-    departmentId: null,
     ...partial,
   };
 }
@@ -69,19 +68,6 @@ describe("isContentVisible", () => {
       ).toBe(true);
       expect(
         isContentVisible(restriction, viewer({ groupIds: ["other"] })),
-      ).toBe(false);
-    });
-  });
-
-  describe("given content restricted to a department", () => {
-    /** @scenario Content restricted to a department is visible to members of that department */
-    it("shows it to a member of that department", () => {
-      const restriction = eff("restrict", { departmentIds: ["hr"] });
-      expect(
-        isContentVisible(restriction, viewer({ departmentId: "hr" })),
-      ).toBe(true);
-      expect(
-        isContentVisible(restriction, viewer({ departmentId: "eng" })),
       ).toBe(false);
     });
   });
@@ -163,27 +149,20 @@ describe("describeAudience", () => {
     expect(
       describeAudience(audience({ admins: true, groupIds: ["g1"] }), {
         groups: { g1: "Security" },
-        departments: {},
       }),
     ).toBe("Admins, Security");
     expect(
       describeAudience(audience({ viewers: true, projectOwner: true }), {
         groups: {},
-        departments: {},
       }),
     ).toBe("Viewers, the project owner");
-    expect(
-      describeAudience(audience({}), { groups: {}, departments: {} }),
-    ).toBe("no one");
+    expect(describeAudience(audience({}), { groups: {} })).toBe("no one");
   });
 });
 
 describe("needsAudienceFacts and isContentVisibleToPublic", () => {
-  it("needs membership facts only for group/department restrictions", () => {
+  it("needs membership facts only for group restrictions", () => {
     expect(needsAudienceFacts(eff("restrict", { groupIds: ["g"] }))).toBe(true);
-    expect(needsAudienceFacts(eff("restrict", { departmentIds: ["d"] }))).toBe(
-      true,
-    );
     expect(needsAudienceFacts(eff("restrict", { admins: true }))).toBe(false);
     expect(needsAudienceFacts(eff("capture"))).toBe(false);
   });

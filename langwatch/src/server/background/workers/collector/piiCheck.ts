@@ -62,6 +62,38 @@ function getDlpClient(): DlpServiceClient {
   return dlpClient;
 }
 
+/**
+ * Entities the Presidio analyzer detects at the strict level. Exported so the
+ * settings tooltip's entity labels are test-pinned to this list.
+ */
+export const PRESIDIO_STRICT_ENTITIES = [
+  "CREDIT_CARD",
+  "CRYPTO",
+  "EMAIL_ADDRESS",
+  "IBAN_CODE",
+  "IP_ADDRESS",
+  "LOCATION",
+  "PERSON",
+  "PHONE_NUMBER",
+  "MEDICAL_LICENSE",
+  "US_BANK_NUMBER",
+  "US_DRIVER_LICENSE",
+  "US_ITIN",
+  "US_PASSPORT",
+  "US_SSN",
+  "UK_NHS",
+  "SG_NRIC_FIN",
+  "AU_ABN",
+  "AU_ACN",
+  "AU_TFN",
+  "AU_MEDICARE",
+  "IN_PAN",
+  "IN_AADHAAR",
+  "IN_VEHICLE_REGISTRATION",
+  "IN_VOTER",
+  "IN_PASSPORT",
+] as const;
+
 const strictInfoTypes = {
   google_dlp: [
     "FIRST_NAME",
@@ -79,33 +111,7 @@ const strictInfoTypes = {
     "VAT_NUMBER",
     "MEDICAL_RECORD_NUMBER",
   ],
-  presidio: [
-    "CREDIT_CARD",
-    "CRYPTO",
-    "EMAIL_ADDRESS",
-    "IBAN_CODE",
-    "IP_ADDRESS",
-    "LOCATION",
-    "PERSON",
-    "PHONE_NUMBER",
-    "MEDICAL_LICENSE",
-    "US_BANK_NUMBER",
-    "US_DRIVER_LICENSE",
-    "US_ITIN",
-    "US_PASSPORT",
-    "US_SSN",
-    "UK_NHS",
-    "SG_NRIC_FIN",
-    "AU_ABN",
-    "AU_ACN",
-    "AU_TFN",
-    "AU_MEDICARE",
-    "IN_PAN",
-    "IN_AADHAAR",
-    "IN_VEHICLE_REGISTRATION",
-    "IN_VOTER",
-    "IN_PASSPORT",
-  ],
+  presidio: [...PRESIDIO_STRICT_ENTITIES],
 };
 
 const essentialInfoTypes = {

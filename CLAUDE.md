@@ -104,6 +104,7 @@ specs/               # BDD feature specs
 |----------------|------------------|
 | Building from scratch without checking existing code | Search the codebase first - follow existing patterns, extend existing systems, reuse existing abstractions |
 | Building settings UI without reading the UX guidelines | Read `dev/docs/best_practices/` first (`scope-selector-and-badges.md`, `drawers.md`, `row-actions-overflow-menu.md`, `scoped-resources.md`). Scope selection ALWAYS uses `ScopeChipPicker` (multi-scope, `personalScopes` for personal-project variants), never a hand-rolled Select |
+| Exposing internal technical details in user-facing copy ("in-process", "uses the analysis service") | Read `dev/docs/best_practices/copywriting.md`. Copy says what the feature does for the customer, never how it is built; descriptions stay short, full lists go in a `(?)` tooltip pinned to the code by a test |
 | Implementing without checking feature files | Check `specs/` for existing feature files first - they ARE the requirements. If none exists, create one before coding |
 | Using "should" in test descriptions | Use action-based descriptions: `it("checks local first")` not `it("should check local first")` |
 | Describe blocks without "when" context | Inner describe blocks must use "when" conditions: `describe("when user clicks submit", () => ...)` not `describe("submit behavior", ...)` |

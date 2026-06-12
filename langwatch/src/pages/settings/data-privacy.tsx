@@ -19,6 +19,7 @@ import {
 import {
   Building2,
   Folder,
+  HelpCircle,
   MoreVertical,
   Plus,
   Shield,
@@ -43,6 +44,10 @@ import {
   touchedFromConfig,
 } from "~/components/settings/dataPrivacyRuleConfig";
 import {
+  ESSENTIAL_PII_SUMMARY,
+  STRICT_ADDED_PII_SUMMARY,
+} from "~/components/settings/piiEntityLabels";
+import {
   ScopeChipPicker,
   type ScopeChipPickerEntry,
   type ScopeChipPickerScopeType,
@@ -57,6 +62,7 @@ import { Menu } from "~/components/ui/menu";
 import { Select } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
 import { toaster } from "~/components/ui/toaster";
+import { Tooltip } from "~/components/ui/tooltip";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useUrlScopeFilter } from "~/hooks/useUrlScopeFilter";
@@ -504,11 +510,6 @@ function describeAudienceSelection(
   if (audience.projectOwner) parts.push("the project owner");
   for (const id of audience.groupIds) {
     parts.push(options.groups.find((g) => g.id === id)?.name ?? "a group");
-  }
-  for (const id of audience.departmentIds) {
-    parts.push(
-      options.departments.find((d) => d.id === id)?.name ?? "a department",
-    );
   }
   return parts.length > 0
     ? `Visible to: ${parts.join(", ")}`
@@ -971,28 +972,16 @@ function PrivacyRuleDrawer({
                     Only the project owner (their own personal projects)
                   </Checkbox>
                 </VStack>
-                {audienceOptions.groups.length > 0 && (
-                  <AudienceMultiSelect
-                    label="Groups"
-                    options={audienceOptions.groups}
-                    selected={audience.groupIds}
-                    onChange={(groupIds) => {
-                      setAudience((prev) => ({ ...prev, groupIds }));
-                      touchRestrictedCategories();
-                    }}
-                  />
-                )}
-                {audienceOptions.departments.length > 0 && (
-                  <AudienceMultiSelect
-                    label="Departments"
-                    options={audienceOptions.departments}
-                    selected={audience.departmentIds}
-                    onChange={(departmentIds) => {
-                      setAudience((prev) => ({ ...prev, departmentIds }));
-                      touchRestrictedCategories();
-                    }}
-                  />
-                )}
+                <AudienceMultiSelect
+                  label="Custom groups"
+                  options={audienceOptions.groups}
+                  selected={audience.groupIds}
+                  emptyPlaceholder="No custom groups in this organization yet"
+                  onChange={(groupIds) => {
+                    setAudience((prev) => ({ ...prev, groupIds }));
+                    touchRestrictedCategories();
+                  }}
+                />
                 <Text fontSize="xs" color="fg.muted">
                   {describeAudienceSelection(audience, audienceOptions)}
                 </Text>
@@ -1018,16 +1007,31 @@ function PrivacyRuleDrawer({
                     <RadioGroup.ItemHiddenInput />
                     <RadioGroup.ItemIndicator />
                     <RadioGroup.ItemText>
-                      Essential (fast, in-process: emails, phones, cards, IDs)
+                      Essential (emails, phones, cards, IPs, national IDs)
                     </RadioGroup.ItemText>
+                    <Tooltip
+                      content={`Detects and masks: ${ESSENTIAL_PII_SUMMARY}.`}
+                      contentProps={{ maxWidth: "340px" }}
+                    >
+                      <Box color="fg.muted" display="inline-flex">
+                        <HelpCircle size={13} />
+                      </Box>
+                    </Tooltip>
                   </RadioGroup.Item>
                   <RadioGroup.Item value="strict">
                     <RadioGroup.ItemHiddenInput />
                     <RadioGroup.ItemIndicator />
                     <RadioGroup.ItemText>
-                      Strict (adds names and locations, uses the analysis
-                      service)
+                      Strict (adds names, locations, and more)
                     </RadioGroup.ItemText>
+                    <Tooltip
+                      content={`Deep detection with the Microsoft Presidio PII model. Everything in Essential, plus: ${STRICT_ADDED_PII_SUMMARY}.`}
+                      contentProps={{ maxWidth: "340px" }}
+                    >
+                      <Box color="fg.muted" display="inline-flex">
+                        <HelpCircle size={13} />
+                      </Box>
+                    </Tooltip>
                   </RadioGroup.Item>
                 </VStack>
               </RadioGroup.Root>
@@ -1054,6 +1058,11 @@ function PrivacyRuleDrawer({
               </HStack>
               {secretsEnabled && (
                 <VStack gap={2} align="stretch" paddingLeft={10}>
+                  {secretsPatterns.length > 0 && (
+                    <Text fontWeight="600" fontSize="sm">
+                      Custom patterns
+                    </Text>
+                  )}
                   {secretsPatterns.map((pattern, index) => {
                     const error = secretPatternError(pattern);
                     return (
@@ -1151,11 +1160,13 @@ function AudienceMultiSelect({
   options,
   selected,
   onChange,
+  emptyPlaceholder,
 }: {
   label: string;
   options: { id: string; name: string }[];
   selected: string[];
   onChange: (ids: string[]) => void;
+  emptyPlaceholder?: string;
 }) {
   const collection = useMemo(
     () =>
@@ -1164,6 +1175,7 @@ function AudienceMultiSelect({
       }),
     [options],
   );
+  const empty = options.length === 0;
   return (
     <Field.Root>
       <Field.Label fontSize="sm">{label}</Field.Label>
@@ -1172,10 +1184,17 @@ function AudienceMultiSelect({
         value={selected}
         multiple
         size="sm"
+        disabled={empty}
         onValueChange={(d) => onChange(d.value)}
       >
         <Select.Trigger background="bg" aria-label={label}>
-          <Select.ValueText placeholder={`Pick ${label.toLowerCase()}`} />
+          <Select.ValueText
+            placeholder={
+              empty && emptyPlaceholder
+                ? emptyPlaceholder
+                : `Pick ${label.toLowerCase()}`
+            }
+          />
         </Select.Trigger>
         <Select.Content>
           {collection.items.map((item) => (

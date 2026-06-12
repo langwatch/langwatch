@@ -16,7 +16,6 @@ export interface ViewerFacts {
   /** Owns the (personal) project the trace belongs to. */
   isProjectOwner: boolean;
   groupIds: string[];
-  departmentId: string | null;
 }
 
 /**
@@ -32,8 +31,8 @@ export interface EffectiveRestriction {
  * Whether a signed-in viewer may read content under an effective restriction.
  * Non-members see nothing; dropped content is not stored; captured content is
  * visible to every member; a restrict audience matches the built-in role groups
- * (admins, all members, viewers), the project owner, any of the viewer's
- * groups, or the viewer's department.
+ * (admins, all members, viewers), the project owner, or any of the viewer's
+ * groups.
  */
 export function isContentVisible(
   eff: EffectiveRestriction,
@@ -48,12 +47,6 @@ export function isContentVisible(
   if (audience.viewers && viewer.isViewer) return true;
   if (audience.projectOwner && viewer.isProjectOwner) return true;
   if (audience.groupIds.some((id) => viewer.groupIds.includes(id))) return true;
-  if (
-    viewer.departmentId != null &&
-    audience.departmentIds.includes(viewer.departmentId)
-  ) {
-    return true;
-  }
   return false;
 }
 
@@ -63,29 +56,25 @@ export function isContentVisibleToPublic(eff: EffectiveRestriction): boolean {
 }
 
 /**
- * Whether deciding this restriction needs the viewer's groups/department (i.e.
- * the audience names specific groups or departments). Admin/viewer/owner-only
- * and no-one restrictions are decided from facts the read path already holds,
- * so it can skip the extra membership lookups in the common cases.
+ * Whether deciding this restriction needs the viewer's group memberships (i.e.
+ * the audience names specific groups). Admin/viewer/owner-only and no-one
+ * restrictions are decided from facts the read path already holds, so it can
+ * skip the extra membership lookups in the common cases.
  */
 export function needsAudienceFacts(eff: EffectiveRestriction): boolean {
-  return (
-    eff.disposition === "restrict" &&
-    (eff.audience.groupIds.length > 0 || eff.audience.departmentIds.length > 0)
-  );
+  return eff.disposition === "restrict" && eff.audience.groupIds.length > 0;
 }
 
 /**
  * A human label for who may see a restricted category, for the redaction
- * placeholder. Group and department ids are mapped to names by the caller (it
- * holds the prisma client); unknown ids fall back to a generic word. An empty
- * audience reads as "no one".
+ * placeholder. Group ids are mapped to names by the caller (it holds the
+ * prisma client); unknown ids fall back to a generic word. An empty audience
+ * reads as "no one".
  */
 export function describeAudience(
   audience: ResolvedAudience,
   names: {
     groups: Record<string, string>;
-    departments: Record<string, string>;
   },
 ): string {
   const parts: string[] = [];
@@ -95,9 +84,6 @@ export function describeAudience(
   if (audience.projectOwner) parts.push("the project owner");
   for (const id of audience.groupIds) {
     parts.push(names.groups[id] ?? "a group");
-  }
-  for (const id of audience.departmentIds) {
-    parts.push(names.departments[id] ?? "a department");
   }
   return parts.length > 0 ? parts.join(", ") : "no one";
 }

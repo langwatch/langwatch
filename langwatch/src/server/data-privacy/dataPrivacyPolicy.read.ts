@@ -37,9 +37,8 @@ export type DataPrivacyScopeAvailable = {
 
 export type DataPrivacyAudienceOptions = {
   /** The organization's custom RBAC groups (created on the enterprise plan;
-   *  an org without any simply shows no group control). */
+   *  an org without any sees the group control empty and disabled). */
   groups: { id: string; name: string }[];
-  departments: { id: string; name: string }[];
 };
 
 export type DataPrivacySnapshot = {
@@ -117,7 +116,7 @@ export async function getDataPrivacySnapshot(
           ? [{ id: projectId, name, teamId: project?.teamId ?? "" }]
           : [],
       },
-      audienceOptions: { groups: [], departments: [] },
+      audienceOptions: { groups: [] },
     };
   }
 
@@ -237,9 +236,6 @@ export async function getDataPrivacySnapshot(
 
   const audienceOptions: DataPrivacyAudienceOptions = {
     groups: orgGroups,
-    departments: orgDepartments
-      .filter((d) => d.archivedAt === null)
-      .map(({ id, name }) => ({ id, name })),
   };
 
   return { projectId, effective, rules, available, audienceOptions };

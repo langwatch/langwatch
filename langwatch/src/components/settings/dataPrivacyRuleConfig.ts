@@ -25,7 +25,7 @@ import {
 
 /**
  * The drawer's audience selection: the built-in role groups, the
- * personal-project owner, plus the organization's groups and departments.
+ * personal-project owner, plus the organization's custom RBAC groups.
  * Everything off/empty = "no one" (fully hidden).
  */
 export interface AudienceFormState {
@@ -34,7 +34,6 @@ export interface AudienceFormState {
   viewers: boolean;
   projectOwner: boolean;
   groupIds: string[];
-  departmentIds: string[];
 }
 
 export const EMPTY_AUDIENCE_FORM: AudienceFormState = {
@@ -43,7 +42,6 @@ export const EMPTY_AUDIENCE_FORM: AudienceFormState = {
   viewers: false,
   projectOwner: false,
   groupIds: [],
-  departmentIds: [],
 };
 
 /** A custom attribute rule row as edited in the drawer. */
@@ -71,9 +69,6 @@ export function audienceConfig(audience: AudienceFormState): Audience {
   if (audience.viewers) out.viewers = true;
   if (audience.projectOwner) out.projectOwner = true;
   if (audience.groupIds.length > 0) out.groupIds = [...audience.groupIds];
-  if (audience.departmentIds.length > 0) {
-    out.departmentIds = [...audience.departmentIds];
-  }
   return out;
 }
 
@@ -86,7 +81,6 @@ function audienceToFormState(
     viewers: audience?.viewers ?? false,
     projectOwner: audience?.projectOwner ?? false,
     groupIds: [...(audience?.groupIds ?? [])],
-    departmentIds: [...(audience?.departmentIds ?? [])],
   };
 }
 

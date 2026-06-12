@@ -29,9 +29,11 @@ export type PiiLevel = (typeof PII_LEVELS)[number];
  * Who may read a `restrict`-ed category. Built on the forward access model:
  * `admins` = passes the team/org admin check, `allMembers` = has team access,
  * `viewers` = holds the built-in VIEWER role, `projectOwner` = is the owner of
- * the (personal) project the trace belongs to, plus real Groups + Departments
- * (custom groups exist only on the enterprise plan, which is the only plan that
- * can create them). Everything false/empty = "no one" (fully hidden).
+ * the (personal) project the trace belongs to, plus the organization's custom
+ * RBAC groups (custom groups exist only on the enterprise plan, which is the
+ * only plan that can create them). Departments scope where a rule applies,
+ * never who can see content, so they are not an audience primitive.
+ * Everything false/empty = "no one" (fully hidden).
  */
 export const audienceSchema = z
   .object({
@@ -40,7 +42,6 @@ export const audienceSchema = z
     viewers: z.boolean().optional(),
     projectOwner: z.boolean().optional(),
     groupIds: z.array(z.string()).optional(),
-    departmentIds: z.array(z.string()).optional(),
   })
   .strict();
 export type Audience = z.infer<typeof audienceSchema>;
@@ -114,7 +115,6 @@ export interface ResolvedAudience {
   viewers: boolean;
   projectOwner: boolean;
   groupIds: string[];
-  departmentIds: string[];
 }
 
 export interface ResolvedCategory {
@@ -141,7 +141,6 @@ export const EMPTY_AUDIENCE: ResolvedAudience = {
   viewers: false,
   projectOwner: false,
   groupIds: [],
-  departmentIds: [],
 };
 
 /**
@@ -168,6 +167,5 @@ export function resolveAudience(audience?: Audience): ResolvedAudience {
     viewers: audience?.viewers ?? false,
     projectOwner: audience?.projectOwner ?? false,
     groupIds: audience?.groupIds ?? [],
-    departmentIds: audience?.departmentIds ?? [],
   };
 }

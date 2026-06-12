@@ -106,7 +106,6 @@ describe("buildRuleConfig", () => {
           viewers: true,
           projectOwner: true,
           groupIds: ["g1"],
-          departmentIds: ["d1"],
         }),
         touched: { ...noTouch, categories: { output: true } },
       });
@@ -117,7 +116,6 @@ describe("buildRuleConfig", () => {
           viewers: true,
           projectOwner: true,
           groupIds: ["g1"],
-          departmentIds: ["d1"],
         },
       });
     });

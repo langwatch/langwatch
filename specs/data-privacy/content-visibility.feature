@@ -6,12 +6,13 @@ Feature: Restricting who can see trace content
   # "Restrict" stores the content but hides it at read time from anyone outside
   # the audience. The audience is built on the forward access model: the
   # built-in role groups (Admins, All members, Viewers), the project owner for
-  # personal projects, plus any of the organization's groups and departments
+  # personal projects, plus any of the organization's custom RBAC groups
   # (custom groups exist only on the enterprise plan, since only it can create
-  # them). An empty audience means no one can see it. Unlike dropping,
-  # restricting is fully retroactive - changing the audience changes who can
-  # read existing traces immediately. A viewer outside the audience sees a
-  # redaction placeholder with the reason, not a blank field.
+  # them). Departments scope WHERE a rule applies, never WHO can see content.
+  # An empty audience means no one can see it. Unlike dropping, restricting is
+  # fully retroactive - changing the audience changes who can read existing
+  # traces immediately. A viewer outside the audience sees a redaction
+  # placeholder with the reason, not a blank field.
 
   Background:
     Given an organization "acme" with a team "platform" and a project "web-app"
@@ -36,13 +37,6 @@ Feature: Restricting who can see trace content
     Then the trace input is visible to "erin"
     When "dave" opens a trace for "web-app"
     Then the trace input is redacted for "dave"
-
-  @integration
-  Scenario: Content restricted to a department is visible to members of that department
-    Given a member "frank" who belongs to the "hr" department
-    And a rule on "web-app" that restricts trace output to the "hr" department
-    When "frank" opens a trace for "web-app"
-    Then the trace output is visible to "frank"
 
   @integration
   Scenario: An empty audience hides content from everyone including admins
