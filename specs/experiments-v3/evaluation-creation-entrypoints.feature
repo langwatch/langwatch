@@ -20,7 +20,19 @@ Feature: Creating and opening evaluations goes to the workbench
     Then it opens in the evaluations workbench
 
   @integration @unimplemented
-  Scenario: Legacy wizard URLs redirect to the workbench
-    Given a link to "/:project/evaluations/wizard/:slug"
+  Scenario: A bare legacy wizard URL redirects to a fresh workbench
+    Given a link to "/:project/evaluations/wizard" with no experiment slug
+    When I open it
+    Then I am redirected to "/:project/experiments/workbench"
+
+  @integration @unimplemented
+  Scenario: Legacy wizard URLs for workbench-native experiments redirect to the workbench
+    Given a link to "/:project/evaluations/wizard/:slug" for a workbench-native experiment
     When I open it
     Then I am redirected to "/:project/experiments/workbench/:slug"
+
+  @integration @unimplemented
+  Scenario: Legacy wizard URLs for experiments that predate the workbench redirect to their workflow
+    Given a link to "/:project/evaluations/wizard/:slug" for an experiment that predates the workbench
+    When I open it
+    Then I am redirected to "/:project/studio/:workflowId"
