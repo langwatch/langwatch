@@ -13,6 +13,8 @@
  * Spec: specs/assistant/langy-github-prs.feature. Issue: #4747.
  */
 
+import { parseGithubProgressEvents } from "./githubProgressEvents";
+
 export type GithubPrLink = {
   owner: string;
   repo: string;
@@ -38,4 +40,36 @@ export function extractGithubPrLinks(text: string): GithubPrLink[] {
     out.push({ owner, repo, number: Number(numberStr), url });
   }
   return out;
+}
+
+/**
+ * PR links the assistant actually OPENED this turn — not ones it merely
+ * mentioned. Used for the daily PR cap and the `langy.github.pr_opened`
+ * audit log: counting every github.com/pull URL in prose lets "summarize PR
+ * #4751" twenty times exhaust the cap and forge audit entries.
+ *
+ * The github.md skill prints `[langy:progress:opened:<owner>/<repo>#<n>]`
+ * after `gh pr create`, so when progress sentinels are present we count only
+ * links matching an `opened` event. With NO progress events at all (older
+ * skill, sentinel stripped upstream) we fall back to every link — the
+ * pre-existing over-counting beats silently never counting.
+ */
+export function extractOpenedPrLinks(text: string): GithubPrLink[] {
+  const links = extractGithubPrLinks(text);
+  const { events } = parseGithubProgressEvents(text);
+  if (events.length === 0) return links;
+
+  const openedDetails = events
+    .filter((e) => e.stage === "opened")
+    .map((e) => e.detail)
+    .filter((d): d is string => Boolean(d));
+  // `opened` fired but the detail didn't survive (skill drift) — fall back
+  // rather than undercount a real PR.
+  if (openedDetails.length === 0) {
+    return events.some((e) => e.stage === "opened") ? links : [];
+  }
+  const opened = new Set(openedDetails.map((d) => d.trim().toLowerCase()));
+  return links.filter((l) =>
+    opened.has(`${l.owner}/${l.repo}#${l.number}`.toLowerCase()),
+  );
 }

@@ -13,6 +13,11 @@ import { createHmac, timingSafeEqual } from "crypto";
 
 export const STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
+// Tolerated forward clock skew between the signing and verifying hosts. A
+// payload "issued" further in the future than this is rejected — it can only
+// come from a skewed signer or someone replaying across a clock rollback.
+export const STATE_MAX_FUTURE_SKEW_MS = 60 * 1000;
+
 export type GithubOauthStatePayload = {
   userId: string;
   organizationId: string;
@@ -20,6 +25,12 @@ export type GithubOauthStatePayload = {
   returnTo: string;
   issuedAt: number;
   nonce: string;
+  /**
+   * Whether /connect successfully stored the nonce in Redis. Signed into the
+   * state so the callback knows to enforce single-use (true) or fall back to
+   * the signature + session-rebind defenses (false — Redis was down).
+   */
+  nonceRegistered: boolean;
 };
 
 export function signGithubOauthState(
@@ -59,10 +70,14 @@ export function verifyGithubOauthState(
     typeof payload?.userId !== "string" ||
     typeof payload?.organizationId !== "string" ||
     typeof payload?.issuedAt !== "number" ||
+    typeof payload?.returnTo !== "string" ||
+    typeof payload?.nonce !== "string" ||
+    typeof payload?.nonceRegistered !== "boolean" ||
     (payload.mode !== "popup" && payload.mode !== "redirect")
   ) {
     return null;
   }
   if (now - payload.issuedAt > STATE_TTL_MS) return null;
+  if (payload.issuedAt - now > STATE_MAX_FUTURE_SKEW_MS) return null;
   return payload;
 }

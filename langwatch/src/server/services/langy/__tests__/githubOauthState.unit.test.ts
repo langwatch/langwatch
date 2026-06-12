@@ -20,6 +20,7 @@ function makePayload(
     returnTo: "/settings/integrations#github",
     issuedAt: NOW,
     nonce: "n",
+    nonceRegistered: true,
     ...overrides,
   };
 }
@@ -69,6 +70,44 @@ describe("signGithubOauthState + verifyGithubOauthState", () => {
       expect(
         verifyGithubOauthState(token, SIGNING_KEY, NOW + STATE_TTL_MS + 1),
       ).toBeNull();
+    });
+  });
+
+  describe("when the payload claims a future issuedAt beyond clock skew", () => {
+    it("returns null — can only be a skewed signer or a clock-rollback replay", () => {
+      const token = signGithubOauthState(
+        makePayload({ issuedAt: NOW + 5 * 60 * 1000 }),
+        SIGNING_KEY,
+      );
+      expect(verifyGithubOauthState(token, SIGNING_KEY, NOW)).toBeNull();
+    });
+  });
+
+  describe("when nonce or returnTo are not strings", () => {
+    it("returns null for a non-string nonce", () => {
+      const token = signGithubOauthState(
+        makePayload({ nonce: 42 as unknown as string }),
+        SIGNING_KEY,
+      );
+      expect(verifyGithubOauthState(token, SIGNING_KEY, NOW)).toBeNull();
+    });
+    it("returns null for a non-string returnTo", () => {
+      const token = signGithubOauthState(
+        makePayload({ returnTo: null as unknown as string }),
+        SIGNING_KEY,
+      );
+      expect(verifyGithubOauthState(token, SIGNING_KEY, NOW)).toBeNull();
+    });
+  });
+
+  describe("when nonceRegistered is missing (pre-flag token shape)", () => {
+    it("returns null so old states can't dodge the replay check", () => {
+      const { nonceRegistered: _omit, ...legacy } = makePayload();
+      const token = signGithubOauthState(
+        legacy as GithubOauthStatePayload,
+        SIGNING_KEY,
+      );
+      expect(verifyGithubOauthState(token, SIGNING_KEY, NOW)).toBeNull();
     });
   });
 

@@ -136,6 +136,56 @@ describe("getGithubTokenForUser", () => {
     });
   });
 
+  describe("when GitHub is transiently down (5xx) during refresh", () => {
+    it("returns null but KEEPS the row — a GitHub blip must not force re-OAuth", async () => {
+      findUnique.mockResolvedValue({
+        encryptedRefreshToken: "enc(good-refresh)",
+        githubLogin: "tester",
+      });
+      decrypt.mockReturnValue("good-refresh");
+      mockRefresh({}, 503);
+
+      expect(await callMint()).toBeNull();
+      expect(deleteMany).not.toHaveBeenCalled();
+      expect(update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the refresh fetch throws (network error / timeout)", () => {
+    it("returns null and keeps the row", async () => {
+      findUnique.mockResolvedValue({
+        encryptedRefreshToken: "enc(good-refresh)",
+        githubLogin: "tester",
+      });
+      decrypt.mockReturnValue("good-refresh");
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => {
+          throw new Error("ECONNRESET");
+        }),
+      );
+
+      expect(await callMint()).toBeNull();
+      expect(deleteMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the row vanishes between the pre-lock read and the locked re-read", () => {
+    it("returns null without refreshing (disconnect raced the mint)", async () => {
+      findUnique
+        .mockResolvedValueOnce({
+          encryptedRefreshToken: "enc(old)",
+          githubLogin: "tester",
+        })
+        .mockResolvedValueOnce(null);
+      const fetchMock = mockRefresh({});
+
+      expect(await callMint()).toBeNull();
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(deleteMany).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the stored refresh token can't be decrypted", () => {
     it("deletes the row and returns null", async () => {
       findUnique.mockResolvedValue({
