@@ -35,18 +35,14 @@ export type CodeEvaluatorEditorDrawerProps = {
   onSave?: (evaluator: { id: string; name: string }) => void;
 };
 
-/**
- * Creates a custom CODE evaluator: a Python code block with its inputs and
- * outputs, exactly like the studio code component, stored on the evaluator
- * itself (no workflow record) and edited right here in the drawer.
- */
-export function CodeEvaluatorEditorDrawer(
-  props: CodeEvaluatorEditorDrawerProps,
-) {
+const validFields = (fields: EditableField[]) =>
+  fields.filter((f) => f.identifier.trim() !== "");
+
+/** Form state and the create mutation behind the drawer; no JSX in here. */
+function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
   const { project } = useOrganizationTeamProject();
-  const { closeDrawer, canGoBack, goBack } = useDrawer();
+  const { closeDrawer } = useDrawer();
   const utils = api.useContext();
-  const isOpen = props.open !== false && props.open !== undefined;
 
   const [name, setName] = useState("");
   const [code, setCode] = useState(DEFAULT_CODE_EVALUATOR_CONFIG.code);
@@ -91,9 +87,6 @@ export function CodeEvaluatorEditorDrawer(
     },
   });
 
-  const validFields = (fields: EditableField[]) =>
-    fields.filter((f) => f.identifier.trim() !== "");
-
   const handleSave = () => {
     if (!project?.id || !name.trim()) return;
     const config: CodeEvaluatorConfig = {
@@ -116,6 +109,35 @@ export function CodeEvaluatorEditorDrawer(
     validFields(outputs).length > 0 &&
     !createMutation.isPending;
 
+  return {
+    name,
+    setName,
+    code,
+    setCode,
+    inputs,
+    setInputs,
+    outputs,
+    setOutputs,
+    handleSave,
+    canSave,
+    isPending: createMutation.isPending,
+  };
+}
+
+type CodeEvaluatorFormState = ReturnType<typeof useCodeEvaluatorForm>;
+
+/**
+ * Creates a custom CODE evaluator: a Python code block with its inputs and
+ * outputs, exactly like the studio code component, stored on the evaluator
+ * itself (no workflow record) and edited right here in the drawer.
+ */
+export function CodeEvaluatorEditorDrawer(
+  props: CodeEvaluatorEditorDrawerProps,
+) {
+  const { closeDrawer, canGoBack, goBack } = useDrawer();
+  const form = useCodeEvaluatorForm(props);
+  const isOpen = props.open !== false && props.open !== undefined;
+
   return (
     <Drawer.Root
       open={isOpen}
@@ -131,81 +153,16 @@ export function CodeEvaluatorEditorDrawer(
     >
       <Drawer.Content bg="bg">
         <Drawer.CloseTrigger />
-        <Drawer.Header>
-          <HStack gap={2}>
-            {canGoBack && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={goBack}
-                padding={1}
-                minWidth="auto"
-                data-testid="back-button"
-              >
-                <LuArrowLeft size={20} />
-              </Button>
-            )}
-            <Text fontSize="lg" fontWeight="semibold">
-              New Code Evaluator
-            </Text>
-          </HStack>
-        </Drawer.Header>
+        <EditorHeader canGoBack={canGoBack} goBack={goBack} />
         <Drawer.Body display="flex" flexDirection="column" gap={4}>
-          <Field.Root required>
-            <Field.Label>Name</Field.Label>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="My code evaluator"
-              data-testid="code-evaluator-name"
-            />
-          </Field.Root>
-
-          <Field.Root>
-            <Field.Label>Python Code</Field.Label>
-            <Field.HelperText margin={0}>
-              Define a Python class with a `__call__` method that takes the
-              inputs and returns the outputs (passed, score, label or details).
-            </Field.HelperText>
-            <Box
-              width="full"
-              height="320px"
-              borderWidth="1px"
-              borderColor="border"
-              borderRadius="md"
-              overflow="hidden"
-            >
-              <CodeEditor
-                code={code}
-                setCode={setCode}
-                onClose={() => undefined}
-                language="python"
-                technologies={["python"]}
-                inputs={validFields(inputs)}
-                outputs={validFields(outputs)}
-              />
-            </Box>
-          </Field.Root>
-
-          <FieldListEditor
-            label="Inputs"
-            fields={inputs}
-            setFields={setInputs}
-            testIdPrefix="code-evaluator-input"
-          />
-          <FieldListEditor
-            label="Outputs"
-            fields={outputs}
-            setFields={setOutputs}
-            testIdPrefix="code-evaluator-output"
-          />
+          <CodeEvaluatorFormFields form={form} />
         </Drawer.Body>
         <Drawer.Footer borderTopWidth="1px" borderColor="border">
           <Button
             colorPalette="blue"
-            onClick={handleSave}
-            disabled={!canSave}
-            loading={createMutation.isPending}
+            onClick={form.handleSave}
+            disabled={!form.canSave}
+            loading={form.isPending}
             data-testid="save-code-evaluator"
           >
             Create evaluator
@@ -213,6 +170,91 @@ export function CodeEvaluatorEditorDrawer(
         </Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>
+  );
+}
+
+function EditorHeader({
+  canGoBack,
+  goBack,
+}: {
+  canGoBack: boolean;
+  goBack: () => void;
+}) {
+  return (
+    <Drawer.Header>
+      <HStack gap={2}>
+        {canGoBack && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={goBack}
+            padding={1}
+            minWidth="auto"
+            data-testid="back-button"
+          >
+            <LuArrowLeft size={20} />
+          </Button>
+        )}
+        <Text fontSize="lg" fontWeight="semibold">
+          New Code Evaluator
+        </Text>
+      </HStack>
+    </Drawer.Header>
+  );
+}
+
+function CodeEvaluatorFormFields({ form }: { form: CodeEvaluatorFormState }) {
+  return (
+    <>
+      <Field.Root required>
+        <Field.Label>Name</Field.Label>
+        <Input
+          value={form.name}
+          onChange={(e) => form.setName(e.target.value)}
+          placeholder="My code evaluator"
+          data-testid="code-evaluator-name"
+        />
+      </Field.Root>
+
+      <Field.Root>
+        <Field.Label>Python Code</Field.Label>
+        <Field.HelperText margin={0}>
+          Define a Python class with a `__call__` method that takes the inputs
+          and returns the outputs (passed, score, label or details).
+        </Field.HelperText>
+        <Box
+          width="full"
+          height="320px"
+          borderWidth="1px"
+          borderColor="border"
+          borderRadius="md"
+          overflow="hidden"
+        >
+          <CodeEditor
+            code={form.code}
+            setCode={form.setCode}
+            onClose={() => undefined}
+            language="python"
+            technologies={["python"]}
+            inputs={validFields(form.inputs)}
+            outputs={validFields(form.outputs)}
+          />
+        </Box>
+      </Field.Root>
+
+      <FieldListEditor
+        label="Inputs"
+        fields={form.inputs}
+        setFields={form.setInputs}
+        testIdPrefix="code-evaluator-input"
+      />
+      <FieldListEditor
+        label="Outputs"
+        fields={form.outputs}
+        setFields={form.setOutputs}
+        testIdPrefix="code-evaluator-output"
+      />
+    </>
   );
 }
 

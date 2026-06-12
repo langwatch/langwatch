@@ -8,7 +8,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
 import { formatDistanceToNow } from "date-fns";
 import { CheckCircle, Code, Plus, Workflow } from "lucide-react";
 import { useState } from "react";
@@ -24,6 +23,7 @@ import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
 } from "~/server/evaluations/evaluators.generated";
+import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
 import { api } from "~/utils/api";
 import { evaluatorTempNameMap } from "../checks/EvaluatorSelection";
 import { Menu } from "../ui/menu";
@@ -269,6 +269,9 @@ function EvaluatorCard({
       cursor="pointer"
       onClick={onClick}
       onKeyDown={(e) => {
+        // Keys bubbling up from the nested actions menu (trigger or items)
+        // must not select the card; only act when the card itself has focus.
+        if (e.target !== e.currentTarget) return;
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           onClick();

@@ -139,7 +139,7 @@ export function RunUntilHereDialog() {
               rows={rows.map((row, index) => ({
                 ...row,
                 id: stringifyValue(row.id),
-                selected: index === selectedRowIndex,
+                isSelected: index === selectedRowIndex,
               }))}
               columns={columns}
               onRowClick={(rowIndex) => setSelectedRowIndex(rowIndex)}

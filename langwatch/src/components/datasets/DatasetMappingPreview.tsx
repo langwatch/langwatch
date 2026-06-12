@@ -64,6 +64,13 @@ export function DatasetMappingPreview({
 
   const { project } = useOrganizationTeamProject();
 
+  // The preview table's row contract is `isSelected`; entry rows keep the
+  // wider `selected` field consumed by the add-to-dataset submit filter.
+  const previewRows = useMemo(
+    () => rowData.map((row) => ({ ...row, isSelected: !!row.selected })),
+    [rowData],
+  );
+
   // Extract thread_ids from traces
   const threadIds = useMemo(() => {
     const ids = traces
@@ -309,22 +316,24 @@ export function DatasetMappingPreview({
             >
               <Box maxHeight="400px" overflow="auto" width="full">
                 <DatasetPreviewTable
-                  rows={rowData}
+                  rows={previewRows}
                   columns={
                     (selectedDataset.columnTypes as DatasetColumns) ?? []
                   }
                   maxColumns={50}
-                  selectable
-                  onToggleRow={(rowIndex, selected) => {
+                  isSelectable
+                  onToggleRow={(rowIndex, isSelected) => {
                     onRowDataChange(
                       rowData.map((row, index) =>
-                        index === rowIndex ? { ...row, selected } : row,
+                        index === rowIndex
+                          ? { ...row, selected: isSelected }
+                          : row,
                       ),
                     );
                   }}
-                  onToggleAll={(selected) => {
+                  onToggleAll={(isSelected) => {
                     onRowDataChange(
-                      rowData.map((row) => ({ ...row, selected })),
+                      rowData.map((row) => ({ ...row, selected: isSelected })),
                     );
                   }}
                   onCellEdit={(rowIndex, columnName, value) => {

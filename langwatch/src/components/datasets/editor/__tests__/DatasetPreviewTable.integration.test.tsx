@@ -30,11 +30,11 @@ function renderTable({
   columns,
   ...props
 }: {
-  rows: Array<{ id?: string; selected?: boolean } & Record<string, unknown>>;
+  rows: Array<{ id?: string; isSelected?: boolean } & Record<string, unknown>>;
   columns: DatasetColumns;
-  selectable?: boolean;
-  onToggleRow?: (rowIndex: number, selected: boolean) => void;
-  onToggleAll?: (selected: boolean) => void;
+  isSelectable?: boolean;
+  onToggleRow?: (rowIndex: number, isSelected: boolean) => void;
+  onToggleAll?: (isSelected: boolean) => void;
   onCellEdit?: (rowIndex: number, columnName: string, value: unknown) => void;
   onRowClick?: (rowIndex: number) => void;
 }) {
@@ -152,9 +152,9 @@ describe("DatasetPreviewTable (integration)", () => {
       const user = userEvent.setup();
       const onToggleRow = vi.fn();
       renderTable({
-        rows: [{ id: "row-1", selected: false, payload: "hello" }],
+        rows: [{ id: "row-1", isSelected: false, payload: "hello" }],
         columns: [{ name: "payload", type: "string" }],
-        selectable: true,
+        isSelectable: true,
         onToggleRow,
       });
 
@@ -168,9 +168,9 @@ describe("DatasetPreviewTable (integration)", () => {
       const user = userEvent.setup();
       const onToggleAll = vi.fn();
       renderTable({
-        rows: [{ id: "row-1", selected: false, payload: "hello" }],
+        rows: [{ id: "row-1", isSelected: false, payload: "hello" }],
         columns: [{ name: "payload", type: "string" }],
-        selectable: true,
+        isSelectable: true,
         onToggleAll,
       });
 
@@ -186,8 +186,8 @@ describe("DatasetPreviewTable (integration)", () => {
       const onRowClick = vi.fn();
       renderTable({
         rows: [
-          { id: "row-1", selected: false, payload: "first" },
-          { id: "row-2", selected: true, payload: "second" },
+          { id: "row-1", isSelected: false, payload: "first" },
+          { id: "row-2", isSelected: true, payload: "second" },
         ],
         columns: [{ name: "payload", type: "string" }],
         onRowClick,

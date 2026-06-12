@@ -6,7 +6,7 @@
  *
  * Used by the dataset preview cards and the add-to-dataset mapping preview.
  * The data stays owned by the caller: edits (when `onCellEdit` is passed),
- * checkbox selection (`selectable`) and row picking (`onRowClick`) all
+ * checkbox selection (`isSelectable`) and row picking (`onRowClick`) all
  * propagate up instead of being copied into an internal store.
  */
 import { Box, Checkbox, HStack, Text } from "@chakra-ui/react";
@@ -31,7 +31,10 @@ import { datasetTableCss } from "./datasetTableStyles";
 import { JSON_LIKE_TYPES } from "./EditableCell";
 import { TableCell } from "./TableCell";
 
-type PreviewRow = { id?: string; selected?: boolean } & Record<string, unknown>;
+type PreviewRow = { id?: string; isSelected?: boolean } & Record<
+  string,
+  unknown
+>;
 
 const CHECKBOX_WIDTH_PX = 36;
 const ROW_NUMBER_WIDTH_PX = 48;
@@ -46,7 +49,7 @@ export function DatasetPreviewTable({
   rows,
   columns,
   maxColumns = 8,
-  selectable = false,
+  isSelectable = false,
   onToggleRow,
   onToggleAll,
   onCellEdit,
@@ -56,10 +59,10 @@ export function DatasetPreviewTable({
   rows: PreviewRow[];
   columns: DatasetColumns;
   maxColumns?: number;
-  /** Renders a leading checkbox column bound to each row's `selected`. */
-  selectable?: boolean;
-  onToggleRow?: (rowIndex: number, selected: boolean) => void;
-  onToggleAll?: (selected: boolean) => void;
+  /** Renders a leading checkbox column bound to each row's `isSelected`. */
+  isSelectable?: boolean;
+  onToggleRow?: (rowIndex: number, isSelected: boolean) => void;
+  onToggleAll?: (isSelected: boolean) => void;
   /** Makes cells editable (double-click), like the workbench. For JSON-like
    *  columns the edited text is parsed back to a value when valid JSON. */
   onCellEdit?: (rowIndex: number, columnName: string, value: unknown) => void;
@@ -109,8 +112,8 @@ export function DatasetPreviewTable({
     () => new Set(),
   );
 
-  const allSelected =
-    selectable && rows.length > 0 && rows.every((row) => !!row.selected);
+  const areAllSelected =
+    isSelectable && rows.length > 0 && rows.every((row) => !!row.isSelected);
 
   const contextValue = useMemo(
     (): DatasetTableContextValue => ({
@@ -145,7 +148,7 @@ export function DatasetPreviewTable({
         });
       },
       toggleRowSelection: (rowIndex) => {
-        onToggleRow?.(rowIndex, !rows[rowIndex]?.selected);
+        onToggleRow?.(rowIndex, !rows[rowIndex]?.isSelected);
       },
       editorPortalRef,
     }),
@@ -169,7 +172,7 @@ export function DatasetPreviewTable({
   const tableColumns = useMemo(() => {
     const cols: ColumnDef<DatasetTableRowData>[] = [];
 
-    if (selectable) {
+    if (isSelectable) {
       cols.push(
         columnHelper.display({
           id: "select",
@@ -178,8 +181,8 @@ export function DatasetPreviewTable({
               size="sm"
               top="1px"
               aria-label="Select all rows"
-              checked={allSelected}
-              onCheckedChange={() => onToggleAll?.(!allSelected)}
+              checked={areAllSelected}
+              onCheckedChange={() => onToggleAll?.(!areAllSelected)}
             >
               <Checkbox.HiddenInput />
               <Checkbox.Control />
@@ -189,9 +192,9 @@ export function DatasetPreviewTable({
             <Checkbox.Root
               size="sm"
               aria-label={`Select row ${info.row.index + 1}`}
-              checked={!!rows[info.row.index]?.selected}
+              checked={!!rows[info.row.index]?.isSelected}
               onCheckedChange={() =>
-                onToggleRow?.(info.row.index, !rows[info.row.index]?.selected)
+                onToggleRow?.(info.row.index, !rows[info.row.index]?.isSelected)
               }
               onClick={(e) => e.stopPropagation()}
             >
@@ -250,8 +253,8 @@ export function DatasetPreviewTable({
   }, [
     columnHelper,
     visibleColumns,
-    selectable,
-    allSelected,
+    isSelectable,
+    areAllSelected,
     rows,
     onToggleAll,
     onToggleRow,
@@ -282,7 +285,7 @@ export function DatasetPreviewTable({
           <colgroup>
             <col
               style={{
-                width: selectable ? CHECKBOX_WIDTH_PX : ROW_NUMBER_WIDTH_PX,
+                width: isSelectable ? CHECKBOX_WIDTH_PX : ROW_NUMBER_WIDTH_PX,
               }}
             />
             {visibleColumns.map((col) => (
@@ -310,7 +313,7 @@ export function DatasetPreviewTable({
               <tr
                 key={row.id}
                 data-index={row.index}
-                data-selected={rows[row.index]?.selected ? "true" : undefined}
+                data-selected={rows[row.index]?.isSelected ? "true" : undefined}
                 onClick={onRowClick ? () => onRowClick(row.index) : undefined}
                 style={onRowClick ? { cursor: "pointer" } : undefined}
               >
