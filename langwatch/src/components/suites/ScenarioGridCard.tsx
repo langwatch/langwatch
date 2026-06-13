@@ -60,13 +60,13 @@ export function ScenarioGridCard({
           paddingY={0.5}
           borderRadius="md"
           border="1px solid"
-          borderColor="gray.300"
+          borderColor="border.muted"
           fontSize="xs"
           color="fg.default"
-          bg="white"
+          bg="bg.panel"
           cursor={isCancelling ? "default" : "pointer"}
           opacity={isCancelling ? 0.6 : 1}
-          _hover={isCancelling ? undefined : { bg: "gray.100", borderColor: "gray.400" }}
+          _hover={isCancelling ? undefined : { bg: "bg.muted", borderColor: "border.emphasized" }}
           position="absolute"
           top={2}
           right={2}

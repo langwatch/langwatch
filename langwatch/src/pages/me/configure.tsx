@@ -587,7 +587,7 @@ function RevealedSecretBanner({
           gap={2}
           paddingX={2}
           paddingY={2}
-          backgroundColor="white"
+          backgroundColor="bg.panel"
           borderRadius="sm"
           borderWidth="1px"
           borderColor="border.muted"
