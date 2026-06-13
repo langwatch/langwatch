@@ -66,6 +66,7 @@ import { SavedViewsBar } from "./messages/SavedViewsBar";
 import { PresenceMenuItem } from "./sidebar/PresenceMenuItem";
 import { SdkRadarBanner } from "./SdkRadarBanner";
 import { UpgradeModal } from "./UpgradeModal";
+import { ColorModeButton } from "./ui/color-mode";
 import { Link } from "./ui/link";
 import { Menu } from "./ui/menu";
 import { PageErrorFallback } from "./ui/PageErrorFallback";
@@ -707,6 +708,8 @@ export const DashboardLayout = ({
 
           {/* Command bar trigger */}
           {project && <CommandBarTrigger />}
+
+          <ColorModeButton />
 
           <Menu.Root>
             <Menu.Trigger asChild>
