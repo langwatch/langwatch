@@ -13,6 +13,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { Node } from "@xyflow/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -75,8 +76,8 @@ vi.mock("../../../hooks/useGetDatasetData", () => ({
   useGetDatasetData: (args: unknown) => mockUseGetDatasetData(args),
 }));
 
-// Keep the shell light but the FieldsDefinition editor real - the
-// editable inputs ARE the behavior under test.
+// Keep the shell light but the inputs editor real - the editable
+// inputs ARE the behavior under test.
 vi.mock("../BasePropertiesPanel", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("../BasePropertiesPanel")>();
@@ -141,26 +142,35 @@ describe("EntryPointPropertiesPanel", () => {
     /** @scenario Adding an input on the entry point */
     it("lets the user add an input field", async () => {
       renderPanel();
+      const user = userEvent.setup();
 
       expect(screen.getByText("Inputs")).toBeInTheDocument();
-      fireEvent.click(screen.getByTestId("add-outputs-field-button"));
-
-      // The appended field starts empty (a blank identifier fails
-      // validation, so nothing submits yet); the update lands once the
-      // user names it.
-      const identifierInputs = screen.getAllByRole("textbox");
-      fireEvent.change(identifierInputs[identifierInputs.length - 1]!, {
-        target: { value: "context" },
-      });
+      await user.click(screen.getByTestId("add-variable-button"));
+      await user.click(screen.getByRole("menuitem", { name: /Text/ }));
 
       await waitFor(() => {
         const updates = mockSetNode.mock.calls.map(
           (c) => c[0] as { id: string; data: { outputs?: unknown[] } },
         );
+        const update = updates.find((u) => u.data.outputs?.length === 2);
+        expect(update).toBeTruthy();
+      });
+    });
+
+    /** @scenario The entry point accepts an image input */
+    it("lets the user add an image input", async () => {
+      renderPanel();
+      const user = userEvent.setup();
+
+      await user.click(screen.getByTestId("add-variable-button"));
+      await user.click(screen.getByRole("menuitem", { name: /Image/ }));
+
+      await waitFor(() => {
+        const updates = mockSetNode.mock.calls.map(
+          (c) => c[0] as { id: string; data: { outputs?: { type: string }[] } },
+        );
         const update = updates.find((u) =>
-          u.data.outputs?.some(
-            (o) => (o as { identifier: string }).identifier === "context",
-          ),
+          u.data.outputs?.some((o) => o.type === "image"),
         );
         expect(update).toBeTruthy();
       });
@@ -200,10 +210,10 @@ describe("EntryPointPropertiesPanel", () => {
     it("removing an input does not touch the dataset", async () => {
       renderPanel(datasetNode());
 
-      fireEvent.click(screen.getByTestId("remove-outputs-1-field"));
+      fireEvent.click(screen.getByTestId("remove-variable-irrelevant"));
 
-      // The remove submits through react-hook-form asynchronously; find
-      // the node update that carries the shrunken field list.
+      // The remove writes the shrunken field list back to the node; find
+      // the update that carries it.
       await waitFor(() => {
         const updates = mockSetNode.mock.calls.map(
           (c) => c[0] as { id: string; data: Record<string, unknown> },

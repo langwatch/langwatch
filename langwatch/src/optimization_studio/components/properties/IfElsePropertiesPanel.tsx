@@ -1,12 +1,19 @@
-import { HStack, Link, Spacer, Text, VStack } from "@chakra-ui/react";
-import type { Node } from "@xyflow/react";
-import { useCallback } from "react";
+import { Box, HStack, Link, Spacer, Text, VStack } from "@chakra-ui/react";
+import { type Node, useUpdateNodeInternals } from "@xyflow/react";
+import { useCallback, useMemo } from "react";
 import { ExternalLink } from "react-feather";
 import { useShallow } from "zustand/react/shallow";
 import { CodeBlockEditor } from "~/components/blocks/CodeBlockEditor";
 import { Switch } from "~/components/ui/switch";
+import type { FieldMapping } from "~/components/variables";
+import { type Variable, VariablesSection } from "~/components/variables";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import type { Component, Field } from "../../types/dsl";
+import {
+  applyMappingChange,
+  buildAvailableSources,
+  buildInputMappings,
+} from "../../utils/edgeMappingUtils";
 import { LiquidConditionEditor } from "../code/LiquidConditionEditor";
 import {
   BasePropertiesPanel,
@@ -51,10 +58,75 @@ function pythonConditionTemplate(inputs: Field[]): string {
  * gating contract, so they render read-only.
  */
 export function IfElsePropertiesPanel({ node }: { node: Node<Component> }) {
-  const { setNodeParameter } = useWorkflowStore(
-    useShallow((state) => ({
-      setNodeParameter: state.setNodeParameter,
-    })),
+  const { nodes, edges, setNode, setNodeParameter, setEdges, getWorkflow } =
+    useWorkflowStore(
+      useShallow((state) => ({
+        nodes: state.getWorkflow().nodes,
+        edges: state.getWorkflow().edges,
+        setNode: state.setNode,
+        setNodeParameter: state.setNodeParameter,
+        setEdges: state.setEdges,
+        getWorkflow: state.getWorkflow,
+      })),
+    );
+  const updateNodeInternals = useUpdateNodeInternals();
+
+  const inputs: Variable[] = (node.data.inputs ?? []).map((input) => ({
+    identifier: input.identifier,
+    type: input.type,
+  }));
+
+  const availableSources = useMemo(
+    () => buildAvailableSources({ nodeId: node.id, nodes, edges }),
+    [edges, nodes, node.id],
+  );
+
+  const inputMappings = useMemo(
+    () =>
+      buildInputMappings({
+        nodeId: node.id,
+        edges,
+        inputs: node.data.inputs ?? [],
+      }),
+    [edges, node.id, node.data.inputs],
+  );
+
+  const handleMappingChange = useCallback(
+    (identifier: string, mapping: FieldMapping | undefined) => {
+      const workflow = getWorkflow();
+      const currentInputs =
+        workflow.nodes.find((n) => n.id === node.id)?.data.inputs ?? [];
+      const result = applyMappingChange({
+        nodeId: node.id,
+        identifier,
+        mapping,
+        currentEdges: workflow.edges,
+        currentInputs,
+      });
+      setEdges(result.edges);
+      setNode({ id: node.id, data: { inputs: result.inputs } });
+      updateNodeInternals(node.id);
+    },
+    [getWorkflow, node.id, setEdges, setNode, updateNodeInternals],
+  );
+
+  const handleInputsChange = useCallback(
+    (newVariables: Variable[]) => {
+      const existingInputs = node.data.inputs ?? [];
+      const newInputs: Field[] = newVariables.map((variable) => {
+        const existing = existingInputs.find(
+          (i) => i.identifier === variable.identifier,
+        );
+        return {
+          identifier: variable.identifier,
+          type: variable.type as Field["type"],
+          ...(existing?.value != null ? { value: existing.value } : {}),
+        };
+      });
+      setNode({ id: node.id, data: { inputs: newInputs } });
+      updateNodeInternals(node.id);
+    },
+    [node.id, node.data.inputs, setNode, updateNodeInternals],
   );
 
   const param = useCallback(
@@ -113,6 +185,7 @@ export function IfElsePropertiesPanel({ node }: { node: Node<Component> }) {
     <BasePropertiesPanel
       node={node}
       hideParameters
+      hideInputs
       outputsTitle="Branches"
       outputsReadOnly
     >
@@ -172,6 +245,19 @@ export function IfElsePropertiesPanel({ node }: { node: Node<Component> }) {
           </>
         )}
       </VStack>
+      <Box width="full">
+        <VariablesSection
+          variables={inputs}
+          onChange={handleInputsChange}
+          showMappings={true}
+          mappings={inputMappings}
+          onMappingChange={handleMappingChange}
+          availableSources={availableSources}
+          canAddRemove={true}
+          readOnly={false}
+          title="Inputs"
+        />
+      </Box>
     </BasePropertiesPanel>
   );
 }

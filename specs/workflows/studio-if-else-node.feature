@@ -40,6 +40,16 @@ Feature: If/Else conditional branch node in workflows
     Then the condition is saved on the node's parameters
     And the workflow autosaves with the new condition
 
+  # The if/else inputs use the same modern field editor as the code and LLM
+  # nodes (a compact type-icon + name row with mappings and an Add menu), so
+  # every input type those nodes accept is available here too, including image.
+  @integration
+  Scenario: The if/else inputs use the shared field editor
+    Given an if/else node with input "context"
+    When I open the node's properties panel
+    Then the inputs use the same field editor as the code and LLM nodes
+    And the input type options include image
+
   # ============================================================================
   # Execution: routing + skipping (engine behavior)
   # ============================================================================

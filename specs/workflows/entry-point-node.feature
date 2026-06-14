@@ -47,6 +47,15 @@ Feature: Entry point node with optional dataset and user-defined inputs
     And I add an input "feature_flag" of type str
     Then the entry node exposes a "feature_flag" field to connect from
 
+  # The entry inputs use the same modern field editor as the code and LLM
+  # nodes (a compact type-icon + name row with an Add menu), so every input
+  # type those nodes accept is available here too, including image.
+  @integration
+  Scenario: The entry point accepts an image input
+    When I open the entry point drawer
+    And I add an input of type image
+    Then the entry node exposes an image input field
+
   @integration
   Scenario: Attaching a dataset merges its columns into the inputs
     Given the entry point has a user-defined input "feature_flag"

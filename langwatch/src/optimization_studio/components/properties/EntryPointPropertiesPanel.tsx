@@ -6,18 +6,18 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import type { Node } from "@xyflow/react";
+import { type Node, useUpdateNodeInternals } from "@xyflow/react";
 import { useCallback, useState } from "react";
 import { ArrowRight, Database, Flag, Folder, X } from "react-feather";
 import { useShallow } from "zustand/react/shallow";
+import { type Variable, VariablesSection } from "~/components/variables";
 import { Tooltip } from "../../../components/ui/tooltip";
 import { useGetDatasetData } from "../../hooks/useGetDatasetData";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
-import type { Entry } from "../../types/dsl";
+import type { Entry, Field } from "../../types/dsl";
 import { DatasetModal } from "../DatasetModal";
 import {
   BasePropertiesPanel,
-  FieldsDefinition,
   PropertySectionTitle,
 } from "./BasePropertiesPanel";
 
@@ -47,7 +47,36 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
     })),
   );
 
+  const updateNodeInternals = useUpdateNodeInternals();
+
   const dataset = node.data.dataset;
+
+  // The entry fields are the workflow inputs. DSL-wise they live on the node's
+  // `outputs` (they are emitted to downstream nodes); the user-facing language
+  // is "Inputs". They are the source of the run, so there is nothing to map.
+  const inputVariables: Variable[] = (node.data.outputs ?? []).map((field) => ({
+    identifier: field.identifier,
+    type: field.type,
+  }));
+
+  const handleInputsChange = useCallback(
+    (newVariables: Variable[]) => {
+      const existing = node.data.outputs ?? [];
+      const outputs: Field[] = newVariables.map((variable) => {
+        const prev = existing.find((f) => f.identifier === variable.identifier);
+        return {
+          ...(prev ?? {}),
+          identifier: variable.identifier,
+          type: variable.type as Field["type"],
+        };
+      });
+      // Send only the changed field; setNode merges data shallowly, so an
+      // attached dataset and other entry config survive untouched.
+      setNode({ id: node.id, data: { outputs } });
+      updateNodeInternals(node.id);
+    },
+    [node.id, node.data.outputs, setNode, updateNodeInternals],
+  );
 
   const detachDataset = useCallback(() => {
     setNode({
@@ -64,10 +93,15 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
 
   return (
     <BasePropertiesPanel node={node} hideOutputs hideInputs hideParameters>
-      {/* The entry fields are the workflow inputs - fully editable.
-          DSL-wise they live on the node's `outputs` (they're emitted to
-          downstream nodes), the user-facing language is "Inputs". */}
-      <FieldsDefinition node={node} title="Inputs" field="outputs" />
+      <VariablesSection
+        variables={inputVariables}
+        onChange={handleInputsChange}
+        showMappings={false}
+        isMappingDisabled={true}
+        canAddRemove={true}
+        readOnly={false}
+        title="Inputs"
+      />
 
       <VStack width="full" align="start">
         <HStack width="full">

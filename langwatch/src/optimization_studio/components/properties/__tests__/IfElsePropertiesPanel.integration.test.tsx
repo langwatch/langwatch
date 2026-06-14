@@ -14,6 +14,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Component } from "../../../types/dsl";
 
 const mockSetNodeParameter = vi.fn();
+const mockSetNode = vi.fn();
+const mockSetEdges = vi.fn();
 
 vi.mock("../../../hooks/useWorkflowStore", async (importOriginal) => {
   const actual =
@@ -23,6 +25,8 @@ vi.mock("../../../hooks/useWorkflowStore", async (importOriginal) => {
     useWorkflowStore: (selector: (state: unknown) => unknown) =>
       selector({
         setNodeParameter: mockSetNodeParameter,
+        setNode: mockSetNode,
+        setEdges: mockSetEdges,
         nodes: [],
         edges: [],
         getWorkflow: () => ({ nodes: [], edges: [] }),
@@ -152,6 +156,17 @@ describe("IfElsePropertiesPanel", () => {
       const template = (codeCall![1] as { value: string }).value;
       expect(template).toContain("def execute(context: str) -> bool:");
       expect(template).toContain('return context != ""');
+    });
+  });
+
+  describe("when editing the inputs", () => {
+    /** @scenario The if/else inputs use the shared field editor */
+    it("renders the inputs with the shared field editor and image support", () => {
+      renderPanel();
+
+      expect(screen.getByText("context")).toBeInTheDocument();
+      expect(screen.getByTestId("add-variable-button")).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: "Image" })).toBeInTheDocument();
     });
   });
 
