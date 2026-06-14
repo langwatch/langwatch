@@ -1,5 +1,5 @@
 import { generate } from "@langwatch/ksuid";
-import { EvaluationExecutionMode } from "@prisma/client";
+import { EvaluationExecutionMode, Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { customAlphabet } from "nanoid";
 import { ZodError, z } from "zod";
@@ -13,8 +13,9 @@ import {
 import { validatedPreconditionsSchema } from "../../evaluations/preconditionValidation";
 import { enforceLicenseLimit } from "../../license-enforcement";
 import { coerceMonitorMappings } from "../../tracer/tracesMapping";
-import { checkProjectPermission } from "../rbac";
+import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { copyEvaluatorToProject } from "./copyEvaluatorToProject";
 
 /**
  * Generates a unique slug for a monitor.
@@ -197,6 +198,96 @@ export const monitorsRouter = createTRPCRouter({
       });
 
       return newCheck;
+    }),
+  copy: protectedProcedure
+    .input(
+      z.object({
+        monitorId: z.string(),
+        // Target project to replicate into.
+        projectId: z.string(),
+        // Project the monitor is being copied from.
+        sourceProjectId: z.string(),
+      }),
+    )
+    .use(checkProjectPermission("evaluations:manage"))
+    .mutation(async ({ input, ctx }) => {
+      const { monitorId, projectId, sourceProjectId } = input;
+      const prisma = ctx.prisma;
+
+      const hasSourcePermission = await hasProjectPermission(
+        ctx,
+        sourceProjectId,
+        "evaluations:manage",
+      );
+      if (!hasSourcePermission) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message:
+            "You do not have permission to manage evaluations in the source project",
+        });
+      }
+
+      const source = await prisma.monitor.findFirst({
+        where: { id: monitorId, projectId: sourceProjectId },
+      });
+      if (!source) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Monitor not found",
+        });
+      }
+
+      await enforceLicenseLimit(ctx, projectId, "onlineEvaluations");
+
+      // Evaluator-backed monitors keep their settings (and, for workflow
+      // evaluators, the backing workflow) on a separate Evaluator record scoped
+      // to the source project. Copy it across so the replica is self-contained
+      // in the target project instead of dangling a cross-project reference.
+      // Legacy wizard monitors have no evaluator — their settings live inline on
+      // the monitor, so copying the monitor fields below is enough.
+      let newEvaluatorId: string | null = null;
+      if (source.evaluatorId) {
+        const copiedEvaluator = await copyEvaluatorToProject({
+          ctx,
+          evaluatorId: source.evaluatorId,
+          sourceProjectId,
+          targetProjectId: projectId,
+        });
+        newEvaluatorId = copiedEvaluator.id;
+      }
+
+      const uniqueName = await findUniqueMonitorName(
+        prisma,
+        projectId,
+        source.name,
+      );
+
+      // Replicas start disabled: a real-time evaluator runs (and bills) on every
+      // matching trace, so the user opts in after reviewing it in the target
+      // project rather than having it fire the moment it is replicated.
+      const replica = await prisma.monitor.create({
+        data: {
+          id: generate(KSUID_RESOURCES.MONITOR).toString(),
+          projectId,
+          name: uniqueName,
+          checkType: source.checkType,
+          slug: generateMonitorSlug(source.name),
+          preconditions: source.preconditions as Prisma.InputJsonValue,
+          parameters: source.parameters as Prisma.InputJsonValue,
+          mappings:
+            source.mappings === null
+              ? Prisma.JsonNull
+              : (source.mappings as Prisma.InputJsonValue),
+          sample: source.sample,
+          enabled: false,
+          executionMode: source.executionMode,
+          evaluatorId: newEvaluatorId,
+          level: source.level,
+          threadIdleTimeout: source.threadIdleTimeout,
+        },
+      });
+
+      return replica;
     }),
   update: protectedProcedure
     .input(
