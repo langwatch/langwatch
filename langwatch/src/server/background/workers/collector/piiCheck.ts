@@ -5,7 +5,7 @@ import { env } from "../../../../env.mjs";
 import { createLogger } from "../../../../utils/logger/server";
 import { startSpan } from "../../../../utils/posthogErrorCapture";
 import { normalizePresidioMarkers } from "../../../data-privacy/redaction/markers";
-import type { BatchEvaluationResult } from "../../../evaluations/evaluators.generated";
+import type { BatchEvaluationResult } from "../../../evaluations/evaluators";
 import {
   evaluationDurationHistogram,
   getEvaluationStatusCounter,

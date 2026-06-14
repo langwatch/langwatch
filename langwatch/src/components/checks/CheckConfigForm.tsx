@@ -36,7 +36,7 @@ import {
   evaluatorTypesSchema,
   type Evaluators,
   type EvaluatorTypes,
-} from "../../server/evaluations/evaluators.generated";
+} from "../../server/evaluations/evaluators";
 import {
   getEvaluatorDefaultSettings,
   getEvaluatorDefinitions,

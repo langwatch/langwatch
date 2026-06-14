@@ -19,7 +19,7 @@ import {
   AVAILABLE_EVALUATORS,
   type EvaluatorDefinition,
   type EvaluatorTypes,
-} from "../../server/evaluations/evaluators.generated";
+} from "../../server/evaluations/evaluators";
 import { api } from "../../utils/api";
 import { isFeatureEnabled } from "../../utils/featureFlags";
 import { titleCase } from "../../utils/stringCasing";

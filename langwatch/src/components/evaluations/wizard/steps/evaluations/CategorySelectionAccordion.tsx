@@ -14,7 +14,7 @@ import {
   useEvaluationWizardStore,
 } from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
-import { AVAILABLE_EVALUATORS } from "../../../../../server/evaluations/evaluators.generated";
+import { AVAILABLE_EVALUATORS } from "../../../../../server/evaluations/evaluators";
 import { api } from "../../../../../utils/api";
 import { PuzzleIcon } from "../../../../icons/PuzzleIcon";
 import { Tooltip } from "../../../../ui/tooltip";

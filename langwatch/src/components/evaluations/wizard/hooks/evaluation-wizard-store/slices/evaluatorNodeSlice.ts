@@ -8,7 +8,7 @@ import type {
 } from "~/optimization_studio/types/dsl";
 import { nameToId } from "~/optimization_studio/utils/nodeUtils";
 import { buildEvaluatorFromType } from "~/optimization_studio/utils/registryUtils";
-import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
+import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
 import type { useAvailableEvaluators } from "../../../../../../hooks/useAvailableEvaluators";
 import type { BaseNodeSlice } from "./baseNodeSlice";
 import type { ExecutorSlice } from "./executorSlice";

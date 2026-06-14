@@ -23,7 +23,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
-} from "~/server/evaluations/evaluators.generated";
+} from "~/server/evaluations/evaluators";
 import { api } from "~/utils/api";
 import { evaluatorTempNameMap } from "../checks/EvaluatorSelection";
 import { Menu } from "../ui/menu";

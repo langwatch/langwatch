@@ -19,7 +19,7 @@ import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { getApp } from "~/server/app-layer/app";
-import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.generated";
+import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
 import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { KSUID_RESOURCES } from "~/utils/constants";

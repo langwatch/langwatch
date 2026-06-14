@@ -6,7 +6,7 @@ import {
   AVAILABLE_EVALUATORS,
   type EvaluatorDefinition,
   type EvaluatorTypes,
-} from "../server/evaluations/evaluators.generated";
+} from "../server/evaluations/evaluators";
 import { api } from "../utils/api";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 

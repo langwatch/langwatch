@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { EvaluationExecutionMode } from "@prisma/client";
-import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
+import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
 import {
   evaluatePreconditions,
   buildPreconditionTraceDataFromTrace,

@@ -1,5 +1,5 @@
 import { EvaluatorExecutionError } from "../../evaluations/errors";
-import type { BatchEvaluationResult, SingleEvaluationResult } from "~/server/evaluations/evaluators.generated";
+import type { BatchEvaluationResult, SingleEvaluationResult } from "~/server/evaluations/evaluators";
 import { evaluationDurationHistogram, getEvaluationStatusCounter } from "~/server/metrics";
 import { tryAndConvertTo } from "~/server/tracer/tracesMapping";
 import { createLogger } from "~/utils/logger/server";

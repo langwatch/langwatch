@@ -18,7 +18,7 @@ import { AddOrEditDatasetDrawer } from "~/components/AddOrEditDatasetDrawer";
 import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TypedAgent } from "~/server/agents/agent.repository";
-import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
+import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
 import { api } from "~/utils/api";
 
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";

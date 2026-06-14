@@ -341,9 +341,9 @@ function CodeImplementation() {
     <Card.Root width="full" height="full" position="sticky" top={6}>
       <Card.Body width="full" height="full" paddingTop={0}>
         {!checkType.startsWith("evaluators/") &&
-          availableEvaluators[checkType as Exclude<typeof checkType, `evaluators/${string}`>] && (
+          availableEvaluators[checkType as keyof typeof availableEvaluators] && (
           <EvaluationManualIntegration
-            evaluatorDefinition={availableEvaluators[checkType as Exclude<typeof checkType, `evaluators/${string}`>]!}
+            evaluatorDefinition={availableEvaluators[checkType as keyof typeof availableEvaluators]!}
             checkType={checkType as Exclude<typeof checkType, `evaluators/${string}`>}
             name={name ?? "Untitled"}
             executionMode={

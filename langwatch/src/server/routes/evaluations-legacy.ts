@@ -45,7 +45,7 @@ import {
   type EvaluatorDefinition,
   type EvaluatorTypes,
   type SingleEvaluationResult,
-} from "~/server/evaluations/evaluators.generated";
+} from "~/server/evaluations/evaluators";
 import { getEvaluatorDefaultSettings } from "~/server/evaluations/getEvaluator";
 import {
   type EvaluationRESTParams,

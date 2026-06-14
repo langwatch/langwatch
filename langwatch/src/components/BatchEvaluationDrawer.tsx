@@ -23,7 +23,7 @@ import { Switch } from "~/components/ui/switch";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators.generated";
+import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators";
 import { api } from "~/utils/api";
 
 interface BatchEvaluatioProps {

@@ -36,7 +36,7 @@ vi.mock("../../../hooks/useOrganizationTeamProject", () => ({
 }));
 
 // Mock evaluator definitions (generated file may not exist in test env)
-vi.mock("../../../server/evaluations/evaluators.generated", () => ({
+vi.mock("../../../server/evaluations/evaluators", () => ({
   AVAILABLE_EVALUATORS: {},
 }));
 

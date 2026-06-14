@@ -1,6 +1,6 @@
 import { EmptyState, Grid, RadioCard } from "@chakra-ui/react";
 import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
-import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
+import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
 import { useAnimatedFocusElementById } from "../../../../../hooks/useAnimatedFocusElementById";
 import { useAvailableEvaluators } from "../../../../../hooks/useAvailableEvaluators";
 import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";

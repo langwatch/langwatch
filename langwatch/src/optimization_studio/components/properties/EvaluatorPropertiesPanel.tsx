@@ -14,7 +14,7 @@ import {
   AVAILABLE_EVALUATORS,
   evaluatorsSchema,
   type EvaluatorTypes,
-} from "../../../server/evaluations/evaluators.generated";
+} from "../../../server/evaluations/evaluators";
 import { getEvaluatorDefaultSettings } from "../../../server/evaluations/getEvaluator";
 import { api } from "../../../utils/api";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";

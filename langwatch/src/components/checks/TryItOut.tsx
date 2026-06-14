@@ -27,7 +27,7 @@ import {
   evaluatorsSchema,
   type Evaluators,
   type SingleEvaluationResult,
-} from "../../server/evaluations/evaluators.generated";
+} from "../../server/evaluations/evaluators";
 import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
 import { evaluatePreconditions, buildPreconditionTraceDataFromTrace, checkEvaluatorRequiredFields } from "../../server/evaluations/preconditions";
 import type { CheckPreconditions } from "../../server/evaluations/types";

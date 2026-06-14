@@ -179,7 +179,7 @@ vi.mock("~/server/tracer/types", () => ({
   reservedTraceMetadataSchema: {},
 }));
 
-vi.mock("~/server/evaluations/evaluators.generated", () => ({
+vi.mock("~/server/evaluations/evaluators", () => ({
   AVAILABLE_EVALUATORS: {},
 }));
 

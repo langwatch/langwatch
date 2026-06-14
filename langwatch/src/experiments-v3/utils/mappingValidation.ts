@@ -9,7 +9,7 @@ import type { Field } from "~/optimization_studio/types/dsl";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
-} from "~/server/evaluations/evaluators.generated";
+} from "~/server/evaluations/evaluators";
 import type {
   DatasetReference,
   EvaluatorConfig,

@@ -11,7 +11,7 @@ import { FormProvider } from "react-hook-form";
 import type { ZodType } from "zod";
 import DynamicZodForm from "~/components/checks/DynamicZodForm";
 import { Link } from "~/components/ui/link";
-import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
+import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
 import { WorkflowCardDisplay } from "~/optimization_studio/components/workflow/WorkflowCard";
 import { EvaluatorMappingsSection } from "./EvaluatorMappingsSection";
 import type { EvaluatorMappingsConfig } from "./EvaluatorEditorShared";

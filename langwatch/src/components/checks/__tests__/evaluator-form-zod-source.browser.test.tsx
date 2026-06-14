@@ -24,7 +24,7 @@ import { z } from "zod";
 import {
   AVAILABLE_EVALUATORS,
   evaluatorsSchema,
-} from "../../../server/evaluations/evaluators.generated";
+} from "../../../server/evaluations/evaluators";
 
 afterEach(() => cleanup());
 

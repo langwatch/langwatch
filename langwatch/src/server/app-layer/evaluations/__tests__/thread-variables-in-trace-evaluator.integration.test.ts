@@ -8,7 +8,7 @@
  * All I/O deps are injected via constructor — zero vi.mock calls.
  */
 import { describe, expect, it, vi } from "vitest";
-import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.generated";
+import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
 import type { Trace } from "~/server/tracer/types";
 import type { LangEvalsClient } from "../../clients/langevals/langevals.client";
 import {

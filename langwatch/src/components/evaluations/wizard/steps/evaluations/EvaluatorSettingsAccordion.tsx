@@ -6,7 +6,7 @@ import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/
 import {
   evaluatorsSchema,
   type EvaluatorTypes,
-} from "~/server/evaluations/evaluators.generated";
+} from "~/server/evaluations/evaluators";
 import { useAvailableEvaluators } from "../../../../../hooks/useAvailableEvaluators";
 import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
 import type { Field } from "../../../../../optimization_studio/types/dsl";
