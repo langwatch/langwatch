@@ -17,7 +17,6 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
-  pull-requests: write
   contents: read
 
 env:
@@ -34,6 +33,8 @@ jobs:
       && github.event.action != 'closed'
       && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
     steps:
       - name: Install boxd CLI
         run: |
@@ -133,7 +134,7 @@ jobs:
 
       - name: Comment preview URL on PR
         if: always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |
             const pr = context.issue.number;
@@ -159,6 +160,8 @@ jobs:
       github.event_name == 'pull_request'
       && github.event.action == 'closed'
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
     steps:
       - name: Install boxd CLI
         run: |
@@ -180,7 +183,7 @@ jobs:
 
       - name: Update PR comment
         if: always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |
             const pr = context.issue.number;
