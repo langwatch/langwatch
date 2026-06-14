@@ -29,7 +29,14 @@ function getSentinelValue(key: string): string | null {
   const prefix = `${key}=`;
   const line = envExampleLines.find((l) => l.startsWith(prefix));
   if (line === undefined) return null;
-  return line.slice(prefix.length).trim();
+  const raw = line.slice(prefix.length).trim();
+  if (
+    (raw.startsWith('"') && raw.endsWith('"')) ||
+    (raw.startsWith("'") && raw.endsWith("'"))
+  ) {
+    return raw.slice(1, -1).trim();
+  }
+  return raw;
 }
 
 /**
