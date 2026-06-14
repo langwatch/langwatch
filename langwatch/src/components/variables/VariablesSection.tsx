@@ -3,7 +3,6 @@ import {
   Button,
   HStack,
   Input,
-  NativeSelect,
   Spacer,
   Text,
   VStack,
@@ -12,6 +11,7 @@ import { Info, Plus, X } from "lucide-react";
 import { useCallback, useState } from "react";
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
+import { FieldTypeSelect } from "~/prompts/components/ui/FieldTypeSelect";
 import {
   TYPE_LABELS,
   VariableTypeIcon,
@@ -212,9 +212,7 @@ export const VariablesSection = ({
                 <Menu.Item
                   key={option.value}
                   value={option.value}
-                  onClick={() =>
-                    handleAddVariable(option.value as FieldType)
-                  }
+                  onClick={() => handleAddVariable(option.value as FieldType)}
                 >
                   <HStack gap={2}>
                     <VariableTypeIcon type={option.value} size={14} />
@@ -280,16 +278,18 @@ export const VariablesSection = ({
       )}
 
       {/* Validation error for missing mappings */}
-      {showMissingMappingsError && showMappings && missingMappingIds.size > 0 && (
-        <Text
-          data-testid="missing-mappings-error"
-          color="red.500"
-          fontSize="sm"
-        >
-          Please map all required fields:{" "}
-          {Array.from(missingMappingIds).join(", ")}
-        </Text>
-      )}
+      {showMissingMappingsError &&
+        showMappings &&
+        missingMappingIds.size > 0 && (
+          <Text
+            data-testid="missing-mappings-error"
+            color="red.500"
+            fontSize="sm"
+          >
+            Please map all required fields:{" "}
+            {Array.from(missingMappingIds).join(", ")}
+          </Text>
+        )}
     </VStack>
   );
 };
@@ -385,48 +385,14 @@ const VariableRow = ({
 
   return (
     <HStack gap={2} width="full">
-      {/* Type Icon with selector */}
-      {readOnly ? (
-        <Box flexShrink={0} padding={0}>
-          <VariableTypeIcon type={variable.type} size={14} />
-        </Box>
-      ) : (
-        <NativeSelect.Root size="xs" width="30px" marginX={-2} flexShrink={0}>
-          <NativeSelect.Field
-            value={variable.type}
-            onChange={(e) => onUpdate({ type: e.target.value as FieldType })}
-            border="1px solid"
-            borderColor="transparent"
-            borderRadius="lg"
-            padding={1}
-            paddingRight={5}
-            _hover={{ borderColor: "border" }}
-            css={{
-              // Hide the default text, show only icon
-              color: "transparent",
-              "& option": { color: "black" },
-            }}
-            background="transparent"
-            cursor="pointer"
-          >
-            {INPUT_TYPE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </NativeSelect.Field>
-          {/* Custom indicator with type icon */}
-          <Box
-            position="absolute"
-            left={2}
-            top="50%"
-            transform="translateY(-50%)"
-            pointerEvents="none"
-          >
-            <VariableTypeIcon type={variable.type} size={14} />
-          </Box>
-        </NativeSelect.Root>
-      )}
+      {/* Type selector: icon + type name as an outline button */}
+      <FieldTypeSelect
+        value={variable.type}
+        options={INPUT_TYPE_OPTIONS}
+        onChange={(type) => onUpdate({ type: type as FieldType })}
+        readOnly={readOnly}
+        testId={`variable-type-select-${variable.identifier}`}
+      />
 
       {/* Variable Name */}
       {isEditing && !readOnly ? (
