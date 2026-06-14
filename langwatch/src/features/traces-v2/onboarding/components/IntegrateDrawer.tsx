@@ -11,6 +11,7 @@ import { PlatformGrid } from "~/features/onboarding/components/sections/observab
 import {
   PromptList,
   SkillList,
+  TRACING_SKILL_ID,
 } from "~/features/onboarding/components/sections/ViaClaudeCodeScreen";
 import { ViaMcpClientScreen } from "~/features/onboarding/components/sections/ViaClaudeDesktopScreen";
 import {
@@ -252,10 +253,11 @@ export function IntegrationContent({
           <ViaMcpClientScreen />
         </Tabs.Content>
         <Tabs.Content value="skill" padding={0}>
-          <SkillList />
+          {/* Traces onboarding leads with tracing — that's the job here. */}
+          <SkillList primarySkillId={TRACING_SKILL_ID} />
         </Tabs.Content>
         <Tabs.Content value="prompt" padding={0}>
-          <PromptList />
+          <PromptList primarySkillId={TRACING_SKILL_ID} />
         </Tabs.Content>
         <Tabs.Content value="sdk" padding={0}>
           <ManualSetup />

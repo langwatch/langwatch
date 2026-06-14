@@ -192,14 +192,44 @@ Rule: Generate access token inside the Integrate drawer
   Scenario: Generated token is shown with env vars
     Given the user successfully generated a token
     Then the card shows env-var lines for `LANGWATCH_API_KEY`, `LANGWATCH_PROJECT_ID`, and `LANGWATCH_ENDPOINT`
-    And `LANGWATCH_API_KEY` is masked behind a reveal toggle
+    And every env line is highlighted so the whole block stands out
+    And the token is shown in full so it can be copied at a glance
+    And a toggle is available to hide the sensitive values again
     And a warning reminds the user the token is shown once
+
+  Scenario: A copy button sits next to the shown-once warning
+    Given the user successfully generated a token
+    Then a copy button is rendered right after the "shown once" warning
+    When the user clicks that copy button
+    Then the raw token is copied to the clipboard
 
   Scenario: Token failure surfaces a toast
     Given the `personalAccessToken.create` mutation fails
     When the user clicks "Generate access token"
     Then a toast surfaces the error message
     And the generate button returns to its enabled state
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SETUP TAB SKILL ORDERING
+# ─────────────────────────────────────────────────────────────────────────────
+
+Rule: Tracing leads the skill list inside the traces onboarding
+  The traces empty state exists to get traces flowing, so its "Skills"
+  and "Prompt" tabs surface "Add LangWatch tracing to your code" first.
+  The shared onboarding flow keeps its own default skill order — only
+  the traces surface promotes tracing.
+
+  Background:
+    Given the Integrate drawer is open
+
+  Scenario: Tracing is the first card on the Skills tab
+    When the user selects the "Skills" tab
+    Then the first skill card is "Add LangWatch tracing to your code"
+
+  Scenario: Tracing is the first card on the Prompt tab
+    When the user selects the "Prompt" tab
+    Then the first prompt card is "Add LangWatch tracing to your code"
 
 
 # ─────────────────────────────────────────────────────────────────────────────

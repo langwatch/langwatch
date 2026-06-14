@@ -83,6 +83,25 @@ const SKILLS: SkillItem[] = [
   },
 ];
 
+/**
+ * Skill id for "Add LangWatch tracing to your code". The traces onboarding
+ * leads with this one — see `orderSkills`.
+ */
+export const TRACING_SKILL_ID = "tracing";
+
+/**
+ * Returns SKILLS with `primarySkillId` moved to the front, preserving the
+ * relative order of the rest. The traces empty state uses this to lead with
+ * tracing without reordering the shared onboarding list (every other
+ * surface keeps the default order). Unknown / absent ids are a no-op.
+ */
+function orderSkills(primarySkillId?: string): SkillItem[] {
+  if (!primarySkillId) return SKILLS;
+  const primary = SKILLS.find((skill) => skill.id === primarySkillId);
+  if (!primary) return SKILLS;
+  return [primary, ...SKILLS.filter((skill) => skill.id !== primarySkillId)];
+}
+
 interface EditorPath {
   editor: string;
   path: string;
@@ -468,13 +487,18 @@ function McpTab({
  * chrome. Used by the traces-v2 empty state which surfaces Prompt as a
  * top-level setup path instead of nesting it under "Via Coding Agent".
  */
-export function PromptList(): React.ReactElement {
+export function PromptList({
+  primarySkillId,
+}: {
+  /** Skill id to surface first; the rest keep their default order. */
+  primarySkillId?: string;
+} = {}): React.ReactElement {
   return (
     <Grid
       templateColumns={{ base: "1fr", md: "repeat(2, 1fr)" }}
       gap={3}
     >
-      {SKILLS.map((skill) => (
+      {orderSkills(primarySkillId).map((skill) => (
         <PromptRow key={skill.id} skill={skill} />
       ))}
     </Grid>
@@ -485,13 +509,18 @@ export function PromptList(): React.ReactElement {
  * Just the skill list — same as PromptList but renders the install +
  * `/command` rows for the "Skill" top-level path.
  */
-export function SkillList(): React.ReactElement {
+export function SkillList({
+  primarySkillId,
+}: {
+  /** Skill id to surface first; the rest keep their default order. */
+  primarySkillId?: string;
+} = {}): React.ReactElement {
   return (
     <Grid
       templateColumns={{ base: "1fr", lg: "repeat(2, 1fr)" }}
       gap={3}
     >
-      {SKILLS.map((skill) => (
+      {orderSkills(primarySkillId).map((skill) => (
         <SkillRow key={skill.id} skill={skill} />
       ))}
     </Grid>

@@ -97,7 +97,7 @@ export const buildOnboardingSteps = (
     {
       key: "syncFirstMessage",
       title: "Sync your first message",
-      href: `/${projectSlug}/messages`,
+      href: `/${projectSlug}/traces`,
       complete: data.firstMessage,
     },
     {

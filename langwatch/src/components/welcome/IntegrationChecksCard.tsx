@@ -37,10 +37,10 @@ const checks: IntegrationCheck[] = [
   {
     key: "firstMessage",
     label: "Sync your first message",
-    href: (slug: string) => `/${slug}/messages`,
+    href: (slug: string) => `/${slug}/traces`,
     event: "integration_checks_first_message",
     icon: LuMessageCircle,
-    tooltip: "View messages observed by the LangWatch platform",
+    tooltip: "View traces observed by the LangWatch platform",
   },
   {
     key: "workflows",

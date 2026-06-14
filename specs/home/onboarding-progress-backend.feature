@@ -47,6 +47,37 @@ Feature: Onboarding Progress Backend
     When I request the onboarding status
     Then step "syncFirstMessage" should be complete
 
+  # Setup model providers step (scope cascade)
+  # Bound to onboarding-checks.integration.test.ts. A model provider is
+  # visible to a project when it is scoped to the project, the project's
+  # team, or the project's organization — the same PROJECT -> TEAM ->
+  # ORGANIZATION cascade real model-provider reads use. The onboarding
+  # check must mirror that cascade, otherwise a user whose only provider
+  # is configured org-wide sees "Setup your model providers" stuck
+  # incomplete even though every project under that org can use it.
+
+  Scenario: Step setupModelProviders is complete for a project-scoped provider
+    Given an enabled model provider scoped to the project
+    When I request the onboarding status
+    Then step "setupModelProviders" should be complete
+
+  Scenario: Step setupModelProviders is complete for an organization-scoped provider
+    Given an enabled model provider scoped to the project's organization
+    And no model provider is scoped directly to the project
+    When I request the onboarding status
+    Then step "setupModelProviders" should be complete
+
+  Scenario: Step setupModelProviders is complete for a team-scoped provider
+    Given an enabled model provider scoped to the project's team
+    And no model provider is scoped directly to the project
+    When I request the onboarding status
+    Then step "setupModelProviders" should be complete
+
+  Scenario: Step setupModelProviders ignores disabled providers
+    Given the project's only visible model provider is disabled
+    When I request the onboarding status
+    Then step "setupModelProviders" should be incomplete
+
   # Create workflow step
   @unimplemented
   Scenario: Step createWorkflow is incomplete when no workflows exist

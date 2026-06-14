@@ -4,8 +4,9 @@
  * Integration tests for Onboarding Checks service.
  * Tests the actual getCheckStatus method with real database queries.
  */
+import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { getTestUser } from "../../../utils/testUtils";
+import { getTestProject, getTestUser } from "../../../utils/testUtils";
 import { prisma } from "../../db";
 import { OnboardingChecksService } from "../onboarding-checks.service";
 
@@ -172,6 +173,100 @@ describe("OnboardingChecksService Integration", () => {
       // without isolating the test data completely)
       const result = await service.getCheckStatus(projectId);
       expect(typeof result.prompts).toBe("number");
+    });
+
+    describe("when a model provider is visible only through the scope cascade", () => {
+      // Each case spins up a dedicated org/team/project so no provider from
+      // another test leaks into the cascade and masks the result. This is the
+      // regression guard for the bug where an org- or team-scoped provider
+      // left "Setup your model providers" stuck incomplete because the check
+      // only matched the PROJECT scope.
+      const cascadeProviderIds: string[] = [];
+
+      afterAll(async () => {
+        if (cascadeProviderIds.length > 0) {
+          await prisma.modelProvider.deleteMany({
+            where: { id: { in: cascadeProviderIds } },
+          });
+        }
+      });
+
+      const resolveScopeIds = async (project: { teamId: string }) => {
+        const team = await prisma.team.findUniqueOrThrow({
+          where: { id: project.teamId },
+          select: { id: true, organizationId: true },
+        });
+        return { teamId: team.id, organizationId: team.organizationId };
+      };
+
+      it("counts an organization-scoped provider for a project under that org", async () => {
+        const project = await getTestProject("onboarding-mp-org");
+        const { organizationId } = await resolveScopeIds(project);
+
+        const provider = await prisma.modelProvider.create({
+          data: {
+            id: `test-org-provider-${nanoid()}`,
+            name: "OpenAI",
+            provider: "openai",
+            enabled: true,
+            organizationId,
+            scopes: {
+              create: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
+            },
+          },
+        });
+        cascadeProviderIds.push(provider.id);
+
+        const result = await service.getCheckStatus(project.id);
+
+        expect(result.modelProviders).toBe(1);
+      });
+
+      it("counts a team-scoped provider for a project under that team", async () => {
+        const project = await getTestProject("onboarding-mp-team");
+        const { teamId, organizationId } = await resolveScopeIds(project);
+
+        const provider = await prisma.modelProvider.create({
+          data: {
+            id: `test-team-provider-${nanoid()}`,
+            name: "OpenAI",
+            provider: "openai",
+            enabled: true,
+            organizationId,
+            scopes: {
+              create: [{ scopeType: "TEAM", scopeId: teamId }],
+            },
+          },
+        });
+        cascadeProviderIds.push(provider.id);
+
+        const result = await service.getCheckStatus(project.id);
+
+        expect(result.modelProviders).toBe(1);
+      });
+
+      it("does not count an org-scoped provider that is disabled", async () => {
+        const project = await getTestProject("onboarding-mp-disabled");
+        const { organizationId } = await resolveScopeIds(project);
+
+        const provider = await prisma.modelProvider.create({
+          data: {
+            id: `test-disabled-org-provider-${nanoid()}`,
+            name: "OpenAI",
+            provider: "openai",
+            enabled: false,
+            organizationId,
+            scopes: {
+              create: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
+            },
+          },
+        });
+        cascadeProviderIds.push(provider.id);
+
+        const result = await service.getCheckStatus(project.id);
+
+        expect(result.modelProviders).toBe(0);
+      });
     });
 
     it("does not count deleted prompts", async () => {

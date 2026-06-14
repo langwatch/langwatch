@@ -52,9 +52,7 @@ export const buildQuickAccessCards = (
         />
       ),
       color: tracesConfig.color.split(".")[0] ?? "blue",
-      href: isIntegrated
-        ? `/${projectSlug}/messages`
-        : `/${projectSlug}/messages`,
+      href: `/${projectSlug}/traces`,
       docsHref: "https://langwatch.ai/docs/integration/quick-start",
     },
     {
