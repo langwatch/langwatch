@@ -17,7 +17,7 @@ import {
 } from "~/server/tracer/types";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 
 import { baseResponses } from "../../shared/base-responses";
 
@@ -75,7 +75,7 @@ secured.access(requires("traces:create")).post(
         { error, body: rawBody, projectId: project.id },
         "invalid event received",
       );
-      captureException(error);
+      captureException(toError(error));
       const validationError = fromZodError(error as ZodError);
       return c.json({ error: validationError.message }, 400);
     }
@@ -93,7 +93,7 @@ secured.access(requires("traces:create")).post(
           { error, body: rawBody, projectId: project.id },
           "invalid event received",
         );
-        captureException(error);
+        captureException(toError(error));
         const validationError = fromZodError(error as ZodError);
         return c.json({ error: validationError.message }, 400);
       }

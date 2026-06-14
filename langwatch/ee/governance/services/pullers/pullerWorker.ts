@@ -38,6 +38,7 @@ import { connection } from "~/server/redis";
 import { createLogger } from "~/utils/logger/server";
 import {
   captureException,
+  toError,
   withScope,
 } from "~/utils/posthogErrorCapture";
 import { PULLER_QUEUE } from "~/server/background/queues/constants";
@@ -156,7 +157,7 @@ export async function runIngestionPullerJob(
     await withScope(async (scope) => {
       scope.setTag?.("worker", "ingestionPuller");
       scope.setExtra?.("ingestionSourceId", ingestionSourceId);
-      captureException(error);
+      captureException(toError(error));
     });
     await prisma.ingestionSource.update({
       where: { id: ingestionSourceId },
