@@ -79,6 +79,7 @@ describe("OnboardingChecksService Integration", () => {
       expect(typeof result.prompts).toBe("number");
     });
 
+    /** @scenario Step setupModelProviders is complete for a project-scoped provider */
     it("returns 1 when at least one enabled model provider exists", async () => {
       // Create an enabled model provider
       const modelProvider = await prisma.modelProvider.create({
@@ -199,6 +200,7 @@ describe("OnboardingChecksService Integration", () => {
         return { teamId: team.id, organizationId: team.organizationId };
       };
 
+      /** @scenario Step setupModelProviders is complete for an organization-scoped provider */
       it("counts an organization-scoped provider for a project under that org", async () => {
         const project = await getTestProject("onboarding-mp-org");
         const { organizationId } = await resolveScopeIds(project);
@@ -222,6 +224,7 @@ describe("OnboardingChecksService Integration", () => {
         expect(result.modelProviders).toBe(1);
       });
 
+      /** @scenario Step setupModelProviders is complete for a team-scoped provider */
       it("counts a team-scoped provider for a project under that team", async () => {
         const project = await getTestProject("onboarding-mp-team");
         const { teamId, organizationId } = await resolveScopeIds(project);
@@ -245,6 +248,7 @@ describe("OnboardingChecksService Integration", () => {
         expect(result.modelProviders).toBe(1);
       });
 
+      /** @scenario Step setupModelProviders ignores disabled providers */
       it("does not count an org-scoped provider that is disabled", async () => {
         const project = await getTestProject("onboarding-mp-disabled");
         const { organizationId } = await resolveScopeIds(project);
