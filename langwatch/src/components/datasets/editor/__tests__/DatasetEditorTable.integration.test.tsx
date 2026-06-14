@@ -234,7 +234,7 @@ describe("given an in-memory dataset", () => {
 
   describe("when Add row is clicked", () => {
     /** @scenario Add a new row */
-    it("appends an empty row and starts editing it immediately", async () => {
+    it("appends an empty row without forcing it into edit mode", async () => {
       const user = userEvent.setup();
       renderInMemory();
 
@@ -245,8 +245,8 @@ describe("given an in-memory dataset", () => {
           "3 records",
         );
       });
-      // Editing starts on the new row's first cell
-      expect(await screen.findByRole("textbox")).toBeInTheDocument();
+      // Add row must not steal focus or pop the cell editor open
+      expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
     });
   });
 

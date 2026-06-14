@@ -122,7 +122,12 @@ export default function ExperimentsWorkbenchPage() {
         overflow="hidden"
       >
         {/* Header */}
-        <HStack paddingX={6} paddingY={3} flexShrink={0}>
+        <HStack
+          paddingX={6}
+          paddingTop={5}
+          paddingBottom={3}
+          flexShrink={0}
+        >
           <EditableHeading
             value={name}
             onSave={setName}
@@ -151,7 +156,6 @@ export default function ExperimentsWorkbenchPage() {
           position="relative"
           overflow="hidden"
           marginLeft={4}
-          marginTop={2}
           borderTopLeftRadius="xl"
           borderLeft="1px solid"
           borderTop="1px solid"

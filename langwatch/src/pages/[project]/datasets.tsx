@@ -183,161 +183,168 @@ function DatasetsPage() {
           Dataset
         </PageLayout.HeaderButton>
       </PageLayout.Header>
-      <Box width="full" maxW="calc(100vw - 200px)">
+      <Box width="full" maxW="calc(100vw - 200px)" paddingX={6} paddingY={6}>
         {datasets.data && datasets.data.length === 0 ? (
-          <Box paddingX={6} paddingY={6}>
-            <NoDataInfoBlock
-              title="No datasets yet"
-              description="Upload or create datasets on your messages to do further analysis or to train your own models."
-              docsInfo={
-                <VStack gap={3}>
-                  <Button
-                    colorPalette="orange"
-                    data-testid="empty-state-create-dataset"
-                    onClick={() => uploadCSVModal.onOpen()}
+          <NoDataInfoBlock
+            title="No datasets yet"
+            description="Upload or create datasets on your messages to do further analysis or to train your own models."
+            docsInfo={
+              <VStack gap={3}>
+                <Button
+                  colorPalette="orange"
+                  data-testid="empty-state-create-dataset"
+                  onClick={() => uploadCSVModal.onOpen()}
+                >
+                  <Upload size={16} /> Upload or Create Dataset
+                </Button>
+                <Text>
+                  To learn more about datasets, please visit our{" "}
+                  <Link
+                    color="orange.400"
+                    href="https://docs.langwatch.ai/datasets/overview"
+                    isExternal
                   >
-                    <Upload size={16} /> Upload or Create Dataset
-                  </Button>
-                  <Text>
-                    To learn more about datasets, please visit our{" "}
-                    <Link
-                      color="orange.400"
-                      href="https://docs.langwatch.ai/datasets/overview"
-                      isExternal
-                    >
-                      documentation
-                    </Link>
-                    .
-                  </Text>
-                </VStack>
-              }
-              icon={<TableIcon />}
-            />
-          </Box>
+                    documentation
+                  </Link>
+                  .
+                </Text>
+              </VStack>
+            }
+            icon={<TableIcon />}
+          />
         ) : (
-          <Table.Root variant="line">
-            <Table.Header>
-              <Table.Row>
-                <Table.ColumnHeader>Name</Table.ColumnHeader>
-                <Table.ColumnHeader>Columns</Table.ColumnHeader>
-                <Table.ColumnHeader>Entries</Table.ColumnHeader>
-                <Table.ColumnHeader width={240}>Last Update</Table.ColumnHeader>
-                <Table.ColumnHeader width={20}></Table.ColumnHeader>
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {datasets.isLoading ? (
-                Array.from({ length: 3 }).map((_, i) => (
-                  <Table.Row key={i}>
-                    {Array.from({ length: 4 }).map((_, i) => (
-                      <Table.Cell key={i}>
-                        <Skeleton height="20px" />
-                      </Table.Cell>
-                    ))}
-                  </Table.Row>
-                ))
-              ) : filteredDatasets && filteredDatasets.length === 0 ? (
+          <Box
+            borderWidth="1px"
+            borderColor="border.emphasized"
+            borderRadius="md"
+            overflow="hidden"
+          >
+            <Table.Root variant="line">
+              <Table.Header>
                 <Table.Row>
-                  <Table.Cell colSpan={5}>
-                    <Text paddingY={4} color="fg.muted">
-                      No datasets match &quot;{search}&quot;
-                    </Text>
-                  </Table.Cell>
+                  <Table.ColumnHeader>Name</Table.ColumnHeader>
+                  <Table.ColumnHeader>Columns</Table.ColumnHeader>
+                  <Table.ColumnHeader>Entries</Table.ColumnHeader>
+                  <Table.ColumnHeader width={240}>
+                    Last Update
+                  </Table.ColumnHeader>
+                  <Table.ColumnHeader width={20}></Table.ColumnHeader>
                 </Table.Row>
-              ) : filteredDatasets ? (
-                filteredDatasets.map((dataset: Dataset) => (
-                  <Table.Row
-                    cursor="pointer"
-                    onClick={() => goToDataset(dataset.id)}
-                    key={dataset.id}
-                  >
-                    <Table.Cell>{dataset.name}</Table.Cell>
-                    <Table.Cell maxWidth="250px">
-                      <HStack wrap="wrap">
-                        {((dataset.columnTypes as DatasetColumns) ?? []).map(
-                          ({ name }) => (
-                            <Badge size="sm" key={name}>
-                              {name}
-                            </Badge>
-                          ),
-                        )}
-                      </HStack>
-                    </Table.Cell>
-                    <Table.Cell>
-                      {dataset.useS3
-                        ? (dataset.s3RecordCount ?? 0)
-                        : (dataset._count.datasetRecords ?? 0)}
-                    </Table.Cell>
-                    <Table.Cell>
-                      {new Date(
-                        dataset.updatedAt ?? dataset.createdAt,
-                      ).toLocaleString()}
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Menu.Root>
-                        <Menu.Trigger asChild>
-                          <Button
-                            variant={"ghost"}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                            }}
-                          >
-                            <MoreVertical />
-                          </Button>
-                        </Menu.Trigger>
-                        <Menu.Content>
-                          <Menu.Item
-                            value="copy"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setCopyDataset({
-                                datasetId: dataset.id,
-                                datasetName: dataset.name,
-                              });
-                            }}
-                          >
-                            <Copy size={16} /> Replicate to another project
-                          </Menu.Item>
-                          {!isLiteMember && (
-                            <>
-                              <Menu.Item
-                                value="edit"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  setEditDataset({
-                                    datasetId: dataset.id,
-                                    name: dataset.name,
-                                    columnTypes:
-                                      dataset.columnTypes as DatasetColumns,
-                                  });
-                                  addEditDatasetDrawer.onOpen();
-                                }}
-                              >
-                                <Edit size={16} /> Edit dataset
-                              </Menu.Item>
-                              <Menu.Item
-                                value="delete"
-                                color="red.600"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  showDeleteDialog({
-                                    id: dataset.id,
-                                    name: dataset.name,
-                                  });
-                                }}
-                              >
-                                <Trash2 size={16} /> Delete dataset
-                              </Menu.Item>
-                            </>
-                          )}
-                        </Menu.Content>
-                      </Menu.Root>
+              </Table.Header>
+              <Table.Body>
+                {datasets.isLoading ? (
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <Table.Row key={i}>
+                      {Array.from({ length: 4 }).map((_, i) => (
+                        <Table.Cell key={i}>
+                          <Skeleton height="20px" />
+                        </Table.Cell>
+                      ))}
+                    </Table.Row>
+                  ))
+                ) : filteredDatasets && filteredDatasets.length === 0 ? (
+                  <Table.Row>
+                    <Table.Cell colSpan={5}>
+                      <Text paddingY={4} color="fg.muted">
+                        No datasets match &quot;{search}&quot;
+                      </Text>
                     </Table.Cell>
                   </Table.Row>
-                ))
-              ) : null}
-            </Table.Body>
-          </Table.Root>
+                ) : filteredDatasets ? (
+                  filteredDatasets.map((dataset: Dataset) => (
+                    <Table.Row
+                      cursor="pointer"
+                      onClick={() => goToDataset(dataset.id)}
+                      key={dataset.id}
+                    >
+                      <Table.Cell>{dataset.name}</Table.Cell>
+                      <Table.Cell maxWidth="250px">
+                        <HStack wrap="wrap">
+                          {((dataset.columnTypes as DatasetColumns) ?? []).map(
+                            ({ name }) => (
+                              <Badge size="sm" key={name}>
+                                {name}
+                              </Badge>
+                            ),
+                          )}
+                        </HStack>
+                      </Table.Cell>
+                      <Table.Cell>
+                        {dataset.useS3
+                          ? (dataset.s3RecordCount ?? 0)
+                          : (dataset._count.datasetRecords ?? 0)}
+                      </Table.Cell>
+                      <Table.Cell>
+                        {new Date(
+                          dataset.updatedAt ?? dataset.createdAt,
+                        ).toLocaleString()}
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Menu.Root>
+                          <Menu.Trigger asChild>
+                            <Button
+                              variant={"ghost"}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                              }}
+                            >
+                              <MoreVertical />
+                            </Button>
+                          </Menu.Trigger>
+                          <Menu.Content>
+                            <Menu.Item
+                              value="copy"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setCopyDataset({
+                                  datasetId: dataset.id,
+                                  datasetName: dataset.name,
+                                });
+                              }}
+                            >
+                              <Copy size={16} /> Replicate to another project
+                            </Menu.Item>
+                            {!isLiteMember && (
+                              <>
+                                <Menu.Item
+                                  value="edit"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    setEditDataset({
+                                      datasetId: dataset.id,
+                                      name: dataset.name,
+                                      columnTypes:
+                                        dataset.columnTypes as DatasetColumns,
+                                    });
+                                    addEditDatasetDrawer.onOpen();
+                                  }}
+                                >
+                                  <Edit size={16} /> Edit dataset
+                                </Menu.Item>
+                                <Menu.Item
+                                  value="delete"
+                                  color="red.600"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    showDeleteDialog({
+                                      id: dataset.id,
+                                      name: dataset.name,
+                                    });
+                                  }}
+                                >
+                                  <Trash2 size={16} /> Delete dataset
+                                </Menu.Item>
+                              </>
+                            )}
+                          </Menu.Content>
+                        </Menu.Root>
+                      </Table.Cell>
+                    </Table.Row>
+                  ))
+                ) : null}
+              </Table.Body>
+            </Table.Root>
+          </Box>
         )}
       </Box>
       <AddOrEditDatasetDrawer

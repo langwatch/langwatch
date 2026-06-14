@@ -86,7 +86,7 @@ Feature: Dataset editor
   Scenario: Add a new row
     When I click "Add row"
     Then an empty row appears at the bottom of the table
-    And I can start editing it immediately
+    And no cell is forced into edit mode
 
   @integration
   Scenario: Select and delete rows

@@ -16,6 +16,7 @@ import {
   Box,
   Button,
   Checkbox,
+  Heading,
   HStack,
   Spacer,
   Spinner,
@@ -540,14 +541,13 @@ export function DatasetEditorTable({
     window.URL.revokeObjectURL(url);
   }, [columns, datasetId, datasetName, downloadDataset, project?.id, store]);
 
+  // "Add row" only appends an empty row at the bottom. It must not steal focus
+  // into the first cell or pop the cell editor open: on an empty dataset the
+  // new row is row 0, so auto-editing looks like the grid jumped into editing
+  // the first cell on its own. The user clicks the new row to edit it.
   const handleAddRow = useCallback(() => {
-    const newRowIndex = addRow();
-    const firstColumn = store.getState().columns[0];
-    if (firstColumn) {
-      setSelectedCell({ row: newRowIndex, columnId: firstColumn.id });
-      setEditingCell({ row: newRowIndex, columnId: firstColumn.id });
-    }
-  }, [addRow, setEditingCell, setSelectedCell, store]);
+    addRow();
+  }, [addRow]);
 
   return (
     <VStack
@@ -559,13 +559,9 @@ export function DatasetEditorTable({
     >
       <HStack gap={3} align="center" width="full">
         {title === undefined && datasetName ? (
-          <Text fontSize="lg" fontWeight="semibold" data-testid="dataset-title">
-            {datasetName}
-          </Text>
+          <Heading data-testid="dataset-title">{datasetName}</Heading>
         ) : typeof title === "string" ? (
-          <Text fontSize="lg" fontWeight="semibold">
-            {title}
-          </Text>
+          <Heading size="md">{title}</Heading>
         ) : (
           title
         )}
@@ -636,7 +632,7 @@ export function DatasetEditorTable({
         flex={isEmbedded ? 1 : undefined}
         maxHeight={isEmbedded ? undefined : "calc(100vh - 250px)"}
         borderWidth="1px"
-        borderColor="border.muted"
+        borderColor="border.emphasized"
         borderRadius="md"
         css={{
           ...datasetTableCss,
