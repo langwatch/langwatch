@@ -244,3 +244,112 @@ func TestPatternIfElse_PythonConditionNonBoolFailsTheGate(t *testing.T) {
 	assert.Contains(t, gateErr["message"], "True or False",
 		"error must state the bool contract")
 }
+
+// convergeWorkflowBody builds the customer's convergence shape: an If/Else
+// fork whose two branches feed the SAME end input. Only the taken branch
+// runs, so the shared input deterministically carries that branch's value
+// while the skipped branch contributes nothing.
+//
+//	entry ──ctx──► gate ──true──► codeA ─┐
+//	                 └───false──► codeB ─┴──► end.answer
+func convergeWorkflowBody(contextValue string) string {
+	return `{
+	  "type":"execute_flow",
+	  "payload": {
+	    "trace_id":"pattern-converge",
+	    "origin":"workflow",
+	    "workflow": {
+	      "workflow_id":"wf","api_key":"sk-pattern-converge","spec_version":"1.3",
+	      "name":"PatternConverge","icon":"x","description":"x","version":"x",
+	      "template_adapter":"default",
+	      "nodes":[
+	        {"id":"entry","type":"entry","data":{
+	          "outputs":[{"identifier":"context","type":"str"}],
+	          "dataset":{"inline":{"records":{
+	            "context":["` + contextValue + `"]
+	          },"count":1}},
+	          "entry_selection":0,"train_size":1.0,"test_size":0.0,"seed":1
+	        }},
+	        {"id":"gate","type":"if_else","data":{
+	          "name":"If/Else",
+	          "parameters":[{"identifier":"condition","type":"str","value":"context != \"\""}],
+	          "inputs":[{"identifier":"context","type":"str"}],
+	          "outputs":[
+	            {"identifier":"true","type":"bool"},
+	            {"identifier":"false","type":"bool"}
+	          ]
+	        }},
+	        {"id":"codeA","type":"code","data":{
+	          "parameters":[{"identifier":"code","type":"code","value":"def execute(context='', gate=None):\n    return {'answer': 'A:' + context}\n"}],
+	          "inputs":[
+	            {"identifier":"context","type":"str"},
+	            {"identifier":"gate","type":"bool"}
+	          ],
+	          "outputs":[{"identifier":"answer","type":"str"}]
+	        }},
+	        {"id":"codeB","type":"code","data":{
+	          "parameters":[{"identifier":"code","type":"code","value":"def execute(gate=None):\n    return {'answer': 'B:fallback'}\n"}],
+	          "inputs":[{"identifier":"gate","type":"bool"}],
+	          "outputs":[{"identifier":"answer","type":"str"}]
+	        }},
+	        {"id":"end","type":"end","data":{"inputs":[
+	          {"identifier":"answer","type":"str"}
+	        ]}}
+	      ],
+	      "edges":[
+	        {"id":"e1","source":"entry","sourceHandle":"outputs.context","target":"gate","targetHandle":"inputs.context","type":"default"},
+	        {"id":"e2","source":"entry","sourceHandle":"outputs.context","target":"codeA","targetHandle":"inputs.context","type":"default"},
+	        {"id":"e3","source":"gate","sourceHandle":"outputs.true","target":"codeA","targetHandle":"inputs.gate","type":"default"},
+	        {"id":"e4","source":"gate","sourceHandle":"outputs.false","target":"codeB","targetHandle":"inputs.gate","type":"default"},
+	        {"id":"e5","source":"codeA","sourceHandle":"outputs.answer","target":"end","targetHandle":"inputs.answer","type":"default"},
+	        {"id":"e6","source":"codeB","sourceHandle":"outputs.answer","target":"end","targetHandle":"inputs.answer","type":"default"}
+	      ],
+	      "state":{}
+	    },
+	    "inputs":[{}]
+	  }
+	}`
+}
+
+func convergedAnswer(t *testing.T, res *app.WorkflowResult) any {
+	t.Helper()
+	endNode, ok := res.Nodes["end"].(map[string]any)
+	require.True(t, ok, "end node missing: %+v", res.Nodes)
+	outputs, _ := endNode["outputs"].(map[string]any)
+	return outputs["answer"]
+}
+
+/** @scenario A converged input receives the value from whichever branch ran */
+func TestPatternIfElse_ConvergeOnSameInput_TrueBranchValueWins(t *testing.T) {
+	llm := &fakeLLMClient{}
+	url, _ := setupPatternStack(t, llm, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	res := postSync(t, &stack{url: url}, convergeWorkflowBody("ctx"))
+	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
+
+	assert.Equal(t, "success", nodeStatus(t, res, "codeA"))
+	assert.Equal(t, "skipped", nodeStatus(t, res, "codeB"))
+	assert.Equal(t, "success", nodeStatus(t, res, "end"),
+		"the convergence node runs on the taken branch")
+	assert.Equal(t, "A:ctx", convergedAnswer(t, res),
+		"the shared input must carry the true branch value")
+}
+
+/** @scenario A converged input receives the value from whichever branch ran */
+func TestPatternIfElse_ConvergeOnSameInput_FalseBranchValueWins(t *testing.T) {
+	llm := &fakeLLMClient{}
+	url, _ := setupPatternStack(t, llm, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	res := postSync(t, &stack{url: url}, convergeWorkflowBody(""))
+	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
+
+	assert.Equal(t, "skipped", nodeStatus(t, res, "codeA"))
+	assert.Equal(t, "success", nodeStatus(t, res, "codeB"))
+	assert.Equal(t, "success", nodeStatus(t, res, "end"))
+	assert.Equal(t, "B:fallback", convergedAnswer(t, res),
+		"the shared input must carry the false branch value when it is taken")
+}

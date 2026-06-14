@@ -22,6 +22,7 @@ import type {
   Workflow,
 } from "../types/dsl";
 import { hasDSLChanged } from "../utils/dslUtils";
+import { canConvergeOnInput } from "../utils/edgeConvergence";
 import { findLowestAvailableName, nameToId } from "../utils/nodeUtils";
 
 const logger = createLogger("langwatch:studio:workflowStore");
@@ -564,9 +565,16 @@ export const store = (
         edge.target === connection.target &&
         edge.targetHandle === connection.targetHandle,
     );
-    if (existingConnection) {
+    // An input takes one source, except across mutually exclusive If/Else
+    // branches: only one of them ever runs, so they may converge on the
+    // same input. Sources that can run together stay blocked.
+    if (
+      existingConnection &&
+      !canConvergeOnInput({ nodes: get().nodes, edges: currentEdges, connection })
+    ) {
       return {
-        error: "Cannot connect two values to the same input",
+        error:
+          "These two values can run at the same time, so they can't feed the same input. Only mutually exclusive If/Else branches can converge on one input.",
       };
     }
     set({
