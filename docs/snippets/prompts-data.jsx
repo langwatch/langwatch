@@ -477,7 +477,7 @@ CRITICAL: Do NOT guess how to write scenario tests. Different frameworks have di
 ### Step 2: Install the Scenario SDK
 
 For Python: \`pip install langwatch-scenario pytest pytest-asyncio\` (or \`uv add ...\`).
-For TypeScript: \`npm install @langwatch/scenario@^0.4.12 vitest @ai-sdk/openai\` (or \`pnpm add ...\`). The voice adapter factories (\`openAIRealtimeAgent\`, \`pipecatAgent\`, etc.) and \`voice.effects\` require \`@langwatch/scenario\` >= 0.4.12 — earlier versions only expose the lower-level \`RealtimeAgentAdapter\` class.
+For TypeScript: \`npm install @langwatch/scenario@^0.4.12 vitest\` (or \`pnpm add ...\`).
 
 ### Step 3: Configure the Default Model
 
@@ -2428,7 +2428,7 @@ CRITICAL: Do NOT guess how to write scenario tests. Different frameworks have di
 ### Step 2: Install the Scenario SDK
 
 For Python: \`pip install langwatch-scenario pytest pytest-asyncio\` (or \`uv add ...\`).
-For TypeScript: \`npm install @langwatch/scenario@^0.4.12 vitest @ai-sdk/openai\` (or \`pnpm add ...\`). The voice adapter factories (\`openAIRealtimeAgent\`, \`pipecatAgent\`, etc.) and \`voice.effects\` require \`@langwatch/scenario\` >= 0.4.12 — earlier versions only expose the lower-level \`RealtimeAgentAdapter\` class.
+For TypeScript: \`npm install @langwatch/scenario@^0.4.12 vitest\` (or \`pnpm add ...\`).
 
 ### Step 3: Configure the Default Model
 
@@ -3966,7 +3966,7 @@ CRITICAL: Do NOT guess how to write scenario tests. Different frameworks have di
 ### Step 2: Install the Scenario SDK
 
 For Python: \`pip install langwatch-scenario pytest pytest-asyncio\` (or \`uv add ...\`).
-For TypeScript: \`npm install @langwatch/scenario@^0.4.12 vitest @ai-sdk/openai\` (or \`pnpm add ...\`). The voice adapter factories (\`openAIRealtimeAgent\`, \`pipecatAgent\`, etc.) and \`voice.effects\` require \`@langwatch/scenario\` >= 0.4.12 — earlier versions only expose the lower-level \`RealtimeAgentAdapter\` class.
+For TypeScript: \`npm install @langwatch/scenario@^0.4.12 vitest\` (or \`pnpm add ...\`).
 
 ### Step 3: Configure the Default Model
 
