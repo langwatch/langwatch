@@ -166,3 +166,15 @@ Feature: If/Else conditional branch node in workflows
     When the workflow runs
     Then the gate errors stating the True or False contract
     And no branch executes
+
+  # Dataset cells and form fields arrive as strings; an input declared as a
+  # number must reach python code as a number so comparisons work. This is
+  # the input type coercion the python engine did (autoparse_field_value),
+  # restored for the Go code-execution paths.
+  @integration
+  Scenario: A string dataset value is coerced to the declared input type
+    Given an if/else gate with a python condition comparing a float input
+    And the input is fed a numeric string from the dataset
+    When the workflow runs
+    Then the input is coerced to a number before the condition runs
+    And the gate evaluates without a type error

@@ -337,6 +337,75 @@ func TestPatternIfElse_ConvergeOnSameInput_TrueBranchValueWins(t *testing.T) {
 		"the shared input must carry the true branch value")
 }
 
+// autoparseIfElseBody feeds a string dataset value into a python if/else
+// condition that does float arithmetic. The `amount` input is declared
+// `float`, so the engine must coerce "1" -> 1.0 before the sandbox runs;
+// otherwise `amount > 5` raises "'>' not supported between str and int".
+func autoparseIfElseBody(amountValue string) string {
+	return `{
+	  "type":"execute_flow",
+	  "payload": {
+	    "trace_id":"pattern-autoparse",
+	    "origin":"workflow",
+	    "workflow": {
+	      "workflow_id":"wf","api_key":"sk-pattern-autoparse","spec_version":"1.3",
+	      "name":"PatternAutoparse","icon":"x","description":"x","version":"x",
+	      "template_adapter":"default",
+	      "nodes":[
+	        {"id":"entry","type":"entry","data":{
+	          "outputs":[{"identifier":"amount","type":"str"}],
+	          "dataset":{"inline":{"records":{
+	            "amount":["` + amountValue + `"]
+	          },"count":1}},
+	          "entry_selection":0,"train_size":1.0,"test_size":0.0,"seed":1
+	        }},
+	        {"id":"gate","type":"if_else","data":{
+	          "name":"If/Else",
+	          "parameters":[
+	            {"identifier":"condition_language","type":"str","value":"python"},
+	            {"identifier":"code","type":"code","value":"def execute(amount: float) -> bool:\n    return amount > 5\n"}
+	          ],
+	          "inputs":[{"identifier":"amount","type":"float"}],
+	          "outputs":[
+	            {"identifier":"true","type":"bool"},
+	            {"identifier":"false","type":"bool"}
+	          ]
+	        }}
+	      ],
+	      "edges":[
+	        {"id":"e1","source":"entry","sourceHandle":"outputs.amount","target":"gate","targetHandle":"inputs.amount","type":"default"}
+	      ],
+	      "state":{}
+	    },
+	    "inputs":[{}]
+	  }
+	}`
+}
+
+/** @scenario A string dataset value is coerced to the declared input type */
+func TestPatternIfElse_PythonConditionAutoparsesStringToFloat(t *testing.T) {
+	llm := &fakeLLMClient{}
+	url, _ := setupPatternStack(t, llm, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// "1" arrives as a string from the dataset; with autoparse the gate
+	// evaluates 1.0 > 5 instead of erroring on a str/int comparison.
+	res := postSync(t, &stack{url: url}, autoparseIfElseBody("1"))
+	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
+	assert.Equal(t, "success", nodeStatus(t, res, "gate"),
+		"the gate must not error on a string-typed numeric input")
+	gate := res.Nodes["gate"].(map[string]any)
+	gateOut, _ := gate["outputs"].(map[string]any)
+	assert.Equal(t, false, gateOut["true"], "1 > 5 must evaluate to false")
+
+	res2 := postSync(t, &stack{url: url}, autoparseIfElseBody("9"))
+	require.Equal(t, "success", res2.Status, "engine error: %+v", res2.Error)
+	gate2 := res2.Nodes["gate"].(map[string]any)
+	gateOut2, _ := gate2["outputs"].(map[string]any)
+	assert.Equal(t, true, gateOut2["true"], "9 > 5 must evaluate to true")
+}
+
 /** @scenario A converged input receives the value from whichever branch ran */
 func TestPatternIfElse_ConvergeOnSameInput_FalseBranchValueWins(t *testing.T) {
 	llm := &fakeLLMClient{}

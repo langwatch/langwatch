@@ -360,7 +360,7 @@ func (e *Engine) runIfElsePython(ctx context.Context, node *dsl.Node, inputs map
 	}
 	res, err := e.code.Execute(ctx, codeblock.Request{
 		Code:            code + conditionResultAdapter,
-		Inputs:          inputs,
+		Inputs:          autoparseInputs(inputs, node.Data.Inputs),
 		DeclaredOutputs: []string{"result"},
 		Secrets:         secrets,
 	})
@@ -424,7 +424,7 @@ func (e *Engine) runCode(ctx context.Context, node *dsl.Node, inputs map[string]
 	declared := outputNames(node.Data.Outputs)
 	res, err := e.code.Execute(ctx, codeblock.Request{
 		Code:            code,
-		Inputs:          inputs,
+		Inputs:          autoparseInputs(inputs, node.Data.Inputs),
 		DeclaredOutputs: declared,
 		Secrets:         secrets,
 	})
