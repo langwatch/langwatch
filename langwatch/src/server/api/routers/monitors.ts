@@ -246,6 +246,7 @@ export const monitorsRouter = createTRPCRouter({
       // Legacy wizard monitors have no evaluator — their settings live inline on
       // the monitor, so copying the monitor fields below is enough.
       let newEvaluatorId: string | null = null;
+      let newWorkflowId: string | null = null;
       if (source.evaluatorId) {
         const copiedEvaluator = await copyEvaluatorToProject({
           ctx,
@@ -254,6 +255,7 @@ export const monitorsRouter = createTRPCRouter({
           targetProjectId: projectId,
         });
         newEvaluatorId = copiedEvaluator.id;
+        newWorkflowId = copiedEvaluator.workflowId;
       }
 
       const uniqueName = await findUniqueMonitorName(
@@ -262,32 +264,46 @@ export const monitorsRouter = createTRPCRouter({
         source.name,
       );
 
-      // Replicas start disabled: a real-time evaluator runs (and bills) on every
-      // matching trace, so the user opts in after reviewing it in the target
-      // project rather than having it fire the moment it is replicated.
-      const replica = await prisma.monitor.create({
-        data: {
-          id: generate(KSUID_RESOURCES.MONITOR).toString(),
-          projectId,
-          name: uniqueName,
-          checkType: source.checkType,
-          slug: generateMonitorSlug(source.name),
-          preconditions: source.preconditions as Prisma.InputJsonValue,
-          parameters: source.parameters as Prisma.InputJsonValue,
-          mappings:
-            source.mappings === null
-              ? Prisma.JsonNull
-              : (source.mappings as Prisma.InputJsonValue),
-          sample: source.sample,
-          enabled: false,
-          executionMode: source.executionMode,
-          evaluatorId: newEvaluatorId,
-          level: source.level,
-          threadIdleTimeout: source.threadIdleTimeout,
-        },
-      });
-
-      return replica;
+      try {
+        // Replicas start disabled: a real-time evaluator runs (and bills) on
+        // every matching trace, so the user opts in after reviewing it in the
+        // target project rather than having it fire the moment it is replicated.
+        return await prisma.monitor.create({
+          data: {
+            id: generate(KSUID_RESOURCES.MONITOR).toString(),
+            projectId,
+            name: uniqueName,
+            checkType: source.checkType,
+            slug: generateMonitorSlug(source.name),
+            preconditions: source.preconditions as Prisma.InputJsonValue,
+            parameters: source.parameters as Prisma.InputJsonValue,
+            mappings:
+              source.mappings === null
+                ? Prisma.JsonNull
+                : (source.mappings as Prisma.InputJsonValue),
+            sample: source.sample,
+            enabled: false,
+            executionMode: source.executionMode,
+            evaluatorId: newEvaluatorId,
+            level: source.level,
+            threadIdleTimeout: source.threadIdleTimeout,
+          },
+        });
+      } catch (createError) {
+        // Roll back the evaluator (and its workflow) we copied for this monitor
+        // so a failed insert doesn't orphan them in the target project.
+        if (newEvaluatorId) {
+          await prisma.evaluator
+            .deleteMany({ where: { id: newEvaluatorId, projectId } })
+            .catch(() => {});
+        }
+        if (newWorkflowId) {
+          await prisma.workflow
+            .deleteMany({ where: { id: newWorkflowId, projectId } })
+            .catch(() => {});
+        }
+        throw createError;
+      }
     }),
   update: protectedProcedure
     .input(

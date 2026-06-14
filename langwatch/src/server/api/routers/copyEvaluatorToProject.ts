@@ -11,6 +11,79 @@ import {
 
 type CopyEvaluatorCtx = { prisma: PrismaClient; session: Session };
 
+type SourceEvaluator = NonNullable<
+  Awaited<ReturnType<typeof loadSourceEvaluator>>
+>;
+
+/** Loads the source evaluator (with its workflow), or throws NOT_FOUND. */
+async function loadSourceEvaluator(
+  ctx: CopyEvaluatorCtx,
+  evaluatorId: string,
+  sourceProjectId: string,
+) {
+  const source = await ctx.prisma.evaluator.findFirst({
+    where: { id: evaluatorId, projectId: sourceProjectId, archivedAt: null },
+    include: { workflow: { include: { latestVersion: true } } },
+  });
+  if (!source) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Evaluator not found" });
+  }
+  return source;
+}
+
+/**
+ * Clones a workflow evaluator's backing workflow into the target project and
+ * returns the new workflow id. Returns null for non-workflow evaluators. Throws
+ * if a workflow evaluator has no saved version to copy — creating the evaluator
+ * without a workflow would leave a structurally broken replica.
+ */
+async function copyWorkflowForEvaluator(
+  ctx: CopyEvaluatorCtx,
+  source: SourceEvaluator,
+  targetProjectId: string,
+  sourceProjectId: string,
+): Promise<string | null> {
+  if (source.type !== "workflow") return null;
+
+  if (!source.workflowId || !source.workflow?.latestVersion?.dsl) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message:
+        "Cannot replicate a workflow evaluator without a saved workflow version",
+    });
+  }
+
+  const { workflowId, dsl } = await copyWorkflowWithDatasets({
+    ctx,
+    workflow: {
+      id: source.workflow.id,
+      name: source.workflow.name,
+      icon: source.workflow.icon,
+      description: source.workflow.description,
+      isEvaluator: source.workflow.isEvaluator,
+      isComponent: source.workflow.isComponent,
+      latestVersion: source.workflow.latestVersion,
+    },
+    targetProjectId,
+    sourceProjectId,
+    copiedFromWorkflowId: source.workflowId,
+  });
+
+  try {
+    await saveOrCommitWorkflowVersion({
+      ctx,
+      input: { projectId: targetProjectId, workflowId, dsl },
+      autoSaved: false,
+      commitMessage: "Copied from " + source.workflow.name,
+    });
+  } catch (saveError) {
+    await ctx.prisma.workflow.delete({ where: { id: workflowId } }).catch(() => {});
+    throw saveError;
+  }
+
+  return workflowId;
+}
+
 /**
  * Copies an evaluator (and its backing workflow, for workflow-type evaluators)
  * from one project into another and returns the created evaluator.
@@ -35,61 +108,13 @@ export async function copyEvaluatorToProject({
 }) {
   await enforceLicenseLimit(ctx, targetProjectId, "evaluators");
 
-  const source = await ctx.prisma.evaluator.findFirst({
-    where: {
-      id: evaluatorId,
-      projectId: sourceProjectId,
-      archivedAt: null,
-    },
-    include: {
-      workflow: { include: { latestVersion: true } },
-    },
-  });
-
-  if (!source) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Evaluator not found" });
-  }
-
-  let newWorkflowId: string | null = null;
-  if (
-    source.type === "workflow" &&
-    source.workflowId &&
-    source.workflow?.latestVersion?.dsl
-  ) {
-    const { workflowId, dsl } = await copyWorkflowWithDatasets({
-      ctx,
-      workflow: {
-        id: source.workflow.id,
-        name: source.workflow.name,
-        icon: source.workflow.icon,
-        description: source.workflow.description,
-        isEvaluator: source.workflow.isEvaluator,
-        isComponent: source.workflow.isComponent,
-        latestVersion: source.workflow.latestVersion,
-      },
-      targetProjectId,
-      sourceProjectId,
-      copiedFromWorkflowId: source.workflowId,
-    });
-    newWorkflowId = workflowId;
-    try {
-      await saveOrCommitWorkflowVersion({
-        ctx,
-        input: {
-          projectId: targetProjectId,
-          workflowId,
-          dsl,
-        },
-        autoSaved: false,
-        commitMessage: "Copied from " + source.workflow.name,
-      });
-    } catch (saveError) {
-      await ctx.prisma.workflow
-        .delete({ where: { id: newWorkflowId } })
-        .catch(() => {});
-      throw saveError;
-    }
-  }
+  const source = await loadSourceEvaluator(ctx, evaluatorId, sourceProjectId);
+  const newWorkflowId = await copyWorkflowForEvaluator(
+    ctx,
+    source,
+    targetProjectId,
+    sourceProjectId,
+  );
 
   const evaluatorService = EvaluatorService.create(ctx.prisma);
   try {

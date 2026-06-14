@@ -34,7 +34,7 @@ Feature: Replicate an online evaluator to another project
       Given a monitor in the source project with no linked evaluator
       When I replicate it to the target project
       Then a new monitor exists in the target project
-      And the new monitor keeps the same check type, settings, preconditions, mappings, sample rate, execution mode and level
+      And the new monitor evaluates traces the same way the original did
       And the new monitor is created disabled so it does not start evaluating until I review it
       And the source monitor is left unchanged
 
