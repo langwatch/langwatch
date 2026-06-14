@@ -385,7 +385,6 @@ const VariableRow = ({
 
   return (
     <HStack gap={2} width="full">
-      {/* Type selector: icon + type name as an outline button */}
       <FieldTypeSelect
         value={variable.type}
         options={INPUT_TYPE_OPTIONS}

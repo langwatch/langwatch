@@ -363,7 +363,6 @@ const OutputRow = ({
 
   return (
     <HStack gap={2} width="full">
-      {/* Type selector: icon + type name as an outline button */}
       <FieldTypeSelect
         value={output.type}
         options={typeOptions}
