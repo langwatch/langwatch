@@ -502,9 +502,7 @@ export class EvaluationExecutionService {
     if (isNativeEvaluatorType(builtInType)) {
       const nativeResult = await executeNativeEvaluation({
         evaluatorType: builtInType,
-        projectId,
         data: data.data,
-        settings,
       });
       return augmentEvaluationResult({
         evaluatorType: builtInType,

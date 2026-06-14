@@ -21,9 +21,7 @@ export async function executeNativeEvaluation({
   data,
 }: {
   evaluatorType: string;
-  projectId: string;
   data: Record<string, unknown>;
-  settings?: Record<string, unknown>;
 }): Promise<SingleEvaluationResult> {
   const start = performance.now();
   try {

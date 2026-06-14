@@ -549,9 +549,7 @@ export const runEvaluation = async ({
   if (isNativeEvaluatorType(builtInEvaluatorType)) {
     const nativeResult = await executeNativeEvaluation({
       evaluatorType: builtInEvaluatorType,
-      projectId,
       data: data.data,
-      settings,
     });
     return augmentEvaluationResult({
       evaluatorType: builtInEvaluatorType,

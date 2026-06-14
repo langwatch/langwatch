@@ -34,7 +34,7 @@ export const NATIVE_EVALUATOR_DEFINITIONS = {
   [API_KEYS_AND_SECRETS_DETECTION]: {
     name: "API Keys & Secrets Detection",
     description:
-      "Flags leaked credentials in trace content: provider and cloud API keys, tokens, private keys, and database connection strings. Runs in-process. A secret that privacy redaction already scrubbed at ingestion is still flagged.",
+      "Flags leaked credentials in trace content: provider and cloud API keys, tokens, private keys, and database connection strings. A secret that privacy redaction already scrubbed at ingestion is still flagged.",
     category: "safety",
     docsUrl: undefined,
     isGuardrail: true,
