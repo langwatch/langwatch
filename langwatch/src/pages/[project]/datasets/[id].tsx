@@ -22,6 +22,7 @@ export default function Dataset() {
       <Box width="full" paddingX={6} paddingY={6}>
         <DatasetEditorTable
           datasetId={datasetId}
+          floatingSelectionBar
           headerActions={
             hasPermission("evaluations:manage") ? (
               <Button

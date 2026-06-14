@@ -13,6 +13,8 @@ cat specs/foo/bar.feature    # Read the scenarios
 
 If no feature file exists for your task, create one before writing code.
 
+**For frontend work, read the UX docs first.** Before any non-trivial frontend change (anything beyond a specific, targeted tweak the user spelled out), read the relevant pattern docs under `dev/docs/best_practices/` so you extend existing patterns instead of reinventing them. The UI ones: `react.md`, `drawers.md`, `row-actions-overflow-menu.md`, `selection-action-bar.md`, `scope-selector-and-badges.md`. If the surface you are building has no doc yet, write one as part of the change.
+
 ## Development Environment
 
 `make quickstart` is the single entry point. It asks what you're working on and starts only the services you need, overriding only the URLs whose services are local. Your `langwatch/.env` is the source of truth for everything else.

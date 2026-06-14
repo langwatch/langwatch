@@ -40,11 +40,21 @@ import {
   useRef,
   useState,
 } from "react";
-import { Check, Cloud, Download, Edit2, Plus, Upload, X } from "react-feather";
+import {
+  Check,
+  Cloud,
+  Download,
+  Edit2,
+  Plus,
+  Trash2,
+  Upload,
+  X,
+} from "react-feather";
 import { useStore } from "zustand";
 
 import { AddOrEditDatasetDrawer } from "~/components/AddOrEditDatasetDrawer";
 import { ColumnTypeIcon } from "~/components/shared/ColumnTypeIcon";
+import { SelectionActionBar } from "~/components/ui/SelectionActionBar";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -128,6 +138,7 @@ export function DatasetEditorTable({
   title,
   hideButtons = false,
   isEmbedded = false,
+  floatingSelectionBar = false,
   canEditDatasetRecord = true,
   bottomSpace,
   controllerRef,
@@ -141,6 +152,11 @@ export function DatasetEditorTable({
   title?: ReactNode;
   hideButtons?: boolean;
   isEmbedded?: boolean;
+  /** Render the row-selection actions as a floating bottom-center bar instead
+   *  of an inline toolbar button. For standalone pages (the dataset detail
+   *  page); leave off inside modals/drawers where a viewport-fixed bar would
+   *  sit behind the overlay. */
+  floatingSelectionBar?: boolean;
   /** Page-specific actions rendered at the end of the chrome button row. */
   headerActions?: ReactNode;
   /** Disable editing the dataset definition (columns) in the database. */
@@ -572,7 +588,7 @@ export function DatasetEditorTable({
           <SaveStatusChip state={autosave.state} error={autosave.error} />
         )}
         <Spacer />
-        {selectedRows.size > 0 && (
+        {!floatingSelectionBar && selectedRows.size > 0 && (
           <Button
             size="sm"
             colorPalette="red"
@@ -692,6 +708,24 @@ export function DatasetEditorTable({
         <Spacer />
       </HStack>
       {bottomSpace && <Box height={bottomSpace} flexShrink={0} />}
+
+      {floatingSelectionBar && selectedRows.size > 0 && (
+        <SelectionActionBar
+          label={`${selectedRows.size} selected`}
+          onClear={clearRowSelection}
+          testId="dataset-selection-bar"
+        >
+          <Button
+            size="xs"
+            variant="outline"
+            colorPalette="red"
+            data-testid="delete-selected-rows"
+            onClick={() => deleteSelectedRows()}
+          >
+            <Trash2 size={14} /> Delete
+          </Button>
+        </SelectionActionBar>
+      )}
 
       {editColumnsDrawer.open && (
         <AddOrEditDatasetDrawer
