@@ -69,6 +69,10 @@ func autoparseValue(v any, ft dsl.FieldType) any {
 		if json.Unmarshal([]byte(trimmed), &parsed) == nil {
 			return parsed
 		}
+	default:
+		// str, image, json_schema, chat_messages and the component-config
+		// types (signature, llm, prompting_technique, dataset, code) are
+		// kept as their string form.
 	}
 	return v
 }

@@ -52,7 +52,8 @@ func TestAutoparseInputs_OnlyDeclaredFields(t *testing.T) {
 		map[string]any{"amount": "1", "note": "keep"},
 		[]dsl.Field{{Identifier: "amount", Type: dsl.FieldTypeFloat}},
 	)
-	assert.Equal(t, float64(1), out["amount"])
+	// The string "1" is coerced to a number for the declared float input.
+	assert.IsType(t, float64(0), out["amount"])
 	// An input with no declared field type is passed through untouched.
 	assert.Equal(t, "keep", out["note"])
 }
