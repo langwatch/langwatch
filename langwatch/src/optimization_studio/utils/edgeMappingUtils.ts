@@ -1,8 +1,5 @@
 import type { Edge, Node } from "@xyflow/react";
-import type {
-  AvailableSource,
-  FieldMapping,
-} from "~/components/variables";
+import type { AvailableSource, FieldMapping } from "~/components/variables";
 import type { Component, Field } from "../types/dsl";
 
 /**
@@ -35,15 +32,14 @@ export function buildAvailableSources({
     .filter((n) => !downstreamNodes.has(n.id) && n.id !== "end")
     .map((n) => {
       const isEntry = n.type === "entry";
-      const entryDataset = isEntry
-        ? (n.data as { dataset?: { name?: string } }).dataset
-        : undefined;
       return {
         id: n.id,
-        name: isEntry
-          ? (entryDataset?.name ?? "Dataset")
-          : (n.data.name ?? n.id),
-        type: isEntry ? "dataset" : (n.type as AvailableSource["type"]),
+        // In a workflow the entry point is the input source; the attached
+        // dataset is just a seed, so the mapping reads from "Entry", not the
+        // dataset name. Evaluations v3 has its own buildAvailableSources and
+        // keeps the dataset-name behavior.
+        name: isEntry ? "Entry" : (n.data.name ?? n.id),
+        type: n.type as AvailableSource["type"],
         fields:
           n.data.outputs?.map((output) => ({
             name: output.identifier,
@@ -101,10 +97,7 @@ export function applyMappingChangeToEdges({
   // Remove existing edge for this input
   const filteredEdges = currentEdges.filter(
     (edge) =>
-      !(
-        edge.target === nodeId &&
-        edge.targetHandle === `inputs.${identifier}`
-      ),
+      !(edge.target === nodeId && edge.targetHandle === `inputs.${identifier}`),
   );
 
   if (mapping && mapping.type === "source") {
@@ -191,10 +184,7 @@ export function applyMappingChange({
   // Remove existing edge for this input
   const filteredEdges = currentEdges.filter(
     (edge) =>
-      !(
-        edge.target === nodeId &&
-        edge.targetHandle === `inputs.${identifier}`
-      ),
+      !(edge.target === nodeId && edge.targetHandle === `inputs.${identifier}`),
   );
 
   // Update field.value on the matching input

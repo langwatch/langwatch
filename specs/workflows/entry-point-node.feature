@@ -85,6 +85,15 @@ Feature: Entry point node with optional dataset and user-defined inputs
     Then the dataset stays attached
     And the entry inputs no longer include "irrelevant"
 
+  # In a workflow the entry point is the input source; the attached dataset
+  # is just a seed, so a downstream node's input mapping reads from "Entry",
+  # not the dataset name. (Evaluations v3 keeps the dataset-name labeling.)
+  @integration
+  Scenario: A workflow input maps from the entry, not the dataset name
+    Given a node maps an input from the entry point
+    And the entry point has a dataset attached
+    Then the mapping source reads as "Entry", not the dataset name
+
   # ============================================================================
   # Navigation
   # ============================================================================
