@@ -307,7 +307,11 @@ export const inviteRouter = createTRPCRouter({
         organizationId: z.string(),
       }),
     )
-    .use(checkOrganizationPermission("organization:view"))
+    // Tightened from organization:view to manage — pending invites
+    // expose admin intent (who's being added, with what role / to
+    // which teams). MEMBER reading this is a leak. Both TS callers
+    // (settings/members, SubscriptionPage) are admin-only surfaces.
+    .use(checkOrganizationPermission("organization:manage"))
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
