@@ -586,30 +586,24 @@ export function DatasetEditorTable({
         )}
         {!hideButtons && (
           <>
-            <Tooltip content="Download as CSV">
+            <Button
+              size="sm"
+              variant="ghost"
+              data-testid="download-csv"
+              loading={downloadDataset.isLoading}
+              onClick={() => void downloadCSV()}
+            >
+              <Download size={16} /> Download as CSV
+            </Button>
+            {datasetId && (
               <Button
                 size="sm"
                 variant="ghost"
-                aria-label="Download CSV"
-                data-testid="download-csv"
-                loading={downloadDataset.isLoading}
-                onClick={() => void downloadCSV()}
+                data-testid="add-rows-from-csv"
+                onClick={() => addRowsFromCSVModal.onOpen()}
               >
-                <Download size={16} />
+                <Upload size={16} /> Add rows
               </Button>
-            </Tooltip>
-            {datasetId && (
-              <Tooltip content="Add rows from CSV">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  aria-label="Add rows from CSV"
-                  data-testid="add-rows-from-csv"
-                  onClick={() => addRowsFromCSVModal.onOpen()}
-                >
-                  <Upload size={16} />
-                </Button>
-              </Tooltip>
             )}
             {canEditDatasetRecord && (
               <Button
