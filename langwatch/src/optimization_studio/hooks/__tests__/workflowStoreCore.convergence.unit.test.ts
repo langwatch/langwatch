@@ -9,7 +9,10 @@ import type { Edge, Node } from "@xyflow/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createStore, type StoreApi } from "zustand";
 
-import { store as storeCreator, type WorkflowStore } from "../workflowStoreCore";
+import {
+  store as storeCreator,
+  type WorkflowStore,
+} from "../workflowStoreCore";
 
 const node = (id: string, type: string): Node => ({
   id,
@@ -49,9 +52,7 @@ const forkEdges = [
 ];
 
 const edgesIntoAnswer = (edges: Edge[]) =>
-  edges.filter(
-    (e) => e.target === "end" && e.targetHandle === "inputs.answer",
-  );
+  edges.filter((e) => e.target === "end" && e.targetHandle === "inputs.answer");
 
 describe("workflowStoreCore - branch convergence on connect", () => {
   let store: StoreApi<WorkflowStore>;

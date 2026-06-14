@@ -10,7 +10,12 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("~/utils/compat/next-router", () => {
-  const router = { query: {}, asPath: "/p/workflows/wf", push: vi.fn(), replace: vi.fn() };
+  const router = {
+    query: {},
+    asPath: "/p/workflows/wf",
+    push: vi.fn(),
+    replace: vi.fn(),
+  };
   return { default: router, useRouter: () => router };
 });
 

@@ -119,9 +119,7 @@ describe("computeNodeGuards", () => {
       ];
       const guards = computeNodeGuards({ nodes, edges });
       expect(guards.get("inner")).toEqual(new Set(["outer:true"]));
-      expect(guards.get("leaf")).toEqual(
-        new Set(["outer:true", "inner:true"]),
-      );
+      expect(guards.get("leaf")).toEqual(new Set(["outer:true", "inner:true"]));
     });
   });
 });

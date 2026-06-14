@@ -29,7 +29,10 @@ type Guard = string;
 const IF_ELSE = "if_else";
 const BRANCH_HANDLES = new Set(["true", "false"]);
 
-function stripPrefix(handle: string | null | undefined, prefix: string): string {
+function stripPrefix(
+  handle: string | null | undefined,
+  prefix: string,
+): string {
   if (!handle) return "";
   return handle.startsWith(prefix) ? handle.slice(prefix.length) : handle;
 }

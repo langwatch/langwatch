@@ -570,7 +570,11 @@ export const store = (
     // same input. Sources that can run together stay blocked.
     if (
       existingConnection &&
-      !canConvergeOnInput({ nodes: get().nodes, edges: currentEdges, connection })
+      !canConvergeOnInput({
+        nodes: get().nodes,
+        edges: currentEdges,
+        connection,
+      })
     ) {
       return {
         error:
