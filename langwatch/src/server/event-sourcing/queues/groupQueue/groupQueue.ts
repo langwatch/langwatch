@@ -181,7 +181,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     this.blockingConnection = this.consumerEnabled
       ? "duplicate" in effectiveConnection &&
         typeof effectiveConnection.duplicate === "function"
-        ? effectiveConnection.duplicate()
+        ? effectiveConnection.duplicate({ maxRetriesPerRequest: null })
         : effectiveConnection
       : effectiveConnection;
     this.spanAttributes = spanAttributes;
