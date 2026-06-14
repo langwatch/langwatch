@@ -139,6 +139,21 @@ Feature: If/Else conditional branch node in workflows
     Then I see the python code editor
     And no liquid expression input
 
+  # The liquid condition is easy to get wrong silently, so the field
+  # validates live (the same way the engine parses it) and frames itself
+  # with {% %} so it reads as a Liquid expression.
+  @integration
+  Scenario: The condition flags invalid Liquid syntax
+    Given an if/else node with a liquid condition
+    When I type a malformed expression
+    Then the condition shows an error explaining the syntax is invalid
+
+  @integration
+  Scenario: The condition warns when it references an unknown input
+    Given an if/else node with input "amount"
+    When I type a condition referencing a variable that is not an input
+    Then the condition warns that the variable is not a known input
+
   @integration
   Scenario: Toggling Code off returns to the liquid expression
     Given an if/else node in code mode

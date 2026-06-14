@@ -225,6 +225,9 @@ export function IfElsePropertiesPanel({ node }: { node: Node<Component> }) {
               value={condition}
               onChange={handleConditionChange}
               placeholder={'e.g. context != ""'}
+              availableVariables={(node.data.inputs ?? []).map(
+                (i) => i.identifier,
+              )}
             />
             <Text fontSize="12px" color="fg.muted">
               <Link
