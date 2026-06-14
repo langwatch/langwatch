@@ -56,6 +56,21 @@ Feature: Entry point node with optional dataset and user-defined inputs
     And I add an input of type image
     Then the entry node exposes an image input field
 
+  # Like the LLM nodes, an entry input can hold an optional default value. At
+  # run time the default fills the field when the dataset row or API call does
+  # not provide it; a provided value always wins.
+  @integration
+  Scenario: An entry input can carry a default value
+    When I open the entry point drawer
+    And I type a default value for an input
+    Then the default is stored on the input
+
+  @integration @unimplemented
+  Scenario: An entry default fills a missing field at run time
+    Given an entry input "lang" with default "en"
+    When the workflow runs without a "lang" value provided
+    Then the run receives "lang" as "en"
+
   @integration
   Scenario: Attaching a dataset merges its columns into the inputs
     Given the entry point has a user-defined input "feature_flag"

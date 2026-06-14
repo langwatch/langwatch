@@ -186,8 +186,8 @@ export function IfElsePropertiesPanel({ node }: { node: Node<Component> }) {
       node={node}
       hideParameters
       hideInputs
-      outputsTitle="Branches"
-      outputsReadOnly
+      hideOutputs
+      paddingX={4}
     >
       <VStack width="full" align="start" gap={2}>
         <HStack width="full">

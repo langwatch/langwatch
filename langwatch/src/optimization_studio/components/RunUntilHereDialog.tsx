@@ -65,7 +65,8 @@ export function RunUntilHereDialog() {
   const firstRowSignature = JSON.stringify(rows[0] ?? null);
 
   // Prefill on open: last submitted values win, then the first dataset
-  // row (which may arrive async for saved datasets), then empty.
+  // row (which may arrive async for saved datasets), then the input's
+  // default value, then empty.
   useEffect(() => {
     if (!untilNodeId) {
       setView("fields");
@@ -79,11 +80,15 @@ export function RunUntilHereDialog() {
     const firstRow = rows[0];
     setValues(
       Object.fromEntries(
-        (entryData?.outputs ?? []).map((field) => [
-          field.identifier,
-          manualValues?.[field.identifier] ??
-            stringifyValue(firstRow?.[field.identifier]),
-        ]),
+        (entryData?.outputs ?? []).map((field) => {
+          const fromRow = firstRow?.[field.identifier];
+          const value =
+            manualValues?.[field.identifier] ??
+            (fromRow !== undefined && fromRow !== null
+              ? stringifyValue(fromRow)
+              : stringifyValue(field.value));
+          return [field.identifier, value];
+        }),
       ),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps

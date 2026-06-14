@@ -59,6 +59,14 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
     type: field.type,
   }));
 
+  // Optional default values, keyed by identifier. A default fills the input at
+  // run time when the dataset row or API call does not provide that field.
+  const inputValues: Record<string, string> = Object.fromEntries(
+    (node.data.outputs ?? [])
+      .filter((field) => typeof field.value === "string")
+      .map((field) => [field.identifier, field.value as string]),
+  );
+
   const handleInputsChange = useCallback(
     (newVariables: Variable[]) => {
       const existing = node.data.outputs ?? [];
@@ -78,6 +86,18 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
     [node.id, node.data.outputs, setNode, updateNodeInternals],
   );
 
+  const handleValueChange = useCallback(
+    (identifier: string, value: string) => {
+      const outputs = (node.data.outputs ?? []).map((field) =>
+        field.identifier === identifier
+          ? { ...field, value: value === "" ? undefined : value }
+          : field,
+      );
+      setNode({ id: node.id, data: { outputs } });
+    },
+    [node.id, node.data.outputs, setNode],
+  );
+
   const detachDataset = useCallback(() => {
     setNode({
       id: node.id,
@@ -92,12 +112,19 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
   }, [endNodeId, setSelectedNode]);
 
   return (
-    <BasePropertiesPanel node={node} hideOutputs hideInputs hideParameters>
+    <BasePropertiesPanel
+      node={node}
+      hideOutputs
+      hideInputs
+      hideParameters
+      paddingX={4}
+    >
       <VariablesSection
         variables={inputVariables}
         onChange={handleInputsChange}
         showMappings={false}
-        isMappingDisabled={true}
+        values={inputValues}
+        onValueChange={handleValueChange}
         canAddRemove={true}
         readOnly={false}
         title="Inputs"
@@ -188,28 +215,16 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
         editingDataset={editingDataset}
       />
       {endNodeId && (
-        <VStack
-          align="start"
-          gap={2}
-          width="full"
-          border="1px solid"
-          borderColor="border"
-          borderRadius="md"
-          padding={3}
-        >
-          <Text fontSize="13px" color="fg.muted">
-            Define the outputs for this workflow
-          </Text>
+        <VStack align="start" gap={2} width="full">
+          <PropertySectionTitle>Workflow Outputs</PropertySectionTitle>
           <Button
             size="sm"
             variant="outline"
-            width="full"
             data-testid="go-to-end-node"
             onClick={goToEndNode}
           >
             <Flag size={14} />
             <Text>Go to end node</Text>
-            <Spacer />
             <ArrowRight size={14} />
           </Button>
         </VStack>

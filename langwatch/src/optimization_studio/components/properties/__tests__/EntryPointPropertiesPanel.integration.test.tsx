@@ -175,6 +175,32 @@ describe("EntryPointPropertiesPanel", () => {
         expect(update).toBeTruthy();
       });
     });
+
+    /** @scenario An entry input can carry a default value */
+    it("stores a default value typed for an input", async () => {
+      renderPanel();
+
+      // The single textbox is the input's default-value field (the name is a
+      // click-to-edit label until edited).
+      fireEvent.change(screen.getByRole("textbox"), {
+        target: { value: "hello" },
+      });
+
+      await waitFor(() => {
+        const updates = mockSetNode.mock.calls.map(
+          (c) =>
+            c[0] as {
+              data: { outputs?: { identifier: string; value?: unknown }[] };
+            },
+        );
+        const update = updates.find((u) =>
+          u.data.outputs?.some(
+            (o) => o.identifier === "query" && o.value === "hello",
+          ),
+        );
+        expect(update).toBeTruthy();
+      });
+    });
   });
 
   describe("when a dataset is attached", () => {

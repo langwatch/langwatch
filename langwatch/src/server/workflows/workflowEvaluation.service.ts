@@ -2,6 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
+import { entryInlineWithDefaults } from "~/optimization_studio/server/entryInputDefaults";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
 import type {
   Entry,
@@ -181,6 +182,18 @@ export function injectEntryParameters(
           type: "string" as const,
         })),
       },
+    };
+  }
+
+  // Backfill any entry field with a default value that the caller did not
+  // provide as a parameter, so the run gets the default instead of nothing.
+  if (entry.dataset?.inline) {
+    entry.dataset = {
+      ...entry.dataset,
+      inline: entryInlineWithDefaults(
+        entry.dataset.inline,
+        entry.outputs ?? [],
+      ),
     };
   }
 }
