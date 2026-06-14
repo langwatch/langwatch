@@ -85,13 +85,19 @@ jobs:
             boxd fork "$STAGING_VM" --name "$pr"
             echo "created=true" >> "$GITHUB_OUTPUT"
             # Wait for fork to accept exec (up to 60s)
+            ready=0
             for i in $(seq 1 12); do
               if boxd exec "$pr" --timeout 5 -- true 2>/dev/null; then
                 echo "Fork ready after ${i}x5s"
+                ready=1
                 break
               fi
               sleep 5
             done
+            if [ "$ready" -eq 0 ]; then
+              echo "::error::Fork $pr did not become ready within 60s"
+              exit 1
+            fi
           fi
 
       - name: Check out PR SHA + boot with per-fork env
