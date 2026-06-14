@@ -161,12 +161,18 @@ describe("IfElsePropertiesPanel", () => {
 
   describe("when editing the inputs", () => {
     /** @scenario The if/else inputs use the shared field editor */
-    it("renders the inputs with the shared field editor and image support", () => {
+    it("renders the inputs with the shared field editor and image support", async () => {
+      const user = userEvent.setup();
       renderPanel();
 
       expect(screen.getByText("context")).toBeInTheDocument();
       expect(screen.getByTestId("add-variable-button")).toBeInTheDocument();
-      expect(screen.getByRole("option", { name: "Image" })).toBeInTheDocument();
+
+      // Image is an available input type in the shared editor's Add menu
+      await user.click(screen.getByTestId("add-variable-button"));
+      expect(
+        screen.getByRole("menuitem", { name: /Image/ }),
+      ).toBeInTheDocument();
     });
   });
 
