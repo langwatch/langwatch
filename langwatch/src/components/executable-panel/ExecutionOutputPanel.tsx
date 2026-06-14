@@ -205,6 +205,29 @@ const renderExecutionOutputs = (
     return null;
   }
 
+  // If/Else emits both branch handles (`true` and `false`) so the canvas
+  // can route either way, but showing both as separate boxes reads as a
+  // contradiction ("FALSE: true"). The condition result is just the `true`
+  // handle's boolean, so surface that single value.
+  if (nodeType === "if_else") {
+    const outputs = executionState.outputs as Record<string, unknown>;
+    const conditionResult =
+      "true" in outputs ? outputs.true : !(outputs.false as boolean);
+    return (
+      <VStack width="full" align="start" gap={3}>
+        <Text
+          fontSize="13px"
+          fontWeight="bold"
+          textTransform="uppercase"
+          color="gray.600"
+        >
+          Condition
+        </Text>
+        <OutputBox value={conditionResult} />
+      </VStack>
+    );
+  }
+
   return Object.entries(executionState.outputs)
     .filter(([_, value]) => value !== null)
     .map(([identifier, value]) => {

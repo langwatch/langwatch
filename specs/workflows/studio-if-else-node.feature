@@ -104,6 +104,16 @@ Feature: If/Else conditional branch node in workflows
     Then skipped nodes render with a muted "skipped" status indicator
     And the taken branch shows normal success states
 
+  # The node emits both branch handles for routing, but the run results
+  # panel must read clearly: a single condition outcome, not two boxes
+  # ("FALSE: true", "TRUE: false") that look contradictory.
+  @integration
+  Scenario: The if/else result shows a single condition value
+    Given an if/else node that has been run
+    When I view the node's outputs in the drawer
+    Then I see a single condition result of true or false
+    And not separate true and false branch boxes
+
   # ============================================================================
   # Condition authoring (liquid editor + python code mode)
   # ============================================================================
