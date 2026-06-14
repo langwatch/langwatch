@@ -141,9 +141,9 @@ export function augmentEvaluationResult({
   const notes: string[] = [];
   if (markerHits > 0) {
     notes.push(
-      `${markerHits} ${noun} value${
-        markerHits === 1 ? "" : "s"
-      } were already redacted at ingestion`,
+      markerHits === 1
+        ? `1 ${noun} value was already redacted at ingestion`
+        : `${markerHits} ${noun} values were already redacted at ingestion`,
     );
   }
   if (droppedFail) {
