@@ -796,7 +796,7 @@ describe("<AICreateModal/>", () => {
   // dialog leaks into document.body and the second test sees it (length > 0) —
   // the accumulation that gets aria-hidden and makes getByRole(/close/i) flake on
   // CI. With cleanup the DOM is clean between tests.
-  describe("test isolation (regression guard for #4467)", () => {
+  describe("when tests run in isolation (regression guard for #4467)", () => {
     /** @scenario "An open modal renders a dialog into the document" */
     it("renders a dialog", () => {
       render(
