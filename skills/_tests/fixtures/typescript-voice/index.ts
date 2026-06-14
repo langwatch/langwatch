@@ -7,7 +7,7 @@ const VOICE = "alloy";
 const INSTRUCTIONS = "You are a friendly phone support agent. Greet the caller, then help with billing questions.";
 
 export async function createVoiceAgent() {
-  const rt = new OpenAIRealtimeWebSocket({ model: "gpt-realtime-mini" });
+  const rt = new OpenAIRealtimeWebSocket({ model: "gpt-4o-realtime-preview" });
   rt.socket.addEventListener("open", () => {
     rt.send({
       type: "session.update",
