@@ -18,6 +18,7 @@ describe("captureException()", () => {
   });
 
   describe("when called with an Error instance", () => {
+    /** @scenario Captures full details from an Error instance */
     it("captures the error message", () => {
       const error = new Error("connection failed");
 
@@ -61,6 +62,7 @@ describe("captureException()", () => {
   });
 
   describe("when called with a string", () => {
+    /** @scenario Captures a string as the exception message */
     it("captures the string as the exception message", () => {
       captureException("timeout occurred");
 

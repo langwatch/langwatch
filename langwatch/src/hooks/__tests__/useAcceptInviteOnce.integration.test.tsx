@@ -73,6 +73,7 @@ vi.mock("~/utils/hardRedirect", () => ({
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: captureExceptionSpy,
+  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
 }));
 
 import {
