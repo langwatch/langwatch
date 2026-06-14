@@ -43,55 +43,61 @@ describe("ExecutionOutputPanel - if/else outputs", () => {
   afterEach(() => cleanup());
 
   describe("given an if/else run whose condition was false", () => {
-    /** @scenario The if/else result shows a single condition value */
-    it("shows one Condition box of false, not both branch handles", () => {
-      const { container } = render(
-        <ExecutionOutputPanel
-          executionState={successState({ true: false, false: true })}
-          nodeType="if_else"
-        />,
-        { wrapper: Wrapper },
-      );
+    describe("when the panel renders its outputs", () => {
+      /** @scenario The if/else result shows a single condition value */
+      it("shows one Condition box of false, not both branch handles", () => {
+        const { container } = render(
+          <ExecutionOutputPanel
+            executionState={successState({ true: false, false: true })}
+            nodeType="if_else"
+          />,
+          { wrapper: Wrapper },
+        );
 
-      expect(screen.getByText("Condition")).toBeInTheDocument();
-      // A single output box, not the two true/false boxes.
-      expect(container.querySelectorAll("pre")).toHaveLength(1);
-      const box = container.querySelector("pre");
-      expect(box?.textContent).toContain("false");
-      expect(box?.textContent).not.toContain("true");
+        expect(screen.getByText("Condition")).toBeInTheDocument();
+        // A single output box, not the two true/false boxes.
+        expect(container.querySelectorAll("pre")).toHaveLength(1);
+        const box = container.querySelector("pre");
+        expect(box?.textContent).toContain("false");
+        expect(box?.textContent).not.toContain("true");
+      });
     });
   });
 
   describe("given an if/else run whose condition was true", () => {
-    /** @scenario The if/else result shows a single condition value */
-    it("shows one Condition box of true", () => {
-      const { container } = render(
-        <ExecutionOutputPanel
-          executionState={successState({ true: true, false: false })}
-          nodeType="if_else"
-        />,
-        { wrapper: Wrapper },
-      );
+    describe("when the panel renders its outputs", () => {
+      /** @scenario The if/else result shows a single condition value */
+      it("shows one Condition box of true", () => {
+        const { container } = render(
+          <ExecutionOutputPanel
+            executionState={successState({ true: true, false: false })}
+            nodeType="if_else"
+          />,
+          { wrapper: Wrapper },
+        );
 
-      expect(screen.getByText("Condition")).toBeInTheDocument();
-      expect(container.querySelectorAll("pre")).toHaveLength(1);
-      expect(container.querySelector("pre")?.textContent).toContain("true");
+        expect(screen.getByText("Condition")).toBeInTheDocument();
+        expect(container.querySelectorAll("pre")).toHaveLength(1);
+        expect(container.querySelector("pre")?.textContent).toContain("true");
+      });
     });
   });
 
   describe("given a non if/else node", () => {
-    it("still renders each named output", () => {
-      const { container } = render(
-        <ExecutionOutputPanel
-          executionState={successState({ answer: "hello" })}
-          nodeType="code"
-        />,
-        { wrapper: Wrapper },
-      );
+    describe("when the panel renders its outputs", () => {
+      it("still renders each named output", () => {
+        const { container } = render(
+          <ExecutionOutputPanel
+            executionState={successState({ answer: "hello" })}
+            nodeType="code"
+          />,
+          { wrapper: Wrapper },
+        );
 
-      expect(screen.getByText("answer")).toBeInTheDocument();
-      expect(container.querySelectorAll("pre")).toHaveLength(1);
-      expect(container.querySelector("pre")?.textContent).toContain("hello");
+        expect(screen.getByText("answer")).toBeInTheDocument();
+        expect(container.querySelectorAll("pre")).toHaveLength(1);
+        expect(container.querySelector("pre")?.textContent).toContain("hello");
+      });
     });
   });
 });

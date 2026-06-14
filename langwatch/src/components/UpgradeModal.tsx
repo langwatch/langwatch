@@ -198,6 +198,12 @@ function LimitContent({
                         onClick={() =>
                           goToResource(proj.projectSlug, resource.id)
                         }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            goToResource(proj.projectSlug, resource.id);
+                          }
+                        }}
                         data-testid="limit-breakdown-badge"
                       >
                         {FeatureIcon && <FeatureIcon size={12} />}

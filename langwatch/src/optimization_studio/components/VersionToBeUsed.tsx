@@ -184,13 +184,13 @@ export function NewVersionFields({
   // The description is required and starts empty, so keying the ring on the
   // error alone paints it red the moment the dialog opens, before anyone has
   // typed anything.
-  const showValidation = form.formState.submitCount > 0;
+  const shouldShowValidation = form.formState.submitCount > 0;
 
   return (
     <HStack width="full">
       <Field.Root
         width="fit-content"
-        invalid={showValidation && !!form.formState.errors.version}
+        invalid={shouldShowValidation && !!form.formState.errors.version}
       >
         <VStack align="start">
           <Field.Label as={SmallLabel} color="fg.muted">
@@ -210,7 +210,7 @@ export function NewVersionFields({
       </Field.Root>
       <Field.Root
         width="full"
-        invalid={showValidation && !!form.formState.errors.commitMessage}
+        invalid={shouldShowValidation && !!form.formState.errors.commitMessage}
       >
         <VStack align="start" width="full">
           <Field.Label as={SmallLabel} color="fg.muted">

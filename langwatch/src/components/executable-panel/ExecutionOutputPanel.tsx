@@ -211,7 +211,7 @@ const renderExecutionOutputs = (
   // handle's boolean, so surface that single value.
   if (nodeType === "if_else") {
     const outputs = executionState.outputs as Record<string, unknown>;
-    const conditionResult =
+    const isConditionTrue =
       "true" in outputs ? outputs.true : !(outputs.false as boolean);
     return (
       <VStack width="full" align="start" gap={3}>
@@ -223,7 +223,7 @@ const renderExecutionOutputs = (
         >
           Condition
         </Text>
-        <OutputBox value={conditionResult} />
+        <OutputBox value={isConditionTrue} />
       </VStack>
     );
   }
