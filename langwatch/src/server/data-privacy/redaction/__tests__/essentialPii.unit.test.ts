@@ -6,22 +6,22 @@ const redact = (text: string) => redactEssentialPiiInText({ text });
 
 describe("redactEssentialPiiInText", () => {
   describe("given an email address", () => {
-    it("redacts it", () => {
+    it("redacts it with a typed marker", () => {
       const { text } = redact("contact test@example.com please");
-      expect(text).toBe("contact [REDACTED] please");
+      expect(text).toBe("contact [EMAIL_ADDRESS] please");
     });
   });
 
   describe("given IP addresses", () => {
     it("redacts an IPv4 address", () => {
       expect(redact("from 192.168.0.1 today").text).toBe(
-        "from [REDACTED] today",
+        "from [IP_ADDRESS] today",
       );
     });
 
     it("redacts an IPv6 address", () => {
       const { text } = redact("host fe80::1ff:fe23:4567:890a end");
-      expect(text).toContain("[REDACTED]");
+      expect(text).toContain("[IP_ADDRESS]");
       expect(text).not.toContain("fe80");
     });
 
@@ -35,7 +35,7 @@ describe("redactEssentialPiiInText", () => {
   describe("given a credit card number", () => {
     it("redacts a Luhn-valid number", () => {
       expect(redact("card 4111111111111111 ok").text).toBe(
-        "card [REDACTED] ok",
+        "card [CREDIT_CARD] ok",
       );
     });
 
@@ -48,7 +48,7 @@ describe("redactEssentialPiiInText", () => {
   describe("given an IBAN", () => {
     it("redacts a checksum-valid IBAN", () => {
       expect(redact("iban DE89370400440532013000 here").text).toBe(
-        "iban [REDACTED] here",
+        "iban [IBAN_CODE] here",
       );
     });
 
@@ -61,13 +61,13 @@ describe("redactEssentialPiiInText", () => {
   describe("given phone numbers", () => {
     it("redacts an international number", () => {
       const { text } = redact("call +31 6 12345678 now");
-      expect(text).toContain("[REDACTED]");
+      expect(text).toContain("[PHONE_NUMBER]");
       expect(text).not.toContain("12345678");
     });
 
     it("redacts a US number", () => {
       const { text } = redact("ring (415) 555-2671 today");
-      expect(text).toContain("[REDACTED]");
+      expect(text).toContain("[PHONE_NUMBER]");
     });
   });
 
@@ -79,7 +79,7 @@ describe("redactEssentialPiiInText", () => {
 
     it("redacts it when an SSN context word is nearby", () => {
       const { text } = redact("SSN: 123456789 on file");
-      expect(text).toContain("[REDACTED]");
+      expect(text).toContain("[US_SSN]");
       expect(text).not.toContain("123456789");
     });
   });
@@ -89,7 +89,7 @@ describe("redactEssentialPiiInText", () => {
       const { text } = redact(
         "to 0x52908400098527886E0F7030069857D2E4169EE7 now",
       );
-      expect(text).toContain("[REDACTED]");
+      expect(text).toContain("[CRYPTO]");
     });
   });
 
@@ -118,7 +118,7 @@ describe("redactEssentialPiiInText", () => {
   describe("given a medical license number", () => {
     it("redacts a DEA-style number when context names it", () => {
       const { text } = redact("DEA license AB1234567 on record");
-      expect(text).toContain("[REDACTED]");
+      expect(text).toContain("[MEDICAL_LICENSE]");
       expect(text).not.toContain("AB1234567");
     });
 
@@ -155,12 +155,13 @@ describe("redactEssentialPiiInText", () => {
   });
 
   describe("given several PII spans in one string", () => {
-    it("redacts each and counts them", () => {
+    it("redacts each with its own typed marker and counts them", () => {
       const { text, redactedCount } = redact(
         "mail test@example.com ip 10.0.0.1 card 4111111111111111",
       );
-      expect(text).not.toContain("test@example.com");
-      expect(text).not.toContain("10.0.0.1");
+      expect(text).toBe(
+        "mail [EMAIL_ADDRESS] ip [IP_ADDRESS] card [CREDIT_CARD]",
+      );
       expect(redactedCount).toBe(3);
     });
   });

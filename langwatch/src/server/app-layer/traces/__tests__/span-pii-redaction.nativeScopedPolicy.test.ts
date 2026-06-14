@@ -100,7 +100,7 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
       await service.redactSpan(span, null, "ESSENTIAL", TENANT);
 
       expect(attr(span, "input")).not.toContain(key);
-      expect(attr(span, "input")).toContain("[REDACTED]");
+      expect(attr(span, "input")).toContain("[SECRET]");
       expect(batchSpy).not.toHaveBeenCalled();
     });
 
@@ -115,7 +115,7 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
 
       const value = attr(span, "input")!;
       expect(value).not.toContain("s3cr3tpw");
-      expect(value).toContain("[REDACTED]");
+      expect(value).toContain("[SECRET]");
       expect(value).toContain("db.acme.internal");
       expect(batchSpy).not.toHaveBeenCalled();
     });
@@ -127,7 +127,7 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
 
       await service.redactSpan(span, null, "ESSENTIAL", TENANT);
 
-      expect(attr(span, "authorization")).toBe("[REDACTED]");
+      expect(attr(span, "authorization")).toBe("[SECRET]");
       expect(batchSpy).not.toHaveBeenCalled();
     });
 
@@ -153,7 +153,7 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
 
       await service.redactSpan(span, null, "ESSENTIAL", TENANT);
 
-      expect(attr(span, "input")).toBe("token [REDACTED] end");
+      expect(attr(span, "input")).toBe("token [SECRET] end");
       expect(batchSpy).not.toHaveBeenCalled();
     });
   });
@@ -186,7 +186,8 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
       const value = attr(span, "input")!;
       expect(value).not.toContain("jane@example.com");
       expect(value).not.toContain("4155552671");
-      expect(value).toContain("[REDACTED]");
+      expect(value).toContain("[EMAIL_ADDRESS]");
+      expect(value).toContain("[PHONE_NUMBER]");
       expect(batchSpy).not.toHaveBeenCalled();
     });
 

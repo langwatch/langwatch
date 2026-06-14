@@ -39,13 +39,22 @@ describe("PIIRedactionNotice", () => {
       );
       expect(container.textContent).toBe("");
     });
+
+    it("ignores ordinary bracketed text that is not a marker", () => {
+      const { container } = render(
+        <Wrapper>
+          <PIIRedactionNotice content="[INFO] the job started" />
+        </Wrapper>,
+      );
+      expect(container.textContent).toBe("");
+    });
   });
 
-  describe("when content contains [REDACTED]", () => {
-    it("renders the banner with a Settings link", () => {
+  describe("when content carries a typed redaction marker", () => {
+    it("renders the banner with a Settings link for a PII marker", () => {
       render(
         <Wrapper>
-          <PIIRedactionNotice content="my name is [REDACTED] from somewhere" />
+          <PIIRedactionNotice content="reach me at [EMAIL_ADDRESS] anytime" />
         </Wrapper>,
       );
       expect(
@@ -55,6 +64,17 @@ describe("PIIRedactionNotice", () => {
         name: /Settings/i,
       });
       expect(link.getAttribute("href")).toBe("/acme/settings");
+    });
+
+    it("renders the banner for a secret marker", () => {
+      render(
+        <Wrapper>
+          <PIIRedactionNotice content="authorization: [SECRET]" />
+        </Wrapper>,
+      );
+      expect(
+        screen.getByText(/redacted by this project's privacy settings/i),
+      ).toBeTruthy();
     });
   });
 

@@ -5,12 +5,14 @@
  * database-URL passwords, bearer tokens) out of free text, plus a key-name pass
  * for obviously-sensitive attribute names. Runs in-process per span: no external
  * service, no entropy scanning (too noisy for v1), all patterns precompiled and
- * linear-time. Detected secrets are replaced with the same `[REDACTED]` marker
- * the PII path uses.
+ * linear-time. Detected secrets are replaced with the typed `[SECRET]` marker,
+ * which the trace view reads back and which keeps the secrets evaluator able to
+ * flag a credential that was already scrubbed at ingestion.
  */
+import { SECRET_MARKER } from "./markers";
 
-/** The placeholder every redaction (secrets + PII) writes in place of a match. */
-export const SECRETS_REDACTION_MARKER = "[REDACTED]";
+/** The placeholder a redacted secret is replaced with. */
+export const SECRETS_REDACTION_MARKER = SECRET_MARKER;
 const REPLACEMENT = SECRETS_REDACTION_MARKER;
 
 /** Inputs longer than this are passed through untouched, mirroring the PII size budget. */
@@ -172,4 +174,69 @@ export function redactSecretsInText({
   }
 
   return { text: result, redactedCount };
+}
+
+export interface SecretMatch {
+  /** The built-in rule id, or `custom_pattern` for a caller-supplied regex. */
+  ruleId: string;
+  description: string;
+  /** Span of the full match in the original text. */
+  start: number;
+  end: number;
+}
+
+/**
+ * Detect secrets in one string WITHOUT redacting it: returns the rule that
+ * matched and where, so the secrets evaluator can report a leak (and which
+ * kind) while leaving the text alone. Shares the exact rule set used by
+ * `redactSecretsInText`, so what the evaluator flags is what redaction scrubs.
+ *
+ * Uses `matchAll`, which clones the regex internally, so the module-level global
+ * rules keep `lastIndex === 0` just like the `.replace` path. Detection scans
+ * the original text (redaction rewrites the string between rules), so on rare
+ * overlapping matches the count can differ slightly from `redactedCount` — fine
+ * for scoring a pass/fail.
+ */
+export function detectSecretsInText({
+  text,
+  customPatterns = [],
+}: {
+  text: string;
+  customPatterns?: readonly RegExp[];
+}): SecretMatch[] {
+  if (
+    typeof text !== "string" ||
+    text.length === 0 ||
+    text.length > MAX_SCAN_LENGTH
+  ) {
+    return [];
+  }
+
+  const matches: SecretMatch[] = [];
+
+  for (const rule of VALUE_RULES) {
+    for (const match of text.matchAll(rule.regex)) {
+      const start = match.index ?? 0;
+      matches.push({
+        ruleId: rule.id,
+        description: rule.description,
+        start,
+        end: start + match[0].length,
+      });
+    }
+  }
+
+  for (const pattern of customPatterns) {
+    for (const match of text.matchAll(pattern)) {
+      const start = match.index ?? 0;
+      matches.push({
+        ruleId: "custom_pattern",
+        description: "Custom secret pattern",
+        start,
+        end: start + match[0].length,
+      });
+    }
+  }
+
+  return matches;
 }

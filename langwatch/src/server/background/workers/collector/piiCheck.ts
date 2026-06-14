@@ -4,6 +4,7 @@ import type { PIIRedactionLevel } from "~/server/event-sourcing/pipelines/trace-
 import { env } from "../../../../env.mjs";
 import { createLogger } from "../../../../utils/logger/server";
 import { startSpan } from "../../../../utils/posthogErrorCapture";
+import { normalizePresidioMarkers } from "../../../data-privacy/redaction/markers";
 import type { BatchEvaluationResult } from "../../../evaluations/evaluators.generated";
 import {
   evaluationDurationHistogram,
@@ -337,7 +338,8 @@ export const presidioClearPII = async (
     throw new Error(result.details);
   }
   if (result.status === "processed" && result.raw_response?.anonymized) {
-    currentObject[lastKey] = result.raw_response.anonymized + remaining;
+    currentObject[lastKey] =
+      normalizePresidioMarkers(result.raw_response.anonymized) + remaining;
   }
 };
 
@@ -422,7 +424,7 @@ export const batchPresidioClearPII = async (
       throw new Error(result.details);
     }
     if (result.status === "processed" && result.raw_response?.anonymized) {
-      return result.raw_response.anonymized + entry.remaining;
+      return normalizePresidioMarkers(result.raw_response.anonymized) + entry.remaining;
     }
     return null;
   });

@@ -32,10 +32,10 @@ describe("redactStringNative", () => {
     it("redacts both a secret and an email", () => {
       const p = policy({});
       expect(redactStringNative({ text: SECRET, policy: p }).text).toContain(
-        "[REDACTED]",
+        "[SECRET]",
       );
       expect(redactStringNative({ text: EMAIL, policy: p }).text).toBe(
-        "mail [REDACTED] end",
+        "mail [EMAIL_ADDRESS] end",
       );
     });
   });
@@ -55,7 +55,7 @@ describe("redactStringNative", () => {
       const p = policy({ piiLevel: "disabled" });
       expect(redactStringNative({ text: EMAIL, policy: p }).text).toBe(EMAIL);
       expect(redactStringNative({ text: SECRET, policy: p }).text).toContain(
-        "[REDACTED]",
+        "[SECRET]",
       );
     });
   });
@@ -65,7 +65,7 @@ describe("redactStringNative", () => {
       const p = policy({ piiLevel: "strict" });
       expect(redactStringNative({ text: EMAIL, policy: p }).text).toBe(EMAIL);
       expect(redactStringNative({ text: SECRET, policy: p }).text).toContain(
-        "[REDACTED]",
+        "[SECRET]",
       );
     });
   });
@@ -79,7 +79,7 @@ describe("redactStringNative", () => {
         policy: p,
         compiledSecretPatterns: compiled,
       });
-      expect(text).toBe("token [REDACTED] end");
+      expect(text).toBe("token [SECRET] end");
     });
   });
 });

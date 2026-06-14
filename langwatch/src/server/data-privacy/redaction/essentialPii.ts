@@ -1,4 +1,5 @@
 import { findPhoneNumbersInText } from "libphonenumber-js";
+import { formatPiiMarker } from "./markers";
 
 /**
  * Native, lightweight redaction for the "essential" PII level: the pattern- and
@@ -11,10 +12,10 @@ import { findPhoneNumbersInText } from "libphonenumber-js";
  * Flow mirrors Presidio analyze -> anonymize: collect candidate spans from every
  * recognizer, drop any that fail their checksum, gate low-confidence patterns on
  * a nearby context word, merge overlapping spans preferring the longer, then
- * rebuild the string in one pass replacing each survivor with `[REDACTED]`.
+ * rebuild the string in one pass replacing each survivor with its typed marker
+ * (`[EMAIL_ADDRESS]`, `[PHONE_NUMBER]`, ...).
  */
 
-const REPLACEMENT = "[REDACTED]";
 const MAX_SCAN_LENGTH = 250_000;
 const CONTEXT_WINDOW = 50;
 
@@ -199,6 +200,8 @@ const RECOGNIZERS: Recognizer[] = [
 interface Span {
   start: number;
   end: number;
+  /** The PII entity that matched here, written as the redaction marker. */
+  entity: string;
 }
 
 function hasContextWord(
@@ -242,7 +245,11 @@ export function redactEssentialPiiInText({
     for (const match of text.matchAll(recognizer.regex)) {
       const raw = match[0];
       const start = match.index ?? 0;
-      const span: Span = { start, end: start + raw.length };
+      const span: Span = {
+        start,
+        end: start + raw.length,
+        entity: recognizer.entity,
+      };
       if (recognizer.validate && !recognizer.validate(raw)) continue;
       if (
         recognizer.contextRequired &&
@@ -258,7 +265,11 @@ export function redactEssentialPiiInText({
     for (const phone of findPhoneNumbersInText(text, {
       defaultCountry: "US",
     })) {
-      spans.push({ start: phone.startsAt, end: phone.endsAt });
+      spans.push({
+        start: phone.startsAt,
+        end: phone.endsAt,
+        entity: "PHONE_NUMBER",
+      });
     }
   } catch {
     // Defensive: never let phone parsing break ingestion.
@@ -280,7 +291,7 @@ export function redactEssentialPiiInText({
   let result = "";
   let cursor = 0;
   for (const span of kept) {
-    result += text.slice(cursor, span.start) + REPLACEMENT;
+    result += text.slice(cursor, span.start) + formatPiiMarker(span.entity);
     cursor = span.end;
   }
   result += text.slice(cursor);

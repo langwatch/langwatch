@@ -1,15 +1,17 @@
 import { Alert, Link } from "@chakra-ui/react";
 import NextLink from "~/utils/compat/next-link";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { hasRedactionMarker } from "~/server/data-privacy/redaction/markers";
 
 /**
  * Banner shown when trace content carries redaction markers.
  *
  * The trace-processing pipeline replaces matched PII and secret substrings
- * in-place with "[REDACTED]", which leaves the message render empty or
- * near-empty to a casual reader. Multiple team members reported "the gateway
- * lost the payload" when the real cause was redaction stripping content they
- * did not know was being scrubbed, let alone how to reach the setting.
+ * in-place with a typed marker (`[PHONE_NUMBER]`, `[SECRET]`, ...), which
+ * leaves the message render altered to a casual reader. Multiple team members
+ * reported "the gateway lost the payload" when the real cause was redaction
+ * scrubbing content they did not know was being removed, let alone how to reach
+ * the setting.
  *
  * This alert surfaces the privacy-settings link next to any trace that carries
  * redaction markers. It does NOT un-redact content.
@@ -21,7 +23,7 @@ export function PIIRedactionNotice({
 }) {
   const { project } = useOrganizationTeamProject();
 
-  if (!content || !/\[REDACTED\]/.test(content)) return null;
+  if (!hasRedactionMarker(content)) return null;
   const settingsHref = project?.slug ? `/${project.slug}/settings` : "/settings";
 
   return (

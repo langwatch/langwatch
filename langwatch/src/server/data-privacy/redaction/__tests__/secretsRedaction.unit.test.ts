@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   BUILTIN_SECRET_RULES,
   compileSecretPatterns,
+  detectSecretsInText,
   isSensitiveAttributeKey,
   redactSecretsInText,
 } from "../secretsRedaction";
@@ -29,7 +30,7 @@ describe("redactSecretsInText", () => {
     for (const [label, input] of cases) {
       it(`redacts ${label}`, () => {
         const { text, redactedCount } = redact(input);
-        expect(text).toContain("[REDACTED]");
+        expect(text).toContain("[SECRET]");
         expect(redactedCount).toBeGreaterThanOrEqual(1);
       });
     }
@@ -41,7 +42,7 @@ describe("redactSecretsInText", () => {
         "key:\n-----BEGIN RSA PRIVATE KEY-----\nMIIabc\nDEFghi\n-----END RSA PRIVATE KEY-----\ntail";
       const { text } = redact(input);
       expect(text).not.toContain("MIIabc");
-      expect(text).toContain("[REDACTED]");
+      expect(text).toContain("[SECRET]");
       expect(text).toContain("tail");
     });
   });
@@ -49,14 +50,14 @@ describe("redactSecretsInText", () => {
   describe("given a database URL with a password", () => {
     it("redacts only the password and keeps scheme, user, host, and database", () => {
       const { text } = redact("postgres://app:hunter2@db.internal:5432/app");
-      expect(text).toBe("postgres://app:[REDACTED]@db.internal:5432/app");
+      expect(text).toBe("postgres://app:[SECRET]@db.internal:5432/app");
     });
   });
 
   describe("given a bearer authorization header value", () => {
     it("redacts the token and keeps the Bearer prefix", () => {
       const { text } = redact("Authorization: Bearer abc123token456xyz");
-      expect(text).toBe("Authorization: Bearer [REDACTED]");
+      expect(text).toBe("Authorization: Bearer [SECRET]");
     });
   });
 
@@ -90,7 +91,7 @@ describe("redactSecretsInText", () => {
         "token acme_live_abcd1234 end",
         custom,
       );
-      expect(text).toBe("token [REDACTED] end");
+      expect(text).toBe("token [SECRET] end");
       expect(redactedCount).toBe(1);
     });
   });
@@ -138,5 +139,54 @@ describe("BUILTIN_SECRET_RULES", () => {
   it("exposes one entry per built-in value rule for the UI", () => {
     expect(BUILTIN_SECRET_RULES.length).toBeGreaterThanOrEqual(8);
     expect(BUILTIN_SECRET_RULES.every((r) => r.id && r.description)).toBe(true);
+  });
+});
+
+describe("detectSecretsInText", () => {
+  describe("given text with a provider key", () => {
+    it("reports the rule that matched and where, without altering the text", () => {
+      const input = `key sk-proj-${"A".repeat(40)} here`;
+      const matches = detectSecretsInText({ text: input });
+      expect(matches).toHaveLength(1);
+      expect(matches[0]!.ruleId).toBe("openai_api_key");
+      // The detector never mutates the input.
+      expect(input).toContain("sk-proj-");
+    });
+  });
+
+  describe("given text with several distinct secrets", () => {
+    it("reports each one", () => {
+      const matches = detectSecretsInText({
+        text: `aws AKIAIOSFODNN7EXAMPLE and gh ghp_${"a".repeat(36)}`,
+      });
+      const ruleIds = matches.map((m) => m.ruleId).sort();
+      expect(ruleIds).toEqual(["aws_access_key_id", "github_token"]);
+    });
+  });
+
+  describe("given a custom pattern", () => {
+    it("reports it as a custom_pattern match", () => {
+      const custom = compileSecretPatterns(["acme_live_[a-z0-9]{8,}"]);
+      const matches = detectSecretsInText({
+        text: "token acme_live_abcd1234 end",
+        customPatterns: custom,
+      });
+      expect(matches).toHaveLength(1);
+      expect(matches[0]!.ruleId).toBe("custom_pattern");
+    });
+  });
+
+  describe("given ordinary text", () => {
+    it("returns no matches", () => {
+      expect(detectSecretsInText({ text: "the user said thanks" })).toEqual([]);
+    });
+  });
+
+  describe("given already-redacted text carrying a [SECRET] marker", () => {
+    it("does not re-detect the marker as a secret", () => {
+      expect(
+        detectSecretsInText({ text: "authorization: [SECRET]" }),
+      ).toEqual([]);
+    });
   });
 });
