@@ -40,16 +40,7 @@ import {
   useRef,
   useState,
 } from "react";
-import {
-  Check,
-  Cloud,
-  Download,
-  Edit2,
-  Plus,
-  Trash2,
-  Upload,
-  X,
-} from "react-feather";
+import { Check, Download, Edit2, Plus, Trash2, Upload, X } from "react-feather";
 import { useStore } from "zustand";
 
 import { AddOrEditDatasetDrawer } from "~/components/AddOrEditDatasetDrawer";
@@ -805,7 +796,7 @@ function RowCheckbox({
 }
 
 /**
- * Compact autosave indicator: cloud when idle, spinner while saving, check
+ * Compact autosave indicator: nothing when idle, spinner while saving, check
  * on success, and a loud error with the message when a save fails: a
  * blocked save must never look like a successful one.
  */
@@ -842,9 +833,5 @@ export function SaveStatusChip({
       </Tooltip>
     );
   }
-  return (
-    <Box color="fg.subtle" data-testid="save-status-idle">
-      <Cloud size={13} />
-    </Box>
-  );
+  return null;
 }
