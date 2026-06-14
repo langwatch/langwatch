@@ -3,6 +3,7 @@ import { evaluateApiKeysAndSecrets } from "../apiKeysAndSecretsDetection";
 
 describe("evaluateApiKeysAndSecrets", () => {
   describe("given content with a leaked provider key", () => {
+    /** @scenario The secrets evaluator flags a leaked key in trace content */
     it("fails with a count and a per-rule summary", () => {
       const result = evaluateApiKeysAndSecrets({
         input: `here is my key sk-proj-${"A".repeat(40)} thanks`,
@@ -16,6 +17,7 @@ describe("evaluateApiKeysAndSecrets", () => {
   });
 
   describe("given a secret hiding in a mapped custom attribute (not input/output)", () => {
+    /** @scenario The secrets evaluator scans every mapped field */
     it("still detects it by scanning every string field", () => {
       const result = evaluateApiKeysAndSecrets({
         "app.debug.headers": { authorization: "AKIAIOSFODNN7EXAMPLE" },
@@ -28,6 +30,7 @@ describe("evaluateApiKeysAndSecrets", () => {
   });
 
   describe("given clean content", () => {
+    /** @scenario Clean content passes the secrets evaluator */
     it("passes with score zero", () => {
       const result = evaluateApiKeysAndSecrets({
         input: "the user asked about the weather",

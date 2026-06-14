@@ -26,6 +26,7 @@ const passed: SingleEvaluationResult = {
 
 describe("augmentEvaluationResult", () => {
   describe("given the PII detector and content redacted at ingestion", () => {
+    /** @scenario PII redacted at ingestion still fails the PII detector */
     it("flags an enabled-entity marker that the live pass could not see", () => {
       const result = augment({
         evaluatorType: PII,
@@ -40,6 +41,7 @@ describe("augmentEvaluationResult", () => {
       expect(result.details).toMatch(/redacted at ingestion/i);
     });
 
+    /** @scenario A redacted entity the evaluator is not checking is ignored */
     it("ignores a marker for an entity the evaluator is not checking", () => {
       const result = augment({
         evaluatorType: PII,
@@ -62,6 +64,7 @@ describe("augmentEvaluationResult", () => {
   });
 
   describe("given the secrets detector and a redacted secret", () => {
+    /** @scenario A secret already redacted at ingestion is still flagged */
     it("flags a [SECRET] marker on top of the live result", () => {
       const result = augment({
         evaluatorType: SECRETS,
@@ -76,6 +79,7 @@ describe("augmentEvaluationResult", () => {
   });
 
   describe("given content was dropped at ingestion", () => {
+    /** @scenario Dropped content fails the detector */
     it("fails when nothing is left to check", () => {
       const result = augment({
         evaluatorType: PII,
@@ -90,6 +94,7 @@ describe("augmentEvaluationResult", () => {
       expect(result.details).toMatch(/dropped at ingestion/i);
     });
 
+    /** @scenario A populated mapped field is not failed by a dropped sibling */
     it("does not fail on drop when another mapped field still has content", () => {
       const result = augment({
         evaluatorType: PII,
@@ -114,6 +119,7 @@ describe("augmentEvaluationResult", () => {
   });
 
   describe("given an error result", () => {
+    /** @scenario An evaluation error is never rewritten by the augmenter */
     it("never touches it (operational failures stay visible)", () => {
       const error: SingleEvaluationResult = {
         status: "error",
