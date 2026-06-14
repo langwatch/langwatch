@@ -6,7 +6,7 @@ import {
   TraceFlags,
 } from "@opentelemetry/api";
 import fastq from "fastq";
-import type IORedis from "ioredis";
+import IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import { getLangWatchTracer } from "langwatch";
 import type { SemConvAttributes } from "langwatch/observability";
@@ -178,12 +178,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     this.consumerEnabled = options?.consumerEnabled ?? true;
     // Dedicated connection for BRPOP to avoid blocking the shared connection.
     // Only needed when the dispatcher loop runs (consumer mode).
-    this.blockingConnection = this.consumerEnabled
-      ? "duplicate" in effectiveConnection &&
-        typeof effectiveConnection.duplicate === "function"
+    this.blockingConnection =
+      this.consumerEnabled && effectiveConnection instanceof IORedis
         ? effectiveConnection.duplicate({ maxRetriesPerRequest: null })
-        : effectiveConnection
-      : effectiveConnection;
+        : effectiveConnection;
     this.spanAttributes = spanAttributes;
     this.delay = delay;
     this.deduplication = deduplication;
@@ -1010,7 +1008,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   }
 
   async waitUntilReady(): Promise<void> {
-    // No-op — Redis connection is already established, fastq needs no setup.
+    const bc = this.blockingConnection;
+    if (bc === this.redisConnection) return;
+    if (bc.status === "ready") return;
+    await new Promise<void>((resolve) => bc.once("ready", resolve));
   }
 
   async close(): Promise<void> {
