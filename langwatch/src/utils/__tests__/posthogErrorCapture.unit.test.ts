@@ -85,6 +85,24 @@ describe("captureException()", () => {
       );
     });
   });
+
+  describe("when called with options", () => {
+    it("merges extra, tags, and defaults level to 'error'", () => {
+      captureException(new Error("fail"), {
+        extra: { requestId: "abc" },
+        tags: { source: "widget" },
+      });
+
+      expect(posthog.capture).toHaveBeenCalledWith(
+        "$exception",
+        expect.objectContaining({
+          requestId: "abc",
+          source: "widget",
+          $exception_level: "error",
+        }),
+      );
+    });
+  });
 });
 
 describe("toError()", () => {

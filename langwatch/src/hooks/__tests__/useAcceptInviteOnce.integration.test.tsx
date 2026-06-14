@@ -223,7 +223,11 @@ describe("useAcceptInviteOnce()", () => {
         act(() => {
           mockState.mutation.isError = true;
           mockState.mutation.error = { message: "The invite has expired" };
-          mockState.handlers.onError?.({ message: "The invite has expired" });
+          // Pass a real Error to match the TRPCClientError runtime type (which extends Error),
+          // so toError() preserves the instance rather than stringifying to "[object Object]".
+          mockState.handlers.onError?.(
+            new Error("The invite has expired") as { message: string },
+          );
         });
         rerender();
 

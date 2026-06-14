@@ -94,10 +94,8 @@ export function useAcceptInviteOnce({
         return;
       }
       // Real failure (expired invite, email mismatch, …). The page renders
-      // `errorMessage` inline; also capture for observability. Extract the
-      // tRPC error's `.message` so `toError` preserves it instead of
-      // stringifying the error object to "[object Object]".
-      captureException(toError(error.message ?? String(error)), {
+      // `errorMessage` inline; also capture for observability.
+      captureException(toError(error), {
         tags: { source: "useAcceptInviteOnce" },
       });
     },
