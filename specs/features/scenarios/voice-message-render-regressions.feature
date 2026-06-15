@@ -5,7 +5,7 @@ Feature: Voice message rendering regressions in simulation run UI
 
   Background:
     Given I am viewing a simulation run in the run detail drawer
-    And the run's conversation is rendered by ScenarioMessageRenderer in drawer variant
+    And the run's conversation includes voice message turns
 
   # ---------------------------------------------------------------------------
   # #4698 — text-first part ordering must collapse into a single bubble
@@ -29,8 +29,7 @@ Feature: Voice message rendering regressions in simulation run UI
 
   @integration
   Scenario: User-role voice turns align right
-    Given an assistant message contains an audio part and a text transcript part
-    And the message has role "user"
+    Given a user voice message contains an audio part and a text transcript part
     When the renderer paints that turn
     Then the media bubble aligns to the right (user side)
 

@@ -174,7 +174,7 @@ describe("ScenarioRunDetailDrawer", () => {
   // companion to the grid-variant fixture in
   // ScenarioMessageRenderer.integration.test.tsx.
   // -------------------------------------------------------------------------
-  describe("ScenarioMessageRenderer (drawer variant) for an input_audio url turn (#4138)", () => {
+  describe("when rendering a voice turn with a url-shape audio source in the drawer (#4138)", () => {
     it("renders a media-part-audio element whose src is the file url inside the drawer", () => {
       render(
         <ScenarioMessageRenderer
