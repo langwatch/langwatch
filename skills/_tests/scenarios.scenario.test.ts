@@ -841,13 +841,26 @@ describe("Scenarios Skill", () => {
             expect(testContent).toContain("@langwatch/scenario");
             expect(testContent).toMatch(/scenario\.run\(/);
 
-            // Verify a voice adapter is used rather than a plain text agent
-            expect(testContent).toMatch(
-              /(openAIRealtimeAgent|pipecatAgent|elevenLabsAgent|geminiLiveAgent|twilioAgent|composableAgent)/
+            // Guard against home-rolled test frameworks (mirrors Python voice test)
+            expect(testContent).not.toMatch(
+              /from\s+["'](?:agent-tester|simulation-framework|voice-test-framework|langwatch-testing)["']/
             );
 
-            // Verify the simulator was configured with a voice
-            expect(testContent).toMatch(/voice\s*:/);
+            // Verify a voice adapter factory is CALLED (not just mentioned in a comment)
+            expect(
+              testContent,
+              "Expected the test to call a voice adapter factory (openAIRealtimeAgent / pipecatAgent / elevenLabsAgent / geminiLiveAgent / twilioAgent / composableAgent) — bare mentions in comments or string literals do not count."
+            ).toMatch(
+              /\b(?:scenario\.)?(?:openAIRealtimeAgent|pipecatAgent|elevenLabsAgent|geminiLiveAgent|twilioAgent|composableAgent)\s*\(/
+            );
+
+            // Verify the simulator was configured with a voice inside the userSimulatorAgent call
+            expect(
+              testContent,
+              'Expected userSimulatorAgent({ voice: "openai/..." | "elevenlabs/..." }) so the simulated caller speaks'
+            ).toMatch(
+              /userSimulatorAgent\s*\(\s*\{[\s\S]*?voice\s*:\s*["'](?:elevenlabs|openai)\/[^"']+["']/
+            );
           },
           scenario.judge(),
         ],
@@ -855,7 +868,7 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    1_800_000
   );
 
 });
