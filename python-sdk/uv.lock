@@ -221,21 +221,21 @@ wheels = [
 
 [[package]]
 name = "anthropic"
-version = "0.36.2"
+version = "0.107.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
     { name = "distro" },
+    { name = "docstring-parser" },
     { name = "httpx" },
     { name = "jiter" },
     { name = "pydantic" },
     { name = "sniffio" },
-    { name = "tokenizers" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2b/ee/53cadd3262cbd3f1e6feee9640bd74e59bc33a053f214631eb2fe85eac2e/anthropic-0.36.2.tar.gz", hash = "sha256:d5a3fa56d1c82a51944f9dc7b0dc72048deb89f8df5ebfd09e2d1b59c62eb8eb", size = 928435, upload-time = "2024-10-17T18:43:44.514Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d9/57/9eaf3d6823eba892c837a738f32a74b51193a23904a8761f6711f7714105/anthropic-0.107.0.tar.gz", hash = "sha256:e036aae37b7a9ba0a71d74663a559002c96800eeaca4e336ca1f2d10d0a33297", size = 855992, upload-time = "2026-06-06T17:13:36.755Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/cf/46/e564db65755947c66b5c23fae53886db41aea28b4132a50311c92c739f5f/anthropic-0.36.2-py3-none-any.whl", hash = "sha256:308ddc6c538de03c081552e456bc0b387b6f7c7d1dea0c20122cc11c7cdbaf6a", size = 939627, upload-time = "2024-10-17T18:43:42.873Z" },
+    { url = "https://files.pythonhosted.org/packages/58/1d/f8b7f1c0344f3c1cabebc48a969f7363dba9a306fd0cca293587e2c3093a/anthropic-0.107.0-py3-none-any.whl", hash = "sha256:b28315631e8ed92eec37ff0f911e59730c6a04663d9fffd53e201e11fa6669f1", size = 838567, upload-time = "2026-06-06T17:13:38.037Z" },
 ]
 
 [[package]]
@@ -3206,7 +3206,7 @@ wheels = [
 
 [[package]]
 name = "langwatch"
-version = "0.25.0"
+version = "0.26.0"
 source = { editable = "." }
 dependencies = [
     { name = "attrs" },
@@ -3333,7 +3333,7 @@ provides-extras = ["langchain", "dspy", "litellm", "dev", "tests"]
 [package.metadata.requires-dev]
 dev = [{ name = "black", specifier = ">=26.3.1" }]
 examples = [
-    { name = "anthropic", specifier = ">=0.36.0,<0.37.0" },
+    { name = "anthropic", specifier = ">=0.36.0,<0.108.0" },
     { name = "chainlit", specifier = ">=2.11.1,<3" },
     { name = "cloudpickle", specifier = ">=3.1.1" },
     { name = "dspy-ai", specifier = ">=3.0.3,<4" },
