@@ -470,12 +470,10 @@ describe("<ScenarioMessageRenderer/>", () => {
       const mediaWrapper = audio.closest("[data-align]");
       expect(mediaWrapper).toHaveAttribute("data-align", "flex-start");
 
-      // No transcript artifact: the inner media container holds only the
-      // <audio> (its VStack), no italic caption <p>. Asserting the audio's
-      // immediate container has a single child guards against an empty
-      // transcript node sneaking in.
-      const innerContainer = audio.parentElement?.parentElement;
-      expect(innerContainer?.childElementCount).toBe(1);
+      // No transcript artifact: the bubble must not render an italic caption
+      // <p>. Scoped to the media wrapper so Chakra wrappers outside the bubble
+      // never false-positive; does not depend on wrapper nesting depth.
+      expect(mediaWrapper!.querySelector("p")).toBeNull();
     });
   });
 });

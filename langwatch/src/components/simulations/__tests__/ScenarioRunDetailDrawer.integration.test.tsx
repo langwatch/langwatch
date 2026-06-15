@@ -52,6 +52,9 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 
 describe("ScenarioRunDetailDrawer", () => {
   afterEach(cleanup);
+  beforeAll(() => {
+    Element.prototype.scrollIntoView = vi.fn();
+  });
 
   describe("ScenarioRunHeader in drawer context", () => {
     describe("given a failed run", () => {
@@ -172,10 +175,6 @@ describe("ScenarioRunDetailDrawer", () => {
   // ScenarioMessageRenderer.integration.test.tsx.
   // -------------------------------------------------------------------------
   describe("ScenarioMessageRenderer (drawer variant) for an input_audio url turn (#4138)", () => {
-    beforeAll(() => {
-      Element.prototype.scrollIntoView = vi.fn();
-    });
-
     it("renders a media-part-audio element whose src is the file url inside the drawer", () => {
       render(
         <ScenarioMessageRenderer

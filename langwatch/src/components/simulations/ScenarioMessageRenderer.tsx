@@ -15,6 +15,15 @@ import type { MediaPartData } from "./MediaPart";
 
 type RawMessage = ScenarioMessageSnapshotEvent["messages"][number];
 
+// Role → alignment mapping. Extracted here so `align` and `data-align` always
+// derive from the same value — the `data-align` attribute mirrors `align` for
+// jsdom tests, which cannot read Chakra's atomic CSS classes via getComputedStyle.
+const alignForRole = (role?: string): "flex-start" | "flex-end" =>
+  role === "assistant" ? "flex-start" : "flex-end";
+
+const textAlignForRole = (role?: string): "left" | "right" =>
+  role === "assistant" ? "left" : "right";
+
 type DisplayItem =
   | { kind: "text"; id: string; role: string; content: string; traceId?: string }
   | { kind: "image"; id: string; src: string; role?: string; traceId?: string }
@@ -85,12 +94,8 @@ export function ScenarioMessageRenderer({
             return (
               <VStack
                 key={item.id}
-                align={item.role === "assistant" ? "flex-start" : "flex-end"}
-                // Test affordance: Chakra's `align` prop compiles to an atomic
-                // CSS class jsdom's getComputedStyle cannot read, so the
-                // left/right alignment is asserted via this mirrored attribute.
-                // Same value as `align` above — no behavior change.
-                data-align={item.role === "assistant" ? "flex-start" : "flex-end"}
+                align={alignForRole(item.role)}
+                data-align={alignForRole(item.role)}
                 gap={1}
               >
                 {item.role === "assistant" ? (
@@ -140,9 +145,8 @@ export function ScenarioMessageRenderer({
             return (
               <VStack
                 key={item.id}
-                align={item.role === "assistant" ? "flex-start" : "flex-end"}
-                // Test affordance — see the `text` case. Mirrors `align`.
-                data-align={item.role === "assistant" ? "flex-start" : "flex-end"}
+                align={alignForRole(item.role)}
+                data-align={alignForRole(item.role)}
               >
                 <Image src={item.src} maxH="200px" borderRadius="md" />
               </VStack>
@@ -152,9 +156,8 @@ export function ScenarioMessageRenderer({
             return (
               <VStack
                 key={item.id}
-                align={item.role === "assistant" ? "flex-start" : "flex-end"}
-                // Test affordance — see the `text` case. Mirrors `align`.
-                data-align={item.role === "assistant" ? "flex-start" : "flex-end"}
+                align={alignForRole(item.role)}
+                data-align={alignForRole(item.role)}
                 width="100%"
               >
                 <VStack
@@ -177,9 +180,7 @@ export function ScenarioMessageRenderer({
                       color="fg.muted"
                       fontStyle="italic"
                       paddingX={2}
-                      textAlign={
-                        item.role === "assistant" ? "left" : "right"
-                      }
+                      textAlign={textAlignForRole(item.role)}
                     >
                       {item.transcript}
                     </Text>
