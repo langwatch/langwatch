@@ -896,11 +896,17 @@ async def test_realtime_greeting():
     assert result.success, result.reasoning
 \`\`\`
 
-### Worked example (TypeScript, OpenAI Realtime — adapter IS the agent, mirror prod config)
+### Worked example (TypeScript, OpenAI Realtime — adapter drives the model session)
+
+Use this shape when the user's production agent IS an OpenAI Realtime model.
+The adapter drives the session directly — import the same \`instructions\` and \`tools\` your production agent uses rather than copy-pasting them inline.
+One source of truth keeps the test aligned with what is actually deployed.
 
 \`\`\`typescript
 import scenario, { voice } from "@langwatch/scenario";
 import { describe, it, expect } from "vitest";
+// Import your production agent config — don't duplicate it here
+import { AGENT_INSTRUCTIONS, AGENT_TOOLS } from "../src/billing-agent";
 
 describe("Voice agent — angry billing", () => {
   it("acknowledges frustration before pivoting to logistics", async () => {
@@ -911,13 +917,13 @@ describe("Voice agent — angry billing", () => {
         "The agent must acknowledge the frustration before pivoting to " +
         "logistics, stay calm, and queue a refund.",
       agents: [
-        // The adapter IS the agent. Mirror the user's PROD model,
-        // voice, instructions, and tools here — anything you leave as
-        // a placeholder is what you're actually testing.
+        // The adapter drives an OpenAI Realtime session with the same
+        // config your production agent uses. Importing from production
+        // source keeps the test aligned with what is actually deployed.
         scenario.openAIRealtimeAgent({
           voice: "alloy",
-          instructions: "<paste the EXACT prod system prompt here>",
-          // tools: [...prod tool schemas...],
+          instructions: AGENT_INSTRUCTIONS,
+          // tools: AGENT_TOOLS,
         }),
         scenario.userSimulatorAgent({
           voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL",
@@ -2847,11 +2853,17 @@ async def test_realtime_greeting():
     assert result.success, result.reasoning
 \`\`\`
 
-### Worked example (TypeScript, OpenAI Realtime — adapter IS the agent, mirror prod config)
+### Worked example (TypeScript, OpenAI Realtime — adapter drives the model session)
+
+Use this shape when the user's production agent IS an OpenAI Realtime model.
+The adapter drives the session directly — import the same \`instructions\` and \`tools\` your production agent uses rather than copy-pasting them inline.
+One source of truth keeps the test aligned with what is actually deployed.
 
 \`\`\`typescript
 import scenario, { voice } from "@langwatch/scenario";
 import { describe, it, expect } from "vitest";
+// Import your production agent config — don't duplicate it here
+import { AGENT_INSTRUCTIONS, AGENT_TOOLS } from "../src/billing-agent";
 
 describe("Voice agent — angry billing", () => {
   it("acknowledges frustration before pivoting to logistics", async () => {
@@ -2862,13 +2874,13 @@ describe("Voice agent — angry billing", () => {
         "The agent must acknowledge the frustration before pivoting to " +
         "logistics, stay calm, and queue a refund.",
       agents: [
-        // The adapter IS the agent. Mirror the user's PROD model,
-        // voice, instructions, and tools here — anything you leave as
-        // a placeholder is what you're actually testing.
+        // The adapter drives an OpenAI Realtime session with the same
+        // config your production agent uses. Importing from production
+        // source keeps the test aligned with what is actually deployed.
         scenario.openAIRealtimeAgent({
           voice: "alloy",
-          instructions: "<paste the EXACT prod system prompt here>",
-          // tools: [...prod tool schemas...],
+          instructions: AGENT_INSTRUCTIONS,
+          // tools: AGENT_TOOLS,
         }),
         scenario.userSimulatorAgent({
           voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL",
@@ -4385,11 +4397,17 @@ async def test_realtime_greeting():
     assert result.success, result.reasoning
 \`\`\`
 
-### Worked example (TypeScript, OpenAI Realtime — adapter IS the agent, mirror prod config)
+### Worked example (TypeScript, OpenAI Realtime — adapter drives the model session)
+
+Use this shape when the user's production agent IS an OpenAI Realtime model.
+The adapter drives the session directly — import the same \`instructions\` and \`tools\` your production agent uses rather than copy-pasting them inline.
+One source of truth keeps the test aligned with what is actually deployed.
 
 \`\`\`typescript
 import scenario, { voice } from "@langwatch/scenario";
 import { describe, it, expect } from "vitest";
+// Import your production agent config — don't duplicate it here
+import { AGENT_INSTRUCTIONS, AGENT_TOOLS } from "../src/billing-agent";
 
 describe("Voice agent — angry billing", () => {
   it("acknowledges frustration before pivoting to logistics", async () => {
@@ -4400,13 +4418,13 @@ describe("Voice agent — angry billing", () => {
         "The agent must acknowledge the frustration before pivoting to " +
         "logistics, stay calm, and queue a refund.",
       agents: [
-        // The adapter IS the agent. Mirror the user's PROD model,
-        // voice, instructions, and tools here — anything you leave as
-        // a placeholder is what you're actually testing.
+        // The adapter drives an OpenAI Realtime session with the same
+        // config your production agent uses. Importing from production
+        // source keeps the test aligned with what is actually deployed.
         scenario.openAIRealtimeAgent({
           voice: "alloy",
-          instructions: "<paste the EXACT prod system prompt here>",
-          // tools: [...prod tool schemas...],
+          instructions: AGENT_INSTRUCTIONS,
+          // tools: AGENT_TOOLS,
         }),
         scenario.userSimulatorAgent({
           voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL",
