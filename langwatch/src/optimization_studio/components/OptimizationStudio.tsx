@@ -50,6 +50,7 @@ import { titleCase } from "../../utils/stringCasing";
 import { useAskBeforeLeaving } from "../hooks/useAskBeforeLeaving";
 import { PostEventProvider, usePostEvent } from "../hooks/usePostEvent";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
+import { isConnectionAllowed } from "../utils/controlFlow";
 import { AutoSave } from "./AutoSave";
 import { PlaygroundButton } from "./ChatWindow";
 import { StudioNodeDrawer } from "./drawers/StudioNodeDrawer";
@@ -104,6 +105,8 @@ export default function OptimizationStudio() {
     onNodesDelete,
     onEdgesChange,
     onConnect,
+    onConnectStart,
+    onConnectEnd,
     setIsDraggingNode,
     setClickedNodeId,
     openResultsPanelRequest,
@@ -123,6 +126,8 @@ export default function OptimizationStudio() {
         onNodesDelete: state.onNodesDelete,
         onEdgesChange: state.onEdgesChange,
         onConnect: state.onConnect,
+        onConnectStart: state.onConnectStart,
+        onConnectEnd: state.onConnectEnd,
         setIsDraggingNode: state.setIsDraggingNode,
         setClickedNodeId: state.setClickedNodeId,
         openResultsPanelRequest: state.openResultsPanelRequest,
@@ -316,6 +321,16 @@ export default function OptimizationStudio() {
                               });
                             }
                           }}
+                          onConnectStart={(_event, params) =>
+                            onConnectStart({
+                              nodeId: params.nodeId,
+                              handleId: params.handleId,
+                            })
+                          }
+                          onConnectEnd={() => onConnectEnd()}
+                          isValidConnection={(connection) =>
+                            isConnectionAllowed({ nodes, connection })
+                          }
                           selectNodesOnDrag={false}
                           onNodeDragStart={() => {
                             setIsDraggingNode(true);

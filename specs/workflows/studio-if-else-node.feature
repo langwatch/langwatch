@@ -205,3 +205,56 @@ Feature: If/Else conditional branch node in workflows
     When the workflow runs
     Then the input is coerced to a number before the condition runs
     And "6 > 5" routes the true branch while "4 > 5" routes the false branch
+
+  # ============================================================================
+  # Control-flow connections (connect a branch to the node, not to an input)
+  # ============================================================================
+
+  # Customer context: wiring a branch to a downstream node forced authors to
+  # add a throwaway "gate" bool input on the target just to receive the
+  # branch, which read as confusing. A branch is control flow, not data: it
+  # decides whether the next node runs, it does not hand it a value. So a
+  # branch connects to the node itself through a dedicated control-flow point.
+
+  @integration
+  Scenario: Every node exposes a control-flow connection point while dragging a branch
+    Given an if/else node and a downstream node on the canvas
+    When I start dragging from the if/else "true" branch handle
+    Then a green control-flow target appears centered on the left edge of every connectable node
+    And it is larger than the input handles so it reads as the branch drop point
+
+  @integration
+  Scenario: Connecting a branch to a node gates it without adding an input
+    Given an if/else node and a code node on the canvas
+    When I connect the if/else "true" branch to the code node's control-flow target
+    Then a control-flow edge is created to the node, not to any input
+    And the code node gains no "gate" input
+
+  @integration
+  Scenario: A control-flow connection passes no value into the gated node
+    Given a code node connected from an if/else "true" branch by a control-flow edge
+    When the workflow runs and the true branch is taken
+    Then the code node runs and its inputs do not include the branch boolean
+
+  @integration
+  Scenario: A node behind a not-taken branch is skipped over a control-flow edge
+    Given a code node connected from an if/else "false" branch by a control-flow edge
+    When the workflow runs and the condition is true
+    Then the code node is skipped because its branch was not taken
+
+  # A branch is control flow: dragging it can only land on a node's
+  # control-flow target, never on a data input row.
+  @integration
+  Scenario: A branch handle only connects to control-flow targets
+    Given an if/else node and a code node with a string input on the canvas
+    When I drag the if/else "true" branch over the code node's string input
+    Then the connection is not allowed onto the input
+    And only the control-flow target accepts it
+
+  # Existing workflows wired the old way (branch into a bool "gate" input)
+  # keep working unchanged.
+  @integration
+  Scenario: Legacy branch-into-input workflows still gate correctly
+    Given a workflow whose branch connects into a downstream bool input
+    When the workflow runs
+    Then the downstream node still gates on the branch as before

@@ -46,6 +46,7 @@ import type {
   Field,
   LLMConfig,
 } from "../../types/dsl";
+import { CONTROL_FLOW_HANDLE_ID } from "../../utils/controlFlow";
 import { checkIsEvaluator } from "../../utils/nodeUtils";
 import { hasUnsavedChanges } from "../../utils/unsavedChanges";
 import { ComponentIcon } from "../ColorfulBlockIcons";
@@ -53,6 +54,44 @@ import { ComponentIcon } from "../ColorfulBlockIcons";
 export function getNodeDisplayName(node: { id: string; data: Component }) {
   const data = node.data as any;
   return data.localConfig?.name ?? data.name ?? data.cls ?? node.id;
+}
+
+/**
+ * The control-flow target handle: a green circle centered on the left edge
+ * of a node, the drop point for an If/Else branch. A branch is control flow,
+ * not data, so it connects to the node itself rather than to an input row.
+ * It only appears while dragging a branch (the store flags it), and it is
+ * larger and green so it reads as distinct from the orange input handles.
+ * The entry node is the workflow root and never receives a branch, so it has
+ * none.
+ */
+function ControlFlowHandle({ nodeType }: { nodeType: string }) {
+  const branchConnectionInProgress = useWorkflowStore(
+    (state) => state.branchConnectionInProgress,
+  );
+  if (!branchConnectionInProgress) return null;
+  if (nodeType === "entry" || nodeType === "prompting_technique") return null;
+
+  return (
+    <Handle
+      type="target"
+      id={CONTROL_FLOW_HANDLE_ID}
+      position={Position.Left}
+      isConnectableStart={false}
+      style={{
+        zIndex: 20,
+        top: "50%",
+        left: "-1px",
+        transform: "translateY(-50%)",
+        width: "13px",
+        height: "13px",
+        background: "var(--chakra-colors-bg)",
+        borderRadius: "100%",
+        border: "2px solid #22C55E",
+        boxShadow: "0px 0px 7px 1px #22C55E",
+      }}
+    />
+  );
 }
 
 function NodeInputs({
@@ -297,6 +336,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
         }
       }}
     >
+      <ControlFlowHandle nodeType={props.type} />
       {props.selected && !["entry", "end"].includes(props.type) && (
         <Menu.Root positioning={{ placement: "top-start" }}>
           <Menu.Trigger asChild>

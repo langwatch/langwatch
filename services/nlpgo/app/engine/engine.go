@@ -1142,6 +1142,12 @@ func (r *runState) resolveInputs(_ *planner.Plan, id string) map[string]any {
 	}
 	edges := r.edgesByTarget[id]
 	for _, e := range edges {
+		// Control-flow edges (an If/Else branch wired to the node itself)
+		// gate execution but carry no value, so they never contribute to
+		// the target's inputs. The gating is handled in shouldSkip.
+		if e.IsControlFlow() {
+			continue
+		}
 		parentOut, ok := r.outputs[e.Source]
 		if !ok {
 			continue

@@ -207,6 +207,23 @@ type Edge struct {
 	Type         string `json:"type"`
 }
 
+// ControlEdgeType marks an edge as a control-flow connection: an If/Else
+// branch wired to a downstream node itself rather than to one of its data
+// inputs. It gates whether the target runs (handled in shouldSkip) but
+// passes no value into the target's inputs (suppressed in resolveInputs).
+const ControlEdgeType = "control"
+
+// ControlFlowHandleID is the reserved targetHandle id of the node-level
+// control-flow connection point the Studio renders (the green handle).
+const ControlFlowHandleID = "control"
+
+// IsControlFlow reports whether the edge is a control-flow connection.
+// An edge counts as control flow if it is explicitly typed, or if it
+// targets the reserved node-level control handle.
+func (e Edge) IsControlFlow() bool {
+	return e.Type == ControlEdgeType || e.TargetHandle == ControlFlowHandleID
+}
+
 // HTTPAuthConfig describes the auth on an HTTP block.
 type HTTPAuthConfig struct {
 	Type     string  `json:"type"` // bearer | api_key | basic

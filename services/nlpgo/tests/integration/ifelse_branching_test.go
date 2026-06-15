@@ -95,6 +95,7 @@ func nodeStatus(t *testing.T, res *app.WorkflowResult, id string) string {
 }
 
 /** @scenario True condition executes only the true branch */
+/** @scenario Legacy branch-into-input workflows still gate correctly */
 func TestPatternIfElse_TrueBranchRuns_FalseBranchSkipped(t *testing.T) {
 	llm := &fakeLLMClient{}
 	url, _ := setupPatternStack(t, llm, func(w http.ResponseWriter, _ *http.Request) {
@@ -557,6 +558,111 @@ func TestPatternIfElse_ComponentPythonCondition_ManualInputAutoparses(t *testing
 	gate := res.Nodes["gate"].(map[string]any)
 	gateOut, _ := gate["outputs"].(map[string]any)
 	assert.Equal(t, true, gateOut["true"], "7 > 5 must evaluate to true")
+}
+
+// controlFlowWorkflowBody wires the if/else branches to downstream nodes
+// through CONTROL-FLOW edges (targetHandle "control", type "control"): the
+// branch connects to the node itself, not to a data input. codeA has a
+// strict `execute(context)` signature and a data edge feeding `context`,
+// so if the control edge wrongly passed the branch boolean as an extra
+// kwarg the sandbox would error — a clean run proves control flow carries
+// no value. codeB takes no inputs and rides the false branch.
+//
+//	entry ──ctx(data)──► codeA ─┐
+//	  └──ctx──► gate ══true(control)══► codeA ─┴──► end.answer
+//	             └════false(control)═══► codeB ─────► end.answer
+func controlFlowWorkflowBody(contextValue string) string {
+	return `{
+	  "type":"execute_flow",
+	  "payload": {
+	    "trace_id":"pattern-controlflow",
+	    "origin":"workflow",
+	    "workflow": {
+	      "workflow_id":"wf","api_key":"sk-pattern-controlflow","spec_version":"1.3",
+	      "name":"PatternControlFlow","icon":"x","description":"x","version":"x",
+	      "template_adapter":"default",
+	      "nodes":[
+	        {"id":"entry","type":"entry","data":{
+	          "outputs":[{"identifier":"context","type":"str"}],
+	          "dataset":{"inline":{"records":{
+	            "context":["` + contextValue + `"]
+	          },"count":1}},
+	          "entry_selection":0,"train_size":1.0,"test_size":0.0,"seed":1
+	        }},
+	        {"id":"gate","type":"if_else","data":{
+	          "name":"If/Else",
+	          "parameters":[{"identifier":"condition","type":"str","value":"context != \"\""}],
+	          "inputs":[{"identifier":"context","type":"str"}],
+	          "outputs":[
+	            {"identifier":"true","type":"bool"},
+	            {"identifier":"false","type":"bool"}
+	          ]
+	        }},
+	        {"id":"codeA","type":"code","data":{
+	          "parameters":[{"identifier":"code","type":"code","value":"def execute(context):\n    return {'answer': 'A:' + context}\n"}],
+	          "inputs":[{"identifier":"context","type":"str"}],
+	          "outputs":[{"identifier":"answer","type":"str"}]
+	        }},
+	        {"id":"codeB","type":"code","data":{
+	          "parameters":[{"identifier":"code","type":"code","value":"def execute():\n    return {'answer': 'B:fallback'}\n"}],
+	          "inputs":[],
+	          "outputs":[{"identifier":"answer","type":"str"}]
+	        }},
+	        {"id":"end","type":"end","data":{"inputs":[
+	          {"identifier":"answer","type":"str"}
+	        ]}}
+	      ],
+	      "edges":[
+	        {"id":"e1","source":"entry","sourceHandle":"outputs.context","target":"gate","targetHandle":"inputs.context","type":"default"},
+	        {"id":"e2","source":"entry","sourceHandle":"outputs.context","target":"codeA","targetHandle":"inputs.context","type":"default"},
+	        {"id":"e3","source":"gate","sourceHandle":"outputs.true","target":"codeA","targetHandle":"control","type":"control"},
+	        {"id":"e4","source":"gate","sourceHandle":"outputs.false","target":"codeB","targetHandle":"control","type":"control"},
+	        {"id":"e5","source":"codeA","sourceHandle":"outputs.answer","target":"end","targetHandle":"inputs.answer","type":"default"},
+	        {"id":"e6","source":"codeB","sourceHandle":"outputs.answer","target":"end","targetHandle":"inputs.answer","type":"default"}
+	      ],
+	      "state":{}
+	    },
+	    "inputs":[{}]
+	  }
+	}`
+}
+
+/** @scenario Connecting a branch to a node gates it without adding an input */
+/** @scenario A control-flow connection passes no value into the gated node */
+func TestPatternIfElse_ControlFlowEdge_GatesAndPassesNoValue(t *testing.T) {
+	llm := &fakeLLMClient{}
+	url, _ := setupPatternStack(t, llm, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	res := postSync(t, &stack{url: url}, controlFlowWorkflowBody("ctx"))
+	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
+
+	// True branch taken: codeA runs over its control edge. A success here
+	// proves the control edge passed NO value — codeA's strict
+	// execute(context) signature would have errored on an extra branch kwarg.
+	assert.Equal(t, "success", nodeStatus(t, res, "codeA"))
+	assert.Equal(t, "skipped", nodeStatus(t, res, "codeB"))
+	assert.Equal(t, "success", nodeStatus(t, res, "end"))
+	assert.Equal(t, "A:ctx", convergedAnswer(t, res),
+		"the gated node runs and only its real data input flows through")
+}
+
+/** @scenario A node behind a not-taken branch is skipped over a control-flow edge */
+func TestPatternIfElse_ControlFlowEdge_SkipsNotTakenBranch(t *testing.T) {
+	llm := &fakeLLMClient{}
+	url, _ := setupPatternStack(t, llm, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	res := postSync(t, &stack{url: url}, controlFlowWorkflowBody(""))
+	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
+
+	// Condition false: the true-branch node is skipped over its control
+	// edge, the false-branch node runs.
+	assert.Equal(t, "skipped", nodeStatus(t, res, "codeA"))
+	assert.Equal(t, "success", nodeStatus(t, res, "codeB"))
+	assert.Equal(t, "B:fallback", convergedAnswer(t, res))
 }
 
 /** @scenario A converged input receives the value from whichever branch ran */

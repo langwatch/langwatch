@@ -21,6 +21,11 @@ import type {
   LLMConfig,
   Workflow,
 } from "../types/dsl";
+import {
+  CONTROL_FLOW_EDGE_TYPE,
+  isBranchConnectionOrigin,
+  isControlFlowConnection,
+} from "../utils/controlFlow";
 import { hasDSLChanged } from "../utils/dslUtils";
 import { canConvergeOnInput } from "../utils/edgeConvergence";
 import { findLowestAvailableName, nameToId } from "../utils/nodeUtils";
@@ -52,6 +57,8 @@ export type State = Workflow & {
   isDraggingNode: boolean;
   /** The node ID confirmed by onNodeClick (genuine click, not drag). Gates drawer opening. */
   clickedNodeId: string | null;
+  /** True while dragging an If/Else branch handle. Lights up the green control-flow targets on every node. */
+  branchConnectionInProgress: boolean;
 };
 
 export type WorkflowStore = State & {
@@ -79,6 +86,13 @@ export type WorkflowStore = State & {
   onEdgesChange: (changes: EdgeChange[]) => void;
   onNodesDelete: () => void;
   onConnect: (connection: Connection) => { error?: string } | undefined;
+  /** Called when a connection drag starts; flags If/Else branch drags so nodes show the control-flow target. */
+  onConnectStart: (params: {
+    nodeId: string | null;
+    handleId: string | null;
+  }) => void;
+  /** Called when a connection drag ends; clears the branch-drag flag. */
+  onConnectEnd: () => void;
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
   edgeConnectToNewHandle: (
@@ -184,6 +198,7 @@ export const initialState: State = {
   playgroundOpen: false,
   isDraggingNode: false,
   clickedNodeId: null,
+  branchConnectionInProgress: false,
 };
 
 export const getWorkflow = (state: State) => {
@@ -560,6 +575,20 @@ export const store = (
   },
   onConnect: (connection: Connection) => {
     const currentEdges = get().edges;
+    // Control-flow connection: an If/Else branch wired to the node itself
+    // (the green control handle) rather than to a data input. It only gates
+    // execution, so it skips the input-convergence rules entirely and is
+    // tagged so the engine passes no value through it.
+    if (isControlFlowConnection(connection)) {
+      set({
+        branchConnectionInProgress: false,
+        edges: addEdge(
+          { ...connection, type: CONTROL_FLOW_EDGE_TYPE },
+          currentEdges,
+        ),
+      });
+      return;
+    }
     const existingConnection = currentEdges.find(
       (edge) =>
         edge.target === connection.target &&
@@ -587,6 +616,23 @@ export const store = (
         type: edge.type ?? "default",
       })),
     });
+  },
+  onConnectStart: (params: {
+    nodeId: string | null;
+    handleId: string | null;
+  }) => {
+    const node = get().nodes.find((n) => n.id === params.nodeId);
+    set({
+      branchConnectionInProgress: isBranchConnectionOrigin({
+        node,
+        handleId: params.handleId,
+      }),
+    });
+  },
+  onConnectEnd: () => {
+    if (get().branchConnectionInProgress) {
+      set({ branchConnectionInProgress: false });
+    }
   },
   setNodes: (nodes: Node[]) => {
     set({ nodes });
