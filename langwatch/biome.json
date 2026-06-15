@@ -154,6 +154,25 @@
 					}
 				}
 			}
+		},
+		{
+			"includes": ["src/server/**/*.ts", "src/server/**/*.tsx"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": {
+							"level": "error",
+							"options": {
+								"paths": {
+									"~/utils/logger": {
+										"message": "Server files must import from ~/utils/logger/server (uses AsyncLocalStorage). ~/utils/logger is browser-safe only."
+									}
+								}
+							}
+						}
+					}
+				}
+			}
 		}
 	],
 	"assist": {
