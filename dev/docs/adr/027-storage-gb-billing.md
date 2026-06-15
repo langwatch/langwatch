@@ -122,6 +122,8 @@ Stripe Price `unit_amount_decimal` is static — one fixed number applied to the
 
 The retention length chosen (60 vs 90) does **not** change the unit price — longer retention costs more naturally because more bytes live longer (more GiB-hours). One meter, one rate per plan; Enterprise rates are separate Prices on the same meter.
 
+**Logical bytes, not compressed disk (deliberate).** `_size_bytes` is `byteSize()` of the payload columns — the **uncompressed logical** size of the data, not its ZSTD-compressed on-disk footprint (typically 5–10× smaller). We bill the **logical/real value** the customer's data represents, not what it costs us to store after compression. The €3/GiB-month is therefore calibrated against logical GiB; this is the priced unit and the contract. (Ingestion cost we incur — and any 1 TB-then-deleted gaming surface — is covered separately by the `billable_events` meter; stored-GiB billing is strictly about retained logical volume.)
+
 ## Schema
 
 One **purely additive** Prisma migration, two new tables. The billable-events
@@ -224,8 +226,10 @@ No ClickHouse migration; `_size_bytes` exists.
 1. €3/GiB-month price point — confirm with pricing copy owner.
 2. Customer notice copy + go-live date — gates the SubscriptionItem backfill.
 3. Free plan's 14-day visibility / 45-day blurred recovery window — read-path concern, sibling spec (#4745), not billing.
-4. `LimitType.storage` (soft notify vs hard cap) — follow-up PR.
+4. `LimitType.storage` (soft notify vs hard cap) — follow-up PR (final phase).
 5. Idle-org heartbeat (per-org synthetic event so cursors never freeze) — only if real orgs surface the gap.
+6. **Reconciliation job** — periodically compare `Σ StorageUsageHourly.megabytes (reportedAt not null)` against Stripe's `meter_event_summaries` per org/period to detect drift. Finance-side safety net, not on the billing critical path; address in the final phase.
+7. **TTL-eviction undercount on late catch-up** — a sealed hour H caught up after some of its >30-day rows have already TTL-deleted will undercount (acknowledged in Invariants). Bounded by the 35-day gap ceiling + live dispatch; real only during long outages. Address in the final phase if it surfaces.
 
 ## References
 
