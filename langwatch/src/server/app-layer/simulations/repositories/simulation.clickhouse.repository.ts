@@ -979,19 +979,26 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       return new Set();
     }
 
+    // simulation_runs is a ReplacingMergeTree, so each run is read at its
+    // latest version. Rather than the IN-tuple dedup pattern — which scans the
+    // table twice (once to build the latest-version key set, once for the
+    // outer filter) and materialises a key set sized to every run — fold each
+    // run to its latest version in a single GROUP BY pass with
+    // argMax(ArchivedAt, UpdatedAt) and keep the sets whose latest run is not
+    // archived. Light columns only; the distinct external set ids are
+    // identical.
     const rows = await this.queryRows<{ ScenarioSetId: string }>(
       `SELECT DISTINCT IF(ScenarioSetId = '', '${DEFAULT_SET_ID}', ScenarioSetId) AS ScenarioSetId
-       FROM ${TABLE_NAME}
-       WHERE TenantId IN ({projectIds:Array(String)})
-         AND NOT startsWith(ScenarioSetId, '${INTERNAL_SET_PREFIX}')
-         AND ArchivedAt IS NULL
-         AND (TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, UpdatedAt) IN (
-           SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
-           FROM ${TABLE_NAME}
-           WHERE TenantId IN ({projectIds:Array(String)})
-             AND NOT startsWith(ScenarioSetId, '${INTERNAL_SET_PREFIX}')
-           GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
-         )`,
+       FROM (
+         SELECT
+           ScenarioSetId,
+           argMax(ArchivedAt, UpdatedAt) AS latestArchivedAt
+         FROM ${TABLE_NAME}
+         WHERE TenantId IN ({projectIds:Array(String)})
+           AND NOT startsWith(ScenarioSetId, '${INTERNAL_SET_PREFIX}')
+         GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+       )
+       WHERE latestArchivedAt IS NULL`,
       { tenantId: firstProjectId, projectIds },
     );
 
