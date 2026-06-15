@@ -19,6 +19,7 @@
  * resolution from there.
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { createS3Client } from "../storage";
 
 const s3ClientConstructorCalls: any[] = [];
 
@@ -69,16 +70,18 @@ vi.mock("../../env.mjs", () => ({
   ),
 }));
 
+function resetS3Env() {
+  s3ClientConstructorCalls.length = 0;
+  delete process.env.S3_ENDPOINT;
+  delete process.env.S3_ACCESS_KEY_ID;
+  delete process.env.S3_SECRET_ACCESS_KEY;
+  delete process.env.S3_SESSION_TOKEN;
+  delete process.env.S3_REGION;
+  delete process.env.S3_BUCKET_NAME;
+}
+
 describe("createS3Client credential mode handling", () => {
-  beforeEach(() => {
-    s3ClientConstructorCalls.length = 0;
-    delete process.env.S3_ENDPOINT;
-    delete process.env.S3_ACCESS_KEY_ID;
-    delete process.env.S3_SECRET_ACCESS_KEY;
-    delete process.env.S3_SESSION_TOKEN;
-    delete process.env.S3_REGION;
-    delete process.env.S3_BUCKET_NAME;
-  });
+  beforeEach(resetS3Env);
 
   describe("given static IAM-user keys (AKIA + secret, no token)", () => {
     /** @scenario "S3 client uses explicit credentials when env keys are present" */
@@ -184,6 +187,82 @@ describe("createS3Client credential mode handling", () => {
       const config = s3ClientConstructorCalls[0];
       expect(config.credentials).toBeUndefined();
       expect("credentials" in config).toBe(false);
+    });
+  });
+});
+
+describe("region resolution — AWS endpoint, keyless (IRSA path)", () => {
+  beforeEach(resetS3Env);
+
+  describe("when no endpoint is set and no keys are provided", () => {
+    it("omits region so SDK resolves from credential chain", async () => {
+      await createS3Client("test-project");
+      const call = s3ClientConstructorCalls[0];
+      expect(call).not.toHaveProperty("region");
+    });
+  });
+
+  describe("when endpoint is *.amazonaws.com and no keys are provided", () => {
+    it("omits region so SDK resolves from credential chain", async () => {
+      process.env.S3_ENDPOINT = "https://s3.eu-central-1.amazonaws.com";
+      await createS3Client("test-project");
+      const call = s3ClientConstructorCalls[0];
+      expect(call).not.toHaveProperty("region");
+    });
+  });
+
+  describe("when endpoint is AWS and explicit keys are provided (pre-#4058 compatibility path)", () => {
+    it("falls back to 'auto' to preserve pre-#4058 ops-tooling behavior", async () => {
+      process.env.S3_ACCESS_KEY_ID = "AKIAEXAMPLE";
+      process.env.S3_SECRET_ACCESS_KEY = "secret-value";
+      await createS3Client("test-project");
+      const call = s3ClientConstructorCalls[0];
+      expect(call.region).toBe("auto");
+    });
+  });
+});
+
+describe("region resolution — non-AWS endpoint (BYOC/R2/MinIO)", () => {
+  beforeEach(resetS3Env);
+
+  describe("when endpoint is Cloudflare R2", () => {
+    it("uses 'auto' region", async () => {
+      process.env.S3_ENDPOINT = "https://abc123.r2.cloudflarestorage.com";
+      await createS3Client("test-project");
+      const call = s3ClientConstructorCalls[0];
+      expect(call.region).toBe("auto");
+    });
+  });
+
+  describe("when endpoint is MinIO", () => {
+    it("uses 'auto' region", async () => {
+      process.env.S3_ENDPOINT = "http://minio:9000";
+      await createS3Client("test-project");
+      const call = s3ClientConstructorCalls[0];
+      expect(call.region).toBe("auto");
+    });
+  });
+});
+
+describe("region resolution — explicit S3_REGION always wins", () => {
+  beforeEach(resetS3Env);
+
+  describe("when S3_REGION is set for AWS endpoint without keys", () => {
+    it("uses S3_REGION value", async () => {
+      process.env.S3_REGION = "eu-central-1";
+      await createS3Client("test-project");
+      const call = s3ClientConstructorCalls[0];
+      expect(call.region).toBe("eu-central-1");
+    });
+  });
+
+  describe("when S3_REGION is set for BYOC endpoint", () => {
+    it("uses S3_REGION value", async () => {
+      process.env.S3_REGION = "us-east-1";
+      process.env.S3_ENDPOINT = "http://minio:9000";
+      await createS3Client("test-project");
+      const call = s3ClientConstructorCalls[0];
+      expect(call.region).toBe("us-east-1");
     });
   });
 });
