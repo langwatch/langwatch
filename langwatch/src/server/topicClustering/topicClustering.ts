@@ -186,29 +186,36 @@ type TraceSearchResult = {
   returnedCount: number;
 };
 
-async function fetchCountsFromClickHouse(
+export async function fetchCountsFromClickHouse(
   clickhouse: ClickHouseClient,
   projectId: string,
 ): Promise<TraceCounts> {
   const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
   const twelveMonthsAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
 
+  // trace_summaries is a ReplacingMergeTree, so we count one row per trace
+  // (its latest version). Rather than the IN-tuple dedup pattern — which
+  // scans the 12-month window twice (once to build the latest-version key
+  // set, once for the outer aggregate) and materialises a key set sized to
+  // every trace — fold to the latest version in a single GROUP BY pass with
+  // argMax(col, UpdatedAt). The conditional counts read the latest version's
+  // OccurredAt / TopicId, identical to the previous shape, but with one scan
+  // and no IN-set build. Light columns only (no heavy payloads).
   const result = await clickhouse.query({
     query: `
       SELECT
         toString(count(*)) AS total,
-        toString(countIf(OccurredAt >= fromUnixTimestamp64Milli({thirtyDaysAgo:UInt64}))) AS recent,
-        toString(countIf(TopicId IS NOT NULL AND TopicId != '')) AS assigned
-      FROM trace_summaries t
-      WHERE TenantId = {tenantId:String}
-        AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
-        AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
-          SELECT TenantId, TraceId, max(UpdatedAt)
-          FROM trace_summaries
-          WHERE TenantId = {tenantId:String}
-            AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
-          GROUP BY TenantId, TraceId
-        )
+        toString(countIf(latestOccurredAt >= fromUnixTimestamp64Milli({thirtyDaysAgo:UInt64}))) AS recent,
+        toString(countIf(latestTopicId IS NOT NULL AND latestTopicId != '')) AS assigned
+      FROM (
+        SELECT
+          argMax(OccurredAt, UpdatedAt) AS latestOccurredAt,
+          argMax(TopicId, UpdatedAt) AS latestTopicId
+        FROM trace_summaries
+        WHERE TenantId = {tenantId:String}
+          AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
+        GROUP BY TenantId, TraceId
+      )
     `,
     query_params: { tenantId: projectId, thirtyDaysAgo, twelveMonthsAgo },
     format: "JSONEachRow",
