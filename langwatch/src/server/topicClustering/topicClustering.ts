@@ -47,7 +47,7 @@ export const clusterTopicsForProject = async (
   }
 
   const { totalTracesCount, recentTracesCount, assignedTracesCount } =
-    await fetchCountsFromClickHouse(clickhouse, projectId);
+    await fetchCountsFromClickHouse({ clickhouse, projectId });
 
   logger.info(
     {
@@ -186,10 +186,13 @@ type TraceSearchResult = {
   returnedCount: number;
 };
 
-export async function fetchCountsFromClickHouse(
-  clickhouse: ClickHouseClient,
-  projectId: string,
-): Promise<TraceCounts> {
+export async function fetchCountsFromClickHouse({
+  clickhouse,
+  projectId,
+}: {
+  clickhouse: ClickHouseClient;
+  projectId: string;
+}): Promise<TraceCounts> {
   const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
   const twelveMonthsAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
 

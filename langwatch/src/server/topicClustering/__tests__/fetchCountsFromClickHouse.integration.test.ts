@@ -125,17 +125,22 @@ describe("fetchCountsFromClickHouse integration", () => {
     await cleanupTestData(TENANT_ID);
   });
 
-  describe("when traces span the recency / assignment / version dimensions", () => {
-    it("counts each trace once at its latest version", async () => {
-      const counts = await fetchCountsFromClickHouse(ch, TENANT_ID);
+  describe("given traces across recency, assignment, and version dimensions", () => {
+    describe("when counting total / recent / assigned", () => {
+      it("counts each trace once at its latest version", async () => {
+        const counts = await fetchCountsFromClickHouse({
+          clickhouse: ch,
+          projectId: TENANT_ID,
+        });
 
-      // A, B, C are within 12 months; D is excluded.
-      expect(counts.totalTracesCount).toBe(3);
-      // A (5d) and C (10d) are within 30 days; B (90d) is not.
-      expect(counts.recentTracesCount).toBe(2);
-      // Only A's latest version carries a non-empty TopicId. C's "" and the
-      // stale A version's null must not count.
-      expect(counts.assignedTracesCount).toBe(1);
+        // A, B, C are within 12 months; D is excluded.
+        expect(counts.totalTracesCount).toBe(3);
+        // A (5d) and C (10d) are within 30 days; B (90d) is not.
+        expect(counts.recentTracesCount).toBe(2);
+        // Only A's latest version carries a non-empty TopicId. C's "" and the
+        // stale A version's null must not count.
+        expect(counts.assignedTracesCount).toBe(1);
+      });
     });
   });
 });
