@@ -42,8 +42,9 @@ export function ListTable({
             borderRightWidth: "1px",
             borderRightColor: "border.muted",
           },
-          // Comfortable left padding on the first column, balanced on the last.
-          "& th:first-of-type, & td:first-of-type": { paddingLeft: "6" },
+          // A little left padding on the first column so leading content does
+          // not hug the border, balanced by the last column's right padding.
+          "& th:first-of-type, & td:first-of-type": { paddingLeft: "4" },
           "& th:last-of-type, & td:last-of-type": { paddingRight: "4" },
         }}
         {...props}
