@@ -780,7 +780,7 @@ scenario.userSimulatorAgent({
 });
 \`\`\`
 
-For a full runnable TypeScript voice test, see the **Worked example (TypeScript)** below.
+For full runnable TypeScript voice tests, see the **OpenAI Realtime** and **Pipecat WS** TypeScript worked examples below.
 
 ### Step 5: Tell the simulator it's on a phone, not in chat
 
@@ -2731,7 +2731,7 @@ scenario.userSimulatorAgent({
 });
 \`\`\`
 
-For a full runnable TypeScript voice test, see the **Worked example (TypeScript)** below.
+For full runnable TypeScript voice tests, see the **OpenAI Realtime** and **Pipecat WS** TypeScript worked examples below.
 
 ### Step 5: Tell the simulator it's on a phone, not in chat
 
@@ -4269,7 +4269,7 @@ scenario.userSimulatorAgent({
 });
 \`\`\`
 
-For a full runnable TypeScript voice test, see the **Worked example (TypeScript)** below.
+For full runnable TypeScript voice tests, see the **OpenAI Realtime** and **Pipecat WS** TypeScript worked examples below.
 
 ### Step 5: Tell the simulator it's on a phone, not in chat
 
