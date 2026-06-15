@@ -473,6 +473,92 @@ func TestPatternIfElse_LiquidConditionAutoparsesStringToFloat(t *testing.T) {
 	assert.Equal(t, false, gateOut2["true"], "4 > 5 must evaluate to false")
 }
 
+// componentIfElseBody builds an execute_component payload: a SINGLE
+// if/else gate run in isolation with a manually-typed input, exactly
+// like the Studio drawer's Execute button. The `question` input is
+// declared `float`, the manual value arrives as the string the input
+// textarea produces, and the condition is supplied per call (liquid by
+// default, or python via condition_language+code).
+func componentIfElseBody(questionValue, params string) string {
+	return `{
+	  "type":"execute_component",
+	  "payload": {
+	    "trace_id":"component-ifelse",
+	    "node_id":"gate",
+	    "origin":"workflow",
+	    "workflow": {
+	      "workflow_id":"wf","api_key":"sk-component-ifelse","spec_version":"1.3",
+	      "name":"ComponentIfElse","icon":"x","description":"x","version":"x",
+	      "template_adapter":"default",
+	      "nodes":[
+	        {"id":"gate","type":"if_else","data":{
+	          "name":"If/Else",
+	          "parameters":` + params + `,
+	          "inputs":[{"identifier":"question","type":"float"}],
+	          "outputs":[
+	            {"identifier":"true","type":"bool"},
+	            {"identifier":"false","type":"bool"}
+	          ]
+	        }}
+	      ],
+	      "edges":[],
+	      "state":{}
+	    },
+	    "inputs":{"question":"` + questionValue + `"}
+	  }
+	}`
+}
+
+/** @scenario A liquid condition coerces a numeric-string input before comparing */
+func TestPatternIfElse_ComponentLiquidCondition_ManualInputAutoparses(t *testing.T) {
+	llm := &fakeLLMClient{}
+	url, _ := setupPatternStack(t, llm, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// The Studio drawer's manual Execute on a single gate: "7" typed into
+	// the input panel must evaluate 7 > 5 = true, not the string "7" which
+	// Liquid mismatches against 5 and routes false.
+	liquidParams := `[{"identifier":"condition","type":"str","value":"question > 5"}]`
+
+	res := postSync(t, &stack{url: url}, componentIfElseBody("7", liquidParams))
+	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
+	assert.Equal(t, "success", nodeStatus(t, res, "gate"))
+	gate := res.Nodes["gate"].(map[string]any)
+	gateOut, _ := gate["outputs"].(map[string]any)
+	assert.Equal(t, true, gateOut["true"], "7 > 5 must evaluate to true")
+
+	res2 := postSync(t, &stack{url: url}, componentIfElseBody("4", liquidParams))
+	require.Equal(t, "success", res2.Status, "engine error: %+v", res2.Error)
+	gate2 := res2.Nodes["gate"].(map[string]any)
+	gateOut2, _ := gate2["outputs"].(map[string]any)
+	assert.Equal(t, false, gateOut2["true"], "4 > 5 must evaluate to false")
+}
+
+/** @scenario A string dataset value is coerced to the declared input type */
+func TestPatternIfElse_ComponentPythonCondition_ManualInputAutoparses(t *testing.T) {
+	llm := &fakeLLMClient{}
+	url, _ := setupPatternStack(t, llm, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// The same single-node Execute, but the condition is python. "7" must
+	// reach execute() as a float so `question > 5` returns True instead of
+	// raising on a str/int comparison.
+	pythonParams := `[
+	  {"identifier":"condition_language","type":"str","value":"python"},
+	  {"identifier":"code","type":"code","value":"def execute(question: float) -> bool:\n    return question > 5\n"}
+	]`
+
+	res := postSync(t, &stack{url: url}, componentIfElseBody("7", pythonParams))
+	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
+	assert.Equal(t, "success", nodeStatus(t, res, "gate"),
+		"the gate must not error on a string-typed numeric manual input")
+	gate := res.Nodes["gate"].(map[string]any)
+	gateOut, _ := gate["outputs"].(map[string]any)
+	assert.Equal(t, true, gateOut["true"], "7 > 5 must evaluate to true")
+}
+
 /** @scenario A converged input receives the value from whichever branch ran */
 func TestPatternIfElse_ConvergeOnSameInput_FalseBranchValueWins(t *testing.T) {
 	llm := &fakeLLMClient{}
