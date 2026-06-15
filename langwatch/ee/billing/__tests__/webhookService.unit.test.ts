@@ -1155,7 +1155,7 @@ describe("webhookService", () => {
         });
 
         await vi.advanceTimersByTimeAsync(2000);
-        await Promise.allSettled([checkoutPromise, invoicePromise]);
+        await Promise.all([checkoutPromise, invoicePromise]);
 
         const confirmedCalls = mockSendSlackSubscriptionEvent.mock.calls.filter(
           (call: unknown[]) => (call[0] as { type: string }).type === "confirmed",
@@ -1191,7 +1191,7 @@ describe("webhookService", () => {
         });
 
         await vi.advanceTimersByTimeAsync(2000);
-        await Promise.allSettled([invoicePromise, updatePromise]);
+        await Promise.all([invoicePromise, updatePromise]);
 
         const confirmedCalls = mockSendSlackSubscriptionEvent.mock.calls.filter(
           (call: unknown[]) => (call[0] as { type: string }).type === "confirmed",
@@ -1221,7 +1221,37 @@ describe("webhookService", () => {
         const promise2 = service.handleInvoicePaymentSucceeded({ subscriptionId: "sub_stripe_2" });
 
         await vi.advanceTimersByTimeAsync(2000);
-        await Promise.allSettled([promise1, promise2]);
+        await Promise.all([promise1, promise2]);
+
+        const confirmedCalls = mockSendSlackSubscriptionEvent.mock.calls.filter(
+          (call: unknown[]) => (call[0] as { type: string }).type === "confirmed",
+        );
+        expect(confirmedCalls).toHaveLength(2);
+      });
+    });
+
+    describe("when the confirmed notification fails to send", () => {
+      it("releases the dedup key so a retry re-sends", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING }),
+        );
+        subRepo.activate.mockResolvedValue(
+          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        );
+
+        mockSendSlackSubscriptionEvent.mockRejectedValueOnce(new Error("slack down"));
+
+        const failingPromise = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_stripe_1",
+        });
+        await vi.advanceTimersByTimeAsync(2000);
+        await failingPromise;
+
+        const retryPromise = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_stripe_1",
+        });
+        await vi.advanceTimersByTimeAsync(2000);
+        await retryPromise;
 
         const confirmedCalls = mockSendSlackSubscriptionEvent.mock.calls.filter(
           (call: unknown[]) => (call[0] as { type: string }).type === "confirmed",

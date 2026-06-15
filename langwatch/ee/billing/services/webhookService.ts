@@ -921,16 +921,26 @@ export class EEWebhookService implements WebhookService {
       return;
     }
 
-    await getApp().notifications.sendSlackSubscriptionEvent({
-      type: "confirmed",
-      organizationId,
-      organizationName,
-      plan,
-      subscriptionId: dbSubscriptionId,
-      startDate,
-      maxMembers,
-      maxMessagesPerMonth,
-    });
+    try {
+      await getApp().notifications.sendSlackSubscriptionEvent({
+        type: "confirmed",
+        organizationId,
+        organizationName,
+        plan,
+        subscriptionId: dbSubscriptionId,
+        startDate,
+        maxMembers,
+        maxMessagesPerMonth,
+      });
+    } catch (err) {
+      // Release the dedup key so a retry can re-send; otherwise a transient
+      // Slack failure would suppress the confirmed alert for the whole TTL window.
+      await subscriptionConfirmedCooldown.delete(subscriptionId);
+      logger.error(
+        { subscriptionId, organizationId, err },
+        "[stripeWebhook] Failed to send confirmed notification",
+      );
+    }
   }
 
   private async clearTrialLicenseIfPresent(
