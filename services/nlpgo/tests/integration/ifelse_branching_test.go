@@ -406,6 +406,73 @@ func TestPatternIfElse_PythonConditionAutoparsesStringToFloat(t *testing.T) {
 	assert.Equal(t, true, gateOut2["true"], "9 > 5 must evaluate to true")
 }
 
+// autoparseLiquidIfElseBody feeds a string dataset value into a Liquid
+// if/else condition that does numeric comparison. The `amount` input is
+// declared `float`, so the engine must coerce "6" -> 6.0 before evaluating;
+// otherwise Liquid compares the string "6" against 5, treats the mismatched
+// types as incomparable, and silently routes false for every value.
+func autoparseLiquidIfElseBody(amountValue string) string {
+	return `{
+	  "type":"execute_flow",
+	  "payload": {
+	    "trace_id":"pattern-autoparse-liquid",
+	    "origin":"workflow",
+	    "workflow": {
+	      "workflow_id":"wf","api_key":"sk-pattern-autoparse-liquid","spec_version":"1.3",
+	      "name":"PatternAutoparseLiquid","icon":"x","description":"x","version":"x",
+	      "template_adapter":"default",
+	      "nodes":[
+	        {"id":"entry","type":"entry","data":{
+	          "outputs":[{"identifier":"amount","type":"str"}],
+	          "dataset":{"inline":{"records":{
+	            "amount":["` + amountValue + `"]
+	          },"count":1}},
+	          "entry_selection":0,"train_size":1.0,"test_size":0.0,"seed":1
+	        }},
+	        {"id":"gate","type":"if_else","data":{
+	          "name":"If/Else",
+	          "parameters":[{"identifier":"condition","type":"str","value":"amount > 5"}],
+	          "inputs":[{"identifier":"amount","type":"float"}],
+	          "outputs":[
+	            {"identifier":"true","type":"bool"},
+	            {"identifier":"false","type":"bool"}
+	          ]
+	        }}
+	      ],
+	      "edges":[
+	        {"id":"e1","source":"entry","sourceHandle":"outputs.amount","target":"gate","targetHandle":"inputs.amount","type":"default"}
+	      ],
+	      "state":{}
+	    },
+	    "inputs":[{}]
+	  }
+	}`
+}
+
+/** @scenario A liquid condition coerces a numeric-string input before comparing */
+func TestPatternIfElse_LiquidConditionAutoparsesStringToFloat(t *testing.T) {
+	llm := &fakeLLMClient{}
+	url, _ := setupPatternStack(t, llm, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// "6" arrives as a string from the dataset; with autoparse the Liquid
+	// gate evaluates 6 > 5 (true) instead of a str/int mismatch that routes
+	// false for every value.
+	res := postSync(t, &stack{url: url}, autoparseLiquidIfElseBody("6"))
+	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
+	assert.Equal(t, "success", nodeStatus(t, res, "gate"))
+	gate := res.Nodes["gate"].(map[string]any)
+	gateOut, _ := gate["outputs"].(map[string]any)
+	assert.Equal(t, true, gateOut["true"], "6 > 5 must evaluate to true")
+
+	res2 := postSync(t, &stack{url: url}, autoparseLiquidIfElseBody("4"))
+	require.Equal(t, "success", res2.Status, "engine error: %+v", res2.Error)
+	gate2 := res2.Nodes["gate"].(map[string]any)
+	gateOut2, _ := gate2["outputs"].(map[string]any)
+	assert.Equal(t, false, gateOut2["true"], "4 > 5 must evaluate to false")
+}
+
 /** @scenario A converged input receives the value from whichever branch ran */
 func TestPatternIfElse_ConvergeOnSameInput_FalseBranchValueWins(t *testing.T) {
 	llm := &fakeLLMClient{}

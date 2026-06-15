@@ -193,3 +193,15 @@ Feature: If/Else conditional branch node in workflows
     When the workflow runs
     Then the input is coerced to a number before the condition runs
     And the gate evaluates without a type error
+
+  # The default liquid condition needs the same coercion: a numeric string
+  # compared against a number in Liquid is a type mismatch that silently
+  # routes false for every value, so "6 > 5" wrongly reads as false. The
+  # input must reach Liquid as a number, like the python path.
+  @integration
+  Scenario: A liquid condition coerces a numeric-string input before comparing
+    Given an if/else gate with a liquid condition comparing a float input
+    And the input is fed a numeric string from the dataset
+    When the workflow runs
+    Then the input is coerced to a number before the condition runs
+    And "6 > 5" routes the true branch while "4 > 5" routes the false branch

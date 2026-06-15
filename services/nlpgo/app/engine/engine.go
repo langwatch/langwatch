@@ -325,7 +325,14 @@ func (e *Engine) runIfElse(ctx context.Context, node *dsl.Node, inputs map[strin
 		return e.runIfElsePython(ctx, node, inputs, ns, secrets)
 	}
 	condition := paramString(node.Data.Parameters, "condition")
-	result, err := template.EvaluateCondition(condition, inputs)
+	// Coerce string inputs to their declared types first, so a dataset/form
+	// "6" feeding a `float` input compares as 6 > 5, not the string "6" which
+	// Liquid treats as a type mismatch and silently evaluates to false. Same
+	// autoparse the python condition and code paths apply.
+	result, err := template.EvaluateCondition(
+		condition,
+		autoparseInputs(inputs, node.Data.Inputs),
+	)
 	if err != nil {
 		return nil, &NodeError{Type: "invalid_condition", Message: err.Error()}
 	}
