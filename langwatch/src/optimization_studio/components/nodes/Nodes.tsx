@@ -97,17 +97,23 @@ function ControlFlowHandle({
       isConnectableStart={false}
       style={{
         zIndex: 20,
-        top: "50%",
-        left: "-1px",
-        transform: "translateY(-50%)",
+        // Sit at the node header, vertically aligned with the icon (10px top
+        // padding + half the 24px icon), so the control point reads as part of
+        // the node's title row and never overlaps the input handles below.
+        top: "22px",
+        // Centered on the left border: half outside, half inside.
+        left: "0px",
+        transform: "translate(-50%, -50%)",
         width: "13px",
         height: "13px",
         background: "var(--chakra-colors-bg)",
         borderRadius: "100%",
         border: "2px solid #22C55E",
+        // Match the subtle glow of the orange input handles (2px at rest,
+        // 4px while a branch drag is looking for a target).
         boxShadow: branchConnectionInProgress
-          ? "0px 0px 8px 2px #22C55E"
-          : "0px 0px 4px 0px #22C55E",
+          ? "0px 0px 4px 0px #22C55E"
+          : "0px 0px 2px 0px #22C55E",
         opacity: visible ? 1 : 0,
         pointerEvents: visible ? undefined : "none",
       }}

@@ -433,8 +433,8 @@ function ReactFlowBackground() {
     useColorRawValue("gray.900"),
   );
   const dotColor = useColorModeValue(
-    useColorRawValue("gray.300"),
-    useColorRawValue("gray.700"),
+    useColorRawValue("gray.200"),
+    useColorRawValue("gray.800"),
   );
 
   return (
