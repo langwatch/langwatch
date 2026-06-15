@@ -432,10 +432,11 @@ function ReactFlowBackground() {
     useColorRawValue("gray.100"),
     useColorRawValue("gray.900"),
   );
-  const dotColor = useColorModeValue(
-    useColorRawValue("gray.200"),
-    useColorRawValue("gray.800"),
-  );
+  // Hardcoded to the pre-redesign grays (old gray.300 in light, a subtle dark
+  // in dark). The theme gray scale shifted to darker Chakra v3 defaults, which
+  // turned the canvas dots into a heavy grid; pin them so the texture stays the
+  // light, subtle one it was for years rather than tracking the token.
+  const dotColor = useColorModeValue("#E5E7EB", "#2d2d3d");
 
   return (
     <Background

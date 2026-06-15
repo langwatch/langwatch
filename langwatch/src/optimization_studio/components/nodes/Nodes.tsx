@@ -18,7 +18,14 @@ import {
   NodeToolbar,
   Position,
 } from "@xyflow/react";
-import React, { forwardRef, type Ref, useMemo } from "react";
+import React, {
+  forwardRef,
+  type Ref,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useDragLayer } from "react-dnd";
 import {
   Check,
@@ -71,12 +78,17 @@ export function getNodeDisplayName(node: { id: string; data: Component }) {
  * edge so the live connection point reads clearly. The entry node is the
  * workflow root and never receives a branch, so it has none.
  */
+/** VStack gap between node sections/rows (Chakra gap={2}). */
+const NODE_ROW_GAP = 8;
+
 function ControlFlowHandle({
   nodeId,
   nodeType,
+  inputsSignature,
 }: {
   nodeId: string;
   nodeType: string;
+  inputsSignature: string;
 }) {
   const { branchConnectionInProgress, hasControlEdge } = useWorkflowStore(
     useShallow((state) => ({
@@ -86,21 +98,47 @@ function ControlFlowHandle({
       ),
     })),
   );
+  const handleRef = useRef<HTMLDivElement>(null);
+  // Vertical position: one row pitch below the last input's handle (the same
+  // gap as between input dots), or the card's middle when there are no inputs.
+  // Measured from layout because row heights vary with content.
+  const [topPx, setTopPx] = useState<number | undefined>(undefined);
+
+  useLayoutEffect(() => {
+    const node = handleRef.current?.parentElement;
+    if (!node) return;
+    const measure = () => {
+      const rows = Array.from(node.children).filter((c) =>
+        c.classList.contains("js-node-input-row"),
+      ) as HTMLElement[];
+      const last = rows[rows.length - 1];
+      if (!last) {
+        setTopPx(undefined);
+        return;
+      }
+      // Where the next input dot would sit: last row center + one row pitch.
+      const next = last.offsetTop + last.offsetHeight * 1.5 + NODE_ROW_GAP;
+      setTopPx(Math.min(next, node.offsetHeight - 10));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [inputsSignature]);
+
   if (nodeType === "entry" || nodeType === "prompting_technique") return null;
 
   const visible = branchConnectionInProgress || hasControlEdge;
   return (
     <Handle
+      ref={handleRef}
       type="target"
       id={CONTROL_FLOW_HANDLE_ID}
       position={Position.Left}
       isConnectableStart={false}
       style={{
         zIndex: 20,
-        // Sit at the node header, vertically aligned with the icon (10px top
-        // padding + half the 24px icon), so the control point reads as part of
-        // the node's title row and never overlaps the input handles below.
-        top: "22px",
+        top: topPx !== undefined ? `${topPx}px` : "50%",
         // Centered on the left border: half outside, half inside.
         left: "0px",
         transform: "translate(-50%, -50%)",
@@ -137,6 +175,7 @@ function NodeInputs({
       {inputs.map((input) => (
         <HStack
           key={input.identifier}
+          className="js-node-input-row"
           gap={1}
           paddingX={2}
           paddingY={1}
@@ -363,7 +402,13 @@ export const ComponentNode = forwardRef(function ComponentNode(
         }
       }}
     >
-      <ControlFlowHandle nodeId={props.id} nodeType={props.type} />
+      <ControlFlowHandle
+        nodeId={props.id}
+        nodeType={props.type}
+        inputsSignature={(props.data.inputs ?? [])
+          .map((f) => `${f.identifier}:${f.type}`)
+          .join(",")}
+      />
       {props.selected && !["entry", "end"].includes(props.type) && (
         <Menu.Root positioning={{ placement: "top-start" }}>
           <Menu.Trigger asChild>
