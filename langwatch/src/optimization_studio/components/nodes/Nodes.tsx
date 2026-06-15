@@ -46,7 +46,10 @@ import type {
   Field,
   LLMConfig,
 } from "../../types/dsl";
-import { CONTROL_FLOW_HANDLE_ID } from "../../utils/controlFlow";
+import {
+  CONTROL_FLOW_HANDLE_ID,
+  isControlFlowEdge,
+} from "../../utils/controlFlow";
 import { checkIsEvaluator } from "../../utils/nodeUtils";
 import { hasUnsavedChanges } from "../../utils/unsavedChanges";
 import { ComponentIcon } from "../ColorfulBlockIcons";
@@ -60,18 +63,32 @@ export function getNodeDisplayName(node: { id: string; data: Component }) {
  * The control-flow target handle: a green circle centered on the left edge
  * of a node, the drop point for an If/Else branch. A branch is control flow,
  * not data, so it connects to the node itself rather than to an input row.
- * It only appears while dragging a branch (the store flags it), and it is
- * larger and green so it reads as distinct from the orange input handles.
- * The entry node is the workflow root and never receives a branch, so it has
- * none.
+ *
+ * The handle is always mounted (so a connected control edge has an anchor to
+ * render against) but stays invisible until it matters: it lights up green,
+ * larger than the orange input handles, while a branch is being dragged (the
+ * store flags it), and it stays visible when the node already has a control
+ * edge so the live connection point reads clearly. The entry node is the
+ * workflow root and never receives a branch, so it has none.
  */
-function ControlFlowHandle({ nodeType }: { nodeType: string }) {
-  const branchConnectionInProgress = useWorkflowStore(
-    (state) => state.branchConnectionInProgress,
+function ControlFlowHandle({
+  nodeId,
+  nodeType,
+}: {
+  nodeId: string;
+  nodeType: string;
+}) {
+  const { branchConnectionInProgress, hasControlEdge } = useWorkflowStore(
+    useShallow((state) => ({
+      branchConnectionInProgress: state.branchConnectionInProgress,
+      hasControlEdge: state.edges.some(
+        (e) => e.target === nodeId && isControlFlowEdge(e),
+      ),
+    })),
   );
-  if (!branchConnectionInProgress) return null;
   if (nodeType === "entry" || nodeType === "prompting_technique") return null;
 
+  const visible = branchConnectionInProgress || hasControlEdge;
   return (
     <Handle
       type="target"
@@ -88,7 +105,11 @@ function ControlFlowHandle({ nodeType }: { nodeType: string }) {
         background: "var(--chakra-colors-bg)",
         borderRadius: "100%",
         border: "2px solid #22C55E",
-        boxShadow: "0px 0px 7px 1px #22C55E",
+        boxShadow: branchConnectionInProgress
+          ? "0px 0px 8px 2px #22C55E"
+          : "0px 0px 4px 0px #22C55E",
+        opacity: visible ? 1 : 0,
+        pointerEvents: visible ? undefined : "none",
       }}
     />
   );
@@ -336,7 +357,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
         }
       }}
     >
-      <ControlFlowHandle nodeType={props.type} />
+      <ControlFlowHandle nodeId={props.id} nodeType={props.type} />
       {props.selected && !["entry", "end"].includes(props.type) && (
         <Menu.Root positioning={{ placement: "top-start" }}>
           <Menu.Trigger asChild>
