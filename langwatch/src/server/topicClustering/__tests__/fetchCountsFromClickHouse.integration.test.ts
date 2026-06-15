@@ -111,6 +111,22 @@ describe("fetchCountsFromClickHouse integration", () => {
         updatedAtMs: now - 400 * DAY,
         topicId: "topic-2",
       }),
+      // E: latest version CLEARS the topic (recent). A stale older version
+      // (also recent) had a topic. The latest wins, so E is recent but NOT
+      // assigned — guards against argMax skipping the NULL latest TopicId and
+      // folding to the stale non-null one.
+      traceRow({
+        traceId: `${TENANT_ID}-E`,
+        occurredAtMs: now - 5 * DAY,
+        updatedAtMs: now - 5 * DAY,
+        topicId: "topic-3",
+      }),
+      traceRow({
+        traceId: `${TENANT_ID}-E`,
+        occurredAtMs: now - 1 * DAY,
+        updatedAtMs: now - 1 * DAY,
+        topicId: null,
+      }),
     ];
 
     await ch.insert({
@@ -133,12 +149,12 @@ describe("fetchCountsFromClickHouse integration", () => {
           projectId: TENANT_ID,
         });
 
-        // A, B, C are within 12 months; D is excluded.
-        expect(counts.totalTracesCount).toBe(3);
-        // A (5d) and C (10d) are within 30 days; B (90d) is not.
-        expect(counts.recentTracesCount).toBe(2);
-        // Only A's latest version carries a non-empty TopicId. C's "" and the
-        // stale A version's null must not count.
+        // A, B, C, E are within 12 months; D is excluded.
+        expect(counts.totalTracesCount).toBe(4);
+        // A (5d), C (10d), E (1d) are within 30 days; B (90d) is not.
+        expect(counts.recentTracesCount).toBe(3);
+        // Only A's latest version carries a non-empty TopicId. C's "", the
+        // stale A version's null, and E's latest-cleared null must not count.
         expect(counts.assignedTracesCount).toBe(1);
       });
     });

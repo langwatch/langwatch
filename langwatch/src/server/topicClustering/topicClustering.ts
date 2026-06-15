@@ -201,19 +201,26 @@ export async function fetchCountsFromClickHouse({
   // scans the 12-month window twice (once to build the latest-version key
   // set, once for the outer aggregate) and materialises a key set sized to
   // every trace — fold to the latest version in a single GROUP BY pass with
-  // argMax(col, UpdatedAt). The conditional counts read the latest version's
-  // OccurredAt / TopicId, identical to the previous shape, but with one scan
-  // and no IN-set build. Light columns only (no heavy payloads).
+  // argMax(expr, UpdatedAt). The conditional counts read the latest version's
+  // OccurredAt / assigned-state, identical to the previous shape, but with one
+  // scan and no IN-set build. Light columns only (no heavy payloads).
+  //
+  // The assigned check folds over `argMax(TopicId IS NOT NULL AND TopicId !=
+  // '', UpdatedAt)`, not `argMax(TopicId, UpdatedAt)`: TopicId is Nullable and
+  // argMax skips rows whose first argument is NULL, so a trace whose latest
+  // version cleared its topic (latest TopicId = NULL) would otherwise fold to
+  // an older non-null TopicId and be over-counted. The boolean expression is
+  // non-nullable, so the fold reads the true latest version.
   const result = await clickhouse.query({
     query: `
       SELECT
         toString(count(*)) AS total,
         toString(countIf(latestOccurredAt >= fromUnixTimestamp64Milli({thirtyDaysAgo:UInt64}))) AS recent,
-        toString(countIf(latestTopicId IS NOT NULL AND latestTopicId != '')) AS assigned
+        toString(countIf(latestAssigned)) AS assigned
       FROM (
         SELECT
           argMax(OccurredAt, UpdatedAt) AS latestOccurredAt,
-          argMax(TopicId, UpdatedAt) AS latestTopicId
+          argMax(TopicId IS NOT NULL AND TopicId != '', UpdatedAt) AS latestAssigned
         FROM trace_summaries
         WHERE TenantId = {tenantId:String}
           AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
