@@ -22,9 +22,10 @@ import type {
   Workflow,
 } from "../types/dsl";
 import {
-  CONTROL_FLOW_EDGE_TYPE,
+  GATE_FIELD,
+  GATE_HANDLE_ID,
   isBranchConnectionOrigin,
-  isControlFlowConnection,
+  nodeHasGateInput,
 } from "../utils/controlFlow";
 import { hasDSLChanged } from "../utils/dslUtils";
 import { canConvergeOnInput } from "../utils/edgeConvergence";
@@ -57,8 +58,10 @@ export type State = Workflow & {
   isDraggingNode: boolean;
   /** The node ID confirmed by onNodeClick (genuine click, not drag). Gates drawer opening. */
   clickedNodeId: string | null;
-  /** True while dragging an If/Else branch handle. Lights up the green control-flow targets on every node. */
+  /** True while dragging an If/Else branch handle. Grows a temporary green "gate" input on every connectable node. */
   branchConnectionInProgress: boolean;
+  /** The If/Else node a branch drag started from, so it does not offer itself a gate. */
+  branchConnectionSourceId: string | null;
 };
 
 export type WorkflowStore = State & {
@@ -86,7 +89,7 @@ export type WorkflowStore = State & {
   onEdgesChange: (changes: EdgeChange[]) => void;
   onNodesDelete: () => void;
   onConnect: (connection: Connection) => { error?: string } | undefined;
-  /** Called when a connection drag starts; flags If/Else branch drags so nodes show the control-flow target. */
+  /** Called when a connection drag starts; flags If/Else branch drags so nodes show the temporary gate input. */
   onConnectStart: (params: {
     nodeId: string | null;
     handleId: string | null;
@@ -199,6 +202,7 @@ export const initialState: State = {
   isDraggingNode: false,
   clickedNodeId: null,
   branchConnectionInProgress: false,
+  branchConnectionSourceId: null,
 };
 
 export const getWorkflow = (state: State) => {
@@ -575,19 +579,36 @@ export const store = (
   },
   onConnect: (connection: Connection) => {
     const currentEdges = get().edges;
-    // Control-flow connection: an If/Else branch wired to the node itself
-    // (the green control handle) rather than to a data input. It only gates
-    // execution, so it skips the input-convergence rules entirely and is
-    // tagged so the engine passes no value through it.
-    if (isControlFlowConnection(connection)) {
-      set({
-        branchConnectionInProgress: false,
-        edges: addEdge(
-          { ...connection, type: CONTROL_FLOW_EDGE_TYPE },
-          currentEdges,
-        ),
-      });
-      return;
+    const nodes = get().nodes;
+    const fromBranch = isBranchConnectionOrigin({
+      node: nodes.find((n) => n.id === connection.source),
+      handleId: connection.sourceHandle,
+    });
+    // Dropping a branch onto a node's temporary gate: materialize a real
+    // "gate" bool input on the target and wire the branch into it. The branch
+    // carries its boolean value like a normal edge; the engine gates the node
+    // on the branch and plumbs that value into the gate input.
+    if (
+      fromBranch &&
+      connection.targetHandle === GATE_HANDLE_ID &&
+      connection.target
+    ) {
+      const targetNode = nodes.find((n) => n.id === connection.target);
+      if (targetNode && !nodeHasGateInput(targetNode)) {
+        const inputs: Field[] = [
+          ...((targetNode.data as { inputs?: Field[] }).inputs ?? []),
+          { identifier: GATE_FIELD, type: "bool" },
+        ];
+        set({
+          branchConnectionInProgress: false,
+          branchConnectionSourceId: null,
+          nodes: nodes.map((n) =>
+            n.id === targetNode.id ? { ...n, data: { ...n.data, inputs } } : n,
+          ),
+          edges: addEdge({ ...connection, type: "default" }, currentEdges),
+        });
+        return;
+      }
     }
     const existingConnection = currentEdges.find(
       (edge) =>
@@ -599,11 +620,7 @@ export const store = (
     // same input. Sources that can run together stay blocked.
     if (
       existingConnection &&
-      !canConvergeOnInput({
-        nodes: get().nodes,
-        edges: currentEdges,
-        connection,
-      })
+      !canConvergeOnInput({ nodes, edges: currentEdges, connection })
     ) {
       return {
         error:
@@ -611,6 +628,8 @@ export const store = (
       };
     }
     set({
+      branchConnectionInProgress: false,
+      branchConnectionSourceId: null,
       edges: addEdge(connection, currentEdges).map((edge) => ({
         ...edge,
         type: edge.type ?? "default",
@@ -622,16 +641,21 @@ export const store = (
     handleId: string | null;
   }) => {
     const node = get().nodes.find((n) => n.id === params.nodeId);
+    const fromBranch = isBranchConnectionOrigin({
+      node,
+      handleId: params.handleId,
+    });
     set({
-      branchConnectionInProgress: isBranchConnectionOrigin({
-        node,
-        handleId: params.handleId,
-      }),
+      branchConnectionInProgress: fromBranch,
+      branchConnectionSourceId: fromBranch ? (params.nodeId ?? null) : null,
     });
   },
   onConnectEnd: () => {
     if (get().branchConnectionInProgress) {
-      set({ branchConnectionInProgress: false });
+      set({
+        branchConnectionInProgress: false,
+        branchConnectionSourceId: null,
+      });
     }
   },
   setNodes: (nodes: Node[]) => {

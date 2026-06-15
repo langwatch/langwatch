@@ -17,15 +17,9 @@ import {
   type NodeProps,
   NodeToolbar,
   Position,
+  useUpdateNodeInternals,
 } from "@xyflow/react";
-import React, {
-  forwardRef,
-  type Ref,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { forwardRef, type Ref, useEffect, useMemo } from "react";
 import { useDragLayer } from "react-dnd";
 import {
   Check,
@@ -54,8 +48,9 @@ import type {
   LLMConfig,
 } from "../../types/dsl";
 import {
-  CONTROL_FLOW_HANDLE_ID,
-  isControlFlowEdge,
+  GATE_FIELD,
+  GATE_HANDLE_ID,
+  showsTemporaryGate,
 } from "../../utils/controlFlow";
 import { checkIsEvaluator } from "../../utils/nodeUtils";
 import { hasUnsavedChanges } from "../../utils/unsavedChanges";
@@ -66,116 +61,25 @@ export function getNodeDisplayName(node: { id: string; data: Component }) {
   return data.localConfig?.name ?? data.name ?? data.cls ?? node.id;
 }
 
-/**
- * The control-flow target handle: a green circle centered on the left edge
- * of a node, the drop point for an If/Else branch. A branch is control flow,
- * not data, so it connects to the node itself rather than to an input row.
- *
- * The handle is always mounted (so a connected control edge has an anchor to
- * render against) but stays invisible until it matters: it lights up green,
- * larger than the orange input handles, while a branch is being dragged (the
- * store flags it), and it stays visible when the node already has a control
- * edge so the live connection point reads clearly. The entry node is the
- * workflow root and never receives a branch, so it has none.
- */
-/** VStack gap between node sections/rows (Chakra gap={2}). */
-const NODE_ROW_GAP = 8;
-
-function ControlFlowHandle({
-  nodeId,
-  nodeType,
-  inputsSignature,
-}: {
-  nodeId: string;
-  nodeType: string;
-  inputsSignature: string;
-}) {
-  const { branchConnectionInProgress, hasControlEdge } = useWorkflowStore(
-    useShallow((state) => ({
-      branchConnectionInProgress: state.branchConnectionInProgress,
-      hasControlEdge: state.edges.some(
-        (e) => e.target === nodeId && isControlFlowEdge(e),
-      ),
-    })),
-  );
-  const handleRef = useRef<HTMLDivElement>(null);
-  // Vertical position: one row pitch below the last input's handle (the same
-  // gap as between input dots), or the card's middle when there are no inputs.
-  // Measured from layout because row heights vary with content.
-  const [topPx, setTopPx] = useState<number | undefined>(undefined);
-
-  useLayoutEffect(() => {
-    const node = handleRef.current?.parentElement;
-    if (!node) return;
-    const measure = () => {
-      const rows = Array.from(node.children).filter((c) =>
-        c.classList.contains("js-node-input-row"),
-      ) as HTMLElement[];
-      const last = rows[rows.length - 1];
-      if (!last) {
-        setTopPx(undefined);
-        return;
-      }
-      // Where the next input dot would sit: last row center + one row pitch.
-      const next = last.offsetTop + last.offsetHeight * 1.5 + NODE_ROW_GAP;
-      setTopPx(Math.min(next, node.offsetHeight - 10));
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [inputsSignature]);
-
-  if (nodeType === "entry" || nodeType === "prompting_technique") return null;
-
-  const visible = branchConnectionInProgress || hasControlEdge;
-  return (
-    <Handle
-      ref={handleRef}
-      type="target"
-      id={CONTROL_FLOW_HANDLE_ID}
-      position={Position.Left}
-      isConnectableStart={false}
-      style={{
-        zIndex: 20,
-        top: topPx !== undefined ? `${topPx}px` : "50%",
-        // Centered on the left border: half outside, half inside.
-        left: "0px",
-        transform: "translate(-50%, -50%)",
-        width: "13px",
-        height: "13px",
-        background: "var(--chakra-colors-bg)",
-        borderRadius: "100%",
-        border: "2px solid #22C55E",
-        // Match the subtle glow of the orange input handles (2px at rest,
-        // 4px while a branch drag is looking for a target).
-        boxShadow: branchConnectionInProgress
-          ? "0px 0px 4px 0px #22C55E"
-          : "0px 0px 2px 0px #22C55E",
-        opacity: visible ? 1 : 0,
-        pointerEvents: visible ? undefined : "none",
-      }}
-    />
-  );
-}
-
 function NodeInputs({
   node,
   namespace,
   inputs,
   selected,
+  showGateDropTarget,
 }: {
   node?: Node<Component>;
   namespace: string;
   inputs: Field[];
   selected: boolean;
+  /** Show the temporary green "gate" drop row while a branch is dragged. */
+  showGateDropTarget?: boolean;
 }) {
   return (
     <>
       {inputs.map((input) => (
         <HStack
           key={input.identifier}
-          className="js-node-input-row"
           gap={1}
           paddingX={2}
           paddingY={1}
@@ -211,6 +115,39 @@ function NodeInputs({
             )}
         </HStack>
       ))}
+      {showGateDropTarget && (
+        <HStack
+          key="__branch_gate__"
+          gap={1}
+          paddingX={2}
+          paddingY={1}
+          background="green.50"
+          borderRadius="8px"
+          width="full"
+          position="relative"
+          border="1px solid"
+          borderColor="green.solid"
+          data-testid="branch-gate-drop-target"
+        >
+          <Handle
+            type="target"
+            id={`${namespace}.${GATE_FIELD}`}
+            position={Position.Left}
+            style={{
+              marginLeft: "-10px",
+              width: "9px",
+              height: "9px",
+              background: "var(--chakra-colors-bg)",
+              borderRadius: "100%",
+              border: "1px solid #22C55E",
+              boxShadow: "0px 0px 4px 0px #22C55E",
+            }}
+          />
+          <Text color="green.fg">{GATE_FIELD}</Text>
+          <Text color="green.fg">:</Text>
+          <TypeLabel type="bool" />
+        </HStack>
+      )}
     </>
   );
 }
@@ -320,6 +257,8 @@ export const ComponentNode = forwardRef(function ComponentNode(
     setPropertiesExpanded,
     deleteNode,
     duplicateNode,
+    branchConnectionInProgress,
+    branchConnectionSourceId,
   } = useWorkflowStore(
     useShallow(
       ({
@@ -331,6 +270,8 @@ export const ComponentNode = forwardRef(function ComponentNode(
         setNodes,
         deleteNode,
         duplicateNode,
+        branchConnectionInProgress,
+        branchConnectionSourceId,
       }) => ({
         node: nodes.find((node) => node.id === props.id),
         hoveredNodeId,
@@ -340,10 +281,26 @@ export const ComponentNode = forwardRef(function ComponentNode(
         setNodes,
         deleteNode,
         duplicateNode,
+        branchConnectionInProgress,
+        branchConnectionSourceId,
       }),
     ),
   );
   const isHovered = hoveredNodeId === props.id;
+
+  // While an If/Else branch is dragged, every connectable node without a gate
+  // input grows a temporary green "gate" drop row. Re-register handles with
+  // React Flow whenever that row appears/disappears so the drop target is live.
+  const showGateDropTarget =
+    branchConnectionInProgress &&
+    showsTemporaryGate({
+      node: { id: props.id, type: props.type, data: props.data },
+      sourceId: branchConnectionSourceId,
+    });
+  const updateNodeInternals = useUpdateNodeInternals();
+  useEffect(() => {
+    updateNodeInternals(props.id);
+  }, [props.id, showGateDropTarget, updateNodeInternals]);
 
   const { isDragging, item } = useDragLayer((monitor) => ({
     item: monitor.getItem(),
@@ -402,13 +359,6 @@ export const ComponentNode = forwardRef(function ComponentNode(
         }
       }}
     >
-      <ControlFlowHandle
-        nodeId={props.id}
-        nodeType={props.type}
-        inputsSignature={(props.data.inputs ?? [])
-          .map((f) => `${f.identifier}:${f.type}`)
-          .join(",")}
-      />
       {props.selected && !["entry", "end"].includes(props.type) && (
         <Menu.Root positioning={{ placement: "top-start" }}>
           <Menu.Trigger asChild>
@@ -504,14 +454,15 @@ export const ComponentNode = forwardRef(function ComponentNode(
             </HStack>
           </React.Fragment>
         ))}
-      {props.data.inputs && (
+      {(props.data.inputs || showGateDropTarget) && (
         <>
           <NodeSectionTitle>{props.inputsTitle ?? "Inputs"}</NodeSectionTitle>
           <NodeInputs
             node={node}
             namespace="inputs"
-            inputs={props.data.inputs}
+            inputs={props.data.inputs ?? []}
             selected={!!props.selected || isHovered}
+            showGateDropTarget={showGateDropTarget}
           />
         </>
       )}

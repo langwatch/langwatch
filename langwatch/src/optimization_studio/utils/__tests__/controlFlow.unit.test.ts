@@ -1,24 +1,27 @@
 /**
  * @vitest-environment node
  */
-import type { Edge, Node } from "@xyflow/react";
+import type { Node } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
 
 import {
-  CONTROL_FLOW_EDGE_TYPE,
-  CONTROL_FLOW_HANDLE_ID,
+  GATE_HANDLE_ID,
   isBranchConnectionOrigin,
   isBranchSourceHandle,
   isConnectionAllowed,
-  isControlFlowConnection,
-  isControlFlowEdge,
+  nodeHasGateInput,
+  showsTemporaryGate,
 } from "../controlFlow";
 
-const node = (id: string, type: string): Node => ({
+const node = (
+  id: string,
+  type: string,
+  inputs: { identifier: string; type: string }[] = [],
+): Node => ({
   id,
   type,
   position: { x: 0, y: 0 },
-  data: {},
+  data: { inputs },
 });
 
 describe("controlFlow helpers", () => {
@@ -32,7 +35,6 @@ describe("controlFlow helpers", () => {
     it("rejects ordinary output handles", () => {
       expect(isBranchSourceHandle("outputs.answer")).toBe(false);
       expect(isBranchSourceHandle(null)).toBe(false);
-      expect(isBranchSourceHandle(undefined)).toBe(false);
     });
   });
 
@@ -44,15 +46,6 @@ describe("controlFlow helpers", () => {
           handleId: "outputs.true",
         }),
       ).toBe(true);
-    });
-
-    it("is false for a non-branch handle, a non-if/else node, or no node", () => {
-      expect(
-        isBranchConnectionOrigin({
-          node: node("gate", "if_else"),
-          handleId: "outputs.answer",
-        }),
-      ).toBe(false);
       expect(
         isBranchConnectionOrigin({
           node: node("code", "code"),
@@ -60,92 +53,131 @@ describe("controlFlow helpers", () => {
         }),
       ).toBe(false);
       expect(
-        isBranchConnectionOrigin({ node: undefined, handleId: "outputs.true" }),
+        isBranchConnectionOrigin({
+          node: node("gate", "if_else"),
+          handleId: "outputs.answer",
+        }),
       ).toBe(false);
     });
   });
 
-  describe("isControlFlowConnection", () => {
-    it("matches the reserved control handle target", () => {
+  describe("nodeHasGateInput", () => {
+    it("detects an existing gate input", () => {
       expect(
-        isControlFlowConnection({ targetHandle: CONTROL_FLOW_HANDLE_ID }),
+        nodeHasGateInput(
+          node("c", "code", [{ identifier: "gate", type: "bool" }]),
+        ),
       ).toBe(true);
-      expect(isControlFlowConnection({ targetHandle: "inputs.gate" })).toBe(
-        false,
-      );
+      expect(
+        nodeHasGateInput(
+          node("c", "code", [{ identifier: "question", type: "str" }]),
+        ),
+      ).toBe(false);
     });
   });
 
-  describe("isControlFlowEdge", () => {
-    it("matches by edge type or control target handle", () => {
+  describe("showsTemporaryGate", () => {
+    /** @scenario The temporary gate is not offered when the node already has one */
+    it("offers a temporary gate only to connectable nodes without one", () => {
+      const sourceId = "gate";
+      expect(showsTemporaryGate({ node: node("code", "code"), sourceId })).toBe(
+        true,
+      );
+      // already has a gate input
       expect(
-        isControlFlowEdge({
-          type: CONTROL_FLOW_EDGE_TYPE,
-          targetHandle: null,
-        } as Edge),
-      ).toBe(true);
+        showsTemporaryGate({
+          node: node("c2", "code", [{ identifier: "gate", type: "bool" }]),
+          sourceId,
+        }),
+      ).toBe(false);
+      // the drag's own source node
       expect(
-        isControlFlowEdge({
-          type: "default",
-          targetHandle: CONTROL_FLOW_HANDLE_ID,
-        } as Edge),
-      ).toBe(true);
+        showsTemporaryGate({ node: node("gate", "if_else"), sourceId: "gate" }),
+      ).toBe(false);
+      // entry / prompting_technique are excluded
       expect(
-        isControlFlowEdge({
-          type: "default",
-          targetHandle: "inputs.gate",
-        } as Edge),
+        showsTemporaryGate({ node: node("entry", "entry"), sourceId }),
+      ).toBe(false);
+      expect(
+        showsTemporaryGate({
+          node: node("pt", "prompting_technique"),
+          sourceId,
+        }),
       ).toBe(false);
     });
   });
 
   describe("isConnectionAllowed", () => {
-    const nodes = [node("gate", "if_else"), node("code", "code")];
+    const nodes = [
+      node("gate", "if_else"),
+      node("code", "code", [
+        { identifier: "question", type: "str" },
+        { identifier: "ready", type: "bool" },
+      ]),
+    ];
 
-    /** @scenario A branch handle only connects to control-flow targets */
-    it("lets a branch land on a control handle but not on a data input", () => {
+    /** @scenario A branch only connects to bool inputs */
+    it("lets a branch land on a bool input or the gate, not on a non-bool input", () => {
+      // existing bool input
       expect(
         isConnectionAllowed({
           nodes,
           connection: {
             source: "gate",
             sourceHandle: "outputs.true",
-            targetHandle: CONTROL_FLOW_HANDLE_ID,
+            target: "code",
+            targetHandle: "inputs.ready",
           },
         }),
       ).toBe(true);
+      // the gate handle (temporary or real)
       expect(
         isConnectionAllowed({
           nodes,
           connection: {
             source: "gate",
             sourceHandle: "outputs.true",
+            target: "code",
+            targetHandle: GATE_HANDLE_ID,
+          },
+        }),
+      ).toBe(true);
+      // a non-bool input
+      expect(
+        isConnectionAllowed({
+          nodes,
+          connection: {
+            source: "gate",
+            sourceHandle: "outputs.true",
+            target: "code",
             targetHandle: "inputs.question",
           },
         }),
       ).toBe(false);
     });
 
-    it("lets the control handle accept only a branch source", () => {
+    it("rejects a branch self-connection", () => {
       expect(
         isConnectionAllowed({
           nodes,
           connection: {
-            source: "code",
-            sourceHandle: "outputs.answer",
-            targetHandle: CONTROL_FLOW_HANDLE_ID,
+            source: "gate",
+            sourceHandle: "outputs.true",
+            target: "gate",
+            targetHandle: GATE_HANDLE_ID,
           },
         }),
       ).toBe(false);
     });
 
-    it("leaves ordinary data connections unaffected", () => {
+    it("leaves ordinary (non-branch) connections unaffected", () => {
       expect(
         isConnectionAllowed({
           nodes,
           connection: {
             source: "code",
             sourceHandle: "outputs.answer",
+            target: "gate",
             targetHandle: "inputs.question",
           },
         }),

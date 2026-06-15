@@ -95,7 +95,6 @@ func nodeStatus(t *testing.T, res *app.WorkflowResult, id string) string {
 }
 
 /** @scenario True condition executes only the true branch */
-/** @scenario Legacy branch-into-input workflows still gate correctly */
 func TestPatternIfElse_TrueBranchRuns_FalseBranchSkipped(t *testing.T) {
 	llm := &fakeLLMClient{}
 	url, _ := setupPatternStack(t, llm, func(w http.ResponseWriter, _ *http.Request) {
@@ -560,26 +559,25 @@ func TestPatternIfElse_ComponentPythonCondition_ManualInputAutoparses(t *testing
 	assert.Equal(t, true, gateOut["true"], "7 > 5 must evaluate to true")
 }
 
-// controlFlowWorkflowBody wires the if/else branches to downstream nodes
-// through CONTROL-FLOW edges (targetHandle "control", type "control"): the
-// branch connects to the node itself, not to a data input. codeA has a
-// strict `execute(context)` signature and a data edge feeding `context`,
-// so if the control edge wrongly passed the branch boolean as an extra
-// kwarg the sandbox would error — a clean run proves control flow carries
-// no value. codeB takes no inputs and rides the false branch.
+// gateWorkflowBody wires the if/else branches into downstream nodes through
+// their bool "gate" input (a normal data edge): the branch gates whether the
+// node runs (shouldSkip) AND passes its boolean value into the gate input.
+// codeA has a strict `execute(context, gate)` signature and echoes the gate
+// value, so a clean run with the gate value in its answer proves the branch
+// boolean flowed into the gate input. codeB rides the false branch.
 //
 //	entry ──ctx(data)──► codeA ─┐
-//	  └──ctx──► gate ══true(control)══► codeA ─┴──► end.answer
-//	             └════false(control)═══► codeB ─────► end.answer
-func controlFlowWorkflowBody(contextValue string) string {
+//	  └──ctx──► gate ──true──► codeA.gate ─┴──► end.answer
+//	             └────false──► codeB.gate ─────► end.answer
+func gateWorkflowBody(contextValue string) string {
 	return `{
 	  "type":"execute_flow",
 	  "payload": {
-	    "trace_id":"pattern-controlflow",
+	    "trace_id":"pattern-branchgate",
 	    "origin":"workflow",
 	    "workflow": {
-	      "workflow_id":"wf","api_key":"sk-pattern-controlflow","spec_version":"1.3",
-	      "name":"PatternControlFlow","icon":"x","description":"x","version":"x",
+	      "workflow_id":"wf","api_key":"sk-pattern-branchgate","spec_version":"1.3",
+	      "name":"PatternBranchGate","icon":"x","description":"x","version":"x",
 	      "template_adapter":"default",
 	      "nodes":[
 	        {"id":"entry","type":"entry","data":{
@@ -599,13 +597,13 @@ func controlFlowWorkflowBody(contextValue string) string {
 	          ]
 	        }},
 	        {"id":"codeA","type":"code","data":{
-	          "parameters":[{"identifier":"code","type":"code","value":"def execute(context):\n    return {'answer': 'A:' + context}\n"}],
-	          "inputs":[{"identifier":"context","type":"str"}],
+	          "parameters":[{"identifier":"code","type":"code","value":"def execute(context, gate):\n    return {'answer': 'A:' + context + ':' + str(gate)}\n"}],
+	          "inputs":[{"identifier":"context","type":"str"},{"identifier":"gate","type":"bool"}],
 	          "outputs":[{"identifier":"answer","type":"str"}]
 	        }},
 	        {"id":"codeB","type":"code","data":{
-	          "parameters":[{"identifier":"code","type":"code","value":"def execute():\n    return {'answer': 'B:fallback'}\n"}],
-	          "inputs":[],
+	          "parameters":[{"identifier":"code","type":"code","value":"def execute(gate):\n    return {'answer': 'B:' + str(gate)}\n"}],
+	          "inputs":[{"identifier":"gate","type":"bool"}],
 	          "outputs":[{"identifier":"answer","type":"str"}]
 	        }},
 	        {"id":"end","type":"end","data":{"inputs":[
@@ -615,8 +613,8 @@ func controlFlowWorkflowBody(contextValue string) string {
 	      "edges":[
 	        {"id":"e1","source":"entry","sourceHandle":"outputs.context","target":"gate","targetHandle":"inputs.context","type":"default"},
 	        {"id":"e2","source":"entry","sourceHandle":"outputs.context","target":"codeA","targetHandle":"inputs.context","type":"default"},
-	        {"id":"e3","source":"gate","sourceHandle":"outputs.true","target":"codeA","targetHandle":"control","type":"control"},
-	        {"id":"e4","source":"gate","sourceHandle":"outputs.false","target":"codeB","targetHandle":"control","type":"control"},
+	        {"id":"e3","source":"gate","sourceHandle":"outputs.true","target":"codeA","targetHandle":"inputs.gate","type":"default"},
+	        {"id":"e4","source":"gate","sourceHandle":"outputs.false","target":"codeB","targetHandle":"inputs.gate","type":"default"},
 	        {"id":"e5","source":"codeA","sourceHandle":"outputs.answer","target":"end","targetHandle":"inputs.answer","type":"default"},
 	        {"id":"e6","source":"codeB","sourceHandle":"outputs.answer","target":"end","targetHandle":"inputs.answer","type":"default"}
 	      ],
@@ -627,42 +625,41 @@ func controlFlowWorkflowBody(contextValue string) string {
 	}`
 }
 
-/** @scenario Connecting a branch to a node gates it without adding an input */
-/** @scenario A control-flow connection passes no value into the gated node */
-func TestPatternIfElse_ControlFlowEdge_GatesAndPassesNoValue(t *testing.T) {
+/** @scenario The branch value flows into the gate input */
+func TestPatternIfElse_BranchGate_PassesValueAndGates(t *testing.T) {
 	llm := &fakeLLMClient{}
 	url, _ := setupPatternStack(t, llm, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	res := postSync(t, &stack{url: url}, controlFlowWorkflowBody("ctx"))
+	res := postSync(t, &stack{url: url}, gateWorkflowBody("ctx"))
 	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
 
-	// True branch taken: codeA runs over its control edge. A success here
-	// proves the control edge passed NO value — codeA's strict
-	// execute(context) signature would have errored on an extra branch kwarg.
+	// True branch taken: codeA runs and its strict execute(context, gate)
+	// signature requires the gate value, so the echoed "True" proves the
+	// branch boolean flowed into the gate input.
 	assert.Equal(t, "success", nodeStatus(t, res, "codeA"))
 	assert.Equal(t, "skipped", nodeStatus(t, res, "codeB"))
 	assert.Equal(t, "success", nodeStatus(t, res, "end"))
-	assert.Equal(t, "A:ctx", convergedAnswer(t, res),
-		"the gated node runs and only its real data input flows through")
+	assert.Equal(t, "A:ctx:True", convergedAnswer(t, res),
+		"the gated node runs and the branch boolean flows into its gate input")
 }
 
-/** @scenario A node behind a not-taken branch is skipped over a control-flow edge */
-func TestPatternIfElse_ControlFlowEdge_SkipsNotTakenBranch(t *testing.T) {
+/** @scenario A node behind a not-taken branch is skipped */
+func TestPatternIfElse_BranchGate_SkipsNotTakenBranch(t *testing.T) {
 	llm := &fakeLLMClient{}
 	url, _ := setupPatternStack(t, llm, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	res := postSync(t, &stack{url: url}, controlFlowWorkflowBody(""))
+	res := postSync(t, &stack{url: url}, gateWorkflowBody(""))
 	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
 
-	// Condition false: the true-branch node is skipped over its control
-	// edge, the false-branch node runs.
+	// Condition false: the true-branch node is skipped, the false-branch node
+	// runs and receives its branch boolean in the gate input.
 	assert.Equal(t, "skipped", nodeStatus(t, res, "codeA"))
 	assert.Equal(t, "success", nodeStatus(t, res, "codeB"))
-	assert.Equal(t, "B:fallback", convergedAnswer(t, res))
+	assert.Equal(t, "B:True", convergedAnswer(t, res))
 }
 
 /** @scenario A converged input receives the value from whichever branch ran */

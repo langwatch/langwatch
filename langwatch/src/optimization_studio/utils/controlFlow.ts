@@ -1,44 +1,47 @@
-import type { Edge, Node } from "@xyflow/react";
+import type { Node } from "@xyflow/react";
 
 /**
- * Control-flow connections wire an If/Else branch to a downstream NODE
- * rather than to one of its data inputs. A branch decides whether the next
- * node runs; it carries no value. So the branch lands on a dedicated
- * node-level target handle (the green control-flow point), and the edge is
- * marked as control flow so the engine gates on it without plumbing a value.
+ * If/Else branch routing. A branch (the `true` / `false` output of an If/Else
+ * node) routes execution down one path AND carries its boolean value, so it
+ * connects like a normal edge into a bool input. To make wiring obvious, while
+ * a branch is being dragged every connectable node grows a temporary green
+ * "gate" bool input; dropping onto it materializes a real `gate` input wired
+ * to the branch (see workflowStoreCore.onConnect). The engine gates the target
+ * on the branch and passes the branch boolean into that input.
  */
 
-/** React Flow id of the node-level control-flow target handle. */
-export const CONTROL_FLOW_HANDLE_ID = "control";
+/** Identifier of the bool input a branch lands on by default. */
+export const GATE_FIELD = "gate";
 
-/**
- * Edge `type` for a control-flow connection. The Go engine reads this to
- * gate the target without passing the branch boolean into its inputs (see
- * services/nlpgo/app/engine/engine.go resolveInputs).
- */
-export const CONTROL_FLOW_EDGE_TYPE = "control";
+/** React Flow target handle id of the gate input. */
+export const GATE_HANDLE_ID = `inputs.${GATE_FIELD}`;
 
 const IF_ELSE = "if_else";
 const BRANCH_HANDLES = new Set(["true", "false"]);
 
-function stripOutputsPrefix(handle: string | null | undefined): string {
+function stripPrefix(
+  handle: string | null | undefined,
+  prefix: string,
+): string {
   if (!handle) return "";
-  return handle.startsWith("outputs.")
-    ? handle.slice("outputs.".length)
-    : handle;
+  return handle.startsWith(prefix) ? handle.slice(prefix.length) : handle;
+}
+
+type FieldLike = { identifier: string; type?: string };
+
+function nodeInputs(node: Node | undefined): FieldLike[] {
+  const inputs = (node?.data as { inputs?: FieldLike[] } | undefined)?.inputs;
+  return Array.isArray(inputs) ? inputs : [];
 }
 
 /** Whether a source handle is an If/Else branch handle (`outputs.true`/`false`). */
 export function isBranchSourceHandle(
   handle: string | null | undefined,
 ): boolean {
-  return BRANCH_HANDLES.has(stripOutputsPrefix(handle));
+  return BRANCH_HANDLES.has(stripPrefix(handle, "outputs."));
 }
 
-/**
- * Whether a drag originates from an If/Else node's branch handle, given the
- * dragged node and handle. This is what lights up the control-flow targets.
- */
+/** Whether a drag originates from an If/Else node's branch handle. */
 export function isBranchConnectionOrigin({
   node,
   handleId,
@@ -49,28 +52,36 @@ export function isBranchConnectionOrigin({
   return node?.type === IF_ELSE && isBranchSourceHandle(handleId);
 }
 
-/** Whether a connection targets a node's control-flow handle. */
-export function isControlFlowConnection(connection: {
-  targetHandle?: string | null;
-}): boolean {
-  return connection.targetHandle === CONTROL_FLOW_HANDLE_ID;
+/** Whether the node already has a `gate` input (so no temporary gate is offered). */
+export function nodeHasGateInput(node: Node | undefined): boolean {
+  return nodeInputs(node).some((f) => f.identifier === GATE_FIELD);
 }
 
-/** Whether an edge is a control-flow edge (gates execution, passes no value). */
-export function isControlFlowEdge(
-  edge: Pick<Edge, "type" | "targetHandle">,
-): boolean {
-  return (
-    edge.type === CONTROL_FLOW_EDGE_TYPE ||
-    edge.targetHandle === CONTROL_FLOW_HANDLE_ID
-  );
+/**
+ * Whether a node should grow a temporary gate input while a branch is dragged:
+ * any node that takes inputs and does not already have a gate. The drag's own
+ * source node, the entry (source-only) node, and prompting_technique (which
+ * attaches to a node and has no inputs) are excluded.
+ */
+export function showsTemporaryGate({
+  node,
+  sourceId,
+}: {
+  node: { id: string; type?: string; data?: unknown };
+  sourceId: string | null;
+}): boolean {
+  if (node.id === sourceId) return false;
+  if (node.type === "entry" || node.type === "prompting_technique") {
+    return false;
+  }
+  return !nodeHasGateInput(node as Node);
 }
 
 /**
  * Whether a pending connection is allowed (React Flow isValidConnection).
- * A branch is control flow: it may only land on a node's control-flow
- * target, and that target only accepts a branch. Every other connection is
- * unaffected (normal data wiring keeps its own rules in onConnect).
+ * A branch carries a boolean, so it may only land on a bool input (an existing
+ * bool input or the gate). Self-connections are rejected. Every non-branch
+ * connection keeps its own rules in onConnect.
  */
 export function isConnectionAllowed({
   nodes,
@@ -80,16 +91,26 @@ export function isConnectionAllowed({
   connection: {
     source?: string | null;
     sourceHandle?: string | null;
+    target?: string | null;
     targetHandle?: string | null;
   };
 }): boolean {
+  if (connection.source && connection.source === connection.target) {
+    return false;
+  }
   const sourceNode = nodes.find((n) => n.id === connection.source);
-  const fromBranch = isBranchConnectionOrigin({
-    node: sourceNode,
-    handleId: connection.sourceHandle,
-  });
-  const toControl = isControlFlowConnection(connection);
-  if (fromBranch) return toControl;
-  if (toControl) return fromBranch;
-  return true;
+  if (
+    !isBranchConnectionOrigin({
+      node: sourceNode,
+      handleId: connection.sourceHandle,
+    })
+  ) {
+    return true;
+  }
+  // The gate (temporary or real) is bool by construction.
+  if (connection.targetHandle === GATE_HANDLE_ID) return true;
+  const targetNode = nodes.find((n) => n.id === connection.target);
+  const inputId = stripPrefix(connection.targetHandle, "inputs.");
+  const input = nodeInputs(targetNode).find((f) => f.identifier === inputId);
+  return input?.type === "bool";
 }
