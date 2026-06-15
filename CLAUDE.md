@@ -67,6 +67,21 @@ control-plane both source the same `.env`, so each secret lives in
 exactly one place (no prefix duplication). Set
 `FEATURE_FLAG_FORCE_ENABLE=release_ui_ai_gateway_menu_enabled` to unhide the UI.
 
+### NLP Engine (Go, services/nlpgo/)
+
+`nlpgo` is the Go NLP engine that runs optimization-studio executions and
+evaluators. `pnpm dev` auto-starts it alongside vite + api when the Go toolchain
+is on PATH; the process appears as `nlpgo` in the concurrent output. It binds the
+port the app dials via `LANGWATCH_NLP_SERVICE` (default `:5561`, otherwise PORT+1)
+and reuses an existing listener if another worktree already booted one. When
+`LANGWATCH_NLP_SERVICE` points at an external host, no local engine is started.
+Set `LANGWATCH_SKIP_NLP=1` to opt out. To run it standalone:
+
+```bash
+make service svc=nlpgo       # run once
+make service-watch svc=nlpgo # live reload via air
+```
+
 ## Commands
 
 Inside langwatch/
