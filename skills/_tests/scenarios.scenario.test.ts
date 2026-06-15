@@ -814,7 +814,7 @@ describe("Scenarios Skill", () => {
             model: judgeModel,
             criteria: [
               "Agent created voice scenario test files using the LangWatch Scenario framework's voice support",
-              "Agent used a voice adapter (openAIRealtimeAgent / pipecatAgent / elevenLabsAgent / composableAgent) rather than a plain text agent",
+              "Agent used a voice adapter (openAIRealtimeAgent / pipecatAgent / elevenLabsAgent / geminiLiveAgent / twilioAgent / composableAgent) rather than a plain text agent",
               "Agent used the `langwatch scenario-docs voice/...` CLI command to read the voice docs",
             ],
           }),
@@ -841,7 +841,7 @@ describe("Scenarios Skill", () => {
             expect(testContent).toContain("@langwatch/scenario");
             expect(testContent).toMatch(/scenario\.run\(/);
 
-            // Guard against home-rolled test frameworks (mirrors Python voice test)
+            // Guard against home-rolled test frameworks instead of @langwatch/scenario
             expect(testContent).not.toMatch(
               /from\s+["'](?:agent-tester|simulation-framework|voice-test-framework|langwatch-testing)["']/
             );
@@ -859,7 +859,7 @@ describe("Scenarios Skill", () => {
               testContent,
               'Expected userSimulatorAgent({ voice: "openai/..." | "elevenlabs/..." }) so the simulated caller speaks'
             ).toMatch(
-              /userSimulatorAgent\s*\(\s*\{[\s\S]*?voice\s*:\s*["'](?:elevenlabs|openai)\/[^"']+["']/
+              /userSimulatorAgent\s*\(\s*\{[^}]*?voice\s*:\s*["'](?:elevenlabs|openai)\/[^"']+["']/
             );
           },
           scenario.judge(),
