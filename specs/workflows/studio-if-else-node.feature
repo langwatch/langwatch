@@ -114,6 +114,16 @@ Feature: If/Else conditional branch node in workflows
     Then I see a single condition result of true or false
     And not separate true and false branch boxes
 
+  # A condition evaluates in well under a millisecond, so a re-run must still
+  # refresh the duration. Gating the timing on a non-zero duration left the
+  # panel showing a stale time from a prior, slower run.
+  @integration
+  Scenario: A sub-millisecond run still shows its duration
+    Given an if/else node that has been run
+    When the run completes in under a millisecond
+    Then the outputs panel shows a 0ms duration
+    And not a stale duration from a previous run
+
   # ============================================================================
   # Condition authoring (liquid editor + python code mode)
   # ============================================================================

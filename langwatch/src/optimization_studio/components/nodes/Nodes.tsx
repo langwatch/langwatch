@@ -125,8 +125,6 @@ function NodeInputs({
           borderRadius="8px"
           width="full"
           position="relative"
-          border="1px solid"
-          borderColor="green.solid"
           data-testid="branch-gate-drop-target"
         >
           <Handle

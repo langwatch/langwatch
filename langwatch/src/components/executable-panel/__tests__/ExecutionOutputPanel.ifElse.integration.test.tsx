@@ -83,6 +83,30 @@ describe("ExecutionOutputPanel - if/else outputs", () => {
     });
   });
 
+  describe("given an if/else run that completed in under a millisecond", () => {
+    describe("when the panel renders its metadata", () => {
+      /** @scenario A sub-millisecond run still shows its duration */
+      it("shows a 0ms duration instead of hiding the timing line", () => {
+        const zeroDuration = {
+          status: "success",
+          // started_at === finished_at: a real sub-millisecond if/else run.
+          timestamps: { started_at: 1700000000000, finished_at: 1700000000000 },
+          outputs: { true: false, false: true },
+        } as unknown as ExecutionState;
+
+        render(
+          <ExecutionOutputPanel
+            executionState={zeroDuration}
+            nodeType="if_else"
+          />,
+          { wrapper: Wrapper },
+        );
+
+        expect(screen.getByText("0ms")).toBeInTheDocument();
+      });
+    });
+  });
+
   describe("given a non if/else node", () => {
     describe("when the panel renders its outputs", () => {
       it("still renders each named output", () => {
