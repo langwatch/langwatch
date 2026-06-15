@@ -81,7 +81,7 @@ The projection short-circuits for orgs that are not SaaS-billable (no `stripeCus
 Clones `reportUsageForMonth.command.ts`:
 
 ```
-1. Mark in-flight on BillingMeterCheckpoint(orgId, meterName="STORAGE_GB", billingMonth=monthOf(h))
+1. Mark in-flight on StorageBillingCheckpoint(orgId, billingMonth=monthOf(h)) via StorageBillingCheckpointService
 2. usageReportingService.reportUsageDelta({ events: [{
      eventName: "langwatch_storage_megabytes_hourly",
      value: row.megabytes,                       // additive, integer MiB
@@ -124,18 +124,12 @@ The retention length chosen (60 vs 90) does **not** change the unit price — lo
 
 ## Schema
 
-One Prisma migration, two changes:
+One **purely additive** Prisma migration, two new tables. The billable-events
+checkpoint (`BillingMeterCheckpoint`) is left untouched — storage billing owns
+its own persistence rather than mutating a live billing table:
 
 ```prisma
-// (1) Discriminate the existing checkpoint by meter so STORAGE_GB cannot
-// collide with BILLABLE_EVENTS. Default backfills existing rows.
-model BillingMeterCheckpoint {
-  // existing fields …
-  meterName String @default("BILLABLE_EVENTS")          // NEW — discriminator
-  @@unique([organizationId, meterName, billingMonth])   // was (organizationId, billingMonth)
-}
-
-// (2) Durable per-hour measurement. The reporter drains reportedAt IS NULL
+// (1) Durable per-hour measurement. The reporter drains reportedAt IS NULL
 // and stamps on success. Per-hour audit trail + cursor for catch-up.
 model StorageUsageHourly {
   organizationId String
@@ -146,7 +140,30 @@ model StorageUsageHourly {
   @@id([organizationId, sealedHour])
   @@index([reportedAt])
 }
+
+// (2) Dedicated two-phase reporting checkpoint for the STORAGE_GB meter — a
+// sibling of BillingMeterCheckpoint, owned by StorageBillingCheckpointService.
+model StorageBillingCheckpoint {
+  id                   String   @id @default(cuid())
+  organizationId       String
+  billingMonth         String   // "2026-02"
+  lastReportedTotal    Int      @default(0)
+  pendingReportedTotal Int?     // non-null = in-flight Stripe call
+  consecutiveFailures  Int      @default(0)
+  updatedAt            DateTime @updatedAt
+  @@unique([organizationId, billingMonth])
+}
 ```
+
+**Separate checkpoint table, not a `meterName` discriminator.** An earlier draft
+discriminated `BillingMeterCheckpoint` by meter and swapped its unique index.
+Rejected: that drops a unique index on a *live* billing table and forces the
+billable-events command + tests to change to make room for a sibling meter. A
+dedicated `StorageBillingCheckpoint` + `StorageBillingCheckpointService` makes
+the migration purely additive (no `DROP INDEX`, no `ALTER` on existing tables),
+keeps the billable-events path byte-for-byte unchanged, and gives each meter
+clear ownership of its own persistence. The minor cost — a second near-identical
+checkpoint table/service — is accepted; the two meters evolve independently.
 
 The audit table is the load-bearing fix for catch-up correctness: `StorageMeterService` is a stock read with no time-travel, so persisting each measured value per hour decouples *measurement* from *Stripe availability* — the reporter can stall and resume without re-measuring (and without re-billing).
 
@@ -193,7 +210,7 @@ No ClickHouse migration; `_size_bytes` exists.
 
 **Negative.**
 - Cancel/downgrade becomes a billing-correctness path: Stripe discards accrued metered usage on cancel unless `cancel_at_period_end` (default) or `prorate=true` + `invoice_now=true` (immediate). Existing cancel paths in `subscription.service.ts` must be audited; each flow gets an integration test asserting the final invoice line.
-- The checkpoint discriminator migration swaps a unique index — brief `ACCESS EXCLUSIVE` on `BillingMeterCheckpoint` (sub-second at current row counts; flag in runbook).
+- The schema migration is purely additive (two `CREATE TABLE`s) — no locks on existing tables, no change to the billable-events checkpoint.
 - Stripe's 35-day timestamp ceiling caps catch-up; longer projection outages need the `meterEventAdjustments.create` runbook path.
 - Hourly catch-up means hourly CH queries per org per gap — bounded with the same memory-budget pattern as the existing storage-meter query (per-table-then-sum, no UNION ALL).
 
