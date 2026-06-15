@@ -1793,6 +1793,43 @@ model BillingMeterCheckpoint {
   @@unique([organizationId, billingMonth])
 }
 
+// ADR-027 storage billing — own its persistence, additively, alongside (not
+// inside) the billable-events checkpoint above. Keeping a separate table means
+// the storage meter never touches BillingMeterCheckpoint's live unique index.
+
+// Durable per-hour stored-bytes measurement. The dispatcher writes one row per
+// sealed UTC hour (megabytes = stored bytes aged > 30d, measured once); the
+// reporter drains reportedAt IS NULL across orgs and stamps it on Stripe
+// success. This decouples measurement from Stripe availability — the reporter
+// can stall and resume without re-measuring or re-billing — and is the per-org
+// audit trail an invoice line traces back to.
+model StorageUsageHourly {
+  organizationId String
+  sealedHour     DateTime // UTC, truncated to hour
+  megabytes      Int // ceil(bytes / 1_048_576), measured at sample time
+  reportedAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@id([organizationId, sealedHour])
+  @@index([reportedAt])
+}
+
+// Two-phase reporting checkpoint dedicated to the STORAGE_GB meter — a parallel
+// of BillingMeterCheckpoint owned by StorageBillingCheckpointService. Separate
+// table (not a meterName discriminator on the shared one) so storage billing is
+// purely additive and the billable-events checkpoint is never altered.
+model StorageBillingCheckpoint {
+  id                   String   @id @default(cuid())
+  organizationId       String
+  billingMonth         String // "2026-02"
+  lastReportedTotal    Int      @default(0)
+  pendingReportedTotal Int? // non-null = in-flight Stripe call
+  consecutiveFailures  Int      @default(0)
+  updatedAt            DateTime @updatedAt
+
+  @@unique([organizationId, billingMonth])
+}
+
 // ============================================================================
 // AI Gateway
 //
