@@ -175,6 +175,23 @@ describe("showAiCallFailedToast", () => {
     ).toBeInTheDocument();
   });
 
+  /** @scenario A failed assistive AI call warns, it does not error */
+  it("renders as a warning toast, not an error", async () => {
+    mountToaster();
+    showAiCallFailedToast({
+      featureKey: "workflows.commit_message",
+      featureDisplayName: "Workflow commit message",
+      role: "FAST",
+      projectSlug: "acme-app",
+      errorMessage: "boom",
+    });
+
+    const title = await screen.findByText(/Workflow commit message failed/i);
+    const root = title.closest("[data-type]");
+    expect(root).not.toBeNull();
+    expect(root!.getAttribute("data-type")).toBe("warning");
+  });
+
   it("dedupes by stable id", async () => {
     mountToaster();
     const info = {

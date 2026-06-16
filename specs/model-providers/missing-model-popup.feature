@@ -136,7 +136,28 @@ Feature: Missing-model toast when a feature can't resolve a model
     When I open the save-version drawer
     Then a commit-message generation request is sent
     And the description field fills with the generated message
-    And no sparkles generate button is shown
+    And the sparkles generate button stays available to regenerate or retry
+
+  @integration
+  Scenario: Clicking the sparkles button with a configured model regenerates the description
+    Given a Fast model resolves for the project
+    And the save-version drawer is open
+    When I click the sparkles generate button on the description field
+    Then a new commit-message generation request is sent
+
+  # gpt-5 family reasoning models reject function tools combined with
+  # reasoning_effort on /v1/chat/completions (the provider asks for
+  # /v1/responses), and these calls go through the OpenAI-compatible
+  # chat-completions proxy. A commit message is one short string, so the
+  # generation uses a plain-text completion instead of a function-tool
+  # round-trip and works across every model the user might configure.
+  @integration
+  Scenario: Commit-message generation works for reasoning models
+    Given the Fast model is a gpt-5 family reasoning model
+    And the workflow has unsaved changes
+    When the commit-message generation request is sent
+    Then it is a plain-text completion, not a function-tool call
+    And the description field fills with the generated message
 
   # ============================================================================
   # Downstream AI-call failures (not MODEL_NOT_CONFIGURED)
@@ -150,6 +171,15 @@ Feature: Missing-model toast when a feature can't resolve a model
     And a toast appears titled "Workflow commit message failed"
     And the body says "Double-check your Fast model configuration in Model Providers"
     And the original short provider error message is surfaced underneath the hint
+
+  # The commit-message autogen (and AI search, ...) is assistive: it failing
+  # does not break anything the user was doing, so a yellow warning is the
+  # right level, not a red error.
+  @integration
+  Scenario: A failed assistive AI call warns, it does not error
+    Given the Fast role resolves to a model whose provider key is invalid
+    When the workflow auto-commit fires and the provider returns 401
+    Then the toast severity is a warning, not an error
 
   # ============================================================================
   # Background-task / no-UI-context surface (future)

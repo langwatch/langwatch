@@ -223,25 +223,27 @@ export function NewVersionFields({
                 <AISparklesLoader />
               ) : canSave &&
                 resolvedDefault.isFetched &&
-                !isModelConfigured &&
                 previousVersion?.dsl ? (
-                // No model to auto-generate with: degrade to an explicit
-                // generate affordance. Clicking it runs the doomed call on
-                // purpose, and the missing-model toast becomes the answer
-                // to a question the user actually asked.
+                // Always offer an explicit generate affordance: a manual retry
+                // after a failed autogen, a re-roll of a description the user
+                // does not like, or (with no model configured) the trigger that
+                // surfaces the missing-model toast on purpose. force:true
+                // bypasses the auto-gen gate; clearing the edited flag lets the
+                // result land even if the user typed something first.
                 <IconButton
                   size="xs"
                   variant="ghost"
                   color="blue.400"
                   aria-label="Generate description"
                   data-testid="generate-commit-message-button"
-                  onClick={() =>
+                  onClick={() => {
+                    userEditedCommitMessage.current = false;
                     generateCommitMessageCallback(
                       previousVersion.dsl!,
                       getWorkflow(),
                       { force: true },
-                    )
-                  }
+                    );
+                  }}
                 >
                   <Sparkles size={16} />
                 </IconButton>

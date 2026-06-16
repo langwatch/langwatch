@@ -137,16 +137,31 @@ describe("given the save-version fields are rendered", () => {
 
   describe("when a Fast model resolves for the project", () => {
     /** @scenario A configured Fast model still auto-generates the description */
-    it("auto-fires generation and shows no sparkles button", async () => {
+    it("auto-fires generation and keeps a regenerate button available", async () => {
       mockResolvedDefault.current = { model: "openai/gpt-5-mini" };
       render(<Harness />);
 
       await waitFor(() => {
         expect(mockGenerateMutate).toHaveBeenCalledTimes(1);
       });
+      // The sparkles button stays available as a manual retry / re-roll,
+      // not only when no model is configured.
       expect(
-        screen.queryByTestId("generate-commit-message-button"),
-      ).not.toBeInTheDocument();
+        screen.getByTestId("generate-commit-message-button"),
+      ).toBeInTheDocument();
+    });
+
+    /** @scenario Clicking the sparkles button with a configured model regenerates the description */
+    it("re-fires generation when the regenerate button is clicked", async () => {
+      mockResolvedDefault.current = { model: "openai/gpt-5-mini" };
+      render(<Harness />);
+
+      await waitFor(() => {
+        expect(mockGenerateMutate).toHaveBeenCalledTimes(1);
+      });
+
+      fireEvent.click(screen.getByTestId("generate-commit-message-button"));
+      expect(mockGenerateMutate).toHaveBeenCalledTimes(2);
     });
   });
 });

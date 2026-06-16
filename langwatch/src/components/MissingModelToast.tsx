@@ -118,7 +118,10 @@ export function showAiCallFailedToast(info: AiCallFailedInfo): void {
 
   toaster.create({
     id,
-    type: "error",
+    // Warning, not error: the AI call is an assistive convenience (commit
+    // messages, AI search, ...). It failing nudges the user to check their
+    // model configuration; nothing the user was doing actually broke.
+    type: "warning",
     duration: 10000,
     title: `${info.featureDisplayName} failed`,
     description,
