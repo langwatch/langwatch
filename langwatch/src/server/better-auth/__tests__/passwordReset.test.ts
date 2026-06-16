@@ -36,7 +36,7 @@ describe("better-auth password reset wiring", () => {
   });
 
   describe("when BetterAuth invokes sendResetPassword", () => {
-    /** @scenario sendResetPassword builds the reset link from BASE_HOST and the token */
+    /** @scenario The reset link is rooted at the deployment's own URL and carries the token */
     it("emails the user a reset link rooted at BASE_HOST carrying the token", async () => {
       const emailAndPassword = getEmailAndPassword();
       expect(typeof emailAndPassword.sendResetPassword).toBe("function");

@@ -79,17 +79,17 @@ Feature: Forgot / reset password on credential (email-mode) sign-in
     Then the body says the link expires
     And the body says the user can ignore the email if they did not request it
 
-  # --- Server wiring (BetterAuth emailAndPassword) ---
+  # --- Reset link, session revocation, and rate limiting ---
 
   @integration
-  Scenario: sendResetPassword builds the reset link from BASE_HOST and the token
-    Given BetterAuth invokes the configured sendResetPassword callback with a user and token
-    Then the callback sends a reset email to that user
-    And the reset link is rooted at BASE_HOST and carries the token
+  Scenario: The reset link is rooted at the deployment's own URL and carries the token
+    Given a password reset is generated for a user
+    Then the user is sent a reset email
+    And the reset link points at this deployment's reset page and carries the token
 
   @integration
   Scenario: A successful reset revokes all of the user's existing sessions
-    Given BetterAuth invokes the configured onPasswordReset callback for a user
+    Given a user completes a password reset
     Then every existing session for that user is revoked
 
   @integration
