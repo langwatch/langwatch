@@ -1,6 +1,6 @@
 import { Badge, Text } from "@chakra-ui/react";
 import type { TraceListItem } from "../../../../../types/trace";
-import { formatDuration, formatTokens } from "../../../../../utils/formatters";
+import { formatTokens } from "../../../../../utils/formatters";
 import {
   originColorPalette,
   originLabel,
@@ -14,19 +14,6 @@ export const StatusCell = {
   id: "status",
   label: "Status",
   render: ({ row }) => <StatusIndicator status={row.status} />,
-} as const satisfies CellDef<TraceListItem>;
-
-export const TtftCell = {
-  id: "ttft",
-  label: "TTFT",
-  render: ({ row }) => (
-    <MonoCell>{row.ttft != null ? formatDuration(row.ttft) : dash}</MonoCell>
-  ),
-  renderComfortable: ({ row }) => (
-    <Text textStyle="sm" color="fg.muted" textAlign="right">
-      {row.ttft != null ? formatDuration(row.ttft) : dash}
-    </Text>
-  ),
 } as const satisfies CellDef<TraceListItem>;
 
 export const UserIdCell = {

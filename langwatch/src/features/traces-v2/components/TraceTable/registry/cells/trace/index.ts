@@ -19,7 +19,6 @@ import {
   StatusCell,
   TokensInCell,
   TokensOutCell,
-  TtftCell,
   UserIdCell,
 } from "./SimpleCells";
 import { SinceCell } from "./SinceCell";
@@ -30,6 +29,7 @@ import { TokensCell } from "./TokensCell";
 import { TraceCell } from "./TraceCell";
 import { TraceIdCell } from "./TraceIdCell";
 import { TraceNameCell } from "./TraceNameCell";
+import { TtftCell } from "./TtftCell";
 
 /**
  * Cell renderers keyed by column id. Every TraceColumnId must have a cell;

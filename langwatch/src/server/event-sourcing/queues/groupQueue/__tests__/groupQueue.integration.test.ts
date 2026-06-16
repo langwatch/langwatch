@@ -512,10 +512,12 @@ describe.skipIf(!hasTestcontainers)(
             value: "second",
           });
 
-          // Both sends signal the dispatcher before the 200ms delay elapses,
-          // so pickup of the squashed job rides on the BRPOP fallback poll
-          // (signalTimeoutSec = 5s). The window must absorb several poll
-          // cycles on a CPU-starved CI runner.
+          // Both stage signals fire before dispatchAfter (delay: 200), so the
+          // dispatcher consumes and drains them while the job is not yet due.
+          // Dispatch then rides the BRPOP idle-rescan net (signalTimeoutSec,
+          // 5s), and on a loaded CI runner that net plus worker overhead can
+          // exceed 10s of wall clock — same ceiling class as the TOCTOU
+          // dispatch-gap flake. 30s gives the net 3x headroom.
           await vi.waitFor(
             () => {
               expect(processed).toHaveBeenCalledTimes(1);
