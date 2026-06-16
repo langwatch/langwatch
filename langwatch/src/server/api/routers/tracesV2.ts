@@ -410,6 +410,10 @@ export function redactV2Content<
   T extends {
     input?: string | null;
     output?: string | null;
+    inputRedacted?: boolean | null;
+    outputRedacted?: boolean | null;
+    inputVisibleTo?: string | null;
+    outputVisibleTo?: string | null;
     attributes?: Record<string, string>;
     params?: Record<string, unknown> | null;
   },
@@ -418,15 +422,32 @@ export function redactV2Content<
   protections: {
     canSeeCapturedInput?: boolean | null;
     canSeeCapturedOutput?: boolean | null;
+    capturedInputVisibleTo?: string | null;
+    capturedOutputVisibleTo?: string | null;
     hiddenAttributes?: Array<{ pattern: string; visibleTo: string }>;
   },
 ): T {
+  // A field is redacted only when there WAS content the viewer may not see, so a
+  // genuinely empty input never renders the placeholder. The audience label
+  // rides along so the drawer can say who it is visible to.
+  const inputRedacted =
+    protections.canSeeCapturedInput !== true && dto.input != null;
+  const outputRedacted =
+    protections.canSeeCapturedOutput !== true && dto.output != null;
   const redacted: T = {
     ...dto,
     input:
       protections.canSeeCapturedInput === true ? (dto.input ?? null) : null,
     output:
       protections.canSeeCapturedOutput === true ? (dto.output ?? null) : null,
+    inputRedacted,
+    outputRedacted,
+    inputVisibleTo: inputRedacted
+      ? (protections.capturedInputVisibleTo ?? null)
+      : null,
+    outputVisibleTo: outputRedacted
+      ? (protections.capturedOutputVisibleTo ?? null)
+      : null,
   };
   // Custom attribute rules with a restrict disposition: replace the matched
   // attribute values (header attributes, span params, span-event attributes)

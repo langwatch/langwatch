@@ -29,7 +29,10 @@ describe("redactV2Content", () => {
           input: "hello",
           output: "world",
           attributes: { "app.billing.card_token": "tok", "service.name": "x" },
-          params: { app: { billing: { card_token: "tok" } }, model: "gpt-5" },
+          params: {
+            app: { billing: { card_token: "tok" } },
+            model: "gpt-5-mini",
+          },
           events: [
             {
               name: "e1",
@@ -48,7 +51,7 @@ describe("redactV2Content", () => {
         (out.params as { app: { billing: { card_token: string } } }).app.billing
           .card_token,
       ).toBe("[REDACTED] (visible to Admins)");
-      expect((out.params as { model: string }).model).toBe("gpt-5");
+      expect((out.params as { model: string }).model).toBe("gpt-5-mini");
       const event = (
         out as unknown as {
           events: Array<{ attributes: Record<string, unknown> }>;
@@ -77,6 +80,47 @@ describe("redactV2Content", () => {
       expect(out.attributes?.["langwatch.privacy.dropped_attributes"]).toBe(
         "app.internal.session",
       );
+    });
+  });
+
+  describe("given a restrict rule hides content from the viewer", () => {
+    it("flags the field redacted and carries the audience label", () => {
+      const out = redactV2Content(
+        { input: "secret prompt", output: "secret answer" },
+        {
+          canSeeCapturedInput: false,
+          canSeeCapturedOutput: false,
+          capturedInputVisibleTo: "Admins, Security group",
+          capturedOutputVisibleTo: "Admins, Security group",
+        },
+      );
+
+      expect(out.input).toBeNull();
+      expect(out.inputRedacted).toBe(true);
+      expect(out.inputVisibleTo).toBe("Admins, Security group");
+      expect(out.outputRedacted).toBe(true);
+      expect(out.outputVisibleTo).toBe("Admins, Security group");
+    });
+
+    it("does not flag a genuinely empty field as redacted", () => {
+      const out = redactV2Content(
+        { input: null, output: "world" },
+        { canSeeCapturedInput: false, canSeeCapturedOutput: true },
+      );
+
+      expect(out.inputRedacted).toBe(false);
+      expect(out.inputVisibleTo).toBeNull();
+      expect(out.outputRedacted).toBe(false);
+    });
+
+    it("does not flag content the viewer is allowed to see", () => {
+      const out = redactV2Content(
+        { input: "hello" },
+        { canSeeCapturedInput: true, canSeeCapturedOutput: true },
+      );
+
+      expect(out.input).toBe("hello");
+      expect(out.inputRedacted).toBe(false);
     });
   });
 

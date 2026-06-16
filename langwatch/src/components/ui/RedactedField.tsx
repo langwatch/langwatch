@@ -10,6 +10,15 @@ interface RedactedFieldProps {
   field: "input" | "output";
   children: React.ReactNode;
   loadingComponent?: React.ReactNode;
+  /**
+   * When provided, drives the redaction state directly instead of the per-field
+   * query: the traces-v2 drawer passes the DTO's own redaction info so the
+   * marker can never disagree with the content the server already nulled.
+   * `visibleTo` is the human audience label ("Admins, Security group" or "no
+   * one"), or null for the generic copy.
+   */
+  redacted?: boolean;
+  visibleTo?: string | null;
 }
 
 /**
@@ -37,9 +46,16 @@ export const RedactedField: React.FC<RedactedFieldProps> = ({
   field,
   children,
   loadingComponent,
+  redacted,
+  visibleTo: visibleToProp,
 }) => {
-  const { isRedacted, isLoading, visibleTo } = useFieldRedaction(field);
+  const query = useFieldRedaction(field);
   const { hasPermission } = useOrganizationTeamProject();
+
+  const explicit = redacted !== undefined;
+  const isRedacted = explicit ? redacted : query.isRedacted;
+  const isLoading = explicit ? false : query.isLoading;
+  const visibleTo = explicit ? (visibleToProp ?? null) : query.visibleTo;
 
   if (isLoading || isRedacted === undefined) {
     return <>{loadingComponent ?? <Skeleton height="20px" width="100%" />}</>;

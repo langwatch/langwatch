@@ -152,7 +152,11 @@ export function SpanAccordions({
                     <EmptyHint>Loading…</EmptyHint>
                   ) : (
                     <VStack align="stretch" gap={2}>
-                      <RedactedField field="input">
+                      <RedactedField
+                        field="input"
+                        redacted={detail?.inputRedacted ?? false}
+                        visibleTo={detail?.inputVisibleTo}
+                      >
                         {detail?.input ? (
                           <IOViewer
                             label="Input"
@@ -163,7 +167,11 @@ export function SpanAccordions({
                           />
                         ) : null}
                       </RedactedField>
-                      <RedactedField field="output">
+                      <RedactedField
+                        field="output"
+                        redacted={detail?.outputRedacted ?? false}
+                        visibleTo={detail?.outputVisibleTo}
+                      >
                         {detail?.output ? (
                           <IOViewer
                             label="Output"

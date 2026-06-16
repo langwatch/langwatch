@@ -66,6 +66,12 @@ const traceHeaderSchema = z.object({
   error: z.string().nullish(),
   input: z.string().nullish(),
   output: z.string().nullish(),
+  // Set when a restrict privacy rule hides the content from this viewer, so the
+  // header shows a labeled placeholder instead of nothing.
+  inputRedacted: z.boolean().nullish(),
+  outputRedacted: z.boolean().nullish(),
+  inputVisibleTo: z.string().nullish(),
+  outputVisibleTo: z.string().nullish(),
   // True when input/output/error were teaser-redacted by the plan's
   // visibility window — drives the blurred-content upgrade treatment.
   redactedByVisibilityWindow: z.boolean().optional(),
@@ -192,6 +198,13 @@ export const spanDetailSchema = z.object({
   vendor: z.string().nullish(),
   input: z.string().nullish(),
   output: z.string().nullish(),
+  // Set when a restrict privacy rule hides the content from this viewer, so the
+  // drawer shows a labeled placeholder instead of nothing. `*VisibleTo` is the
+  // human audience label ("Admins, Security group" or "no one").
+  inputRedacted: z.boolean().nullish(),
+  outputRedacted: z.boolean().nullish(),
+  inputVisibleTo: z.string().nullish(),
+  outputVisibleTo: z.string().nullish(),
   error: z
     .object({
       message: z.string(),
