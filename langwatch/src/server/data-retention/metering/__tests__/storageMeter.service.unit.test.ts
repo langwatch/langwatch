@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { RETENTION_MANAGED_TABLES } from "../../retentionPolicy.schema";
 import { StorageMeterService } from "../storageMeter.service";
 
 /**
@@ -21,6 +22,9 @@ describe("StorageMeterService memory guard", () => {
   function assertGuarded(call: { clickhouse_settings?: Record<string, unknown> }) {
     expect(call.clickhouse_settings).toBeDefined();
     expect(call.clickhouse_settings!.max_threads).toBe(2);
+    // A coarse guardrail so a runaway byteSize recompute can't grind for a
+    // minute; a materialized read finishes in seconds, well under this.
+    expect(call.clickhouse_settings!.max_execution_time).toBe(45);
   }
 
   describe("when computing the per-category storage breakdown", () => {
@@ -44,6 +48,28 @@ describe("StorageMeterService memory guard", () => {
 
       expect(query).toHaveBeenCalledTimes(1);
       assertGuarded(query.mock.calls[0]![0]);
+    });
+  });
+
+  describe("when the single aggregate total query fails for a heavy table", () => {
+    it("falls back to the per-table breakdown instead of throwing", async () => {
+      // The combined UNION ALL aggregate trips the per-query limit, but each
+      // table's own query still succeeds — the total should degrade to the
+      // sum of the per-table subtotals rather than failing the whole metric.
+      const query = vi.fn().mockImplementation(async (arg: { query: string }) => {
+        if (arg.query.includes("UNION ALL")) {
+          throw new Error("Code: 241. DB::Exception: memory limit exceeded");
+        }
+        return { json: async () => [{ total: "10" }] };
+      });
+      const client = { query } as const;
+      const service = new StorageMeterService(async () => client as any);
+
+      const total = await service.getTotalStorageBytes({ tenantId: "p-heavy" });
+
+      expect(total).toBe(10 * RETENTION_MANAGED_TABLES.length);
+      // one failed aggregate attempt + one query per table for the fallback
+      expect(query).toHaveBeenCalledTimes(1 + RETENTION_MANAGED_TABLES.length);
     });
   });
 });

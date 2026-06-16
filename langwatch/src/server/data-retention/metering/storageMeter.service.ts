@@ -27,8 +27,19 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 // total server memory so it can't help tip the box into a server-wide OOM. The
 // common case (parts where `_size_bytes` is already materialized) reads a tiny
 // UInt32 column and is unaffected.
+//
+// `max_execution_time` is a coarse guardrail on top of that: a materialized
+// read finishes in a few seconds even for the largest tenants, so this only
+// trips on the pathological recompute path (observed at 24-60s reading tens of
+// GB). Tripping it fails that one read — which is then degraded gracefully (see
+// getStorageBreakdown's per-table catch and queryTotalBytes's fallback) instead
+// of letting one tenant's metering grind for a minute and burn tens of GB of
+// reads every cache cycle. The durable fix is to backfill the column so the
+// recompute never happens (see queryTotalBytes).
+const METERING_MAX_EXECUTION_SECONDS = 45;
 const METERING_CLICKHOUSE_SETTINGS = {
   max_threads: 2,
+  max_execution_time: METERING_MAX_EXECUTION_SECONDS,
 } as const;
 
 interface StorageBreakdown {
@@ -112,6 +123,18 @@ export class StorageMeterService {
    * Sums per-table `_size_bytes` totals for a tenant in a single query. Each
    * table is pre-aggregated inside a UNION ALL so only the 11 scalar subtotals
    * (not every row's `_size_bytes`) reach the outer sum.
+   *
+   * On parts where `_size_bytes` was never materialized this still recomputes
+   * `byteSize(...)` over the heavy payload columns, which for the largest
+   * tenants reads tens of GB and can exceed the per-query memory/time limit.
+   * If the single aggregate fails for any reason, fall back to the per-table
+   * {@link getStorageBreakdown}, whose per-table catch degrades only the
+   * failing table to zero — so one heavy table can't fail the whole total.
+   *
+   * The durable fix is to stop the recompute entirely by backfilling the
+   * column on existing parts (out of band, during a low-traffic window):
+   *   ALTER TABLE <table> MATERIALIZE COLUMN _size_bytes;
+   * after which every read hits the stored UInt32 and this path is cheap.
    */
   private async queryTotalBytes(tenantId: string): Promise<number> {
     if (!this.resolveClickHouseClient) return 0;
@@ -126,13 +149,22 @@ export class StorageMeterService {
         `SELECT sum(_size_bytes) AS t FROM ${table} WHERE TenantId = {tenantId:String}`,
     ).join("\n  UNION ALL\n  ");
 
-    const result = await client.query({
-      query: `SELECT sum(t) AS total FROM (\n  ${unions}\n)`,
-      query_params: { tenantId },
-      format: "JSONEachRow",
-      clickhouse_settings: METERING_CLICKHOUSE_SETTINGS,
-    });
-    const rows = (await result.json()) as Array<{ total: string }>;
-    return Number(rows[0]?.total ?? 0);
+    try {
+      const result = await client.query({
+        query: `SELECT sum(t) AS total FROM (\n  ${unions}\n)`,
+        query_params: { tenantId },
+        format: "JSONEachRow",
+        clickhouse_settings: METERING_CLICKHOUSE_SETTINGS,
+      });
+      const rows = (await result.json()) as Array<{ total: string }>;
+      return Number(rows[0]?.total ?? 0);
+    } catch (error) {
+      logger.warn(
+        { tenantId, error },
+        "Total _size_bytes query failed; falling back to per-table breakdown",
+      );
+      const { totalBytes } = await this.getStorageBreakdown({ tenantId });
+      return totalBytes;
+    }
   }
 }
