@@ -48,6 +48,27 @@ Feature: Dropping trace content at ingestion
     Then the stored trace keeps its input and output
     And the stored trace has no tool-call arguments or results
 
+  # System instructions and tool calls are not only their own attributes: they
+  # also live as turns inside the captured conversation (a system message, tool
+  # result messages, an assistant turn's tool_calls). Dropping the category has
+  # to remove those turns from the conversation too, or the very content the rule
+  # was meant to drop stays readable inside the input and output.
+
+  @integration
+  Scenario: Dropping system instructions strips the system turn from the conversation
+    Given a rule on "web-app" that drops system instructions
+    When a trace is ingested whose conversation starts with a system message
+    Then the stored conversation has no system message
+    And the stored trace keeps its user and assistant messages
+
+  @integration
+  Scenario: Dropping tool calls strips tool messages and assistant tool_calls
+    Given a rule on "web-app" that drops tool calls only
+    When a trace is ingested whose conversation has tool result messages and an assistant turn that calls a tool
+    Then the stored conversation has no tool messages
+    And the stored assistant message has no tool_calls
+    And the stored trace keeps its user and assistant messages
+
   @integration
   Scenario: A coding-agent's full request body is never stored when input is dropped
     Given a rule on "web-app" that drops trace input

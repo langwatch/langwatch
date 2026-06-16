@@ -406,6 +406,13 @@ function buildSpanContentRedactions(
   ]);
 }
 
+type V2RedactionFlags = {
+  inputRedacted: boolean;
+  outputRedacted: boolean;
+  inputVisibleTo: string | null;
+  outputVisibleTo: string | null;
+};
+
 export function redactV2Content<
   T extends {
     input?: string | null;
@@ -426,7 +433,7 @@ export function redactV2Content<
     capturedOutputVisibleTo?: string | null;
     hiddenAttributes?: Array<{ pattern: string; visibleTo: string }>;
   },
-): T {
+): T & V2RedactionFlags {
   // A field is redacted only when there WAS content the viewer may not see, so a
   // genuinely empty input never renders the placeholder. The audience label
   // rides along so the drawer can say who it is visible to.
@@ -434,7 +441,7 @@ export function redactV2Content<
     protections.canSeeCapturedInput !== true && dto.input != null;
   const outputRedacted =
     protections.canSeeCapturedOutput !== true && dto.output != null;
-  const redacted: T = {
+  const redacted: T & V2RedactionFlags = {
     ...dto,
     input:
       protections.canSeeCapturedInput === true ? (dto.input ?? null) : null,
@@ -637,8 +644,11 @@ export const tracesV2Router = createTRPCRouter({
           input.projectId,
         ),
       });
-      const turns = page.items.map((t) =>
-        redactV2Content(
+      const turns = page.items.map((t) => {
+        // Conversation turns only need the permission-nulled input/output, not
+        // the placeholder flags the drawer uses — strip those so the turn shape
+        // stays the bare conversation DTO the client expects.
+        const { input, output } = redactV2Content(
           {
             traceId: t.traceId,
             timestamp: t.timestamp,
@@ -649,8 +659,17 @@ export const tracesV2Router = createTRPCRouter({
             output: t.output ?? null,
           },
           protections,
-        ),
-      );
+        );
+        return {
+          traceId: t.traceId,
+          timestamp: t.timestamp,
+          name: t.traceName || t.name,
+          rootSpanType: t.rootSpanType ?? null,
+          status: t.status,
+          input,
+          output,
+        };
+      });
       // Position/previous/next are derived client-side from the active
       // traceId so the cache key doesn't churn on J/K navigation.
       return {
