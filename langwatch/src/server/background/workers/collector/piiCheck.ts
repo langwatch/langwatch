@@ -391,12 +391,7 @@ export const batchPresidioClearPII = async (
         body: JSON.stringify({
           data: truncated.map((t) => ({ input: t.input })),
           settings: {
-            entities: Object.fromEntries(
-              (piiRedactionLevel === "ESSENTIAL"
-                ? essentialInfoTypes
-                : strictInfoTypes
-              ).presidio.map((name) => [name.toLowerCase(), true]),
-            ),
+            entities: presidioEntitiesSetting(piiRedactionLevel, entities),
             min_threshold: 0.5,
           },
           env: {},

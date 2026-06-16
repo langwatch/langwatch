@@ -1171,15 +1171,15 @@ function PrivacyRuleDrawer({
                   {piiLevel === "custom" && (
                     <VStack align="stretch" gap={3} paddingLeft={10}>
                       <PiiEntityToggleGroup
-                        title="Detected in-process"
-                        hint="Fast and free, redacted as data arrives."
+                        title="Fast detection"
+                        hint="Redacted instantly as data arrives, at no extra cost."
                         labels={ESSENTIAL_PII_ENTITY_LABELS}
                         selected={piiEntities}
                         onToggle={togglePiiEntity}
                       />
                       <PiiEntityToggleGroup
-                        title="Needs the analysis service"
-                        hint="Deeper detection for names and locations, slower."
+                        title="Deep detection"
+                        hint="Also finds names and locations. May add some latency."
                         labels={STRICT_ADDED_PII_ENTITY_LABELS}
                         selected={piiEntities}
                         onToggle={togglePiiEntity}

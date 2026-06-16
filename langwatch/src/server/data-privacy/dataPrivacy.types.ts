@@ -1,4 +1,19 @@
 import { z } from "zod";
+import {
+  REDACTION_MARKER_ENTITIES,
+  SECRET_MARKER_ENTITY,
+} from "./redaction/markers";
+
+/**
+ * The entity names a custom PII policy may select: every redaction-marker
+ * entity except the secrets marker (secrets are a separate toggle). Sourced
+ * from the dependency-free marker registry so it stays pinned to the engines.
+ */
+const VALID_PII_ENTITIES: ReadonlySet<string> = new Set(
+  [...REDACTION_MARKER_ENTITIES].filter(
+    (entity) => entity !== SECRET_MARKER_ENTITY,
+  ),
+);
 
 /**
  * Canonical contract for the unified data-privacy policy (ADR-021).
@@ -100,11 +115,36 @@ export const dataPrivacyConfigSchema = z
         level: z.enum(PII_LEVELS),
         // Only meaningful when level === "custom": the exact identifiers to
         // redact, as canonical entity names ("EMAIL_ADDRESS", "BR_CPF",
-        // "PERSON"). Pattern-based ones run natively; ones that need the
+        // "PERSON"). Validated against the known set so a typo cannot silently
+        // redact nothing. Pattern-based ones run natively; ones that need the
         // analysis service are sent there only when selected.
-        entities: z.array(z.string()).max(64).optional(),
+        entities: z
+          .array(
+            z.string().refine((entity) => VALID_PII_ENTITIES.has(entity), {
+              message: "Unknown PII entity",
+            }),
+          )
+          .max(64)
+          .optional(),
       })
       .strict()
+      .superRefine((pii, ctx) => {
+        if (pii.level === "custom") {
+          if (!pii.entities || pii.entities.length === 0) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: "The custom PII level needs at least one entity",
+              path: ["entities"],
+            });
+          }
+        } else if (pii.entities && pii.entities.length > 0) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Entities can only be set when the level is custom",
+            path: ["entities"],
+          });
+        }
+      })
       .optional(),
     secrets: z
       .object({
