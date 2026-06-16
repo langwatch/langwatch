@@ -19,6 +19,8 @@ import {
   beforeSessionCreate,
   beforeUserCreate,
 } from "./hooks";
+import { revokeAllSessionsForUser } from "./revokeSessions";
+import { sendResetPasswordEmail } from "../mailer/resetPasswordEmail";
 
 const logger = createLogger("langwatch:better-auth");
 
@@ -377,6 +379,36 @@ export const auth = betterAuth({
     password: {
       hash: async (password: string) => hash(password, 10),
       verify: async ({ password, hash: storedHash }) => compare(password, storedHash),
+    },
+    /**
+     * Reset-link lifetime. Kept at BetterAuth's one-hour default but stated
+     * explicitly so the email copy ("this link expires in 1 hour") and the
+     * token expiry can't silently drift apart.
+     */
+    resetPasswordTokenExpiresIn: 60 * 60,
+    /**
+     * Wires BetterAuth's /request-password-reset endpoint to our existing
+     * transactional mailer (SendGrid / SES via `sendEmail`). Without this the
+     * endpoint returns RESET_PASSWORD_DISABLED. We ignore BetterAuth's default
+     * `url` and build the link off BASE_HOST + the issued token so it lands on
+     * our own /auth/reset-password page. BetterAuth only enables (and the
+     * cloud-mode `hooks.before` gate only allows) this in email mode, so the
+     * link is always credential-mode.
+     */
+    sendResetPassword: async ({ user, token }) => {
+      await sendResetPasswordEmail({
+        email: user.email,
+        resetUrl: `${env.BASE_HOST}/auth/reset-password?token=${token}`,
+      });
+    },
+    /**
+     * After a successful reset, force-logout every existing session for the
+     * user. The self-service change-password flow revokes *other* sessions
+     * (keeping the current tab); here the user isn't signed in, and a reset is
+     * the recovery path for a possibly-compromised account, so we revoke all.
+     */
+    onPasswordReset: async ({ user }) => {
+      await revokeAllSessionsForUser({ prisma, userId: user.id });
     },
   },
 

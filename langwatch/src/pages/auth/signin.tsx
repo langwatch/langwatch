@@ -162,6 +162,17 @@ function SignInForm() {
               >
                 <Input type="password" {...form.register("password")} />
               </HorizontalFormControl>
+              <HStack width="full">
+                <Spacer />
+                <Box asChild>
+                  <Link
+                    href="/auth/forgot-password"
+                    style={{ textDecoration: "underline", fontSize: "14px" }}
+                  >
+                    Forgot password?
+                  </Link>
+                </Box>
+              </HStack>
               {error && (
                 <Alert.Root status="error">
                   <Alert.Indicator />
