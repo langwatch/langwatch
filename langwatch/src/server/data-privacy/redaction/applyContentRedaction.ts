@@ -10,11 +10,12 @@ import {
 /**
  * Compose the NATIVE (in-process) redaction passes for a resolved policy: the
  * secrets scrubber (when enabled, including the policy's custom patterns) then
- * essential PII (when the level is `essential`). Strict PII is intentionally NOT
- * here: it stays a batched call to the external analysis service so all of a
- * span's strings go in one request, so the caller runs that separately when the
- * level is `strict`. Disabled PII skips the PII pass entirely; secrets still
- * run when enabled (they are an independent concern).
+ * essential PII (for every non-disabled level). Essential PII is the native
+ * floor even at the `strict` level: strict additionally sends the span to the
+ * external analysis service for names/locations, but the regex/checksum
+ * entities are scrubbed here first so they never leak when that service is
+ * unreachable (or simply unconfigured in dev). Disabled PII skips the PII pass
+ * entirely; secrets still run when enabled (they are an independent concern).
  *
  * Pure and synchronous so it can run per string in the hot ingestion path.
  */
@@ -39,7 +40,7 @@ export function redactStringNative({
     redactedCount += secrets.redactedCount;
   }
 
-  if (policy.pii.level === "essential") {
+  if (policy.pii.level !== "disabled") {
     const pii = redactEssentialPiiInText({ text: result });
     result = pii.text;
     redactedCount += pii.redactedCount;

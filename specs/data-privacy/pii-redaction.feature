@@ -36,6 +36,19 @@ Feature: Redacting personal data from traces
     Then the stored input has the name redacted
     And the analysis service was called
 
+  # Strict layers names and locations on top of the essential entities. If the
+  # analysis service is unreachable (or simply not configured in development),
+  # strict must not leave everything exposed: the native essential pass still
+  # scrubs emails, cards, and the other pattern-based identifiers, so the failure
+  # mode is "names slip through" rather than "all personal data is stored".
+  @integration
+  Scenario: Strict falls back to the native essential floor when the analysis service is unavailable
+    Given the resolved PII level for "web-app" is strict
+    And the analysis service is unavailable
+    When a trace is ingested whose input contains an email address and a person's name
+    Then the stored input has the email address redacted
+    And the stored input still contains the name
+
   @integration
   Scenario: Disabling PII keeps personal data
     Given a rule on "web-app" that disables PII redaction

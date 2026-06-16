@@ -232,6 +232,36 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
       expect(batchSpy).toHaveBeenCalledTimes(1);
       expect(attr(span, "input")).toBe("[REDACTED]");
     });
+
+    /** @scenario Strict falls back to the native essential floor when the analysis service is unavailable */
+    it("still redacts essential PII natively when the analysis service is unavailable", async () => {
+      const batchSpy = vi.fn<BatchClearPIIFunction>(async (texts) =>
+        texts.map(() => "[REDACTED]"),
+      );
+      // isLangevalsConfigured: false + not production -> buildOptions returns
+      // null, so the strict batch is never sent. The native floor is all that
+      // runs, and it must still scrub the pattern-based entities.
+      const service = new OtlpSpanPiiRedactionService({
+        batchClearPII: batchSpy,
+        isLangevalsConfigured: false,
+        isProduction: false,
+        dataPrivacyResolver: resolverFor(mkPolicy({ piiLevel: "strict" })),
+      });
+      const span = spanWith({
+        input:
+          "email jane@example.com card 4242424242424242 name Alexander Hamilton",
+      });
+
+      await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+
+      const value = attr(span, "input")!;
+      expect(value).not.toContain("jane@example.com");
+      expect(value).not.toContain("4242424242424242");
+      expect(value).toContain("[EMAIL_ADDRESS]");
+      // Names need the analysis service, which is down, so they remain.
+      expect(value).toContain("Alexander Hamilton");
+      expect(batchSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe("given PII redaction disabled", () => {

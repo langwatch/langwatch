@@ -61,9 +61,11 @@ describe("redactStringNative", () => {
   });
 
   describe("given the strict PII level", () => {
-    it("does not run essential natively (strict is batched elsewhere) but still scrubs secrets", () => {
+    it("runs essential PII natively as a floor and still scrubs secrets (strict names/locations are batched elsewhere)", () => {
       const p = policy({ piiLevel: "strict" });
-      expect(redactStringNative({ text: EMAIL, policy: p }).text).toBe(EMAIL);
+      expect(redactStringNative({ text: EMAIL, policy: p }).text).toBe(
+        "mail [EMAIL_ADDRESS] end",
+      );
       expect(redactStringNative({ text: SECRET, policy: p }).text).toContain(
         "[SECRET]",
       );

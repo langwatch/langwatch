@@ -167,11 +167,13 @@ type RedactionBatch = {
  *
  * Two paths exist. With a scoped data-privacy policy resolvable for the tenant
  * (the normal ingestion path), the secrets scrubber and the native essential-PII
- * recognizers run in-process with no external call; only the strict level still
- * escalates to the analysis-service batch. Without a tenant, or with the
- * LANGWATCH_DATA_PRIVACY_ENFORCEMENT kill switch set, the analysis-service batch path runs
- * unchanged. This service is applied BEFORE creating immutable events in the
- * event sourcing pipeline.
+ * recognizers run in-process with no external call. The strict level runs that
+ * same native floor first, then escalates to the analysis-service batch for the
+ * names/locations the regex recognizers can't catch — so an unreachable (or, in
+ * dev, unconfigured) analysis service downgrades strict to essential instead of
+ * leaking. Without a tenant, or with the LANGWATCH_DATA_PRIVACY_ENFORCEMENT kill
+ * switch set, the analysis-service batch path runs unchanged. This service is
+ * applied BEFORE creating immutable events in the event sourcing pipeline.
  */
 export class OtlpSpanPiiRedactionService {
   private readonly deps: OtlpSpanPiiRedactionServiceDependencies;
@@ -218,9 +220,13 @@ export class OtlpSpanPiiRedactionService {
     return { policy: { ...resolved, pii: { level } }, level };
   }
 
-  /** Whether the native pass would change anything for this policy. */
+  /**
+   * Whether the native pass would change anything for this policy. Runs for
+   * every non-disabled PII level (essential PII is the native floor even at
+   * strict) and whenever secrets redaction is on.
+   */
   private nativePassActive(policy: ResolvedDataPrivacy): boolean {
-    return policy.secrets.enabled || policy.pii.level === "essential";
+    return policy.secrets.enabled || policy.pii.level !== "disabled";
   }
 
   private nativeSecretPatterns(
