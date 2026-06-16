@@ -22,7 +22,7 @@ const seedSaved = () => {
   return store;
 };
 
-describe("deleteSelectedRows (saved mode)", () => {
+describe("given a saved-mode dataset editor", () => {
   describe("when deleting a server-backed record", () => {
     it("queues a server deletion and drops the row locally", () => {
       const store = seedSaved();
@@ -68,7 +68,7 @@ describe("deleteSelectedRows (saved mode)", () => {
   });
 });
 
-describe("deleteSelectedRows (in-memory / draft mode)", () => {
+describe("given an in-memory (draft) dataset editor", () => {
   describe("when deleting a row", () => {
     it("removes it locally without queuing any server change", () => {
       const store = createDatasetEditorStore();
