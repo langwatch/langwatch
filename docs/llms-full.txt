@@ -25760,6 +25760,14 @@ Replace `{provider}` with: `auth0`, `azure-ad`, `cognito`, `github`, `gitlab`, `
 
 ## Provider Setup
 
+### Email/Password
+
+The default mode (`NEXTAUTH_PROVIDER=email`) needs no identity provider. Users register with an email and password, and a self-service "Forgot password?" link on the sign-in screen lets them reset a forgotten one.
+
+Reset links are sent through the same transactional email provider as the rest of LangWatch. Configure SendGrid or AWS SES as described in [Third-party integrations](/self-hosting/configuration/third-party-integrations) so the reset email can be delivered. If no email provider is configured, the request still returns the same neutral confirmation but no email is sent. The reset link expires one hour after it is issued, and a completed reset signs out the account's other active sessions.
+
+When `NEXTAUTH_PROVIDER` is set to any SSO provider below, the credential form and the "Forgot password?" link are not shown, and the password reset endpoints are disabled.
+
 ### Auth0
 
 1. Create an application in the [Auth0 Dashboard](https://manage.auth0.com/)
