@@ -1,4 +1,4 @@
-import { Alert, Box, Text } from "@chakra-ui/react";
+import { Alert, Box, HStack, Text } from "@chakra-ui/react";
 import { type Node, useUpdateNodeInternals } from "@xyflow/react";
 import { useCallback, useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -10,15 +10,30 @@ import { BasePropertiesPanel } from "./BasePropertiesPanel";
 /**
  * The full vocabulary an evaluator can return. When the workflow
  * behaves as an evaluator, the End node's results are exactly these
- * four - fixed identifiers and types, no add/remove/rename. Unused
- * fields simply stay unconnected.
+ * four - fixed identifiers and types, no add/remove/rename. Every
+ * result is optional: connect any combination (a pass/fail, a score,
+ * both, or neither) and unconnected results are simply omitted.
  */
 export const EVALUATOR_RESULT_FIELDS: Field[] = [
   { identifier: "passed", type: "bool", optional: true },
   { identifier: "score", type: "float", optional: true },
-  { identifier: "details", type: "str", optional: true },
   { identifier: "label", type: "str", optional: true },
+  { identifier: "details", type: "str", optional: true },
 ];
+
+const EVALUATOR_RESULT_TYPE_LABELS: Record<string, string> = {
+  bool: "Boolean",
+  float: "Number",
+  str: "Text",
+};
+
+const EVALUATOR_RESULT_DESCRIPTIONS: Record<string, string> = {
+  passed: "Whether the evaluation passed or not.",
+  score: "Any numerical score.",
+  label: "A category, for categorical evaluations.",
+  details:
+    "The reasoning behind the result, usually the LLM as judge explanation.",
+};
 
 export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
   const { node, edges, setNode, workflowType } = useWorkflowStore(
@@ -41,11 +56,11 @@ export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
     node.data.behave_as === "evaluator" || workflowType === "evaluator";
 
   // Pin the evaluator end node to the fixed result vocabulary. Existing
-  // connections survive (identifiers passed/score keep their handles);
-  // free-form fields users created by hand are replaced by the
-  // contract, which is the point - the four options should be obvious,
-  // not discovered by renaming "output" to "score" on a call. Also stamp
-  // behave_as so the node carries the flag forward once normalized.
+  // connections survive (identifiers keep their handles); free-form fields
+  // users created by hand are replaced by the contract. The check also
+  // reconciles optionality and order, so older nodes that pinned passed/score
+  // as required (or kept details/label in the wrong spot) normalize to the
+  // all-optional, label-before-details vocabulary.
   useEffect(() => {
     if (!isEvaluator) return;
     const current = node.data.inputs ?? [];
@@ -54,7 +69,12 @@ export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
       current.length === EVALUATOR_RESULT_FIELDS.length &&
       EVALUATOR_RESULT_FIELDS.every((f, i) => {
         const c = current[i];
-        return c && c.identifier === f.identifier && c.type === f.type;
+        return (
+          c &&
+          c.identifier === f.identifier &&
+          c.type === f.type &&
+          !!c.optional === !!f.optional
+        );
       });
     if (!matchesContract) {
       setNode({
@@ -65,8 +85,9 @@ export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
           inputs: EVALUATOR_RESULT_FIELDS,
         },
       });
+      updateNodeInternals(node.id);
     }
-  }, [isEvaluator, node.id, node.data, setNode]);
+  }, [isEvaluator, node.id, node.data, setNode, updateNodeInternals]);
 
   const hasResultConnected = edges.some(
     (edge) =>
@@ -75,10 +96,8 @@ export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
         edge.targetHandle === "inputs.passed"),
   );
 
-  // The End node's "results" are its inputs (data flows in). Render them
-  // through the shared VariablesSection so the rows match every other node
-  // panel (type selector on the left, name, remove). Connections come from
-  // the canvas edges, so the per-row value/mapping column is hidden.
+  // Non-evaluator end nodes keep free-form results, rendered through the
+  // shared VariablesSection so the rows match every other node panel.
   const variables: Variable[] = (node.data.inputs ?? []).map((f) => ({
     identifier: f.identifier,
     type: f.type as Variable["type"],
@@ -104,30 +123,53 @@ export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
 
   return (
     <BasePropertiesPanel node={node} hideInputs hideOutputs hideParameters>
-      <Box width="full">
-        <VariablesSection
-          variables={variables}
-          onChange={handleResultsChange}
-          showMappings={false}
-          isMappingDisabled={true}
-          canAddRemove={!isEvaluator}
-          readOnly={isEvaluator}
-          title="Results"
-        />
-      </Box>
-      {isEvaluator && (
-        <Text fontSize="13px" color="fg.muted">
-          Evaluators return up to these four results. Connect the ones your
-          workflow produces - unconnected results are simply omitted.
-        </Text>
+      {isEvaluator ? (
+        <Box width="full" display="flex" flexDirection="column" gap={4}>
+          <Text fontSize="14px" fontWeight="semibold">
+            Results
+          </Text>
+          <Text fontSize="13px" color="fg.muted">
+            Evaluators return up to these four results. Connect the ones your
+            workflow produces; unconnected results are simply omitted.
+          </Text>
+          <Box display="flex" flexDirection="column" gap={3}>
+            {EVALUATOR_RESULT_FIELDS.map((field) => (
+              <Box key={field.identifier} width="full">
+                <HStack gap={2} align="baseline">
+                  <Text fontFamily="mono" fontSize="14px" fontWeight="medium">
+                    {field.identifier}
+                  </Text>
+                  <Text fontSize="12px" color="fg.subtle">
+                    {EVALUATOR_RESULT_TYPE_LABELS[field.type] ?? field.type}
+                  </Text>
+                </HStack>
+                <Text fontSize="13px" color="fg.muted">
+                  {EVALUATOR_RESULT_DESCRIPTIONS[field.identifier]}
+                </Text>
+              </Box>
+            ))}
+          </Box>
+        </Box>
+      ) : (
+        <Box width="full">
+          <VariablesSection
+            variables={variables}
+            onChange={handleResultsChange}
+            showMappings={false}
+            isMappingDisabled={true}
+            canAddRemove={true}
+            readOnly={false}
+            title="Results"
+          />
+        </Box>
       )}
       {isEvaluator && !hasResultConnected && (
         <Alert.Root>
           <Alert.Indicator />
           <Alert.Content>
             <Text>
-              Connect either a <b>score</b> or a <b>passed</b> result for this
-              evaluator to be useful.
+              Connect at least one result, usually a <b>passed</b> or a{" "}
+              <b>score</b>, for this evaluator to be useful.
             </Text>
           </Alert.Content>
         </Alert.Root>

@@ -6,9 +6,10 @@ Feature: Fixed result fields on the evaluator End node
   # Customer context: users renamed/retyped free-form end fields by hand
   # ("rename this to score, make it a number") without knowing the
   # evaluator contract. When the workflow behaves as an evaluator, the
-  # End node's results are a fixed vocabulary: passed (bool),
-  # score (float), details (str), label (str). Unused fields simply stay
-  # unconnected.
+  # End node's results are a fixed vocabulary: passed (bool), score
+  # (float), label (str), details (str). Every result is optional, so any
+  # combination can be connected; unconnected results stay omitted. The
+  # drawer explains each field rather than offering editable rows.
 
   Background:
     Given I am logged in
@@ -17,14 +18,24 @@ Feature: Fixed result fields on the evaluator End node
   @integration
   Scenario: Evaluator End node lists exactly the four fixed result fields
     When I open the End node drawer
-    Then the results are exactly "passed", "score", "details" and "label"
+    Then the results are exactly "passed", "score", "label" and "details"
     And each field shows its fixed type (bool, float, str, str)
+
+  @integration
+  Scenario: Evaluator End node lists label before details
+    When I open the End node drawer
+    Then the result fields appear in the order "passed", "score", "label", "details"
 
   @integration
   Scenario: Evaluator End node results cannot be added or removed
     When I open the End node drawer
-    Then there is no affordance to add another result field
-    And there is no affordance to remove or rename the fixed fields
+    Then each result field is explained with what it returns
+    And there is no affordance to add, remove or rename the fixed fields
+
+  @unit
+  Scenario: All evaluator results are optional
+    Then "passed", "score", "label" and "details" are each optional
+    So that an evaluator can return any combination of them
 
   @integration
   Scenario: Unconnected fixed fields are allowed
@@ -43,5 +54,5 @@ Feature: Fixed result fields on the evaluator End node
     Given an older evaluator workflow whose End node has hand-made "score" and "reasoning" fields
     And the End node does not carry the evaluator flag
     When I open the End node drawer
-    Then the results normalize to the fixed "passed", "score", "details" and "label" vocabulary
+    Then the results normalize to the fixed "passed", "score", "label" and "details" vocabulary
     And the evaluator flag is stamped onto the node

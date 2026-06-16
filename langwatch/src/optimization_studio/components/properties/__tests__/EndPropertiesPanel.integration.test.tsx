@@ -2,10 +2,10 @@
  * @vitest-environment jsdom
  *
  * Evaluator End node: the results are a fixed four-field vocabulary
- * (passed, score, details, label) - normalized on open, read-only, with
- * a connect-score-or-passed nudge. Non-evaluator end nodes keep their
- * free-form results. The results render through the shared VariablesSection
- * (same row layout as every other node panel), with the value column hidden.
+ * (passed, score, label, details), all optional - normalized on open and
+ * explained field by field (not editable rows), with a connect-a-result
+ * nudge. Non-evaluator end nodes keep their free-form results, rendered
+ * through the shared VariablesSection.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -122,7 +122,17 @@ describe("EndPropertiesPanel", () => {
     });
 
     /** @scenario Evaluator End node results cannot be added or removed */
-    it("renders the results read-only", () => {
+    it("explains each fixed result field instead of editable rows", () => {
+      // Wire a result so the connect-a-result nudge is hidden, keeping each
+      // field identifier unique to the explanation list.
+      mockEdges = [
+        {
+          id: "e1",
+          source: "judge",
+          target: "end",
+          targetHandle: "inputs.score",
+        },
+      ];
       renderPanel(
         createEndNode({
           behave_as: "evaluator",
@@ -131,15 +141,52 @@ describe("EndPropertiesPanel", () => {
       );
 
       expect(screen.getByText("Results")).toBeInTheDocument();
-      // Read-only: the fixed vocabulary shows, but no add/remove affordances.
-      expect(screen.getByTestId("variable-name-passed")).toBeInTheDocument();
-      expect(screen.getByTestId("variable-name-score")).toBeInTheDocument();
+      // Field-by-field explanation, in order, with descriptions.
+      expect(screen.getByText("passed")).toBeInTheDocument();
+      expect(screen.getByText("score")).toBeInTheDocument();
+      expect(screen.getByText("label")).toBeInTheDocument();
+      expect(screen.getByText("details")).toBeInTheDocument();
+      expect(screen.getByText("Any numerical score.")).toBeInTheDocument();
+      // No editable variable components in evaluator mode.
       expect(
         screen.queryByTestId("add-variable-button"),
       ).not.toBeInTheDocument();
       expect(
-        screen.queryByTestId("remove-variable-passed"),
+        screen.queryByTestId("variable-name-passed"),
       ).not.toBeInTheDocument();
+    });
+
+    /** @scenario Evaluator End node lists label before details */
+    it("orders the result fields passed, score, label, details", () => {
+      mockEdges = [
+        {
+          id: "e1",
+          source: "judge",
+          target: "end",
+          targetHandle: "inputs.score",
+        },
+      ];
+      const { container } = renderPanel(
+        createEndNode({
+          behave_as: "evaluator",
+          inputs: EVALUATOR_RESULT_FIELDS,
+        }),
+      );
+
+      const order = Array.from(container.querySelectorAll("*"))
+        .filter((el) => el.children.length === 0)
+        .map((el) => el.textContent)
+        .filter((t) =>
+          ["passed", "score", "label", "details"].includes(t ?? ""),
+        );
+      expect(order).toEqual(["passed", "score", "label", "details"]);
+    });
+
+    /** @scenario All evaluator results are optional */
+    it("marks every result field optional", () => {
+      expect(EVALUATOR_RESULT_FIELDS.every((f) => f.optional === true)).toBe(
+        true,
+      );
     });
 
     it("nudges to connect score or passed when neither is wired", () => {
@@ -151,7 +198,9 @@ describe("EndPropertiesPanel", () => {
         }),
       );
 
-      expect(screen.getByText(/Connect either a/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Connect at least one result/i),
+      ).toBeInTheDocument();
     });
 
     /** @scenario Unconnected fixed fields are allowed */
@@ -171,7 +220,9 @@ describe("EndPropertiesPanel", () => {
         }),
       );
 
-      expect(screen.queryByText(/Connect either a/i)).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(/Connect at least one result/i),
+      ).not.toBeInTheDocument();
     });
   });
 
