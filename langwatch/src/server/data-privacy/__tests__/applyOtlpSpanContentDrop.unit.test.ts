@@ -86,7 +86,13 @@ function marker(span: OtlpSpan): string | undefined {
   );
 }
 
-function attrVal(span: OtlpSpan, key: string): string | undefined {
+function attrVal({
+  span,
+  key,
+}: {
+  span: OtlpSpan;
+  key: string;
+}): string | undefined {
   return (
     span.attributes.find((a) => a.key === key)?.value.stringValue ?? undefined
   );
@@ -274,8 +280,8 @@ describe("stripOtlpSpanContent", () => {
 
         stripOtlpSpanContent({ span: s, policy: policy({ system: "drop" }) });
 
-        const wrapped = attrVal(s, "langwatch.input")!;
-        const bare = attrVal(s, "gen_ai.input.messages")!;
+        const wrapped = attrVal({ span: s, key: "langwatch.input" })!;
+        const bare = attrVal({ span: s, key: "gen_ai.input.messages" })!;
         expect(wrapped).not.toContain("you are a pirate");
         expect(wrapped).toContain("hello there");
         expect(wrapped).toContain("chat_messages"); // wrapper preserved
@@ -305,7 +311,7 @@ describe("stripOtlpSpanContent", () => {
 
         stripOtlpSpanContent({ span: s, policy: policy({ tools: "drop" }) });
 
-        const out = attrVal(s, "gen_ai.output.messages")!;
+        const out = attrVal({ span: s, key: "gen_ai.output.messages" })!;
         expect(out).not.toContain("secret tool result");
         expect(out).not.toContain("tool_calls");
         expect(out).not.toContain("lookup");
