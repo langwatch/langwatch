@@ -24,11 +24,15 @@ import {
 let ch: ClickHouseClient;
 const tag = nanoid();
 
-async function insertTrace(
-  tenantId: string,
-  traceId: string,
-  conversationId: string | null,
-) {
+async function insertTrace({
+  tenantId,
+  traceId,
+  conversationId,
+}: {
+  tenantId: string;
+  traceId: string;
+  conversationId: string | null;
+}) {
   await ch.insert({
     table: "trace_summaries",
     values: [
@@ -81,7 +85,7 @@ beforeAll(async () => {
 afterAll(async () => {
   if (ch) {
     await ch.exec({
-      query: `ALTER TABLE trace_summaries DELETE WHERE startsWith(TraceId, {tag:String})`,
+      query: `ALTER TABLE trace_summaries DELETE WHERE startsWith(TenantId, {tag:String}) AND startsWith(TraceId, {tag:String})`,
       query_params: { tag },
     });
   }
@@ -104,10 +108,26 @@ describe("trace_summaries conversation-id skip-index (migration 00035)", () => {
     it("returns only the traces in that conversation", async () => {
       const tenantId = `${tag}-tenant-a`;
       const thread = `${tag}-conv-1`;
-      await insertTrace(tenantId, `${tag}-t1`, thread);
-      await insertTrace(tenantId, `${tag}-t2`, thread);
-      await insertTrace(tenantId, `${tag}-t3`, `${tag}-conv-2`);
-      await insertTrace(tenantId, `${tag}-t4`, null);
+      await insertTrace({
+        tenantId: tenantId,
+        traceId: `${tag}-t1`,
+        conversationId: thread,
+      });
+      await insertTrace({
+        tenantId: tenantId,
+        traceId: `${tag}-t2`,
+        conversationId: thread,
+      });
+      await insertTrace({
+        tenantId: tenantId,
+        traceId: `${tag}-t3`,
+        conversationId: `${tag}-conv-2`,
+      });
+      await insertTrace({
+        tenantId: tenantId,
+        traceId: `${tag}-t4`,
+        conversationId: null,
+      });
 
       const rows = await (
         await ch.query({
@@ -131,9 +151,21 @@ describe("trace_summaries conversation-id skip-index (migration 00035)", () => {
   describe("when resolving multiple thread ids", () => {
     it("returns the union of their conversations", async () => {
       const tenantId = `${tag}-tenant-b`;
-      await insertTrace(tenantId, `${tag}-b1`, `${tag}-bc-1`);
-      await insertTrace(tenantId, `${tag}-b2`, `${tag}-bc-2`);
-      await insertTrace(tenantId, `${tag}-b3`, `${tag}-bc-3`);
+      await insertTrace({
+        tenantId: tenantId,
+        traceId: `${tag}-b1`,
+        conversationId: `${tag}-bc-1`,
+      });
+      await insertTrace({
+        tenantId: tenantId,
+        traceId: `${tag}-b2`,
+        conversationId: `${tag}-bc-2`,
+      });
+      await insertTrace({
+        tenantId: tenantId,
+        traceId: `${tag}-b3`,
+        conversationId: `${tag}-bc-3`,
+      });
 
       const rows = await (
         await ch.query({
