@@ -112,9 +112,9 @@ describe("redactSecretsInText", () => {
   describe("given a greedy custom pattern inside a JSON string", () => {
     it("redacts only the value and leaves the closing quote and JSON intact", () => {
       const custom = compileSecretPatterns(["sk-.*"]);
-      const json = '{"api_key":"sk-proj-abc123def456","model":"gpt-5"}';
+      const json = '{"api_key":"sk-proj-abc123def456","model":"gpt-5-mini"}';
       const { text, redactedCount } = redact(json, custom);
-      expect(text).toBe('{"api_key":"[SECRET]","model":"gpt-5"}');
+      expect(text).toBe('{"api_key":"[SECRET]","model":"gpt-5-mini"}');
       expect(redactedCount).toBe(1);
     });
   });
