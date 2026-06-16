@@ -92,14 +92,17 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
 
   describe("given the default policy (essential PII, secrets on)", () => {
     /** @scenario A leaked provider API key is redacted with no configuration */
-    it("redacts a leaked OpenAI key natively with no analysis-service call", async () => {
+    it("redacts a leaked modern OpenAI project key natively with no analysis-service call", async () => {
       const { service, batchSpy } = makeService(PLATFORM_DEFAULT_DATA_PRIVACY);
-      const key = "sk-" + "A".repeat(40);
+      // Modern base64url key: `_` and `-` mid-body, no inner word boundary.
+      const key =
+        "sk-proj-aB3dEf_gHi-jKlMnOpQrStUvWx0123456789xYaB-cD_eF";
       const span = spanWith({ input: `my key is ${key} thanks` });
 
       await service.redactSpan(span, null, "ESSENTIAL", TENANT);
 
       expect(attr(span, "input")).not.toContain(key);
+      expect(attr(span, "input")).not.toContain("sk-proj-");
       expect(attr(span, "input")).toContain("[SECRET]");
       expect(batchSpy).not.toHaveBeenCalled();
     });
