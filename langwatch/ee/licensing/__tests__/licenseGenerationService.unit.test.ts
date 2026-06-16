@@ -13,12 +13,6 @@ const baseParams = {
   now: new Date("2025-06-15T12:00:00Z"),
 };
 
-// Round-trip validation runs at the license's issue time so the test is
-// time-independent: a license is issued for one year, so validating "now =
-// issue time" is always within the validity window regardless of the wall
-// clock the suite runs on.
-const validationNow = baseParams.now;
-
 describe("generateLicenseKey", () => {
   describe("when generating a GROWTH license", () => {
     it("generates a valid license key that passes round-trip validation", () => {
@@ -26,7 +20,7 @@ describe("generateLicenseKey", () => {
       const result = validateLicense(
         licenseKey,
         TEST_PUBLIC_KEY,
-        validationNow,
+        baseParams.now,
       );
 
       expect(result.valid).toBe(true);
@@ -85,7 +79,7 @@ describe("generateLicenseKey", () => {
       const result = validateLicense(
         licenseKey,
         TEST_PUBLIC_KEY,
-        validationNow,
+        baseParams.now,
       );
       expect(result.valid).toBe(true);
       expect(licenseData.plan.type).toBe("PRO");
@@ -105,7 +99,7 @@ describe("generateLicenseKey", () => {
       const result = validateLicense(
         licenseKey,
         TEST_PUBLIC_KEY,
-        validationNow,
+        baseParams.now,
       );
       expect(result.valid).toBe(true);
       expect(licenseData.plan.type).toBe("ENTERPRISE");
@@ -219,7 +213,7 @@ describe("generateLicenseKey", () => {
       const result = validateLicense(
         licenseKey,
         TEST_PUBLIC_KEY,
-        validationNow,
+        baseParams.now,
       );
 
       expect(result.valid).toBe(true);
