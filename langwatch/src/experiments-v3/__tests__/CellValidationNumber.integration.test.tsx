@@ -350,7 +350,7 @@ describe("Number column validation", () => {
   });
 });
 
-describe("Cell editing cancellation behavior", () => {
+describe("Cell editing commit and cancellation behavior", () => {
   beforeEach(() => {
     useEvaluationsV3Store.getState().reset();
   });
@@ -360,7 +360,7 @@ describe("Cell editing cancellation behavior", () => {
     vi.clearAllMocks();
   });
 
-  it("cancels edit on blur (click outside) without saving", async () => {
+  it("saves the edit on blur (click outside) instead of canceling", async () => {
     const user = userEvent.setup();
     render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
@@ -373,12 +373,41 @@ describe("Cell editing cancellation behavior", () => {
     // Click outside (blur)
     await user.click(document.body);
 
-    // Wait for blur timeout
-    await waitFor(() => {
-      expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
-    }, { timeout: 500 });
+    // Wait for the editor to close
+    await waitFor(
+      () => {
+        expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+      },
+      { timeout: 500 },
+    );
 
-    // Value should NOT be saved (blur cancels)
-    expect(screen.getByTestId("cell-0-input")).not.toHaveTextContent("test value");
+    // Clicking outside commits the edit now; only Escape discards.
+    expect(screen.getByTestId("cell-0-input")).toHaveTextContent("test value");
+  });
+
+  it("reverts the edit on Escape without saving", async () => {
+    const user = userEvent.setup();
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
+
+    const cell = screen.getByTestId("cell-0-input");
+    const originalText = cell.textContent ?? "";
+    await user.dblClick(cell);
+
+    const textarea = await screen.findByRole("textbox");
+    await user.type(textarea, "test value");
+
+    // Escape cancels and discards the typed value
+    await user.keyboard("{Escape}");
+
+    await waitFor(
+      () => {
+        expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+      },
+      { timeout: 500 },
+    );
+
+    const reverted = screen.getByTestId("cell-0-input");
+    expect(reverted).not.toHaveTextContent("test value");
+    expect(reverted).toHaveTextContent(originalText);
   });
 });
