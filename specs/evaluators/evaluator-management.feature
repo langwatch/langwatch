@@ -255,6 +255,13 @@ Feature: Evaluator management
     Given the EvaluatorCategorySelectorDrawer is open
     Then the option "Custom (Code)" is rendered before "Custom (from Workflow)"
 
+  # Copy is for customers, especially first-timers; it must not leak internals
+  # or compare against the other option. See dev/docs/best_practices/copywriting.md.
+  Scenario: Custom code evaluator copy stays customer-facing
+    Given the EvaluatorCategorySelectorDrawer is open
+    Then the "Custom (Code)" option reads "Write a custom Python evaluator"
+    And its description does not reference the workflow option
+
   Scenario: Create a code evaluator from the drawer
     Given the EvaluatorCategorySelectorDrawer is open
     When I select "Custom (Code)"

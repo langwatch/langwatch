@@ -261,7 +261,7 @@ export function EvaluatorCategorySelectorDrawer(
                     paddingTop={4}
                   >
                     Select a category to see available evaluators, or create a
-                    custom one from a workflow.
+                    custom one.
                   </Text>
 
                   <VStack
@@ -288,7 +288,7 @@ export function EvaluatorCategorySelectorDrawer(
                           id="code"
                           icon={Code}
                           title="Custom (Code)"
-                          description="Write a Python evaluator right here, no workflow needed"
+                          description="Write a custom Python evaluator"
                           onClick={onSelectCode}
                         />
                         <CategoryCard

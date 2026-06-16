@@ -158,6 +158,20 @@ describe("EvaluatorCategorySelectorDrawer", () => {
           Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
     });
+
+    /** @scenario Custom code evaluator copy stays customer-facing */
+    it("describes the Custom (Code) option without leaking internal comparisons", async () => {
+      renderDrawer();
+
+      await waitFor(() => {
+        expect(
+          screen.getByText("Write a custom Python evaluator"),
+        ).toBeInTheDocument();
+      });
+      // Copy must not reference the workflow option a first-time user has no
+      // context for. See dev/docs/best_practices/copywriting.md.
+      expect(screen.queryByText(/no workflow needed/i)).not.toBeInTheDocument();
+    });
   });
 
   describe("Navigation", () => {
