@@ -160,19 +160,24 @@ function SignInForm() {
                 helper="Enter your password"
                 invalid={form.formState.errors.password?.message !== undefined}
               >
-                <Input type="password" {...form.register("password")} />
+                <VStack align="stretch" gap={2} width="full">
+                  <Input type="password" {...form.register("password")} />
+                  <HStack width="full">
+                    <Spacer />
+                    <Box asChild>
+                      <Link
+                        href="/auth/forgot-password"
+                        style={{
+                          textDecoration: "underline",
+                          fontSize: "14px",
+                        }}
+                      >
+                        Forgot password?
+                      </Link>
+                    </Box>
+                  </HStack>
+                </VStack>
               </HorizontalFormControl>
-              <HStack width="full">
-                <Spacer />
-                <Box asChild>
-                  <Link
-                    href="/auth/forgot-password"
-                    style={{ textDecoration: "underline", fontSize: "14px" }}
-                  >
-                    Forgot password?
-                  </Link>
-                </Box>
-              </HStack>
               {error && (
                 <Alert.Root status="error">
                   <Alert.Indicator />

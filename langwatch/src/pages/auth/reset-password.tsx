@@ -18,6 +18,7 @@ import { z } from "zod";
 import { authClient } from "~/utils/auth-client";
 import Link from "~/utils/compat/next-link";
 import { useSearchParams } from "~/utils/compat/next-navigation";
+import { FormErrorDisplay } from "../../components/FormErrorDisplay";
 import { HorizontalFormControl } from "../../components/HorizontalFormControl";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 
@@ -89,8 +90,10 @@ function ResetPasswordForm({ token }: { token: string }) {
           Your password has been reset. You can now sign in with your new
           password.
         </Text>
-        <Button colorPalette="orange" asChild>
-          <Link href="/auth/signin">Sign in</Link>
+        <Button colorPalette="orange" variant="solid" asChild>
+          <Link href="/auth/signin" style={{ color: "white" }}>
+            Sign in
+          </Link>
         </Button>
       </AuthCard>
     );
@@ -115,9 +118,11 @@ function ResetPasswordForm({ token }: { token: string }) {
                 label="New Password"
                 helper="Enter your new password"
                 invalid={form.formState.errors.password?.message !== undefined}
-                error={form.formState.errors.password}
               >
-                <Input type="password" {...form.register("password")} />
+                <VStack align="stretch" gap={1} width="full">
+                  <Input type="password" {...form.register("password")} />
+                  <FormErrorDisplay error={form.formState.errors.password} />
+                </VStack>
               </HorizontalFormControl>
               <HorizontalFormControl
                 label="Confirm Password"
@@ -125,9 +130,13 @@ function ResetPasswordForm({ token }: { token: string }) {
                 invalid={
                   form.formState.errors.confirmPassword?.message !== undefined
                 }
-                error={form.formState.errors.confirmPassword}
               >
-                <Input type="password" {...form.register("confirmPassword")} />
+                <VStack align="stretch" gap={1} width="full">
+                  <Input type="password" {...form.register("confirmPassword")} />
+                  <FormErrorDisplay
+                    error={form.formState.errors.confirmPassword}
+                  />
+                </VStack>
               </HorizontalFormControl>
               {serverError && (
                 <Alert.Root status="error" width="full">
