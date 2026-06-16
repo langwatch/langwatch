@@ -3,6 +3,7 @@ import type { z } from "zod";
 import { getApp } from "../../../../src/server/app-layer/app";
 import type { signUpDataSchema } from "../../../../src/server/schemas/sign-up-data.schema";
 import { captureException } from "../../../../src/utils/posthogErrorCapture";
+import { CIO_FREE_PLAN } from "../planLabel";
 import type { CioPersonTraits } from "../types";
 
 type SignUpData = z.infer<typeof signUpDataSchema>;
@@ -74,6 +75,7 @@ export function fireSignupNurturingCalls({
     has_prompts: false,
     has_simulations: false,
     has_subscription: false,
+    plan: CIO_FREE_PLAN,
     createdAt: new Date().toISOString(),
   };
 
@@ -86,7 +88,7 @@ export function fireSignupNurturingCalls({
       traits: {
         name: organizationName,
         ...pickDefined({ company_size: signUpData?.companySize }),
-        plan: "free",
+        plan: CIO_FREE_PLAN,
       },
     })
     .catch(captureException);
