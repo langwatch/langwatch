@@ -10,6 +10,7 @@ import {
   HStack,
   Input,
   RadioGroup,
+  Separator,
   Spacer,
   Spinner,
   Table,
@@ -534,9 +535,21 @@ export function EffectiveSummary({
 
 const dispositionCollection = createListCollection({
   items: [
-    { value: "capture", label: "Captured" },
-    { value: "restrict", label: "Restricted" },
-    { value: "drop", label: "Dropped" },
+    {
+      value: "capture",
+      label: "Captured",
+      description: "Stored and visible to your team.",
+    },
+    {
+      value: "restrict",
+      label: "Restricted",
+      description: "Stored, visible only to the audience below.",
+    },
+    {
+      value: "drop",
+      label: "Dropped",
+      description: "Stripped at ingestion, cannot be recovered.",
+    },
   ],
 });
 
@@ -643,6 +656,12 @@ function PrivacyRuleDrawer({
   // Read inside the scope-change effect without re-deriving on every touch.
   const touchedRef = useRef(touched);
   touchedRef.current = touched;
+  // Remember the last enabled PII level so toggling redaction off and back on
+  // restores the chosen level instead of silently dropping Strict to Essential.
+  const lastEnabledPiiLevel = useRef<PiiLevel>("essential");
+  useEffect(() => {
+    if (piiLevel !== "disabled") lastEnabledPiiLevel.current = piiLevel;
+  }, [piiLevel]);
 
   const touchCategory = (category: ContentCategory) =>
     setTouched((prev) => ({
@@ -856,24 +875,47 @@ function PrivacyRuleDrawer({
                     <Select.Content>
                       {dispositionCollection.items.map((item) => (
                         <Select.Item key={item.value} item={item}>
-                          {item.label}
+                          <VStack align="start" gap={0}>
+                            <Text fontSize="sm">{item.label}</Text>
+                            <Text fontSize="xs" color="fg.muted">
+                              {item.description}
+                            </Text>
+                          </VStack>
                         </Select.Item>
                       ))}
                     </Select.Content>
                   </Select.Root>
                 </HStack>
               ))}
-              <Text fontSize="xs" color="fg.muted">
-                Captured content is stored and visible to the audience below
-                when restricted; dropped content is stripped at ingestion and
-                cannot be recovered.
-              </Text>
             </VStack>
 
             <VStack gap={2} align="stretch">
-              <Text fontWeight="600" fontSize="sm">
-                Custom attributes
-              </Text>
+              <HStack gap={2}>
+                <Text fontWeight="600" fontSize="sm">
+                  Custom attributes
+                </Text>
+                <Tooltip
+                  content="Match span attribute keys beyond the four categories, with * wildcards: restricted attributes are hidden from outside the audience, dropped ones are stripped at ingestion."
+                  contentProps={{ maxWidth: "340px" }}
+                >
+                  <Box color="fg.muted" display="inline-flex">
+                    <HelpCircle size={13} />
+                  </Box>
+                </Tooltip>
+                <Spacer />
+                <Button
+                  size="xs"
+                  variant="outline"
+                  onClick={() =>
+                    setCustomAttributes((prev) => [
+                      ...prev,
+                      { pattern: "", disposition: "restrict" },
+                    ])
+                  }
+                >
+                  <Plus size={14} /> Add attribute rule
+                </Button>
+              </HStack>
               {customAttributes.map((row, index) => {
                 const error = attributePatternError(row.pattern);
                 return (
@@ -951,25 +993,6 @@ function PrivacyRuleDrawer({
                   </VStack>
                 );
               })}
-              <Box>
-                <Button
-                  size="xs"
-                  variant="ghost"
-                  onClick={() =>
-                    setCustomAttributes((prev) => [
-                      ...prev,
-                      { pattern: "", disposition: "restrict" },
-                    ])
-                  }
-                >
-                  <Plus size={14} /> Add attribute rule
-                </Button>
-              </Box>
-              <Text fontSize="xs" color="fg.muted">
-                Match span attribute keys beyond the four categories, with *
-                wildcards: restricted attributes are hidden from outside the
-                audience, dropped ones are stripped at ingestion.
-              </Text>
             </VStack>
 
             {anyRestrict && (
@@ -991,54 +1014,75 @@ function PrivacyRuleDrawer({
               </VStack>
             )}
 
-            <Field.Root>
-              <Field.Label>PII redaction</Field.Label>
-              <RadioGroup.Root
-                value={piiLevel}
-                onValueChange={(d) => {
-                  setPiiLevel((d.value as PiiLevel) ?? "essential");
-                  setTouched((prev) => ({ ...prev, pii: true }));
-                }}
-              >
-                <VStack align="start" gap={1}>
-                  <RadioGroup.Item value="disabled">
-                    <RadioGroup.ItemHiddenInput />
-                    <RadioGroup.ItemIndicator />
-                    <RadioGroup.ItemText>Disabled</RadioGroup.ItemText>
-                  </RadioGroup.Item>
-                  <RadioGroup.Item value="essential">
-                    <RadioGroup.ItemHiddenInput />
-                    <RadioGroup.ItemIndicator />
-                    <RadioGroup.ItemText>
-                      Essential (emails, phones, cards, IPs, national IDs)
-                    </RadioGroup.ItemText>
-                    <Tooltip
-                      content={`Detects and masks: ${ESSENTIAL_PII_SUMMARY}.`}
-                      contentProps={{ maxWidth: "340px" }}
-                    >
-                      <Box color="fg.muted" display="inline-flex">
-                        <HelpCircle size={13} />
-                      </Box>
-                    </Tooltip>
-                  </RadioGroup.Item>
-                  <RadioGroup.Item value="strict">
-                    <RadioGroup.ItemHiddenInput />
-                    <RadioGroup.ItemIndicator />
-                    <RadioGroup.ItemText>
-                      Strict (adds names, locations, and more)
-                    </RadioGroup.ItemText>
-                    <Tooltip
-                      content={`Deep detection with the Microsoft Presidio PII model. Everything in Essential, plus: ${STRICT_ADDED_PII_SUMMARY}.`}
-                      contentProps={{ maxWidth: "340px" }}
-                    >
-                      <Box color="fg.muted" display="inline-flex">
-                        <HelpCircle size={13} />
-                      </Box>
-                    </Tooltip>
-                  </RadioGroup.Item>
+            <Separator />
+
+            <VStack gap={2} align="stretch">
+              <HStack gap={3} align="start">
+                <Switch
+                  checked={piiLevel !== "disabled"}
+                  onCheckedChange={({ checked }) => {
+                    setPiiLevel(
+                      checked === true
+                        ? lastEnabledPiiLevel.current
+                        : "disabled",
+                    );
+                    setTouched((prev) => ({ ...prev, pii: true }));
+                  }}
+                />
+                <VStack align="start" gap={0}>
+                  <Text fontWeight="600" fontSize="sm">
+                    PII redaction
+                  </Text>
+                  <Text fontSize="xs" color="fg.muted">
+                    Masks personal data like emails, phones, cards, and IDs in
+                    stored content.
+                  </Text>
                 </VStack>
-              </RadioGroup.Root>
-            </Field.Root>
+              </HStack>
+              {piiLevel !== "disabled" && (
+                <RadioGroup.Root
+                  value={piiLevel}
+                  paddingLeft={10}
+                  onValueChange={(d) => {
+                    setPiiLevel((d.value as PiiLevel) ?? "essential");
+                    setTouched((prev) => ({ ...prev, pii: true }));
+                  }}
+                >
+                  <VStack align="start" gap={1}>
+                    <RadioGroup.Item value="essential">
+                      <RadioGroup.ItemHiddenInput />
+                      <RadioGroup.ItemIndicator />
+                      <RadioGroup.ItemText>
+                        Essential (emails, phones, cards, IPs, national IDs)
+                      </RadioGroup.ItemText>
+                      <Tooltip
+                        content={`Detects and masks: ${ESSENTIAL_PII_SUMMARY}.`}
+                        contentProps={{ maxWidth: "340px" }}
+                      >
+                        <Box color="fg.muted" display="inline-flex">
+                          <HelpCircle size={13} />
+                        </Box>
+                      </Tooltip>
+                    </RadioGroup.Item>
+                    <RadioGroup.Item value="strict">
+                      <RadioGroup.ItemHiddenInput />
+                      <RadioGroup.ItemIndicator />
+                      <RadioGroup.ItemText>
+                        Strict (adds names, locations, and more)
+                      </RadioGroup.ItemText>
+                      <Tooltip
+                        content={`Deep detection with the Microsoft Presidio PII model. Everything in Essential, plus: ${STRICT_ADDED_PII_SUMMARY}.`}
+                        contentProps={{ maxWidth: "340px" }}
+                      >
+                        <Box color="fg.muted" display="inline-flex">
+                          <HelpCircle size={13} />
+                        </Box>
+                      </Tooltip>
+                    </RadioGroup.Item>
+                  </VStack>
+                </RadioGroup.Root>
+              )}
+            </VStack>
 
             <VStack gap={2} align="stretch">
               <HStack gap={3} align="start">
