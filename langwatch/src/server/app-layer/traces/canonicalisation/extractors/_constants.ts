@@ -37,6 +37,8 @@ export const ATTR_KEYS = {
   GEN_AI_USAGE_COMPLETION_TOKENS: "gen_ai.usage.completion_tokens",
   // Time to first token in milliseconds, relative to the span start.
   GEN_AI_SERVER_TIME_TO_FIRST_TOKEN: "gen_ai.server.time_to_first_token",
+  // Vercel AI SDK time to first token, a duration in milliseconds.
+  AI_RESPONSE_MS_TO_FIRST_CHUNK: "ai.response.msToFirstChunk",
   GEN_AI_CONVERSATION_ID: "gen_ai.conversation.id",
   GEN_AI_AGENT_ID: "gen_ai.agent.id",
   GEN_AI_AGENT_DESCRIPTION: "gen_ai.agent.description",
