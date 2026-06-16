@@ -5,12 +5,7 @@
  * Validates input transformation and error display.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -210,9 +205,7 @@ describe("Number column validation", () => {
         { id: "input_0", name: "input", type: "string" },
         { id: "score_1", name: "score", type: "number" },
       ],
-      savedRecords: [
-        { id: "rec1", input: "hello", score: "" },
-      ],
+      savedRecords: [{ id: "rec1", input: "hello", score: "" }],
     });
     store.setActiveDataset("num_test");
   });

@@ -47,9 +47,9 @@ describe("deleteSelectedRows (saved mode)", () => {
       store.getState().toggleRowSelection(1);
       store.getState().deleteSelectedRows();
 
-      expect(
-        store.getState().pendingSavedChanges["ds-1"]?.["new_123"],
-      ).toEqual({ _delete: true });
+      expect(store.getState().pendingSavedChanges["ds-1"]?.new_123).toEqual({
+        _delete: true,
+      });
       expect(store.getState().records).toHaveLength(1);
     });
   });
@@ -61,9 +61,9 @@ describe("deleteSelectedRows (saved mode)", () => {
       store.getState().toggleRowSelection(1);
       store.getState().deleteSelectedRows();
 
-      expect(
-        store.getState().pendingSavedChanges["ds-1"]?.["new_123"],
-      ).toEqual({ _delete: true });
+      expect(store.getState().pendingSavedChanges["ds-1"]?.new_123).toEqual({
+        _delete: true,
+      });
     });
   });
 });
