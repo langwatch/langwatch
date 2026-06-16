@@ -5526,7 +5526,7 @@ def custom_llm_call(prompt: str):
     return response.text
 ```
 
-When `cost` is set, it is used as-is. When only token counts are set, LangWatch multiplies them by the model's registry prices as usual.
+When `cost` is set, it is used as-is, even for a known model with token counts: an explicit cost is treated as authoritative and overrides the registry calculation. When only token counts are set, LangWatch multiplies them by the model's registry prices as usual.
 
 ## Custom model costs
 
@@ -9255,7 +9255,7 @@ async function customLLMCall(prompt: string): Promise<string> {
 }
 ```
 
-When `cost` is set, it is used as-is. When only token counts are set, LangWatch multiplies them by the model's registry prices as usual.
+When `cost` is set, it is used as-is, even for a known model with token counts: an explicit cost is treated as authoritative and overrides the registry calculation. When only token counts are set, LangWatch multiplies them by the model's registry prices as usual.
 
 ## Custom model costs
 

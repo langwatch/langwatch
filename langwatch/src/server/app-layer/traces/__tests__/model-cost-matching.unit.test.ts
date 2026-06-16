@@ -158,13 +158,72 @@ describe("computeSpanCost", () => {
   });
 
   describe("when span has SDK-provided cost", () => {
-    it("falls back to SDK cost", () => {
+    it("uses the SDK cost when no model/tokens are present", () => {
       const result = computeSpanCost({
         attrs: { "langwatch.span.cost": 0.005 },
         promptTokens: null,
         completionTokens: null,
       });
       expect(result).toBeCloseTo(0.005, 6);
+    });
+
+    it("prefers the explicit cost over the registry for a known model with tokens", () => {
+      // Regression: a known model + tokens used to win via the registry,
+      // silently dropping an explicit negotiated/override cost. The explicit
+      // figure is authoritative and must win.
+      const result = computeSpanCost({
+        attrs: {
+          "gen_ai.request.model": "gpt-5-mini",
+          "langwatch.span.cost": 0.042,
+        },
+        promptTokens: 1000,
+        completionTokens: 500,
+      });
+      // Registry would compute 0.00125; the explicit cost wins.
+      expect(result).toBeCloseTo(0.042, 6);
+    });
+
+    it("prefers a provider-reported cost over the registry for an on-table model (Claude Code cost_usd)", () => {
+      // Anthropic reports its own cost_usd on every claude turn; for on-table
+      // models it must win over our token×registry estimate.
+      const result = computeSpanCost({
+        attrs: {
+          "gen_ai.response.model": "claude-opus-4-7",
+          "langwatch.span.cost": 0.123,
+        },
+        promptTokens: 2000,
+        completionTokens: 800,
+      });
+      expect(result).toBeCloseTo(0.123, 6);
+    });
+
+    it("falls through to the registry when the explicit cost is zero", () => {
+      // A zero (or absent) explicit cost must not suppress registry costing.
+      const result = computeSpanCost({
+        attrs: {
+          "gen_ai.request.model": "gpt-5-mini",
+          "langwatch.span.cost": 0,
+        },
+        promptTokens: 1000,
+        completionTokens: 500,
+      });
+      expect(result).toBeCloseTo(0.00125, 6);
+    });
+
+    it("keeps per-token enrichment rates ahead of an explicit total cost", () => {
+      // Custom per-token rates are a deliberate pricing policy and stay first.
+      const result = computeSpanCost({
+        attrs: {
+          "gen_ai.request.model": "gpt-5-mini",
+          "langwatch.model.inputCostPerToken": 1e-6,
+          "langwatch.model.outputCostPerToken": 2e-6,
+          "langwatch.span.cost": 0.042,
+        },
+        promptTokens: 1000,
+        completionTokens: 500,
+      });
+      // 1000 * 1e-6 + 500 * 2e-6 = 0.002 (enrichment), not 0.042 (explicit).
+      expect(result).toBeCloseTo(0.002, 6);
     });
   });
 
