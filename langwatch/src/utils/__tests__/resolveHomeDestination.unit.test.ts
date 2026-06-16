@@ -102,4 +102,84 @@ describe("resolveHomeDestination", () => {
       ).toBe("/me");
     });
   });
+
+  describe("when an organization slug is supplied for an org-scoped home", () => {
+    // Regression: a fresh-login user whose selected project drifted to a
+    // non-governance org landed on /me and 404'd behind the feature-flag guard.
+    // Carrying ?org=<slug> lets the page re-pin to the resolver's org.
+    it("carries ?org=<slug> onto a /me destination", () => {
+      expect(
+        resolveHomeDestination({
+          ...base,
+          resolverDestination: "/me",
+          organizationSlug: "acme",
+        }),
+      ).toBe("/me?org=acme");
+    });
+
+    it("carries ?org=<slug> onto a /governance destination", () => {
+      expect(
+        resolveHomeDestination({
+          ...base,
+          resolverDestination: "/governance",
+          organizationSlug: "acme",
+        }),
+      ).toBe("/governance?org=acme");
+    });
+
+    it("carries ?org=<slug> onto /me even when forced by an explicit pin", () => {
+      expect(
+        resolveHomeDestination({
+          ...base,
+          resolverDestination: "/me",
+          isOverride: true,
+          organizationSlug: "acme",
+        }),
+      ).toBe("/me?org=acme");
+    });
+
+    it("carries ?org=<slug> onto /me forced by a personal last-visit", () => {
+      expect(
+        resolveHomeDestination({
+          ...base,
+          resolverDestination: "/acme",
+          lastVisitedHomeKind: "personal",
+          organizationSlug: "acme",
+        }),
+      ).toBe("/me?org=acme");
+    });
+
+    it("url-encodes a slug with reserved characters", () => {
+      expect(
+        resolveHomeDestination({
+          ...base,
+          resolverDestination: "/me",
+          organizationSlug: "acme org/eu",
+        }),
+      ).toBe("/me?org=acme%20org%2Feu");
+    });
+
+    it("leaves a project-home destination untouched", () => {
+      expect(
+        resolveHomeDestination({
+          ...base,
+          resolverDestination: "/inbox-narrator",
+          organizationSlug: "acme",
+        }),
+      ).toBe("/inbox-narrator");
+    });
+
+    it("appends no param when the org slug is null or absent", () => {
+      expect(
+        resolveHomeDestination({
+          ...base,
+          resolverDestination: "/me",
+          organizationSlug: null,
+        }),
+      ).toBe("/me");
+      expect(
+        resolveHomeDestination({ ...base, resolverDestination: "/me" }),
+      ).toBe("/me");
+    });
+  });
 });
