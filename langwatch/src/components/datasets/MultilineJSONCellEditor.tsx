@@ -74,7 +74,7 @@ export function MultilineJSONCellEditor({
         width="100%"
         height="100%"
         minHeight="64px"
-        backgroundColor="white"
+        backgroundColor="bg.surface"
         fontSize="13px"
         lineHeight="1.5em"
         value={localValue || ""}
