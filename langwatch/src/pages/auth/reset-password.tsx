@@ -25,6 +25,18 @@ import { LogoIcon } from "../../components/icons/LogoIcon";
 const INVALID_LINK_MESSAGE =
   "This password reset link is invalid or has expired. Request a new one to continue.";
 
+const resetPasswordSchema = z
+  .object({
+    password: z
+      .string()
+      .min(8, { message: "Password must be at least 8 characters" }),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ["confirmPassword"],
+  });
+
 export default function ResetPassword() {
   const query = useSearchParams();
   const token = query?.get("token") ?? null;
@@ -42,28 +54,14 @@ export default function ResetPassword() {
 }
 
 function ResetPasswordForm({ token }: { token: string }) {
-  const schema = z
-    .object({
-      password: z
-        .string()
-        .min(8, { message: "Password must be at least 8 characters" }),
-      confirmPassword: z
-        .string()
-        .min(8, { message: "Password must be at least 8 characters" }),
-    })
-    .refine((data) => data.password === data.confirmPassword, {
-      message: "Passwords don't match",
-      path: ["confirmPassword"],
-    });
-
-  const form = useForm<z.infer<typeof schema>>({
-    resolver: zodResolver(schema),
+  const form = useForm<z.infer<typeof resetPasswordSchema>>({
+    resolver: zodResolver(resetPasswordSchema),
   });
   const [isLoading, setIsLoading] = useState(false);
   const [isDone, setIsDone] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
-  const onSubmit = async (values: z.infer<typeof schema>) => {
+  const onSubmit = async (values: z.infer<typeof resetPasswordSchema>) => {
     setIsLoading(true);
     setServerError(null);
     try {

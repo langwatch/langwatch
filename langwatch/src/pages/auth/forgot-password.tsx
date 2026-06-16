@@ -20,6 +20,8 @@ import { HorizontalFormControl } from "../../components/HorizontalFormControl";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 
+const forgotPasswordSchema = z.object({ email: z.string().email() });
+
 export default function ForgotPassword() {
   const publicEnv = usePublicEnv();
   const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
@@ -47,14 +49,13 @@ export default function ForgotPassword() {
 }
 
 function ForgotPasswordForm() {
-  const schema = z.object({ email: z.string().email() });
-  const form = useForm<z.infer<typeof schema>>({
-    resolver: zodResolver(schema),
+  const form = useForm<z.infer<typeof forgotPasswordSchema>>({
+    resolver: zodResolver(forgotPasswordSchema),
   });
   const [isLoading, setIsLoading] = useState(false);
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
 
-  const onSubmit = async (values: z.infer<typeof schema>) => {
+  const onSubmit = async (values: z.infer<typeof forgotPasswordSchema>) => {
     setIsLoading(true);
     try {
       // BetterAuth returns a success-shaped response whether or not the email

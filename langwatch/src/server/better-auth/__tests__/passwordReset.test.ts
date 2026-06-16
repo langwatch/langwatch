@@ -53,6 +53,21 @@ describe("better-auth password reset wiring", () => {
         resetUrl: `${env.BASE_HOST}/auth/reset-password?token=tok_test_123`,
       });
     });
+
+    it("percent-encodes tokens that carry URL-significant characters", async () => {
+      const emailAndPassword = getEmailAndPassword();
+
+      await emailAndPassword.sendResetPassword!({
+        user: { id: "user_2", email: "special@acme.test" },
+        url: "https://ignored.example/reset",
+        token: "tok+with=special",
+      });
+
+      expect(sendResetPasswordEmail).toHaveBeenCalledWith({
+        email: "special@acme.test",
+        resetUrl: `${env.BASE_HOST}/auth/reset-password?token=tok%2Bwith%3Dspecial`,
+      });
+    });
   });
 
   describe("when BetterAuth invokes onPasswordReset", () => {

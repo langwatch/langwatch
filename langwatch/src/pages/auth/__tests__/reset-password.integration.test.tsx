@@ -128,7 +128,7 @@ describe("ResetPassword page", () => {
       const { container } = renderPage();
       fillAndSubmit({ container, password: "short", confirm: "short" });
 
-      // Both fields are too short, so the message renders for each.
+      // Length is enforced on the password field, so the message renders.
       expect(
         (await screen.findAllByText(/at least 8 characters/i)).length,
       ).toBeGreaterThan(0);
