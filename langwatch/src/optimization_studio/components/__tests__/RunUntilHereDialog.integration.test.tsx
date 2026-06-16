@@ -34,7 +34,12 @@ const { mockNodes, mockSetNode, mockStartWorkflowExecution, mockDatasetData } =
 
 vi.mock("../../hooks/useWorkflowStore", () => ({
   useWorkflowStore: (selector: (s: unknown) => unknown) =>
-    selector({ nodes: mockNodes.current, setNode: mockSetNode }),
+    selector({
+      nodes: mockNodes.current,
+      setNode: mockSetNode,
+      deselectAllNodes: vi.fn(),
+      setPropertiesExpanded: vi.fn(),
+    }),
 }));
 
 vi.mock("../../hooks/useWorkflowExecution", () => ({

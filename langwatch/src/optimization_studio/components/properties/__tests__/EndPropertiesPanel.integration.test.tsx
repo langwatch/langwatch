@@ -4,7 +4,8 @@
  * Evaluator End node: the results are a fixed four-field vocabulary
  * (passed, score, details, label) - normalized on open, read-only, with
  * a connect-score-or-passed nudge. Non-evaluator end nodes keep their
- * free-form results.
+ * free-form results. The results render through the shared VariablesSection
+ * (same row layout as every other node panel), with the value column hidden.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -41,22 +42,19 @@ vi.mock(
   },
 );
 
-// Capture the props the panel hands to the shell - the read-only
-// results contract is expressed through them.
-const basePanelProps: Array<Record<string, unknown>> = [];
+vi.mock("@xyflow/react", () => ({
+  useUpdateNodeInternals: () => vi.fn(),
+}));
+
+// Render the shell's children inline so the real VariablesSection mounts.
 vi.mock("../BasePropertiesPanel", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("../BasePropertiesPanel")>();
   return {
     ...actual,
-    BasePropertiesPanel: (props: Record<string, unknown>) => {
-      basePanelProps.push(props);
-      return (
-        <div data-testid="base-properties-panel">
-          {props.children as React.ReactNode}
-        </div>
-      );
-    },
+    BasePropertiesPanel: ({ children }: { children: React.ReactNode }) => (
+      <div data-testid="base-properties-panel">{children}</div>
+    ),
   };
 });
 
@@ -92,7 +90,6 @@ describe("EndPropertiesPanel", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
-    basePanelProps.length = 0;
     mockEdges = [];
     mockWorkflowType = "workflow";
   });
@@ -133,10 +130,16 @@ describe("EndPropertiesPanel", () => {
         }),
       );
 
-      expect(basePanelProps[0]).toMatchObject({
-        inputsTitle: "Results",
-        inputsReadOnly: true,
-      });
+      expect(screen.getByText("Results")).toBeInTheDocument();
+      // Read-only: the fixed vocabulary shows, but no add/remove affordances.
+      expect(screen.getByTestId("variable-name-passed")).toBeInTheDocument();
+      expect(screen.getByTestId("variable-name-score")).toBeInTheDocument();
+      expect(
+        screen.queryByTestId("add-variable-button"),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("remove-variable-passed"),
+      ).not.toBeInTheDocument();
     });
 
     it("nudges to connect score or passed when neither is wired", () => {
@@ -204,10 +207,10 @@ describe("EndPropertiesPanel", () => {
         }),
       );
 
-      expect(basePanelProps[0]).toMatchObject({
-        inputsTitle: "Results",
-        inputsReadOnly: true,
-      });
+      expect(screen.getByText("Results")).toBeInTheDocument();
+      expect(
+        screen.queryByTestId("add-variable-button"),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -217,10 +220,9 @@ describe("EndPropertiesPanel", () => {
       renderPanel(createEndNode());
 
       expect(mockSetNode).not.toHaveBeenCalled();
-      expect(basePanelProps[0]).toMatchObject({
-        inputsTitle: "Results",
-        inputsReadOnly: false,
-      });
+      expect(screen.getByText("Results")).toBeInTheDocument();
+      // Editable: the add affordance is present for free-form results.
+      expect(screen.getByTestId("add-variable-button")).toBeInTheDocument();
     });
   });
 });

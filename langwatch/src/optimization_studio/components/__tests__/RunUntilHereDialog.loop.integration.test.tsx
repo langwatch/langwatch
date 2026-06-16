@@ -30,7 +30,12 @@ vi.mock("~/optimization_studio/hooks/useRunUntilHereDialogStore", () => ({
 
 vi.mock("~/optimization_studio/hooks/useWorkflowStore", () => ({
   useWorkflowStore: (selector: (s: unknown) => unknown) =>
-    selector({ nodes: [entryNode], setNode: vi.fn() }),
+    selector({
+      nodes: [entryNode],
+      setNode: vi.fn(),
+      deselectAllNodes: vi.fn(),
+      setPropertiesExpanded: vi.fn(),
+    }),
 }));
 
 vi.mock("~/optimization_studio/hooks/useWorkflowExecution", () => ({

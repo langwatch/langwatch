@@ -37,9 +37,17 @@ export function RunUntilHereDialog() {
   const { untilNodeId, close } = useRunUntilHereDialogStore(
     useShallow(({ untilNodeId, close }) => ({ untilNodeId, close })),
   );
-  const { nodes, setNode } = useWorkflowStore(
-    useShallow(({ nodes, setNode }) => ({ nodes, setNode })),
-  );
+  const { nodes, setNode, deselectAllNodes, setPropertiesExpanded } =
+    useWorkflowStore(
+      useShallow(
+        ({ nodes, setNode, deselectAllNodes, setPropertiesExpanded }) => ({
+          nodes,
+          setNode,
+          deselectAllNodes,
+          setPropertiesExpanded,
+        }),
+      ),
+    );
   const { startWorkflowExecution } = useWorkflowExecution();
 
   const entryNode = nodes.find((node) => node.type === "entry");
@@ -93,6 +101,17 @@ export function RunUntilHereDialog() {
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [untilNodeId, firstRowSignature]);
+
+  // Opening the dialog from a node's run menu selects that node, which
+  // surfaces its properties drawer docked behind the dialog. Deselect so the
+  // dialog stays clean; the drawer reopens on its own when the run completes
+  // (usePostEvent's execution_state_change handler re-selects the target).
+  useEffect(() => {
+    if (untilNodeId) {
+      deselectAllNodes();
+      setPropertiesExpanded(false);
+    }
+  }, [untilNodeId, deselectAllNodes, setPropertiesExpanded]);
 
   const runWithValues = (runValues: Record<string, string>) => {
     if (!untilNodeId) return;
@@ -154,6 +173,7 @@ export function RunUntilHereDialog() {
                 isSelected: index === selectedRowIndex,
               }))}
               columns={columns}
+              background="bg.panel"
               onRowClick={(rowIndex) => setSelectedRowIndex(rowIndex)}
             />
           ) : fields.length > 0 ? (

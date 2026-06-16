@@ -50,6 +50,7 @@ export function DatasetPreviewTable({
   columns,
   maxColumns = 8,
   maxHeight,
+  background,
   isSelectable = false,
   onToggleRow,
   onToggleAll,
@@ -62,6 +63,8 @@ export function DatasetPreviewTable({
   maxColumns?: number;
   /** Caps the table height; rows beyond it scroll inside the border. */
   maxHeight?: string;
+  /** Solid surface color for the table container (e.g. on a frosted dialog). */
+  background?: string;
   /** Renders a leading checkbox column bound to each row's `isSelected`. */
   isSelectable?: boolean;
   onToggleRow?: (rowIndex: number, isSelected: boolean) => void;
@@ -274,6 +277,7 @@ export function DatasetPreviewTable({
       width="full"
       maxHeight={maxHeight}
       overflowY="auto"
+      background={background}
       borderWidth="1px"
       borderColor="border.muted"
       borderRadius="md"
@@ -286,6 +290,14 @@ export function DatasetPreviewTable({
           tableLayout: "fixed",
         },
         "& thead th": { position: "sticky", top: 0, zIndex: 2 },
+        // Round the last row's outer cells so a selected last row follows the
+        // container's rounded corners instead of poking square edges through.
+        "& tbody tr:last-child td:first-child": {
+          borderBottomLeftRadius: "var(--chakra-radii-md)",
+        },
+        "& tbody tr:last-child td:last-child": {
+          borderBottomRightRadius: "var(--chakra-radii-md)",
+        },
       }}
     >
       <DatasetTableProvider value={contextValue}>

@@ -1,7 +1,8 @@
-import { Alert, Text } from "@chakra-ui/react";
-import type { Node } from "@xyflow/react";
-import { useEffect } from "react";
+import { Alert, Box, Text } from "@chakra-ui/react";
+import { type Node, useUpdateNodeInternals } from "@xyflow/react";
+import { useCallback, useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
+import { type Variable, VariablesSection } from "~/components/variables";
 import { useWorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
 import type { End, Field } from "../../types/dsl";
 import { BasePropertiesPanel } from "./BasePropertiesPanel";
@@ -28,6 +29,7 @@ export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
       workflowType: state.workflow_type,
     })),
   );
+  const updateNodeInternals = useUpdateNodeInternals();
 
   // Treat the end node as an evaluator from EITHER signal: the node's own
   // behave_as flag OR the workflow being an evaluator. Older evaluator
@@ -73,14 +75,46 @@ export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
         edge.targetHandle === "inputs.passed"),
   );
 
+  // The End node's "results" are its inputs (data flows in). Render them
+  // through the shared VariablesSection so the rows match every other node
+  // panel (type selector on the left, name, remove). Connections come from
+  // the canvas edges, so the per-row value/mapping column is hidden.
+  const variables: Variable[] = (node.data.inputs ?? []).map((f) => ({
+    identifier: f.identifier,
+    type: f.type as Variable["type"],
+  }));
+
+  const handleResultsChange = useCallback(
+    (newVariables: Variable[]) => {
+      const existing = node.data.inputs ?? [];
+      const newInputs: Field[] = newVariables.map((variable) => {
+        const prev = existing.find((i) => i.identifier === variable.identifier);
+        return {
+          identifier: variable.identifier,
+          type: variable.type as Field["type"],
+          ...(prev?.optional != null ? { optional: prev.optional } : {}),
+          ...(prev?.value != null ? { value: prev.value } : {}),
+        };
+      });
+      setNode({ id: node.id, data: { inputs: newInputs } });
+      updateNodeInternals(node.id);
+    },
+    [node.id, node.data.inputs, setNode, updateNodeInternals],
+  );
+
   return (
-    <BasePropertiesPanel
-      node={node}
-      hideOutputs
-      hideParameters
-      inputsTitle="Results"
-      inputsReadOnly={isEvaluator}
-    >
+    <BasePropertiesPanel node={node} hideInputs hideOutputs hideParameters>
+      <Box width="full">
+        <VariablesSection
+          variables={variables}
+          onChange={handleResultsChange}
+          showMappings={false}
+          isMappingDisabled={true}
+          canAddRemove={!isEvaluator}
+          readOnly={isEvaluator}
+          title="Results"
+        />
+      </Box>
       {isEvaluator && (
         <Text fontSize="13px" color="fg.muted">
           Evaluators return up to these four results. Connect the ones your

@@ -442,7 +442,7 @@ const VariableRow = ({
         </HStack>
       )}
 
-      {!isMappingDisabled && (
+      {!isMappingDisabled ? (
         <>
           {/* = sign and value/mapping input */}
           <Text color="fg.subtle" fontSize="sm" flexShrink={0}>
@@ -478,6 +478,10 @@ const VariableRow = ({
             />
           )}
         </>
+      ) : (
+        // No value column (e.g. End node results): push the remove button to
+        // the right edge so the row fills its width, matching the Outputs rows.
+        <Spacer />
       )}
 
       {/* Delete Button */}
