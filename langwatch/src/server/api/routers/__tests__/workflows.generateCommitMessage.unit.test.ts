@@ -20,6 +20,12 @@ vi.mock("ai", () => ({
   generateText: (...args: unknown[]) => mockGenerateText(...args),
 }));
 
+// The mutation runs through the audit-log middleware, which writes to the
+// real Prisma singleton. Stub it so the unit test never needs a database.
+vi.mock("../../../auditLog", () => ({
+  auditLog: vi.fn(() => Promise.resolve()),
+}));
+
 type MiddlewareParams = {
   ctx: Record<string, unknown>;
   next: () => Promise<unknown>;
