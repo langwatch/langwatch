@@ -52,7 +52,11 @@ vi.mock("~/utils/api", () => ({
 // Stub store getState calls made in onLaunchTour
 vi.mock("../../../stores/viewStore", () => ({
   useViewStore: Object.assign(
-    (selector: (s: unknown) => unknown) => selector({ activeLensId: "all-traces", sort: { columnId: "timestamp", direction: "desc" } }),
+    (selector: (s: unknown) => unknown) =>
+      selector({
+        activeLensId: "all-traces",
+        sort: { columnId: "timestamp", direction: "desc" },
+      }),
     { getState: () => ({ selectLens: vi.fn() }) },
   ),
 }));
@@ -60,7 +64,12 @@ vi.mock("../../../stores/viewStore", () => ({
 vi.mock("../../../stores/filterStore", () => ({
   useFilterStore: Object.assign(
     (selector: (s: unknown) => unknown) =>
-      selector({ debouncedQueryText: "", debouncedTimeRange: { from: 0, to: 1, label: "Last 24h" }, page: 1, pageSize: 20 }),
+      selector({
+        debouncedQueryText: "",
+        debouncedTimeRange: { from: 0, to: 1, label: "Last 24h" },
+        page: 1,
+        pageSize: 20,
+      }),
     {
       getState: () => ({
         clearAll: vi.fn(),

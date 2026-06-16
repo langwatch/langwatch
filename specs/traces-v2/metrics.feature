@@ -443,6 +443,35 @@ Rule: Trace table metric cells
     Then duration, cost, tokens, and TTFT cells use the MonoCell wrapper for vertical alignment across rows
 
 
+Rule: Latency cells render a p95-scaled inline bar
+  Duration and TTFT cells pair the value with an inline bar scaled to the
+  95th percentile of the visible page (not max), so a single outlier does
+  not compress every other row into a thumbnail. Each metric scales to its
+  own p95: duration bars against the page's duration p95, TTFT bars
+  against the page's TTFT p95.
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the trace table is visible with traces
+
+  Scenario: Duration cell bar scales to the visible page's duration p95
+    When the trace table renders
+    Then each duration cell shows an inline bar filled proportionally to duration / p95 of the visible page, capped at 100%
+    And rows at or above the p95 render a full-width red bar
+    And hovering the cell shows the duration as a percentage of the page's p95
+
+  Scenario: TTFT cell bar scales to the visible page's TTFT p95
+    Given the TTFT column is enabled
+    When the trace table renders
+    Then each TTFT cell shows an inline bar filled proportionally to ttft / TTFT p95 of the visible page, capped at 100%
+    And rows at or above the TTFT p95 render a full-width red bar
+    And hovering the cell shows the TTFT as a percentage of the page's TTFT p95
+
+  Scenario: TTFT cell without a value shows no bar
+    Given a trace has no time-to-first-token data
+    Then its TTFT cell shows "—" without a bar
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # TOOLTIP BEHAVIOR
 # ─────────────────────────────────────────────────────────────────────────────

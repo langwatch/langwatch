@@ -44,7 +44,7 @@ import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfigu
 import { ModelProviderDisabledError } from "~/server/modelProviders/modelProviderDisabledError";
 import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import { createLogger } from "../../utils/logger/server";
-import { captureException } from "../../utils/posthogErrorCapture";
+import { captureException, toError } from "../../utils/posthogErrorCapture";
 import { auditLog } from "../auditLog";
 import { getLogLevelFromStatusCode } from "../middleware/requestLogging";
 import type { OpsScope, PermissionMiddleware } from "./rbac";
@@ -438,7 +438,7 @@ function spanAttributes(path: string, type: string) {
 }
 
 function recordSpanError(span: Span, error: unknown): void {
-  const e = error instanceof Error ? error : new Error(String(error));
+  const e = toError(error);
   span.recordException(e);
   span.setStatus({ code: SpanStatusCode.ERROR, message: e.message });
 }
@@ -565,7 +565,7 @@ export function handleTrpcCallLogging({
   userAgent: string | null;
   statusCode: number | null;
   log: Pick<ReturnType<typeof createLogger>, "info" | "warn" | "error">;
-  capture: (error: unknown) => void;
+  capture: (error: Error | string) => void;
 }): void {
   const logData: Record<string, any> = {
     path,
@@ -597,7 +597,7 @@ export function handleTrpcCallLogging({
 
     // Only capture 5xx errors (actual bugs)
     if (resolvedStatus >= 500) {
-      capture(result.error);
+      capture(toError(result.error));
     }
 
     const logLevel = getLogLevelFromStatusCode(resolvedStatus);

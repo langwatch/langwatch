@@ -9,6 +9,7 @@ vi.mock("~/server/triggers/sendSlackWebhook", () => ({
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
+  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
 }));
 
 import { sendSlackWebhook } from "~/server/triggers/sendSlackWebhook";

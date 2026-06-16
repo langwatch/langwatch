@@ -5,7 +5,7 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, fireEvent } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -31,7 +31,8 @@ vi.mock("../../hooks/useProjectHasTraces", () => ({
 vi.mock("../store/onboardingStore", () => ({
   useOnboardingStore: (selector: (s: unknown) => unknown) =>
     selector({
-      integrationCtaDismissedAtByProject: mockIntegrationCtaDismissedAtByProject,
+      integrationCtaDismissedAtByProject:
+        mockIntegrationCtaDismissedAtByProject,
       setIntegrationCtaDismissedAt: mockSetDismissedAt,
     }),
 }));

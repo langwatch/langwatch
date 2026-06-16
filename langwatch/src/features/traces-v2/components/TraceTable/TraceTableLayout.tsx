@@ -72,6 +72,7 @@ export const TraceTableLayout: React.FC<TraceTableLayoutProps> = ({
         ref={setRef}
         flex={1}
         overflow="auto"
+        data-spotlight="trace-table"
         opacity={isReplacingData ? 0.6 : 1}
         transition="opacity 150ms ease-out"
         pointerEvents={isReplacingData ? "none" : "auto"}

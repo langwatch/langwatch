@@ -163,6 +163,7 @@ export class IngestionKeyService {
     {
       apiKeyId: string;
       sourceType: string;
+      lookupId: string;
       ingestionTemplateId: string | null;
     }[]
   > {
@@ -183,6 +184,7 @@ export class IngestionKeyService {
       .map((k) => ({
         apiKeyId: k.id,
         sourceType: k.ingestSourceType,
+        lookupId: k.lookupId,
         ingestionTemplateId: k.ingestionTemplateId,
       }));
   }

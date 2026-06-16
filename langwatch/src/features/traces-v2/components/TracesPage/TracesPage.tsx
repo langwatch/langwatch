@@ -1,10 +1,17 @@
-import { Box, Flex, HStack, useBreakpointValue, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Flex,
+  HStack,
+  useBreakpointValue,
+  VStack,
+} from "@chakra-ui/react";
 import { AnimatePresence, motion } from "motion/react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ExportConfigDialog } from "~/components/messages/ExportConfigDialog";
 import { ExportProgress } from "~/components/messages/ExportProgress";
 import { useTracesV2Presence } from "~/features/presence/hooks/useTracesV2Presence";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { analyzeOrGroups } from "~/server/app-layer/traces/query-language/queries";
 import { useLensFilterDirtySync } from "../../hooks/useLensFilterDirtySync";
 import { useLensSync } from "../../hooks/useLensSync";
 import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
@@ -15,31 +22,30 @@ import { useTraceFreshness } from "../../hooks/useTraceFreshness";
 import { useTraceListExport } from "../../hooks/useTraceListExport";
 import { useTraceListQuery } from "../../hooks/useTraceListQuery";
 import { useURLSync } from "../../hooks/useURLSync";
-import { useDrawerStore } from "../../stores/drawerStore";
-import { TraceV2DrawerShell } from "../TraceDrawer";
 import { OnboardingHost } from "../../onboarding";
+import { SampleDataBanner } from "../../onboarding/components/SampleDataBanner";
 import { useFirstTraceSpotlightTrigger } from "../../onboarding/hooks/useFirstTraceSpotlightTrigger";
+import { usePreviewTracesActive } from "../../onboarding/hooks/usePreviewTracesActive";
 import { SpotlightOverlay } from "../../onboarding/spotlights/SpotlightOverlay";
 import { useOnboardingStore } from "../../onboarding/store/onboardingStore";
-import { SampleDataBanner } from "../../onboarding/components/SampleDataBanner";
-import { usePreviewTracesActive } from "../../onboarding/hooks/usePreviewTracesActive";
-import { AuroraSvg } from "./AuroraSvg";
+import { useDrawerStore } from "../../stores/drawerStore";
+import { useFilterStore } from "../../stores/filterStore";
 import {
   SELECT_ALL_MATCHING_CAP,
   useSelectionStore,
 } from "../../stores/selectionStore";
-import { useFilterStore } from "../../stores/filterStore";
 import { useUIStore } from "../../stores/uiStore";
-import { analyzeOrGroups } from "~/server/app-layer/traces/query-language/queries";
 import { DensityProvider } from "../DensityProvider";
 import { FilterSidebar } from "../FilterSidebar/FilterSidebar";
-import { SidebarResizeHandle } from "../FilterSidebar/SidebarResizeHandle";
 import { ConnectorLaneWidth } from "../FilterSidebar/OrConnectorOverlay";
+import { SidebarResizeHandle } from "../FilterSidebar/SidebarResizeHandle";
 import { FindBar } from "../FindBar";
 import { SearchBar } from "../SearchBar/SearchBar";
 import { BulkActionBar } from "../Toolbar/BulkActionBar";
 import { Toolbar } from "../Toolbar/Toolbar";
+import { TraceV2DrawerShell } from "../TraceDrawer";
 import { TraceTable } from "../TraceTable/TraceTable";
+import { AuroraSvg } from "./AuroraSvg";
 import { EmptyResultsPane } from "./EmptyResultsPane";
 import { IntegratePane } from "./IntegratePane";
 import { PageKeyboardShortcuts } from "./PageKeyboardShortcuts";
@@ -142,6 +148,25 @@ export const TracesPage: React.FC = () => {
     hasAnyTraces,
   });
 
+  // Project switches reset the per-project surfaces: the open drawer
+  // points at a trace the new project can't load, and the active
+  // filter query references facet values (evaluator ids, models,
+  // metadata) that don't exist across projects — both would render as
+  // confusing empty/error states if left in place. The ref skips the
+  // initial mount so a plain page load never wipes a URL-restored
+  // filter.
+  const prevProjectIdRef = useRef<string | null>(null);
+  const closeDrawerOnSwitch = useDrawerStore((s) => s.closeDrawer);
+  const clearFilters = useFilterStore((s) => s.clearAll);
+  useEffect(() => {
+    const projectId = project?.id ?? null;
+    const prev = prevProjectIdRef.current;
+    prevProjectIdRef.current = projectId;
+    if (prev === null || projectId === null || prev === projectId) return;
+    closeDrawerOnSwitch();
+    clearFilters();
+  }, [project?.id, closeDrawerOnSwitch, clearFilters]);
+
   return (
     <DensityProvider>
       {/* OnboardingHost lazy-mounts the body stage attribute + the
@@ -191,24 +216,27 @@ export const TracesPage: React.FC = () => {
             {/* Hide the sidebar during the integrate pane (no data →
                 no facets to show) and during the legacy journey except
                 for the facets/outro beats. */}
-            {!showIntegratePane && (!showEmptyState || sidebarVisibleDuringEmpty) && (
-              // `height="full"` + `overflow="hidden"` on this wrapper is
-              // load-bearing: without it the inner aside expands to its
-              // intrinsic content height (1700px+ once every facet group
-              // is rendered) and the HStack just hides the overflow at
-              // the bottom — meaning ~half the facets are invisible AND
-              // unscrollable on shorter viewports. Constraining the
-              // wrapper here lets the inner VStack's `overflowY="auto"`
-              // actually kick in.
-              <Box
-                flexShrink={0}
-                data-tour-target="sidebar"
-                height="full"
-                overflow="hidden"
-              >
-                <FilterAside dimmed={dimChrome && !sidebarVisibleDuringEmpty} />
-              </Box>
-            )}
+            {!showIntegratePane &&
+              (!showEmptyState || sidebarVisibleDuringEmpty) && (
+                // `height="full"` + `overflow="hidden"` on this wrapper is
+                // load-bearing: without it the inner aside expands to its
+                // intrinsic content height (1700px+ once every facet group
+                // is rendered) and the HStack just hides the overflow at
+                // the bottom — meaning ~half the facets are invisible AND
+                // unscrollable on shorter viewports. Constraining the
+                // wrapper here lets the inner VStack's `overflowY="auto"`
+                // actually kick in.
+                <Box
+                  flexShrink={0}
+                  data-tour-target="sidebar"
+                  height="full"
+                  overflow="hidden"
+                >
+                  <FilterAside
+                    dimmed={dimChrome && !sidebarVisibleDuringEmpty}
+                  />
+                </Box>
+              )}
             {/* Cross-fade between the three main pane modes. `mode="wait"`
                 lets the IntegratePane finish its exit (0.32s) before the
                 ResultsPane mounts and fades in (0.36s with a short
@@ -263,7 +291,10 @@ const PaneFader: React.FC<{
 }> = ({ children, delayIn = 0 }) => (
   <motion.div
     initial={{ opacity: 0 }}
-    animate={{ opacity: 1, transition: { duration: 0.36, delay: delayIn, ease: "easeOut" } }}
+    animate={{
+      opacity: 1,
+      transition: { duration: 0.36, delay: delayIn, ease: "easeOut" },
+    }}
     exit={{ opacity: 0, transition: { duration: 0.24, ease: "easeIn" } }}
     style={{ display: "flex", flex: 1, minWidth: 0, height: "100%" }}
   >

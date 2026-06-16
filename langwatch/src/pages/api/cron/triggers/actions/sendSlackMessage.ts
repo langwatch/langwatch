@@ -1,6 +1,6 @@
 import { TriggerAction } from "@prisma/client";
 import { sendSlackWebhook } from "~/server/triggers/sendSlackWebhook";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import type { ActionParams, TriggerContext } from "../types";
 
 export const handleSendSlackMessage = async (context: TriggerContext) => {
@@ -19,12 +19,15 @@ export const handleSendSlackMessage = async (context: TriggerContext) => {
 
     await sendSlackWebhook(triggerInfo);
   } catch (error) {
-    captureException(error, {
-      extra: {
-        triggerId: trigger.id,
-        projectId: trigger.projectId,
-        action: TriggerAction.SEND_SLACK_MESSAGE,
+    captureException(
+      toError(error),
+      {
+        extra: {
+          triggerId: trigger.id,
+          projectId: trigger.projectId,
+          action: TriggerAction.SEND_SLACK_MESSAGE,
+        },
       },
-    });
+    );
   }
 };

@@ -22,6 +22,7 @@ import {
 } from "~/prompts/components/ui/FieldTypeSelect";
 import { getTypeLabel } from "~/prompts/components/ui/VariableTypeIcon";
 import { HoverableBigText } from "../../../components/HoverableBigText";
+import { toaster } from "../../../components/ui/toaster";
 import { Tooltip } from "../../../components/ui/tooltip";
 import { camelCaseToTitleCase } from "../../../utils/stringCasing";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
@@ -32,7 +33,7 @@ import type {
   LLMConfig,
   Workflow,
 } from "../../types/dsl";
-import { nameToId } from "../../utils/nodeUtils";
+import { nameToId, validateNodeName } from "../../utils/nodeUtils";
 import { ComponentIcon } from "../ColorfulBlockIcons";
 import { useInsideDrawer } from "../drawers/useInsideDrawer";
 import {
@@ -504,12 +505,14 @@ export function BasePropertiesPanel({
     propertiesExpanded,
     setPropertiesExpanded,
     setNode,
+    nodes: workflowNodes,
   } = useWorkflowStore(
     useShallow((state) => ({
       deselectAllNodes: state.deselectAllNodes,
       propertiesExpanded: state.propertiesExpanded,
       setPropertiesExpanded: state.setPropertiesExpanded,
       setNode: state.setNode,
+      nodes: state.nodes,
     })),
   );
 
@@ -520,6 +523,19 @@ export function BasePropertiesPanel({
     !("data" in node);
 
   const handleNameChange = (value: string, id: string) => {
+    const result = validateNodeName({
+      name: value,
+      currentNodeId: id,
+      existingNodeIds: workflowNodes.map((n) => n.id),
+    });
+    if (!result.valid) {
+      toaster.create({
+        title: "Invalid name",
+        description: result.error,
+        type: "error",
+      });
+      return;
+    }
     const newId = nameToId(value);
     setNode({ id, data: { name: value } }, newId);
   };
@@ -587,6 +603,10 @@ export function BasePropertiesPanel({
                           if (name) {
                             handleNameChange(name, node.id);
                           }
+                        }
+                        if (e.key === "Escape") {
+                          setIsEditingName(false);
+                          setName(undefined);
                         }
                       }}
                     />

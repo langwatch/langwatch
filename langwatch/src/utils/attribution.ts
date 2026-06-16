@@ -10,7 +10,7 @@
  * `~/hooks/useAttributionCapture.ts`, which imports from here.
  */
 
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 
 let storageErrorReported = false;
 
@@ -55,7 +55,7 @@ function storageKey(field: AttributionField): string {
 function reportStorageError(error: unknown): void {
   if (storageErrorReported) return;
   storageErrorReported = true;
-  captureException(error, {
+  captureException(toError(error), {
     tags: { module: "attribution" },
     level: "warning",
   });

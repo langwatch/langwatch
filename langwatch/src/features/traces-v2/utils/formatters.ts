@@ -243,24 +243,6 @@ export const STATUS_COLORS: Readonly<Record<string, Tokens["colors"]>> = {
 };
 
 /**
- * Origin palette — kept in sync with `~/utils/originColors.ts` so the
- * filter sidebar dots, the Origin table cell, and any chip rendering
- * the trace's origin agree on what colour each origin gets. Picking
- * deterministic mappings (instead of hashing the string) avoids the
- * "evaluation just landed on orange today" surprise that prompted
- * this change.
- */
-export const ORIGIN_COLORS: Readonly<Record<string, Tokens["colors"]>> = {
-  application: "blue.solid",
-  evaluation: "green.solid",
-  simulation: "pink.solid",
-  workflow: "cyan.solid",
-  playground: "teal.solid",
-  gateway: "purple.solid",
-  sample: "gray.solid",
-};
-
-/**
  * Hash palette — deliberately conservative. Each entry is a Chakra colorPalette
  * name whose `.subtle`/`.muted`/`.emphasized` variants render legibly in BOTH
  * light and dark mode. Yellow is excluded because its low-contrast subtle tones

@@ -512,11 +512,17 @@ describe.skipIf(!hasTestcontainers)(
             value: "second",
           });
 
+          // Both stage signals fire before dispatchAfter (delay: 200), so the
+          // dispatcher consumes and drains them while the job is not yet due.
+          // Dispatch then rides the BRPOP idle-rescan net (signalTimeoutSec,
+          // 5s), and on a loaded CI runner that net plus worker overhead can
+          // exceed 10s of wall clock — same ceiling class as the TOCTOU
+          // dispatch-gap flake. 30s gives the net 3x headroom.
           await vi.waitFor(
             () => {
               expect(processed).toHaveBeenCalledTimes(1);
             },
-            { timeout: 10000, interval: 50 },
+            { timeout: 30000, interval: 50 },
           );
 
           const receivedPayload = processed.mock.calls[0]![0];

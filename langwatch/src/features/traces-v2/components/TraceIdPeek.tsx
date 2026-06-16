@@ -27,6 +27,15 @@ interface TracePreviewHoverCardProps {
   traceId: string;
   children: ReactNode;
   /**
+   * Approximate trace timestamp (ms epoch) forwarded to the summary
+   * fetch as a partition-pruning hint. `trace_summaries` is partitioned
+   * on `OccurredAt`, so a read filtered only by `traceId` cannot prune
+   * partitions and walks every weekly partition including the cold S3
+   * tier. Pass it from the surrounding row whenever it is known; when
+   * omitted the popover falls back to the unconstrained by-id fetch.
+   */
+  occurredAtMs?: number;
+  /**
    * Defaults to "bottom-start" — sits below the trigger and aligns to
    * its leading edge. Override when the trigger is on the far right of
    * a row and a bottom-end placement reads better.
@@ -49,6 +58,7 @@ interface TracePreviewHoverCardProps {
 export const TracePreviewHoverCard: React.FC<TracePreviewHoverCardProps> = ({
   traceId,
   children,
+  occurredAtMs,
   placement = "bottom-start",
 }) => {
   const [hasHovered, setHasHovered] = useState(false);
@@ -75,7 +85,12 @@ export const TracePreviewHoverCard: React.FC<TracePreviewHoverCardProps> = ({
             background="bg.panel"
             boxShadow="lg"
           >
-            {hasHovered && <PeekPopoverContent traceId={traceId} />}
+            {hasHovered && (
+              <PeekPopoverContent
+                traceId={traceId}
+                occurredAtMs={occurredAtMs}
+              />
+            )}
           </HoverCard.Content>
         </HoverCard.Positioner>
       </Portal>
@@ -85,6 +100,12 @@ export const TracePreviewHoverCard: React.FC<TracePreviewHoverCardProps> = ({
 
 interface TraceIdPeekProps {
   traceId: string;
+  /**
+   * Approximate trace timestamp (ms epoch) forwarded as a partition-
+   * pruning hint to the peek summary fetch and to the drawer it opens.
+   * See {@link TracePreviewHoverCardProps.occurredAtMs}.
+   */
+  occurredAtMs?: number;
 }
 
 /**
@@ -96,16 +117,25 @@ interface TraceIdPeekProps {
  * already have a button or link you can wrap, prefer
  * `<TracePreviewHoverCard>` directly so the eye doesn't crowd the row.
  */
-export const TraceIdPeek: React.FC<TraceIdPeekProps> = ({ traceId }) => {
+export const TraceIdPeek: React.FC<TraceIdPeekProps> = ({
+  traceId,
+  occurredAtMs,
+}) => {
   const { openDrawer } = useDrawer();
 
   const handleOpenDrawer = (e: React.MouseEvent) => {
     e.stopPropagation();
-    openDrawer("traceV2Details", { traceId });
+    // Forward the timestamp as the drawer's `t` partition hint so the
+    // opened drawer's per-trace reads prune partitions instead of
+    // walking every weekly partition by id.
+    openDrawer("traceV2Details", {
+      traceId,
+      ...(occurredAtMs !== undefined ? { t: String(occurredAtMs) } : {}),
+    });
   };
 
   return (
-    <TracePreviewHoverCard traceId={traceId}>
+    <TracePreviewHoverCard traceId={traceId} occurredAtMs={occurredAtMs}>
       <Box
         as="button"
         onClick={handleOpenDrawer}
@@ -128,11 +158,21 @@ export const TraceIdPeek: React.FC<TraceIdPeekProps> = ({ traceId }) => {
   );
 };
 
-function PeekPopoverContent({ traceId }: { traceId: string }) {
+function PeekPopoverContent({
+  traceId,
+  occurredAtMs,
+}: {
+  traceId: string;
+  occurredAtMs?: number;
+}) {
   const { project } = useOrganizationTeamProject();
 
   const { data: trace, isLoading } = api.tracesV2.header.useQuery(
-    { projectId: project?.id ?? "", traceId },
+    {
+      projectId: project?.id ?? "",
+      traceId,
+      ...(occurredAtMs !== undefined ? { occurredAtMs } : {}),
+    },
     { enabled: !!project?.id, staleTime: 300_000 },
   );
 

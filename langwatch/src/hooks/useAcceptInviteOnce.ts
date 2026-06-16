@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { INVITE_ALREADY_ACCEPTED_MESSAGE } from "~/server/invites/errors";
 import { api } from "~/utils/api";
 import { hardRedirect } from "~/utils/hardRedirect";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { toaster } from "~/components/ui/toaster";
 
 /**
@@ -95,7 +95,9 @@ export function useAcceptInviteOnce({
       }
       // Real failure (expired invite, email mismatch, …). The page renders
       // `errorMessage` inline; also capture for observability.
-      captureException(error, { tags: { source: "useAcceptInviteOnce" } });
+      captureException(toError(error), {
+        tags: { source: "useAcceptInviteOnce" },
+      });
     },
   });
 

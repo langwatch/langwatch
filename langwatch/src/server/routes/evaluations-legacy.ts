@@ -79,7 +79,7 @@ import { rAGChunkSchema } from "~/server/tracer/types";
 import { coerceEvaluatorScalar } from "~/server/utils/coerceEvaluatorScalar";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { createLogger } from "~/utils/logger/server";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { mapZodIssuesToLogContext } from "~/utils/zod";
 
 const logger = createLogger("langwatch:evaluations-legacy");
@@ -211,7 +211,7 @@ secured
           { error, body, projectId: project.id },
           "invalid log_results data received",
         );
-        captureException(error, { extra: { projectId: project.id } });
+        captureException(toError(error), { extra: { projectId: project.id } });
         const validationError = fromZodError(error as ZodError);
         return c.json({ error: validationError.message }, 400);
       }
@@ -248,7 +248,7 @@ secured
             { error, body: params, projectId: project.id },
             "failed to validate data for batch evaluation",
           );
-          captureException(error, {
+          captureException(toError(error), {
             extra: { projectId: project.id, param: params },
           });
           const validationError = fromZodError(error);
@@ -267,7 +267,7 @@ secured
             { error, body: params, projectId: project.id },
             "internal server error processing batch evaluation",
           );
-          captureException(error, {
+          captureException(toError(error), {
             extra: { projectId: project.id, param: params },
           });
           return c.json(
@@ -356,7 +356,7 @@ secured
         { error, body, projectId: project.id },
         "invalid evaluation params received",
       );
-      captureException(error, { extra: { projectId: project.id } });
+      captureException(toError(error), { extra: { projectId: project.id } });
       const validationError = fromZodError(error as ZodError);
       return c.json({ error: validationError.message }, 400);
     }
@@ -408,7 +408,7 @@ secured
         { error, body, projectId: project.id },
         "invalid evaluation data received",
       );
-      captureException(error, { extra: { projectId: project.id } });
+      captureException(toError(error), { extra: { projectId: project.id } });
       const validationError = fromZodError(error as ZodError);
       return c.json({ error: validationError.message }, 400);
     }
@@ -768,7 +768,7 @@ async function handleEvaluatorCall(
       },
       "invalid evaluation params received",
     );
-    captureException(error, {
+    captureException(toError(error), {
       extra: { projectId: project.id, validationError: message },
     });
     return c.json({ error: message }, 400);
@@ -819,7 +819,7 @@ async function handleEvaluatorCall(
       },
       "invalid settings received for the evaluator",
     );
-    captureException(error, {
+    captureException(toError(error), {
       extra: { projectId: project.id, validationError: message },
     });
     return c.json(
@@ -853,7 +853,7 @@ async function handleEvaluatorCall(
       },
       "invalid evaluation data received",
     );
-    captureException(error, {
+    captureException(toError(error), {
       extra: { projectId: project.id, validationError: message },
     });
     return c.json({ error: message }, 400);
@@ -919,7 +919,7 @@ async function handleEvaluatorCall(
       costId = cost.id;
     }
   } catch (error) {
-    captureException(error, { extra: { projectId: project.id } });
+    captureException(toError(error), { extra: { projectId: project.id } });
     logger.error(
       { err: error, projectId: project.id },
       "error running evaluation",
@@ -956,7 +956,7 @@ async function handleEvaluatorCall(
             : undefined,
       })
       .catch((eventError: unknown) => {
-        captureException(eventError, {
+        captureException(toError(eventError), {
           extra: {
             projectId: project.id,
             evaluationId,

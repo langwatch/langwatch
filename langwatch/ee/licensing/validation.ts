@@ -1,8 +1,8 @@
 import crypto from "crypto";
 import { LICENSE_ERRORS, PUBLIC_KEY } from "./constants";
 import { mapToPlanInfo } from "./planMapping";
-import { SignedLicenseSchema } from "./types";
 import type { SignedLicense, ValidationResult } from "./types";
+import { SignedLicenseSchema } from "./types";
 
 /**
  * Parses a base64-encoded license key into a SignedLicense object.
@@ -75,11 +75,13 @@ export function isExpired(expiresAt: string, now: Date = new Date()): boolean {
  *
  * @param licenseKey - Base64-encoded license string
  * @param publicKey - RSA public key (defaults to production key)
+ * @param now - Current date, injectable for testing (defaults to real clock)
  * @returns ValidationResult indicating success or failure with error
  */
 export function validateLicense(
   licenseKey: string,
   publicKey: string = PUBLIC_KEY,
+  now: Date = new Date(),
 ): ValidationResult {
   // Step 1: Parse
   const signedLicense = parseLicenseKey(licenseKey);
@@ -93,7 +95,7 @@ export function validateLicense(
   }
 
   // Step 3: Check expiration
-  if (isExpired(signedLicense.data.expiresAt)) {
+  if (isExpired(signedLicense.data.expiresAt, now)) {
     return { valid: false, error: LICENSE_ERRORS.EXPIRED };
   }
 
@@ -104,4 +106,3 @@ export function validateLicense(
     planInfo: mapToPlanInfo(signedLicense.data),
   };
 }
-

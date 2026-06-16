@@ -42,7 +42,14 @@ describe("jobEnvelope", () => {
     };
 
     beforeEach(() => {
-      vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", undefined);
+      // Set "false" rather than unset: under the vmThreads pool process.env is
+      // shared and aggressively recycled, and vi.stubEnv(key, undefined) clears
+      // it via the metaEnv proxy's *delete* path (no deleteProperty trap — it
+      // only works by defaulting through to process.env), which races the
+      // outer "true" stub. Writing a value goes through the proxy set trap,
+      // which reliably forwards. Any non-"true" value exercises the same
+      // envelopeWritesEnabled() === false branch.
+      vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "false");
     });
 
     describe("when encoding", () => {
