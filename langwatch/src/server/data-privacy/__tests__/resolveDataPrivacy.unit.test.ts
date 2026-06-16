@@ -258,4 +258,45 @@ describe("resolveDataPrivacy", () => {
       expect(entry?.audience.admins).toBe(true);
     });
   });
+
+  // The Data Privacy snapshot derives effectiveOrganization / effectiveTeam by
+  // resolving with synthetic facts whose narrower scope ids are empty, so the
+  // PROJECT (and TEAM, for the org baseline) chain entries match no row. That is
+  // what makes the settings page's effective summary follow the scope filter.
+  describe("given org, team, and project rules on PII", () => {
+    const rows = [
+      rule("ORGANIZATION", "acme", { pii: { level: "essential" } }),
+      rule("TEAM", "platform", { pii: { level: "strict" } }),
+      rule("PROJECT", "web-app", { pii: { level: "disabled" } }),
+    ];
+
+    /** @scenario The effective summary resolves a baseline for the selected scope tier */
+    it("resolves a baseline per scope tier from synthetic facts", () => {
+      const orgBaseline = resolveDataPrivacy({
+        rows,
+        facts: {
+          organizationId: "acme",
+          teamId: "",
+          projectId: "",
+          departmentId: null,
+          isPersonal: false,
+        },
+      });
+      const teamBaseline = resolveDataPrivacy({
+        rows,
+        facts: {
+          organizationId: "acme",
+          teamId: "platform",
+          projectId: "",
+          departmentId: null,
+          isPersonal: false,
+        },
+      });
+      const projectPolicy = resolveDataPrivacy({ rows, facts: teamProject });
+
+      expect(orgBaseline.pii.level).toBe("essential");
+      expect(teamBaseline.pii.level).toBe("strict");
+      expect(projectPolicy.pii.level).toBe("disabled");
+    });
+  });
 });

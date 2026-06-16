@@ -12,6 +12,7 @@ import {
 } from "./dataPrivacy.types";
 import type { DataPrivacyScopeTier } from "./dataPrivacyPolicy.repository";
 import { getDataPrivacyPolicyService } from "./dataPrivacyPolicy.service";
+import { type DataPrivacyRow, resolveDataPrivacy } from "./resolveDataPrivacy";
 
 export type ReadCtx = { prisma: PrismaClient; session: Session | null };
 
@@ -46,6 +47,13 @@ export type DataPrivacySnapshot = {
   /** Effective privacy policy for this project, every field populated by the
    *  cascade or the platform default. */
   effective: ResolvedDataPrivacy;
+  /** The baseline a project in this team inherits before its own (and its
+   *  department's) rules: the cascade stopping at the TEAM tier. Null for a
+   *  personal-account project that has no team/org. */
+  effectiveTeam: ResolvedDataPrivacy | null;
+  /** The org-wide baseline: only ORGANIZATION rules and the platform defaults.
+   *  Null for a personal-account project that has no org. */
+  effectiveOrganization: ResolvedDataPrivacy | null;
   /** Rule rows the caller can read, one per (scope, personalOnly). */
   rules: DataPrivacyRule[];
   /** Scopes the caller can write to (RBAC-filtered), for the chip picker. */
@@ -107,6 +115,8 @@ export async function getDataPrivacySnapshot(
     return {
       projectId,
       effective,
+      effectiveTeam: null,
+      effectiveOrganization: null,
       rules: [],
       available: {
         organization: null,
@@ -197,20 +207,57 @@ export async function getDataPrivacySnapshot(
     return projectName.get(scopeId) ?? scopeId;
   };
 
-  const rules: DataPrivacyRule[] = [];
+  // Parse every row once. A row whose stored config no longer parses is
+  // unrenderable and unresolvable; the repository already warns about it on the
+  // resolution path, so the snapshot just leaves it out.
+  const allRows: DataPrivacyRow[] = [];
   for (const row of rows) {
-    if (!canReadScope(row.scopeType, row.scopeId)) continue;
-    // A row whose stored config no longer parses is unrenderable; the
-    // repository already warns about it on the resolution path, so the
-    // snapshot just leaves it out.
     const parsed = dataPrivacyConfigSchema.safeParse(row.config);
     if (!parsed.success) continue;
+    allRows.push({
+      scopeType: row.scopeType,
+      scopeId: row.scopeId,
+      personalOnly: row.personalOnly,
+      config: parsed.data,
+    });
+  }
+
+  // The rule LIST is RBAC-filtered (a project-only viewer never sees org rules),
+  // but the effective BASELINES are resolved from every row: a team/org baseline
+  // is exactly what already folds into the project effective the viewer can see,
+  // so it leaks nothing new. The TEAM baseline is the cascade stopping at the
+  // project's team (non-personal); the ORGANIZATION baseline keeps only org
+  // rules. Synthetic facts with empty narrower ids make those tiers no-ops.
+  const effectiveTeam = resolveDataPrivacy({
+    rows: allRows,
+    facts: {
+      organizationId,
+      teamId: project?.teamId ?? "",
+      projectId: "",
+      departmentId: null,
+      isPersonal: false,
+    },
+  });
+  const effectiveOrganization = resolveDataPrivacy({
+    rows: allRows,
+    facts: {
+      organizationId,
+      teamId: "",
+      projectId: "",
+      departmentId: null,
+      isPersonal: false,
+    },
+  });
+
+  const rules: DataPrivacyRule[] = [];
+  for (const row of allRows) {
+    if (!canReadScope(row.scopeType, row.scopeId)) continue;
     rules.push({
       scopeType: row.scopeType,
       scopeId: row.scopeId,
       name: scopeName(row.scopeType, row.scopeId),
       personalOnly: row.personalOnly,
-      config: parsed.data,
+      config: row.config,
     });
   }
 
@@ -238,5 +285,13 @@ export async function getDataPrivacySnapshot(
     groups: orgGroups,
   };
 
-  return { projectId, effective, rules, available, audienceOptions };
+  return {
+    projectId,
+    effective,
+    effectiveTeam,
+    effectiveOrganization,
+    rules,
+    available,
+    audienceOptions,
+  };
 }

@@ -73,6 +73,23 @@ Feature: Data privacy policy configuration
     And trace output is visible only to admins for "web-app"
     And PII is redacted at the strict level for "web-app"
 
+  # The settings page shows an "effective" summary that follows the scope filter:
+  # "All you can see" shows the organization baseline, "This team" the team
+  # baseline, and a project the full cascade, so an admin sees what each tier
+  # contributes before a project's own rules apply.
+
+  @unit
+  Scenario: The effective summary resolves a baseline for the selected scope tier
+    Given an organization rule that sets essential PII redaction
+    And a team rule on "platform" that sets strict PII redaction
+    And a project rule on "web-app" that disables PII redaction
+    When the effective policy is resolved at the organization scope
+    Then PII is redacted at the essential level
+    When the effective policy is resolved at the team "platform" scope
+    Then PII is redacted at the strict level
+    When the effective policy is resolved at the project "web-app" scope
+    Then PII is disabled for "web-app"
+
   # Personal projects are every user's private CLI workspace. An admin can write
   # one rule that covers all of them without touching each project, and can
   # narrow it to the personal projects of people in a given department.

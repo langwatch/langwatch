@@ -63,6 +63,7 @@ import {
 import {
   type AvailableScopes,
   ScopeFilter,
+  type ScopeFilter as ScopeFilterValue,
 } from "~/components/settings/ScopeFilter";
 import { Drawer } from "~/components/ui/drawer";
 import { Menu } from "~/components/ui/menu";
@@ -85,6 +86,7 @@ import type {
   DataPrivacyAudienceOptions,
   DataPrivacyRule,
   DataPrivacyScopeAvailable,
+  DataPrivacySnapshot,
 } from "~/server/data-privacy/dataPrivacyPolicy.read";
 import { api } from "~/utils/api";
 import { isSafeRegex } from "~/utils/safeRegex";
@@ -249,8 +251,6 @@ function DataPrivacyPage({ projectId }: { projectId: string }) {
           projects.
         </Text>
 
-        {snapshot && <EffectiveCard effective={snapshot.effective} />}
-
         {snapshot && snapshot.rules.length === 0 ? (
           <Card.Root width="full">
             <Card.Body>
@@ -368,6 +368,14 @@ function DataPrivacyPage({ projectId }: { projectId: string }) {
           )
         )}
 
+        {snapshot && (
+          <EffectiveSummary
+            snapshot={snapshot}
+            scopeFilter={scopeFilter}
+            currentTeamId={currentProject?.teamId ?? null}
+          />
+        )}
+
         {available && snapshot && (
           <PrivacyRuleDrawer
             open={drawerOpen}
@@ -426,62 +434,101 @@ function DataPrivacyPage({ projectId }: { projectId: string }) {
   );
 }
 
-function EffectiveCard({ effective }: { effective: ResolvedDataPrivacy }) {
+/**
+ * The effective view follows the scope filter: "All you can see" shows the
+ * organization baseline, "This team" the team baseline, and a project the full
+ * cascade. Team/org baselines are null for a personal-account project, which
+ * falls back to its own project policy.
+ */
+function pickEffectiveForScope(
+  snapshot: DataPrivacySnapshot,
+  scopeFilter: ScopeFilterValue,
+  currentTeamId: string | null,
+): { effective: ResolvedDataPrivacy; scopeLabel: string } {
+  if (scopeFilter.kind === "all" && snapshot.effectiveOrganization) {
+    return {
+      effective: snapshot.effectiveOrganization,
+      scopeLabel: "this organization",
+    };
+  }
+  const isCurrentTeam =
+    scopeFilter.kind === "team-current" ||
+    (scopeFilter.kind === "specific" &&
+      scopeFilter.scopeType === "TEAM" &&
+      scopeFilter.scopeId === currentTeamId);
+  if (isCurrentTeam && snapshot.effectiveTeam) {
+    return { effective: snapshot.effectiveTeam, scopeLabel: "this team" };
+  }
+  return { effective: snapshot.effective, scopeLabel: "this project" };
+}
+
+export function EffectiveSummary({
+  snapshot,
+  scopeFilter,
+  currentTeamId,
+}: {
+  snapshot: DataPrivacySnapshot;
+  scopeFilter: ScopeFilterValue;
+  currentTeamId: string | null;
+}) {
+  const { effective, scopeLabel } = pickEffectiveForScope(
+    snapshot,
+    scopeFilter,
+    currentTeamId,
+  );
   return (
-    <Card.Root width="full">
-      <Card.Header>
+    <VStack gap={3} align="stretch" width="full" paddingTop={2}>
+      <VStack gap={0} align="start">
         <Heading as="h3" fontSize="lg">
-          Effective for this project
+          Effective for {scopeLabel}
         </Heading>
         <Text fontSize="sm" color="fg.muted">
-          What is actually applied right now, after inheriting down the scopes.
+          What is actually applied, after the rules above cascade down.
         </Text>
-      </Card.Header>
-      <Card.Body>
-        <VStack gap={2} align="stretch">
-          {CONTENT_CATEGORIES.map((category) => (
-            <HStack key={category} justifyContent="space-between">
-              <Text color="fg.muted">{CATEGORY_LABELS[category]}</Text>
-              <Text>
-                {DISPOSITION_LABELS[effective.categories[category].disposition]}
-              </Text>
-            </HStack>
-          ))}
-          {effective.customAttributes.length > 0 && (
-            <HStack justifyContent="space-between">
-              <Text color="fg.muted">Attribute rules</Text>
-              <Text>
-                {effective.customAttributes
-                  .map(
-                    (rule) =>
-                      `${rule.pattern} ${
-                        rule.disposition === "drop" ? "dropped" : "restricted"
-                      }`,
-                  )
-                  .join(" · ")}
-              </Text>
-            </HStack>
-          )}
-          <HStack justifyContent="space-between">
-            <Text color="fg.muted">PII redaction</Text>
-            <Text>{PII_LABELS[effective.pii.level]}</Text>
-          </HStack>
-          <HStack justifyContent="space-between">
-            <Text color="fg.muted">Secrets redaction</Text>
+      </VStack>
+      <VStack gap={2} align="stretch">
+        {CONTENT_CATEGORIES.map((category) => (
+          <HStack key={category} justifyContent="space-between">
+            <Text color="fg.muted">{CATEGORY_LABELS[category]}</Text>
             <Text>
-              {effective.secrets.enabled ? "On" : "Off"}
-              {effective.secrets.customPatterns.length > 0
-                ? ` · ${effective.secrets.customPatterns.length} custom ${
-                    effective.secrets.customPatterns.length === 1
-                      ? "pattern"
-                      : "patterns"
-                  }`
-                : ""}
+              {DISPOSITION_LABELS[effective.categories[category].disposition]}
             </Text>
           </HStack>
-        </VStack>
-      </Card.Body>
-    </Card.Root>
+        ))}
+        {effective.customAttributes.length > 0 && (
+          <HStack justifyContent="space-between">
+            <Text color="fg.muted">Attribute rules</Text>
+            <Text>
+              {effective.customAttributes
+                .map(
+                  (rule) =>
+                    `${rule.pattern} ${
+                      rule.disposition === "drop" ? "dropped" : "restricted"
+                    }`,
+                )
+                .join(" · ")}
+            </Text>
+          </HStack>
+        )}
+        <HStack justifyContent="space-between">
+          <Text color="fg.muted">PII redaction</Text>
+          <Text>{PII_LABELS[effective.pii.level]}</Text>
+        </HStack>
+        <HStack justifyContent="space-between">
+          <Text color="fg.muted">Secrets redaction</Text>
+          <Text>
+            {effective.secrets.enabled ? "On" : "Off"}
+            {effective.secrets.customPatterns.length > 0
+              ? ` · ${effective.secrets.customPatterns.length} custom ${
+                  effective.secrets.customPatterns.length === 1
+                    ? "pattern"
+                    : "patterns"
+                }`
+              : ""}
+          </Text>
+        </HStack>
+      </VStack>
+    </VStack>
   );
 }
 
