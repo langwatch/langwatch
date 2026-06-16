@@ -345,9 +345,9 @@ const CATEGORY_SUMMARY_LABELS: Record<ContentCategory, string> = {
 };
 
 const PII_SUMMARY_LABELS: Record<PiiLevel, string> = {
-  disabled: "Disabled",
-  essential: "Essential",
-  strict: "Strict",
+  disabled: "PII redaction off",
+  essential: "PII redaction",
+  strict: "Strict PII redaction",
 };
 
 const DISPOSITION_SUMMARY_LABELS: Record<Disposition, string> = {
@@ -379,9 +379,11 @@ export function ruleSummary(config: DataPrivacyConfig): string {
         : `${attributeRules} attribute rules`,
     );
   }
-  if (config.pii) parts.push(`PII ${PII_SUMMARY_LABELS[config.pii.level]}`);
+  if (config.pii) parts.push(PII_SUMMARY_LABELS[config.pii.level]);
   if (config.secrets) {
-    parts.push(config.secrets.enabled ? "Secrets on" : "Secrets off");
+    parts.push(
+      config.secrets.enabled ? "Secrets redaction" : "Secrets redaction off",
+    );
     const patterns = config.secrets.customPatterns?.length ?? 0;
     if (patterns > 0) {
       parts.push(

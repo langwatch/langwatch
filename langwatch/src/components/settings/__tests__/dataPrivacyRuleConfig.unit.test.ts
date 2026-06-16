@@ -343,7 +343,17 @@ describe("ruleSummary", () => {
     });
 
     expect(summary).toBe(
-      "Input drop · 2 attribute rules · PII Disabled · Secrets on · 2 secret patterns",
+      "Input drop · 2 attribute rules · PII redaction off · Secrets redaction · 2 secret patterns",
+    );
+  });
+
+  it("reads PII redaction without a level prefix, and Strict when strict", () => {
+    expect(ruleSummary({ pii: { level: "essential" } })).toBe("PII redaction");
+    expect(ruleSummary({ pii: { level: "strict" } })).toBe(
+      "Strict PII redaction",
+    );
+    expect(ruleSummary({ secrets: { enabled: true } })).toBe(
+      "Secrets redaction",
     );
   });
 
