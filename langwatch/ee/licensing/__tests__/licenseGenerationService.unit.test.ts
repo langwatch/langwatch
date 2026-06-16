@@ -17,7 +17,7 @@ describe("generateLicenseKey", () => {
   describe("when generating a GROWTH license", () => {
     it("generates a valid license key that passes round-trip validation", () => {
       const { licenseKey } = generateLicenseKey(baseParams);
-      const result = validateLicense(licenseKey, TEST_PUBLIC_KEY);
+      const result = validateLicense(licenseKey, TEST_PUBLIC_KEY, baseParams.now);
 
       expect(result.valid).toBe(true);
     });
@@ -72,7 +72,7 @@ describe("generateLicenseKey", () => {
         maxMembers: 10,
       });
 
-      const result = validateLicense(licenseKey, TEST_PUBLIC_KEY);
+      const result = validateLicense(licenseKey, TEST_PUBLIC_KEY, baseParams.now);
       expect(result.valid).toBe(true);
       expect(licenseData.plan.type).toBe("PRO");
       expect(licenseData.plan.maxMembers).toBe(10);
@@ -88,7 +88,7 @@ describe("generateLicenseKey", () => {
         maxMembers: 50,
       });
 
-      const result = validateLicense(licenseKey, TEST_PUBLIC_KEY);
+      const result = validateLicense(licenseKey, TEST_PUBLIC_KEY, baseParams.now);
       expect(result.valid).toBe(true);
       expect(licenseData.plan.type).toBe("ENTERPRISE");
       expect(licenseData.plan.maxMembers).toBe(50);
@@ -198,7 +198,7 @@ describe("generateLicenseKey", () => {
   describe("when validating round-trip integrity", () => {
     it("produces a license that can be parsed and verified", () => {
       const { licenseKey, licenseData } = generateLicenseKey(baseParams);
-      const result = validateLicense(licenseKey, TEST_PUBLIC_KEY);
+      const result = validateLicense(licenseKey, TEST_PUBLIC_KEY, baseParams.now);
 
       expect(result.valid).toBe(true);
       if (result.valid) {
