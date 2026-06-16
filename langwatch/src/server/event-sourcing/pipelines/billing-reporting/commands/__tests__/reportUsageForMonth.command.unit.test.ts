@@ -81,6 +81,7 @@ vi.mock("~/server/utils/ttlCache", () => ({
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: mockCaptureException,
+  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
   withScope: vi.fn((cb: (scope: Record<string, unknown>) => void) => {
     cb({ setTag: vi.fn(), setExtra: vi.fn() });
   }),

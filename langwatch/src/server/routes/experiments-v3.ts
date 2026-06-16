@@ -49,7 +49,7 @@ import { trackServerEvent } from "~/server/posthog";
 import { fireExperimentRanNurturing } from "../../../ee/billing/nurturing/hooks/featureAdoption";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
 import { createLogger } from "~/utils/logger/server";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import type { NextRequestShim as any } from "./types";
 
 const logger = createLogger("langwatch:experiments-v3");
@@ -262,7 +262,7 @@ secured.access(sessionAuth).post("/execute", zValidator("json", executionRequest
       }
     } catch (error) {
       logger.error({ error, projectId }, "Orchestrator error");
-      captureException(error, { extra: { projectId } });
+      captureException(toError(error), { extra: { projectId } });
 
       await stream.writeSSE({
         data: JSON.stringify({
@@ -433,7 +433,7 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
           { error, projectId: project.id, slug },
           "Orchestrator error",
         );
-        captureException(error, { extra: { projectId: project.id, slug } });
+        captureException(toError(error), { extra: { projectId: project.id, slug } });
 
         await stream.writeSSE({
           data: JSON.stringify({
@@ -483,7 +483,7 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
         { error, projectId: project.id, slug, runId },
         "Execution error",
       );
-      captureException(error, {
+      captureException(toError(error), {
         extra: { projectId: project.id, slug, runId },
       });
       await runStateManager.failRun(runId, (error as Error).message);

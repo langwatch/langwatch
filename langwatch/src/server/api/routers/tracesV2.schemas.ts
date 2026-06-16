@@ -66,6 +66,9 @@ const traceHeaderSchema = z.object({
   error: z.string().nullish(),
   input: z.string().nullish(),
   output: z.string().nullish(),
+  // True when input/output/error were teaser-redacted by the plan's
+  // visibility window — drives the blurred-content upgrade treatment.
+  redactedByVisibilityWindow: z.boolean().optional(),
   models: z.array(z.string()),
   /**
    * Grand list-price cost of the trace (sum of span costs). LangWatch bills

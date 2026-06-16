@@ -2,7 +2,7 @@ import type { NurturingService } from "../../../../../../ee/billing/nurturing/nu
 import type { ProjectService } from "../../../../app-layer/projects/project.service";
 import { CIO_REACTOR_DEBOUNCE_TTL_MS } from "../../trace-processing/reactors/customerIoTraceSync.reactor";
 import { createLogger } from "../../../../../utils/logger/server";
-import { captureException } from "../../../../../utils/posthogErrorCapture";
+import { captureException, toError } from "../../../../../utils/posthogErrorCapture";
 import type { ReactorContext, ReactorDefinition } from "../../../reactors/reactor.types";
 import type { SimulationRunStateData } from "../projections/simulationRunState.foldProjection";
 import type { SimulationProcessingEvent } from "../schemas/events";
@@ -94,7 +94,7 @@ export function createCustomerIoSimulationSyncReactor(
             }})
             .catch((error) => {
               logger.error({ projectId, error }, "Failed to identify user for first simulation");
-              captureException(error);
+              captureException(toError(error));
             });
           void deps.nurturing
             .trackEvent({ userId, event: "first_simulation_ran", properties: {
@@ -102,7 +102,7 @@ export function createCustomerIoSimulationSyncReactor(
             }})
             .catch((error) => {
               logger.error({ projectId, error }, "Failed to track first_simulation_ran event");
-              captureException(error);
+              captureException(toError(error));
             });
         } else {
           const newCount = existingCount + 1;
@@ -114,7 +114,7 @@ export function createCustomerIoSimulationSyncReactor(
             }})
             .catch((error) => {
               logger.error({ projectId, error }, "Failed to identify user for simulation update");
-              captureException(error);
+              captureException(toError(error));
             });
         }
       } catch (error) {
@@ -122,7 +122,7 @@ export function createCustomerIoSimulationSyncReactor(
           { projectId, error },
           "Failed to process CIO simulation sync — non-fatal",
         );
-        captureException(error);
+        captureException(toError(error));
       }
     },
   };

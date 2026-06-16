@@ -608,6 +608,9 @@ export const traceSchema = z.object({
   events: z.array(eventSchema).optional(),
   evaluations: z.array(evaluationSchema).optional(),
   spans: z.array(spanSchema),
+  // Set server-side when content was teaser-redacted by the plan's
+  // visibility window — the UI renders the upgrade CTA off this flag.
+  redacted_by_visibility_window: z.boolean().optional(),
 });
 
 export type Trace = z.infer<typeof traceSchema>;

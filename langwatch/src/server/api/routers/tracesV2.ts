@@ -1,6 +1,7 @@
 import { on } from "node:events";
 import { z } from "zod";
 import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution";
+import { getVisibilityCutoffMsForProject } from "~/server/api/utils";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { ValidationError } from "~/server/app-layer/domain-error";
@@ -140,6 +141,7 @@ function mapTraceSummaryToHeader(summary: TraceSummaryData): TraceHeader {
     error: summary.errorMessage,
     input: summary.computedInput,
     output: summary.computedOutput,
+    redactedByVisibilityWindow: summary.redactedByVisibilityWindow,
     models: summary.models,
     totalCost: summary.totalCost,
     nonBilledCost,
@@ -507,6 +509,9 @@ export const tracesV2Router = createTRPCRouter({
         page: input.page,
         pageSize: input.pageSize,
         filterWhere: buildFilterWhere(input),
+        visibilityCutoffMs: await getVisibilityCutoffMsForProject(
+          input.projectId,
+        ),
       });
       return {
         ...page,
@@ -607,6 +612,9 @@ export const tracesV2Router = createTRPCRouter({
         page: 1,
         pageSize: 200,
         filterWhere,
+        visibilityCutoffMs: await getVisibilityCutoffMsForProject(
+          input.projectId,
+        ),
       });
       const turns = page.items.map((t) =>
         redactV2Content(
@@ -761,9 +769,14 @@ export const tracesV2Router = createTRPCRouter({
       const summary = await app.traces.summary.getByTraceId(
         input.projectId,
         input.traceId,
-        input.occurredAtMs !== undefined
-          ? { occurredAtMs: input.occurredAtMs }
-          : undefined,
+        {
+          ...(input.occurredAtMs !== undefined
+            ? { occurredAtMs: input.occurredAtMs }
+            : {}),
+          visibilityCutoffMs: await getVisibilityCutoffMsForProject(
+            input.projectId,
+          ),
+        },
       );
       if (!summary) {
         throw new TraceNotFoundError(input.traceId);
@@ -952,6 +965,9 @@ export const tracesV2Router = createTRPCRouter({
       const page = await app.traces.spans.getSpansPaginated({
         tenantId: input.projectId,
         traceId: input.traceId,
+        visibilityCutoffMs: await getVisibilityCutoffMsForProject(
+          input.projectId,
+        ),
         limit: input.limit,
         offset: input.offset,
         ...occurredAtFromInput(input),
@@ -988,6 +1004,9 @@ export const tracesV2Router = createTRPCRouter({
         tenantId: input.projectId,
         traceId: input.traceId,
         sinceStartTimeMs: input.sinceStartTimeMs,
+        visibilityCutoffMs: await getVisibilityCutoffMsForProject(
+          input.projectId,
+        ),
         ...occurredAtFromInput(input),
       });
       const redactions = buildSpanContentRedactions(spans, protections);
@@ -1111,6 +1130,9 @@ export const tracesV2Router = createTRPCRouter({
       const spans = await app.traces.spans.getSpansByTraceId({
         tenantId: input.projectId,
         traceId: input.traceId,
+        visibilityCutoffMs: await getVisibilityCutoffMsForProject(
+          input.projectId,
+        ),
         ...occurredAtFromInput(input),
       });
       // Span-level protections first (category visibility, restricted custom
@@ -1153,6 +1175,9 @@ export const tracesV2Router = createTRPCRouter({
           tenantId: input.projectId,
           traceId: input.traceId,
           spanId: input.spanId,
+          visibilityCutoffMs: await getVisibilityCutoffMsForProject(
+            input.projectId,
+          ),
           ...hint,
         }),
         app.traces.spans.getSpanEvents({

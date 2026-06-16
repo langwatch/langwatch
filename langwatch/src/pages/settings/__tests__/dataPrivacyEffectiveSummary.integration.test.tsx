@@ -97,7 +97,12 @@ describe("EffectiveSummary", () => {
       render(
         <EffectiveSummary
           snapshot={snapshot}
-          scopeFilter={{ kind: "specific", scopeType: "TEAM", scopeId: "team-1" }}
+          scopeFilter={{
+            kind: "specific",
+            scopeType: "TEAM",
+            scopeId: "team-1",
+            name: "Platform",
+          }}
           currentTeamId="team-1"
         />,
         { wrapper },

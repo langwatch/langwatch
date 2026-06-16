@@ -12,4 +12,10 @@ export interface Protections {
   // placeholder naming `visibleTo`. Patterns may carry `*` wildcards. Absent or
   // empty when nothing is hidden for the viewer.
   hiddenAttributes?: Array<{ pattern: string; visibleTo: string }>;
+  /**
+   * Plan-based visibility window: traces/spans started before this epoch-ms
+   * cutoff get their content teaser-redacted. `null`/`undefined` = no window
+   * (paid/licensed plans, internal reads).
+   */
+  visibilityCutoffMs?: number | null;
 }

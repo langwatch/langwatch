@@ -15,6 +15,7 @@ import { CornerDownRight } from "react-feather";
 import { stringifyIfObject } from "~/utils/stringifyIfObject";
 import { AnnotationExpectedOutputs } from "../../components/AnnotationExpectedOutputs";
 import { Annotations } from "../../components/Annotations";
+import { BlurredContentGate } from "~/features/traces-v2/components/BlurredContentGate";
 import { Markdown } from "../../components/Markdown";
 import { EventsCounter } from "../../components/messages/EventsCounter";
 import {
@@ -88,7 +89,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
     };
   }, [annotations.data]);
 
-  return (
+  const content = (
     <VStack ref={ref as any} align="start" width="full" gap={0}>
       <Grid
         templateColumns="repeat(4, 1fr)"
@@ -298,6 +299,12 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
         )}
       </Grid>
     </VStack>
+  );
+
+  return trace.redacted_by_visibility_window ? (
+    <BlurredContentGate>{content}</BlurredContentGate>
+  ) : (
+    content
   );
 });
 

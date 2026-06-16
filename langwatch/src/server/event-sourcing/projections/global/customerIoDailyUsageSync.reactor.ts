@@ -3,7 +3,7 @@ import type { NurturingService } from "../../../../../ee/billing/nurturing/nurtu
 import type { ProjectService } from "../../../app-layer/projects/project.service";
 import { CIO_REACTOR_DEBOUNCE_TTL_MS } from "../../pipelines/trace-processing/reactors/customerIoTraceSync.reactor";
 import { createLogger } from "../../../../utils/logger/server";
-import { captureException } from "../../../../utils/posthogErrorCapture";
+import { captureException, toError } from "../../../../utils/posthogErrorCapture";
 import type { Event } from "../../domain/types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
 import type { ProjectDailySdkUsageState } from "./projectDailySdkUsage.store";
@@ -98,14 +98,14 @@ export function createCustomerIoDailyUsageSyncReactor(
               { projectId, error },
               "Failed to identify user for daily usage sync",
             );
-            captureException(error);
+            captureException(toError(error));
           });
       } catch (error) {
         logger.error(
           { projectId, error },
           "Failed to process CIO daily usage sync — non-fatal",
         );
-        captureException(error);
+        captureException(toError(error));
       }
     },
   };

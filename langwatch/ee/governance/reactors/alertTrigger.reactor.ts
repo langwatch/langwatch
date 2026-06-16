@@ -9,7 +9,7 @@ import {
   triggerFiltersReferenceEvents,
 } from "~/server/filters/triggerFilter.matcher";
 import { createLogger } from "~/utils/logger/server";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import type { ReactorDefinition } from "~/server/event-sourcing/reactors/reactor.types";
 import {
   dispatchTriggerAction,
@@ -123,7 +123,7 @@ export function createAlertTriggerReactor(
             },
             "Failed to evaluate trigger",
           );
-          captureException(error, {
+          captureException(toError(error), {
             extra: {
               tenantId,
               traceId,

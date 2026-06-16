@@ -50,6 +50,7 @@ vi.mock("~/optimization_studio/server/lambda", () => ({
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
+  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
 }));
 
 // Mock the trace id generator so tests can assert call count and deterministic ids.

@@ -22,7 +22,7 @@ import { type ZodError, ZodError as ZodErrorClass, z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { mapZodIssuesToLogContext } from "~/utils/zod";
 import { getInputsOutputs } from "~/optimization_studio/utils/nodeUtils";
 import type { Workflow } from "~/optimization_studio/types/dsl";
@@ -202,7 +202,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post(
         { error, body, projectId: project.id },
         "invalid log_results data received",
       );
-      captureException(error, { extra: { projectId: project.id } });
+      captureException(toError(error), { extra: { projectId: project.id } });
       const validationError = fromZodError(error as ZodError);
       return c.json({ error: validationError.message }, 400);
     }
@@ -239,7 +239,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post(
           { error, body: params, projectId: project.id },
           "failed to validate data for batch evaluation",
         );
-        captureException(error, {
+        captureException(toError(error), {
           extra: { projectId: project.id, param: params },
         });
         const validationError = fromZodError(error);
@@ -258,7 +258,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post(
           { error, body: params, projectId: project.id },
           "internal server error processing batch evaluation",
         );
-        captureException(error, {
+        captureException(toError(error), {
           extra: { projectId: project.id, param: params },
         });
         return c.json(
@@ -337,7 +337,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/dataset/evaluate", async 
       { error, body, projectId: project.id },
       "invalid evaluation params received",
     );
-    captureException(error, { extra: { projectId: project.id } });
+    captureException(toError(error), { extra: { projectId: project.id } });
     const validationError = fromZodError(error as ZodError);
     return c.json({ error: validationError.message }, 400);
   }
@@ -392,7 +392,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/dataset/evaluate", async 
       { error, body, projectId: project.id },
       "invalid evaluation data received",
     );
-    captureException(error, { extra: { projectId: project.id } });
+    captureException(toError(error), { extra: { projectId: project.id } });
     const validationError = fromZodError(error as ZodError);
     return c.json({ error: validationError.message }, 400);
   }
@@ -734,7 +734,7 @@ async function handleEvaluatorCall(
       },
       "invalid evaluation params received",
     );
-    captureException(error, {
+    captureException(toError(error), {
       extra: { projectId: project.id, validationError: message },
     });
     return c.json({ error: message }, 400);
@@ -787,7 +787,7 @@ async function handleEvaluatorCall(
       },
       "invalid settings received for the evaluator",
     );
-    captureException(error, {
+    captureException(toError(error), {
       extra: { projectId: project.id, validationError: message },
     });
     return c.json(
@@ -821,7 +821,7 @@ async function handleEvaluatorCall(
       },
       "invalid evaluation data received",
     );
-    captureException(error, {
+    captureException(toError(error), {
       extra: { projectId: project.id, validationError: message },
     });
     return c.json({ error: message }, 400);
@@ -888,7 +888,7 @@ async function handleEvaluatorCall(
       costId = cost.id;
     }
   } catch (error) {
-    captureException(error, { extra: { projectId: project.id } });
+    captureException(toError(error), { extra: { projectId: project.id } });
     logger.error(
       { err: error, projectId: project.id },
       "error running evaluation",
@@ -925,7 +925,7 @@ async function handleEvaluatorCall(
             : undefined,
       })
       .catch((eventError: unknown) => {
-        captureException(eventError, {
+        captureException(toError(eventError), {
           extra: {
             projectId: project.id,
             evaluationId,

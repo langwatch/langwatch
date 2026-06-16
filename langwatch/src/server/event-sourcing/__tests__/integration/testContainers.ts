@@ -2,6 +2,7 @@ import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import IORedis, { type Redis } from "ioredis";
 import { migrateUp } from "~/server/clickhouse/goose";
 import { createLogger } from "~/utils/logger/server";
+import { toError } from "~/utils/posthogErrorCapture";
 
 const logger = createLogger("langwatch:event-sourcing:test-containers");
 
@@ -146,7 +147,7 @@ export async function stopTestContainers(): Promise<void> {
         new Promise<void>((resolve) => setTimeout(resolve, 2000)),
       ]);
     } catch (e) {
-      errors.push(e instanceof Error ? e : new Error(String(e)));
+      errors.push(toError(e));
     }
   }
 
@@ -164,7 +165,7 @@ export async function stopTestContainers(): Promise<void> {
         new Promise<void>((resolve) => setTimeout(resolve, 2000)),
       ]);
     } catch (e) {
-      errors.push(e instanceof Error ? e : new Error(String(e)));
+      errors.push(toError(e));
     }
     try {
       conn.disconnect();

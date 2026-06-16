@@ -1,3 +1,7 @@
+import {
+  redactSpanContent,
+  redactTraceContent,
+} from "~/server/app-layer/traces/visibility-window.service";
 import { PRIVACY_DROPPED_MARKER_ATTR } from "~/server/data-privacy/dropKeyCatalog";
 import type { Protections } from "~/server/elasticsearch/protections";
 import type {
@@ -224,13 +228,24 @@ export function applySpanProtections(
     redactions,
   );
 
-  return {
+  const transformed = {
     ...span,
     input: transformedInput,
     output: transformedOutput,
     metrics: transformedMetrics,
     params: transformedParams as Span["params"],
   };
+
+  // Teaser-redact content of spans beyond the plan's visibility window
+  if (
+    protections.visibilityCutoffMs !== null &&
+    protections.visibilityCutoffMs !== undefined &&
+    span.timestamps.started_at < protections.visibilityCutoffMs
+  ) {
+    return redactSpanContent(transformed);
+  }
+
+  return transformed;
 }
 
 /**
@@ -340,7 +355,7 @@ export function applyTraceProtections(
   // rule changes.
   const droppedCategories = collectDroppedCategories(trace.spans);
 
-  return {
+  const transformed = {
     ...trace,
     input: transformedInput,
     output: transformedOutput,
@@ -351,4 +366,23 @@ export function applyTraceProtections(
       ? { privacy: { ...trace.privacy, droppedCategories } }
       : {}),
   };
+
+  // Teaser-redact content of traces beyond the plan's visibility window.
+  // Spans were already age-checked and teased individually in
+  // applySpanProtections — exclude them here so they are not double-teased;
+  // this pass covers the trace-level content fields and stamps the redacted
+  // flag for the upgrade CTA.
+  if (
+    protections.visibilityCutoffMs !== null &&
+    protections.visibilityCutoffMs !== undefined &&
+    trace.timestamps.started_at < protections.visibilityCutoffMs
+  ) {
+    const { spans, ...traceWithoutSpans } = transformed;
+    return {
+      ...redactTraceContent({ ...traceWithoutSpans, spans: [] }),
+      spans,
+    };
+  }
+
+  return transformed;
 }

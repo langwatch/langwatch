@@ -1,7 +1,7 @@
 import type { NurturingService } from "../../../../../../ee/billing/nurturing/nurturing.service";
 import type { ProjectService } from "../../../../app-layer/projects/project.service";
 import { createLogger } from "../../../../../utils/logger/server";
-import { captureException } from "../../../../../utils/posthogErrorCapture";
+import { captureException, toError } from "../../../../../utils/posthogErrorCapture";
 import type { ReactorContext, ReactorDefinition } from "../../../reactors/reactor.types";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "../schemas/events";
@@ -80,7 +80,7 @@ export function createCustomerIoTraceSyncReactor(
             }})
             .catch((error) => {
               logger.error({ projectId, error }, "Failed to identify user for first trace");
-              captureException(error);
+              captureException(toError(error));
             });
           void deps.nurturing
             .trackEvent({ userId, event: "first_trace_integrated", properties: {
@@ -90,7 +90,7 @@ export function createCustomerIoTraceSyncReactor(
             }})
             .catch((error) => {
               logger.error({ projectId, error }, "Failed to track first_trace_integrated event");
-              captureException(error);
+              captureException(toError(error));
             });
         } else {
           // Subsequent trace — debounced via makeJobId, fire-and-forget
@@ -100,7 +100,7 @@ export function createCustomerIoTraceSyncReactor(
             }})
             .catch((error) => {
               logger.error({ projectId, error }, "Failed to identify user for trace update");
-              captureException(error);
+              captureException(toError(error));
             });
         }
       } catch (error) {
@@ -108,7 +108,7 @@ export function createCustomerIoTraceSyncReactor(
           { projectId, error },
           "Failed to process CIO trace sync — non-fatal",
         );
-        captureException(error);
+        captureException(toError(error));
       }
     },
   };
