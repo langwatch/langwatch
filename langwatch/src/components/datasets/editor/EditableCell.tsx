@@ -167,10 +167,14 @@ export function EditableCell({
   const [validationError, setValidationError] = useState(false);
   const cellRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Set when Esc cancels so the blur that follows the editor unmount does not
+  // re-commit the value (blur now saves; Esc must win).
+  const isCancelingRef = useRef(false);
 
   // Reset edit value and validation state when entering edit mode, formatting JSON if applicable
   useEffect(() => {
     if (isEditing) {
+      isCancelingRef.current = false;
       setValidationError(false);
       // For JSON-like types, format the value for easier editing
       const isJsonType = dataType && JSON_LIKE_TYPES.includes(dataType);
@@ -304,6 +308,7 @@ export function EditableCell({
   ]);
 
   const handleCancel = useCallback(() => {
+    isCancelingRef.current = true;
     setEditValue(value);
     setValidationError(false);
     setEditingCell(undefined);
@@ -315,27 +320,47 @@ export function EditableCell({
         e.preventDefault();
         e.stopPropagation(); // Prevent global handler from re-opening edit mode
         handleSave();
-      } else if (e.key === "Escape") {
-        e.preventDefault();
-        e.stopPropagation(); // Prevent global handler from clearing selection
-        handleCancel();
       } else if (e.key === "Tab") {
         e.preventDefault();
         e.stopPropagation();
         handleSave();
         // TODO: Move to next cell
       }
+      // Escape is handled by a window-level capture listener (see effect
+      // below) so it can run before the surrounding dialog's document-level
+      // Escape handler and cancel the cell instead of closing the dialog.
     },
-    [handleSave, handleCancel],
+    [handleSave],
   );
 
   const handleBlur = useCallback(() => {
-    // Small delay to allow click events to register first
-    // On blur, cancel without saving (user must press Enter to save)
-    setTimeout(() => {
+    // Clicking outside commits the edit; Esc is the only way to discard.
+    // An Esc-cancel unmounts the editor, which can fire this blur right
+    // after; the guard keeps that stray blur from re-committing the value.
+    if (isCancelingRef.current) {
+      isCancelingRef.current = false;
+      return;
+    }
+    handleSave();
+  }, [handleSave]);
+
+  // Esc must cancel the cell WITHOUT closing a surrounding dialog. The dialog
+  // (zag) listens for Escape on the document in the capture phase, which beats
+  // any handler inside it; a window-level capture listener runs even earlier,
+  // so it cancels the edit and stops the event before the dialog sees it.
+  useEffect(() => {
+    if (!isEditing) return;
+    const onEscapeCapture = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
       handleCancel();
-    }, 100);
-  }, [handleCancel]);
+    };
+    window.addEventListener("keydown", onEscapeCapture, { capture: true });
+    return () =>
+      window.removeEventListener("keydown", onEscapeCapture, { capture: true });
+  }, [isEditing, handleCancel]);
 
   // Format and truncate display value
   const displayValue = useMemo(() => {
