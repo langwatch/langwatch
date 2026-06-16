@@ -398,6 +398,69 @@ describe("applySpanToSummary token timing from OTel instrumentation events (@reg
       expect(result.timeToLastTokenMs).toBe(1900);
     });
   });
+
+  describe("when span has llm.content.completion.chunk events (OpenLLMetry / traceloop)", () => {
+    it("computes timeToFirstToken from the earliest chunk and timeToLastToken from the latest", () => {
+      const span = createTestSpan({
+        startTimeUnixMs: 1000,
+        endTimeUnixMs: 3000,
+        durationMs: 2000,
+        events: [
+          {
+            name: "llm.content.completion.chunk",
+            timeUnixMs: 1150,
+            attributes: {},
+          },
+          {
+            name: "llm.content.completion.chunk",
+            timeUnixMs: 2700,
+            attributes: {},
+          },
+        ],
+      });
+
+      const result = applySpanToSummary({ state: createInitState(), span });
+
+      expect(result.timeToFirstTokenMs).toBe(150);
+      expect(result.timeToLastTokenMs).toBe(1700);
+    });
+  });
+
+  describe("when span has ai.response.msToFirstChunk attribute (Vercel AI SDK)", () => {
+    it("computes timeToFirstToken from the duration attribute when no events exist", () => {
+      const span = createTestSpan({
+        startTimeUnixMs: 1000,
+        endTimeUnixMs: 4000,
+        durationMs: 3000,
+        events: [],
+        spanAttributes: {
+          "ai.response.msToFirstChunk": 1716,
+        },
+      });
+
+      const result = applySpanToSummary({ state: createInitState(), span });
+
+      expect(result.timeToFirstTokenMs).toBe(1716);
+    });
+
+    it("prefers event-based TTFT over the duration attribute", () => {
+      const span = createTestSpan({
+        startTimeUnixMs: 1000,
+        endTimeUnixMs: 4000,
+        durationMs: 3000,
+        events: [
+          { name: "ai.stream.firstChunk", timeUnixMs: 1250, attributes: {} },
+        ],
+        spanAttributes: {
+          "ai.response.msToFirstChunk": 1716,
+        },
+      });
+
+      const result = applySpanToSummary({ state: createInitState(), span });
+
+      expect(result.timeToFirstTokenMs).toBe(250);
+    });
+  });
 });
 
 describe("applySpanToSummary cache + reasoning token roll-up", () => {

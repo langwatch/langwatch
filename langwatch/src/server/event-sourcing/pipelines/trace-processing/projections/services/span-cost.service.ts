@@ -6,6 +6,7 @@ import type { NormalizedSpan } from "../../schemas/spans";
 
 export const FIRST_TOKEN_EVENTS = new Set([
   "gen_ai.content.chunk",
+  "llm.content.completion.chunk",
   "first_token",
   "llm.first_token",
   "ai.stream.firstChunk",
@@ -14,6 +15,7 @@ export const FIRST_TOKEN_EVENTS = new Set([
 
 export const LAST_TOKEN_EVENTS = new Set([
   "gen_ai.content.chunk",
+  "llm.content.completion.chunk",
   "last_token",
   "llm.last_token",
   "ai.stream.finish",
@@ -194,6 +196,17 @@ export class SpanCostService {
       );
       if (attrTtft !== null && attrTtft >= 0) {
         timeToFirstToken = attrTtft;
+      }
+    }
+
+    if (timeToFirstToken === null) {
+      // Vercel AI SDK reports TTFT as a duration attribute and emits no
+      // stream event, so it needs its own fallback.
+      const msToFirstChunk = coerceToNumber(
+        span.spanAttributes[ATTR_KEYS.AI_RESPONSE_MS_TO_FIRST_CHUNK],
+      );
+      if (msToFirstChunk !== null && msToFirstChunk >= 0) {
+        timeToFirstToken = msToFirstChunk;
       }
     }
 
