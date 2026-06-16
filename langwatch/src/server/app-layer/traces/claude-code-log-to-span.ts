@@ -50,10 +50,12 @@
  * from there and attach it to the tool span's output. The deciding model call's
  * own OUTPUT is its `tool_use` block, read straight from its response body.
  *
- * Cost is handled by the existing span pipeline. Anthropic models are on the
- * static price table (computeSpanCost priority 2); we also set
- * `langwatch.span.cost = cost_usd` (reserved fallback, priority 3) so an
- * off-table claude model is still costed from Anthropic's own figure.
+ * Cost is handled by the existing span pipeline. We set
+ * `langwatch.span.cost = cost_usd` from Anthropic's own reported figure, which
+ * computeSpanCost trusts (priority 2) over its token×registry estimate — so
+ * every claude turn is costed from Anthropic's authoritative number, on-table
+ * or off. The static price table is the fallback for turns that arrive without
+ * a cost_usd.
  */
 
 import { createHash } from "node:crypto";
@@ -518,8 +520,9 @@ function buildModelSpan(
       ),
     );
 
-  // Reserved fallback cost key (priority 3 in computeSpanCost). For Anthropic
-  // models the static table (priority 2) wins; this covers off-table models.
+  // Authoritative provider cost (priority 2 in computeSpanCost): Anthropic's
+  // own cost_usd is trusted over the token×registry estimate for every claude
+  // turn, on-table or off.
   const cost = asNumber(anchor.attrs.cost_usd);
   if (cost !== null) attrs.push(dblAttr(ATTR_KEYS.LANGWATCH_SPAN_COST, cost));
 
@@ -671,8 +674,7 @@ function buildRootSpan({
   children: SynthesizedClaudeSpan[];
   promptTextById: ReadonlyMap<string, string>;
 }): SynthesizedClaudeSpan {
-  const userPrompt =
-    records.find((r) => r.eventName === "user_prompt") ?? null;
+  const userPrompt = records.find((r) => r.eventName === "user_prompt") ?? null;
   const promptText =
     asNonEmpty(userPrompt?.attrs.prompt) ??
     asNonEmpty([...promptTextById.values()][0]);
@@ -718,8 +720,7 @@ function buildRootSpan({
   if (!Number.isFinite(endMs)) endMs = startMs;
 
   const name = rootSpanName(promptText);
-  const resource =
-    userPrompt?.resource ?? children[0]?.resource ?? null;
+  const resource = userPrompt?.resource ?? children[0]?.resource ?? null;
   const instrumentationScope =
     userPrompt?.instrumentationScope ??
     children[0]?.instrumentationScope ??

@@ -281,6 +281,22 @@ In the REST API `metadata` object:
 | `labels` | string[] | Categorization tags |
 | *other keys* | any | Stored as custom metadata |
 
+## Timings
+
+Beyond metadata, spans carry timing information that powers the latency views: the Duration column, the Time to First Token (TTFT) column, and the latency analytics.
+
+| Field | Where | Description |
+|-------|-------|-------------|
+| `timestamps.started_at` | Span | When the operation started (epoch ms). Set automatically by the SDKs |
+| `timestamps.first_token_at` | Span | When the first streamed token arrived (epoch ms). Powers TTFT |
+| `timestamps.finished_at` | Span | When the operation finished (epoch ms). Set automatically by the SDKs |
+| `gen_ai.server.time_to_first_token` | OTEL attribute | TTFT as a duration in milliseconds, alternative to `first_token_at` |
+
+Most streaming instrumentations report TTFT automatically. To set it manually, or to understand how it rolls up to the trace level, see the dedicated tutorials:
+
+- **Python:** [Tracking Time to First Token](/integration/python/tutorials/tracking-time-to-first-token)
+- **TypeScript:** [Tracking Time to First Token](/integration/typescript/tutorials/tracking-time-to-first-token)
+
 ## Best Practices
 
 <CardGroup cols={2}>

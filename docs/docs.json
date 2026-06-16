@@ -334,6 +334,13 @@
                     ]
                   },
                   {
+                    "group": "Tracking Time to First Token",
+                    "pages": [
+                      "integration/python/tutorials/tracking-time-to-first-token",
+                      "integration/typescript/tutorials/tracking-time-to-first-token"
+                    ]
+                  },
+                  {
                     "group": "Tracking Tool Calls",
                     "pages": [
                       "integration/python/tutorials/tracking-tool-calls",
