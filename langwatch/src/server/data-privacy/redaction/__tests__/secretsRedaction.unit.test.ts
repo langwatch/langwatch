@@ -13,11 +13,23 @@ const redact = (text: string, customPatterns?: readonly RegExp[]) =>
 
 describe("redactSecretsInText", () => {
   describe("given a built-in provider or cloud key", () => {
+    // Provider keys use realistic base64url bodies (`_` and `-`, no inner word
+    // boundary): the shape a `[A-Za-z0-9]+\b` rule silently misses.
     const cases: Array<[string, string]> = [
       ["an AWS access key id", "creds AKIAIOSFODNN7EXAMPLE here"],
       ["a GitHub token", `token ghp_${"a".repeat(36)} here`],
-      ["an OpenAI key", `key sk-proj-${"A".repeat(40)} here`],
-      ["an Anthropic key", `key sk-ant-api03-${"A".repeat(40)} here`],
+      [
+        "an OpenAI project key",
+        "key sk-proj-aB3dEf_gHi-jKlMnOpQrStUvWx0123456789xY here",
+      ],
+      [
+        "an Anthropic key",
+        "key sk-ant-api03-aB3dEf_gHi-jKlMnOpQrStUvWx0123456789 here",
+      ],
+      [
+        "a LangWatch key",
+        "key sk-lw-aB3dEf_gHi-jKlMnOpQrStUvWx0123456789 here",
+      ],
       ["a Slack token", `xoxb-${"1".repeat(20)} here`],
       ["a Google API key", `AIza${"A".repeat(35)} here`],
       ["a Stripe secret key", `sk_live_${"a".repeat(24)} here`],
@@ -84,6 +96,29 @@ describe("redactSecretsInText", () => {
     });
   });
 
+  describe("given a modern base64url provider key", () => {
+    it("redacts the whole key, not just a leading alphanumeric run", () => {
+      // `_` and `-` mid-body, and the body has no inner word boundary: the
+      // shape that slipped past the old `sk-(?:proj-)?[A-Za-z0-9]{20,}\b` rule.
+      const key =
+        "sk-proj-aB3dEf_gHi-jKlMnOpQrStUvWx0123456789xYaB-cD_eF";
+      const { text } = redact(`here is my key ${key} thanks`);
+      expect(text).toBe("here is my key [SECRET] thanks");
+      expect(text).not.toContain("sk-proj-");
+      expect(text).not.toContain("aB3dEf");
+    });
+  });
+
+  describe("given a greedy custom pattern inside a JSON string", () => {
+    it("redacts only the value and leaves the closing quote and JSON intact", () => {
+      const custom = compileSecretPatterns(["sk-.*"]);
+      const json = '{"api_key":"sk-proj-abc123def456","model":"gpt-5"}';
+      const { text, redactedCount } = redact(json, custom);
+      expect(text).toBe('{"api_key":"[SECRET]","model":"gpt-5"}');
+      expect(redactedCount).toBe(1);
+    });
+  });
+
   describe("given a custom pattern", () => {
     it("redacts a company-specific token shape", () => {
       const custom = compileSecretPatterns(["acme_live_[a-z0-9]{8,}"]);
@@ -145,10 +180,11 @@ describe("BUILTIN_SECRET_RULES", () => {
 describe("detectSecretsInText", () => {
   describe("given text with a provider key", () => {
     it("reports the rule that matched and where, without altering the text", () => {
-      const input = `key sk-proj-${"A".repeat(40)} here`;
+      const input =
+        "key sk-proj-aB3dEf_gHi-jKlMnOpQrStUvWx0123456789xY here";
       const matches = detectSecretsInText({ text: input });
       expect(matches).toHaveLength(1);
-      expect(matches[0]!.ruleId).toBe("openai_api_key");
+      expect(matches[0]!.ruleId).toBe("provider_api_key");
       // The detector never mutates the input.
       expect(input).toContain("sk-proj-");
     });

@@ -52,14 +52,14 @@ const VALUE_RULES: ValueRule[] = [
     regex: /\b(?:gh[posru]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{60,})\b/g,
   },
   {
-    id: "anthropic_api_key",
-    description: "Anthropic API key",
-    regex: /\bsk-ant-[A-Za-z0-9-]{20,}\b/g,
-  },
-  {
-    id: "openai_api_key",
-    description: "OpenAI API key",
-    regex: /\bsk-(?:proj-)?[A-Za-z0-9]{20,}\b/g,
+    // Provider secret keys share the `sk-` namespace: OpenAI (`sk-proj-...`,
+    // legacy `sk-...`), Anthropic (`sk-ant-...`), LangWatch (`sk-lw-...`), and
+    // others. The body is base64url, so it includes `_` and `-` and has no inner
+    // word boundary; matching the whole token and stopping at the next non-key
+    // char catches modern keys a `[A-Za-z0-9]+\b` rule misses.
+    id: "provider_api_key",
+    description: "Provider API key (sk-...)",
+    regex: /\bsk-[A-Za-z0-9_-]{20,}(?![A-Za-z0-9_-])/g,
   },
   {
     id: "stripe_secret_key",
@@ -131,6 +131,24 @@ export function compileSecretPatterns(patterns: readonly string[]): RegExp[] {
   return compiled;
 }
 
+/**
+ * A secret value lives inside a single quoted string (a JSON value, a header
+ * line, a log field), so it can never legitimately contain a quote or backtick.
+ * We clamp every match at the first such character so a greedy custom pattern
+ * like `sk-.*` redacts only the credential and leaves the closing quote (and the
+ * rest of the surrounding JSON) intact, instead of swallowing the line. Newlines
+ * are deliberately excluded: `.*` already stops at them, and the multi-line PEM
+ * rule must keep spanning them. Single-line built-in rules never match a quote,
+ * so the clamp is a no-op for them.
+ */
+const VALUE_BOUNDARY = /["'`]/;
+
+/** Length of `match` up to the first structural boundary char (or its full length). */
+function keptLengthAtBoundary(match: string): number {
+  const index = match.search(VALUE_BOUNDARY);
+  return index === -1 ? match.length : index;
+}
+
 export interface SecretsRedactionResult {
   text: string;
   redactedCount: number;
@@ -161,15 +179,27 @@ export function redactSecretsInText({
 
   for (const rule of VALUE_RULES) {
     result = result.replace(rule.regex, (...args: string[]) => {
+      // Rules that keep surrounding context (url password, bearer prefix) are
+      // tightly bounded already, so they render verbatim without the clamp.
+      if (rule.render) {
+        redactedCount++;
+        return rule.render(...args);
+      }
+      const full = args[0] ?? "";
+      const kept = keptLengthAtBoundary(full);
+      if (kept === 0) return full;
       redactedCount++;
-      return rule.render ? rule.render(...args) : REPLACEMENT;
+      return REPLACEMENT + full.slice(kept);
     });
   }
 
   for (const pattern of customPatterns) {
-    result = result.replace(pattern, () => {
+    result = result.replace(pattern, (...args: string[]) => {
+      const full = args[0] ?? "";
+      const kept = keptLengthAtBoundary(full);
+      if (kept === 0) return full;
       redactedCount++;
-      return REPLACEMENT;
+      return REPLACEMENT + full.slice(kept);
     });
   }
 
@@ -217,11 +247,15 @@ export function detectSecretsInText({
   for (const rule of VALUE_RULES) {
     for (const match of text.matchAll(rule.regex)) {
       const start = match.index ?? 0;
+      const kept = rule.render
+        ? match[0].length
+        : keptLengthAtBoundary(match[0]);
+      if (kept === 0) continue;
       matches.push({
         ruleId: rule.id,
         description: rule.description,
         start,
-        end: start + match[0].length,
+        end: start + kept,
       });
     }
   }
@@ -229,11 +263,13 @@ export function detectSecretsInText({
   for (const pattern of customPatterns) {
     for (const match of text.matchAll(pattern)) {
       const start = match.index ?? 0;
+      const kept = keptLengthAtBoundary(match[0]);
+      if (kept === 0) continue;
       matches.push({
         ruleId: "custom_pattern",
         description: "Custom secret pattern",
         start,
-        end: start + match[0].length,
+        end: start + kept,
       });
     }
   }
