@@ -87,6 +87,10 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
   };
 
   const handleEditEvaluator = (evaluator: EvaluatorWithFields) => {
+    if (evaluator.type === "code") {
+      openDrawer("codeEvaluatorEditor", { evaluatorId: evaluator.id });
+      return;
+    }
     const config = evaluator.config as { evaluatorType?: string } | null;
     openDrawer("evaluatorEditor", {
       evaluatorId: evaluator.id,

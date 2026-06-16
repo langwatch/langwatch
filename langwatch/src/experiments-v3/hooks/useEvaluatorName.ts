@@ -64,3 +64,46 @@ export const useEvaluatorName = (evaluator: EvaluatorConfig): string => {
   const names = useEvaluatorNames([evaluator]);
   return names.get(evaluator.id) ?? evaluator.id;
 };
+
+/**
+ * Returns the set of evaluator config ids whose database evaluator is a code
+ * evaluator (DB `type === "code"`). Used to route their edit flow to the code
+ * editor rather than the generic mapping editor.
+ *
+ * Reuses the same `getById` queries as the name lookup (same keys, shared
+ * cache), so detection adds no extra requests and is ready by the time the
+ * chip has rendered its name.
+ */
+export const useCodeEvaluatorIds = (
+  evaluators: EvaluatorConfig[],
+): Set<string> => {
+  const { project } = useOrganizationTeamProject();
+
+  const queries = api.useQueries((t) =>
+    evaluators.map((evaluator) =>
+      t.evaluators.getById(
+        {
+          id: evaluator.dbEvaluatorId ?? "",
+          projectId: project?.id ?? "",
+        },
+        {
+          enabled: !!evaluator.dbEvaluatorId && !!project?.id,
+          staleTime: 60_000,
+        },
+      ),
+    ),
+  );
+
+  const codeKey = evaluators
+    .map((ev, i) => `${ev.id}:${queries[i]?.data?.type === "code" ? 1 : 0}`)
+    .join("|");
+
+  return useMemo(() => {
+    return new Set(
+      evaluators
+        .filter((_ev, index) => queries[index]?.data?.type === "code")
+        .map((ev) => ev.id),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [codeKey]);
+};

@@ -271,6 +271,15 @@ Feature: Evaluator management
     Then the evaluator is stored with type "code" and the code in its config
     And no workflow record is created
 
+  # Editing must reopen the code editor (code + inputs + outputs), not the
+  # generic mapping-only editor. In the workbench, the inputs and their source
+  # mapping are merged into one list, like the prompt drawer.
+  Scenario: Editing a code evaluator reopens the code editor
+    Given a saved code evaluator
+    When I edit it from the evaluators page or the workbench
+    Then the code editor opens with its saved code, inputs and outputs
+    And in the workbench each input shows its source mapping inline
+
   Scenario: Code evaluator inputs drive the mapping UI
     Given a code evaluator whose code takes "output" and "expected_output"
     When I use it in an evaluation
