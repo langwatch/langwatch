@@ -78,11 +78,15 @@ export function isExpired(expiresAt: string, now: Date = new Date()): boolean {
  * @param now - Clock used for the expiration check (defaults to current time)
  * @returns ValidationResult indicating success or failure with error
  */
-export function validateLicense(
-  licenseKey: string,
-  publicKey: string = PUBLIC_KEY,
-  now: Date = new Date(),
-): ValidationResult {
+export function validateLicense({
+  licenseKey,
+  publicKey = PUBLIC_KEY,
+  now = new Date(),
+}: {
+  licenseKey: string;
+  publicKey?: string;
+  now?: Date;
+}): ValidationResult {
   // Step 1: Parse
   const signedLicense = parseLicenseKey(licenseKey);
   if (!signedLicense) {
