@@ -12,9 +12,10 @@ import {
 
 describe("redaction markers", () => {
   describe("when the engine entity lists change", () => {
-    it("covers exactly the Presidio strict superset plus SECRET", () => {
+    it("covers exactly every engine entity (Presidio strict plus native-only) plus SECRET", () => {
       const expected = new Set([
         ...PRESIDIO_STRICT_ENTITIES,
+        ...ESSENTIAL_PII_ENTITIES,
         SECRET_MARKER_ENTITY,
       ]);
       expect([...REDACTION_MARKER_ENTITIES].sort()).toEqual(

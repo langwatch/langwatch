@@ -154,7 +154,10 @@ export function resolveDataPrivacy({
     }
 
     if (config.pii && !setPii) {
-      resolved.pii = { level: config.pii.level };
+      resolved.pii = {
+        level: config.pii.level,
+        entities: config.pii.entities ?? [],
+      };
       setPii = true;
     }
 

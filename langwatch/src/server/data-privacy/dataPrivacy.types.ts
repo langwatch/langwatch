@@ -22,7 +22,12 @@ export type ContentCategory = (typeof CONTENT_CATEGORIES)[number];
 export const DISPOSITIONS = ["capture", "restrict", "drop"] as const;
 export type Disposition = (typeof DISPOSITIONS)[number];
 
-export const PII_LEVELS = ["disabled", "essential", "strict"] as const;
+export const PII_LEVELS = [
+  "disabled",
+  "essential",
+  "strict",
+  "custom",
+] as const;
 export type PiiLevel = (typeof PII_LEVELS)[number];
 
 /**
@@ -91,7 +96,14 @@ export const dataPrivacyConfigSchema = z
       .strict()
       .optional(),
     pii: z
-      .object({ level: z.enum(PII_LEVELS) })
+      .object({
+        level: z.enum(PII_LEVELS),
+        // Only meaningful when level === "custom": the exact identifiers to
+        // redact, as canonical entity names ("EMAIL_ADDRESS", "BR_CPF",
+        // "PERSON"). Pattern-based ones run natively; ones that need the
+        // analysis service are sent there only when selected.
+        entities: z.array(z.string()).max(64).optional(),
+      })
       .strict()
       .optional(),
     secrets: z
@@ -134,7 +146,7 @@ export interface ResolvedCustomAttributeRule {
 
 export interface ResolvedDataPrivacy {
   categories: Record<ContentCategory, ResolvedCategory>;
-  pii: { level: PiiLevel };
+  pii: { level: PiiLevel; entities: string[] };
   secrets: { enabled: boolean; customPatterns: string[] };
   customAttributes: ResolvedCustomAttributeRule[];
 }
@@ -160,7 +172,7 @@ export const PLATFORM_DEFAULT_DATA_PRIVACY: ResolvedDataPrivacy = {
     system: { disposition: "capture", audience: { ...EMPTY_AUDIENCE } },
     tools: { disposition: "capture", audience: { ...EMPTY_AUDIENCE } },
   },
-  pii: { level: "essential" },
+  pii: { level: "essential", entities: [] },
   secrets: { enabled: true, customPatterns: [] },
   customAttributes: [],
 };

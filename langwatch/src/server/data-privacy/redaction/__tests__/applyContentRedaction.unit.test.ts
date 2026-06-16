@@ -18,7 +18,7 @@ function policy({
   });
   return {
     categories: { input: cat(), output: cat(), system: cat(), tools: cat() },
-    pii: { level: piiLevel },
+    pii: { level: piiLevel, entities: [] },
     secrets: { enabled: secretsEnabled, customPatterns },
     customAttributes: [],
   };

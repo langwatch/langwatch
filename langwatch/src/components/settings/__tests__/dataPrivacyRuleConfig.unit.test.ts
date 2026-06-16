@@ -42,6 +42,7 @@ function build({
   dispositions = defaultDispositions,
   aud = audience({ admins: true }),
   piiLevel = "essential" as const,
+  piiEntities = [] as string[],
   secretsEnabled = true,
   secretsPatterns = [] as string[],
   customAttributes = [] as CustomAttributeFormRow[],
@@ -50,6 +51,7 @@ function build({
   dispositions?: RuleFormState["dispositions"];
   aud?: AudienceFormState;
   piiLevel?: RuleFormState["piiLevel"];
+  piiEntities?: string[];
   secretsEnabled?: boolean;
   secretsPatterns?: string[];
   customAttributes?: CustomAttributeFormRow[];
@@ -59,6 +61,7 @@ function build({
     dispositions,
     audience: aud,
     piiLevel,
+    piiEntities,
     secretsEnabled,
     secretsPatterns,
     customAttributes,
@@ -75,7 +78,7 @@ function resolved(
   });
   return {
     categories: { input: cat(), output: cat(), system: cat(), tools: cat() },
-    pii: { level: "essential" },
+    pii: { level: "essential", entities: [] },
     secrets: { enabled: true, customPatterns: [] },
     customAttributes: [],
     ...overrides,
@@ -262,6 +265,7 @@ describe("configToFormState and touchedFromConfig", () => {
         dispositions: state.dispositions,
         audience: state.audience,
         piiLevel: state.piiLevel,
+        piiEntities: state.piiEntities,
         secretsEnabled: state.secretsEnabled,
         secretsPatterns: state.secretsPatterns,
         customAttributes: state.customAttributes,
@@ -303,7 +307,7 @@ describe("inheritedFormState", () => {
             system: { disposition: "capture", audience: { ...EMPTY_AUDIENCE } },
             tools: { disposition: "capture", audience: { ...EMPTY_AUDIENCE } },
           },
-          pii: { level: "strict" },
+          pii: { level: "strict", entities: [] },
         }),
         isCurrentProjectScope: true,
       });
@@ -319,7 +323,7 @@ describe("inheritedFormState", () => {
   describe("given any other scope", () => {
     it("falls back to the platform defaults", () => {
       const state = inheritedFormState({
-        effective: resolved({ pii: { level: "strict" } }),
+        effective: resolved({ pii: { level: "strict", entities: [] } }),
         isCurrentProjectScope: false,
       });
 
@@ -355,6 +359,17 @@ describe("ruleSummary", () => {
     expect(ruleSummary({ secrets: { enabled: true } })).toBe(
       "Secrets redaction",
     );
+  });
+
+  it("reads a custom level as the count of selected identifiers", () => {
+    expect(
+      ruleSummary({
+        pii: { level: "custom", entities: ["EMAIL_ADDRESS", "BR_CPF"] },
+      }),
+    ).toBe("Custom PII (2 types)");
+    expect(
+      ruleSummary({ pii: { level: "custom", entities: ["BR_CPF"] } }),
+    ).toBe("Custom PII (1 type)");
   });
 
   it("reads as no changes for an empty config", () => {

@@ -43,7 +43,7 @@ function policy({
       system: cat(system),
       tools: cat(tools),
     },
-    pii: { level: "essential" },
+    pii: { level: "essential", entities: [] },
     secrets: { enabled: true, customPatterns: [] },
     customAttributes: dropAttributes.map((pattern) => ({
       pattern,

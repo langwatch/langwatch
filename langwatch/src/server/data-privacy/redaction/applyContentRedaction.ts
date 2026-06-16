@@ -1,11 +1,41 @@
 import type { ResolvedDataPrivacy } from "../dataPrivacy.types";
-import { redactEssentialPiiInText } from "./essentialPii";
+import {
+  ESSENTIAL_PII_ENTITIES,
+  redactEssentialPiiInText,
+} from "./essentialPii";
 import {
   compileSecretPatterns,
   isSensitiveAttributeKey,
   redactSecretsInText,
   SECRETS_REDACTION_MARKER,
 } from "./secretsRedaction";
+
+const NATIVE_PII_ENTITY_SET: ReadonlySet<string> = new Set(
+  ESSENTIAL_PII_ENTITIES,
+);
+
+/**
+ * The native essential identifiers a resolved policy redacts in-process:
+ * `"all"` for the essential and strict levels (the full floor), the selected
+ * native subset for custom, or `null` when PII is disabled. Identifiers the
+ * native engine cannot detect (names, locations) are not returned here; the
+ * caller routes those to the analysis service.
+ */
+export function nativePiiEntitiesForPolicy(
+  policy: ResolvedDataPrivacy,
+): "all" | string[] | null {
+  switch (policy.pii.level) {
+    case "disabled":
+      return null;
+    case "essential":
+    case "strict":
+      return "all";
+    case "custom":
+      return policy.pii.entities.filter((entity) =>
+        NATIVE_PII_ENTITY_SET.has(entity),
+      );
+  }
+}
 
 /**
  * Compose the NATIVE (in-process) redaction passes for a resolved policy: the
@@ -40,8 +70,15 @@ export function redactStringNative({
     redactedCount += secrets.redactedCount;
   }
 
-  if (policy.pii.level !== "disabled") {
-    const pii = redactEssentialPiiInText({ text: result });
+  const piiEntities = nativePiiEntitiesForPolicy(policy);
+  if (
+    piiEntities !== null &&
+    (piiEntities === "all" || piiEntities.length > 0)
+  ) {
+    const pii = redactEssentialPiiInText({
+      text: result,
+      entities: piiEntities === "all" ? undefined : piiEntities,
+    });
     result = pii.text;
     redactedCount += pii.redactedCount;
   }

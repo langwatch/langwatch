@@ -259,6 +259,21 @@ describe("resolveDataPrivacy", () => {
     });
   });
 
+  describe("given a custom PII level with selected entities", () => {
+    it("carries the level and its entities through the cascade", () => {
+      const rows = [
+        rule("PROJECT", "web-app", {
+          pii: { level: "custom", entities: ["EMAIL_ADDRESS", "BR_CPF"] },
+        }),
+      ];
+
+      const resolved = resolveDataPrivacy({ rows, facts: teamProject });
+
+      expect(resolved.pii.level).toBe("custom");
+      expect(resolved.pii.entities).toEqual(["EMAIL_ADDRESS", "BR_CPF"]);
+    });
+  });
+
   // The Data Privacy snapshot derives effectiveOrganization / effectiveTeam by
   // resolving with synthetic facts whose narrower scope ids are empty, so the
   // PROJECT (and TEAM, for the org baseline) chain entries match no row. That is

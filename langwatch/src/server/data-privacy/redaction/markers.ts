@@ -26,9 +26,9 @@ export function formatPiiMarker(entity: string): string {
 
 /**
  * Every entity name a redaction marker can carry: the Presidio strict entity
- * set (a superset of the native essential set) plus `SECRET`. Used to tell a
- * real marker apart from incidental bracketed text like `[INFO]` or `<div>`.
- * Pinned to the engines by markers.unit.test.ts.
+ * set, the native-only identifiers the analyzer does not have (the Brazilian
+ * CPF), and `SECRET`. Used to tell a real marker apart from incidental bracketed
+ * text like `[INFO]` or `<div>`. Pinned to the engines by markers.unit.test.ts.
  */
 export const REDACTION_MARKER_ENTITIES: ReadonlySet<string> = new Set([
   "CREDIT_CARD",
@@ -56,6 +56,7 @@ export const REDACTION_MARKER_ENTITIES: ReadonlySet<string> = new Set([
   "IN_VEHICLE_REGISTRATION",
   "IN_VOTER",
   "IN_PASSPORT",
+  "BR_CPF",
   SECRET_MARKER_ENTITY,
 ]);
 

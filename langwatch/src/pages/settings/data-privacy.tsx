@@ -11,6 +11,7 @@ import {
   Input,
   RadioGroup,
   Separator,
+  SimpleGrid,
   Spacer,
   Spinner,
   Table,
@@ -35,8 +36,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import SettingsLayout from "~/components/SettingsLayout";
 import {
   ALL_MEMBERS_VALUE,
-  applyAudienceSelection,
   type AudienceFormState,
+  applyAudienceSelection,
   audienceToSelection,
   buildRuleConfig,
   type CustomAttributeFormRow,
@@ -53,7 +54,9 @@ import {
   touchedFromConfig,
 } from "~/components/settings/dataPrivacyRuleConfig";
 import {
+  ESSENTIAL_PII_ENTITY_LABELS,
   ESSENTIAL_PII_SUMMARY,
+  STRICT_ADDED_PII_ENTITY_LABELS,
   STRICT_ADDED_PII_SUMMARY,
 } from "~/components/settings/piiEntityLabels";
 import {
@@ -66,6 +69,7 @@ import {
   ScopeFilter,
   type ScopeFilter as ScopeFilterValue,
 } from "~/components/settings/ScopeFilter";
+import { Checkbox } from "~/components/ui/checkbox";
 import { Drawer } from "~/components/ui/drawer";
 import { Menu } from "~/components/ui/menu";
 import { Select } from "~/components/ui/select";
@@ -109,7 +113,53 @@ const PII_LABELS: Record<PiiLevel, string> = {
   disabled: "Disabled",
   essential: "Essential",
   strict: "Strict",
+  custom: "Custom",
 };
+
+/**
+ * A labeled group of PII identifier checkboxes for the custom level. One group
+ * for the natively-detected identifiers and one for the ones that need the
+ * analysis service, so the customer sees the cost trade-off of each selection.
+ */
+function PiiEntityToggleGroup({
+  title,
+  hint,
+  labels,
+  selected,
+  onToggle,
+}: {
+  title: string;
+  hint: string;
+  labels: Record<string, string>;
+  selected: string[];
+  onToggle: (entity: string) => void;
+}) {
+  const selectedSet = new Set(selected);
+  return (
+    <VStack align="stretch" gap={1.5}>
+      <VStack align="start" gap={0}>
+        <Text fontWeight="600" fontSize="xs">
+          {title}
+        </Text>
+        <Text fontSize="xs" color="fg.muted">
+          {hint}
+        </Text>
+      </VStack>
+      <SimpleGrid columns={2} gap={1} columnGap={4}>
+        {Object.entries(labels).map(([entity, label]) => (
+          <Checkbox
+            key={entity}
+            size="sm"
+            checked={selectedSet.has(entity)}
+            onCheckedChange={() => onToggle(entity)}
+          >
+            <Text fontSize="xs">{label}</Text>
+          </Checkbox>
+        ))}
+      </SimpleGrid>
+    </VStack>
+  );
+}
 
 const SCOPE_ICON: Record<string, typeof Building2> = {
   ORGANIZATION: Building2,
@@ -513,7 +563,13 @@ export function EffectiveSummary({
         )}
         <HStack justifyContent="space-between">
           <Text color="fg.muted">PII redaction</Text>
-          <Text>{PII_LABELS[effective.pii.level]}</Text>
+          <Text>
+            {effective.pii.level === "custom"
+              ? `Custom (${effective.pii.entities.length} ${
+                  effective.pii.entities.length === 1 ? "type" : "types"
+                })`
+              : PII_LABELS[effective.pii.level]}
+          </Text>
         </HStack>
         <HStack justifyContent="space-between">
           <Text color="fg.muted">Secrets redaction</Text>
@@ -645,6 +701,7 @@ function PrivacyRuleDrawer({
     admins: true,
   });
   const [piiLevel, setPiiLevel] = useState<PiiLevel>("essential");
+  const [piiEntities, setPiiEntities] = useState<string[]>([]);
   const [secretsEnabled, setSecretsEnabled] = useState(true);
   const [secretsPatterns, setSecretsPatterns] = useState<string[]>([]);
   const [customAttributes, setCustomAttributes] = useState<
@@ -662,6 +719,15 @@ function PrivacyRuleDrawer({
   useEffect(() => {
     if (piiLevel !== "disabled") lastEnabledPiiLevel.current = piiLevel;
   }, [piiLevel]);
+
+  const togglePiiEntity = (entity: string) => {
+    setPiiEntities((prev) =>
+      prev.includes(entity)
+        ? prev.filter((e) => e !== entity)
+        : [...prev, entity],
+    );
+    setTouched((prev) => ({ ...prev, pii: true }));
+  };
 
   const touchCategory = (category: ContentCategory) =>
     setTouched((prev) => ({
@@ -687,6 +753,7 @@ function PrivacyRuleDrawer({
     setDispositions(form.dispositions);
     setAudience(form.audience);
     setPiiLevel(form.piiLevel);
+    setPiiEntities(form.piiEntities);
     setSecretsEnabled(form.secretsEnabled);
     setSecretsPatterns(form.secretsPatterns);
     setCustomAttributes(form.customAttributes);
@@ -753,6 +820,7 @@ function PrivacyRuleDrawer({
         dispositions,
         audience,
         piiLevel,
+        piiEntities,
         secretsEnabled,
         secretsPatterns,
         customAttributes,
@@ -762,6 +830,7 @@ function PrivacyRuleDrawer({
       dispositions,
       audience,
       piiLevel,
+      piiEntities,
       secretsEnabled,
       secretsPatterns,
       customAttributes,
@@ -1040,47 +1109,84 @@ function PrivacyRuleDrawer({
                 </VStack>
               </HStack>
               {piiLevel !== "disabled" && (
-                <RadioGroup.Root
-                  value={piiLevel}
-                  paddingLeft={10}
-                  onValueChange={(d) => {
-                    setPiiLevel((d.value as PiiLevel) ?? "essential");
-                    setTouched((prev) => ({ ...prev, pii: true }));
-                  }}
-                >
-                  <VStack align="start" gap={1}>
-                    <RadioGroup.Item value="essential">
-                      <RadioGroup.ItemHiddenInput />
-                      <RadioGroup.ItemIndicator />
-                      <RadioGroup.ItemText>
-                        Essential (emails, phones, cards, IPs, national IDs)
-                      </RadioGroup.ItemText>
-                      <Tooltip
-                        content={`Detects and masks: ${ESSENTIAL_PII_SUMMARY}.`}
-                        contentProps={{ maxWidth: "340px" }}
-                      >
-                        <Box color="fg.muted" display="inline-flex">
-                          <HelpCircle size={13} />
-                        </Box>
-                      </Tooltip>
-                    </RadioGroup.Item>
-                    <RadioGroup.Item value="strict">
-                      <RadioGroup.ItemHiddenInput />
-                      <RadioGroup.ItemIndicator />
-                      <RadioGroup.ItemText>
-                        Strict (adds names, locations, and more)
-                      </RadioGroup.ItemText>
-                      <Tooltip
-                        content={`Deep detection with the Microsoft Presidio PII model. Everything in Essential, plus: ${STRICT_ADDED_PII_SUMMARY}.`}
-                        contentProps={{ maxWidth: "340px" }}
-                      >
-                        <Box color="fg.muted" display="inline-flex">
-                          <HelpCircle size={13} />
-                        </Box>
-                      </Tooltip>
-                    </RadioGroup.Item>
-                  </VStack>
-                </RadioGroup.Root>
+                <>
+                  <RadioGroup.Root
+                    value={piiLevel}
+                    paddingLeft={10}
+                    onValueChange={(d) => {
+                      const next = (d.value as PiiLevel) ?? "essential";
+                      setPiiLevel(next);
+                      // Seed custom with the native essentials the first time so
+                      // it starts from a sensible base the customer can pare down.
+                      if (next === "custom") {
+                        setPiiEntities((prev) =>
+                          prev.length > 0
+                            ? prev
+                            : Object.keys(ESSENTIAL_PII_ENTITY_LABELS),
+                        );
+                      }
+                      setTouched((prev) => ({ ...prev, pii: true }));
+                    }}
+                  >
+                    <VStack align="start" gap={1}>
+                      <RadioGroup.Item value="essential">
+                        <RadioGroup.ItemHiddenInput />
+                        <RadioGroup.ItemIndicator />
+                        <RadioGroup.ItemText>
+                          Essential (emails, phones, cards, IPs, national IDs)
+                        </RadioGroup.ItemText>
+                        <Tooltip
+                          content={`Detects and masks: ${ESSENTIAL_PII_SUMMARY}.`}
+                          contentProps={{ maxWidth: "340px" }}
+                        >
+                          <Box color="fg.muted" display="inline-flex">
+                            <HelpCircle size={13} />
+                          </Box>
+                        </Tooltip>
+                      </RadioGroup.Item>
+                      <RadioGroup.Item value="strict">
+                        <RadioGroup.ItemHiddenInput />
+                        <RadioGroup.ItemIndicator />
+                        <RadioGroup.ItemText>
+                          Strict (adds names, locations, and more)
+                        </RadioGroup.ItemText>
+                        <Tooltip
+                          content={`Deep detection with the Microsoft Presidio PII model. Everything in Essential, plus: ${STRICT_ADDED_PII_SUMMARY}.`}
+                          contentProps={{ maxWidth: "340px" }}
+                        >
+                          <Box color="fg.muted" display="inline-flex">
+                            <HelpCircle size={13} />
+                          </Box>
+                        </Tooltip>
+                      </RadioGroup.Item>
+                      <RadioGroup.Item value="custom">
+                        <RadioGroup.ItemHiddenInput />
+                        <RadioGroup.ItemIndicator />
+                        <RadioGroup.ItemText>
+                          Custom (choose exactly what to redact)
+                        </RadioGroup.ItemText>
+                      </RadioGroup.Item>
+                    </VStack>
+                  </RadioGroup.Root>
+                  {piiLevel === "custom" && (
+                    <VStack align="stretch" gap={3} paddingLeft={10}>
+                      <PiiEntityToggleGroup
+                        title="Detected in-process"
+                        hint="Fast and free, redacted as data arrives."
+                        labels={ESSENTIAL_PII_ENTITY_LABELS}
+                        selected={piiEntities}
+                        onToggle={togglePiiEntity}
+                      />
+                      <PiiEntityToggleGroup
+                        title="Needs the analysis service"
+                        hint="Deeper detection for names and locations, slower."
+                        labels={STRICT_ADDED_PII_ENTITY_LABELS}
+                        selected={piiEntities}
+                        onToggle={togglePiiEntity}
+                      />
+                    </VStack>
+                  )}
+                </>
               )}
             </VStack>
 

@@ -3,6 +3,7 @@ import {
   batchPresidioClearPII as defaultBatchPresidioClearPII,
   googleDLPClearPII,
   type PIICheckOptions,
+  PRESIDIO_STRICT_ENTITIES,
 } from "~/server/background/workers/collector/piiCheck";
 import type {
   PiiLevel,
@@ -11,9 +12,23 @@ import type {
 import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
 import {
   compilePolicySecretPatterns,
+  nativePiiEntitiesForPolicy,
   redactAttributeNative,
   redactStringNative,
 } from "~/server/data-privacy/redaction/applyContentRedaction";
+import { ESSENTIAL_PII_ENTITIES } from "~/server/data-privacy/redaction/essentialPii";
+
+/**
+ * Identifiers the strict analyzer detects that the native engine cannot
+ * (names, locations, and a few national IDs). For the custom level these are
+ * the only selections that still require the analysis service; everything else
+ * is redacted natively.
+ */
+const STRICT_ONLY_PII_ENTITIES: readonly string[] =
+  PRESIDIO_STRICT_ENTITIES.filter(
+    (entity) => !new Set<string>(ESSENTIAL_PII_ENTITIES).has(entity),
+  );
+
 import { featureFlagService } from "~/server/featureFlag";
 import { createLogger } from "~/utils/logger/server";
 import {
@@ -90,15 +105,22 @@ const runGoogleDlpBatch = (
   );
 
 const defaultBatchClearPII: BatchClearPIIFunction = async (texts, options) => {
-  const { piiRedactionLevel, mainMethod } = options;
+  const { piiRedactionLevel, mainMethod, entities } = options;
 
   if (mainMethod === "google_dlp") {
     return runGoogleDlpBatch(texts, piiRedactionLevel);
   }
 
   try {
-    return await defaultBatchPresidioClearPII(texts, piiRedactionLevel);
+    return await defaultBatchPresidioClearPII(
+      texts,
+      piiRedactionLevel,
+      entities,
+    );
   } catch {
+    // The DLP fallback redacts by level, not by the custom entity subset; the
+    // native pass already handled the pattern-based selections, so this only
+    // ever widens the analysis-service entities on a presidio outage.
     return await runGoogleDlpBatch(texts, piiRedactionLevel);
   }
 };
@@ -217,16 +239,50 @@ export class OtlpSpanPiiRedactionService {
       return null;
     }
     const level = reconcilePiiLevel(resolved.pii.level, requestLevel);
-    return { policy: { ...resolved, pii: { level } }, level };
+    return {
+      policy: {
+        ...resolved,
+        pii: { level, entities: resolved.pii.entities },
+      },
+      level,
+    };
   }
 
   /**
-   * Whether the native pass would change anything for this policy. Runs for
-   * every non-disabled PII level (essential PII is the native floor even at
-   * strict) and whenever secrets redaction is on.
+   * Whether the native pass would change anything for this policy: secrets
+   * redaction is on, or there are native essential identifiers to scrub (every
+   * essential/strict entity, or the native subset a custom level selected).
    */
   private nativePassActive(policy: ResolvedDataPrivacy): boolean {
-    return policy.secrets.enabled || policy.pii.level !== "disabled";
+    if (policy.secrets.enabled) return true;
+    const pii = nativePiiEntitiesForPolicy(policy);
+    return pii === "all" || (Array.isArray(pii) && pii.length > 0);
+  }
+
+  /**
+   * The analysis-service entities a resolved policy still needs after the native
+   * pass. The custom level selects them explicitly; everything else native
+   * already covered, so only these are sent out.
+   */
+  private customLambdaEntities(policy: ResolvedDataPrivacy): string[] {
+    const selected = new Set(policy.pii.entities);
+    return STRICT_ONLY_PII_ENTITIES.filter((entity) => selected.has(entity));
+  }
+
+  /**
+   * The analysis-service call a resolved policy still needs after the native
+   * pass: `{}` for strict (its default entity list), `{ entities }` for a custom
+   * level that selected analysis-service identifiers, or null to skip it.
+   */
+  private lambdaAfterNative(
+    policy: ResolvedDataPrivacy,
+  ): { entities?: readonly string[] } | null {
+    if (policy.pii.level === "strict") return {};
+    if (policy.pii.level === "custom") {
+      const entities = this.customLambdaEntities(policy);
+      return entities.length > 0 ? { entities } : null;
+    }
+    return null;
   }
 
   private nativeSecretPatterns(
@@ -333,9 +389,10 @@ export class OtlpSpanPiiRedactionService {
 
   /**
    * Redacts the span + resource in place. Native secrets + essential PII run
-   * in-process when a policy is resolvable for the tenant; only the strict level
-   * escalates to the analysis-service batch. Without a tenant (or with the kill
-   * switch set) the analysis-service batch path runs unchanged.
+   * in-process when a policy is resolvable for the tenant; the strict level and
+   * any custom level that selected analysis-service identifiers escalate to the
+   * batch for those. Without a tenant (or with the kill switch set) the
+   * analysis-service batch path runs unchanged.
    */
   async redactSpan(
     span: OtlpSpan,
@@ -349,8 +406,9 @@ export class OtlpSpanPiiRedactionService {
       return;
     }
     this.applyNativeSpanPass(span, resource, native.policy);
-    if (native.level === "strict") {
-      await this.lambdaRedactSpan(span, resource, "STRICT");
+    const lambda = this.lambdaAfterNative(native.policy);
+    if (lambda) {
+      await this.lambdaRedactSpan(span, resource, "STRICT", lambda.entities);
     }
   }
 
@@ -364,8 +422,9 @@ export class OtlpSpanPiiRedactionService {
     span: OtlpSpan,
     resource: OtlpResource | null,
     piiRedactionLevel: PIIRedactionLevel,
+    entities?: readonly string[],
   ): Promise<void> {
-    const options = await this.buildOptions(piiRedactionLevel);
+    const options = await this.buildOptions(piiRedactionLevel, entities);
     if (!options) return;
 
     const entries: StringEntry[] = [];
@@ -470,8 +529,9 @@ export class OtlpSpanPiiRedactionService {
       return;
     }
     this.applyNativeLogPass(log, native.policy);
-    if (native.level === "strict") {
-      await this.lambdaRedactLog(log, "STRICT");
+    const lambda = this.lambdaAfterNative(native.policy);
+    if (lambda) {
+      await this.lambdaRedactLog(log, "STRICT", lambda.entities);
     }
   }
 
@@ -482,8 +542,9 @@ export class OtlpSpanPiiRedactionService {
       resourceAttributes: Record<string, string>;
     },
     piiRedactionLevel: PIIRedactionLevel,
+    entities?: readonly string[],
   ): Promise<void> {
-    const options = await this.buildOptions(piiRedactionLevel);
+    const options = await this.buildOptions(piiRedactionLevel, entities);
     if (!options) return;
 
     const batch = this.createRedactionBatch();
@@ -523,8 +584,13 @@ export class OtlpSpanPiiRedactionService {
         compiled,
       );
     }
-    if (native.level === "strict") {
-      await this.lambdaRedactMetricAttributes(metric, "STRICT");
+    const lambda = this.lambdaAfterNative(native.policy);
+    if (lambda) {
+      await this.lambdaRedactMetricAttributes(
+        metric,
+        "STRICT",
+        lambda.entities,
+      );
     }
   }
 
@@ -534,8 +600,9 @@ export class OtlpSpanPiiRedactionService {
       resourceAttributes: Record<string, string>;
     },
     piiRedactionLevel: PIIRedactionLevel,
+    entities?: readonly string[],
   ): Promise<void> {
-    const options = await this.buildOptions(piiRedactionLevel);
+    const options = await this.buildOptions(piiRedactionLevel, entities);
     if (!options) return;
 
     const batch = this.createRedactionBatch();
@@ -552,6 +619,7 @@ export class OtlpSpanPiiRedactionService {
    */
   private async buildOptions(
     piiRedactionLevel: PIIRedactionLevel,
+    entities?: readonly string[],
   ): Promise<PIICheckOptions | null> {
     const disabled = await featureFlagService.isEnabled(
       "ops_pii_redaction_disabled",
@@ -575,6 +643,7 @@ export class OtlpSpanPiiRedactionService {
       piiRedactionLevel,
       enforced: piiEnforced,
       mainMethod: "presidio",
+      ...(entities && entities.length > 0 ? { entities } : {}),
     };
   }
 

@@ -272,10 +272,27 @@ export const googleDLPClearPII = async (
   }
 };
 
+/**
+ * The Presidio `entities` request setting. Uses the explicit override when given
+ * (the custom level passes only the analysis-service identifiers a team chose),
+ * otherwise the level's default list. Names are lowercased for the analyzer.
+ */
+function presidioEntitiesSetting(
+  piiRedactionLevel: PIIRedactionLevel,
+  entities?: readonly string[],
+): Record<string, boolean> {
+  const names =
+    entities ??
+    (piiRedactionLevel === "ESSENTIAL" ? essentialInfoTypes : strictInfoTypes)
+      .presidio;
+  return Object.fromEntries(names.map((name) => [name.toLowerCase(), true]));
+}
+
 export const presidioClearPII = async (
   currentObject: Record<string | number, any>,
   lastKey: string | number,
   piiRedactionLevel: PIIRedactionLevel,
+  entities?: readonly string[],
 ): Promise<void> => {
   getPiiChecksCounter("presidio").inc();
   const timeout = 60_000;
@@ -299,12 +316,7 @@ export const presidioClearPII = async (
       body: JSON.stringify({
         data: [{ input: text }],
         settings: {
-          entities: Object.fromEntries(
-            (piiRedactionLevel === "ESSENTIAL"
-              ? essentialInfoTypes
-              : strictInfoTypes
-            ).presidio.map((name) => [name.toLowerCase(), true]),
-          ),
+          entities: presidioEntitiesSetting(piiRedactionLevel, entities),
           min_threshold: 0.5,
         },
         env: {},
@@ -352,6 +364,7 @@ export const presidioClearPII = async (
 export const batchPresidioClearPII = async (
   texts: string[],
   piiRedactionLevel: PIIRedactionLevel,
+  entities?: readonly string[],
 ): Promise<(string | null)[]> => {
   if (texts.length === 0) return [];
 
@@ -424,7 +437,10 @@ export const batchPresidioClearPII = async (
       throw new Error(result.details);
     }
     if (result.status === "processed" && result.raw_response?.anonymized) {
-      return normalizePresidioMarkers(result.raw_response.anonymized) + entry.remaining;
+      return (
+        normalizePresidioMarkers(result.raw_response.anonymized) +
+        entry.remaining
+      );
     }
     return null;
   });
@@ -434,6 +450,12 @@ export type PIICheckOptions = {
   piiRedactionLevel: PIIRedactionLevel;
   enforced?: boolean;
   mainMethod?: "google_dlp" | "presidio";
+  /**
+   * Explicit analyzer entity names (uppercase, e.g. "PERSON") to detect,
+   * overriding the level's default set. The custom PII level uses this to scan
+   * only the analysis-service identifiers a team selected.
+   */
+  entities?: readonly string[];
 };
 
 export const cleanupPIIs = async (

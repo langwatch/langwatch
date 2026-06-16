@@ -160,6 +160,7 @@ export function buildRuleConfig({
   dispositions,
   audience,
   piiLevel,
+  piiEntities,
   secretsEnabled,
   secretsPatterns,
   customAttributes,
@@ -168,6 +169,7 @@ export function buildRuleConfig({
   dispositions: Record<ContentCategory, Disposition>;
   audience: AudienceFormState;
   piiLevel: PiiLevel;
+  piiEntities: string[];
   secretsEnabled: boolean;
   secretsPatterns: string[];
   customAttributes: CustomAttributeFormRow[];
@@ -189,7 +191,12 @@ export function buildRuleConfig({
 
   const config: DataPrivacyConfig = {};
   if (Object.keys(categories).length > 0) config.categories = categories;
-  if (touched.pii) config.pii = { level: piiLevel };
+  if (touched.pii) {
+    config.pii =
+      piiLevel === "custom"
+        ? { level: piiLevel, entities: [...piiEntities].sort() }
+        : { level: piiLevel };
+  }
   if (touched.secrets) {
     const patterns = secretsPatterns.map((p) => p.trim()).filter(Boolean);
     config.secrets = {
@@ -217,6 +224,8 @@ export interface RuleFormState {
   dispositions: Record<ContentCategory, Disposition>;
   audience: AudienceFormState;
   piiLevel: PiiLevel;
+  /** Selected entity names, only meaningful when piiLevel === "custom". */
+  piiEntities: string[];
   secretsEnabled: boolean;
   secretsPatterns: string[];
   customAttributes: CustomAttributeFormRow[];
@@ -251,6 +260,7 @@ export function inheritedFormState({
       dispositions: { ...DEFAULT_DISPOSITIONS },
       audience: { ...EMPTY_AUDIENCE_FORM, admins: true },
       piiLevel: "essential",
+      piiEntities: [],
       secretsEnabled: true,
       secretsPatterns: [],
       customAttributes: [],
@@ -273,6 +283,7 @@ export function inheritedFormState({
     dispositions,
     audience,
     piiLevel: effective.pii.level,
+    piiEntities: [...effective.pii.entities],
     secretsEnabled: effective.secrets.enabled,
     secretsPatterns: [],
     customAttributes: [],
@@ -311,6 +322,7 @@ export function configToFormState(config: DataPrivacyConfig): RuleFormState {
     dispositions,
     audience,
     piiLevel: config.pii?.level ?? "essential",
+    piiEntities: [...(config.pii?.entities ?? [])],
     secretsEnabled: config.secrets?.enabled ?? true,
     secretsPatterns: [...(config.secrets?.customPatterns ?? [])],
     customAttributes: (config.customAttributes ?? []).map((rule) => ({
@@ -348,6 +360,7 @@ const PII_SUMMARY_LABELS: Record<PiiLevel, string> = {
   disabled: "PII redaction off",
   essential: "PII redaction",
   strict: "Strict PII redaction",
+  custom: "Custom PII redaction",
 };
 
 const DISPOSITION_SUMMARY_LABELS: Record<Disposition, string> = {
@@ -379,7 +392,16 @@ export function ruleSummary(config: DataPrivacyConfig): string {
         : `${attributeRules} attribute rules`,
     );
   }
-  if (config.pii) parts.push(PII_SUMMARY_LABELS[config.pii.level]);
+  if (config.pii) {
+    if (config.pii.level === "custom") {
+      const count = config.pii.entities?.length ?? 0;
+      parts.push(
+        count === 1 ? "Custom PII (1 type)" : `Custom PII (${count} types)`,
+      );
+    } else {
+      parts.push(PII_SUMMARY_LABELS[config.pii.level]);
+    }
+  }
   if (config.secrets) {
     parts.push(
       config.secrets.enabled ? "Secrets redaction" : "Secrets redaction off",

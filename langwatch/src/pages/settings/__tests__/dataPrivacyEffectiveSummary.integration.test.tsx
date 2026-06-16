@@ -30,7 +30,7 @@ function resolvedWithPii(level: PiiLevel): ResolvedDataPrivacy {
       system: { ...PLATFORM_DEFAULT_DATA_PRIVACY.categories.system },
       tools: { ...PLATFORM_DEFAULT_DATA_PRIVACY.categories.tools },
     },
-    pii: { level },
+    pii: { level, entities: [] },
     secrets: { enabled: true, customPatterns: [] },
     customAttributes: [],
   };

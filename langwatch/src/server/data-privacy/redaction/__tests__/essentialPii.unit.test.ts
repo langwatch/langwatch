@@ -165,4 +165,52 @@ describe("redactEssentialPiiInText", () => {
       expect(redactedCount).toBe(3);
     });
   });
+
+  describe("given a Brazilian CPF", () => {
+    it("redacts a check-digit-valid formatted CPF", () => {
+      expect(redact("cpf 529.982.247-25 ok").text).toBe("cpf [BR_CPF] ok");
+    });
+
+    it("redacts a check-digit-valid bare CPF", () => {
+      expect(redact("cpf 52998224725 ok").text).toBe("cpf [BR_CPF] ok");
+    });
+
+    it("leaves a CPF-shaped number with bad check digits intact", () => {
+      const input = "ref 529.982.247-00 done";
+      expect(redact(input).text).toBe(input);
+    });
+
+    it("leaves a repeated-digit sequence intact", () => {
+      const input = "ref 111.111.111-11 done";
+      expect(redact(input).text).toBe(input);
+    });
+  });
+
+  describe("given an entity filter (the custom level)", () => {
+    it("redacts only the selected identifiers", () => {
+      const { text } = redactEssentialPiiInText({
+        text: "mail test@example.com cpf 529.982.247-25 card 4111111111111111",
+        entities: ["EMAIL_ADDRESS", "BR_CPF"],
+      });
+      expect(text).toBe(
+        "mail [EMAIL_ADDRESS] cpf [BR_CPF] card 4111111111111111",
+      );
+    });
+
+    it("does not run phone detection when PHONE_NUMBER is not selected", () => {
+      const { text } = redactEssentialPiiInText({
+        text: "call +1 415 555 2671 or mail test@example.com",
+        entities: ["EMAIL_ADDRESS"],
+      });
+      expect(text).toContain("+1 415 555 2671");
+      expect(text).toContain("[EMAIL_ADDRESS]");
+    });
+
+    it("redacts everything native when no filter is given", () => {
+      const { redactedCount } = redact(
+        "mail test@example.com cpf 529.982.247-25",
+      );
+      expect(redactedCount).toBe(2);
+    });
+  });
 });

@@ -27,6 +27,7 @@ const TENANT = "project-web-app";
 
 function mkPolicy({
   piiLevel = "essential" as PiiLevel,
+  piiEntities = [] as string[],
   secretsEnabled = true,
   customPatterns = [] as string[],
 }): ResolvedDataPrivacy {
@@ -36,7 +37,7 @@ function mkPolicy({
   });
   return {
     categories: { input: cat(), output: cat(), system: cat(), tools: cat() },
-    pii: { level: piiLevel },
+    pii: { level: piiLevel, entities: piiEntities },
     secrets: { enabled: secretsEnabled, customPatterns },
     customAttributes: [],
   };
@@ -273,6 +274,68 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
       await service.redactSpan(span, null, "ESSENTIAL", TENANT);
 
       expect(attr(span, "input")).toContain("jane@example.com");
+      expect(batchSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the essential level and a Brazilian CPF", () => {
+    /** @scenario A Brazilian CPF is redacted at the essential level */
+    it("redacts the CPF natively with no analysis-service call", async () => {
+      const { service, batchSpy } = makeService(mkPolicy({}));
+      const span = spanWith({ input: "cpf 529.982.247-25 done" });
+
+      await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+
+      expect(attr(span, "input")).toBe("cpf [BR_CPF] done");
+      expect(batchSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a custom PII level", () => {
+    /** @scenario A custom level redacts only the selected identifiers natively */
+    it("redacts only the selected native identifiers, leaving the rest, with no analysis-service call", async () => {
+      const { service, batchSpy } = makeService(
+        mkPolicy({
+          piiLevel: "custom",
+          piiEntities: ["EMAIL_ADDRESS", "BR_CPF"],
+        }),
+      );
+      const span = spanWith({
+        input: "mail jane@example.com cpf 529.982.247-25 card 4111111111111111",
+      });
+
+      await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+
+      const value = attr(span, "input")!;
+      expect(value).toContain("[EMAIL_ADDRESS]");
+      expect(value).toContain("[BR_CPF]");
+      // The card was not selected, so it is left intact.
+      expect(value).toContain("4111111111111111");
+      expect(batchSpy).not.toHaveBeenCalled();
+    });
+
+    /** @scenario A custom level reaches the analysis service only for the identifiers that need it */
+    it("sends only the selected analysis-service identifiers to the batch", async () => {
+      const { service, batchSpy } = makeService(
+        mkPolicy({ piiLevel: "custom", piiEntities: ["PERSON"] }),
+      );
+      const span = spanWith({ input: "My name is Alexander Hamilton." });
+
+      await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+
+      expect(batchSpy).toHaveBeenCalledTimes(1);
+      expect(batchSpy.mock.calls[0]![1].entities).toEqual(["PERSON"]);
+    });
+
+    it("does not call the analysis service when only native identifiers are selected", async () => {
+      const { service, batchSpy } = makeService(
+        mkPolicy({ piiLevel: "custom", piiEntities: ["EMAIL_ADDRESS"] }),
+      );
+      const span = spanWith({ input: "mail jane@example.com" });
+
+      await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+
+      expect(attr(span, "input")).toContain("[EMAIL_ADDRESS]");
       expect(batchSpy).not.toHaveBeenCalled();
     });
   });

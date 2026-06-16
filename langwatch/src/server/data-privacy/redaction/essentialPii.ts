@@ -38,6 +38,7 @@ export const ESSENTIAL_PII_ENTITIES = [
   "AU_TFN",
   "IN_PAN",
   "IN_AADHAAR",
+  "BR_CPF",
 ] as const;
 
 interface Recognizer {
@@ -86,6 +87,30 @@ function ipv6Plausible(raw: string): boolean {
   if (raw.includes("::")) return true;
   if (/[a-fA-F]/.test(raw)) return true;
   return raw.split(":").length === 8;
+}
+
+/**
+ * Validate a Brazilian CPF by its two check digits (mod 11). Rejects the
+ * repeated-digit sequences (000.000.000-00, 111..., etc.) that pass the
+ * arithmetic but are never issued, so a random eleven-digit run is not
+ * mistaken for a taxpayer id.
+ */
+function cpfValid(raw: string): boolean {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length !== 11) return false;
+  if (/^(\d)\1{10}$/.test(digits)) return false;
+  const checkDigit = (length: number): number => {
+    let sum = 0;
+    for (let i = 0; i < length; i++) {
+      sum += (digits.charCodeAt(i) - 48) * (length + 1 - i);
+    }
+    const remainder = (sum * 10) % 11;
+    return remainder === 10 ? 0 : remainder;
+  };
+  return (
+    checkDigit(9) === digits.charCodeAt(9) - 48 &&
+    checkDigit(10) === digits.charCodeAt(10) - 48
+  );
 }
 
 const RECOGNIZERS: Recognizer[] = [
@@ -195,6 +220,13 @@ const RECOGNIZERS: Recognizer[] = [
     contextRequired: true,
     contextWords: ["aadhaar", "aadhar", "uidai"],
   },
+  // Brazilian CPF: 11 digits, written `123.456.789-09` or bare. The two check
+  // digits make it self-validating, so it fires on the checksum alone.
+  {
+    entity: "BR_CPF",
+    regex: /\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/g,
+    validate: cpfValid,
+  },
 ];
 
 interface Span {
@@ -225,11 +257,18 @@ export interface PiiRedactionResult {
 
 /**
  * Redact essential PII from one string and report how many spans were replaced.
+ *
+ * `entities` narrows the recognizers that run: pass a subset (the custom PII
+ * level) to redact only those identifiers, or omit it (the essential level) to
+ * run every native recognizer. Entity names are the canonical identifiers from
+ * `ESSENTIAL_PII_ENTITIES` (e.g. `EMAIL_ADDRESS`, `BR_CPF`).
  */
 export function redactEssentialPiiInText({
   text,
+  entities,
 }: {
   text: string;
+  entities?: readonly string[];
 }): PiiRedactionResult {
   if (
     typeof text !== "string" ||
@@ -239,9 +278,11 @@ export function redactEssentialPiiInText({
     return { text, redactedCount: 0 };
   }
 
+  const allowed = entities ? new Set(entities) : null;
   const spans: Span[] = [];
 
   for (const recognizer of RECOGNIZERS) {
+    if (allowed && !allowed.has(recognizer.entity)) continue;
     for (const match of text.matchAll(recognizer.regex)) {
       const raw = match[0];
       const start = match.index ?? 0;
@@ -261,18 +302,20 @@ export function redactEssentialPiiInText({
     }
   }
 
-  try {
-    for (const phone of findPhoneNumbersInText(text, {
-      defaultCountry: "US",
-    })) {
-      spans.push({
-        start: phone.startsAt,
-        end: phone.endsAt,
-        entity: "PHONE_NUMBER",
-      });
+  if (!allowed || allowed.has("PHONE_NUMBER")) {
+    try {
+      for (const phone of findPhoneNumbersInText(text, {
+        defaultCountry: "US",
+      })) {
+        spans.push({
+          start: phone.startsAt,
+          end: phone.endsAt,
+          entity: "PHONE_NUMBER",
+        });
+      }
+    } catch {
+      // Defensive: never let phone parsing break ingestion.
     }
-  } catch {
-    // Defensive: never let phone parsing break ingestion.
   }
 
   if (spans.length === 0) return { text, redactedCount: 0 };

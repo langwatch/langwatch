@@ -30,7 +30,7 @@ function policy(
       system: cat(dispositions.system),
       tools: cat(dispositions.tools),
     },
-    pii: { level: "essential" },
+    pii: { level: "essential", entities: [] },
     secrets: { enabled: true, customPatterns: [] },
     customAttributes,
   };

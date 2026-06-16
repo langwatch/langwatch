@@ -26,6 +26,7 @@ export const ESSENTIAL_PII_ENTITY_LABELS: Record<string, string> = {
   AU_TFN: "Australian tax file numbers (TFN)",
   IN_PAN: "Indian PAN",
   IN_AADHAAR: "Indian Aadhaar numbers",
+  BR_CPF: "Brazilian CPF",
 };
 
 /** Entities the strict level adds on top of essential. */
