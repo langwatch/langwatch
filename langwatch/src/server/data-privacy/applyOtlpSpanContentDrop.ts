@@ -4,12 +4,15 @@ import { matchesAnyAttributePattern } from "./attributePatternMatcher";
 import type { ResolvedDataPrivacy } from "./dataPrivacy.types";
 import { getDataPrivacyPolicyService } from "./dataPrivacyPolicy.service";
 import {
+  CHAT_ARRAY_KEYS,
   computeDropMatchers,
   computeDroppedKeys,
   DROPPED_ATTRIBUTES_MARKER_MAX_KEYS,
   droppedCategories,
   PRIVACY_DROPPED_ATTRIBUTES_MARKER_ATTR,
   PRIVACY_DROPPED_MARKER_ATTR,
+  rolesDroppedFromChatArrays,
+  stripRolesFromChatArrayJson,
 } from "./dropKeyCatalog";
 
 const logger = createLogger("langwatch:data-privacy:content-drop");
@@ -73,9 +76,35 @@ export function stripOtlpSpanContent({
       return true;
     });
 
-  span.attributes = stripAttrs(span.attributes);
+  // Role-based categories (system, tools) also live inside the captured
+  // input/output conversation, so strip those roles from every surviving
+  // chat-message array. Done before canonicalization can re-derive
+  // gen_ai.system_instructions from a system turn that was left behind.
+  const { roles: droppedRoles, stripToolCalls } =
+    rolesDroppedFromChatArrays(policy);
+  const stripRoles = (
+    attributes: OtlpSpan["attributes"],
+  ): OtlpSpan["attributes"] => {
+    if (droppedRoles.size === 0 && !stripToolCalls) return attributes;
+    return attributes.map((attr) => {
+      const stringValue = attr.value?.stringValue;
+      if (!CHAT_ARRAY_KEYS.has(attr.key) || typeof stringValue !== "string") {
+        return attr;
+      }
+      const result = stripRolesFromChatArrayJson(
+        stringValue,
+        droppedRoles,
+        stripToolCalls,
+      );
+      if (!result) return attr;
+      droppedCount += result.removed;
+      return { ...attr, value: { ...attr.value, stringValue: result.json } };
+    });
+  };
+
+  span.attributes = stripRoles(stripAttrs(span.attributes));
   for (const event of span.events) {
-    event.attributes = stripAttrs(event.attributes);
+    event.attributes = stripRoles(stripAttrs(event.attributes));
   }
 
   const stampMarker = (key: string, value: string) => {

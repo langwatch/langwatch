@@ -52,6 +52,110 @@ export const CONTENT_KEY_CATALOG: Record<ContentCategory, readonly string[]> = {
   ],
 };
 
+/**
+ * System instructions and tool calls do not only live in their own attributes
+ * (`gen_ai.system_instructions`, `gen_ai.tool.call.*`); they also ride inside the
+ * captured input/output conversation as chat messages with `role: "system"` or
+ * `role: "tool"`, and as `tool_calls` on assistant messages. Canonicalization
+ * (which runs AFTER the drop) re-derives `gen_ai.system_instructions` from that
+ * conversation, so dropping the key alone is not enough: the role has to be
+ * stripped from the conversation arrays too, or the content survives.
+ */
+const ROLE_BASED_CATEGORY_ROLES: Partial<
+  Record<ContentCategory, readonly string[]>
+> = {
+  system: ["system"],
+  tools: ["tool", "function"],
+};
+
+/** Catalog keys whose value is a chat-message conversation (input and output). */
+export const CHAT_ARRAY_KEYS: ReadonlySet<string> = new Set([
+  ...CONTENT_KEY_CATALOG.input,
+  ...CONTENT_KEY_CATALOG.output,
+]);
+
+/**
+ * For a resolved policy, the message roles to remove from conversation arrays and
+ * whether assistant `tool_calls` should be stripped, derived from which
+ * role-based categories (`system`, `tools`) are set to `drop`.
+ */
+export function rolesDroppedFromChatArrays(policy: ResolvedDataPrivacy): {
+  roles: Set<string>;
+  stripToolCalls: boolean;
+} {
+  const roles = new Set<string>();
+  let stripToolCalls = false;
+  for (const category of CONTENT_CATEGORIES) {
+    const categoryRoles = ROLE_BASED_CATEGORY_ROLES[category];
+    if (categoryRoles && policy.categories[category].disposition === "drop") {
+      for (const role of categoryRoles) roles.add(role);
+      if (category === "tools") stripToolCalls = true;
+    }
+  }
+  return { roles, stripToolCalls };
+}
+
+function isChatMessage(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+/**
+ * Remove the given message roles (and optionally assistant `tool_calls`) from a
+ * conversation serialized as JSON. Handles the LangWatch
+ * `{ type: "chat_messages", value: [...] }` wrapper and a bare messages array.
+ * Returns the rewritten JSON and how many messages/tool-call sets were removed,
+ * or `null` when the value is not a conversation (left untouched, never thrown).
+ */
+export function stripRolesFromChatArrayJson(
+  json: string,
+  roles: ReadonlySet<string>,
+  stripToolCalls: boolean,
+): { json: string; removed: number } | null {
+  if (roles.size === 0 && !stripToolCalls) return null;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(json);
+  } catch {
+    return null;
+  }
+
+  let messages: unknown[];
+  let rewrap: (next: unknown[]) => unknown;
+  if (Array.isArray(parsed)) {
+    messages = parsed;
+    rewrap = (next) => next;
+  } else if (
+    isChatMessage(parsed) &&
+    Array.isArray((parsed as { value?: unknown }).value)
+  ) {
+    messages = (parsed as { value: unknown[] }).value;
+    rewrap = (next) => ({ ...parsed, value: next });
+  } else {
+    return null;
+  }
+
+  let removed = 0;
+  const next: unknown[] = [];
+  for (const message of messages) {
+    const role = isChatMessage(message) ? message.role : undefined;
+    if (typeof role === "string" && roles.has(role)) {
+      removed++;
+      continue;
+    }
+    if (stripToolCalls && isChatMessage(message) && message.tool_calls != null) {
+      const { tool_calls: _dropped, ...rest } = message;
+      removed++;
+      next.push(rest);
+      continue;
+    }
+    next.push(message);
+  }
+
+  if (removed === 0) return null;
+  return { json: JSON.stringify(rewrap(next)), removed };
+}
+
 /** Marker stamped on a span whose content was dropped, so the UI can explain it. */
 export const PRIVACY_DROPPED_MARKER_ATTR = "langwatch.privacy.dropped";
 

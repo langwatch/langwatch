@@ -86,6 +86,12 @@ function marker(span: OtlpSpan): string | undefined {
   );
 }
 
+function attrVal(span: OtlpSpan, key: string): string | undefined {
+  return (
+    span.attributes.find((a) => a.key === key)?.value.stringValue ?? undefined
+  );
+}
+
 describe("stripOtlpSpanContent", () => {
   describe("given a span carrying every content category plus metadata", () => {
     describe("when every category is dropped", () => {
@@ -246,6 +252,65 @@ describe("stripOtlpSpanContent", () => {
         expect(result.droppedCount).toBe(0);
         expect(keys(s)).toEqual(["gen_ai.input.messages"]);
         expect(marker(s)).toBeUndefined();
+      });
+    });
+  });
+
+  describe("given system instructions ride inside the captured input conversation", () => {
+    describe("when system is dropped but input is captured", () => {
+      /** @scenario Dropping system instructions strips the system turn from the conversation */
+      it("removes the system message from the conversation but keeps the user turn", () => {
+        const messages = [
+          { role: "system", content: "you are a pirate" },
+          { role: "user", content: "hello there" },
+        ];
+        const s = span({
+          "langwatch.input": JSON.stringify({
+            type: "chat_messages",
+            value: messages,
+          }),
+          "gen_ai.input.messages": JSON.stringify(messages),
+        });
+
+        stripOtlpSpanContent({ span: s, policy: policy({ system: "drop" }) });
+
+        const wrapped = attrVal(s, "langwatch.input")!;
+        const bare = attrVal(s, "gen_ai.input.messages")!;
+        expect(wrapped).not.toContain("you are a pirate");
+        expect(wrapped).toContain("hello there");
+        expect(wrapped).toContain("chat_messages"); // wrapper preserved
+        expect(bare).not.toContain("you are a pirate");
+        expect(bare).toContain("hello there");
+      });
+    });
+  });
+
+  describe("given tool calls ride inside the conversation", () => {
+    describe("when tool calls are dropped", () => {
+      /** @scenario Dropping tool calls strips tool messages and assistant tool_calls */
+      it("removes tool-role messages and assistant tool_calls, keeps the text turns", () => {
+        const s = span({
+          "gen_ai.output.messages": JSON.stringify([
+            {
+              role: "assistant",
+              content: "let me check",
+              tool_calls: [
+                { id: "1", function: { name: "lookup", arguments: "{}" } },
+              ],
+            },
+            { role: "tool", content: "secret tool result" },
+            { role: "assistant", content: "all done" },
+          ]),
+        });
+
+        stripOtlpSpanContent({ span: s, policy: policy({ tools: "drop" }) });
+
+        const out = attrVal(s, "gen_ai.output.messages")!;
+        expect(out).not.toContain("secret tool result");
+        expect(out).not.toContain("tool_calls");
+        expect(out).not.toContain("lookup");
+        expect(out).toContain("let me check");
+        expect(out).toContain("all done");
       });
     });
   });
