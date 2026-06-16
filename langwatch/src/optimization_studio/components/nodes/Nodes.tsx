@@ -106,13 +106,7 @@ function NodeInputs({
           <Text color="fg.subtle">:</Text>
           <TypeLabel type={input.type} />
           <Spacer />
-          {input.optional &&
-            (!node ||
-              node.type !== "end" ||
-              (input.identifier !== "score" &&
-                input.identifier !== "passed")) && (
-              <Text color="fg.subtle">(optional)</Text>
-            )}
+          {input.optional && <Text color="fg.subtle">(optional)</Text>}
         </HStack>
       ))}
       {showGateDropTarget && (
