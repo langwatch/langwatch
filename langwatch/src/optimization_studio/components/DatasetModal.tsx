@@ -146,8 +146,6 @@ export function DatasetModal({
     });
   };
 
-  const isDraft = !!editingDataset && !editingDataset.id;
-
   return (
     <Dialog.Root
       open={open}
@@ -182,18 +180,6 @@ export function DatasetModal({
                 >
                   <ArrowLeft size={16} /> Datasets
                 </Button>
-                <Spacer />
-                {isDraft && (
-                  <Button
-                    size="sm"
-                    colorPalette="blue"
-                    variant="outline"
-                    data-testid="save-draft-as-dataset"
-                    onClick={handleSaveDraftAsDataset}
-                  >
-                    <Database size={14} /> Save as dataset
-                  </Button>
-                )}
               </HStack>
             </Dialog.Header>
             <Dialog.Body paddingBottom="32px">
@@ -202,6 +188,7 @@ export function DatasetModal({
                   <DatasetEditorTable
                     datasetId={editingDataset.id}
                     editorPortalRef={editorPortalRef}
+                    floatingSelectionBar
                     onColumnsChanged={(columnTypes) => {
                       attachDataset(editingDataset, columnTypes);
                     }}
@@ -210,6 +197,7 @@ export function DatasetModal({
                   <DatasetEditorTable
                     title={editingDataset.name ?? "Draft Dataset"}
                     editorPortalRef={editorPortalRef}
+                    floatingSelectionBar
                     inMemoryDataset={{
                       name: editingDataset.name,
                       columnTypes: editingDataset.inline.columnTypes,
@@ -218,6 +206,17 @@ export function DatasetModal({
                       ),
                     }}
                     onUpdateDataset={handleDraftChange}
+                    headerActions={
+                      <Button
+                        size="sm"
+                        colorPalette="blue"
+                        variant="outline"
+                        data-testid="save-draft-as-dataset"
+                        onClick={handleSaveDraftAsDataset}
+                      >
+                        <Database size={14} /> Save as dataset
+                      </Button>
+                    }
                   />
                 ) : null}
               </Box>

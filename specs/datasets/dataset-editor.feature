@@ -95,6 +95,17 @@ Feature: Dataset editor
     Then the rows are removed from the table
     And the deletion is saved to the dataset
 
+  # Rows added in the editor persist to the database under their
+  # client-generated id, so deleting them must send a real server deletion
+  # too. Treating any client-generated id as "never saved" left deleted rows
+  # in the database and they reappeared on reload.
+  @integration
+  Scenario: Deleting a row that was added and saved in the editor persists
+    Given I added a row and gave it a value so it saved to the dataset
+    When I select that row and delete it
+    Then a server deletion is queued for that row
+    And the row does not reappear when the dataset is reopened
+
   # ============================================================================
   # Columns
   # ============================================================================

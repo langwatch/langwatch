@@ -242,12 +242,14 @@ export function createDatasetEditorStore(): StoreApi<DatasetEditorStore> {
 
       const datasetChanges = { ...(pendingSavedChanges[dbDatasetId] ?? {}) };
       for (const record of removed) {
-        if (record.id.startsWith("new_")) {
-          // Never reached the server, just drop any queued create
-          delete datasetChanges[record.id];
-        } else {
-          datasetChanges[record.id] = { _delete: true };
-        }
+        // Always queue a server deletion, overwriting any pending create or
+        // edit for the row. The backend persists locally-added rows under
+        // their client-generated "new_" id, so that prefix is not a reliable
+        // "never reached the server" signal: skipping the deletion for those
+        // is what made deleted rows reappear on reload. A row that genuinely
+        // never synced is a harmless no-op for deleteMany (it ignores unknown
+        // ids).
+        datasetChanges[record.id] = { _delete: true };
       }
 
       set({
