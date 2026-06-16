@@ -51,25 +51,27 @@ describe("StorageMeterService memory guard", () => {
     });
   });
 
-  describe("when the single aggregate total query fails for a heavy table", () => {
-    it("falls back to the per-table breakdown instead of throwing", async () => {
-      // The combined UNION ALL aggregate trips the per-query limit, but each
-      // table's own query still succeeds — the total should degrade to the
-      // sum of the per-table subtotals rather than failing the whole metric.
-      const query = vi.fn().mockImplementation(async (arg: { query: string }) => {
-        if (arg.query.includes("UNION ALL")) {
-          throw new Error("Code: 241. DB::Exception: memory limit exceeded");
-        }
-        return { json: async () => [{ total: "10" }] };
+  describe("given a heavy tenant where the aggregate query can exceed limits", () => {
+    describe("when the single aggregate total query fails", () => {
+      it("falls back to the per-table breakdown instead of throwing", async () => {
+        // The combined UNION ALL aggregate trips the per-query limit, but each
+        // table's own query still succeeds — the total should degrade to the
+        // sum of the per-table subtotals rather than failing the whole metric.
+        const query = vi.fn().mockImplementation(async (arg: { query: string }) => {
+          if (arg.query.includes("UNION ALL")) {
+            throw new Error("Code: 241. DB::Exception: memory limit exceeded");
+          }
+          return { json: async () => [{ total: "10" }] };
+        });
+        const client = { query } as const;
+        const service = new StorageMeterService(async () => client as any);
+
+        const total = await service.getTotalStorageBytes({ tenantId: "p-heavy" });
+
+        expect(total).toBe(10 * RETENTION_MANAGED_TABLES.length);
+        // one failed aggregate attempt + one query per table for the fallback
+        expect(query).toHaveBeenCalledTimes(1 + RETENTION_MANAGED_TABLES.length);
       });
-      const client = { query } as const;
-      const service = new StorageMeterService(async () => client as any);
-
-      const total = await service.getTotalStorageBytes({ tenantId: "p-heavy" });
-
-      expect(total).toBe(10 * RETENTION_MANAGED_TABLES.length);
-      // one failed aggregate attempt + one query per table for the fallback
-      expect(query).toHaveBeenCalledTimes(1 + RETENTION_MANAGED_TABLES.length);
     });
   });
 });
