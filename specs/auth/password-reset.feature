@@ -30,6 +30,13 @@ Feature: Forgot / reset password on credential (email-mode) sign-in
     Then the credential form is not rendered
     And there is no "Forgot password?" link
 
+  @integration
+  Scenario: The forgot and reset pages are reachable without signing in
+    Given I am not signed in
+    When I open /auth/forgot-password or /auth/reset-password
+    Then the page renders without bouncing me to sign in
+    And a genuinely protected route still bounces me to sign in with a callback
+
   # --- Requesting a reset (/auth/forgot-password) ---
 
   @integration
