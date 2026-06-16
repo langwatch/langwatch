@@ -47,9 +47,8 @@ export function computeSpanCost({
   );
   const cacheCreationTokens = Math.max(
     0,
-    coerceToNumber(
-      attrs[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS],
-    ) ?? 0,
+    coerceToNumber(attrs[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]) ??
+      0,
   );
 
   // Priority 1: Custom cost rates from enrichment. A custom cost may carry

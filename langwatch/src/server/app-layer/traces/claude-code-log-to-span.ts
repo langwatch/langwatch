@@ -674,8 +674,7 @@ function buildRootSpan({
   children: SynthesizedClaudeSpan[];
   promptTextById: ReadonlyMap<string, string>;
 }): SynthesizedClaudeSpan {
-  const userPrompt =
-    records.find((r) => r.eventName === "user_prompt") ?? null;
+  const userPrompt = records.find((r) => r.eventName === "user_prompt") ?? null;
   const promptText =
     asNonEmpty(userPrompt?.attrs.prompt) ??
     asNonEmpty([...promptTextById.values()][0]);
@@ -721,8 +720,7 @@ function buildRootSpan({
   if (!Number.isFinite(endMs)) endMs = startMs;
 
   const name = rootSpanName(promptText);
-  const resource =
-    userPrompt?.resource ?? children[0]?.resource ?? null;
+  const resource = userPrompt?.resource ?? children[0]?.resource ?? null;
   const instrumentationScope =
     userPrompt?.instrumentationScope ??
     children[0]?.instrumentationScope ??
