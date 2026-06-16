@@ -7,6 +7,7 @@ import { collectUsageStats } from "~/server/collectUsageStats";
 import { createLogger } from "../../../utils/logger/server";
 import {
   captureException,
+  toError,
   withScope,
 } from "../../../utils/posthogErrorCapture";
 import {
@@ -59,7 +60,9 @@ export async function runUsageStatsJob(job: Job<UsageStatsJob, void, string>) {
     await withScope(async (scope) => {
       scope.setTag?.("worker", "usageStats");
       scope.setExtra?.("job", job.data);
-      captureException(error);
+      captureException(
+        toError(error),
+      );
     });
   }
 }

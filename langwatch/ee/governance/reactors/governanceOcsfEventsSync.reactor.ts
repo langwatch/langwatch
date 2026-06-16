@@ -7,7 +7,7 @@ import {
   type GovernanceOcsfEventInput,
 } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { createLogger } from "~/utils/logger/server";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import type {
   ReactorContext,
   ReactorDefinition,
@@ -190,7 +190,7 @@ export function createGovernanceOcsfEventsSyncReactor(
           },
           "failed to fold governance trace into governance_ocsf_events",
         );
-        captureException(error);
+        captureException(toError(error));
       }
     },
   };

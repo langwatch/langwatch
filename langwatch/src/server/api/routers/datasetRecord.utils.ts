@@ -1,7 +1,7 @@
 import type { Dataset, DatasetRecord, Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { stripNullBytes } from "../../datasets/sanitize";
 import type { DatasetRecordInput } from "../../datasets/types";
 import { prisma } from "../../db";
@@ -88,7 +88,7 @@ export const createManyDatasetRecords = async ({
       existingRecords = fetchedRecords;
     } catch (error) {
       if ((error as any).name !== "NoSuchKey") {
-        captureException(error);
+        captureException(toError(error));
         throw error;
       }
     }
@@ -219,7 +219,7 @@ export const getFullDataset = async ({
         truncated,
       };
     } catch (error) {
-      captureException(error);
+      captureException(toError(error));
       throw error;
     }
   } else {

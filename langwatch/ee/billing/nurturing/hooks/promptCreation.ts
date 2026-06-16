@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { getApp } from "../../../../src/server/app-layer/app";
 import { createLogger } from "../../../../src/utils/logger/server";
-import { captureException } from "../../../../src/utils/posthogErrorCapture";
+import { captureException, toError } from "../../../../src/utils/posthogErrorCapture";
 
 const logger = createLogger("ee:nurturing:prompt-creation");
 
@@ -125,7 +125,7 @@ export function afterPromptCreated({
         { projectId, error },
         "Failed to fire prompt creation nurturing — non-fatal",
       );
-      captureException(error);
+      captureException(toError(error));
     }
   })();
 }

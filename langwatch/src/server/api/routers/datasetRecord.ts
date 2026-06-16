@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { stripNullBytes } from "../../datasets/sanitize";
 import { newDatasetEntriesSchema } from "../../datasets/types";
 import { prisma } from "../../db";
@@ -213,7 +213,9 @@ const deleteManyDatasetRecords = async ({
           message: "No records found to delete",
         });
       }
-      captureException(error);
+      captureException(
+        toError(error),
+      );
       throw error;
     }
 

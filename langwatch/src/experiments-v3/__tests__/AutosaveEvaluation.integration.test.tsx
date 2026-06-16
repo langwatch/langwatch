@@ -75,6 +75,7 @@ vi.mock("../../components/ui/toaster", () => ({
 // Mock posthog
 vi.mock("../../utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
+  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
 }));
 
 // Import hook after mocks
