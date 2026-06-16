@@ -535,18 +535,12 @@ Let's get cracking.
   <Step title="Let LangWatch MCP do the rest for you (Optional)">
     Install the [LangWatch MCP Server](/integration/mcp) and ask your coding assistant (Cursor, Claude Code, Codex, etc.) to instrument your codebase with LangWatch, OR keep following the steps below to instrument your codebase manually.
 
-    Add the LangWatch MCP to your editor:
+    Add the LangWatch MCP to your editor. Under the `mcpServers` object of your editor's MCP settings file, add an entry named `langwatch` with these fields:
 
-    ```json
-    {
-      "mcpServers": {
-        "langwatch": {
-          "command": "npx",
-          "args": ["-y", "@langwatch/mcp-server"]
-        }
-      }
-    }
-    ```
+    - `command`: `npx`
+    - `args`: `-y`, then the package name `@langwatch/mcp-server` on a separate token
+
+    See [LangWatch MCP](/integration/mcp) for per-editor instructions and the API key field.
 
     Then ask your coding assistant to instrument your codebase with LangWatch:
 
@@ -11266,62 +11260,39 @@ Run this command to add the MCP server:
 claude mcp add langwatch -- npx -y @langwatch/mcp-server --apiKey your-api-key-here
 ```
 
-Or add it manually to your `~/.claude.json`:
+Or add it manually to your `~/.claude.json`. Under the `mcpServers` object, add an entry named `langwatch` with these fields:
 
-```json
-{
-  "mcpServers": {
-    "langwatch": {
-      "command": "npx",
-      "args": ["-y", "@langwatch/mcp-server"],
-      "env": {
-        "LANGWATCH_API_KEY": "your-api-key-here"
-      }
-    }
-  }
-}
-```
+- `command`: `npx`
+- `args`: `-y`, then the package name `@langwatch/mcp-server` on a separate token
+- `env.LANGWATCH_API_KEY`: your LangWatch API key
 
 See the [Claude Code MCP documentation](https://code.claude.com/docs/en/mcp#plugin-provided-mcp-servers) for more details.
+
+<Info>
+This page intentionally describes the config in prose rather than as a JSON snippet. Some CLI agents (notably Gemini CLI 0.36.0 and earlier) parse `@`-prefixed runs as file paths and can crash with `ENAMETOOLONG` when a multi-line JSON snippet wraps the scoped package name in double quotes. See [#3104](https://github.com/langwatch/langwatch/issues/3104) for details. The bash `claude mcp add` form above is safe — the package name is followed by a whitespace terminator.
+</Info>
 
 
 ### Copilot
 
-Add to `.vscode/mcp.json` in your project (or use **MCP: Add Server** from the Command Palette):
+Add to `.vscode/mcp.json` in your project (or use **MCP: Add Server** from the Command Palette).
 
-```json
-{
-  "servers": {
-    "langwatch": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@langwatch/mcp-server"],
-      "env": { "LANGWATCH_API_KEY": "your-api-key-here" }
-    }
-  }
-}
-```
+Under the `servers` object, add an entry named `langwatch` with these fields:
+
+- `type`: `stdio`
+- `command`: `npx`
+- `args`: `-y`, then the package name `@langwatch/mcp-server` on a separate token
+- `env.LANGWATCH_API_KEY`: your LangWatch API key
 
 
 ### Cursor
 
 1. Open Cursor Settings
 2. Navigate to the **Tools and MCP** section in the sidebar
-3. Add the LangWatch MCP server:
-
-```json
-{
-  "mcpServers": {
-    "langwatch": {
-      "command": "npx",
-      "args": ["-y", "@langwatch/mcp-server"],
-      "env": {
-        "LANGWATCH_API_KEY": "your-api-key-here"
-      }
-    }
-  }
-}
-```
+3. Add the LangWatch MCP server. Under the `mcpServers` object, add an entry named `langwatch` with these fields:
+   - `command`: `npx`
+   - `args`: `-y`, then the package name `@langwatch/mcp-server` on a separate token
+   - `env.LANGWATCH_API_KEY`: your LangWatch API key
 
 
 ### ChatGPT
@@ -11358,21 +11329,11 @@ The server supports OAuth Authorization Code + PKCE with Dynamic Client Registra
 
 ### Other
 
-For other MCP-compatible editors, add the following configuration to your MCP settings file:
+For other MCP-compatible editors, add an entry named `langwatch` under the `mcpServers` object of your editor's MCP settings file with these fields:
 
-```json
-{
-  "mcpServers": {
-    "langwatch": {
-      "command": "npx",
-      "args": ["-y", "@langwatch/mcp-server"],
-      "env": {
-        "LANGWATCH_API_KEY": "your-api-key-here"
-      }
-    }
-  }
-}
-```
+- `command`: `npx`
+- `args`: `-y`, then the package name `@langwatch/mcp-server` on a separate token
+- `env.LANGWATCH_API_KEY`: your LangWatch API key
 
 Refer to your editor's MCP documentation for the specific configuration file location.
 
