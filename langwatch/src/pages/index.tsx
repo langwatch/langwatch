@@ -54,6 +54,10 @@ export default function Index() {
           governanceUiEnabled: resolved.data.governanceUiEnabled,
           lastVisitedHomeKind,
           lastProjectSlug: project?.slug ?? null,
+          // The org the resolver ran against; carried onto /me and /governance
+          // so the org-scoped page re-pins to it instead of 404ing behind its
+          // feature-flag guard when the selected project's org has drifted.
+          organizationSlug: organization?.slug ?? null,
         }),
       );
       return;

@@ -11,6 +11,13 @@ export interface HomeDestinationInput {
   lastVisitedHomeKind: LastVisitedHomeKind;
   /** Slug of the user's current (last-visited) project, or null if none. */
   lastProjectSlug: string | null;
+  /**
+   * Slug of the org the persona resolver ran against. Carried as `?org=<slug>`
+   * onto org-scoped governance homes (/me, /governance) so the destination
+   * page re-pins to this org instead of inheriting a drifted project's org.
+   * Null when no org is resolved (org-less bootstrap) — no param is appended.
+   */
+  organizationSlug?: string | null;
 }
 
 /**
@@ -30,7 +37,14 @@ export interface HomeDestinationInput {
  *    last-visited project's home.
  *  - With no visit history, the persona resolver's destination stands.
  */
-export function resolveHomeDestination({
+export function resolveHomeDestination(input: HomeDestinationInput): string {
+  return withOrganizationParam(
+    resolveBaseDestination(input),
+    input.organizationSlug ?? null,
+  );
+}
+
+function resolveBaseDestination({
   resolverDestination,
   isOverride,
   governanceUiEnabled,
@@ -54,4 +68,25 @@ export function resolveHomeDestination({
   }
 
   return resolverDestination;
+}
+
+/**
+ * `/me` and `/governance` are org-scoped pages that resolve their active org
+ * from `selectedOrganizationId` — which, on a fresh login, can still point at a
+ * different (non-governance) org than the one the persona resolver used to pick
+ * this destination, so the page 404s behind its feature-flag guard. Carrying
+ * the resolver's org as `?org=<slug>` lets `useOrgQueryParamSelection` re-pin
+ * the page to the right org on landing (and strip the param), matching the
+ * workspace switcher's per-org "My Workspace" links. Project homes are
+ * project-scoped and need no org hint.
+ */
+function withOrganizationParam(
+  destination: string,
+  organizationSlug: string | null,
+): string {
+  if (!organizationSlug) return destination;
+  if (destination === "/me" || destination === "/governance") {
+    return `${destination}?org=${encodeURIComponent(organizationSlug)}`;
+  }
+  return destination;
 }
