@@ -130,6 +130,9 @@ export const traceSummaryDataSchema = z.object({
   createdAt: z.number(),
   updatedAt: z.number(),
   LastEventOccurredAt: z.number(),
+  // Set at read time when computed input/output/error were teaser-redacted
+  // by the plan's visibility window (never persisted).
+  redactedByVisibilityWindow: z.boolean().optional(),
 });
 
 export type TraceSummaryData = z.infer<typeof traceSummaryDataSchema>;

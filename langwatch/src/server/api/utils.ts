@@ -6,9 +6,75 @@ import {
   TeamUserRole,
 } from "@prisma/client";
 import type { Session } from "~/server/auth";
+import { VisibilityWindowService } from "~/server/app-layer/traces/visibility-window.service";
+import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
+import { TtlCache } from "~/server/utils/ttlCache";
+import { createLogger } from "~/utils/logger/server";
+import { FREE_VISIBILITY_DAYS } from "../../../ee/licensing/constants";
 import type { Protections } from "../elasticsearch/protections";
 import { hasProjectPermission, isDemoProject } from "./rbac";
 import { getApp } from "~/server/app-layer/app";
+
+/**
+ * Cache: projectId -> visibilityDays sentinel ("none" = no window). Plan
+ * resolution is an uncached Prisma read; a short TTL keeps the per-request
+ * cost near zero while plan changes still apply within a minute. The CUTOFF
+ * itself is computed fresh per call (it moves with `now`), only the plan
+ * lookup is cached.
+ */
+const visibilityDaysCache = new TtlCache<number | "none">(
+  60 * 1000,
+  "ttlcache:visibility-days:",
+);
+
+const visibilityLogger = createLogger("langwatch:visibility-window");
+
+/**
+ * Resolves the plan-based visibility cutoff for a project's organization.
+ * Fails CLOSED: unresolvable org or plan errors apply the free-tier window
+ * (a leak is irreversible; over-blur is a refresh away).
+ */
+export async function getVisibilityCutoffMsForProject(
+  projectId: string,
+): Promise<number | null> {
+  const dayMs = 24 * 60 * 60 * 1000;
+  const failClosedCutoff = () => Date.now() - FREE_VISIBILITY_DAYS * dayMs;
+
+  const cached = await visibilityDaysCache.get(projectId);
+  if (cached !== undefined) {
+    return cached === "none" ? null : Date.now() - cached * dayMs;
+  }
+
+  try {
+    const organizationId = await resolveOrganizationId(projectId);
+    if (!organizationId) {
+      visibilityLogger.error(
+        { projectId },
+        "visibility window failing closed: project resolves to no organization",
+      );
+      return failClosedCutoff();
+    }
+    // Throws on plan-resolution failure — only real plan answers reach the
+    // cache below.
+    const cutoffMs = await new VisibilityWindowService(
+      getApp().planProvider,
+    ).getVisibilityCutoffMs({ organizationId });
+    const visibilityDays =
+      cutoffMs === null
+        ? ("none" as const)
+        : Math.round((Date.now() - cutoffMs) / dayMs);
+    await visibilityDaysCache.set(projectId, visibilityDays);
+    return cutoffMs;
+  } catch (error) {
+    // Fail-closed results are NOT cached — a transient plan-store error
+    // should not pin paying customers to the free window for the TTL.
+    visibilityLogger.error(
+      { projectId, error },
+      "visibility window failing closed: plan resolution failed",
+    );
+    return failClosedCutoff();
+  }
+}
 
 export const extractCheckKeys = (
   inputObject: Record<string, any>,
@@ -90,6 +156,10 @@ export async function getUserProtectionsForProject(
     ctx.publiclyShared ||
     (await hasProjectPermission(ctx, projectId, "cost:view"));
 
+  // The plan-based visibility window applies to every user-facing read,
+  // including public shares — sharing must not be the bypass.
+  const visibilityCutoffMs = await getVisibilityCutoffMsForProject(projectId);
+
   const project = await ctx.prisma.project.findUniqueOrThrow({
     where: { id: projectId, archivedAt: null },
     select: {
@@ -114,6 +184,7 @@ export async function getUserProtectionsForProject(
       canSeeCapturedOutput:
         project.capturedOutputVisibility ===
         ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
+      visibilityCutoffMs,
     };
   }
 
@@ -172,5 +243,6 @@ export async function getUserProtectionsForProject(
     canSeeCapturedOutput: obtainVisibilityLevel(
       project.capturedOutputVisibility,
     ),
+    visibilityCutoffMs,
   };
 }

@@ -18,6 +18,7 @@ import { useShikiAdapter } from "./markdownView/shikiAdapter";
 import { PaneLayout } from "./panes/PaneLayout";
 import { ResizeRail } from "./panes/ResizeRail";
 import { usePaneLayout } from "./panes/usePaneLayout";
+import { BlurredContentGate } from "../BlurredContentGate";
 import { ScenarioRoleProvider } from "./scenarioRoles";
 import { TraceDrawerEmptyState } from "./TraceDrawerEmptyState";
 import { TraceDrawerSkeleton } from "./TraceDrawerSkeleton";
@@ -261,6 +262,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                     minHeight={0}
                     minWidth={0}
                     direction="column"
+                    position="relative"
                     bg={{ base: "bg.surface", _dark: "bg.panel" }}
                   >
                     <ScenarioRoleProvider
@@ -347,6 +349,9 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                         />
                       )}
                     </ScenarioRoleProvider>
+                    {trace.redactedByVisibilityWindow ? (
+                      <BlurredContentGate />
+                    ) : null}
                   </Flex>
                 </PeerCursorOverlay>
               </>

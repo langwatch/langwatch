@@ -1,0 +1,133 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e5]:
+        - link [ref=e6] [cursor=pointer]:
+          - /url: /
+          - img [ref=e7]
+        - 'button "Switch workspace (current: test@langwatch.ai)" [ref=e11] [cursor=pointer]':
+          - generic [ref=e12]:
+            - generic [ref=e14]: t
+            - paragraph [ref=e15]: test@langwatch.ai
+            - img [ref=e16]
+      - generic [ref=e18]:
+        - paragraph [ref=e19]: DEV
+        - button "Open command bar" [ref=e20] [cursor=pointer]:
+          - img [ref=e21]
+          - paragraph [ref=e24]: Search
+          - generic [ref=e25]: ⌘K
+        - button "t" [ref=e26] [cursor=pointer]:
+          - generic [ref=e28]: t
+    - generic [ref=e29]:
+      - generic [ref=e32]:
+        - generic [ref=e33]:
+          - link "Home" [ref=e34] [cursor=pointer]:
+            - /url: /testlangwatchai-MdT1dr
+            - img [ref=e37]
+          - paragraph [ref=e40]
+          - link "Analytics" [ref=e41] [cursor=pointer]:
+            - /url: /testlangwatchai-MdT1dr/analytics
+            - img [ref=e44]
+          - link "Traces" [ref=e47] [cursor=pointer]:
+            - /url: /testlangwatchai-MdT1dr/messages?view=table
+            - img [ref=e50]
+          - link "Trace Explorer" [ref=e53] [cursor=pointer]:
+            - /url: /testlangwatchai-MdT1dr/traces
+            - img [ref=e56]
+          - paragraph [ref=e60]
+          - button "Expand Simulations" [ref=e63] [cursor=pointer]:
+            - img [ref=e66]
+          - link "Evaluations" [ref=e68] [cursor=pointer]:
+            - /url: /testlangwatchai-MdT1dr/evaluations
+            - img [ref=e71]
+          - link "Annotations" [ref=e74] [cursor=pointer]:
+            - /url: /testlangwatchai-MdT1dr/annotations
+            - img [ref=e77]
+          - paragraph [ref=e80]
+          - link "Prompts" [ref=e81] [cursor=pointer]:
+            - /url: /testlangwatchai-MdT1dr/prompts
+            - img [ref=e84]
+          - link "Agents" [ref=e86] [cursor=pointer]:
+            - /url: /testlangwatchai-MdT1dr/agents
+            - img [ref=e89]
+          - link "Workflows" [ref=e92] [cursor=pointer]:
+            - /url: /testlangwatchai-MdT1dr/workflows
+            - img [ref=e95]
+          - link "Evaluators" [ref=e99] [cursor=pointer]:
+            - /url: /testlangwatchai-MdT1dr/evaluators
+            - img [ref=e102]
+          - link "Datasets" [ref=e106] [cursor=pointer]:
+            - /url: /testlangwatchai-MdT1dr/datasets
+            - img [ref=e109]
+          - paragraph [ref=e111]
+          - link "AI Gateway" [ref=e112] [cursor=pointer]:
+            - /url: /settings/gateway/virtual-keys
+            - img [ref=e115]
+        - generic [ref=e122]:
+          - link "Settings" [ref=e123] [cursor=pointer]:
+            - /url: /settings
+            - img [ref=e126]
+          - generic [ref=e129]:
+            - button "Chat" [ref=e130] [cursor=pointer]:
+              - img [ref=e133]
+            - button "Support" [ref=e135] [cursor=pointer]:
+              - img [ref=e138]
+          - 'button "Current theme: light. Click to change." [ref=e146] [cursor=pointer]':
+            - img [ref=e147]
+      - generic [ref=e156]:
+        - heading "Settings" [level=1] [ref=e158]
+        - generic [ref=e159]:
+          - generic [ref=e160]:
+            - link "General Settings" [ref=e161] [cursor=pointer]:
+              - /url: /settings
+              - paragraph [ref=e163]: General Settings
+            - link "API Keys" [ref=e165] [cursor=pointer]:
+              - /url: /settings/api-keys
+              - paragraph [ref=e167]: API Keys
+            - generic [ref=e170] [cursor=pointer]:
+              - paragraph [ref=e171]: Models
+              - img [ref=e173]
+            - generic [ref=e176] [cursor=pointer]:
+              - paragraph [ref=e177]: Teams & Access
+              - img [ref=e179]
+            - generic [ref=e182] [cursor=pointer]:
+              - paragraph [ref=e183]: Features
+              - img [ref=e185]
+            - generic [ref=e187]:
+              - generic [ref=e188] [cursor=pointer]:
+                - paragraph [ref=e189]: Billing
+                - img [ref=e191]
+              - generic [ref=e193]:
+                - link "Usage & Billing" [ref=e194] [cursor=pointer]:
+                  - /url: /settings/usage
+                  - paragraph [ref=e196]: Usage & Billing
+                - link "Subscription" [ref=e198] [cursor=pointer]:
+                  - /url: /settings/subscription
+                  - paragraph [ref=e200]: Subscription
+          - generic [ref=e203]:
+            - generic [ref=e204]:
+              - heading "License" [level=2] [ref=e205]
+              - button "New License" [ref=e207] [cursor=pointer]:
+                - img [ref=e208]
+                - text: New License
+            - paragraph [ref=e209]: Manage your LangWatch license for self-hosted deployments. A valid license is required for commercial use and enables specific plan limits.
+            - generic [ref=e212]:
+              - generic [ref=e214]: ENTERPRISE
+              - generic [ref=e215]:
+                - generic [ref=e216]:
+                  - paragraph [ref=e217]: "Plan:"
+                  - paragraph [ref=e218]: Enterprise
+                - generic [ref=e219]:
+                  - paragraph [ref=e220]: "Licensed to:"
+                  - paragraph [ref=e221]: Langwatch
+                - generic [ref=e222]:
+                  - paragraph [ref=e223]: "Seats:"
+                  - paragraph [ref=e224]: 2 / 10000
+                - generic [ref=e225]:
+                  - paragraph [ref=e226]: "Expires:"
+                  - paragraph [ref=e227]: February 5, 2030
+              - generic [ref=e228]:
+                - button "Remove License" [ref=e229] [cursor=pointer]
+                - link "Contact Sales" [ref=e230] [cursor=pointer]:
+                  - /url: https://langwatch.ai/get-a-demo
+  - region "Notifications, top-end (alt+T)"
