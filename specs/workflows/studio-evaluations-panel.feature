@@ -34,3 +34,30 @@ Feature: Studio evaluations panel
       When I click the run-via-API button in the run summary footer
       Then a dialog shows a curl snippet for the workflow's evaluate endpoint
       And the snippet authenticates with the project API key header
+      And the snippet states it runs against the workflow's attached dataset
+
+    # The snippet used to hardcode a "feature_flag" placeholder, which read as
+    # the workflow's actual inputs and left authors unsure where the row data
+    # came from. The parameters now mirror the entry point's own fields, so the
+    # example is real for this workflow.
+
+    @integration
+    Scenario: The parameters example mirrors the entry point fields the dataset does not provide
+      Given the entry point declares a "feature_flag" field with no matching dataset column
+      And the entry point also declares fields that match dataset columns
+      When I open the run-via-API dialog
+      Then the parameters example includes "feature_flag" with an example value of its type
+      And the parameters example omits the entry fields that match a dataset column
+
+    @integration
+    Scenario: An image entry field gets a base64 data-url example
+      Given the entry point declares an image-typed field the dataset does not provide
+      When I open the run-via-API dialog
+      Then the parameters example shows that field with a base64 data-url value
+
+    @integration
+    Scenario: With every entry field already provided by the dataset the snippet shows an illustrative flag
+      Given every entry field matches a dataset column
+      When I open the run-via-API dialog
+      Then the parameters example shows an illustrative feature-flag value
+      And a comment explains parameters are constant per-row inputs for fields the dataset does not provide

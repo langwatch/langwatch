@@ -43,8 +43,9 @@ import { useEvaluationExecution } from "../hooks/useEvaluationExecution";
 import { useOptimizationExecution } from "../hooks/useOptimizationExecution";
 import { useRunEvalution } from "../hooks/useRunEvalution";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
-import type { Field, Signature, Workflow } from "../types/dsl";
+import type { Entry, Field, Signature, Workflow } from "../types/dsl";
 import { simpleRecordListToNodeDataset } from "../utils/datasetUtils";
+import { getWorkflowEntryOutputs } from "../utils/workflowFields";
 import { isExperimentQueryEnabled } from "./evaluationQueryEnabled";
 import { OpenFullResultsButton } from "./OpenFullResultsButton";
 import { OptimizationProgressBar } from "./ProgressToast";
@@ -193,6 +194,10 @@ export function EvaluationResults({
 
   const { stopEvaluation } = useRunEvalution();
 
+  const { getWorkflow } = useWorkflowStore(({ getWorkflow }) => ({
+    getWorkflow,
+  }));
+
   const {
     selectedRun,
     isFinished,
@@ -289,6 +294,16 @@ export function EvaluationResults({
 
   const evaluationStateRunId = evaluationState?.run_id;
 
+  const workflow = getWorkflow();
+  const entryFields = getWorkflowEntryOutputs(workflow);
+  const entryDataset = (
+    workflow.nodes.find((node) => node.type === "entry")?.data as
+      | Entry
+      | undefined
+  )?.dataset;
+  const datasetColumns =
+    entryDataset?.inline?.columnTypes.map((column) => column.name) ?? [];
+
   return (
     <HStack align="stretch" width="full" height="full" gap={0}>
       <BatchRunsSidebar
@@ -322,7 +337,14 @@ export function EvaluationResults({
             }
             actions={
               <HStack gap={2}>
-                {workflowId && <RunViaApiButton workflowId={workflowId} />}
+                {workflowId && (
+                  <RunViaApiButton
+                    workflowId={workflowId}
+                    entryFields={entryFields}
+                    datasetColumns={datasetColumns}
+                    datasetName={entryDataset?.name}
+                  />
+                )}
                 {selectedRunId_ && (
                   <OpenFullResultsButton
                     projectSlug={project.slug}
