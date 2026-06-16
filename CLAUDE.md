@@ -42,6 +42,8 @@ For per-PR / per-issue cloud environments via boxd, see `dev/docs/boxd-makefile.
 
 See `dev/docs/adr/004-docker-dev-environment.md` for architecture decisions.
 
+**Running the app outside Docker (the default for TS work):** just run `pnpm dev` from `langwatch/` (or `PORT=5570 pnpm dev` for a second instance). You never need to hunt processes by hand. If the ports are already held, `check-ports.sh` refuses to start and prints two ready-to-paste options: a free-port-slot command (`PORT=5570 pnpm dev`), and a one-liner that kills only the node processes holding those exact ports by process group (Docker and everything else are left alone). Paste whichever fits. Do not reinvent process-tree walking, `pkill -f`, or pgid hunting; the script already does it correctly and port-scoped.
+
 ### AI Gateway (Go, services/aigateway/)
 
 The gateway is a separate Go service (not in `compose.dev.yml`) that terminates
