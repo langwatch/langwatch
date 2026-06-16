@@ -61,23 +61,25 @@ describe("useRequiredSession redirect guard", () => {
     addEventListenerSpy.mockRestore();
   });
 
-  describe("when an unauthenticated user lands on a public auth route", () => {
-    /** @scenario The forgot and reset pages are reachable without signing in */
-    it("does not try to redirect /auth/forgot-password or /auth/reset-password", () => {
-      for (const route of ["/auth/forgot-password", "/auth/reset-password"]) {
-        addEventListenerSpy.mockClear();
-        routeRef.current = route;
-        render(<Probe />);
-        expect(onlineListenerCount(addEventListenerSpy)).toBe(0);
-      }
+  describe("given an unauthenticated user on an auth-required page", () => {
+    describe("when the route is a public auth route", () => {
+      /** @scenario The forgot and reset pages are reachable without signing in */
+      it("does not try to redirect /auth/forgot-password or /auth/reset-password", () => {
+        for (const route of ["/auth/forgot-password", "/auth/reset-password"]) {
+          addEventListenerSpy.mockClear();
+          routeRef.current = route;
+          render(<Probe />);
+          expect(onlineListenerCount(addEventListenerSpy)).toBe(0);
+        }
+      });
     });
-  });
 
-  describe("when an unauthenticated user lands on a genuinely protected route", () => {
-    it("reaches the sign-in redirect path", () => {
-      routeRef.current = "/some/protected/page";
-      render(<Probe />);
-      expect(onlineListenerCount(addEventListenerSpy)).toBeGreaterThan(0);
+    describe("when the route is genuinely protected", () => {
+      it("reaches the sign-in redirect path", () => {
+        routeRef.current = "/some/protected/page";
+        render(<Probe />);
+        expect(onlineListenerCount(addEventListenerSpy)).toBeGreaterThan(0);
+      });
     });
   });
 });
