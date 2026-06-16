@@ -51,11 +51,11 @@ function ForgotPasswordForm() {
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
   });
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
 
   const onSubmit = async (values: z.infer<typeof schema>) => {
-    setLoading(true);
+    setIsLoading(true);
     try {
       // BetterAuth returns a success-shaped response whether or not the email
       // is registered, and we swallow any transport error below: the form must
@@ -67,7 +67,7 @@ function ForgotPasswordForm() {
     } catch {
       // Intentionally ignored. See the neutral-confirmation note above.
     } finally {
-      setLoading(false);
+      setIsLoading(false);
       setSubmittedEmail(values.email);
     }
   };
@@ -113,7 +113,7 @@ function ForgotPasswordForm() {
               <HStack width="full" paddingTop={4}>
                 <BackToSignInLink />
                 <Spacer />
-                <Button colorPalette="orange" type="submit" loading={loading}>
+                <Button colorPalette="orange" type="submit" loading={isLoading}>
                   Send reset link
                 </Button>
               </HStack>

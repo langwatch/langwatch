@@ -58,12 +58,12 @@ function ResetPasswordForm({ token }: { token: string }) {
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
   });
-  const [loading, setLoading] = useState(false);
-  const [done, setDone] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isDone, setIsDone] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
   const onSubmit = async (values: z.infer<typeof schema>) => {
-    setLoading(true);
+    setIsLoading(true);
     setServerError(null);
     try {
       const result = await authClient.resetPassword({
@@ -74,15 +74,15 @@ function ResetPasswordForm({ token }: { token: string }) {
         setServerError(INVALID_LINK_MESSAGE);
         return;
       }
-      setDone(true);
+      setIsDone(true);
     } catch {
       setServerError(INVALID_LINK_MESSAGE);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  if (done) {
+  if (isDone) {
     return (
       <AuthCard title="Password updated">
         <Text>
@@ -148,7 +148,7 @@ function ResetPasswordForm({ token }: { token: string }) {
                   </Link>
                 </Box>
                 <Spacer />
-                <Button colorPalette="orange" type="submit" loading={loading}>
+                <Button colorPalette="orange" type="submit" loading={isLoading}>
                   Reset password
                 </Button>
               </HStack>

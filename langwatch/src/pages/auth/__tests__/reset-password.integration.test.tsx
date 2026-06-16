@@ -68,11 +68,15 @@ const passwordInputs = (container: HTMLElement) =>
     container.querySelectorAll('input[type="password"]'),
   ) as HTMLInputElement[];
 
-const fillAndSubmit = (
-  container: HTMLElement,
-  password: string,
-  confirm: string,
-) => {
+const fillAndSubmit = ({
+  container,
+  password,
+  confirm,
+}: {
+  container: HTMLElement;
+  password: string;
+  confirm: string;
+}) => {
   const [pw, confirmPw] = passwordInputs(container);
   fireEvent.change(pw!, { target: { value: password } });
   fireEvent.change(confirmPw!, { target: { value: confirm } });
@@ -97,7 +101,11 @@ describe("ResetPassword page", () => {
     /** @scenario Submitting a valid new password with a token resets it and returns to sign-in */
     it("calls resetPassword with the new password and token, then confirms with a sign-in link", async () => {
       const { container } = renderPage();
-      fillAndSubmit(container, "newsecret123", "newsecret123");
+      fillAndSubmit({
+        container,
+        password: "newsecret123",
+        confirm: "newsecret123",
+      });
 
       await waitFor(() => {
         expect(mockResetPassword).toHaveBeenCalledWith({
@@ -118,7 +126,7 @@ describe("ResetPassword page", () => {
     /** @scenario The reset form rejects passwords shorter than 8 characters */
     it("shows a length validation error and does not call the reset endpoint", async () => {
       const { container } = renderPage();
-      fillAndSubmit(container, "short", "short");
+      fillAndSubmit({ container, password: "short", confirm: "short" });
 
       // Both fields are too short, so the message renders for each.
       expect(
@@ -132,7 +140,11 @@ describe("ResetPassword page", () => {
     /** @scenario The reset form rejects a mismatched confirmation */
     it("shows a mismatch error and does not call the reset endpoint", async () => {
       const { container } = renderPage();
-      fillAndSubmit(container, "newsecret123", "different123");
+      fillAndSubmit({
+        container,
+        password: "newsecret123",
+        confirm: "different123",
+      });
 
       expect(await screen.findByText(/passwords don't match/i)).toBeTruthy();
       expect(mockResetPassword).not.toHaveBeenCalled();
@@ -148,7 +160,11 @@ describe("ResetPassword page", () => {
       });
       setToken("tok_expired");
       const { container } = renderPage();
-      fillAndSubmit(container, "newsecret123", "newsecret123");
+      fillAndSubmit({
+        container,
+        password: "newsecret123",
+        confirm: "newsecret123",
+      });
 
       expect(await screen.findByText(/invalid or has expired/i)).toBeTruthy();
       const retry = screen.getByRole("link", {

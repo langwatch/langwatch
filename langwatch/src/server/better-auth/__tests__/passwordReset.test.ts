@@ -12,6 +12,7 @@ vi.mock("../revokeSessions", () => ({
 
 import { env } from "~/env.mjs";
 import { sendResetPasswordEmail } from "../../mailer/resetPasswordEmail";
+import { auth } from "../index";
 import { revokeAllSessionsForUser } from "../revokeSessions";
 
 type EmailAndPasswordOptions = {
@@ -26,10 +27,8 @@ type EmailAndPasswordOptions = {
   resetPasswordTokenExpiresIn?: number;
 };
 
-const getEmailAndPassword = async (): Promise<EmailAndPasswordOptions> => {
-  const { auth } = await import("../index");
-  return (auth as any).options.emailAndPassword as EmailAndPasswordOptions;
-};
+const getEmailAndPassword = (): EmailAndPasswordOptions =>
+  (auth as any).options.emailAndPassword as EmailAndPasswordOptions;
 
 describe("better-auth password reset wiring", () => {
   beforeEach(() => {
@@ -39,7 +38,7 @@ describe("better-auth password reset wiring", () => {
   describe("when BetterAuth invokes sendResetPassword", () => {
     /** @scenario sendResetPassword builds the reset link from BASE_HOST and the token */
     it("emails the user a reset link rooted at BASE_HOST carrying the token", async () => {
-      const emailAndPassword = await getEmailAndPassword();
+      const emailAndPassword = getEmailAndPassword();
       expect(typeof emailAndPassword.sendResetPassword).toBe("function");
 
       await emailAndPassword.sendResetPassword!({
@@ -59,7 +58,7 @@ describe("better-auth password reset wiring", () => {
   describe("when BetterAuth invokes onPasswordReset", () => {
     /** @scenario A successful reset revokes all of the user's existing sessions */
     it("revokes every existing session for the user", async () => {
-      const emailAndPassword = await getEmailAndPassword();
+      const emailAndPassword = getEmailAndPassword();
       expect(typeof emailAndPassword.onPasswordReset).toBe("function");
 
       await emailAndPassword.onPasswordReset!({
@@ -74,16 +73,15 @@ describe("better-auth password reset wiring", () => {
   });
 
   describe("when the reset token lifetime is configured", () => {
-    it("expires reset tokens after one hour", async () => {
-      const emailAndPassword = await getEmailAndPassword();
+    it("expires reset tokens after one hour", () => {
+      const emailAndPassword = getEmailAndPassword();
       expect(emailAndPassword.resetPasswordTokenExpiresIn).toBe(60 * 60);
     });
   });
 
   describe("when the rate-limit configuration is inspected", () => {
     /** @scenario Password reset endpoints are rate-limited to five attempts per hour */
-    it("caps /request-password-reset and /reset-password at 5 per hour", async () => {
-      const { auth } = await import("../index");
+    it("caps /request-password-reset and /reset-password at 5 per hour", () => {
       const customRules = (auth as any).options.rateLimit.customRules as Record<
         string,
         { window: number; max: number }
