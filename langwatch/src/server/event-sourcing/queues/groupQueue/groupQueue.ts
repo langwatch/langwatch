@@ -6,7 +6,7 @@ import {
   TraceFlags,
 } from "@opentelemetry/api";
 import fastq from "fastq";
-import IORedis from "ioredis";
+import { Redis as IORedis } from "ioredis";
 import type { Cluster } from "ioredis";
 import { getLangWatchTracer } from "langwatch";
 import type { SemConvAttributes } from "langwatch/observability";
