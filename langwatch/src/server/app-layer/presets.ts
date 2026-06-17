@@ -3,7 +3,12 @@ import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/gove
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import type { PrismaClient } from "@prisma/client";
 import { env } from "~/env.mjs";
-import { type ClickHouseClientResolver, getClickHouseClientForProject, getSharedClickHouseClient, isClickHouseEnabled } from "~/server/clickhouse/clickhouseClient";
+import {
+  type ClickHouseClientResolver,
+  getClickHouseClientForProject,
+  getSharedClickHouseClient,
+  isClickHouseEnabled,
+} from "~/server/clickhouse/clickhouseClient";
 import { prisma as globalPrisma } from "~/server/db";
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
@@ -23,7 +28,10 @@ import { createSeatEventSubscriptionFns } from "../../../ee/billing/services/sea
 import { EESubscriptionService } from "../../../ee/billing/services/subscription.service";
 import * as subscriptionItemCalculator from "../../../ee/billing/services/subscriptionItemCalculator";
 import { StripeUsageReportingService } from "../../../ee/billing/services/usageReportingService";
-import { EEWebhookService, type WebhookService } from "../../../ee/billing/services/webhookService";
+import {
+  EEWebhookService,
+  type WebhookService,
+} from "../../../ee/billing/services/webhookService";
 import { createStripeClient } from "../../../ee/billing/stripe/stripeClient";
 import { meters } from "../../../ee/billing/stripe/stripePriceCatalog";
 import { FREE_PLAN } from "../../../ee/licensing/constants";
@@ -37,12 +45,24 @@ import { RetroactiveUpdateService } from "../data-retention/retroactive/retroact
 import { esClient, TRACE_INDEX, traceIndexId } from "../elasticsearch";
 import { EventSourcing } from "../event-sourcing";
 import type { PipelineRepositories } from "../event-sourcing/pipelineRegistry";
-import { type AppCommands, PipelineRegistry } from "../event-sourcing/pipelineRegistry";
+import {
+  type AppCommands,
+  PipelineRegistry,
+} from "../event-sourcing/pipelineRegistry";
 import { createExperimentRunItemAppendStore } from "../event-sourcing/pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
-import { ExperimentRunStateRepositoryClickHouse, ExperimentRunStateRepositoryMemory } from "../event-sourcing/pipelines/experiment-run-processing/repositories";
+import {
+  ExperimentRunStateRepositoryClickHouse,
+  ExperimentRunStateRepositoryMemory,
+} from "../event-sourcing/pipelines/experiment-run-processing/repositories";
 import type { ScenarioExecutionReactorHandle } from "../event-sourcing/pipelines/simulation-processing/reactors/scenarioExecution.reactor";
-import { SimulationRunStateRepositoryClickHouse, SimulationRunStateRepositoryMemory } from "../event-sourcing/pipelines/simulation-processing/repositories";
-import { SuiteRunStateRepositoryClickHouse, SuiteRunStateRepositoryMemory } from "../event-sourcing/pipelines/suite-run-processing/repositories";
+import {
+  SimulationRunStateRepositoryClickHouse,
+  SimulationRunStateRepositoryMemory,
+} from "../event-sourcing/pipelines/simulation-processing/repositories";
+import {
+  SuiteRunStateRepositoryClickHouse,
+  SuiteRunStateRepositoryMemory,
+} from "../event-sourcing/pipelines/suite-run-processing/repositories";
 import { ExperimentService } from "../experiments/experiment.service";
 import { InviteService } from "../invites/invite.service";
 import { OrganizationRepository } from "../repositories/organization.repository";
@@ -60,8 +80,15 @@ import { LangEvalsHttpClient } from "./clients/langevals/langevals.http.client";
 import { createRedisConnectionFromConfig } from "./clients/redis.factory";
 import { TiktokenClient } from "./clients/tokenizer/tiktoken.client";
 import { NullTokenizerClient } from "./clients/tokenizer/tokenizer.client";
-import { type AppConfig, createAppConfigFromEnv, type ProcessRole } from "./config";
-import type { AppDependencies, DataRetentionDependencies } from "./dependencies";
+import {
+  type AppConfig,
+  createAppConfigFromEnv,
+  type ProcessRole,
+} from "./config";
+import type {
+  AppDependencies,
+  DataRetentionDependencies,
+} from "./dependencies";
 import { DspyStepService } from "./dspy-steps/dspy-step.service";
 import { DspyStepClickHouseRepository } from "./dspy-steps/repositories/dspy-step.clickhouse.repository";
 import { NullDspyStepRepository } from "./dspy-steps/repositories/dspy-step.repository";
@@ -148,7 +175,9 @@ export function initializeWorkerApp(): App {
   return initializeDefaultApp({ processRole: "worker" });
 }
 
-export function initializeDefaultApp(options?: { processRole?: ProcessRole }): App {
+export function initializeDefaultApp(options?: {
+  processRole?: ProcessRole;
+}): App {
   if (globalForApp.__langwatch_app) return globalForApp.__langwatch_app;
 
   const prisma = globalPrisma;
@@ -157,18 +186,22 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const clickhouseEnabled = !!config.clickhouseUrl || isClickHouseEnabled();
 
   // Resolver: given a tenantId (projectId), returns the right ClickHouse client
-  const resolveClickHouseClient: ClickHouseClientResolver = async (tenantId: string): Promise<ClickHouseClient> => {
+  const resolveClickHouseClient: ClickHouseClientResolver = async (
+    tenantId: string,
+  ): Promise<ClickHouseClient> => {
     const client = await getClickHouseClientForProject(tenantId);
-    if (!client) throw new Error(`ClickHouse not available for tenant ${tenantId}`);
+    if (!client)
+      throw new Error(`ClickHouse not available for tenant ${tenantId}`);
     return client;
   };
 
-
-  const redis = config.skipRedis ? null : createRedisConnectionFromConfig({
-    url: config.redisUrl,
-    clusterEndpoints: config.redisClusterEndpoints,
-    db: config.redisDbIndex,
-  });
+  const redis = config.skipRedis
+    ? null
+    : createRedisConnectionFromConfig({
+        url: config.redisUrl,
+        clusterEndpoints: config.redisClusterEndpoints,
+        db: config.redisDbIndex,
+      });
 
   const broadcast = new BroadcastService(redis);
   const projects = traced(
@@ -176,7 +209,9 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     "ProjectService",
   );
   const presence = new PresenceService(
-    redis ? new RedisPresenceRepository(redis) : new InMemoryPresenceRepository(),
+    redis
+      ? new RedisPresenceRepository(redis)
+      : new InMemoryPresenceRepository(),
     broadcast,
     projects,
   );
@@ -184,13 +219,17 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
 
   const traceSummary = traced(
     new TraceSummaryService(
-      clickhouseEnabled ? new TraceSummaryClickHouseRepository(resolveClickHouseClient) : new NullTraceSummaryRepository(),
+      clickhouseEnabled
+        ? new TraceSummaryClickHouseRepository(resolveClickHouseClient)
+        : new NullTraceSummaryRepository(),
     ),
     "TraceSummaryService",
   );
   const evaluationRuns = traced(
     new EvaluationRunService(
-      clickhouseEnabled ? new EvaluationRunClickHouseRepository(resolveClickHouseClient) : new NullEvaluationRunRepository(),
+      clickhouseEnabled
+        ? new EvaluationRunClickHouseRepository(resolveClickHouseClient)
+        : new NullEvaluationRunRepository(),
     ),
     "EvaluationRunService",
   );
@@ -200,7 +239,9 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   );
   const traceList = traced(
     new TraceListService(
-      clickhouseEnabled ? new TraceListClickHouseRepository(resolveClickHouseClient) : new NullTraceListRepository(),
+      clickhouseEnabled
+        ? new TraceListClickHouseRepository(resolveClickHouseClient)
+        : new NullTraceListRepository(),
       evaluationRuns,
       topics,
     ),
@@ -239,20 +280,26 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   });
   const spanStorage = traced(
     new SpanStorageService(
-      clickhouseEnabled ? new SpanStorageClickHouseRepository(resolveClickHouseClient) : new NullSpanStorageRepository(),
+      clickhouseEnabled
+        ? new SpanStorageClickHouseRepository(resolveClickHouseClient)
+        : new NullSpanStorageRepository(),
       { blobStore, ioExtractionService },
     ),
     "SpanStorageService",
   );
   const logRecordStorage = traced(
     new LogRecordStorageService(
-      clickhouseEnabled ? new LogRecordStorageClickHouseRepository(resolveClickHouseClient) : new NullLogRecordStorageRepository(),
+      clickhouseEnabled
+        ? new LogRecordStorageClickHouseRepository(resolveClickHouseClient)
+        : new NullLogRecordStorageRepository(),
     ),
     "LogRecordStorageService",
   );
   const metricRecordStorage = traced(
     new MetricRecordStorageService(
-      clickhouseEnabled ? new MetricRecordStorageClickHouseRepository(resolveClickHouseClient) : new NullMetricRecordStorageRepository(),
+      clickhouseEnabled
+        ? new MetricRecordStorageClickHouseRepository(resolveClickHouseClient)
+        : new NullMetricRecordStorageRepository(),
     ),
     "MetricRecordStorageService",
   );
@@ -289,15 +336,24 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   // (which stamps dspy_steps as a traces-category table) and the data-retention
   // services wired further below.
   const dataRetentionPolicyRepo = new DataRetentionPolicyRepository(prisma);
-  const retentionPolicyCache = new RetentionPolicyCache(dataRetentionPolicyRepo);
+  const retentionPolicyCache = new RetentionPolicyCache(
+    dataRetentionPolicyRepo,
+  );
 
   const dspySteps = traced(
     new DspyStepService(
-      clickhouseEnabled ? new DspyStepClickHouseRepository(resolveClickHouseClient, retentionPolicyCache) : new NullDspyStepRepository(),
+      clickhouseEnabled
+        ? new DspyStepClickHouseRepository(
+            resolveClickHouseClient,
+            retentionPolicyCache,
+          )
+        : new NullDspyStepRepository(),
     ),
     "DspyStepService",
   );
-  const simulationReads = SimulationRunService.create(clickhouseEnabled ? resolveClickHouseClient : null);
+  const simulationReads = SimulationRunService.create(
+    clickhouseEnabled ? resolveClickHouseClient : null,
+  );
   // SuiteRunService is created after pipeline registration (needs startSuiteRun command)
 
   const evaluations = {
@@ -349,8 +405,14 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   let stripeClient: ReturnType<typeof createStripeClient> | undefined;
   if (config.isSaas) {
     stripeClient = createStripeClient();
-    usageReportingService = new StripeUsageReportingService({ stripe: stripeClient, meterId: meters.BILLABLE_EVENTS });
-    const seatEventFns = createSeatEventSubscriptionFns({ stripe: stripeClient, db: prisma });
+    usageReportingService = new StripeUsageReportingService({
+      stripe: stripeClient,
+      meterId: meters.BILLABLE_EVENTS,
+    });
+    const seatEventFns = createSeatEventSubscriptionFns({
+      stripe: stripeClient,
+      db: prisma,
+    });
     subscription = EESubscriptionService.create({
       stripe: stripeClient,
       db: prisma,
@@ -378,7 +440,9 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   );
   const triggers = new TriggerService(new PrismaTriggerRepository(prisma));
   const tokenizer = new TokenizerService(
-    config.disableTokenization ? new NullTokenizerClient() : new TiktokenClient(),
+    config.disableTokenization
+      ? new NullTokenizerClient()
+      : new TiktokenClient(),
   );
 
   const nurturing = config.customerIoApiKey
@@ -513,7 +577,8 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     governanceOcsfEventsSync,
   });
   const commands = registry.registerAll();
-  (globalForApp as any).__scenarioExecutionHandle = commands.scenarioExecutionHandle;
+  (globalForApp as any).__scenarioExecutionHandle =
+    commands.scenarioExecutionHandle;
 
   const suiteRunService = SuiteRunService.create({
     resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : null,
@@ -600,11 +665,16 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     close: () => Promise<void>;
   }> = [];
   if (clickhouseEnabled) {
-    const { clearCustomClientCache } = require("~/server/clickhouse/clickhouseClient");
+    const {
+      clearCustomClientCache,
+    } = require("~/server/clickhouse/clickhouseClient");
     const { closeClickHouseClient } = require("~/server/clickhouse/client");
     gracefulCloseables.push({
       name: "clickhouse",
-      close: async () => { await clearCustomClientCache(); await closeClickHouseClient(); },
+      close: async () => {
+        await clearCustomClientCache();
+        await closeClickHouseClient();
+      },
     });
   }
   if (redis) {
@@ -712,7 +782,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
   const testPinnedTraceService = new PinnedTraceService(
     new PinnedTraceRepository(testPrisma),
   );
-  const noop = async () => { };
+  const noop = async () => {
+    /* noop */
+  };
   // Clear the module-global discover broadcaster so a test app built
   // after `initializeDefaultApp` doesn't inherit the production
   // broadcaster's closure (which captured the production
@@ -729,10 +801,11 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
   };
 
   const nullOrganizations = traced(
-    new OrganizationService(
-      new NullOrganizationRepository(),
-      { seedForOrg: async () => { } } as unknown as PromptTagRepository,
-    ),
+    new OrganizationService(new NullOrganizationRepository(), {
+      seedForOrg: async () => {
+        /* noop */
+      },
+    } as unknown as PromptTagRepository),
     "OrganizationService",
   );
   const nullProjects = traced(
@@ -750,13 +823,36 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       nullProjects,
     ),
     traces: (() => {
-      const nullEvalRuns = new EvaluationRunService(new NullEvaluationRunRepository());
+      const nullEvalRuns = new EvaluationRunService(
+        new NullEvaluationRunRepository(),
+      );
       return {
-        summary: traced(new TraceSummaryService(new NullTraceSummaryRepository()), "TraceSummaryService"),
-        list: traced(new TraceListService(new NullTraceListRepository(), nullEvalRuns, new TopicService(new NullTopicRepository())), "TraceListService"),
-        spans: traced(new SpanStorageService(new NullSpanStorageRepository()), "SpanStorageService"),
-        logRecords: traced(new LogRecordStorageService(new NullLogRecordStorageRepository()), "LogRecordStorageService"),
-        metricRecords: traced(new MetricRecordStorageService(new NullMetricRecordStorageRepository()), "MetricRecordStorageService"),
+        summary: traced(
+          new TraceSummaryService(new NullTraceSummaryRepository()),
+          "TraceSummaryService",
+        ),
+        list: traced(
+          new TraceListService(
+            new NullTraceListRepository(),
+            nullEvalRuns,
+            new TopicService(new NullTopicRepository()),
+          ),
+          "TraceListService",
+        ),
+        spans: traced(
+          new SpanStorageService(new NullSpanStorageRepository()),
+          "SpanStorageService",
+        ),
+        logRecords: traced(
+          new LogRecordStorageService(new NullLogRecordStorageRepository()),
+          "LogRecordStorageService",
+        ),
+        metricRecords: traced(
+          new MetricRecordStorageService(
+            new NullMetricRecordStorageRepository(),
+          ),
+          "MetricRecordStorageService",
+        ),
         collection: traced(
           new TraceRequestCollectionService({
             dedup: createSpanDedupeService(null),
@@ -779,14 +875,24 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       };
     })(),
     evaluations: {
-      runs: traced(new EvaluationRunService(new NullEvaluationRunRepository()), "EvaluationRunService"),
-      execution: void 0 as unknown as AppDependencies["evaluations"]["execution"],
+      runs: traced(
+        new EvaluationRunService(new NullEvaluationRunRepository()),
+        "EvaluationRunService",
+      ),
+      execution:
+        void 0 as unknown as AppDependencies["evaluations"]["execution"],
     },
     dspySteps: { steps: new DspyStepService(new NullDspyStepRepository()) },
     experiments: ExperimentService.create(testPrisma),
     triggers: new TriggerService(new NullTriggerRepository()),
     simulations: { runs: SimulationRunService.create(null) },
-    suiteRuns: { runs: SuiteRunService.create({ resolveClickHouseClient: null, startSuiteRun: noop, queueSimulationRun: noop }) },
+    suiteRuns: {
+      runs: SuiteRunService.create({
+        resolveClickHouseClient: null,
+        startSuiteRun: noop,
+        queueSimulationRun: noop,
+      }),
+    },
     organizations: nullOrganizations,
     projects: nullProjects,
     tokenizer: new TokenizerService(new NullTokenizerClient()),
@@ -808,12 +914,24 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     usageLimits: UsageLimitService.createNull(),
     ops: {
       queues: new QueueService(new NullQueueRepository()),
-      eventExplorer: new EventExplorerService(new NullEventExplorerRepository()),
+      eventExplorer: new EventExplorerService(
+        new NullEventExplorerRepository(),
+      ),
       replay: new ReplayService(new NullReplayRepository()),
       metricsCollector: null,
     },
     commands: {
-      traces: { recordSpan: noop, assignTopic: noop, recordLog: noop, recordMetric: noop, resolveOrigin: noop, addAnnotation: noop, removeAnnotation: noop, bulkSyncAnnotations: noop, changeTraceName: noop } satisfies AppCommands["traces"],
+      traces: {
+        recordSpan: noop,
+        assignTopic: noop,
+        recordLog: noop,
+        recordMetric: noop,
+        resolveOrigin: noop,
+        addAnnotation: noop,
+        removeAnnotation: noop,
+        bulkSyncAnnotations: noop,
+        changeTraceName: noop,
+      } satisfies AppCommands["traces"],
       evaluations: {
         executeEvaluation: noop,
         startEvaluation: noop,
@@ -846,11 +964,25 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       billing: {
         reportUsageForMonth: noop,
       } as AppCommands["billing"],
-      scenarioExecutionHandle: { reactor: { name: "scenarioExecution", options: { runIn: ["worker"] }, handle: async () => {} }, setPool: () => {} },
+      scenarioExecutionHandle: {
+        reactor: {
+          name: "scenarioExecution",
+          options: { runIn: ["worker"] },
+          handle: async () => {
+            /* noop */
+          },
+        },
+        setPool: () => {
+          /* noop */
+        },
+      },
     },
     retentionPolicyCache: testRetentionPolicyCache,
     dataRetention: {
-      policy: new DataRetentionPolicyService(testRetentionPolicyRepo, testRetentionPolicyCache),
+      policy: new DataRetentionPolicyService(
+        testRetentionPolicyRepo,
+        testRetentionPolicyCache,
+      ),
       pinning: testPinnedTraceService,
       retroactive: new RetroactiveUpdateService(null),
       metering: new StorageMeterService(null),
