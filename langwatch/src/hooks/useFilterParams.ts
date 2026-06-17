@@ -1,5 +1,6 @@
-import { useRouter } from "~/utils/compat/next-router";
 import qs from "qs";
+import { useRouter } from "~/utils/compat/next-router";
+import { URL_QS_PARSE_OPTIONS } from "~/utils/qsParseOptions";
 import { usePeriodSelector } from "../components/PeriodSelector";
 import { filterOutEmptyFilters } from "../server/analytics/utils";
 import { availableFilters } from "../server/filters/registry";
@@ -22,11 +23,10 @@ export const useFilterParams = () => {
   const filters: Partial<Record<FilterField, FilterParam>> = {};
 
   const queryString = router.asPath.split("?")[1] ?? "";
-  const queryParams = qs.parse(queryString.replaceAll("%2C", ","), {
-    allowDots: true,
-    comma: true,
-    allowEmptyArrays: true,
-  });
+  const queryParams = qs.parse(
+    queryString.replaceAll("%2C", ","),
+    URL_QS_PARSE_OPTIONS,
+  );
 
   for (const [filterKey, filter] of Object.entries(availableFilters)) {
     const param = queryParams[filter.urlKey];
@@ -88,9 +88,7 @@ export const useFilterParams = () => {
   if (!hasUrlFilterOrDateParams && project?.id) {
     try {
       const viewId =
-        localStorage.getItem(
-          `langwatch-saved-views-selected-${project.id}`,
-        ) ??
+        localStorage.getItem(`langwatch-saved-views-selected-${project.id}`) ??
         localStorage.getItem(`langwatch-selected-view-${project.id}`);
 
       if (viewId && viewId !== "all-traces") {
@@ -140,11 +138,7 @@ export const useFilterParams = () => {
     const routeParams = Object.fromEntries(
       Object.entries(router.query).filter(([key]) => pathParamKeys.has(key)),
     );
-    const parsed = qs.parse(newQs, {
-      allowDots: true,
-      comma: true,
-      allowEmptyArrays: true,
-    });
+    const parsed = qs.parse(newQs, URL_QS_PARSE_OPTIONS);
     void router.push(
       { pathname: router.pathname, query: { ...routeParams, ...parsed } },
       currentPath + "?" + newQs,
@@ -166,8 +160,7 @@ export const useFilterParams = () => {
         {
           ...Object.fromEntries(
             Object.entries(queryParams).filter(
-              ([key]) =>
-                key !== filterUrl && !key.startsWith(filterUrl + "."),
+              ([key]) => key !== filterUrl && !key.startsWith(filterUrl + "."),
             ),
           ),
           [filterUrl]: params,

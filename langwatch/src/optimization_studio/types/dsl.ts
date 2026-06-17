@@ -3,8 +3,8 @@ import { z } from "zod";
 
 import type { LocalPromptConfig } from "~/experiments-v3/types";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
-import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
 import { FieldMappingSchema } from "~/server/scenarios/execution/types";
+import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
 
 import { datasetColumnTypeSchema } from "../../server/datasets/types";
 import type { ChatMessage } from "../../server/tracer/types";
@@ -48,7 +48,10 @@ export type ExecutionStatus =
   | "waiting"
   | "running"
   | "success"
-  | "error";
+  | "error"
+  // The node sat behind an if/else branch that was not taken - never
+  // dispatched, zero cost.
+  | "skipped";
 
 export type ComponentType =
   | "entry"
@@ -60,7 +63,11 @@ export type ComponentType =
   | "custom"
   | "evaluator"
   | "http"
-  | "agent";
+  | "agent"
+  // Conditional gate: evaluates a Liquid expression over its inputs
+  // and routes execution down the true or false branch handle; the
+  // engine skips nodes hanging off the not-taken branch.
+  | "if_else";
 
 // Define the execution state type
 export interface ExecutionState {
@@ -247,6 +254,10 @@ export type Entry = BaseComponent & {
   test_size: number;
   seed: number;
   dataset?: NodeDataset;
+  /** Values from the last run-until-here dialog submission, used to
+   *  prefill the next one. Persisted with the workflow like any node
+   *  data. */
+  manual_run_values?: Record<string, string>;
 };
 
 export type Evaluator = Omit<BaseComponent, "cls"> & {

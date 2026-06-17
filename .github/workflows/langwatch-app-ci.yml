@@ -291,6 +291,9 @@ jobs:
         with:
           reporter: github-pr-review
           fail_level: error
+          # The action resolves the Biome version (from the lockfile) and runs
+          # Biome inside workdir, so biome_flags paths are relative to it.
+          workdir: langwatch
           biome_flags: "./src"
 
       - name: Notify Slack on failure

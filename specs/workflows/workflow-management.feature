@@ -67,3 +67,20 @@ Feature: Workflow Management UI
     When I interact with the confirmation input using keyboard
     Then keyboard events should not bubble to the parent Link
     And no navigation should be triggered
+
+  # ============================================================================
+  # Version description autogeneration
+  # ============================================================================
+
+  # Customer context: while publishing an evaluator, the AI description
+  # autogen failed and an error toast appeared mid-flow, reading as if
+  # the publish itself had failed and needing to be explained away. The
+  # autogen only prefills a field the user can type into either way.
+
+  @unit @unimplemented
+  Scenario: Version description autogen failure falls back silently
+    Given I commit a new workflow version
+    And the AI description autogeneration fails
+    Then no error toast is shown
+    And the description falls back to "autosaved" or stays empty for manual input
+    And the commit proceeds normally

@@ -12,7 +12,8 @@ import { createInnerTRPCContext } from "../../trpc";
 
 // Mock license enforcement to avoid limits during tests
 vi.mock("../../../license-enforcement", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../license-enforcement")>();
+  const actual =
+    await importOriginal<typeof import("../../../license-enforcement")>();
   return {
     ...actual,
     enforceLicenseLimit: vi.fn(),
@@ -150,6 +151,75 @@ describe("Evaluators Endpoints", () => {
           workflowId,
         }),
       ).rejects.toThrow(/already exists for this workflow/);
+    });
+
+    /** @scenario Create a code evaluator from the drawer */
+    it("creates a code evaluator with the code in its config and no workflow record", async () => {
+      const workflowCountBefore = await prisma.workflow.count();
+
+      const result = await caller.evaluators.create({
+        projectId,
+        name: "My Code Evaluator",
+        type: "code",
+        config: {
+          code: 'class Code:\n    def __call__(self, output: str):\n        return {"passed": True}\n',
+          inputs: [{ identifier: "output", type: "str" }],
+          outputs: [{ identifier: "passed", type: "bool" }],
+        },
+      });
+
+      expect(result.type).toBe("code");
+      expect(result.workflowId).toBeNull();
+      expect((result.config as { code: string }).code).toContain("class Code");
+
+      const workflowCountAfter = await prisma.workflow.count();
+      expect(workflowCountAfter).toBe(workflowCountBefore);
+    });
+
+    /** @scenario Create a code evaluator from the drawer */
+    it("rejects a code evaluator with an invalid config", async () => {
+      await expect(
+        caller.evaluators.create({
+          projectId,
+          name: "Broken Code Evaluator",
+          type: "code",
+          config: { inputs: [], outputs: [] },
+        }),
+      ).rejects.toThrow(/code, inputs, and outputs/);
+    });
+
+    /** @scenario Code evaluator inputs drive the mapping UI */
+    it("computes code evaluator fields from its config", async () => {
+      const created = await caller.evaluators.create({
+        projectId,
+        name: "Fields Code Evaluator",
+        type: "code",
+        config: {
+          code: 'class Code:\n    def __call__(self, output: str, expected_output: str):\n        return {"passed": True, "score": 1.0}\n',
+          inputs: [
+            { identifier: "output", type: "str" },
+            { identifier: "expected_output", type: "str" },
+          ],
+          outputs: [
+            { identifier: "passed", type: "bool" },
+            { identifier: "score", type: "float" },
+          ],
+        },
+      });
+
+      const fetched = await caller.evaluators.getById({
+        id: created.id,
+        projectId,
+      });
+
+      expect(fetched?.fields.map((f) => f.identifier)).toEqual([
+        "output",
+        "expected_output",
+      ]);
+      expect(fetched?.outputFields.map((f) => f.identifier)).toEqual([
+        "passed",
+        "score",
+      ]);
     });
   });
 
@@ -443,7 +513,9 @@ describe("Evaluators Endpoints", () => {
       const targetCopy = copies.find((c) => c.projectId === targetProjectId);
       expect(targetCopy).toBeDefined();
       expect(targetCopy!.projectId).toBe(targetProjectId);
-      expect((targetCopy!.fullPath as string).includes("Test Project Copy Target")).toBe(true);
+      expect(
+        (targetCopy!.fullPath as string).includes("Test Project Copy Target"),
+      ).toBe(true);
     });
 
     it("pushToCopies updates selected copies with source name and config", async () => {
@@ -480,7 +552,10 @@ describe("Evaluators Endpoints", () => {
         projectId: targetProjectId,
       });
       expect(copyAfter?.name).toBe("Push Source Updated");
-      expect(copyAfter?.config).toMatchObject({ evaluatorType: "test", value: 2 });
+      expect(copyAfter?.config).toMatchObject({
+        evaluatorType: "test",
+        value: 2,
+      });
     });
 
     it("syncFromSource updates a copy from its source", async () => {
@@ -516,7 +591,10 @@ describe("Evaluators Endpoints", () => {
         projectId: targetProjectId,
       });
       expect(copyAfter?.name).toBe("Sync Source Synced");
-      expect(copyAfter?.config).toMatchObject({ evaluatorType: "test", v: "synced" });
+      expect(copyAfter?.config).toMatchObject({
+        evaluatorType: "test",
+        v: "synced",
+      });
     });
   });
 });

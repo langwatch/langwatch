@@ -91,3 +91,9 @@ Feature: Prompt/Messages Editing Modes
     Then I see the Prompt/Messages toggle
     When I open the prompt editor in the Playground
     Then I see the Prompt/Messages toggle
+
+  @integration
+  Scenario: The mode title reads as clickable without hovering
+    When I open the prompt editor
+    Then the "Prompt" section title shows a chevron-down icon
+    And the chevron is visible before any hover

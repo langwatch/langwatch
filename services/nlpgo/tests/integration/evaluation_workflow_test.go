@@ -234,6 +234,108 @@ func TestEvaluationWorkflow_PostsBatchResultsToLangWatch(t *testing.T) {
 	}
 }
 
+// TestEvaluationWorkflow_RowTraceIDsResolveToExportedSpans - the
+// "Trace not found" customer bug on evaluate runs: each result row
+// recorded a per-row ULID as trace_id, but no exported span ever
+// carried that id (ingestion does not re-home spans by the
+// langwatch.trace_id attribute), so every "view trace" link from the
+// results table 404'd. The engine now pins a real W3C trace id per row
+// through the context-aware ID generator and records that same id on
+// the row - these assertions tie the two ends together.
+/** @scenario Result rows from a workflow evaluate run link to a resolvable trace */
+func TestEvaluationWorkflow_RowTraceIDsResolveToExportedSpans(t *testing.T) {
+	rec := installProductionTracerStack(t)
+	url, captured, mu := setupEvaluationStack(t)
+
+	envelope := `{
+	  "type": "execute_evaluation",
+	  "payload": {
+	    "trace_id": "trace_eval_spans",
+	    "run_id": "run_eval_spans",
+	    "workflow_version_id": "wfv_1",
+	    "evaluate_on": "full",
+	    "origin": "evaluation",
+	    "workflow": {
+	      "workflow_id": "wf_eval",
+	      "api_key": "sk-token",
+	      "spec_version": "1.3",
+	      "name": "Eval Demo",
+	      "icon": "x",
+	      "description": "x",
+	      "version": "x",
+	      "template_adapter": "default",
+	      "enable_tracing": true,
+	      "nodes": [
+	        {"id":"entry","type":"entry","data":{
+	          "outputs":[
+	            {"identifier":"input","type":"str"},
+	            {"identifier":"output","type":"str"}
+	          ],
+	          "dataset":{"inline":{"records":{"input":["hello","world"],"output":["hello","world"]}}},
+	          "train_size":1.0,"test_size":0.0,"seed":1
+	        }},
+	        {"id":"eval","type":"evaluator","data":{
+	          "evaluator":"langevals/exact_match"
+	        }},
+	        {"id":"end","type":"end","data":{}}
+	      ],
+	      "edges": [
+	        {"id":"e1","source":"entry","sourceHandle":"outputs.input","target":"eval","targetHandle":"inputs.input","type":"default"},
+	        {"id":"e2","source":"entry","sourceHandle":"outputs.output","target":"eval","targetHandle":"inputs.output","type":"default"},
+	        {"id":"e3","source":"eval","sourceHandle":"any","target":"end","targetHandle":"any","type":"default"}
+	      ],
+	      "state": {}
+	    }
+	  }
+	}`
+
+	req, err := http.NewRequest(http.MethodPost, url+"/go/studio/execute", bytes.NewBufferString(envelope))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-LangWatch-Origin", "evaluation")
+	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	readSSE(t, resp.Body, func(f streamFrame) bool { return f.Event == "done" })
+
+	// Collect the per-row trace ids the batch recorded - what the
+	// results table's "view trace" will look up.
+	mu.Lock()
+	rowTraceIDs := []string{}
+	for i := range *captured {
+		r := (*captured)[i]
+		if r.path != "/api/evaluations/batch/log_results" {
+			continue
+		}
+		ds, _ := r.body["dataset"].([]any)
+		// Reset on every batch post - the FINAL batch carries all rows;
+		// progress posts are prefixes of it.
+		rowTraceIDs = rowTraceIDs[:0]
+		for _, raw := range ds {
+			row, _ := raw.(map[string]any)
+			if tid, ok := row["trace_id"].(string); ok && tid != "" {
+				rowTraceIDs = append(rowTraceIDs, tid)
+			}
+		}
+	}
+	mu.Unlock()
+	require.Len(t, rowTraceIDs, 2, "both rows must record a trace_id")
+
+	exported := map[string]bool{}
+	for _, span := range rec.Ended() {
+		exported[span.SpanContext().TraceID().String()] = true
+	}
+	for _, tid := range rowTraceIDs {
+		assert.Len(t, tid, 32, "row trace_id must be a W3C trace id, got %q", tid)
+		assert.True(t, exported[tid],
+			"row trace_id %q must match an exported span's trace id - otherwise the trace view 404s",
+			tid)
+	}
+	// Distinct rows → distinct traces (one trace per evaluated row).
+	assert.NotEqual(t, rowTraceIDs[0], rowTraceIDs[1])
+}
+
 // TestEvaluationWorkflow_NonInlineDatasetReturnsActionableError —
 // defensive guard for when Studio's loadDatasets() somehow fails to
 // inline a saved dataset before forwarding to nlpgo. Originally the

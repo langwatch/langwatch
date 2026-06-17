@@ -56,7 +56,10 @@ describe("getEvaluatorDataForParams coercion", () => {
     });
 
     it("JSON-stringifies arrays on output", () => {
-      const result = evaluate({ output: [1, 2, 3], expected_output: "[1,2,3]" });
+      const result = evaluate({
+        output: [1, 2, 3],
+        expected_output: "[1,2,3]",
+      });
       if (result.type !== "default") throw new Error("unreachable");
       expect(result.data.output).toBe("[1,2,3]");
     });
@@ -92,6 +95,20 @@ describe("getEvaluatorDataForParams coercion", () => {
   describe("when checkType is a custom evaluator", () => {
     it("passes params through without coercion (custom evaluators self-validate)", () => {
       const result = getEvaluatorDataForParams("custom/wf_123", {
+        output: true,
+        expected_output: 1,
+      });
+      expect(result.type).toBe("custom");
+      if (result.type !== "custom") throw new Error("unreachable");
+      expect(result.data.output).toBe(true);
+      expect(result.data.expected_output).toBe(1);
+    });
+  });
+
+  describe("when checkType is a code evaluator", () => {
+    /** @scenario Code evaluator executes through the engine code component */
+    it("passes params through without coercion (the code declares its own inputs)", () => {
+      const result = getEvaluatorDataForParams("code/evaluator_abc", {
         output: true,
         expected_output: 1,
       });

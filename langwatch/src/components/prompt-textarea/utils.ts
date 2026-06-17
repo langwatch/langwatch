@@ -38,6 +38,29 @@ export const findUnclosedBraces = (
   return { start: lastOpenBrace, query };
 };
 
+/**
+ * Find a fully-typed `{{variable}}` ending exactly at the cursor.
+ *
+ * Typing the final closing brace makes `findUnclosedBraces` return null,
+ * which used to dismiss the insertion menu at the exact moment the user
+ * finished typing the name they wanted to create. Detecting the
+ * just-completed token lets the menu stay open and keep offering
+ * "Create variable" for unknown names. `start` follows the same
+ * convention as `findUnclosedBraces` (position right after `{{`).
+ */
+export const findJustCompletedVariable = (
+  text: string,
+  cursorPos: number,
+): { start: number; name: string } | null => {
+  const textBeforeCursor = text.substring(0, cursorPos);
+  const match = /\{\{\s*([A-Za-z_]\w*)\s*\}\}$/.exec(textBeforeCursor);
+  if (!match) return null;
+  return {
+    start: match.index + 2,
+    name: match[1]!,
+  };
+};
+
 /** Find unclosed {% before cursor position for triggering the logic menu.
  *  Returns { start, query } where start is the position after {%
  *  and query is the trimmed keyword being typed.
@@ -148,8 +171,13 @@ export const setTextareaValueUndoable = (
 
   // Use execCommand to replace - this is tracked by browser undo stack
   // Note: execCommand is deprecated but still works and is the only way
-  // to integrate with the native undo stack
-  document.execCommand("insertText", false, newValue);
+  // to integrate with the native undo stack. jsdom doesn't implement it,
+  // so fall back to a direct value write there (no native undo in tests).
+  if (typeof document.execCommand === "function") {
+    document.execCommand("insertText", false, newValue);
+  } else {
+    textarea.value = newValue;
+  }
 
   // Set cursor position if provided
   if (cursorPosition !== undefined) {

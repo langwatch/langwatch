@@ -2011,6 +2011,25 @@ export class GroupStagingScripts {
   }
 
   /**
+   * Earliest dispatch-after score in the ready set, or null when empty.
+   * The dispatcher clamps its BRPOP fallback to this so groups staged
+   * with a dispatch delay wake when due: their send-time signals fire
+   * (and get drained) while the job is still inside its delay window,
+   * and nothing re-signals at the due time.
+   */
+  async getEarliestReadyScore(): Promise<number | null> {
+    const result = await this.redis.zrange(
+      `${this.keyPrefix}ready`,
+      0,
+      0,
+      "WITHSCORES",
+    );
+    if (result.length < 2) return null;
+    const score = Number(result[1]);
+    return Number.isFinite(score) ? score : null;
+  }
+
+  /**
    * Get the key prefix for metrics/recovery scans.
    */
   getKeyPrefix(): string {

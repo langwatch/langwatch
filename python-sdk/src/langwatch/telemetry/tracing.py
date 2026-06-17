@@ -5,7 +5,7 @@ from uuid import UUID
 import httpx
 import threading
 from deprecated import deprecated
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 from langwatch.attributes import AttributeKey
 from langwatch.utils.auth import build_auth_headers
 from langwatch.utils.exceptions import better_raise_for_status
@@ -61,8 +61,19 @@ __all__ = ["trace", "LangWatchTrace"]
 
 T = TypeVar("T", bound=Callable[..., Any])
 
+def _is_transient_error(error: BaseException) -> bool:
+    """Network blips and server 5xx responses are retryable; client 4xx
+    responses are real answers and must surface immediately."""
+    if isinstance(error, (httpx.TimeoutException, httpx.ConnectError)):
+        return True
+    return (
+        isinstance(error, httpx.HTTPStatusError)
+        and error.response.status_code >= 500
+    )
+
+
 _retry_on_transient = retry(
-    retry=retry_if_exception_type((httpx.TimeoutException, httpx.ConnectError)),
+    retry=retry_if_exception(_is_transient_error),
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=2, max=10),
     reraise=True,

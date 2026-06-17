@@ -549,4 +549,156 @@ describe("PromptTextAreaWithVariables", () => {
       expect(screen.getByDisplayValue("Hello world")).toBeInTheDocument();
     });
   });
+
+  describe("when typing the closing braces of an unknown variable", () => {
+    /** @scenario Create suggestion persists after typing the closing braces */
+    it("keeps the insertion menu open offering create", async () => {
+      const onCreateVariable = vi.fn();
+      renderComponent({
+        variables: [],
+        onCreateVariable,
+        availableSources: [],
+      });
+
+      const textarea = screen.getByRole("textbox");
+      fireEvent.change(textarea, {
+        target: { value: "{{myvar}}", selectionStart: 9 },
+      });
+
+      expect(await screen.findByText(/Create variable/)).toBeInTheDocument();
+    });
+
+    /** @scenario Creating from the persisted menu fixes the reference */
+    it("creates the variable from the persisted menu", async () => {
+      const onCreateVariable = vi.fn();
+      renderComponent({
+        variables: [],
+        onCreateVariable,
+        availableSources: [],
+      });
+
+      const textarea = screen.getByRole("textbox");
+      fireEvent.change(textarea, {
+        target: { value: "{{myvar}}", selectionStart: 9 },
+      });
+
+      const createOption = await screen.findByText(/Create variable/);
+      fireEvent.click(createOption);
+
+      expect(onCreateVariable).toHaveBeenCalledWith({
+        identifier: "myvar",
+        type: "str",
+      });
+      await waitFor(() => {
+        expect(screen.queryByText(/Create variable/)).not.toBeInTheDocument();
+      });
+    });
+
+    /** @scenario Menu does not persist for known variables after closing braces */
+    it("closes the menu after completing a known variable", async () => {
+      const onCreateVariable = vi.fn();
+      renderComponent({
+        variables: mockVariables,
+        onCreateVariable,
+        availableSources: [],
+      });
+
+      const textarea = screen.getByRole("textbox");
+      fireEvent.change(textarea, {
+        target: { value: "{{question}}", selectionStart: 12 },
+      });
+
+      // Defer past the menu's setTimeout(0) open window
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(screen.queryByText(/Create variable/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the prompt references undefined variables", () => {
+    /** @scenario Variable-not-found banner offers a Create action */
+    it("shows the banner with a Create button for the first missing variable", () => {
+      renderComponent({
+        value: "Judge this: {{response}}",
+        variables: [],
+        onCreateVariable: vi.fn(),
+      });
+
+      const banner = screen.getByTestId("undefined-variables-banner");
+      expect(banner).toHaveTextContent("Undefined variables: response");
+      expect(
+        screen.getByTestId("create-missing-variable-button"),
+      ).toHaveTextContent('Create "response"');
+    });
+
+    /** @scenario Create button defines the missing variable */
+    it("creates the missing variable when the Create button is clicked", () => {
+      const onCreateVariable = vi.fn();
+      renderComponent({
+        value: "Judge this: {{response}}",
+        variables: [],
+        onCreateVariable,
+      });
+
+      fireEvent.click(screen.getByTestId("create-missing-variable-button"));
+
+      expect(onCreateVariable).toHaveBeenCalledWith({
+        identifier: "response",
+        type: "str",
+      });
+    });
+
+    /** @scenario Create resolves one missing variable at a time */
+    it("creates only the first missing variable when several are missing", () => {
+      const onCreateVariable = vi.fn();
+      renderComponent({
+        value: "{{query}} with {{context}}",
+        variables: [],
+        onCreateVariable,
+      });
+
+      fireEvent.click(screen.getByTestId("create-missing-variable-button"));
+
+      expect(onCreateVariable).toHaveBeenCalledTimes(1);
+      expect(onCreateVariable).toHaveBeenCalledWith({
+        identifier: "query",
+        type: "str",
+      });
+    });
+
+    it("hides the Create button when no creation callback is provided", () => {
+      renderComponent({
+        value: "Judge this: {{response}}",
+        variables: [],
+      });
+
+      expect(
+        screen.getByTestId("undefined-variables-banner"),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId("create-missing-variable-button"),
+      ).not.toBeInTheDocument();
+    });
+
+    /** @scenario Error banner never covers the last line of the prompt */
+    it("reserves bottom padding on the textarea while the banner shows, including on focus", () => {
+      renderComponent({
+        value: "line one\n{{missing}}",
+        variables: [],
+        onCreateVariable: vi.fn(),
+      });
+
+      const textarea = screen.getByRole("textbox");
+      // jsdom reports offsetHeight 0, so the 28px floor applies.
+      expect(textarea.style.paddingBottom).toBe("28px");
+
+      // Focusing rewrites the padding shorthand for the thicker border -
+      // the banner reservation must survive it (this was the bug: the
+      // last line was only covered while actually typing).
+      fireEvent.focus(textarea);
+      expect(textarea.style.paddingBottom).toBe("28px");
+
+      fireEvent.blur(textarea);
+      expect(textarea.style.paddingBottom).toBe("28px");
+    });
+  });
 });

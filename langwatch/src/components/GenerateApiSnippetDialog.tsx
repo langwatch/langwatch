@@ -43,8 +43,9 @@ export function GenerateApiSnippetDialog({
   children,
 }: GenerateApiSnippetProps) {
   const { open, onOpen, onClose } = useDisclosure();
-  const [selectedTarget, setSelectedTarget] =
-    useState<Target>("python_python3");
+  const [selectedTarget, setSelectedTarget] = useState<Target>(
+    targets[0] ?? "python_python3",
+  );
   const [selectedSnippet, setSelectedSnippet] = useState<Snippet | undefined>(
     snippets[0],
   );

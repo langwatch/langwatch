@@ -44,6 +44,7 @@ vi.mock("../hooks/useTargetName", () => ({
 vi.mock("../hooks/useEvaluatorName", () => ({
   useEvaluatorName: () => "My Custom Evaluator",
   useEvaluatorNames: () => new Map(),
+  useCodeEvaluatorIds: () => new Set(),
 }));
 
 import { EvaluationsV3Table } from "../components/EvaluationsV3Table";
