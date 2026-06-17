@@ -75,9 +75,7 @@ describe("PrivacyDroppedNotice", () => {
           <PrivacyDroppedNotice categories={["input"]} />
         </Wrapper>,
       );
-      const link = container.querySelector(
-        'a[href="/settings/data-privacy"]',
-      );
+      const link = container.querySelector('a[href="/settings/data-privacy"]');
       expect(link?.textContent).toBe("Privacy settings");
     });
 

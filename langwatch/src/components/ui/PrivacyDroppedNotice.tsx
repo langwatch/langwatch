@@ -1,6 +1,6 @@
 import { Alert, Button } from "@chakra-ui/react";
-import NextLink from "~/utils/compat/next-link";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import NextLink from "~/utils/compat/next-link";
 
 /**
  * Banner shown when a trace is missing content because a `drop` privacy policy
@@ -24,7 +24,9 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 function describeCategories(categories: string[]): string {
-  const labels = categories.map((category) => CATEGORY_LABELS[category] ?? category);
+  const labels = categories.map(
+    (category) => CATEGORY_LABELS[category] ?? category,
+  );
   if (labels.length === 1) return labels[0]!;
   if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
   return `${labels.slice(0, -1).join(", ")}, and ${labels[labels.length - 1]}`;

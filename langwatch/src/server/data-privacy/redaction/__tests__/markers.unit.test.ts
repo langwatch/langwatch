@@ -41,9 +41,9 @@ describe("redaction markers", () => {
     });
 
     it("ignores bracketed text that is not a known entity", () => {
-      expect(findRedactionMarkers("[INFO] starting <html> [REDACTED]").size).toBe(
-        0,
-      );
+      expect(
+        findRedactionMarkers("[INFO] starting <html> [REDACTED]").size,
+      ).toBe(0);
       expect(hasRedactionMarker("[INFO] nothing here")).toBe(false);
     });
   });

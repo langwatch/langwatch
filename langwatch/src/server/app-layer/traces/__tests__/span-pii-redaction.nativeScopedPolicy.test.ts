@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   EMPTY_AUDIENCE,
-  PLATFORM_DEFAULT_DATA_PRIVACY,
   type PiiLevel,
+  PLATFORM_DEFAULT_DATA_PRIVACY,
   type ResolvedDataPrivacy,
 } from "~/server/data-privacy/dataPrivacy.types";
 import type {
@@ -69,7 +69,9 @@ function spanWith(attributes: Record<string, string>): OtlpSpan {
 }
 
 function attr(span: OtlpSpan, key: string): string | undefined {
-  return span.attributes.find((a) => a.key === key)?.value.stringValue ?? undefined;
+  return (
+    span.attributes.find((a) => a.key === key)?.value.stringValue ?? undefined
+  );
 }
 
 function makeService(policy: ResolvedDataPrivacy) {
@@ -96,8 +98,7 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
     it("redacts a leaked modern OpenAI project key natively with no analysis-service call", async () => {
       const { service, batchSpy } = makeService(PLATFORM_DEFAULT_DATA_PRIVACY);
       // Modern base64url key: `_` and `-` mid-body, no inner word boundary.
-      const key =
-        "sk-proj-aB3dEf_gHi-jKlMnOpQrStUvWx0123456789xYaB-cD_eF";
+      const key = "sk-proj-aB3dEf_gHi-jKlMnOpQrStUvWx0123456789xYaB-cD_eF";
       const span = spanWith({ input: `my key is ${key} thanks` });
 
       await service.redactSpan(span, null, "ESSENTIAL", TENANT);
@@ -225,7 +226,9 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
   describe("given the strict PII level", () => {
     /** @scenario Strict level redacts names using the analysis service */
     it("sends content to the analysis-service batch", async () => {
-      const { service, batchSpy } = makeService(mkPolicy({ piiLevel: "strict" }));
+      const { service, batchSpy } = makeService(
+        mkPolicy({ piiLevel: "strict" }),
+      );
       const span = spanWith({ input: "My name is Alexander Hamilton." });
 
       await service.redactSpan(span, null, "ESSENTIAL", TENANT);
@@ -268,7 +271,9 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
   describe("given PII redaction disabled", () => {
     /** @scenario Disabling PII keeps personal data */
     it("keeps an email address while secrets stay scrubbed", async () => {
-      const { service, batchSpy } = makeService(mkPolicy({ piiLevel: "disabled" }));
+      const { service, batchSpy } = makeService(
+        mkPolicy({ piiLevel: "disabled" }),
+      );
       const span = spanWith({ input: "contact jane@example.com please" });
 
       await service.redactSpan(span, null, "ESSENTIAL", TENANT);

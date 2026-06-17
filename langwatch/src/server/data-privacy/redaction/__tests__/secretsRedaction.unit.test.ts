@@ -100,8 +100,7 @@ describe("redactSecretsInText", () => {
     it("redacts the whole key, not just a leading alphanumeric run", () => {
       // `_` and `-` mid-body, and the body has no inner word boundary: the
       // shape that slipped past the old `sk-(?:proj-)?[A-Za-z0-9]{20,}\b` rule.
-      const key =
-        "sk-proj-aB3dEf_gHi-jKlMnOpQrStUvWx0123456789xYaB-cD_eF";
+      const key = "sk-proj-aB3dEf_gHi-jKlMnOpQrStUvWx0123456789xYaB-cD_eF";
       const { text } = redact(`here is my key ${key} thanks`);
       expect(text).toBe("here is my key [SECRET] thanks");
       expect(text).not.toContain("sk-proj-");
@@ -180,8 +179,7 @@ describe("BUILTIN_SECRET_RULES", () => {
 describe("detectSecretsInText", () => {
   describe("given text with a provider key", () => {
     it("reports the rule that matched and where, without altering the text", () => {
-      const input =
-        "key sk-proj-aB3dEf_gHi-jKlMnOpQrStUvWx0123456789xY here";
+      const input = "key sk-proj-aB3dEf_gHi-jKlMnOpQrStUvWx0123456789xY here";
       const matches = detectSecretsInText({ text: input });
       expect(matches).toHaveLength(1);
       expect(matches[0]!.ruleId).toBe("provider_api_key");
@@ -220,9 +218,9 @@ describe("detectSecretsInText", () => {
 
   describe("given already-redacted text carrying a [SECRET] marker", () => {
     it("does not re-detect the marker as a secret", () => {
-      expect(
-        detectSecretsInText({ text: "authorization: [SECRET]" }),
-      ).toEqual([]);
+      expect(detectSecretsInText({ text: "authorization: [SECRET]" })).toEqual(
+        [],
+      );
     });
   });
 });

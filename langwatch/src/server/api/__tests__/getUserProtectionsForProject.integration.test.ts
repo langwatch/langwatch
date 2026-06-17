@@ -18,8 +18,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import type { Session } from "~/server/auth";
 import { getTestProject } from "../../../utils/testUtils";
-import { prisma } from "../../db";
 import { getDataPrivacyPolicyService } from "../../data-privacy/dataPrivacyPolicy.service";
+import { prisma } from "../../db";
 import { getUserProtectionsForProject } from "../utils";
 
 const NAMESPACE = "dataprivacy-visibility";
@@ -53,8 +53,16 @@ describe("getUserProtectionsForProject audience-aware visibility", () => {
     memberUserId = member.id;
     await prisma.organizationUser.createMany({
       data: [
-        { userId: adminUserId, organizationId, role: OrganizationUserRole.ADMIN },
-        { userId: memberUserId, organizationId, role: OrganizationUserRole.MEMBER },
+        {
+          userId: adminUserId,
+          organizationId,
+          role: OrganizationUserRole.ADMIN,
+        },
+        {
+          userId: memberUserId,
+          organizationId,
+          role: OrganizationUserRole.MEMBER,
+        },
       ],
     });
     // Team RoleBindings make membership resolve from the binding query directly,
@@ -113,7 +121,9 @@ describe("getUserProtectionsForProject audience-aware visibility", () => {
         scope: { scopeType: "PROJECT", scopeId: project.id },
         personalOnly: false,
         config: {
-          categories: { input: { disposition: "restrict", audience: { admins: true } } },
+          categories: {
+            input: { disposition: "restrict", audience: { admins: true } },
+          },
         },
       });
 
@@ -128,7 +138,9 @@ describe("getUserProtectionsForProject audience-aware visibility", () => {
         scope: { scopeType: "PROJECT", scopeId: project.id },
         personalOnly: false,
         config: {
-          categories: { input: { disposition: "restrict", audience: { admins: true } } },
+          categories: {
+            input: { disposition: "restrict", audience: { admins: true } },
+          },
         },
       });
     });

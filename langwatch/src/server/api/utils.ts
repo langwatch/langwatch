@@ -5,8 +5,8 @@ import {
   TeamUserRole,
 } from "@prisma/client";
 import { getApp } from "~/server/app-layer/app";
-import type { Session } from "~/server/auth";
 import { VisibilityWindowService } from "~/server/app-layer/traces/visibility-window.service";
+import type { Session } from "~/server/auth";
 import {
   describeAudience,
   isContentVisible,

@@ -19,9 +19,7 @@ describe("native evaluator merge into the facade", () => {
   });
 
   it("merges the native settings schema so the form and validation see it", () => {
-    expect(
-      API_KEYS_AND_SECRETS_DETECTION in evaluatorsSchema.shape,
-    ).toBe(true);
+    expect(API_KEYS_AND_SECRETS_DETECTION in evaluatorsSchema.shape).toBe(true);
     // A native settings payload (empty) parses.
     expect(
       evaluatorsSchema.shape[API_KEYS_AND_SECRETS_DETECTION].safeParse({

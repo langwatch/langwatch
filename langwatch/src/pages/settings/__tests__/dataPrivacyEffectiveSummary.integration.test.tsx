@@ -68,7 +68,9 @@ describe("EffectiveSummary", () => {
       );
 
       expect(
-        screen.getByRole("heading", { name: "Effective for this organization" }),
+        screen.getByRole("heading", {
+          name: "Effective for this organization",
+        }),
       ).toBeInTheDocument();
       expect(screen.getByText("Essential")).toBeInTheDocument();
     });

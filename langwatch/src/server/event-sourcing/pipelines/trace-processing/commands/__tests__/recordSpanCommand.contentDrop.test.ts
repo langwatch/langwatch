@@ -7,19 +7,21 @@
  * its own integration tests); the real drop logic + real fold run end-to-end.
  */
 import { describe, expect, it } from "vitest";
-
-import { createTenantId, type Command } from "../../../../";
 import { stripOtlpSpanContent } from "~/server/data-privacy/applyOtlpSpanContentDrop";
-import { PRIVACY_DROPPED_MARKER_ATTR } from "~/server/data-privacy/dropKeyCatalog";
 import {
-  EMPTY_AUDIENCE,
   type Disposition,
+  EMPTY_AUDIENCE,
   type ResolvedDataPrivacy,
 } from "~/server/data-privacy/dataPrivacy.types";
-import type { OtlpKeyValue } from "../../schemas/otlp";
-import type { PIIRedactionLevel, RecordSpanCommandData } from "../../schemas/commands";
-import { RECORD_SPAN_COMMAND_TYPE } from "../../schemas/constants";
+import { PRIVACY_DROPPED_MARKER_ATTR } from "~/server/data-privacy/dropKeyCatalog";
+import { type Command, createTenantId } from "../../../../";
 import { TraceSummaryFoldProjection } from "../../projections/traceSummary.foldProjection";
+import type {
+  PIIRedactionLevel,
+  RecordSpanCommandData,
+} from "../../schemas/commands";
+import { RECORD_SPAN_COMMAND_TYPE } from "../../schemas/constants";
+import type { OtlpKeyValue } from "../../schemas/otlp";
 import {
   RecordSpanCommand,
   type RecordSpanCommandDependencies,
@@ -53,7 +55,9 @@ function policy({
   };
 }
 
-function makeHandler(dropPolicy: ResolvedDataPrivacy | null): RecordSpanCommand {
+function makeHandler(
+  dropPolicy: ResolvedDataPrivacy | null,
+): RecordSpanCommand {
   const deps: RecordSpanCommandDependencies = {
     piiRedactionService: { redactSpan: async () => {} },
     costEnrichmentService: { enrichSpan: async () => {} },
@@ -62,7 +66,11 @@ function makeHandler(dropPolicy: ResolvedDataPrivacy | null): RecordSpanCommand 
       dropSpanContent: async ({ span }) =>
         dropPolicy
           ? stripOtlpSpanContent({ span, policy: dropPolicy })
-          : { droppedCount: 0, droppedCategories: [], droppedAttributeKeys: [] },
+          : {
+              droppedCount: 0,
+              droppedCategories: [],
+              droppedAttributeKeys: [],
+            },
     },
   };
   return new RecordSpanCommand(deps);
@@ -115,7 +123,9 @@ function command({
   };
 }
 
-function spanKeys(event: { data: { span: { attributes: OtlpKeyValue[] } } }): string[] {
+function spanKeys(event: {
+  data: { span: { attributes: OtlpKeyValue[] } };
+}): string[] {
   return event.data.span.attributes.map((a) => a.key);
 }
 
@@ -187,7 +197,10 @@ describe("RecordSpanCommand content drop", () => {
         const captured = await makeHandler(null).handle(
           command({ project: "project-keep", attributes: IO_ATTRS }),
         );
-        const keptState = fold.handleTraceSpanReceived(captured[0]!, fold.init());
+        const keptState = fold.handleTraceSpanReceived(
+          captured[0]!,
+          fold.init(),
+        );
         expect(keptState.computedInput).toBeTruthy();
 
         // Drop input — the same fold path now sees no input on the event.

@@ -8,7 +8,7 @@
 //
 // Pure (Zod + types only); the native executors live in `native/` and are
 // reached from the dispatchers, never from this file.
-import { z } from "zod";
+import type { z } from "zod";
 import {
   AVAILABLE_EVALUATORS as GENERATED_AVAILABLE_EVALUATORS,
   evaluatorsSchema as generatedEvaluatorsSchema,
@@ -75,6 +75,14 @@ export const AVAILABLE_EVALUATORS = {
   [K in EvaluatorTypes]: EvaluatorDefinition<K>;
 };
 
+export type {
+  BatchEvaluationResult,
+  EvaluationResult,
+  EvaluationResultError,
+  EvaluationResultSkipped,
+  Money,
+  SingleEvaluationResult,
+} from "./evaluators.generated";
 export {
   batchEvaluationResultSchema,
   evaluationResultErrorSchema,
@@ -83,13 +91,4 @@ export {
   evaluatorTypesSchema,
   moneySchema,
   singleEvaluationResultSchema,
-} from "./evaluators.generated";
-
-export type {
-  BatchEvaluationResult,
-  EvaluationResult,
-  EvaluationResultError,
-  EvaluationResultSkipped,
-  Money,
-  SingleEvaluationResult,
 } from "./evaluators.generated";

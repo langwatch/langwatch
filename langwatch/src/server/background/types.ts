@@ -106,4 +106,3 @@ export type IngestionPullerJob = {
   /** Wall-clock dispatch time (ms since epoch). */
   scheduledAt: number;
 };
-

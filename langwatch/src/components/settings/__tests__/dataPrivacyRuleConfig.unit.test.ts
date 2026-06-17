@@ -6,8 +6,8 @@ import {
 } from "~/server/data-privacy/dataPrivacy.types";
 import {
   ALL_MEMBERS_VALUE,
-  applyAudienceSelection,
   type AudienceFormState,
+  applyAudienceSelection,
   audienceConfig,
   audienceToSelection,
   buildRuleConfig,
@@ -400,7 +400,11 @@ describe("audience selection", () => {
         ["projectOwner"],
         ["projectOwner", ROLE_VALUES.admins, "group:auditors"],
       );
-      expect(next).toEqual(["projectOwner", ROLE_VALUES.admins, "group:auditors"]);
+      expect(next).toEqual([
+        "projectOwner",
+        ROLE_VALUES.admins,
+        "group:auditors",
+      ]);
     });
   });
 

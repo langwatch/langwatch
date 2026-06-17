@@ -64,7 +64,7 @@ secured
       }
 
       const contentType = c.req.header("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
+      if (!contentType?.includes("application/json")) {
         logger.error("collector request body is not json");
 
         return c.json({ message: "Invalid body, expecting json" }, 400);

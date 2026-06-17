@@ -143,7 +143,11 @@ export function stripRolesFromChatArrayJson(
       removed++;
       continue;
     }
-    if (stripToolCalls && isChatMessage(message) && message.tool_calls != null) {
+    if (
+      stripToolCalls &&
+      isChatMessage(message) &&
+      message.tool_calls != null
+    ) {
       const { tool_calls: _dropped, ...rest } = message;
       removed++;
       next.push(rest);

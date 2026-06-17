@@ -8,15 +8,15 @@
  * seen through (a [SECRET] marker still fails the evaluation).
  */
 import { describe, expect, it, vi } from "vitest";
+import type { Trace } from "~/server/tracer/types";
+import type { TraceService } from "~/server/traces/trace.service";
 import type { LangEvalsClient } from "../../clients/langevals/langevals.client";
 import {
-  EvaluationExecutionService,
   type EvaluationExecutionDeps,
+  EvaluationExecutionService,
   type ModelEnvResolver,
   type WorkflowExecutor,
 } from "../evaluation-execution.service";
-import type { TraceService } from "~/server/traces/trace.service";
-import type { Trace } from "~/server/tracer/types";
 
 const SECRETS_EVALUATOR = "langwatch/api_keys_and_secrets_detection";
 

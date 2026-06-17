@@ -6,8 +6,8 @@ import {
   evaluationDurationHistogram,
   getEvaluationStatusCounter,
 } from "../../metrics";
-import { API_KEYS_AND_SECRETS_DETECTION } from "../evaluators.native";
 import type { SingleEvaluationResult } from "../evaluators";
+import { API_KEYS_AND_SECRETS_DETECTION } from "../evaluators.native";
 import { evaluateApiKeysAndSecrets } from "./apiKeysAndSecretsDetection";
 import { collectStrings } from "./collectStrings";
 
