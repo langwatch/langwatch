@@ -66,7 +66,12 @@ export const STABLE_AUTH_ERRORS = [
 export const isStableAuthError = (error: string | null | undefined): boolean =>
   !!error && (STABLE_AUTH_ERRORS as readonly string[]).includes(error);
 
-/** Server route that clears BOTH the app session and the Auth0 session. */
+/**
+ * Server route that clears the app session and, on Auth0 deployments,
+ * federates to Auth0 `/v2/logout` to clear the identity-provider session too
+ * (see logoutHandler in server/routes/auth.ts). Other providers just clear the
+ * app session and return to sign-in.
+ */
 export const FEDERATED_LOGOUT_PATH = "/api/auth/logout";
 
 /** Friendly heading for known error codes; falls back to the raw code. */
@@ -164,10 +169,7 @@ export function SignInError({ error: rawError }: { error: string }) {
                       <br />
                       <br />
                       If your organization uses single sign-on, enter your work
-                      email and choose your company login. You can link extra
-                      sign-in methods later from{" "}
-                      <b>Settings &gt; Authentication</b> once you are signed
-                      in.
+                      email and choose your company login.
                     </Text>
                     <Button asChild marginTop={4} color="white">
                       <a href={FEDERATED_LOGOUT_PATH}>
