@@ -9,6 +9,7 @@ import {
   getFullDataset,
 } from "../api/routers/datasetRecord.utils";
 import { DatasetRepository } from "./dataset.repository";
+import { enqueueDatasetNormalize } from "./dataset-normalize.queue";
 import { DatasetRecordRepository } from "./dataset-record.repository";
 import { getDatasetStorage } from "./dataset-storage";
 import {
@@ -895,13 +896,14 @@ export class DatasetService {
   async createPendingUpload(params: {
     projectId: string;
     name: string;
+    filename?: string;
   }): Promise<{
     datasetId: string;
     slug: string;
     uploadUrl: string;
     stagingKey: string;
   }> {
-    const { projectId, name } = params;
+    const { projectId, name, filename } = params;
 
     const slug = this.generateSlug(name);
     // C2: reject a name conflict before minting a presigned URL so a duplicate
@@ -925,6 +927,9 @@ export class DatasetService {
       // C1: bind the minted key to the row so finalize never trusts a
       // client-supplied key.
       stagingKey: upload.key,
+      // Captured so the normalize job can detect the file format; the staged
+      // object carries no original filename.
+      uploadFilename: filename ?? null,
     });
 
     return {
@@ -1014,8 +1019,25 @@ export class DatasetService {
       data: { status: "processing" },
     });
 
-    // TODO(rung 4): enqueue the normalize GroupQueue job
-    //   { datasetId, projectId, stagingKey } → stream staging → chunked JSONL.
+    // ADR-032 D5: enqueue the normalize GroupQueue job (or inline-run it when no
+    // worker/queue is present). It streams the staged object → chunked JSONL and
+    // flips the dataset to `ready`. tenantId === projectId (datasets are
+    // project-scoped and the event-sourcing tenant IS the project). The filename
+    // drives format detection; when the client didn't send one (older client),
+    // default to `.jsonl` — the streaming-friendly format the direct-upload path
+    // targets — rather than blocking finalize.
+    await enqueueDatasetNormalize({
+      prisma: this.prisma,
+      payload: {
+        id: datasetId,
+        tenantId: projectId,
+        projectId,
+        datasetId,
+        stagingKey,
+        filename: dataset.uploadFilename ?? `${datasetId}.jsonl`,
+      },
+    });
+
     return { datasetId, status: "processing" };
   }
 

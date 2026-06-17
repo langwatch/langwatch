@@ -95,6 +95,14 @@ import { createCustomEvaluationSyncReactor } from "./pipelines/trace-processing/
 import { createProjectMetadataReactor } from "./pipelines/trace-processing/reactors/projectMetadata.reactor";
 import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
+import { DatasetRepository } from "~/server/datasets/dataset.repository";
+import {
+  createDatasetNormalizeHandler,
+  datasetNormalizeDedupId,
+  type DatasetNormalizePayload,
+} from "~/server/datasets/dataset-normalize.job";
+import { registerDatasetNormalizeEnqueue } from "~/server/datasets/dataset-normalize.queue";
+import { getDatasetStorage } from "~/server/datasets/dataset-storage";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { TraceService } from "~/server/traces/trace.service";
 import { createAlertTriggerReactor } from "@ee/governance/reactors/alertTrigger.reactor";
@@ -490,6 +498,32 @@ export class PipelineRegistry {
         }),
       );
     }
+
+    // ADR-032 D5: register the standalone `datasetNormalize` GroupQueue job
+    // (pure Postgres + S3, no fold/reactor). Per-group concurrency is inherent
+    // and the group key is the datasetId (framework prepends tenantId=projectId)
+    // → exactly one normalize in flight per dataset. The enqueue side is wired
+    // into the dataset domain via `registerDatasetNormalizeEnqueue`; when the
+    // global queue is unavailable the dataset module inline-runs the handler.
+    const datasetNormalizeHandler = createDatasetNormalizeHandler({
+      repository: new DatasetRepository(this.deps.prisma),
+      getStorage: getDatasetStorage,
+    });
+    const datasetNormalizeQueue =
+      tracePipeline.service.registerJob<DatasetNormalizePayload>({
+        name: "datasetNormalize",
+        process: datasetNormalizeHandler,
+        groupKeyFn: (p) => p.datasetId,
+        deduplication: { makeId: datasetNormalizeDedupId },
+      });
+
+    if (datasetNormalizeQueue) {
+      registerDatasetNormalizeEnqueue((payload) =>
+        datasetNormalizeQueue.send(payload),
+      );
+    }
+    // No else: when the global queue is absent the dataset module falls back to
+    // running the handler inline at enqueue time (dev/test without a worker).
 
     return {
       pipeline: tracePipeline,

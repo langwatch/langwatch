@@ -1,10 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Mock only the boundaries: the storage service (S3/local) and (via stubs) the
-// repository. The service logic under test stays real.
+// Mock only the boundaries: the storage service (S3/local), the normalize
+// enqueue seam, and (via stubs) the repository. The service logic under test
+// stays real.
 vi.mock("../dataset-storage", () => ({ getDatasetStorage: vi.fn() }));
+vi.mock("../dataset-normalize.queue", () => ({
+  enqueueDatasetNormalize: vi.fn().mockResolvedValue(undefined),
+}));
 
 import { DatasetService } from "../dataset.service";
+import { enqueueDatasetNormalize } from "../dataset-normalize.queue";
 import { getDatasetStorage } from "../dataset-storage";
 import {
   DirectUploadUnavailableError,
@@ -36,6 +41,7 @@ describe("DatasetService", () => {
         const result = await makeService(repo).createPendingUpload({
           projectId: "p1",
           name: "DS",
+          filename: "data.jsonl",
         });
 
         expect(result).toMatchObject({
@@ -49,6 +55,7 @@ describe("DatasetService", () => {
             contentLayout: "s3_jsonl",
             projectId: "p1",
             stagingKey: "staging/p1/u1",
+            uploadFilename: "data.jsonl",
           }),
         );
       });
@@ -111,6 +118,7 @@ describe("DatasetService", () => {
             id: "d1",
             status: "uploading",
             stagingKey: "staging/p1/bound-key",
+            uploadFilename: "data.jsonl",
           }),
           update: vi.fn().mockResolvedValue({}),
         };
@@ -127,6 +135,19 @@ describe("DatasetService", () => {
         expect(result.status).toBe("processing");
         expect(repo.update).toHaveBeenCalledWith(
           expect.objectContaining({ data: { status: "processing" } }),
+        );
+        // Enqueues the normalize job with tenantId === projectId and the
+        // filename bound to the row (drives format detection).
+        expect(enqueueDatasetNormalize).toHaveBeenCalledWith(
+          expect.objectContaining({
+            payload: expect.objectContaining({
+              datasetId: "d1",
+              projectId: "p1",
+              tenantId: "p1",
+              stagingKey: "staging/p1/bound-key",
+              filename: "data.jsonl",
+            }),
+          }),
         );
       });
     });

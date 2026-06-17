@@ -13,6 +13,8 @@
  * without leaking across projects — each project resolves its own BYOC /
  * global bucket + credentials through `createS3Client`.
  */
+
+import type { Readable } from "node:stream";
 import {
   DeleteObjectCommand,
   GetObjectCommand,
@@ -186,5 +188,35 @@ export class S3DatasetStorage implements DatasetStorage {
     await s3Client.send(
       new DeleteObjectCommand({ Bucket: s3Bucket, Key: key }),
     );
+  }
+
+  async streamStaged({
+    projectId,
+    key,
+  }: {
+    projectId: string;
+    key: string;
+  }): Promise<Readable> {
+    assertKeyWithinProject(projectId, key);
+    const { s3Client, s3Bucket } = await this.client(projectId);
+    try {
+      const response = await s3Client.send(
+        new GetObjectCommand({ Bucket: s3Bucket, Key: key }),
+      );
+      // SDK v3 streams the body as a Node Readable in the server runtime
+      // (s3-driver relies on the same cast). Backpressure flows through it, so
+      // the normalize job never buffers the whole staged file.
+      return response.Body as Readable;
+    } catch (error: unknown) {
+      if (
+        errorHasProp(error, "name", "NoSuchKey") ||
+        errorHasProp(error, "name", "NotFound") ||
+        errorHasProp(error, "code", "NoSuchKey") ||
+        errorHasProp(error, "code", "NotFound")
+      ) {
+        throw new StagedUploadNotFoundError();
+      }
+      throw error;
+    }
   }
 }

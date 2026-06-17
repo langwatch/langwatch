@@ -9,6 +9,9 @@
  * `DirectUploadUnavailableError` and the caller falls back to the backend
  * upload path.
  */
+
+import type { Readable } from "node:stream";
+import { createReadStream } from "fs";
 import fs from "fs/promises";
 import path from "path";
 import {
@@ -128,5 +131,27 @@ export class LocalDatasetStorage implements DatasetStorage {
   }): Promise<void> {
     assertKeyWithinProject(projectId, key);
     await fs.rm(localPath(key), { force: true });
+  }
+
+  async streamStaged({
+    projectId,
+    key,
+  }: {
+    projectId: string;
+    key: string;
+  }): Promise<Readable> {
+    assertKeyWithinProject(projectId, key);
+    const filePath = localPath(key);
+    try {
+      // Stat first so a missing staged upload surfaces a typed error eagerly,
+      // rather than as a late stream 'error' the caller has to translate.
+      await fs.stat(filePath);
+    } catch (error: unknown) {
+      if (errorHasProp(error, "code", "ENOENT")) {
+        throw new StagedUploadNotFoundError();
+      }
+      throw error;
+    }
+    return createReadStream(filePath);
   }
 }

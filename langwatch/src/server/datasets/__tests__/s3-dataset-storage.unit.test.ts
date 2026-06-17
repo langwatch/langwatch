@@ -1,3 +1,4 @@
+import { Readable } from "node:stream";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock ONLY the boundaries: the S3 client factory and the presigner. The
@@ -158,6 +159,53 @@ describe("S3DatasetStorage", () => {
             key: "staging/p1/u1",
           }),
         ).rejects.toBeInstanceOf(StagedUploadNotFoundError);
+      });
+    });
+  });
+
+  describe("streamStaged()", () => {
+    describe("when the staged object exists", () => {
+      it("returns the GetObject body as a readable stream", async () => {
+        const { resolved, send } = makeFakeClient();
+        const body = Readable.from(['{"a":1}\n']);
+        send.mockResolvedValue({ Body: body });
+        createS3Client.mockResolvedValue(resolved);
+
+        const stream = await new S3DatasetStorage().streamStaged({
+          projectId: "p1",
+          key: "staging/p1/u1",
+        });
+
+        const chunks: string[] = [];
+        for await (const chunk of stream) chunks.push(String(chunk));
+        expect(chunks.join("")).toBe('{"a":1}\n');
+        expect(send.mock.calls[0]![0].input.Key).toBe("staging/p1/u1");
+      });
+    });
+
+    describe("when the staged object does not exist (NoSuchKey)", () => {
+      it("throws StagedUploadNotFoundError", async () => {
+        const { resolved, send } = makeFakeClient();
+        send.mockRejectedValue({ name: "NoSuchKey" });
+        createS3Client.mockResolvedValue(resolved);
+
+        await expect(
+          new S3DatasetStorage().streamStaged({
+            projectId: "p1",
+            key: "staging/p1/u1",
+          }),
+        ).rejects.toBeInstanceOf(StagedUploadNotFoundError);
+      });
+    });
+
+    describe("when the key escapes the project's staging prefix", () => {
+      it("rejects before touching S3", async () => {
+        await expect(
+          new S3DatasetStorage().streamStaged({
+            projectId: "p1",
+            key: "staging/p2/u1",
+          }),
+        ).rejects.toThrow(/traversal/);
       });
     });
   });

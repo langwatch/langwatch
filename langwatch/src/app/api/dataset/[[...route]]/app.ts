@@ -286,11 +286,16 @@ secured.access(requires("datasets:manage")).post(
     if (!name || typeof name !== "string" || name.trim() === "") {
       throw new UnprocessableEntityError("name field is required");
     }
+    // Optional: the client knows the file's name/extension; capture it so the
+    // normalize job can detect the format (the staged object has no name).
+    const filename =
+      typeof body.filename === "string" ? body.filename : undefined;
 
     try {
       const result = await service.createPendingUpload({
         projectId: project.id,
         name: name.trim(),
+        filename,
       });
       return c.json(result, 201);
     } catch (error) {

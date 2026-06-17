@@ -19,6 +19,7 @@
  * singletons beyond a small per-project S3 client memo) precisely so they can
  * be lifted into `App` later with no rewrite.
  */
+import type { Readable } from "node:stream";
 import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
 import type { DatasetChunk } from "./dataset-chunking";
 import { LocalDatasetStorage } from "./local-dataset-storage";
@@ -74,6 +75,14 @@ export interface DatasetStorage {
     projectId: string;
     key: string;
   }): Promise<number>;
+
+  /**
+   * Open a backpressured read stream over a staged upload — the normalize
+   * job's source (stream → record transform → chunk-writer, never an in-memory
+   * array). Throws `StagedUploadNotFoundError` when the staged object is
+   * missing. The key is validated to sit under the project's `staging/` prefix.
+   */
+  streamStaged(params: { projectId: string; key: string }): Promise<Readable>;
 
   /** Best-effort delete of a staged upload (e.g. after a finalize rejection). */
   deleteStaged(params: { projectId: string; key: string }): Promise<void>;

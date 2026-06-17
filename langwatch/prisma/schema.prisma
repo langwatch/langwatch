@@ -622,6 +622,9 @@ model Dataset {
   // Server-owned staging key bound to the row at presign time, so finalize
   // never trusts a client-supplied key (ADR-032 D4 / C1).
   stagingKey       String?
+  // Original upload filename, captured at presign so the normalize job can
+  // detect the file format (CSV/JSONL/JSON) — the staged object carries no name.
+  uploadFilename   String?
   rowCount         Int?
   sizeBytes        BigInt?
   chunkCount       Int?

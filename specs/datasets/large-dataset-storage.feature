@@ -24,14 +24,14 @@ Feature: Large dataset storage
     And the dataset shows as "processing" while it is prepared
     And the dataset becomes "ready" once preparation finishes
 
-  @integration @unimplemented
+  @unit
   Scenario: Both CSV and JSONL files are accepted
     When I upload a dataset as a CSV file
     Then once ready it has the expected rows and columns
     When I upload a dataset as a JSONL file
     Then once ready it has the expected rows and columns
 
-  @integration @unimplemented
+  @unit
   Scenario: A ready dataset reports its true row count and size
     When I upload a dataset of 50 rows
     Then once ready the dataset reports 50 rows

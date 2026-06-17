@@ -118,4 +118,29 @@ describe("LocalDatasetStorage", () => {
       });
     });
   });
+
+  describe("streamStaged()", () => {
+    describe("given a staged upload written to storage", () => {
+      it("streams its bytes back", async () => {
+        const key = "staging/p1/u1";
+        const filePath = path.join(storageDir, key);
+        await fs.mkdir(path.dirname(filePath), { recursive: true });
+        await fs.writeFile(filePath, '{"a":1}\n{"a":2}\n', "utf-8");
+
+        const stream = await storage.streamStaged({ projectId: "p1", key });
+        const chunks: string[] = [];
+        for await (const chunk of stream) chunks.push(String(chunk));
+
+        expect(chunks.join("")).toBe('{"a":1}\n{"a":2}\n');
+      });
+    });
+
+    describe("when the staged upload is missing", () => {
+      it("throws StagedUploadNotFoundError", async () => {
+        await expect(
+          storage.streamStaged({ projectId: "p1", key: "staging/p1/missing" }),
+        ).rejects.toThrow(/Uploaded object not found/);
+      });
+    });
+  });
 });
