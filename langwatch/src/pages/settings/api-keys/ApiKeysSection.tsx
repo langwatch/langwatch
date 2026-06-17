@@ -8,25 +8,25 @@ import {
   Spacer,
   Table,
   Text,
-  VStack,
   useDisclosure,
+  VStack,
 } from "@chakra-ui/react";
-import { Tooltip } from "../../../components/ui/tooltip";
 import { Clipboard, Key, Pencil, Plus, RotateCw, Trash2 } from "lucide-react";
-import { PageLayout } from "../../../components/ui/layouts/PageLayout";
 import { useMemo, useState } from "react";
-import { toaster } from "../../../components/ui/toaster";
-import { usePublicEnv } from "../../../hooks/usePublicEnv";
-import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
-import { useSession } from "~/utils/auth-client";
-import { api, type RouterOutputs } from "../../../utils/api";
-import { formatTimeAgo } from "../../../utils/formatTimeAgo";
-import { ProviderScopeChips } from "../../../components/settings/ProviderScopeChips";
 import { ScopeFilter as ScopeFilterComponent } from "~/components/settings/ScopeFilter";
 import { useAvailableScopes } from "~/hooks/useAvailableScopes";
 import { useUrlScopeFilter } from "~/hooks/useUrlScopeFilter";
+import { useSession } from "~/utils/auth-client";
 import { filterProvidersByScope } from "~/utils/filterProvidersByScope";
+import { ProviderScopeChips } from "../../../components/settings/ProviderScopeChips";
 import { RegenerateApiKeyDialog } from "../../../components/settings/RegenerateApiKeyDialog";
+import { PageLayout } from "../../../components/ui/layouts/PageLayout";
+import { toaster } from "../../../components/ui/toaster";
+import { Tooltip } from "../../../components/ui/tooltip";
+import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+import { usePublicEnv } from "../../../hooks/usePublicEnv";
+import { api, type RouterOutputs } from "../../../utils/api";
+import { formatTimeAgo } from "../../../utils/formatTimeAgo";
 import { CreateApiKeyDrawer, type CreateApiKeyInput } from "./CreateApiKeyDrawer";
 import { EditApiKeyDrawer } from "./EditApiKeyDrawer";
 import { IngestionKeysSection } from "./IngestionKeysSection";

@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { TRPCError } from "@trpc/server";
 import { Prisma, type PrismaClient } from "@prisma/client";
-import { projectRouter } from "../project";
-import { createInnerTRPCContext } from "../../trpc";
+import { TRPCError } from "@trpc/server";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { auditLog } from "../../../auditLog";
+import { createInnerTRPCContext } from "../../trpc";
+import { projectRouter } from "../project";
 
 /**
  * Unit tests for project.regenerateApiKey mutation
