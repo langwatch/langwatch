@@ -12,7 +12,7 @@ import {
   useDisclosure,
 } from "@chakra-ui/react";
 import { Tooltip } from "../../../components/ui/tooltip";
-import { Clipboard, Key, Pencil, Plus, Trash2 } from "lucide-react";
+import { Clipboard, Key, Pencil, Plus, RotateCw, Trash2 } from "lucide-react";
 import { PageLayout } from "../../../components/ui/layouts/PageLayout";
 import { useMemo, useState } from "react";
 import { toaster } from "../../../components/ui/toaster";
@@ -26,6 +26,7 @@ import { ScopeFilter as ScopeFilterComponent } from "~/components/settings/Scope
 import { useAvailableScopes } from "~/hooks/useAvailableScopes";
 import { useUrlScopeFilter } from "~/hooks/useUrlScopeFilter";
 import { filterProvidersByScope } from "~/utils/filterProvidersByScope";
+import { RegenerateApiKeyDialog } from "../../../components/settings/RegenerateApiKeyDialog";
 import { CreateApiKeyDrawer, type CreateApiKeyInput } from "./CreateApiKeyDrawer";
 import { EditApiKeyDrawer } from "./EditApiKeyDrawer";
 import { IngestionKeysSection } from "./IngestionKeysSection";
@@ -34,24 +35,53 @@ import { TokenCreatedDialog } from "./TokenCreatedDialog";
 
 type ApiKeyRow = RouterOutputs["apiKey"]["list"][number];
 
-function ProjectKeyActions({ apiKey }: { apiKey: string }) {
+/**
+ * Actions for the legacy "Project API Key" row. The row intentionally has no
+ * edit/revoke affordance — the only mutating action is rotation, and only when
+ * the viewer can manage the project (`project:manage`). Rotation is the
+ * supported, audited replacement for the base key that the unified-keys rework
+ * removed.
+ */
+function ProjectKeyActions({
+  apiKey,
+  canManage,
+  onRotate,
+}: {
+  apiKey: string;
+  canManage: boolean;
+  onRotate: () => void;
+}) {
   return (
-    <Button
-      size="xs"
-      variant="ghost"
-      aria-label="Copy secret key"
-      onClick={() => {
-        void navigator.clipboard.writeText(apiKey);
-        toaster.create({
-          title: "API key copied to clipboard",
-          type: "success",
-          duration: 2000,
-          meta: { closable: true },
-        });
-      }}
-    >
-      <Clipboard size={14} />
-    </Button>
+    <HStack gap={1}>
+      <Button
+        size="xs"
+        variant="ghost"
+        aria-label="Copy secret key"
+        onClick={() => {
+          void navigator.clipboard.writeText(apiKey);
+          toaster.create({
+            title: "API key copied to clipboard",
+            type: "success",
+            duration: 2000,
+            meta: { closable: true },
+          });
+        }}
+      >
+        <Clipboard size={14} />
+      </Button>
+      {canManage && (
+        <Tooltip content="Rotate this key">
+          <Button
+            size="xs"
+            variant="ghost"
+            aria-label="Rotate Project API Key"
+            onClick={onRotate}
+          >
+            <RotateCw size={14} aria-hidden="true" />
+          </Button>
+        </Tooltip>
+      )}
+    </HStack>
   );
 }
 
@@ -77,8 +107,13 @@ export function ApiKeysSection({
   const session = useSession();
   const currentUserId = session.data?.user?.id ?? "";
   const publicEnv = usePublicEnv();
-  const { project, team, organization } = useOrganizationTeamProject();
+  const { project, team, organization, hasPermission } =
+    useOrganizationTeamProject();
   const endpoint = publicEnv.data?.BASE_HOST ?? "https://app.langwatch.ai";
+
+  // Rotating the legacy project base key is a project-level admin action,
+  // gated on `project:manage` (same gate as the regenerateApiKey mutation).
+  const canManageProject = hasPermission("project:manage");
 
   const apiKeys = api.apiKey.list.useQuery({ organizationId });
   const myBindings = api.apiKey.myBindings.useQuery({ organizationId });
@@ -89,6 +124,7 @@ export function ApiKeysSection({
   const createMutation = api.apiKey.create.useMutation();
   const updateMutation = api.apiKey.update.useMutation();
   const revokeMutation = api.apiKey.revoke.useMutation();
+  const regenerateMutation = api.project.regenerateApiKey.useMutation();
   const queryClient = api.useContext();
 
   const {
@@ -101,6 +137,7 @@ export function ApiKeysSection({
   const [newKeyInput, setNewKeyInput] = useState<CreateApiKeyInput | null>(null);
   const [apiKeyToRevoke, setApiKeyToRevoke] = useState<string | null>(null);
   const [apiKeyToEdit, setApiKeyToEdit] = useState<ApiKeyRow | null>(null);
+  const [isRotateConfirmOpen, setIsRotateConfirmOpen] = useState(false);
 
   // Derive available scopes (and org-tree hierarchy) for the filter dropdown
   // from the organization graph.
@@ -283,6 +320,42 @@ export function ApiKeysSection({
     );
   };
 
+  // Rotate the legacy project base key. The mutation does a single atomic
+  // update + audit log server-side, so on success the previous key is already
+  // dead; we surface the fresh key once via the existing TokenCreatedDialog
+  // (driven by `newToken`) and refresh the row that sources `project.apiKey`.
+  const handleRotateProjectKey = () => {
+    if (!project?.id) return;
+    regenerateMutation.mutate(
+      { projectId: project.id },
+      {
+        onSuccess: (res) => {
+          setIsRotateConfirmOpen(false);
+          setNewToken(res.apiKey);
+          void queryClient.organization.getAll.invalidate();
+          toaster.create({
+            title: "Project API key rotated",
+            description:
+              "The previous key no longer works. Update your integrations.",
+            type: "warning",
+            duration: 6000,
+            meta: { closable: true },
+          });
+        },
+        onError: (error) => {
+          setIsRotateConfirmOpen(false);
+          toaster.create({
+            title: "Failed to rotate project API key",
+            description: error.message,
+            type: "error",
+            duration: 5000,
+            meta: { closable: true },
+          });
+        },
+      },
+    );
+  };
+
   // Build unified rows: API keys + project service key
   const projectApiKey = project?.apiKey;
 
@@ -427,7 +500,11 @@ export function ApiKeysSection({
                       <Badge size="sm" colorPalette="green">All</Badge>
                     </Table.Cell>
                     <Table.Cell>
-                      <ProjectKeyActions apiKey={projectApiKey} />
+                      <ProjectKeyActions
+                        apiKey={projectApiKey}
+                        canManage={canManageProject}
+                        onRotate={() => setIsRotateConfirmOpen(true)}
+                      />
                     </Table.Cell>
                   </Table.Row>
                 )}
@@ -609,6 +686,13 @@ export function ApiKeysSection({
         isRevoking={revokeMutation.isLoading}
         onCancel={() => setApiKeyToRevoke(null)}
         onConfirm={handleRevoke}
+      />
+
+      <RegenerateApiKeyDialog
+        open={isRotateConfirmOpen}
+        isLoading={regenerateMutation.isLoading}
+        onClose={() => setIsRotateConfirmOpen(false)}
+        onConfirm={handleRotateProjectKey}
       />
     </>
   );

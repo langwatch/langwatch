@@ -10,6 +10,7 @@ import { TeamUserRole, OrganizationUserRole } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "../../../db";
+import { TokenResolver } from "../../../api-key/token-resolver";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 
@@ -21,6 +22,9 @@ describe.skipIf(isTestcontainersOnly)("project.regenerateApiKey integration", ()
   const testNamespace = `regen-api-key-${nanoid(8)}`;
   let projectId: string;
   let caller: ReturnType<typeof appRouter.createCaller>;
+  // A caller for a user who can view but NOT manage the project, used to prove
+  // rotation is gated on `project:manage`.
+  let viewerCaller: ReturnType<typeof appRouter.createCaller>;
 
   beforeAll(async () => {
     // Create isolated test data for this test suite
@@ -82,6 +86,37 @@ describe.skipIf(isTestcontainersOnly)("project.regenerateApiKey integration", ()
       },
     });
     caller = appRouter.createCaller(ctx);
+
+    // A second user on the SAME org/team/project with view-only roles
+    // (org MEMBER + team VIEWER). Neither role grants `project:manage`, so
+    // this caller must be rejected when it tries to rotate the base key.
+    const viewer = await prisma.user.create({
+      data: {
+        name: "Viewer User",
+        email: `viewer-${testNamespace}@example.com`,
+      },
+    });
+    await prisma.organizationUser.create({
+      data: {
+        userId: viewer.id,
+        organizationId: organization.id,
+        role: OrganizationUserRole.MEMBER,
+      },
+    });
+    await prisma.teamUser.create({
+      data: {
+        userId: viewer.id,
+        teamId: team.id,
+        role: TeamUserRole.VIEWER,
+      },
+    });
+    const viewerCtx = createInnerTRPCContext({
+      session: {
+        user: { id: viewer.id },
+        expires: "1",
+      },
+    });
+    viewerCaller = appRouter.createCaller(viewerCtx);
   });
 
   afterAll(async () => {
@@ -103,6 +138,9 @@ describe.skipIf(isTestcontainersOnly)("project.regenerateApiKey integration", ()
     }).catch(() => {});
     await prisma.user.deleteMany({
       where: { email: `test-${testNamespace}@example.com` },
+    }).catch(() => {});
+    await prisma.user.deleteMany({
+      where: { email: `viewer-${testNamespace}@example.com` },
     }).catch(() => {});
   });
 
@@ -140,6 +178,75 @@ describe.skipIf(isTestcontainersOnly)("project.regenerateApiKey integration", ()
       caller.project.regenerateApiKey({ projectId: "nonexistent-project-id" }),
     ).rejects.toMatchObject({
       code: "UNAUTHORIZED",
+    });
+  });
+
+  describe("given rotation invalidates the previous base key", () => {
+    it("makes the old base key stop authenticating and the new one authenticate scoped to the project", async () => {
+      const before = await prisma.project.findUnique({
+        where: { id: projectId },
+        select: { apiKey: true },
+      });
+      const originalApiKey = before!.apiKey;
+
+      const resolver = TokenResolver.create(prisma);
+
+      // Sanity: the original base key authenticates to this project via the
+      // real legacy-key resolution path before rotation.
+      const resolvedBefore = await resolver.resolve({ token: originalApiKey });
+      expect(resolvedBefore?.type).toBe("legacyProjectKey");
+      expect(resolvedBefore?.project.id).toBe(projectId);
+
+      const { apiKey: newApiKey } = await caller.project.regenerateApiKey({
+        projectId,
+      });
+
+      // The previous raw key no longer resolves to anything.
+      const resolvedOld = await resolver.resolve({ token: originalApiKey });
+      expect(resolvedOld).toBeNull();
+
+      // The new key resolves, scoped to the same project.
+      const resolvedNew = await resolver.resolve({ token: newApiKey });
+      expect(resolvedNew?.type).toBe("legacyProjectKey");
+      expect(resolvedNew?.project.id).toBe(projectId);
+    });
+  });
+
+  describe("given a user without project:manage permission", () => {
+    it("rejects the rotation and leaves the base key unchanged", async () => {
+      const before = await prisma.project.findUnique({
+        where: { id: projectId },
+        select: { apiKey: true },
+      });
+      const keyBefore = before!.apiKey;
+
+      await expect(
+        viewerCaller.project.regenerateApiKey({ projectId }),
+      ).rejects.toMatchObject({
+        // checkProjectPermission("project:manage") throws UNAUTHORIZED when the
+        // caller lacks the permission (see server/api/rbac.ts checkProjectPermission).
+        code: "UNAUTHORIZED",
+      });
+
+      const after = await prisma.project.findUnique({
+        where: { id: projectId },
+        select: { apiKey: true },
+      });
+      expect(after!.apiKey).toBe(keyBefore);
+    });
+  });
+
+  describe("given a successful rotation", () => {
+    it("records an audit-log entry for the rotation", async () => {
+      await caller.project.regenerateApiKey({ projectId });
+
+      const entry = await prisma.auditLog.findFirst({
+        where: {
+          action: "project.apiKey.regenerated",
+          projectId,
+        },
+      });
+      expect(entry).not.toBeNull();
     });
   });
 });

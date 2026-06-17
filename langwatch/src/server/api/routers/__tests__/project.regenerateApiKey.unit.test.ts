@@ -214,5 +214,28 @@ describe("project.regenerateApiKey mutation logic", () => {
         message: "Database connection failed",
       });
     });
+
+    it("does not record the rotation as audited when the update fails", async () => {
+      // The mutation does a SINGLE atomic prisma.project.update before the
+      // success audit log. When that write rejects, the row — and thus the old
+      // key's validity — is left intact, so the rotation must NOT be recorded
+      // as a completed action. The generic tRPC error-audit middleware still
+      // fires (action: "regenerateApiKey", error: ...) — that is orthogonal
+      // platform telemetry for the failed call, not a half-rotation — so we
+      // assert specifically that the success-path "project.apiKey.regenerated"
+      // audit was never written.
+      const projectId = "project_123";
+      mockPrisma.project.update.mockRejectedValueOnce(
+        new Error("Database connection failed"),
+      );
+
+      await expect(
+        caller.regenerateApiKey({ projectId }),
+      ).rejects.toBeDefined();
+
+      expect(auditLog).not.toHaveBeenCalledWith(
+        expect.objectContaining({ action: "project.apiKey.regenerated" }),
+      );
+    });
   });
 });
