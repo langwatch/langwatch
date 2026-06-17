@@ -27,10 +27,7 @@ export interface SummaryRowOpts {
  * @param traceId - The trace ID to embed.
  * @param opts - Optional overrides.
  */
-export function makeSummaryRow(
-  traceId: string,
-  opts?: SummaryRowOpts,
-) {
+export function makeSummaryRow(traceId: string, opts?: SummaryRowOpts) {
   const defaultOutput = '{"type":"text","value":"preview…"}';
   return {
     ts_TraceId: traceId,

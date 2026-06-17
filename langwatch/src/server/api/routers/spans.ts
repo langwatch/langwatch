@@ -8,8 +8,10 @@ import {
 } from "~/server/api/trpc";
 import { TraceService } from "~/server/traces/trace.service";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
-import { checkPermissionOrPubliclyShared } from "../rbac";
-import { checkProjectPermission } from "../rbac";
+import {
+  checkPermissionOrPubliclyShared,
+  checkProjectPermission,
+} from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
 
 export const spansRouter = createTRPCRouter({

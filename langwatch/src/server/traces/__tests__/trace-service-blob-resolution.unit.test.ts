@@ -9,12 +9,12 @@
  *
  * BDD structure: given/when nested describes, action-based it() names.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { Trace } from "~/server/tracer/types";
-import type { Protections } from "~/server/elasticsearch/protections";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { BlobNotFoundError } from "~/server/app-layer/traces/blob-store.service";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
+import type { Protections } from "~/server/elasticsearch/protections";
+import type { Trace } from "~/server/tracer/types";
 import { TraceService } from "../trace.service";
 
 // ---------------------------------------------------------------------------
@@ -95,10 +95,20 @@ const fullOutput =
  */
 function makeEventRefBlobStore(contents: Record<string, string>): BlobStore {
   return {
-    getFromEventLog: vi.fn(async ({ field }: { eventId: string; field: string; tenantId: string; aggregateType: string; aggregateId: string }) => {
-      if (field in contents) return contents[field]!;
-      throw new BlobNotFoundError("evt-test", field, "proj-1");
-    }),
+    getFromEventLog: vi.fn(
+      async ({
+        field,
+      }: {
+        eventId: string;
+        field: string;
+        tenantId: string;
+        aggregateType: string;
+        aggregateId: string;
+      }) => {
+        if (field in contents) return contents[field]!;
+        throw new BlobNotFoundError("evt-test", field, "proj-1");
+      },
+    ),
     putSpool: vi.fn(),
     getSpool: vi.fn(),
     deleteSpool: vi.fn(),
@@ -125,8 +135,8 @@ function makeTraceWithPreview(): Trace {
         name: "test",
         timestamps: { started_at: 0, finished_at: 1000 },
         params: {
-          "langwatch": {
-            "output": "preview…",
+          langwatch: {
+            output: "preview…",
           },
         },
       },
@@ -148,10 +158,7 @@ describe("TraceService.getTracesWithSpans() — ADR-022 blob resolution pipeline
     blobStore = makeEventRefBlobStore({ "langwatch.output": fullOutput });
     ioExtractionService = new TraceIOExtractionService();
 
-    service = new TraceService(
-      {} as any,
-      { blobStore, ioExtractionService },
-    );
+    service = new TraceService({} as any, { blobStore, ioExtractionService });
   });
 
   describe("given ClickHouse returns a trace with offloaded-span preview output", () => {
@@ -192,11 +199,8 @@ describe("TraceService.getTracesWithSpans() — ADR-022 blob resolution pipeline
       it("constructs successfully without throwing when blob deps are provided", () => {
         // Constructing TraceService with ADR-022 deps (blobStore + ioExtractionService)
         // should not throw. The production wiring (presets.ts) exercises this path.
-        expect(() =>
-          new TraceService(
-            {} as any,
-            { blobStore, ioExtractionService },
-          ),
+        expect(
+          () => new TraceService({} as any, { blobStore, ioExtractionService }),
         ).not.toThrow();
       });
     });

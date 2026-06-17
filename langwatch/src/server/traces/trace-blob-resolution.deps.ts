@@ -1,11 +1,11 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import {
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-  type ClickHouseClientResolver,
-} from "~/server/clickhouse/clickhouseClient";
 import { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
+import {
+  type ClickHouseClientResolver,
+  getClickHouseClientForProject,
+  isClickHouseEnabled,
+} from "~/server/clickhouse/clickhouseClient";
 import { createS3Client } from "~/server/storage";
 import type { BlobResolutionDeps } from "./trace.service";
 
@@ -57,7 +57,8 @@ export function buildTraceBlobResolutionDeps(overrides?: {
   clickhouseEnabled?: boolean;
   resolveClickHouseClient?: ClickHouseClientResolver;
 }): BlobResolutionDeps {
-  const clickhouseEnabled = overrides?.clickhouseEnabled ?? isClickHouseEnabled();
+  const clickhouseEnabled =
+    overrides?.clickhouseEnabled ?? isClickHouseEnabled();
   const resolveClickHouseClient =
     overrides?.resolveClickHouseClient ?? defaultResolveClickHouseClient;
 

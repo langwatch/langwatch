@@ -33,15 +33,18 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Protections } from "~/server/elasticsearch/protections";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { BlobNotFoundError } from "~/server/app-layer/traces/blob-store.service";
-import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
-import { TraceService } from "../trace.service";
-import { resolveOffloadedTraces } from "../resolve-offloaded-traces";
+import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
+import type { Protections } from "~/server/elasticsearch/protections";
 import { createLogger } from "~/utils/logger/server";
-import { makeSummaryRow, makeSpanRowWithEventRef } from "./fixtures/ch-row-fixtures";
+import { resolveOffloadedTraces } from "../resolve-offloaded-traces";
+import { TraceService } from "../trace.service";
+import {
+  makeSpanRowWithEventRef,
+  makeSummaryRow,
+} from "./fixtures/ch-row-fixtures";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks — mock only the raw CH SQL boundary so the real resolver runs
@@ -176,10 +179,10 @@ function makeTenantScopedBlobStore(): BlobStore & {
 }
 
 function makeService(blobStore: BlobStore): TraceService {
-  return new TraceService(
-    {} as never,
-    { blobStore, ioExtractionService: new TraceIOExtractionService() },
-  );
+  return new TraceService({} as never, {
+    blobStore,
+    ioExtractionService: new TraceIOExtractionService(),
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -297,9 +300,14 @@ describe("TraceService — AC1: getTracesWithSpans with full=true resolves from 
       it("calls BlobStore.getFromEventLog at least once", async () => {
         setupGetTracesWithSpansMocks();
 
-        await service.getTracesWithSpans(PROJECT_ID_A, [TRACE_ID], protections, {
-          full: true,
-        });
+        await service.getTracesWithSpans(
+          PROJECT_ID_A,
+          [TRACE_ID],
+          protections,
+          {
+            full: true,
+          },
+        );
 
         expect(blobStore.getFromEventLog).toHaveBeenCalledTimes(1);
       });
@@ -524,12 +532,10 @@ describe("ClickHouseTraceService — #4888 full resolution crosses the mapper", 
     blobStore: BlobStore;
     getFromEventLogSpy: ReturnType<typeof vi.fn>;
   } {
-    const getFromEventLogSpy = vi.fn(
-      async ({ field }: { field: string }) => {
-        if (field in contents) return contents[field]!;
-        throw new BlobNotFoundError("evt-001", field, PROJECT_ID_CH);
-      },
-    );
+    const getFromEventLogSpy = vi.fn(async ({ field }: { field: string }) => {
+      if (field in contents) return contents[field]!;
+      throw new BlobNotFoundError("evt-001", field, PROJECT_ID_CH);
+    });
     const blobStore = {
       getFromEventLog: getFromEventLogSpy,
       putSpool: vi.fn(),
@@ -564,9 +570,14 @@ describe("ClickHouseTraceService — #4888 full resolution crosses the mapper", 
         });
         const service = buildService(blobStore);
 
-        await service.getTracesWithSpans(PROJECT_ID_CH, [TRACE_ID_CH], protections, {
-          resolveBlobs: true,
-        });
+        await service.getTracesWithSpans(
+          PROJECT_ID_CH,
+          [TRACE_ID_CH],
+          protections,
+          {
+            resolveBlobs: true,
+          },
+        );
 
         expect(getFromEventLogSpy).toHaveBeenCalledOnce();
       });
@@ -693,7 +704,9 @@ describe("ClickHouseTraceService — #4888 full resolution crosses the mapper", 
         );
 
         const outputVal = traces![0]!.output?.value as string | undefined;
-        expect(Buffer.byteLength(outputVal!, "utf8")).toBeGreaterThan(IO_PREVIEW_BYTES);
+        expect(Buffer.byteLength(outputVal!, "utf8")).toBeGreaterThan(
+          IO_PREVIEW_BYTES,
+        );
       });
 
       it("trace.output equals FULL_OUTPUT after resolution", async () => {
@@ -722,9 +735,14 @@ describe("ClickHouseTraceService — #4888 full resolution crosses the mapper", 
         });
         const service = buildService(blobStore);
 
-        await service.getTracesWithSpans(PROJECT_ID_CH, [TRACE_ID_CH], protections, {
-          resolveBlobs: false,
-        });
+        await service.getTracesWithSpans(
+          PROJECT_ID_CH,
+          [TRACE_ID_CH],
+          protections,
+          {
+            resolveBlobs: false,
+          },
+        );
 
         expect(getFromEventLogSpy).not.toHaveBeenCalled();
       });

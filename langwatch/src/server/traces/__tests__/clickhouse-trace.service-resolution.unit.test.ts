@@ -8,13 +8,13 @@
  * BDD structure: given/when nested describes, action-based it() names.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Protections } from "~/server/elasticsearch/protections";
-import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { BlobNotFoundError } from "~/server/app-layer/traces/blob-store.service";
+import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import { resolveOffloadedTraces } from "../resolve-offloaded-traces";
+import type { Protections } from "~/server/elasticsearch/protections";
 import { createLogger } from "~/utils/logger/server";
+import { resolveOffloadedTraces } from "../resolve-offloaded-traces";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks — mock only the CH SQL boundary
@@ -44,10 +44,7 @@ vi.mock("~/server/filters/clickhouse", () => ({
 
 vi.mock("langwatch", () => ({
   getLangWatchTracer: () => ({
-    withActiveSpan: (
-      _name: string,
-      ...args: unknown[]
-    ) => {
+    withActiveSpan: (_name: string, ...args: unknown[]) => {
       const fn = args.length === 1 ? args[0] : args[1];
       const fakeSpan: {
         setAttribute: () => void;
@@ -68,7 +65,8 @@ const protections: Protections = {
   canSeeTopics: true,
 } as Protections;
 
-const fullOutput = "The full 50 KB output value that was offloaded to event_log";
+const fullOutput =
+  "The full 50 KB output value that was offloaded to event_log";
 
 /** Minimal trace-summary row as returned by ClickHouse. */
 function makeSummaryRow(traceId: string) {
@@ -120,7 +118,9 @@ function makeSpanRowWithEventRef(traceId: string, spanId: string) {
     ResourceAttributes: {},
     SpanAttributes: {
       "langwatch.output": "preview…",
-      [`${EVENTREF_ATTR_PREFIX}langwatch.output`]: JSON.stringify({ field: "langwatch.output" }),
+      [`${EVENTREF_ATTR_PREFIX}langwatch.output`]: JSON.stringify({
+        field: "langwatch.output",
+      }),
     },
     StatusCode: 1,
     StatusMessage: "",
@@ -140,10 +140,20 @@ function makeSpanRowWithEventRef(traceId: string, spanId: string) {
  */
 function makeEventRefBlobStore(contents: Record<string, string>): BlobStore {
   return {
-    getFromEventLog: vi.fn(async ({ field }: { eventId: string; field: string; tenantId: string; aggregateType: string; aggregateId: string }) => {
-      if (field in contents) return contents[field]!;
-      throw new BlobNotFoundError("evt-test", field, "proj-1");
-    }),
+    getFromEventLog: vi.fn(
+      async ({
+        field,
+      }: {
+        eventId: string;
+        field: string;
+        tenantId: string;
+        aggregateType: string;
+        aggregateId: string;
+      }) => {
+        if (field in contents) return contents[field]!;
+        throw new BlobNotFoundError("evt-test", field, "proj-1");
+      },
+    ),
     putSpool: vi.fn(),
     getSpool: vi.fn(),
     deleteSpool: vi.fn(),

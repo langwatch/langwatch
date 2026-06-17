@@ -1,7 +1,7 @@
+import { on } from "node:events";
 import { PublicShareResourceTypes } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import shuffle from "lodash-es/shuffle";
-import { on } from "node:events";
 import { z } from "zod";
 import {
   createTRPCRouter,
@@ -14,14 +14,18 @@ import { TraceService } from "~/server/traces/trace.service";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { createLogger } from "~/utils/logger/server";
 import { evaluatorsSchema } from "../../evaluations/evaluators.generated";
-import { evaluatePreconditions, buildPreconditionTraceDataFromTrace, checkEvaluatorRequiredFields } from "../../evaluations/preconditions";
-import { checkPreconditionSchema } from "../../evaluations/types";
-import { checkPermissionOrPubliclyShared, checkProjectPermission } from "../rbac";
-import { getUserProtectionsForProject } from "../utils";
 import {
-  getAllForProjectInput,
-  tracesFilterInput,
-} from "./traces.schemas";
+  buildPreconditionTraceDataFromTrace,
+  checkEvaluatorRequiredFields,
+  evaluatePreconditions,
+} from "../../evaluations/preconditions";
+import { checkPreconditionSchema } from "../../evaluations/types";
+import {
+  checkPermissionOrPubliclyShared,
+  checkProjectPermission,
+} from "../rbac";
+import { getUserProtectionsForProject } from "../utils";
+import { getAllForProjectInput, tracesFilterInput } from "./traces.schemas";
 
 export { getAllForProjectInput };
 
@@ -269,9 +273,7 @@ export const tracesRouter = createTRPCRouter({
     }),
 
   getFormattedSpansDigest: protectedProcedure
-    .input(
-      z.object({ projectId: z.string(), traceIds: z.array(z.string()) }),
-    )
+    .input(z.object({ projectId: z.string(), traceIds: z.array(z.string()) }))
     .use(checkProjectPermission("traces:view"))
     .query(async ({ input, ctx }) => {
       const { projectId, traceIds } = input;
@@ -287,7 +289,12 @@ export const tracesRouter = createTRPCRouter({
       );
 
       return Object.fromEntries(
-        await Promise.all(traces.map(async (t) => [t.trace_id, await formatSpansDigest(t.spans ?? [])])),
+        await Promise.all(
+          traces.map(async (t) => [
+            t.trace_id,
+            await formatSpansDigest(t.spans ?? []),
+          ]),
+        ),
       );
     }),
 
@@ -410,23 +417,21 @@ export const tracesRouter = createTRPCRouter({
         protections,
       );
 
-      const passedPreconditions = traceWithSpans.filter(
-        (trace) => {
-          if (!evaluatorType) return false;
-          const spans = trace.spans ?? [];
-          const requiredFieldsMet = checkEvaluatorRequiredFields({
-            evaluatorType,
-            spans,
-            expectedOutput: trace.expected_output,
-          });
-          if (!requiredFieldsMet) return false;
-          const traceData = buildPreconditionTraceDataFromTrace({ trace, spans });
-          return evaluatePreconditions({
-            traceData,
-            preconditions,
-          });
-        },
-      );
+      const passedPreconditions = traceWithSpans.filter((trace) => {
+        if (!evaluatorType) return false;
+        const spans = trace.spans ?? [];
+        const requiredFieldsMet = checkEvaluatorRequiredFields({
+          evaluatorType,
+          spans,
+          expectedOutput: trace.expected_output,
+        });
+        if (!requiredFieldsMet) return false;
+        const traceData = buildPreconditionTraceDataFromTrace({ trace, spans });
+        return evaluatePreconditions({
+          traceData,
+          preconditions,
+        });
+      });
       const passedPreconditionsTraceIds = passedPreconditions?.map(
         (trace) => trace.trace_id,
       );
