@@ -16,10 +16,10 @@ import { api } from "~/utils/api";
 import { IconWrapper } from "../../../components/IconWrapper";
 import { DiscordOutlineIcon } from "../../../components/icons/DiscordOutline";
 import { Tooltip } from "../../../components/ui/tooltip";
-import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import { useAgentPickerFlow } from "../../hooks/useAgentPickerFlow";
-import { usePromptPickerFlow } from "../../hooks/usePromptPickerFlow";
 import { useEvaluatorPickerFlow } from "../../hooks/useEvaluatorPickerFlow";
+import { usePromptPickerFlow } from "../../hooks/usePromptPickerFlow";
+import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import { MODULES } from "../../registry";
 import type { ComponentType, Custom, Field } from "../../types/dsl";
 import { getInputsOutputs } from "../../utils/nodeUtils";
@@ -145,6 +145,8 @@ export const NodeSelectionPanel = ({
 
           <NodeDraggable component={MODULES.http} type="http" />
 
+          <NodeDraggable component={MODULES.ifElse} type="if_else" />
+
           <AgentNodeDraggable onDragEnd={handleAgentDragEnd} />
 
           <EvaluatorNodeDraggable onDragEnd={handleEvaluatorDragEnd} />
@@ -239,7 +241,7 @@ export function CustomDragLayer() {
     }
   }, [isDragging, item]);
 
-  if (!isDragging || !item || !item.node) {
+  if (!isDragging || !item?.node) {
     return null;
   }
 

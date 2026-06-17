@@ -4,7 +4,14 @@
  * Unit tests for SpotlightOverlay rendering and navigation.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, act, fireEvent, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -31,7 +38,9 @@ vi.mock("../../store/onboardingStore", () => ({
 }));
 
 // Stub history.replaceState so fragment writes don't throw in jsdom
-const historyReplaceState = vi.spyOn(window.history, "replaceState").mockImplementation(() => undefined);
+const historyReplaceState = vi
+  .spyOn(window.history, "replaceState")
+  .mockImplementation(() => undefined);
 
 // Make requestAnimationFrame execute synchronously in jsdom so the
 // anchor measurement effect fires within `act()` / `waitFor()`.
@@ -89,7 +98,9 @@ describe("<SpotlightOverlay />", () => {
     describe("when rendered", () => {
       it("renders nothing", () => {
         renderOverlay();
-        expect(screen.queryByTestId("spotlight-popover")).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("spotlight-popover"),
+        ).not.toBeInTheDocument();
       });
     });
   });
@@ -208,7 +219,29 @@ describe("<SpotlightOverlay />", () => {
         await act(async () => {
           await new Promise((r) => setTimeout(r, 50));
         });
-        expect(screen.queryByTestId("spotlight-popover")).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("spotlight-popover"),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    describe("when a conditional anchor is missing but its fallback exists", () => {
+      beforeEach(() => {
+        mockSpotlightsActive = true;
+        // evaluator-drill's primary anchor (evaluator-drilldown) only
+        // exists with a row expanded; the tour must fall back to the
+        // always-present evaluator-section anchor instead of skipping —
+        // skipping was how the 4-step tour died after step 2.
+        mockCurrentSpotlightId = "evaluator-drill";
+        addAnchor("evaluator-section");
+      });
+
+      it("renders the spotlight against the fallback anchor", async () => {
+        renderOverlay();
+        await waitFor(() =>
+          expect(screen.getByTestId("spotlight-popover")).toBeInTheDocument(),
+        );
+        expect(screen.getByText("Evaluator drilldown")).toBeInTheDocument();
       });
     });
 

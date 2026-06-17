@@ -2,7 +2,7 @@ import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
 import type { Prisma, PrismaClient, WorkflowVersion } from "@prisma/client";
 import type { JsonValue } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
-import { generateText, tool } from "ai";
+import { generateText } from "ai";
 import { createPatch } from "diff";
 import { nanoid } from "nanoid";
 import type { Session } from "~/server/auth";
@@ -1118,30 +1118,18 @@ ${diff}
             `,
           },
         ],
-        tools: {
-          commitMessage: tool({
-            inputSchema: z.object({
-              message: z.string(),
-            }),
-            outputSchema: z.string(),
-            execute: async ({ message }) => {
-              return message;
-            },
-          }),
-        },
-        toolChoice: {
-          type: "tool",
-          toolName: "commitMessage",
-        },
       }));
 
-      const result = commitMessage.toolResults?.find(
-        (t) => t.toolName === "commitMessage",
-      )?.output;
+      // A commit message is one short string: a plain-text completion, not a
+      // function-tool round-trip. Function tools combined with reasoning_effort
+      // are rejected on /v1/chat/completions for the gpt-5 family (the provider
+      // asks for /v1/responses), and these model calls go through the
+      // OpenAI-compatible chat-completions proxy. Generating text directly
+      // sidesteps that incompatibility and behaves the same across providers.
 
       // TODO: save call costs to user account
 
-      return result;
+      return commitMessage.text.trim();
     }),
 });
 

@@ -52,8 +52,7 @@ export function useSamplePreview(): SamplePreviewResult | null {
   // so the aurora beat's before/after distinction still works. For all other
   // preview modes (no-traces default, toolbar opt-in, spotlights) always
   // show the full set — the journey stage gate is irrelevant outside the tour.
-  const arrivalsVisible =
-    !tourActive || shouldShowArrivals(onboardingStage);
+  const arrivalsVisible = !tourActive || shouldShowArrivals(onboardingStage);
   const previewSet = arrivalsVisible
     ? [...ARRIVAL_PREVIEW_TRACES, ...SAMPLE_PREVIEW_TRACES]
     : SAMPLE_PREVIEW_TRACES;

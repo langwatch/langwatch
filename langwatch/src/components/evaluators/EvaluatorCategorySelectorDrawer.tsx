@@ -1,13 +1,14 @@
 import { Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
-import { AnimatePresence, motion, type Variants } from "motion/react";
 import {
   Brain,
   CheckSquare,
+  Code,
   Database,
   Shield,
   Star,
   Workflow,
 } from "lucide-react";
+import { AnimatePresence, motion, type Variants } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
 
@@ -36,6 +37,7 @@ export type EvaluatorCategorySelectorDrawerProps = {
   onClose?: () => void;
   onSelectCategory?: (category: EvaluatorCategoryId) => void;
   onSelectWorkflow?: () => void;
+  onSelectCode?: () => void;
 };
 
 const evaluatorCategories: Array<{
@@ -138,6 +140,8 @@ export function EvaluatorCategorySelectorDrawer(
   const onSelectWorkflow =
     props.onSelectWorkflow ??
     (() => openDrawer("workflowSelectorForEvaluator"));
+  const onSelectCode =
+    props.onSelectCode ?? (() => openDrawer("codeEvaluatorEditor"));
   // `open` arrives from CurrentDrawer as the drawer-name string (e.g.
   // "evaluatorCategorySelector"), not a boolean. Treat any non-false,
   // non-undefined value as open.
@@ -257,7 +261,7 @@ export function EvaluatorCategorySelectorDrawer(
                     paddingTop={4}
                   >
                     Select a category to see available evaluators, or create a
-                    custom one from a workflow.
+                    custom one.
                   </Text>
 
                   <VStack
@@ -279,13 +283,22 @@ export function EvaluatorCategorySelectorDrawer(
                       borderColor="border"
                       paddingTop={3}
                     >
-                      <CategoryCard
-                        id="workflow"
-                        icon={Workflow}
-                        title="Custom (from Workflow)"
-                        description="Create a new workflow for custom evaluation logic"
-                        onClick={onSelectWorkflow}
-                      />
+                      <VStack gap={3} align="stretch">
+                        <CategoryCard
+                          id="code"
+                          icon={Code}
+                          title="Custom (Code)"
+                          description="Write a custom Python evaluator"
+                          onClick={onSelectCode}
+                        />
+                        <CategoryCard
+                          id="workflow"
+                          icon={Workflow}
+                          title="Custom (from Workflow)"
+                          description="Create a new workflow for custom evaluation logic"
+                          onClick={onSelectWorkflow}
+                        />
+                      </VStack>
                     </Box>
                   </VStack>
                 </VStack>

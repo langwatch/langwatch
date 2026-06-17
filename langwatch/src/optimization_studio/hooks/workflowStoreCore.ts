@@ -16,11 +16,19 @@ import { snakeCaseToPascalCase } from "../../utils/stringCasing";
 import type {
   BaseComponent,
   Component,
+  Entry,
   Field,
   LLMConfig,
   Workflow,
 } from "../types/dsl";
+import {
+  GATE_FIELD,
+  GATE_HANDLE_ID,
+  isBranchConnectionOrigin,
+  nodeHasGateInput,
+} from "../utils/controlFlow";
 import { hasDSLChanged } from "../utils/dslUtils";
+import { canConvergeOnInput } from "../utils/edgeConvergence";
 import { findLowestAvailableName, nameToId } from "../utils/nodeUtils";
 
 const logger = createLogger("langwatch:studio:workflowStore");
@@ -50,6 +58,10 @@ export type State = Workflow & {
   isDraggingNode: boolean;
   /** The node ID confirmed by onNodeClick (genuine click, not drag). Gates drawer opening. */
   clickedNodeId: string | null;
+  /** True while dragging an If/Else branch handle. Grows a temporary green "gate" input on every connectable node. */
+  branchConnectionInProgress: boolean;
+  /** The If/Else node a branch drag started from, so it does not offer itself a gate. */
+  branchConnectionSourceId: string | null;
 };
 
 export type WorkflowStore = State & {
@@ -77,6 +89,13 @@ export type WorkflowStore = State & {
   onEdgesChange: (changes: EdgeChange[]) => void;
   onNodesDelete: () => void;
   onConnect: (connection: Connection) => { error?: string } | undefined;
+  /** Called when a connection drag starts; flags If/Else branch drags so nodes show the temporary gate input. */
+  onConnectStart: (params: {
+    nodeId: string | null;
+    handleId: string | null;
+  }) => void;
+  /** Called when a connection drag ends; clears the branch-drag flag. */
+  onConnectEnd: () => void;
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
   edgeConnectToNewHandle: (
@@ -116,6 +135,19 @@ export type WorkflowStore = State & {
     optimizationState: Partial<Workflow["state"]["optimization"]>,
   ) => void;
   setHoveredNodeId: (nodeId: string | undefined) => void;
+  /**
+   * Attach (or replace) the dataset on an entry node, merging its
+   * columns into the node's fields instead of overwriting them.
+   * User-defined inputs survive a dataset attach; columns already
+   * present (by identifier) are not duplicated. The user can then
+   * remove dataset-derived fields they don't care about - the dataset
+   * stays attached either way.
+   */
+  attachEntryDataset: (
+    nodeId: string,
+    dataset: Entry["dataset"],
+    columns: Field[],
+  ) => void;
   setSelectedNode: (nodeId: string) => void;
   deselectAllNodes: () => void;
   setPropertiesExpanded: (expanded: boolean) => void;
@@ -169,6 +201,8 @@ export const initialState: State = {
   playgroundOpen: false,
   isDraggingNode: false,
   clickedNodeId: null,
+  branchConnectionInProgress: false,
+  branchConnectionSourceId: null,
 };
 
 export const getWorkflow = (state: State) => {
@@ -203,7 +237,10 @@ export const serializeWorkflow = <T extends { nodes: Node[]; edges: Edge[] }>(
     ...workflow,
     nodes: workflow.nodes.map((node) => {
       const { selected, dragging, ...rest } = node;
-      const { execution_state, ...dataRest } = rest.data as Record<string, unknown>;
+      const { execution_state, ...dataRest } = rest.data as Record<
+        string,
+        unknown
+      >;
       return { ...rest, data: dataRest };
     }) as T["nodes"],
     edges: workflow.edges.map((edge) => {
@@ -278,7 +315,6 @@ export const removeInvalidEdges = ({
           },
           "dropping edge: handle identifier missing",
         );
-
       }
 
       return sourceValid && targetValid;
@@ -382,8 +418,7 @@ export const updateInputFields = (parameters: Field[], inputs: Field[]) => {
   });
 };
 
-const escapeRegex = (str: string) =>
-  str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 export const updateOutputFields = (
   parameters: Field[],
@@ -398,13 +433,9 @@ export const updateOutputFields = (
     if (p.identifier === "code") {
       let code = p.value as string;
       for (const [index, output] of outputs.entries()) {
-        const escapedId = escapeRegex(
-          previousOutputs[index]?.identifier ?? "",
-        );
+        const escapedId = escapeRegex(previousOutputs[index]?.identifier ?? "");
         code = code.replace(
-          new RegExp(
-            `(return[\\s\\n\\t]+?\\{[^\\}]*?)"${escapedId}"`,
-          ),
+          new RegExp(`(return[\\s\\n\\t]+?\\{[^\\}]*?)"${escapedId}"`),
           `$1"${output.identifier}"`,
         );
       }
@@ -452,6 +483,18 @@ export const store = (
   ) => {
     const resolved =
       typeof workflow === "function" ? workflow(get().getWorkflow()) : workflow;
+    // The entry node was historically named "Entry" and styled as a
+    // dataset grid, which made dataset columns read as the workflow's
+    // inputs. It now presents as "Entry point" everywhere - normalize
+    // legacy names on load so canvas and drawer agree (persisted on the
+    // next autosave).
+    if ("nodes" in resolved && resolved.nodes) {
+      resolved.nodes = resolved.nodes.map((node) =>
+        node.type === "entry" && node.data.name === "Entry"
+          ? { ...node, data: { ...node.data, name: "Entry point" } }
+          : node,
+      );
+    }
     const keys = Object.keys(resolved);
     logger.debug({ keys }, "setWorkflow: updating workflow");
     if ("edges" in resolved) {
@@ -472,7 +515,6 @@ export const store = (
           },
           "setWorkflow: edges count decreased",
         );
-
       }
     }
     set(resolved);
@@ -505,11 +547,7 @@ export const store = (
   onNodesChange: (changes: NodeChange[]) => {
     const removeChanges = changes.filter((c) => c.type === "remove");
     if (removeChanges.length > 0) {
-      logger.warn(
-        { removeChanges },
-        "onNodesChange: REMOVING nodes",
-      );
-
+      logger.warn({ removeChanges }, "onNodesChange: REMOVING nodes");
     }
     const hasDeselection = changes.some(
       (c) => c.type === "select" && !c.selected,
@@ -534,7 +572,6 @@ export const store = (
         },
         "onEdgesChange: REMOVING edges",
       );
-
     }
     set({
       edges: applyEdgeChanges(changes, get().edges),
@@ -542,22 +579,84 @@ export const store = (
   },
   onConnect: (connection: Connection) => {
     const currentEdges = get().edges;
+    const nodes = get().nodes;
+    const fromBranch = isBranchConnectionOrigin({
+      node: nodes.find((n) => n.id === connection.source),
+      handleId: connection.sourceHandle,
+    });
+    // Dropping a branch onto a node's temporary gate: materialize a real
+    // "gate" bool input on the target and wire the branch into it. The branch
+    // carries its boolean value like a normal edge; the engine gates the node
+    // on the branch and plumbs that value into the gate input.
+    if (
+      fromBranch &&
+      connection.targetHandle === GATE_HANDLE_ID &&
+      connection.target
+    ) {
+      const targetNode = nodes.find((n) => n.id === connection.target);
+      if (targetNode && !nodeHasGateInput(targetNode)) {
+        const inputs: Field[] = [
+          ...((targetNode.data as { inputs?: Field[] }).inputs ?? []),
+          { identifier: GATE_FIELD, type: "bool" },
+        ];
+        set({
+          branchConnectionInProgress: false,
+          branchConnectionSourceId: null,
+          nodes: nodes.map((n) =>
+            n.id === targetNode.id ? { ...n, data: { ...n.data, inputs } } : n,
+          ),
+          edges: addEdge({ ...connection, type: "default" }, currentEdges),
+        });
+        return;
+      }
+    }
     const existingConnection = currentEdges.find(
       (edge) =>
         edge.target === connection.target &&
         edge.targetHandle === connection.targetHandle,
     );
-    if (existingConnection) {
+    // An input takes one source, except across mutually exclusive If/Else
+    // branches: only one of them ever runs, so they may converge on the
+    // same input. Sources that can run together stay blocked.
+    if (
+      existingConnection &&
+      !canConvergeOnInput({ nodes, edges: currentEdges, connection })
+    ) {
       return {
-        error: "Cannot connect two values to the same input",
+        error:
+          "These two values can run at the same time, so they can't feed the same input. Only mutually exclusive If/Else branches can converge on one input.",
       };
     }
     set({
+      branchConnectionInProgress: false,
+      branchConnectionSourceId: null,
       edges: addEdge(connection, currentEdges).map((edge) => ({
         ...edge,
         type: edge.type ?? "default",
       })),
     });
+  },
+  onConnectStart: (params: {
+    nodeId: string | null;
+    handleId: string | null;
+  }) => {
+    const node = get().nodes.find((n) => n.id === params.nodeId);
+    const fromBranch = isBranchConnectionOrigin({
+      node,
+      handleId: params.handleId,
+    });
+    set({
+      branchConnectionInProgress: fromBranch,
+      branchConnectionSourceId: fromBranch ? (params.nodeId ?? null) : null,
+    });
+  },
+  onConnectEnd: () => {
+    if (get().branchConnectionInProgress) {
+      set({
+        branchConnectionInProgress: false,
+        branchConnectionSourceId: null,
+      });
+    }
   },
   setNodes: (nodes: Node[]) => {
     set({ nodes });
@@ -581,7 +680,6 @@ export const store = (
         },
         "setEdges: edges count decreased",
       );
-
     }
     set({ edges });
   },
@@ -694,8 +792,7 @@ export const store = (
                 ),
               }
             : {}),
-          ...((node.data?.inputs || node.data?.outputs) &&
-          n.type === "code"
+          ...((node.data?.inputs || node.data?.outputs) && n.type === "code"
             ? {
                 parameters: updateOutputFields(
                   updateInputFields(
@@ -817,6 +914,15 @@ export const store = (
         ...currentNode.data,
         name: newName,
         execution_state: undefined,
+        ...(currentNode.type === "code" && currentNode.data.parameters
+          ? {
+              parameters: updateCodeClassName(
+                currentNode.data.parameters as Field[],
+                currentNode.id,
+                newId,
+              ),
+            }
+          : {}),
       },
     };
     set({
@@ -934,6 +1040,27 @@ export const store = (
   },
   setHoveredNodeId: (nodeId: string | undefined) => {
     set({ hoveredNodeId: nodeId });
+  },
+  attachEntryDataset: (
+    nodeId: string,
+    dataset: Entry["dataset"],
+    columns: Field[],
+  ) => {
+    set({
+      nodes: get().nodes.map((node) => {
+        if (node.id !== nodeId) return node;
+        const existing = node.data.outputs ?? [];
+        const existingIds = new Set(existing.map((f) => f.identifier));
+        const merged = [
+          ...existing,
+          ...columns.filter((c) => !existingIds.has(c.identifier)),
+        ];
+        return {
+          ...node,
+          data: { ...node.data, outputs: merged, dataset } as Component,
+        };
+      }),
+    });
   },
   setSelectedNode: (nodeId: string) => {
     set({

@@ -221,7 +221,12 @@ export function ApiKeyIntegrationInfoCard({
             >
               <HStack justify="space-between" align="center" gap={3}>
                 <HStack gap={2} align="center" color="fg" flex={1} minWidth={0}>
-                  <Icon as={Sparkles} boxSize={4} color="orange.fg" flexShrink={0} />
+                  <Icon
+                    as={Sparkles}
+                    boxSize={4}
+                    color="orange.fg"
+                    flexShrink={0}
+                  />
                   <Text fontSize="sm" lineHeight="snug">
                     <Text as="span" color="orange.fg" fontWeight="semibold">
                       Copy this token before you move on.

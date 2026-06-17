@@ -55,6 +55,7 @@ vi.mock("~/utils/logger/server", () => ({
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
+  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
 }));
 
 const FIXED_OCCURRED_AT_MS = 1_700_000_000_000;

@@ -11,7 +11,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { TriggerAction } from "@prisma/client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CheckSquare } from "react-feather";
 import { useForm } from "react-hook-form";
 import { useLocalStorage } from "usehooks-ts";
@@ -314,11 +314,21 @@ export function AutomationDrawer() {
   };
 
   const editDataset = useDisclosure();
+  const editorPortalRef = useRef<HTMLDivElement>(null);
 
   return (
     <Drawer.Root
       open={true}
       onOpenChange={({ open }) => !open && closeDrawer()}
+      onEscapeKeyDown={(e) => {
+        // Escape while the floating cell editor is open should only close
+        // the editor (its own handler), never the whole drawer.
+        if (
+          editorPortalRef.current?.querySelector("[data-floating-cell-editor]")
+        ) {
+          e.preventDefault();
+        }
+      }}
       placement="end"
     >
       <Drawer.Content bg="bg" maxWidth="1200px">
@@ -326,7 +336,7 @@ export function AutomationDrawer() {
           <Drawer.CloseTrigger />
           <Heading>Add Automation</Heading>
         </Drawer.Header>
-        <Drawer.Body>
+        <Drawer.Body ref={editorPortalRef}>
           {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
           <form onSubmit={handleSubmit(onSubmit)}>
             <HorizontalFormControl
@@ -472,6 +482,7 @@ export function AutomationDrawer() {
                     onRowDataChange={setRowDataFromDataset}
                     paragraph="This is a sample of the data will look when added to the dataset."
                     setDatasetTriggerMapping={setDatasetTriggerMapping}
+                    editorPortalRef={editorPortalRef}
                   />
                 )}
               </>

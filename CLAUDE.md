@@ -13,6 +13,8 @@ cat specs/foo/bar.feature    # Read the scenarios
 
 If no feature file exists for your task, create one before writing code.
 
+**For frontend work, read the UX docs first.** Before any non-trivial frontend change (anything beyond a specific, targeted tweak the user spelled out), read the relevant pattern docs under `dev/docs/best_practices/` so you extend existing patterns instead of reinventing them. The UI ones: `react.md`, `drawers.md`, `row-actions-overflow-menu.md`, `selection-action-bar.md`, `scope-selector-and-badges.md`. If the surface you are building has no doc yet, write one as part of the change.
+
 ## Development Environment
 
 `make quickstart` is the single entry point. It asks what you're working on and starts only the services you need, overriding only the URLs whose services are local. Your `langwatch/.env` is the source of truth for everything else.
@@ -67,23 +69,18 @@ exactly one place (no prefix duplication). Set
 
 ### NLP Engine (Go, services/nlpgo/)
 
-nlpgo is the Go service (not in `compose.dev.yml`) that powers the optimization
-studio, the experiments workbench, scenarios, topic clustering and evaluator
-orchestration. Like the gateway, `pnpm dev` auto-starts it alongside vite + api
-when the Go toolchain is on PATH; the process appears as `nlpgo` in the
-concurrent output, binds the port the app calls (`LANGWATCH_NLP_SERVICE`, default
-:5561, the app port + 1), and reuses an existing listener if another worktree
-already booted one. Set `LANGWATCH_SKIP_NLPGO=1` to opt out, or point
-`LANGWATCH_NLP_SERVICE` at a remote host to use a shared nlpgo. To run it
-standalone:
+`nlpgo` is the Go NLP engine that runs optimization-studio executions and
+evaluators. `pnpm dev` auto-starts it alongside vite + api when the Go toolchain
+is on PATH; the process appears as `nlpgo` in the concurrent output. It binds the
+port the app dials via `LANGWATCH_NLP_SERVICE` (default `:5561`, otherwise PORT+1)
+and reuses an existing listener if another worktree already booted one. When
+`LANGWATCH_NLP_SERVICE` points at an external host, no local engine is started.
+Set `LANGWATCH_SKIP_NLP=1` to opt out. To run it standalone:
 
 ```bash
-make service svc=nlpgo            # run once
-make service-watch svc=nlpgo     # live reload via air
+make service svc=nlpgo       # run once
+make service-watch svc=nlpgo # live reload via air
 ```
-
-langevals (the evaluator scorer service on :5562) is not auto-started; bring it
-up with `make quickstart all-local-nlp` when you need real evaluator runs.
 
 ## Commands
 

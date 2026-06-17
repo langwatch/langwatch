@@ -447,11 +447,18 @@ if dedupId ~= "" and dedupTtlMs > 0 then
   if existingJobId then
     local rank = redis.call("ZRANK", groupJobsKey, existingJobId)
     if rank then
-      -- Still in staging: squash in place (net zero pending count change)
+      -- Still in staging: squash in place (net zero pending count change). The
+      -- squash drops one payload on the floor; if it carried an offloaded blob
+      -- (ADR-026) that blob is now unreferenced and would leak until its TTL
+      -- (the 2026-06-11 capacity incident). Report the displaced value so the
+      -- caller can reclaim its blob. On replace the OLD stored value is dropped;
+      -- otherwise the NEW value we were just handed is the one discarded.
+      local orphanedValue = jobDataJson
       if shouldExtend == 1 then
         redis.call("ZADD", groupJobsKey, dispatchAfter, existingJobId)
       end
       if shouldReplace == 1 then
+        orphanedValue = redis.call("HGET", dataKey, existingJobId) or ""
         redis.call("HSET", dataKey, existingJobId, jobDataJson)
       end
       redis.call("SET", dedupKey, existingJobId, "PX", dedupTtlMs)
@@ -462,7 +469,7 @@ if dedupId ~= "" and dedupTtlMs > 0 then
       refreshGroupKeyTtl(groupJobsKey, dataKey, nowMs)
       redis.call("LPUSH", signalKey, "1")
       redis.call("LTRIM", signalKey, 0, 999)
-      return 0
+      return {0, orphanedValue}
     end
     -- Already dispatched: dedup key is stale, clean it up
     redis.call("DEL", dedupKey)
@@ -488,7 +495,8 @@ redis.call("LTRIM", signalKey, 0, 999)
 -- New job staged: increment total pending counter
 redis.call("INCR", totalPendingKey)
 
-return 1
+-- A genuinely new stage displaces nothing, so there is no blob to reclaim.
+return {1, ""}
 `;
 
 const STAGE_BATCH_LUA =
@@ -510,6 +518,9 @@ local nowMs        = tonumber(ARGV[#ARGV - 1])
 
 local newStagedCount = 0
 local affectedGroups = {}
+-- Per-job (index-aligned) displaced values whose offloaded blob the caller must
+-- reclaim; "" for a genuine new stage. Mirrors STAGE_LUA's single-job report.
+local orphanedValues = {}
 
 for i = 1, count do
   local offset = 2 + (i - 1) * 8
@@ -527,16 +538,21 @@ for i = 1, count do
   local dedupKey     = (dedupId ~= "") and (keyPrefix .. "dedup:" .. dedupId) or (keyPrefix .. "dedup:__none__")
 
   local isDeduped = false
+  local orphanedValue = ""
   if dedupId ~= "" and dedupTtlMs > 0 then
     local existingJobId = redis.call("GET", dedupKey)
     if existingJobId then
       local rank = redis.call("ZRANK", groupJobsKey, existingJobId)
       if rank then
-        -- Still in staging: squash in place
+        -- Still in staging: squash in place. The displaced payload's blob would
+        -- leak (see STAGE_LUA) — on replace it is the OLD stored value, else the
+        -- NEW value we were handed is the one dropped.
+        orphanedValue = jobDataJson
         if shouldExtend == 1 then
           redis.call("ZADD", groupJobsKey, dispatchAfter, existingJobId)
         end
         if shouldReplace == 1 then
+          orphanedValue = redis.call("HGET", dataKey, existingJobId) or ""
           redis.call("HSET", dataKey, existingJobId, jobDataJson)
         end
         redis.call("SET", dedupKey, existingJobId, "PX", dedupTtlMs)
@@ -556,6 +572,7 @@ for i = 1, count do
     end
     newStagedCount = newStagedCount + 1
   end
+  orphanedValues[i] = orphanedValue
 
   refreshGroupKeyTtl(groupJobsKey, dataKey, nowMs)
 
@@ -589,7 +606,7 @@ if newStagedCount > 0 then
   redis.call("INCRBY", totalPendingKey, newStagedCount)
 end
 
-return newStagedCount
+return {newStagedCount, orphanedValues}
 `;
 
 const DISPATCH_LUA =
@@ -1483,7 +1500,13 @@ export class GroupStagingScripts {
    * shouldExtend/shouldReplace). When the old job was already dispatched, the
    * stale dedup key is cleaned up and the new job is staged as genuinely new.
    *
-   * @returns true if a new job was staged, false if squashed onto an existing job (dedup)
+   * A squash drops one payload (the replaced old value, or the discarded new
+   * value when `replace` is off); `orphanedValue` reports it so the caller can
+   * reclaim its offloaded blob (ADR-026) instead of leaking it. It is `""` for a
+   * genuine new stage, which displaces nothing.
+   *
+   * @returns `isNew` (true if staged fresh, false if deduped) plus the displaced
+   *   `orphanedValue` whose blob the caller must reclaim.
    */
   async stage({
     stagedJobId,
@@ -1503,7 +1526,7 @@ export class GroupStagingScripts {
     jobDataJson: string;
     shouldExtend?: boolean;
     shouldReplace?: boolean;
-  }): Promise<boolean> {
+  }): Promise<{ isNew: boolean; orphanedValue: string }> {
     const groupJobsKey = `${this.keyPrefix}group:${groupId}:jobs`;
     const readyKey = `${this.keyPrefix}ready`;
     const signalKey = `${this.keyPrefix}signal`;
@@ -1540,13 +1563,23 @@ export class GroupStagingScripts {
       String(readGlobalBudget()),
     );
 
-    return result === 1;
+    // STAGE_LUA returns [code, orphanedValue]. Tolerate a bare integer reply
+    // defensively (e.g. a stale cached script during a rolling deploy).
+    const [code, orphanedValue] = Array.isArray(result)
+      ? (result as [number, unknown])
+      : [result as number, ""];
+    return {
+      isNew: Number(code) === 1,
+      orphanedValue: orphanedValue == null ? "" : String(orphanedValue),
+    };
   }
 
   /**
    * Stage a batch of jobs into their respective group queues.
    *
-   * @returns number of new jobs staged (excluding replaced ones)
+   * @returns `newStagedCount` (new jobs, excluding deduped) plus the
+   *   index-aligned `orphanedValues` of squashed jobs whose offloaded blobs the
+   *   caller must reclaim (`""` where nothing was displaced). See {@link stage}.
    */
   async stageBatch(
     jobs: Array<{
@@ -1559,8 +1592,8 @@ export class GroupStagingScripts {
       shouldExtend?: boolean;
       shouldReplace?: boolean;
     }>,
-  ): Promise<number> {
-    if (jobs.length === 0) return 0;
+  ): Promise<{ newStagedCount: number; orphanedValues: string[] }> {
+    if (jobs.length === 0) return { newStagedCount: 0, orphanedValues: [] };
 
     const readyKey = `${this.keyPrefix}ready`;
     const signalKey = `${this.keyPrefix}signal`;
@@ -1594,7 +1627,18 @@ export class GroupStagingScripts {
       ...args,
     );
 
-    return Number(result);
+    // STAGE_BATCH_LUA returns [newStagedCount, orphanedValues[]]. Tolerate a
+    // bare integer reply defensively (stale cached script mid-deploy).
+    if (Array.isArray(result)) {
+      const [count, orphans] = result as [number, unknown];
+      return {
+        newStagedCount: Number(count),
+        orphanedValues: Array.isArray(orphans)
+          ? orphans.map((v) => (v == null ? "" : String(v)))
+          : [],
+      };
+    }
+    return { newStagedCount: Number(result), orphanedValues: [] };
   }
 
   /**
@@ -1964,6 +2008,25 @@ export class GroupStagingScripts {
    */
   async getReadySize(): Promise<number> {
     return this.redis.zcard(`${this.keyPrefix}ready`);
+  }
+
+  /**
+   * Earliest dispatch-after score in the ready set, or null when empty.
+   * The dispatcher clamps its BRPOP fallback to this so groups staged
+   * with a dispatch delay wake when due: their send-time signals fire
+   * (and get drained) while the job is still inside its delay window,
+   * and nothing re-signals at the due time.
+   */
+  async getEarliestReadyScore(): Promise<number | null> {
+    const result = await this.redis.zrange(
+      `${this.keyPrefix}ready`,
+      0,
+      0,
+      "WITHSCORES",
+    );
+    if (result.length < 2) return null;
+    const score = Number(result[1]);
+    return Number.isFinite(score) ? score : null;
   }
 
   /**

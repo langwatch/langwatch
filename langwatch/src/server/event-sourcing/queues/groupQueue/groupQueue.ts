@@ -326,7 +326,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       span.setAttributes({ ...customAttributes });
     }
 
-    const isNew = await this.scripts.stage({
+    const { isNew, orphanedValue } = await this.scripts.stage({
       stagedJobId,
       groupId,
       dispatchAfterMs,
@@ -339,6 +339,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       shouldExtend,
       shouldReplace,
     });
+
+    // A dedup squash displaced a staged payload; reclaim its offloaded blob so
+    // it does not leak until the 7-day TTL (the 2026-06-11 capacity incident).
+    // Fire-and-forget (matches the worker reclaim paths); a no-op for inline
+    // payloads (readEnvelopeBlobId yields null) and new stages (orphanedValue "").
+    if (orphanedValue) {
+      this.deleteEnvelopeBlobs([orphanedValue]);
+    }
 
     if (isNew) {
       gqJobsStagedTotal.inc({ queue_name: this.queueName });
@@ -429,7 +437,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       }),
     );
 
-    const newStagedCount = await this.scripts.stageBatch(jobsToStage);
+    const { newStagedCount, orphanedValues } =
+      await this.scripts.stageBatch(jobsToStage);
+
+    // Reclaim blobs displaced by any in-batch dedup squashes (see send()).
+    const orphans = orphanedValues.filter((value) => value.length > 0);
+    if (orphans.length > 0) {
+      this.deleteEnvelopeBlobs(orphans);
+    }
 
     const dedupedCount = payloads.length - newStagedCount;
     if (newStagedCount > 0) {
@@ -781,9 +796,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   }
 
   /**
-   * Best-effort deletion of offloaded bodies whose staged values are retired.
-   * Fire-and-forget: the blob TTL is the correctness backstop, so a failed
-   * delete only means the blob lingers until expiry.
+   * Best-effort reclamation of offloaded bodies whose staged values are retired
+   * (drained, completed, retried, or displaced by a dedup squash). Inline and
+   * legacy values yield no blob id and are skipped. Fire-and-forget: the blob
+   * TTL is the correctness backstop, so a failed delete only means the blob
+   * lingers until expiry. Producer (send/sendBatch) and worker paths alike call
+   * this without awaiting, to keep the hot path off the extra round-trip.
    */
   private deleteEnvelopeBlobs(values: string[]): void {
     for (const value of values) {

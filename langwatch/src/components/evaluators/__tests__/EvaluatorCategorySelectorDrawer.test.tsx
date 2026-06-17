@@ -141,6 +141,37 @@ describe("EvaluatorCategorySelectorDrawer", () => {
         expect(screen.getByText("Custom (from Workflow)")).toBeInTheDocument();
       });
     });
+
+    /** @scenario Custom code evaluator option is shown before the workflow option */
+    it("shows Custom (Code) before Custom (from Workflow)", async () => {
+      renderDrawer();
+
+      await waitFor(() => {
+        expect(screen.getByText("Custom (Code)")).toBeInTheDocument();
+      });
+
+      const codeOption = screen.getByText("Custom (Code)");
+      const workflowOption = screen.getByText("Custom (from Workflow)");
+      // The code option must come first in document order.
+      expect(
+        codeOption.compareDocumentPosition(workflowOption) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    /** @scenario Custom code evaluator copy stays customer-facing */
+    it("describes the Custom (Code) option without leaking internal comparisons", async () => {
+      renderDrawer();
+
+      await waitFor(() => {
+        expect(
+          screen.getByText("Write a custom Python evaluator"),
+        ).toBeInTheDocument();
+      });
+      // Copy must not reference the workflow option a first-time user has no
+      // context for. See dev/docs/best_practices/copywriting.md.
+      expect(screen.queryByText(/no workflow needed/i)).not.toBeInTheDocument();
+    });
   });
 
   describe("Navigation", () => {
@@ -220,7 +251,9 @@ describe("EvaluatorCategorySelectorDrawer", () => {
       const user = userEvent.setup();
       renderDrawer();
 
-      await user.click(screen.getByTestId("evaluator-category-expected_answer"));
+      await user.click(
+        screen.getByTestId("evaluator-category-expected_answer"),
+      );
       await user.click(await screen.findByTestId("mock-type-pick"));
 
       await waitFor(() => {

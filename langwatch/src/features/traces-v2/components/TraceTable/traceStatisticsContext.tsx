@@ -10,13 +10,23 @@ interface TraceStatistics {
    * divide-by-zero downstream.
    */
   p95DurationMs: number;
-  /** True when stats are computed from real rows (vs the loading placeholder). */
+  /** True when duration stats are computed from real rows (vs the loading placeholder). */
   hasData: boolean;
+  /**
+   * 95th-percentile time-to-first-token across the visible page rows
+   * that have a TTFT value. The TTFT column bar scales to this, same
+   * rationale as the duration p95.
+   */
+  p95TtftMs: number;
+  /** True when at least one visible row carries a TTFT value. */
+  hasTtftData: boolean;
 }
 
 const DEFAULT_STATS: TraceStatistics = {
   p95DurationMs: 1,
   hasData: false,
+  p95TtftMs: 1,
+  hasTtftData: false,
 };
 
 const TraceStatisticsContext = createContext<TraceStatistics>(DEFAULT_STATS);
@@ -31,6 +41,12 @@ function percentile(sorted: number[], p: number): number {
   if (lo === hi) return sorted[lo]!;
   const frac = rank - lo;
   return sorted[lo]! * (1 - frac) + sorted[hi]! * frac;
+}
+
+function positiveSorted(values: Array<number | null | undefined>): number[] {
+  return values
+    .filter((v): v is number => typeof v === "number" && v > 0)
+    .sort((a, b) => a - b);
 }
 
 interface TraceStatisticsProviderProps {
@@ -51,14 +67,14 @@ export function TraceStatisticsProvider({
 }: TraceStatisticsProviderProps) {
   const value = useMemo<TraceStatistics>(() => {
     if (skip || traces.length === 0) return DEFAULT_STATS;
-    const durations = traces
-      .map((t) => t.durationMs)
-      .filter((d) => d > 0)
-      .sort((a, b) => a - b);
-    if (durations.length === 0) return DEFAULT_STATS;
+    const durations = positiveSorted(traces.map((t) => t.durationMs));
+    const ttfts = positiveSorted(traces.map((t) => t.ttft));
+    if (durations.length === 0 && ttfts.length === 0) return DEFAULT_STATS;
     return {
       p95DurationMs: Math.max(1, percentile(durations, 95)),
-      hasData: true,
+      hasData: durations.length > 0,
+      p95TtftMs: Math.max(1, percentile(ttfts, 95)),
+      hasTtftData: ttfts.length > 0,
     };
   }, [traces, skip]);
   return (

@@ -9,6 +9,7 @@ import (
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/langwatch/langwatch/services/nlpgo/app/engine/dsl"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/planner"
 )
 
@@ -168,6 +169,15 @@ func (e *Engine) runLayerStream(ctx context.Context, req ExecuteRequest, plan *p
 		go func() {
 			defer wg.Done()
 			node := state.nodes[nodeID]
+			// Branch gating: see runLayer's twin branch. The skipped
+			// state is still emitted so Studio paints the node as
+			// skipped instead of leaving it idle.
+			if state.shouldSkip(nodeID) {
+				ns := &NodeState{ID: nodeID, Status: string(dsl.StatusSkipped)}
+				state.recordState(nodeID, ns)
+				emit(ctx, out, stateEvent(traceID, nodeID, ns))
+				return
+			}
 			inputs := state.resolveInputs(plan, nodeID)
 			ns := &NodeState{ID: nodeID, Status: "running", Inputs: inputs}
 			emit(ctx, out, stateEvent(traceID, nodeID, ns))
@@ -278,7 +288,7 @@ func stateEvent(traceID, nodeID string, ns *NodeState) StreamEvent {
 	if ns.Error != nil {
 		es["error"] = ns.Error.Message
 	}
-	if ns.DurationMS > 0 {
+	if ns.Status == string(dsl.StatusSuccess) || ns.Status == string(dsl.StatusError) {
 		// Studio's ExecutionOutputPanel renders the per-component
 		// duration via `<SpanDuration>` only when BOTH
 		// `timestamps.started_at` and `timestamps.finished_at` are set
@@ -287,6 +297,13 @@ func stateEvent(traceID, nodeID string, ns *NodeState) StreamEvent {
 		// clock-times through NodeState — the UI only uses the diff,
 		// and the wall-clock skew between the running and finished
 		// events is measured in microseconds.
+		//
+		// Emit on every completed node, including sub-millisecond ones
+		// (DurationMS == 0). A fast node like if/else legitimately runs
+		// in under a millisecond; gating on DurationMS > 0 meant a
+		// re-run never refreshed the panel, because the Studio reducer
+		// merges new timestamps over old and a missing field left the
+		// stale duration from a prior, slower run on screen.
 		finishedAt := time.Now().UnixMilli()
 		es["timestamps"] = map[string]any{
 			"started_at":  finishedAt - ns.DurationMS,

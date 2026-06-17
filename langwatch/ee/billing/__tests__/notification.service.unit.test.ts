@@ -33,6 +33,7 @@ vi.mock("../../../src/utils/logger/server", () => ({
 
 vi.mock("../../../src/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
+  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
 }));
 
 import { sendUsageLimitEmail } from "../../../src/server/mailer/usageLimitEmail";

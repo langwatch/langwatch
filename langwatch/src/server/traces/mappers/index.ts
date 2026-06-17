@@ -1,4 +1,5 @@
 export {
+  applyEventProtections,
   applySpanProtections,
   applyTraceProtections,
   extractRedactionsForObject,

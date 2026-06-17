@@ -22,7 +22,7 @@ help:
 	@echo "    make service-watch svc=<name>       run a Go service with live reload (air)"
 	@echo "    make worktree <issue|name>          create a git worktree for an issue/feature"
 	@echo "    make down                           stop all services"
-	@echo "    make test-scripts                   run bats unit tests (root + langwatch scripts)"
+	@echo "    make test-scripts                   run bats unit tests under scripts/__tests__/"
 	@echo ""
 	@echo "  Boxd workflows (multi-step orchestration over the boxd CLI):"
 	@echo "    make boxd-help                      full boxd target reference"
@@ -118,12 +118,11 @@ service-watch:
 refresh-dev-s3:
 	@bash langwatch/scripts/refresh-dev-s3-env.sh
 
-# Run all *.unit.bats tests under scripts/__tests__/ and
-# langwatch/scripts/__tests__/. Dev-only: these tests cover shell behavior of
-# `dev.sh` / `write-dev-overrides.sh` / `worktree.sh` / `boxd-fork.sh`, the AI
-# gateway secret seeding, and the `pnpm dev` Go service auto-start. CI does NOT
-# run them; the launchers are local dev tools, not part of the shipped product.
-# If you're editing one of those scripts, run `make test-scripts` to verify.
+# Run all *.unit.bats tests under scripts/__tests__/. Dev-only — these
+# tests cover shell behavior of `dev.sh` / `write-dev-overrides.sh` /
+# `worktree.sh` / `boxd-fork.sh`. CI does NOT run them; the launchers
+# are local dev tools, not part of the shipped product. If you're
+# editing one of those scripts, run `make test-scripts` to verify.
 #
 # Requires `bats` (`brew install bats-core` on macOS,
 # `sudo apt-get install -y bats` on Linux).
@@ -138,7 +137,7 @@ test-scripts:
 		echo "  Linux:  sudo apt-get install -y bats" >&2; \
 		exit 1; \
 	fi
-	bats scripts/__tests__/*.unit.bats langwatch/scripts/__tests__/*.unit.bats
+	bats scripts/__tests__/*.unit.bats
 
 # Stop all services
 down:
@@ -163,12 +162,17 @@ clean:
 install:
 	cd langwatch && pnpm install
 
-# Thin alias for `pnpm dev`, which auto-starts the Go aigateway and the Go
-# nlpgo engine alongside vite + api + workers (see langwatch/scripts/start.sh).
-# Running `pnpm dev` from langwatch/ is equivalent. Opt a bundled service out
-# with LANGWATCH_SKIP_AIGATEWAY=1 or LANGWATCH_SKIP_NLPGO=1.
+# Run the app (pnpm dev, which also auto-starts the Go aigateway) alongside
+# the Go nlpgo engine. nlpgo is the `nlpgo` subcommand of the cmd/service
+# monobinary, run the same way as aigateway (`make service svc=nlpgo`). We pin
+# SERVER_ADDR=:5561 so it binds the port the app expects (LANGWATCH_NLP_SERVICE
+# → http://localhost:5561) and doesn't collide with langevals on :5562.
+# LANGWATCH_ENDPOINT points nlpgo's evaluator/agent-workflow callbacks back at
+# the local app.
 start:
-	cd langwatch && pnpm dev
+	cd langwatch && pnpm concurrently --kill-others \
+		'pnpm dev' \
+		'SERVER_ADDR=:5561 LANGWATCH_ENDPOINT=http://localhost:5560 make -C .. service svc=nlpgo'
 
 start/postgres:
 	@echo "Starting Postgres..."

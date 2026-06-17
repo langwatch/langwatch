@@ -1,3 +1,4 @@
+import { FREE_VISIBILITY_DAYS } from "../licensing/constants";
 import type { PlanInfo } from "../licensing/planInfo";
 import { PlanTypes, type PlanTypes as PlanType } from "./planTypes";
 import { GROWTH_SEAT_PLAN_TYPES } from "./utils/growthSeatEvent";
@@ -90,6 +91,8 @@ export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {
     type: PlanTypes.FREE,
     name: "Free",
     free: true,
+    // SaaS Free gets the 14-day content visibility window.
+    visibilityDays: FREE_VISIBILITY_DAYS,
     maxMembers: 2,
     maxProjects: 2,
     maxMessagesPerMonth: 50_000,

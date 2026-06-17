@@ -2,11 +2,6 @@
 
 set -eo pipefail
 
-# Shared start-or-skip decision + nlpgo port resolution for the bundled Go
-# services (aigateway, nlpgo). Keeps this orchestrator readable and lets the
-# logic be unit-tested in isolation (dev-autostart.unit.bats).
-source "$(dirname "$0")/lib/go-service-autostart.sh"
-
 # Fail fast if any port we'd bind to is already taken (stale `pnpm dev`,
 # Docker exposing the same port, etc). Without this, we'd only discover the
 # conflict 30s later after Vite/tsx finish booting.
@@ -110,53 +105,47 @@ fi
 # toolchain isn't on PATH (contributors who only touch the TS app).
 # Opt-out: LANGWATCH_SKIP_AIGATEWAY=1.
 START_GATEWAY_COMMAND=""
-if [[ "$NODE_ENV" = "development" ]]; then
+if [[ "$NODE_ENV" = "development" && "$LANGWATCH_SKIP_AIGATEWAY" != "1" ]]; then
   _GATEWAY_PORT="${GATEWAY_PORT_DERIVED:-5563}"
-  case "$(go_service_should_start "$LANGWATCH_SKIP_AIGATEWAY" "$_GATEWAY_PORT")" in
-    start)
-      START_GATEWAY_COMMAND="make -C .. service svc=aigateway"
-      echo "  ✓ aigateway: auto-start on :$_GATEWAY_PORT" ;;
-    skip:no-go-toolchain)
-      echo "  ! aigateway: skipped (Go toolchain not in PATH); run \`make service svc=aigateway\` manually" ;;
-    skip:port-in-use)
-      echo "  ✓ aigateway: already running on :$_GATEWAY_PORT, reusing" ;;
-  esac
+  if ! command -v go >/dev/null 2>&1; then
+    echo "  ! aigateway: skipped (Go toolchain not in PATH); run \`make service svc=aigateway\` manually"
+  elif lsof -i ":$_GATEWAY_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+    echo "  ✓ aigateway: already running on :$_GATEWAY_PORT, reusing"
+  else
+    START_GATEWAY_COMMAND="make -C .. service svc=aigateway"
+    echo "  ✓ aigateway: auto-start on :$_GATEWAY_PORT"
+  fi
 fi
 
-# nlpgo engine (Go service). Bundled into pnpm dev for the same reason as the
-# gateway: the experiments workbench, playground, scenarios and evaluators all
-# route to nlpgo, so booting it here means a plain `pnpm dev` exercises the full
-# path without a second terminal. nlpgo binds the port the app calls
-# (LANGWATCH_NLP_SERVICE, default :5561 = PORT+1) and points its callbacks back
-# at the local app. Skips when Go is absent, when the port is already serving
-# (another worktree's nlpgo), or when LANGWATCH_NLP_SERVICE is a remote host.
-# Opt-out: LANGWATCH_SKIP_NLPGO=1.
-START_NLPGO_COMMAND=""
-if [[ "$NODE_ENV" = "development" ]]; then
-  _NLPGO_PORT="$(nlpgo_bind_port "$_APP_PORT" "$LANGWATCH_NLP_SERVICE")"
-  if [ "$_NLPGO_PORT" = "remote" ]; then
-    echo "  ✓ nlpgo: using configured LANGWATCH_NLP_SERVICE=$LANGWATCH_NLP_SERVICE, skipping local auto-start"
+# nlpgo data plane (Go NLP engine). Bundled into pnpm dev so the optimization
+# studio reaches a live engine without a second terminal (or `make start`).
+# It binds the port the app dials via LANGWATCH_NLP_SERVICE: that port when it
+# points at localhost, otherwise PORT+1 (5561 for the default 5560 app port),
+# and the app is pointed there when LANGWATCH_NLP_SERVICE is unset. Skips
+# silently when that port is already taken (another worktree / a manual run),
+# when LANGWATCH_NLP_SERVICE points at an external host, when the Go toolchain
+# isn't on PATH, and via LANGWATCH_SKIP_NLP=1.
+START_NLP_COMMAND=""
+if [[ "$NODE_ENV" = "development" && "$LANGWATCH_SKIP_NLP" != "1" ]]; then
+  _NLP_PORT=""
+  if [ -z "$LANGWATCH_NLP_SERVICE" ]; then
+    _NLP_PORT=$((_APP_PORT + 1))
+    export LANGWATCH_NLP_SERVICE="http://localhost:${_NLP_PORT}"
+  elif [[ "$LANGWATCH_NLP_SERVICE" =~ ^https?://(localhost|127\.0\.0\.1):([0-9]+) ]]; then
+    _NLP_PORT="${BASH_REMATCH[2]}"
+  fi
+  if [ -z "$_NLP_PORT" ]; then
+    echo "  ✓ nlpgo: external LANGWATCH_NLP_SERVICE=${LANGWATCH_NLP_SERVICE}, not starting a local one"
+  elif ! command -v go >/dev/null 2>&1; then
+    echo "  ! nlpgo: skipped (Go toolchain not in PATH); run \`make service svc=nlpgo\` manually"
+  elif lsof -i ":$_NLP_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+    echo "  ✓ nlpgo: already running on :$_NLP_PORT, reusing"
   else
-    # Point the app at the port nlpgo binds. Rewrites an empty URL AND a
-    # portless local one (e.g. http://localhost): nlpgo_bind_port already
-    # fell back to the derived port for those, so leaving the URL as-is
-    # would send app traffic to port 80 while nlpgo serves elsewhere.
-    # An explicit host:port is the developer's choice — left untouched.
-    _NLP_HOSTPORT="${LANGWATCH_NLP_SERVICE#*://}"
-    _NLP_HOSTPORT="${_NLP_HOSTPORT%%/*}"
-    case "$_NLP_HOSTPORT" in
-      *:[0-9]*) ;;
-      *) export LANGWATCH_NLP_SERVICE="http://localhost:${_NLPGO_PORT}" ;;
-    esac
-    case "$(go_service_should_start "$LANGWATCH_SKIP_NLPGO" "$_NLPGO_PORT")" in
-      start)
-        START_NLPGO_COMMAND="SERVER_ADDR=:${_NLPGO_PORT} LANGWATCH_ENDPOINT=http://localhost:${_APP_PORT} make -C .. service svc=nlpgo"
-        echo "  ✓ nlpgo: auto-start on :$_NLPGO_PORT" ;;
-      skip:no-go-toolchain)
-        echo "  ! nlpgo: skipped (Go toolchain not in PATH); run \`make service svc=nlpgo\` manually" ;;
-      skip:port-in-use)
-        echo "  ✓ nlpgo: already running on :$_NLPGO_PORT, reusing" ;;
-    esac
+    # SERVER_ADDR overrides the inherited gateway port; LANGWATCH_ENDPOINT is
+    # the app URL the engine calls back for evaluator + agent-workflow nodes
+    # (mirrors compose.dev.yml).
+    START_NLP_COMMAND="SERVER_ADDR=\":${_NLP_PORT}\" LANGWATCH_ENDPOINT=\"http://localhost:${_APP_PORT}\" make -C .. service svc=nlpgo"
+    echo "  ✓ nlpgo: auto-start on :$_NLP_PORT"
   fi
 fi
 
@@ -176,8 +165,8 @@ if [ -n "$START_GATEWAY_COMMAND" ]; then
   COMMANDS+=("$START_GATEWAY_COMMAND")
   NAMES+=("gateway")
 fi
-if [ -n "$START_NLPGO_COMMAND" ]; then
-  COMMANDS+=("$START_NLPGO_COMMAND")
+if [ -n "$START_NLP_COMMAND" ]; then
+  COMMANDS+=("$START_NLP_COMMAND")
   NAMES+=("nlpgo")
 fi
 if [ -n "$START_APP_COMMAND" ]; then

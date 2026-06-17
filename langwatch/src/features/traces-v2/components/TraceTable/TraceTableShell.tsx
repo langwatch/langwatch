@@ -20,7 +20,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { flexRender, type Header, type Table } from "@tanstack/react-table";
-import { ChevronDown, ChevronUp, GripVertical } from "lucide-react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef } from "react";
 import {
@@ -83,13 +83,32 @@ export function TraceTableShell<T>({
       activationConstraint: { distance: 5 },
     }),
   );
+  // After a drag, the browser fires a synthetic click on pointerup —
+  // dnd-kit's PointerSensor doesn't suppress it. Because the drag zone
+  // lives inside the sort <Button onClick>, finishing a reorder would
+  // also toggle the column's sort. Flip this ref on drag start and
+  // clear it on the NEXT tick after drag end/cancel (the synthetic
+  // click fires synchronously before timers run), so the button's
+  // onClick can swallow exactly that one click. Plain clicks never
+  // start a drag, so the ref stays false and sorting works as normal.
+  const suppressSortClickRef = useRef(false);
   const sortableHeaderIds =
     table
       .getHeaderGroups()[0]
       ?.headers.map((h) => h.id)
       .filter((id) => !pinnedColumnIds?.has(id)) ?? [];
 
+  const releaseSortClickSuppression = () => {
+    // setTimeout(0) defers past the synthetic click that the browser
+    // dispatches synchronously after pointerup — resetting inline here
+    // would re-enable sorting before that click reaches the button.
+    setTimeout(() => {
+      suppressSortClickRef.current = false;
+    }, 0);
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
+    releaseSortClickSuppression();
     if (!onColumnReorder) return;
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -206,7 +225,11 @@ export function TraceTableShell<T>({
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
+            onDragStart={() => {
+              suppressSortClickRef.current = true;
+            }}
             onDragEnd={handleDragEnd}
+            onDragCancel={releaseSortClickSuppression}
           >
             <SortableContext
               items={sortableHeaderIds}
@@ -220,6 +243,7 @@ export function TraceTableShell<T>({
                       header={header}
                       isStickyFirst={stickyFirstColumn && i === 0}
                       reorderable={!pinnedColumnIds?.has(header.id)}
+                      suppressSortClickRef={suppressSortClickRef}
                     />
                   ))}
                 </Tr>
@@ -256,27 +280,34 @@ interface HeaderCellProps<T> {
    * checkbox column uses this).
    */
   reorderable?: boolean;
+  /**
+   * Shared flag set by the surrounding DndContext while a column drag
+   * is in flight. The sort button checks it to swallow the synthetic
+   * click the browser fires right after a drag's pointerup — without
+   * it, dropping a column onto a sortable header also toggled sort.
+   */
+  suppressSortClickRef?: React.RefObject<boolean>;
 }
 
 function HeaderCell<T>({
   header,
   isStickyFirst,
   reorderable = false,
+  suppressSortClickRef,
 }: HeaderCellProps<T>): React.ReactElement {
   // Conditional `useSortable` — same hooks-discipline-friendly pattern
   // the sidebar uses for SortableSection. We always call the hook so
   // its call order is stable; the returned props are simply unused
   // when `reorderable` is false.
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: header.id, disabled: !reorderable });
+  const { listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: header.id, disabled: !reorderable });
+  // Drag zone gets ONLY the pointer listeners. The sortable
+  // `attributes` (role="button", tabIndex=0) are deliberately dropped:
+  // they'd nest an interactive element inside the sort <Button>
+  // (invalid HTML) and add a dead tab stop — we only wire the
+  // PointerSensor, so there's no keyboard reorder to expose anyway.
   const dragHandleProps = (
-    reorderable ? { ...attributes, ...(listeners ?? {}) } : {}
+    reorderable ? { ...(listeners ?? {}) } : {}
   ) as React.HTMLAttributes<HTMLElement>;
   const meta = header.column.columnDef.meta as ColumnMeta | undefined;
   // Open the one-off education dialog the first time the user tries
@@ -391,20 +422,6 @@ function HeaderCell<T>({
       letterSpacing="0.06em"
       whiteSpace="nowrap"
       transition="none"
-      // Th-scoped CSS reveals the drag grip on hover. `_groupHover` via
-      // `role="group"` was unreliable across our chakra("th") wrapper —
-      // the raw `&:hover` descendant selector is simpler and works
-      // regardless of how the parent's group plumbing resolves.
-      css={{
-        "& [data-column-drag-handle]": {
-          opacity: 0,
-          transition: "opacity 100ms ease",
-        },
-        "&:hover [data-column-drag-handle], & [data-column-drag-handle]:focus-visible":
-          {
-            opacity: 1,
-          },
-      }}
       position={isStickyFirst ? "sticky" : "relative"}
       left={isStickyFirst ? 0 : undefined}
       zIndex={isStickyFirst ? 3 : isDragging ? 4 : undefined}
@@ -437,81 +454,33 @@ function HeaderCell<T>({
       onMouseDown={onHeaderMouseDown}
       onDoubleClick={onHeaderDoubleClick}
     >
-      {reorderable && (
-        // Drag handle floats on the cell's left edge, hidden until the
-        // user hovers (or focuses) the header. The header label/sort
-        // chrome owns the cell's full width so labels like "TIME" no
-        // longer get squeezed by a permanently-rendered grip — the grip
-        // appears only when the operator is reaching for it. On hover
-        // it sits over the leftmost few pixels of the label; on a
-        // narrow column the label dims behind it, which is fine since
-        // the user is actively about to drag the column.
-        // GripVertical (vertical-dot orientation) reads as the "grab to
-        // move horizontally" gesture, matching every other table
-        // reorder UI users have seen.
-        <Box
-          data-column-drag-handle="true"
-          position="absolute"
-          top="50%"
-          left="2px"
-          transform="translateY(-50%)"
-          display="inline-flex"
-          alignItems="center"
-          justifyContent="center"
-          width="14px"
-          height="14px"
-          color="fg.subtle"
-          cursor="grab"
-          // Opacity is controlled by the Th-scoped CSS above; keyboard
-          // focus also reveals the handle via the `:focus-visible`
-          // selector. We still paint a focus ring locally for the
-          // keyboard path so the handle is unambiguously the focused
-          // element.
-          _focusVisible={{
-            outline: "2px solid",
-            outlineColor: "blue.focusRing",
-            outlineOffset: "1px",
-            borderRadius: "sm",
-          }}
-          _active={{ cursor: "grabbing" }}
-          // Backdrop so the grip stays legible when overlaying short
-          // labels in narrow columns. Picks up the active-sort tint
-          // so it doesn't clash with the cell's own background.
-          bg={
-            isActiveSort
-              ? { base: "bg.muted", _dark: "bg.muted" }
-              : { base: "bg.subtle/85", _dark: "bg.surface/85" }
-          }
-          borderRadius="sm"
-          zIndex={1}
-          aria-label="Drag to reorder column"
-          title="Drag to reorder column"
-          {...dragHandleProps}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Icon boxSize="10px">
-            <GripVertical />
-          </Icon>
-        </Box>
-      )}
-      {/* Reserve room for the (hover-revealed) drag grip on reorderable
-          columns so the first character of the label never sits under
-          the grip. The previous "label owns full width, grip overlays"
-          rule clipped letters like the "D" of "DURATION" the instant
-          the user hovered. Trade-off: the label starts ~16px from the
-          left edge always, even when the grip is invisible — minor
-          indent for guaranteed legibility, no hover-shift jitter, and
-          ellipsis still handles the right side cleanly on narrow
-          columns. */}
-      <Box flex={1} minWidth={0} paddingLeft={reorderable ? "16px" : 0}>
+      {/* No grip — the label itself is the drag zone (grab cursor on
+          hover). The sort chevron sits outside the drag zone so it
+          keeps the pointer cursor and never starts a reorder. Labels
+          own the cell's full width again, so narrow columns ("TIME")
+          aren't squeezed by handle chrome. */}
+      <Box flex={1} minWidth={0}>
         {canSort ? (
           <SortableHeaderButton
             align={align}
             sortDirection={sortDirection}
             onToggle={header.column.getToggleSortingHandler()}
+            dragZoneProps={reorderable ? dragHandleProps : undefined}
+            suppressSortClickRef={suppressSortClickRef}
           >
             {flexRender(header.column.columnDef.header, header.getContext())}
           </SortableHeaderButton>
+        ) : reorderable ? (
+          <Box
+            data-column-drag-handle="true"
+            cursor="grab"
+            _active={{ cursor: "grabbing" }}
+            truncate
+            title="Drag to reorder column"
+            {...dragHandleProps}
+          >
+            {flexRender(header.column.columnDef.header, header.getContext())}
+          </Box>
         ) : (
           flexRender(header.column.columnDef.header, header.getContext())
         )}
@@ -526,6 +495,17 @@ interface SortableHeaderButtonProps {
   sortDirection: false | "asc" | "desc";
   onToggle: ((event: unknown) => void) | undefined;
   children: React.ReactNode;
+  /**
+   * dnd-kit sortable pointer listeners. When set, the label text
+   * becomes the drag-to-reorder zone (grab cursor); the sort chevron
+   * stays outside it so sorting keeps priority — hovering the chevron
+   * shows a pointer, not a grab. The PointerSensor's 5px activation
+   * distance means a plain click on the label still falls through to
+   * the button's sort toggle.
+   */
+  dragZoneProps?: React.HTMLAttributes<HTMLElement>;
+  /** See HeaderCellProps — true while a drag's synthetic click is pending. */
+  suppressSortClickRef?: React.RefObject<boolean>;
 }
 
 function SortableHeaderButton({
@@ -533,8 +513,18 @@ function SortableHeaderButton({
   sortDirection,
   onToggle,
   children,
+  dragZoneProps,
+  suppressSortClickRef,
 }: SortableHeaderButtonProps): React.ReactElement {
   const isActive = sortDirection !== false;
+  const handleClick = (event: React.MouseEvent) => {
+    // The browser fires a synthetic click on pointerup after a drag,
+    // and dnd-kit doesn't suppress it. If a reorder just finished
+    // (ref flipped on drag start, cleared on the next tick after drag
+    // end), swallow the click so dropping a column doesn't also sort.
+    if (suppressSortClickRef?.current) return;
+    onToggle?.(event);
+  };
   return (
     <Button
       type="button"
@@ -554,14 +544,28 @@ function SortableHeaderButton({
       letterSpacing="inherit"
       textTransform="inherit"
       bg="transparent"
-      onClick={onToggle}
+      onClick={handleClick}
       _hover={{ color: "fg", bg: "transparent" }}
       _active={{ bg: "transparent" }}
       _focusVisible={{ bg: "transparent" }}
       role="group"
     >
       <HStack gap={1} minWidth={0} flex={1}>
-        <Box truncate flex={1} minWidth={0} textAlign={align}>
+        <Box
+          truncate
+          flex={1}
+          minWidth={0}
+          textAlign={align}
+          {...(dragZoneProps
+            ? {
+                "data-column-drag-handle": "true",
+                cursor: "grab",
+                _active: { cursor: "grabbing" },
+                title: "Drag to reorder · click to sort",
+                ...dragZoneProps,
+              }
+            : {})}
+        >
           {children}
         </Box>
         {isActive ? (

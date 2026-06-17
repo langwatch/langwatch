@@ -56,6 +56,7 @@ vi.mock("../hooks/useTargetName", () => ({
 vi.mock("../hooks/useEvaluatorName", () => ({
   useEvaluatorName: () => "Exact Match",
   useEvaluatorNames: () => new Map(),
+  useCodeEvaluatorIds: () => new Set(),
 }));
 
 import type { EvaluationV3Event } from "~/server/experiments-v3/execution/types";

@@ -5,7 +5,7 @@ import { useShallow } from "zustand/react/shallow";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import { captureException } from "../../utils/posthogErrorCapture";
+import { captureException, toError } from "../../utils/posthogErrorCapture";
 import { isNotFound as isTrpcNotFound } from "../../utils/trpcError";
 import { createInitialState } from "../types";
 import { extractPersistedState } from "../types/persistence";
@@ -262,13 +262,16 @@ export const useAutosaveEvaluationsV3 = () => {
               closable: true,
             },
           });
-          captureException(error, {
-            extra: {
-              context: "Failed to autosave evaluations v3",
-              projectId: project.id,
-              persistedState,
+          captureException(
+            toError(error),
+            {
+              extra: {
+                context: "Failed to autosave evaluations v3",
+                projectId: project.id,
+                persistedState,
+              },
             },
-          });
+          );
         }
       })();
     }, AUTOSAVE_DEBOUNCE_MS);

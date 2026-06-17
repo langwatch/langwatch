@@ -4,7 +4,7 @@ import {
 } from "@slack/webhook";
 import { sendUsageLimitEmail } from "../../../src/server/mailer/usageLimitEmail";
 import { createLogger } from "../../../src/utils/logger/server";
-import { captureException } from "../../../src/utils/posthogErrorCapture";
+import { captureException, toError } from "../../../src/utils/posthogErrorCapture";
 import type { AppConfig } from "../../../src/server/app-layer/config";
 import type {
   LicensePurchaseNotificationPayload,
@@ -336,7 +336,7 @@ export class NotificationService {
       await webhook.send(body);
     } catch (error) {
       logger.error({ error }, errorLog);
-      captureException(error);
+      captureException(toError(error));
     }
   }
 
@@ -572,7 +572,7 @@ export class NotificationService {
         { error },
         "Failed to send HubSpot signup form notification",
       );
-      captureException(error);
+      captureException(toError(error));
     } finally {
       clearTimeout(timeoutId);
     }
@@ -643,7 +643,7 @@ export class NotificationService {
         { error },
         "Failed to send HubSpot plan-limit notification",
       );
-      captureException(error);
+      captureException(toError(error));
     } finally {
       clearTimeout(timeoutId);
     }

@@ -38,6 +38,12 @@ Feature: GroupQueue payload envelope
     Then its blob key is deleted
     And any blob that escapes deletion expires via its TTL safety net
 
+  Scenario: Offloaded blobs displaced by a dedup squash are reclaimed
+    Given a staged offloaded job
+    When a later job with the same dedup id squashes it in place
+    Then the displaced payload's blob key is deleted
+    And only the surviving payload's blob remains
+
   Scenario: A missing blob does not wedge the group
     Given an offloaded job whose blob has expired or been deleted
     When dispatch delivers it to the worker

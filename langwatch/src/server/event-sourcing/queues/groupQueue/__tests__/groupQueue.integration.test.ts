@@ -291,6 +291,96 @@ describe.skipIf(!hasTestcontainers)(
           }
         });
       });
+
+      // Regression for the 2026-06-11 Redis capacity incident: a dedup squash
+      // displaced a blob-backed payload but nothing reclaimed the displaced
+      // blob, so ~280K orphans (~7.4 GB) accumulated until their 7-day TTL. The
+      // `delay` keeps both sends in staging so the second squash-replaces the
+      // first in place (the production path: a reactor re-folding a turn).
+      describe("when a dedup squash displaces a large payload", () => {
+        const bigPayload = (filler: string): TestPayload => ({
+          id: "dup",
+          groupId: "group-a",
+          value: filler.repeat(64 * 1024),
+        });
+
+        it("reclaims the displaced old blob on replace so it cannot leak", async () => {
+          vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
+          try {
+            const queueName = `{test/gq/blob-dedup-${crypto.randomUUID().slice(0, 8)}}`;
+            const queue = createQueue(vi.fn().mockResolvedValue(undefined), {
+              name: queueName,
+              delay: 60_000,
+              deduplication: { makeId: (p) => p.id, ttlMs: 120_000 },
+            });
+            await queue.waitUntilReady();
+
+            await queue.send(bigPayload("a"));
+            const [firstBlob] = await redis.keys(`${queueName}:gq:blob:*`);
+            expect(firstBlob).toBeDefined();
+
+            // Squash-replace: a fresh blob is staged and the first is displaced.
+            await queue.send(bigPayload("b"));
+
+            // The displaced blob is reclaimed fire-and-forget; only the new
+            // one survives.
+            await vi.waitFor(
+              async () => {
+                const blobs = await redis.keys(`${queueName}:gq:blob:*`);
+                expect(blobs).toHaveLength(1);
+                expect(blobs).not.toContain(firstBlob);
+              },
+              { timeout: 5000, interval: 50 },
+            );
+            // Staging holds exactly the one squashed job, referencing the new blob.
+            expect(
+              await redis.hlen(`${queueName}:gq:group:group-a:data`),
+            ).toBe(1);
+          } finally {
+            vi.unstubAllEnvs();
+          }
+        });
+
+        it("reclaims the discarded new blob when the existing payload is kept (replace:false)", async () => {
+          vi.stubEnv("GROUP_QUEUE_ENVELOPE_WRITES_ENABLED", "true");
+          try {
+            const queueName = `{test/gq/blob-keep-${crypto.randomUUID().slice(0, 8)}}`;
+            const queue = createQueue(vi.fn().mockResolvedValue(undefined), {
+              name: queueName,
+              delay: 60_000,
+              deduplication: {
+                makeId: (p) => p.id,
+                ttlMs: 120_000,
+                extend: false,
+                replace: false,
+              },
+            });
+            await queue.waitUntilReady();
+
+            await queue.send(bigPayload("a"));
+            const [keptBlob] = await redis.keys(`${queueName}:gq:blob:*`);
+            expect(keptBlob).toBeDefined();
+
+            // Dedup hit without replace: the new value never lands, its blob is
+            // discarded and reclaimed fire-and-forget; the original blob stays.
+            await queue.send(bigPayload("b"));
+
+            await vi.waitFor(
+              async () => {
+                expect(await redis.keys(`${queueName}:gq:blob:*`)).toEqual([
+                  keptBlob,
+                ]);
+              },
+              { timeout: 5000, interval: 50 },
+            );
+            expect(
+              await redis.hlen(`${queueName}:gq:group:group-a:data`),
+            ).toBe(1);
+          } finally {
+            vi.unstubAllEnvs();
+          }
+        });
+      });
     });
 
     describe("per-group sequential processing", () => {
@@ -386,11 +476,11 @@ describe.skipIf(!hasTestcontainers)(
             value: "second",
           });
 
-          // Wait for both to complete. Generous ceiling: a delayed job
-          // produces no dispatcher signal when it becomes ready, so its
-          // dispatch waits for the next BRPOP timeout cycle
-          // (signalTimeoutSec), and container clock skew widens that
-          // further on CI runners.
+          // Wait for both to complete. Generous ceiling: when the second
+          // dedup job becomes due it produces no dispatcher signal, so its
+          // dispatch waits for the next BRPOP timeout cycle (signalTimeoutSec,
+          // 5s), and container clock skew widens that further on CI runners.
+          // Same ceiling class as the squash test below.
           await vi.waitFor(
             () => {
               expect(processed).toHaveBeenCalledTimes(2);
@@ -426,10 +516,12 @@ describe.skipIf(!hasTestcontainers)(
             value: "second",
           });
 
-          // Generous ceiling: a delayed job produces no dispatcher signal
-          // when it becomes ready, so its dispatch waits for the next
-          // BRPOP timeout cycle (signalTimeoutSec), and container clock
-          // skew widens that further on CI runners.
+          // Both stage signals fire before dispatchAfter (delay: 200), so the
+          // dispatcher consumes and drains them while the job is not yet due.
+          // Dispatch then rides the BRPOP idle-rescan net (signalTimeoutSec,
+          // 5s), and on a loaded CI runner that net plus worker overhead can
+          // exceed 10s of wall clock — same ceiling class as the TOCTOU
+          // dispatch-gap flake. 30s gives the net 3x headroom.
           await vi.waitFor(
             () => {
               expect(processed).toHaveBeenCalledTimes(1);

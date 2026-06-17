@@ -11,7 +11,7 @@ import {
 } from "@chakra-ui/react";
 import { AlertTriangle, Copy, Check, RotateCcw, Home } from "lucide-react";
 import { useRouter } from "~/utils/compat/next-router";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 
 export function PageErrorFallback({
   error,
@@ -27,7 +27,7 @@ export function PageErrorFallback({
   const isDev = process.env.NODE_ENV === "development";
 
   useEffect(() => {
-    captureException(error, {
+    captureException(toError(error), {
       tags: { source: "error-boundary" },
       extra: { pathname: window.location.pathname },
     });

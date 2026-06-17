@@ -2,16 +2,27 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { EditableCell } from "../components/DatasetSection/EditableCell";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { EditableCell } from "~/components/datasets/editor/EditableCell";
+import { EvaluationsV3DatasetTableProvider } from "../components/EvaluationsV3DatasetTableProvider";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { DEFAULT_TEST_DATA_ID } from "../types";
 
 // Wrapper with Chakra provider
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  <ChakraProvider value={defaultSystem}>
+    <EvaluationsV3DatasetTableProvider>
+      {children}
+    </EvaluationsV3DatasetTableProvider>
+  </ChakraProvider>
 );
 
 // Helper to render with store reset and Chakra provider
@@ -128,6 +139,56 @@ describe("Dataset inline editing", () => {
         const records = getActiveDatasetRecords();
         expect(records?.input?.[0]).toBe("modified");
       });
+    });
+  });
+
+  describe("Commit cell edit by clicking outside", () => {
+    it("saves the value on blur instead of discarding it", async () => {
+      const user = userEvent.setup();
+      renderCell("", 0, "input");
+
+      useEvaluationsV3Store
+        .getState()
+        .setEditingCell({ row: 0, columnId: "input" });
+
+      const textarea = await screen.findByRole("textbox");
+      await user.type(textarea, "modified");
+
+      // Clicking outside blurs the textarea; this should commit, not cancel.
+      fireEvent.blur(textarea);
+
+      await waitFor(() => {
+        expect(getActiveDatasetRecords()?.input?.[0]).toBe("modified");
+      });
+    });
+  });
+
+  describe("Escape while editing inside a dialog", () => {
+    it("cancels the cell without reaching a document-level Escape handler", async () => {
+      const user = userEvent.setup();
+      const initialValue = getActiveDatasetRecords()?.input?.[0];
+
+      renderCell("original", 0, "input");
+
+      useEvaluationsV3Store
+        .getState()
+        .setEditingCell({ row: 0, columnId: "input" });
+
+      const textarea = await screen.findByRole("textbox");
+      await user.clear(textarea);
+      await user.type(textarea, "modified");
+
+      // Stand in for the dialog's document-level capture Escape listener
+      // (this is how Chakra/zag dialogs close). The cell's window-level
+      // capture handler must run first and stop the event.
+      const dialogEscape = vi.fn();
+      document.addEventListener("keydown", dialogEscape, { capture: true });
+      await user.keyboard("{Escape}");
+      document.removeEventListener("keydown", dialogEscape, { capture: true });
+
+      expect(dialogEscape).not.toHaveBeenCalled();
+      // And the edit was reverted, not saved.
+      expect(getActiveDatasetRecords()?.input?.[0]).toBe(initialValue);
     });
   });
 

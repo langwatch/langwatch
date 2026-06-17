@@ -13,6 +13,7 @@ import cloneDeep from "lodash-es/cloneDeep";
 import Long from "long";
 import { z } from "zod";
 import { createLogger } from "~/utils/logger/server";
+import { toError } from "~/utils/posthogErrorCapture";
 import type { DeepPartial } from "../../utils/types";
 import type { CollectorJob } from "../background/types";
 import { openTelemetryToLangWatchMetadataMapping } from "./metadata";
@@ -105,7 +106,7 @@ export const openTelemetryTraceRequestToTracesForCollection = async (
           message: error instanceof Error ? error.message : "Unknown error",
         });
         span.recordException(
-          error instanceof Error ? error : new Error(String(error)),
+          toError(error),
         );
         throw error;
       }
@@ -214,7 +215,7 @@ const openTelemetryTraceRequestToTraceForCollection = (
           message: error instanceof Error ? error.message : "Unknown error",
         });
         span.recordException(
-          error instanceof Error ? error : new Error(String(error)),
+          toError(error),
         );
         throw error;
       }
@@ -1303,7 +1304,7 @@ const addOpenTelemetrySpanAsSpan = (
           message: error instanceof Error ? error.message : "Unknown error",
         });
         otelSpan.recordException(
-          error instanceof Error ? error : new Error(String(error)),
+          toError(error),
         );
         throw error;
       }

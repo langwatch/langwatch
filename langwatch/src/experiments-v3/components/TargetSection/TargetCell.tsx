@@ -18,20 +18,21 @@ import {
   LuSquare,
 } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
-import { TraceIdPeek } from "~/features/traces-v2/components/TraceIdPeek";
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
+import { TraceIdPeek } from "~/features/traces-v2/components/TraceIdPeek";
+import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { parseLLMError } from "~/utils/formatLLMError";
 import { formatTargetOutput } from "~/utils/formatTargetOutput";
-import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
+import { useCodeEvaluatorIds } from "../../hooks/useEvaluatorName";
 import { useTargetName } from "../../hooks/useTargetName";
 import type { EvaluatorConfig, TargetConfig } from "../../types";
 import { formatLatency } from "../../utils/computeAggregates";
+import { createEvaluatorEditorCallbacks } from "../../utils/evaluatorEditorCallbacks";
 import {
   convertFromUIMapping,
   convertToUIMapping,
 } from "../../utils/fieldMappingConverters";
-import { createEvaluatorEditorCallbacks } from "../../utils/evaluatorEditorCallbacks";
 import { evaluatorHasMissingMappings } from "../../utils/mappingValidation";
 import { EvaluatorChip } from "../TargetSection/EvaluatorChip";
 
@@ -104,6 +105,9 @@ export function TargetCellContent({
     setEvaluatorMapping: state.setEvaluatorMapping,
     removeEvaluatorMapping: state.removeEvaluatorMapping,
   }));
+
+  // Code evaluators (DB type "code") route their edit flow to the code editor.
+  const codeEvaluatorIds = useCodeEvaluatorIds(evaluators);
 
   // State for expanded output view
   const [isOutputExpanded, setIsOutputExpanded] = useState(false);
@@ -192,7 +196,8 @@ export function TargetCellContent({
         });
       }
       // Use local config outputs if available (unsaved changes), fallback to saved outputs
-      const effectiveOutputs = target.localPromptConfig?.outputs ?? target.outputs;
+      const effectiveOutputs =
+        target.localPromptConfig?.outputs ?? target.outputs;
       availableSources.push({
         id: target.id,
         name: targetName,
@@ -289,14 +294,23 @@ export function TargetCellContent({
             color="red.fg"
             fontSize="13px"
             align="start"
-            cursor={isErrorOverflowing && !isErrorExpanded ? "pointer" : undefined}
+            cursor={
+              isErrorOverflowing && !isErrorExpanded ? "pointer" : undefined
+            }
             onClick={() => setIsErrorExpanded(true)}
-            onDoubleClick={isErrorOverflowing ? () => setIsErrorExpanded(false) : undefined}
+            onDoubleClick={
+              isErrorOverflowing ? () => setIsErrorExpanded(false) : undefined
+            }
           >
             <Box flexShrink={0} paddingTop={0.5}>
               <LuCircleAlert size={16} />
             </Box>
-            <Text lineClamp={expanded || isErrorExpanded ? undefined : 2} userSelect="text" whiteSpace="pre-wrap" wordBreak="break-word">
+            <Text
+              lineClamp={expanded || isErrorExpanded ? undefined : 2}
+              userSelect="text"
+              whiteSpace="pre-wrap"
+              wordBreak="break-word"
+            >
               {parseLLMError(error).message}
             </Text>
           </HStack>
@@ -403,6 +417,24 @@ export function TargetCellContent({
           hasAnyTargetOutputs={hasAnyTargetOutputs}
           targetType={target.type}
           onEdit={() => {
+            // Code evaluators have their own editor (the Python code block plus
+            // its inputs and outputs); the generic editor can only show the
+            // mapping. Route them to the code editor, with the inputs and their
+            // mapping merged inline.
+            if (codeEvaluatorIds.has(evaluator.id)) {
+              setFlowCallbacks(
+                "codeEvaluatorEditor",
+                createEvaluatorEditorCallbacks({
+                  onMappingChange: buildOnMappingChange(evaluator),
+                }),
+              );
+              openDrawer("codeEvaluatorEditor", {
+                evaluatorId: evaluator.dbEvaluatorId,
+                mappingsConfig: buildMappingsConfig(evaluator),
+              });
+              return;
+            }
+
             // Route all non-serializable callbacks through setFlowCallbacks.
             // onMappingChange + onLocalConfigChange must live here (not in
             // mappingsConfig) so the drawer's mappings section renders — see

@@ -7,8 +7,10 @@ import { toaster } from "./ui/toaster";
  *
  * Why toast and not modal: the previous design opened a full Dialog,
  * which felt heavy for background flows (AI search, auto-saved
- * commit-message generation). A sticky orange toast with a deep-link
- * action button is just as discoverable but doesn't trap focus.
+ * commit-message generation). A sticky info toast with a deep-link
+ * action button is just as discoverable but doesn't trap focus. Info,
+ * not error: a missing model is a configuration nudge, nothing failed
+ * from the user's point of view.
  *
  * The toaster system already lives at the app root; we don't mount any
  * extra component for this. Stable per-(featureKey, role) toast IDs
@@ -64,7 +66,7 @@ export function showMissingModelToast(info: MissingModelInfo): void {
 
   toaster.create({
     id,
-    type: "error",
+    type: "info",
     duration: Infinity,
     title: `Model not configured for ${info.featureDisplayName}`,
     description,
@@ -116,7 +118,10 @@ export function showAiCallFailedToast(info: AiCallFailedInfo): void {
 
   toaster.create({
     id,
-    type: "error",
+    // Warning, not error: the AI call is an assistive convenience (commit
+    // messages, AI search, ...). It failing nudges the user to check their
+    // model configuration; nothing the user was doing actually broke.
+    type: "warning",
     duration: 10000,
     title: `${info.featureDisplayName} failed`,
     description,

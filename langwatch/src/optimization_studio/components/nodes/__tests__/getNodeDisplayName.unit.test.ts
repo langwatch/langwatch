@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 // Mock the heavy UI dependencies so we can import getNodeDisplayName in isolation
 vi.mock("@xyflow/react", () => ({
@@ -11,9 +11,6 @@ vi.mock("react-dnd", () => ({ useDragLayer: () => ({}) }));
 vi.mock("usehooks-ts", () => ({ useDebounceValue: (v: unknown) => [v] }));
 vi.mock("zustand/react/shallow", () => ({
   useShallow: (fn: unknown) => fn,
-}));
-vi.mock("../../../../components/evaluations/wizard/hooks/useWizardContext", () => ({
-  useWizardContext: () => ({ isInsideWizard: false }),
 }));
 vi.mock("../../../../components/llmPromptConfigs/LLMModelDisplay", () => ({
   LLMModelDisplay: () => null,

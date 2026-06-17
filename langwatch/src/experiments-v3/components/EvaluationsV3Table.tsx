@@ -1,8 +1,4 @@
 import { Box, HStack, Link, Text } from "@chakra-ui/react";
-import type {
-  EvaluatorField,
-  EvaluatorWithFields,
-} from "~/server/evaluators/evaluator.service";
 import {
   type ColumnDef,
   type ColumnSizingState,
@@ -15,21 +11,27 @@ import { nanoid } from "nanoid";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { AddOrEditDatasetDrawer } from "~/components/AddOrEditDatasetDrawer";
+import { datasetTableCss } from "~/components/datasets/editor/datasetTableStyles";
+import type { ColumnType } from "~/components/datasets/editor/TableCell";
+import { useTableKeyboardNavigation } from "~/components/datasets/editor/useTableKeyboardNavigation";
+import { VirtualizedTableBody } from "~/components/datasets/editor/VirtualizedTableBody";
+import type { FieldMapping as UIFieldMapping } from "~/components/variables";
 import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import type {
+  Field,
+  HttpComponentConfig,
+} from "~/optimization_studio/types/dsl";
 import type { TypedAgent } from "~/server/agents/agent.repository";
-import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
-import { api } from "~/utils/api";
-
-import type { FieldMapping as UIFieldMapping } from "~/components/variables";
-import type { Field, HttpComponentConfig } from "~/optimization_studio/types/dsl";
 import type { DatasetColumnType } from "~/server/datasets/types";
+import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
+import type {
+  EvaluatorField,
+  EvaluatorWithFields,
+} from "~/server/evaluators/evaluator.service";
+import { api } from "~/utils/api";
 import { DRAWER_WIDTH } from "../constants";
 import { useDatasetSync } from "../hooks/useDatasetSync";
-import {
-  buildInputsFromBodyTemplate,
-  convertHttpComponentConfig,
-} from "../utils/httpAgentUtils";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { useExecuteEvaluation } from "../hooks/useExecuteEvaluation";
 import {
@@ -37,7 +39,6 @@ import {
   useOpenTargetEditor,
 } from "../hooks/useOpenTargetEditor";
 import { useDatasetSelectionLoader } from "../hooks/useSavedDatasetLoader";
-import { useTableKeyboardNavigation } from "../hooks/useTableKeyboardNavigation";
 import type {
   DatasetColumn,
   DatasetReference,
@@ -56,10 +57,14 @@ import {
   convertFromUIMapping,
   convertToUIMapping,
 } from "../utils/fieldMappingConverters";
+import {
+  buildInputsFromBodyTemplate,
+  convertHttpComponentConfig,
+} from "../utils/httpAgentUtils";
 import { createPromptEditorCallbacks } from "../utils/promptEditorCallbacks";
 import { ColumnTypeIcon } from "./ColumnTypeIcon";
-import { type ColumnType } from "./DatasetSection/TableCell";
 import { DatasetSuperHeader } from "./DatasetSuperHeader";
+import { EvaluationsV3DatasetTableProvider } from "./EvaluationsV3DatasetTableProvider";
 import { SelectionToolbar } from "./SelectionToolbar";
 import {
   CheckboxCellFromMeta,
@@ -68,7 +73,6 @@ import {
   TargetHeaderFromMeta,
 } from "./TableMetaWrappers";
 import { TargetSuperHeader } from "./TargetSuperHeader";
-import { VirtualizedTableBody } from "./VirtualizedTableBody";
 
 // Max rows for expanded mode (disable virtualization above this)
 const MAX_ROWS_FOR_FIT_MODE = 100;
@@ -234,9 +238,7 @@ export function EvaluationsV3Table({
     (targetId: string): boolean => {
       const outputs = results.targetOutputs[targetId];
       if (!outputs) return false;
-      return outputs.some(
-        (output) => output !== undefined && output !== null,
-      );
+      return outputs.some((output) => output !== undefined && output !== null);
     },
     [results.targetOutputs],
   );
@@ -312,7 +314,9 @@ export function EvaluationsV3Table({
       if (isHttpAgent) {
         // HTTP agent: extract inputs from body template
         const httpComponentConfig = config as HttpComponentConfig;
-        targetInputs = buildInputsFromBodyTemplate(httpComponentConfig.bodyTemplate);
+        targetInputs = buildInputsFromBodyTemplate(
+          httpComponentConfig.bodyTemplate,
+        );
         httpConfig = convertHttpComponentConfig(httpComponentConfig);
 
         // Fall back to default input if bodyTemplate has no variables
@@ -329,7 +333,9 @@ export function EvaluationsV3Table({
       const targetConfig: TargetConfig = {
         id: `target_${Date.now()}`, // Generate unique ID for the workbench
         type: "agent", // This is a target of type "agent" (code/workflow/http)
-        agentType: isHttpAgent ? "http" : (savedAgent.type as TargetConfig["agentType"]),
+        agentType: isHttpAgent
+          ? "http"
+          : (savedAgent.type as TargetConfig["agentType"]),
         dbAgentId: savedAgent.id, // Reference to the database agent
         inputs: targetInputs,
         outputs: (config.outputs as TargetConfig["outputs"]) ?? [
@@ -739,7 +745,12 @@ export function EvaluationsV3Table({
         openDrawer("evaluatorList");
       }
     },
-    [openDrawer, handleSelectPrompt, handleSelectSavedAgent, handleSelectEvaluatorAsTarget],
+    [
+      openDrawer,
+      handleSelectPrompt,
+      handleSelectSavedAgent,
+      handleSelectEvaluatorAsTarget,
+    ],
   );
 
   // Dataset handlers for drawer integration
@@ -1305,7 +1316,9 @@ export function EvaluationsV3Table({
   const handleResizeDoubleClick = useCallback(
     (columnId: string, columnType: string) => {
       const defaultPct =
-        columnType === "dataset" ? DATASET_COL_DEFAULT_PCT : TARGET_COL_DEFAULT_PCT;
+        columnType === "dataset"
+          ? DATASET_COL_DEFAULT_PCT
+          : TARGET_COL_DEFAULT_PCT;
 
       setColumnSizing((prev) => ({
         ...prev,
@@ -1395,6 +1408,7 @@ export function EvaluationsV3Table({
       minWidth={`calc(100vw - ${MENU_PLUS_PADDING}px + ${DRAWER_WIDTH}px)`}
       minHeight="full"
       css={{
+        ...datasetTableCss,
         "& table": {
           // Table width = max(100%, sum of column percentages) + fixed widths (checkbox + drawer)
           // This allows columns to exceed 100% and trigger horizontal scroll
@@ -1417,16 +1431,6 @@ export function EvaluationsV3Table({
           top: `${SUPER_HEADER_HEIGHT}px`,
           zIndex: 10,
           backgroundColor: "var(--chakra-colors-bg-panel)",
-        },
-        "& th": {
-          borderBottom: "1px solid var(--chakra-colors-border)",
-          borderRight: "1px solid var(--chakra-colors-border-muted)",
-          padding: "8px 12px",
-          textAlign: "left",
-          backgroundColor: "var(--chakra-colors-bg-panel)",
-          fontWeight: "medium",
-          fontSize: "13px",
-          position: "relative",
         },
         // Resize handle styles - wider hit area, narrow visible indicator
         "& .resizer": {
@@ -1455,29 +1459,6 @@ export function EvaluationsV3Table({
         // Only show indicator when hovering the resize area or actively resizing
         "& .resizer:hover::after, & .resizer.isResizing::after": {
           opacity: 1,
-        },
-        "& td": {
-          borderBottom: "1px solid var(--chakra-colors-border-muted)",
-          borderRight: "1px solid var(--chakra-colors-border-muted)",
-          padding: "8px 12px",
-          fontSize: "13px",
-          verticalAlign: "top",
-          // CSS variable for fade overlay gradient
-          "--cell-bg": "var(--chakra-colors-bg-panel)",
-        },
-        "& tr:hover td": {
-          backgroundColor: "var(--chakra-colors-bg-subtle)",
-          // Update CSS variable for fade overlay on hover
-          "--cell-bg": "var(--chakra-colors-bg-subtle)",
-        },
-        // Selected row styling
-        "& tr[data-selected='true'] td": {
-          backgroundColor: "var(--chakra-colors-blue-subtle)",
-          "--cell-bg": "var(--chakra-colors-blue-subtle)",
-          "border-color": "var(--chakra-colors-blue-muted)",
-        },
-        "& tr:has(+ tr[data-selected='true']) td": {
-          "border-bottom-color": "var(--chakra-colors-blue-muted)",
         },
       }}
     >
@@ -1540,7 +1521,11 @@ export function EvaluationsV3Table({
                   <th
                     key={header.id}
                     style={{
-                      width: getColumnWidth(header.id, columnType, isFixedWidth),
+                      width: getColumnWidth(
+                        header.id,
+                        columnType,
+                        isFixedWidth,
+                      ),
                     }}
                     // Add data attribute for target columns to enable scroll-to behavior
                     {...(targetId && { "data-target-column": targetId })}
@@ -1556,7 +1541,10 @@ export function EvaluationsV3Table({
                     {!isFixedWidth && header.id !== "select" && (
                       <div
                         onMouseDown={createResizeHandler(header.id, columnType)}
-                        onTouchStart={createResizeHandler(header.id, columnType)}
+                        onTouchStart={createResizeHandler(
+                          header.id,
+                          columnType,
+                        )}
                         onDoubleClick={() =>
                           handleResizeDoubleClick(header.id, columnType)
                         }
@@ -1588,24 +1576,30 @@ export function EvaluationsV3Table({
               ) : (
                 <>
                   {/* Filler column - absorbs remaining space */}
-                  <th colSpan={2} style={{ width: "auto", minWidth: DRAWER_WIDTH }}></th>
+                  <th
+                    colSpan={2}
+                    style={{ width: "auto", minWidth: DRAWER_WIDTH }}
+                  ></th>
                 </>
               )}
             </tr>
           ))}
         </thead>
         <tbody>
-          <VirtualizedTableBody
-            rows={table.getRowModel().rows}
-            scrollContainer={scrollContainer}
-            columnCount={table.getAllColumns().length + 2}
-            selectedRows={selectedRows}
-            activeDatasetId={activeDatasetId}
-            isLoading={isLoadingExperiment || isLoadingDatasets}
-            shouldVirtualize={shouldVirtualize}
-            disableVirtualization={disableVirtualization}
-            displayRowCount={displayRowCount}
-          />
+          <EvaluationsV3DatasetTableProvider>
+            <VirtualizedTableBody
+              rows={table.getRowModel().rows}
+              scrollContainer={scrollContainer}
+              columnCount={table.getAllColumns().length + 2}
+              selectedRows={selectedRows}
+              activeDatasetId={activeDatasetId}
+              isLoading={isLoadingExperiment || isLoadingDatasets}
+              shouldVirtualize={shouldVirtualize}
+              disableVirtualization={disableVirtualization}
+              displayRowCount={displayRowCount}
+              trailingSpacerWidth={DRAWER_WIDTH}
+            />
+          </EvaluationsV3DatasetTableProvider>
         </tbody>
       </table>
 
