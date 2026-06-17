@@ -28,7 +28,7 @@
  *   - fakeBlobStore / makeSpan helpers consistent with sibling test file
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("langwatch", () => ({
   getLangWatchTracer: () => ({
@@ -36,22 +36,27 @@ vi.mock("langwatch", () => ({
       _name: string,
       _opts: unknown,
       fn: (span: { setAttributes: () => void }) => unknown,
-    ) => fn({ setAttributes: () => {} }),
+    ) =>
+      fn({
+        setAttributes: () => {
+          /* noop */
+        },
+      }),
   }),
 }));
 
-import {
-  NormalizedSpanKind,
-  NormalizedStatusCode,
-  type NormalizedSpan,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
-import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import {
-  BlobNotFoundError,
   BlobFieldNotFoundError,
+  BlobNotFoundError,
 } from "~/server/app-layer/traces/blob-store.service";
+import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
+import {
+  type NormalizedSpan,
+  NormalizedSpanKind,
+  NormalizedStatusCode,
+} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { resolveOffloadedTraces } from "./resolve-offloaded-traces";
 
 // ---------------------------------------------------------------------------
