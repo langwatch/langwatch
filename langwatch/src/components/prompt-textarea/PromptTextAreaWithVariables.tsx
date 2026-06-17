@@ -251,7 +251,7 @@ export const PromptTextAreaWithVariables = ({
   // the redundant per-render setState churned the commit phase into React's
   // nested-update limit ("Maximum update depth exceeded"). A primitive
   // signature plus a no-op guard keeps the height in sync without the churn.
-  const invalidVariablesKey = invalidVariables.join(" ");
+  const invalidVariablesKey = invalidVariables.join("\n");
   useLayoutEffect(() => {
     const measured = bannerRef.current?.offsetHeight ?? 0;
     setBannerHeight((prev) => (prev === measured ? prev : measured));

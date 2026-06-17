@@ -1,3 +1,4 @@
+@integration
 Feature: Prompt playground stays stable when a prompt references undefined variables
   When a message uses a variable that is not declared as an input, the editor
   flags it with an "Undefined variables" warning so the author can create it.

@@ -754,9 +754,11 @@ describe("PromptTextAreaWithVariables", () => {
         fireEvent.click(screen.getByTestId("rerender"));
       }
 
-      // The set of invalid variables never changed, so the layout effect must
-      // not re-measure. Pre-fix this was 5 (one re-measure + setState per render)
-      // and is what drove the "Maximum update depth exceeded" crash in-app.
+      // This proves the proximate cause is gone: with the invalid-variable set
+      // unchanged, the layout effect no longer re-measures and re-setStates on
+      // every render (pre-fix this was 5, one per render). The literal "Maximum
+      // update depth" throw needs the full app re-render storm to manifest, so
+      // the eliminated per-render churn is the faithful, deterministic proxy.
       expect(bannerHeightReads).toBe(0);
     });
   });
