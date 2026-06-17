@@ -23,7 +23,7 @@
  * Conventions matched from resolve-offloaded-traces.unit.test.ts:
  *   - vitest, vi.mock("langwatch", ...) tracer passthrough
  *   - BDD nested describe (given / when)
- *   - One expectation per it()
+ *   - Assertions grouped per behavior; single expectation per it() where practical
  *   - No "should" in test names
  *   - fakeBlobStore / makeSpan helpers consistent with sibling test file
  */

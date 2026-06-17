@@ -28,7 +28,7 @@
  *   AC7 — cross-tenant: same EventId, wrong tenant → BlobNotFoundError → preview
  *          returned; getFromEventLog called with the reading tenant's id.
  *
- * BDD structure: describe(given/when) → it() — one expectation per test.
+ * BDD structure: describe(given/when) → it() — assertions grouped per behavior.
  * No "should" in test names.
  */
 
@@ -39,6 +39,7 @@ import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-project
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { Protections } from "~/server/elasticsearch/protections";
 import { createLogger } from "~/utils/logger/server";
+import { ClickHouseTraceService } from "../clickhouse-trace.service";
 import { resolveOffloadedTraces } from "../resolve-offloaded-traces";
 import { TraceService } from "../trace.service";
 import {
@@ -499,12 +500,8 @@ describe("ClickHouseTraceService — #4888 full resolution crosses the mapper", 
   const PROJECT_ID_CH = "proj-4888";
   const TRACE_ID_CH = "trace-4888";
 
-  let ClickHouseTraceService: typeof import("../clickhouse-trace.service").ClickHouseTraceService;
-
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.clearAllMocks();
-    const mod = await import("../clickhouse-trace.service");
-    ClickHouseTraceService = mod.ClickHouseTraceService;
   });
 
   function setupJoinedFetch() {
