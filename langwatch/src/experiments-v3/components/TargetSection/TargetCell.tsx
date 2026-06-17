@@ -181,20 +181,11 @@ export function TargetCellContent({
   // path (cleared on ErrorBoundary remount — see issue #3087).
   const buildMappingsConfig = useCallback(
     (evaluator: EvaluatorConfig) => {
-      // Build available sources
+      // Build available sources. Target outputs come FIRST: for an evaluator,
+      // the graded field (e.g. "output") should offer the runner's outputs
+      // ahead of dataset columns, mirroring how inputs prefer the dataset.
       const activeDataset = datasets.find((d) => d.id === activeDatasetId);
       const availableSources = [];
-      if (activeDataset) {
-        availableSources.push({
-          id: activeDataset.id,
-          name: activeDataset.name,
-          type: "dataset" as const,
-          fields: activeDataset.columns.map((col) => ({
-            name: col.name,
-            type: "str" as const,
-          })),
-        });
-      }
       // Use local config outputs if available (unsaved changes), fallback to saved outputs
       const effectiveOutputs =
         target.localPromptConfig?.outputs ?? target.outputs;
@@ -207,6 +198,17 @@ export function TargetCellContent({
           type: o.type as "str" | "float" | "bool",
         })),
       });
+      if (activeDataset) {
+        availableSources.push({
+          id: activeDataset.id,
+          name: activeDataset.name,
+          type: "dataset" as const,
+          fields: activeDataset.columns.map((col) => ({
+            name: col.name,
+            type: "str" as const,
+          })),
+        });
+      }
 
       // Get current mappings in UI format (used as initial state in the drawer)
       const storeMappings =

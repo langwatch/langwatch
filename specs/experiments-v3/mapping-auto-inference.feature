@@ -120,7 +120,7 @@ Feature: Mapping Auto-Inference
   @regression
   Scenario: "output" never falls back to a dataset column
     Given I have a dataset with column "output"
-    And I have a runner with no output named like "output"
+    And I have a runner with multiple outputs, none named like "output"
     When I add an evaluator with input "output"
     Then evaluator "output" has no auto-inferred mapping
     And the dataset's "output" column is NOT chosen
@@ -147,6 +147,33 @@ Feature: Mapping Auto-Inference
     When I add an evaluator with input "output"
     Then evaluator "output" is mapped to the runner output "output"
     And the dataset's "output" column is not chosen
+
+  # When an "output"-like evaluator field cannot be matched to a target output
+  # by name, but the target exposes exactly ONE output, that single output is
+  # the only sensible source, so it is auto-mapped. This covers the common
+  # single-output classifier case (a target "category_classifier" whose one
+  # output "category" does not match the evaluator field name "output").
+  Scenario: Auto-map a target-output field to the target's only output when no name matches
+    Given I have a runner producing a single output "category"
+    And I have a dataset with columns "input, expected_output"
+    When I add an evaluator with input "output"
+    Then evaluator "output" is mapped to the runner output "category"
+    And no manual mapping is required for "output"
+
+  @regression
+  Scenario: Do not guess a single output when the target has multiple outputs and no name matches
+    Given I have a runner producing outputs "category" and "confidence"
+    When I add an evaluator with input "output"
+    Then evaluator "output" has no auto-inferred mapping
+
+  # When manually mapping an evaluator field in the workbench, the source
+  # selector offers the TARGET's outputs ahead of the dataset columns, so the
+  # graded "output" field surfaces the runner's output first instead of a
+  # same-named dataset column.
+  @unimplemented
+  Scenario: The evaluator mapping selector offers target outputs before dataset columns
+    Given I open an evaluator's mapping drawer in the workbench
+    Then the source selector lists the target's outputs before the dataset columns
 
   # ============================================================================
   # Semantic Mapping Dictionary
