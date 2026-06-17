@@ -17,6 +17,7 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  type HeadObjectCommandOutput,
   PutObjectCommand,
   type S3Client,
 } from "@aws-sdk/client-s3";
@@ -24,26 +25,19 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { nanoid } from "nanoid";
 import { createS3Client } from "../storage";
 import {
+  assertKeyWithinProject,
   assertNoTraversal,
   chunkKey,
   type DatasetChunk,
+  errorHasProp,
   parseJsonl,
   toJsonlChunks,
 } from "./dataset-chunking";
 import type { DatasetStorage, PresignedUpload } from "./dataset-storage";
+import { StagedUploadNotFoundError } from "./errors";
 import { stagingUploadKey, UPLOAD_TTL_SECONDS } from "./presigned-upload";
 
 type ResolvedS3Client = { s3Client: S3Client; s3Bucket: string };
-
-const errorHasProp = (
-  error: unknown,
-  prop: "code" | "name",
-  value: string,
-): boolean =>
-  typeof error === "object" &&
-  error !== null &&
-  prop in error &&
-  (error as Record<string, unknown>)[prop] === value;
 
 export class S3DatasetStorage implements DatasetStorage {
   /**
@@ -59,6 +53,9 @@ export class S3DatasetStorage implements DatasetStorage {
     if (cached) return cached;
     const created = createS3Client(projectId);
     this.clients.set(projectId, created);
+    // Evict a transient resolution failure so the next call retries instead of
+    // caching a rejected promise forever (M4).
+    created.catch(() => this.clients.delete(projectId));
     return created;
   }
 
@@ -119,7 +116,9 @@ export class S3DatasetStorage implements DatasetStorage {
         }
         throw error;
       }
-      if (jsonl) rows.push(...parseJsonl(jsonl));
+      // An empty chunk parses to []; never silently skip (m2). The
+      // missing-chunk invariant is already enforced by the throw above.
+      rows.push(...parseJsonl(jsonl));
     }
     return rows;
   }
@@ -147,11 +146,32 @@ export class S3DatasetStorage implements DatasetStorage {
     projectId: string;
     key: string;
   }): Promise<number> {
+    assertKeyWithinProject(projectId, key);
     const { s3Client, s3Bucket } = await this.client(projectId);
-    const head = await s3Client.send(
-      new HeadObjectCommand({ Bucket: s3Bucket, Key: key }),
-    );
-    return head.ContentLength ?? 0;
+    let head: HeadObjectCommandOutput;
+    try {
+      head = await s3Client.send(
+        new HeadObjectCommand({ Bucket: s3Bucket, Key: key }),
+      );
+    } catch (error: unknown) {
+      // A never-completed (or already-reaped) upload — distinct from a too-large
+      // one (M5). NoSuchKey / NotFound both surface here depending on the SDK.
+      if (
+        errorHasProp(error, "name", "NoSuchKey") ||
+        errorHasProp(error, "name", "NotFound") ||
+        errorHasProp(error, "code", "NoSuchKey") ||
+        errorHasProp(error, "code", "NotFound")
+      ) {
+        throw new StagedUploadNotFoundError();
+      }
+      throw error;
+    }
+    // A HEAD with no ContentLength means the object isn't a complete upload —
+    // treat as not-found rather than silently reporting 0 bytes (M5).
+    if (head.ContentLength == null) {
+      throw new StagedUploadNotFoundError();
+    }
+    return head.ContentLength;
   }
 
   async deleteStaged({
@@ -161,6 +181,7 @@ export class S3DatasetStorage implements DatasetStorage {
     projectId: string;
     key: string;
   }): Promise<void> {
+    assertKeyWithinProject(projectId, key);
     const { s3Client, s3Bucket } = await this.client(projectId);
     await s3Client.send(
       new DeleteObjectCommand({ Bucket: s3Bucket, Key: key }),

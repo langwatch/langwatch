@@ -134,9 +134,46 @@ export const assertNoTraversal = (...parts: string[]): void => {
   }
 };
 
+/**
+ * Guard a full storage key (which legitimately contains `/`) before it is
+ * path-joined to disk or sent to S3. Defense-in-depth on the staged-object
+ * methods (m4): the key is server-minted, but validate anyway — reject any
+ * `..` segment and require it to sit under this project's `staging/` prefix so
+ * a key can never escape the tenant scope.
+ */
+export const assertKeyWithinProject = (
+  projectId: string,
+  key: string,
+): void => {
+  assertNoTraversal(projectId);
+  if (
+    key.includes("..") ||
+    key.startsWith("/") ||
+    !key.startsWith(`staging/${projectId}/`)
+  ) {
+    throw new Error("Invalid key: path traversal attempt detected");
+  }
+};
+
 /** Parse a JSONL blob into rows, ignoring blank lines. */
 export const parseJsonl = (jsonl: string): unknown[] =>
   jsonl
     .split("\n")
     .filter((line) => line.trim().length > 0)
     .map((line) => JSON.parse(line));
+
+/**
+ * Narrow an `unknown` caught value to one carrying a given property with a
+ * given string value. Shared by every storage impl so the "is this a
+ * NoSuchKey / ENOENT?" check lives in exactly one place. The prop name is a
+ * param because the SDKs disagree (`name` for S3 errors, `code` for Node FS).
+ */
+export const errorHasProp = (
+  error: unknown,
+  prop: "code" | "name",
+  value: string,
+): boolean =>
+  typeof error === "object" &&
+  error !== null &&
+  prop in error &&
+  (error as Record<string, unknown>)[prop] === value;

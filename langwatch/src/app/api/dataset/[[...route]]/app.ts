@@ -330,22 +330,26 @@ secured.access(requires("datasets:manage")).post(
     const project = c.get("project");
     const service = c.get("datasetService");
 
-    const body = await c.req.parseBody();
-    const stagingKey = body.stagingKey;
-    if (!stagingKey || typeof stagingKey !== "string") {
-      throw new UnprocessableEntityError("stagingKey field is required");
-    }
-
+    // The staging key is the server-minted one bound to the row (C1); the
+    // client no longer supplies it.
     try {
       const result = await service.finalizeUpload({
         projectId: project.id,
         datasetId,
-        stagingKey,
       });
       return c.json(result, 200);
     } catch (error) {
       if (error instanceof Error && error.name === "UploadTooLargeError") {
         throw new BadRequestError(error.message);
+      }
+      if (error instanceof Error && error.name === "UploadNotPendingError") {
+        return c.json({ error: "Conflict", message: error.message }, 409);
+      }
+      if (
+        error instanceof Error &&
+        error.name === "StagedUploadNotFoundError"
+      ) {
+        return c.json({ error: "UploadNotFound", message: error.message }, 422);
       }
       if (error instanceof Error && error.name === "DatasetNotFoundError") {
         return c.json({ error: "NotFound", message: error.message }, 404);

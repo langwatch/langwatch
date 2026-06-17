@@ -6,7 +6,10 @@ vi.mock("../dataset-storage", () => ({ getDatasetStorage: vi.fn() }));
 
 import { DatasetService } from "../dataset.service";
 import { getDatasetStorage } from "../dataset-storage";
-import { DirectUploadUnavailableError } from "../errors";
+import {
+  DirectUploadUnavailableError,
+  StagedUploadNotFoundError,
+} from "../errors";
 import { UPLOAD_MAX_BYTES } from "../presigned-upload";
 
 const makeService = (repo: Record<string, unknown>) =>
@@ -45,8 +48,31 @@ describe("DatasetService", () => {
             status: "uploading",
             contentLayout: "s3_jsonl",
             projectId: "p1",
+            stagingKey: "staging/p1/u1",
           }),
         );
+      });
+    });
+
+    describe("when the name already exists", () => {
+      it("rejects before minting a presigned URL (C2)", async () => {
+        const createPresignedUpload = vi.fn();
+        vi.mocked(getDatasetStorage).mockResolvedValue({
+          createPresignedUpload,
+        } as any);
+        const repo = {
+          findBySlug: vi.fn().mockResolvedValue({ id: "existing" }),
+          create: vi.fn(),
+        };
+
+        await expect(
+          makeService(repo).createPendingUpload({
+            projectId: "p1",
+            name: "DS",
+          }),
+        ).rejects.toThrow(/already exists/i);
+        expect(createPresignedUpload).not.toHaveBeenCalled();
+        expect(repo.create).not.toHaveBeenCalled();
       });
     });
 
@@ -57,7 +83,10 @@ describe("DatasetService", () => {
             .fn()
             .mockRejectedValue(new DirectUploadUnavailableError()),
         } as any);
-        const repo = { findBySlug: vi.fn(), create: vi.fn() };
+        const repo = {
+          findBySlug: vi.fn().mockResolvedValue(null),
+          create: vi.fn(),
+        };
 
         await expect(
           makeService(repo).createPendingUpload({
@@ -71,35 +100,63 @@ describe("DatasetService", () => {
   });
 
   describe("finalizeUpload()", () => {
-    describe("when the staged key is not under the project's prefix", () => {
-      it("rejects it", async () => {
-        const repo = { findOne: vi.fn().mockResolvedValue({ id: "d1" }) };
-        await expect(
-          makeService(repo).finalizeUpload({
-            projectId: "p1",
-            datasetId: "d1",
-            stagingKey: "staging/p2/x",
+    describe("when the dataset's bound staging key drives the HEAD", () => {
+      it("HEADs the row's stagingKey and flips the dataset to processing", async () => {
+        const headStagedObjectSize = vi.fn().mockResolvedValue(1024);
+        vi.mocked(getDatasetStorage).mockResolvedValue({
+          headStagedObjectSize,
+        } as any);
+        const repo = {
+          findOne: vi.fn().mockResolvedValue({
+            id: "d1",
+            status: "uploading",
+            stagingKey: "staging/p1/bound-key",
           }),
-        ).rejects.toThrow(/does not belong/);
+          update: vi.fn().mockResolvedValue({}),
+        };
+
+        const result = await makeService(repo).finalizeUpload({
+          projectId: "p1",
+          datasetId: "d1",
+        });
+
+        expect(headStagedObjectSize).toHaveBeenCalledWith({
+          projectId: "p1",
+          key: "staging/p1/bound-key",
+        });
+        expect(result.status).toBe("processing");
+        expect(repo.update).toHaveBeenCalledWith(
+          expect.objectContaining({ data: { status: "processing" } }),
+        );
       });
     });
 
     describe("when the staged object exceeds the size cap", () => {
-      it("marks the dataset failed and throws", async () => {
+      it("deletes the staged object, marks the dataset failed, and throws", async () => {
+        const deleteStaged = vi.fn().mockResolvedValue(undefined);
         vi.mocked(getDatasetStorage).mockResolvedValue({
           headStagedObjectSize: vi.fn().mockResolvedValue(UPLOAD_MAX_BYTES + 1),
+          deleteStaged,
         } as any);
         const repo = {
-          findOne: vi.fn().mockResolvedValue({ id: "d1" }),
+          findOne: vi.fn().mockResolvedValue({
+            id: "d1",
+            status: "uploading",
+            stagingKey: "staging/p1/k",
+          }),
           update: vi.fn().mockResolvedValue({}),
         };
+
         await expect(
           makeService(repo).finalizeUpload({
             projectId: "p1",
             datasetId: "d1",
-            stagingKey: "staging/p1/x",
           }),
         ).rejects.toThrow(/maximum/i);
+        expect(deleteStaged).toHaveBeenCalledWith({
+          projectId: "p1",
+          key: "staging/p1/k",
+        });
         expect(repo.update).toHaveBeenCalledWith(
           expect.objectContaining({
             data: expect.objectContaining({ status: "failed" }),
@@ -108,26 +165,99 @@ describe("DatasetService", () => {
       });
     });
 
-    describe("when the upload is within the cap", () => {
-      it("flips the dataset to processing", async () => {
+    describe("when the staged object is missing or incomplete", () => {
+      it("flips the dataset to failed and surfaces StagedUploadNotFoundError", async () => {
         vi.mocked(getDatasetStorage).mockResolvedValue({
-          headStagedObjectSize: vi.fn().mockResolvedValue(1024),
+          headStagedObjectSize: vi
+            .fn()
+            .mockRejectedValue(new StagedUploadNotFoundError()),
         } as any);
         const repo = {
-          findOne: vi.fn().mockResolvedValue({ id: "d1" }),
+          findOne: vi.fn().mockResolvedValue({
+            id: "d1",
+            status: "uploading",
+            stagingKey: "staging/p1/k",
+          }),
           update: vi.fn().mockResolvedValue({}),
         };
 
-        const result = await makeService(repo).finalizeUpload({
-          projectId: "p1",
-          datasetId: "d1",
-          stagingKey: "staging/p1/x",
-        });
-
-        expect(result.status).toBe("processing");
+        await expect(
+          makeService(repo).finalizeUpload({
+            projectId: "p1",
+            datasetId: "d1",
+          }),
+        ).rejects.toBeInstanceOf(StagedUploadNotFoundError);
         expect(repo.update).toHaveBeenCalledWith(
-          expect.objectContaining({ data: { status: "processing" } }),
+          expect.objectContaining({
+            data: expect.objectContaining({
+              status: "failed",
+              statusError: "Uploaded object not found",
+            }),
+          }),
         );
+      });
+    });
+
+    describe("when the dataset is not in the uploading state", () => {
+      it("throws UploadNotPendingError without HEADing storage", async () => {
+        const headStagedObjectSize = vi.fn();
+        vi.mocked(getDatasetStorage).mockResolvedValue({
+          headStagedObjectSize,
+        } as any);
+        const repo = {
+          findOne: vi.fn().mockResolvedValue({
+            id: "d1",
+            status: "processing",
+            stagingKey: "staging/p1/k",
+          }),
+        };
+
+        await expect(
+          makeService(repo).finalizeUpload({
+            projectId: "p1",
+            datasetId: "d1",
+          }),
+        ).rejects.toThrow(/not pending/i);
+        expect(headStagedObjectSize).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the dataset has no bound staging key", () => {
+      it("throws UploadNotPendingError", async () => {
+        const repo = {
+          findOne: vi.fn().mockResolvedValue({
+            id: "d1",
+            status: "uploading",
+            stagingKey: null,
+          }),
+        };
+
+        await expect(
+          makeService(repo).finalizeUpload({
+            projectId: "p1",
+            datasetId: "d1",
+          }),
+        ).rejects.toThrow(/no pending staged upload/i);
+      });
+    });
+
+    describe("when the dataset is archived", () => {
+      it("throws DatasetNotFoundError", async () => {
+        const repo = {
+          findOne: vi.fn().mockResolvedValue({
+            id: "d1",
+            status: "uploading",
+            stagingKey: "staging/p1/k",
+            archivedAt: new Date(),
+          }),
+        };
+
+        await expect(
+          makeService(repo).finalizeUpload({
+            projectId: "p1",
+            datasetId: "d1",
+          }),
+        ).rejects.toThrow(/not found/i);
       });
     });
 
@@ -138,7 +268,6 @@ describe("DatasetService", () => {
           makeService(repo).finalizeUpload({
             projectId: "p1",
             datasetId: "missing",
-            stagingKey: "staging/p1/x",
           }),
         ).rejects.toThrow(/not found/i);
       });

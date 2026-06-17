@@ -619,6 +619,9 @@ model Dataset {
   contentLayout    String            @default("postgres") // postgres | s3_jsonl
   status           String            @default("ready") // uploading | processing | ready | failed
   statusError      String?
+  // Server-owned staging key bound to the row at presign time, so finalize
+  // never trusts a client-supplied key (ADR-032 D4 / C1).
+  stagingKey       String?
   rowCount         Int?
   sizeBytes        BigInt?
   chunkCount       Int?

@@ -78,3 +78,28 @@ export class UploadTooLargeError extends Error {
     this.name = "UploadTooLargeError";
   }
 }
+
+/**
+ * Thrown when finalize is called on a dataset that is not in the `uploading`
+ * state (e.g. re-finalizing a `processing`/`ready` dataset). Blocks finalize
+ * replay; the route maps it to 409 Conflict.
+ */
+export class UploadNotPendingError extends Error {
+  constructor(message = "Upload is not pending finalization") {
+    super(message);
+    this.name = "UploadNotPendingError";
+  }
+}
+
+/**
+ * Thrown when the staged object a finalize references is missing or incomplete
+ * (never uploaded, NoSuchKey/NotFound, or a HEAD with no ContentLength). The
+ * route maps it to 422; the dataset is flipped to `failed` so a never-completed
+ * upload doesn't sit stuck in `uploading`.
+ */
+export class StagedUploadNotFoundError extends Error {
+  constructor(message = "Uploaded object not found") {
+    super(message);
+    this.name = "StagedUploadNotFoundError";
+  }
+}

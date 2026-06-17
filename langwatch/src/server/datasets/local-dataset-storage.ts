@@ -12,20 +12,19 @@
 import fs from "fs/promises";
 import path from "path";
 import {
+  assertKeyWithinProject,
   assertNoTraversal,
   chunkKey,
   type DatasetChunk,
+  errorHasProp,
   parseJsonl,
   toJsonlChunks,
 } from "./dataset-chunking";
 import type { DatasetStorage, PresignedUpload } from "./dataset-storage";
-import { DirectUploadUnavailableError } from "./errors";
-
-const errorHasProp = (error: unknown, prop: "code", value: string): boolean =>
-  typeof error === "object" &&
-  error !== null &&
-  prop in error &&
-  (error as Record<string, unknown>)[prop] === value;
+import {
+  DirectUploadUnavailableError,
+  StagedUploadNotFoundError,
+} from "./errors";
 
 /** Absolute on-disk path for a storage key under the local root. */
 const localPath = (key: string): string => {
@@ -82,7 +81,9 @@ export class LocalDatasetStorage implements DatasetStorage {
         }
         throw error;
       }
-      if (jsonl) rows.push(...parseJsonl(jsonl));
+      // An empty chunk parses to []; never silently skip (m2). The
+      // missing-chunk invariant is already enforced by the throw above.
+      rows.push(...parseJsonl(jsonl));
     }
     return rows;
   }
@@ -104,9 +105,18 @@ export class LocalDatasetStorage implements DatasetStorage {
     projectId: string;
     key: string;
   }): Promise<number> {
-    assertNoTraversal(projectId);
-    const stat = await fs.stat(localPath(key));
-    return stat.size;
+    assertKeyWithinProject(projectId, key);
+    try {
+      const stat = await fs.stat(localPath(key));
+      return stat.size;
+    } catch (error: unknown) {
+      // A never-completed (or already-reaped) upload — distinct from a too-large
+      // one (M5).
+      if (errorHasProp(error, "code", "ENOENT")) {
+        throw new StagedUploadNotFoundError();
+      }
+      throw error;
+    }
   }
 
   async deleteStaged({
@@ -116,7 +126,7 @@ export class LocalDatasetStorage implements DatasetStorage {
     projectId: string;
     key: string;
   }): Promise<void> {
-    assertNoTraversal(projectId);
+    assertKeyWithinProject(projectId, key);
     await fs.rm(localPath(key), { force: true });
   }
 }

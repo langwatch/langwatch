@@ -16,6 +16,8 @@ import {
   DatasetNotFoundError,
   InvalidColumnError,
   MalformedColumnTypesError,
+  StagedUploadNotFoundError,
+  UploadNotPendingError,
   UploadTooLargeError,
 } from "./errors";
 import { ExperimentRepository } from "./experiment.repository";
@@ -882,11 +884,13 @@ export class DatasetService {
    * @throws {UploadValidationError} if file too large, too many rows, etc.
    */
   /**
-   * R3: start a direct browser→S3 upload for a NEW dataset. Mints the
-   * presigned target first (fails fast with `DirectUploadUnavailableError`
+   * R3: start a direct browser→S3 upload for a NEW dataset. Checks the name
+   * conflict FIRST (C2 — a conflict must never mint a presigned URL), then
+   * mints the presigned target (fails fast with `DirectUploadUnavailableError`
    * on backends that can't presign — caller falls back to backend upload),
-   * then creates the `Dataset` in `uploading`. Content lands in S3 once the
-   * normalize job runs (rung 4); `columnTypes` is unknown until then.
+   * then creates the `Dataset` in `uploading` with the minted staging key
+   * bound to the row (C1). Content lands in S3 once the normalize job runs
+   * (rung 4); `columnTypes` is unknown until then.
    */
   async createPendingUpload(params: {
     projectId: string;
@@ -899,14 +903,16 @@ export class DatasetService {
   }> {
     const { projectId, name } = params;
 
-    const storage = await getDatasetStorage(projectId);
-    // Throws DirectUploadUnavailableError on local/no-S3 → no orphan row.
-    const upload = await storage.createPresignedUpload({ projectId });
-
     const slug = this.generateSlug(name);
+    // C2: reject a name conflict before minting a presigned URL so a duplicate
+    // name never produces a usable upload target.
     if (await this.repository.findBySlug({ slug, projectId })) {
       throw new DatasetConflictError();
     }
+
+    const storage = await getDatasetStorage(projectId);
+    // Throws DirectUploadUnavailableError on local/no-S3 → no orphan row.
+    const upload = await storage.createPresignedUpload({ projectId });
 
     const dataset = await this.repository.create({
       id: `dataset_${nanoid()}`,
@@ -916,6 +922,9 @@ export class DatasetService {
       columnTypes: [], // unknown until normalize parses the uploaded file
       status: "uploading",
       contentLayout: "s3_jsonl",
+      // C1: bind the minted key to the row so finalize never trusts a
+      // client-supplied key.
+      stagingKey: upload.key,
     });
 
     return {
@@ -927,34 +936,70 @@ export class DatasetService {
   }
 
   /**
-   * R3: finalize a direct upload. Verifies the staged object belongs to the
-   * project, enforces the size cap (HEAD), and flips the dataset to
-   * `processing`. The normalize job is enqueued from here in rung 4.
+   * R3: finalize a direct upload. The staging key is read from the dataset row
+   * (C1 — never trust a client-supplied key); finalize is gated to datasets in
+   * `uploading` (C1 — blocks finalize replay), enforces the size cap (HEAD;
+   * deletes the staged object when over-cap, ADR D4/M6), and flips the dataset
+   * to `processing`. The normalize job is enqueued from here in rung 4.
+   *
+   * @throws {DatasetNotFoundError} if the dataset is missing or archived
+   * @throws {UploadNotPendingError} if the dataset is not in `uploading`
+   * @throws {StagedUploadNotFoundError} if the staged object is missing/incomplete
+   * @throws {UploadTooLargeError} if the staged object exceeds the size cap
    */
   async finalizeUpload(params: {
     projectId: string;
     datasetId: string;
-    stagingKey: string;
   }): Promise<{ datasetId: string; status: "processing" }> {
-    const { projectId, datasetId, stagingKey } = params;
+    const { projectId, datasetId } = params;
 
     const dataset = await this.repository.findOne({ id: datasetId, projectId });
-    if (!dataset) {
+    // C1: not found OR archived is not finalizable.
+    if (!dataset || dataset.archivedAt) {
       throw new DatasetNotFoundError();
     }
-    // Tenant guard: the staged object must live under this project's prefix.
-    if (!stagingKey.startsWith(`staging/${projectId}/`)) {
-      throw new DatasetNotFoundError(
-        "Staged object does not belong to project",
-      );
+    // C1: only a pending upload can be finalized; blocks re-finalizing a
+    // processing/ready dataset (finalize replay).
+    if (dataset.status !== "uploading") {
+      throw new UploadNotPendingError();
+    }
+    // C1: the staging key is the server-minted one bound to the row, not a
+    // client param. A null key means the row was never set up for direct
+    // upload — not finalizable.
+    const stagingKey = dataset.stagingKey;
+    if (!stagingKey) {
+      throw new UploadNotPendingError("Dataset has no pending staged upload");
     }
 
     const storage = await getDatasetStorage(projectId);
-    const sizeBytes = await storage.headStagedObjectSize({
-      projectId,
-      key: stagingKey,
-    });
+
+    let sizeBytes: number;
+    try {
+      sizeBytes = await storage.headStagedObjectSize({
+        projectId,
+        key: stagingKey,
+      });
+    } catch (error: unknown) {
+      // M5: a never-completed upload shouldn't sit stuck in `uploading` — flip
+      // it to failed before surfacing the not-found error.
+      if (error instanceof StagedUploadNotFoundError) {
+        await this.repository.update({
+          id: datasetId,
+          projectId,
+          data: { status: "failed", statusError: "Uploaded object not found" },
+        });
+      }
+      throw error;
+    }
+
     if (exceedsUploadCap(sizeBytes)) {
+      // M6 / ADR D4: reject AND delete the over-cap staged object (best-effort;
+      // a failed delete must not mask the size rejection).
+      try {
+        await storage.deleteStaged({ projectId, key: stagingKey });
+      } catch {
+        // non-fatal: the staging lifecycle rule reaps it eventually.
+      }
       await this.repository.update({
         id: datasetId,
         projectId,
