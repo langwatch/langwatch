@@ -161,7 +161,7 @@ Feature: Mapping Auto-Inference
     And no manual mapping is required for "output"
 
   @regression
-  Scenario: Do not guess a single output when the target has multiple outputs and no name matches
+  Scenario: An output field is left for me to map when the runner has several outputs to choose from
     Given I have a runner producing outputs "category" and "confidence"
     When I add an evaluator with input "output"
     Then evaluator "output" has no auto-inferred mapping

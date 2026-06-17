@@ -500,48 +500,66 @@ describe("inferEvaluatorMappings", () => {
     }
   });
 
-  /** @scenario Auto-map a target-output field to the target's only output when no name matches */
-  it("maps an output field to the target's only output when no name matches", () => {
-    const dataset = createTestDataset("ds-1", "Dataset 1", [
-      createTestColumn("input"),
-      createTestColumn("expected_output"),
-    ]);
-    const target = createTestTarget(
-      "target-1",
-      [{ identifier: "input", type: "str" }],
-      // Single output whose name does not match "output" by any rule
-      [{ identifier: "category", type: "str" }],
-    );
-    const evaluatorInputs: Field[] = [{ identifier: "output", type: "str" }];
+  describe("given an output-like field that matches no target output by name", () => {
+    describe("when the target exposes a single output", () => {
+      /** @scenario Auto-map a target-output field to the target's only output when no name matches */
+      it("maps the output field to that sole output", () => {
+        const dataset = createTestDataset("ds-1", "Dataset 1", [
+          createTestColumn("input"),
+          createTestColumn("expected_output"),
+        ]);
+        const target = createTestTarget(
+          "target-1",
+          [{ identifier: "input", type: "str" }],
+          // Single output whose name does not match "output" by any rule
+          [{ identifier: "category", type: "str" }],
+        );
+        const evaluatorInputs: Field[] = [
+          { identifier: "output", type: "str" },
+        ];
 
-    const mappings = inferEvaluatorMappings(evaluatorInputs, dataset, target);
+        const mappings = inferEvaluatorMappings(
+          evaluatorInputs,
+          dataset,
+          target,
+        );
 
-    expect(mappings.output).toEqual({
-      type: "source",
-      source: "target",
-      sourceId: "target-1",
-      sourceField: "category",
+        expect(mappings.output).toEqual({
+          type: "source",
+          source: "target",
+          sourceId: "target-1",
+          sourceField: "category",
+        });
+      });
     });
-  });
 
-  /** @scenario Do not guess a single output when the target has multiple outputs and no name matches */
-  it("does not guess when the target has multiple outputs and no name matches", () => {
-    const dataset = createTestDataset("ds-1", "Dataset 1", [
-      createTestColumn("input"),
-    ]);
-    const target = createTestTarget(
-      "target-1",
-      [{ identifier: "input", type: "str" }],
-      [
-        { identifier: "category", type: "str" },
-        { identifier: "confidence", type: "str" },
-      ],
-    );
-    const evaluatorInputs: Field[] = [{ identifier: "output", type: "str" }];
+    describe("when the target exposes multiple outputs", () => {
+      /** @scenario An output field is left for me to map when the runner has several outputs to choose from */
+      it("leaves the output field unmapped", () => {
+        const dataset = createTestDataset("ds-1", "Dataset 1", [
+          createTestColumn("input"),
+        ]);
+        const target = createTestTarget(
+          "target-1",
+          [{ identifier: "input", type: "str" }],
+          [
+            { identifier: "category", type: "str" },
+            { identifier: "confidence", type: "str" },
+          ],
+        );
+        const evaluatorInputs: Field[] = [
+          { identifier: "output", type: "str" },
+        ];
 
-    const mappings = inferEvaluatorMappings(evaluatorInputs, dataset, target);
+        const mappings = inferEvaluatorMappings(
+          evaluatorInputs,
+          dataset,
+          target,
+        );
 
-    expect(mappings.output).toBeUndefined();
+        expect(mappings.output).toBeUndefined();
+      });
+    });
   });
 
   it("does not override existing mappings", () => {
