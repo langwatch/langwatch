@@ -163,6 +163,22 @@ const putChunkObject = async (
   );
 };
 
+const errorHasProp = (
+  error: unknown,
+  prop: "code" | "name",
+  value: string,
+): boolean =>
+  typeof error === "object" &&
+  error !== null &&
+  prop in error &&
+  (error as Record<string, unknown>)[prop] === value;
+
+/**
+ * A missing chunk is **corruption**, not emptiness: `readDatasetChunks` is
+ * driven by PG-authoritative `chunkCount`, so chunk `i` for `i < chunkCount`
+ * must exist. Returning "" on ENOENT/NoSuchKey would silently truncate the
+ * dataset while the counts still claim full data — so we throw and fail fast.
+ */
 const getChunkObject = async (
   projectId: string,
   key: string,
@@ -170,8 +186,10 @@ const getChunkObject = async (
   if (env.DATASET_STORAGE_LOCAL) {
     try {
       return await fs.readFile(localChunkPath(key), "utf-8");
-    } catch (error: any) {
-      if (error.code === "ENOENT") return "";
+    } catch (error: unknown) {
+      if (errorHasProp(error, "code", "ENOENT")) {
+        throw new Error(`Missing dataset chunk: ${key}`);
+      }
       throw error;
     }
   }
@@ -181,8 +199,10 @@ const getChunkObject = async (
       new GetObjectCommand({ Bucket: s3Bucket, Key: key }),
     );
     return (await Body?.transformToString()) ?? "";
-  } catch (error: any) {
-    if (error.name === "NoSuchKey") return "";
+  } catch (error: unknown) {
+    if (errorHasProp(error, "name", "NoSuchKey")) {
+      throw new Error(`Missing dataset chunk: ${key}`);
+    }
     throw error;
   }
 };
