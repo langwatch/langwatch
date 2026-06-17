@@ -6,6 +6,7 @@ import {
   TraceFlags,
 } from "@opentelemetry/api";
 import fastq from "fastq";
+// biome-ignore lint/style/useImportType: instanceof requires runtime class value
 import { Redis as IORedis } from "ioredis";
 import type { Cluster } from "ioredis";
 import { getLangWatchTracer } from "langwatch";
