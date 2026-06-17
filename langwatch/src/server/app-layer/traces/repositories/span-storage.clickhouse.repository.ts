@@ -1036,6 +1036,71 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     );
   }
 
+  /**
+   * Resolve a trace's occurrence time from `trace_summaries` so the Events.*
+   * reads below can prune `stored_spans` partitions even when the caller never
+   * threaded an `occurredAtMs` hint — back-stack / conversation-jump / deep-link
+   * drawer opens that dropped it, and worker callers that never had one.
+   *
+   * `trace_summaries` is `ORDER BY (TenantId, TraceId)`, so this is a sort-key
+   * point seek over a couple of granules of small columns. That is far cheaper
+   * than the alternative it replaces: letting the Events.* read fall back to an
+   * unbounded `stored_spans` scan that walks every weekly partition, including
+   * the cold S3 tier. Returns `undefined` only when the trace isn't in
+   * `trace_summaries` at all (orphan / not-yet-projected), where the read keeps
+   * its previous unbounded behaviour.
+   */
+  private async resolveTraceOccurredAtMs(
+    tenantId: string,
+    traceId: string,
+  ): Promise<number | undefined> {
+    const client = await this.resolveClient(tenantId);
+    const result = await client.query({
+      query: `
+        SELECT toUnixTimestamp64Milli(min(OccurredAt)) AS occurredAtMs
+        FROM trace_summaries
+        WHERE TenantId = {tenantId:String}
+          AND TraceId = {traceId:String}
+      `,
+      query_params: { tenantId, traceId },
+      format: "JSONEachRow",
+    });
+    const rows = (await result.json()) as Array<{
+      occurredAtMs: string | number | null;
+    }>;
+    const raw = rows[0]?.occurredAtMs;
+    if (raw === null || raw === undefined) return undefined;
+    // `min` over no matching rows yields the epoch default (0); treat that — and
+    // any non-positive value — as "unknown" so the caller stays unbounded.
+    const ms = typeof raw === "string" ? Number(raw) : raw;
+    return Number.isFinite(ms) && ms > 0 ? ms : undefined;
+  }
+
+  /**
+   * Partition-pruned execution for the single-trace Events.* reads. The window
+   * comes from the trace's own occurrence time — the caller's hint when present,
+   * otherwise resolved from `trace_summaries` — so an empty result is
+   * authoritative: the trace has no matching events within its ±2-day span
+   * window, and we do NOT rescan unbounded.
+   *
+   * That unbounded-on-empty rescan (what {@link withPartitionHint} does) was
+   * itself a cold S3 partition walk: a trace legitimately *without* events made
+   * every such read scan the whole table. We only scan unbounded when the trace
+   * time is genuinely unknown (the trace isn't in `trace_summaries`).
+   */
+  private async readTraceEvents<T>(
+    {
+      tenantId,
+      traceId,
+      occurredAtMs,
+    }: { tenantId: string; traceId: string } & OccurredAtHint,
+    run: (window: PartitionWindow | undefined) => Promise<T>,
+  ): Promise<T> {
+    const hintMs =
+      occurredAtMs ?? (await this.resolveTraceOccurredAtMs(tenantId, traceId));
+    return run(partitionWindowFor({ occurredAtMs: hintMs }));
+  }
+
   async getTraceEventsByTraceId({
     tenantId,
     traceId,
@@ -1050,9 +1115,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     );
 
     try {
-      return await withPartitionHint<DerivedTraceEvent[]>(
-        { occurredAtMs },
-        (rows) => rows.length === 0,
+      return await this.readTraceEvents<DerivedTraceEvent[]>(
+        { tenantId, traceId, occurredAtMs },
         async (window) => {
           const partition = partitionFragment(window);
           const client = await this.resolveClient(tenantId);
@@ -1131,9 +1195,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     );
 
     try {
-      return await withPartitionHint<ElasticSearchEvent[]>(
-        { occurredAtMs },
-        (rows) => rows.length === 0,
+      return await this.readTraceEvents<ElasticSearchEvent[]>(
+        { tenantId, traceId, occurredAtMs },
         async (window) => {
           const partition = partitionFragment(window);
           const client = await this.resolveClient(tenantId);
@@ -1205,9 +1268,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     );
 
     try {
-      return await withPartitionHint<ElasticSearchEvent[]>(
-        { occurredAtMs },
-        (rows) => rows.length === 0,
+      return await this.readTraceEvents<ElasticSearchEvent[]>(
+        { tenantId, traceId, occurredAtMs },
         async (window) => {
           const partition = partitionFragment(window);
           const client = await this.resolveClient(tenantId);
