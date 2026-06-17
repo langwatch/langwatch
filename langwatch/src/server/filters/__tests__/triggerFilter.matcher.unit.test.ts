@@ -221,22 +221,188 @@ describe("matchesTriggerFilters", () => {
     });
   });
 
-  describe("when filters contain unsupported fields", () => {
-    it("skips metadata.key (key-selector) without failing", () => {
+  describe("when filters contain an unevaluable field (issue #4805 fail-closed)", () => {
+    it("does not match when metadata.key (key-selector) is the unmet condition", () => {
       const data = makeTraceData({ origin: "application" });
       const filters: TriggerFilters = {
         "traces.origin": ["application"],
         "metadata.key": ["some_key"],
       };
-      expect(matchesTriggerFilters(data, filters)).toBe(true);
+      // metadata.key cannot be positively evaluated in-memory; a non-empty
+      // condition on it must force NO-MATCH rather than skip-to-pass.
+      expect(matchesTriggerFilters(data, filters)).toBe(false);
     });
 
-    it("skips events.metrics.value (numeric-only) without failing", () => {
+    it("does not match an all-unevaluable filter set", () => {
       const data = makeTraceData();
       const filters: TriggerFilters = {
-        "events.metrics.value": { click: { count: ["5"] } },
+        "metadata.key": ["some_key"],
+      };
+      expect(matchesTriggerFilters(data, filters)).toBe(false);
+    });
+
+    it("stays vacuous when an unevaluable field carries only an empty condition", () => {
+      const data = makeTraceData({ origin: "application" });
+      const filters: TriggerFilters = {
+        "traces.origin": ["application"],
+        "metadata.key": [],
       };
       expect(matchesTriggerFilters(data, filters)).toBe(true);
+    });
+  });
+
+  describe("when filtering by events.metrics.value (numeric range)", () => {
+    function makeEventData(
+      events: PreconditionTraceData["events"],
+    ): PreconditionTraceData {
+      return makeTraceData({ events });
+    }
+
+    const thumbsDownFilter: TriggerFilters = {
+      "events.metrics.value": { thumbs_up_down: { vote: ["-1", "-1"] } },
+    };
+
+    describe("given a thumbs-down automation filter", () => {
+      it("does not match when there is no thumbs_up_down event", () => {
+        const data = makeEventData(null);
+        expect(matchesTriggerFilters(data, thumbsDownFilter)).toBe(false);
+      });
+
+      it("does not match an up-vote (vote 1)", () => {
+        const data = makeEventData([
+          {
+            event_type: "thumbs_up_down",
+            metrics: [{ key: "vote", value: 1 }],
+            event_details: [],
+          },
+        ]);
+        expect(matchesTriggerFilters(data, thumbsDownFilter)).toBe(false);
+      });
+
+      it("does not match a neutral vote (vote 0)", () => {
+        const data = makeEventData([
+          {
+            event_type: "thumbs_up_down",
+            metrics: [{ key: "vote", value: 0 }],
+            event_details: [],
+          },
+        ]);
+        expect(matchesTriggerFilters(data, thumbsDownFilter)).toBe(false);
+      });
+
+      it("matches a down-vote (vote -1)", () => {
+        const data = makeEventData([
+          {
+            event_type: "thumbs_up_down",
+            metrics: [{ key: "vote", value: -1 }],
+            event_details: [],
+          },
+        ]);
+        expect(matchesTriggerFilters(data, thumbsDownFilter)).toBe(true);
+      });
+    });
+
+    describe("given a trace-origin filter combined with an unmet down-vote condition", () => {
+      it("does not match when the origin matches but there is no down-vote", () => {
+        const data = makeEventData(null);
+        const filters: TriggerFilters = {
+          "traces.origin": ["application"],
+          "events.metrics.value": { thumbs_up_down: { vote: ["-1", "-1"] } },
+        };
+        // origin matches, but the event condition is unmet → whole set fails.
+        expect(matchesTriggerFilters(data, filters)).toBe(false);
+      });
+    });
+
+    describe("given the range boundary parity table", () => {
+      function matchWithRange(value: number, range: [string, string]): boolean {
+        const data = makeEventData([
+          {
+            event_type: "rating",
+            metrics: [{ key: "score", value }],
+            event_details: [],
+          },
+        ]);
+        const filters: TriggerFilters = {
+          "events.metrics.value": { rating: { score: range } },
+        };
+        return matchesTriggerFilters(data, filters);
+      }
+
+      it("matches a value strictly inside the range", () => {
+        expect(matchWithRange(5, ["0", "10"])).toBe(true);
+      });
+
+      it("matches a value equal to the minimum (inclusive)", () => {
+        expect(matchWithRange(0, ["0", "10"])).toBe(true);
+      });
+
+      it("matches a value equal to the maximum (inclusive)", () => {
+        expect(matchWithRange(10, ["0", "10"])).toBe(true);
+      });
+
+      it("does not match a value just below the minimum", () => {
+        expect(matchWithRange(-0.5, ["0", "10"])).toBe(false);
+      });
+
+      it("does not match a value just above the maximum", () => {
+        expect(matchWithRange(10.5, ["0", "10"])).toBe(false);
+      });
+
+      it("does not match when fewer than two range values are given", () => {
+        const data = makeEventData([
+          {
+            event_type: "rating",
+            metrics: [{ key: "score", value: 5 }],
+            event_details: [],
+          },
+        ]);
+        const filters: TriggerFilters = {
+          "events.metrics.value": { rating: { score: ["5"] } },
+        };
+        expect(matchesTriggerFilters(data, filters)).toBe(false);
+      });
+
+      it("does not match when range values are non-numeric", () => {
+        expect(matchWithRange(5, ["low", "high"])).toBe(false);
+      });
+
+      it("does not match when min is greater than max", () => {
+        expect(matchWithRange(5, ["10", "0"])).toBe(false);
+      });
+
+      it("does not match when the event type is present but the metric key is absent", () => {
+        const data = makeEventData([
+          {
+            event_type: "rating",
+            metrics: [{ key: "other", value: 5 }],
+            event_details: [],
+          },
+        ]);
+        const filters: TriggerFilters = {
+          "events.metrics.value": { rating: { score: ["0", "10"] } },
+        };
+        expect(matchesTriggerFilters(data, filters)).toBe(false);
+      });
+    });
+
+    describe("given malformed filter values", () => {
+      it("does not throw on a non-numeric or short range", () => {
+        const data = makeEventData([
+          {
+            event_type: "thumbs_up_down",
+            metrics: [{ key: "vote", value: -1 }],
+            event_details: [],
+          },
+        ]);
+        const filters: TriggerFilters = {
+          "events.metrics.value": {
+            thumbs_up_down: { vote: ["not-a-number"] },
+          },
+        };
+        expect(() => matchesTriggerFilters(data, filters)).not.toThrow();
+        expect(matchesTriggerFilters(data, filters)).toBe(false);
+      });
     });
   });
 });
@@ -984,6 +1150,14 @@ describe("triggerFiltersReferenceEvents", () => {
         } as TriggerFilters),
       ).toBe(true);
     });
+
+    it("returns true for events.metrics.value (matched in-memory as a range)", () => {
+      expect(
+        triggerFiltersReferenceEvents({
+          "events.metrics.value": { thumbs_up_down: { vote: ["-1", "-1"] } },
+        } as TriggerFilters),
+      ).toBe(true);
+    });
   });
 
   describe("when filters do not need the events list", () => {
@@ -991,14 +1165,6 @@ describe("triggerFiltersReferenceEvents", () => {
       expect(
         triggerFiltersReferenceEvents({
           "metadata.user_id": ["u1"],
-        } as TriggerFilters),
-      ).toBe(false);
-    });
-
-    it("returns false for value-only event fields (unsupported in-memory)", () => {
-      expect(
-        triggerFiltersReferenceEvents({
-          "events.metrics.value": { click: { count: ["5"] } },
         } as TriggerFilters),
       ).toBe(false);
     });

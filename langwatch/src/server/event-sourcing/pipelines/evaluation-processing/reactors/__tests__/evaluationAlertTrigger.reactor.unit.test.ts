@@ -496,6 +496,39 @@ describe("evaluationAlertTrigger reactor", () => {
     });
   });
 
+  describe("when an evaluation filter is combined with an unmet event condition", () => {
+    it("does not dispatch when the events.metrics.value condition is not satisfied", async () => {
+      const trigger = createTrigger({
+        filters: {
+          "events.metrics.value": { thumbs_up_down: { vote: ["-1", "-1"] } },
+          "evaluations.passed": { "evaluator-1": ["true"] },
+        },
+      });
+      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue([
+        trigger,
+      ]);
+      // Evaluation half is satisfied...
+      (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
+        createEvalFoldState({ evaluatorId: "evaluator-1", passed: true }),
+      ]);
+      // ...but the trace has no down-vote, so the event condition is unmet.
+      (deps.deriveEvents as any).mockResolvedValue([]);
+
+      const reactor = createEvaluationAlertTriggerReactor(deps);
+      const event = createEvent();
+      const context: ReactorContext<EvaluationRunData> = {
+        tenantId: "tenant-1",
+        aggregateId: "eval-1",
+        foldState: createEvalFoldState(),
+      };
+
+      await reactor.handle(event, context);
+
+      expect(deps.deriveEvents).toHaveBeenCalled();
+      expect(deps.triggers.claimSend).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when both trace and evaluation filters match", () => {
     it("dispatches trigger action for mixed filter triggers", async () => {
       const trigger = createTrigger({
