@@ -1,16 +1,13 @@
 import { Readable } from "node:stream";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toJsonlChunks } from "../dataset-chunking";
-import {
-  createDatasetNormalizeHandler,
-  datasetNormalizeDedupId,
-} from "../dataset-normalize.job";
+import { createDatasetNormalizeHandler } from "../dataset-normalize.job";
 
 /**
  * Unit test the normalize handler at its boundaries: a fake `DatasetStorage`
- * (streamStaged → Readable.from(...), writeChunks / deleteStaged spies) and a
- * stub `DatasetRepository`. The streaming parse + chunk-writer logic under test
- * stays real.
+ * (streamStaged → Readable.from(...), writeChunks / deleteStaged /
+ * deleteChunksFrom spies) and a stub `DatasetRepository`. The streaming parse +
+ * chunk-writer logic under test stays real.
  */
 
 const makeStorage = (overrides: Record<string, unknown> = {}) => {
@@ -25,11 +22,13 @@ const makeStorage = (overrides: Record<string, unknown> = {}) => {
       toJsonlChunks(records).map((c) => ({ ...c, index: c.index + fromIndex })),
   );
   const deleteStaged = vi.fn().mockResolvedValue(undefined);
+  const deleteChunksFrom = vi.fn().mockResolvedValue(undefined);
   const headStagedObjectSize = vi.fn().mockResolvedValue(1024);
   return {
     storage: {
       writeChunks,
       deleteStaged,
+      deleteChunksFrom,
       headStagedObjectSize,
       streamStaged: vi.fn(),
       readChunks: vi.fn(),
@@ -38,6 +37,7 @@ const makeStorage = (overrides: Record<string, unknown> = {}) => {
     },
     writeChunks,
     deleteStaged,
+    deleteChunksFrom,
     headStagedObjectSize,
   };
 };
@@ -58,15 +58,8 @@ const basePayload = {
 
 beforeEach(() => vi.clearAllMocks());
 
-describe("datasetNormalizeDedupId()", () => {
-  it("keys dedup by datasetId so one normalize runs per dataset", () => {
-    expect(datasetNormalizeDedupId(basePayload)).toBe("d1");
-  });
-});
-
 describe("createDatasetNormalizeHandler()", () => {
   describe("when a processing JSONL dataset normalizes successfully", () => {
-    /** @scenario "Both CSV and JSONL files are accepted" */
     it("writes chunks and flips the dataset to ready with counters and columnTypes", async () => {
       const { storage, writeChunks, deleteStaged } = makeStorage({
         streamStaged: vi
@@ -101,7 +94,6 @@ describe("createDatasetNormalizeHandler()", () => {
   });
 
   describe("when a CSV dataset normalizes successfully", () => {
-    /** @scenario "Both CSV and JSONL files are accepted" */
     it("derives headers from the CSV fields and writes the rows", async () => {
       const { storage, writeChunks } = makeStorage({
         streamStaged: vi
@@ -128,7 +120,6 @@ describe("createDatasetNormalizeHandler()", () => {
   });
 
   describe("when a ready dataset reports its row count and size", () => {
-    /** @scenario "A ready dataset reports its true row count and size" */
     it("records the true rowCount and a positive sizeBytes once ready", async () => {
       const rows = Array.from({ length: 50 }, (_, i) => `{"a":"${i}"}`).join(
         "\n",
@@ -261,6 +252,109 @@ describe("createDatasetNormalizeHandler()", () => {
       ).rejects.toThrow(/JSONL/i);
       const update = repo.update.mock.calls[0]![0];
       expect(update.data.status).toBe("failed");
+    });
+  });
+
+  describe("when a record carries a reserved column name", () => {
+    it("renames the key in stored rows and columnTypes (id → id_)", async () => {
+      const { storage, writeChunks } = makeStorage({
+        streamStaged: vi
+          .fn()
+          .mockResolvedValue(Readable.from(['{"id":"x","b":"y"}\n'])),
+      });
+      const repo = makeRepo({ id: "d1", status: "processing" });
+
+      const handler = createDatasetNormalizeHandler({
+        repository: repo as any,
+        getStorage: async () => storage as any,
+      });
+      await handler(basePayload);
+
+      // The stored row's keys are rewritten so they match columnTypes.
+      const pushed = writeChunks.mock.calls[0]![0].records;
+      expect(pushed).toEqual([{ id_: "x", b: "y" }]);
+      const update = repo.update.mock.calls[0]![0];
+      expect(update.data.columnTypes).toEqual([
+        { name: "id_", type: "string" },
+        { name: "b", type: "string" },
+      ]);
+    });
+  });
+
+  describe("when the uploaded file has no rows", () => {
+    it("fails the dataset with an empty-file statusError instead of flipping to ready", async () => {
+      const { storage } = makeStorage({
+        streamStaged: vi.fn().mockResolvedValue(Readable.from(["\n  \n"])),
+      });
+      const repo = makeRepo({ id: "d1", status: "processing" });
+
+      const handler = createDatasetNormalizeHandler({
+        repository: repo as any,
+        getStorage: async () => storage as any,
+      });
+
+      await expect(handler(basePayload)).rejects.toThrow(/empty/i);
+      const update = repo.update.mock.calls[0]![0];
+      expect(update.data.status).toBe("failed");
+      expect(update.data.statusError).toMatch(/empty/i);
+    });
+  });
+
+  describe("when a JSONL line exceeds the max line size", () => {
+    it("fails the dataset rather than buffering an unbounded line", async () => {
+      const giant = `{"a":"${"x".repeat(9 * 1024 * 1024)}"}\n`;
+      const { storage } = makeStorage({
+        streamStaged: vi.fn().mockResolvedValue(Readable.from([giant])),
+      });
+      const repo = makeRepo({ id: "d1", status: "processing" });
+
+      const handler = createDatasetNormalizeHandler({
+        repository: repo as any,
+        getStorage: async () => storage as any,
+      });
+
+      await expect(handler(basePayload)).rejects.toThrow(/max size|malformed/i);
+      const update = repo.update.mock.calls[0]![0];
+      expect(update.data.status).toBe("failed");
+    });
+  });
+
+  // @regression — a re-drive that writes fewer chunks than a crashed prior run
+  // leaves orphan chunk objects; the handler must delete them from the new
+  // chunk count upward so the chunk set matches the PG counters (I-IDEM).
+  describe("when a prior run left more chunks than this run writes", () => {
+    it("deletes orphan chunks from the final count and stops at the first gap", async () => {
+      const { storage, deleteChunksFrom } = makeStorage({
+        // This run writes exactly 2 chunks (tiny per-chunk cap splits the rows).
+        writeChunks: vi.fn(async ({ records, fromIndex = 0 }: any) =>
+          toJsonlChunks(records, { maxBytes: 10 }).map((c) => ({
+            ...c,
+            index: c.index + fromIndex,
+          })),
+        ),
+        streamStaged: vi
+          .fn()
+          .mockResolvedValue(
+            Readable.from(['{"v":"aaaaaaaa"}\n{"v":"bbbbbbbb"}\n']),
+          ),
+      });
+      const repo = makeRepo({ id: "d1", status: "processing" });
+
+      const handler = createDatasetNormalizeHandler({
+        repository: repo as any,
+        getStorage: async () => storage as any,
+      });
+      await handler(basePayload);
+
+      const update = repo.update.mock.calls[0]![0];
+      // deleteChunksFrom is called with fromIndex === this run's chunk count, so
+      // any orphan at that index or beyond is reaped (the impl stops at the
+      // first missing index).
+      expect(deleteChunksFrom).toHaveBeenCalledWith({
+        projectId: "p1",
+        datasetId: "d1",
+        fromIndex: update.data.chunkCount,
+      });
     });
   });
 });

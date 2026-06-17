@@ -12,6 +12,7 @@ import { DatasetService } from "../dataset.service";
 import { enqueueDatasetNormalize } from "../dataset-normalize.queue";
 import { getDatasetStorage } from "../dataset-storage";
 import {
+  DatasetNotRetryableError,
   DirectUploadUnavailableError,
   StagedUploadNotFoundError,
 } from "../errors";
@@ -76,6 +77,7 @@ describe("DatasetService", () => {
           makeService(repo).createPendingUpload({
             projectId: "p1",
             name: "DS",
+            filename: "data.jsonl",
           }),
         ).rejects.toThrow(/already exists/i);
         expect(createPresignedUpload).not.toHaveBeenCalled();
@@ -99,6 +101,7 @@ describe("DatasetService", () => {
           makeService(repo).createPendingUpload({
             projectId: "p1",
             name: "DS",
+            filename: "data.jsonl",
           }),
         ).rejects.toThrow(/Direct upload is unavailable/);
         expect(repo.create).not.toHaveBeenCalled();
@@ -289,6 +292,108 @@ describe("DatasetService", () => {
           makeService(repo).finalizeUpload({
             projectId: "p1",
             datasetId: "missing",
+          }),
+        ).rejects.toThrow(/not found/i);
+      });
+    });
+  });
+
+  describe("retryNormalize()", () => {
+    describe("when retrying a failed dataset (I-RECOVER)", () => {
+      it("flips the dataset back to processing and re-enqueues normalize", async () => {
+        const repo = {
+          findOne: vi.fn().mockResolvedValue({
+            id: "d1",
+            status: "failed",
+            stagingKey: "staging/p1/k",
+            uploadFilename: "data.jsonl",
+          }),
+          update: vi.fn().mockResolvedValue({}),
+        };
+
+        const result = await makeService(repo).retryNormalize({
+          projectId: "p1",
+          datasetId: "d1",
+        });
+
+        expect(result).toEqual({ datasetId: "d1", status: "processing" });
+        expect(repo.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: { status: "processing", statusError: null },
+          }),
+        );
+        expect(enqueueDatasetNormalize).toHaveBeenCalledWith(
+          expect.objectContaining({
+            payload: expect.objectContaining({
+              datasetId: "d1",
+              projectId: "p1",
+              tenantId: "p1",
+              stagingKey: "staging/p1/k",
+              filename: "data.jsonl",
+            }),
+          }),
+        );
+      });
+    });
+
+    describe("when the dataset is already ready", () => {
+      it("throws DatasetNotRetryableError without enqueuing", async () => {
+        const repo = {
+          findOne: vi.fn().mockResolvedValue({
+            id: "d1",
+            status: "ready",
+            stagingKey: "staging/p1/k",
+          }),
+          update: vi.fn(),
+        };
+
+        await expect(
+          makeService(repo).retryNormalize({
+            projectId: "p1",
+            datasetId: "d1",
+          }),
+        ).rejects.toBeInstanceOf(DatasetNotRetryableError);
+        expect(enqueueDatasetNormalize).not.toHaveBeenCalled();
+        expect(repo.update).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the dataset has no staging key", () => {
+      it("throws DatasetNotRetryableError (no source to normalize)", async () => {
+        const repo = {
+          findOne: vi.fn().mockResolvedValue({
+            id: "d1",
+            status: "failed",
+            stagingKey: null,
+          }),
+          update: vi.fn(),
+        };
+
+        await expect(
+          makeService(repo).retryNormalize({
+            projectId: "p1",
+            datasetId: "d1",
+          }),
+        ).rejects.toBeInstanceOf(DatasetNotRetryableError);
+        expect(enqueueDatasetNormalize).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the dataset is archived", () => {
+      it("throws DatasetNotFoundError", async () => {
+        const repo = {
+          findOne: vi.fn().mockResolvedValue({
+            id: "d1",
+            status: "failed",
+            stagingKey: "staging/p1/k",
+            archivedAt: new Date(),
+          }),
+        };
+
+        await expect(
+          makeService(repo).retryNormalize({
+            projectId: "p1",
+            datasetId: "d1",
           }),
         ).rejects.toThrow(/not found/i);
       });

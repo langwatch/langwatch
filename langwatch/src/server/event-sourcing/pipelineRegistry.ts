@@ -20,7 +20,6 @@ import { DatasetRepository } from "~/server/datasets/dataset.repository";
 import {
   createDatasetNormalizeHandler,
   type DatasetNormalizePayload,
-  datasetNormalizeDedupId,
 } from "~/server/datasets/dataset-normalize.job";
 import { registerDatasetNormalizeEnqueue } from "~/server/datasets/dataset-normalize.queue";
 import { getDatasetStorage } from "~/server/datasets/dataset-storage";
@@ -557,8 +556,10 @@ export class PipelineRegistry {
       tracePipeline.service.registerJob<DatasetNormalizePayload>({
         name: "datasetNormalize",
         process: datasetNormalizeHandler,
+        // The per-dataset group key already serializes to concurrency-1, so no
+        // deduplication block is needed; the 200ms debounce default is
+        // surprising and could swallow a fast retry (m1).
         groupKeyFn: (p) => p.datasetId,
-        deduplication: { makeId: datasetNormalizeDedupId },
       });
 
     if (datasetNormalizeQueue) {

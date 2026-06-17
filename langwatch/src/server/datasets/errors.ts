@@ -103,3 +103,17 @@ export class StagedUploadNotFoundError extends Error {
     this.name = "StagedUploadNotFoundError";
   }
 }
+
+/**
+ * Thrown when a manual normalize retry is requested on a dataset that can't be
+ * re-run: it's not in a recoverable state (`failed`/`processing`) or it carries
+ * no staging key to re-read (no source to normalize). The route maps it to 409
+ * Conflict. ADR-032 I-RECOVER: a stuck dataset is recoverable, but only when
+ * there's something to recover from.
+ */
+export class DatasetNotRetryableError extends Error {
+  constructor(message = "Dataset cannot be retried") {
+    super(message);
+    this.name = "DatasetNotRetryableError";
+  }
+}

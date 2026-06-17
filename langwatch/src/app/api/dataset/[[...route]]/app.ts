@@ -286,16 +286,18 @@ secured.access(requires("datasets:manage")).post(
     if (!name || typeof name !== "string" || name.trim() === "") {
       throw new UnprocessableEntityError("name field is required");
     }
-    // Optional: the client knows the file's name/extension; capture it so the
-    // normalize job can detect the format (the staged object has no name).
-    const filename =
-      typeof body.filename === "string" ? body.filename : undefined;
+    // M1: required — the staged object carries no original filename, so the
+    // normalize job depends on this to detect the file format.
+    const filename = body.filename;
+    if (!filename || typeof filename !== "string" || filename.trim() === "") {
+      throw new UnprocessableEntityError("filename field is required");
+    }
 
     try {
       const result = await service.createPendingUpload({
         projectId: project.id,
         name: name.trim(),
-        filename,
+        filename: filename.trim(),
       });
       return c.json(result, 201);
     } catch (error) {
@@ -358,6 +360,36 @@ secured.access(requires("datasets:manage")).post(
       }
       if (error instanceof Error && error.name === "DatasetNotFoundError") {
         return c.json({ error: "NotFound", message: error.message }, 404);
+      }
+      throw error;
+    }
+  },
+);
+
+// ── Direct upload: manually retry a failed/stuck normalize (I-RECOVER) ──
+secured.access(requires("datasets:manage")).post(
+  "/direct-upload/:datasetId/retry",
+  datasetServiceMiddleware,
+  describeRoute({
+    description: "Retry normalization of a failed or stuck dataset",
+  }),
+  async (c) => {
+    const { datasetId } = c.req.param();
+    const project = c.get("project");
+    const service = c.get("datasetService");
+
+    try {
+      const result = await service.retryNormalize({
+        projectId: project.id,
+        datasetId,
+      });
+      return c.json(result, 200);
+    } catch (error) {
+      if (error instanceof Error && error.name === "DatasetNotFoundError") {
+        return c.json({ error: "NotFound", message: error.message }, 404);
+      }
+      if (error instanceof Error && error.name === "DatasetNotRetryableError") {
+        return c.json({ error: "Conflict", message: error.message }, 409);
       }
       throw error;
     }

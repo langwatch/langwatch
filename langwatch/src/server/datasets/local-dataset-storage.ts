@@ -62,6 +62,32 @@ export class LocalDatasetStorage implements DatasetStorage {
     return chunks;
   }
 
+  async deleteChunksFrom({
+    projectId,
+    datasetId,
+    fromIndex,
+  }: {
+    projectId: string;
+    datasetId: string;
+    fromIndex: number;
+  }): Promise<void> {
+    assertNoTraversal(projectId, datasetId);
+    // Chunks are contiguous from 0, so walk upward and stop at the first miss
+    // (the first gap) — no fixed cap needed.
+    for (let i = fromIndex; ; i++) {
+      const filePath = localPath(chunkKey(projectId, datasetId, i));
+      try {
+        await fs.stat(filePath);
+      } catch (error: unknown) {
+        if (errorHasProp(error, "code", "ENOENT")) {
+          return;
+        }
+        throw error;
+      }
+      await fs.rm(filePath);
+    }
+  }
+
   async readChunks({
     projectId,
     datasetId,

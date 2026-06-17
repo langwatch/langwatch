@@ -1,8 +1,10 @@
+import { Readable } from "node:stream";
 import fs from "fs/promises";
 import os from "os";
 import path from "path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { chunkKey } from "../dataset-chunking";
+import { createDatasetNormalizeHandler } from "../dataset-normalize.job";
 // Real-FS integration: exercise LocalDatasetStorage against a real temp dir.
 // No env mock — the factory selects this impl; here we instantiate it directly
 // and point its root at a tmp dir via LOCAL_STORAGE_PATH. Per
@@ -140,6 +142,127 @@ describe("LocalDatasetStorage", () => {
         await expect(
           storage.streamStaged({ projectId: "p1", key: "staging/p1/missing" }),
         ).rejects.toThrow(/Uploaded object not found/);
+      });
+    });
+  });
+
+  // Read-back round-trip (m6): run the real normalize handler against the real
+  // filesystem, then read the chunks back — so the bound scenarios are backed
+  // by actual stored bytes, not just a write-side `repository.update` assertion.
+  describe("normalize → read round-trip", () => {
+    /** Stage a raw upload on disk under the project's staging prefix. */
+    const stage = async (
+      projectId: string,
+      uploadId: string,
+      content: string,
+    ): Promise<string> => {
+      const key = `staging/${projectId}/${uploadId}`;
+      const filePath = path.join(storageDir, key);
+      await fs.mkdir(path.dirname(filePath), { recursive: true });
+      await fs.writeFile(filePath, content, "utf-8");
+      return key;
+    };
+
+    /**
+     * Run the real handler with the real LocalDatasetStorage and a stub repo
+     * that captures the `ready` update; returns the rows read back from disk.
+     */
+    const normalizeAndReadBack = async (params: {
+      projectId: string;
+      datasetId: string;
+      uploadId: string;
+      filename: string;
+      content: string;
+    }) => {
+      const stagingKey = await stage(
+        params.projectId,
+        params.uploadId,
+        params.content,
+      );
+      const update = vi.fn().mockResolvedValue({});
+      const repository = {
+        findOne: vi
+          .fn()
+          .mockResolvedValue({ id: params.datasetId, status: "processing" }),
+        update,
+      };
+      const handler = createDatasetNormalizeHandler({
+        repository: repository as never,
+        getStorage: async () => storage,
+      });
+      await handler({
+        id: params.datasetId,
+        tenantId: params.projectId,
+        projectId: params.projectId,
+        datasetId: params.datasetId,
+        stagingKey,
+        filename: params.filename,
+      });
+      const ready = update.mock.calls[0]![0].data;
+      const rows = await storage.readChunks({
+        projectId: params.projectId,
+        datasetId: params.datasetId,
+        chunkCount: ready.chunkCount,
+      });
+      return { ready, rows };
+    };
+
+    describe("given a JSONL upload", () => {
+      /** @scenario "Both CSV and JSONL files are accepted" */
+      it("normalizes to disk and reads the same rows back", async () => {
+        const { ready, rows } = await normalizeAndReadBack({
+          projectId: "p1",
+          datasetId: "rt-jsonl",
+          uploadId: "u-jsonl",
+          filename: "data.jsonl",
+          content: '{"a":"1","b":"x"}\n{"a":"2","b":"y"}\n',
+        });
+
+        expect(ready.status).toBe("ready");
+        expect(rows).toEqual([
+          { a: "1", b: "x" },
+          { a: "2", b: "y" },
+        ]);
+      });
+    });
+
+    describe("given a CSV upload", () => {
+      /** @scenario "Both CSV and JSONL files are accepted" */
+      it("normalizes to disk and reads the same rows back", async () => {
+        const { ready, rows } = await normalizeAndReadBack({
+          projectId: "p1",
+          datasetId: "rt-csv",
+          uploadId: "u-csv",
+          filename: "data.csv",
+          content: "a,b\n1,x\n2,y\n",
+        });
+
+        expect(ready.status).toBe("ready");
+        expect(rows).toEqual([
+          { a: "1", b: "x" },
+          { a: "2", b: "y" },
+        ]);
+      });
+    });
+
+    describe("given a ready dataset read back from disk", () => {
+      /** @scenario "A ready dataset reports its true row count and size" */
+      it("reports the true rowCount and a positive sizeBytes matching the stored bytes", async () => {
+        const content =
+          Array.from({ length: 50 }, (_, i) => `{"a":"${i}"}`).join("\n") +
+          "\n";
+        const { ready, rows } = await normalizeAndReadBack({
+          projectId: "p1",
+          datasetId: "rt-count",
+          uploadId: "u-count",
+          filename: "data.jsonl",
+          content,
+        });
+
+        expect(ready.status).toBe("ready");
+        expect(ready.rowCount).toBe(50);
+        expect(ready.sizeBytes).toBeGreaterThan(0n);
+        expect(rows).toHaveLength(50);
       });
     });
   });

@@ -3,6 +3,7 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { tryToMapPreviousColumnsToNewColumns } from "~/optimization_studio/utils/datasetUtils";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import { createLogger } from "~/utils/logger/server";
 import { slugify } from "~/utils/slugify";
 import {
   createManyDatasetRecords,
@@ -15,6 +16,7 @@ import { getDatasetStorage } from "./dataset-storage";
 import {
   DatasetConflictError,
   DatasetNotFoundError,
+  DatasetNotRetryableError,
   InvalidColumnError,
   MalformedColumnTypesError,
   StagedUploadNotFoundError,
@@ -37,6 +39,8 @@ import {
   parseFileContent,
   renameReservedColumns,
 } from "./upload-utils";
+
+const logger = createLogger("langwatch:datasets:service");
 
 /**
  * Result type for paginated dataset listings.
@@ -896,7 +900,7 @@ export class DatasetService {
   async createPendingUpload(params: {
     projectId: string;
     name: string;
-    filename?: string;
+    filename: string;
   }): Promise<{
     datasetId: string;
     slug: string;
@@ -927,9 +931,9 @@ export class DatasetService {
       // C1: bind the minted key to the row so finalize never trusts a
       // client-supplied key.
       stagingKey: upload.key,
-      // Captured so the normalize job can detect the file format; the staged
-      // object carries no original filename.
-      uploadFilename: filename ?? null,
+      // Required at presign (M1) so the normalize job can always detect the
+      // file format — the staged object carries no original filename.
+      uploadFilename: filename,
     });
 
     return {
@@ -1023,10 +1027,16 @@ export class DatasetService {
     // worker/queue is present). It streams the staged object → chunked JSONL and
     // flips the dataset to `ready`. tenantId === projectId (datasets are
     // project-scoped and the event-sourcing tenant IS the project). The filename
-    // drives format detection; when the client didn't send one (older client),
-    // default to `.jsonl` — the streaming-friendly format the direct-upload path
-    // targets — rather than blocking finalize.
-    await enqueueDatasetNormalize({
+    // drives format detection; M1 makes it required at presign, so
+    // `uploadFilename` is always set — the `.jsonl` fallback is purely defensive
+    // for a legacy row created before M1.
+    //
+    // M4: fire-and-forget — never block the HTTP response on normalization. In
+    // prod the GroupQueue producer `.send()` is non-blocking; the no-Redis
+    // memory-queue and inline modes would otherwise run the whole normalize
+    // inside the finalize request (violating ADR D5 "no synchronous-in-request"
+    // for the single-node self-host shape). The client polls `processing`.
+    void enqueueDatasetNormalize({
       prisma: this.prisma,
       payload: {
         id: datasetId,
@@ -1036,6 +1046,68 @@ export class DatasetService {
         stagingKey,
         filename: dataset.uploadFilename ?? `${datasetId}.jsonl`,
       },
+    }).catch((error: unknown) => {
+      logger.error({ error, datasetId }, "failed to enqueue normalize");
+    });
+
+    return { datasetId, status: "processing" };
+  }
+
+  /**
+   * I-RECOVER: manually retry normalization of a stuck/failed dataset. A
+   * `failed` dataset (or one wedged at `processing` after a worker death) is
+   * re-runnable — there's no other way to recover it, since the handler no-ops
+   * anything not `processing`. Flips the dataset back to `processing` (clearing
+   * the prior error) and re-enqueues the normalize job from the row's bound
+   * staging key.
+   *
+   * @throws {DatasetNotFoundError} if the dataset is missing or archived
+   * @throws {DatasetNotRetryableError} if the dataset is not `failed`/`processing`
+   *   or has no staging key to re-read (no source to normalize)
+   */
+  async retryNormalize(params: {
+    projectId: string;
+    datasetId: string;
+  }): Promise<{ datasetId: string; status: "processing" }> {
+    const { projectId, datasetId } = params;
+
+    const dataset = await this.repository.findOne({ id: datasetId, projectId });
+    if (!dataset || dataset.archivedAt) {
+      throw new DatasetNotFoundError();
+    }
+    // Only a failed (or wedged-processing) dataset is retryable; a `ready` or
+    // still-`uploading` dataset has nothing to re-drive.
+    if (dataset.status !== "failed" && dataset.status !== "processing") {
+      throw new DatasetNotRetryableError();
+    }
+    // No staging key → no source to normalize from.
+    const stagingKey = dataset.stagingKey;
+    if (!stagingKey) {
+      throw new DatasetNotRetryableError(
+        "Dataset has no staged upload to retry",
+      );
+    }
+
+    await this.repository.update({
+      id: datasetId,
+      projectId,
+      data: { status: "processing", statusError: null },
+    });
+
+    // M4: fire-and-forget — don't block the retry HTTP response on the
+    // normalize (see finalizeUpload). The same payload shape finalize uses.
+    void enqueueDatasetNormalize({
+      prisma: this.prisma,
+      payload: {
+        id: datasetId,
+        tenantId: projectId,
+        projectId,
+        datasetId,
+        stagingKey,
+        filename: dataset.uploadFilename ?? `${datasetId}.jsonl`,
+      },
+    }).catch((error: unknown) => {
+      logger.error({ error, datasetId }, "failed to enqueue normalize retry");
     });
 
     return { datasetId, status: "processing" };

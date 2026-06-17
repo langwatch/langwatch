@@ -51,6 +51,16 @@ import {
  */
 export const LARGE_JSON_MAX_BYTES = 100 * 1024 * 1024;
 
+/**
+ * Max bytes for a single JSONL line (I-MEM). `readline` emits one line at a
+ * time, so a normal file never buffers more than a line; but a pathological
+ * file with no newlines (or one giant line) would make `readline` buffer the
+ * whole thing in memory. Assumption: a legitimate dataset row fits well under
+ * this — over it, the file is treated as malformed and the dataset is failed
+ * rather than risking an OOM.
+ */
+export const MAX_JSONL_LINE_BYTES = 8 * 1024 * 1024;
+
 /** Payload for the `datasetNormalize` GroupQueue job. */
 export type DatasetNormalizePayload = {
   /** Stable job id (datasetId) — used for staged-job debuggability + dedup. */
@@ -66,10 +76,6 @@ export type DatasetNormalizePayload = {
   stagingKey: string;
   filename: string;
 };
-
-/** Dedup id: one normalize in flight per dataset (group key is the same). */
-export const datasetNormalizeDedupId = (p: DatasetNormalizePayload): string =>
-  p.datasetId;
 
 export type DatasetNormalizeDeps = {
   repository: DatasetRepository;
@@ -163,8 +169,42 @@ const streamToString = async (stream: Readable): Promise<string> => {
 };
 
 /**
- * Stream-parse a staged source into the chunk writer and capture the column
- * headers (first record / CSV fields). Memory stays bounded for CSV/JSONL.
+ * Build the original→safe column rename map (m4). Reserved column names (`id`,
+ * etc.) are renamed to a safe form (`id_`) exactly as `createDatasetFromUpload`
+ * does; only entries that actually changed are kept so the common case is a
+ * no-op pass-through.
+ */
+const buildRenameMap = (headers: string[]): Map<string, string> => {
+  const renamed = renameReservedColumns(headers);
+  const map = new Map<string, string>();
+  headers.forEach((original, i) => {
+    if (original !== renamed[i]) map.set(original, renamed[i]!);
+  });
+  return map;
+};
+
+/**
+ * Rewrite a record's keys through the rename map so the stored JSONL row keys
+ * match `columnTypes` (m4). Streaming — one record at a time, never buffers the
+ * file. A no-op when nothing was renamed.
+ */
+const applyRename = (
+  record: Record<string, unknown>,
+  renameMap: Map<string, string>,
+): Record<string, unknown> => {
+  if (renameMap.size === 0) return record;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(record)) {
+    out[renameMap.get(key) ?? key] = value;
+  }
+  return out;
+};
+
+/**
+ * Stream-parse a staged source into the chunk writer and capture the (already
+ * reserved-renamed) column headers from the first record / CSV fields. Each
+ * record's keys are rewritten through the rename map as it streams through so
+ * stored rows match `columnTypes` (m4). Memory stays bounded for CSV/JSONL.
  */
 const parseInto = async (params: {
   stream: Readable;
@@ -174,15 +214,29 @@ const parseInto = async (params: {
 }): Promise<{ headers: string[] }> => {
   const { stream, format, writer, sizeBytes } = params;
   let headers: string[] = [];
+  let renameMap = new Map<string, string>();
+  // Capture headers the first time we see them, derive the rename map, and
+  // expose headers in their safe (renamed) form so columnTypes matches the
+  // rewritten row keys.
+  const captureHeaders = (rawKeys: string[]): void => {
+    if (headers.length > 0) return;
+    renameMap = buildRenameMap(rawKeys);
+    headers = renameReservedColumns(rawKeys);
+  };
 
   if (format === "jsonl") {
     const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
     for await (const rawLine of rl) {
+      // I-MEM: bound a pathological no-newline / giant-line file. `readline`
+      // already buffers a line at a time; this caps that buffer's size.
+      if (Buffer.byteLength(rawLine, "utf8") > MAX_JSONL_LINE_BYTES) {
+        throw new Error("JSONL line exceeds max size — malformed file");
+      }
       const line = scrubNullBytes(rawLine).trim();
       if (line.length === 0) continue;
       const record = JSON.parse(line) as Record<string, unknown>;
-      if (headers.length === 0) headers = Object.keys(record);
-      await writer.push(record);
+      captureHeaders(Object.keys(record));
+      await writer.push(applyRename(record, renameMap));
     }
     return { headers };
   }
@@ -200,11 +254,11 @@ const parseInto = async (params: {
         skipEmptyLines: true,
         step: (row, parser) => {
           if (headers.length === 0 && row.meta.fields) {
-            headers = row.meta.fields;
+            captureHeaders(row.meta.fields);
           }
           parser.pause();
           chain = chain
-            .then(() => writer.push(row.data))
+            .then(() => writer.push(applyRename(row.data, renameMap)))
             .then(() => parser.resume())
             .catch((error: unknown) => {
               parser.abort();
@@ -230,19 +284,18 @@ const parseInto = async (params: {
     throw new Error("JSON content must be an array of objects");
   }
   for (const record of parsed as Record<string, unknown>[]) {
-    if (headers.length === 0) headers = Object.keys(record);
-    await writer.push(record);
+    captureHeaders(Object.keys(record));
+    await writer.push(applyRename(record, renameMap));
   }
   return { headers };
 };
 
 /**
- * Derive `columnTypes` from the parsed headers, mirroring
- * `createDatasetFromUpload`: rename reserved columns, default every column to
- * `"string"`.
+ * Derive `columnTypes` from the (already reserved-renamed) headers, mirroring
+ * `createDatasetFromUpload`: default every column to `"string"`.
  */
 const deriveColumnTypes = (headers: string[]): DatasetColumns =>
-  renameReservedColumns(headers).map((name) => ({
+  headers.map((name) => ({
     name,
     type: "string" as const,
   }));
@@ -295,6 +348,21 @@ export const createDatasetNormalizeHandler = (deps: DatasetNormalizeDeps) => {
       const chunks = await writer.finalize();
       const meta = chunkedMeta(chunks);
       const columnTypes = deriveColumnTypes(headers);
+
+      // m5: an empty upload is a failure, not a 0-chunk `ready` dataset — this
+      // matches the legacy upload contract (which rejects an empty file).
+      if (meta.rowCount === 0) {
+        throw new Error("Uploaded file is empty");
+      }
+
+      // I-IDEM: a re-drive that wrote fewer chunks than a crashed prior run
+      // leaves orphan `chunk-NNNNN` objects past this run's last index. Delete
+      // them before flipping to `ready` so the chunk set matches `chunkCount`.
+      await storage.deleteChunksFrom({
+        projectId,
+        datasetId,
+        fromIndex: meta.chunkCount,
+      });
 
       await deps.repository.update({
         id: datasetId,

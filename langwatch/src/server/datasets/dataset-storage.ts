@@ -86,6 +86,19 @@ export interface DatasetStorage {
 
   /** Best-effort delete of a staged upload (e.g. after a finalize rejection). */
   deleteStaged(params: { projectId: string; key: string }): Promise<void>;
+
+  /**
+   * Delete orphan chunk objects left by a longer prior run (I-IDEM). Chunks are
+   * contiguous from index 0, so a re-drive that wrote fewer chunks than a
+   * crashed run leaves `chunk-{finalCount}`…`chunk-{prevCount-1}` orphaned.
+   * Delete from `fromIndex` upward, stopping at the first index that does NOT
+   * exist (the first contiguous gap) — no fixed cap needed.
+   */
+  deleteChunksFrom(params: {
+    projectId: string;
+    datasetId: string;
+    fromIndex: number;
+  }): Promise<void>;
 }
 
 /**

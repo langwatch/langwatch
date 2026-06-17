@@ -92,6 +92,38 @@ export class S3DatasetStorage implements DatasetStorage {
     return chunks;
   }
 
+  async deleteChunksFrom({
+    projectId,
+    datasetId,
+    fromIndex,
+  }: {
+    projectId: string;
+    datasetId: string;
+    fromIndex: number;
+  }): Promise<void> {
+    assertNoTraversal(projectId, datasetId);
+    const { s3Client, s3Bucket } = await this.client(projectId);
+    // Chunks are contiguous from 0, so walk upward and stop at the first miss
+    // (the first gap) — no fixed cap needed.
+    for (let i = fromIndex; ; i++) {
+      const Key = chunkKey(projectId, datasetId, i);
+      try {
+        await s3Client.send(new HeadObjectCommand({ Bucket: s3Bucket, Key }));
+      } catch (error: unknown) {
+        if (
+          errorHasProp(error, "name", "NoSuchKey") ||
+          errorHasProp(error, "name", "NotFound") ||
+          errorHasProp(error, "code", "NoSuchKey") ||
+          errorHasProp(error, "code", "NotFound")
+        ) {
+          return;
+        }
+        throw error;
+      }
+      await s3Client.send(new DeleteObjectCommand({ Bucket: s3Bucket, Key }));
+    }
+  }
+
   async readChunks({
     projectId,
     datasetId,

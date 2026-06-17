@@ -94,6 +94,69 @@ describe("S3DatasetStorage", () => {
     });
   });
 
+  describe("deleteChunksFrom()", () => {
+    // @regression — a re-drive that wrote fewer chunks than a crashed prior run
+    // leaves orphan chunk objects; deleteChunksFrom must reap them from the new
+    // chunk count upward and stop at the first gap, or readChunks corrupts on
+    // the next read (I-IDEM).
+    describe("when an orphan chunk remains past the new chunk count", () => {
+      it("deletes the orphan and stops at the first missing index", async () => {
+        const { resolved, send } = makeFakeClient();
+        // HEAD chunk-00002 → exists; DeleteObject chunk-00002 → ok;
+        // HEAD chunk-00003 → NoSuchKey (the first gap) → stop.
+        send
+          .mockResolvedValueOnce({ ContentLength: 10 }) // HEAD 2
+          .mockResolvedValueOnce({}) // DELETE 2
+          .mockRejectedValueOnce({ name: "NoSuchKey" }); // HEAD 3
+        createS3Client.mockResolvedValue(resolved);
+
+        await new S3DatasetStorage().deleteChunksFrom({
+          projectId: "p1",
+          datasetId: "d1",
+          fromIndex: 2,
+        });
+
+        const commands = send.mock.calls.map((call) => ({
+          name: call[0].constructor.name,
+          key: call[0].input.Key,
+        }));
+        expect(commands).toEqual([
+          {
+            name: "HeadObjectCommand",
+            key: "datasets/p1/d1/chunk-00002.jsonl",
+          },
+          {
+            name: "DeleteObjectCommand",
+            key: "datasets/p1/d1/chunk-00002.jsonl",
+          },
+          {
+            name: "HeadObjectCommand",
+            key: "datasets/p1/d1/chunk-00003.jsonl",
+          },
+        ]);
+      });
+    });
+
+    describe("when no orphan chunks remain at the new count", () => {
+      it("stops immediately without deleting anything", async () => {
+        const { resolved, send } = makeFakeClient();
+        send.mockRejectedValueOnce({ name: "NotFound" }); // HEAD 2 → gap
+        createS3Client.mockResolvedValue(resolved);
+
+        await new S3DatasetStorage().deleteChunksFrom({
+          projectId: "p1",
+          datasetId: "d1",
+          fromIndex: 2,
+        });
+
+        expect(send).toHaveBeenCalledTimes(1);
+        expect(send.mock.calls[0]![0].constructor.name).toBe(
+          "HeadObjectCommand",
+        );
+      });
+    });
+  });
+
   describe("createPresignedUpload()", () => {
     describe("when minting a presigned PUT", () => {
       it("targets a staging/{projectId}/ key and signs with the upload TTL", async () => {
