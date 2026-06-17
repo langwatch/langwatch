@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock only the boundaries: the storage service (S3/local) and (via stubs) the
 // repository. The service logic under test stays real.
@@ -60,7 +60,10 @@ describe("DatasetService", () => {
         const repo = { findBySlug: vi.fn(), create: vi.fn() };
 
         await expect(
-          makeService(repo).createPendingUpload({ projectId: "p1", name: "DS" }),
+          makeService(repo).createPendingUpload({
+            projectId: "p1",
+            name: "DS",
+          }),
         ).rejects.toThrow(/Direct upload is unavailable/);
         expect(repo.create).not.toHaveBeenCalled();
       });

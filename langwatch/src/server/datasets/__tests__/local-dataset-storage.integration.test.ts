@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "fs/promises";
 import os from "os";
 import path from "path";
-
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { chunkKey } from "../dataset-chunking";
 // Real-FS integration: exercise LocalDatasetStorage against a real temp dir.
 // No env mock — the factory selects this impl; here we instantiate it directly
 // and point its root at a tmp dir via LOCAL_STORAGE_PATH. Per
@@ -12,7 +12,6 @@ import path from "path";
 // `.integration.test.ts` runs in CI under testcontainers; locally without
 // Docker the integration runner won't start — that's expected.
 import { LocalDatasetStorage } from "../local-dataset-storage";
-import { chunkKey } from "../dataset-chunking";
 
 const storage = new LocalDatasetStorage();
 let storageDir: string;

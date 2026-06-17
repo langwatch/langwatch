@@ -14,18 +14,14 @@ import path from "path";
 import {
   assertNoTraversal,
   chunkKey,
+  type DatasetChunk,
   parseJsonl,
   toJsonlChunks,
-  type DatasetChunk,
 } from "./dataset-chunking";
 import type { DatasetStorage, PresignedUpload } from "./dataset-storage";
 import { DirectUploadUnavailableError } from "./errors";
 
-const errorHasProp = (
-  error: unknown,
-  prop: "code",
-  value: string,
-): boolean =>
+const errorHasProp = (error: unknown, prop: "code", value: string): boolean =>
   typeof error === "object" &&
   error !== null &&
   prop in error &&

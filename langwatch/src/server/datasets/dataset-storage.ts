@@ -65,7 +65,9 @@ export interface DatasetStorage {
    * browser-reachable presign (local FS) throw `DirectUploadUnavailableError`
    * so the caller falls back to the backend upload path.
    */
-  createPresignedUpload(params: { projectId: string }): Promise<PresignedUpload>;
+  createPresignedUpload(params: {
+    projectId: string;
+  }): Promise<PresignedUpload>;
 
   /** HEAD a staged upload to read its size — finalize size-cap enforcement. */
   headStagedObjectSize(params: {

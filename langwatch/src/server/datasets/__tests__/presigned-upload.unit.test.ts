@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  stagingUploadKey,
   exceedsUploadCap,
+  stagingUploadKey,
   UPLOAD_MAX_BYTES,
 } from "../presigned-upload";
 

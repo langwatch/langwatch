@@ -1,8 +1,8 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
 import { generate } from "@langwatch/ksuid";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { KSUID_RESOURCES } from "~/utils/constants";
 import { tryToMapPreviousColumnsToNewColumns } from "~/optimization_studio/utils/datasetUtils";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
 import {
   createManyDatasetRecords,
@@ -10,6 +10,7 @@ import {
 } from "../api/routers/datasetRecord.utils";
 import { DatasetRepository } from "./dataset.repository";
 import { DatasetRecordRepository } from "./dataset-record.repository";
+import { getDatasetStorage } from "./dataset-storage";
 import {
   DatasetConflictError,
   DatasetNotFoundError,
@@ -17,9 +18,8 @@ import {
   MalformedColumnTypesError,
   UploadTooLargeError,
 } from "./errors";
-import { getDatasetStorage } from "./dataset-storage";
-import { exceedsUploadCap } from "./presigned-upload";
 import { ExperimentRepository } from "./experiment.repository";
+import { exceedsUploadCap } from "./presigned-upload";
 import { stripNullBytes } from "./sanitize";
 import type {
   DatasetColumns,
@@ -449,10 +449,7 @@ export class DatasetService {
    *
    * @throws {DatasetNotFoundError} if dataset not found
    */
-  async getBySlugOrId(params: {
-    slugOrId: string;
-    projectId: string;
-  }) {
+  async getBySlugOrId(params: { slugOrId: string; projectId: string }) {
     const dataset = await this.repository.findBySlugOrId(params);
     if (!dataset) {
       throw new DatasetNotFoundError();
@@ -501,10 +498,7 @@ export class DatasetService {
    *
    * @throws {DatasetNotFoundError} if dataset not found
    */
-  async archiveDataset(params: {
-    slugOrId: string;
-    projectId: string;
-  }) {
+  async archiveDataset(params: { slugOrId: string; projectId: string }) {
     const dataset = await this.getBySlugOrId(params);
     const slug = this.generateSlug(dataset.name);
 
@@ -572,7 +566,9 @@ export class DatasetService {
       projectId: params.projectId,
     });
 
-    const sanitisedEntry = stripNullBytes(params.entry) as Prisma.InputJsonValue;
+    const sanitisedEntry = stripNullBytes(
+      params.entry,
+    ) as Prisma.InputJsonValue;
 
     const existing = await this.recordRepository.findOne({
       id: params.recordId,
@@ -841,9 +837,7 @@ export class DatasetService {
     if (missingColumns.length > 0 || extraColumns.length > 0) {
       const parts: string[] = [];
       if (missingColumns.length > 0) {
-        parts.push(
-          `unexpected columns: ${missingColumns.join(", ")}`,
-        );
+        parts.push(`unexpected columns: ${missingColumns.join(", ")}`);
       }
       if (extraColumns.length > 0) {
         parts.push(`missing columns: ${extraColumns.join(", ")}`);
@@ -950,7 +944,9 @@ export class DatasetService {
     }
     // Tenant guard: the staged object must live under this project's prefix.
     if (!stagingKey.startsWith(`staging/${projectId}/`)) {
-      throw new DatasetNotFoundError("Staged object does not belong to project");
+      throw new DatasetNotFoundError(
+        "Staged object does not belong to project",
+      );
     }
 
     const storage = await getDatasetStorage(projectId);

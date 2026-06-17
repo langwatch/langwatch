@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Boundary mock: the storage-destination resolver is the only external
 // dependency of the factory. Everything else (impl construction) is real, so
@@ -10,8 +10,8 @@ vi.mock("~/server/stored-objects/project-storage-destination", () => ({
 }));
 
 import { getDatasetStorage } from "../dataset-storage";
-import { S3DatasetStorage } from "../s3-dataset-storage";
 import { LocalDatasetStorage } from "../local-dataset-storage";
+import { S3DatasetStorage } from "../s3-dataset-storage";
 
 beforeEach(() => {
   resolveProjectStorageDestination.mockReset();

@@ -282,7 +282,7 @@ secured.access(requires("datasets:manage")).post(
     const service = c.get("datasetService");
 
     const body = await c.req.parseBody();
-    const name = body["name"];
+    const name = body.name;
     if (!name || typeof name !== "string" || name.trim() === "") {
       throw new UnprocessableEntityError("name field is required");
     }
@@ -331,7 +331,7 @@ secured.access(requires("datasets:manage")).post(
     const service = c.get("datasetService");
 
     const body = await c.req.parseBody();
-    const stagingKey = body["stagingKey"];
+    const stagingKey = body.stagingKey;
     if (!stagingKey || typeof stagingKey !== "string") {
       throw new UnprocessableEntityError("stagingKey field is required");
     }
