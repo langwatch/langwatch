@@ -263,12 +263,9 @@ export const useHandleServerMessage = ({
           setWorkflowExecutionState(message.payload.execution_state);
 
           // Auto-select the target node and expand properties when a
-          // "Run workflow until here" execution completes, so the user
+          // "Run workflow until here" execution succeeds, so the user
           // can see the results without clicking manually.
-          if (
-            message.payload.execution_state?.status === "success" ||
-            message.payload.execution_state?.status === "error"
-          ) {
+          if (message.payload.execution_state?.status === "success") {
             const untilNodeId = getWorkflow().state.execution?.until_node_id;
             if (untilNodeId) {
               workflowStore.setSelectedNode(untilNodeId);
@@ -277,6 +274,19 @@ export const useHandleServerMessage = ({
           }
 
           if (message.payload.execution_state?.status === "error") {
+            // Surface the node that actually failed (e.g. an LLM with no
+            // messages) instead of the run target, whose stale output would
+            // otherwise hide the error. Fall back to the target when no
+            // single node carries the error.
+            const failedNode = getWorkflow().nodes.find(
+              (node) => node.data.execution_state?.status === "error",
+            );
+            const focusNodeId =
+              failedNode?.id ?? getWorkflow().state.execution?.until_node_id;
+            if (focusNodeId) {
+              workflowStore.setSelectedNode(focusNodeId);
+              workflowStore.setPropertiesExpanded(true);
+            }
             alertOnError(message.payload.execution_state.error);
             stopWorkflowIfRunning(message.payload.execution_state.error);
           }

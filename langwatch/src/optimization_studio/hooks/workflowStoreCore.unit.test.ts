@@ -357,17 +357,12 @@ describe("workflowStoreCore", () => {
 
         expect(state.edges).toHaveLength(2);
 
-        const incomingEdge = state.edges.find(
-          (e) => e.source === "upstream",
-        );
+        const incomingEdge = state.edges.find((e) => e.source === "upstream");
         expect(incomingEdge?.target).toBe("renamed_middle");
 
-        const outgoingEdge = state.edges.find(
-          (e) => e.target === "downstream",
-        );
+        const outgoingEdge = state.edges.find((e) => e.target === "downstream");
         expect(outgoingEdge?.source).toBe("renamed_middle");
       });
-
     });
 
     describe("when updating a node without renaming", () => {
@@ -403,7 +398,9 @@ describe("workflowStoreCore", () => {
 
         const state = testStore.getState();
         const nodeA = state.nodes.find((n) => n.id === "nodeA");
-        expect(nodeA?.data.inputs).toEqual([{ identifier: "input", type: "str" }]);
+        expect(nodeA?.data.inputs).toEqual([
+          { identifier: "input", type: "str" },
+        ]);
         // Edge survives because nodeA.outputs and nodeB.inputs still match the handles
         expect(state.edges).toHaveLength(1);
       });
@@ -426,7 +423,9 @@ describe("workflowStoreCore", () => {
 
         let state = testStore.getState();
         let nodeA = state.nodes.find((n) => n.id === "nodeA");
-        expect((nodeA?.data as Record<string, unknown>)["localConfig"]).toEqual({ someKey: "someValue" });
+        expect((nodeA?.data as Record<string, unknown>)["localConfig"]).toEqual(
+          { someKey: "someValue" },
+        );
 
         // Now clear it by passing undefined
         testStore.getState().setNode({
@@ -436,9 +435,13 @@ describe("workflowStoreCore", () => {
 
         state = testStore.getState();
         nodeA = state.nodes.find((n) => n.id === "nodeA");
-        expect((nodeA?.data as Record<string, unknown>)["localConfig"]).toBeUndefined();
+        expect(
+          (nodeA?.data as Record<string, unknown>)["localConfig"],
+        ).toBeUndefined();
         // Array fields remain untouched
-        expect(nodeA?.data.inputs).toEqual([{ identifier: "input", type: "str" }]);
+        expect(nodeA?.data.inputs).toEqual([
+          { identifier: "input", type: "str" },
+        ]);
       });
     });
 
@@ -490,9 +493,9 @@ describe("workflowStoreCore", () => {
         expect(
           params.find((p) => p.identifier === "some_param")?.value,
         ).toEqual({ ref: "new_name" });
-        expect(
-          params.find((p) => p.identifier === "other_param")?.value,
-        ).toBe("plain_value");
+        expect(params.find((p) => p.identifier === "other_param")?.value).toBe(
+          "plain_value",
+        );
       });
     });
   });
@@ -540,20 +543,24 @@ describe("workflowStoreCore", () => {
 
     it("rewrites __call__ signature when the new default is in use", () => {
       const result = updateInputFields(
-        codeParam(`class Code:\n    def __call__(self, input: str):\n        return {"output": input}\n`),
+        codeParam(
+          `class Code:\n    def __call__(self, input: str):\n        return {"output": input}\n`,
+        ),
         [
           { identifier: "input", type: "str" },
           { identifier: "context", type: "str" },
         ],
       );
       expect(result[0]?.value).toContain(
-        "def __call__(self, input: str, context: str):",
+        "def __call__(self, input: str = None, context: str = None):",
       );
     });
 
     it("rewrites legacy forward signature without converting it to __call__", () => {
       const result = updateInputFields(
-        codeParam(`class Code:\n    def forward(self, input: str):\n        return {"output": input}\n`),
+        codeParam(
+          `class Code:\n    def forward(self, input: str):\n        return {"output": input}\n`,
+        ),
         [
           { identifier: "input", type: "str" },
           { identifier: "context", type: "str" },
@@ -561,9 +568,114 @@ describe("workflowStoreCore", () => {
       );
       // Method name preserved as-is; only the param list is rewritten.
       expect(result[0]?.value).toContain(
-        "def forward(self, input: str, context: str):",
+        "def forward(self, input: str = None, context: str = None):",
       );
       expect(result[0]?.value).not.toContain("def __call__");
+    });
+
+    // An unconnected input is omitted from the engine call, so a bare
+    // `input: str` would raise "missing a required argument". Defaulting
+    // every input to None keeps partial runs and optional inputs working.
+    /** @scenario Code inputs default to None */
+    it("defaults every input to None so unconnected inputs do not error", () => {
+      const result = updateInputFields(
+        codeParam(
+          `class Code:\n    def __call__(self, input: str):\n        return {"output": input}\n`,
+        ),
+        [
+          { identifier: "input", type: "str" },
+          { identifier: "gate", type: "bool" },
+        ],
+      );
+      expect(result[0]?.value).toContain(
+        "def __call__(self, input: str = None, gate: bool = None):",
+      );
+    });
+  });
+
+  describe("code signature stays in sync when an input is added by dragging", () => {
+    let testStore: StoreApi<WorkflowStore>;
+
+    beforeEach(() => {
+      testStore = createStore<WorkflowStore>(storeCreator as any);
+    });
+
+    const codeNode = () =>
+      makeNode({
+        id: "code1",
+        type: "code",
+        inputs: [{ identifier: "input", type: "str" }],
+        outputs: [{ identifier: "output", type: "str" }],
+        parameters: [
+          {
+            identifier: "code",
+            type: "code",
+            value:
+              'class Code:\n    def __call__(self, input: str = None):\n        return {"output": input}\n',
+          },
+        ],
+      });
+
+    const codeOf = (nodeId: string) => {
+      const node = testStore.getState().nodes.find((n) => n.id === nodeId);
+      const params =
+        (
+          node?.data as {
+            parameters?: Array<{ identifier: string; value?: unknown }>;
+          }
+        ).parameters ?? [];
+      return params.find((p) => p.identifier === "code")?.value as string;
+    };
+
+    // Regression: dropping an If/Else branch onto a code node's gate added
+    // the `gate` input but left __call__ untouched, so the engine called it
+    // with an unexpected `gate` keyword.
+    /** @scenario Dropping an If/Else branch on a code node adds the gate to the signature */
+    it("threads a gate dropped from an If/Else branch into the __call__ signature", () => {
+      testStore.getState().setNodes([
+        makeNode({
+          id: "ifelse",
+          type: "if_else",
+          outputs: [
+            { identifier: "true", type: "bool" },
+            { identifier: "false", type: "bool" },
+          ],
+        }),
+        codeNode(),
+      ]);
+      testStore.getState().setEdges([]);
+
+      testStore.getState().onConnect({
+        source: "ifelse",
+        sourceHandle: "outputs.true",
+        target: "code1",
+        targetHandle: "inputs.gate",
+      });
+
+      expect(codeOf("code1")).toContain(
+        "def __call__(self, input: str = None, gate: bool = None):",
+      );
+    });
+
+    // Regression: wiring an output to a code node's empty handle area created
+    // a new input without rewriting __call__, so the run failed the same way.
+    /** @scenario Wiring a new input handle adds it to the signature */
+    it("threads a freshly wired input into the __call__ signature", () => {
+      testStore.getState().setNodes([
+        makeNode({
+          id: "src",
+          type: "signature",
+          outputs: [{ identifier: "answer", type: "str" }],
+        }),
+        codeNode(),
+      ]);
+      testStore.getState().setEdges([]);
+
+      testStore.getState().edgeConnectToNewHandle("src", "answer", "code1");
+
+      expect(codeOf("code1")).toContain(
+        "def __call__(self, input: str = None, answer: str = None):",
+      );
     });
   });
 

@@ -72,7 +72,11 @@ describe("Optimization Studio Registry", () => {
       const codeParam = code.parameters?.find((p) => p.identifier === "code");
 
       expect(codeParam).toBeDefined();
-      expect(codeParam?.value).toContain("def __call__(self, input: str)");
+      // Inputs default to None so an unconnected handle does not raise a
+      // missing-argument error at run time.
+      expect(codeParam?.value).toContain(
+        "def __call__(self, input: str = None)",
+      );
     });
 
     it("has code parameter returning output key", () => {

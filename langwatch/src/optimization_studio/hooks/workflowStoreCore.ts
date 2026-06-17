@@ -53,7 +53,6 @@ export type State = Workflow & {
     | "optimizations"
     | "closed"
     | undefined;
-  playgroundOpen: boolean;
   /** True while the user is dragging a node. Used to suppress drawer opening during drag. */
   isDraggingNode: boolean;
   /** The node ID confirmed by onNodeClick (genuine click, not drag). Gates drawer opening. */
@@ -156,7 +155,6 @@ export type WorkflowStore = State & {
   setOpenResultsPanelRequest: (
     request: "evaluations" | "optimizations" | "closed" | undefined,
   ) => void;
-  setPlaygroundOpen: (open: boolean) => void;
   setIsDraggingNode: (dragging: boolean) => void;
   setClickedNodeId: (id: string | null) => void;
   stopWorkflowIfRunning: (message: string | undefined) => void;
@@ -198,7 +196,6 @@ export const initialState: State = {
   lastCommittedWorkflow: undefined,
   currentVersionId: undefined,
   openResultsPanelRequest: undefined,
-  playgroundOpen: false,
   isDraggingNode: false,
   clickedNodeId: null,
   branchConnectionInProgress: false,
@@ -399,11 +396,15 @@ export const updateInputFields = (parameters: Field[], inputs: Field[]) => {
       // customer's code already uses — silently rewriting a legacy
       // `forward` into `__call__` on field-add would surprise users
       // and break diffs in their commit history.
+      // Every input defaults to None so an unconnected handle does not
+      // raise "missing a required argument" at run time - the engine omits
+      // unwired inputs from the call, and a bare `input: str` would then
+      // fail. Defaulting keeps partial runs and optional inputs flexible.
       let code = (p.value as string).replace(
         /def (__call__|forward)\([\s\S]*?\):/,
         (_match, methodName: string) =>
           `def ${methodName}(self, ${inputs
-            .map((i) => `${i.identifier}: ${typesMap[i.type]}`)
+            .map((i) => `${i.identifier}: ${typesMap[i.type]} = None`)
             .join(", ")}):`,
       );
       if (code.includes(": Any") && !code.includes("from typing import Any")) {
@@ -603,7 +604,28 @@ export const store = (
           branchConnectionInProgress: false,
           branchConnectionSourceId: null,
           nodes: nodes.map((n) =>
-            n.id === targetNode.id ? { ...n, data: { ...n.data, inputs } } : n,
+            n.id === targetNode.id
+              ? {
+                  ...n,
+                  data: {
+                    ...n.data,
+                    inputs,
+                    // A code node's entrypoint signature is derived from its
+                    // inputs, so the new gate field has to be threaded into
+                    // the parameters too or the engine calls __call__ with an
+                    // unexpected `gate` keyword. setNode does the same.
+                    ...(n.type === "code"
+                      ? {
+                          parameters: updateInputFields(
+                            (n.data as { parameters?: Field[] }).parameters ??
+                              [],
+                            inputs,
+                          ),
+                        }
+                      : {}),
+                  },
+                }
+              : n,
           ),
           edges: addEdge({ ...connection, type: "default" }, currentEdges),
         });
@@ -716,22 +738,30 @@ export const store = (
       .find((node) => node.id === target)
       ?.data.inputs?.map((input) => input.identifier);
     set({
-      nodes: nodes.map((node) =>
-        node.id === target
-          ? {
-              ...node,
-              data: {
-                ...node.data,
-                inputs: existingInputs?.includes(newHandle)
-                  ? node.data.inputs
-                  : [
-                      ...(node.data.inputs ?? []),
-                      { identifier: newHandle, type },
-                    ],
-              } as Component,
-            }
-          : node,
-      ),
+      nodes: nodes.map((node) => {
+        if (node.id !== target) return node;
+        const newInputs = existingInputs?.includes(newHandle)
+          ? (node.data.inputs ?? [])
+          : [...(node.data.inputs ?? []), { identifier: newHandle, type }];
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            inputs: newInputs,
+            // Keep a code node's entrypoint signature in sync with the
+            // freshly wired input, mirroring setNode - otherwise the engine
+            // passes a keyword the __call__ signature does not accept.
+            ...(node.type === "code"
+              ? {
+                  parameters: updateInputFields(
+                    (node.data as { parameters?: Field[] }).parameters ?? [],
+                    newInputs as Field[],
+                  ),
+                }
+              : {}),
+          } as Component,
+        };
+      }),
       edges: [
         ...edges,
         {
@@ -1098,9 +1128,6 @@ export const store = (
   },
   setOpenResultsPanelRequest: (request) => {
     set({ openResultsPanelRequest: request });
-  },
-  setPlaygroundOpen: (open: boolean) => {
-    set({ playgroundOpen: open });
   },
   setIsDraggingNode: (dragging: boolean) => {
     set({
