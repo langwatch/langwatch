@@ -430,11 +430,14 @@ describe("matchesTriggerFilters", () => {
   describe("when filtering by events.event_details.value (fail-closed phantom field)", () => {
     it("does not match when the filter carries a non-empty condition (fail-closed)", () => {
       const data = makeTraceData();
-      const filters: TriggerFilters = {
+      // events.event_details.value is a phantom field — not a real FilterField,
+      // handled at runtime via the UNSUPPORTED_FIELDS string set — so the literal
+      // is cast to exercise the fail-closed path.
+      const filters = {
         "events.event_details.value": {
           exception: { message: ["x"] },
-        } as any,
-      };
+        },
+      } as unknown as TriggerFilters;
       // events.event_details.value is an UNSUPPORTED_FIELD — a non-empty condition
       // on it must force NO-MATCH rather than skip-to-pass (mirrors metadata.key).
       expect(matchesTriggerFilters(data, filters)).toBe(false);
