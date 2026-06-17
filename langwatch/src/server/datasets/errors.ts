@@ -56,3 +56,25 @@ export class InvalidColumnError extends Error {
     this.validColumns = validColumns;
   }
 }
+
+/**
+ * Thrown when direct browser→S3 upload isn't available because object storage
+ * isn't configured (e.g. single-node self-hosted). The caller should fall back
+ * to the backend multipart upload path.
+ */
+export class DirectUploadUnavailableError extends Error {
+  constructor(
+    message = "Direct upload is unavailable; use the backend upload path",
+  ) {
+    super(message);
+    this.name = "DirectUploadUnavailableError";
+  }
+}
+
+/** Thrown when a finalized direct upload exceeds the hard size cap. */
+export class UploadTooLargeError extends Error {
+  constructor(message = "Uploaded file exceeds the maximum allowed size") {
+    super(message);
+    this.name = "UploadTooLargeError";
+  }
+}
