@@ -8,11 +8,9 @@
  * key. These tests cover restoring that control on the legacy "Project API
  * Key" row: it is permission-gated on `project:manage`, opens the reused
  * regenerate-confirm dialog, and drives the `project.regenerateApiKey`
- * mutation. A failed rotation surfaces an error toast.
- *
- * We assert the mutation mock is called (and the error path toasts) without
- * driving the success path through `TokenCreatedDialog` — that surface pulls
- * in a dynamic ShikiCommandBox import that is flaky under jsdom.
+ * mutation. A failed rotation surfaces an error toast. The success path
+ * drives through `TokenCreatedDialog`, whose dynamic ShikiCommandBox import
+ * is stubbed synchronously so the new key is assertable in jsdom.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -21,36 +19,14 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiKeysSection } from "../ApiKeysSection";
 
-// ---------------------------------------------------------------------------
-// Stub out dynamic() so TokenCreatedDialog renders synchronously in jsdom.
-//
-// next-dynamic wraps React.lazy which always suspends for at least one async
-// tick even when the module mock resolves immediately. To avoid that, we
-// replace dynamic() entirely: our stub calls the importFn synchronously via a
-// shared promise-cache trick, but the key insight is that vitest resolves
-// mocked module imports synchronously inside the factory. We capture the
-// resolved component in a closure and return a plain function component.
-// ---------------------------------------------------------------------------
+// Stub dynamic() so TokenCreatedDialog's ShikiCommandBox renders synchronously:
+// React.lazy (which next-dynamic wraps) always suspends for at least one async
+// tick in jsdom, making the token text unassertable without this replacement.
 vi.mock("~/utils/compat/next-dynamic", () => ({
   default: (_importFn: () => Promise<any>) =>
-    // Return a no-op stub; the ShikiCommandBox mock below replaces the
-    // actual content. TokenCreatedDialog will render null for ShikiCommandBox
-    // slots, which is fine — the token value appears elsewhere in the dialog
-    // (e.g. the env snippet rendered by the stub below via the real mock).
-    //
-    // Actually: we need the ShikiCommandBox stub to render so the token text
-    // appears. The trick: return a component that renders the ShikiCommandBox
-    // stub directly from the mock registry.
     function DynamicStub(props: Record<string, unknown>) {
-      // ShikiCommandBox renders <pre>{command}</pre> — pass through props.
       return <pre data-testid="shiki-box">{String(props.command ?? "")}</pre>;
     },
-}));
-
-vi.mock("~/components/code/ShikiCommandBox", () => ({
-  ShikiCommandBox: ({ command }: { command: string }) => (
-    <pre data-testid="shiki-box">{command}</pre>
-  ),
 }));
 
 // ---------------------------------------------------------------------------
