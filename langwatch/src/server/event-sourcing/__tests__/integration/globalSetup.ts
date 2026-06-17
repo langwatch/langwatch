@@ -1,3 +1,8 @@
+import { execFileSync, execSync } from "node:child_process";
+import * as crypto from "node:crypto";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import {
   ClickHouseContainer,
   type StartedClickHouseContainer,
@@ -6,11 +11,6 @@ import {
   RedisContainer,
   type StartedRedisContainer,
 } from "@testcontainers/redis";
-import * as fs from "node:fs";
-import * as path from "node:path";
-import * as os from "node:os";
-import * as crypto from "node:crypto";
-import { execSync } from "node:child_process";
 import { migrateUp } from "~/server/clickhouse/goose";
 
 const TEST_DATABASE = "test_langwatch";
@@ -82,9 +82,15 @@ const MIGRATIONS_HASH_FILE = path.join(
  * migrations are added and need to be applied to the reused container.
  */
 function computeMigrationsHash(): string {
-  const migrationsDir = path.join(__dirname, "../../../../server/clickhouse/migrations");
+  const migrationsDir = path.join(
+    __dirname,
+    "../../../../server/clickhouse/migrations",
+  );
   if (!fs.existsSync(migrationsDir)) return "";
-  const files = fs.readdirSync(migrationsDir).filter(f => f.endsWith(".sql")).sort();
+  const files = fs
+    .readdirSync(migrationsDir)
+    .filter((f) => f.endsWith(".sql"))
+    .sort();
   const hash = crypto.createHash("md5");
   for (const file of files) {
     hash.update(file);
@@ -110,6 +116,125 @@ function saveMigrationsHash(): void {
 
 let clickHouseContainer: StartedClickHouseContainer | null = null;
 let redisContainer: StartedRedisContainer | null = null;
+
+type LocalServiceUrls = {
+  clickHouseBaseUrl: string;
+  redisUrl: string;
+  databaseUrl?: string;
+};
+
+/**
+ * Native local-services mode: run integration tests against always-on local
+ * ClickHouse/Redis/Postgres instead of docker testcontainers. Activated by
+ * LANGWATCH_TEST_CLICKHOUSE_URL + LANGWATCH_TEST_REDIS_URL (typically set in
+ * langwatch/.env, loaded by vitest.integration.config.ts). Each service gets
+ * a dedicated test database (test_langwatch on ClickHouse, a numbered redis
+ * db, LANGWATCH_TEST_DATABASE_URL's database on Postgres) so suites never
+ * touch dev data. Never active in CI.
+ */
+function localServiceUrls(): LocalServiceUrls | null {
+  if (process.env.CI) return null;
+  const clickHouseBaseUrl = process.env.LANGWATCH_TEST_CLICKHOUSE_URL;
+  const redisUrl = process.env.LANGWATCH_TEST_REDIS_URL;
+  if (!clickHouseBaseUrl || !redisUrl) return null;
+  return {
+    clickHouseBaseUrl,
+    redisUrl,
+    databaseUrl: process.env.LANGWATCH_TEST_DATABASE_URL,
+  };
+}
+
+async function setupLocalServices(urls: LocalServiceUrls): Promise<void> {
+  console.log(
+    "[globalSetup] Using native local services (no docker): LANGWATCH_TEST_* env vars are set",
+  );
+
+  const redisDb = new URL(urls.redisUrl).pathname.replace(/^\//, "");
+  if (!redisDb || redisDb === "0") {
+    throw new Error(
+      "LANGWATCH_TEST_REDIS_URL must select a numbered redis database (e.g. redis://localhost:6379/5): " +
+        "the instance is shared with the dev stack and db 0 holds the dev queues",
+    );
+  }
+
+  // Always run goose here (no migrations-hash shortcut): the hash file is
+  // shared across targets, so switching between docker and native ClickHouse
+  // could otherwise skip migrations the new target never received. Goose is
+  // a fast no-op when the database is up to date.
+  console.log(
+    `[globalSetup] Running ClickHouse migrations on ${urls.clickHouseBaseUrl} (database ${TEST_DATABASE})...`,
+  );
+  await migrateUp({
+    connectionUrl: urls.clickHouseBaseUrl,
+    database: TEST_DATABASE,
+    verbose: false,
+  });
+
+  if (urls.databaseUrl) {
+    ensureLocalPostgresDatabase(urls.databaseUrl);
+    console.log(
+      "[globalSetup] Running prisma migrate deploy on the test Postgres database...",
+    );
+    execSync("pnpm prisma migrate deploy", {
+      stdio: "inherit",
+      env: { ...process.env, DATABASE_URL: urls.databaseUrl },
+    });
+  }
+
+  const clickHouseUrl = new URL(urls.clickHouseBaseUrl);
+  clickHouseUrl.pathname = `/${TEST_DATABASE}`;
+
+  const containerInfo = {
+    clickHouseUrl: clickHouseUrl.toString(),
+    redisUrl: urls.redisUrl,
+    ...(urls.databaseUrl ? { databaseUrl: urls.databaseUrl } : {}),
+  };
+  fs.writeFileSync(CONTAINER_INFO_FILE, JSON.stringify(containerInfo));
+
+  console.log(`[globalSetup] ClickHouse URL: ${containerInfo.clickHouseUrl}`);
+  console.log(`[globalSetup] Redis URL: ${containerInfo.redisUrl}`);
+  if (urls.databaseUrl) {
+    console.log(`[globalSetup] Postgres URL: ${urls.databaseUrl}`);
+  }
+  console.log(
+    `[globalSetup] Container info written to: ${CONTAINER_INFO_FILE}`,
+  );
+}
+
+/**
+ * Creates the test database on the local Postgres when it doesn't exist yet,
+ * via psql against the maintenance database on the same server.
+ */
+function ensureLocalPostgresDatabase(databaseUrl: string): void {
+  const url = new URL(databaseUrl);
+  const dbName = url.pathname.replace(/^\//, "");
+  if (!/^[a-zA-Z0-9_]+$/.test(dbName)) {
+    throw new Error(
+      `LANGWATCH_TEST_DATABASE_URL must name a [a-zA-Z0-9_]+ database, got "${dbName}"`,
+    );
+  }
+  const adminUrl = new URL(databaseUrl);
+  adminUrl.pathname = "/postgres";
+  adminUrl.search = "";
+
+  const exists = execFileSync(
+    "psql",
+    [
+      adminUrl.toString(),
+      "-tAc",
+      `SELECT 1 FROM pg_database WHERE datname='${dbName}'`,
+    ],
+    { encoding: "utf-8" },
+  ).trim();
+  if (exists !== "1") {
+    console.log(`[globalSetup] Creating Postgres database ${dbName}...`);
+    execFileSync(
+      "psql",
+      [adminUrl.toString(), "-c", `CREATE DATABASE "${dbName}"`],
+      { stdio: "inherit" },
+    );
+  }
+}
 
 /**
  * Global setup for integration tests.
@@ -140,15 +265,29 @@ export async function setup(): Promise<void> {
   }
 
   // Generate sdk-versions.json (normally done by start:prepare:files)
-  const sdkVersionsPath = path.join(__dirname, "../../../../server/sdk-radar/sdk-versions.json");
+  const sdkVersionsPath = path.join(
+    __dirname,
+    "../../../../server/sdk-radar/sdk-versions.json",
+  );
   if (!fs.existsSync(sdkVersionsPath)) {
     console.log("[globalSetup] Generating sdk-versions.json...");
     execSync("pnpm run generate:sdk-versions", { stdio: "inherit" });
   }
 
   // Skip if using CI service containers
-  if (process.env.CI_CLICKHOUSE_URL && process.env.CI_REDIS_URL && process.env.CI) {
+  if (
+    process.env.CI_CLICKHOUSE_URL &&
+    process.env.CI_REDIS_URL &&
+    process.env.CI
+  ) {
     console.log("[globalSetup] Using CI service containers");
+    return;
+  }
+
+  // Skip docker entirely when native local services are configured
+  const localServices = localServiceUrls();
+  if (localServices) {
+    await setupLocalServices(localServices);
     return;
   }
 
@@ -157,7 +296,9 @@ export async function setup(): Promise<void> {
   // Start ClickHouse container (reusable to speed up subsequent test runs)
   const storagePolicyConfigPath = createStoragePolicyConfigFile();
 
-  clickHouseContainer = await new ClickHouseContainer("clickhouse/clickhouse-server:25.10.2.65")
+  clickHouseContainer = await new ClickHouseContainer(
+    "clickhouse/clickhouse-server:25.10.2.65",
+  )
     .withLabels(CONTAINER_LABELS)
     .withReuse()
     .withCopyFilesToContainer([
@@ -182,7 +323,9 @@ export async function setup(): Promise<void> {
   // With reusable containers, only re-run if migration files changed.
   const migrationsChanged = needsMigrationRerun();
   if (migrationsChanged) {
-    console.log("[globalSetup] Migration files changed, running ClickHouse migrations...");
+    console.log(
+      "[globalSetup] Migration files changed, running ClickHouse migrations...",
+    );
     await migrateUp({
       connectionUrl: clickHouseBaseUrl,
       database: TEST_DATABASE,
@@ -190,7 +333,9 @@ export async function setup(): Promise<void> {
     });
     saveMigrationsHash();
   } else {
-    console.log("[globalSetup] Migration files unchanged, skipping migrations.");
+    console.log(
+      "[globalSetup] Migration files unchanged, skipping migrations.",
+    );
   }
 
   // Create URL with the correct database name for test workers
@@ -207,7 +352,9 @@ export async function setup(): Promise<void> {
 
   console.log(`[globalSetup] ClickHouse URL: ${clickHouseUrl}`);
   console.log(`[globalSetup] Redis URL: ${redisUrl}`);
-  console.log(`[globalSetup] Container info written to: ${CONTAINER_INFO_FILE}`);
+  console.log(
+    `[globalSetup] Container info written to: ${CONTAINER_INFO_FILE}`,
+  );
   console.log("[globalSetup] Testcontainers started successfully");
 }
 
@@ -218,7 +365,16 @@ export async function setup(): Promise<void> {
  */
 export async function teardown(): Promise<void> {
   // Skip if using CI service containers
-  if (process.env.CI_CLICKHOUSE_URL && process.env.CI_REDIS_URL && process.env.CI) {
+  if (
+    process.env.CI_CLICKHOUSE_URL &&
+    process.env.CI_REDIS_URL &&
+    process.env.CI
+  ) {
+    return;
+  }
+
+  // Native local services are not ours to stop
+  if (localServiceUrls()) {
     return;
   }
 
@@ -227,7 +383,9 @@ export async function teardown(): Promise<void> {
   // To force cleanup, set STOP_TEST_CONTAINERS=true or run:
   //   docker rm -f $(docker ps -q --filter "label=langwatch.test=true")
   if (process.env.STOP_TEST_CONTAINERS !== "true") {
-    console.log("[globalSetup] Keeping reusable containers running for faster subsequent runs");
+    console.log(
+      "[globalSetup] Keeping reusable containers running for faster subsequent runs",
+    );
     return;
   }
 

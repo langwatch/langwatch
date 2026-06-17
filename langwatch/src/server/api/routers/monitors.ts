@@ -7,8 +7,8 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
 import {
   AVAILABLE_EVALUATORS,
-  evaluatorsSchema,
   type EvaluatorTypes,
+  evaluatorsSchema,
 } from "../../evaluations/evaluators";
 import { validatedPreconditionsSchema } from "../../evaluations/preconditionValidation";
 import { enforceLicenseLimit } from "../../license-enforcement";
@@ -331,13 +331,15 @@ export const monitorsRouter = createTRPCRouter({
 });
 
 const validateCheckSettings = (checkType: string, parameters: any) => {
-  // Allow workflow evaluators (they use "workflow" as checkType)
+  // Allow workflow evaluators ("workflow") and code evaluators ("code/{id}")
   const isWorkflowEvaluator = checkType === "workflow";
+  const isCodeEvaluator = checkType.startsWith("code/");
 
   if (
     AVAILABLE_EVALUATORS[checkType as EvaluatorTypes] === undefined &&
     !checkType.startsWith("custom/") &&
-    !isWorkflowEvaluator
+    !isWorkflowEvaluator &&
+    !isCodeEvaluator
   ) {
     throw new TRPCError({
       code: "BAD_REQUEST",
@@ -345,9 +347,13 @@ const validateCheckSettings = (checkType: string, parameters: any) => {
     });
   }
 
-  // Skip settings validation for workflow evaluators and custom evaluators
+  // Skip settings validation for workflow, code, and custom evaluators
   // (they don't have schema-based settings)
-  if (!checkType.startsWith("custom/") && !isWorkflowEvaluator) {
+  if (
+    !checkType.startsWith("custom/") &&
+    !isWorkflowEvaluator &&
+    !isCodeEvaluator
+  ) {
     const checkType_ = checkType as EvaluatorTypes;
     try {
       evaluatorsSchema.shape[checkType_].shape.settings.parse(parameters);

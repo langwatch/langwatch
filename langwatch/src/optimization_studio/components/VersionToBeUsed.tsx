@@ -1,4 +1,12 @@
-import { Field, HStack, Input, Text, VStack } from "@chakra-ui/react";
+import {
+  Field,
+  HStack,
+  IconButton,
+  Input,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 import { useFormContext } from "react-hook-form";
 import { useDebounceCallback } from "usehooks-ts";
@@ -10,7 +18,6 @@ import {
 } from "../../components/ModelSelector";
 import { SmallLabel } from "../../components/SmallLabel";
 import { InputGroup } from "../../components/ui/input-group";
-import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
@@ -78,10 +85,11 @@ export function NewVersionFields({
     form,
   });
 
-  // Cascade-resolved model for studio LLM defaults (used to gate
-  // auto-generated commit messages).
+  // Cascade-resolved Fast model for commit-message autogen: null when
+  // nothing is configured at any scope, so the doomed generation call
+  // (and the missing-model toast it would surface) never auto-fires.
   const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
-    { projectId: project?.id ?? "", featureKey: "studio.autocomplete" },
+    { projectId: project?.id ?? "", featureKey: "workflows.commit_message" },
     { enabled: !!project?.id },
   );
 
@@ -92,6 +100,8 @@ export function NewVersionFields({
     "chat",
   );
   const isDefaultModelDisabled = modelOption?.isDisabled ?? false;
+  const isModelConfigured =
+    resolvedDefault.data != null && !isDefaultModelDisabled;
 
   const generateCommitMessage =
     api.workflow.generateCommitMessage.useMutation();
@@ -100,8 +110,10 @@ export function NewVersionFields({
   const hasTriggeredGeneration = useRef(false);
 
   const generateCommitMessageCallback = useCallback(
-    (prevDsl: Workflow, newDsl: Workflow) => {
-      if (isDefaultModelDisabled) {
+    (prevDsl: Workflow, newDsl: Workflow, options?: { force?: boolean }) => {
+      // The explicit sparkles click forces through: failing there is
+      // user-initiated, and the missing-model toast is the answer.
+      if (!isModelConfigured && !options?.force) {
         return;
       }
 
@@ -120,19 +132,12 @@ export function NewVersionFields({
               });
             }
           },
-          onError: (e) => {
-            toaster.create({
-              title: "Error auto-generating version description",
-              description: e.message,
-              type: "error",
-              duration: 5000,
-              meta: { closable: true },
-            });
-          },
+          // No onError toast: autogen only prefills the description
+          // field, the user types one either way when it stays empty.
         },
       );
     },
-    [form, generateCommitMessage, project?.id, isDefaultModelDisabled],
+    [form, generateCommitMessage, project?.id, isModelConfigured],
   );
 
   const debouncedGenerateCommitMessage = useDebounceCallback(
@@ -145,15 +150,22 @@ export function NewVersionFields({
 
   useEffect(() => {
     if (canSave && previousVersion?.dsl && !hasTriggeredGeneration.current) {
+      // Hold the one-shot trigger until the model resolution answers,
+      // so a slow query doesn't read as "not configured".
+      if (!resolvedDefault.isFetched) return;
       hasTriggeredGeneration.current = true;
       userEditedCommitMessage.current = false;
+      // No shouldValidate here: with no model to auto-fill the field,
+      // validating the freshly-cleared value paints the required ring
+      // before the user has done anything. Submit still validates.
       form.setValue("commitMessage", "", {
         shouldDirty: true,
-        shouldValidate: true,
       });
-      setTimeout(() => {
-        debouncedGenerateCommitMessage(previousVersion.dsl!, getWorkflow());
-      }, 0);
+      if (isModelConfigured) {
+        setTimeout(() => {
+          debouncedGenerateCommitMessage(previousVersion.dsl!, getWorkflow());
+        }, 0);
+      }
     } else if (canSave && !previousVersion) {
       form.setValue("commitMessage", "First version", {
         shouldDirty: true,
@@ -161,11 +173,25 @@ export function NewVersionFields({
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canSave, previousVersion?.dsl]);
+  }, [
+    canSave,
+    previousVersion?.dsl,
+    resolvedDefault.isFetched,
+    isModelConfigured,
+  ]);
+
+  // Only redden the fields once the user has actually attempted to submit.
+  // The description is required and starts empty, so keying the ring on the
+  // error alone paints it red the moment the dialog opens, before anyone has
+  // typed anything.
+  const shouldShowValidation = form.formState.submitCount > 0;
 
   return (
     <HStack width="full">
-      <Field.Root width="fit-content" invalid={!!form.formState.errors.version}>
+      <Field.Root
+        width="fit-content"
+        invalid={shouldShowValidation && !!form.formState.errors.version}
+      >
         <VStack align="start">
           <Field.Label as={SmallLabel} color="fg.muted">
             Version
@@ -182,7 +208,10 @@ export function NewVersionFields({
           />
         </VStack>
       </Field.Root>
-      <Field.Root width="full" invalid={!!form.formState.errors.commitMessage}>
+      <Field.Root
+        width="full"
+        invalid={shouldShowValidation && !!form.formState.errors.commitMessage}
+      >
         <VStack align="start" width="full">
           <Field.Label as={SmallLabel} color="fg.muted">
             Description
@@ -190,7 +219,35 @@ export function NewVersionFields({
           <InputGroup
             width="full"
             endElement={
-              generateCommitMessage.isLoading ? <AISparklesLoader /> : undefined
+              generateCommitMessage.isLoading ? (
+                <AISparklesLoader />
+              ) : canSave &&
+                resolvedDefault.isFetched &&
+                previousVersion?.dsl ? (
+                // Always offer an explicit generate affordance: a manual retry
+                // after a failed autogen, a re-roll of a description the user
+                // does not like, or (with no model configured) the trigger that
+                // surfaces the missing-model toast on purpose. force:true
+                // bypasses the auto-gen gate; clearing the edited flag lets the
+                // result land even if the user typed something first.
+                <IconButton
+                  size="xs"
+                  variant="ghost"
+                  color="blue.400"
+                  aria-label="Generate description"
+                  data-testid="generate-commit-message-button"
+                  onClick={() => {
+                    userEditedCommitMessage.current = false;
+                    generateCommitMessageCallback(
+                      previousVersion.dsl!,
+                      getWorkflow(),
+                      { force: true },
+                    );
+                  }}
+                >
+                  <Sparkles size={16} />
+                </IconButton>
+              ) : undefined
             }
           >
             <Input

@@ -12,6 +12,7 @@ import {
   getEvaluatorDefaultSettings,
   getEvaluatorDefinitions,
 } from "~/server/evaluations/getEvaluator";
+import { codeEvaluatorConfigSchema } from "./codeEvaluator";
 import { EvaluatorRepository } from "./evaluator.repository";
 
 // ============================================================================
@@ -198,9 +199,22 @@ export class EvaluatorService {
       return { ...evaluator, fields, outputFields, workflowName, workflowIcon };
     }
 
+    if (evaluator.type === "code") {
+      const parsed = codeEvaluatorConfigSchema.safeParse(evaluator.config);
+      return {
+        ...evaluator,
+        fields: parsed.success ? parsed.data.inputs : [],
+        outputFields: parsed.success
+          ? parsed.data.outputs
+          : [...STANDARD_EVALUATOR_OUTPUT_FIELDS],
+      };
+    }
+
     const config = evaluator.config as { evaluatorType?: string } | null;
     const evaluatorType = config?.evaluatorType;
-    const fields = evaluatorType ? this.computeBuiltInFields(evaluatorType) : [];
+    const fields = evaluatorType
+      ? this.computeBuiltInFields(evaluatorType)
+      : [];
     const outputFields = evaluatorType
       ? this.computeBuiltInOutputFields(evaluatorType)
       : [...STANDARD_EVALUATOR_OUTPUT_FIELDS];
@@ -331,9 +345,7 @@ export class EvaluatorService {
     });
 
     const userIds = [
-      ...new Set(
-        logs.map((l) => l.userId).filter((id): id is string => !!id),
-      ),
+      ...new Set(logs.map((l) => l.userId).filter((id): id is string => !!id)),
     ];
     const users = await this.repository.findUsersByIds(userIds);
     const usersById = Object.fromEntries(users.map((u) => [u.id, u]));

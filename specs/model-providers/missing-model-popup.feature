@@ -7,9 +7,10 @@ Feature: Missing-model toast when a feature can't resolve a model
   # key, role, and project context. The tRPC error formatter surfaces it
   # with a stable `cause.code = "MODEL_NOT_CONFIGURED"` so the frontend
   # interceptor in `utils/api.tsx` can catch it and emit a sticky
-  # orange toast via `showMissingModelToast`. The class and resolver
-  # live with B3.1; this spec describes the frontend interceptor +
-  # toast UX (B3.2).
+  # info toast via `showMissingModelToast`: a missing model is a
+  # configuration nudge, not a failure, so the toast must not look
+  # like an error. The class and resolver live with B3.1; this spec
+  # describes the frontend interceptor + toast UX (B3.2).
   #
   # A second discriminator `AI_CALL_FAILED` covers the case where the
   # cascade DID resolve a model but the downstream call failed
@@ -54,6 +55,7 @@ Feature: Missing-model toast when a feature can't resolve a model
     Then the title reads "Model not configured for AI search"
     And the body explains that the Fast role needs a model picked in Model Providers settings
     And the toast is sticky (no auto-dismiss) so a user who steps away still sees it
+    And the toast severity is informational, not error
 
   @integration
   Scenario: The modal carries one primary CTA to the right settings page and role
@@ -88,6 +90,76 @@ Feature: Missing-model toast when a feature can't resolve a model
     # short-circuits duplicate emits.
 
   # ============================================================================
+  # Background generation never auto-fires without a model
+  # (workflow commit messages)
+  # ============================================================================
+
+  # Auto-generated version descriptions are cosmetic sugar: when the
+  # Fast model is missing, firing the request just to fail produces an
+  # unprompted toast on a surface the user never asked anything of.
+  # The client knows the cascade result up front (the resolver returns
+  # null when nothing is configured), so the generation call is gated
+  # client-side and the affordance degrades to an explicit
+  # sparkles-icon button.
+
+  @integration
+  Scenario: Opening the save-version drawer with no Fast model fires no generation and no toast
+    Given no Fast model resolves at any scope
+    And the workflow has unsaved changes
+    When I open the save-version drawer
+    Then no commit-message generation request is sent
+    And no "Model not configured" toast appears
+    And the description field shows a sparkles generate button
+
+  @integration
+  Scenario: Clicking the sparkles button without a Fast model surfaces the info toast
+    Given no Fast model resolves at any scope
+    And the save-version drawer is open
+    When I click the sparkles generate button on the description field
+    Then a generation request is sent and fails as model-not-configured
+    And the "Model not configured for Workflow commit messages" info toast appears
+    And the toast carries the "Configure Fast model" action
+
+  @integration
+  Scenario: Evaluate-time autosave without a Fast model commits silently
+    Given no Fast model resolves at any scope
+    And the workflow has unsaved changes
+    When I run an evaluation
+    Then the version is committed with the description "autosaved"
+    And no commit-message generation request is sent
+    And no toast appears
+
+  @integration
+  Scenario: A configured Fast model still auto-generates the description
+    Given a Fast model resolves for the project
+    And the workflow has unsaved changes
+    When I open the save-version drawer
+    Then a commit-message generation request is sent
+    And the description field fills with the generated message
+    And the sparkles generate button stays available to regenerate or retry
+
+  @integration
+  Scenario: Clicking the sparkles button with a configured model regenerates the description
+    Given a Fast model resolves for the project
+    And the save-version drawer is open
+    When I click the sparkles generate button on the description field
+    Then a new commit-message generation request is sent
+
+  # gpt-5 family reasoning models reject function tools combined with
+  # reasoning_effort on /v1/chat/completions (the provider asks for
+  # /v1/responses), and these calls go through the OpenAI-compatible
+  # chat-completions proxy. A commit message is one short string, so the
+  # generation uses a plain-text completion instead of a function-tool
+  # round-trip and works across every model the user might configure.
+  @integration
+  Scenario: Commit-message generation works for reasoning models
+    Given the Fast model is a gpt-5 family reasoning model
+    And the workflow has unsaved changes
+    When the commit-message generation request is sent
+    Then it is a plain-text completion, not a function-tool call
+    And the description field fills with the generated message
+
+  # ============================================================================
   # Downstream AI-call failures (not MODEL_NOT_CONFIGURED)
   # ============================================================================
 
@@ -99,6 +171,15 @@ Feature: Missing-model toast when a feature can't resolve a model
     And a toast appears titled "Workflow commit message failed"
     And the body says "Double-check your Fast model configuration in Model Providers"
     And the original short provider error message is surfaced underneath the hint
+
+  # The commit-message autogen (and AI search, ...) is assistive: it failing
+  # does not break anything the user was doing, so a yellow warning is the
+  # right level, not a red error.
+  @integration
+  Scenario: A failed assistive AI call warns, it does not error
+    Given the Fast role resolves to a model whose provider key is invalid
+    When the workflow auto-commit fires and the provider returns 401
+    Then the toast severity is a warning, not an error
 
   # ============================================================================
   # Background-task / no-UI-context surface (future)

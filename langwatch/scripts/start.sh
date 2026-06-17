@@ -117,6 +117,38 @@ if [[ "$NODE_ENV" = "development" && "$LANGWATCH_SKIP_AIGATEWAY" != "1" ]]; then
   fi
 fi
 
+# nlpgo data plane (Go NLP engine). Bundled into pnpm dev so the optimization
+# studio reaches a live engine without a second terminal (or `make start`).
+# It binds the port the app dials via LANGWATCH_NLP_SERVICE: that port when it
+# points at localhost, otherwise PORT+1 (5561 for the default 5560 app port),
+# and the app is pointed there when LANGWATCH_NLP_SERVICE is unset. Skips
+# silently when that port is already taken (another worktree / a manual run),
+# when LANGWATCH_NLP_SERVICE points at an external host, when the Go toolchain
+# isn't on PATH, and via LANGWATCH_SKIP_NLP=1.
+START_NLP_COMMAND=""
+if [[ "$NODE_ENV" = "development" && "$LANGWATCH_SKIP_NLP" != "1" ]]; then
+  _NLP_PORT=""
+  if [ -z "$LANGWATCH_NLP_SERVICE" ]; then
+    _NLP_PORT=$((_APP_PORT + 1))
+    export LANGWATCH_NLP_SERVICE="http://localhost:${_NLP_PORT}"
+  elif [[ "$LANGWATCH_NLP_SERVICE" =~ ^https?://(localhost|127\.0\.0\.1):([0-9]+) ]]; then
+    _NLP_PORT="${BASH_REMATCH[2]}"
+  fi
+  if [ -z "$_NLP_PORT" ]; then
+    echo "  ✓ nlpgo: external LANGWATCH_NLP_SERVICE=${LANGWATCH_NLP_SERVICE}, not starting a local one"
+  elif ! command -v go >/dev/null 2>&1; then
+    echo "  ! nlpgo: skipped (Go toolchain not in PATH); run \`make service svc=nlpgo\` manually"
+  elif lsof -i ":$_NLP_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+    echo "  ✓ nlpgo: already running on :$_NLP_PORT, reusing"
+  else
+    # SERVER_ADDR overrides the inherited gateway port; LANGWATCH_ENDPOINT is
+    # the app URL the engine calls back for evaluator + agent-workflow nodes
+    # (mirrors compose.dev.yml).
+    START_NLP_COMMAND="SERVER_ADDR=\":${_NLP_PORT}\" LANGWATCH_ENDPOINT=\"http://localhost:${_APP_PORT}\" make -C .. service svc=nlpgo"
+    echo "  ✓ nlpgo: auto-start on :$_NLP_PORT"
+  fi
+fi
+
 pnpm run start:prepare:db
 
 COMMANDS=()
@@ -132,6 +164,10 @@ fi
 if [ -n "$START_GATEWAY_COMMAND" ]; then
   COMMANDS+=("$START_GATEWAY_COMMAND")
   NAMES+=("gateway")
+fi
+if [ -n "$START_NLP_COMMAND" ]; then
+  COMMANDS+=("$START_NLP_COMMAND")
+  NAMES+=("nlpgo")
 fi
 if [ -n "$START_APP_COMMAND" ]; then
   COMMANDS+=("$RUNTIME_ENV $START_APP_COMMAND")

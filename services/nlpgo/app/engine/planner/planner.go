@@ -24,6 +24,7 @@ var supportedKinds = map[dsl.ComponentType]struct{}{
 	dsl.ComponentEvaluator:          {},
 	dsl.ComponentAgent:              {},
 	dsl.ComponentCustom:             {},
+	dsl.ComponentIfElse:             {},
 }
 
 // Plan is the result of validating + topologically sorting a workflow.

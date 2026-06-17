@@ -103,15 +103,36 @@ func TestStateEvent_TimestampsHaveBothStartedAndFinished(t *testing.T) {
 	}
 }
 
-// TestStateEvent_NoTimestampsWhenDurationZero pins the inverse: the
-// running event (status=running, DurationMS still zero) must NOT emit a
-// timestamps map, otherwise the UI's hasTiming gate would render a
-// negative duration.
-func TestStateEvent_NoTimestampsWhenDurationZero(t *testing.T) {
-	ns := &NodeState{ID: "code", Status: "running", DurationMS: 0}
-	ev := stateEvent("trace-x", "code", ns)
+// TestStateEvent_NoTimestampsBeforeCompletion pins the inverse: a node
+// that has not finished (running) or that never ran (skipped) must NOT
+// emit a timestamps map, otherwise the UI's hasTiming gate would render a
+// duration for an event that has no finished_at yet.
+func TestStateEvent_NoTimestampsBeforeCompletion(t *testing.T) {
+	for _, status := range []string{"running", string(dsl.StatusSkipped)} {
+		ns := &NodeState{ID: "code", Status: status, DurationMS: 0}
+		ev := stateEvent("trace-x", "code", ns)
+		payload := ev.Payload["execution_state"].(map[string]any)
+		if _, ok := payload["timestamps"]; ok {
+			t.Errorf("%s event must not include timestamps; got %v", status, payload["timestamps"])
+		}
+	}
+}
+
+// TestStateEvent_TimestampsEmittedForZeroDurationCompletion pins the fix
+// for a sub-millisecond node (if/else) re-run never refreshing the panel:
+// a completed node must emit timestamps even when DurationMS rounds to 0,
+// so the Studio reducer overwrites a stale duration from a prior, slower
+// run instead of merging nothing over it.
+func TestStateEvent_TimestampsEmittedForZeroDurationCompletion(t *testing.T) {
+	ns := &NodeState{ID: "if_else", Status: string(dsl.StatusSuccess), DurationMS: 0}
+	ev := stateEvent("trace-x", "if_else", ns)
 	payload := ev.Payload["execution_state"].(map[string]any)
-	if _, ok := payload["timestamps"]; ok {
-		t.Errorf("running event must not include timestamps; got %v", payload["timestamps"])
+	ts, ok := payload["timestamps"].(map[string]any)
+	if !ok {
+		t.Fatalf("a completed 0ms node must still emit timestamps so a re-run refreshes the panel")
+	}
+	started, finished := ts["started_at"].(int64), ts["finished_at"].(int64)
+	if finished-started != 0 {
+		t.Errorf("finished - started = %dms; want 0ms for a sub-millisecond node", finished-started)
 	}
 }

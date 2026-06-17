@@ -23,9 +23,9 @@ import {
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
 } from "~/prompts/utils/llmPromptConfigUtils";
 import { api } from "~/utils/api";
-import { useWizardContext } from "../../../../../components/evaluations/wizard/hooks/useWizardContext";
 import { useWorkflowStore } from "../../../../hooks/useWorkflowStore";
 import type { LlmPromptConfigComponent } from "../../../../types/dsl";
+import { buildAvailableSources } from "../../../../utils/edgeMappingUtils";
 import { PromptSourceHeader } from "../promptSourceSelect/PromptSourceHeader";
 import { WrappedOptimizationStudioLLMConfigField } from "../WrappedOptimizationStudioLLMConfigField";
 import { computeMessageEdgeUpdate } from "./messageEdgeUtils";
@@ -66,8 +66,6 @@ export function SignaturePropertiesPanelForm({
       setEdges: state.setEdges,
     })),
   );
-
-  const { isInsideWizard } = useWizardContext();
 
   // Initialize form with values from node data
   const initialConfigValues = useMemo(
@@ -201,44 +199,13 @@ export function SignaturePropertiesPanelForm({
 
   const updateNodeInternals = useUpdateNodeInternals();
 
-  // Build availableSources for variable mappings
-  const availableSources: AvailableSource[] = useMemo(() => {
-    const dependentNodes: string[] = [];
-    const toVisit = [node.id];
-    while (toVisit.length > 0) {
-      const currentNode = toVisit.shift();
-      if (!currentNode) continue;
-      dependentNodes.push(currentNode);
-      toVisit.push(
-        ...edges
-          .filter((edge) => edge.source === currentNode)
-          .map((edge) => edge.target),
-      );
-    }
-
-    return nodes
-      .filter((n) => !dependentNodes.includes(n.id) && n.id !== "end")
-      .map((n) => {
-        const isEntry = n.type === "entry";
-        // For entry nodes, get dataset name from data.dataset
-        const entryDataset = isEntry
-          ? (n.data as { dataset?: { name?: string } }).dataset
-          : undefined;
-        return {
-          id: n.id,
-          name: isEntry
-            ? (entryDataset?.name ?? "Dataset")
-            : (n.data.name ?? n.id),
-          type: isEntry ? "dataset" : (n.type as AvailableSource["type"]),
-          fields:
-            n.data.outputs?.map((output) => ({
-              name: output.identifier,
-              type: output.type,
-            })) ?? [],
-        };
-      })
-      .filter((source) => source.fields.length > 0);
-  }, [edges, nodes, node.id]);
+  // Build availableSources for variable mappings. Shares the workflow
+  // source builder so the entry point (not the attached dataset name) is the
+  // mapping source, consistent with the other node panels.
+  const availableSources: AvailableSource[] = useMemo(
+    () => buildAvailableSources({ nodeId: node.id, nodes, edges }),
+    [edges, nodes, node.id],
+  );
 
   // Build mappings from edges
   const variableMappings: Record<string, FieldMapping> = useMemo(() => {
@@ -402,7 +369,7 @@ export function SignaturePropertiesPanelForm({
             mappings={variableMappings}
             onMappingChange={onMappingChange}
           />
-          {!isInsideWizard && <DemonstrationsField />}
+          <DemonstrationsField />
         </VStack>
       </form>
     </FormProvider>

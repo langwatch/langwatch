@@ -1,10 +1,8 @@
 import {
-  Box,
   Button,
   Field,
   HStack,
   Input,
-  NativeSelect,
   Spacer,
   type StackProps,
   Text,
@@ -13,11 +11,16 @@ import {
 import { type Node, useUpdateNodeInternals } from "@xyflow/react";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
-import { ChevronDown, Columns, Info, Plus, Trash2, X } from "react-feather";
+import { Columns, Info, Plus, Trash2, X } from "react-feather";
 import { useFieldArray, useForm } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
 import { useShallow } from "zustand/react/shallow";
 import { PropertySectionTitle } from "~/components/ui/PropertySectionTitle";
+import {
+  type FieldTypeOption,
+  FieldTypeSelect,
+} from "~/prompts/components/ui/FieldTypeSelect";
+import { getTypeLabel } from "~/prompts/components/ui/VariableTypeIcon";
 import { HoverableBigText } from "../../../components/HoverableBigText";
 import { toaster } from "../../../components/ui/toaster";
 import { Tooltip } from "../../../components/ui/tooltip";
@@ -38,7 +41,6 @@ import {
   getNodeDisplayName,
   isExecutableComponent,
   NodeSectionTitle,
-  TypeLabel,
 } from "../nodes/Nodes";
 
 import { OptimizationStudioLLMConfigField } from "./llm-configs/OptimizationStudioLLMConfigField";
@@ -86,6 +88,7 @@ export function FieldsDefinition({
     control,
     handleSubmit,
     formState: { errors },
+    setValue,
     watch,
   } = useForm<FieldArrayForm>({
     defaultValues: {
@@ -97,6 +100,16 @@ export function FieldsDefinition({
     control,
     name: "fields",
   });
+
+  // The type vocabulary a field row can pick. Image is only meaningful on
+  // inputs (e.g. dataset columns fed into a node), matching the prior
+  // selector. Labels come from the shared TYPE_LABELS so Text/Number/...
+  // read the same everywhere.
+  const typeOptions: FieldTypeOption[] = (
+    field === "inputs"
+      ? ["str", "image", "float", "bool", "dict", "list"]
+      : ["str", "float", "bool", "dict", "list"]
+  ).map((value) => ({ value, label: getTypeLabel(value) }));
 
   const updateNodeInternals = useUpdateNodeInternals();
 
@@ -115,15 +128,35 @@ export function FieldsDefinition({
     onSubmit(data);
   };
 
+  // Re-sync the form when the node's fields change from OUTSIDE the form:
+  // attaching a dataset merges its columns into the entry node, and the
+  // evaluator toggle swaps the end node's results. Keyed on a content
+  // signature, not the array reference, so a fresh reference each render
+  // can't loop; guarded against the form already matching so the user's own
+  // edits - which round-trip through setNode and return identical - never
+  // trigger a replace mid-typing.
+  const fieldsSignature = JSON.stringify(
+    (node.data[field] ?? []).map((f) => [
+      f.identifier,
+      f.type,
+      f.optional ?? false,
+    ]),
+  );
   useEffect(() => {
     const currentFields = node.data[field] ?? [];
+    const formSignature = JSON.stringify(
+      ((control._formValues.fields as FieldType[] | undefined) ?? []).map(
+        (f) => [f.identifier, f.type, f.optional ?? false],
+      ),
+    );
+    if (formSignature === fieldsSignature) return;
     replace(currentFields);
 
     setTimeout(() => {
       updateNodeInternals(node.id);
     }, 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [node.data.behave_as]);
+  }, [fieldsSignature]);
 
   const watchedFields = watch("fields");
 
@@ -145,6 +178,7 @@ export function FieldsDefinition({
           <Button
             size="xs"
             variant="ghost"
+            data-testid={`add-${field}-field-button`}
             onClick={() => append({ identifier: "", type: "str" })}
           >
             <Plus size={16} />
@@ -207,48 +241,21 @@ export function FieldsDefinition({
                     {field_.identifier}
                   </Text>
                 )}
-                <HStack
-                  position="relative"
-                  background="bg"
-                  borderRadius="8px"
-                  paddingX={2}
-                  paddingY={1}
-                  gap={2}
-                  height="full"
-                >
-                  <Box fontSize="13px">
-                    <TypeLabel type={watchedFields[index]?.type ?? ""} />
-                  </Box>
-                  {!readOnly ? (
-                    <>
-                      <Box color="fg.muted">
-                        <ChevronDown size={14} />
-                      </Box>
-                      <NativeSelect.Root
-                        position="absolute"
-                        top={0}
-                        left={0}
-                        height="32px"
-                        width="100%"
-                        cursor="pointer"
-                        zIndex={10}
-                        opacity={0}
-                      >
-                        <NativeSelect.Field
-                          {...control.register(`fields.${index}.type`)}
-                        >
-                          <option value="str">str</option>
-                          {field === "inputs" && (
-                            <option value="image">image</option>
-                          )}
-                          <option value="float">float</option>
-                          <option value="bool">bool</option>
-                          <option value="dict">dict</option>
-                          <option value="list">list</option>
-                        </NativeSelect.Field>
-                      </NativeSelect.Root>
-                    </>
-                  ) : null}
+                <HStack paddingX={1} paddingY={1} height="full">
+                  <FieldTypeSelect
+                    value={watchedFields[index]?.type ?? "str"}
+                    options={typeOptions}
+                    readOnly={readOnly}
+                    onChange={(newType) => {
+                      setValue(
+                        `fields.${index}.type`,
+                        newType as FieldType["type"],
+                        { shouldDirty: true },
+                      );
+                      void handleSubmit(handleOnChange)();
+                    }}
+                    testId={`field-type-select-${field}-${index}`}
+                  />
                 </HStack>
               </HStack>
               {!readOnly ? (
@@ -256,6 +263,7 @@ export function FieldsDefinition({
                   colorPalette="gray"
                   size="sm"
                   height="40px"
+                  data-testid={`remove-${field}-${index}-field`}
                   onClick={() => {
                     remove(index);
                     void handleSubmit(onSubmit)();

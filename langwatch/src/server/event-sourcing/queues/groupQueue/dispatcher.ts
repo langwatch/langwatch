@@ -104,11 +104,41 @@ export class GroupQueueDispatcher {
     const signalKey = this.params.scripts.getSignalKey();
     await this.params.blockingConnection.brpop(
       signalKey,
-      this.params.signalTimeoutSec,
+      await this.nextWakeTimeoutSec(),
     );
     // Drain remaining buffered signals — the upcoming dispatchBatch
     // handles multiple jobs in one Lua call, so N signals = 1 cycle.
     await this.params.blockingConnection.del(signalKey);
+  }
+
+  /**
+   * BRPOP timeout for the next wait, clamped to the earliest due group.
+   * Send-time signals fire (and get drained by the dispatch cycle) while
+   * a delayed job is still inside its delay window, and nothing
+   * re-signals at the due time — without the clamp, a delayed group
+   * waits out the full fixed poll interval. A past-due score clamps to
+   * the floor, which also self-heals signals lost to the post-dispatch
+   * drain. When the processing queue is saturated, dispatch can't make
+   * progress anyway, so the fixed interval applies as before.
+   */
+  private async nextWakeTimeoutSec(): Promise<number> {
+    const saturated =
+      this.params.processingQueue.length() +
+        this.params.processingQueue.running() >=
+      this.params.globalConcurrency;
+    if (saturated) return this.params.signalTimeoutSec;
+    try {
+      const earliest = await this.params.scripts.getEarliestReadyScore();
+      if (earliest === null) return this.params.signalTimeoutSec;
+      const untilDueSec = (earliest - Date.now()) / 1000;
+      return Math.min(
+        this.params.signalTimeoutSec,
+        Math.max(untilDueSec, 0.05),
+      );
+    } catch {
+      // Peek is best-effort; fall back to the fixed interval.
+      return this.params.signalTimeoutSec;
+    }
   }
 
   private async dispatchBatch(): Promise<number> {

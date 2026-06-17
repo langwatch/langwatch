@@ -2,12 +2,7 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -335,17 +330,22 @@ describe("VariablesSection", () => {
       const variables: Variable[] = [{ identifier: "question", type: "str" }];
       renderComponent({ variables, onChange: vi.fn(), canAddRemove: true });
 
-      // Find the X button (delete)
-      const buttons = screen.getAllByRole("button");
-      expect(buttons.length).toBeGreaterThan(1); // + button and delete button
+      expect(
+        screen.getByTestId("remove-variable-question"),
+      ).toBeInTheDocument();
     });
 
     it("hides delete button when canAddRemove is false", () => {
       const variables: Variable[] = [{ identifier: "question", type: "str" }];
       renderComponent({ variables, onChange: vi.fn(), canAddRemove: false });
 
-      // Should not have any buttons (no + and no delete)
-      expect(screen.queryByRole("button")).not.toBeInTheDocument();
+      // No add button and no delete button (the type selector button stays)
+      expect(
+        screen.queryByTestId("add-variable-button"),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("remove-variable-question"),
+      ).not.toBeInTheDocument();
     });
 
     it("calls onChange without the removed variable", async () => {
@@ -357,10 +357,7 @@ describe("VariablesSection", () => {
       ];
       renderComponent({ variables, onChange });
 
-      // Find delete buttons (exclude the + button)
-      const buttons = screen.getAllByRole("button");
-      // Click the first delete button (second button after +)
-      await user.click(buttons[1]!);
+      await user.click(screen.getByTestId("remove-variable-question"));
 
       expect(onChange).toHaveBeenCalledWith([
         { identifier: "context", type: "str" },
@@ -416,7 +413,8 @@ describe("VariablesSection", () => {
   });
 
   describe("type selector on icon", () => {
-    it("shows caret next to type icon when not readOnly", () => {
+    /** @scenario The type selector shows its type label as an outline button */
+    it("shows the type label as an outline button", () => {
       const variables: Variable[] = [{ identifier: "question", type: "str" }];
       renderComponent({
         variables,
@@ -424,13 +422,32 @@ describe("VariablesSection", () => {
         showMappings: false,
       });
 
-      // Should have an SVG for chevron-down (caret)
-      // The ChevronDown icon renders as an SVG
-      const svgs = document.querySelectorAll("svg");
-      expect(svgs.length).toBeGreaterThan(0);
+      const typeButton = screen.getByTestId("variable-type-select-question");
+      // The type name is shown next to the icon, and it is a real button
+      expect(typeButton).toHaveTextContent("Text");
+      expect(typeButton.tagName).toBe("BUTTON");
     });
 
-    it("hides caret when readOnly", () => {
+    /** @scenario Change variable type via the type selector */
+    it("changes the type when picking from the menu", async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      const variables: Variable[] = [{ identifier: "question", type: "str" }];
+      renderComponent({
+        variables,
+        onChange,
+        showMappings: false,
+      });
+
+      await user.click(screen.getByTestId("variable-type-select-question"));
+      await user.click(screen.getByTestId("field-type-option-float"));
+
+      expect(onChange).toHaveBeenCalledWith([
+        { identifier: "question", type: "float" },
+      ]);
+    });
+
+    it("shows the type label without a button in read-only mode", () => {
       const variables: Variable[] = [{ identifier: "question", type: "str" }];
       renderComponent({
         variables,
@@ -439,8 +456,9 @@ describe("VariablesSection", () => {
         readOnly: true,
       });
 
-      // Should not have caret SVG (only the type icon)
-      // In readOnly mode, the chevron is not rendered
+      const typeDisplay = screen.getByTestId("variable-type-select-question");
+      expect(typeDisplay).toHaveTextContent("Text");
+      expect(typeDisplay.tagName).not.toBe("BUTTON");
     });
   });
 

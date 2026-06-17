@@ -1,5 +1,5 @@
-// Inline to avoid circular dependency: DatasetTable → ag-grid CSS → crashes in Node
 const DEFAULT_DATASET_NAME = "Draft Dataset";
+
 import { DEFAULT_MODEL } from "../../utils/constants";
 import type { End, Entry, Signature, Workflow } from "../types/dsl";
 import { DEFAULT_MAX_TOKENS } from "../utils/registryUtils";
@@ -13,7 +13,7 @@ export const entryNode = () => ({
   },
   deletable: false,
   data: {
-    name: "Entry",
+    name: "Entry point",
     outputs: [{ identifier: "question", type: "str" }],
     entry_selection: "random",
     train_size: 0.8,

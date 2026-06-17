@@ -226,8 +226,10 @@ export async function cleanupTestData(tenantId?: string): Promise<void> {
   // When tenantId is provided, queues should be closed before cleanup is called
   // Only flush all Redis data when doing full cleanup (no tenantId)
   if (redisConnection && !tenantId) {
-    // Full cleanup - flush all Redis data
-    await redisConnection.flushall();
+    // Full cleanup - flush the test redis database. flushdb, NOT flushall:
+    // in native local-services mode the redis instance is shared with the
+    // dev stack and only the numbered test db belongs to the suite.
+    await redisConnection.flushdb();
   }
   // For tenant-specific cleanup, we don't clean up Redis here
   // because queues should be closed first (which cleans up their keys)
