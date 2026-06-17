@@ -33,6 +33,13 @@ export type CodeEvaluatorConfig = z.infer<typeof codeEvaluatorConfigSchema>;
  * dictionary with any subset of these keys; whichever are present become the
  * evaluation result. These mirror the studio's evaluator End node, so the
  * outputs are not user-customizable, only the inputs are.
+ *
+ * This is the full result contract from `evaluationResultSchema` (passed,
+ * score, label, details). It is intentionally distinct from
+ * `STANDARD_EVALUATOR_OUTPUT_FIELDS` in evaluator.service.ts, which drops the
+ * free-text `details`: that is the evaluator-as-target mapping set, not the
+ * return contract. It is defined here, rather than imported from the service,
+ * to stay client-safe for the evaluator drawer and avoid a circular import.
  */
 export const CODE_EVALUATOR_OUTPUT_FIELDS: Array<{
   identifier: string;
