@@ -16,12 +16,12 @@ Boxd CLI lives at `/usr/local/bin/boxd`. The SSH surface `ssh boxd.sh '<cmd>'` m
 After several rounds of iteration, the shape is:
 
 - **Staging** (not "golden") — one long-lived Boxd VM per Boxd account, owned by the repo bot (or per-dev in the fallback model). Staging is **not** a shared sandbox — no human SSH, no proxy-exposed URL for humans to hit. Only the bot and the refresh/fork paths touch it.
-- **Main-merge refresh** = destroy and recreate staging from scratch (not `git pull` on a live VM), run a real domain-level health probe (login + a read + a write), only bless it as "ready" after the probe passes. Seeds run as part of refresh, designed idempotent (`create-if-null`).
+- **Main-merge refresh** = soft refresh the long-lived staging VM in place for v1 (`git reset --hard origin/main && docker compose up -d --build`); a full destroy/recreate path remains future work. Real domain-level health probe (HTTP 200/302/307) is mandatory before forks target staging.
 - **Staging stays dataless at rest** — the server doesn't dogfood itself into its own Clickhouse (verified via grep), so an untouched staging accumulates no real rows between refreshes.
 - **Per-PR fork** = `boxd fork langwatch-staging --name pr<N>`, then `boxd exec pr<N> -e BASE_HOST=https://pr<N>.boxd.sh -e NEXTAUTH_URL=https://pr<N>.boxd.sh -- 'cd workspace/langwatch && git checkout <sha> && docker compose -f compose.yml -f compose.dev.yml up -d'`, then `boxd proxy set-port --port=5560`. No file edits required — `compose.dev.yml:175-176` already parameterizes `BASE_HOST`/`NEXTAUTH_URL` from shell env with a localhost fallback, and the comment at `compose.dev.yml:170-174` explicitly anticipates this use case. `NEXTAUTH_PROVIDER: "email"` at `compose.dev.yml:181` avoids per-fork OAuth callback registration.
 - **Quota** — soft cap = 4 `pr<N>` VMs; hard safety bound = 10 (the Boxd account ceiling). FIFO eviction of oldest `pr<N>` triggers when the soft cap is reached, well before the hard limit, so permanent VMs are never at risk. Separate scheduled reaper reconciles against GitHub PR state for orphans. (See issue #3433.)
-- **Auth primary** — bot GitHub identity owns a Boxd account, ed25519 key paired once, private key in `secrets.BOXD_SSH_KEY`. Bot email: `user-test-agent@langwatch.ai` (org-controlled mailbox, confirmed available).
-- **Auth fallback** — `workflow_dispatch` with per-dev `BOXD_TOKEN_<NAME>` JWT secrets; dispatcher owns their fork; main-merge iterates a `.github/boxd-accounts.yml` manifest to refresh every registered dev's staging (because cross-account sharing is not a Boxd primitive).
+- **Auth v1** — Drew's Boxd account with `secrets.BOXD_SSH_KEY`.
+- **Auth follow-up** — machine-user migration tracked separately; dev-dispatch fallback (per-dev `BOXD_TOKEN_<NAME>`) retired from v1 scope.
 - **PostHog/analytics** — suppress on staging/forks via env override, otherwise previews pollute real telemetry.
 
 ## Remaining open questions (blockers for `/plan`)
@@ -45,24 +45,9 @@ All other risks surfaced below have an agreed mitigation in the consolidated des
 
 This trades off a small amount of convenience (oldest preview quietly disappears) for sidestepping the cap problem entirely. It does not solve any of the other findings below.
 
-**Precondition B — Non-interactive auth via a GitHub bot identity (preferred) with a dev-dispatch fallback.**
+**Auth v1 — Drew's Boxd account with `BOXD_SSH_KEY`.** The workflow uses Drew's ed25519 private key stored at `secrets.BOXD_SSH_KEY` for all VM operations. Drew's account owns the golden VM (`langwatch-main-golden-image`) and all `pr<N>` forks live in that account's namespace.
 
-**Primary path: repo bot account.** Create / use a dedicated GitHub bot user (e.g. `@langwatch-ci-bot`) with its own Boxd account. Generate an ed25519 keypair just for this bot, pair it once via Boxd's browser link flow (logged in as the bot), and store the private key as `secrets.BOXD_SSH_KEY` at the repo level. The workflow uses `ssh boxd.sh` with this key for all VM operations. The bot account owns the golden image and all `pr<N>` forks live in the bot's namespace. Rotation = "log in as the bot, re-pair" — a normal shared-secret lifecycle.
-
-**Fallback path: dev-dispatched, dev-owned VMs.** If bot-account pairing turns out not to work (because Boxd accounts are strictly personal-GitHub-linked and won't accept a headless bot user), the fallback is:
-
-- The workflow is dispatched via `workflow_dispatch` (or a labeled PR action), not on every push.
-- Each participating dev has their own `BOXD_SSH_KEY_<NAME>` secret — or better, a `BOXD_TOKEN_<NAME>` JWT, since JWTs are individually revocable and don't grant the full SSH account surface.
-- The workflow reads `github.actor`, selects that dev's credential, and forks into **their** Boxd account.
-- That dev "owns" the preview VM for that PR.
-
-Two problems with the fallback path, both need answers before relying on it:
-
-1. **Golden images cannot be shared across Boxd accounts.** Verified via `docs.boxd.sh/llms-full.txt` — forking is within-account only, authentication is strictly per-account, and `/using-boxd/teams` returns 404. Workable mitigation: **fan-out main refresh across a registered-account manifest.** A file like `.github/boxd-accounts.yml` lists each participating dev's `{ github_actor, credential_secret_name, golden_vm_name }`. The `push: main` workflow iterates the manifest and, for each entry, SSHes with that dev's credential and refreshes *their* golden. PR dispatch uses the dispatcher's credential to fork *their* golden into *their* account. It's an annoying manifest to keep in sync, but it works. Costs: O(N-devs) main-merge runtime; per-dev drift (finding §2 applies independently in each account — each golden accumulates its own history); a one-time bootstrap per new dev to create the initial golden in their account; manifest maintenance when devs join/leave. Still preferable to "one centralized golden we can't reach." Other paths to keep on the shelf: (a) ship the golden as a Docker-image artifact from CI so first-time bootstrap is "pull & boot" rather than scripted clone+compose; (b) push Boxd for team accounts or cross-account sharing; (c) skip the warm-golden model and boot fresh per fork (simplest, but you lose the fast-review-click UX the whole thing was justified by).
-
-2. **Private SSH keys as repo secrets is a security step down.** Any workflow on the repo with `secrets` access can read them. Prefer `BOXD_TOKEN_<NAME>` JWTs (scoped, revocable, short-TTL) over SSH private keys. Even then, treat the fallback as a short-term workaround, not the permanent shape.
-
-**Strong recommendation:** do not design the workflow to hard-depend on the fallback. Target the bot-account path as v1; only use the dev-dispatch fallback if Boxd explicitly refuses to support bot-owned accounts. Confirm with Boxd support before committing.
+**Auth follow-up — machine-user migration.** A dedicated CI bot account (e.g. `@langwatch-ci-bot`) with its own Boxd account remains the preferred long-term shape but is not required for v1. The dev-dispatch fallback (per-dev `BOXD_TOKEN_<NAME>` secrets + `.github/boxd-accounts.yml` manifest) is also deferred — cross-account VM sharing is not a Boxd primitive, making it expensive to maintain.
 
 ### 2. "Refresh the golden on main merge" is deceptively hard
 
@@ -75,7 +60,7 @@ Two problems with the fallback path, both need answers before relying on it:
 
 A real golden pipeline either (a) rebuilds the VM from scratch from a declarative spec on every merge (slow, deterministic), or (b) snapshots post-health-check and forks the snapshot. Neither is one `ssh exec` away.
 
-**Update (iteration):** Boxd does not expose snapshot primitives — verified via full doc + CLI surface check. Available primitives are `new`, `fork`, `destroy`, `exec`; `--image` on `new` takes an OCI container image for the root filesystem, not a VM-state snapshot. Suspend/resume is "coming soon" per docs. So (b) is not available; the design has adopted (a): **destroy-and-recreate staging on main merge** with a real domain-level health probe before forks are allowed to target it. Seeds idempotent.
+**Update (iteration):** Boxd does not expose snapshot primitives — verified via full doc + CLI surface check. Available primitives are `new`, `fork`, `destroy`, `exec`; `--image` on `new` takes an OCI container image for the root filesystem, not a VM-state snapshot. Suspend/resume is "coming soon" per docs. So (b) is not available; the current workflow uses an in-place soft refresh (`git reset --hard origin/main && docker compose up -d --build`), and a full destroy-and-recreate path remains future work.
 
 ### 3. The in-VM NEXTAUTH_URL quirk is the tip of a config-drift iceberg
 
