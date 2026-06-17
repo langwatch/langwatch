@@ -1,5 +1,4 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
-import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { auditLog } from "../../../auditLog";
 import { createInnerTRPCContext } from "../../trpc";
@@ -236,6 +235,29 @@ describe("project.regenerateApiKey mutation logic", () => {
       expect(auditLog).not.toHaveBeenCalledWith(
         expect.objectContaining({ action: "project.apiKey.regenerated" }),
       );
+    });
+  });
+
+  describe("when the audit log fails after the key is rotated", () => {
+    it("still resolves with the new key so the user is not locked out", async () => {
+      // AC6: an audit failure must not prevent the caller from receiving the
+      // new key. The DB write already committed; swallowing the audit error
+      // and returning the key is the only safe path.
+      const projectId = "project_123";
+      const expectedApiKey =
+        "sk-lw-mock48characterrandomstringforapikeygeneration";
+      mockPrisma.project.update.mockResolvedValueOnce({
+        id: projectId,
+        apiKey: expectedApiKey,
+        slug: "test-project",
+      });
+      vi.mocked(auditLog).mockRejectedValueOnce(
+        new Error("audit service unavailable"),
+      );
+
+      const result = await caller.regenerateApiKey({ projectId });
+
+      expect(result).toEqual({ apiKey: expectedApiKey });
     });
   });
 });

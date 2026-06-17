@@ -160,42 +160,50 @@ describe.skipIf(isTestcontainersOnly)(
         .catch(() => {});
     });
 
-    it("regenerates API key for existing project", async () => {
-      // Get the original API key
-      const project = await prisma.project.findUnique({
-        where: { id: projectId },
-        select: { apiKey: true },
+    describe("given an existing project", () => {
+      describe("when regenerating the API key", () => {
+        it("regenerates API key for existing project", async () => {
+          // Get the original API key
+          const project = await prisma.project.findUnique({
+            where: { id: projectId },
+            select: { apiKey: true },
+          });
+
+          if (!project) {
+            throw new Error("Test project not found");
+          }
+
+          const originalApiKey = project.apiKey;
+
+          // Regenerate the API key
+          const result = await caller.project.regenerateApiKey({ projectId });
+
+          // Verify the new key is different
+          expect(result.apiKey).not.toBe(originalApiKey);
+          expect(result.apiKey).toMatch(/^sk-lw-/);
+
+          // Verify the key was actually updated in the database
+          const updatedProject = await prisma.project.findUnique({
+            where: { id: projectId },
+            select: { apiKey: true },
+          });
+          expect(updatedProject?.apiKey).toBe(result.apiKey);
+          expect(updatedProject?.apiKey).not.toBe(originalApiKey);
+        });
       });
-
-      if (!project) {
-        throw new Error("Test project not found");
-      }
-
-      const originalApiKey = project.apiKey;
-
-      // Regenerate the API key
-      const result = await caller.project.regenerateApiKey({ projectId });
-
-      // Verify the new key is different
-      expect(result.apiKey).not.toBe(originalApiKey);
-      expect(result.apiKey).toMatch(/^sk-lw-/);
-
-      // Verify the key was actually updated in the database
-      const updatedProject = await prisma.project.findUnique({
-        where: { id: projectId },
-        select: { apiKey: true },
-      });
-      expect(updatedProject?.apiKey).toBe(result.apiKey);
-      expect(updatedProject?.apiKey).not.toBe(originalApiKey);
     });
 
-    it("returns UNAUTHORIZED for nonexistent project (secure behavior - does not reveal project existence)", async () => {
-      await expect(
-        caller.project.regenerateApiKey({
-          projectId: "nonexistent-project-id",
-        }),
-      ).rejects.toMatchObject({
-        code: "UNAUTHORIZED",
+    describe("given a nonexistent project", () => {
+      describe("when regenerating the API key", () => {
+        it("returns UNAUTHORIZED for nonexistent project (secure behavior - does not reveal project existence)", async () => {
+          await expect(
+            caller.project.regenerateApiKey({
+              projectId: "nonexistent-project-id",
+            }),
+          ).rejects.toMatchObject({
+            code: "UNAUTHORIZED",
+          });
+        });
       });
     });
 

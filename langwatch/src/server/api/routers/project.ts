@@ -1,3 +1,4 @@
+import { generate } from "@langwatch/ksuid";
 import {
   Prisma,
   type PrismaClient,
@@ -7,10 +8,7 @@ import {
   TeamUserRole,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
-import type { Session } from "~/server/auth";
-import { KSUID_RESOURCES } from "~/utils/constants";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import {
@@ -19,14 +17,16 @@ import {
   publicProcedure,
 } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
+import type { Session } from "~/server/auth";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { encrypt } from "~/utils/encryption";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
 import { auditLog } from "../../auditLog";
 import {
   createLicenseEnforcementService,
   LimitExceededError,
 } from "../../license-enforcement";
-import { captureException } from "~/utils/posthogErrorCapture";
 import { generateApiKey } from "../../utils/apiKeyGenerator";
 import {
   checkOrganizationPermission,
@@ -116,7 +116,6 @@ export const projectRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const userId = ctx.session.user.id;
       const prisma = ctx.prisma;
-
 
       const enforcement = createLicenseEnforcementService(prisma);
       try {
@@ -276,12 +275,13 @@ export const projectRouter = createTRPCRouter({
           },
         });
 
-        // Audit log the security-critical action
+        // Audit log the security-critical action; non-fatal so an audit
+        // failure cannot prevent returning the new key to the user.
         await auditLog({
           action: "project.apiKey.regenerated",
           userId: ctx.session.user.id,
           projectId: input.projectId,
-        });
+        }).catch(captureException);
 
         return { apiKey: project.apiKey };
       } catch (error) {
@@ -306,7 +306,9 @@ export const projectRouter = createTRPCRouter({
           name: z.string().optional(),
           language: z.string().optional(),
           framework: z.string().optional(),
-          piiRedactionLevel: z.enum(["STRICT", "ESSENTIAL", "DISABLED"]).optional(),
+          piiRedactionLevel: z
+            .enum(["STRICT", "ESSENTIAL", "DISABLED"])
+            .optional(),
           teamId: z.string().optional(),
           capturedInputVisibility: z
             .enum(["REDACTED_TO_ALL", "VISIBLE_TO_ADMIN", "VISIBLE_TO_ALL"])
@@ -402,8 +404,7 @@ export const projectRouter = createTRPCRouter({
             input.capturedOutputVisibility ?? project.capturedOutputVisibility,
           traceSharingEnabled:
             input.traceSharingEnabled ?? project.traceSharingEnabled,
-          presenceEnabled:
-            input.presenceEnabled ?? project.presenceEnabled,
+          presenceEnabled: input.presenceEnabled ?? project.presenceEnabled,
           s3Endpoint: input.s3Endpoint ? encrypt(input.s3Endpoint) : null,
           s3AccessKeyId: input.s3AccessKeyId
             ? encrypt(input.s3AccessKeyId)
@@ -480,8 +481,9 @@ export const projectRouter = createTRPCRouter({
     .use(checkProjectPermission("project:update"))
     .mutation(async ({ input }) => {
       const { projectId } = input;
-      const { scheduleTopicClusteringForProject } =
-        await import("../../background/queues/topicClusteringQueue");
+      const { scheduleTopicClusteringForProject } = await import(
+        "../../background/queues/topicClusteringQueue"
+      );
 
       try {
         // Add the job directly to the queue for immediate processing
@@ -530,5 +532,3 @@ async function checkCapturedDataVisibilityPermission({
   }
   return next();
 }
-
-

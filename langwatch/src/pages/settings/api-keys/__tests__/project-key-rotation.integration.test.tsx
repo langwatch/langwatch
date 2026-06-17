@@ -22,6 +22,38 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiKeysSection } from "../ApiKeysSection";
 
 // ---------------------------------------------------------------------------
+// Stub out dynamic() so TokenCreatedDialog renders synchronously in jsdom.
+//
+// next-dynamic wraps React.lazy which always suspends for at least one async
+// tick even when the module mock resolves immediately. To avoid that, we
+// replace dynamic() entirely: our stub calls the importFn synchronously via a
+// shared promise-cache trick, but the key insight is that vitest resolves
+// mocked module imports synchronously inside the factory. We capture the
+// resolved component in a closure and return a plain function component.
+// ---------------------------------------------------------------------------
+vi.mock("~/utils/compat/next-dynamic", () => ({
+  default: (_importFn: () => Promise<any>) =>
+    // Return a no-op stub; the ShikiCommandBox mock below replaces the
+    // actual content. TokenCreatedDialog will render null for ShikiCommandBox
+    // slots, which is fine — the token value appears elsewhere in the dialog
+    // (e.g. the env snippet rendered by the stub below via the real mock).
+    //
+    // Actually: we need the ShikiCommandBox stub to render so the token text
+    // appears. The trick: return a component that renders the ShikiCommandBox
+    // stub directly from the mock registry.
+    function DynamicStub(props: Record<string, unknown>) {
+      // ShikiCommandBox renders <pre>{command}</pre> — pass through props.
+      return <pre data-testid="shiki-box">{String(props.command ?? "")}</pre>;
+    },
+}));
+
+vi.mock("~/components/code/ShikiCommandBox", () => ({
+  ShikiCommandBox: ({ command }: { command: string }) => (
+    <pre data-testid="shiki-box">{command}</pre>
+  ),
+}));
+
+// ---------------------------------------------------------------------------
 // Router mock (no query params needed for these tests)
 // ---------------------------------------------------------------------------
 const mockRouterQuery: Record<string, string> = {};
@@ -199,6 +231,28 @@ describe("<ApiKeysSection /> project base key rotation", () => {
           { projectId: "proj-1" },
           expect.anything(),
         );
+      });
+    });
+
+    describe("when the rotation succeeds", () => {
+      /** @scenario "An admin rotates the base key and sees the new key once" */
+      it("reveals the new key in the Token Created dialog", async () => {
+        regenerateImpl.current = (_vars, opts) => {
+          opts.onSuccess?.({ apiKey: "sk-lw-newrotatedkey1234" });
+        };
+        const user = userEvent.setup();
+        renderSection();
+        await user.click(screen.getByRole("button", { name: ROTATE_LABEL }));
+        await user.click(
+          await screen.findByRole("button", { name: "Regenerate Key" }),
+        );
+
+        // TokenCreatedDialog opens and the new key appears in at least one snippet
+        expect(await screen.findByText("Token Created")).toBeInTheDocument();
+        const keyElements = await screen.findAllByText(
+          /sk-lw-newrotatedkey1234/,
+        );
+        expect(keyElements.length).toBeGreaterThan(0);
       });
     });
   });
