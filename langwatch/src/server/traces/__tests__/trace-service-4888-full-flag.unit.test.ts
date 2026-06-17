@@ -14,6 +14,13 @@
  * `getFromEventLog`. That exercises the gate at the layer it actually lives —
  * unlike a TS-layer mock, which would pass on a shape production never produces.
  *
+ * The CH-layer mapper-crossing describe block at the bottom exercises
+ * `ClickHouseTraceService.getTracesWithSpans` directly (via `buildService`) to
+ * prove the full value survives `mapNormalizedSpanToSpan` (params.langwatch.output
+ * byte-identical, no reserved-key leak, trace.output widens past 64 KB).
+ * These cases were previously in `trace-service-4888-full-flag.integration.test.ts`
+ * but that file mocked ALL boundaries, so it needed no Docker and belonged here.
+ *
  * ACs covered:
  *   AC1 — full=true triggers resolution (getFromEventLog called ≥ 1 time) and
  *          the resolved span attribute is the full 400 KB value.
@@ -32,6 +39,9 @@ import { BlobNotFoundError } from "~/server/app-layer/traces/blob-store.service"
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
 import { TraceService } from "../trace.service";
+import { resolveOffloadedTraces } from "../resolve-offloaded-traces";
+import { createLogger } from "~/utils/logger/server";
+import { makeSummaryRow, makeSpanRowWithEventRef } from "./fixtures/ch-row-fixtures";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks — mock only the raw CH SQL boundary so the real resolver runs
@@ -80,6 +90,7 @@ vi.mock("langwatch", () => ({
       const fakeSpan = {
         setAttribute: () => {},
         setAttributes: () => {},
+        addEvent: () => {},
       };
       return (fn as (s: typeof fakeSpan) => Promise<unknown>)(fakeSpan);
     },
@@ -91,6 +102,7 @@ vi.mock("langwatch", () => ({
 // ---------------------------------------------------------------------------
 
 const IO_PREVIEW_BYTES = 65536;
+const LARGE_BYTE_COUNT = 400_000;
 
 const protections: Protections = {
   canSeeCosts: true,
@@ -106,94 +118,32 @@ const PROJECT_ID_A = "tenant-aaa";
 const PROJECT_ID_B = "tenant-bbb";
 const TRACE_ID = "trace-001";
 
-const FULL_OUTPUT = "x".repeat(400_000);
+const FULL_OUTPUT = "x".repeat(LARGE_BYTE_COUNT);
 const PREVIEW_OUTPUT = "x".repeat(IO_PREVIEW_BYTES) + "…";
 
 // ---------------------------------------------------------------------------
-// Raw ClickHouse row fixtures (mirrors clickhouse-trace.service-resolution test)
+// Mock setup helper
 // ---------------------------------------------------------------------------
 
-/** Minimal trace-summary row as returned by ClickHouse. */
-function makeSummaryRow(traceId: string) {
-  return {
-    ts_TraceId: traceId,
-    ts_SpanCount: 1,
-    ts_TotalDurationMs: 100,
-    ts_ComputedIOSchemaVersion: "1",
-    ts_ComputedInput: null,
-    ts_ComputedOutput: `{"type":"text","value":${JSON.stringify(PREVIEW_OUTPUT)}}`,
-    ts_TimeToFirstTokenMs: 10,
-    ts_TimeToLastTokenMs: 90,
-    ts_TokensPerSecond: 5,
-    ts_ContainsErrorStatus: false,
-    ts_ContainsOKStatus: true,
-    ts_ErrorMessage: "",
-    ts_Models: [],
-    ts_TotalCost: 0.0,
-    ts_NonBilledCost: 0.0,
-    ts_TokensEstimated: false,
-    ts_TotalPromptTokenCount: 0,
-    ts_TotalCompletionTokenCount: 0,
-    ts_TopicId: null,
-    ts_SubTopicId: null,
-    ts_HasAnnotation: null,
-    ts_AnnotationIds: [],
-    ts_Attributes: {},
-    ts_TraceName: null,
-    ts_OccurredAt: Date.now(),
-    ts_CreatedAt: Date.now(),
-    ts_UpdatedAt: Date.now(),
-  };
-}
-
-/**
- * Minimal span row carrying an offloaded eventref for langwatch.output:
- * a 64 KB preview value plus a flat reserved eventref pointer (the REAL
- * production shape — flat key on SpanAttributes).
- */
-function makeSpanRowWithEventRef(traceId: string, spanId: string) {
-  return {
-    SpanId: spanId,
-    TraceId: traceId,
-    TenantId: PROJECT_ID_A,
-    ParentSpanId: null,
-    ParentTraceId: null,
-    ParentIsRemote: null,
-    Sampled: true,
-    StartTime: Date.now(),
-    EndTime: Date.now() + 100,
-    DurationMs: 100,
-    SpanName: "llm-call",
-    SpanKind: 1,
-    ResourceAttributes: {},
-    SpanAttributes: {
-      "langwatch.output": PREVIEW_OUTPUT,
-      [`${EVENTREF_ATTR_PREFIX}langwatch.output`]: JSON.stringify({
-        field: "langwatch.output",
-        eventId: "evt-001",
-      }),
-    },
-    StatusCode: 1,
-    StatusMessage: "",
-    ScopeName: "test",
-    ScopeVersion: "1.0",
-    Events_Timestamp: [],
-    Events_Name: [],
-    Events_Attributes: [],
-    Links_TraceId: [],
-    Links_SpanId: [],
-    Links_Attributes: [],
-  };
-}
-
 /** Set up the two CH queries fetchTracesWithSpansJoined fires (summary, spans). */
-function setupGetTracesWithSpansMocks() {
+function setupGetTracesWithSpansMocks(tenantId = PROJECT_ID_A) {
   mockClickHouseQuery
     .mockResolvedValueOnce({
-      json: () => Promise.resolve([makeSummaryRow(TRACE_ID)]),
+      json: () =>
+        Promise.resolve([
+          makeSummaryRow(TRACE_ID, {
+            computedOutput: `{"type":"text","value":${JSON.stringify(PREVIEW_OUTPUT)}}`,
+          }),
+        ]),
     })
     .mockResolvedValueOnce({
-      json: () => Promise.resolve([makeSpanRowWithEventRef(TRACE_ID, "span-1")]),
+      json: () =>
+        Promise.resolve([
+          makeSpanRowWithEventRef(TRACE_ID, "span-1", {
+            tenantId,
+            previewOutput: PREVIEW_OUTPUT,
+          }),
+        ]),
     });
 }
 
@@ -233,7 +183,7 @@ function makeService(blobStore: BlobStore): TraceService {
 }
 
 // ---------------------------------------------------------------------------
-// AC1 — full=true triggers resolution at the CH layer
+// AC1 — full=true triggers resolution at the CH layer (TraceService level)
 // ---------------------------------------------------------------------------
 
 describe("TraceService — AC1: getById with full=true resolves from event_log", () => {
@@ -258,6 +208,22 @@ describe("TraceService — AC1: getById with full=true resolves from event_log",
         expect(blobStore.getFromEventLog).toHaveBeenCalledTimes(1);
       });
 
+      it("the resolved span attribute is defined", async () => {
+        setupGetTracesWithSpansMocks();
+
+        const trace = await service.getById(
+          PROJECT_ID_A,
+          TRACE_ID,
+          protections,
+          { full: true },
+        );
+
+        const span = trace?.spans?.[0] as
+          | { params?: { langwatch?: { output?: string } } }
+          | undefined;
+        expect(span?.params?.langwatch?.output).toBeDefined();
+      });
+
       it("the resolved span attribute byte length equals the full 400 KB value", async () => {
         setupGetTracesWithSpansMocks();
 
@@ -272,13 +238,10 @@ describe("TraceService — AC1: getById with full=true resolves from event_log",
           | { params?: { langwatch?: { output?: string } } }
           | undefined;
         const resolved = span?.params?.langwatch?.output;
-        expect(
-          resolved !== undefined &&
-            Buffer.byteLength(resolved, "utf8") === 400_000,
-        ).toBe(true);
+        expect(Buffer.byteLength(resolved!, "utf8")).toBe(LARGE_BYTE_COUNT);
       });
 
-      it("no langwatch.reserved.* key survives in the returned span", async () => {
+      it("no langwatch.reserved.* key survives in the returned span (key-level check)", async () => {
         setupGetTracesWithSpansMocks();
 
         const trace = await service.getById(
@@ -288,8 +251,19 @@ describe("TraceService — AC1: getById with full=true resolves from event_log",
           { full: true },
         );
 
-        const spanStr = JSON.stringify(trace?.spans?.[0] ?? {});
-        expect(spanStr).not.toContain(EVENTREF_ATTR_PREFIX);
+        const span = trace?.spans?.[0] as
+          | { params?: { langwatch?: { reserved?: unknown } } }
+          | undefined;
+        // Key-level: reserved namespace must be absent from the mapped span
+        expect(span?.params?.langwatch?.reserved).toBeUndefined();
+        // Also check that no flat key under params carries the reserved prefix
+        const flatParams = span?.params as Record<string, unknown> | undefined;
+        if (flatParams) {
+          const allKeys = Object.keys(flatParams);
+          expect(
+            allKeys.every((k) => !k.startsWith(EVENTREF_ATTR_PREFIX)),
+          ).toBe(true);
+        }
       });
 
       it("the recomputed trace.output value equals the full 400 KB value", async () => {
@@ -498,6 +472,278 @@ describe("TraceService — AC7: cross-tenant event_log read denied, preview retu
         await expect(
           serviceB.getById(PROJECT_ID_B, TRACE_ID, protections, { full: true }),
         ).resolves.not.toThrow();
+      });
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CH-layer mapper-crossing tests (merged from integration test — all boundaries
+// are mocked so these need no Docker container and belong in unit).
+//
+// These call ClickHouseTraceService.getTracesWithSpans directly via buildService
+// to prove: (a) full value survives mapNormalizedSpanToSpan byte-identical, (b)
+// no reserved-key leak, (c) trace.output widens past 64 KB, (d) resolveBlobs:false
+// issues zero getFromEventLog calls and preserves the preview.
+// ---------------------------------------------------------------------------
+
+describe("ClickHouseTraceService — #4888 full resolution crosses the mapper", () => {
+  const PROJECT_ID_CH = "proj-4888";
+  const TRACE_ID_CH = "trace-4888";
+
+  let ClickHouseTraceService: typeof import("../clickhouse-trace.service").ClickHouseTraceService;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const mod = await import("../clickhouse-trace.service");
+    ClickHouseTraceService = mod.ClickHouseTraceService;
+  });
+
+  function setupJoinedFetch() {
+    mockClickHouseQuery
+      .mockResolvedValueOnce({
+        json: () =>
+          Promise.resolve([
+            makeSummaryRow(TRACE_ID_CH, {
+              computedOutput: `{"type":"text","value":${JSON.stringify(PREVIEW_OUTPUT)}}`,
+            }),
+          ]),
+      })
+      .mockResolvedValueOnce({
+        json: () =>
+          Promise.resolve([
+            makeSpanRowWithEventRef(TRACE_ID_CH, "span-1", {
+              tenantId: PROJECT_ID_CH,
+              previewOutput: PREVIEW_OUTPUT,
+            }),
+          ]),
+      });
+  }
+
+  function makeEventRefBlobStore(contents: Record<string, string>): {
+    blobStore: BlobStore;
+    getFromEventLogSpy: ReturnType<typeof vi.fn>;
+  } {
+    const getFromEventLogSpy = vi.fn(
+      async ({ field }: { field: string }) => {
+        if (field in contents) return contents[field]!;
+        throw new BlobNotFoundError("evt-001", field, PROJECT_ID_CH);
+      },
+    );
+    const blobStore = {
+      getFromEventLog: getFromEventLogSpy,
+      putSpool: vi.fn(),
+      getSpool: vi.fn(),
+      deleteSpool: vi.fn(),
+    } as unknown as BlobStore;
+    return { blobStore, getFromEventLogSpy };
+  }
+
+  function buildService(blobStore: BlobStore) {
+    const resolveTraceSpansFn: import("../clickhouse-trace.service").ResolveTraceSpansFn =
+      (projectId, normalizedSpans) =>
+        resolveOffloadedTraces({
+          projectId,
+          normalizedSpans,
+          blobStore,
+          ioExtractionService: new TraceIOExtractionService(),
+          logger: createLogger("test"),
+        });
+    return new ClickHouseTraceService(
+      { project: { findUnique: vi.fn() } } as never,
+      resolveTraceSpansFn,
+    );
+  }
+
+  describe("given a >64 KB offloaded langwatch.output (preview + flat eventref)", () => {
+    describe("when getTracesWithSpans is called with resolveBlobs: true (detail path)", () => {
+      it("calls getFromEventLog exactly once", async () => {
+        setupJoinedFetch();
+        const { blobStore, getFromEventLogSpy } = makeEventRefBlobStore({
+          "langwatch.output": FULL_OUTPUT,
+        });
+        const service = buildService(blobStore);
+
+        await service.getTracesWithSpans(PROJECT_ID_CH, [TRACE_ID_CH], protections, {
+          resolveBlobs: true,
+        });
+
+        expect(getFromEventLogSpy).toHaveBeenCalledOnce();
+      });
+
+      it("the resolved value is defined in params.langwatch.output", async () => {
+        setupJoinedFetch();
+        const { blobStore } = makeEventRefBlobStore({
+          "langwatch.output": FULL_OUTPUT,
+        });
+        const service = buildService(blobStore);
+
+        const traces = await service.getTracesWithSpans(
+          PROJECT_ID_CH,
+          [TRACE_ID_CH],
+          protections,
+          { resolveBlobs: true },
+        );
+
+        const span = traces![0]!.spans[0] as unknown as {
+          params?: { langwatch?: { output?: string } };
+        };
+        expect(span.params?.langwatch?.output).toBeDefined();
+      });
+
+      it("the resolved value survives the mapper byte-identical (400 KB)", async () => {
+        setupJoinedFetch();
+        const { blobStore } = makeEventRefBlobStore({
+          "langwatch.output": FULL_OUTPUT,
+        });
+        const service = buildService(blobStore);
+
+        const traces = await service.getTracesWithSpans(
+          PROJECT_ID_CH,
+          [TRACE_ID_CH],
+          protections,
+          { resolveBlobs: true },
+        );
+
+        const span = traces![0]!.spans[0] as unknown as {
+          params?: { langwatch?: { output?: string } };
+        };
+        const resolved = span.params?.langwatch?.output;
+        expect(Buffer.byteLength(resolved!, "utf8")).toBe(LARGE_BYTE_COUNT);
+      });
+
+      it("the resolved value in params.langwatch.output equals FULL_OUTPUT", async () => {
+        setupJoinedFetch();
+        const { blobStore } = makeEventRefBlobStore({
+          "langwatch.output": FULL_OUTPUT,
+        });
+        const service = buildService(blobStore);
+
+        const traces = await service.getTracesWithSpans(
+          PROJECT_ID_CH,
+          [TRACE_ID_CH],
+          protections,
+          { resolveBlobs: true },
+        );
+
+        const span = traces![0]!.spans[0] as unknown as {
+          params?: { langwatch?: { output?: string } };
+        };
+        expect(span.params?.langwatch?.output).toBe(FULL_OUTPUT);
+      });
+
+      it("no langwatch.reserved.* key leaks into the mapped span (key-level check)", async () => {
+        setupJoinedFetch();
+        const { blobStore } = makeEventRefBlobStore({
+          "langwatch.output": FULL_OUTPUT,
+        });
+        const service = buildService(blobStore);
+
+        const traces = await service.getTracesWithSpans(
+          PROJECT_ID_CH,
+          [TRACE_ID_CH],
+          protections,
+          { resolveBlobs: true },
+        );
+
+        const span = traces![0]!.spans[0] as unknown as {
+          params?: { langwatch?: { reserved?: unknown } };
+        };
+        // Key-level: reserved namespace must be absent from the mapped span
+        expect(span?.params?.langwatch?.reserved).toBeUndefined();
+        // Also verify no flat key under params carries the reserved prefix
+        const flatParams = span?.params as Record<string, unknown> | undefined;
+        if (flatParams) {
+          const allKeys = Object.keys(flatParams);
+          expect(
+            allKeys.every((k) => !k.startsWith(EVENTREF_ATTR_PREFIX)),
+          ).toBe(true);
+        }
+      });
+
+      it("trace.output is defined after resolution", async () => {
+        setupJoinedFetch();
+        const { blobStore } = makeEventRefBlobStore({
+          "langwatch.output": FULL_OUTPUT,
+        });
+        const service = buildService(blobStore);
+
+        const traces = await service.getTracesWithSpans(
+          PROJECT_ID_CH,
+          [TRACE_ID_CH],
+          protections,
+          { resolveBlobs: true },
+        );
+
+        expect(traces![0]!.output?.value).toBeDefined();
+      });
+
+      it("trace.output widens past the 64 KB preview to the full value", async () => {
+        setupJoinedFetch();
+        const { blobStore } = makeEventRefBlobStore({
+          "langwatch.output": FULL_OUTPUT,
+        });
+        const service = buildService(blobStore);
+
+        const traces = await service.getTracesWithSpans(
+          PROJECT_ID_CH,
+          [TRACE_ID_CH],
+          protections,
+          { resolveBlobs: true },
+        );
+
+        const outputVal = traces![0]!.output?.value as string | undefined;
+        expect(Buffer.byteLength(outputVal!, "utf8")).toBeGreaterThan(IO_PREVIEW_BYTES);
+      });
+
+      it("trace.output equals FULL_OUTPUT after resolution", async () => {
+        setupJoinedFetch();
+        const { blobStore } = makeEventRefBlobStore({
+          "langwatch.output": FULL_OUTPUT,
+        });
+        const service = buildService(blobStore);
+
+        const traces = await service.getTracesWithSpans(
+          PROJECT_ID_CH,
+          [TRACE_ID_CH],
+          protections,
+          { resolveBlobs: true },
+        );
+
+        expect(traces![0]!.output?.value).toBe(FULL_OUTPUT);
+      });
+    });
+
+    describe("when getTracesWithSpans is called with resolveBlobs: false (list/enrich path)", () => {
+      it("issues ZERO getFromEventLog calls (no event_log load on the list path)", async () => {
+        setupJoinedFetch();
+        const { blobStore, getFromEventLogSpy } = makeEventRefBlobStore({
+          "langwatch.output": FULL_OUTPUT,
+        });
+        const service = buildService(blobStore);
+
+        await service.getTracesWithSpans(PROJECT_ID_CH, [TRACE_ID_CH], protections, {
+          resolveBlobs: false,
+        });
+
+        expect(getFromEventLogSpy).not.toHaveBeenCalled();
+      });
+
+      it("preserves the ≤64 KB preview (does not widen to the full value)", async () => {
+        setupJoinedFetch();
+        const { blobStore } = makeEventRefBlobStore({
+          "langwatch.output": FULL_OUTPUT,
+        });
+        const service = buildService(blobStore);
+
+        const traces = await service.getTracesWithSpans(
+          PROJECT_ID_CH,
+          [TRACE_ID_CH],
+          protections,
+          { resolveBlobs: false },
+        );
+
+        expect(traces![0]!.output?.value).not.toBe(FULL_OUTPUT);
       });
     });
   });

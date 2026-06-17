@@ -20,7 +20,7 @@ const defaultResolveClickHouseClient: ClickHouseClientResolver = async (
 ): Promise<ClickHouseClient> => {
   const client = await getClickHouseClientForProject(tenantId);
   if (!client) {
-    throw new Error(`ClickHouse not available for tenant ${tenantId}`);
+    throw new Error("ClickHouse not available for this tenant");
   }
   return client;
 };

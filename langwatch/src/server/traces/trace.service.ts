@@ -184,7 +184,7 @@ export class TraceService {
    * Static factory method for creating TraceService with default dependencies.
    *
    * @param prisma - PrismaClient instance
-   * @param blobResolutionDeps - Optional blob-offload resolution deps (#4215)
+   * @param blobResolutionDeps - Optional blob-offload resolution deps (#4888)
    * @returns TraceService instance
    */
   static create(
