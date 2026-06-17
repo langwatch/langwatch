@@ -239,7 +239,7 @@ jobs:
         run: |
           if [ -z "$BOXD_SSH_KEY" ]; then
             echo "BOXD_SKIP=true" >> "$GITHUB_ENV"
-            echo "::warning::BOXD_SSH_KEY is not configured; preview VM steps skipped"
+            echo "::warning::BOXD_SSH_KEY is not configured; staging refresh steps skipped"
             exit 0
           fi
           mkdir -p ~/.ssh
@@ -248,8 +248,8 @@ jobs:
           echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
           printf '%s\n' "$BOXD_SSH_KEY" | ssh-add -
 
-      # Soft refresh: git pull + compose up --build on the running staging VM.
-      # "Dirty staging" risk is bounded by the no-human-access policy + destroy-and-recreate reaper.
+      # Soft refresh: git reset --hard origin/main + compose up --build on the running staging VM.
+      # "Dirty staging" risk is bounded by the no-human-access policy; full destroy/recreate is future work (see TODO below).
       # TODO: add a full-rebuild path (destroy + bootstrap from empty) when someone builds a bootstrap script.
       - name: Refresh staging in place
         if: env.BOXD_SKIP != 'true'
@@ -299,7 +299,7 @@ jobs:
         run: |
           if [ -z "$BOXD_SSH_KEY" ]; then
             echo "BOXD_SKIP=true" >> "$GITHUB_ENV"
-            echo "::warning::BOXD_SSH_KEY is not configured; preview VM steps skipped"
+            echo "::warning::BOXD_SSH_KEY is not configured; orphan reaper steps skipped"
             exit 0
           fi
           mkdir -p ~/.ssh
