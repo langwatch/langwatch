@@ -1,18 +1,16 @@
 /**
- * ADR-032 R3 (v6): heavy dataset files upload browser→S3 directly via a
- * presigned PUT to a server-owned staging key. The size cap is enforced at
- * *finalize* (HEAD the staged object) — no new dependency (uses the existing
- * `s3-request-presigner`). A POST-policy that rejects before bytes land
- * (`createPresignedPost`) is deferred hardening.
+ * ADR-032 R3 (v6): pure policy for the heavy browser→storage direct upload.
  *
- * Pure helpers (`stagingUploadKey`, `exceedsUploadCap`) are unit-tested; the
- * SDK wrappers (`createPresignedUpload`, `getStagedObjectSize`) are thin and
- * covered by the route's integration test.
+ * Heavy files upload directly to a server-owned staging key; the size cap is
+ * enforced at *finalize* (HEAD the staged object) — no new dependency (the S3
+ * impl uses the already-installed `s3-request-presigner`). A POST-policy that
+ * rejects before bytes land (`createPresignedPost`) is deferred hardening.
+ *
+ * This module is deliberately provider-agnostic: it owns only the staging-key
+ * scheme, the size cap and the presign TTL. The SDK wrappers (presigned PUT,
+ * HEAD, delete) live in `S3DatasetStorage`, which composes these helpers.
  */
-import { HeadObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { nanoid } from "nanoid";
-import { createS3Client } from "../storage";
+import { assertNoTraversal } from "./dataset-chunking";
 
 /**
  * Hard upload size cap (~5 GiB). Above the 2–3 GB target use case; enforced at
@@ -22,14 +20,6 @@ export const UPLOAD_MAX_BYTES = 5 * 1024 * 1024 * 1024;
 
 /** Presigned PUT URLs are short-lived. */
 export const UPLOAD_TTL_SECONDS = 15 * 60;
-
-const assertNoTraversal = (...parts: string[]) => {
-  for (const part of parts) {
-    if (part.includes("..") || part.includes("/")) {
-      throw new Error("Invalid id: path traversal attempt detected");
-    }
-  }
-};
 
 /**
  * Server-owned, tenant-scoped staging key the client cannot widen — the
@@ -49,40 +39,3 @@ export const exceedsUploadCap = (
   sizeBytes: number,
   maxBytes: number = UPLOAD_MAX_BYTES,
 ): boolean => sizeBytes > maxBytes;
-
-export type PresignedUpload = { uploadId: string; key: string; url: string };
-
-/**
- * Mint a presigned PUT for a fresh upload. The key is generated server-side
- * (tenant-scoped staging prefix), so the client can only PUT that one object.
- */
-export const createPresignedUpload = async ({
-  projectId,
-}: {
-  projectId: string;
-}): Promise<PresignedUpload> => {
-  const uploadId = nanoid();
-  const key = stagingUploadKey(projectId, uploadId);
-  const { s3Client, s3Bucket } = await createS3Client(projectId);
-  const url = await getSignedUrl(
-    s3Client,
-    new PutObjectCommand({ Bucket: s3Bucket, Key: key }),
-    { expiresIn: UPLOAD_TTL_SECONDS },
-  );
-  return { uploadId, key, url };
-};
-
-/** HEAD the staged object to read its size — finalize size-cap enforcement. */
-export const getStagedObjectSize = async ({
-  projectId,
-  key,
-}: {
-  projectId: string;
-  key: string;
-}): Promise<number> => {
-  const { s3Client, s3Bucket } = await createS3Client(projectId);
-  const head = await s3Client.send(
-    new HeadObjectCommand({ Bucket: s3Bucket, Key: key }),
-  );
-  return head.ContentLength ?? 0;
-};
