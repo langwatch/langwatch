@@ -487,6 +487,47 @@ function hiddenCategoryAttributeRules(
   return rules;
 }
 
+/**
+ * Recursively remove hidden chat turns from any attribute value: drop messages
+ * whose role is hidden, strip assistant `tool_calls` when tool calls are hidden,
+ * and apply the same to JSON-string-encoded conversations. This covers the raw
+ * chat-array attributes (`gen_ai.input.messages`, `langwatch.input`, …) the
+ * attributes table can expand — they are input/output-category keys, so the
+ * placeholder rules above do not touch them, yet they still carry the system and
+ * tool turns. Returns a new value; the input is not mutated.
+ */
+function stripHiddenChatTurnsDeep(
+  node: unknown,
+  roles: ReadonlySet<string>,
+  stripToolCalls: boolean,
+): unknown {
+  if (Array.isArray(node)) {
+    const out: unknown[] = [];
+    for (const item of node) {
+      const role =
+        item && typeof item === "object"
+          ? (item as { role?: unknown }).role
+          : undefined;
+      if (typeof role === "string" && roles.has(role)) continue;
+      out.push(stripHiddenChatTurnsDeep(item, roles, stripToolCalls));
+    }
+    return out;
+  }
+  if (node && typeof node === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(node)) {
+      if (stripToolCalls && key === "tool_calls") continue;
+      out[key] = stripHiddenChatTurnsDeep(value, roles, stripToolCalls);
+    }
+    return out;
+  }
+  if (typeof node === "string") {
+    const result = stripRolesFromChatArrayJson(node, roles, stripToolCalls);
+    return result ? result.json : node;
+  }
+  return node;
+}
+
 export function redactV2Content<
   T extends {
     input?: string | null;
@@ -568,6 +609,26 @@ export function redactV2Content<
             }
           : event,
       );
+    }
+  }
+  // The raw chat-array attributes still carry the hidden system/tool turns
+  // (they are input/output-category keys, untouched by the rules above), so an
+  // expanded attribute could reveal them. Strip those turns from params and
+  // attributes too, when any are hidden.
+  if (roles.size > 0 || stripToolCalls) {
+    if (redacted.params) {
+      redacted.params = stripHiddenChatTurnsDeep(
+        redacted.params,
+        roles,
+        stripToolCalls,
+      ) as T["params"];
+    }
+    if (redacted.attributes) {
+      redacted.attributes = stripHiddenChatTurnsDeep(
+        redacted.attributes,
+        roles,
+        stripToolCalls,
+      ) as T["attributes"];
     }
   }
   return redacted;

@@ -246,6 +246,44 @@ describe("redactV2Content", () => {
       expect(parsed[1]!.tool_calls).toBeUndefined();
       expect(out.input).not.toContain("tool result");
     });
+
+    it("strips the hidden turns from the raw chat-array attributes too (nested params and flat attributes)", () => {
+      const messages = [
+        { role: "user", content: "hi" },
+        {
+          role: "assistant",
+          content: "",
+          tool_calls: [{ id: "1", function: { name: "lookup" } }],
+        },
+        { role: "tool", content: "SECRET tool result" },
+      ];
+      const out = redactV2Content(
+        {
+          input: null,
+          // Nested params (the span mapper unflattens dotted keys).
+          params: { gen_ai: { input: { messages } } },
+          // Flat attributes carry the conversation as a JSON string.
+          attributes: { "gen_ai.input.messages": JSON.stringify(messages) },
+        },
+        {
+          canSeeCapturedInput: true,
+          canSeeCapturedOutput: true,
+          contentCategories: cats({ tools: restricted("Admins") }),
+        },
+      );
+
+      const paramsMessages = (
+        out.params as {
+          gen_ai: { input: { messages: Array<{ role: string }> } };
+        }
+      ).gen_ai.input.messages;
+      expect(paramsMessages.map((m) => m.role)).toEqual(["user", "assistant"]);
+      expect(JSON.stringify(out.params)).not.toContain("SECRET tool result");
+      expect(JSON.stringify(out.params)).not.toContain("tool_calls");
+      expect(out.attributes?.["gen_ai.input.messages"]).not.toContain(
+        "SECRET tool result",
+      );
+    });
   });
 });
 
