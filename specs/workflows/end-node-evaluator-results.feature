@@ -22,9 +22,9 @@ Feature: Fixed result fields on the evaluator End node
     And each field shows its fixed type (bool, float, str, str)
 
   @integration
-  Scenario: Evaluator End node lists label before details
+  Scenario: Evaluator End node lists details first
     When I open the End node drawer
-    Then the result fields appear in the order "passed", "score", "label", "details"
+    Then the result fields appear in the order "details", "passed", "score", "label"
 
   @integration
   Scenario: Evaluator End node results cannot be added or removed

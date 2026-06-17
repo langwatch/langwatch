@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  *
  * Evaluator End node: the results are a fixed four-field vocabulary
- * (passed, score, label, details), all optional - normalized on open and
+ * (details, passed, score, label), all optional - normalized on open and
  * explained field by field (not editable rows), with a connect-a-result
  * nudge. Non-evaluator end nodes keep their free-form results, rendered
  * through the shared VariablesSection.
@@ -156,8 +156,8 @@ describe("EndPropertiesPanel", () => {
       ).not.toBeInTheDocument();
     });
 
-    /** @scenario Evaluator End node lists label before details */
-    it("orders the result fields passed, score, label, details", () => {
+    /** @scenario Evaluator End node lists details first */
+    it("orders the result fields details, passed, score, label", () => {
       mockEdges = [
         {
           id: "e1",
@@ -179,7 +179,7 @@ describe("EndPropertiesPanel", () => {
         .filter((t) =>
           ["passed", "score", "label", "details"].includes(t ?? ""),
         );
-      expect(order).toEqual(["passed", "score", "label", "details"]);
+      expect(order).toEqual(["details", "passed", "score", "label"]);
     });
 
     /** @scenario All evaluator results are optional */
