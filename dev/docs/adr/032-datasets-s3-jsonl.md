@@ -4,7 +4,7 @@
 
 **Status:** Accepted
 
-> **One-line:** Dataset **content** moves out of **Postgres** into **S3 as ~100 MB JSONL chunks**, large files upload **browser→S3 via a presigned upload to a server-owned staging key**, a **standalone GroupQueue job** normalizes them off-thread under a streaming contract (recoverable by manual retry), and existing datasets are **flip-all-at-once migrated by a hardened, advisory-locked job off the boot path** — all behind the existing `resolveProjectStorageDestination` seam so self-hosted and BYOC keep working.
+> **One-line:** Dataset **content** moves out of **Postgres** into **S3 as ~16 MB JSONL chunks**, large files upload **browser→S3 via a presigned upload to a server-owned staging key**, a **standalone GroupQueue job** normalizes them off-thread under a streaming contract (recoverable by manual retry), and existing datasets are **flip-all-at-once migrated by a hardened, advisory-locked job off the boot path** — all behind the existing `resolveProjectStorageDestination` seam so self-hosted and BYOC keep working.
 
 ## Context
 
@@ -27,7 +27,7 @@ End state: **no dataset *content* in Postgres.** Dataset *metadata* (id, name, s
 
 1. **S3 is the sole store for dataset *content*; Postgres keeps only *metadata*.** Content is JSONL. The `Dataset` row stays in PG so evaluations/projects keep their FKs. Rejects PG content storage (size-capped) and the dead single-blob S3 path.
 
-2. **Content is ~100 MB JSONL chunks under `datasets/{projectId}/{datasetId}/`, ordered zero-padded keys** (`chunk-00000.jsonl`, …). **PG is authoritative for addressing** (`rowCount`, `sizeBytes`, `chunkCount`, per-chunk row offsets); S3 LIST is repair/audit only, not the read path. Rejects a manifest object (drift) and S3-LIST-authoritative reads (eventual consistency on overwrite/delete).
+2. **Content is ~16 MB byte-capped JSONL chunks under `datasets/{projectId}/{datasetId}/`, ordered zero-padded keys** (`chunk-00000.jsonl`, …). The byte cap is the only hard chunk bound in v1 — small enough to bound normalize memory and the future paginated read's per-chunk I/O, large enough to avoid object explosion (~128 objects per 2 GB). A fixed *row-count* cap is rejected (a low value explodes object count + the offset index on light-row data); the row-count ceiling is deferred to the reads epic. **PG is authoritative for addressing** (`rowCount`, `sizeBytes`, `chunkCount`, per-chunk row offsets); S3 LIST is repair/audit only, not the read path. Rejects a manifest object (drift), S3-LIST-authoritative reads (eventual consistency on overwrite/delete), and a low fixed row cap (object explosion on light rows).
 
 3. **Append writes a new chunk; edit/delete rewrites only the affected chunk** (located via the row-offset index), under the per-dataset advisory lock (Decision 9). Rejects tombstone/overlay and change-log+compaction (over-built for an upload-and-read workload).
 
@@ -37,7 +37,7 @@ End state: **no dataset *content* in Postgres.** Dataset *metadata* (id, name, s
 
 6. **The dataset carries a PG `status` column** (`uploading` → `processing` → `ready` / `failed`), typed `String @default("ready")` so existing rows stay valid; the normalize job flips it. **Every read consumer gates on `status=ready`** — UI (polls), the Go engine via `loadDatasets.ts`, the REST `/upload` append path, and the SDK — so a half-normalized dataset is never served. Rejects a ClickHouse fold projection (PG-only domain) and a Prisma enum (house style uses `String` for lifecycles).
 
-7. **Existing dataset content is migrated PG→S3 flip-all-at-once by an idempotent, advisory-locked job — off the blocking boot path.** Cloud runs it as an explicit one-off (k8s Job / `pnpm run task`); self-hosted fires it **after the server is listening** (non-blocking, non-fatal — never on the `set -e` boot path `scripts/start.sh` uses, so a transient S3/DB error can't boot-loop the fleet). A **per-dataset Postgres advisory lock** guarantees exactly one pod migrates a dataset. The new layout is marked by a dedicated **`contentLayout` field — NOT by overloading `useS3`** — so an old-image pod mid-rolling-deploy never mistakes new chunks for the dead single-blob path; it falls back to PG (rows still present). The backfill **never deletes PG rows**; dropping `DatasetRecord` is a **separate later migration** after confirmed full cutover. Safe because the existing corpus is hard-capped at 25 MB / 10k rows and new big datasets are born on S3 (never backfilled). Rejects boot-blocking the migration, overloading `useS3`, and the no-lock backfill.
+7. **Existing dataset content is migrated PG→S3 flip-all-at-once by an idempotent, advisory-locked job — off the blocking boot path.** The same task runs from three triggers, never on the `set -e` boot path: **cloud** k8s Job · **self-hosted Helm** `post-install,post-upgrade` **hook Job** · **compose/bare** `pnpm run task`. It **self-skips** when storage is unconfigured or no datasets remain on `contentLayout='postgres'` — so it's safe to fire every upgrade and effectively runs "only if old PG rows remain." A **per-dataset Postgres advisory lock** guarantees exactly one pod migrates a dataset. The new layout is marked by a dedicated **`contentLayout` field — NOT by overloading `useS3`**. **The flip is rollout-gated:** the Job/hook runs *after* the deploy completes, so no old-image pod is present when a dataset flips → migrated datasets never diverge; an old pod reading a not-yet-flipped dataset still resolves via PG (the backfill **never deletes PG rows**). The only residual is a *net-new* S3 dataset created by a new pod mid-rollout being briefly invisible to a still-draining old pod (transient "not found", resolves when the deploy finishes) — accepted rather than adding a dual-write window. Dropping `DatasetRecord` is a **separate later migration** after confirmed full cutover. Safe because the existing corpus is hard-capped at 25 MB / 10k rows and new datasets are born on S3 (never backfilled). Rejects boot-blocking the migration, overloading `useS3`, the no-lock backfill, and a dual-write window.
 
 8. **Bucket and credentials are resolved through `resolveProjectStorageDestination` (never hardcoded); all S3-dependent behavior gates on "storage configured," and boot never fails when S3 is absent.** Single-instance self-hosted may use local FS; multi-pod requires S3. The BYOC route choice is deferred — the resolver seam keeps it additive. Rejects a hardcoded global bucket and building on the dead `useCustomS3` DB route.
 
@@ -47,14 +47,14 @@ End state: **no dataset *content* in Postgres.** Dataset *metadata* (id, name, s
 
 | Name | Value | Purpose |
 |---|---|---|
-| `CHUNK_MAX_BYTES` | ~100 MB | Target cap per JSONL chunk; rolls over when the next row would exceed it. |
+| `CHUNK_MAX_BYTES` | ~16 MB | Byte cap per JSONL chunk; rolls over when the next row would exceed it (oversized single row still gets its own chunk). Only hard chunk bound in v1; row-count ceiling deferred to the reads epic. |
 | Chunk key format | `datasets/{projectId}/{datasetId}/chunk-{NNNNN}.jsonl` | Ordered, zero-padded, tenant-prefixed. PG-authoritative; LIST is repair-only. |
 | Staging key format | `staging/{projectId}/{uploadId}` + bucket lifecycle TTL | Server-owned upload target; lifecycle rule reaps orphaned un-finalized uploads. |
 | `UPLOAD_MAX_BYTES` | TBD | Hard size cap — enforced by the presign POST-policy and a fast reject in normalize. |
 | Normalize concurrency | 1 per normalize group | A heavy normalize can't OOM the shared worker. |
 | `Dataset.contentLayout` default | `"postgres"` | New-layout marker + migration done-flag; old pods ignore it → fall back to PG. |
 | `Dataset.status` default | `"ready"` | Keeps every pre-existing row valid without backfill. |
-| `SKIP_DATASET_S3_MIGRATE` | env, unset/false | Opt-out for the self-hosted post-listen migration fire. |
+| `SKIP_DATASET_S3_MIGRATE` | env, unset/false | Opt-out for the migration task (cloud Job / Helm hook Job). |
 
 ## Invariants
 
@@ -111,7 +111,7 @@ Migration is additive (new nullable columns + defaults); existing rows become `s
 - **Batched/streaming dataset reads** — the immediate fast-follow epic.
 - **`UPLOAD_MAX_BYTES`** — pick a concrete value before implementation.
 - **Automatic re-drive** (poll-triggered, no scheduler) and the **`.withOutbox` migration** — optional later hardening; v1 ships manual retry only.
-- **Self-hosted migration trigger** — post-listen background fire vs documented `pnpm run task` (must stay off `set -e`).
+- **Chunk row-count ceiling** — value deferred to the reads epic; v1's only hard bound is the ~16 MB byte cap (Decision 2). (Self-hosted migration trigger resolved in Decision 7 — Helm hook Job.)
 - **Presign POST-policy vs PUT** — confirm `createPresignedPost` (new dep `@aws-sdk/s3-presigned-post`) for the size cap.
 - **BYOC route** — decommission the dead `useCustomS3` DB route or wire `DATAPLANE_S3__`; deferred, resolver seam keeps it additive.
 - **S3-native versioning** & **storage billing** — designed-for, deferred (`sizeBytes` captured now).
@@ -122,3 +122,4 @@ Migration is additive (new nullable columns + defaults); existing rows become `s
 - **v1 (2026-06-17)** — initial decision. Forks: chunk addressing → ordered S3 keys + PG counters; edit/delete → rewrite affected chunk; upload path → always direct-to-S3; normalize runner → GroupQueue standalone job; status → PG `Dataset.status`; migration → flip-all-at-once. BYOC deferred.
 - **v2 (2026-06-17) — red-team fold.** Migration moved off the boot path, per-dataset advisory lock added, `contentLayout` replaces the `useS3` overload (D7). Presign key made server-owned + scoped + size-capped via POST-policy (D4). Advisory lock serializes all chunk mutations (D9). Status-gating extended to all read consumers (D6). Counters made PG-authoritative. The 5 MB read truncation acknowledged as out of scope, batched reads are the immediate fast-follow. Worker-death recovery flagged on the GroupQueue runner (D5).
 - **v4 (2026-06-17).** Dropped the standalone re-drive sweeper. Recovery floor = the streaming/memory contract (interruption is rare) + **manual retry** (a stuck `processing` dataset is always re-runnable; PG rows + staging file intact, nothing lost). Poll-triggered re-drive and `.withOutbox` are optional later hardening, not in v1. Keeps the runner pure Postgres + S3 — no ClickHouse, no scheduler.
+- **v5 (2026-06-17).** Chunk byte cap **~100 MB → ~16 MB** (D2) — 100 MB over-reads for the future paginated UI; a fixed row cap is rejected (object explosion on light rows), row-count ceiling deferred to the reads epic. Self-hosted migration trigger → **Helm `post-install,post-upgrade` hook Job** (D7), idempotent self-skip. **CodeRabbit fold:** D7 clarified — the flip is rollout-gated (Job/hook runs post-deploy, no old pods at flip), reconciling the PG-fallback wording with S3-as-sole-store; net-new-mid-rollout invisibility accepted as transient (dual-write explicitly rejected). Code (rung 2): `getChunkObject` now **throws on a missing chunk** instead of returning "" (was silent read truncation); `catch` blocks use `unknown` + type guards.
