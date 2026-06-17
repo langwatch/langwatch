@@ -6,7 +6,13 @@
  * evaluator can actually be edited from the evaluators page and the workbench.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -124,6 +130,45 @@ describe("CodeEvaluatorEditorDrawer", () => {
         });
         expect(screen.getByText("Create evaluator")).toBeInTheDocument();
         expect(screen.getByTestId("code-evaluator-name")).toHaveValue("");
+      });
+    });
+
+    describe("when an input field is added or removed", () => {
+      /** @scenario Code evaluator inputs stay in sync with the signature */
+      it("rewrites the __call__ signature when an input is added", async () => {
+        render(<CodeEvaluatorEditorDrawer open />, { wrapper: Wrapper });
+        await waitFor(() => {
+          expect(screen.getByText("New Code Evaluator")).toBeInTheDocument();
+        });
+
+        fireEvent.click(screen.getByTestId("code-evaluator-input-add"));
+        fireEvent.change(
+          screen.getByTestId("code-evaluator-input-identifier-2"),
+          { target: { value: "context" } },
+        );
+
+        expect(screen.getByTestId("code-editor")).toHaveTextContent(
+          "def __call__(self, output: str = None, expected_output: str = None, context: str = None):",
+        );
+      });
+
+      it("rewrites the __call__ signature when an input is removed", async () => {
+        render(<CodeEvaluatorEditorDrawer open />, { wrapper: Wrapper });
+        await waitFor(() => {
+          expect(screen.getByText("New Code Evaluator")).toBeInTheDocument();
+        });
+
+        fireEvent.click(
+          screen.getByRole("button", {
+            name: "Remove inputs expected_output",
+          }),
+        );
+
+        // Only the signature line is rewritten; the body is preserved (so a
+        // reference to expected_output may remain in the body, which is fine).
+        expect(screen.getByTestId("code-editor")).toHaveTextContent(
+          "def __call__(self, output: str = None):",
+        );
       });
     });
   });

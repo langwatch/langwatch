@@ -27,6 +27,7 @@ import {
   isBranchConnectionOrigin,
   nodeHasGateInput,
 } from "../utils/controlFlow";
+import { rewriteCodeSignature } from "../utils/codeSignature";
 import { hasDSLChanged } from "../utils/dslUtils";
 import { canConvergeOnInput } from "../utils/edgeConvergence";
 import { findLowestAvailableName, nameToId } from "../utils/nodeUtils";
@@ -363,60 +364,16 @@ export const updateCodeClassName = (
   );
 };
 
-const typesMap: Record<Field["type"], string> = {
-  str: "str",
-  int: "int",
-  float: "float",
-  bool: "bool",
-  image: "dspy.Image",
-  list: "list",
-  "list[str]": "list[str]",
-  "list[float]": "list[float]",
-  "list[int]": "list[int]",
-  "list[bool]": "list[bool]",
-  dict: "dict[str, Any]",
-  json_schema: "Any",
-  chat_messages: "list[dict[str, Any]]",
-  signature: "dspy.Signature",
-  llm: "Any",
-  prompting_technique: "Any",
-  dataset: "Any",
-  code: "str",
-};
-
 export const updateInputFields = (parameters: Field[], inputs: Field[]) => {
   if (inputs.length === 0) {
     return parameters;
   }
 
-  return parameters.map((p) => {
-    if (p.identifier === "code") {
-      // Match either the new idiomatic-Python entrypoint (`__call__`)
-      // or the legacy/torch-style `forward` and preserve whichever the
-      // customer's code already uses — silently rewriting a legacy
-      // `forward` into `__call__` on field-add would surprise users
-      // and break diffs in their commit history.
-      // Every input defaults to None so an unconnected handle does not
-      // raise "missing a required argument" at run time - the engine omits
-      // unwired inputs from the call, and a bare `input: str` would then
-      // fail. Defaulting keeps partial runs and optional inputs flexible.
-      let code = (p.value as string).replace(
-        /def (__call__|forward)\([\s\S]*?\):/,
-        (_match, methodName: string) =>
-          `def ${methodName}(self, ${inputs
-            .map((i) => `${i.identifier}: ${typesMap[i.type]} = None`)
-            .join(", ")}):`,
-      );
-      if (code.includes(": Any") && !code.includes("from typing import Any")) {
-        code = `from typing import Any\n${code}`;
-      }
-      return {
-        ...p,
-        value: code,
-      };
-    }
-    return p;
-  });
+  return parameters.map((p) =>
+    p.identifier === "code"
+      ? { ...p, value: rewriteCodeSignature(p.value as string, inputs) }
+      : p,
+  );
 };
 
 const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

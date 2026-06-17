@@ -280,6 +280,15 @@ Feature: Evaluator management
     Then the code editor opens with its saved code, inputs and outputs
     And in the workbench each input shows its source mapping inline
 
+  # Same behavior as the studio code node: the Python entrypoint signature is
+  # derived from the declared inputs, so adding or removing an input field
+  # rewrites it (with None defaults) and the saved evaluator never calls the
+  # entrypoint with an unexpected or missing keyword.
+  Scenario: Code evaluator inputs stay in sync with the signature
+    Given the code evaluator drawer
+    When I add or remove an input field
+    Then the __call__ signature is rewritten to match the declared inputs
+
   Scenario: Code evaluator inputs drive the mapping UI
     Given a code evaluator whose code takes "output" and "expected_output"
     When I use it in an evaluation

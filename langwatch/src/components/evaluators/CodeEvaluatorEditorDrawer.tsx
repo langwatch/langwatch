@@ -28,6 +28,7 @@ import {
 } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { CodeEditor } from "~/optimization_studio/components/code/CodeEditorModal";
+import { rewriteCodeSignature } from "~/optimization_studio/utils/codeSignature";
 import {
   type CodeEvaluatorConfig,
   DEFAULT_CODE_EVALUATOR_CONFIG,
@@ -119,6 +120,18 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
       setOutputs(config.outputs.map((f) => ({ ...f })));
     }
   }, [evaluatorQuery.data]);
+
+  // Keep the Python __call__ signature in sync with the declared inputs, the
+  // same way the studio code node does, so adding or removing an input field
+  // rewrites the entrypoint and the saved evaluator never calls it with an
+  // unexpected keyword. Only the signature line changes; the body is kept.
+  const setInputsAndSyncCode = (next: EditableField[]) => {
+    setInputs(next);
+    const valid = validFields(next);
+    if (valid.length > 0) {
+      setCode((current) => rewriteCodeSignature(current, valid));
+    }
+  };
 
   const handleMappingChange = (
     identifier: string,
@@ -230,7 +243,7 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
     code,
     setCode,
     inputs,
-    setInputs,
+    setInputs: setInputsAndSyncCode,
     outputs,
     setOutputs,
     mappings,
