@@ -97,9 +97,7 @@ describe("customEvaluatorTemplate", () => {
       // entry than to end. A smaller entry-side left-edge gap yields an equal
       // visual gap on both sides.
       expect(x("entry")).toBeGreaterThan(0);
-      expect(x("llm_call") - x("entry")).toBeLessThan(
-        x("end") - x("llm_call"),
-      );
+      expect(x("llm_call") - x("entry")).toBeLessThan(x("end") - x("llm_call"));
     });
   });
 });

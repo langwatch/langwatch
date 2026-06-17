@@ -21,13 +21,13 @@ import type {
   LLMConfig,
   Workflow,
 } from "../types/dsl";
+import { rewriteCodeSignature } from "../utils/codeSignature";
 import {
   GATE_FIELD,
   GATE_HANDLE_ID,
   isBranchConnectionOrigin,
   nodeHasGateInput,
 } from "../utils/controlFlow";
-import { rewriteCodeSignature } from "../utils/codeSignature";
 import { hasDSLChanged } from "../utils/dslUtils";
 import { canConvergeOnInput } from "../utils/edgeConvergence";
 import { findLowestAvailableName, nameToId } from "../utils/nodeUtils";

@@ -423,9 +423,9 @@ describe("workflowStoreCore", () => {
 
         let state = testStore.getState();
         let nodeA = state.nodes.find((n) => n.id === "nodeA");
-        expect((nodeA?.data as Record<string, unknown>)["localConfig"]).toEqual(
-          { someKey: "someValue" },
-        );
+        expect((nodeA?.data as Record<string, unknown>).localConfig).toEqual({
+          someKey: "someValue",
+        });
 
         // Now clear it by passing undefined
         testStore.getState().setNode({
@@ -436,7 +436,7 @@ describe("workflowStoreCore", () => {
         state = testStore.getState();
         nodeA = state.nodes.find((n) => n.id === "nodeA");
         expect(
-          (nodeA?.data as Record<string, unknown>)["localConfig"],
+          (nodeA?.data as Record<string, unknown>).localConfig,
         ).toBeUndefined();
         // Array fields remain untouched
         expect(nodeA?.data.inputs).toEqual([

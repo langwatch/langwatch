@@ -11,7 +11,8 @@ describe("rewriteCodeSignature", () => {
   describe("given inputs to sync", () => {
     describe("when the entrypoint is __call__", () => {
       it("rewrites the parameter list with None defaults", () => {
-        const code = "class Code:\n  def __call__(self, output: str):\n    return {}";
+        const code =
+          "class Code:\n  def __call__(self, output: str):\n    return {}";
         const next = rewriteCodeSignature(code, [
           { identifier: "output", type: "str" },
           { identifier: "expected_output", type: "str" },
@@ -35,9 +36,10 @@ describe("rewriteCodeSignature", () => {
 
     describe("when the entrypoint is the legacy forward", () => {
       it("preserves the method name", () => {
-        const next = rewriteCodeSignature("def forward(self, x: str):\n  pass", [
-          { identifier: "input", type: "str" },
-        ]);
+        const next = rewriteCodeSignature(
+          "def forward(self, x: str):\n  pass",
+          [{ identifier: "input", type: "str" }],
+        );
         expect(next).toContain("def forward(self, input: str = None):");
       });
     });
