@@ -27,3 +27,9 @@ Feature: GroupQueue dispatcher connection resilience
     Given startTestContainers has been called once for a given ClickHouse URL
     When startTestContainers is called again with the same ClickHouse URL
     Then initializeClickHouseSchema is not called a second time for that URL
+
+  @unit
+  Scenario: Cluster connections also get a dedicated blocking connection
+    Given a Redis Cluster connection as the consumer connection
+    When a GroupQueueProcessor is created in consumer mode
+    Then the blocking connection is a dedicated duplicate, not the shared cluster connection

@@ -6,8 +6,7 @@ import {
   TraceFlags,
 } from "@opentelemetry/api";
 import fastq from "fastq";
-// biome-ignore lint/style/useImportType: instanceof requires runtime class value
-import { type Cluster, Redis as IORedis } from "ioredis";
+import { Cluster, Redis as IORedis } from "ioredis";
 import { getLangWatchTracer } from "langwatch";
 import type { SemConvAttributes } from "langwatch/observability";
 import { createLogger } from "../../../../utils/logger/server";
@@ -178,10 +177,15 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     this.consumerEnabled = options?.consumerEnabled ?? true;
     // Dedicated connection for BRPOP to avoid blocking the shared connection.
     // Only needed when the dispatcher loop runs (consumer mode).
-    this.blockingConnection =
-      this.consumerEnabled && effectiveConnection instanceof IORedis
+    // IORedis.duplicate() takes an options override; Cluster.duplicate() takes no
+    // args (maxRetriesPerRequest: null is already set inside Cluster's redisOptions).
+    this.blockingConnection = !this.consumerEnabled
+      ? effectiveConnection
+      : effectiveConnection instanceof IORedis
         ? effectiveConnection.duplicate({ maxRetriesPerRequest: null })
-        : effectiveConnection;
+        : effectiveConnection instanceof Cluster
+          ? effectiveConnection.duplicate()
+          : effectiveConnection;
     this.spanAttributes = spanAttributes;
     this.delay = delay;
     this.deduplication = deduplication;
