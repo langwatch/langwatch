@@ -1011,7 +1011,31 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     const bc = this.blockingConnection;
     if (bc === this.redisConnection) return;
     if (bc.status === "ready") return;
-    await new Promise<void>((resolve) => bc.once("ready", resolve));
+    await new Promise<void>((resolve, reject) => {
+      const onReady = () => {
+        bc.off("error", onError);
+        bc.off("end", onEnd);
+        bc.off("close", onEnd);
+        resolve();
+      };
+      const onError = (err: unknown) => {
+        bc.off("ready", onReady);
+        bc.off("end", onEnd);
+        bc.off("close", onEnd);
+        reject(err instanceof Error ? err : new Error(String(err)));
+      };
+      const onEnd = () => {
+        bc.off("ready", onReady);
+        bc.off("error", onError);
+        bc.off("end", onEnd);
+        bc.off("close", onEnd);
+        reject(new Error("Blocking Redis connection closed before ready"));
+      };
+      bc.once("ready", onReady);
+      bc.once("error", onError);
+      bc.once("end", onEnd);
+      bc.once("close", onEnd);
+    });
   }
 
   async close(): Promise<void> {

@@ -10,10 +10,10 @@ Feature: GroupQueue dispatcher connection resilience
   # up to exceed the 10-second vi.waitFor timeout in the squash test.
 
   @integration
-  Scenario: Blocking connection overrides maxRetriesPerRequest from source connection
-    Given a Redis connection created with maxRetriesPerRequest set to 0
+  Scenario: GroupQueueProcessor retries blocked operations regardless of source connection retry settings
+    Given a Redis connection configured to fail immediately on transient errors
     When a GroupQueueProcessor is created with this connection as the consumer connection
-    Then the internal blockingConnection has maxRetriesPerRequest set to null
+    Then the dispatcher retries BRPOP operations automatically after transient connection failures
 
   @integration
   Scenario: Delayed squashed job processes exactly once within timeout
