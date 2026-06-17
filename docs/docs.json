@@ -65,7 +65,6 @@
                   "skills/pms-and-domain-experts"
                 ]
               },
-              "integration/install",
               "integration/cli",
               "integration/mcp",
               "better-agents/overview"
@@ -1252,6 +1251,10 @@
     {
       "source": "/integration/cookbooks",
       "destination": "/integration/code-examples"
+    },
+    {
+      "source": "/integration/install",
+      "destination": "/integration/cli"
     },
     {
       "source": "/guardrails/:path*",
