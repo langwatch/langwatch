@@ -11,7 +11,7 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { forwardRef } from "react";
+import { forwardRef, useReducer } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AvailableSource } from "../../variables/VariableMappingInput";
 import type { Variable } from "../../variables/VariablesSection";
@@ -699,6 +699,65 @@ describe("PromptTextAreaWithVariables", () => {
 
       fireEvent.blur(textarea);
       expect(textarea.style.paddingBottom).toBe("28px");
+    });
+
+    /** @scenario An undefined variable is flagged without crashing the page */
+    it("does not re-measure the banner on every parent re-render when the invalid-variable set is unchanged", () => {
+      // Regression: the banner useLayoutEffect depended on the `invalidVariables`
+      // array identity. The prompt editor rebuilds the variables array on every
+      // render, so the effect re-ran and called setState on every render, which
+      // churned the commit phase into React's "Maximum update depth exceeded"
+      // crash (it threw the page to the top-level error boundary). The fix keys
+      // the effect on a stable primitive signature of the invalid names, so it
+      // only re-measures when the set of undefined variables actually changes.
+      // Each re-measure here stands in for one of the per-render setStates that
+      // fed the crash, so a non-zero count on stable input is the regression.
+      function Harness() {
+        const [, forceRerender] = useReducer((n: number) => n + 1, 0);
+        // Mirrors PromptMessagesEditor: a brand-new array (and objects) each render.
+        const variables: Variable[] = [{ identifier: "question", type: "str" }];
+        return (
+          <ChakraProvider value={defaultSystem}>
+            <button
+              type="button"
+              data-testid="rerender"
+              onClick={() => forceRerender()}
+            >
+              rerender
+            </button>
+            <PromptTextAreaWithVariables
+              value="Judge this: {{response}}"
+              onChange={vi.fn()}
+              variables={variables}
+            />
+          </ChakraProvider>
+        );
+      }
+
+      render(<Harness />);
+
+      // `response` is undefined, so the banner is mounted. Spy on the exact node
+      // the layout effect measures, so we count only its reads (not Chakra's).
+      const banner = screen.getByTestId("undefined-variables-banner");
+      let bannerHeightReads = 0;
+      Object.defineProperty(banner, "offsetHeight", {
+        configurable: true,
+        get() {
+          bannerHeightReads += 1;
+          return 24;
+        },
+      });
+
+      // Re-render the parent repeatedly; each pass hands down a fresh variables
+      // array, exactly as the real editor does on every render.
+      for (let i = 0; i < 5; i += 1) {
+        fireEvent.click(screen.getByTestId("rerender"));
+      }
+
+      // The set of invalid variables never changed, so the layout effect must
+      // not re-measure. Pre-fix this was 5 (one re-measure + setState per render)
+      // and is what drove the "Maximum update depth exceeded" crash in-app.
+      expect(bannerHeightReads).toBe(0);
     });
   });
 });

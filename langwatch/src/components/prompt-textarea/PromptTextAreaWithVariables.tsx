@@ -244,9 +244,18 @@ export const PromptTextAreaWithVariables = ({
   // always 0) on the legacy reservation.
   const bannerRef = useRef<HTMLDivElement>(null);
   const [bannerHeight, setBannerHeight] = useState(0);
+  // Re-measure the banner only when the *set* of invalid variables actually
+  // changes (the banner mounts/unmounts, or its text reflows onto more lines).
+  // Depending on the `invalidVariables` array identity instead re-ran this on
+  // every render, because the variables list upstream is rebuilt each render;
+  // the redundant per-render setState churned the commit phase into React's
+  // nested-update limit ("Maximum update depth exceeded"). A primitive
+  // signature plus a no-op guard keeps the height in sync without the churn.
+  const invalidVariablesKey = invalidVariables.join(" ");
   useLayoutEffect(() => {
-    setBannerHeight(bannerRef.current?.offsetHeight ?? 0);
-  }, [invalidVariables]);
+    const measured = bannerRef.current?.offsetHeight ?? 0;
+    setBannerHeight((prev) => (prev === measured ? prev : measured));
+  }, [invalidVariablesKey]);
   const reservedBottomPadding =
     invalidVariables.length > 0 ? Math.max(bannerHeight + 8, 28) : null;
 
