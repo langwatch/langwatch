@@ -15,7 +15,10 @@ import {
   DatasetNotFoundError,
   InvalidColumnError,
   MalformedColumnTypesError,
+  UploadTooLargeError,
 } from "./errors";
+import { getDatasetStorage } from "./dataset-storage";
+import { exceedsUploadCap } from "./presigned-upload";
 import { ExperimentRepository } from "./experiment.repository";
 import { stripNullBytes } from "./sanitize";
 import type {
@@ -884,6 +887,97 @@ export class DatasetService {
    * @throws {DatasetConflictError} if slug conflicts
    * @throws {UploadValidationError} if file too large, too many rows, etc.
    */
+  /**
+   * R3: start a direct browser→S3 upload for a NEW dataset. Mints the
+   * presigned target first (fails fast with `DirectUploadUnavailableError`
+   * on backends that can't presign — caller falls back to backend upload),
+   * then creates the `Dataset` in `uploading`. Content lands in S3 once the
+   * normalize job runs (rung 4); `columnTypes` is unknown until then.
+   */
+  async createPendingUpload(params: {
+    projectId: string;
+    name: string;
+  }): Promise<{
+    datasetId: string;
+    slug: string;
+    uploadUrl: string;
+    stagingKey: string;
+  }> {
+    const { projectId, name } = params;
+
+    const storage = await getDatasetStorage(projectId);
+    // Throws DirectUploadUnavailableError on local/no-S3 → no orphan row.
+    const upload = await storage.createPresignedUpload({ projectId });
+
+    const slug = this.generateSlug(name);
+    if (await this.repository.findBySlug({ slug, projectId })) {
+      throw new DatasetConflictError();
+    }
+
+    const dataset = await this.repository.create({
+      id: `dataset_${nanoid()}`,
+      slug,
+      name,
+      projectId,
+      columnTypes: [], // unknown until normalize parses the uploaded file
+      status: "uploading",
+      contentLayout: "s3_jsonl",
+    });
+
+    return {
+      datasetId: dataset.id,
+      slug: dataset.slug,
+      uploadUrl: upload.url,
+      stagingKey: upload.key,
+    };
+  }
+
+  /**
+   * R3: finalize a direct upload. Verifies the staged object belongs to the
+   * project, enforces the size cap (HEAD), and flips the dataset to
+   * `processing`. The normalize job is enqueued from here in rung 4.
+   */
+  async finalizeUpload(params: {
+    projectId: string;
+    datasetId: string;
+    stagingKey: string;
+  }): Promise<{ datasetId: string; status: "processing" }> {
+    const { projectId, datasetId, stagingKey } = params;
+
+    const dataset = await this.repository.findOne({ id: datasetId, projectId });
+    if (!dataset) {
+      throw new DatasetNotFoundError();
+    }
+    // Tenant guard: the staged object must live under this project's prefix.
+    if (!stagingKey.startsWith(`staging/${projectId}/`)) {
+      throw new DatasetNotFoundError("Staged object does not belong to project");
+    }
+
+    const storage = await getDatasetStorage(projectId);
+    const sizeBytes = await storage.headStagedObjectSize({
+      projectId,
+      key: stagingKey,
+    });
+    if (exceedsUploadCap(sizeBytes)) {
+      await this.repository.update({
+        id: datasetId,
+        projectId,
+        data: { status: "failed", statusError: "Uploaded file is too large" },
+      });
+      throw new UploadTooLargeError();
+    }
+
+    await this.repository.update({
+      id: datasetId,
+      projectId,
+      data: { status: "processing" },
+    });
+
+    // TODO(rung 4): enqueue the normalize GroupQueue job
+    //   { datasetId, projectId, stagingKey } → stream staging → chunked JSONL.
+    return { datasetId, status: "processing" };
+  }
+
   async createDatasetFromUpload(params: {
     projectId: string;
     name: string;

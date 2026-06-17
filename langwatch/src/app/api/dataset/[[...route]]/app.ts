@@ -267,6 +267,94 @@ secured.access(requires("datasets:manage")).post(
   },
 );
 
+// ── Direct (browser→S3) upload: request a presigned PUT ─────────
+// Registered before /:slugOrId so "direct-upload" isn't matched as a slug.
+secured.access(requires("datasets:manage")).post(
+  "/direct-upload",
+  datasetServiceMiddleware,
+  describeRoute({
+    description:
+      "Start a direct browser→S3 dataset upload (returns a presigned PUT)",
+  }),
+  resourceLimitMiddleware("datasets"),
+  async (c) => {
+    const project = c.get("project");
+    const service = c.get("datasetService");
+
+    const body = await c.req.parseBody();
+    const name = body["name"];
+    if (!name || typeof name !== "string" || name.trim() === "") {
+      throw new UnprocessableEntityError("name field is required");
+    }
+
+    try {
+      const result = await service.createPendingUpload({
+        projectId: project.id,
+        name: name.trim(),
+      });
+      return c.json(result, 201);
+    } catch (error) {
+      // Self-hosted without browser-reachable S3 → client falls back to /upload.
+      if (
+        error instanceof Error &&
+        error.name === "DirectUploadUnavailableError"
+      ) {
+        return c.json(
+          { error: "DirectUploadUnavailable", message: error.message },
+          409,
+        );
+      }
+      if (error instanceof Error && error.name === "DatasetConflictError") {
+        return c.json(
+          {
+            error: "Conflict",
+            message: "A dataset with this slug already exists",
+          },
+          409,
+        );
+      }
+      throw error;
+    }
+  },
+);
+
+// ── Direct upload: finalize after the browser has PUT the file ───
+secured.access(requires("datasets:manage")).post(
+  "/direct-upload/:datasetId/finalize",
+  datasetServiceMiddleware,
+  describeRoute({
+    description: "Finalize a direct upload: size-check and start processing",
+  }),
+  async (c) => {
+    const { datasetId } = c.req.param();
+    const project = c.get("project");
+    const service = c.get("datasetService");
+
+    const body = await c.req.parseBody();
+    const stagingKey = body["stagingKey"];
+    if (!stagingKey || typeof stagingKey !== "string") {
+      throw new UnprocessableEntityError("stagingKey field is required");
+    }
+
+    try {
+      const result = await service.finalizeUpload({
+        projectId: project.id,
+        datasetId,
+        stagingKey,
+      });
+      return c.json(result, 200);
+    } catch (error) {
+      if (error instanceof Error && error.name === "UploadTooLargeError") {
+        throw new BadRequestError(error.message);
+      }
+      if (error instanceof Error && error.name === "DatasetNotFoundError") {
+        return c.json({ error: "NotFound", message: error.message }, 404);
+      }
+      throw error;
+    }
+  },
+);
+
 // ── Upload File to Existing Dataset ─────────────────────────────
 secured.access(requires("datasets:manage")).post(
   "/:slugOrId/upload",
