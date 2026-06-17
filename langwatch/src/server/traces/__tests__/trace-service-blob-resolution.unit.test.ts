@@ -178,10 +178,13 @@ describe("TraceService.getTracesWithSpans() — ADR-022 blob resolution pipeline
           protections,
         );
 
+        // #4888: TraceService forwards the per-call blob-resolution gate to CH.
+        // No `full` was passed, so resolveBlobs is undefined (preview).
         expect(mockGetTracesWithSpansCH).toHaveBeenCalledWith(
           "proj-1",
           ["trace-1"],
           protections,
+          { resolveBlobs: undefined },
         );
         expect(traces[0]!.trace_id).toBe("trace-1");
       });

@@ -1,76 +1,60 @@
 /**
- * TDD-red tests for issue #4888 — TraceService full-flag read path.
+ * TDD tests for issue #4888 — TraceService full-flag read path, exercised at
+ * the REAL seam.
  *
- * These tests encode the seam contract described in the plan:
- *   TraceService.getById(projectId, traceId, protections, opts?: {full?: boolean})
- *   TraceService.getTracesWithSpans(projectId, traceIds, protections, opts?: {full?: boolean})
+ * Resolution lives in the ClickHouse layer (`resolveAndMerge` →
+ * `resolveOffloadedTraces`), gated per-call by a `resolveBlobs` flag that
+ * `TraceService.getById` / `getTracesWithSpans` forward from `opts.full`.
+ * Resolution operates on NormalizedSpan with FLAT `spanAttributes` carrying the
+ * `langwatch.reserved.eventref.*` keys — the only level where the eventref is
+ * present (the legacy mapper strips it and nests the rest under `params`).
  *
- * They FAIL against current code because:
- *   - getById / getTracesWithSpans do not accept an opts argument yet.
- *   - TraceService.create() does not accept blobResolutionDeps from the
- *     router context (buildTraceBlobResolutionDeps() factory not wired yet).
- *   - The ClickHouseTraceService does not forward a resolveBlobs flag yet.
+ * So these tests mock ONLY the raw ClickHouse client (summary + span rows) and
+ * let the REAL CH service + REAL resolver run, with a fake BlobStore providing
+ * `getFromEventLog`. That exercises the gate at the layer it actually lives —
+ * unlike a TS-layer mock, which would pass on a shape production never produces.
  *
  * ACs covered:
- *   AC1 — full=true triggers resolution (getFromEventLog called ≥ 1 time)
- *   AC2 — full=false (or omitted) → getFromEventLog called 0 times; also
- *          list paths (getAllTracesForProject etc.) pass no blobResolutionDeps
- *          (resolver fn undefined) and issue zero event_log SELECTs.
+ *   AC1 — full=true triggers resolution (getFromEventLog called ≥ 1 time) and
+ *          the resolved span attribute is the full 400 KB value.
+ *   AC2 — full=false (or omitted) → getFromEventLog called 0 times (preview).
  *   AC7 — cross-tenant: same EventId, wrong tenant → BlobNotFoundError → preview
- *          returned; getFromEventLog called but returns no rows for tenant B.
- *
- * Mocking approach matches trace.service.unit.test.ts + trace-service-blob-resolution.unit.test.ts:
- *   - vi.hoisted for ClickHouseTraceService mock
- *   - Real TraceIOExtractionService
- *   - BlobStore stub that records calls and simulates tenant scoping
+ *          returned; getFromEventLog called with the reading tenant's id.
  *
  * BDD structure: describe(given/when) → it() — one expectation per test.
  * No "should" in test names.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { Trace } from "~/server/tracer/types";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Protections } from "~/server/elasticsearch/protections";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
-import {
-  BlobNotFoundError,
-} from "~/server/app-layer/traces/blob-store.service";
+import { BlobNotFoundError } from "~/server/app-layer/traces/blob-store.service";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
 import { TraceService } from "../trace.service";
 
 // ---------------------------------------------------------------------------
-// Hoisted mocks
+// Hoisted mocks — mock only the raw CH SQL boundary so the real resolver runs
 // ---------------------------------------------------------------------------
 
-const { mockGetTracesWithSpansCH, mockResolveTraceIdByPrefixCH } = vi.hoisted(
-  () => ({
-    mockGetTracesWithSpansCH: vi.fn(),
-    mockResolveTraceIdByPrefixCH: vi.fn(),
-  }),
-);
-
-const mockClickHouseInstance = {
-  getTracesWithSpans: mockGetTracesWithSpansCH,
-  getAllTracesForProject: vi.fn(),
-  getTopicCounts: vi.fn(),
-  getCustomersAndLabels: vi.fn(),
-  getDistinctFieldNames: vi.fn(),
-  getSpanForPromptStudio: vi.fn(),
-  getTracesByThreadId: vi.fn(),
-  getTracesWithSpansByThreadIds: vi.fn(),
-  resolveTraceIdByPrefix: mockResolveTraceIdByPrefixCH,
-};
-
-vi.mock("../clickhouse-trace.service", () => ({
-  ClickHouseTraceService: Object.assign(vi.fn(), {
-    create: () => mockClickHouseInstance,
-  }),
+const { mockClickHouseQuery } = vi.hoisted(() => ({
+  mockClickHouseQuery: vi.fn(),
 }));
 
-vi.mock("../elasticsearch-trace.service", () => ({
-  ElasticsearchTraceService: Object.assign(vi.fn(), {
-    create: () => ({}),
+vi.mock("~/server/clickhouse/clickhouseClient", () => ({
+  getClickHouseClientForProject: () =>
+    Promise.resolve({ query: mockClickHouseQuery }),
+}));
+
+vi.mock("~/server/db", () => ({
+  prisma: {},
+}));
+
+vi.mock("~/server/filters/clickhouse", () => ({
+  generateClickHouseFilterConditions: () => ({
+    conditions: [],
+    params: {},
+    hasUnsupportedFilters: false,
   }),
 }));
 
@@ -80,17 +64,25 @@ vi.mock("~/server/evaluations/evaluation.service", () => ({
   }),
 }));
 
-vi.mock("~/server/db", () => ({
-  prisma: {},
+vi.mock("../elasticsearch-trace.service", () => ({
+  ElasticsearchTraceService: Object.assign(vi.fn(), {
+    create: () => ({}),
+  }),
 }));
 
+// Mirror the sibling test's tracer passthrough — the span exposes BOTH
+// setAttribute (singular) and setAttributes (plural), matching the real OTel
+// Span interface (TraceIOExtractionService calls setAttributes).
 vi.mock("langwatch", () => ({
   getLangWatchTracer: () => ({
-    withActiveSpan: (
-      _name: string,
-      _opts: unknown,
-      fn: (span: { setAttribute: () => void }) => Promise<unknown>,
-    ) => fn({ setAttribute: () => {} }),
+    withActiveSpan: (_name: string, ...args: unknown[]) => {
+      const fn = args.length === 1 ? args[0] : args[1];
+      const fakeSpan = {
+        setAttribute: () => {},
+        setAttributes: () => {},
+      };
+      return (fn as (s: typeof fakeSpan) => Promise<unknown>)(fakeSpan);
+    },
   }),
 }));
 
@@ -104,6 +96,10 @@ const protections: Protections = {
   canSeeCosts: true,
   canSeePiiData: true,
   canSeeTopics: true,
+  // Required for trace.input/output to survive applyTraceProtections — without
+  // these the redaction layer strips trace.output to undefined.
+  canSeeCapturedInput: true,
+  canSeeCapturedOutput: true,
 } as Protections;
 
 const PROJECT_ID_A = "tenant-aaa";
@@ -114,32 +110,109 @@ const FULL_OUTPUT = "x".repeat(400_000);
 const PREVIEW_OUTPUT = "x".repeat(IO_PREVIEW_BYTES) + "…";
 
 // ---------------------------------------------------------------------------
-// BlobStore fakes
+// Raw ClickHouse row fixtures (mirrors clickhouse-trace.service-resolution test)
+// ---------------------------------------------------------------------------
+
+/** Minimal trace-summary row as returned by ClickHouse. */
+function makeSummaryRow(traceId: string) {
+  return {
+    ts_TraceId: traceId,
+    ts_SpanCount: 1,
+    ts_TotalDurationMs: 100,
+    ts_ComputedIOSchemaVersion: "1",
+    ts_ComputedInput: null,
+    ts_ComputedOutput: `{"type":"text","value":${JSON.stringify(PREVIEW_OUTPUT)}}`,
+    ts_TimeToFirstTokenMs: 10,
+    ts_TimeToLastTokenMs: 90,
+    ts_TokensPerSecond: 5,
+    ts_ContainsErrorStatus: false,
+    ts_ContainsOKStatus: true,
+    ts_ErrorMessage: "",
+    ts_Models: [],
+    ts_TotalCost: 0.0,
+    ts_NonBilledCost: 0.0,
+    ts_TokensEstimated: false,
+    ts_TotalPromptTokenCount: 0,
+    ts_TotalCompletionTokenCount: 0,
+    ts_TopicId: null,
+    ts_SubTopicId: null,
+    ts_HasAnnotation: null,
+    ts_AnnotationIds: [],
+    ts_Attributes: {},
+    ts_TraceName: null,
+    ts_OccurredAt: Date.now(),
+    ts_CreatedAt: Date.now(),
+    ts_UpdatedAt: Date.now(),
+  };
+}
+
+/**
+ * Minimal span row carrying an offloaded eventref for langwatch.output:
+ * a 64 KB preview value plus a flat reserved eventref pointer (the REAL
+ * production shape — flat key on SpanAttributes).
+ */
+function makeSpanRowWithEventRef(traceId: string, spanId: string) {
+  return {
+    SpanId: spanId,
+    TraceId: traceId,
+    TenantId: PROJECT_ID_A,
+    ParentSpanId: null,
+    ParentTraceId: null,
+    ParentIsRemote: null,
+    Sampled: true,
+    StartTime: Date.now(),
+    EndTime: Date.now() + 100,
+    DurationMs: 100,
+    SpanName: "llm-call",
+    SpanKind: 1,
+    ResourceAttributes: {},
+    SpanAttributes: {
+      "langwatch.output": PREVIEW_OUTPUT,
+      [`${EVENTREF_ATTR_PREFIX}langwatch.output`]: JSON.stringify({
+        field: "langwatch.output",
+        eventId: "evt-001",
+      }),
+    },
+    StatusCode: 1,
+    StatusMessage: "",
+    ScopeName: "test",
+    ScopeVersion: "1.0",
+    Events_Timestamp: [],
+    Events_Name: [],
+    Events_Attributes: [],
+    Links_TraceId: [],
+    Links_SpanId: [],
+    Links_Attributes: [],
+  };
+}
+
+/** Set up the two CH queries fetchTracesWithSpansJoined fires (summary, spans). */
+function setupGetTracesWithSpansMocks() {
+  mockClickHouseQuery
+    .mockResolvedValueOnce({
+      json: () => Promise.resolve([makeSummaryRow(TRACE_ID)]),
+    })
+    .mockResolvedValueOnce({
+      json: () => Promise.resolve([makeSpanRowWithEventRef(TRACE_ID, "span-1")]),
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Tenant-scoped BlobStore fake
 // ---------------------------------------------------------------------------
 
 /**
- * Tenant-scoped BlobStore stub: getFromEventLog only resolves for PROJECT_ID_A.
- * A call from PROJECT_ID_B returns no rows (BlobNotFoundError), mirroring the
- * real TenantId WHERE predicate.
+ * getFromEventLog resolves the full value only for PROJECT_ID_A; any other
+ * tenant gets a BlobNotFoundError, mirroring the real TenantId WHERE predicate.
  */
 function makeTenantScopedBlobStore(): BlobStore & {
   getFromEventLog: ReturnType<typeof vi.fn>;
 } {
   const getFromEventLog = vi.fn(
-    async ({
-      tenantId,
-      field,
-    }: {
-      eventId: string;
-      field: string;
-      tenantId: string;
-      aggregateType: string;
-      aggregateId: string;
-    }) => {
+    async ({ tenantId, field }: { tenantId: string; field: string }) => {
       if (tenantId === PROJECT_ID_A && field === "langwatch.output") {
         return FULL_OUTPUT;
       }
-      // Wrong tenant or unknown field → no rows → BlobNotFoundError
       throw new BlobNotFoundError("evt-001", field, tenantId);
     },
   );
@@ -152,278 +225,229 @@ function makeTenantScopedBlobStore(): BlobStore & {
   } as unknown as BlobStore & { getFromEventLog: ReturnType<typeof vi.fn> };
 }
 
-/**
- * Builds a Trace fixture whose single span carries an offloaded langwatch.output
- * eventref (preview value + reserved pointer).
- */
-function makeOffloadedTrace(): Trace {
-  return {
-    trace_id: TRACE_ID,
-    project_id: PROJECT_ID_A,
-    metadata: {},
-    timestamps: { started_at: 0, inserted_at: 0, updated_at: 0 },
-    input: undefined,
-    output: { value: PREVIEW_OUTPUT },
-    spans: [
-      {
-        span_id: "span-1",
-        trace_id: TRACE_ID,
-        type: "span",
-        name: "test-span",
-        timestamps: { started_at: 0, finished_at: 1000 },
-        params: {},
-        attributes: {
-          "langwatch.output": PREVIEW_OUTPUT,
-          [`${EVENTREF_ATTR_PREFIX}langwatch.output`]: JSON.stringify({
-            field: "langwatch.output",
-            eventId: "evt-001",
-          }),
-        },
-      },
-    ],
-  } as unknown as Trace;
+function makeService(blobStore: BlobStore): TraceService {
+  return new TraceService(
+    {} as never,
+    { blobStore, ioExtractionService: new TraceIOExtractionService() },
+  );
 }
 
 // ---------------------------------------------------------------------------
-// AC1 — full=true triggers resolution (getFromEventLog called ≥ 1 time)
+// AC1 — full=true triggers resolution at the CH layer
 // ---------------------------------------------------------------------------
 
-describe(
-  "TraceService — AC1: getById with full=true calls BlobStore.getFromEventLog",
-  () => {
-    let blobStore: ReturnType<typeof makeTenantScopedBlobStore>;
-    let ioExtractionService: TraceIOExtractionService;
-    let service: TraceService;
+describe("TraceService — AC1: getById with full=true resolves from event_log", () => {
+  let blobStore: ReturnType<typeof makeTenantScopedBlobStore>;
+  let service: TraceService;
 
-    beforeEach(() => {
-      vi.clearAllMocks();
-      blobStore = makeTenantScopedBlobStore();
-      ioExtractionService = new TraceIOExtractionService();
-      // TraceService with blobResolutionDeps wired
-      service = new TraceService(
-        {} as never,
-        { blobStore, ioExtractionService },
-      );
-      mockGetTracesWithSpansCH.mockResolvedValue([makeOffloadedTrace()]);
-      mockResolveTraceIdByPrefixCH.mockResolvedValue([]);
-    });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    blobStore = makeTenantScopedBlobStore();
+    service = makeService(blobStore);
+  });
 
-    describe("given a trace with an offloaded langwatch.output eventref", () => {
-      describe("when getById is called with opts { full: true }", () => {
-        it("calls BlobStore.getFromEventLog at least once (resolution runs)", async () => {
-          // AC1: the full flag triggers event_log resolution.
-          // This test FAILS until TraceService.getById accepts opts.full and
-          // propagates it to ClickHouseTraceService which fires the resolver.
-          await service.getById(PROJECT_ID_A, TRACE_ID, protections, {
-            full: true,
-          });
+  describe("given a trace whose span carries an offloaded langwatch.output eventref", () => {
+    describe("when getById is called with opts { full: true }", () => {
+      it("calls BlobStore.getFromEventLog at least once (resolution runs)", async () => {
+        setupGetTracesWithSpansMocks();
 
-          expect(blobStore.getFromEventLog).toHaveBeenCalledTimes(1);
-        });
-
-        it("the returned trace output byte length equals the full 400 KB ingested value (not the 65539-byte preview)", async () => {
-          const trace = await service.getById(
-            PROJECT_ID_A,
-            TRACE_ID,
-            protections,
-            { full: true },
-          );
-
-          const outputVal = trace?.output?.value as string | undefined;
-          // Full resolution means 400,000 bytes — NOT the 65539-byte preview (65536 "x" + "…")
-          expect(
-            outputVal !== undefined &&
-              Buffer.byteLength(outputVal, "utf8") === 400_000,
-          ).toBe(true);
-        });
-
-        it("the returned trace output value equals FULL_OUTPUT (not the preview string)", async () => {
-          const trace = await service.getById(
-            PROJECT_ID_A,
-            TRACE_ID,
-            protections,
-            { full: true },
-          );
-
-          // After resolution, output.value should equal the full 400 KB string from event_log
-          expect(trace?.output?.value).toBe(FULL_OUTPUT);
-        });
-      });
-    });
-  },
-);
-
-describe(
-  "TraceService — AC1: getTracesWithSpans with full=true calls BlobStore.getFromEventLog",
-  () => {
-    let blobStore: ReturnType<typeof makeTenantScopedBlobStore>;
-    let ioExtractionService: TraceIOExtractionService;
-    let service: TraceService;
-
-    beforeEach(() => {
-      vi.clearAllMocks();
-      blobStore = makeTenantScopedBlobStore();
-      ioExtractionService = new TraceIOExtractionService();
-      service = new TraceService(
-        {} as never,
-        { blobStore, ioExtractionService },
-      );
-      mockGetTracesWithSpansCH.mockResolvedValue([makeOffloadedTrace()]);
-    });
-
-    describe("given a trace list with an offloaded langwatch.output eventref", () => {
-      describe("when getTracesWithSpans is called with opts { full: true }", () => {
-        it("calls BlobStore.getFromEventLog at least once", async () => {
-          await service.getTracesWithSpans(
-            PROJECT_ID_A,
-            [TRACE_ID],
-            protections,
-            { full: true },
-          );
-
-          expect(blobStore.getFromEventLog).toHaveBeenCalledTimes(1);
-        });
-
-        it("the returned trace output byte length equals the full 400 KB value (not the preview)", async () => {
-          const traces = await service.getTracesWithSpans(
-            PROJECT_ID_A,
-            [TRACE_ID],
-            protections,
-            { full: true },
-          );
-
-          const outputVal = traces[0]?.output?.value as string | undefined;
-          // Full resolution means 400,000 bytes — NOT the 65539-byte preview
-          expect(
-            outputVal !== undefined &&
-              Buffer.byteLength(outputVal, "utf8") === 400_000,
-          ).toBe(true);
-        });
-      });
-    });
-  },
-);
-
-// ---------------------------------------------------------------------------
-// AC2 — full=false (or omitted) → getFromEventLog called 0 times
-// ---------------------------------------------------------------------------
-
-describe(
-  "TraceService — AC2: getById with full=false (or omitted) calls getFromEventLog 0 times",
-  () => {
-    let blobStore: ReturnType<typeof makeTenantScopedBlobStore>;
-    let ioExtractionService: TraceIOExtractionService;
-    let service: TraceService;
-
-    beforeEach(() => {
-      vi.clearAllMocks();
-      blobStore = makeTenantScopedBlobStore();
-      ioExtractionService = new TraceIOExtractionService();
-      service = new TraceService(
-        {} as never,
-        { blobStore, ioExtractionService },
-      );
-      mockGetTracesWithSpansCH.mockResolvedValue([makeOffloadedTrace()]);
-      mockResolveTraceIdByPrefixCH.mockResolvedValue([]);
-    });
-
-    describe("when getById is called with opts { full: false }", () => {
-      it("BlobStore.getFromEventLog is called 0 times (preview returned)", async () => {
-        // AC2: the absence / false flag must NOT trigger event_log resolution.
-        // This test FAILS until the conditional gating on opts.full is wired.
         await service.getById(PROJECT_ID_A, TRACE_ID, protections, {
-          full: false,
+          full: true,
         });
 
-        expect(blobStore.getFromEventLog).toHaveBeenCalledTimes(0);
+        expect(blobStore.getFromEventLog).toHaveBeenCalledTimes(1);
+      });
+
+      it("the resolved span attribute byte length equals the full 400 KB value", async () => {
+        setupGetTracesWithSpansMocks();
+
+        const trace = await service.getById(
+          PROJECT_ID_A,
+          TRACE_ID,
+          protections,
+          { full: true },
+        );
+
+        const span = trace?.spans?.[0] as
+          | { params?: { langwatch?: { output?: string } } }
+          | undefined;
+        const resolved = span?.params?.langwatch?.output;
+        expect(
+          resolved !== undefined &&
+            Buffer.byteLength(resolved, "utf8") === 400_000,
+        ).toBe(true);
+      });
+
+      it("no langwatch.reserved.* key survives in the returned span", async () => {
+        setupGetTracesWithSpansMocks();
+
+        const trace = await service.getById(
+          PROJECT_ID_A,
+          TRACE_ID,
+          protections,
+          { full: true },
+        );
+
+        const spanStr = JSON.stringify(trace?.spans?.[0] ?? {});
+        expect(spanStr).not.toContain(EVENTREF_ATTR_PREFIX);
+      });
+
+      it("the recomputed trace.output value equals the full 400 KB value", async () => {
+        setupGetTracesWithSpansMocks();
+
+        const trace = await service.getById(
+          PROJECT_ID_A,
+          TRACE_ID,
+          protections,
+          { full: true },
+        );
+
+        expect(trace?.output?.value).toBe(FULL_OUTPUT);
       });
     });
+  });
+});
 
-    describe("when getById is called without opts (default)", () => {
-      it("BlobStore.getFromEventLog is called 0 times (preview returned)", async () => {
-        await service.getById(PROJECT_ID_A, TRACE_ID, protections);
+describe("TraceService — AC1: getTracesWithSpans with full=true resolves from event_log", () => {
+  let blobStore: ReturnType<typeof makeTenantScopedBlobStore>;
+  let service: TraceService;
 
-        expect(blobStore.getFromEventLog).toHaveBeenCalledTimes(0);
+  beforeEach(() => {
+    vi.clearAllMocks();
+    blobStore = makeTenantScopedBlobStore();
+    service = makeService(blobStore);
+  });
+
+  describe("given a trace list with an offloaded langwatch.output eventref", () => {
+    describe("when getTracesWithSpans is called with opts { full: true }", () => {
+      it("calls BlobStore.getFromEventLog at least once", async () => {
+        setupGetTracesWithSpansMocks();
+
+        await service.getTracesWithSpans(PROJECT_ID_A, [TRACE_ID], protections, {
+          full: true,
+        });
+
+        expect(blobStore.getFromEventLog).toHaveBeenCalledTimes(1);
       });
-    });
-  },
-);
 
-describe(
-  "TraceService — AC2: getTracesWithSpans with full=false (or omitted) calls getFromEventLog 0 times",
-  () => {
-    let blobStore: ReturnType<typeof makeTenantScopedBlobStore>;
-    let ioExtractionService: TraceIOExtractionService;
-    let service: TraceService;
+      it("the recomputed trace.output value equals the full 400 KB value", async () => {
+        setupGetTracesWithSpansMocks();
 
-    beforeEach(() => {
-      vi.clearAllMocks();
-      blobStore = makeTenantScopedBlobStore();
-      ioExtractionService = new TraceIOExtractionService();
-      service = new TraceService(
-        {} as never,
-        { blobStore, ioExtractionService },
-      );
-      mockGetTracesWithSpansCH.mockResolvedValue([makeOffloadedTrace()]);
-    });
-
-    describe("when getTracesWithSpans is called without opts (default)", () => {
-      it("BlobStore.getFromEventLog is called 0 times", async () => {
-        await service.getTracesWithSpans(PROJECT_ID_A, [TRACE_ID], protections);
-
-        expect(blobStore.getFromEventLog).toHaveBeenCalledTimes(0);
-      });
-    });
-
-    describe("when getTracesWithSpans is called with opts { full: false }", () => {
-      it("BlobStore.getFromEventLog is called 0 times", async () => {
-        await service.getTracesWithSpans(
+        const traces = await service.getTracesWithSpans(
           PROJECT_ID_A,
           [TRACE_ID],
           protections,
-          { full: false },
+          { full: true },
         );
 
-        expect(blobStore.getFromEventLog).toHaveBeenCalledTimes(0);
+        expect(traces[0]?.output?.value).toBe(FULL_OUTPUT);
       });
     });
-  },
-);
+  });
+});
 
-describe(
-  "TraceService — AC2: TraceService constructed without blobResolutionDeps issues 0 event_log SELECTs",
-  () => {
-    let blobStoreSpy: ReturnType<typeof makeTenantScopedBlobStore>;
+// ---------------------------------------------------------------------------
+// AC2 — full=false (or omitted) → getFromEventLog called 0 times (preview)
+// ---------------------------------------------------------------------------
 
-    beforeEach(() => {
-      vi.clearAllMocks();
-      blobStoreSpy = makeTenantScopedBlobStore();
-      mockGetTracesWithSpansCH.mockResolvedValue([makeOffloadedTrace()]);
-      mockResolveTraceIdByPrefixCH.mockResolvedValue([]);
+describe("TraceService — AC2: getById without full resolves nothing (preview)", () => {
+  let blobStore: ReturnType<typeof makeTenantScopedBlobStore>;
+  let service: TraceService;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    blobStore = makeTenantScopedBlobStore();
+    service = makeService(blobStore);
+  });
+
+  describe("when getById is called with opts { full: false }", () => {
+    it("BlobStore.getFromEventLog is called 0 times", async () => {
+      setupGetTracesWithSpansMocks();
+
+      await service.getById(PROJECT_ID_A, TRACE_ID, protections, {
+        full: false,
+      });
+
+      expect(blobStore.getFromEventLog).toHaveBeenCalledTimes(0);
+    });
+  });
+
+  describe("when getById is called without opts (default)", () => {
+    it("BlobStore.getFromEventLog is called 0 times", async () => {
+      setupGetTracesWithSpansMocks();
+
+      await service.getById(PROJECT_ID_A, TRACE_ID, protections);
+
+      expect(blobStore.getFromEventLog).toHaveBeenCalledTimes(0);
     });
 
-    describe("given a TraceService created without blobResolutionDeps (list/search router context)", () => {
-      describe("when getTracesWithSpans is called (simulating getAllTracesForProject list path)", () => {
-        it("does not call any BlobStore.getFromEventLog (resolver fn is undefined)", async () => {
-          // This is the AC2 assertion for the list path: TraceService.create()
-          // without deps → resolveTraceSpansFn is undefined → no event_log calls.
-          const listService = new TraceService({} as never);
+    it("the returned trace.output is the ≤64 KB preview, not the full value", async () => {
+      setupGetTracesWithSpansMocks();
 
-          await listService.getTracesWithSpans(
-            PROJECT_ID_A,
-            [TRACE_ID],
-            protections,
-          );
+      const trace = await service.getById(PROJECT_ID_A, TRACE_ID, protections);
 
-          // The blobStoreSpy is NOT wired to this service, but we assert the
-          // construction shape: no resolver means no event_log SELECT is issued.
-          // The test fails if the service calls a resolver that does not exist.
-          expect(blobStoreSpy.getFromEventLog).toHaveBeenCalledTimes(0);
-        });
+      expect(trace?.output?.value).not.toBe(FULL_OUTPUT);
+    });
+  });
+});
+
+describe("TraceService — AC2: getTracesWithSpans without full resolves nothing", () => {
+  let blobStore: ReturnType<typeof makeTenantScopedBlobStore>;
+  let service: TraceService;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    blobStore = makeTenantScopedBlobStore();
+    service = makeService(blobStore);
+  });
+
+  describe("when getTracesWithSpans is called without opts (default)", () => {
+    it("BlobStore.getFromEventLog is called 0 times", async () => {
+      setupGetTracesWithSpansMocks();
+
+      await service.getTracesWithSpans(PROJECT_ID_A, [TRACE_ID], protections);
+
+      expect(blobStore.getFromEventLog).toHaveBeenCalledTimes(0);
+    });
+  });
+
+  describe("when getTracesWithSpans is called with opts { full: false }", () => {
+    it("BlobStore.getFromEventLog is called 0 times", async () => {
+      setupGetTracesWithSpansMocks();
+
+      await service.getTracesWithSpans(PROJECT_ID_A, [TRACE_ID], protections, {
+        full: false,
+      });
+
+      expect(blobStore.getFromEventLog).toHaveBeenCalledTimes(0);
+    });
+  });
+});
+
+describe("TraceService — AC2: a service constructed without blobResolutionDeps never resolves", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe("given a TraceService created without blobResolutionDeps (list/search router context)", () => {
+    describe("when getTracesWithSpans is called with full=true", () => {
+      it("does not throw and returns the preview (no resolver wired)", async () => {
+        setupGetTracesWithSpansMocks();
+        const listService = new TraceService({} as never);
+
+        const traces = await listService.getTracesWithSpans(
+          PROJECT_ID_A,
+          [TRACE_ID],
+          protections,
+          { full: true },
+        );
+
+        // No resolver → preview kept, no full value.
+        expect(traces[0]?.output?.value).not.toBe(FULL_OUTPUT);
       });
     });
-  },
-);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // AC7 — cross-tenant: tenant B cannot read tenant A's event_log data
@@ -431,40 +455,17 @@ describe(
 
 describe("TraceService — AC7: cross-tenant event_log read denied, preview returned", () => {
   let blobStore: ReturnType<typeof makeTenantScopedBlobStore>;
-  let ioExtractionService: TraceIOExtractionService;
 
   beforeEach(() => {
     vi.clearAllMocks();
     blobStore = makeTenantScopedBlobStore();
-    ioExtractionService = new TraceIOExtractionService();
-    // Return the same offloaded trace body regardless of tenant (simulates
-    // the projection row being accessible but event_log row belonging to A)
-    mockGetTracesWithSpansCH.mockResolvedValue([makeOffloadedTrace()]);
-    mockResolveTraceIdByPrefixCH.mockResolvedValue([]);
   });
 
-  describe("given an eventref pointing to event_log row owned by tenant A", () => {
+  describe("given an eventref whose event_log row belongs to tenant A", () => {
     describe("when getById is called with full=true but projectId is tenant B", () => {
-      it("BlobStore.getFromEventLog is called (resolution attempted for tenant B)", async () => {
-        // The call IS attempted but the tenantId predicate returns no rows.
-        const serviceB = new TraceService(
-          {} as never,
-          { blobStore, ioExtractionService },
-        );
-
-        await serviceB.getById(PROJECT_ID_B, TRACE_ID, protections, {
-          full: true,
-        });
-
-        // Resolution was attempted (event_log SELECT issued for tenant B)
-        expect(blobStore.getFromEventLog).toHaveBeenCalledTimes(1);
-      });
-
-      it("getFromEventLog was called with tenantId = tenant B (not A)", async () => {
-        const serviceB = new TraceService(
-          {} as never,
-          { blobStore, ioExtractionService },
-        );
+      it("getFromEventLog is called with tenantId = tenant B (not A)", async () => {
+        setupGetTracesWithSpansMocks();
+        const serviceB = makeService(blobStore);
 
         await serviceB.getById(PROJECT_ID_B, TRACE_ID, protections, {
           full: true,
@@ -477,10 +478,8 @@ describe("TraceService — AC7: cross-tenant event_log read denied, preview retu
       });
 
       it("the returned trace output is the preview (not tenant A full value)", async () => {
-        const serviceB = new TraceService(
-          {} as never,
-          { blobStore, ioExtractionService },
-        );
+        setupGetTracesWithSpansMocks();
+        const serviceB = makeService(blobStore);
 
         const trace = await serviceB.getById(
           PROJECT_ID_B,
@@ -489,17 +488,12 @@ describe("TraceService — AC7: cross-tenant event_log read denied, preview retu
           { full: true },
         );
 
-        // BlobNotFoundError was thrown for tenant B → preview kept
-        const outputVal = trace?.output?.value as string | undefined;
-        // Must NOT be the full 400 KB value (that belongs to tenant A)
-        expect(outputVal).not.toBe(FULL_OUTPUT);
+        expect(trace?.output?.value).not.toBe(FULL_OUTPUT);
       });
 
-      it("does not throw — cross-tenant denial is graceful (preview degradation)", async () => {
-        const serviceB = new TraceService(
-          {} as never,
-          { blobStore, ioExtractionService },
-        );
+      it("does not throw — cross-tenant denial degrades to preview", async () => {
+        setupGetTracesWithSpansMocks();
+        const serviceB = makeService(blobStore);
 
         await expect(
           serviceB.getById(PROJECT_ID_B, TRACE_ID, protections, { full: true }),

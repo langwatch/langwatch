@@ -11,6 +11,7 @@ import {
 import { getApp } from "~/server/app-layer/app";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
 import { TraceService } from "~/server/traces/trace.service";
+import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { createLogger } from "~/utils/logger/server";
 import { evaluatorsSchema } from "../../evaluations/evaluators.generated";
 import { evaluatePreconditions, buildPreconditionTraceDataFromTrace, checkEvaluatorRequiredFields } from "../../evaluations/preconditions";
@@ -54,11 +55,15 @@ export const tracesRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      const traceService = TraceService.create(ctx.prisma);
+      const traceService = TraceService.create(
+        ctx.prisma,
+        buildTraceBlobResolutionDeps(),
+      );
       const trace = await traceService.getById(
         input.projectId,
         input.traceId,
         protections,
+        { full: true },
       );
 
       if (!trace) {
@@ -254,8 +259,13 @@ export const tracesRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      const traceService = TraceService.create(ctx.prisma);
-      return traceService.getTracesWithSpans(projectId, traceIds, protections);
+      const traceService = TraceService.create(
+        ctx.prisma,
+        buildTraceBlobResolutionDeps(),
+      );
+      return traceService.getTracesWithSpans(projectId, traceIds, protections, {
+        full: true,
+      });
     }),
 
   getFormattedSpansDigest: protectedProcedure

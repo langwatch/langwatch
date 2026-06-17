@@ -56,10 +56,8 @@ import { NullMetricRecordStorageRepository } from "./traces/repositories/metric-
 import { SpanStorageService } from "./traces/span-storage.service";
 import { SpanStorageClickHouseRepository } from "./traces/repositories/span-storage.clickhouse.repository";
 import { NullSpanStorageRepository } from "./traces/repositories/span-storage.repository";
-import { BlobStore } from "./traces/blob-store.service";
-import { TraceIOExtractionService } from "./traces/trace-io-extraction.service";
 import { maybeSpool } from "./traces/edge-spool";
-import { createS3Client } from "~/server/storage";
+import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
 import { TokenizerService } from "./traces/tokenizer.service";
 import { LogRequestCollectionService } from "./traces/log-request-collection.service";
@@ -212,8 +210,14 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   );
   // ADR-022: construct blob/IO deps before SpanStorageService so the v2 read
   // path (spansFull / spanDetail) can resolve offloaded eventref pointers.
-  const blobStore = new BlobStore(createS3Client, clickhouseEnabled ? resolveClickHouseClient : undefined);
-  const ioExtractionService = new TraceIOExtractionService();
+  // Built via the shared factory (#4888) so the request layer and this
+  // composition root construct these deps from one definition. We pass the
+  // composition-root ClickHouse decision/resolver so the eval-path deps stay
+  // byte-identical to the pre-#4888 wiring.
+  const { blobStore, ioExtractionService } = buildTraceBlobResolutionDeps({
+    clickhouseEnabled,
+    resolveClickHouseClient,
+  });
 
   // Wire the discover-cache → SSE bridge. Module-level setter keeps
   // the TraceListService constructor lean (the null/test preset below
