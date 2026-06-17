@@ -1,38 +1,37 @@
 import { SpanKind } from "@opentelemetry/api";
+import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
-import type { Command, CommandHandler } from "../../../";
+import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
+import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import {
-	createTenantId,
-	defineCommandSchema,
-	EventUtils,
-} from "../../../";
-import { createLogger } from "../../../../../utils/logger/server";
-import {
-	DEFAULT_PII_REDACTION_LEVEL,
-	recordSpanCommandDataSchema,
-	type PIIRedactionLevel,
-	type RecordSpanCommandData,
-} from "../schemas/commands";
-import {
-	RECORD_SPAN_COMMAND_TYPE,
-	SPAN_RECEIVED_EVENT_TYPE,
-	SPAN_RECEIVED_EVENT_VERSION_LATEST,
-} from "../schemas/constants";
-import type { SpanReceivedEvent } from "../schemas/events";
-import type { OtlpResource, OtlpSpan } from "../schemas/otlp";
-import { OtlpSpanCostEnrichmentService, createCostEnrichmentDeps } from "~/server/app-layer/traces/span-cost-enrichment.service";
+  createCostEnrichmentDeps,
+  OtlpSpanCostEnrichmentService,
+} from "~/server/app-layer/traces/span-cost-enrichment.service";
 import { OtlpSpanPiiRedactionService } from "~/server/app-layer/traces/span-pii-redaction.service";
 import { OtlpSpanTokenEstimationService } from "~/server/app-layer/traces/span-token-estimation.service";
-import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
-import { featureFlagService } from "~/server/featureFlag";
 import {
   applyOtlpSpanContentDrop,
   type SpanContentDropResult,
 } from "~/server/data-privacy/applyOtlpSpanContentDrop";
-import { TraceRequestUtils } from "../utils/traceRequest.utils";
+import { featureFlagService } from "~/server/featureFlag";
+import { createLogger } from "../../../../../utils/logger/server";
+import type { Command, CommandHandler } from "../../../";
+import { createTenantId, defineCommandSchema, EventUtils } from "../../../";
+import {
+  DEFAULT_PII_REDACTION_LEVEL,
+  type PIIRedactionLevel,
+  type RecordSpanCommandData,
+  recordSpanCommandDataSchema,
+} from "../schemas/commands";
+import {
+  RECORD_SPAN_COMMAND_TYPE,
+  SPAN_RECEIVED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_VERSION_LATEST,
+} from "../schemas/constants";
+import type { SpanReceivedEvent } from "../schemas/events";
+import type { OtlpResource, OtlpSpan } from "../schemas/otlp";
 import { capOversizedAttributes } from "../utils/capOversizedAttributes";
-import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
-import type { PrismaClient } from "@prisma/client";
+import { TraceRequestUtils } from "../utils/traceRequest.utils";
 
 /**
  * Deduplication options for the `recordSpan` command at the GroupQueue layer.
@@ -113,10 +112,9 @@ function createDefaultDependencies(): RecordSpanCommandDependencies {
 /**
  * Command handler for recording spans in the trace processing pipeline.
  */
-export class RecordSpanCommand implements CommandHandler<
-  Command<RecordSpanCommandData>,
-  SpanReceivedEvent
-> {
+export class RecordSpanCommand
+  implements CommandHandler<Command<RecordSpanCommandData>, SpanReceivedEvent>
+{
   static readonly schema = defineCommandSchema(
     RECORD_SPAN_COMMAND_TYPE,
     recordSpanCommandDataSchema,
@@ -205,7 +203,9 @@ export class RecordSpanCommand implements CommandHandler<
           // ADR-022: spool body is the full serialized RecordSpanCommandData.
           // Merge the spooled span/resource/instrumentationScope fields back into
           // the in-flight command (the queue message carries only spoolRef + id fields).
-          const parsed = JSON.parse(spoolBody.toString("utf-8")) as RecordSpanCommandData;
+          const parsed = JSON.parse(
+            spoolBody.toString("utf-8"),
+          ) as RecordSpanCommandData;
           resolvedCommandData = {
             ...commandData,
             span: parsed.span,
@@ -389,7 +389,9 @@ export class RecordSpanCommand implements CommandHandler<
    * state, eliminating the race bug that arose when a single handler instance was
    * shared across parallel queue jobs (pipeline.ts uses withCommandInstance).
    */
-  async cleanupAfterStore(command: Command<RecordSpanCommandData>): Promise<void> {
+  async cleanupAfterStore(
+    command: Command<RecordSpanCommandData>,
+  ): Promise<void> {
     const spoolRef = command.data.spoolRef;
     if (spoolRef && this.blobStore) {
       await this.blobStore.deleteSpool(spoolRef).catch((err: unknown) => {
@@ -450,7 +452,9 @@ export class RecordSpanCommand implements CommandHandler<
   ): void {
     const RESERVED_PREFIX = "langwatch.reserved.";
 
-    const strip = (attributes: OtlpSpan["attributes"]): OtlpSpan["attributes"] => {
+    const strip = (
+      attributes: OtlpSpan["attributes"],
+    ): OtlpSpan["attributes"] => {
       const filtered = attributes.filter((attr) => {
         if (
           attr.key.startsWith(RESERVED_PREFIX) &&

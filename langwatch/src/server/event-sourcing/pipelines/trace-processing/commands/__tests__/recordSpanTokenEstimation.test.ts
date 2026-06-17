@@ -98,7 +98,11 @@ function createDeps(): RecordSpanCommandDependencies {
     piiRedactionService: { redactSpan: vi.fn() },
     costEnrichmentService: { enrichSpan: vi.fn() },
     contentDropService: {
-      dropSpanContent: async () => ({ droppedCount: 0, droppedCategories: [], droppedAttributeKeys: [] }),
+      dropSpanContent: async () => ({
+        droppedCount: 0,
+        droppedCategories: [],
+        droppedAttributeKeys: [],
+      }),
     },
     tokenEstimationService: {
       estimateSpanTokens: vi.fn(async ({ span }: { span: OtlpSpan }) => {

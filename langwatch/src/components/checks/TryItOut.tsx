@@ -29,7 +29,11 @@ import {
   type SingleEvaluationResult,
 } from "../../server/evaluations/evaluators";
 import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
-import { buildPreconditionTraceDataFromTrace, checkEvaluatorRequiredFields, evaluatePreconditions } from "../../server/evaluations/preconditions";
+import {
+  buildPreconditionTraceDataFromTrace,
+  checkEvaluatorRequiredFields,
+  evaluatePreconditions,
+} from "../../server/evaluations/preconditions";
 import type { CheckPreconditions } from "../../server/evaluations/types";
 import type { ElasticSearchSpan } from "../../server/tracer/types";
 import { api } from "../../utils/api";
@@ -103,32 +107,31 @@ export function TryItOut({
     ) ?? false;
 
   const tracesLivePassesPreconditions =
-    tracesPassingPreconditionsOnLoad.data?.map(
-      (trace) =>
-        (() => {
-          if (!evaluatorType) return false;
-          const spans = (trace.spans ?? []).map((span) =>
-            transformElasticSearchSpanToSpan(
-              {
-                canSeeCapturedInput: false,
-                canSeeCapturedOutput: false,
-                canSeeCosts: false,
-              },
-              new Set(),
-            )(span as ElasticSearchSpan),
-          );
-          const requiredFieldsMet = checkEvaluatorRequiredFields({
-            evaluatorType,
-            spans,
-            expectedOutput: trace.expected_output,
-          });
-          if (!requiredFieldsMet) return false;
-          const traceData = buildPreconditionTraceDataFromTrace({ trace, spans });
-          return evaluatePreconditions({
-            traceData,
-            preconditions,
-          });
-        })(),
+    tracesPassingPreconditionsOnLoad.data?.map((trace) =>
+      (() => {
+        if (!evaluatorType) return false;
+        const spans = (trace.spans ?? []).map((span) =>
+          transformElasticSearchSpanToSpan(
+            {
+              canSeeCapturedInput: false,
+              canSeeCapturedOutput: false,
+              canSeeCosts: false,
+            },
+            new Set(),
+          )(span as ElasticSearchSpan),
+        );
+        const requiredFieldsMet = checkEvaluatorRequiredFields({
+          evaluatorType,
+          spans,
+          expectedOutput: trace.expected_output,
+        });
+        if (!requiredFieldsMet) return false;
+        const traceData = buildPreconditionTraceDataFromTrace({ trace, spans });
+        return evaluatePreconditions({
+          traceData,
+          preconditions,
+        });
+      })(),
     ) ?? [];
   const firstPassingPrecondition = tracesLivePassesPreconditions.findIndex(
     (pass) => pass,

@@ -3,8 +3,8 @@ import { z } from "zod";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
-import { KSUID_RESOURCES } from "~/utils/constants";
 import { trackServerEvent } from "~/server/posthog";
+import { KSUID_RESOURCES } from "~/utils/constants";
 
 import { createLogger } from "~/utils/logger/server";
 import {
@@ -15,8 +15,8 @@ import { getAzureSafetyEnvFromProject } from "../../app-layer/evaluations/azure-
 import { runEvaluationForTrace } from "../../background/workers/evaluationsWorker";
 import {
   AVAILABLE_EVALUATORS,
-  evaluatorsSchema,
   type EvaluatorTypes,
+  evaluatorsSchema,
 } from "../../evaluations/evaluators";
 import { mappingStateSchema } from "../../tracer/tracesMapping";
 import { checkProjectPermission } from "../rbac";
@@ -111,10 +111,24 @@ export const evaluationsRouter = createTRPCRouter({
             evaluatorType: input.evaluatorType,
             traceId: input.traceId,
             status: result.status,
-            score: result.status === "processed" && typeof result.score === 'number' ? result.score : undefined,
-            passed: result.status === "processed" ? (result.passed ?? undefined) : undefined,
-            label: result.status === "processed" ? (result.label ?? undefined) : undefined,
-            details: result.status === "error" ? result.details : result.status === "processed" ? (result.details ?? undefined) : undefined,
+            score:
+              result.status === "processed" && typeof result.score === "number"
+                ? result.score
+                : undefined,
+            passed:
+              result.status === "processed"
+                ? (result.passed ?? undefined)
+                : undefined,
+            label:
+              result.status === "processed"
+                ? (result.label ?? undefined)
+                : undefined,
+            details:
+              result.status === "error"
+                ? result.details
+                : result.status === "processed"
+                  ? (result.details ?? undefined)
+                  : undefined,
             error: result.status === "error" ? result.details : undefined,
             occurredAt: Date.now(),
           });

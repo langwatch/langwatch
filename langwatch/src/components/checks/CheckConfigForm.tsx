@@ -41,7 +41,10 @@ import {
   getEvaluatorDefaultSettings,
   getEvaluatorDefinitions,
 } from "../../server/evaluations/getEvaluator";
-import { type CheckPreconditions, checkPreconditionsSchema } from "../../server/evaluations/types";
+import {
+  type CheckPreconditions,
+  checkPreconditionsSchema,
+} from "../../server/evaluations/types";
 import {
   type MappingState,
   mappingStateSchema,
