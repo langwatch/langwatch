@@ -2,7 +2,13 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DatasetReference, TargetConfig } from "../../../types";
@@ -25,9 +31,8 @@ vi.mock("../../../hooks/useTargetName", () => ({
 // Resolver returns a friendly name for the chained prompt target, and falls
 // back to the raw id when no entity/name is known.
 vi.mock("../../../hooks/useResolveTargetName", () => ({
-  useResolveTargetName:
-    () => (t: { id: string; promptId?: string }) =>
-      t.promptId === "prompt-cat" ? "category_classifier" : t.id,
+  useResolveTargetName: () => (t: { id: string; promptId?: string }) =>
+    t.promptId === "prompt-cat" ? "category_classifier" : t.id,
 }));
 
 const mockDatasets: DatasetReference[] = [

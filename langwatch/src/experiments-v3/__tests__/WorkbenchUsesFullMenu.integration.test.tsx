@@ -25,7 +25,11 @@ vi.mock("~/components/DashboardLayout", () => ({
 }));
 
 vi.mock("~/utils/compat/next-router", () => ({
-  useRouter: () => ({ query: { slug: "exp-1" }, pathname: "", replace: vi.fn() }),
+  useRouter: () => ({
+    query: { slug: "exp-1" },
+    pathname: "",
+    replace: vi.fn(),
+  }),
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
