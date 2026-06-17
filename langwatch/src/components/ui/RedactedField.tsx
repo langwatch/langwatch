@@ -1,9 +1,9 @@
 import { HStack, Icon, Link, Skeleton, Text, VStack } from "@chakra-ui/react";
-import NextLink from "~/utils/compat/next-link";
 import type React from "react";
 import { Lock } from "react-feather";
 import { useFieldRedaction } from "~/hooks/useFieldRedaction";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import NextLink from "~/utils/compat/next-link";
 import { Tooltip } from "./tooltip";
 
 interface RedactedFieldProps {
@@ -42,6 +42,50 @@ function explanationFor(visibleTo: string | null): string {
   return `A privacy rule limits who can read this content. Visible to: ${visibleTo}.`;
 }
 
+/**
+ * The redacted-state marker and its tooltip. Kept as a separate component so the
+ * organization/permission lookup it needs for the "Open privacy settings" link
+ * only runs when content is actually redacted, never for content that renders
+ * normally (which is the common case and may render outside an org context).
+ */
+const RedactedMarker: React.FC<{ visibleTo: string | null }> = ({
+  visibleTo,
+}) => {
+  const { hasPermission } = useOrganizationTeamProject();
+  const hint = audienceHint(visibleTo);
+  const canOpenSettings = hasPermission("project:view");
+  return (
+    <Tooltip
+      interactive
+      content={
+        <VStack align="start" gap={1}>
+          <Text>{explanationFor(visibleTo)}</Text>
+          {canOpenSettings && (
+            <Link asChild color="inherit" textDecoration="underline">
+              <NextLink href="/settings/data-privacy">
+                Open privacy settings
+              </NextLink>
+            </Link>
+          )}
+        </VStack>
+      }
+    >
+      <HStack
+        color="fg.muted"
+        fontStyle="italic"
+        fontSize="sm"
+        gap={1}
+        cursor="default"
+        display="inline-flex"
+      >
+        <Icon as={Lock} boxSize={3} />
+        <Text>Redacted</Text>
+        {hint && <Text>({hint})</Text>}
+      </HStack>
+    </Tooltip>
+  );
+};
+
 export const RedactedField: React.FC<RedactedFieldProps> = ({
   field,
   children,
@@ -50,7 +94,6 @@ export const RedactedField: React.FC<RedactedFieldProps> = ({
   visibleTo: visibleToProp,
 }) => {
   const query = useFieldRedaction(field);
-  const { hasPermission } = useOrganizationTeamProject();
 
   const explicit = redacted !== undefined;
   const isRedacted = explicit ? redacted : query.isRedacted;
@@ -62,38 +105,7 @@ export const RedactedField: React.FC<RedactedFieldProps> = ({
   }
 
   if (isRedacted) {
-    const hint = audienceHint(visibleTo);
-    const canOpenSettings = hasPermission("project:view");
-    return (
-      <Tooltip
-        interactive
-        content={
-          <VStack align="start" gap={1}>
-            <Text>{explanationFor(visibleTo)}</Text>
-            {canOpenSettings && (
-              <Link asChild color="inherit" textDecoration="underline">
-                <NextLink href="/settings/data-privacy">
-                  Open privacy settings
-                </NextLink>
-              </Link>
-            )}
-          </VStack>
-        }
-      >
-        <HStack
-          color="fg.muted"
-          fontStyle="italic"
-          fontSize="sm"
-          gap={1}
-          cursor="default"
-          display="inline-flex"
-        >
-          <Icon as={Lock} boxSize={3} />
-          <Text>Redacted</Text>
-          {hint && <Text>({hint})</Text>}
-        </HStack>
-      </Tooltip>
-    );
+    return <RedactedMarker visibleTo={visibleTo} />;
   }
 
   return <>{children}</>;

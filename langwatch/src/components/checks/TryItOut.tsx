@@ -24,12 +24,12 @@ import { useFilterParams } from "../../hooks/useFilterParams";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { transformElasticSearchSpanToSpan } from "../../server/elasticsearch/transformers";
 import {
-  evaluatorsSchema,
   type Evaluators,
+  evaluatorsSchema,
   type SingleEvaluationResult,
 } from "../../server/evaluations/evaluators";
 import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
-import { evaluatePreconditions, buildPreconditionTraceDataFromTrace, checkEvaluatorRequiredFields } from "../../server/evaluations/preconditions";
+import { buildPreconditionTraceDataFromTrace, checkEvaluatorRequiredFields, evaluatePreconditions } from "../../server/evaluations/preconditions";
 import type { CheckPreconditions } from "../../server/evaluations/types";
 import type { ElasticSearchSpan } from "../../server/tracer/types";
 import { api } from "../../utils/api";
