@@ -567,8 +567,9 @@ export async function* runOrchestrator(
     "Starting orchestrator",
   );
 
-  // Set running flag
-  await abortManager.setRunning(runId);
+  // Set running flag + record the owner so abort can authorize this run even
+  // on the interactive SSE path, which never creates a polling run-state record.
+  await abortManager.setRunning(runId, projectId);
 
   // Get commands for ClickHouse dual-write (unconditional)
   const commands = getApp().experimentRuns;

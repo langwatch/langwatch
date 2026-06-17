@@ -127,7 +127,7 @@ export default function NewExperimentWorkbench() {
   ]);
 
   return (
-    <DashboardLayout backgroundColor="bg.panel" compactMenu={true}>
+    <DashboardLayout backgroundColor="bg.panel">
       <Center height="calc(100vh - 100px)">
         {createExperiment.isError ? (
           <Box padding={6} maxWidth="500px">

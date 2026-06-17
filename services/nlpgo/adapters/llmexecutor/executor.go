@@ -70,10 +70,15 @@ func (e *Executor) Execute(ctx context.Context, req app.LLMRequest) (*app.LLMRes
 	}
 	durationMS := time.Since(start).Milliseconds()
 	if resp.StatusCode/100 != 2 {
+		provider, _ := litellm.SplitProviderModel(req.Model)
+		if provider == "" {
+			provider = req.Provider
+		}
 		return nil, &GatewayHTTPError{
 			StatusCode: resp.StatusCode,
 			Body:       resp.Body,
 			Headers:    resp.Headers,
+			Provider:   provider,
 		}
 	}
 	return parseChatCompletionResponse(resp.Body, durationMS)
@@ -96,6 +101,10 @@ type GatewayHTTPError struct {
 	StatusCode int
 	Body       []byte
 	Headers    map[string]string
+	// Provider names the upstream the request was dispatched to ("openai",
+	// "anthropic", ...). Prefixed onto the surfaced message so the user can
+	// tell a provider rejection from a LangWatch failure.
+	Provider string
 }
 
 // HTTPStatusCode exposes the gateway/provider status for fault
@@ -104,15 +113,15 @@ type GatewayHTTPError struct {
 func (e *GatewayHTTPError) HTTPStatusCode() int { return e.StatusCode }
 
 // Error implements error. Surfaces the upstream provider's message
-// verbatim (parsed out of the OpenAI-shape response body) so the trace
-// drawer and SSE error frame carry the real reason — "You exceeded your
-// current quota, please check your plan and billing details", "Rate
-// limit reached for gpt-5-mini", "Incorrect API key provided" — instead
-// of an opaque "gateway returned non-2xx status 429" that gives the user
-// zero signal whether the gateway is broken, the key is invalid, the
-// prompt is bad, or the account is out of credits (rchaves dogfood
-// 2026-04-29). Mirrors the LiteLLM behavior the Python path used to
-// expose: pass-through, no nlpgo-side prefix.
+// verbatim (parsed out of the OpenAI-shape response body), prefixed with
+// the provider name when known — "openai: You exceeded your current
+// quota...", "openai: Request headers are too large." — so the trace
+// drawer and SSE error frame carry both the real reason AND who said it.
+// The reason stays verbatim because an opaque "gateway returned non-2xx
+// status 429" gives the user zero signal whether the key is invalid, the
+// prompt is bad, or the account is out of credits; the provider prefix
+// exists because an ambiguous provider-edge rejection ("Request headers
+// are too large.") otherwise reads as a LangWatch infrastructure failure.
 //
 // Falls back to a status-code-only message when the body is missing,
 // not JSON, or doesn't carry a recognizable error envelope — preserves
@@ -120,6 +129,9 @@ func (e *GatewayHTTPError) HTTPStatusCode() int { return e.StatusCode }
 // HTML, future passthrough endpoints).
 func (e *GatewayHTTPError) Error() string {
 	if msg := extractProviderErrorMessage(e.Body); msg != "" {
+		if e.Provider != "" {
+			return e.Provider + ": " + msg
+		}
 		return msg
 	}
 	return fmt.Sprintf("gateway returned non-2xx status %d", e.StatusCode)

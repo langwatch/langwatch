@@ -11,6 +11,48 @@ import { stripUnsupportedLLMParamsFromWorkflow } from "../../../../server/workfl
 
 const logger = createLogger("langwatch:post_event");
 
+// How often to poll the abort flag while blocked on a stream read. The
+// orchestrator signals abort through a Redis flag (no push), so an in-flight
+// cell waiting on a slow LLM response only learns about an abort by polling.
+// One second keeps the Stop button responsive without adding meaningful Redis
+// load during normal streaming, where reads resolve well before this fires.
+const ABORT_POLL_INTERVAL_MS = 1000;
+
+/**
+ * Reads the next stream chunk, resolving to "aborted" if an abort is requested
+ * while the read is still pending. Without this an abort is only noticed
+ * between chunks, so a cell blocked on a slow LLM response keeps running until
+ * that response arrives. Cancelling the reader (the caller's job once this
+ * returns "aborted") closes the connection to nlpgo, whose request context then
+ * cancels the in-flight execution — the Go engine treats a client disconnect as
+ * the cancel signal and has no separate in-process stop.
+ */
+const readChunkOrAbort = async (
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  isAborted?: () => Promise<boolean>,
+): Promise<ReadableStreamReadResult<Uint8Array> | "aborted"> => {
+  if (!isAborted) {
+    return reader.read();
+  }
+
+  let pollTimer: ReturnType<typeof setInterval> | undefined;
+  const abortPoll = new Promise<"aborted">((resolve) => {
+    pollTimer = setInterval(() => {
+      void isAborted().then((aborted) => {
+        if (aborted) resolve("aborted");
+      });
+    }, ABORT_POLL_INTERVAL_MS);
+  });
+
+  try {
+    return await Promise.race([reader.read(), abortPoll]);
+  } finally {
+    if (pollTimer) {
+      clearInterval(pollTimer);
+    }
+  }
+};
+
 export const studioBackendPostEvent = async ({
   projectId,
   message: message,
@@ -117,7 +159,15 @@ export const studioBackendPostEvent = async ({
         break;
       }
 
-      const { done, value } = await reader.read();
+      // Race the read against the abort flag so a cell blocked on a slow LLM
+      // response cancels promptly instead of only between chunks.
+      const readResult = await readChunkOrAbort(reader, isAborted);
+      if (readResult === "aborted") {
+        logger.info("Execution aborted mid-read, cancelling stream reader");
+        await reader.cancel();
+        break;
+      }
+      const { done, value } = readResult;
       if (done) break;
 
       const chunk = decoder.decode(value, { stream: true });

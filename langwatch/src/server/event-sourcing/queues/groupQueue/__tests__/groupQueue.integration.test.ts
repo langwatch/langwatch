@@ -476,12 +476,16 @@ describe.skipIf(!hasTestcontainers)(
             value: "second",
           });
 
-          // Wait for both to complete
+          // Wait for both to complete. Generous ceiling: when the second
+          // dedup job becomes due it produces no dispatcher signal, so its
+          // dispatch waits for the next BRPOP timeout cycle (signalTimeoutSec,
+          // 5s), and container clock skew widens that further on CI runners.
+          // Same ceiling class as the squash test below.
           await vi.waitFor(
             () => {
               expect(processed).toHaveBeenCalledTimes(2);
             },
-            { timeout: 10000, interval: 50 },
+            { timeout: 30000, interval: 50 },
           );
         });
       });

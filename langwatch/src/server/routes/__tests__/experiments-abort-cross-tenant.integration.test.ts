@@ -37,8 +37,14 @@ vi.mock("~/server/experiments-v3/execution/orchestrator", () => ({
 }));
 
 const managerAbort = vi.fn().mockResolvedValue(undefined);
+// No in-flight running-owner record for these runs, so authorization falls
+// back to the polling run-state record below.
+const getRunningProjectId = vi.fn().mockResolvedValue(null);
 vi.mock("~/server/experiments-v3/execution/abortManager", () => ({
-  abortManager: { requestAbort: (...args: unknown[]) => managerAbort(...args) },
+  abortManager: {
+    requestAbort: (...args: unknown[]) => managerAbort(...args),
+    getRunningProjectId: (...args: unknown[]) => getRunningProjectId(...args),
+  },
 }));
 
 const post = async (body: unknown) => {
@@ -53,6 +59,7 @@ const post = async (body: unknown) => {
 describe("POST /api/experiments/abort cross-tenant isolation", () => {
   beforeEach(() => {
     getRunState.mockReset();
+    getRunningProjectId.mockReset().mockResolvedValue(null);
     requestAbort.mockClear();
     managerAbort.mockClear();
   });

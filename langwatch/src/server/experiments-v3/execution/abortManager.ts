@@ -67,16 +67,50 @@ export const abortManager = {
   },
 
   /**
-   * Mark a run as "running" (for tracking active executions).
-   * This can be used to list active executions if needed.
+   * Mark a run as "running" and record its owning project.
+   *
+   * The owner is read back by `getRunningProjectId` to authorize abort
+   * requests for runs that never create a polling run-state record (the
+   * interactive workbench SSE path). Stored as JSON so the start timestamp
+   * stays available for listing active executions.
    */
-  async setRunning(runId: string): Promise<void> {
+  async setRunning(runId: string, projectId: string): Promise<void> {
     if (!connection) {
       return;
     }
 
     const key = `eval_v3_running:${runId}`;
-    await connection.set(key, Date.now().toString(), "EX", ABORT_TTL_SECONDS);
+    await connection.set(
+      key,
+      JSON.stringify({ projectId, startedAt: Date.now() }),
+      "EX",
+      ABORT_TTL_SECONDS,
+    );
+  },
+
+  /**
+   * Get the project that owns an in-flight run, or null when the run is not
+   * currently running. Authorizes abort requests against the run's owner
+   * without depending on the polling run-state record, which the interactive
+   * SSE path never creates.
+   */
+  async getRunningProjectId(runId: string): Promise<string | null> {
+    if (!connection) {
+      return null;
+    }
+
+    const key = `eval_v3_running:${runId}`;
+    const value = await connection.get(key);
+    if (!value) {
+      return null;
+    }
+
+    try {
+      const parsed = JSON.parse(value) as { projectId?: string };
+      return parsed.projectId ?? null;
+    } catch {
+      return null;
+    }
   },
 
   /**
