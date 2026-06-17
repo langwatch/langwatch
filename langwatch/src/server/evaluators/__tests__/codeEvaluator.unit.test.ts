@@ -116,10 +116,10 @@ describe("codeEvaluator", () => {
       };
       expect(data.behave_as).toBe("evaluator");
       expect(data.inputs.map((i) => i.identifier)).toEqual([
+        "details",
         "passed",
         "score",
         "label",
-        "details",
       ]);
     });
   });
@@ -146,7 +146,7 @@ describe("codeEvaluator", () => {
         (endNode.data as { inputs: Array<{ identifier: string }> }).inputs.map(
           (i) => i.identifier,
         ),
-      ).toEqual(["passed", "score", "label", "details"]);
+      ).toEqual(["details", "passed", "score", "label"]);
     });
   });
 });

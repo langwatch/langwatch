@@ -34,21 +34,23 @@ export type CodeEvaluatorConfig = z.infer<typeof codeEvaluatorConfigSchema>;
  * evaluation result. These mirror the studio's evaluator End node, so the
  * outputs are not user-customizable, only the inputs are.
  *
- * This is the full result contract from `evaluationResultSchema` (passed,
- * score, label, details). It is intentionally distinct from
- * `STANDARD_EVALUATOR_OUTPUT_FIELDS` in evaluator.service.ts, which drops the
- * free-text `details`: that is the evaluator-as-target mapping set, not the
- * return contract. It is defined here, rather than imported from the service,
- * to stay client-safe for the evaluator drawer and avoid a circular import.
+ * This is the full result contract from `evaluationResultSchema`, in the same
+ * details-first order as `EVALUATOR_RESULT_FIELDS` in EndPropertiesPanel so
+ * the two evaluator surfaces stay consistent (reasoning before verdict). It is
+ * intentionally distinct from `STANDARD_EVALUATOR_OUTPUT_FIELDS` in
+ * evaluator.service.ts, which drops the free-text `details`: that is the
+ * evaluator-as-target mapping set, not the return contract. It is defined here,
+ * rather than imported from either, to stay client-safe for the evaluator
+ * drawer and avoid a circular import.
  */
 export const CODE_EVALUATOR_OUTPUT_FIELDS: Array<{
   identifier: string;
   type: Field["type"];
 }> = [
+  { identifier: "details", type: "str" },
   { identifier: "passed", type: "bool" },
   { identifier: "score", type: "float" },
   { identifier: "label", type: "str" },
-  { identifier: "details", type: "str" },
 ];
 
 /** Default shape new code evaluators are seeded with in the editor. */
