@@ -86,6 +86,7 @@ export async function enforceLicenseLimit(
           limitType: error.limitType,
           current: error.current,
           max: error.max,
+          source: "server_safety_net",
         },
       });
       throw new TRPCError({
