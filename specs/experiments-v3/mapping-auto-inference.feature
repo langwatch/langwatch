@@ -170,7 +170,6 @@ Feature: Mapping Auto-Inference
   # selector offers the TARGET's outputs ahead of the dataset columns, so the
   # graded "output" field surfaces the runner's output first instead of a
   # same-named dataset column.
-  @unimplemented
   Scenario: The evaluator mapping selector offers target outputs before dataset columns
     Given I open an evaluator's mapping drawer in the workbench
     Then the source selector lists the target's outputs before the dataset columns
