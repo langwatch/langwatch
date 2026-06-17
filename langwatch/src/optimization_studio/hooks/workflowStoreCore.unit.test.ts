@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from "vitest";
 import type { Edge, Node } from "@xyflow/react";
+import { beforeEach, describe, expect, it } from "vitest";
 import { createStore, type StoreApi } from "zustand";
 import {
   removeInvalidEdges,
@@ -593,7 +593,7 @@ describe("workflowStoreCore", () => {
     });
   });
 
-  describe("code signature stays in sync when an input is added by dragging", () => {
+  describe("given a code node", () => {
     let testStore: StoreApi<WorkflowStore>;
 
     beforeEach(() => {
@@ -627,55 +627,57 @@ describe("workflowStoreCore", () => {
       return params.find((p) => p.identifier === "code")?.value as string;
     };
 
-    // Regression: dropping an If/Else branch onto a code node's gate added
-    // the `gate` input but left __call__ untouched, so the engine called it
-    // with an unexpected `gate` keyword.
-    /** @scenario Dropping an If/Else branch on a code node adds the gate to the signature */
-    it("threads a gate dropped from an If/Else branch into the __call__ signature", () => {
-      testStore.getState().setNodes([
-        makeNode({
-          id: "ifelse",
-          type: "if_else",
-          outputs: [
-            { identifier: "true", type: "bool" },
-            { identifier: "false", type: "bool" },
-          ],
-        }),
-        codeNode(),
-      ]);
-      testStore.getState().setEdges([]);
+    describe("when an input is added by dragging", () => {
+      // Regression: dropping an If/Else branch onto a code node's gate added
+      // the `gate` input but left __call__ untouched, so the engine called it
+      // with an unexpected `gate` keyword.
+      /** @scenario Dropping an If/Else branch on a code node adds the gate to the signature */
+      it("threads a gate dropped from an If/Else branch into the __call__ signature", () => {
+        testStore.getState().setNodes([
+          makeNode({
+            id: "ifelse",
+            type: "if_else",
+            outputs: [
+              { identifier: "true", type: "bool" },
+              { identifier: "false", type: "bool" },
+            ],
+          }),
+          codeNode(),
+        ]);
+        testStore.getState().setEdges([]);
 
-      testStore.getState().onConnect({
-        source: "ifelse",
-        sourceHandle: "outputs.true",
-        target: "code1",
-        targetHandle: "inputs.gate",
+        testStore.getState().onConnect({
+          source: "ifelse",
+          sourceHandle: "outputs.true",
+          target: "code1",
+          targetHandle: "inputs.gate",
+        });
+
+        expect(codeOf("code1")).toContain(
+          "def __call__(self, input: str = None, gate: bool = None):",
+        );
       });
 
-      expect(codeOf("code1")).toContain(
-        "def __call__(self, input: str = None, gate: bool = None):",
-      );
-    });
+      // Regression: wiring an output to a code node's empty handle area created
+      // a new input without rewriting __call__, so the run failed the same way.
+      /** @scenario Wiring a new input handle adds it to the signature */
+      it("threads a freshly wired input into the __call__ signature", () => {
+        testStore.getState().setNodes([
+          makeNode({
+            id: "src",
+            type: "signature",
+            outputs: [{ identifier: "answer", type: "str" }],
+          }),
+          codeNode(),
+        ]);
+        testStore.getState().setEdges([]);
 
-    // Regression: wiring an output to a code node's empty handle area created
-    // a new input without rewriting __call__, so the run failed the same way.
-    /** @scenario Wiring a new input handle adds it to the signature */
-    it("threads a freshly wired input into the __call__ signature", () => {
-      testStore.getState().setNodes([
-        makeNode({
-          id: "src",
-          type: "signature",
-          outputs: [{ identifier: "answer", type: "str" }],
-        }),
-        codeNode(),
-      ]);
-      testStore.getState().setEdges([]);
+        testStore.getState().edgeConnectToNewHandle("src", "answer", "code1");
 
-      testStore.getState().edgeConnectToNewHandle("src", "answer", "code1");
-
-      expect(codeOf("code1")).toContain(
-        "def __call__(self, input: str = None, answer: str = None):",
-      );
+        expect(codeOf("code1")).toContain(
+          "def __call__(self, input: str = None, answer: str = None):",
+        );
+      });
     });
   });
 

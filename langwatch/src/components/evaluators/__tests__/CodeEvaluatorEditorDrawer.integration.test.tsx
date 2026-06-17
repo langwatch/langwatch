@@ -133,8 +133,28 @@ describe("CodeEvaluatorEditorDrawer", () => {
       });
     });
 
+    describe("when the drawer shows the outputs section", () => {
+      /** @scenario Code evaluator outputs are the fixed evaluator contract */
+      it("presents the fixed evaluator result fields and no output editor", async () => {
+        render(<CodeEvaluatorEditorDrawer open />, { wrapper: Wrapper });
+        await waitFor(() => {
+          expect(screen.getByText("New Code Evaluator")).toBeInTheDocument();
+        });
+
+        for (const field of ["passed", "score", "label", "details"]) {
+          expect(
+            screen.getByTestId(`code-evaluator-output-field-${field}`),
+          ).toBeInTheDocument();
+        }
+        // Outputs are the fixed contract: there is no add-output control.
+        expect(
+          screen.queryByTestId("code-evaluator-output-add"),
+        ).not.toBeInTheDocument();
+      });
+    });
+
     describe("when an input field is added or removed", () => {
-      /** @scenario Code evaluator inputs stay in sync with the signature */
+      /** @scenario Code evaluator input changes keep runs valid */
       it("rewrites the __call__ signature when an input is added", async () => {
         render(<CodeEvaluatorEditorDrawer open />, { wrapper: Wrapper });
         await waitFor(() => {

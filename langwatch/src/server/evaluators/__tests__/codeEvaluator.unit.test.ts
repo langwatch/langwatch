@@ -87,7 +87,7 @@ describe("codeEvaluator", () => {
       expect(codeParam?.value).toBe("class Code: ...");
     });
 
-    it("connects every input and output with engine-format handles", () => {
+    it("connects every input and the full output contract with engine-format handles", () => {
       expect(dsl.edges).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -104,17 +104,49 @@ describe("codeEvaluator", () => {
           }),
         ]),
       );
-      expect(dsl.edges).toHaveLength(4);
+      // 2 entry -> code edges + 4 code -> end edges (the fixed contract).
+      expect(dsl.edges).toHaveLength(6);
     });
 
-    it("marks the end node as an evaluator with the output contract", () => {
+    it("marks the end node as an evaluator carrying the full fixed contract", () => {
       const endNode = dsl.nodes.find((n) => n.type === "end")!;
       const data = endNode.data as {
         behave_as?: string;
         inputs: Array<{ identifier: string }>;
       };
       expect(data.behave_as).toBe("evaluator");
-      expect(data.inputs.map((i) => i.identifier)).toEqual(["passed", "score"]);
+      expect(data.inputs.map((i) => i.identifier)).toEqual([
+        "passed",
+        "score",
+        "label",
+        "details",
+      ]);
+    });
+  });
+
+  describe("when the code returns only a subset of the contract", () => {
+    const dsl = buildCodeEvaluatorDsl({
+      name: "Pass-only Evaluator",
+      config: {
+        code: "class Code:\n  def __call__(self, output: str):\n    return {'passed': True}",
+        inputs: [{ identifier: "output", type: "str" }],
+        outputs: [{ identifier: "passed", type: "bool" }],
+      },
+    });
+
+    /** @scenario Code evaluator returns only the fields it computes */
+    it("declares no outputs on the code node so a partial return is not a missing_output error", () => {
+      const codeNode = dsl.nodes.find((n) => n.type === "code")!;
+      expect((codeNode.data as { outputs: unknown[] }).outputs).toEqual([]);
+    });
+
+    it("still wires the full contract into the end node regardless of the saved outputs", () => {
+      const endNode = dsl.nodes.find((n) => n.type === "end")!;
+      expect(
+        (endNode.data as { inputs: Array<{ identifier: string }> }).inputs.map(
+          (i) => i.identifier,
+        ),
+      ).toEqual(["passed", "score", "label", "details"]);
     });
   });
 });

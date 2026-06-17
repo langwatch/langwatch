@@ -32,8 +32,9 @@ const typesMap: Record<Field["type"], string> = {
  *
  * Matches either the idiomatic `__call__` or the legacy `forward`, preserving
  * whichever the code already uses, and only rewrites the signature line (the
- * body is left untouched). Every parameter defaults to `None` so an
- * unconnected input does not raise "missing a required argument" at run time.
+ * body is left untouched). An optional `-> ReturnType` annotation is preserved.
+ * Every parameter defaults to `None` so an unconnected input does not raise
+ * "missing a required argument" at run time.
  */
 export const rewriteCodeSignature = (
   code: string,
@@ -42,14 +43,14 @@ export const rewriteCodeSignature = (
   if (inputs.length === 0) return code;
 
   let next = code.replace(
-    /def (__call__|forward)\([\s\S]*?\):/,
-    (_match, methodName: string) =>
+    /def (__call__|forward)\([\s\S]*?\)(\s*->\s*[^:\n]+)?:/,
+    (_match, methodName: string, returnType: string | undefined) =>
       `def ${methodName}(self, ${inputs
         .map(
           (i) =>
             `${i.identifier}: ${typesMap[i.type as Field["type"]] ?? "Any"} = None`,
         )
-        .join(", ")}):`,
+        .join(", ")})${returnType ?? ""}:`,
   );
   if (next.includes(": Any") && !next.includes("from typing import Any")) {
     next = `from typing import Any\n${next}`;
