@@ -141,7 +141,9 @@ describe("matchesTriggerFilters", () => {
     });
 
     it("uses OR semantics across multiple keys (matches if any key matches)", () => {
-      const data = makeTraceData({ customMetadata: { env: "staging", region: "eu" } });
+      const data = makeTraceData({
+        customMetadata: { env: "staging", region: "eu" },
+      });
       const filters: TriggerFilters = {
         "metadata.value": { env: ["production"], region: ["eu"] },
       };
@@ -149,7 +151,9 @@ describe("matchesTriggerFilters", () => {
     });
 
     it("does not match when no keys match (OR of all false)", () => {
-      const data = makeTraceData({ customMetadata: { env: "staging", region: "us" } });
+      const data = makeTraceData({
+        customMetadata: { env: "staging", region: "us" },
+      });
       const filters: TriggerFilters = {
         "metadata.value": { env: ["production"], region: ["eu"] },
       };
@@ -496,9 +500,7 @@ describe("matchesEvaluationFilters", () => {
 
   describe("when filtering by evaluations.evaluator_id.guardrails_only", () => {
     it("matches guardrail evaluator", () => {
-      const evals = [
-        makeEval({ evaluatorId: "eval-abc", isGuardrail: true }),
-      ];
+      const evals = [makeEval({ evaluatorId: "eval-abc", isGuardrail: true })];
       const filters: TriggerFilters = {
         "evaluations.evaluator_id.guardrails_only": ["eval-abc"],
       };
@@ -506,9 +508,7 @@ describe("matchesEvaluationFilters", () => {
     });
 
     it("does not match non-guardrail evaluator", () => {
-      const evals = [
-        makeEval({ evaluatorId: "eval-abc", isGuardrail: false }),
-      ];
+      const evals = [makeEval({ evaluatorId: "eval-abc", isGuardrail: false })];
       const filters: TriggerFilters = {
         "evaluations.evaluator_id.guardrails_only": ["eval-abc"],
       };
@@ -518,9 +518,7 @@ describe("matchesEvaluationFilters", () => {
 
   describe("when filtering by evaluations.evaluator_id.has_passed", () => {
     it("matches when evaluator has passed result", () => {
-      const evals = [
-        makeEval({ evaluatorId: "eval-abc", passed: true }),
-      ];
+      const evals = [makeEval({ evaluatorId: "eval-abc", passed: true })];
       const filters: TriggerFilters = {
         "evaluations.evaluator_id.has_passed": ["eval-abc"],
       };
@@ -528,9 +526,7 @@ describe("matchesEvaluationFilters", () => {
     });
 
     it("does not match when passed is null", () => {
-      const evals = [
-        makeEval({ evaluatorId: "eval-abc", passed: null }),
-      ];
+      const evals = [makeEval({ evaluatorId: "eval-abc", passed: null })];
       const filters: TriggerFilters = {
         "evaluations.evaluator_id.has_passed": ["eval-abc"],
       };
@@ -558,9 +554,7 @@ describe("matchesEvaluationFilters", () => {
 
   describe("when filtering by evaluations.evaluator_id.has_label", () => {
     it("matches when evaluator has label", () => {
-      const evals = [
-        makeEval({ evaluatorId: "eval-abc", label: "positive" }),
-      ];
+      const evals = [makeEval({ evaluatorId: "eval-abc", label: "positive" })];
       const filters: TriggerFilters = {
         "evaluations.evaluator_id.has_label": ["eval-abc"],
       };
@@ -586,9 +580,7 @@ describe("matchesEvaluationFilters", () => {
 
   describe("when filtering by evaluations.passed (keyed)", () => {
     it("matches when evaluator passed", () => {
-      const evals = [
-        makeEval({ evaluatorId: "eval-abc", passed: true }),
-      ];
+      const evals = [makeEval({ evaluatorId: "eval-abc", passed: true })];
       const filters: TriggerFilters = {
         "evaluations.passed": { "eval-abc": ["true"] },
       };
@@ -596,9 +588,7 @@ describe("matchesEvaluationFilters", () => {
     });
 
     it("matches when evaluator failed", () => {
-      const evals = [
-        makeEval({ evaluatorId: "eval-abc", passed: false }),
-      ];
+      const evals = [makeEval({ evaluatorId: "eval-abc", passed: false })];
       const filters: TriggerFilters = {
         "evaluations.passed": { "eval-abc": ["false"] },
       };
@@ -606,9 +596,7 @@ describe("matchesEvaluationFilters", () => {
     });
 
     it("does not match when passed value differs", () => {
-      const evals = [
-        makeEval({ evaluatorId: "eval-abc", passed: false }),
-      ];
+      const evals = [makeEval({ evaluatorId: "eval-abc", passed: false })];
       const filters: TriggerFilters = {
         "evaluations.passed": { "eval-abc": ["true"] },
       };
@@ -616,9 +604,7 @@ describe("matchesEvaluationFilters", () => {
     });
 
     it("does not match when evaluator not found", () => {
-      const evals = [
-        makeEval({ evaluatorId: "eval-xyz", passed: true }),
-      ];
+      const evals = [makeEval({ evaluatorId: "eval-xyz", passed: true })];
       const filters: TriggerFilters = {
         "evaluations.passed": { "eval-abc": ["true"] },
       };
@@ -646,7 +632,9 @@ describe("matchesEvaluationFilters", () => {
 
   describe("when filtering by evaluations.state (keyed)", () => {
     it("matches when status matches", () => {
-      const evals = [makeEval({ evaluatorId: "eval-abc", status: "processed" })];
+      const evals = [
+        makeEval({ evaluatorId: "eval-abc", status: "processed" }),
+      ];
       const filters: TriggerFilters = {
         "evaluations.state": { "eval-abc": ["processed"] },
       };
@@ -664,9 +652,7 @@ describe("matchesEvaluationFilters", () => {
 
   describe("when filtering by evaluations.label (keyed)", () => {
     it("matches when label is in filter values", () => {
-      const evals = [
-        makeEval({ evaluatorId: "eval-abc", label: "positive" }),
-      ];
+      const evals = [makeEval({ evaluatorId: "eval-abc", label: "positive" })];
       const filters: TriggerFilters = {
         "evaluations.label": { "eval-abc": ["positive", "negative"] },
       };
@@ -674,9 +660,7 @@ describe("matchesEvaluationFilters", () => {
     });
 
     it("does not match when label is not in filter values", () => {
-      const evals = [
-        makeEval({ evaluatorId: "eval-abc", label: "neutral" }),
-      ];
+      const evals = [makeEval({ evaluatorId: "eval-abc", label: "neutral" })];
       const filters: TriggerFilters = {
         "evaluations.label": { "eval-abc": ["positive", "negative"] },
       };
@@ -739,9 +723,7 @@ describe("matchesEvaluationFilters", () => {
     });
 
     it("does not match when one evaluator is missing", () => {
-      const evals = [
-        makeEval({ evaluatorId: "eval-abc", passed: true }),
-      ];
+      const evals = [makeEval({ evaluatorId: "eval-abc", passed: true })];
       const filters: TriggerFilters = {
         "evaluations.passed": {
           "eval-abc": ["true"],
