@@ -157,5 +157,67 @@ describe("getUserProtectionsForProject audience-aware visibility", () => {
       expect(admin.canSeeCapturedInput).toBe(true);
       expect(admin.capturedInputVisibleTo).toBeNull();
     });
+
+    /** @scenario A viewer inside the audience is told the content is restricted to them */
+    it("tells an in-audience admin the input is restricted to them", async () => {
+      const admin = await protections(adminUserId);
+      expect(admin.contentCategories?.input).toEqual({
+        canSee: true,
+        restrictVisibleTo: "Admins",
+      });
+    });
+  });
+
+  describe("when system instructions are restricted to admins", () => {
+    beforeEach(async () => {
+      await service.setForScope({
+        scope: { scopeType: "PROJECT", scopeId: project.id },
+        personalOnly: false,
+        config: {
+          categories: {
+            system: { disposition: "restrict", audience: { admins: true } },
+          },
+        },
+      });
+    });
+
+    /** @scenario System instructions restricted to admins are hidden from a plain member */
+    it("hides system instructions from a member while keeping the rest visible", async () => {
+      const member = await protections(memberUserId);
+      expect(member.contentCategories?.system.canSee).toBe(false);
+      expect(member.contentCategories?.system.restrictVisibleTo).toBe("Admins");
+      // The other categories are untouched by a system-only rule.
+      expect(member.contentCategories?.input.canSee).toBe(true);
+      expect(member.contentCategories?.output.canSee).toBe(true);
+    });
+
+    /** @scenario System instructions restricted to admins are visible to an admin */
+    it("shows system instructions to an admin", async () => {
+      const admin = await protections(adminUserId);
+      expect(admin.contentCategories?.system.canSee).toBe(true);
+    });
+  });
+
+  describe("when tool calls are restricted to admins", () => {
+    beforeEach(async () => {
+      await service.setForScope({
+        scope: { scopeType: "PROJECT", scopeId: project.id },
+        personalOnly: false,
+        config: {
+          categories: {
+            tools: { disposition: "restrict", audience: { admins: true } },
+          },
+        },
+      });
+    });
+
+    it("hides tool calls from a member and shows them to an admin", async () => {
+      const member = await protections(memberUserId);
+      expect(member.contentCategories?.tools.canSee).toBe(false);
+      expect(member.contentCategories?.tools.restrictVisibleTo).toBe("Admins");
+
+      const admin = await protections(adminUserId);
+      expect(admin.contentCategories?.tools.canSee).toBe(true);
+    });
   });
 });

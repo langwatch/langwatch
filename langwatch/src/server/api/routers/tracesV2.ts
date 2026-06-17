@@ -1,8 +1,8 @@
 import { on } from "node:events";
 import { z } from "zod";
 import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution";
-import { getVisibilityCutoffMsForProject } from "~/server/api/utils";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { getVisibilityCutoffMsForProject } from "~/server/api/utils";
 import { getApp } from "~/server/app-layer/app";
 import { ValidationError } from "~/server/app-layer/domain-error";
 import {
@@ -15,7 +15,18 @@ import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to
 import { deriveUnmappedCostSuggestion } from "~/server/app-layer/traces/model-cost-span-preview.service";
 import type { SpanSummaryRow } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import {
+  CONTENT_CATEGORIES,
+  type ContentCategory,
+} from "~/server/data-privacy/dataPrivacy.types";
 import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
+import {
+  CONTENT_KEY_CATALOG,
+  PRIVACY_DROPPED_MARKER_ATTR,
+  PRIVACY_PII_INCOMPLETE_MARKER_ATTR,
+  stripRolesFromChatArrayJson,
+} from "~/server/data-privacy/dropKeyCatalog";
+import type { CategoryVisibility } from "~/server/elasticsearch/protections";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import {
   changeTraceNameInputSchema,
@@ -51,6 +62,7 @@ import { checkProjectPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
 import { withoutHiddenResourceAttrs } from "./tracesV2.resourceAttrs";
 import type {
+  ContentPrivacy,
   SpanDetail,
   SpanLangwatchSignals,
   SpanTreeNode,
@@ -413,6 +425,68 @@ type V2RedactionFlags = {
   outputVisibleTo: string | null;
 };
 
+/** Protection facts the V2 read mappers consume to enforce restrict at read. */
+type V2Protections = {
+  canSeeCapturedInput?: boolean | null;
+  canSeeCapturedOutput?: boolean | null;
+  capturedInputVisibleTo?: string | null;
+  capturedOutputVisibleTo?: string | null;
+  contentCategories?: Record<ContentCategory, CategoryVisibility>;
+  hiddenAttributes?: Array<{ pattern: string; visibleTo: string }>;
+};
+
+/**
+ * System instructions and tool calls ride INSIDE the captured input/output
+ * conversation as system/tool role turns and assistant `tool_calls`. When the
+ * viewer is outside their audience the surviving input/output string must have
+ * those turns stripped, mirroring the ingestion-time drop, so the transcript
+ * never renders content the policy hides. Returns the roles to remove and
+ * whether to drop `tool_calls`, derived from per-category visibility.
+ */
+function turnsHiddenForViewer(protections: V2Protections): {
+  roles: Set<string>;
+  stripToolCalls: boolean;
+} {
+  const roles = new Set<string>();
+  let stripToolCalls = false;
+  const cats = protections.contentCategories;
+  if (cats) {
+    if (!cats.system.canSee) roles.add("system");
+    if (!cats.tools.canSee) {
+      roles.add("tool");
+      roles.add("function");
+      stripToolCalls = true;
+    }
+  }
+  return { roles, stripToolCalls };
+}
+
+/**
+ * Synthetic hidden-attribute rules for the standalone system/tools attribute
+ * keys (`gen_ai.system_instructions`, `gen_ai.tool.call.*`, …) when those
+ * categories are hidden from the viewer, so their values are replaced by the
+ * audience-naming placeholder in the attributes table just like a custom
+ * restrict rule — the conversation turns are handled separately.
+ */
+function hiddenCategoryAttributeRules(
+  protections: V2Protections,
+): Array<{ pattern: string; visibleTo: string }> {
+  const cats = protections.contentCategories;
+  if (!cats) return [];
+  const rules: Array<{ pattern: string; visibleTo: string }> = [];
+  for (const category of ["system", "tools"] as const) {
+    if (!cats[category].canSee) {
+      for (const key of CONTENT_KEY_CATALOG[category]) {
+        rules.push({
+          pattern: key,
+          visibleTo: cats[category].restrictVisibleTo ?? "no one",
+        });
+      }
+    }
+  }
+  return rules;
+}
+
 export function redactV2Content<
   T extends {
     input?: string | null;
@@ -424,16 +498,7 @@ export function redactV2Content<
     attributes?: Record<string, string>;
     params?: Record<string, unknown> | null;
   },
->(
-  dto: T,
-  protections: {
-    canSeeCapturedInput?: boolean | null;
-    canSeeCapturedOutput?: boolean | null;
-    capturedInputVisibleTo?: string | null;
-    capturedOutputVisibleTo?: string | null;
-    hiddenAttributes?: Array<{ pattern: string; visibleTo: string }>;
-  },
-): T & V2RedactionFlags {
+>(dto: T, protections: V2Protections): T & V2RedactionFlags {
   // A field is redacted only when there WAS content the viewer may not see, so a
   // genuinely empty input never renders the placeholder. The audience label
   // rides along so the drawer can say who it is visible to.
@@ -441,12 +506,23 @@ export function redactV2Content<
     protections.canSeeCapturedInput !== true && dto.input != null;
   const outputRedacted =
     protections.canSeeCapturedOutput !== true && dto.output != null;
+
+  // Strip hidden system/tool turns from any surviving (visible) conversation.
+  const { roles, stripToolCalls } = turnsHiddenForViewer(protections);
+  const stripTurns = (json: string | null): string | null => {
+    if (json == null || (roles.size === 0 && !stripToolCalls)) return json;
+    const result = stripRolesFromChatArrayJson(json, roles, stripToolCalls);
+    return result ? result.json : json;
+  };
+  const visibleInput =
+    protections.canSeeCapturedInput === true ? (dto.input ?? null) : null;
+  const visibleOutput =
+    protections.canSeeCapturedOutput === true ? (dto.output ?? null) : null;
+
   const redacted: T & V2RedactionFlags = {
     ...dto,
-    input:
-      protections.canSeeCapturedInput === true ? (dto.input ?? null) : null,
-    output:
-      protections.canSeeCapturedOutput === true ? (dto.output ?? null) : null,
+    input: stripTurns(visibleInput),
+    output: stripTurns(visibleOutput),
     inputRedacted,
     outputRedacted,
     inputVisibleTo: inputRedacted
@@ -456,11 +532,15 @@ export function redactV2Content<
       ? (protections.capturedOutputVisibleTo ?? null)
       : null,
   };
-  // Custom attribute rules with a restrict disposition: replace the matched
-  // attribute values (header attributes, span params, span-event attributes)
-  // with the placeholder naming who can see them.
-  const hidden = protections.hiddenAttributes;
-  if (hidden && hidden.length > 0) {
+  // Custom attribute rules with a restrict disposition, plus the standalone
+  // system/tools attribute keys when those categories are hidden: replace the
+  // matched attribute values (header attributes, span params, span-event
+  // attributes) with the placeholder naming who can see them.
+  const hidden = [
+    ...(protections.hiddenAttributes ?? []),
+    ...hiddenCategoryAttributeRules(protections),
+  ];
+  if (hidden.length > 0) {
     const matchers = compileHiddenAttributeMatchers(hidden);
     if (dto.attributes) {
       redacted.attributes = redactHiddenAttributesCompiled(
@@ -491,6 +571,83 @@ export function redactV2Content<
     }
   }
   return redacted;
+}
+
+/**
+ * Read a dotted-key string attribute from mapped span params. The span mapper
+ * unflattens dotted attribute keys into nested objects, so a marker lands at the
+ * matching nested path rather than as a flat key.
+ */
+function readNestedString(
+  params: Record<string, unknown> | null | undefined,
+  dottedKey: string,
+): string | null {
+  let node: unknown = params;
+  for (const key of dottedKey.split(".")) {
+    if (typeof node !== "object" || node === null) return null;
+    node = (node as Record<string, unknown>)[key];
+  }
+  return typeof node === "string" ? node : null;
+}
+
+/**
+ * The per-span drop marker (`langwatch.privacy.dropped`) as a category set.
+ * Reading the marker (not the live policy) means traces from before a drop rule
+ * was added are never mislabeled.
+ */
+function readDroppedFromParams(
+  params: Record<string, unknown> | null | undefined,
+): Set<string> {
+  const value = readNestedString(params, PRIVACY_DROPPED_MARKER_ATTR);
+  if (value == null) return new Set();
+  return new Set(
+    value
+      .split(",")
+      .map((category) => category.trim())
+      .filter(Boolean),
+  );
+}
+
+/** Whether a span carries the incomplete-strict-PII marker. */
+function readPiiIncompleteFromParams(
+  params: Record<string, unknown> | null | undefined,
+): boolean {
+  return readNestedString(params, PRIVACY_PII_INCOMPLETE_MARKER_ATTR) != null;
+}
+
+/**
+ * The generic per-category privacy status for the drawer, combining the
+ * read-time restrict decision (from the resolved policy, retroactive) with the
+ * per-span drop marker (which follows the data). Drop wins when both apply: the
+ * content is genuinely gone, so there is nothing left to restrict.
+ */
+export function buildContentPrivacy(
+  protections: {
+    contentCategories?: Record<ContentCategory, CategoryVisibility>;
+  },
+  droppedCategories: ReadonlySet<string>,
+): ContentPrivacy {
+  const cats = protections.contentCategories;
+  return Object.fromEntries(
+    CONTENT_CATEGORIES.map((category) => {
+      if (droppedCategories.has(category)) {
+        return [category, { state: "dropped", visibleTo: null }];
+      }
+      const c = cats?.[category];
+      if (c && !c.canSee) {
+        return [
+          category,
+          { state: "restricted", visibleTo: c.restrictVisibleTo },
+        ];
+      }
+      // Visible: a non-null label means restricted but THIS viewer is in the
+      // audience (the "visible to you" badge); null means ordinary capture.
+      return [
+        category,
+        { state: "visible", visibleTo: c?.restrictVisibleTo ?? null },
+      ];
+    }),
+  ) as ContentPrivacy;
 }
 
 // ---------------------------------------------------------------------------
@@ -1178,15 +1335,21 @@ export const tracesV2Router = createTRPCRouter({
       // Span-level protections first (category visibility, restricted custom
       // attributes, hidden content scrubbed out of params), then the DTO pass.
       const redactions = buildSpanContentRedactions(spans, protections);
-      return spans.map((span) =>
-        redactV2Content(
-          mapSpanToDetail(
-            applySpanProtections(span, protections, redactions),
-            [],
-          ),
+      return spans.map((span) => {
+        const detail = mapSpanToDetail(
+          applySpanProtections(span, protections, redactions),
+          [],
+        );
+        const redacted = redactV2Content(detail, protections);
+        const detailParams = detail.params as Record<string, unknown> | null;
+        redacted.contentPrivacy = buildContentPrivacy(
           protections,
-        ),
-      );
+          readDroppedFromParams(detailParams),
+        );
+        redacted.piiAnalysisIncomplete =
+          readPiiIncompleteFromParams(detailParams);
+        return redacted;
+      });
     }),
 
   spanDetail: protectedProcedure
@@ -1289,7 +1452,15 @@ export const tracesV2Router = createTRPCRouter({
         completionTokens: detail.metrics?.completionTokens,
       });
 
-      return redactV2Content(detail, protections);
+      const redactedDetail = redactV2Content(detail, protections);
+      const detailParams = detail.params as Record<string, unknown> | null;
+      redactedDetail.contentPrivacy = buildContentPrivacy(
+        protections,
+        readDroppedFromParams(detailParams),
+      );
+      redactedDetail.piiAnalysisIncomplete =
+        readPiiIncompleteFromParams(detailParams);
+      return redactedDetail;
     }),
 
   /**

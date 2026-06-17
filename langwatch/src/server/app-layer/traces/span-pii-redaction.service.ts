@@ -10,6 +10,7 @@ import type {
   ResolvedDataPrivacy,
 } from "~/server/data-privacy/dataPrivacy.types";
 import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
+import { PRIVACY_PII_INCOMPLETE_MARKER_ATTR } from "~/server/data-privacy/dropKeyCatalog";
 import {
   compilePolicySecretPatterns,
   nativePiiEntitiesForPolicy,
@@ -408,8 +409,47 @@ export class OtlpSpanPiiRedactionService {
     this.applyNativeSpanPass(span, resource, native.policy);
     const lambda = this.lambdaAfterNative(native.policy);
     if (lambda) {
-      await this.lambdaRedactSpan(span, resource, "STRICT", lambda.entities);
+      try {
+        const ran = await this.lambdaRedactSpan(
+          span,
+          resource,
+          "STRICT",
+          lambda.entities,
+        );
+        // The native floor already redacted the pattern-based identifiers; the
+        // analysis service (names/locations) did not run, so mark the span. The
+        // read path then tells the viewer the deep redaction is incomplete
+        // instead of presenting partially-scrubbed content as fully redacted.
+        if (!ran) this.markPiiAnalysisIncomplete(span);
+      } catch (error) {
+        // In production the analysis service is enforced: re-throw so the
+        // pipeline aborts the span rather than storing names/locations. In
+        // development (or self-hosted without the service) the native floor
+        // stands and the span is marked, so the gap is visible, not silent.
+        if (this.deps.isProduction) throw error;
+        this.logger.warn(
+          { error },
+          "strict PII analysis service unavailable; native floor stands, marking span as incomplete",
+        );
+        this.markPiiAnalysisIncomplete(span);
+      }
     }
+  }
+
+  /**
+   * Stamp the marker that records an incomplete strict redaction (idempotent),
+   * so the read path can surface it. Names/locations may remain in the content.
+   */
+  private markPiiAnalysisIncomplete(span: OtlpSpan): void {
+    if (
+      span.attributes.some((a) => a.key === PRIVACY_PII_INCOMPLETE_MARKER_ATTR)
+    ) {
+      return;
+    }
+    span.attributes.push({
+      key: PRIVACY_PII_INCOMPLETE_MARKER_ATTR,
+      value: { stringValue: "strict" },
+    });
   }
 
   /**
@@ -423,9 +463,12 @@ export class OtlpSpanPiiRedactionService {
     resource: OtlpResource | null,
     piiRedactionLevel: PIIRedactionLevel,
     entities?: readonly string[],
-  ): Promise<void> {
+  ): Promise<boolean> {
     const options = await this.buildOptions(piiRedactionLevel, entities);
-    if (!options) return;
+    // No options means the analysis pass was skipped (disabled, or the service
+    // is not configured outside production) — report that it did not run so the
+    // caller can mark a requested strict pass as incomplete.
+    if (!options) return false;
 
     const entries: StringEntry[] = [];
     let anySkipped = false;
@@ -486,7 +529,7 @@ export class OtlpSpanPiiRedactionService {
     }
 
     if (entries.length === 0) {
-      return;
+      return true;
     }
 
     const results = await this.deps.batchClearPII(
@@ -507,6 +550,7 @@ export class OtlpSpanPiiRedactionService {
         (entry.owner as Record<string, unknown>)[entry.field] = redacted;
       }
     }
+    return true;
   }
 
   /**

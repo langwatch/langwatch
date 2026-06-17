@@ -182,6 +182,39 @@ export const spanLangwatchSignalsSchema = z.object({
 export type SpanLangwatchSignals = z.infer<typeof spanLangwatchSignalsSchema>;
 
 /**
+ * Per-category read-time privacy status for a span, one entry per content
+ * category (input / output / system instructions / tool calls). Lets the drawer
+ * present every category the same way so an absent or hidden category never
+ * reads as missing instrumentation.
+ *
+ * - `visible` + `visibleTo` null: ordinary captured content.
+ * - `visible` + `visibleTo` set: restricted, but THIS viewer is in the audience
+ *   (the "visible to you" badge naming who else can see it).
+ * - `restricted`: stored but hidden from this viewer; `visibleTo` names who can.
+ * - `dropped`: removed by a `drop` policy at ingestion, not stored, unrecoverable.
+ */
+export const CONTENT_PRIVACY_STATES = [
+  "visible",
+  "restricted",
+  "dropped",
+] as const;
+
+const categoryPrivacySchema = z.object({
+  state: z.enum(CONTENT_PRIVACY_STATES),
+  visibleTo: z.string().nullable(),
+});
+
+export const contentPrivacySchema = z.object({
+  input: categoryPrivacySchema,
+  output: categoryPrivacySchema,
+  system: categoryPrivacySchema,
+  tools: categoryPrivacySchema,
+});
+
+export type CategoryPrivacy = z.infer<typeof categoryPrivacySchema>;
+export type ContentPrivacy = z.infer<typeof contentPrivacySchema>;
+
+/**
  * Span detail: full span data for the accordion when a span is selected.
  * Returned by `tracesV2.spanDetail`.
  */
@@ -205,6 +238,14 @@ export const spanDetailSchema = z.object({
   outputRedacted: z.boolean().nullish(),
   inputVisibleTo: z.string().nullish(),
   outputVisibleTo: z.string().nullish(),
+  // Generic per-category privacy status (input/output/system/tools), so the
+  // drawer marks every category consistently — restricted, restricted-but-
+  // visible-to-you, or dropped. Absent on older cached responses.
+  contentPrivacy: contentPrivacySchema.nullish(),
+  // True when strict PII redaction was requested but the analysis service
+  // (names/locations) did not run, so the content may still contain names or
+  // locations. The drawer warns instead of implying it is fully scrubbed.
+  piiAnalysisIncomplete: z.boolean().nullish(),
   error: z
     .object({
       message: z.string(),

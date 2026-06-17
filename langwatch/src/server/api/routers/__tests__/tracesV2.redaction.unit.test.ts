@@ -1,6 +1,32 @@
 import { describe, expect, it } from "vitest";
+import type { ContentCategory } from "~/server/data-privacy/dataPrivacy.types";
+import type { CategoryVisibility } from "~/server/elasticsearch/protections";
+import { buildContentPrivacy, redactV2Content } from "../tracesV2";
 
-import { redactV2Content } from "../tracesV2";
+const visible: CategoryVisibility = { canSee: true, restrictVisibleTo: null };
+
+/** A full per-category visibility map, all visible unless overridden. */
+function cats(
+  overrides: Partial<Record<ContentCategory, CategoryVisibility>> = {},
+): Record<ContentCategory, CategoryVisibility> {
+  return {
+    input: { ...visible },
+    output: { ...visible },
+    system: { ...visible },
+    tools: { ...visible },
+    ...overrides,
+  };
+}
+
+const restricted = (visibleTo: string | null): CategoryVisibility => ({
+  canSee: false,
+  restrictVisibleTo: visibleTo,
+});
+
+const restrictedVisible = (visibleTo: string): CategoryVisibility => ({
+  canSee: true,
+  restrictVisibleTo: visibleTo,
+});
 
 describe("redactV2Content", () => {
   describe("given the viewer cannot see captured input", () => {
@@ -134,5 +160,134 @@ describe("redactV2Content", () => {
 
       expect(out.params).toBe(params);
     });
+  });
+
+  describe("given system instructions are restricted from the viewer", () => {
+    const conversation = JSON.stringify({
+      type: "chat_messages",
+      value: [
+        { role: "system", content: "secret instructions" },
+        { role: "user", content: "hi" },
+        { role: "assistant", content: "hello" },
+      ],
+    });
+
+    it("strips the system turn from the visible conversation", () => {
+      const out = redactV2Content(
+        { input: conversation },
+        {
+          canSeeCapturedInput: true,
+          canSeeCapturedOutput: true,
+          contentCategories: cats({ system: restricted("Admins") }),
+        },
+      );
+
+      const parsed = JSON.parse(out.input!) as {
+        value: Array<{ role: string }>;
+      };
+      expect(parsed.value.map((m) => m.role)).toEqual(["user", "assistant"]);
+      expect(out.input).not.toContain("secret instructions");
+    });
+
+    it("replaces the standalone system-instructions attribute with the audience placeholder", () => {
+      const out = redactV2Content(
+        {
+          input: null,
+          params: {
+            gen_ai: { system_instructions: "secret" },
+            model: "gpt-5-mini",
+          },
+        },
+        {
+          canSeeCapturedInput: true,
+          canSeeCapturedOutput: true,
+          contentCategories: cats({ system: restricted("Admins") }),
+        },
+      );
+
+      const params = out.params as {
+        gen_ai: { system_instructions: string };
+        model: string;
+      };
+      expect(params.gen_ai.system_instructions).toBe(
+        "[REDACTED] (visible to Admins)",
+      );
+      expect(params.model).toBe("gpt-5-mini");
+    });
+  });
+
+  describe("given tool calls are restricted from the viewer", () => {
+    /** @scenario Tool calls restricted to a group are visible to that group and hidden from others */
+    it("strips tool turns and assistant tool_calls, keeping user and assistant text", () => {
+      const conversation = JSON.stringify([
+        { role: "user", content: "hi" },
+        {
+          role: "assistant",
+          content: "calling",
+          tool_calls: [{ id: "1", function: { name: "lookup" } }],
+        },
+        { role: "tool", content: "tool result" },
+      ]);
+
+      const out = redactV2Content(
+        { input: conversation },
+        {
+          canSeeCapturedInput: true,
+          canSeeCapturedOutput: true,
+          contentCategories: cats({ tools: restricted("Security group") }),
+        },
+      );
+
+      const parsed = JSON.parse(out.input!) as Array<{
+        role: string;
+        tool_calls?: unknown;
+      }>;
+      expect(parsed.map((m) => m.role)).toEqual(["user", "assistant"]);
+      expect(parsed[1]!.tool_calls).toBeUndefined();
+      expect(out.input).not.toContain("tool result");
+    });
+  });
+});
+
+describe("buildContentPrivacy", () => {
+  /** @scenario Each dropped category is marked where its content would appear */
+  it("marks a dropped category as dropped, distinct from a restriction", () => {
+    const privacy = buildContentPrivacy(
+      { contentCategories: cats() },
+      new Set(["system"]),
+    );
+    expect(privacy.system).toEqual({ state: "dropped", visibleTo: null });
+  });
+
+  it("marks a restricted-hidden category and names who can see it", () => {
+    const privacy = buildContentPrivacy(
+      { contentCategories: cats({ tools: restricted("Admins") }) },
+      new Set(),
+    );
+    expect(privacy.tools).toEqual({ state: "restricted", visibleTo: "Admins" });
+  });
+
+  it("marks restricted-but-visible content so an in-audience viewer is told", () => {
+    const privacy = buildContentPrivacy(
+      { contentCategories: cats({ input: restrictedVisible("Admins") }) },
+      new Set(),
+    );
+    expect(privacy.input).toEqual({ state: "visible", visibleTo: "Admins" });
+  });
+
+  it("leaves plainly captured content unmarked", () => {
+    const privacy = buildContentPrivacy(
+      { contentCategories: cats() },
+      new Set(),
+    );
+    expect(privacy.output).toEqual({ state: "visible", visibleTo: null });
+  });
+
+  it("lets a drop win over a restriction on the same category", () => {
+    const privacy = buildContentPrivacy(
+      { contentCategories: cats({ system: restricted("Admins") }) },
+      new Set(["system"]),
+    );
+    expect(privacy.system.state).toBe("dropped");
   });
 });

@@ -9,6 +9,10 @@ import {
 } from "@chakra-ui/react";
 import { useMemo, useRef } from "react";
 import { LuCircleX } from "react-icons/lu";
+import {
+  ContentPrivacyMarkers,
+  PiiIncompleteNotice,
+} from "~/components/ui/ContentPrivacyMarkers";
 import { RedactedField } from "~/components/ui/RedactedField";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { useSpanDetail } from "../../../hooks/useSpanDetail";
@@ -42,6 +46,18 @@ export function SpanAccordions({
   const spanScope = spanResource?.scope ?? null;
 
   const hasIO = !!(detail?.input || detail?.output);
+  // Any content category that is dropped, restricted, or restricted-but-visible
+  // gives the I/O section something to show even when the content itself is
+  // empty (so a fully hidden or dropped span still explains itself).
+  const contentPrivacy = detail?.contentPrivacy;
+  const piiIncomplete = !!detail?.piiAnalysisIncomplete;
+  const hasPrivacyMarkers =
+    piiIncomplete ||
+    (!!contentPrivacy &&
+      Object.values(contentPrivacy).some(
+        (category) =>
+          category.state !== "visible" || category.visibleTo != null,
+      ));
   const hasResourceAttrs =
     !!spanResource && Object.keys(spanResource.resourceAttributes).length > 0;
   const hasSpanAttrs =
@@ -79,7 +95,7 @@ export function SpanAccordions({
   // needs surfacing there.
   const [openSections, setOpenSections] = useAutoOpenSections(span.spanId, {
     exceptions: hasError,
-    io: hasIO,
+    io: hasIO || hasPrivacyMarkers,
     prompt: hasPrompt,
     attributes: hasSpanAttrs || !!detail?.costSuggestion,
     scope: hasScope,
@@ -144,7 +160,7 @@ export function SpanAccordions({
                   key="io"
                   value="io"
                   title="Input and Output"
-                  empty={!detailQuery.isLoading && !hasIO}
+                  empty={!detailQuery.isLoading && !hasIO && !hasPrivacyMarkers}
                   isFirst={isFirst}
                   open={isOpen}
                 >
@@ -152,6 +168,20 @@ export function SpanAccordions({
                     <EmptyHint>Loading…</EmptyHint>
                   ) : (
                     <VStack align="stretch" gap={2}>
+                      {/* Generic per-category privacy markers. Input/output use
+                        skipRestricted because their hidden state already shows
+                        inline via RedactedField below; system/tools (no inline
+                        slot) show every state here. */}
+                      <ContentPrivacyMarkers
+                        privacy={contentPrivacy}
+                        categories={["input", "output"]}
+                        skipRestricted
+                      />
+                      <ContentPrivacyMarkers
+                        privacy={contentPrivacy}
+                        categories={["system", "tools"]}
+                      />
+                      <PiiIncompleteNotice incomplete={piiIncomplete} />
                       <RedactedField
                         field="input"
                         redacted={detail?.inputRedacted ?? false}

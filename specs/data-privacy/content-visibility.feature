@@ -92,6 +92,62 @@ Feature: Restricting who can see trace content
     When "dave" opens a trace for "alice-workspace"
     Then the trace input is redacted for "dave"
 
+  # System instructions and tool calls are restricted exactly like input and
+  # output. They ride inside the captured conversation as system-role turns,
+  # tool-role turns, and tool calls on assistant turns, so restricting one hides
+  # only those turns from viewers outside the audience while the rest of the
+  # conversation stays readable. The treatment is generic: every content category
+  # (input, output, system instructions, tool calls) is hidden, shown, or marked
+  # the same way, so a viewer never has to learn a different convention per field.
+
+  @integration
+  Scenario: System instructions restricted to admins are hidden from a plain member
+    Given a rule on "web-app" that restricts system instructions to admins
+    When "dave" opens a trace for "web-app"
+    Then the system instructions are redacted for "dave"
+    And the rest of the conversation remains visible to "dave"
+
+  @integration
+  Scenario: System instructions restricted to admins are visible to an admin
+    Given a rule on "web-app" that restricts system instructions to admins
+    When "carol" opens a trace for "web-app"
+    Then the system instructions are visible to "carol"
+
+  @integration
+  Scenario: Tool calls restricted to a group are visible to that group and hidden from others
+    Given a rule on "web-app" that restricts tool calls to the "security" group
+    When "erin" opens a trace for "web-app"
+    Then the tool calls are visible to "erin"
+    When "dave" opens a trace for "web-app"
+    Then the tool calls are redacted for "dave"
+    And the user and assistant messages remain visible to "dave"
+
+  # When content is restricted but the viewer IS in the audience, the view says
+  # so instead of showing the content as if it were ordinary: a marker names the
+  # audience the content is limited to, so an admin reading admin-only content
+  # knows it is restricted rather than assuming everyone can see it. This applies
+  # to every category the same way.
+
+  @integration
+  Scenario: A viewer inside the audience is told the content is restricted to them
+    Given a rule on "web-app" that restricts trace input to admins
+    When "carol" opens a trace for "web-app"
+    Then the trace input is visible to "carol"
+    And it is marked as restricted to the admins audience
+
+  # Dropped content is marked per category as well, so the absence of a category
+  # never reads as missing instrumentation: a dropped category shows that it was
+  # removed by a privacy policy and cannot be recovered, distinct from a
+  # restricted category, which is stored and only hidden.
+
+  @integration
+  Scenario: Each dropped category is marked where its content would appear
+    Given a rule on "web-app" that drops system instructions
+    And a trace stored for "web-app" from after the rule was added
+    When "dave" opens that trace
+    Then the system instructions show that they were dropped by a privacy policy
+    And the marker distinguishes dropping from restriction
+
   # Custom attribute rules restrict individual span attributes the same way:
   # the matching attribute values are replaced by a redaction placeholder for
   # viewers outside the audience, while the rest of the attributes stay visible.

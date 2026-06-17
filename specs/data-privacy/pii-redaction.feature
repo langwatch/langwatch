@@ -52,6 +52,19 @@ Feature: Redacting personal data from traces
     Then the stored input has the email address redacted
     And the stored input still contains the name
 
+  # Falling back silently would let names slip through with no sign that strict
+  # redaction did not fully run, so a reader assumes the trace is fully scrubbed
+  # when it is not. When strict cannot reach the analysis service the trace is
+  # marked: the view tells the reader that name and location redaction did not
+  # run, so the gap is visible rather than silent.
+  @integration
+  Scenario: An incomplete strict redaction is marked on the trace
+    Given the resolved PII level for "web-app" is strict
+    And the analysis service is unavailable
+    When a trace is ingested whose input contains a person's name
+    Then the trace is marked that strict PII redaction did not complete
+    And the marker explains that names and locations may not be redacted
+
   @integration
   Scenario: Disabling PII keeps personal data
     Given a rule on "web-app" that disables PII redaction

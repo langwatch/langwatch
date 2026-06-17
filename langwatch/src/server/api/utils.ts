@@ -15,8 +15,11 @@ import {
   type ViewerFacts,
 } from "~/server/data-privacy/contentVisibility";
 import {
+  CONTENT_CATEGORIES,
+  type ContentCategory,
   PLATFORM_DEFAULT_DATA_PRIVACY,
   type ResolvedAudience,
+  type ResolvedCategory,
   type ResolvedDataPrivacy,
 } from "~/server/data-privacy/dataPrivacy.types";
 import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
@@ -24,7 +27,10 @@ import { resolveOrganizationId } from "~/server/organizations/resolveOrganizatio
 import { TtlCache } from "~/server/utils/ttlCache";
 import { createLogger } from "~/utils/logger/server";
 import { FREE_VISIBILITY_DAYS } from "../../../ee/licensing/constants";
-import type { Protections } from "../elasticsearch/protections";
+import type {
+  CategoryVisibility,
+  Protections,
+} from "../elasticsearch/protections";
 import { hasProjectPermission, isDemoProject } from "./rbac";
 
 const logger = createLogger("langwatch:api:protections");
@@ -181,6 +187,33 @@ async function resolveAudienceNames(
   };
 }
 
+/** A per-category visibility map where every category shares one decision. */
+function uniformContentCategories(
+  canSee: boolean,
+): Record<ContentCategory, CategoryVisibility> {
+  return Object.fromEntries(
+    CONTENT_CATEGORIES.map((category) => [
+      category,
+      { canSee, restrictVisibleTo: null },
+    ]),
+  ) as Record<ContentCategory, CategoryVisibility>;
+}
+
+/**
+ * The audience label for a `restrict` category (whether or not the viewer can
+ * see it), so the trace view can name the audience on a hidden placeholder and
+ * mark restricted-but-visible content for an in-audience viewer. Null for a
+ * non-restrict disposition.
+ */
+function restrictLabelFor(
+  category: ResolvedCategory,
+  names: { groups: Record<string, string> },
+): string | null {
+  return category.disposition === "restrict"
+    ? describeAudience(category.audience, names)
+    : null;
+}
+
 export async function getUserProtectionsForProject(
   ctx: {
     prisma: PrismaClient;
@@ -232,12 +265,11 @@ export async function getUserProtectionsForProject(
         canSeeCapturedOutput: false,
         capturedInputVisibleTo: null,
         capturedOutputVisibleTo: null,
+        contentCategories: uniformContentCategories(false),
         visibilityCutoffMs,
       };
     }
   }
-  const effInput = policy.categories.input;
-  const effOutput = policy.categories.output;
   const restrictedAttributeRules = policy.customAttributes.filter(
     (rule) => rule.disposition === "restrict",
   );
@@ -250,10 +282,25 @@ export async function getUserProtectionsForProject(
     !ctx.session?.user?.id ||
     isDemoProject(projectId, "traces:view")
   ) {
+    // A public viewer has no group facts, so restrict labels resolve any group
+    // ids to a generic word; that only affects the placeholder copy, not the
+    // visibility decision (public sees captured content only).
+    const publicContentCategories = Object.fromEntries(
+      CONTENT_CATEGORIES.map((category) => [
+        category,
+        {
+          canSee: isContentVisibleToPublic(policy.categories[category]),
+          restrictVisibleTo: restrictLabelFor(policy.categories[category], {
+            groups: {},
+          }),
+        } satisfies CategoryVisibility,
+      ]),
+    ) as Record<ContentCategory, CategoryVisibility>;
     return {
       canSeeCosts,
-      canSeeCapturedInput: isContentVisibleToPublic(effInput),
-      canSeeCapturedOutput: isContentVisibleToPublic(effOutput),
+      canSeeCapturedInput: publicContentCategories.input.canSee,
+      canSeeCapturedOutput: publicContentCategories.output.canSee,
+      contentCategories: publicContentCategories,
       hiddenAttributes: restrictedAttributeRules.map((rule) => ({
         pattern: rule.pattern,
         visibleTo: "members of this project",
@@ -298,8 +345,9 @@ export async function getUserProtectionsForProject(
   let organizationId: string | null = null;
   let groupIds: string[] = [];
   const needsFacts =
-    needsAudienceFacts(effInput) ||
-    needsAudienceFacts(effOutput) ||
+    CONTENT_CATEGORIES.some((category) =>
+      needsAudienceFacts(policy.categories[category]),
+    ) ||
     restrictedAttributeRules.some((rule) =>
       needsAudienceFacts({ disposition: "restrict", audience: rule.audience }),
     );
@@ -326,8 +374,6 @@ export async function getUserProtectionsForProject(
     isProjectOwner,
     groupIds,
   };
-  const canSeeCapturedInput = isContentVisible(effInput, viewer);
-  const canSeeCapturedOutput = isContentVisible(effOutput, viewer);
   const hiddenAttributeRules = restrictedAttributeRules.filter(
     (rule) =>
       !isContentVisible(
@@ -336,14 +382,14 @@ export async function getUserProtectionsForProject(
       ),
   );
 
-  // One batched name lookup serves every redaction label this viewer needs.
+  // One batched name lookup serves every label this viewer needs: every
+  // restrict category (whether or not it is visible to them, since an
+  // in-audience viewer is also told which audience the content is limited to)
+  // plus the custom attribute rules hidden from them.
   const audiencesNeedingLabels: ResolvedAudience[] = [
-    ...(!canSeeCapturedInput && effInput.disposition === "restrict"
-      ? [effInput.audience]
-      : []),
-    ...(!canSeeCapturedOutput && effOutput.disposition === "restrict"
-      ? [effOutput.audience]
-      : []),
+    ...CONTENT_CATEGORIES.filter(
+      (category) => policy.categories[category].disposition === "restrict",
+    ).map((category) => policy.categories[category].audience),
     ...hiddenAttributeRules.map((rule) => rule.audience),
   ];
   const names = await resolveAudienceNames(
@@ -352,18 +398,27 @@ export async function getUserProtectionsForProject(
     organizationId,
   );
 
+  const contentCategories = Object.fromEntries(
+    CONTENT_CATEGORIES.map((category) => [
+      category,
+      {
+        canSee: isContentVisible(policy.categories[category], viewer),
+        restrictVisibleTo: restrictLabelFor(policy.categories[category], names),
+      } satisfies CategoryVisibility,
+    ]),
+  ) as Record<ContentCategory, CategoryVisibility>;
+
   return {
     canSeeCosts,
-    canSeeCapturedInput,
-    canSeeCapturedOutput,
-    capturedInputVisibleTo:
-      !canSeeCapturedInput && effInput.disposition === "restrict"
-        ? describeAudience(effInput.audience, names)
-        : null,
-    capturedOutputVisibleTo:
-      !canSeeCapturedOutput && effOutput.disposition === "restrict"
-        ? describeAudience(effOutput.audience, names)
-        : null,
+    canSeeCapturedInput: contentCategories.input.canSee,
+    canSeeCapturedOutput: contentCategories.output.canSee,
+    capturedInputVisibleTo: contentCategories.input.canSee
+      ? null
+      : contentCategories.input.restrictVisibleTo,
+    capturedOutputVisibleTo: contentCategories.output.canSee
+      ? null
+      : contentCategories.output.restrictVisibleTo,
+    contentCategories,
     hiddenAttributes: hiddenAttributeRules.map((rule) => ({
       pattern: rule.pattern,
       visibleTo: describeAudience(rule.audience, names),

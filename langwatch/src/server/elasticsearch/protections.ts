@@ -1,3 +1,21 @@
+import type { ContentCategory } from "~/server/data-privacy/dataPrivacy.types";
+
+/**
+ * Read-time visibility for one content category (input / output / system
+ * instructions / tool calls) for THIS viewer.
+ */
+export interface CategoryVisibility {
+  /** Whether the viewer may read this category's content. */
+  canSee: boolean;
+  /**
+   * Human audience label for a `restrict` rule on this category ("Admins,
+   * Security group" or "no one"), set whether or not the viewer can see it: it
+   * names the audience on a hidden placeholder AND tells an in-audience viewer
+   * the content is restricted (rather than ordinary). Null for plain capture.
+   */
+  restrictVisibleTo: string | null;
+}
+
 export interface Protections {
   canSeeCosts?: boolean | undefined | null;
   canSeeCapturedInput?: boolean | undefined | null;
@@ -7,6 +25,12 @@ export interface Protections {
   // placeholder. Null/absent when the content is visible.
   capturedInputVisibleTo?: string | null;
   capturedOutputVisibleTo?: string | null;
+  // Per-category read-time visibility for ALL four content categories, so the
+  // trace view can present each one consistently (the `canSee*`/`captured*`
+  // fields above are the input/output projection kept for legacy readers).
+  // System instructions and tool calls live inside the captured conversation,
+  // so the V2 read path strips their turns when `system`/`tools` is not visible.
+  contentCategories?: Record<ContentCategory, CategoryVisibility>;
   // Custom attribute rules (restrict disposition) whose audience excludes THIS
   // viewer: the read mappers replace matching attribute values with a redaction
   // placeholder naming `visibleTo`. Patterns may carry `*` wildcards. Absent or

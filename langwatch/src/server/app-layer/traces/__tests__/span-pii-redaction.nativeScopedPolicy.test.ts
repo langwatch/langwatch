@@ -344,4 +344,81 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
       expect(batchSpy).not.toHaveBeenCalled();
     });
   });
+
+  describe("given strict PII and the analysis service cannot run", () => {
+    const PII_INCOMPLETE = "langwatch.privacy.pii_incomplete";
+
+    function strictService({
+      isLangevalsConfigured,
+      isProduction,
+      batchClearPII,
+    }: {
+      isLangevalsConfigured: boolean;
+      isProduction: boolean;
+      batchClearPII: BatchClearPIIFunction;
+    }) {
+      return new OtlpSpanPiiRedactionService({
+        batchClearPII,
+        isLangevalsConfigured,
+        isProduction,
+        dataPrivacyResolver: resolverFor(mkPolicy({ piiLevel: "strict" })),
+      });
+    }
+
+    /** @scenario An incomplete strict redaction is marked on the trace */
+    it("marks the span incomplete when the analysis service is not configured", async () => {
+      const batchSpy = vi.fn<BatchClearPIIFunction>(async (texts) =>
+        texts.map(() => "[REDACTED]"),
+      );
+      const service = strictService({
+        isLangevalsConfigured: false,
+        isProduction: false,
+        batchClearPII: batchSpy,
+      });
+      const span = spanWith({ input: "mail a@b.com, I am John from New York" });
+
+      await service.redactSpan(span, null, "STRICT", TENANT);
+
+      // The native floor still scrubbed the email, but names/locations slip
+      // through, so the span is marked rather than presented as fully scrubbed.
+      expect(attr(span, "input")).not.toContain("a@b.com");
+      expect(attr(span, PII_INCOMPLETE)).toBe("strict");
+      expect(batchSpy).not.toHaveBeenCalled();
+    });
+
+    it("keeps the native floor and marks the span when the analysis service errors", async () => {
+      const batchSpy = vi.fn<BatchClearPIIFunction>(async () => {
+        throw new Error("503 service unavailable");
+      });
+      const service = strictService({
+        isLangevalsConfigured: true,
+        isProduction: false,
+        batchClearPII: batchSpy,
+      });
+      const span = spanWith({ input: "mail a@b.com" });
+
+      await service.redactSpan(span, null, "STRICT", TENANT);
+
+      expect(attr(span, "input")).not.toContain("a@b.com");
+      expect(attr(span, PII_INCOMPLETE)).toBe("strict");
+      expect(batchSpy).toHaveBeenCalled();
+    });
+
+    it("re-throws in production so the span is blocked rather than stored unredacted", async () => {
+      const batchSpy = vi.fn<BatchClearPIIFunction>(async () => {
+        throw new Error("503 service unavailable");
+      });
+      const service = strictService({
+        isLangevalsConfigured: true,
+        isProduction: true,
+        batchClearPII: batchSpy,
+      });
+      const span = spanWith({ input: "mail a@b.com" });
+
+      await expect(
+        service.redactSpan(span, null, "STRICT", TENANT),
+      ).rejects.toThrow();
+      expect(attr(span, PII_INCOMPLETE)).toBeUndefined();
+    });
+  });
 });
