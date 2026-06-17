@@ -390,7 +390,7 @@ describe("matchesTriggerFilters", () => {
       });
     });
 
-    describe("given malformed filter values", () => {
+    describe("when the filter value is malformed", () => {
       it("does not throw on a non-numeric or short range", () => {
         const data = makeEventData([
           {
@@ -407,6 +407,37 @@ describe("matchesTriggerFilters", () => {
         expect(() => matchesTriggerFilters(data, filters)).not.toThrow();
         expect(matchesTriggerFilters(data, filters)).toBe(false);
       });
+    });
+
+    describe("when the filter is events.metrics.value with a wrong event_type", () => {
+      it("does not match when trace has events of a different type than the filter", () => {
+        const data = makeEventData([
+          {
+            event_type: "click",
+            metrics: [{ key: "vote", value: -1 }],
+            event_details: [],
+          },
+        ]);
+        const filters: TriggerFilters = {
+          "events.metrics.value": { thumbs_up_down: { vote: ["-1", "-1"] } },
+        };
+        // Filter expects thumbs_up_down but the trace only has a "click" event.
+        expect(matchesTriggerFilters(data, filters)).toBe(false);
+      });
+    });
+  });
+
+  describe("when filtering by events.event_details.value (fail-closed phantom field)", () => {
+    it("does not match when the filter carries a non-empty condition (fail-closed)", () => {
+      const data = makeTraceData();
+      const filters: TriggerFilters = {
+        "events.event_details.value": {
+          exception: { message: ["x"] },
+        } as any,
+      };
+      // events.event_details.value is an UNSUPPORTED_FIELD — a non-empty condition
+      // on it must force NO-MATCH rather than skip-to-pass (mirrors metadata.key).
+      expect(matchesTriggerFilters(data, filters)).toBe(false);
     });
   });
 });

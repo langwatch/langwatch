@@ -252,18 +252,20 @@ describe("alertTrigger reactor", () => {
   });
 
   describe("given a thumbs-down automation that references event fields", () => {
-    it("derives the trace events list before matching", async () => {
-      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue([
-        thumbsDownTrigger(),
-      ]);
-      (deps.deriveEvents as any).mockResolvedValue([voteEvent(-1)]);
+    describe("when the trace has a down-vote", () => {
+      it("derives the trace events list before matching", async () => {
+        (
+          deps.triggers.getActiveTraceTriggersForProject as any
+        ).mockResolvedValue([thumbsDownTrigger()]);
+        (deps.deriveEvents as any).mockResolvedValue([voteEvent(-1)]);
 
-      const reactor = createAlertTriggerReactor(deps);
-      await reactor.handle(createEvent(), createContext());
+        const reactor = createAlertTriggerReactor(deps);
+        await reactor.handle(createEvent(), createContext());
 
-      expect(deps.deriveEvents).toHaveBeenCalledWith(
-        expect.objectContaining({ tenantId: "tenant-1", traceId: "trace-1" }),
-      );
+        expect(deps.deriveEvents).toHaveBeenCalledWith(
+          expect.objectContaining({ tenantId: "tenant-1", traceId: "trace-1" }),
+        );
+      });
     });
   });
 });

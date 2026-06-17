@@ -329,14 +329,15 @@ function matchEventMetricRange(
   traceData: PreconditionTraceData,
   filterValue: TriggerFilterValue,
 ): boolean {
-  // A bare array shape is not how this double-keyed field is ever produced;
-  // an empty/array value is vacuous, anything else cannot be evaluated.
+  // Defensive guard for an unreachable shape: events.metrics.value is always
+  // double-keyed in production, never a bare array. An empty array is vacuous
+  // (no conditions to fail); a non-empty bare array cannot be evaluated.
   if (Array.isArray(filterValue)) {
     return filterValue.length === 0;
   }
 
   const events = traceData.events;
-  let hasActionableCondition = false;
+  let matched = false;
 
   for (const [eventType, metricMap] of Object.entries(filterValue)) {
     if (typeof metricMap !== "object" || metricMap === null) continue;
@@ -349,8 +350,6 @@ function matchEventMetricRange(
       // matches); in-memory that means this condition cannot pass — it must not
       // skip-to-vacuous-pass, which would re-open the #4805 fire-on-everything
       // hole. So mark it actionable and contribute no match.
-      hasActionableCondition = true;
-
       if (values.length < 2) continue;
 
       const min = parseFloat(values[0] ?? "");
@@ -359,23 +358,28 @@ function matchEventMetricRange(
         continue;
       }
 
-      const matched = (events ?? []).some(
-        (event) =>
-          event.event_type === eventType &&
-          event.metrics.some(
-            (metric) =>
-              metric.key === metricKey &&
-              metric.value >= min &&
-              metric.value <= max,
-          ),
-      );
-      if (matched) return true;
+      if (
+        (events ?? []).some(
+          (event) =>
+            event.event_type === eventType &&
+            event.metrics.some(
+              (metric) =>
+                metric.key === metricKey &&
+                metric.value >= min &&
+                metric.value <= max,
+            ),
+        )
+      ) {
+        matched = true;
+        break;
+      }
     }
+    if (matched) break;
   }
 
   // No actionable range → vacuous (pass). Actionable ranges present but none
-  // matched → no match.
-  return !hasActionableCondition;
+  // matched → no match. Reuse the shared predicate for a single source of truth.
+  return matched || !filterValueHasActionableCondition(filterValue);
 }
 
 /**
