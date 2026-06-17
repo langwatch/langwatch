@@ -14,7 +14,7 @@ export const entryNode = () => ({
   deletable: false,
   data: {
     name: "Entry point",
-    outputs: [{ identifier: "question", type: "str" }],
+    outputs: [{ identifier: "input", type: "str" }],
     entry_selection: "random",
     train_size: 0.8,
     test_size: 0.2,
@@ -23,9 +23,9 @@ export const entryNode = () => ({
       name: DEFAULT_DATASET_NAME,
       inline: {
         records: {
-          question: ["Hello world"],
+          input: ["Hello world"],
         },
-        columnTypes: [{ name: "question", type: "string" }],
+        columnTypes: [{ name: "input", type: "string" }],
       },
     },
   } satisfies Entry,
@@ -65,9 +65,12 @@ export const blankTemplate: Workflow = {
             value: undefined,
           },
           {
+            // Mirrors the default new-prompt shape (buildDefaultFormValues),
+            // so a fresh workflow opens with a runnable prompt instead of an
+            // empty-messages error.
             identifier: "instructions",
             type: "str",
-            value: undefined,
+            value: "You are a helpful assistant.",
           },
           {
             identifier: "messages",
@@ -75,7 +78,7 @@ export const blankTemplate: Workflow = {
             value: [
               {
                 role: "user",
-                content: "{{question}}",
+                content: "{{input}}",
               },
             ],
           },
@@ -85,8 +88,8 @@ export const blankTemplate: Workflow = {
             value: undefined,
           },
         ],
-        inputs: [{ identifier: "question", type: "str" }],
-        outputs: [{ identifier: "answer", type: "str" }],
+        inputs: [{ identifier: "input", type: "str" }],
+        outputs: [{ identifier: "output", type: "str" }],
       } satisfies Signature,
     },
     {
@@ -104,15 +107,15 @@ export const blankTemplate: Workflow = {
     {
       id: "e0-1",
       source: "entry",
-      sourceHandle: "outputs.question",
+      sourceHandle: "outputs.input",
       target: "llm_call",
-      targetHandle: "inputs.question",
+      targetHandle: "inputs.input",
       type: "default",
     },
     {
       id: "e1-2",
       source: "llm_call",
-      sourceHandle: "outputs.answer",
+      sourceHandle: "outputs.output",
       target: "end",
       targetHandle: "inputs.output",
       type: "default",

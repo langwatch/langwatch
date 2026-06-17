@@ -280,6 +280,28 @@ Feature: Evaluator management
     Then the code editor opens with its saved code, inputs and outputs
     And in the workbench each input shows its source mapping inline
 
+  # Same behavior as the studio code node: the Python entrypoint is kept in
+  # sync with the declared inputs, so changing the inputs keeps the evaluator
+  # callable with exactly those inputs, with no missing or unexpected keyword.
+  Scenario: Code evaluator input changes keep runs valid
+    Given the code evaluator drawer
+    When I add or remove an input field
+    Then the evaluator still runs without missing or unexpected input errors
+
+  # Outputs are the fixed evaluator contract (passed, score, label, details),
+  # not user-defined, mirroring the evaluator end node.
+  Scenario: Code evaluator outputs are the fixed evaluator contract
+    Given the code evaluator drawer
+    Then the outputs are shown as the fixed evaluator result fields
+    And there is no control to add or remove output fields
+
+  # A function returns any subset of the contract; whichever it returns become
+  # the result, so an evaluator that returns only passed does not fail.
+  Scenario: Code evaluator returns only the fields it computes
+    Given a code evaluator that returns only passed
+    When it runs against a row
+    Then the result carries passed and reports no error
+
   Scenario: Code evaluator inputs drive the mapping UI
     Given a code evaluator whose code takes "output" and "expected_output"
     When I use it in an evaluation

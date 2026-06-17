@@ -43,6 +43,17 @@ describe("customEvaluatorTemplate", () => {
     });
   });
 
+  describe("the end node", () => {
+    /** @scenario Custom evaluator template lists details first on the end node */
+    it("puts details first so the reasoning edge does not cross the verdict", () => {
+      expect(
+        (
+          node("end")?.data as { inputs: Array<{ identifier: string }> }
+        ).inputs.map((i) => i.identifier),
+      ).toEqual(["details", "passed", "score", "label"]);
+    });
+  });
+
   describe("the wiring", () => {
     /** @scenario Custom evaluator template wires reasoning into the end details */
     it("connects the LLM reasoning to the end details", () => {
@@ -78,11 +89,15 @@ describe("customEvaluatorTemplate", () => {
       ]);
     });
 
-    it("spaces the nodes apart left to right", () => {
+    it("offsets the entry so the gaps around the sample node look balanced", () => {
       const x = (id: string) => node(id)!.position.x;
       expect(x("entry")).toBeLessThan(x("llm_call"));
       expect(x("llm_call")).toBeLessThan(x("end"));
-      expect(x("llm_call") - x("entry")).toBeGreaterThanOrEqual(380);
+      // The sample node is wider than entry, so its left edge sits closer to
+      // entry than to end. A smaller entry-side left-edge gap yields an equal
+      // visual gap on both sides.
+      expect(x("entry")).toBeGreaterThan(0);
+      expect(x("llm_call") - x("entry")).toBeLessThan(x("end") - x("llm_call"));
     });
   });
 });

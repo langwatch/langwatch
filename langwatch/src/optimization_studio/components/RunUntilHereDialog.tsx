@@ -198,6 +198,12 @@ export function RunUntilHereDialog() {
                         [field.identifier]: e.target.value,
                       }));
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        runWithValues(values);
+                      }
+                    }}
                   />
                 </Field.Root>
               ))}

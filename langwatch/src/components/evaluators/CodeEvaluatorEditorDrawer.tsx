@@ -28,7 +28,9 @@ import {
 } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { CodeEditor } from "~/optimization_studio/components/code/CodeEditorModal";
+import { rewriteCodeSignature } from "~/optimization_studio/utils/codeSignature";
 import {
+  CODE_EVALUATOR_OUTPUT_FIELDS,
   type CodeEvaluatorConfig,
   DEFAULT_CODE_EVALUATOR_CONFIG,
 } from "~/server/evaluators/codeEvaluator";
@@ -91,9 +93,8 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
   const [inputs, setInputs] = useState<EditableField[]>(
     DEFAULT_CODE_EVALUATOR_CONFIG.inputs.map((f) => ({ ...f })),
   );
-  const [outputs, setOutputs] = useState<EditableField[]>(
-    DEFAULT_CODE_EVALUATOR_CONFIG.outputs.map((f) => ({ ...f })),
-  );
+  // Outputs are the fixed evaluator contract, not user-editable.
+  const outputs: EditableField[] = CODE_EVALUATOR_OUTPUT_FIELDS;
   const [mappings, setMappings] = useState<Record<string, UIFieldMapping>>(
     mappingsConfig?.initialMappings ?? {},
   );
@@ -115,10 +116,19 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
     if (config?.inputs?.length) {
       setInputs(config.inputs.map((f) => ({ ...f })));
     }
-    if (config?.outputs?.length) {
-      setOutputs(config.outputs.map((f) => ({ ...f })));
-    }
   }, [evaluatorQuery.data]);
+
+  // Keep the Python __call__ signature in sync with the declared inputs, the
+  // same way the studio code node does, so adding or removing an input field
+  // rewrites the entrypoint and the saved evaluator never calls it with an
+  // unexpected keyword. Only the signature line changes; the body is kept.
+  const setInputsAndSyncCode = (next: EditableField[]) => {
+    setInputs(next);
+    const valid = validFields(next);
+    if (valid.length > 0) {
+      setCode((current) => rewriteCodeSignature(current, valid));
+    }
+  };
 
   const handleMappingChange = (
     identifier: string,
@@ -194,7 +204,7 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
     const config: CodeEvaluatorConfig = {
       code,
       inputs: validFields(inputs),
-      outputs: validFields(outputs),
+      outputs: CODE_EVALUATOR_OUTPUT_FIELDS.map((f) => ({ ...f })),
     };
     if (isEditing) {
       updateMutation.mutate({
@@ -220,7 +230,6 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
     !!name.trim() &&
     code.trim() !== "" &&
     validFields(inputs).length > 0 &&
-    validFields(outputs).length > 0 &&
     !isPending &&
     !isLoadingEvaluator;
 
@@ -230,9 +239,8 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
     code,
     setCode,
     inputs,
-    setInputs,
+    setInputs: setInputsAndSyncCode,
     outputs,
-    setOutputs,
     mappings,
     handleMappingChange,
     mappingsConfig,
@@ -402,13 +410,63 @@ function CodeEvaluatorFormFields({ form }: { form: CodeEvaluatorFormState }) {
           testIdPrefix="code-evaluator-input"
         />
       )}
-      <FieldListEditor
-        label="Outputs"
-        fields={form.outputs}
-        setFields={form.setOutputs}
-        testIdPrefix="code-evaluator-output"
-      />
+      <OutputContractInfo />
     </>
+  );
+}
+
+/** Short, human-readable purpose of each fixed evaluator output field. */
+const OUTPUT_FIELD_DESCRIPTIONS: Record<string, string> = {
+  passed: "Whether the check passed (true or false).",
+  score: "A numeric score for the result.",
+  label: "A classification label for the result.",
+  details: "A human-readable explanation of the result.",
+};
+
+/**
+ * The evaluator output contract is fixed (passed, score, label, details), just
+ * like an evaluator end node. Rather than a dynamic field editor that could
+ * declare an output the code never returns, the drawer explains the fields the
+ * function may return; whichever the code returns become the result.
+ */
+function OutputContractInfo() {
+  return (
+    <VStack align="stretch" gap={2}>
+      <Text fontSize="sm" fontWeight="semibold">
+        Outputs
+      </Text>
+      <Text fontSize="xs" color="fg.muted">
+        Return a dictionary from your function with any of these fields.
+        Whichever you return become the evaluation result.
+      </Text>
+      <VStack
+        align="stretch"
+        gap={1.5}
+        borderWidth="1px"
+        borderColor="border"
+        borderRadius="md"
+        padding={3}
+      >
+        {CODE_EVALUATOR_OUTPUT_FIELDS.map((field) => (
+          <HStack key={field.identifier} gap={2} align="baseline">
+            <Text
+              fontSize="sm"
+              fontFamily="mono"
+              fontWeight="medium"
+              data-testid={`code-evaluator-output-field-${field.identifier}`}
+            >
+              {field.identifier}
+            </Text>
+            <Text fontSize="xs" color="fg.muted" fontFamily="mono">
+              {field.type}
+            </Text>
+            <Text fontSize="xs" color="fg.muted">
+              {OUTPUT_FIELD_DESCRIPTIONS[field.identifier]}
+            </Text>
+          </HStack>
+        ))}
+      </VStack>
+    </VStack>
   );
 }
 

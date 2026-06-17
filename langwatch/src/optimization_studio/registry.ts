@@ -76,7 +76,7 @@ const code: Code = {
       identifier: "code",
       type: "code",
       value: `class Code:
-    def __call__(self, ${defaultInput?.identifier ?? "input"}: str):
+    def __call__(self, ${defaultInput?.identifier ?? "input"}: str = None):
         # Your code goes here
 
         return {"${defaultOutput?.identifier ?? "output"}": "Hello world!"}

@@ -13,12 +13,17 @@ import { BasePropertiesPanel } from "./BasePropertiesPanel";
  * four - fixed identifiers and types, no add/remove/rename. Every
  * result is optional: connect any combination (a pass/fail, a score,
  * both, or neither) and unconnected results are simply omitted.
+ *
+ * `details` comes first: it carries the reasoning, and for an LLM judge
+ * the reasoning should precede the verdict so the model reasons before
+ * deciding. It also keeps the scaffold's reasoning -> details edge from
+ * crossing the verdict edge.
  */
 export const EVALUATOR_RESULT_FIELDS: Field[] = [
+  { identifier: "details", type: "str", optional: true },
   { identifier: "passed", type: "bool", optional: true },
   { identifier: "score", type: "float", optional: true },
   { identifier: "label", type: "str", optional: true },
-  { identifier: "details", type: "str", optional: true },
 ];
 
 const EVALUATOR_RESULT_TYPE_LABELS: Record<string, string> = {
@@ -59,8 +64,8 @@ export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
   // connections survive (identifiers keep their handles); free-form fields
   // users created by hand are replaced by the contract. The check also
   // reconciles optionality and order, so older nodes that pinned passed/score
-  // as required (or kept details/label in the wrong spot) normalize to the
-  // all-optional, label-before-details vocabulary.
+  // as required (or kept the fields in the wrong spot) normalize to the
+  // all-optional, details-first vocabulary.
   useEffect(() => {
     if (!isEvaluator) return;
     const current = node.data.inputs ?? [];

@@ -51,6 +51,12 @@ Feature: Run-until-here dialog
     And the entry point outputs are the typed values instead of a dataset row
 
   @integration
+  Scenario: Pressing Enter runs the partial execution
+    Given the run-until-here dialog is open
+    When I edit a field and press Enter
+    Then the execution starts scoped to the target node with the typed values
+
+  @integration
   Scenario: Select dataset value is only offered with an attached dataset
     Given the entry point has no dataset attached
     When the run-until-here dialog opens
