@@ -99,7 +99,11 @@ const PrivacyMarker: React.FC<MarkerCopy> = ({ icon, label, tooltip }) => {
           <Text>{tooltip}</Text>
           {canOpenSettings && (
             <Link asChild color="inherit" textDecoration="underline">
-              <NextLink href="/settings/data-privacy">
+              <NextLink
+                href="/settings/data-privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 Open privacy settings
               </NextLink>
             </Link>

@@ -63,7 +63,13 @@ export function PrivacyDroppedNotice({
             marginTop={1}
             alignSelf="start"
           >
-            <NextLink href="/settings/data-privacy">Privacy settings</NextLink>
+            <NextLink
+              href="/settings/data-privacy"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Privacy settings
+            </NextLink>
           </Button>
         )}
       </Alert.Content>

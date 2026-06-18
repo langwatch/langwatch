@@ -77,6 +77,10 @@ describe("PrivacyDroppedNotice", () => {
       );
       const link = container.querySelector('a[href="/settings/data-privacy"]');
       expect(link?.textContent).toBe("Privacy settings");
+      // Fix-it links open in a new tab so the viewer keeps the trace they were
+      // looking at. See dev/docs/best_practices/inline-fix-links.md.
+      expect(link?.getAttribute("target")).toBe("_blank");
+      expect(link?.getAttribute("rel")).toContain("noopener");
     });
 
     it("hides the link without the permission", () => {
