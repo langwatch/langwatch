@@ -15,8 +15,8 @@ Feature: Remote attachment URLs are fetched and delivered to the model as conten
     cannot be fetched, the run must fail with a clear, user-facing message
     rather than silently sending a broken request or a wall of URL text.
 
-    # Bindings: services/nlpgo/app/engine/attachment_test.go and
-    # services/nlpgo/tests/integration/attachment_url_test.go
+    # Bindings: services/nlpgo/app/engine/attachment_test.go and the live
+    # integration probe services/nlpgo/tests/integration/workflow_llm_vision_url_e2e_test.go
     # Fetch + detect + structure: services/nlpgo/app/engine/attachment.go,
     # applied to the messages buildMessages returns, right beside the existing
     # data-URL image split in multimodal.go.
