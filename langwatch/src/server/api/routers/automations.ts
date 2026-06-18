@@ -26,6 +26,8 @@ import {
   validateTemplateDraft,
 } from "~/server/app-layer/triggers/trigger-template.service";
 import { enforceLicenseLimit } from "../../license-enforcement";
+import { rateLimit } from "../../rateLimit";
+import { buildRetryAfterMessage } from "./rateLimitMessage";
 import {
   sanitizeTriggerFilters,
   triggerFiltersSchema,
@@ -416,7 +418,6 @@ export const automationRouter = createTRPCRouter({
         channel: z.enum(["email", "slack"]),
         trigger: triggerIdentitySchema,
         draft: templateDraftSchema,
-        recipients: z.string().array().default([]),
         webhook: z
           .string()
           .url()
@@ -427,9 +428,41 @@ export const automationRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("triggers:update"))
     .mutation(async ({ ctx, input }) => {
+      // ADR-031: test fire is no longer an open relay. The client-supplied
+      // recipient list is gone from the input entirely — there is nothing to
+      // trust or validate. The email recipient is resolved server-side as the
+      // authenticated session user. A light per-user rate limit guards the
+      // mail provider against a stuck client loop (hygiene, not anti-abuse:
+      // the recipient is always the requester). Slack (webhook) is unchanged
+      // and intentionally exempt from the rate limit — it fires to the
+      // customer's own webhook, not our mail provider.
       try {
+        let recipients: string[] = [];
         if (input.channel === "email") {
-          validateEmailRecipientFormats(input.recipients);
+          const limit = await rateLimit({
+            key: `testfire:${ctx.session.user.id}`,
+            windowSeconds: 60,
+            max: 10,
+          });
+          if (!limit.allowed) {
+            throw new TRPCError({
+              code: "TOO_MANY_REQUESTS",
+              message: buildRetryAfterMessage({
+                prefix: "Too many test fires.",
+                resetAt: limit.resetAt,
+              }),
+            });
+          }
+
+          const email = ctx.session.user.email;
+          if (!email) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message:
+                "Your account has no email address to send a test fire to.",
+            });
+          }
+          recipients = [email];
         }
         const project = await resolveProjectIdentity(input.projectId);
         return await getApp().triggerTemplates.testFire({
@@ -437,7 +470,7 @@ export const automationRouter = createTRPCRouter({
           trigger: input.trigger,
           project,
           draft: input.draft,
-          recipients: input.recipients,
+          recipients,
           webhook: input.webhook,
         });
       } catch (err) {

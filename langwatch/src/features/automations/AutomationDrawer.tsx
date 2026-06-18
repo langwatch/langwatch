@@ -271,7 +271,7 @@ export function AutomationDrawer({
     }
     const token = ++previewToken.current;
     const templates = templatesFromDraft(draft);
-    (async () => {
+    void (async () => {
       try {
         if (channel === "email") {
           const rendered = await renderTriggerEmail({
@@ -338,7 +338,6 @@ export function AutomationDrawer({
           alertType: draft.alertType,
         },
         draft: templatesFromDraft(draft),
-        recipients: target.recipients,
         webhook: target.webhook,
       },
       {
@@ -355,7 +354,7 @@ export function AutomationDrawer({
             type: "success",
             description:
               r.channel === "email"
-                ? `Sent to ${r.recipientCount} recipient(s).`
+                ? "Sent to your inbox."
                 : "Posted to the Slack webhook.",
             meta: { closable: true },
           });

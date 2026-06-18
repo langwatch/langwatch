@@ -112,6 +112,11 @@ function makeDeps(trigger: TriggerSummary = makeTrigger()) {
     deriveEvents: vi.fn().mockResolvedValue([]),
     traceById: vi.fn().mockResolvedValue(undefined),
     enqueueCadence: vi.fn().mockResolvedValue(undefined),
+    emailHourlyCap: 100,
+    consumeEmailCapSlot: vi.fn().mockResolvedValue({ allowed: true, count: 1 }),
+    filterSuppressedEmails: vi
+      .fn()
+      .mockImplementation(async ({ emails }: { emails: string[] }) => emails),
   };
 }
 
@@ -188,6 +193,36 @@ describe("createOutboxDispatcher cadence stage", () => {
     });
   });
 
+  describe("when the mailer consults the per-recipient idempotency gate", () => {
+    it("backs both callbacks with the TriggerSent claim store under a rcpt:-prefixed key stable across retries", async () => {
+      const deps = makeDeps();
+      const dispatcher = createOutboxDispatcher(deps);
+
+      await dispatcher.process(makeCadencePayload());
+
+      const args = vi.mocked(sendTriggerEmail).mock.calls[0]?.[0];
+      expect(args?.isRecipientSent).toBeTypeOf("function");
+      expect(args?.recordRecipientSent).toBeTypeOf("function");
+
+      deps.triggers.isSendClaimed.mockClear();
+      deps.triggers.claimSend.mockClear();
+
+      await args!.isRecipientSent!("a1b2c3");
+      await args!.recordRecipientSent!("a1b2c3");
+
+      const readKey = deps.triggers.isSendClaimed.mock.calls[0]?.[0];
+      const writeKey = deps.triggers.claimSend.mock.calls[0]?.[0];
+      expect(readKey).toEqual({
+        triggerId: TRIGGER_ID,
+        projectId: PROJECT_ID,
+        traceId: expect.stringMatching(/^rcpt:[0-9a-f]{16}:a1b2c3$/),
+      });
+      // Read and write must target the SAME key, or retries would never
+      // observe the recorded delivery.
+      expect(writeKey).toEqual(readKey);
+    });
+  });
+
   describe("when the same traceId appears twice in a coalesced batch", () => {
     it("dedupes in-batch before the dispatch so the digest carries one row per trace", async () => {
       const deps = makeDeps();
@@ -214,7 +249,8 @@ describe("createOutboxDispatcher cadence stage", () => {
           slackTemplateType: null,
           slackTemplate: null,
           emailSubjectTemplate: null,
-          emailBodyTemplate: "Hello {{ trigger.name }} — {{ matches.size }} match",
+          emailBodyTemplate:
+            "Hello {{ trigger.name }} — {{ matches.size }} match",
         },
       });
       const deps = makeDeps(trigger);
@@ -257,6 +293,158 @@ describe("createOutboxDispatcher cadence stage", () => {
       expect(JSON.stringify(arg.payload)).toContain("Latency alert");
       expect(JSON.stringify(arg.payload)).toContain("1 match");
       expect(deps.triggers.claimSend).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("given the per-trigger hourly email cap (ADR-031)", () => {
+    describe("when the dispatch is under the cap", () => {
+      it("sends the email normally and records the claim", async () => {
+        const deps = makeDeps();
+        deps.consumeEmailCapSlot.mockResolvedValueOnce({
+          allowed: true,
+          count: 7,
+        });
+        const dispatcher = createOutboxDispatcher(deps);
+
+        await dispatcher.process(makeCadencePayload());
+
+        expect(deps.consumeEmailCapSlot).toHaveBeenCalledTimes(1);
+        expect(sendTriggerEmail).toHaveBeenCalledTimes(1);
+        expect(deps.triggers.claimSend).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when the dispatch is over the cap", () => {
+      it("drops without sending, without throwing, but still records the claim so replays no-op", async () => {
+        const deps = makeDeps();
+        deps.consumeEmailCapSlot.mockResolvedValueOnce({
+          allowed: false,
+          count: 101,
+        });
+        const dispatcher = createOutboxDispatcher(deps);
+
+        await expect(
+          dispatcher.process(makeCadencePayload()),
+        ).resolves.toBeUndefined();
+
+        expect(sendTriggerEmail).not.toHaveBeenCalled();
+        expect(sendRenderedTriggerEmail).not.toHaveBeenCalled();
+        // Claim is recorded so an outbox replay is a no-op, not a re-send.
+        expect(deps.triggers.claimSend).toHaveBeenCalledTimes(1);
+        // ...but the drop must NOT run delivery-only bookkeeping: the
+        // "last-fired" cosmetic would misrepresent a dropped no-op as a send.
+        expect(deps.triggers.updateLastRunAt).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the trigger sends Slack rather than email", () => {
+      it("never consults the email cap", async () => {
+        const trigger = makeTrigger({
+          action: TriggerAction.SEND_SLACK_MESSAGE,
+          actionParams: { slackWebhook: "https://hooks.slack.com/services/x" },
+        });
+        const deps = makeDeps(trigger);
+        const dispatcher = createOutboxDispatcher(deps);
+
+        await dispatcher.process(makeCadencePayload());
+
+        expect(deps.consumeEmailCapSlot).not.toHaveBeenCalled();
+        expect(sendSlackWebhook).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when a fresh hour opens after the cap was exhausted", () => {
+      it("allows the email again because the slot consumer reports allowed", async () => {
+        const deps = makeDeps();
+        deps.consumeEmailCapSlot
+          .mockResolvedValueOnce({ allowed: false, count: 101 })
+          .mockResolvedValueOnce({ allowed: true, count: 1 });
+        const dispatcher = createOutboxDispatcher(deps);
+
+        await dispatcher.process(makeCadencePayload());
+        expect(sendTriggerEmail).not.toHaveBeenCalled();
+
+        await dispatcher.process(
+          makeCadencePayload({
+            match: { traceId: "trace-2", input: "in", output: "out" },
+            auditDedupKey: `${PROJECT_ID}/${TRIGGER_ID}:trace:trace-2`,
+          }),
+        );
+        expect(sendTriggerEmail).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
+
+  describe("given recipient suppression (ADR-031)", () => {
+    describe("when some but not all recipients are suppressed", () => {
+      it("sends only to the recipients the filter returns", async () => {
+        const trigger = makeTrigger({
+          action: TriggerAction.SEND_EMAIL,
+          actionParams: {
+            members: ["keep@example.com", "gone@example.com"],
+          },
+        });
+        const deps = makeDeps(trigger);
+        deps.filterSuppressedEmails.mockResolvedValueOnce(["keep@example.com"]);
+        const dispatcher = createOutboxDispatcher(deps);
+
+        await dispatcher.process(makeCadencePayload());
+
+        expect(sendTriggerEmail).toHaveBeenCalledTimes(1);
+        expect(sendTriggerEmail).toHaveBeenCalledWith(
+          expect.objectContaining({ triggerEmails: ["keep@example.com"] }),
+        );
+      });
+    });
+
+    describe("when every recipient is suppressed", () => {
+      it("skips the send entirely and records the claim without throwing or burning a cap slot", async () => {
+        const deps = makeDeps();
+        deps.filterSuppressedEmails.mockResolvedValueOnce([]);
+        const dispatcher = createOutboxDispatcher(deps);
+
+        await expect(
+          dispatcher.process(makeCadencePayload()),
+        ).resolves.toBeUndefined();
+
+        expect(sendTriggerEmail).not.toHaveBeenCalled();
+        expect(sendRenderedTriggerEmail).not.toHaveBeenCalled();
+        // Suppression runs before the cap — an all-suppressed dispatch must
+        // not consume a slot.
+        expect(deps.consumeEmailCapSlot).not.toHaveBeenCalled();
+        expect(deps.triggers.claimSend).toHaveBeenCalledTimes(1);
+        // Drop must not run the delivery-only "last-fired" bookkeeping.
+        expect(deps.triggers.updateLastRunAt).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when a custom-template trigger has some recipients suppressed", () => {
+      it("renders and sends to only the filtered recipients", async () => {
+        const trigger = makeTrigger({
+          action: TriggerAction.SEND_EMAIL,
+          name: "Latency alert",
+          actionParams: {
+            members: ["keep@example.com", "gone@example.com"],
+          },
+          templates: {
+            slackTemplateType: null,
+            slackTemplate: null,
+            emailSubjectTemplate: null,
+            emailBodyTemplate: "Hi {{ trigger.name }}",
+          },
+        });
+        const deps = makeDeps(trigger);
+        deps.filterSuppressedEmails.mockResolvedValueOnce(["keep@example.com"]);
+        const dispatcher = createOutboxDispatcher(deps);
+
+        await dispatcher.process(makeCadencePayload());
+
+        expect(sendTriggerEmail).not.toHaveBeenCalled();
+        expect(sendRenderedTriggerEmail).toHaveBeenCalledTimes(1);
+        expect(sendRenderedTriggerEmail).toHaveBeenCalledWith(
+          expect.objectContaining({ triggerEmails: ["keep@example.com"] }),
+        );
+      });
     });
   });
 });

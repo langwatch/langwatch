@@ -121,6 +121,11 @@ export function createEnvConfig() {
       LANGEVALS_STAGING_TTL_SECONDS: z.coerce.number().int().positive().default(600),
       EVAL_MAX_PAYLOAD_BYTES: z.coerce.number().int().positive().default(16_000_000),
       TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES: z.coerce.number().int().positive().default(180_000_000),
+      // ADR-031: per-trigger hourly hard cap on dispatched trigger emails.
+      // Counts dispatches (one digest of N traces = 1), not traces or
+      // recipients. Only ever bites immediate-cadence triggers; digest
+      // cadences cannot exceed 12/hour.
+      TRIGGER_EMAIL_HOURLY_CAP: z.coerce.number().int().positive().default(100),
       DEMO_PROJECT_ID: z.string().optional(),
       DEMO_PROJECT_USER_ID: z.string().optional(),
       DEMO_PROJECT_SLUG: z.string().optional(),
@@ -298,6 +303,7 @@ export function createEnvConfig() {
       LANGEVALS_STAGING_TTL_SECONDS: process.env.LANGEVALS_STAGING_TTL_SECONDS,
       EVAL_MAX_PAYLOAD_BYTES: process.env.EVAL_MAX_PAYLOAD_BYTES,
       TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES: process.env.TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES,
+      TRIGGER_EMAIL_HOURLY_CAP: process.env.TRIGGER_EMAIL_HOURLY_CAP,
       DEMO_PROJECT_ID: process.env.DEMO_PROJECT_ID,
       DEMO_PROJECT_USER_ID: process.env.DEMO_PROJECT_USER_ID,
       DEMO_PROJECT_SLUG: process.env.DEMO_PROJECT_SLUG,

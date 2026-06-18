@@ -1,4 +1,5 @@
 import { TriggerAction } from "@prisma/client";
+import { createHash } from "crypto";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
@@ -78,6 +79,30 @@ export interface OutboxDispatcherDeps {
     payload: CadenceStagePayload,
     options: { delayMs: number },
   ) => Promise<void>;
+  /**
+   * ADR-031: per-trigger hourly hard cap on dispatched emails. Consults a
+   * fixed-hour Redis counter; `allowed: false` means the trigger has already
+   * sent `cap` emails this hour and this dispatch must be dropped (not sent,
+   * not retried). Injected so tests can fake it. Slack never calls it.
+   */
+  consumeEmailCapSlot: (args: {
+    projectId: string;
+    triggerId: string;
+    now: Date;
+  }) => Promise<{ allowed: boolean; count: number }>;
+  /** The configured cap, for operator-facing drop logs (ADR-031). */
+  emailHourlyCap: number;
+  /**
+   * ADR-031: drops recipients who unsubscribed before the provider call.
+   * Returns `emails` minus any address suppressed for this trigger
+   * (trigger-scoped OR project-wide rows). Injected so tests can fake it.
+   * Slack never calls it.
+   */
+  filterSuppressedEmails: (args: {
+    projectId: string;
+    triggerId: string;
+    emails: string[];
+  }) => Promise<string[]>;
 }
 
 /**
@@ -352,9 +377,90 @@ async function handleCadenceBatch(
     });
   };
 
+  // Tracks whether a provider send actually happened. Suppression / over-cap
+  // drops still run `claimSend` below (ADR-031: a replay must no-op), but they
+  // must NOT run the delivery-only bookkeeping — `updateLastRunAt` (the
+  // operator "last-fired" column) and the "dispatched" success log — which
+  // would misrepresent a dropped no-op as a real notification.
+  let didSend = false;
+
   try {
     switch (trigger.action) {
-      case TriggerAction.SEND_EMAIL:
+      case TriggerAction.SEND_EMAIL: {
+        // ADR-031: drop unsubscribed recipients FIRST. An all-suppressed
+        // dispatch has nothing to send — record the claim (so a replay
+        // no-ops), log at info, and skip without throwing AND without burning
+        // a cap slot (the cap is for emails actually sent, not for dispatches
+        // that resolve to zero recipients).
+        const recipients = await deps.filterSuppressedEmails({
+          projectId,
+          triggerId,
+          emails: params.members ?? [],
+        });
+        if (recipients.length === 0) {
+          logger.info(
+            { projectId, triggerId },
+            "All trigger email recipients are suppressed — skipping send",
+          );
+          break;
+        }
+        // ADR-031: per-trigger hourly hard cap. Only consumed once we know
+        // there is a real send to make. Gate BEFORE either the custom-template
+        // or legacy send path. Over the cap the dispatch is a terminal drop:
+        // log loudly, fall through to claimSend below (so a replay no-ops
+        // instead of re-sending), and return WITHOUT sending and WITHOUT
+        // throwing — throwing would let the outbox retry the spam. The cap
+        // counts dispatches, not traces or recipients.
+        const capSlot = await deps.consumeEmailCapSlot({
+          projectId,
+          triggerId,
+          now: new Date(),
+        });
+        if (!capSlot.allowed) {
+          logger.error(
+            {
+              projectId,
+              triggerId,
+              count: capSlot.count,
+              cap: deps.emailHourlyCap,
+            },
+            "Trigger exceeded its hourly email cap — dropping this dispatch. " +
+              "Switch this trigger to a digest cadence to coalesce its volume.",
+          );
+          break;
+        }
+        // Per-recipient idempotency (ADR-031): back the mailer's recipient
+        // gate with the same TriggerSent claim store used for the
+        // (trigger, trace) dedup below, encoding the recipient hash into the
+        // traceId field under a `rcpt:` prefix (real trace ids never carry
+        // it). The digest over the batch's traceIds keeps the key stable
+        // across outbox retries of THIS dispatch — so a partial provider
+        // failure retries only the unfinished recipients — while staying
+        // distinct from past and future dispatches to the same recipients.
+        const dispatchDigest = createHash("sha256")
+          .update(
+            candidatePayloads
+              .map((p) => p.match.traceId)
+              .sort()
+              .join(","),
+          )
+          .digest("hex")
+          .slice(0, 16);
+        const recipientClaimKey = (recipientHash: string) =>
+          `rcpt:${dispatchDigest}:${recipientHash}`;
+        const isRecipientSent = (recipientHash: string) =>
+          deps.triggers.isSendClaimed({
+            triggerId,
+            traceId: recipientClaimKey(recipientHash),
+            projectId,
+          });
+        const recordRecipientSent = async (recipientHash: string) => {
+          await deps.triggers.claimSend({
+            triggerId,
+            traceId: recipientClaimKey(recipientHash),
+            projectId,
+          });
+        };
         if (hasCustomEmail) {
           const rendered = await renderTriggerEmail({
             subjectTemplate: t.emailSubjectTemplate,
@@ -368,23 +474,32 @@ async function handleCadenceBatch(
             );
           }
           await sendRenderedTriggerEmail({
-            triggerEmails: params.members ?? [],
+            triggerEmails: recipients,
             triggerId,
+            projectId,
             subject: rendered.subject,
             html: rendered.html,
+            isRecipientSent,
+            recordRecipientSent,
           });
+          didSend = true;
           break;
         }
         await sendTriggerEmail({
-          triggerEmails: params.members ?? [],
+          triggerEmails: recipients,
           triggerData,
           triggerName: trigger.name,
           triggerId,
+          projectId,
           projectSlug: project.slug,
           triggerType: trigger.alertType,
           triggerMessage: trigger.message ?? "",
+          isRecipientSent,
+          recordRecipientSent,
         });
+        didSend = true;
         break;
+      }
       case TriggerAction.SEND_SLACK_MESSAGE:
         if (hasCustomSlack) {
           const rendered = await renderTriggerSlack({
@@ -404,6 +519,7 @@ async function handleCadenceBatch(
             triggerName: trigger.name,
             payload: rendered.payload,
           });
+          didSend = true;
           break;
         }
         await sendSlackWebhook({
@@ -414,6 +530,7 @@ async function handleCadenceBatch(
           triggerType: trigger.alertType,
           triggerMessage: trigger.message ?? "",
         });
+        didSend = true;
         break;
       default:
         throw new DispatchError({
@@ -472,6 +589,23 @@ async function handleCadenceBatch(
         },
       });
     }
+  }
+
+  // Delivery-only bookkeeping. A suppression / over-cap drop still claimed its
+  // sends above (replay no-op), but never actually delivered — so skip the
+  // "last-fired" cosmetic and the success log, which would otherwise report a
+  // dropped dispatch as a notification.
+  if (!didSend) {
+    logger.info(
+      {
+        projectId,
+        triggerId,
+        action: trigger.action,
+        cadence: trigger.notificationCadence,
+      },
+      "Outbox cadence digest dropped (no recipients or over cap) — claimed but not sent",
+    );
+    return;
   }
 
   // `updateLastRunAt` is a soft-state cosmetic for the operator UI

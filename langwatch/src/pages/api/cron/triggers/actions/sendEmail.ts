@@ -1,18 +1,60 @@
 import { TriggerAction } from "@prisma/client";
+import { env } from "~/env.mjs";
+import { getApp } from "~/server/app-layer/app";
+import { consumeEmailCapSlot } from "~/server/event-sourcing/outbox/emailHourlyCap";
 import { sendTriggerEmail } from "~/server/mailer/triggerEmail";
+import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
 import type { ActionParams, TriggerContext } from "../types";
+
+const logger = createLogger("langwatch:cron:triggers:sendEmail");
 
 export const handleSendEmail = async (context: TriggerContext) => {
   const { trigger, triggerData, projectSlug } = context;
   const actionParams = trigger.actionParams as unknown as ActionParams;
 
   try {
+    // ADR-031: the custom-graph cron path renders the same unsubscribe footer
+    // as the outbox path, so it must honour the same suppression list and
+    // hourly cap — otherwise those footers' links would be dead.
+    const recipients = await getApp().emailSuppressions.filterSuppressed({
+      projectId: trigger.projectId,
+      triggerId: trigger.id,
+      emails: actionParams.members ?? [],
+    });
+    if (recipients.length === 0) {
+      logger.info(
+        { triggerId: trigger.id, projectId: trigger.projectId },
+        "All custom-graph trigger email recipients are suppressed — skipping send",
+      );
+      return;
+    }
+
+    const capSlot = await consumeEmailCapSlot({
+      projectId: trigger.projectId,
+      triggerId: trigger.id,
+      now: new Date(),
+      cap: env.TRIGGER_EMAIL_HOURLY_CAP,
+    });
+    if (!capSlot.allowed) {
+      logger.error(
+        {
+          triggerId: trigger.id,
+          projectId: trigger.projectId,
+          count: capSlot.count,
+          cap: env.TRIGGER_EMAIL_HOURLY_CAP,
+        },
+        "Custom-graph trigger exceeded its hourly email cap — dropping this dispatch",
+      );
+      return;
+    }
+
     const triggerInfo = {
-      triggerEmails: actionParams.members ?? [],
+      triggerEmails: recipients,
       triggerData,
       triggerName: trigger.name,
       triggerId: trigger.id,
+      projectId: trigger.projectId,
       projectSlug,
       triggerType: trigger.alertType ?? null,
       triggerMessage: trigger.message ?? "",

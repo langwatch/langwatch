@@ -166,8 +166,10 @@ export interface NotifyClientDef<S = unknown, TPreview = unknown>
   /** The channel string the preview/testFire endpoints accept. Each
    *  provider names its own — the shared layer doesn't enumerate. */
   readonly channel: "email" | "slack";
-  /** Recipients / webhook for the test-fire mutation. */
-  testFireTarget(slice: S): { recipients: string[]; webhook: string | null };
+  /** Webhook for the test-fire mutation. ADR-031: email test fires resolve
+   *  their recipient server-side (the requester's own inbox), so no provider
+   *  contributes a recipient list here — only Slack contributes its webhook. */
+  testFireTarget(slice: S): { webhook: string | null };
   /** Template strings contributed to the save payload (`templates`). */
   templatesFromSlice(slice: S): TemplateDraft;
 }

@@ -1,5 +1,6 @@
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { CircleCheck, CircleX, Send } from "lucide-react";
+import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { useConfigComplete, useNotifyChannel, useTestHistory } from "../state/selectors";
 
@@ -24,6 +25,8 @@ export function TestFireSection({
   const channel = useNotifyChannel();
   const configComplete = useConfigComplete();
   const history = useTestHistory();
+  const session = useRequiredSession();
+  const sessionEmail = session.data?.user?.email ?? null;
 
   if (!channel) return null;
 
@@ -60,11 +63,18 @@ export function TestFireSection({
               <>
                 {formatTimeAgo(last.at)}
                 {lastIsSuccess
-                  ? ` — delivered to ${last.recipientCount ?? 0} ${
-                      channel === "email" ? "recipient" : "webhook"
-                    }${(last.recipientCount ?? 0) === 1 ? "" : "s"}`
+                  ? channel === "email"
+                    ? " — delivered to your inbox"
+                    : ` — delivered to ${last.recipientCount ?? 0} webhook${
+                        (last.recipientCount ?? 0) === 1 ? "" : "s"
+                      }`
                   : ` — ${last.errorTitle ?? "failed"}`}
               </>
+            ) : channel === "email" ? (
+              // ADR-031: email test fires deliver only to the requester.
+              sessionEmail
+                ? `A test will be sent to ${sessionEmail}`
+                : "A test will be sent to your own account email."
             ) : (
               "Send a banner-marked notification to the configured destination before saving."
             )}
