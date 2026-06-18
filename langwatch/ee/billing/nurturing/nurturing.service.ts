@@ -1,5 +1,5 @@
 import { createLogger } from "../../../src/utils/logger/server";
-import { captureException } from "../../../src/utils/posthogErrorCapture";
+import { captureException, toError } from "../../../src/utils/posthogErrorCapture";
 import type { AppConfig } from "../../../src/server/app-layer/config";
 import type {
   CioBatchCall,
@@ -171,7 +171,7 @@ export class NurturingService {
       }
     } catch (error) {
       logger.error({ error, path }, `[CIO] <<< ${path} EXCEPTION`);
-      captureException(error);
+      captureException(toError(error));
     } finally {
       clearTimeout(timeoutId);
     }

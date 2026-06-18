@@ -127,6 +127,15 @@ interface DrawerState extends DrawerUrlState {
     occurredAtMs?: number | null,
     expectedSpanCount?: number | null,
   ) => void;
+  /**
+   * Fill in the partition-pruning hint after the fact, from a resolved
+   * trace timestamp, when the drawer was opened without one (deep link /
+   * refresh whose URL carries no `t`). Only sets when `occurredAtMs` is
+   * currently null, so it never overwrites a hint the opener already
+   * supplied. Once set, the drawer's per-trace `stored_spans` reads can
+   * prune to the trace's weekly partitions instead of cold-scanning S3.
+   */
+  backfillOccurredAtMs: (occurredAtMs: number) => void;
   closeDrawer: () => void;
   selectSpan: (spanId: string) => void;
   clearSpan: () => void;
@@ -500,6 +509,13 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
       expectedSpanCount: expectedSpanCount ?? null,
       selectedSpanId: null,
       pinnedSpanIds: [],
+    }),
+
+  backfillOccurredAtMs: (occurredAtMs) =>
+    set((s) => {
+      if (s.occurredAtMs !== null) return {};
+      if (!Number.isFinite(occurredAtMs) || occurredAtMs <= 0) return {};
+      return { occurredAtMs };
     }),
 
   closeDrawer: () =>

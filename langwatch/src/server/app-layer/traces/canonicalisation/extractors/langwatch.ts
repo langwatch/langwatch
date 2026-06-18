@@ -411,20 +411,35 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Metrics (cost, tokens, estimated flag)
-    // SDK sends: { type: "json", value: { promptTokens, completionTokens, cost } }
+    // Metrics (cost, tokens, reasoning, TTFT, estimated flag)
+    // Two SDK shapes for the same attribute:
+    // - TypeScript: { type: "json", value: { promptTokens, completionTokens, cost } }
+    // - Python: bare snake_case object { prompt_tokens, completion_tokens,
+    //   reasoning_tokens, cost, first_token_ms }
     // ─────────────────────────────────────────────────────────────────────────
     const rawMetrics = attrs.take(ATTR_KEYS.LANGWATCH_METRICS);
     if (rawMetrics !== undefined) {
-      if (
-        isLangWatchStructuredValue(rawMetrics) &&
-        isRecord(rawMetrics.value)
-      ) {
-        const metricsValue = rawMetrics.value as Record<string, unknown>;
+      const metricsValue: Record<string, unknown> | null =
+        isLangWatchStructuredValue(rawMetrics) && isRecord(rawMetrics.value)
+          ? (rawMetrics.value as Record<string, unknown>)
+          : isRecord(rawMetrics)
+            ? (rawMetrics as Record<string, unknown>)
+            : null;
 
-        // Extract token counts (setAttrIfAbsent — GenAI extractor may have set these)
-        const promptTokens = metricsValue.promptTokens;
-        if (typeof promptTokens === "number" && promptTokens > 0) {
+      if (metricsValue) {
+        const numberField = (...keys: string[]): number | null => {
+          for (const key of keys) {
+            const value = metricsValue[key];
+            if (typeof value === "number" && Number.isFinite(value)) {
+              return value;
+            }
+          }
+          return null;
+        };
+
+        // Token counts (setAttrIfAbsent — GenAI extractor may have set these)
+        const promptTokens = numberField("promptTokens", "prompt_tokens");
+        if (promptTokens !== null && promptTokens > 0) {
           ctx.setAttrIfAbsent(
             ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS,
             promptTokens,
@@ -432,8 +447,11 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
           ctx.recordRule(`${this.id}:metrics.promptTokens`);
         }
 
-        const completionTokens = metricsValue.completionTokens;
-        if (typeof completionTokens === "number" && completionTokens > 0) {
+        const completionTokens = numberField(
+          "completionTokens",
+          "completion_tokens",
+        );
+        if (completionTokens !== null && completionTokens > 0) {
           ctx.setAttrIfAbsent(
             ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS,
             completionTokens,
@@ -441,15 +459,38 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
           ctx.recordRule(`${this.id}:metrics.completionTokens`);
         }
 
-        // Extract cost (setAttrIfAbsent — custom cost rates from enrichment take precedence)
-        const cost = metricsValue.cost;
-        if (typeof cost === "number" && cost > 0) {
+        const reasoningTokens = numberField(
+          "reasoningTokens",
+          "reasoning_tokens",
+        );
+        if (reasoningTokens !== null && reasoningTokens > 0) {
+          ctx.setAttrIfAbsent(
+            ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS,
+            reasoningTokens,
+          );
+          ctx.recordRule(`${this.id}:metrics.reasoningTokens`);
+        }
+
+        // Cost (setAttrIfAbsent — custom cost rates from enrichment take precedence)
+        const cost = numberField("cost");
+        if (cost !== null && cost > 0) {
           ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_SPAN_COST, cost);
           ctx.recordRule(`${this.id}:metrics.cost`);
         }
 
-        // Extract estimated flag
-        const tokensEstimated = metricsValue.tokensEstimated;
+        // Time to first token, already a duration in milliseconds
+        const firstTokenMs = numberField("firstTokenMs", "first_token_ms");
+        if (firstTokenMs !== null && firstTokenMs >= 0) {
+          ctx.setAttrIfAbsent(
+            ATTR_KEYS.GEN_AI_SERVER_TIME_TO_FIRST_TOKEN,
+            firstTokenMs,
+          );
+          ctx.recordRule(`${this.id}:metrics.firstTokenMs`);
+        }
+
+        // Estimated flag
+        const tokensEstimated =
+          metricsValue.tokensEstimated ?? metricsValue.tokens_estimated;
         if (tokensEstimated === true) {
           ctx.setAttr(ATTR_KEYS.LANGWATCH_TOKENS_ESTIMATED, true);
           ctx.recordRule(`${this.id}:metrics.tokensEstimated`);

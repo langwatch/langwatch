@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createEnv } from "@t3-oss/env-core";
 
-import { assertGatewaySecretsAllOrNone, createEnvConfig } from "../env-create.mjs";
+import { assertGatewaySecretsAllOrNone, createEnvConfig, gatewaySecretsSchema } from "../env-create.mjs";
 
 // Regression for iter-110: gateway secrets set partially (e.g. only
 // LW_VIRTUAL_KEY_PEPPER, missing the two HMAC/JWT secrets) let the server
@@ -104,5 +105,72 @@ describe("createEnvConfig — client-safe guard", () => {
         process.env.LW_VIRTUAL_KEY_PEPPER = original;
       }
     }
+  });
+});
+
+// Regression for issue #3903 Friction #2: the .env.example sentinel value
+// "REPLACE_ME" is only 10 chars — deliberately shorter than min(32) — so Zod
+// itself rejects it at boot without a bespoke length-equality guard.
+// This test exercises the REAL gatewaySecretsSchema exported from env-create.mjs
+// (not an inline copy), so a mutation of min(32) → min(1) in production will
+// cause this test to fail because "REPLACE_ME" (10 chars) would pass min(1).
+//
+// Note: @t3-oss/env-core logs issues to console.error but the thrown error
+// message is the fixed string "Invalid environment variables" — the field names
+// appear in the logged issues, not in the thrown string. "REPLACE_ME" itself is
+// not surfaced in the Zod output (only the path + minimum constraint are logged) —
+// this is asserted as a security contract below. The user sees which keys are
+// invalid and the min(32) constraint, and the .env.example comment instructs
+// them to run `openssl rand -hex 32`.
+describe("gatewaySecretsSchema", () => {
+  describe("given LW_GATEWAY_* equal the .env.example REPLACE_ME sentinel", () => {
+    let errorSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    });
+
+    afterEach(() => {
+      errorSpy.mockRestore();
+    });
+
+    /** @scenario First-run env validation surfaces a self-documenting error for unset gateway secrets */
+    it("throws a Zod min(32) error naming the sentinel value", () => {
+      // Call createEnv with the real gatewaySecretsSchema imported from env-create.mjs.
+      // This exercises the actual min(32) constraint — NOT an inline copy — so a
+      // mutation of min(32) → min(1) in env-create.mjs will cause this test to fail.
+      expect(() =>
+        createEnv({
+          clientPrefix: "VITE_PUBLIC_",
+          client: {},
+          server: {
+            LW_VIRTUAL_KEY_PEPPER: gatewaySecretsSchema.LW_VIRTUAL_KEY_PEPPER,
+            LW_GATEWAY_INTERNAL_SECRET: gatewaySecretsSchema.LW_GATEWAY_INTERNAL_SECRET,
+            LW_GATEWAY_JWT_SECRET: gatewaySecretsSchema.LW_GATEWAY_JWT_SECRET,
+          },
+          runtimeEnv: {
+            LW_VIRTUAL_KEY_PEPPER: "REPLACE_ME",
+            LW_GATEWAY_INTERNAL_SECRET: "REPLACE_ME",
+            LW_GATEWAY_JWT_SECRET: "REPLACE_ME",
+          },
+          skipValidation: false,
+        }),
+      ).toThrow("Invalid environment variables");
+
+      // The issues logged to console.error contain the field names and the
+      // minimum constraint so the user can identify which keys need real secrets.
+      const logged = errorSpy.mock.calls
+        .map((c: unknown[]) => c.map((a) => (typeof a === "object" ? JSON.stringify(a) : String(a))).join(" "))
+        .join("\n");
+      expect(logged).toMatch(/LW_VIRTUAL_KEY_PEPPER/);
+      expect(logged).toMatch(/LW_GATEWAY_INTERNAL_SECRET/);
+      expect(logged).toMatch(/LW_GATEWAY_JWT_SECRET/);
+      // "32" appears as the minimum constraint value in the logged issues
+      expect(logged).toMatch(/32/);
+      // Security contract: Zod must NOT leak the placeholder value into the
+      // logged issues. If a future Zod/t3-env release starts echoing the
+      // received value, this assertion will fail — that's the trip-wire.
+      expect(logged).not.toMatch(/REPLACE_ME/);
+    });
   });
 });

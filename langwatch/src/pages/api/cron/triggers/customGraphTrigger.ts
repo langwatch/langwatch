@@ -16,7 +16,7 @@ import type {
 } from "~/server/analytics/types";
 import { prisma } from "~/server/db";
 import type { Trace } from "~/server/tracer/types";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { handleSendEmail } from "./actions/sendEmail";
 import { handleSendSlackMessage } from "./actions/sendSlackMessage";
 import type { ActionParams, TriggerData, TriggerResult } from "./types";
@@ -282,13 +282,16 @@ export const processCustomGraphTrigger = async (
       };
     }
   } catch (error) {
-    captureException(error, {
-      extra: {
-        triggerId,
-        projectId,
-        type: "customGraphAlert",
+    captureException(
+      toError(error),
+      {
+        extra: {
+          triggerId,
+          projectId,
+          type: "customGraphAlert",
+        },
       },
-    });
+    );
 
     return {
       triggerId,

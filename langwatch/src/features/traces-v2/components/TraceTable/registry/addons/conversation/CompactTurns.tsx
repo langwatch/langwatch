@@ -154,7 +154,7 @@ const ConversationTurnRow: React.FC<ConversationTurnRowProps> = ({
           borderLeftColor={style.borderColor}
         >
           <HStack gap={2} textStyle="xs">
-            <TraceIdPeek traceId={trace.traceId} />
+            <TraceIdPeek traceId={trace.traceId} occurredAtMs={trace.timestamp} />
             <Badge size="xs" variant="outline" flexShrink={0}>
               T{turnIndex + 1}
             </Badge>

@@ -19,6 +19,12 @@ Feature: Dataset management in evaluations workbench
     And I see a "+" button to add more datasets
     And I see an edit button for the current dataset
 
+  # Icon-only header controls were hard to find. Header controls now pair the
+  # icon with a text label. See dev/docs/best_practices/icon-button-labels.md.
+  Scenario: Dataset header add and edit controls show text labels
+    Then the add-dataset control reads "Add" next to its icon
+    And the edit-columns control reads "Edit columns" next to its icon
+
   @unimplemented
   Scenario: Dataset tab shows database icon indicator
     Given I have both inline and saved datasets in the workbench

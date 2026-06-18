@@ -1,6 +1,6 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
-import { LuFileCode, LuX } from "react-icons/lu";
 import { Prism } from "prism-react-renderer";
+import { LuFileCode, LuX } from "react-icons/lu";
 import { Dialog } from "../../../components/ui/dialog";
 import { EditorStatusBar } from "./EditorStatusBar";
 
@@ -22,20 +22,17 @@ import { registerCompletion } from "monacopilot";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useColorMode } from "~/components/ui/color-mode";
+import { api } from "~/utils/api";
 import { SecretsIndicator } from "../../../components/secrets/SecretsIndicator";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
+import type { PythonField, PythonProviderHandle } from "./monaco/python/shared";
 import { registerPythonProviders } from "./monaco/registerPythonProviders";
-import type {
-  PythonField,
-  PythonProviderHandle,
-} from "./monaco/python/shared";
 
 /**
  * Use Monaco's bundled VS Code themes verbatim — `vs` for light, `vs-dark`
  * for dark. Matches what users get in VS Code out of the box.
  */
-function vscodeThemeName(colorMode: "light" | "dark"): string {
+export function vscodeThemeName(colorMode: "light" | "dark"): string {
   return colorMode === "dark" ? "vs-dark" : "vs";
 }
 
@@ -303,6 +300,7 @@ export function CodeEditor({
   const { project } = useOrganizationTeamProject();
   const { colorMode } = useColorMode();
   const providersRef = useRef<PythonProviderHandle | null>(null);
+  const editorRef = useRef<MonacoEditorInstance | null>(null);
 
   // Live-fetched secret names; passed into the completion provider so
   // `secrets.<Tab>` suggests names the moment they appear in Settings.
@@ -323,11 +321,11 @@ export function CodeEditor({
   }, [onClose]);
 
   useEffect(() => {
-    onSave.fn = onSaveProp ?? (() => {});
+    onSave.fn = onSaveProp ?? (() => undefined);
   }, [onSaveProp]);
 
   useEffect(() => {
-    onSaveAndClose.fn = onSaveAndCloseProp ?? (() => {});
+    onSaveAndClose.fn = onSaveAndCloseProp ?? (() => undefined);
   }, [onSaveAndCloseProp]);
 
   useEffect(() => {
@@ -337,6 +335,19 @@ export function CodeEditor({
       outputs: outputFields,
     });
   }, [secretNames, inputFields, outputFields]);
+
+  // Monaco is seeded from defaultValue on mount only, so an inline editor would
+  // otherwise show a stale signature when an external change rewrites the code
+  // (e.g. adding or removing an input field rewrites the entrypoint signature).
+  // Reflect those changes into the editor, but skip while it is focused: live
+  // edits already flow through onChange, and setValue would jump the cursor.
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor || editor.hasTextFocus()) return;
+    if (editor.getValue() !== code) {
+      editor.setValue(code);
+    }
+  }, [code]);
 
   useEffect(() => {
     return () => {
@@ -369,6 +380,7 @@ export function CodeEditor({
             // ignore corrupted state
           }
         }
+        editorRef.current = editor;
         editor.focus();
         onEditorMount?.(editor, monaco);
 
@@ -413,9 +425,7 @@ export function CodeEditor({
         // an editor position and insert `secrets.NAME` there.
         if (editorRoot) {
           const onDragOver = (e: DragEvent) => {
-            if (
-              e.dataTransfer?.types.includes("text/x-langwatch-secret")
-            ) {
+            if (e.dataTransfer?.types.includes("text/x-langwatch-secret")) {
               e.preventDefault();
               if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
             }
@@ -424,7 +434,10 @@ export function CodeEditor({
             const name = e.dataTransfer?.getData("text/x-langwatch-secret");
             if (!name) return;
             e.preventDefault();
-            const target = editor.getTargetAtClientPoint?.(e.clientX, e.clientY);
+            const target = editor.getTargetAtClientPoint?.(
+              e.clientX,
+              e.clientY,
+            );
             const pos = target?.position ?? editor.getPosition();
             if (!pos) return;
             editor.focus();
@@ -479,11 +492,7 @@ export function CodeEditor({
           // Cmd/Ctrl+S → Save (keep modal open). Bound here too so the
           // shortcut works even when Monaco has the keystroke captured
           // before it reaches the window-level listener.
-          if (
-            (e.metaKey || e.ctrlKey) &&
-            !e.shiftKey &&
-            e.code === "KeyS"
-          ) {
+          if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.code === "KeyS") {
             e.preventDefault();
             e.stopPropagation();
             onSave.fn();

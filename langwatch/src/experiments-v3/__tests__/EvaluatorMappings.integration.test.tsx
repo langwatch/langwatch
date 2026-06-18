@@ -70,6 +70,7 @@ vi.mock("../hooks/useEvaluatorName", () => ({
       ? "Ragas Answer Correctness"
       : "Exact Match",
   useEvaluatorNames: () => new Map(),
+  useCodeEvaluatorIds: () => new Set(),
 }));
 
 // Mock api

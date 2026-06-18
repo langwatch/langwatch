@@ -38,6 +38,15 @@ export interface Spotlight {
    * skipped while walking forward or backward through the list.
    */
   isApplicable?: (ctx: SpotlightContext) => boolean;
+  /**
+   * Anchor to fall back to when the primary anchor isn't in the DOM.
+   * Conditional surfaces (the evaluator drilldown only exists when a
+   * row is expanded; the viz tabs only exist with the drawer open)
+   * point at an always-present stand-in instead — without one, the
+   * overlay used to silently walk forward past every missing anchor
+   * and end the four-step tour after step two.
+   */
+  fallbackAnchor?: string;
 }
 
 export const TRACE_EXPLORER_SPOTLIGHTS: Spotlight[] = [
@@ -53,7 +62,7 @@ export const TRACE_EXPLORER_SPOTLIGHTS: Spotlight[] = [
     // floats to the right.
     anchor: "ask-ai-chip",
     title: "Find anything, fast",
-    body: "Type a filter, or hit Ask AI (⌘I) and describe what you want — \"errors from the checkout agent in the last hour, slowest first\". The query language is full-featured; the AI lane is the fastest path to a useful view.",
+    body: 'Type a filter, or hit Ask AI (⌘I) and describe what you want — "errors from the checkout agent in the last hour, slowest first". The query language is full-featured; the AI lane is the fastest path to a useful view.',
     placement: "right",
   },
   {
@@ -66,6 +75,7 @@ export const TRACE_EXPLORER_SPOTLIGHTS: Spotlight[] = [
   {
     id: "evaluator-drill",
     anchor: "evaluator-drilldown",
+    fallbackAnchor: "evaluator-section",
     title: "Evaluator drilldown",
     body: "Click an evaluator row to see pass/fail counts and a score slider — no query needed.",
     placement: "right",
@@ -74,8 +84,48 @@ export const TRACE_EXPLORER_SPOTLIGHTS: Spotlight[] = [
   {
     id: "drawer-viz",
     anchor: "viz-tabs",
+    fallbackAnchor: "trace-table",
     title: "Four views, one trace",
     body: "Open any trace and switch between Waterfall, Flame, Topology, or Sequence — same data, a different lens for each question.",
+    placement: "bottom",
+  },
+];
+
+/**
+ * Condition-gated, show-once spotlights for the trace drawer. Unlike the
+ * page tour above, these aren't a linear walkthrough: each one appears
+ * exactly once, the first time the user opens a drawer where the feature
+ * is actually present. Presence of the `data-spotlight` anchor in the DOM
+ * IS the condition — the anchored components only emit the attribute when
+ * the feature has content, so no `isApplicable`/`fallbackAnchor` needed.
+ */
+export const DRAWER_SPOTLIGHTS: Spotlight[] = [
+  {
+    id: "conversation-context",
+    anchor: "conversation-context",
+    title: "Conversation context",
+    body: "This trace is one turn of a longer conversation — click any neighbouring turn to jump to it.",
+    placement: "bottom",
+  },
+  {
+    id: "drawer-io",
+    anchor: "drawer-io",
+    title: "Input & output",
+    body: "The trace's computed input and output, with raw / markdown / JSON views.",
+    placement: "bottom",
+  },
+  {
+    id: "drawer-evals",
+    anchor: "drawer-evals",
+    title: "Evaluations",
+    body: "Evaluator verdicts and scores recorded against this trace.",
+    placement: "bottom",
+  },
+  {
+    id: "drawer-events",
+    anchor: "drawer-events",
+    title: "Events",
+    body: "Point-in-time events your spans emitted, on the trace timeline.",
     placement: "bottom",
   },
 ];

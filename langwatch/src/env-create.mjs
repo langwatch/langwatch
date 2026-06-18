@@ -1,6 +1,18 @@
 import { createEnv } from "@t3-oss/env-core";
 import { z } from "zod";
 
+/**
+ * Zod validators for the three AI Gateway secrets.
+ * Exported so tests can exercise the real `min(32)` constraint directly,
+ * catching mutations like `min(32) → min(1)` without relying on process.env
+ * stubbing or full-stack module reloads.
+ */
+export const gatewaySecretsSchema = {
+  LW_GATEWAY_INTERNAL_SECRET: z.string().min(32).optional(),
+  LW_GATEWAY_JWT_SECRET: z.string().min(32).optional(),
+  LW_VIRTUAL_KEY_PEPPER: z.string().min(32).optional(),
+};
+
 /** @param {import('zod').ZodTypeAny} schema */
 const optionalIfBuildTime = (schema) => {
   return process.env.BUILD_TIME ? schema.optional() : schema;
@@ -57,10 +69,10 @@ export function createEnvConfig() {
       API_TOKEN_JWT_SECRET: optionalIfBuildTime(z.string().min(1)),
       // Shared HMAC secret between control-plane and the Go AI Gateway service.
       // See specs/ai-gateway/_shared/contract.md §4 + §9.
-      LW_GATEWAY_INTERNAL_SECRET: z.string().min(32).optional(),
+      LW_GATEWAY_INTERNAL_SECRET: gatewaySecretsSchema.LW_GATEWAY_INTERNAL_SECRET,
       // HS256 secret used by control-plane to sign the short-lived JWT that the
       // gateway verifies on every request (contract §4.1). 32+ chars.
-      LW_GATEWAY_JWT_SECRET: z.string().min(32).optional(),
+      LW_GATEWAY_JWT_SECRET: gatewaySecretsSchema.LW_GATEWAY_JWT_SECRET,
       // Public-facing base URL the AI Gateway is reachable at. The Go
       // gateway re-uses this same var name in the OPPOSITE direction
       // (gateway -> control plane), so in dev `scripts/start.sh` hijacks
@@ -88,7 +100,7 @@ export function createEnvConfig() {
       LW_GATEWAY_INTERNAL_URL: z.string().url().optional(),
       // Argon2id pepper mixed into virtual-key hashing. Rotating this
       // invalidates all existing VKs — treat as append-only / key-management.
-      LW_VIRTUAL_KEY_PEPPER: z.string().min(32).optional(),
+      LW_VIRTUAL_KEY_PEPPER: gatewaySecretsSchema.LW_VIRTUAL_KEY_PEPPER,
       REDIS_URL: z.string().optional(),
       REDIS_CLUSTER_ENDPOINTS: z.string().optional(),
       REDIS_DB_INDEX: z.preprocess(

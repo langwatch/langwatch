@@ -125,7 +125,9 @@ end
 //
 // Prepends TENANT_ACTIVE_HELPER_LUA so reconcileParked can read the self-healing
 // in-flight count; every script that includes PARK_HELPER_LUA gets both.
-export const PARK_HELPER_LUA = TENANT_ACTIVE_HELPER_LUA + `
+export const PARK_HELPER_LUA =
+  TENANT_ACTIVE_HELPER_LUA +
+  `
 -- Tenant segment of a groupId (everything before the first '/'), else the id.
 local function parkTenantOf(groupId)
   local slashPos = string.find(groupId, "/", 1, true)
@@ -370,7 +372,37 @@ local function unparkLeastServedParked(readyKey, keyPrefix, pausedJobKey, nowMs,
 end
 `;
 
-const STAGE_LUA = TTL_HELPER_LUA + PARK_HELPER_LUA + `
+// Reads routing metadata (pipelineName, jobType, jobName) from a stored job
+// value. Envelope values (ADR-026, "GQ1|<headerLen>|<headerJson><body>") expose
+// it in the tiny header so the payload body is never decoded on Redis's
+// thread; legacy bare-JSON values fall back to a full decode.
+const ROUTING_META_HELPER_LUA = `
+local function gqRoutingMeta(jobDataJson)
+  if string.sub(jobDataJson, 1, 4) == "GQ1|" then
+    local barIdx = string.find(jobDataJson, "|", 5, true)
+    if barIdx then
+      local headerLen = tonumber(string.sub(jobDataJson, 5, barIdx - 1))
+      if headerLen and headerLen > 0 then
+        local ok, header = pcall(cjson.decode, string.sub(jobDataJson, barIdx + 1, barIdx + headerLen))
+        if ok and type(header) == "table" then
+          return header["p"], header["t"], header["n"]
+        end
+      end
+    end
+    return nil, nil, nil
+  end
+  local ok, data = pcall(cjson.decode, jobDataJson)
+  if ok and type(data) == "table" then
+    return data["__pipelineName"], data["__jobType"], data["__jobName"]
+  end
+  return nil, nil, nil
+end
+`;
+
+const STAGE_LUA =
+  TTL_HELPER_LUA +
+  PARK_HELPER_LUA +
+  `
 local groupJobsKey    = KEYS[1]
 local readyKey        = KEYS[2]
 local signalKey       = KEYS[3]
@@ -415,11 +447,18 @@ if dedupId ~= "" and dedupTtlMs > 0 then
   if existingJobId then
     local rank = redis.call("ZRANK", groupJobsKey, existingJobId)
     if rank then
-      -- Still in staging: squash in place (net zero pending count change)
+      -- Still in staging: squash in place (net zero pending count change). The
+      -- squash drops one payload on the floor; if it carried an offloaded blob
+      -- (ADR-026) that blob is now unreferenced and would leak until its TTL
+      -- (the 2026-06-11 capacity incident). Report the displaced value so the
+      -- caller can reclaim its blob. On replace the OLD stored value is dropped;
+      -- otherwise the NEW value we were just handed is the one discarded.
+      local orphanedValue = jobDataJson
       if shouldExtend == 1 then
         redis.call("ZADD", groupJobsKey, dispatchAfter, existingJobId)
       end
       if shouldReplace == 1 then
+        orphanedValue = redis.call("HGET", dataKey, existingJobId) or ""
         redis.call("HSET", dataKey, existingJobId, jobDataJson)
       end
       redis.call("SET", dedupKey, existingJobId, "PX", dedupTtlMs)
@@ -430,7 +469,7 @@ if dedupId ~= "" and dedupTtlMs > 0 then
       refreshGroupKeyTtl(groupJobsKey, dataKey, nowMs)
       redis.call("LPUSH", signalKey, "1")
       redis.call("LTRIM", signalKey, 0, 999)
-      return 0
+      return {0, orphanedValue}
     end
     -- Already dispatched: dedup key is stale, clean it up
     redis.call("DEL", dedupKey)
@@ -456,10 +495,14 @@ redis.call("LTRIM", signalKey, 0, 999)
 -- New job staged: increment total pending counter
 redis.call("INCR", totalPendingKey)
 
-return 1
+-- A genuinely new stage displaces nothing, so there is no blob to reclaim.
+return {1, ""}
 `;
 
-const STAGE_BATCH_LUA = TTL_HELPER_LUA + PARK_HELPER_LUA + `
+const STAGE_BATCH_LUA =
+  TTL_HELPER_LUA +
+  PARK_HELPER_LUA +
+  `
 local readyKey        = KEYS[1]
 local signalKey       = KEYS[2]
 local totalPendingKey = KEYS[3]
@@ -475,6 +518,9 @@ local nowMs        = tonumber(ARGV[#ARGV - 1])
 
 local newStagedCount = 0
 local affectedGroups = {}
+-- Per-job (index-aligned) displaced values whose offloaded blob the caller must
+-- reclaim; "" for a genuine new stage. Mirrors STAGE_LUA's single-job report.
+local orphanedValues = {}
 
 for i = 1, count do
   local offset = 2 + (i - 1) * 8
@@ -492,16 +538,21 @@ for i = 1, count do
   local dedupKey     = (dedupId ~= "") and (keyPrefix .. "dedup:" .. dedupId) or (keyPrefix .. "dedup:__none__")
 
   local isDeduped = false
+  local orphanedValue = ""
   if dedupId ~= "" and dedupTtlMs > 0 then
     local existingJobId = redis.call("GET", dedupKey)
     if existingJobId then
       local rank = redis.call("ZRANK", groupJobsKey, existingJobId)
       if rank then
-        -- Still in staging: squash in place
+        -- Still in staging: squash in place. The displaced payload's blob would
+        -- leak (see STAGE_LUA) — on replace it is the OLD stored value, else the
+        -- NEW value we were handed is the one dropped.
+        orphanedValue = jobDataJson
         if shouldExtend == 1 then
           redis.call("ZADD", groupJobsKey, dispatchAfter, existingJobId)
         end
         if shouldReplace == 1 then
+          orphanedValue = redis.call("HGET", dataKey, existingJobId) or ""
           redis.call("HSET", dataKey, existingJobId, jobDataJson)
         end
         redis.call("SET", dedupKey, existingJobId, "PX", dedupTtlMs)
@@ -521,6 +572,7 @@ for i = 1, count do
     end
     newStagedCount = newStagedCount + 1
   end
+  orphanedValues[i] = orphanedValue
 
   refreshGroupKeyTtl(groupJobsKey, dataKey, nowMs)
 
@@ -554,10 +606,14 @@ if newStagedCount > 0 then
   redis.call("INCRBY", totalPendingKey, newStagedCount)
 end
 
-return newStagedCount
+return {newStagedCount, orphanedValues}
 `;
 
-const DISPATCH_LUA = PARK_HELPER_LUA + WATER_LEVEL_HELPER_LUA + `
+const DISPATCH_LUA =
+  PARK_HELPER_LUA +
+  WATER_LEVEL_HELPER_LUA +
+  ROUTING_META_HELPER_LUA +
+  `
 local readyKey         = KEYS[1]
 local blockedKey       = KEYS[2]
 local pausedJobKey     = KEYS[3]
@@ -698,19 +754,14 @@ local function scanAndDispatch(effCap, bypassPark)
                 local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
                 local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
                 if jobDataJson then
-                  local ok, data = pcall(cjson.decode, jobDataJson)
-                  if ok and type(data) == "table" then
-                    local p = data["__pipelineName"]
-                    local t = data["__jobType"]
-                    local n = data["__jobName"]
-                    local pIsStr = type(p) == "string"
-                    local tIsStr = type(t) == "string"
-                    local nIsStr = type(n) == "string"
-                    if pIsStr then
-                      if redis.call("SISMEMBER", pausedJobKey, p) == 1 then paused = true
-                      elseif tIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t) == 1 then paused = true
-                      elseif tIsStr and nIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t .. "/" .. n) == 1 then paused = true
-                      end
+                  local p, t, n = gqRoutingMeta(jobDataJson)
+                  local pIsStr = type(p) == "string"
+                  local tIsStr = type(t) == "string"
+                  local nIsStr = type(n) == "string"
+                  if pIsStr then
+                    if redis.call("SISMEMBER", pausedJobKey, p) == 1 then paused = true
+                    elseif tIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t) == 1 then paused = true
+                    elseif tIsStr and nIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t .. "/" .. n) == 1 then paused = true
                     end
                   end
                 end
@@ -779,7 +830,11 @@ end
 return nil
 `;
 
-const DISPATCH_BATCH_LUA = PARK_HELPER_LUA + WATER_LEVEL_HELPER_LUA + `
+const DISPATCH_BATCH_LUA =
+  PARK_HELPER_LUA +
+  WATER_LEVEL_HELPER_LUA +
+  ROUTING_META_HELPER_LUA +
+  `
 local readyKey         = KEYS[1]
 local blockedKey       = KEYS[2]
 local pausedJobKey     = KEYS[3]
@@ -910,19 +965,14 @@ local function scanBatch(effCap, bypassPark, dispatched)
                 local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
                 local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
                 if jobDataJson then
-                  local ok, data = pcall(cjson.decode, jobDataJson)
-                  if ok and type(data) == "table" then
-                    local p = data["__pipelineName"]
-                    local t = data["__jobType"]
-                    local n = data["__jobName"]
-                    local pIsStr = type(p) == "string"
-                    local tIsStr = type(t) == "string"
-                    local nIsStr = type(n) == "string"
-                    if pIsStr then
-                      if redis.call("SISMEMBER", pausedJobKey, p) == 1 then paused = true
-                      elseif tIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t) == 1 then paused = true
-                      elseif tIsStr and nIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t .. "/" .. n) == 1 then paused = true
-                      end
+                  local p, t, n = gqRoutingMeta(jobDataJson)
+                  local pIsStr = type(p) == "string"
+                  local tIsStr = type(t) == "string"
+                  local nIsStr = type(n) == "string"
+                  if pIsStr then
+                    if redis.call("SISMEMBER", pausedJobKey, p) == 1 then paused = true
+                    elseif tIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t) == 1 then paused = true
+                    elseif tIsStr and nIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t .. "/" .. n) == 1 then paused = true
                     end
                   end
                 end
@@ -1043,7 +1093,10 @@ end
 return results
 `;
 
-const COMPLETE_LUA = PARK_HELPER_LUA + WATER_LEVEL_HELPER_LUA + `
+const COMPLETE_LUA =
+  PARK_HELPER_LUA +
+  WATER_LEVEL_HELPER_LUA +
+  `
 local activeKey       = KEYS[1]
 local jobsKey         = KEYS[2]
 local readyKey        = KEYS[3]
@@ -1130,7 +1183,9 @@ redis.call("DEL", errorKey)
 return 1
 `;
 
-const REFRESH_LUA = TTL_HELPER_LUA + `
+const REFRESH_LUA =
+  TTL_HELPER_LUA +
+  `
 local activeKey    = KEYS[1]
 local readyKey     = KEYS[2]
 local stagedJobId           = ARGV[1]
@@ -1173,7 +1228,9 @@ end
 return 0
 `;
 
-const RESTAGE_AND_BLOCK_LUA = `
+const RESTAGE_AND_BLOCK_LUA =
+  ROUTING_META_HELPER_LUA +
+  `
 local blockedKey      = KEYS[1]
 local readyKey        = KEYS[2]
 local statsKey        = KEYS[3]
@@ -1238,18 +1295,18 @@ end
 redis.call("INCR", statsKey)
 
 -- 7. Increment per-job-name failed counter
-local ok, data = pcall(cjson.decode, jobDataJson)
-if ok and data then
-  local jn = data["__jobName"]
-  if jn and jn ~= "" then
-    redis.call("INCR", statsKey .. ":" .. jn)
-  end
+local _, _, jn = gqRoutingMeta(jobDataJson)
+if jn and jn ~= "" then
+  redis.call("INCR", statsKey .. ":" .. jn)
 end
 
 return 1
 `;
 
-const RETRY_RESTAGE_LUA = TTL_HELPER_LUA + PARK_HELPER_LUA + `
+const RETRY_RESTAGE_LUA =
+  TTL_HELPER_LUA +
+  PARK_HELPER_LUA +
+  `
 local activeKey       = KEYS[1]
 local totalPendingKey = KEYS[2]
 
@@ -1443,7 +1500,13 @@ export class GroupStagingScripts {
    * shouldExtend/shouldReplace). When the old job was already dispatched, the
    * stale dedup key is cleaned up and the new job is staged as genuinely new.
    *
-   * @returns true if a new job was staged, false if squashed onto an existing job (dedup)
+   * A squash drops one payload (the replaced old value, or the discarded new
+   * value when `replace` is off); `orphanedValue` reports it so the caller can
+   * reclaim its offloaded blob (ADR-026) instead of leaking it. It is `""` for a
+   * genuine new stage, which displaces nothing.
+   *
+   * @returns `isNew` (true if staged fresh, false if deduped) plus the displaced
+   *   `orphanedValue` whose blob the caller must reclaim.
    */
   async stage({
     stagedJobId,
@@ -1463,12 +1526,14 @@ export class GroupStagingScripts {
     jobDataJson: string;
     shouldExtend?: boolean;
     shouldReplace?: boolean;
-  }): Promise<boolean> {
+  }): Promise<{ isNew: boolean; orphanedValue: string }> {
     const groupJobsKey = `${this.keyPrefix}group:${groupId}:jobs`;
     const readyKey = `${this.keyPrefix}ready`;
     const signalKey = `${this.keyPrefix}signal`;
     const dedupKey =
-      dedupId !== "" ? `${this.keyPrefix}dedup:${dedupId}` : `${this.keyPrefix}dedup:__none__`;
+      dedupId !== ""
+        ? `${this.keyPrefix}dedup:${dedupId}`
+        : `${this.keyPrefix}dedup:__none__`;
 
     const dataKey = `${this.keyPrefix}group:${groupId}:data`;
     const totalPendingKey = `${this.keyPrefix}stats:total-pending`;
@@ -1498,13 +1563,23 @@ export class GroupStagingScripts {
       String(readGlobalBudget()),
     );
 
-    return result === 1;
+    // STAGE_LUA returns [code, orphanedValue]. Tolerate a bare integer reply
+    // defensively (e.g. a stale cached script during a rolling deploy).
+    const [code, orphanedValue] = Array.isArray(result)
+      ? (result as [number, unknown])
+      : [result as number, ""];
+    return {
+      isNew: Number(code) === 1,
+      orphanedValue: orphanedValue == null ? "" : String(orphanedValue),
+    };
   }
 
   /**
    * Stage a batch of jobs into their respective group queues.
    *
-   * @returns number of new jobs staged (excluding replaced ones)
+   * @returns `newStagedCount` (new jobs, excluding deduped) plus the
+   *   index-aligned `orphanedValues` of squashed jobs whose offloaded blobs the
+   *   caller must reclaim (`""` where nothing was displaced). See {@link stage}.
    */
   async stageBatch(
     jobs: Array<{
@@ -1517,8 +1592,8 @@ export class GroupStagingScripts {
       shouldExtend?: boolean;
       shouldReplace?: boolean;
     }>,
-  ): Promise<number> {
-    if (jobs.length === 0) return 0;
+  ): Promise<{ newStagedCount: number; orphanedValues: string[] }> {
+    if (jobs.length === 0) return { newStagedCount: 0, orphanedValues: [] };
 
     const readyKey = `${this.keyPrefix}ready`;
     const signalKey = `${this.keyPrefix}signal`;
@@ -1543,9 +1618,27 @@ export class GroupStagingScripts {
     args.push(String(Date.now()));
     args.push(String(readGlobalBudget()));
 
-    const result = await this.redis.eval(STAGE_BATCH_LUA, 3, readyKey, signalKey, totalPendingKey, ...args);
+    const result = await this.redis.eval(
+      STAGE_BATCH_LUA,
+      3,
+      readyKey,
+      signalKey,
+      totalPendingKey,
+      ...args,
+    );
 
-    return Number(result);
+    // STAGE_BATCH_LUA returns [newStagedCount, orphanedValues[]]. Tolerate a
+    // bare integer reply defensively (stale cached script mid-deploy).
+    if (Array.isArray(result)) {
+      const [count, orphans] = result as [number, unknown];
+      return {
+        newStagedCount: Number(count),
+        orphanedValues: Array.isArray(orphans)
+          ? orphans.map((v) => (v == null ? "" : String(v)))
+          : [],
+      };
+    }
+    return { newStagedCount: Number(result), orphanedValues: [] };
   }
 
   /**
@@ -1918,10 +2011,28 @@ export class GroupStagingScripts {
   }
 
   /**
+   * Earliest dispatch-after score in the ready set, or null when empty.
+   * The dispatcher clamps its BRPOP fallback to this so groups staged
+   * with a dispatch delay wake when due: their send-time signals fire
+   * (and get drained) while the job is still inside its delay window,
+   * and nothing re-signals at the due time.
+   */
+  async getEarliestReadyScore(): Promise<number | null> {
+    const result = await this.redis.zrange(
+      `${this.keyPrefix}ready`,
+      0,
+      0,
+      "WITHSCORES",
+    );
+    if (result.length < 2) return null;
+    const score = Number(result[1]);
+    return Number.isFinite(score) ? score : null;
+  }
+
+  /**
    * Get the key prefix for metrics/recovery scans.
    */
   getKeyPrefix(): string {
     return this.keyPrefix;
   }
 }
-

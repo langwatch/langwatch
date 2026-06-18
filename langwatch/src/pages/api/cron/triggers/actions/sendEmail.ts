@@ -4,7 +4,7 @@ import { getApp } from "~/server/app-layer/app";
 import { consumeEmailCapSlot } from "~/server/event-sourcing/outbox/emailHourlyCap";
 import { sendTriggerEmail } from "~/server/mailer/triggerEmail";
 import { createLogger } from "~/utils/logger/server";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import type { ActionParams, TriggerContext } from "../types";
 
 const logger = createLogger("langwatch:cron:triggers:sendEmail");
@@ -62,12 +62,15 @@ export const handleSendEmail = async (context: TriggerContext) => {
 
     await sendTriggerEmail(triggerInfo);
   } catch (error) {
-    captureException(error, {
-      extra: {
-        triggerId: trigger.id,
-        projectId: trigger.projectId,
-        action: TriggerAction.SEND_EMAIL,
+    captureException(
+      toError(error),
+      {
+        extra: {
+          triggerId: trigger.id,
+          projectId: trigger.projectId,
+          action: TriggerAction.SEND_EMAIL,
+        },
       },
-    });
+    );
   }
 };

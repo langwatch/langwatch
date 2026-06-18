@@ -14,7 +14,10 @@ export function BlockLabel({
   pctOfParent: number | null;
   widthPct: number;
 }) {
-  if (widthPct < 2) return null;
+  // Below ~3% there isn't room for even 4 characters + ellipsis at the xs
+  // text size — rendering 1–2 clipped glyphs reads as noise, so skip the
+  // label entirely (the tooltip + context strip still carry the name).
+  if (widthPct < 3) return null;
   if (widthPct < 5) return <>{name.slice(0, 8)}</>;
   const dur = formatDuration(duration);
   const pct = pctOfParent !== null ? ` · ${formatPercent(pctOfParent)}` : "";

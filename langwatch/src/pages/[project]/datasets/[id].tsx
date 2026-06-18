@@ -1,14 +1,42 @@
-import { useRouter } from "~/utils/compat/next-router";
+import { Box, Button } from "@chakra-ui/react";
+import { FlaskConical } from "lucide-react";
 import { DashboardLayout } from "~/components/DashboardLayout";
-import { DatasetTable } from "../../../components/datasets/DatasetTable";
+import { DatasetEditorTable } from "~/components/datasets/editor/DatasetEditorTable";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useRouter } from "~/utils/compat/next-router";
 
 export default function Dataset() {
   const router = useRouter();
-  const datasetId = router.query.id;
+  const datasetId = router.query.id as string;
+  const { project, hasPermission } = useOrganizationTeamProject();
+
+  const runExperiment = () => {
+    void router.push({
+      pathname: `/${project?.slug}/experiments/workbench`,
+      query: { datasetId },
+    });
+  };
 
   return (
     <DashboardLayout>
-      <DatasetTable datasetId={datasetId as string} />
+      <Box width="full" paddingX={6} paddingY={6}>
+        <DatasetEditorTable
+          datasetId={datasetId}
+          floatingSelectionBar
+          headerActions={
+            hasPermission("evaluations:manage") ? (
+              <Button
+                size="sm"
+                colorPalette="blue"
+                data-testid="run-experiment-from-dataset"
+                onClick={runExperiment}
+              >
+                <FlaskConical size={14} /> Run experiment
+              </Button>
+            ) : undefined
+          }
+        />
+      </Box>
     </DashboardLayout>
   );
 }

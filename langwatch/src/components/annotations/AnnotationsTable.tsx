@@ -28,6 +28,20 @@ import { NoDataInfoBlock } from "../NoDataInfoBlock";
 import { RedactedField } from "../ui/RedactedField";
 import UserAvatarGroup from "./AvatarGroup";
 
+/**
+ * Coerce a trace `started_at` value into a numeric ms partition hint, or
+ * undefined. The field is typed numeric but upstream sources have at times
+ * carried an ISO string; normalize both so the hint stays a valid integer
+ * for the `z.number().int()` query contract and the drawer's `t` URL param.
+ */
+function toOccurredAtMsHint(
+  startedAt: number | string | null | undefined,
+): number | undefined {
+  if (startedAt === null || startedAt === undefined) return undefined;
+  const ms = typeof startedAt === "number" ? startedAt : Date.parse(startedAt);
+  return Number.isFinite(ms) && ms > 0 ? Math.floor(ms) : undefined;
+}
+
 type ScoreOption = Record<
   string,
   {
@@ -572,7 +586,12 @@ export const AnnotationsTable = ({
                                     item.trace?.timestamps.started_at ?? "",
                                   ).toLocaleDateString()}
                                 </Text>
-                                <TraceIdPeek traceId={item.traceId} />
+                                <TraceIdPeek
+                                  traceId={item.traceId}
+                                  occurredAtMs={toOccurredAtMsHint(
+                                    item.trace?.timestamps.started_at,
+                                  )}
+                                />
                               </HStack>
                             </Table.Cell>
                           </Table.Row>

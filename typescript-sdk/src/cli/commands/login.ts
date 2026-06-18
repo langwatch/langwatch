@@ -29,12 +29,12 @@ function printAgentHintBanner(): void {
   );
   console.log(
     chalk.gray(
-      "  --device                   AI tools / SSO (browser approval, no paste)",
+      "  --device                   AI tools / SSO (claude, codex, gemini, opencode)",
     ),
   );
   console.log(
     chalk.gray(
-      "  --api-key <KEY>            project SDK key (writes .env)",
+      "  --api-key <KEY>            project SDK key into .env (SDK, evals, prompts)",
     ),
   );
   console.log(
@@ -168,22 +168,30 @@ export const loginCommand = async (
       return;
     }
 
-    // Interactive mode (no flags). Refuse on non-TTY contexts with an
-    // actionable hint pointing at the escape-hatch flags — agents and CI
-    // pipelines should pass the right flag rather than getting stuck on a
-    // hidden interactive prompt.
+    // Interactive mode (no flags). On a non-TTY context (CI, an agent's
+    // piped stdin) we cannot prompt. Erroring here used to nudge agents
+    // toward `--device`, which signs them into a personal device-session and
+    // silently routed their evaluations to a personal project. Default to
+    // PROJECT login instead: it writes a real project's key to `.env`, which
+    // is what the SDK, `langwatch eval`, and the skills expect. AI-tools
+    // login stays explicit behind `--device`.
     if (!process.stdin.isTTY) {
-      console.error(
-        chalk.red(
-          "Error: cannot run interactive `langwatch login` in a non-TTY context.",
+      console.log(
+        chalk.gray(
+          "No login mode given. Defaulting to project login (writes LANGWATCH_API_KEY to .env).",
         ),
       );
-      console.error(chalk.gray("Run one of:"));
-      console.error(chalk.gray("  langwatch login --device                # AI tools / SSO (recommended)"));
-      console.error(chalk.gray("  langwatch login --api-key <KEY>         # project SDK key (writes .env)"));
-      console.error(chalk.gray("  langwatch login --token <TOKEN>         # pre-minted device session"));
-      console.error(chalk.gray("  LANGWATCH_AUTO_LOGIN=1 langwatch <cmd>  # let the wrapper trigger device flow"));
-      process.exit(1);
+      console.log(
+        chalk.gray(
+          "For AI-tools login (claude, codex, gemini, opencode), re-run: langwatch login --device",
+        ),
+      );
+      console.log();
+      await runUnifiedLoginFlow({
+        kind: "project_api_key",
+        browser: options?.browser,
+      });
+      return;
     }
 
     // Always-on agent-hint banner — fake-TTY agents see this BEFORE the
@@ -253,12 +261,12 @@ export const loginCommand = async (
       choices: [
         {
           title: "AI tools / agentic flows",
-          description: "claude, codex, cursor, gemini, opencode — device-flow SSO",
+          description: "claude, codex, cursor, gemini, opencode - device-flow SSO",
           value: "device",
         },
         {
           title: "Project / SDK API key",
-          description: "langwatch sync, langwatch eval, SDK auto-instrumentation",
+          description: "langwatch eval, sync, prompts, SDK auto-instrumentation - writes .env",
           value: "api-key",
         },
         {

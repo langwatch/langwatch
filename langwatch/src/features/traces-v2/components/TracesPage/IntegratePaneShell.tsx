@@ -11,7 +11,7 @@
  *     faded SearchBar + Toolbar chrome passed via `chrome`, and the
  *     agent / MCP / SDK integration guide as the body.
  *   - the /me recent-activity card (`PersonalTracesEmptyState`):
- *     `compact`, no chrome, with a tiles pitch as the body.
+ *     `isCompact`, no chrome, with a tiles pitch as the body.
  */
 import { Box, Flex } from "@chakra-ui/react";
 import type React from "react";
@@ -29,20 +29,20 @@ export const IntegratePaneShell: React.FC<{
    * into a dashboard card rather than owning the whole viewport. Skips
    * the full-height `<main>` so the card sizes the frame instead.
    */
-  compact?: boolean;
+  isCompact?: boolean;
   ariaLabel?: string;
-}> = ({ children, chrome, compact = false, ariaLabel }) => {
+}> = ({ children, chrome, isCompact = false, ariaLabel }) => {
   return (
     <Flex
-      {...(compact ? {} : { as: "main", role: "main" })}
+      {...(isCompact ? {} : { as: "main", role: "main" })}
       aria-label={ariaLabel}
       direction="column"
       flex={1}
       minWidth={0}
-      height={compact ? undefined : "full"}
-      overflow={compact ? "hidden" : "auto"}
+      height={isCompact ? undefined : "full"}
+      overflow={isCompact ? "hidden" : "auto"}
       position="relative"
-      bg={compact ? "transparent" : "bg.surface"}
+      bg={isCompact ? "transparent" : "bg.surface"}
     >
       {/* Single soft orange glow centred on the frame that breathes and
           slow-rotates. Three slightly offset radial blobs share the
@@ -63,13 +63,13 @@ export const IntegratePaneShell: React.FC<{
         justifyContent="center"
       >
         <Box
-          width={compact ? "720px" : "140vmin"}
-          height={compact ? "720px" : "140vmin"}
+          width={isCompact ? "720px" : "140vmin"}
+          height={isCompact ? "720px" : "140vmin"}
           maxWidth="140vmin"
           maxHeight="140vmin"
           borderRadius="full"
           opacity={0.1}
-          filter={compact ? "blur(60px)" : "blur(80px)"}
+          filter={isCompact ? "blur(60px)" : "blur(80px)"}
           backgroundImage={`
             radial-gradient(circle at 46% 50%, var(--chakra-colors-orange-300) 0%, transparent 36%),
             radial-gradient(circle at 54% 48%, var(--chakra-colors-orange-400) 0%, transparent 30%),
@@ -101,10 +101,10 @@ export const IntegratePaneShell: React.FC<{
       >
         <Box
           width="full"
-          maxWidth={compact ? "760px" : "980px"}
+          maxWidth={isCompact ? "760px" : "980px"}
           marginX="auto"
-          paddingX={compact ? 6 : 8}
-          paddingY={compact ? 8 : 10}
+          paddingX={isCompact ? 6 : 8}
+          paddingY={isCompact ? 8 : 10}
         >
           {children}
         </Box>

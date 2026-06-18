@@ -49,7 +49,7 @@ import { trackServerEvent } from "~/server/posthog";
 import { fireExperimentRanNurturing } from "../../../ee/billing/nurturing/hooks/featureAdoption";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
 import { createLogger } from "~/utils/logger/server";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import type { NextRequestShim as any } from "./types";
 
 const logger = createLogger("langwatch:experiments-v3");
@@ -262,7 +262,7 @@ secured.access(sessionAuth).post("/execute", zValidator("json", executionRequest
       }
     } catch (error) {
       logger.error({ error, projectId }, "Orchestrator error");
-      captureException(error, { extra: { projectId } });
+      captureException(toError(error), { extra: { projectId } });
 
       await stream.writeSSE({
         data: JSON.stringify({
@@ -315,10 +315,18 @@ secured.access(sessionAuth).post("/abort", async (c) => {
   // Ownership check: holding evaluations:manage on `projectId` does NOT grant
   // the right to abort a run that belongs to a different project. The runId is
   // attacker-controlled, so verify the run is owned by the authenticated
-  // project before signaling an abort (mirrors GET /runs/:runId). Without this,
-  // a user could abort another tenant's experiment run by guessing its runId.
-  const runState = await runStateManager.getRunState(runId);
-  if (!runState || runState.projectId !== projectId) {
+  // project before signaling an abort. Without this, a user could abort another
+  // tenant's experiment run by guessing its runId.
+  //
+  // In-flight runs register their owner via abortManager.setRunning, which
+  // covers the interactive workbench SSE path — that path streams results
+  // directly and never creates a polling run-state record, so consulting only
+  // runStateManager would 404 every workbench abort. runStateManager remains
+  // the fallback for the CI/CD polling path.
+  const ownerProjectId =
+    (await abortManager.getRunningProjectId(runId)) ??
+    (await runStateManager.getRunState(runId))?.projectId;
+  if (!ownerProjectId || ownerProjectId !== projectId) {
     return c.json({ error: "Run not found" }, { status: 404 });
   }
 
@@ -433,7 +441,7 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
           { error, projectId: project.id, slug },
           "Orchestrator error",
         );
-        captureException(error, { extra: { projectId: project.id, slug } });
+        captureException(toError(error), { extra: { projectId: project.id, slug } });
 
         await stream.writeSSE({
           data: JSON.stringify({
@@ -483,7 +491,7 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
         { error, projectId: project.id, slug, runId },
         "Execution error",
       );
-      captureException(error, {
+      captureException(toError(error), {
         extra: { projectId: project.id, slug, runId },
       });
       await runStateManager.failRun(runId, (error as Error).message);

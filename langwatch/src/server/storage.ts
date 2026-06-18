@@ -141,15 +141,23 @@ export const createS3Client = async (projectId: string) => {
   const sessionToken = env.S3_SESSION_TOKEN;
   const hasExplicitKeys = !!(accessKeyId && secretAccessKey);
 
-  // Region resolution. "auto" is the R2 / MinIO convention and works for
-  // those + any S3-compatible endpoint that ignores region. Real AWS S3
-  // requires the actual bucket region for SigV4 to verify, so the
-  // S3_REGION env override is the escape hatch for AWS deployments.
-  const region = env.S3_REGION ?? "auto";
+  // Region resolution:
+  //   - If S3_REGION is explicitly set, use it.
+  //   - If endpoint is non-AWS (R2, MinIO, custom host), keep "auto" — those operators rely on it.
+  //   - If endpoint is AWS (absent or *.amazonaws.com) AND no explicit keys
+  //     (IRSA path) → pass undefined so the SDK resolves region from its
+  //     chain (IRSA injects AWS_REGION into the EKS pod env).
+  //   - If endpoint is AWS AND explicit keys → fall back to "auto" to preserve
+  //     the pre-PR-4058 behavior for ops tooling / local env with hardcoded keys.
+  const endpoint = privateConfig?.endpoint ?? env.S3_ENDPOINT;
+  const isAwsEndpoint = !endpoint || endpoint.endsWith(".amazonaws.com");
+  const region: string | undefined =
+    env.S3_REGION ??
+    (isAwsEndpoint && !hasExplicitKeys ? undefined : "auto");
 
   const s3Client = new S3Client({
-    region,
-    endpoint: privateConfig?.endpoint ?? env.S3_ENDPOINT,
+    ...(region !== undefined ? { region } : {}),
+    endpoint,
     ...(hasExplicitKeys
       ? {
           credentials: {

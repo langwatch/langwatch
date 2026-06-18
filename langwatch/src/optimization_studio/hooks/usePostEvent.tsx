@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { fetchSSE } from "~/utils/sse/fetchSSE";
 import { toaster } from "../../components/ui/toaster";
-import { isHandledByGlobalHandler } from "../../utils/trpcError";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { createLogger } from "../../utils/logger";
+import { isHandledByGlobalHandler } from "../../utils/trpcError";
 import type { BaseComponent } from "../types/dsl";
 import type { StudioClientEvent, StudioServerEvent } from "../types/events";
 import { useWorkflowStore, type WorkflowStore } from "./useWorkflowStore";
@@ -188,11 +188,16 @@ export const useHandleServerMessage = ({
   } = workflowStore;
 
   const alertOnError = useCallback((message: string | undefined) => {
+    // Keyed by the message so repeated identical failures (e.g.
+    // "LangWatch NLP is unreachable" while the engine is down and the
+    // studio retries) update one toast instead of stacking a wall.
+    const dedupeId = `studio-error-${message?.slice(0, 140) ?? "unknown"}`;
     if (
       !!message?.toLowerCase().includes("stopped") ||
       !!message?.toLowerCase().includes("interrupted")
     ) {
       toaster.create({
+        id: dedupeId,
         title: "Stopped",
         description: message?.slice(0, 140),
         type: "info",
@@ -203,6 +208,7 @@ export const useHandleServerMessage = ({
       });
     } else {
       toaster.create({
+        id: dedupeId,
         title: "Error",
         description: message?.slice(0, 140),
         type: "error",
@@ -257,14 +263,10 @@ export const useHandleServerMessage = ({
           setWorkflowExecutionState(message.payload.execution_state);
 
           // Auto-select the target node and expand properties when a
-          // "Run workflow until here" execution completes, so the user
+          // "Run workflow until here" execution succeeds, so the user
           // can see the results without clicking manually.
-          if (
-            message.payload.execution_state?.status === "success" ||
-            message.payload.execution_state?.status === "error"
-          ) {
-            const untilNodeId =
-              getWorkflow().state.execution?.until_node_id;
+          if (message.payload.execution_state?.status === "success") {
+            const untilNodeId = getWorkflow().state.execution?.until_node_id;
             if (untilNodeId) {
               workflowStore.setSelectedNode(untilNodeId);
               workflowStore.setPropertiesExpanded(true);
@@ -272,6 +274,19 @@ export const useHandleServerMessage = ({
           }
 
           if (message.payload.execution_state?.status === "error") {
+            // Surface the node that actually failed (e.g. an LLM with no
+            // messages) instead of the run target, whose stale output would
+            // otherwise hide the error. Fall back to the target when no
+            // single node carries the error.
+            const failedNode = getWorkflow().nodes.find(
+              (node) => node.data.execution_state?.status === "error",
+            );
+            const focusNodeId =
+              failedNode?.id ?? getWorkflow().state.execution?.until_node_id;
+            if (focusNodeId) {
+              workflowStore.setSelectedNode(focusNodeId);
+              workflowStore.setPropertiesExpanded(true);
+            }
             alertOnError(message.payload.execution_state.error);
             stopWorkflowIfRunning(message.payload.execution_state.error);
           }

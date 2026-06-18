@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.26.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.25.0...python-sdk@v0.26.0) (2026-06-12)
+
+
+### Features
+
+* **prompts:** expose runtime parameters in Python SDK facade + document the feature ([#4746](https://github.com/langwatch/langwatch/issues/4746)) ([7aa3b5f](https://github.com/langwatch/langwatch/commit/7aa3b5f3f508d9ec9c62de6c2009a6b333706aa0))
+
+## [0.25.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.24.0...python-sdk@v0.25.0) (2026-06-11)
+
+
+### Features
+
+* **prompts:** add versioned runtime parameters to prompt versions ([#4043](https://github.com/langwatch/langwatch/issues/4043)) ([8bc5fa5](https://github.com/langwatch/langwatch/commit/8bc5fa5cf64ab8091cf28084207bc170bcb5806f))
+* **traces:** event_log as source of truth for large trace IO + lean projections ([#4215](https://github.com/langwatch/langwatch/issues/4215)) ([#4216](https://github.com/langwatch/langwatch/issues/4216)) ([f3663a5](https://github.com/langwatch/langwatch/commit/f3663a5cf9200ad3ec2d2becf5ed87d7e66197ab))
+
+
+### Bug Fixes
+
+* **deps:** close python-sdk security alerts with surgical uv bumps ([#4660](https://github.com/langwatch/langwatch/issues/4660)) ([c880c27](https://github.com/langwatch/langwatch/commit/c880c27ba3a796b272f9e3eb7501debf9a2e35e7))
+* **deps:** uv security sweep across langevals, mcp-server, python-sdk ([#4687](https://github.com/langwatch/langwatch/issues/4687)) ([7eba1fb](https://github.com/langwatch/langwatch/commit/7eba1fbec1cf01b7929b35529c41f5b089070263))
+
 ## [0.24.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.23.0...python-sdk@v0.24.0) (2026-06-01)
 
 

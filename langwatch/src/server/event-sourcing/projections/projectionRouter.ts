@@ -11,6 +11,7 @@ import {
   observeEsReactorDuration,
   withMetrics,
 } from "~/server/metrics";
+import { toError } from "~/utils/posthogErrorCapture";
 import type { AggregateType } from "../domain/aggregateType";
 import type { Event, Projection } from "../domain/types";
 import type { KillSwitchOptions } from "../pipeline/staticBuilder.types";
@@ -406,7 +407,7 @@ export class ProjectionRouter<
             if (e instanceof AggregateError) {
               errors.push(...(e.errors as Error[]));
             } else {
-              errors.push(e instanceof Error ? e : new Error(String(e)));
+              errors.push(toError(e));
             }
           }
         }
@@ -419,7 +420,7 @@ export class ProjectionRouter<
             if (e instanceof AggregateError) {
               errors.push(...(e.errors as Error[]));
             } else {
-              errors.push(e instanceof Error ? e : new Error(String(e)));
+              errors.push(toError(e));
             }
           }
         }
@@ -462,7 +463,7 @@ export class ProjectionRouter<
               },
               "Failed to dispatch batch of events to fold projection queue",
             );
-            errors.push(error instanceof Error ? error : new Error(String(error)));
+            errors.push(toError(error));
           }
         }
       }
@@ -487,7 +488,7 @@ export class ProjectionRouter<
               aggregateId: String(event.aggregateId),
               tenantId: context.tenantId,
             });
-            errors.push(error instanceof Error ? error : new Error(String(error)));
+            errors.push(toError(error));
           }
         }
       }
@@ -546,7 +547,7 @@ export class ProjectionRouter<
               },
               "Failed to dispatch batch of events to map projection queue",
             );
-            errors.push(error instanceof Error ? error : new Error(String(error)));
+            errors.push(toError(error));
           }
         }
       }
@@ -591,7 +592,7 @@ export class ProjectionRouter<
               aggregateId: String(event.aggregateId),
               tenantId: event.tenantId,
             });
-            errors.push(error instanceof Error ? error : new Error(String(error)));
+            errors.push(toError(error));
           }
         }
       }
@@ -754,6 +755,57 @@ export class ProjectionRouter<
   }
 
   /**
+   * Builds the context a reactor receives. Used for both shouldReact and
+   * handle so the predicate can never see a different shape than the handler.
+   */
+  private buildReactorContext({
+    event,
+    foldState,
+  }: {
+    event: EventType;
+    foldState: unknown;
+  }) {
+    return {
+      tenantId: event.tenantId,
+      aggregateId: String(event.aggregateId),
+      foldState,
+      isReplay: LIVE_DISPATCH_IS_REPLAY,
+    };
+  }
+
+  /**
+   * Evaluates a reactor's optional shouldReact predicate. Fails open: a
+   * thrown predicate is logged and treated as true so a predicate bug can
+   * never drop a side effect (worst case is one redundant job).
+   */
+  private reactorShouldReact(
+    reactor: ReactorDefinition<EventType>,
+    event: EventType,
+    foldState: unknown,
+  ): boolean {
+    if (!reactor.shouldReact) return true;
+
+    try {
+      return reactor.shouldReact(
+        event,
+        this.buildReactorContext({ event, foldState }),
+      );
+    } catch (error) {
+      this.logger.error(
+        {
+          reactorName: reactor.name,
+          eventId: event.id,
+          eventType: event.type,
+          tenantId: event.tenantId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Reactor shouldReact predicate threw — failing open and dispatching",
+      );
+      return true;
+    }
+  }
+
+  /**
    * Dispatches a single event to reactors registered on a fold projection.
    * In queued mode, sends to reactor queues. In inline mode, calls directly.
    */
@@ -769,6 +821,10 @@ export class ProjectionRouter<
     for (const reactor of reactors) {
       if (reactor.options?.disabled) continue;
       if (this.isReactorExcluded(reactor)) continue;
+      if (!this.reactorShouldReact(reactor, event, foldState)) {
+        incrementEsReactorTotal(this.pipelineName, reactor.name, "skipped");
+        continue;
+      }
 
       if (hasReactorQueues) {
         const queueProcessor = this.queueManager.getReactorQueue(reactor.name);
@@ -785,7 +841,7 @@ export class ProjectionRouter<
               },
               "Failed to dispatch event to reactor queue",
             );
-            errors.push(error instanceof Error ? error : new Error(String(error)));
+            errors.push(toError(error));
           }
         } else {
           // Queue expected but not found — fall back to inline execution
@@ -799,12 +855,11 @@ export class ProjectionRouter<
           );
           try {
             await withMetrics({
-              fn: () => reactor.handle(event, {
-                tenantId: event.tenantId,
-                aggregateId: String(event.aggregateId),
-                foldState,
-                isReplay: LIVE_DISPATCH_IS_REPLAY,
-              }),
+              fn: () =>
+                reactor.handle(
+                  event,
+                  this.buildReactorContext({ event, foldState }),
+                ),
               onComplete: (ms) => { incrementEsReactorTotal(this.pipelineName, reactor.name, "completed"); observeEsReactorDuration(this.pipelineName, reactor.name, ms); },
               onFail: (ms) => { incrementEsReactorTotal(this.pipelineName, reactor.name, "failed"); observeEsReactorDuration(this.pipelineName, reactor.name, ms); },
             });
@@ -821,19 +876,18 @@ export class ProjectionRouter<
               },
               "Reactor failed during inline fallback execution",
             );
-            errors.push(error instanceof Error ? error : new Error(String(error)));
+            errors.push(toError(error));
           }
         }
       } else {
         // Inline mode: call reactor directly
         try {
           await withMetrics({
-            fn: () => reactor.handle(event, {
-              tenantId: event.tenantId,
-              aggregateId: String(event.aggregateId),
-              foldState,
-              isReplay: LIVE_DISPATCH_IS_REPLAY,
-            }),
+            fn: () =>
+              reactor.handle(
+                event,
+                this.buildReactorContext({ event, foldState }),
+              ),
             onComplete: (ms) => { incrementEsReactorTotal(this.pipelineName, reactor.name, "completed"); observeEsReactorDuration(this.pipelineName, reactor.name, ms); },
             onFail: (ms) => { incrementEsReactorTotal(this.pipelineName, reactor.name, "failed"); observeEsReactorDuration(this.pipelineName, reactor.name, ms); },
           });
@@ -850,7 +904,7 @@ export class ProjectionRouter<
             },
             "Reactor failed during inline execution — fold state persisted in CH but reactor side-effect (e.g. ES sync) was lost",
           );
-          errors.push(error instanceof Error ? error : new Error(String(error)));
+          errors.push(toError(error));
         }
       }
     }

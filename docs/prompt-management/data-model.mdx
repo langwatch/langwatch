@@ -54,7 +54,12 @@ When you retrieve a prompt, you get all the configuration in a single response:
       { "id": "example_1", "input": "I need help with my account", "output": "I'd be happy to help you with your account. What specific issue are you experiencing?" }
     ]
   },
-  "promptingTechnique": "chain_of_thought"
+  "promptingTechnique": "chain_of_thought",
+  "parameters": {
+    "max_search_iterations": 3,
+    "confidence_threshold": 0.8,
+    "metadata_fields": ["category", "priority"]
+  }
 }
 ```
 
@@ -132,6 +137,12 @@ The main prompt text (system message)
 
 <ResponseField name="messages" type="array">
 Array of chat messages with roles and content (alternative to prompt field)
+</ResponseField>
+
+### Runtime Parameters
+
+<ResponseField name="parameters" type="object" default="{}">
+Arbitrary JSON object versioned alongside the prompt. Use it to store application settings that should change together with the prompt (thresholds, iteration counts, structured output schemas, feature switches). Changing `parameters` creates a new prompt version. See [Runtime Parameters](/prompt-management/features/essential/runtime-parameters).
 </ResponseField>
 
 ## Variable System

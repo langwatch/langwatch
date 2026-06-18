@@ -62,3 +62,63 @@ describe("ScopeChipPicker quick-picks", () => {
     });
   });
 });
+
+describe("ScopeChipPicker single-select variant", () => {
+  afterEach(cleanup);
+
+  const projects = [
+    { id: "p-prod", name: "ACME Prod", teamId: "t-acme" },
+    { id: "p-web", name: "web-app", teamId: "t-acme" },
+    { id: "p-bill", name: "billing-svc", teamId: "t-platform" },
+  ];
+  const teams = [
+    { id: "t-acme", name: "QA Shared Team" },
+    { id: "t-platform", name: "Platform Team" },
+  ];
+
+  describe("given a project is already selected", () => {
+    it("shows the picked project in the trigger and hides the scope summary", () => {
+      renderPicker(
+        <ScopeChipPicker
+          variant="single-select"
+          allowedScopeTypes={["PROJECT"]}
+          organizationId="org-1"
+          availableProjects={projects}
+          availableTeams={teams}
+          value={[{ scopeType: "PROJECT", scopeId: "p-web" }]}
+          onChange={vi.fn()}
+          showSummary={false}
+          placeholder="Select a project"
+        />,
+      );
+
+      // The collapsed trigger reflects the current selection by name.
+      expect(screen.getAllByText("web-app").length).toBeGreaterThan(0);
+      // showSummary={false} keeps the config-oriented helper line out.
+      expect(screen.queryByText(/can use this configuration/)).toBeNull();
+    });
+  });
+
+  describe("given nothing is selected yet", () => {
+    it("shows the placeholder and offers no chips or quick-picks", () => {
+      renderPicker(
+        <ScopeChipPicker
+          variant="single-select"
+          allowedScopeTypes={["PROJECT"]}
+          organizationId="org-1"
+          availableProjects={projects}
+          availableTeams={teams}
+          value={[]}
+          onChange={vi.fn()}
+          placeholder="Select a project"
+        />,
+      );
+
+      expect(screen.getAllByText("Select a project").length).toBeGreaterThan(0);
+      // A plain single-select dropdown: no multi-select chips and none of the
+      // org/team/project quick-pick buttons.
+      expect(screen.queryByTestId("quick-scope-project")).toBeNull();
+      expect(screen.queryByTestId("quick-scope-multiple")).toBeNull();
+    });
+  });
+});

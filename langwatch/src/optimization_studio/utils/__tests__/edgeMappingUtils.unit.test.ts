@@ -1,13 +1,14 @@
 /**
  * @vitest-environment node
  */
-import { describe, it, expect } from "vitest";
+
 import type { Edge, Node } from "@xyflow/react";
+import { describe, expect, it } from "vitest";
 import type { Component } from "../../types/dsl";
 import {
+  applyMappingChangeToEdges,
   buildAvailableSources,
   buildInputMappingsFromEdges,
-  applyMappingChangeToEdges,
 } from "../edgeMappingUtils";
 
 function createNode(
@@ -67,8 +68,8 @@ describe("buildAvailableSources", () => {
       expect(result).toEqual([
         {
           id: "entry",
-          name: "Dataset",
-          type: "dataset",
+          name: "Entry",
+          type: "entry",
           fields: [{ name: "question", type: "str" }],
         },
       ]);
@@ -107,8 +108,8 @@ describe("buildAvailableSources", () => {
       expect(result).toEqual([
         {
           id: "entry",
-          name: "Dataset",
-          type: "dataset",
+          name: "Entry",
+          type: "entry",
           fields: [{ name: "input", type: "str" }],
         },
       ]);
@@ -159,8 +160,9 @@ describe("buildAvailableSources", () => {
     });
   });
 
-  describe("when entry node has a dataset name", () => {
-    it("uses the dataset name for entry nodes", () => {
+  describe("when an entry node has a dataset attached", () => {
+    /** @scenario A workflow input maps from the entry, not the dataset name */
+    it("labels the source as Entry, not the dataset name", () => {
       const nodes = [
         createNode("entry", "entry", {
           outputs: [{ identifier: "question", type: "str" }],
@@ -176,7 +178,8 @@ describe("buildAvailableSources", () => {
         edges,
       });
 
-      expect(result[0]!.name).toBe("Customer FAQ");
+      expect(result[0]!.name).toBe("Entry");
+      expect(result[0]!.type).toBe("entry");
     });
   });
 });

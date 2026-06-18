@@ -22,9 +22,9 @@
  * Each run takes ~2-4s for the dispatch + LLM call; subprocess startup
  * adds ~3s on first invocation due to `go run` compilation.
  */
-import { spawn, type ChildProcess } from "node:child_process";
-import { setTimeout as sleep } from "node:timers/promises";
+import { type ChildProcess, spawn } from "node:child_process";
 import path from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -63,6 +63,13 @@ vi.mock("../../../optimization_studio/server/lambda", () => ({
 }));
 
 const NLPGO_PORT = 5562;
+// nlpgoFetch consults the mocked getProjectLambdaArn ONLY when
+// LANGWATCH_NLP_LAMBDA_CONFIG is set; otherwise it routes straight to
+// LANGWATCH_NLP_SERVICE from the ambient .env — typically a long-running
+// dev nlpgo that has none of this branch's Go code. Pin both paths at the
+// subprocess this test spawns so it exercises THIS worktree's engine.
+process.env.LANGWATCH_NLP_SERVICE = `http://127.0.0.1:${NLPGO_PORT}`;
+delete process.env.LANGWATCH_NLP_LAMBDA_CONFIG;
 // /langwatch/src/server/nlpgo/__tests__  → up 5 = repo root.
 // Was 6 historically (landed at worktrees/ instead of the repo) which
 // silently broke `go run ./cmd/service` with "directory not found"
@@ -145,108 +152,228 @@ afterAll(async () => {
 const liveOpenAI = process.env.OPENAI_API_KEY ? it : it.skip;
 
 describe("nlpgoFetch end-to-end against live nlpgo subprocess", () => {
-  liveOpenAI("routes a Studio workflow to /go/studio/execute_sync and returns a real LLM result", async () => {
-    const { nlpgoFetch } = await import("../nlpgoFetch");
+  liveOpenAI(
+    "routes a Studio workflow to /go/studio/execute_sync and returns a real LLM result",
+    async () => {
+      const { nlpgoFetch } = await import("../nlpgoFetch");
 
-    const workflow = {
-      workflow_id: "ts-e2e",
-      api_key: "k",
-      spec_version: "1.3",
-      name: "TS E2E",
-      icon: "🧪",
-      description: "ts integration",
-      version: "1.3",
-      template_adapter: "default",
-      nodes: [
-        {
-          id: "entry",
-          type: "entry",
-          data: {
-            outputs: [{ identifier: "question", type: "str" }],
-            dataset: {
-              inline: {
-                records: { question: ["Reply with just the digit 4."] },
-              },
-            },
-            entry_selection: 0,
-            train_size: 1.0,
-            test_size: 0.0,
-            seed: 1,
-          },
-        },
-        {
-          id: "answer",
-          type: "signature",
-          data: {
-            name: "Answer",
-            parameters: [
-              {
-                identifier: "llm",
-                type: "llm",
-                value: {
-                  model: "openai/gpt-5-mini",
-                  litellm_params: { api_key: process.env.OPENAI_API_KEY },
+      const workflow = {
+        workflow_id: "ts-e2e",
+        api_key: "k",
+        spec_version: "1.3",
+        name: "TS E2E",
+        icon: "🧪",
+        description: "ts integration",
+        version: "1.3",
+        template_adapter: "default",
+        nodes: [
+          {
+            id: "entry",
+            type: "entry",
+            data: {
+              outputs: [{ identifier: "question", type: "str" }],
+              dataset: {
+                inline: {
+                  records: { question: ["Reply with just the digit 4."] },
                 },
               },
-            ],
-            inputs: [{ identifier: "question", type: "str" }],
-            outputs: [{ identifier: "answer", type: "str" }],
+              entry_selection: 0,
+              train_size: 1.0,
+              test_size: 0.0,
+              seed: 1,
+            },
+          },
+          {
+            id: "answer",
+            type: "signature",
+            data: {
+              name: "Answer",
+              parameters: [
+                {
+                  identifier: "llm",
+                  type: "llm",
+                  value: {
+                    model: "openai/gpt-5-mini",
+                    litellm_params: { api_key: process.env.OPENAI_API_KEY },
+                  },
+                },
+              ],
+              inputs: [{ identifier: "question", type: "str" }],
+              outputs: [{ identifier: "answer", type: "str" }],
+            },
+          },
+          {
+            id: "end",
+            type: "end",
+            data: { inputs: [{ identifier: "answer", type: "str" }] },
+          },
+        ],
+        edges: [
+          {
+            id: "e1",
+            source: "entry",
+            sourceHandle: "outputs.question",
+            target: "answer",
+            targetHandle: "inputs.question",
+            type: "default",
+          },
+          {
+            id: "e2",
+            source: "answer",
+            sourceHandle: "outputs.answer",
+            target: "end",
+            targetHandle: "inputs.answer",
+            type: "default",
+          },
+        ],
+        state: {},
+      };
+
+      const event = {
+        type: "execute_flow",
+        payload: {
+          trace_id: "ts-e2e-trace",
+          workflow,
+          inputs: [{}],
+          origin: "workflow",
+        },
+      };
+
+      const res = await nlpgoFetch({
+        projectId: "test-project",
+        path: "/studio/execute_sync",
+        body: event,
+        origin: "workflow",
+      });
+
+      expect(res.ok).toBe(true);
+      expect(res.enginePath).toBe("go");
+
+      const body = (await res.json()) as {
+        status: string;
+        result?: { answer?: string };
+        error?: { message?: string };
+      };
+      expect(body.status, JSON.stringify(body.error)).toBe("success");
+      expect(body.result?.answer).toBeDefined();
+      expect(body.result?.answer).toContain("4");
+    },
+    60_000,
+  );
+});
+
+describe("vision signature node against live nlpgo subprocess", () => {
+  // A 512x512 solid-red PNG (big enough that the provider's vision
+  // preprocessing doesn't letterbox it into a dark canvas — a 32x32 red
+  // square reads as "black" even via the raw OpenAI API). The model can only
+  // answer the color question by actually SEEING the image — if the data URL
+  // were still inlined as text (the pre-split regression), it could not.
+  const redSquare =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAIAAAB7GkOtAAAFl0lEQVR42u3VMQ0AAAjAsPk3DR54aVIFe9YUAA9JAGAAABgAAAYAgAEAYAAAGAAABgCAAQBgAAAYAAAGAIABAGAAABgAAAYAgAEAYAAAGAAABgCAAQBgAAAYAAAGAGAAABgAAAYAgAEAYAAAGAAABgCAAQBgAAAYAAAGAIABAGAAABgAAAYAgAEAYAAAGAAABgCAAQBgAAAYAAAGAGAAEgAYAAAGAIABAGAAABgAAAYAgAEAYAAAGAAABgCAAQBgAAAYAAAGAIABAGAAABgAAAYAgAEAYAAAGAAABgCAAQAYAAAGAIABAGAAABgAAAYAgAEAYAAAGAAABgCAAQBgAAAYAAAGAIABAGAAABgAAAYAgAEAYAAAGAAABgCAAQAYAAAGAIABAGAAABgAAAYAgAEAYAAAGAAABgCAAQBgAAAYAAAGAIABAGAAABgAAAYAgAEAYAAAGAAABgCAAQBgAAAGAIABAGAAABgAAAYAgAEAYAAAGAAABgCAAQBgAAAYAAAGAIABAGAAABgAAAYAgAEAYAAAGAAABgCAAQBgAAAGAIABAGAAABgAAAYAgAEAYAAAGAAABgCAAQBgAAAYAAAGAIABAGAAABgAAAYAgAEAYAAAGAAABgCAAQBgAAAYAIABAGAAABgAAAYAgAEAYAAAGAAABgCAAQBgAAAYAAAGAIABAGAAABgAAAYAgAEAYAAAGAAABgCAAQBgAAAYAIABAGAAABgAAAYAgAEAYAAAGAAABgCAAQBgAAAYAAAGAIABAGAAABgAAAYAgAEAYAAAGAAABgCAAQBgAAAYAAASABgAAAYAgAEAYAAAGAAABgCAAQBgAAAYAAAGAIABAGAAABgAAAYAgAEAYAAAGAAABgCAAQBgAAAYAAAGAIABABgAAAYAgAEAYAAAGAAABgCAAQBgAAAYAAAGAIABAGAAABgAAAYAgAEAYAAAGAAABgCAAQBgAAAYAAAGAIABACABgAEAYAAAGAAABgCAAQBgAAAYAAAGAIABAGAAABgAAAYAgAEAYAAAGAAABgCAAQBgAAAYAAAGAIABAGAAABgAgAEAYAAAGAAABgCAAQBgAAAYAAAGAIABAGAAABgAAAYAgAEAYAAAGAAABgCAAQBgAAAYAAAGAIABAGAAABgAgAFIAGAAABgAAAYAgAEAYAAAGAAABgCAAQBgAAAYAAAGAIABAGAAABgAAAYAgAEAYAAAGAAABgCAAQBgAAAYAAAGAGAAABgAAAYAgAEAYAAAGAAABgCAAQBgAAAYAAAGAIABAGAAABgAAAYAgAEAYAAAGAAABgCAAQBgAAAYAAAGAGAAABgAAAYAgAEAYAAAGAAABgCAAQBgAAAYAAAGAIABAGAAABgAAAYAgAEAYAAAGAAABgCAAQBgAAAYAAAGAIABABgAAAYAgAEAYAAAGAAABgCAAQBgAAAYAAAGAIABAGAAABgAAAYAgAEAYAAAGAAABgCAAQBgAAAYAAAGAIABABgAAAYAgAEAYAAAGAAABgCAAQBgAAAYAAAGAIABAGAAABgAAAYAgAEAYAAAGAAABgCAAQBgAAAYAAAGAIABAGAAAAYAgAEAYAAAGAAABgCAAQBgAAAYAAAGAIABAGAAABgAAAYAgAEAYAAAGAAABgCAAQBgAAAYAAAGAIABAGAAAAYAgAEAYAAAGAAABgCAAQBgAAAYAAAGAIABAGAAABgAAAYAgAEAYAAAGAAABgCAAQBgAAAYAAAGAIABAGAAAEgAYAAAGAAABgCAAQBgAAAYAAAGAIABAGAAABgAAAYAgAEAYAAAGAAABgCAAQBgAAAYAAAGAIABAGAAABgAAAYAYAAAGAAABgCAAQBgAAAYAAAGAIABAGAAABgAAAYAgAEAYAAAGAAABgCAAQBgAAAYAABHCwofO8XPBui2AAAAAElFTkSuQmCC";
+
+  liveOpenAI(
+    "delivers a dataset image as an image_url part the model can actually see",
+    async () => {
+      const { nlpgoFetch } = await import("../nlpgoFetch");
+
+      const workflow = {
+        workflow_id: "ts-e2e-vision",
+        api_key: "k",
+        spec_version: "1.3",
+        name: "TS E2E Vision",
+        icon: "🖼️",
+        description: "vision split integration",
+        version: "1.3",
+        template_adapter: "default",
+        nodes: [
+          {
+            id: "entry",
+            type: "entry",
+            data: {
+              outputs: [{ identifier: "photo", type: "image" }],
+              dataset: { inline: { records: { photo: [redSquare] } } },
+              entry_selection: 0,
+              train_size: 1.0,
+              test_size: 0.0,
+              seed: 1,
+            },
+          },
+          {
+            id: "describe",
+            type: "signature",
+            data: {
+              name: "Describe",
+              parameters: [
+                {
+                  identifier: "llm",
+                  type: "llm",
+                  value: {
+                    model: "openai/gpt-5-mini",
+                    litellm_params: { api_key: process.env.OPENAI_API_KEY },
+                  },
+                },
+                {
+                  identifier: "instructions",
+                  type: "str",
+                  value:
+                    "You will receive an image: {{photo}}\nAnswer with ONLY the dominant color of the image, one lowercase word.",
+                },
+              ],
+              inputs: [{ identifier: "photo", type: "image" }],
+              outputs: [{ identifier: "color", type: "str" }],
+            },
+          },
+          {
+            id: "end",
+            type: "end",
+            data: { inputs: [{ identifier: "color", type: "str" }] },
+          },
+        ],
+        edges: [
+          {
+            id: "e1",
+            source: "entry",
+            sourceHandle: "outputs.photo",
+            target: "describe",
+            targetHandle: "inputs.photo",
+            type: "default",
+          },
+          {
+            id: "e2",
+            source: "describe",
+            sourceHandle: "outputs.color",
+            target: "end",
+            targetHandle: "inputs.color",
+            type: "default",
+          },
+        ],
+        state: {},
+      };
+
+      const res = await nlpgoFetch({
+        projectId: "test-project-vision",
+        path: "/studio/execute_sync",
+        body: {
+          type: "execute_flow",
+          payload: {
+            trace_id: "ts-e2e-vision-trace",
+            workflow,
+            inputs: [{}],
+            origin: "workflow",
           },
         },
-        {
-          id: "end",
-          type: "end",
-          data: { inputs: [{ identifier: "answer", type: "str" }] },
-        },
-      ],
-      edges: [
-        {
-          id: "e1",
-          source: "entry",
-          sourceHandle: "outputs.question",
-          target: "answer",
-          targetHandle: "inputs.question",
-          type: "default",
-        },
-        {
-          id: "e2",
-          source: "answer",
-          sourceHandle: "outputs.answer",
-          target: "end",
-          targetHandle: "inputs.answer",
-          type: "default",
-        },
-      ],
-      state: {},
-    };
-
-    const event = {
-      type: "execute_flow",
-      payload: {
-        trace_id: "ts-e2e-trace",
-        workflow,
-        inputs: [{}],
         origin: "workflow",
-      },
-    };
+      });
 
-    const res = await nlpgoFetch({
-      projectId: "test-project",
-      path: "/studio/execute_sync",
-      body: event,
-      origin: "workflow",
-    });
-
-    expect(res.ok).toBe(true);
-    expect(res.enginePath).toBe("go");
-
-    const body = (await res.json()) as {
-      status: string;
-      result?: { answer?: string };
-      error?: { message?: string };
-    };
-    expect(body.status, JSON.stringify(body.error)).toBe("success");
-    expect(body.result?.answer).toBeDefined();
-    expect(body.result?.answer).toContain("4");
-  }, 60_000);
+      expect(res.ok).toBe(true);
+      const body = (await res.json()) as {
+        status: string;
+        result?: { color?: string };
+        error?: { message?: string };
+      };
+      expect(body.status, JSON.stringify(body.error)).toBe("success");
+      expect(body.result?.color?.toLowerCase()).toContain("red");
+    },
+    90_000,
+  );
 });

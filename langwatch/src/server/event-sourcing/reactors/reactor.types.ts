@@ -49,12 +49,29 @@ export interface ReactorOptions {
  * after every fold apply + store succeeds. This guarantees correctness:
  * if the fold fails, the reactor never fires.
  *
- * Reactors fire on every fold completion (no eventTypes filter).
+ * Reactors fire on every fold completion unless a `shouldReact`
+ * predicate filters the event out before enqueue.
  * Downstream commands handle their own dedup via makeJobId + delay.
+ *
+ * See dev/docs/adr/026-reactor-should-react-predicate.md.
  */
 export interface ReactorDefinition<E extends Event = Event, FoldState = unknown> {
   /** Unique name for this reactor */
   name: string;
+  /**
+   * Optional pure predicate evaluated at dispatch time, before any job is
+   * enqueued. Return false to skip this reactor entirely for the event.
+   *
+   * Must be pure and synchronous — no IO, no injected dependencies; it runs
+   * on the projection hot path. Guards that need dependencies (DB lookups
+   * etc.) belong in handle(). A thrown predicate is caught, logged, and
+   * treated as true (fail open — never drops a side effect).
+   *
+   * The queue payload `{ event, foldState }` is captured at dispatch, so the
+   * predicate sees exactly what handle() would receive — do not use this for
+   * conditions that should be re-evaluated against fresher state later.
+   */
+  shouldReact?(event: E, context: ReactorContext<FoldState>): boolean;
   /** Side-effect handler called after fold succeeds */
   handle(event: E, context: ReactorContext<FoldState>): Promise<void>;
   /** Optional configuration */

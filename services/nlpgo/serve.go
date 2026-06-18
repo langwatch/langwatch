@@ -37,6 +37,11 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config, pl
 		Handler:           handler,
 		Addr:              cfg.Server.Addr,
 		ReadHeaderTimeout: 10 * time.Second,
+		// net/http rejects requests whose header section exceeds this with a
+		// pre-handler 431 that never reaches our logging. Requests arrive
+		// through LWA, which folds upstream metadata into headers, so give
+		// them ample room instead of the 1 MiB default.
+		MaxHeaderBytes: 8 << 20,
 	}
 
 	g := lifecycle.New(

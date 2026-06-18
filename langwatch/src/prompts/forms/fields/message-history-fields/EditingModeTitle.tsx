@@ -1,5 +1,4 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
-import { useState } from "react";
 import { LuChevronDown } from "react-icons/lu";
 import { Menu } from "~/components/ui/menu";
 import { PropertySectionTitle } from "~/components/ui/PropertySectionTitle";
@@ -52,27 +51,19 @@ export function EditingModeTitle({
   mode: PromptEditingMode;
   onChange: (mode: PromptEditingMode) => void;
 }) {
-  const [isHovered, setIsHovered] = useState(false);
-
   return (
     <Menu.Root>
       <Menu.Trigger asChild>
         <HStack
           gap={1}
           cursor="pointer"
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
           role="button"
           _hover={{ opacity: 0.8 }}
         >
           <PropertySectionTitle padding={0} paddingY={1}>
             {mode === "prompt" ? "Prompt" : "Messages"}
           </PropertySectionTitle>
-          <Box
-            opacity={isHovered ? 1 : 0}
-            transition="opacity 0.15s"
-            color="fg.muted"
-          >
+          <Box color="fg.muted" data-testid="editing-mode-chevron">
             <LuChevronDown size={14} />
           </Box>
         </HStack>

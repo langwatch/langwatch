@@ -4,29 +4,21 @@ MCP server that gives AI coding agents access to LangWatch observability data, p
 
 ## Quick Setup
 
-Add to your MCP client configuration (Claude Code, Cursor, etc.):
-
-```json
-{
-  "mcpServers": {
-    "langwatch": {
-      "command": "npx",
-      "args": ["-y", "@langwatch/mcp-server"],
-      "env": {
-        "LANGWATCH_API_KEY": "your-api-key-here"
-      }
-    }
-  }
-}
-```
-
-For Claude Code, you can also run:
+For Claude Code, run:
 
 ```bash
 claude mcp add langwatch -- npx -y @langwatch/mcp-server --apiKey your-api-key-here
 ```
 
+For Claude Code (manual) or other MCP clients (Cursor, Copilot, etc.), add an entry named `langwatch` under the `mcpServers` object of your client's MCP settings file with these fields:
+
+- `command`: `npx`
+- `args`: `-y`, then the package name `@langwatch/mcp-server` on a separate token
+- `env.LANGWATCH_API_KEY`: your LangWatch API key
+
 The API key is required for observability and prompt tools. Documentation tools work without it.
+
+> The config is described in prose rather than as a JSON snippet because some CLI agents (notably Gemini CLI 0.36.0 and earlier) parse `@`-prefixed runs as file paths and can crash with `ENAMETOOLONG` when a multi-line JSON snippet wraps the scoped package name in double quotes. See [#3104](https://github.com/langwatch/langwatch/issues/3104). The bash form above is safe — the package name is followed by a whitespace terminator.
 
 ## Configuration
 

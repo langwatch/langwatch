@@ -10,7 +10,7 @@ import {
   triggerFiltersReferenceEvents,
 } from "~/server/filters/triggerFilter.matcher";
 import { createLogger } from "~/utils/logger/server";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { isDispatchError } from "../../../outbox/dispatchError";
 import type {
   ReactorContext,
@@ -209,7 +209,7 @@ export function createEvaluationAlertTriggerReactor(
             },
             "Failed to evaluate trigger on evaluation completion",
           );
-          captureException(error, {
+          captureException(toError(error), {
             extra: {
               tenantId,
               traceId,

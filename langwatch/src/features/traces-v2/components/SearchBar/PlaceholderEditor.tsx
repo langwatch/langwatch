@@ -5,6 +5,7 @@ import {
   removeNodeAtLocation,
   swapOperatorAtLocation,
 } from "~/server/app-layer/traces/query-language/mutations";
+import { useFacetValueLabelResolver } from "../../hooks/useFacetValueLabels";
 import { buildDecorationPlan, type TokenRef } from "./filterHighlight";
 
 const PLACEHOLDER_TEXT = "Search filters, free text, or Ask AI…";
@@ -89,6 +90,32 @@ function buildSegments(text: string): DecoratedSegment[] {
   return out;
 }
 
+/**
+ * Swap a chip's raw value for its display label within the segment's
+ * literal text. Anchored after the first ':' so the search only runs
+ * over the value portion (a value that's a substring of the field name
+ * — e.g. field `topics`, value `topic` — can't hit the wrong span).
+ * Uses the replacer-function form of `replace` so `$&`/`$'` sequences
+ * in tenant-controlled labels are inserted verbatim, not interpreted.
+ * Exported for unit testing.
+ */
+export function replaceChipValue({
+  segText,
+  value,
+  label,
+}: {
+  segText: string;
+  value: string;
+  label: string;
+}): string {
+  const colon = segText.indexOf(":");
+  if (colon === -1) return segText.replace(value, () => label);
+  return (
+    segText.slice(0, colon + 1) +
+    segText.slice(colon + 1).replace(value, () => label)
+  );
+}
+
 export interface TokenClickPayload {
   /** Bounding rect of the clicked chip — used to anchor a popover. */
   rect: DOMRect;
@@ -141,6 +168,11 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
 
   const isEmpty = queryText.length === 0;
   const segments = useMemo(() => buildSegments(queryText), [queryText]);
+  // Chips store the raw id (unique) but display the resolved facet label
+  // (readable) — same source the sidebar uses. The id stays one hover
+  // away via `title`, and clicking into the bar mounts the live editor,
+  // which shows the underlying query text verbatim.
+  const resolveLabel = useFacetValueLabelResolver();
 
   return (
     <Box
@@ -241,6 +273,24 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
             // simultaneously activate the heavier ProseMirror editor.
             if (seg.token && onTokenClick && seg.token.value !== null) {
               const tok = seg.token;
+              const richLabel = resolveLabel({
+                field: tok.field,
+                value: tok.value!,
+              });
+              // Swap the id for its display name in the rendered chip
+              // only — token coords, data-attrs, and the query text all
+              // keep the unique id. The replace is anchored after the
+              // first ':' so a value that happens to be a substring of
+              // the field name can't be swapped in the wrong place, and
+              // the replacer-function form keeps `$&`-style patterns in
+              // tenant-controlled labels from being interpreted.
+              const display = richLabel
+                ? replaceChipValue({
+                    segText: seg.text,
+                    value: tok.value!,
+                    label: richLabel,
+                  })
+                : seg.text;
               return (
                 <span
                   key={i}
@@ -250,7 +300,11 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
                   data-filter-chip-field={tok.field}
                   data-filter-chip-value={tok.value}
                   style={{ cursor: "pointer" }}
-                  title="Click to change value"
+                  title={
+                    richLabel
+                      ? `${tok.field}:${tok.value} — click to change value`
+                      : "Click to change value"
+                  }
                   onMouseDown={(event) => {
                     event.preventDefault();
                     event.stopPropagation();
@@ -265,7 +319,7 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
                     });
                   }}
                 >
-                  {seg.text}
+                  {display}
                 </span>
               );
             }

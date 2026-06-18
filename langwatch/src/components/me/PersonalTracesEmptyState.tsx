@@ -123,7 +123,7 @@ export function PersonalTracesEmptyState({
   ];
 
   return (
-    <IntegratePaneShell compact ariaLabel="Start sending your AI usage">
+    <IntegratePaneShell isCompact ariaLabel="Start sending your AI usage">
       <VStack align="stretch" gap={6}>
         <VStack align="start" gap={1.5}>
           <Text

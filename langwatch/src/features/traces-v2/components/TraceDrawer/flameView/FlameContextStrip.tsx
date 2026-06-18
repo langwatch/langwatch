@@ -8,6 +8,7 @@ interface FlameContextStripProps {
   contextInfo: SpanContext | null;
   spanCount: number;
   fullDur: number;
+  showZoomHint: boolean;
 }
 
 /**
@@ -20,6 +21,7 @@ export function FlameContextStrip({
   contextInfo,
   spanCount,
   fullDur,
+  showZoomHint,
 }: FlameContextStripProps) {
   return (
     <Flex
@@ -66,12 +68,7 @@ export function FlameContextStrip({
                 <Text textStyle="xs" color="fg.subtle" whiteSpace="nowrap">
                   of
                 </Text>
-                <Text
-                  textStyle="xs"
-                  color="fg.muted"
-                  truncate
-                  maxWidth="160px"
-                >
+                <Text textStyle="xs" color="fg.muted" truncate maxWidth="160px">
                   {contextInfo.parentName}
                 </Text>
                 <Text textStyle="xs" color="fg.subtle" whiteSpace="nowrap">
@@ -88,7 +85,10 @@ export function FlameContextStrip({
       ) : (
         <Text textStyle="xs" color="fg.subtle">
           {spanCount} span{spanCount === 1 ? "" : "s"} ·{" "}
-          {formatDuration(fullDur)} · hover a span for details
+          {formatDuration(fullDur)} ·{" "}
+          {showZoomHint
+            ? "drag across the ruler to zoom into a region"
+            : "hover a span for details"}
         </Text>
       )}
     </Flex>

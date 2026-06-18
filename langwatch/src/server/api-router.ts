@@ -31,6 +31,7 @@ import { app as simulationRunsApp } from "../app/api/simulation-runs/[[...route]
 import { app as suitesApp } from "../app/api/suites/[[...route]]/app";
 import { app as teamsApp } from "../app/api/teams/[[...route]]/app";
 import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
+import { app as eventsApp } from "../app/api/events/[[...route]]/app";
 import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
 import { app as workflowsCrudApp } from "../app/api/workflows/[[...route]]/app";
 
@@ -103,6 +104,7 @@ export function createApiRouter() {
   api.route("/", dashboardsApp);
   api.route("/", datasetApp);
   api.route("/", evaluatorsApp);
+  api.route("/", eventsApp);
   // experimentsV3App owns the session-authenticated execute/abort endpoints and
   // the API-key-authenticated run/runs endpoints; experimentsApp owns the
   // project-API-key list endpoint (GET /api/experiments). Both live under

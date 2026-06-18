@@ -10,18 +10,19 @@ Every subcommand supports `--help`, and list/get commands accept `--format json`
 
 ## Install
 
+The CLI needs **Node.js 18 or newer** (the `npm` command ships with it). If you don't already have it, get it from [nodejs.org](https://nodejs.org). Then install globally:
+
 ```bash
 npm install -g langwatch
 ```
 
-Or run any command with `npx`:
+Or run any command with `npx`, no install required:
 
 ```bash
 npx langwatch --help
 ```
 
-For pnpm, yarn equivalents, self-hosted endpoint pre-config, and
-enterprise-network notes, see the [full install guide](/integration/install).
+`pnpm install -g langwatch` and `yarn global add langwatch` work the same way; the package is identical across all three package managers.
 
 ## Authenticate
 

@@ -23,7 +23,7 @@ interface ModeSwitchProps {
    * "no turns found" pane the moment the user opens the drawer reads
    * as broken even though the data is en route.
    */
-  conversationLoading?: boolean;
+  isConversationLoading?: boolean;
   /** Trace id used to scope the per-mode peer presence dots. */
   traceId?: string;
   /**
@@ -143,17 +143,17 @@ export function ModeSwitch({
   onViewModeChange,
   turnLabel,
   hasConversation = true,
-  conversationLoading = false,
+  isConversationLoading = false,
   traceId,
   endSlot,
 }: ModeSwitchProps) {
   // Tristate gate: no conversationId → permanently disabled; has id
   // but turns still in flight → disabled with loading copy; has id +
   // turns → enabled.
-  const conversationDisabled = !hasConversation || conversationLoading;
+  const conversationDisabled = !hasConversation || isConversationLoading;
   const conversationDisabledReason = !hasConversation
     ? "This trace is not part of a conversation"
-    : conversationLoading
+    : isConversationLoading
       ? "Loading conversation…"
       : undefined;
   const presenceFor = (mode: DrawerViewMode) =>

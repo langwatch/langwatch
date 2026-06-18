@@ -33,12 +33,14 @@ vi.mock("../../store/onboardingStore", () => ({
 
 import {
   readSpotlightFragment,
-  writeSpotlightFragment,
   useSpotlightURLSync,
+  writeSpotlightFragment,
 } from "../SpotlightOverlay";
 
 // Stub history.replaceState so fragment writes don't throw in jsdom
-const historyReplaceState = vi.spyOn(window.history, "replaceState").mockImplementation(() => undefined);
+const historyReplaceState = vi
+  .spyOn(window.history, "replaceState")
+  .mockImplementation(() => undefined);
 
 // ─── Test lifecycle ───────────────────────────────────────────────────────────
 

@@ -41,6 +41,7 @@ vi.mock("../../../hooks/useTargetName", () => ({
 vi.mock("../../../hooks/useEvaluatorName", () => ({
   useEvaluatorName: () => "Exact Match",
   useEvaluatorNames: () => new Map(),
+  useCodeEvaluatorIds: () => new Set(),
 }));
 
 const renderWithProviders = (ui: React.ReactElement) => {

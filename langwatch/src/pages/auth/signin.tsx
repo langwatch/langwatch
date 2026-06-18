@@ -21,7 +21,7 @@ import { HorizontalFormControl } from "../../components/HorizontalFormControl";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import { toaster } from "../../components/ui/toaster";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
-import { normalizeErrorCode, SignInError } from "./error";
+import { isStableAuthError, normalizeErrorCode, SignInError } from "./error";
 
 export default function SignIn() {
   const { data: session } = useSession();
@@ -50,10 +50,12 @@ export default function SignIn() {
       return;
     }
 
-    if (
-      error !== "OAuthAccountNotLinked" &&
-      isSocialProvider
-    ) {
+    // Don't auto-redirect back to the identity provider on a stable failure
+    // (wrong method / account collision): the IdP still holds a live session
+    // for the failing identity, so re-initiating sign-in silently re-auths it
+    // and traps the user in a loop. Those errors render SignInError with a
+    // federated-logout recovery instead.
+    if (!isStableAuthError(error) && isSocialProvider) {
       setTimeout(
         () => {
           void signIn(isAuthProvider, { callbackUrl });

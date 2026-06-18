@@ -142,12 +142,7 @@ export function ThreadProgressIndicator({
                 Conversation
               </Text>
               <HStack gap={1.5} width="full">
-                <Text
-                  textStyle="xs"
-                  truncate
-                  flex={1}
-                  minWidth={0}
-                >
+                <Text textStyle="xs" truncate flex={1} minWidth={0}>
                   {conversationId}
                 </Text>
                 <Button

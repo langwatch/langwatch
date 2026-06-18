@@ -72,7 +72,11 @@ describe("Optimization Studio Registry", () => {
       const codeParam = code.parameters?.find((p) => p.identifier === "code");
 
       expect(codeParam).toBeDefined();
-      expect(codeParam?.value).toContain("def __call__(self, input: str)");
+      // Inputs default to None so an unconnected handle does not raise a
+      // missing-argument error at run time.
+      expect(codeParam?.value).toContain(
+        "def __call__(self, input: str = None)",
+      );
     });
 
     it("has code parameter returning output key", () => {
@@ -109,6 +113,32 @@ describe("Optimization Studio Registry", () => {
       expect(value).toMatch(/^class\s+\w+\s*:/m);
       expect(value).toContain("def __call__(self");
       expect(value).not.toContain("def forward");
+    });
+  });
+
+  describe("if/else block defaults", () => {
+    const { ifElse } = MODULES;
+
+    /** @scenario If/Else is available in the node palette */
+    it("registers the If/Else module for the node palette", () => {
+      expect(ifElse.name).toBe("If/Else");
+      expect(ifElse.inputs).toEqual([{ identifier: "input", type: "str" }]);
+    });
+
+    /** @scenario If/Else node has one condition and two output branches */
+    it("ships a condition parameter and the fixed branch outputs", () => {
+      const conditionParam = ifElse.parameters?.find(
+        (p) => p.identifier === "condition",
+      );
+      expect(conditionParam).toBeDefined();
+      expect(conditionParam?.type).toBe("str");
+
+      // The branch handles are the engine's gating contract - fixed
+      // identifiers true/false of type bool.
+      expect(ifElse.outputs).toEqual([
+        { identifier: "true", type: "bool" },
+        { identifier: "false", type: "bool" },
+      ]);
     });
   });
 

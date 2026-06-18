@@ -1,8 +1,11 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 import { TriggerAction } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerSummary } from "~/server/app-layer/triggers/repositories/trigger.repository";
 import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
+import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import type { ReactorContext } from "~/server/event-sourcing/reactors/reactor.types";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import { captureException } from "~/utils/posthogErrorCapture";
@@ -22,6 +25,7 @@ vi.mock("~/utils/logger/server", () => ({
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
+  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
 function createFoldState(
@@ -112,6 +116,36 @@ function createTrigger(overrides: Partial<TriggerSummary> = {}): TriggerSummary 
     },
     ...overrides,
   };
+}
+
+/**
+ * A thumbs-down automation: fires when a `thumbs_up_down` event has vote == -1
+ * (#4903 / #4805). Persist-class (annotation-queue) so it flows through the
+ * inline alertTrigger reactor under test — notify-class triggers are owned by
+ * the `.withOutbox` reactor and would never claim a send here.
+ */
+function thumbsDownTrigger(
+  overrides: Partial<TriggerSummary> = {},
+): TriggerSummary {
+  return createTrigger({
+    filters: {
+      "events.metrics.value": { thumbs_up_down: { vote: ["-1", "-1"] } },
+    },
+    ...overrides,
+  });
+}
+
+/** A derived thumbs_up_down span event carrying the given vote metric. */
+function voteEvent(vote: number): DerivedTraceEvent {
+  return {
+    spanId: "span-1",
+    timestamp: Date.now(),
+    name: "thumbs_up_down",
+    attributes: {
+      "event.type": "thumbs_up_down",
+      "event.metrics.vote": String(vote),
+    },
+  } as unknown as DerivedTraceEvent;
 }
 
 function createDeps(
@@ -270,6 +304,98 @@ describe("alertTrigger reactor", () => {
         "trigger-ok",
         "tenant-1",
       );
+    });
+  });
+
+  // #4903 (#4805): a thumbs-down automation is an `events.metrics.value` range
+  // (vote == -1), not a distinct event type. The in-memory matcher used to skip
+  // that field and an all-skipped filter set matched every trace — so the alert
+  // fired on every trace. These exercise the persist-class path through the
+  // inline reactor with the fixed matcher.
+  describe("given a thumbs-down automation", () => {
+    describe("when the trace has no down-vote", () => {
+      it("does not dispatch the trigger action", async () => {
+        (
+          deps.triggers.getActiveTraceTriggersForProject as any
+        ).mockResolvedValue([thumbsDownTrigger()]);
+        // No thumbs_up_down event at all → condition unmet.
+        (deps.deriveEvents as any).mockResolvedValue([]);
+
+        const reactor = createAlertTriggerReactor(deps);
+        await reactor.handle(createEvent(), createContext(createFoldState()));
+
+        expect(deps.triggers.claimSend).not.toHaveBeenCalled();
+        expect(deps.triggers.updateLastRunAt).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the trace has an up-vote", () => {
+      it("does not dispatch the trigger action", async () => {
+        (
+          deps.triggers.getActiveTraceTriggersForProject as any
+        ).mockResolvedValue([thumbsDownTrigger()]);
+        (deps.deriveEvents as any).mockResolvedValue([voteEvent(1)]);
+
+        const reactor = createAlertTriggerReactor(deps);
+        await reactor.handle(createEvent(), createContext(createFoldState()));
+
+        expect(deps.triggers.claimSend).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the trace has a down-vote", () => {
+      it("dispatches the trigger action exactly once", async () => {
+        (
+          deps.triggers.getActiveTraceTriggersForProject as any
+        ).mockResolvedValue([thumbsDownTrigger()]);
+        (deps.deriveEvents as any).mockResolvedValue([voteEvent(-1)]);
+
+        const reactor = createAlertTriggerReactor(deps);
+        await reactor.handle(createEvent(), createContext(createFoldState()));
+
+        expect(deps.triggers.claimSend).toHaveBeenCalledTimes(1);
+        expect(deps.triggers.claimSend).toHaveBeenCalledWith({
+          triggerId: "trigger-1",
+          traceId: "trace-1",
+          projectId: "tenant-1",
+        });
+        expect(deps.triggers.updateLastRunAt).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when the trigger was already sent for this trace", () => {
+      it("respects at-most-once and does not dispatch", async () => {
+        (
+          deps.triggers.getActiveTraceTriggersForProject as any
+        ).mockResolvedValue([thumbsDownTrigger()]);
+        (deps.deriveEvents as any).mockResolvedValue([voteEvent(-1)]);
+        // Lost the claim race (another reactor already sent).
+        (deps.triggers.claimSend as any).mockResolvedValue(false);
+
+        const reactor = createAlertTriggerReactor(deps);
+        await reactor.handle(createEvent(), createContext(createFoldState()));
+
+        expect(deps.triggers.claimSend).toHaveBeenCalledTimes(1);
+        expect(deps.triggers.updateLastRunAt).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a thumbs-down automation that references event fields", () => {
+    describe("when the trace has a down-vote", () => {
+      it("derives the trace events list before matching", async () => {
+        (
+          deps.triggers.getActiveTraceTriggersForProject as any
+        ).mockResolvedValue([thumbsDownTrigger()]);
+        (deps.deriveEvents as any).mockResolvedValue([voteEvent(-1)]);
+
+        const reactor = createAlertTriggerReactor(deps);
+        await reactor.handle(createEvent(), createContext(createFoldState()));
+
+        expect(deps.deriveEvents).toHaveBeenCalledWith(
+          expect.objectContaining({ tenantId: "tenant-1", traceId: "trace-1" }),
+        );
+      });
     });
   });
 });

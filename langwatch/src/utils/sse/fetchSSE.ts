@@ -1,5 +1,6 @@
 import { fetchEventSource } from "@microsoft/fetch-event-source";
 import { createLogger } from "~/utils/logger";
+import { toError } from "~/utils/posthogErrorCapture";
 import { FetchSSETimeoutError } from "./errors";
 
 const logger = createLogger("sseClient");
@@ -134,7 +135,7 @@ export async function fetchSSE<T>({
       },
 
       onerror(error) {
-        handleError(error instanceof Error ? error : new Error(String(error)));
+        handleError(toError(error));
       },
     })
       .then(() => {
@@ -146,7 +147,7 @@ export async function fetchSSE<T>({
       })
       .catch((error) => {
         handleError(
-          error instanceof Error ? error : new Error(String(error)),
+          toError(error),
         );
       });
   });

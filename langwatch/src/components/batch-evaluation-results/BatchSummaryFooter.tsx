@@ -15,7 +15,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import numeral from "numeral";
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { formatCost, formatLatency } from "~/components/shared/formatters";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { BatchRunSummary } from "./BatchRunsSidebar";
@@ -27,6 +27,8 @@ type BatchSummaryFooterProps = {
   showProgress?: boolean;
   /** Callback when stop button is clicked */
   onStop?: () => void;
+  /** Right-aligned actions for the summary row (links, buttons) */
+  actions?: ReactNode;
 };
 
 /**
@@ -80,6 +82,7 @@ export function BatchSummaryFooter({
   run,
   showProgress = false,
   onStop,
+  actions,
 }: BatchSummaryFooterProps) {
   const [currentTimestamp, setCurrentTimestamp] = useState(Date.now());
 
@@ -175,20 +178,19 @@ export function BatchSummaryFooter({
         </VStack>
 
         {/* Stopped indicator */}
+        {(run.timestamps.stoppedAt != null || actions != null) && <Spacer />}
         {run.timestamps.stoppedAt && (
-          <>
-            <Spacer />
-            <HStack>
-              <Box
-                width="12px"
-                height="12px"
-                background="red.500"
-                borderRadius="full"
-              />
-              <Text>Stopped</Text>
-            </HStack>
-          </>
+          <HStack>
+            <Box
+              width="12px"
+              height="12px"
+              background="red.500"
+              borderRadius="full"
+            />
+            <Text>Stopped</Text>
+          </HStack>
         )}
+        {actions}
       </HStack>
 
       {/* Progress bar */}

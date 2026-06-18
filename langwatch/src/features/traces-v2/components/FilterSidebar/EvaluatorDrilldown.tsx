@@ -1,12 +1,16 @@
-import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import type { LiqeQuery } from "liqe";
 import type React from "react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { SimpleSlider } from "~/components/ui/slider";
 import {
   getFacetValueState,
   getRangeValue,
 } from "~/server/app-layer/traces/query-language/queries";
+import { RowButton } from "./RowButton";
+import { commitRange, RangeEndpointInput, stepForSpan } from "./rangeControls";
 import type { FacetItem } from "./types";
+import { formatCount } from "./utils";
 
 interface EvaluatorDrilldownProps {
   /** The evaluator FacetItem (must carry aggregates). */
@@ -21,18 +25,26 @@ interface EvaluatorDrilldownProps {
     value: string;
     isModifierKey?: boolean;
   }) => void;
-  setRange: ({ field, from, to }: { field: string; from: string; to: string }) => void;
+  setRange: ({
+    field,
+    from,
+    to,
+  }: {
+    field: string;
+    from: string;
+    to: string;
+  }) => void;
   removeRange: ({ field }: { field: string }) => void;
 }
 
 const VERDICT_FIELD = "evaluatorVerdict";
 const SCORE_FIELD = "evaluatorScore";
 
-interface VerdictPillSpec {
-  verdict: "pass" | "fail" | "unknown";
+interface VerdictRowSpec {
+  verdict: "pass" | "fail" | "error";
   label: string;
   count: number;
-  /** Chakra palette token used for the active state. */
+  /** Chakra palette token used for the dot + active state. */
   palette: "green" | "red" | "yellow";
 }
 
@@ -42,12 +54,11 @@ interface VerdictPillSpec {
  * `aggregates` field that the discover endpoint already attaches to
  * each evaluator value, so no second round-trip is needed.
  *
- * Verdict pills toggle `evaluatorVerdict:<v>` on the AST; clicking a
- * pill that's already on clears it. Score range is editable through
- * its own min/max inputs (delegates to `setRange("evaluatorScore",
- * …)`). Label row is informational — when an evaluator emits labels,
- * we say so; full per-label filtering lands when the discover wires a
- * label inventory aggregate.
+ * Visually it speaks the sidebar's own language: verdicts are compact
+ * facet-style rows (status dot + label + count, same hover/active
+ * treatment as FacetRow), and the score range reuses the
+ * RangeSection slider + click-to-edit endpoints rather than a pair of
+ * boxed number inputs. No card chrome — just the tree indent guide.
  */
 export const EvaluatorDrilldown: React.FC<EvaluatorDrilldownProps> = ({
   item,
@@ -61,7 +72,7 @@ export const EvaluatorDrilldown: React.FC<EvaluatorDrilldownProps> = ({
   // them. The render result short-circuits to null when aggregates are
   // missing, but the hook order stays stable.
   const aggregates = item.aggregates;
-  const verdicts = useMemo<VerdictPillSpec[]>(
+  const verdicts = useMemo<VerdictRowSpec[]>(
     () => (aggregates ? buildVerdictSpecs(aggregates) : []),
     [aggregates],
   );
@@ -75,38 +86,40 @@ export const EvaluatorDrilldown: React.FC<EvaluatorDrilldownProps> = ({
   );
 
   if (!aggregates) return null;
-  const totalVerdictCount =
-    aggregates.passedCount + aggregates.failedCount + aggregates.erroredCount;
+  const visibleVerdicts = verdicts.filter((v) => v.count > 0);
+  const maxVerdictCount = Math.max(...visibleVerdicts.map((v) => v.count), 0);
 
   return (
     // Indented under the row by the same amount the FacetRow text starts
     // (status-dot + gap) so the drilldown reads as visually attached to
-    // the row above. Top spacing kept tight so the active row + extras
-    // still scan as one unit.
+    // the row above; a hairline indent guide replaces the old card box.
     <Box
       marginLeft="20px"
-      marginTop={1}
-      marginBottom={1.5}
-      paddingX={2}
-      paddingY={1.5}
-      borderLeftWidth="2px"
-      borderLeftColor="border.subtle"
-      borderRadius="sm"
-      bg="bg.subtle"
+      marginTop={0.5}
+      marginBottom={1}
+      paddingLeft={2}
+      borderLeftWidth="1px"
+      borderLeftColor="border.muted"
       data-spotlight="evaluator-drilldown"
     >
-      <VStack align="stretch" gap={1.5}>
-        {totalVerdictCount > 0 && (
-          <VerdictSection
-            verdicts={verdicts}
-            activeVerdicts={activeVerdicts}
-            onToggle={(verdict) =>
-              toggleFacet({ field: VERDICT_FIELD, value: verdict })
-            }
-          />
+      <VStack align="stretch" gap={1}>
+        {visibleVerdicts.length > 0 && (
+          <VStack align="stretch" gap={0}>
+            {visibleVerdicts.map((v) => (
+              <VerdictRow
+                key={v.verdict}
+                spec={v}
+                maxCount={maxVerdictCount}
+                active={activeVerdicts.has(v.verdict)}
+                onClick={() =>
+                  toggleFacet({ field: VERDICT_FIELD, value: v.verdict })
+                }
+              />
+            ))}
+          </VStack>
         )}
         {aggregates.hasScore && (
-          <ScoreSection
+          <ScoreRangeControl
             scoreMin={aggregates.scoreMin}
             scoreMax={aggregates.scoreMax}
             currentFrom={currentScoreRange?.from}
@@ -122,8 +135,8 @@ export const EvaluatorDrilldown: React.FC<EvaluatorDrilldownProps> = ({
           />
         )}
         {aggregates.hasLabel && (
-          <Text textStyle="2xs" color="fg.subtle" fontStyle="italic">
-            This evaluator emits labels.
+          <Text textStyle="2xs" color="fg.subtle" paddingX={1.5}>
+            Emits labels
           </Text>
         )}
       </VStack>
@@ -135,7 +148,7 @@ function buildVerdictSpecs(aggregates: {
   passedCount: number;
   failedCount: number;
   erroredCount: number;
-}): VerdictPillSpec[] {
+}): VerdictRowSpec[] {
   return [
     {
       verdict: "pass",
@@ -150,7 +163,11 @@ function buildVerdictSpecs(aggregates: {
       palette: "red",
     },
     {
-      verdict: "unknown",
+      // Matches the facet expression's `Status = 'error'` branch — the
+      // count below is countIf(Status = 'error'), so the row must filter
+      // by the same bucket (it previously emitted 'unknown', which is the
+      // Passed-is-null-but-not-errored bucket).
+      verdict: "error",
       label: "Errored",
       count: aggregates.erroredCount,
       palette: "yellow",
@@ -160,7 +177,7 @@ function buildVerdictSpecs(aggregates: {
 
 function computeActiveVerdicts(
   ast: LiqeQuery,
-  verdicts: VerdictPillSpec[],
+  verdicts: VerdictRowSpec[],
 ): Set<string> {
   const set = new Set<string>();
   for (const v of verdicts) {
@@ -171,227 +188,195 @@ function computeActiveVerdicts(
   return set;
 }
 
-interface VerdictSectionProps {
-  verdicts: VerdictPillSpec[];
-  activeVerdicts: Set<string>;
-  onToggle: (verdict: VerdictPillSpec["verdict"]) => void;
-}
+const MIN_VISIBLE_FILL_PCT = 4;
 
-const VerdictSection: React.FC<VerdictSectionProps> = ({
-  verdicts,
-  activeVerdicts,
-  onToggle,
-}) => (
-  <VStack align="stretch" gap={1}>
-    <SectionLabel>Verdict</SectionLabel>
-    <HStack gap={1} flexWrap="wrap">
-      {verdicts
-        .filter((v) => v.count > 0)
-        .map((v) => (
-          <VerdictPill
-            key={v.verdict}
-            spec={v}
-            active={activeVerdicts.has(v.verdict)}
-            onClick={() => onToggle(v.verdict)}
-          />
-        ))}
-    </HStack>
-  </VStack>
-);
-
-interface VerdictPillProps {
-  spec: VerdictPillSpec;
+/**
+ * Compact verdict row in FacetRow's visual idiom: coloured status dot,
+ * label, right-aligned count, a thin proportional fill bar along the
+ * bottom edge, subtle-bg + right accent bar when active.
+ */
+const VerdictRow: React.FC<{
+  spec: VerdictRowSpec;
+  maxCount: number;
   active: boolean;
   onClick: () => void;
-}
+}> = ({ spec, maxCount, active, onClick }) => {
+  const fillPct =
+    maxCount > 0
+      ? Math.max((spec.count / maxCount) * 100, MIN_VISIBLE_FILL_PCT)
+      : 0;
+  return (
+    <RowButton
+      type="button"
+      role="checkbox"
+      aria-checked={active}
+      aria-label={`${spec.label} — ${active ? "included" : "click to include"}`}
+      position="relative"
+      width="full"
+      paddingY={0.5}
+      paddingLeft={1.5}
+      paddingRight={0}
+      cursor="pointer"
+      textAlign="left"
+      borderRadius="sm"
+      overflow="hidden"
+      background={active ? `${spec.palette}.subtle` : "transparent"}
+      borderWidth={0}
+      onClick={onClick}
+      transition="background 120ms ease"
+      _hover={{
+        background: active ? `${spec.palette}.subtle` : "bg.muted",
+      }}
+      _focusVisible={{
+        outline: "2px solid",
+        outlineColor: "blue.focusRing",
+        outlineOffset: "-2px",
+      }}
+    >
+      <Box
+        position="absolute"
+        bottom={0}
+        left={0}
+        width={`${fillPct}%`}
+        height="2px"
+        bg={`${spec.palette}.solid`}
+        opacity={0.55}
+        pointerEvents="none"
+      />
+      {active && (
+        <Box
+          position="absolute"
+          top={0}
+          right={0}
+          bottom={0}
+          width="2px"
+          bg={`${spec.palette}.solid`}
+          pointerEvents="none"
+        />
+      )}
+      <HStack gap={1.5} position="relative" minWidth={0} zIndex={1}>
+        <Box
+          width="6px"
+          height="6px"
+          borderRadius="full"
+          bg={`${spec.palette}.solid`}
+          flexShrink={0}
+        />
+        <Text
+          textStyle="2xs"
+          fontWeight={active ? "600" : "500"}
+          truncate
+          flex={1}
+          minWidth={0}
+          color={active ? "fg" : "fg.muted"}
+        >
+          {spec.label}
+        </Text>
+        <Text
+          textStyle="2xs"
+          color="fg.subtle"
+          mr={2}
+          fontWeight={active ? "600" : "400"}
+          flexShrink={0}
+        >
+          {formatCount(spec.count)}
+        </Text>
+      </HStack>
+    </RowButton>
+  );
+};
 
-const VerdictPill: React.FC<VerdictPillProps> = ({ spec, active, onClick }) => (
-  <chakra.button
-    type="button"
-    display="inline-flex"
-    alignItems="center"
-    gap={1}
-    paddingX={1.5}
-    paddingY={0.5}
-    borderRadius="md"
-    borderWidth="1px"
-    borderColor={active ? `${spec.palette}.solid` : `${spec.palette}.muted`}
-    bg={active ? `${spec.palette}.solid` : `${spec.palette}.subtle`}
-    color={active ? `${spec.palette}.contrast` : `${spec.palette}.fg`}
-    cursor="pointer"
-    transition="background 100ms ease, border-color 100ms ease"
-    _hover={{
-      bg: active ? `${spec.palette}.solid` : `${spec.palette}.muted`,
-    }}
-    onClick={onClick}
-    aria-pressed={active}
-  >
-    <Text textStyle="2xs" fontWeight="600">
-      {spec.label}
-    </Text>
-    <Text textStyle="2xs" fontWeight="500" opacity={0.85}>
-      {spec.count.toLocaleString()}
-    </Text>
-  </chakra.button>
-);
-
-interface ScoreSectionProps {
+/**
+ * Score range in RangeSection's idiom: slider + click-to-edit endpoint
+ * values. Commits on drag end / typed commit; selecting the full range
+ * clears the filter so the drilldown never pins a no-op range into the
+ * query string.
+ */
+const ScoreRangeControl: React.FC<{
   scoreMin: number | null;
   scoreMax: number | null;
   currentFrom?: number;
   currentTo?: number;
   onChange: (from: number, to: number) => void;
   onClear: () => void;
-}
+}> = ({ scoreMin, scoreMax, currentFrom, currentTo, onChange, onClear }) => {
+  const min = scoreMin ?? 0;
+  const max = scoreMax ?? 1;
+  const span = max - min || 1;
+  const isActive = currentFrom !== undefined || currentTo !== undefined;
+  const [localValue, setLocalValue] = useState<[number, number]>([
+    currentFrom ?? min,
+    currentTo ?? max,
+  ]);
 
-const ScoreSection: React.FC<ScoreSectionProps> = ({
-  scoreMin,
-  scoreMax,
-  currentFrom,
-  currentTo,
-  onChange,
-  onClear,
-}) => (
-  <VStack align="stretch" gap={1}>
-    <HStack justify="space-between" align="center" gap={2}>
-      <SectionLabel>Score</SectionLabel>
-      <Text textStyle="2xs" color="fg.muted" fontFamily="mono">
-        {formatScore(scoreMin)} → {formatScore(scoreMax)}
+  useEffect(() => {
+    setLocalValue([currentFrom ?? min, currentTo ?? max]);
+  }, [currentFrom, currentTo, min, max]);
+
+  const commit = (rawFrom: number, rawTo: number) => {
+    const normalized = commitRange({
+      rawFrom,
+      rawTo,
+      min,
+      max,
+      span,
+      onChange,
+      onClear,
+    });
+    if (normalized) setLocalValue(normalized);
+  };
+
+  if (max <= min) {
+    return (
+      <Text textStyle="2xs" color="fg.subtle" paddingX={1.5} fontFamily="mono">
+        score {formatScore(min)}
       </Text>
-    </HStack>
-    <ScoreRangeInput
-      min={scoreMin ?? 0}
-      max={scoreMax ?? 1}
-      currentFrom={currentFrom}
-      currentTo={currentTo}
-      onChange={onChange}
-      onClear={onClear}
-    />
-  </VStack>
-);
+    );
+  }
 
-const SectionLabel: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => (
-  <Text
-    textStyle="2xs"
-    color="fg.subtle"
-    textTransform="uppercase"
-    letterSpacing="0.08em"
-    fontWeight="600"
-  >
-    {children}
-  </Text>
-);
+  return (
+    <VStack align="stretch" gap={0} paddingX={1.5}>
+      <SimpleSlider
+        size="sm"
+        min={min}
+        max={max}
+        step={stepForSpan(span)}
+        value={localValue}
+        onValueChange={(d) => {
+          const lo = d.value[0];
+          const hi = d.value[1];
+          if (lo === undefined || hi === undefined) return;
+          setLocalValue([lo, hi]);
+        }}
+        onValueChangeEnd={(d) => {
+          const lo = d.value[0];
+          const hi = d.value[1];
+          if (lo === undefined || hi === undefined) return;
+          commit(lo, hi);
+        }}
+        colorPalette={isActive ? "blue" : "gray"}
+      />
+      <HStack justify="space-between" gap={2}>
+        <RangeEndpointInput
+          value={localValue[0]}
+          format={formatScore}
+          ariaLabel="Score minimum"
+          onCommit={(n) => commit(n, localValue[1])}
+        />
+        <RangeEndpointInput
+          value={localValue[1]}
+          format={formatScore}
+          ariaLabel="Score maximum"
+          align="right"
+          onCommit={(n) => commit(localValue[0], n)}
+        />
+      </HStack>
+    </VStack>
+  );
+};
 
-function formatScore(value: number | null): string {
-  if (value === null || Number.isNaN(value)) return "—";
+function formatScore(value: number): string {
+  if (Number.isNaN(value)) return "—";
   if (Number.isInteger(value)) return value.toString();
   return value.toFixed(2);
 }
-
-interface ScoreRangeInputProps {
-  min: number;
-  max: number;
-  currentFrom?: number;
-  currentTo?: number;
-  onChange: (from: number, to: number) => void;
-  onClear: () => void;
-}
-
-/**
- * Minimal two-input range editor. Kept simple (no Chakra Slider) so
- * the drilldown reads as a compact inspector rather than a heavy
- * range-tuning UI — the operator usually wants "score ≥ X" or
- * "score = Y" and would rather type than drag. `onClear` runs when
- * both inputs are empty so a freshly opened drilldown can wipe an
- * earlier-applied range with two backspaces.
- */
-const ScoreRangeInput: React.FC<ScoreRangeInputProps> = ({
-  min,
-  max,
-  currentFrom,
-  currentTo,
-  onChange,
-  onClear,
-}) => {
-  const fromValue = currentFrom !== undefined ? String(currentFrom) : "";
-  const toValue = currentTo !== undefined ? String(currentTo) : "";
-  return (
-    <HStack gap={1.5} align="center">
-      <chakra.input
-        type="number"
-        inputMode="decimal"
-        step="0.01"
-        placeholder={String(min)}
-        value={fromValue}
-        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-          const nextFrom = e.target.value;
-          const nextTo = toValue;
-          if (!nextFrom && !nextTo) {
-            onClear();
-            return;
-          }
-          // Number("-") / Number("1e") are NaN — keep the partial input
-          // local without propagating it as a real range bound.
-          const parsedFrom = Number(nextFrom || min);
-          const parsedTo = Number(nextTo || max);
-          if (Number.isNaN(parsedFrom) || Number.isNaN(parsedTo)) return;
-          onChange(parsedFrom, parsedTo);
-        }}
-        flex={1}
-        minWidth={0}
-        height="22px"
-        paddingX={1.5}
-        borderWidth="1px"
-        borderColor="border"
-        borderRadius="sm"
-        fontSize="2xs"
-        fontFamily="mono"
-        bg="bg.panel"
-        _focus={{
-          outline: "none",
-          borderColor: "blue.focusRing",
-          boxShadow: "0 0 0 1px var(--chakra-colors-blue-focusRing)",
-        }}
-      />
-      <Text textStyle="2xs" color="fg.subtle">
-        →
-      </Text>
-      <chakra.input
-        type="number"
-        inputMode="decimal"
-        step="0.01"
-        placeholder={String(max)}
-        value={toValue}
-        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-          const nextFrom = fromValue;
-          const nextTo = e.target.value;
-          if (!nextFrom && !nextTo) {
-            onClear();
-            return;
-          }
-          const parsedFrom = Number(nextFrom || min);
-          const parsedTo = Number(nextTo || max);
-          if (Number.isNaN(parsedFrom) || Number.isNaN(parsedTo)) return;
-          onChange(parsedFrom, parsedTo);
-        }}
-        flex={1}
-        minWidth={0}
-        height="22px"
-        paddingX={1.5}
-        borderWidth="1px"
-        borderColor="border"
-        borderRadius="sm"
-        fontSize="2xs"
-        fontFamily="mono"
-        bg="bg.panel"
-        _focus={{
-          outline: "none",
-          borderColor: "blue.focusRing",
-          boxShadow: "0 0 0 1px var(--chakra-colors-blue-focusRing)",
-        }}
-      />
-    </HStack>
-  );
-};

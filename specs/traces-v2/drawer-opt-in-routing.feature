@@ -72,6 +72,13 @@ Feature: Trace drawer honors the new-explorer opt-in from every entry point
       When I click "Full Trace" on a workflow execution result
       Then the new Trace Explorer drawer opens for that trace
 
+    @integration
+    Scenario: The new explorer renders on the optimization studio page
+      Given I have opted into the new Trace Explorer on this device
+      And I am on the optimization studio page
+      When I view a trace from the studio evaluations panel
+      Then the new Trace Explorer drawer opens for that trace
+
   Rule: Switching back returns to the legacy drawer
 
     @planned

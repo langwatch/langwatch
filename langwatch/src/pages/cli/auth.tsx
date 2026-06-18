@@ -11,7 +11,7 @@
  *        a. Mints (or returns existing) personal VK
  *        b. Flips the device-code record to `approved` with the VK secret
  *   7. CLI's polling /exchange returns 200 with the secret on its next poll.
- *   8. Done — user closes the browser tab.
+ *   8. Done, user closes the browser tab.
  *
  * Mirrors the screens-1-thru-4 storyboard in gateway.md.
  */
@@ -34,6 +34,8 @@ import { useRouter } from "~/utils/compat/next-router";
 
 import { useSession } from "~/utils/auth-client";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { resolveCliAuthProjects } from "./cliAuthProjects";
+import { ScopeChipPicker } from "~/components/settings/ScopeChipPicker";
 
 /**
  * Credential the CLI is requesting.
@@ -75,7 +77,7 @@ type ActionState =
 export default function CliAuthPage() {
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
-  const { organizations } = useOrganizationTeamProject({
+  const { organizations, project: currentProject } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
 
@@ -105,41 +107,32 @@ export default function CliAuthPage() {
     }
   }, [organizations, selectedOrgId]);
 
-  // Projects scoped to the selected org, flattened across teams. Drives
-  // the project picker that only renders for `project_api_key` mode.
-  // Excludes the hidden `internal_governance` project — it's a system
-  // tenancy boundary, never a target for SDK keys.
-  const projectsForOrg = useMemo(() => {
-    if (!selectedOrgId || !organizations) return [] as Array<{
-      id: string;
-      name: string;
-      slug: string;
-      teamName: string;
-    }>;
-    const org = organizations.find((o) => o.id === selectedOrgId);
-    if (!org) return [];
-    return (org.teams ?? []).flatMap((team) =>
-      (team.projects ?? [])
-        .filter((p) => p.slug !== "internal_governance")
-        .map((p) => ({
-          id: p.id,
-          name: p.name,
-          slug: p.slug,
-          teamName: team.name,
-        })),
-    );
-  }, [organizations, selectedOrgId]);
+  // Projects offered in the project-login picker (project_api_key mode).
+  // resolveCliAuthProjects hides personal workspace projects. Project login
+  // must target a real, shared project, never a personal one (a coding agent
+  // that picked one silently routed evaluations there), and the hidden
+  // internal_governance tenancy project. It also picks the default: the last
+  // project the user worked in when it's offered, else the sole project.
+  const lastProjectSlug = currentProject?.slug ?? null;
+  const {
+    projects: projectsForOrg,
+    teams: teamsForOrg,
+    defaultProjectId,
+  } = useMemo(() => {
+    const org = organizations?.find((o) => o.id === selectedOrgId);
+    return resolveCliAuthProjects({ teams: org?.teams, lastProjectSlug });
+  }, [organizations, selectedOrgId, lastProjectSlug]);
 
-  // Auto-pick the only project, if there is exactly one. Reset when org
-  // changes so the picker is fresh per-org.
+  // Reset when org changes so the picker is fresh per-org, then apply the
+  // computed default selection.
   useEffect(() => {
     setSelectedProjectId(null);
   }, [selectedOrgId]);
   useEffect(() => {
-    if (projectsForOrg.length === 1 && !selectedProjectId) {
-      setSelectedProjectId(projectsForOrg[0]!.id);
+    if (defaultProjectId && !selectedProjectId) {
+      setSelectedProjectId(defaultProjectId);
     }
-  }, [projectsForOrg, selectedProjectId]);
+  }, [defaultProjectId, selectedProjectId]);
 
   // Redirect to sign-in if unauthenticated, preserving the user_code in
   // the callback URL so the user lands back here after SSO.
@@ -302,7 +295,7 @@ export default function CliAuthPage() {
   return (
     <>
       <Head>
-        <title>Authorize CLI — LangWatch</title>
+        <title>Authorize CLI · LangWatch</title>
       </Head>
       <Container maxWidth="540px" paddingTop="80px" paddingBottom="80px">
         <Card.Root>
@@ -364,7 +357,7 @@ export default function CliAuthPage() {
                 <>
                   <Text fontSize="sm" color="gray.600">
                     {requiresProject
-                      ? "The CLI is requesting a project SDK API key. Pick the project to mint a key for; the key will flow back to your terminal automatically — no copy-paste."
+                      ? "The CLI is requesting a project SDK API key. Pick the project to mint a key for; the key will flow back to your terminal automatically, with no copy-paste."
                       : "The CLI is requesting a device session. Approving signs in this device for AI-tool wrappers (Claude, Codex, etc.) and governance commands."}
                   </Text>
                   <Box
@@ -418,36 +411,39 @@ export default function CliAuthPage() {
                         <Alert.Root status="warning">
                           <Alert.Indicator />
                           <Alert.Content>
-                            <Alert.Title>No projects yet</Alert.Title>
+                            <Alert.Title>No shared projects yet</Alert.Title>
                             <Alert.Description>
-                              Create a project in this organization first, then
-                              re-run <code>langwatch login</code> in your
+                              Create a team project in this organization first
+                              (personal projects can&apos;t back an SDK key),
+                              then re-run <code>langwatch login</code> in your
                               terminal.
                             </Alert.Description>
                           </Alert.Content>
                         </Alert.Root>
                       ) : (
-                        <VStack align="stretch" gap={2}>
-                          {projectsForOrg.map((p) => (
-                            <Button
-                              key={p.id}
-                              variant={
-                                selectedProjectId === p.id ? "solid" : "outline"
-                              }
-                              onClick={() => setSelectedProjectId(p.id)}
-                              justifyContent="flex-start"
-                              height="auto"
-                              paddingY={3}
-                            >
-                              <VStack align="start" gap={0} width="full">
-                                <Text fontWeight="semibold">{p.name}</Text>
-                                <Text fontSize="xs" opacity={0.7}>
-                                  {p.teamName}
-                                </Text>
-                              </VStack>
-                            </Button>
-                          ))}
-                        </VStack>
+                        <ScopeChipPicker
+                          variant="single-select"
+                          label=""
+                          placeholder="Select a project"
+                          allowedScopeTypes={["PROJECT"]}
+                          organizationId={selectedOrgId ?? undefined}
+                          availableProjects={projectsForOrg}
+                          availableTeams={teamsForOrg}
+                          value={
+                            selectedProjectId
+                              ? [
+                                  {
+                                    scopeType: "PROJECT",
+                                    scopeId: selectedProjectId,
+                                  },
+                                ]
+                              : []
+                          }
+                          onChange={(next) =>
+                            setSelectedProjectId(next[0]?.scopeId ?? null)
+                          }
+                          showSummary={false}
+                        />
                       )}
                     </Box>
                   )}
@@ -499,7 +495,7 @@ export default function CliAuthPage() {
                             {action.projectName ?? "your project"}
                           </strong>{" "}
                           ({action.organizationName}). The key flowed back to
-                          your terminal automatically — your{" "}
+                          your terminal automatically, and your{" "}
                           <code>.env</code> is updated. You can close this tab.
                         </Alert.Description>
                       </>

@@ -227,13 +227,14 @@ Feature: Evaluation execution - Backend
     Then the 5 completed results are saved to Elasticsearch
     And stopped_at timestamp is set
 
-  @unimplemented
-  Scenario: Abort cancels in-flight LLM requests
-    Given a cell is currently streaming a response from the LLM
-    When abort is requested
-    Then the stream reader is cancelled immediately
-    And no more events are processed from that stream
-    And the cell is marked as stopped
+  # A cell blocked waiting on a slow model must not keep running until that
+  # response finally arrives. Stopping the run interrupts it promptly rather
+  # than only between streamed results.
+  Scenario: Stopping a running workbench execution halts it mid-stream
+    Given a workbench execution is streaming results from a slow model
+    When the user requests stop
+    Then no further results are delivered for that run
+    And the run stops
 
   # ==========================================================================
   # Hono SSE Endpoint
@@ -271,12 +272,14 @@ Feature: Evaluation execution - Backend
     Then the response Content-Type is "text/event-stream"
     And I receive SSE events as execution progresses
 
-  @unimplemented
-  Scenario: Endpoint handles abort request
-    Given a running execution "run-123"
-    When I POST to /api/experiments/abort with runId="run-123"
-    Then the abort flag is set
-    And I receive 200 OK
+  # An interactive workbench run streams its results directly rather than being
+  # polled, which is why stopping it used to fail with "Abort Failed". Stopping
+  # a run the project owns must now succeed and actually stop it.
+  Scenario: Project members can stop their own running workbench execution
+    Given my project has a running workbench execution "run-123"
+    When I request to stop "run-123"
+    Then the request succeeds
+    And the execution stops
 
   # ==========================================================================
   # Error Cases - Integration

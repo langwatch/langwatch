@@ -489,21 +489,26 @@ export class LlmConfigRepository {
           scope: configData.scope,
         },
       });
-      // Resolve the project's DEFAULT model via the cascade. We let
+      // Resolve the project's DEFAULT model via the cascade, but only on
+      // the paths that actually need one: no version data at all, or a
+      // version without a model. A prompt that ships its own model, like
+      // every prompt pushed by the CLI's sync, must not require the
+      // project to have a default model configured. We let
       // ModelNotConfiguredError propagate so the missing-model toast
       // fires; only swallow resolver-internal crashes and fall back to
       // DEFAULT_MODEL as a last-resort placeholder.
-      let defaultModel: string;
-      try {
-        const resolved = await resolveModelForFeature(
-          "prompt.create_default",
-          { prisma: this.prisma, projectId: configData.projectId },
-        );
-        defaultModel = resolved.model;
-      } catch (err) {
-        if (err instanceof ModelNotConfiguredError) throw err;
-        defaultModel = DEFAULT_MODEL;
-      }
+      const resolveDefaultModel = async (): Promise<string> => {
+        try {
+          const resolved = await resolveModelForFeature(
+            "prompt.create_default",
+            { prisma: this.prisma, projectId: configData.projectId },
+          );
+          return resolved.model;
+        } catch (err) {
+          if (err instanceof ModelNotConfiguredError) throw err;
+          return DEFAULT_MODEL;
+        }
+      };
 
       // Set the version data to the provided version data, or undefined if no version data is provided.
       let newVersionData: Partial<CreateLlmConfigVersionParams> | undefined =
@@ -512,7 +517,7 @@ export class LlmConfigRepository {
       // If no version data is provided, we'll create a default (draft) version.
       if (!newVersionData) {
         const configData = this.buildDefaultVersionConfigData({
-          model: defaultModel,
+          model: await resolveDefaultModel(),
         });
 
         newVersionData = {
@@ -524,7 +529,7 @@ export class LlmConfigRepository {
 
       // Ensure a model is set if configData is provided
       if (newVersionData.configData && !newVersionData.configData.model) {
-        newVersionData.configData.model = defaultModel;
+        newVersionData.configData.model = await resolveDefaultModel();
       }
 
       const newVersion = await tx.llmPromptConfigVersion.create({

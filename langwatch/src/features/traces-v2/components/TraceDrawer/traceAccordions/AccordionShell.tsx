@@ -1,6 +1,6 @@
 import { Accordion, Badge, Box, HStack, Icon, Text } from "@chakra-ui/react";
-import { LuChevronDown } from "react-icons/lu";
 import { type ReactNode, useRef } from "react";
+import { LuChevronDown } from "react-icons/lu";
 import { PresenceSection } from "~/features/presence/components/PresenceSection";
 import { SectionPresenceDot } from "~/features/presence/components/SectionPresenceDot";
 import {
@@ -47,6 +47,7 @@ export function Section({
   children,
   isFirst,
   open,
+  spotlightAnchor,
 }: {
   value: string;
   title: string;
@@ -65,6 +66,13 @@ export function Section({
    * collapsed/open is cheap. Omit to fall back to the eager-mount default.
    */
   open?: boolean;
+  /**
+   * When set, emits `data-spotlight=<value>` on the accordion item so the
+   * drawer's show-once spotlight system can anchor to this section. Pass
+   * only when the section actually has content — anchor presence in the
+   * DOM is the spotlight's display condition.
+   */
+  spotlightAnchor?: string;
 }) {
   const presenceTraceId = useSectionPresenceStore((s) => s.traceId);
   const presenceTab = useSectionPresenceStore((s) => s.tab);
@@ -81,6 +89,7 @@ export function Section({
       data-section={value}
       data-section-label={title}
       data-section-count={count ?? ""}
+      {...(spotlightAnchor ? { "data-spotlight": spotlightAnchor } : {})}
     >
       <Accordion.ItemTrigger
         width="100%"

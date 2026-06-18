@@ -6,6 +6,7 @@ import type { NormalizedSpan } from "../../schemas/spans";
 
 export const FIRST_TOKEN_EVENTS = new Set([
   "gen_ai.content.chunk",
+  "llm.content.completion.chunk",
   "first_token",
   "llm.first_token",
   "ai.stream.firstChunk",
@@ -14,6 +15,7 @@ export const FIRST_TOKEN_EVENTS = new Set([
 
 export const LAST_TOKEN_EVENTS = new Set([
   "gen_ai.content.chunk",
+  "llm.content.completion.chunk",
   "last_token",
   "llm.last_token",
   "ai.stream.finish",
@@ -30,6 +32,32 @@ export const NON_BILLABLE_ATTR = "langwatch.cost.non_billable";
 
 function markerIsTrue(value: unknown): boolean {
   return value === true || value === "true";
+}
+
+/**
+ * LangWatch SDKs export span timing via the `langwatch.timestamps`
+ * attribute — { started_at, first_token_at, finished_at } in unix epoch
+ * milliseconds — rather than stream events or semconv attributes. The
+ * receiver parses JSON-string attribute values into objects, but a raw
+ * string can still reach us (e.g. oversized blobs skip parsing), so
+ * accept both shapes.
+ */
+function firstTokenAtFromLangWatchTimestamps(value: unknown): number | null {
+  let parsed: unknown = value;
+  if (typeof value === "string") {
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return null;
+  }
+  const firstTokenAt = coerceToNumber(
+    (parsed as Record<string, unknown>).first_token_at,
+  );
+  return firstTokenAt !== null && firstTokenAt > 0 ? firstTokenAt : null;
 }
 
 /**
@@ -164,10 +192,33 @@ export class SpanCostService {
 
     if (timeToFirstToken === null) {
       const attrTtft = coerceToNumber(
-        span.spanAttributes["gen_ai.server.time_to_first_token"],
+        span.spanAttributes[ATTR_KEYS.GEN_AI_SERVER_TIME_TO_FIRST_TOKEN],
       );
       if (attrTtft !== null && attrTtft >= 0) {
         timeToFirstToken = attrTtft;
+      }
+    }
+
+    if (timeToFirstToken === null) {
+      // Vercel AI SDK reports TTFT as a duration attribute and emits no
+      // stream event, so it needs its own fallback.
+      const msToFirstChunk = coerceToNumber(
+        span.spanAttributes[ATTR_KEYS.AI_RESPONSE_MS_TO_FIRST_CHUNK],
+      );
+      if (msToFirstChunk !== null && msToFirstChunk >= 0) {
+        timeToFirstToken = msToFirstChunk;
+      }
+    }
+
+    if (timeToFirstToken === null) {
+      const firstTokenAt = firstTokenAtFromLangWatchTimestamps(
+        span.spanAttributes[ATTR_KEYS.LANGWATCH_TIMESTAMPS],
+      );
+      if (firstTokenAt !== null) {
+        const delta = firstTokenAt - span.startTimeUnixMs;
+        if (delta >= 0) {
+          timeToFirstToken = delta;
+        }
       }
     }
 

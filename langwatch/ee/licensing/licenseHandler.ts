@@ -1,11 +1,19 @@
 import type { PrismaClient } from "@prisma/client";
 import type { PlanInfo } from "./planInfo";
 import { FREE_PLAN, PUBLIC_KEY } from "./constants";
+import { createLogger } from "../../src/utils/logger";
+import { getApp } from "../../src/server/app-layer/app";
+import {
+  PLATFORM_DEFAULT_RETENTION_DAYS,
+  RETENTION_CATEGORIES,
+} from "../../src/server/data-retention/retentionPolicy.schema";
 import { resolvePlanDefaults } from "./defaults";
 import { OrganizationNotFoundError } from "./errors";
 import type { LicenseStatus, RemoveLicenseResult, StoreLicenseResult, LicensePlanLimits } from "./types";
 import { validateLicense, parseLicenseKey } from "./validation";
 import type { ILicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
+
+const logger = createLogger("langwatch:licensing:licenseHandler");
 
 /**
  * Interface for trace usage counting.
@@ -128,10 +136,61 @@ export class LicenseHandler {
       },
     });
 
+    await this.provisionMissingRetentionPolicies(organizationId);
+
     return {
       success: true,
       planInfo,
     };
+  }
+
+  /**
+   * A successfully activated license is a paid entry point, so it provisions
+   * the same organization-scoped retention policies the Growth-Seat webhook
+   * does — but create-if-absent only: a category that already has an
+   * organization-level override is never overridden, so a manually-tuned
+   * window survives license activation.
+   *
+   * Best-effort: a retention failure must never fail license activation, so
+   * errors are logged and swallowed.
+   */
+  private async provisionMissingRetentionPolicies(
+    organizationId: string,
+  ): Promise<void> {
+    try {
+      const policy = getApp().dataRetention.policy;
+      const existing = await policy.listOrganizationRules(organizationId);
+      const covered = new Set(
+        existing
+          .filter(
+            (row) =>
+              row.scopeType === "ORGANIZATION" &&
+              row.scopeId === organizationId,
+          )
+          .map((row) => row.category),
+      );
+
+      for (const category of RETENTION_CATEGORIES) {
+        if (covered.has(category)) continue;
+        try {
+          await policy.setForScope({
+            scope: { scopeType: "ORGANIZATION", scopeId: organizationId },
+            category,
+            retentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+          });
+        } catch (err) {
+          logger.error(
+            { organizationId, category, err },
+            "[license] Failed to provision retention policy on license activation",
+          );
+        }
+      }
+    } catch (err) {
+      logger.error(
+        { organizationId, err },
+        "[license] Failed to provision retention policies on license activation",
+      );
+    }
   }
 
   /**
