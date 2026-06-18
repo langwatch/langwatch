@@ -102,10 +102,11 @@ When stdin is not a TTY (genuine CI or an agent's piped stdin), `langwatch login
 
 ### Letting an agent do it
 
-A coding assistant driving `langwatch` will see the always-on banner naming `--device`, `--api-key`, `--token`, `--endpoint` whenever the interactive prompt fires. If the assistant's harness reports as a TTY but can't actually answer prompts, the banner gives it everything it needs to re-invoke:
+A coding assistant driving `langwatch` will see the always-on banner naming `--device`, `--project`, `--api-key`, `--token`, `--endpoint` whenever the interactive prompt fires. If the assistant's harness reports as a TTY but can't actually answer prompts, the banner gives it everything it needs to re-invoke:
 
 ```bash
 langwatch login --device                # AI tools mode (recommended for assistants)
+langwatch login --project               # project SDK key into .env via the browser
 langwatch login --api-key sk-lw-...     # if a project key was injected from secrets
 langwatch login --token lwc_...         # if a device session token was pre-minted
 langwatch login --endpoint https://...  # combine with any of the above for self-hosted
