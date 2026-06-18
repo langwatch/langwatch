@@ -266,6 +266,7 @@ export function SpanAccordions({
                           ? spanResource!.resourceAttributes
                           : undefined
                       }
+                      restrictedAttributes={detail?.restrictedAttributes}
                       title="Span Attributes"
                       spanId={detail?.spanId ?? span.spanId}
                     />

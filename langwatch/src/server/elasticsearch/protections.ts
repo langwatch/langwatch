@@ -36,6 +36,17 @@ export interface Protections {
   // placeholder naming `visibleTo`. Patterns may carry `*` wildcards. Absent or
   // empty when nothing is hidden for the viewer.
   hiddenAttributes?: Array<{ pattern: string; visibleTo: string }>;
+  // ALL custom-attribute `restrict` rules the read path surfaces (not only the
+  // ones hidden from this viewer), each with whether THIS viewer may read a
+  // matching value. The trace view marks matching attribute rows and tells an
+  // in-audience viewer (`canSee: true`) which audience the attribute is limited
+  // to. `hiddenAttributes` is the `canSee: false` subset kept for the redaction
+  // mappers. Patterns may carry `*` wildcards.
+  restrictedAttributes?: Array<{
+    pattern: string;
+    visibleTo: string;
+    canSee: boolean;
+  }>;
   /**
    * Plan-based visibility window: traces/spans started before this epoch-ms
    * cutoff get their content teaser-redacted. `null`/`undefined` = no window

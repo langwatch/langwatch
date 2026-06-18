@@ -215,6 +215,20 @@ export type CategoryPrivacy = z.infer<typeof categoryPrivacySchema>;
 export type ContentPrivacy = z.infer<typeof contentPrivacySchema>;
 
 /**
+ * A custom-attribute `restrict` rule that applies to THIS viewer. The
+ * attributes table marks any row whose key matches `pattern` (which may carry
+ * `*` wildcards): `canSee` true means the viewer is in the audience and the
+ * value shows with a "visible to you" marker; false means the value is hidden
+ * (already redacted server-side). `visibleTo` is the human audience label.
+ */
+export const restrictedAttributeSchema = z.object({
+  pattern: z.string(),
+  visibleTo: z.string(),
+  canSee: z.boolean(),
+});
+export type RestrictedAttribute = z.infer<typeof restrictedAttributeSchema>;
+
+/**
  * Span detail: full span data for the accordion when a span is selected.
  * Returned by `tracesV2.spanDetail`.
  */
@@ -246,6 +260,10 @@ export const spanDetailSchema = z.object({
   // (names/locations) did not run, so the content may still contain names or
   // locations. The drawer warns instead of implying it is fully scrubbed.
   piiAnalysisIncomplete: z.boolean().nullish(),
+  // Custom-attribute restrict rules that apply to this viewer, so the
+  // attributes table can mark a matching row as restricted and name who can
+  // read it. Absent on older cached responses.
+  restrictedAttributes: z.array(restrictedAttributeSchema).nullish(),
   error: z
     .object({
       message: z.string(),

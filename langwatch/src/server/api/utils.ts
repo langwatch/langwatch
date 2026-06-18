@@ -305,6 +305,11 @@ export async function getUserProtectionsForProject(
         pattern: rule.pattern,
         visibleTo: "members of this project",
       })),
+      restrictedAttributes: restrictedAttributeRules.map((rule) => ({
+        pattern: rule.pattern,
+        visibleTo: "members of this project",
+        canSee: false,
+      })),
       visibilityCutoffMs,
     };
   }
@@ -390,7 +395,9 @@ export async function getUserProtectionsForProject(
     ...CONTENT_CATEGORIES.filter(
       (category) => policy.categories[category].disposition === "restrict",
     ).map((category) => policy.categories[category].audience),
-    ...hiddenAttributeRules.map((rule) => rule.audience),
+    // Every restrict rule needs a label, not only the hidden ones: an
+    // in-audience viewer is also told which audience the attribute is limited to.
+    ...restrictedAttributeRules.map((rule) => rule.audience),
   ];
   const names = await resolveAudienceNames(
     ctx.prisma,
@@ -408,6 +415,15 @@ export async function getUserProtectionsForProject(
     ]),
   ) as Record<ContentCategory, CategoryVisibility>;
 
+  const restrictedAttributes = restrictedAttributeRules.map((rule) => ({
+    pattern: rule.pattern,
+    visibleTo: describeAudience(rule.audience, names),
+    canSee: isContentVisible(
+      { disposition: "restrict", audience: rule.audience },
+      viewer,
+    ),
+  }));
+
   return {
     canSeeCosts,
     canSeeCapturedInput: contentCategories.input.canSee,
@@ -423,6 +439,7 @@ export async function getUserProtectionsForProject(
       pattern: rule.pattern,
       visibleTo: describeAudience(rule.audience, names),
     })),
+    restrictedAttributes,
     visibilityCutoffMs,
   };
 }

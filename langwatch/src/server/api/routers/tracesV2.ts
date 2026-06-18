@@ -1409,6 +1409,7 @@ export const tracesV2Router = createTRPCRouter({
         );
         redacted.piiAnalysisIncomplete =
           readPiiIncompleteFromParams(detailParams);
+        redacted.restrictedAttributes = protections.restrictedAttributes ?? null;
         return redacted;
       });
     }),
@@ -1521,6 +1522,8 @@ export const tracesV2Router = createTRPCRouter({
       );
       redactedDetail.piiAnalysisIncomplete =
         readPiiIncompleteFromParams(detailParams);
+      redactedDetail.restrictedAttributes =
+        protections.restrictedAttributes ?? null;
       return redactedDetail;
     }),
 

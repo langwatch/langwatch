@@ -1,8 +1,10 @@
 import { Box, Button, HStack, Icon, Input, Text } from "@chakra-ui/react";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { LuCheck, LuCopy, LuPin, LuPinOff } from "react-icons/lu";
+import { LuCheck, LuCopy, LuEye, LuLock, LuPin, LuPinOff } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import type { RestrictedAttribute } from "~/server/api/routers/tracesV2.schemas";
+import { compileAttributePattern } from "~/server/data-privacy/attributePatternMatcher";
 import { usePinnedAttributes } from "../../hooks/usePinnedAttributes";
 import type { PinnedAttributeSource } from "../../stores/pinnedAttributesStore";
 import { AttributeValue } from "./AttributeValue";
@@ -148,6 +150,11 @@ function LabelResizeHandle({
 interface AttributeTableProps {
   attributes: Record<string, unknown>;
   resourceAttributes?: Record<string, unknown>;
+  /**
+   * Custom-attribute restrict rules for this viewer, used to mark restricted
+   * rows in the span attributes section. Resource attributes are not marked.
+   */
+  restrictedAttributes?: RestrictedAttribute[] | null;
   title?: string;
   /**
    * When set, the span's id is injected as a synthetic leading `span_id` row
@@ -321,6 +328,44 @@ function DisabledPin({ attrKey }: { attrKey: string }) {
   );
 }
 
+/** How a restrict rule applies to one attribute for this viewer. */
+type AttributeRestriction = { visibleTo: string; canSee: boolean };
+
+/**
+ * Per-row marker for a custom attribute under a `restrict` privacy rule. An
+ * in-audience viewer (`canSee`) sees the value with an eye marker telling them
+ * the audience it is limited to; otherwise the value is already redacted and a
+ * lock marker names who can read it.
+ */
+function RestrictionMarker({ visibleTo, canSee }: AttributeRestriction) {
+  return (
+    <Tooltip
+      content={
+        canSee
+          ? `Restricted attribute. You can see it because you are in the audience: ${visibleTo}.`
+          : `Restricted attribute, hidden from you. Visible to: ${visibleTo}.`
+      }
+      positioning={{ placement: "top" }}
+    >
+      <Box
+        as="span"
+        display="inline-flex"
+        alignItems="center"
+        flexShrink={0}
+        color="fg.muted"
+        cursor="default"
+        aria-label={
+          canSee
+            ? `Restricted attribute, visible to ${visibleTo}`
+            : `Restricted attribute, hidden, visible to ${visibleTo}`
+        }
+      >
+        <Icon as={canSee ? LuEye : LuLock} boxSize={3} />
+      </Box>
+    </Tooltip>
+  );
+}
+
 function CopyAllButton({ payload }: { payload: string }) {
   const [copied, setCopied] = useState(false);
   const handleClick = () => {
@@ -360,6 +405,7 @@ function FlatRow({
   onTogglePin,
   labelWidth,
   onLabelResize,
+  restriction,
 }: {
   attrKey: string;
   value: unknown;
@@ -370,6 +416,7 @@ function FlatRow({
   onTogglePin: () => void;
   labelWidth: number;
   onLabelResize: (deltaPx: number) => void;
+  restriction?: AttributeRestriction | null;
 }) {
   const display = formatValue(value);
   return (
@@ -427,9 +474,12 @@ function FlatRow({
           opens a popover with the prettified payload + an override row.
           Same component is wired into table-cell expanders so the same
           payload reads identically wherever it surfaces. */}
-      <Box flex={1} minWidth={0}>
-        <AttributeValue attrKey={attrKey} value={value} />
-      </Box>
+      <HStack flex={1} minWidth={0} gap={1.5}>
+        {restriction ? <RestrictionMarker {...restriction} /> : null}
+        <Box flex={1} minWidth={0}>
+          <AttributeValue attrKey={attrKey} value={value} />
+        </Box>
+      </HStack>
       <Button
         size="xs"
         variant="ghost"
@@ -455,6 +505,7 @@ function AttrSection({
   labelWidth,
   onLabelResize,
   leadingKeys,
+  restrictionFor,
 }: {
   title: string;
   attributes: Record<string, unknown>;
@@ -464,6 +515,8 @@ function AttrSection({
   onLabelResize: (deltaPx: number) => void;
   /** Keys that always sort first (before pins) and render non-pinnable. */
   leadingKeys?: readonly string[];
+  /** Resolves a custom-attribute restrict marker for a row, when one applies. */
+  restrictionFor?: (key: string) => AttributeRestriction | null;
 }) {
   const { project } = useOrganizationTeamProject();
   const { pins, isPinned, togglePin } = usePinnedAttributes(project?.id);
@@ -529,6 +582,7 @@ function AttrSection({
                 onTogglePin={() => togglePin({ source, key })}
                 labelWidth={labelWidth}
                 onLabelResize={onLabelResize}
+                restriction={restrictionFor ? restrictionFor(key) : null}
               />
             );
           })}
@@ -556,10 +610,28 @@ function AttrSection({
 export function AttributeTable({
   attributes,
   resourceAttributes,
+  restrictedAttributes,
   title,
   spanId,
 }: AttributeTableProps) {
   const [viewMode, setViewMode] = useState<AttrViewMode>("flat");
+  // Compile the viewer's restrict rules once; a row is marked when its flat key
+  // matches a rule. Same wildcard matcher the server redaction uses, so the
+  // marker lines up with what is actually redacted.
+  const restrictionFor = useMemo(() => {
+    const compiled = (restrictedAttributes ?? []).map((rule) => ({
+      regex: compileAttributePattern(rule.pattern),
+      visibleTo: rule.visibleTo,
+      canSee: rule.canSee,
+    }));
+    if (compiled.length === 0) return undefined;
+    return (key: string): AttributeRestriction | null => {
+      const match = compiled.find((r) => r.regex.test(key));
+      return match
+        ? { visibleTo: match.visibleTo, canSee: match.canSee }
+        : null;
+    };
+  }, [restrictedAttributes]);
   const [searchTerm, setSearchTerm] = useState("");
   const [labelWidth, , applyLabelDelta] = useLabelColumnWidth();
   const handleLabelResize = applyLabelDelta;
@@ -632,6 +704,7 @@ export function AttributeTable({
         labelWidth={labelWidth}
         onLabelResize={handleLabelResize}
         leadingKeys={spanId ? SPAN_ID_LEADING_KEYS : undefined}
+        restrictionFor={restrictionFor}
       />
       {filterResAttrs && (
         <AttrSection
