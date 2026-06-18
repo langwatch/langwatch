@@ -2,15 +2,15 @@ import { TriggerAction } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerSummary } from "~/server/app-layer/triggers/repositories/trigger.repository";
-import type { ReactorContext } from "~/server/event-sourcing/reactors/reactor.types";
 import {
-  SPAN_RECEIVED_EVENT_TYPE,
   ORIGIN_RESOLVED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_TYPE,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
+import type { ReactorContext } from "~/server/event-sourcing/reactors/reactor.types";
 import {
-  createAlertTriggerNotifyOutboxReactor,
   type AlertTriggerNotifyOutboxReactorDeps,
+  createAlertTriggerNotifyOutboxReactor,
 } from "../alertTriggerNotifyOutbox.reactor";
 
 function createTrigger(
@@ -109,19 +109,18 @@ describe("alertTriggerNotifyOutbox reactor", () => {
 
       expect(requests).toHaveLength(1);
       const [request] = requests;
-      expect(request!.dedupKey).toBe(
-        "tenant-1/trigger-notify:trace:trace-1",
-      );
-      expect(request!.groupKey).toBe(
-        "tenant-1/triggerNotify:trigger-notify",
-      );
+      expect(request!.dedupKey).toBe("tenant-1/trigger-notify:trace:trace-1");
+      expect(request!.groupKey).toBe("tenant-1/triggerNotify:trigger-notify");
       expect(request!.enqueueOptions).toEqual({ ttlMs: 45_000 });
       const payload = request!.payload as unknown as {
         stage: string;
         projectId: string;
         triggerId: string;
         traceId: string;
-        foldSnapshotAtEnqueue: { computedInput: string; computedOutput: string };
+        foldSnapshotAtEnqueue: {
+          computedInput: string;
+          computedOutput: string;
+        };
       };
       expect(payload.stage).toBe("settle");
       expect(payload.projectId).toBe("tenant-1");
@@ -209,7 +208,9 @@ describe("alertTriggerNotifyOutbox reactor", () => {
       expect(requests).toHaveLength(0);
       // Origin gate runs before the trigger fetch, so we never call
       // out to the trigger service either.
-      expect(deps.triggers.getActiveTraceTriggersForProject).not.toHaveBeenCalled();
+      expect(
+        deps.triggers.getActiveTraceTriggersForProject,
+      ).not.toHaveBeenCalled();
     });
   });
 

@@ -25,7 +25,10 @@ import { prisma } from "../src/server/db";
 import { LOCAL_DEV_ENTERPRISE_LICENSE_KEY } from "./localDevLicense";
 
 async function main() {
-  if (process.env.NODE_ENV === "production" && !process.env.SEED_USER_PASSWORD) {
+  if (
+    process.env.NODE_ENV === "production" &&
+    !process.env.SEED_USER_PASSWORD
+  ) {
     throw new Error(
       "Refusing to seed a hardcoded default admin credential with NODE_ENV=production. " +
         "Set SEED_USER_PASSWORD explicitly if you really intend to seed an admin user here.",
@@ -132,7 +135,9 @@ async function main() {
   }
 
   await prisma.organizationUser.upsert({
-    where: { userId_organizationId: { userId: user.id, organizationId: org.id } },
+    where: {
+      userId_organizationId: { userId: user.id, organizationId: org.id },
+    },
     create: { userId: user.id, organizationId: org.id, role: "ADMIN" },
     update: { role: "ADMIN" },
   });

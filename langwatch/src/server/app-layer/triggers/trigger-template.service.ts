@@ -7,19 +7,16 @@ import {
 import { EXAMPLE_MATCHES } from "~/shared/templating/exampleContext";
 import { renderTriggerEmail } from "~/shared/templating/renderEmail";
 import {
+  renderTriggerSlack,
   type SlackPayload,
   type SlackTemplateType,
-  renderTriggerSlack,
 } from "~/shared/templating/renderSlack";
 import {
   buildTemplateContext,
   type TemplateContext,
 } from "~/shared/templating/templateContext";
 import { validateLiquid } from "~/shared/templating/validate";
-import {
-  TemplateValidationError,
-  TestFireUnavailableError,
-} from "./errors";
+import { TemplateValidationError, TestFireUnavailableError } from "./errors";
 
 export type TemplateChannel = "email" | "slack";
 
@@ -75,8 +72,11 @@ const LIQUID_TEMPLATE_COLUMNS = [
   "emailBodyTemplate",
 ] as const satisfies readonly (keyof TemplateDraft)[];
 
-function normalizeSlackType(raw: string | null | undefined): SlackTemplateType | null {
-  return raw != null && (SLACK_TEMPLATE_TYPES as readonly string[]).includes(raw)
+function normalizeSlackType(
+  raw: string | null | undefined,
+): SlackTemplateType | null {
+  return raw != null &&
+    (SLACK_TEMPLATE_TYPES as readonly string[]).includes(raw)
     ? (raw as SlackTemplateType)
     : null;
 }
@@ -90,7 +90,9 @@ function normalizeSlackType(raw: string | null | undefined): SlackTemplateType |
 export function validateTemplateDraft(draft: TemplateDraft): void {
   if (
     draft.slackTemplateType != null &&
-    !(SLACK_TEMPLATE_TYPES as readonly string[]).includes(draft.slackTemplateType)
+    !(SLACK_TEMPLATE_TYPES as readonly string[]).includes(
+      draft.slackTemplateType,
+    )
   ) {
     throw new TemplateValidationError(
       "slackTemplateType",

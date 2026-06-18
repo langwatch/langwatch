@@ -3,9 +3,13 @@ import { describe, expect, it } from "vitest";
 import { renderLiquid } from "~/shared/templating/engine";
 import { EXAMPLE_MATCHES } from "~/shared/templating/exampleContext";
 import { buildTemplateContext } from "~/shared/templating/templateContext";
-import { CLIENT_PROVIDERS, NOTIFY_PROVIDERS, ACTION_PROVIDERS } from "../client";
-import { SERVER_PROVIDERS } from "../server";
+import {
+  ACTION_PROVIDERS,
+  CLIENT_PROVIDERS,
+  NOTIFY_PROVIDERS,
+} from "../client";
 import { SLACK_BLOCK_KIT_TEMPLATES } from "../definitions/slack/templates/registry";
+import { SERVER_PROVIDERS } from "../server";
 
 /**
  * The provider system enforces two invariants here. Failures mean the
@@ -44,7 +48,9 @@ describe("provider registry parity", () => {
         expect(new Set([...notifyActions, ...actionActions])).toEqual(
           new Set(Object.values(TriggerAction)),
         );
-        expect(notifyActions.some((a) => actionActions.includes(a))).toBe(false);
+        expect(notifyActions.some((a) => actionActions.includes(a))).toBe(
+          false,
+        );
       });
 
       it("gives notify providers a channel string the preview/testFire endpoints accept", () => {
@@ -91,26 +97,26 @@ describe("provider registry parity", () => {
     } as const;
 
     describe("when each template renders against the example context for its cadence", () => {
-      it.each(SLACK_BLOCK_KIT_TEMPLATES.map((t) => [t.id, t] as const))(
-        "%s produces a non-empty Block Kit blocks array",
-        async (_id, template) => {
-          const cadences =
-            template.cadenceFit === "both"
-              ? (["immediate", "digest"] as const)
-              : ([template.cadenceFit] as const);
-          for (const cadence of cadences) {
-            const { output } = await renderLiquid({
-              template: template.source,
-              context: contextsByCadence[
-                cadence
-              ] as unknown as Record<string, unknown>,
-            });
-            const blocks: unknown = JSON.parse(output);
-            expect(Array.isArray(blocks)).toBe(true);
-            expect((blocks as unknown[]).length).toBeGreaterThan(0);
-          }
-        },
-      );
+      it.each(
+        SLACK_BLOCK_KIT_TEMPLATES.map((t) => [t.id, t] as const),
+      )("%s produces a non-empty Block Kit blocks array", async (_id, template) => {
+        const cadences =
+          template.cadenceFit === "both"
+            ? (["immediate", "digest"] as const)
+            : ([template.cadenceFit] as const);
+        for (const cadence of cadences) {
+          const { output } = await renderLiquid({
+            template: template.source,
+            context: contextsByCadence[cadence] as unknown as Record<
+              string,
+              unknown
+            >,
+          });
+          const blocks: unknown = JSON.parse(output);
+          expect(Array.isArray(blocks)).toBe(true);
+          expect((blocks as unknown[]).length).toBeGreaterThan(0);
+        }
+      });
     });
   });
 });

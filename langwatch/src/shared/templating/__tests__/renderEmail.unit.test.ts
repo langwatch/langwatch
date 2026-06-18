@@ -67,7 +67,8 @@ describe("renderTriggerEmail", () => {
     it("renders the Markdown to HTML", async () => {
       const email = await renderTriggerEmail({
         subjectTemplate: null,
-        bodyTemplate: "## {{ trigger.name }}\n\n[trace]({{ matches[0].trace.url }})",
+        bodyTemplate:
+          "## {{ trigger.name }}\n\n[trace]({{ matches[0].trace.url }})",
         context: makeContext(),
       });
       expect(email.html).toContain("<h2>High latency</h2>");
@@ -104,9 +105,33 @@ describe("renderTriggerEmail", () => {
         context: makeContext({
           digest: { count: 3, windowStart: null, windowEnd: null },
           matches: [
-            makeMatch({ trace: { id: "trace-aaa", input: "", output: "", url: "#", metadata: {} } }),
-            makeMatch({ trace: { id: "trace-bbb", input: "", output: "", url: "#", metadata: {} } }),
-            makeMatch({ trace: { id: "trace-ccc", input: "", output: "", url: "#", metadata: {} } }),
+            makeMatch({
+              trace: {
+                id: "trace-aaa",
+                input: "",
+                output: "",
+                url: "#",
+                metadata: {},
+              },
+            }),
+            makeMatch({
+              trace: {
+                id: "trace-bbb",
+                input: "",
+                output: "",
+                url: "#",
+                metadata: {},
+              },
+            }),
+            makeMatch({
+              trace: {
+                id: "trace-ccc",
+                input: "",
+                output: "",
+                url: "#",
+                metadata: {},
+              },
+            }),
           ],
         }),
       });
@@ -149,7 +174,9 @@ describe("renderTriggerEmail", () => {
         context: makeContext(),
         testFire: true,
       });
-      expect(email.subject.startsWith(TEST_FIRE_EMAIL_SUBJECT_PREFIX)).toBe(true);
+      expect(email.subject.startsWith(TEST_FIRE_EMAIL_SUBJECT_PREFIX)).toBe(
+        true,
+      );
       expect(email.html).toContain(TEST_FIRE_NOTICE);
     });
   });

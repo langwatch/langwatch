@@ -1,7 +1,7 @@
 import { Box, Button, Heading, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
-import { useRouter } from "~/utils/compat/next-router";
 import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 
 /**
  * ADR-031: public unsubscribe page. No auth guard — the `?token=` is the
@@ -10,7 +10,8 @@ import { api } from "~/utils/api";
  */
 export default function UnsubscribePage() {
   const router = useRouter();
-  const token = typeof router.query.token === "string" ? router.query.token : "";
+  const token =
+    typeof router.query.token === "string" ? router.query.token : "";
   const [done, setDone] = useState<null | "trigger" | "project">(null);
 
   const resolved = api.emailSuppression.resolveUnsubscribeToken.useQuery(
@@ -20,14 +21,18 @@ export default function UnsubscribePage() {
   const confirm = api.emailSuppression.confirmUnsubscribe.useMutation();
 
   const onConfirm = (scope: "trigger" | "project") => {
-    confirm.mutate(
-      { token, scope },
-      { onSuccess: () => setDone(scope) },
-    );
+    confirm.mutate({ token, scope }, { onSuccess: () => setDone(scope) });
   };
 
   return (
-    <Box minH="100vh" bg="bg.subtle" display="flex" alignItems="center" justifyContent="center" padding={6}>
+    <Box
+      minH="100vh"
+      bg="bg.subtle"
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
+      padding={6}
+    >
       <Box
         bg="bg.panel"
         borderWidth="1px"

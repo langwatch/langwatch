@@ -1,4 +1,8 @@
-import type { Prisma, ReactorOutbox, ReactorOutboxStatus } from "@prisma/client";
+import type {
+  Prisma,
+  ReactorOutbox,
+  ReactorOutboxStatus,
+} from "@prisma/client";
 
 export type OutboxRow = ReactorOutbox;
 export type OutboxStatus = ReactorOutboxStatus;

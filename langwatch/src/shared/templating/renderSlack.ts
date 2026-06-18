@@ -129,7 +129,9 @@ export async function renderTriggerSlack({
       });
     }
     return {
-      payload: { blocks: testFire ? [testFireSlackBlock(), ...blocks] : blocks },
+      payload: {
+        blocks: testFire ? [testFireSlackBlock(), ...blocks] : blocks,
+      },
       usedDefault: usedDefaultTemplate,
       missingVariables: rendered.missingVariables,
       errors: [],

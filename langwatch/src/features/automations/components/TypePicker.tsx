@@ -129,4 +129,3 @@ function TypeCard({
     </chakra.button>
   );
 }
-

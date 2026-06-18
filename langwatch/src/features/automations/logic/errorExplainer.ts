@@ -71,7 +71,8 @@ export function explainDomainError(
     case "missing_slack_webhook":
       return {
         title: "Slack webhook missing",
-        description: "Paste a Slack incoming webhook URL in the Configuration step.",
+        description:
+          "Paste a Slack incoming webhook URL in the Configuration step.",
       };
     case "missing_annotator":
       return {

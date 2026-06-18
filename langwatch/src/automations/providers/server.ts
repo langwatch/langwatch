@@ -16,8 +16,14 @@ import type { ServerEntry } from "./types";
  *  the dispatcher up here instead of switching on `action`. */
 export const SERVER_PROVIDERS: Record<TriggerAction, ServerEntry> = {
   [TriggerAction.SEND_EMAIL]: { shared: emailShared, server: emailServer },
-  [TriggerAction.SEND_SLACK_MESSAGE]: { shared: slackShared, server: slackServer },
-  [TriggerAction.ADD_TO_DATASET]: { shared: datasetShared, server: datasetServer },
+  [TriggerAction.SEND_SLACK_MESSAGE]: {
+    shared: slackShared,
+    server: slackServer,
+  },
+  [TriggerAction.ADD_TO_DATASET]: {
+    shared: datasetShared,
+    server: datasetServer,
+  },
   [TriggerAction.ADD_TO_ANNOTATION_QUEUE]: {
     shared: annotationQueueShared,
     server: annotationQueueServer,

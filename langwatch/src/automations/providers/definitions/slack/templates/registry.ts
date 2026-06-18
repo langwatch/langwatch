@@ -1,11 +1,10 @@
 import type { ComponentType } from "react";
-
-import traceAlertCompactSource from "./trace_alert_compact.liquid?raw";
-import traceAlertOneLinerSource from "./trace_alert_one_liner.liquid?raw";
-import evalFailureDetailedSource from "./eval_failure_detailed.liquid?raw";
 import digestCompactSource from "./digest_compact.liquid?raw";
 import digestEvaluatorRollupSource from "./digest_evaluator_rollup.liquid?raw";
 import digestInlineRichSource from "./digest_inline_rich.liquid?raw";
+import evalFailureDetailedSource from "./eval_failure_detailed.liquid?raw";
+import traceAlertCompactSource from "./trace_alert_compact.liquid?raw";
+import traceAlertOneLinerSource from "./trace_alert_one_liner.liquid?raw";
 
 import {
   DigestCompactWireframe,

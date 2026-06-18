@@ -7,8 +7,8 @@ import type {
 } from "../outboxReactor.types";
 import { adaptOutboxReactor } from "../outboxReactorAdapter";
 import {
-  TRIGGER_NOTIFY_REACTOR_NAME,
   type SettleStagePayload,
+  TRIGGER_NOTIFY_REACTOR_NAME,
 } from "../payload";
 import type { OutboxRuntime } from "../setup";
 

@@ -1,4 +1,12 @@
-import { Box, chakra, HoverCard, HStack, Portal, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  chakra,
+  HoverCard,
+  HStack,
+  Portal,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { Info } from "lucide-react";
 import type { VariableInfo } from "~/features/automations/editors/liquidMonaco";
 
@@ -13,11 +21,7 @@ import type { VariableInfo } from "~/features/automations/editors/liquidMonaco";
  * dismiss the moment the pointer leaves the trigger, which made the list
  * effectively un-readable past the first few rows.
  */
-export function VariableInfoIcon({
-  variables,
-}: {
-  variables: VariableInfo[];
-}) {
+export function VariableInfoIcon({ variables }: { variables: VariableInfo[] }) {
   return (
     <HoverCard.Root openDelay={150} closeDelay={120}>
       <HoverCard.Trigger asChild>
@@ -45,12 +49,7 @@ export function VariableInfoIcon({
             background="bg.panel"
             boxShadow="lg"
           >
-            <VStack
-              align="stretch"
-              gap={2}
-              maxHeight="360px"
-              overflowY="auto"
-            >
+            <VStack align="stretch" gap={2} maxHeight="360px" overflowY="auto">
               <Text textStyle="xs" fontWeight="semibold" color="fg.muted">
                 Available variables
               </Text>

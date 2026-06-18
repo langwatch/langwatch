@@ -143,7 +143,10 @@ export class RenderTimeoutError extends Error {
   }
 }
 
-function hasNestedPath(context: Record<string, unknown>, segments: PathSegment[]): boolean {
+function hasNestedPath(
+  context: Record<string, unknown>,
+  segments: PathSegment[],
+): boolean {
   let current: unknown = context;
   for (const segment of segments) {
     if (current == null) return false;
@@ -207,7 +210,10 @@ export async function renderLiquid({
 
   let timer: ReturnType<typeof setTimeout> | undefined;
   const deadline = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new RenderTimeoutError(timeoutMs)), timeoutMs);
+    timer = setTimeout(
+      () => reject(new RenderTimeoutError(timeoutMs)),
+      timeoutMs,
+    );
   });
 
   try {

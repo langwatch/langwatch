@@ -1,8 +1,15 @@
-import { Button, createListCollection, Field, HStack, Input, Text, VStack } from "@chakra-ui/react";
+import {
+  Button,
+  createListCollection,
+  Field,
+  HStack,
+  Input,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { useEffect, useMemo } from "react";
 import { SiSlack } from "react-icons/si";
 import { Select } from "~/components/ui/select";
-import { api } from "~/utils/api";
 import { VariableInfoIcon } from "~/features/automations/components/VariableInfoIcon";
 import { LIQUID_JSON_LANGUAGE_ID } from "~/features/automations/editors/liquidMonaco";
 import { SLACK_BLOCK_KIT_JSON_SCHEMA } from "~/features/automations/editors/monacoSchemas";
@@ -16,6 +23,7 @@ import {
   DEFAULT_SLACK_TEMPLATE,
 } from "~/shared/templating/defaults";
 import { filterVariablesForCadence } from "~/shared/templating/exampleContext";
+import { api } from "~/utils/api";
 import { InlineCadenceSelect } from "../../components/InlineCadenceSelect";
 import type {
   ConfigFormProps,
@@ -23,7 +31,7 @@ import type {
   SavedTriggerRow,
   SummaryIdentity,
 } from "../../types";
-import { type SlackActionParams, type SlackPreview } from "./shared";
+import type { SlackActionParams, SlackPreview } from "./shared";
 import { findTemplateOptionBySource } from "./templates/registry";
 import { SlackBlockKitTemplatePicker } from "./templates/TemplatePicker";
 
@@ -64,7 +72,8 @@ function fromTriggerRow(row: SavedTriggerRow): SlackSlice {
   const params = (row.actionParams ?? {}) as Partial<SlackActionParams>;
   return {
     webhook: typeof params.slackWebhook === "string" ? params.slackWebhook : "",
-    templateType: row.slackTemplateType === "block_kit" ? "block_kit" : "string",
+    templateType:
+      row.slackTemplateType === "block_kit" ? "block_kit" : "string",
     template: {
       value: row.slackTemplate ?? "",
       usingDefault: row.slackTemplate == null,
@@ -215,7 +224,9 @@ function SlackConfigForm({
         }
       />
 
-      {slackPreview ? <CompactSlackPreview payload={slackPreview.payload} /> : null}
+      {slackPreview ? (
+        <CompactSlackPreview payload={slackPreview.payload} />
+      ) : null}
     </VStack>
   );
 }

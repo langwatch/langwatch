@@ -1,16 +1,16 @@
 import type { PrismaClient } from "@prisma/client";
 import { Cluster, type Redis } from "ioredis";
+import { env } from "~/env.mjs";
+import { getProtectionsForProject } from "~/server/api/utils";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
-import type { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import type { TraceSummaryRepository } from "~/server/app-layer/traces/repositories/trace-summary.repository";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { TriggerService } from "~/server/app-layer/triggers/trigger.service";
-import type { EmailSuppressionService } from "~/server/app-layer/triggers/emailSuppression.service";
+import type { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { TraceReadDerivationService } from "~/server/app-layer/traces/trace-read-derivation.service";
-import { getProtectionsForProject } from "~/server/api/utils";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { EmailSuppressionService } from "~/server/app-layer/triggers/emailSuppression.service";
+import type { TriggerService } from "~/server/app-layer/triggers/trigger.service";
 import { TraceService } from "~/server/traces/trace.service";
-import { env } from "~/env.mjs";
 import { TraceSummaryStore } from "../pipelines/trace-processing/projections/traceSummary.store";
 import type { FoldProjectionStore } from "../projections/foldProjection.types";
 import { RedisCachedFoldStore } from "../projections/redisCachedFoldStore";
@@ -18,9 +18,9 @@ import type { EventSourcedQueueProcessor } from "../queues/queue.types";
 import { createOutboxDispatcher } from "./dispatcher";
 import { consumeEmailCapSlot } from "./emailHourlyCap";
 import {
-  settleDedupId,
   type CadenceStagePayload,
   type SettleStagePayload,
+  settleDedupId,
 } from "./payload";
 import { PgOutboxAuditAdapter } from "./pgAuditAdapter";
 
@@ -202,4 +202,3 @@ export function buildOutboxRuntime({
     },
   };
 }
-

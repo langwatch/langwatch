@@ -1,32 +1,29 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DispatchError } from "../dispatchError";
 import { OutboxDrainer, type OutboxDrainerOptions } from "../drainer";
-import { OutboxService } from "../outbox.service";
 import type {
   OutboxLeaseQuery,
   OutboxRepository,
   OutboxRetryUpdate,
 } from "../outbox.repository";
+import { OutboxService } from "../outbox.service";
 import type { OutboxRow } from "../outbox.types";
 import type { OutboxWakeup } from "../wakeupQueue";
 
 class StubRepository implements OutboxRepository {
   rows: OutboxRow[] = [];
-  insertIfAbsent =
-    vi.fn<(row: { reactorName: string; dedupKey: string }) => Promise<boolean>>(
-      async () => true,
-    );
+  insertIfAbsent = vi.fn<
+    (row: { reactorName: string; dedupKey: string }) => Promise<boolean>
+  >(async () => true);
   leaseNext = vi.fn<(query: OutboxLeaseQuery) => Promise<OutboxRow | null>>(
     async () => null,
   );
-  recoverExpiredLeases =
-    vi.fn<(args: { now: Date; limit: number }) => Promise<number>>(
-      async () => 0,
-    );
-  markDispatched =
-    vi.fn<
-      (args: { rowId: string; projectId: string; now: Date }) => Promise<void>
-    >(async () => undefined);
+  recoverExpiredLeases = vi.fn<
+    (args: { now: Date; limit: number }) => Promise<number>
+  >(async () => 0);
+  markDispatched = vi.fn<
+    (args: { rowId: string; projectId: string; now: Date }) => Promise<void>
+  >(async () => undefined);
   markRetry = vi.fn<(update: OutboxRetryUpdate) => Promise<void>>(
     async () => undefined,
   );
@@ -142,9 +139,7 @@ describe("OutboxDrainer.handleWakeup", () => {
       drainer.registerDispatcher("alertDispatch", dispatcher);
       const row = makeRow({ attempts: 1 });
       repo.rows = [row];
-      repo.leaseNext
-        .mockResolvedValueOnce(row)
-        .mockResolvedValueOnce(null);
+      repo.leaseNext.mockResolvedValueOnce(row).mockResolvedValueOnce(null);
 
       await drainer.handleWakeup(baseWakeup);
 
@@ -170,9 +165,7 @@ describe("OutboxDrainer.handleWakeup", () => {
       drainer.registerDispatcher("alertDispatch", dispatcher);
       const row = makeRow();
       repo.rows = [row];
-      repo.leaseNext
-        .mockResolvedValueOnce(row)
-        .mockResolvedValueOnce(null);
+      repo.leaseNext.mockResolvedValueOnce(row).mockResolvedValueOnce(null);
 
       await drainer.handleWakeup(baseWakeup);
 
@@ -191,9 +184,7 @@ describe("OutboxDrainer.handleWakeup", () => {
       drainer.registerDispatcher("alertDispatch", dispatcher);
       const row = makeRow({ attempts: 1 });
       repo.rows = [row];
-      repo.leaseNext
-        .mockResolvedValueOnce(row)
-        .mockResolvedValueOnce(null);
+      repo.leaseNext.mockResolvedValueOnce(row).mockResolvedValueOnce(null);
 
       await drainer.handleWakeup(baseWakeup);
 
@@ -207,7 +198,11 @@ describe("OutboxDrainer.handleWakeup", () => {
     it("schedules an immediate follow-up wakeup to yield", async () => {
       const dispatcher = vi.fn(async () => undefined);
       drainer.registerDispatcher("alertDispatch", dispatcher);
-      repo.rows = [makeRow({ id: "a" }), makeRow({ id: "b" }), makeRow({ id: "c" })];
+      repo.rows = [
+        makeRow({ id: "a" }),
+        makeRow({ id: "b" }),
+        makeRow({ id: "c" }),
+      ];
       repo.leaseNext
         .mockResolvedValueOnce(repo.rows[0]!)
         .mockResolvedValueOnce(repo.rows[1]!)

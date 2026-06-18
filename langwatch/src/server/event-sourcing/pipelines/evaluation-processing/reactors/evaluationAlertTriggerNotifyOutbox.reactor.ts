@@ -1,16 +1,18 @@
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerService } from "~/server/app-layer/triggers/trigger.service";
+import { classifyTriggerFilters } from "~/server/filters/triggerFilter.matcher";
+import { createLogger } from "~/utils/logger/server";
 import { createTenantId } from "../../../domain/tenantId";
 import type {
   OutboxEnqueueRequest,
   OutboxReactorDefinition,
 } from "../../../outbox/outboxReactor.types";
 import {
-  TRIGGER_NOTIFY_REACTOR_NAME,
   auditDedupKey,
   cadenceGroupKey,
   type SettleStagePayload,
+  TRIGGER_NOTIFY_REACTOR_NAME,
 } from "../../../outbox/payload";
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
 import type { ReactorContext } from "../../../reactors/reactor.types";
@@ -20,8 +22,6 @@ import {
   isEvaluationCompletedEvent,
   isEvaluationReportedEvent,
 } from "../schemas/typeGuards";
-import { classifyTriggerFilters } from "~/server/filters/triggerFilter.matcher";
-import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger(
   "langwatch:evaluation-processing:eval-alert-trigger-notify-outbox-reactor",

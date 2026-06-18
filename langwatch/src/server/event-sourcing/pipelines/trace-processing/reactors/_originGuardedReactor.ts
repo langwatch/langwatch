@@ -7,11 +7,11 @@ import type {
   ReactorDefinition,
 } from "../../../reactors/reactor.types";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
-import type { TraceProcessingEvent } from "../schemas/events";
 import {
   ORIGIN_RESOLVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
 } from "../schemas/constants";
+import type { TraceProcessingEvent } from "../schemas/events";
 
 const OLD_TRACE_THRESHOLD_MS = 60 * 60 * 1000;
 

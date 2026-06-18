@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { OutboxService } from "../outbox.service";
 import type {
   OutboxInsertRow,
   OutboxLeaseQuery,
@@ -7,6 +6,7 @@ import type {
   OutboxRepository,
   OutboxRetryUpdate,
 } from "../outbox.repository";
+import { OutboxService } from "../outbox.service";
 import type { OutboxRow } from "../outbox.types";
 
 /**
@@ -159,7 +159,10 @@ class InMemoryOutboxRepository implements OutboxRepository {
 function buildService({
   random = () => 1,
   now,
-}: { random?: () => number; now?: () => Date } = {}) {
+}: {
+  random?: () => number;
+  now?: () => Date;
+} = {}) {
   const repo = new InMemoryOutboxRepository();
   const service = new OutboxService(repo, {
     backoff: { baseMs: 1000, random },
@@ -270,9 +273,7 @@ describe("OutboxService", () => {
           leaseDurationMs: 30_000,
         });
         expect(row?.status).toBe("dispatching");
-        expect(row?.leasedUntil?.getTime()).toBe(
-          fixedNow.getTime() + 30_000,
-        );
+        expect(row?.leasedUntil?.getTime()).toBe(fixedNow.getTime() + 30_000);
         expect(row?.attempts).toBe(1);
       });
     });
@@ -315,9 +316,7 @@ describe("OutboxService", () => {
           error: "transient",
         });
         expect(result.status).toBe("failed_retryable");
-        expect(result.nextAttemptAt?.getTime()).toBe(
-          fixedNow.getTime() + 1000,
-        );
+        expect(result.nextAttemptAt?.getTime()).toBe(fixedNow.getTime() + 1000);
         const fresh = repo.rows[0]!;
         expect(fresh.status).toBe("failed_retryable");
         expect(fresh.attempts).toBe(1);

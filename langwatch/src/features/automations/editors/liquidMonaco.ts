@@ -117,7 +117,10 @@ export function registerLiquidLanguage(monaco: Monaco): void {
         ],
         tag: [
           [/%\}/, { token: "delimiter.liquid", next: "@pop" }],
-          [/\b(if|elsif|else|endif|unless|endunless|for|endfor|in|assign|capture|endcapture)\b/, "keyword.liquid"],
+          [
+            /\b(if|elsif|else|endif|unless|endunless|for|endfor|in|assign|capture|endcapture)\b/,
+            "keyword.liquid",
+          ],
           [/[a-zA-Z_][\w.]*/, "variable.liquid"],
           [/[^%]/, ""],
         ],
@@ -345,7 +348,9 @@ export function detectUnknownVariables(
     }
 
     const tokenOffset =
-      match[0].indexOf(expr) + expr.indexOf(firstPart) + firstPart.indexOf(token);
+      match[0].indexOf(expr) +
+      expr.indexOf(firstPart) +
+      firstPart.indexOf(token);
     found.push({ root, token, index: match.index + tokenOffset, knownRoots });
   }
 
@@ -409,13 +414,17 @@ interface JsonWorkerWithLanguageOps {
   doHover?(
     uri: string,
     position: { line: number; character: number },
-  ): Promise<{
-    contents?: unknown;
-    range?: {
-      start: { line: number; character: number };
-      end: { line: number; character: number };
-    };
-  } | null | undefined>;
+  ): Promise<
+    | {
+        contents?: unknown;
+        range?: {
+          start: { line: number; character: number };
+          end: { line: number; character: number };
+        };
+      }
+    | null
+    | undefined
+  >;
 }
 
 interface JsonCompletionItem {
@@ -436,10 +445,7 @@ interface JsonCompletionItem {
   };
 }
 
-export function positionInsideLiquid(
-  text: string,
-  offset: number,
-): boolean {
+export function positionInsideLiquid(text: string, offset: number): boolean {
   // Closest preceding `{{` or `{%` versus its matching close — if a closer
   // hasn't appeared yet, the cursor is still inside the expression. We bias
   // toward the Liquid completion provider in this case so it owns the surface.
@@ -679,4 +685,3 @@ export function setupLiquidJsonSchema(params: {
     },
   };
 }
-

@@ -37,7 +37,7 @@ function shortHash(triggerId: string): string {
   const secret = env.NEXTAUTH_SECRET ?? "";
   if (!secret) {
     logger.warn(
-      "NEXTAUTH_SECRET is not set; no-reply trigger tags are forgeable and not unguessable. Set NEXTAUTH_SECRET to secure trigger email addresses."
+      "NEXTAUTH_SECRET is not set; no-reply trigger tags are forgeable and not unguessable. Set NEXTAUTH_SECRET to secure trigger email addresses.",
     );
   }
   return createHmac("sha256", secret)

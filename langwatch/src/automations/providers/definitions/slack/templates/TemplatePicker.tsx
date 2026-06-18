@@ -11,10 +11,10 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 
 import {
-  pickDefaultSlackBlockKitTemplateId,
-  templateOptionsForCadence,
   type DraftCadence,
+  pickDefaultSlackBlockKitTemplateId,
   type SlackBlockKitTemplateOption,
+  templateOptionsForCadence,
 } from "./registry";
 
 interface Props {
@@ -81,7 +81,12 @@ export function SlackBlockKitTemplatePicker({
           onOpenChange={(d) => setOtherOpen(d.open)}
         >
           <Collapsible.Trigger asChild>
-            <HStack cursor="pointer" gap={1} color="fg.muted" width="fit-content">
+            <HStack
+              cursor="pointer"
+              gap={1}
+              color="fg.muted"
+              width="fit-content"
+            >
               {otherOpen ? (
                 <ChevronDown size={14} />
               ) : (

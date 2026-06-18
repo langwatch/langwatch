@@ -1,21 +1,34 @@
-import { Box, Button, HStack, Heading, Spacer, Text } from "@chakra-ui/react";
-import { Mail } from "lucide-react";
+import { Box, Button, Heading, HStack, Spacer, Text } from "@chakra-ui/react";
 import type { TriggerAction } from "@prisma/client";
+import { Mail } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CLIENT_PROVIDERS, type NotifyPreview } from "~/automations/providers/client";
-import { type ConfigFormCtx, isNotifyEntry } from "~/automations/providers/types";
+import {
+  DEFAULT_TRACE_DEBOUNCE_MS,
+  MAX_TRACE_DEBOUNCE_MS,
+  MIN_TRACE_DEBOUNCE_MS,
+  NOTIFICATION_CADENCES,
+  type NotificationCadence,
+} from "~/automations/cadences";
+import {
+  CLIENT_PROVIDERS,
+  type NotifyPreview,
+} from "~/automations/providers/client";
+import {
+  type ConfigFormCtx,
+  isNotifyEntry,
+} from "~/automations/providers/types";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";
+import type { FilterParam } from "~/hooks/useFilterParams";
 import { useFilterParams } from "~/hooks/useFilterParams";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
-  sanitizeTriggerFilters,
   type FilterField,
+  sanitizeTriggerFilters,
   type TriggerFilterValue,
 } from "~/server/filters/types";
-import type { FilterParam } from "~/hooks/useFilterParams";
 import {
   EXAMPLE_MATCHES,
   TEMPLATE_VARIABLES,
@@ -28,13 +41,6 @@ import {
 } from "~/shared/templating/templateContext";
 import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
-import {
-  DEFAULT_TRACE_DEBOUNCE_MS,
-  MAX_TRACE_DEBOUNCE_MS,
-  MIN_TRACE_DEBOUNCE_MS,
-  NOTIFICATION_CADENCES,
-  type NotificationCadence,
-} from "~/automations/cadences";
 import { MainSectionList } from "./components/MainSectionList";
 import { CadenceSecondaryDrawer } from "./components/secondaries/CadenceSecondaryDrawer";
 import { ConfigurationSecondaryDrawer } from "./components/secondaries/ConfigurationSecondaryDrawer";
@@ -164,7 +170,10 @@ export function AutomationDrawer({
     let filtersRaw: Record<string, TriggerFilterValue> = {};
     if (typeof row.filters === "string") {
       try {
-        filtersRaw = JSON.parse(row.filters) as Record<string, TriggerFilterValue>;
+        filtersRaw = JSON.parse(row.filters) as Record<
+          string,
+          TriggerFilterValue
+        >;
       } catch {
         filtersRaw = {};
       }
@@ -179,9 +188,9 @@ export function AutomationDrawer({
       customGraphId: row.customGraphId,
       filters: sanitized as Partial<Record<FilterField, FilterParam>>,
       // Defensive narrow: column is a free-form TEXT (see the repo parser).
-      notificationCadence: (NOTIFICATION_CADENCES as readonly string[]).includes(
-        row.notificationCadence,
-      )
+      notificationCadence: (
+        NOTIFICATION_CADENCES as readonly string[]
+      ).includes(row.notificationCadence)
         ? (row.notificationCadence as NotificationCadence)
         : "immediate",
       // Clamp to the same bounds the router enforces so a stale row outside
@@ -579,8 +588,8 @@ function EmailLinkLandingBanner() {
           <Mail size={16} />
         </Box>
         <Text textStyle="sm" color="fg">
-          Opened from an email notification. You're editing the automation
-          that produced that alert.
+          Opened from an email notification. You're editing the automation that
+          produced that alert.
         </Text>
       </HStack>
     </Box>

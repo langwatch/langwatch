@@ -1,12 +1,12 @@
 import { Badge, Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import type { Monaco, OnMount } from "@monaco-editor/react";
 import { ExternalLink, Link2 } from "lucide-react";
-import { useEffect, useMemo, useRef } from "react";
 import * as React from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { SiSlack } from "react-icons/si";
-import dynamic from "~/utils/compat/next-dynamic";
 import { Markdown } from "~/components/Markdown";
 import { Tooltip } from "~/components/ui/tooltip";
+import dynamic from "~/utils/compat/next-dynamic";
 import {
   clearLiquidMarkers,
   clearModelVariables,
@@ -16,8 +16,8 @@ import {
   registerLiquidLanguage,
   setModelVariables,
   setupLiquidJsonSchema,
-  validateLiquidModel,
   type VariableInfo,
+  validateLiquidModel,
 } from "./liquidMonaco";
 import {
   monacoBackgroundFor,
@@ -504,4 +504,3 @@ function slackMrkdwnToCommonMark(input: string): string {
       .replace(/([^\n])\n(?!\n)/g, "$1  \n")
   );
 }
-

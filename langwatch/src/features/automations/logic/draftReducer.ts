@@ -1,4 +1,9 @@
-import { AlertType, type TriggerAction } from "@prisma/client";
+import type { AlertType, TriggerAction } from "@prisma/client";
+import {
+  CADENCE_LABELS,
+  DEFAULT_TRACE_DEBOUNCE_MS,
+  type NotificationCadence,
+} from "~/automations/cadences";
 import {
   type AllSlices,
   CLIENT_PROVIDERS,
@@ -8,11 +13,6 @@ import {
 import { isNotifyEntry } from "~/automations/providers/types";
 import type { FilterParam } from "~/hooks/useFilterParams";
 import type { FilterField } from "~/server/filters/types";
-import {
-  CADENCE_LABELS,
-  DEFAULT_TRACE_DEBOUNCE_MS,
-  type NotificationCadence,
-} from "~/automations/cadences";
 
 /**
  * Pure state machine for the staged automation drawer (ADR-028). Lives
@@ -134,9 +134,15 @@ export function reducer(
         cadenceConfirmed: true,
       };
     case "SET_TRACE_DEBOUNCE_MS":
-      return { ...state, traceDebounceMs: action.value, cadenceConfirmed: true };
+      return {
+        ...state,
+        traceDebounceMs: action.value,
+        cadenceConfirmed: true,
+      };
     case "CONFIRM_CADENCE":
-      return state.cadenceConfirmed ? state : { ...state, cadenceConfirmed: true };
+      return state.cadenceConfirmed
+        ? state
+        : { ...state, cadenceConfirmed: true };
     case "SET_SLICE":
       return {
         ...state,

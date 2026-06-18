@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { definePipeline } from "../staticBuilder";
+import type { Event } from "../../domain/types";
+import type { OutboxReactorDefinition } from "../../outbox/outboxReactor.types";
+import type { ReactorDefinition } from "../../reactors/reactor.types";
 import {
   createMockFoldProjectionDefinition,
   createMockMapProjectionDefinition,
 } from "../../services/__tests__/testHelpers";
-import type { Event } from "../../domain/types";
-import type { OutboxReactorDefinition } from "../../outbox/outboxReactor.types";
-import type { ReactorDefinition } from "../../reactors/reactor.types";
+import { definePipeline } from "../staticBuilder";
 
 describe("StaticPipelineBuilder validations", () => {
   beforeEach(() => {
@@ -67,7 +67,9 @@ describe("StaticPipelineBuilder validations", () => {
 
       expect(pipeline.foldReactors.size).toBe(1);
       expect(pipeline.mapReactors.size).toBe(0);
-      expect(pipeline.foldReactors.get("myReactor")?.projectionName).toBe("myFold");
+      expect(pipeline.foldReactors.get("myReactor")?.projectionName).toBe(
+        "myFold",
+      );
     });
   });
 
@@ -88,7 +90,9 @@ describe("StaticPipelineBuilder validations", () => {
 
       expect(pipeline.mapReactors.size).toBe(1);
       expect(pipeline.foldReactors.size).toBe(0);
-      expect(pipeline.mapReactors.get("myReactor")?.projectionName).toBe("myMap");
+      expect(pipeline.mapReactors.get("myReactor")?.projectionName).toBe(
+        "myMap",
+      );
     });
   });
 

@@ -8,14 +8,7 @@
  *   - lease recovery after expiry
  */
 import { generate } from "@langwatch/ksuid";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  describe,
-  expect,
-  it,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { KSUID_RESOURCES } from "../../../../utils/constants";
 import { getTestProject } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
@@ -33,12 +26,16 @@ describe("PrismaOutboxRepository", () => {
   });
 
   afterEach(async () => {
-    await prisma.reactorOutbox.deleteMany({ where: { projectId, reactorName } });
+    await prisma.reactorOutbox.deleteMany({
+      where: { projectId, reactorName },
+    });
   });
 
   afterAll(async () => {
     // Project / team / org are reused fixtures — don't delete them.
-    await prisma.reactorOutbox.deleteMany({ where: { projectId, reactorName } });
+    await prisma.reactorOutbox.deleteMany({
+      where: { projectId, reactorName },
+    });
   });
 
   describe("insertIfAbsent", () => {

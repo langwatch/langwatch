@@ -1,7 +1,15 @@
-import { Badge, Box, Button, Field, HStack, Input, Text, VStack } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  Button,
+  Field,
+  HStack,
+  Input,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { Mail, X } from "lucide-react";
 import { useMemo, useState } from "react";
-import { api } from "~/utils/api";
 import { VariableInfoIcon } from "~/features/automations/components/VariableInfoIcon";
 import {
   CompactEmailPreview,
@@ -13,6 +21,7 @@ import {
   DEFAULT_EMAIL_SUBJECT_TEMPLATE,
 } from "~/shared/templating/defaults";
 import { filterVariablesForCadence } from "~/shared/templating/exampleContext";
+import { api } from "~/utils/api";
 import { InlineCadenceSelect } from "../../components/InlineCadenceSelect";
 import type {
   ConfigFormProps,
@@ -79,7 +88,9 @@ function testFireTarget(_slice: EmailSlice) {
 
 function templatesFromSlice(slice: EmailSlice) {
   return {
-    emailSubjectTemplate: slice.subject.usingDefault ? null : slice.subject.value,
+    emailSubjectTemplate: slice.subject.usingDefault
+      ? null
+      : slice.subject.value,
     emailBodyTemplate: slice.body.usingDefault ? null : slice.body.value,
     slackTemplate: null,
     slackTemplateType: null,
@@ -206,7 +217,11 @@ function EmailConfigForm({
                 <Text flex="1" minWidth="0">
                   {email}
                 </Text>
-                <Badge size="sm" colorPalette="orange" title="This address is outside your team. The trigger payload — trace input, output, metadata — will leave your org.">
+                <Badge
+                  size="sm"
+                  colorPalette="orange"
+                  title="This address is outside your team. The trigger payload — trace input, output, metadata — will leave your org."
+                >
                   External
                 </Badge>
                 <Button
@@ -236,7 +251,11 @@ function EmailConfigForm({
               }
             }}
           />
-          <Button variant="outline" onClick={addExternal} disabled={!newEmail.trim()}>
+          <Button
+            variant="outline"
+            onClick={addExternal}
+            disabled={!newEmail.trim()}
+          >
             Add email
           </Button>
         </HStack>

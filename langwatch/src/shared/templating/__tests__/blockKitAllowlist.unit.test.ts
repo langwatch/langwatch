@@ -41,7 +41,11 @@ describe("filterBlockKit", () => {
         {
           type: "section",
           text: { type: "mrkdwn", text: "body" },
-          accessory: { type: "image", image_url: "https://x/y.png", alt_text: "y" },
+          accessory: {
+            type: "image",
+            image_url: "https://x/y.png",
+            alt_text: "y",
+          },
         },
       ]);
       expect((block?.accessory as { type: string }).type).toBe("image");

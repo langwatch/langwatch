@@ -4,11 +4,11 @@ import { CLIENT_PROVIDERS } from "~/automations/providers/client";
 import type { EmailSlice } from "~/automations/providers/definitions/email/client";
 import {
   type AutomationDraft,
-  INITIAL_DRAFT,
   conditionsAreSet,
   configIsComplete,
   configurationSummary,
   filtersAreSet,
+  INITIAL_DRAFT,
   isNotifyAction,
   notifyChannel,
   reducer,
@@ -16,7 +16,9 @@ import {
 } from "../draftReducer";
 
 const emailWith = (members: string[]): EmailSlice => ({
-  ...(CLIENT_PROVIDERS[TriggerAction.SEND_EMAIL].client.initialSlice() as EmailSlice),
+  ...(CLIENT_PROVIDERS[
+    TriggerAction.SEND_EMAIL
+  ].client.initialSlice() as EmailSlice),
   members,
 });
 
@@ -26,7 +28,10 @@ const SAMPLE: AutomationDraft = {
   action: TriggerAction.SEND_EMAIL,
   alertType: AlertType.WARNING,
   filters: { "traces.origin": ["sample"] as never },
-  slices: { ...INITIAL_DRAFT.slices, [TriggerAction.SEND_EMAIL]: emailWith(["a@acme.test"]) },
+  slices: {
+    ...INITIAL_DRAFT.slices,
+    [TriggerAction.SEND_EMAIL]: emailWith(["a@acme.test"]),
+  },
 };
 
 describe("draftReducer", () => {
@@ -39,7 +44,8 @@ describe("draftReducer", () => {
       expect(next.action).toBe(TriggerAction.SEND_SLACK_MESSAGE);
       // The email slice we set is still intact — switching type doesn't wipe it.
       expect(
-        (next.slices[TriggerAction.SEND_EMAIL] as { members: string[] }).members,
+        (next.slices[TriggerAction.SEND_EMAIL] as { members: string[] })
+          .members,
       ).toEqual(["a@acme.test"]);
       expect(next.name).toBe("High latency");
     });
@@ -67,7 +73,10 @@ describe("draftReducer", () => {
 
   describe("SET_SOURCE", () => {
     it("clears trace filters when switching to customGraph", () => {
-      const next = reducer(SAMPLE, { type: "SET_SOURCE", value: "customGraph" });
+      const next = reducer(SAMPLE, {
+        type: "SET_SOURCE",
+        value: "customGraph",
+      });
       expect(next.source).toBe("customGraph");
       expect(next.filters).toEqual({});
     });
@@ -123,7 +132,11 @@ describe("filtersAreSet", () => {
 describe("conditionsAreSet", () => {
   describe("when the source is customGraph", () => {
     it("is true only when a graph id is set", () => {
-      const a: AutomationDraft = { ...SAMPLE, source: "customGraph", filters: {} };
+      const a: AutomationDraft = {
+        ...SAMPLE,
+        source: "customGraph",
+        filters: {},
+      };
       expect(conditionsAreSet({ ...a, customGraphId: null })).toBe(false);
       expect(conditionsAreSet({ ...a, customGraphId: "g_1" })).toBe(true);
     });
@@ -178,11 +191,15 @@ describe("notifyChannel + isNotifyAction", () => {
     expect(
       notifyChannel({ ...SAMPLE, action: TriggerAction.SEND_SLACK_MESSAGE }),
     ).toBe("slack");
-    expect(notifyChannel({ ...SAMPLE, action: TriggerAction.ADD_TO_DATASET })).toBeNull();
+    expect(
+      notifyChannel({ ...SAMPLE, action: TriggerAction.ADD_TO_DATASET }),
+    ).toBeNull();
   });
   it("isNotifyAction agrees", () => {
     expect(isNotifyAction(SAMPLE)).toBe(true);
-    expect(isNotifyAction({ ...SAMPLE, action: TriggerAction.ADD_TO_DATASET })).toBe(false);
+    expect(
+      isNotifyAction({ ...SAMPLE, action: TriggerAction.ADD_TO_DATASET }),
+    ).toBe(false);
     expect(isNotifyAction({ ...SAMPLE, action: null })).toBe(false);
   });
 });

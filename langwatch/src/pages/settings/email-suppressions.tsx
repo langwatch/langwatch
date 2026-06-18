@@ -52,7 +52,13 @@ function EmailSuppressionsPage({
   });
 
   return (
-    <VStack align="stretch" gap={6} width="full" maxW="container.lg" padding={6}>
+    <VStack
+      align="stretch"
+      gap={6}
+      width="full"
+      maxW="container.lg"
+      padding={6}
+    >
       <VStack align="start" gap={1}>
         <Heading size="lg">Email Suppressions</Heading>
         <Text color="fg.muted">

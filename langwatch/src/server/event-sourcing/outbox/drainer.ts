@@ -1,7 +1,7 @@
-import type { EventSourcedQueueProcessor } from "../queues/queue.types";
-import { createLogger } from "~/utils/logger/server";
-import { captureException } from "~/utils/posthogErrorCapture";
 import { tenantIdFromGroupId } from "~/server/observability/tenantRateTracker";
+import { createLogger } from "~/utils/logger/server";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
+import type { EventSourcedQueueProcessor } from "../queues/queue.types";
 import { isDispatchError } from "./dispatchError";
 import type { OutboxService } from "./outbox.service";
 import type { OutboxRow } from "./outbox.types";
@@ -64,8 +64,7 @@ export class OutboxDrainer {
     private readonly outboxService: OutboxService,
     options: OutboxDrainerOptions,
   ) {
-    this.leaseDurationMs =
-      options.leaseDurationMs ?? DEFAULT_LEASE_DURATION_MS;
+    this.leaseDurationMs = options.leaseDurationMs ?? DEFAULT_LEASE_DURATION_MS;
     this.maxRowsPerWakeup =
       options.maxRowsPerWakeup ?? DEFAULT_MAX_ROWS_PER_WAKEUP;
     this.scheduleWakeup = options.scheduleWakeup;
@@ -77,10 +76,7 @@ export class OutboxDrainer {
     if (!Number.isFinite(this.leaseDurationMs) || this.leaseDurationMs <= 0) {
       throw new Error("OutboxDrainer: leaseDurationMs must be > 0");
     }
-    if (
-      !Number.isFinite(this.maxRowsPerWakeup) ||
-      this.maxRowsPerWakeup <= 0
-    ) {
+    if (!Number.isFinite(this.maxRowsPerWakeup) || this.maxRowsPerWakeup <= 0) {
       throw new Error("OutboxDrainer: maxRowsPerWakeup must be > 0");
     }
   }
@@ -161,8 +157,7 @@ export class OutboxDrainer {
       return;
     } catch (error) {
       const isRetryable = !isDispatchError(error) || error.retryable;
-      const message =
-        error instanceof Error ? error.message : String(error);
+      const message = error instanceof Error ? error.message : String(error);
 
       if (!isRetryable) {
         await this.outboxService.markDead({ row, error: message });
@@ -175,7 +170,7 @@ export class OutboxDrainer {
           },
           "Outbox dispatch failed permanently",
         );
-        captureException(error, {
+        captureException(toError(error), {
           extra: {
             outboxRowId: row.id,
             reactorName: row.reactorName,
@@ -201,7 +196,7 @@ export class OutboxDrainer {
           },
           "Outbox dispatch exhausted retries",
         );
-        captureException(error, {
+        captureException(toError(error), {
           extra: {
             outboxRowId: row.id,
             reactorName: row.reactorName,

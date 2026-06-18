@@ -75,7 +75,10 @@ describe("renderTriggerSlack", () => {
   describe("when a Block Kit template renders valid JSON", () => {
     it("sends a blocks payload through the allowlist", async () => {
       const template = JSON.stringify([
-        { type: "header", text: { type: "plain_text", text: "{{ trigger.name }}" } },
+        {
+          type: "header",
+          text: { type: "plain_text", text: "{{ trigger.name }}" },
+        },
         { type: "divider" },
         { type: "actions", elements: [{ type: "button", text: "x" }] },
       ]);

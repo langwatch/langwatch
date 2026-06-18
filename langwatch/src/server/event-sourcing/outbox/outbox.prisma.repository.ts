@@ -53,8 +53,9 @@ export class PrismaOutboxRepository implements OutboxRepository {
     // ordering this channel exists to preserve. Branches over a
     // template literal so the optional predicate doesn't fight Prisma's
     // tagged-template parameterisation.
-    const rows = groupKey === undefined
-      ? await this.prisma.$queryRaw<OutboxRow[]>`
+    const rows =
+      groupKey === undefined
+        ? await this.prisma.$queryRaw<OutboxRow[]>`
           UPDATE "ReactorOutbox"
           SET
             "status" = 'dispatching',
@@ -74,7 +75,7 @@ export class PrismaOutboxRepository implements OutboxRepository {
           )
           RETURNING *
         `
-      : await this.prisma.$queryRaw<OutboxRow[]>`
+        : await this.prisma.$queryRaw<OutboxRow[]>`
           UPDATE "ReactorOutbox"
           SET
             "status" = 'dispatching',

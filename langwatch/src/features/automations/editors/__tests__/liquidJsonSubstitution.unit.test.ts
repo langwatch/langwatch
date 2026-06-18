@@ -57,11 +57,7 @@ describe("substituteLiquidForJsonValidation", () => {
     it("records each replaced range with its kind", () => {
       const source = '{"a": "{{ x }}", "b": "{% if y %}z{% endif %}"}';
       const { liquidRanges } = substituteLiquidForJsonValidation(source);
-      expect(liquidRanges.map((r) => r.kind)).toEqual([
-        "output",
-        "tag",
-        "tag",
-      ]);
+      expect(liquidRanges.map((r) => r.kind)).toEqual(["output", "tag", "tag"]);
       expect(liquidRanges).toHaveLength(3);
     });
   });
@@ -84,9 +80,8 @@ describe("substituteLiquidForJsonValidation", () => {
         "{%- endcapture -%}",
         '{"text": "{{ _url }}"}',
       ].join("\n");
-      const { substituted, liquidRanges } = substituteLiquidForJsonValidation(
-        source,
-      );
+      const { substituted, liquidRanges } =
+        substituteLiquidForJsonValidation(source);
       // The capture region collapses to one tag span (blanks); only the
       // trailing `{{ _url }}` inside the JSON string produces an additional
       // output range filled with underscores.
@@ -107,9 +102,8 @@ describe("substituteLiquidForJsonValidation", () => {
   describe("given a comment block", () => {
     it("folds the comment body into whitespace so its contents never reach JSON validation", () => {
       const source = '{% comment %}{{ broken.var }}{% endcomment %}{"a": 1}';
-      const { substituted, liquidRanges } = substituteLiquidForJsonValidation(
-        source,
-      );
+      const { substituted, liquidRanges } =
+        substituteLiquidForJsonValidation(source);
       expect(liquidRanges).toHaveLength(1);
       expect(liquidRanges[0]!.kind).toBe("tag");
       const objectStart = substituted.indexOf('{"a":');
@@ -120,9 +114,8 @@ describe("substituteLiquidForJsonValidation", () => {
   describe("given an unterminated capture block", () => {
     it("falls back to per-span substitution so the editor still flags the missing closer", () => {
       const source = "{%- capture _url -%}\n{{ project.url }}\n";
-      const { substituted, liquidRanges } = substituteLiquidForJsonValidation(
-        source,
-      );
+      const { substituted, liquidRanges } =
+        substituteLiquidForJsonValidation(source);
       // No `{% endcapture %}` to anchor on — the opener is treated as a
       // single tag span (whitespace) and the body's `{{ project.url }}`
       // gets the standard top-level output replacement so the JSON service

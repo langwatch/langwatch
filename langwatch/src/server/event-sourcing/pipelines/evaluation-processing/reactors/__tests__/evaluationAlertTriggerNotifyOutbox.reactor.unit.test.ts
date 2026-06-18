@@ -141,7 +141,10 @@ describe("evaluationAlertTriggerNotifyOutbox reactor", () => {
         "tenant-1/triggerNotify:trigger-eval-notify",
       );
       expect(request!.enqueueOptions).toEqual({ ttlMs: 25_000 });
-      const payload = request!.payload as unknown as { stage: string; foldSnapshotAtEnqueue: { computedInput: string } };
+      const payload = request!.payload as unknown as {
+        stage: string;
+        foldSnapshotAtEnqueue: { computedInput: string };
+      };
       expect(payload.stage).toBe("settle");
       expect(payload.foldSnapshotAtEnqueue.computedInput).toBe("the input");
     });

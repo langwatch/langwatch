@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  calculateBackoffMs,
-  DEFAULT_BACKOFF_CAP_MS,
-} from "../backoff";
+import { calculateBackoffMs, DEFAULT_BACKOFF_CAP_MS } from "../backoff";
 
 describe("calculateBackoffMs", () => {
   describe("given an attempt count of 0", () => {

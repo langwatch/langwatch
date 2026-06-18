@@ -2,7 +2,11 @@ import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { CircleCheck, CircleX, Send } from "lucide-react";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
-import { useConfigComplete, useNotifyChannel, useTestHistory } from "../state/selectors";
+import {
+  useConfigComplete,
+  useNotifyChannel,
+  useTestHistory,
+} from "../state/selectors";
 
 /**
  * Test fire row — last-attempt status + button. Coloured by the most
@@ -72,9 +76,11 @@ export function TestFireSection({
               </>
             ) : channel === "email" ? (
               // ADR-031: email test fires deliver only to the requester.
-              sessionEmail
-                ? `A test will be sent to ${sessionEmail}`
-                : "A test will be sent to your own account email."
+              sessionEmail ? (
+                `A test will be sent to ${sessionEmail}`
+              ) : (
+                "A test will be sent to your own account email."
+              )
             ) : (
               "Send a banner-marked notification to the configured destination before saving."
             )}

@@ -52,9 +52,7 @@ describe("validateTemplateDraft", () => {
       ).toThrowError(TemplateValidationError);
       expect(() =>
         validateTemplateDraft({ emailBodyTemplate: "{{ trigger.name" }),
-      ).toThrowError(
-        expect.objectContaining({ field: "emailBodyTemplate" }),
-      );
+      ).toThrowError(expect.objectContaining({ field: "emailBodyTemplate" }));
     });
   });
 
@@ -65,9 +63,7 @@ describe("validateTemplateDraft", () => {
       ).toThrowError(TemplateValidationError);
       expect(() =>
         validateTemplateDraft({ slackTemplateType: "carousel" }),
-      ).toThrowError(
-        expect.objectContaining({ field: "slackTemplateType" }),
-      );
+      ).toThrowError(expect.objectContaining({ field: "slackTemplateType" }));
     });
   });
 
@@ -78,9 +74,7 @@ describe("validateTemplateDraft", () => {
       ).toThrowError(TemplateValidationError);
       expect(() =>
         validateTemplateDraft({ slackTemplate: "Hi {{ project.name }}" }),
-      ).toThrowError(
-        expect.objectContaining({ field: "slackTemplateType" }),
-      );
+      ).toThrowError(expect.objectContaining({ field: "slackTemplateType" }));
     });
   });
 
@@ -116,9 +110,13 @@ describe("TriggerTemplateService", () => {
 
         expect(result.recipientCount).toBe(2);
         expect(sentEmails).toHaveLength(1);
-        expect(sentEmails[0]!.to).toMatch(/^LangWatch Triggers <no-reply\+[a-f0-9]{12}@/);
+        expect(sentEmails[0]!.to).toMatch(
+          /^LangWatch Triggers <no-reply\+[a-f0-9]{12}@/,
+        );
         expect(sentEmails[0]!.bcc).toEqual(["a@acme.test", "b@acme.test"]);
-        expect(sentEmails[0]!.subject).toContain(TEST_FIRE_EMAIL_SUBJECT_PREFIX);
+        expect(sentEmails[0]!.subject).toContain(
+          TEST_FIRE_EMAIL_SUBJECT_PREFIX,
+        );
         expect(sentEmails[0]!.html).toContain(TEST_FIRE_NOTICE);
       });
     });

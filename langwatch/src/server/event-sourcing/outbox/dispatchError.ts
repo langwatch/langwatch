@@ -91,11 +91,18 @@ export function extractHttpStatus(error: unknown): number | undefined {
  */
 export function toDispatchError(
   error: unknown,
-  { message, retryable: retryableOverride }: { message: string; retryable?: boolean },
+  {
+    message,
+    retryable: retryableOverride,
+  }: { message: string; retryable?: boolean },
 ): DispatchError {
   if (isDispatchError(error)) return error;
   if (retryableOverride !== undefined) {
-    return new DispatchError({ message, retryable: retryableOverride, cause: error });
+    return new DispatchError({
+      message,
+      retryable: retryableOverride,
+      cause: error,
+    });
   }
   const status = extractHttpStatus(error);
   const retryable = status === undefined ? true : isRetryableHttpStatus(status);

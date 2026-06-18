@@ -27,7 +27,7 @@ import {
   type TemplateMatchInput,
 } from "~/shared/templating/templateContext";
 import { createLogger } from "~/utils/logger/server";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { createTenantId } from "../domain/tenantId";
 import {
   computeScheduledFor,
@@ -549,7 +549,7 @@ async function handleCadenceBatch(
       },
       "Cadence dispatch failed",
     );
-    captureException(error, {
+    captureException(toError(error), {
       extra: { projectId, triggerId, triggerAction: trigger.action },
     });
     throw error;
@@ -580,7 +580,7 @@ async function handleCadenceBatch(
         },
         "claimSend failed post-dispatch — swallowing to avoid double-send on retry",
       );
-      captureException(claimErr, {
+      captureException(toError(claimErr), {
         extra: {
           projectId,
           triggerId,
@@ -626,7 +626,7 @@ async function handleCadenceBatch(
       },
       "updateLastRunAt failed post-dispatch — swallowing to avoid double-send on retry",
     );
-    captureException(lastRunErr, {
+    captureException(toError(lastRunErr), {
       extra: { projectId, triggerId, phase: "updateLastRunAt-post-dispatch" },
     });
   }

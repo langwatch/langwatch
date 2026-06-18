@@ -1,10 +1,10 @@
 import { DEFAULT_TRACE_DEBOUNCE_MS } from "~/automations/cadences";
 import { createLogger } from "~/utils/logger/server";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import type { Event } from "../domain/types";
 import type {
-  ReactorDefinition,
   ReactorContext,
+  ReactorDefinition,
 } from "../reactors/reactor.types";
 import type { OutboxReactorDefinition } from "./outboxReactor.types";
 import { isSettle, type SettleStagePayload } from "./payload";
@@ -108,8 +108,7 @@ export function adaptOutboxReactor<E extends Event, FoldState>(
 
         try {
           await outbox.enqueueSettle(payload, {
-            ttlMs:
-              request.enqueueOptions?.ttlMs ?? DEFAULT_TRACE_DEBOUNCE_MS,
+            ttlMs: request.enqueueOptions?.ttlMs ?? DEFAULT_TRACE_DEBOUNCE_MS,
           });
         } catch (error) {
           // Mirror the existing inline enqueue-failure behavior: log +
@@ -123,7 +122,7 @@ export function adaptOutboxReactor<E extends Event, FoldState>(
             },
             "OutboxReactor enqueueSettle failed",
           );
-          captureException(error, {
+          captureException(toError(error), {
             extra: {
               reactorName: definition.name,
               dedupKey: request.dedupKey,

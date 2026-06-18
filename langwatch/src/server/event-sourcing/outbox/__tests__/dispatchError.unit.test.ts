@@ -77,9 +77,9 @@ describe("extractHttpStatus", () => {
     });
 
     it("reads an axios/@slack/webhook nested response status", () => {
-      expect(extractHttpStatus({ original: { response: { status: 404 } } })).toBe(
-        404,
-      );
+      expect(
+        extractHttpStatus({ original: { response: { status: 404 } } }),
+      ).toBe(404);
     });
 
     it("reads a numeric SendGrid code", () => {

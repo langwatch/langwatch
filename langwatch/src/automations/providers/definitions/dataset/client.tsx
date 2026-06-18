@@ -57,7 +57,11 @@ function toActionParams(slice: DatasetSlice): DatasetActionParams {
   };
 }
 
-function DatasetConfigForm({ slice, onChange, ctx }: ConfigFormProps<DatasetSlice>) {
+function DatasetConfigForm({
+  slice,
+  onChange,
+  ctx,
+}: ConfigFormProps<DatasetSlice>) {
   const datasets = api.dataset.getAll.useQuery(
     { projectId: ctx.projectId },
     { enabled: !!ctx.projectId, refetchOnWindowFocus: false },
@@ -71,7 +75,9 @@ function DatasetConfigForm({ slice, onChange, ctx }: ConfigFormProps<DatasetSlic
         setValue={(_field: string, value: string) =>
           onChange({ ...slice, datasetId: value })
         }
-        onCreateNew={() => {}}
+        onCreateNew={() => {
+          // noop
+        }}
       />
       <Text color="fg.muted" textStyle="xs">
         Column mapping uses the dataset's defaults; refine after creating from

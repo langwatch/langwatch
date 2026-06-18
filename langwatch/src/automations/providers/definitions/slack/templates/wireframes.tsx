@@ -15,7 +15,13 @@ function Wire({ kind }: { kind: WireKind }) {
       // rows read as a list of traces, not paragraphs of one message.
       return (
         <HStack gap="1.5" w="full">
-          <Box h="1.5" w="1.5" bg="fg.muted" borderRadius="full" flexShrink={0} />
+          <Box
+            h="1.5"
+            w="1.5"
+            bg="fg.muted"
+            borderRadius="full"
+            flexShrink={0}
+          />
           <Box h="2" bg="fg.muted" borderRadius="xs" flex="1" />
         </HStack>
       );

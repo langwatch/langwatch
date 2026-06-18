@@ -1,4 +1,4 @@
-import { Button, HStack, Heading, Spacer } from "@chakra-ui/react";
+import { Button, Heading, HStack, Spacer } from "@chakra-ui/react";
 import { ArrowLeft, Maximize2, Minimize2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { Drawer } from "~/components/ui/drawer";

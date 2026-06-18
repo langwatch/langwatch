@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { EXAMPLE_MATCHES, TEMPLATE_VARIABLES } from "../exampleContext";
 
 const TEMPLATE_VARIABLE_PATHS = TEMPLATE_VARIABLES.map((v) => v.path);
+
 import { buildTemplateContext } from "../templateContext";
 
 function resolve(path: string, context: unknown): unknown {
@@ -29,11 +30,10 @@ describe("template variable contract", () => {
   });
 
   describe("when resolving every advertised variable path against the example context", () => {
-    it.each(TEMPLATE_VARIABLE_PATHS)(
-      "%s resolves to a provided value",
-      (path) => {
-        expect(resolve(path, context)).not.toBeUndefined();
-      },
-    );
+    it.each(
+      TEMPLATE_VARIABLE_PATHS,
+    )("%s resolves to a provided value", (path) => {
+      expect(resolve(path, context)).not.toBeUndefined();
+    });
   });
 });

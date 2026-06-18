@@ -38,7 +38,10 @@ export const CONDITIONS_JSON_SCHEMA = {
             { type: "array", items: { type: "string" } },
             {
               type: "object",
-              additionalProperties: { type: "array", items: { type: "string" } },
+              additionalProperties: {
+                type: "array",
+                items: { type: "string" },
+              },
             },
           ],
         },

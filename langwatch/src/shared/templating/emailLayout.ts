@@ -46,11 +46,11 @@ export function wrapEmailHtml({
       <div style="font-size:12px;color:#718096;text-align:center;line-height:1.6;">
         Sent with <span style="color:#E53E3E;">♥</span> from
         <a href="${escapeHtmlAttribute(
-          footer.projectUrl
+          footer.projectUrl,
         )}" style="color:#DD6B20;text-decoration:none;">LangWatch</a>
         &nbsp;·&nbsp;
         <a href="${escapeHtmlAttribute(
-          footer.editUrl
+          footer.editUrl,
         )}" style="color:#DD6B20;text-decoration:none;">Edit automation</a>
       </div>
     </div>

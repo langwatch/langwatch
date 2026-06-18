@@ -1,22 +1,22 @@
 import { TriggerAction } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import {
+  CADENCE_WINDOW_MS,
+  NOTIFICATION_CADENCES,
+} from "~/automations/cadences";
+import {
   computeScheduledFor,
   NOTIFY_TRIGGER_ACTIONS,
   PERSIST_TRIGGER_ACTIONS,
 } from "../triggerActionDispatch";
-import {
-  CADENCE_WINDOW_MS,
-  NOTIFICATION_CADENCES,
-} from "~/automations/cadences";
 
 describe("trigger action classification", () => {
   describe("when classifying notify actions", () => {
     it("treats email and Slack as notify", () => {
       expect(NOTIFY_TRIGGER_ACTIONS.has(TriggerAction.SEND_EMAIL)).toBe(true);
-      expect(
-        NOTIFY_TRIGGER_ACTIONS.has(TriggerAction.SEND_SLACK_MESSAGE),
-      ).toBe(true);
+      expect(NOTIFY_TRIGGER_ACTIONS.has(TriggerAction.SEND_SLACK_MESSAGE)).toBe(
+        true,
+      );
     });
   });
 
@@ -46,9 +46,9 @@ describe("trigger action classification", () => {
     });
 
     it("has no extra members beyond the enum", () => {
-      expect(
-        NOTIFY_TRIGGER_ACTIONS.size + PERSIST_TRIGGER_ACTIONS.size,
-      ).toBe(allActions.length);
+      expect(NOTIFY_TRIGGER_ACTIONS.size + PERSIST_TRIGGER_ACTIONS.size).toBe(
+        allActions.length,
+      );
     });
   });
 });

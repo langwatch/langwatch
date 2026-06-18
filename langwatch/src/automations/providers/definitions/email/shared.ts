@@ -28,7 +28,8 @@ const def: SharedDef = {
   action: TriggerAction.SEND_EMAIL,
   category: "notify",
   label: "Email",
-  description: "Send an email to one or more team members or external recipients.",
+  description:
+    "Send an email to one or more team members or external recipients.",
   actionParamsSchema: emailActionParamsSchema,
 };
 

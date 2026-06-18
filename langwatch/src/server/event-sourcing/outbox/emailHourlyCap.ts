@@ -83,7 +83,10 @@ export async function consumeEmailCapSlot({
 
   const existing = memoryStore.get(key);
   if (!existing || existing.expiresAt <= nowMs) {
-    memoryStore.set(key, { count: 1, expiresAt: nowMs + EXPIRE_SECONDS * 1000 });
+    memoryStore.set(key, {
+      count: 1,
+      expiresAt: nowMs + EXPIRE_SECONDS * 1000,
+    });
     return { allowed: 1 <= cap, count: 1 };
   }
   existing.count += 1;

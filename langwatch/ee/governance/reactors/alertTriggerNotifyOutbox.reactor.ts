@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { TriggerService } from "~/server/app-layer/triggers/trigger.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import {
-  TRIGGER_NOTIFY_REACTOR_NAME,
-  auditDedupKey,
-  cadenceGroupKey,
-  type SettleStagePayload,
-} from "~/server/event-sourcing/outbox/payload";
+import type { TriggerService } from "~/server/app-layer/triggers/trigger.service";
 import type {
   OutboxEnqueueRequest,
   OutboxReactorDefinition,
 } from "~/server/event-sourcing/outbox/outboxReactor.types";
+import {
+  auditDedupKey,
+  cadenceGroupKey,
+  type SettleStagePayload,
+  TRIGGER_NOTIFY_REACTOR_NAME,
+} from "~/server/event-sourcing/outbox/payload";
 import { NOTIFY_TRIGGER_ACTIONS } from "~/server/event-sourcing/pipelines/shared/triggerActionDispatch";
 import { defineOriginGuardedTraceOutboxReactor } from "~/server/event-sourcing/pipelines/trace-processing/reactors/_originGuardedReactor";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";

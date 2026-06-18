@@ -2,8 +2,8 @@ import {
   IncomingWebhook,
   type IncomingWebhookSendArguments,
 } from "@slack/webhook";
-import { sendEmail } from "~/server/mailer/emailSender";
 import type { TriggerNotifier } from "~/server/app-layer/triggers/trigger-template.service";
+import { sendEmail } from "~/server/mailer/emailSender";
 
 /**
  * Production delivery for trigger test fires: the email path reuses the shared

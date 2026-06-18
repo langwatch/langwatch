@@ -74,7 +74,10 @@ export function verifyUnsubscribeToken(
   // timingSafeEqual throws on mismatched buffer lengths.
   const provided = Buffer.from(providedSig);
   const expected = Buffer.from(expectedSig);
-  if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) {
+  if (
+    provided.length !== expected.length ||
+    !timingSafeEqual(provided, expected)
+  ) {
     return null;
   }
 

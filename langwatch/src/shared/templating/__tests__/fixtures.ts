@@ -1,7 +1,4 @@
-import type {
-  TemplateContext,
-  TemplateMatchVars,
-} from "../templateContext";
+import type { TemplateContext, TemplateMatchVars } from "../templateContext";
 
 export function makeMatch(
   overrides: Partial<TemplateMatchVars> = {},

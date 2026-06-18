@@ -4,7 +4,9 @@ import { markdownToEmailHtml } from "../markdown";
 describe("markdownToEmailHtml", () => {
   describe("when given Markdown headings and links", () => {
     it("renders them to HTML", () => {
-      const html = markdownToEmailHtml("# Title\n\n[link](https://example.com)");
+      const html = markdownToEmailHtml(
+        "# Title\n\n[link](https://example.com)",
+      );
       expect(html).toContain("<h1>Title</h1>");
       expect(html).toContain('href="https://example.com"');
     });
@@ -28,7 +30,9 @@ describe("markdownToEmailHtml", () => {
 
   describe("when the Markdown contains an event handler attribute", () => {
     it("strips the handler", () => {
-      const html = markdownToEmailHtml('<a href="https://x.com" onclick="evil()">x</a>');
+      const html = markdownToEmailHtml(
+        '<a href="https://x.com" onclick="evil()">x</a>',
+      );
       expect(html).not.toContain("onclick");
     });
   });

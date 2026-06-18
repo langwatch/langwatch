@@ -3,9 +3,7 @@ import annotationQueueClient, {
   type AnnotationQueueSlice,
 } from "./definitions/annotationQueue/client";
 import annotationQueueShared from "./definitions/annotationQueue/shared";
-import datasetClient, {
-  type DatasetSlice,
-} from "./definitions/dataset/client";
+import datasetClient, { type DatasetSlice } from "./definitions/dataset/client";
 import datasetShared from "./definitions/dataset/shared";
 import emailClient, { type EmailSlice } from "./definitions/email/client";
 import emailShared, { type EmailPreview } from "./definitions/email/shared";
@@ -13,8 +11,8 @@ import slackClient, { type SlackSlice } from "./definitions/slack/client";
 import slackShared, { type SlackPreview } from "./definitions/slack/shared";
 import {
   type ClientEntry,
-  type NotifyClientEntry,
   isNotifyEntry,
+  type NotifyClientEntry,
 } from "./types";
 
 /** Per-action slice type — adding a new action means adding one entry. */
@@ -96,6 +94,7 @@ export function initialSlices(): AllSlices {
     [TriggerAction.SEND_EMAIL]: emailClient.initialSlice(),
     [TriggerAction.SEND_SLACK_MESSAGE]: slackClient.initialSlice(),
     [TriggerAction.ADD_TO_DATASET]: datasetClient.initialSlice(),
-    [TriggerAction.ADD_TO_ANNOTATION_QUEUE]: annotationQueueClient.initialSlice(),
+    [TriggerAction.ADD_TO_ANNOTATION_QUEUE]:
+      annotationQueueClient.initialSlice(),
   };
 }

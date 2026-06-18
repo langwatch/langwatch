@@ -756,7 +756,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
   const testPinnedTraceService = new PinnedTraceService(
     new PinnedTraceRepository(testPrisma),
   );
-  const noop = async () => { };
+  const noop = async () => {
+    /* noop */
+  };
   // Clear the module-global discover broadcaster so a test app built
   // after `initializeDefaultApp` doesn't inherit the production
   // broadcaster's closure (which captured the production
@@ -775,7 +777,11 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
   const nullOrganizations = traced(
     new OrganizationService(
       new NullOrganizationRepository(),
-      { seedForOrg: async () => { } } as unknown as PromptTagRepository,
+      {
+        seedForOrg: async () => {
+          /* noop */
+        },
+      } as unknown as PromptTagRepository,
     ),
     "OrganizationService",
   );
@@ -901,7 +907,18 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       billing: {
         reportUsageForMonth: noop,
       } as AppCommands["billing"],
-      scenarioExecutionHandle: { reactor: { name: "scenarioExecution", options: { runIn: ["worker"] }, handle: async () => {} }, setPool: () => {} },
+      scenarioExecutionHandle: {
+        reactor: {
+          name: "scenarioExecution",
+          options: { runIn: ["worker"] },
+          handle: async () => {
+            /* noop */
+          },
+        },
+        setPool: () => {
+          /* noop */
+        },
+      },
     },
     retentionPolicyCache: testRetentionPolicyCache,
     dataRetention: {

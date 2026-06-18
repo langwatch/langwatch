@@ -1,25 +1,32 @@
-import { Box, Field, HStack, NativeSelect, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Field,
+  HStack,
+  NativeSelect,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import type { Monaco } from "@monaco-editor/react";
 import { useEffect, useState } from "react";
-import dynamic from "~/utils/compat/next-dynamic";
-import { Switch } from "~/components/ui/switch";
 import { FieldsFilters } from "~/components/filters/FieldsFilters";
+import { Switch } from "~/components/ui/switch";
 import type { FilterParam } from "~/hooks/useFilterParams";
 import {
+  type FilterField,
   sanitizeTriggerFilters,
   triggerFiltersPermissiveSchema,
-  type FilterField,
 } from "~/server/filters/types";
 import { api } from "~/utils/api";
+import dynamic from "~/utils/compat/next-dynamic";
+import {
+  monacoBackgroundFor,
+  trapEscapeInsideEditor,
+} from "../../editors/monacoEditorChrome";
 import {
   CONDITIONS_JSON_SCHEMA,
   CONDITIONS_MODEL_URI,
   registerJsonSchema,
 } from "../../editors/monacoSchemas";
-import {
-  monacoBackgroundFor,
-  trapEscapeInsideEditor,
-} from "../../editors/monacoEditorChrome";
 import { useMonacoTheme } from "../../editors/useMonacoTheme";
 import type { ConditionSource } from "../../logic/draftReducer";
 import { SourceCard } from "../SourceCard";
@@ -187,9 +194,7 @@ export function FiltersSecondaryDrawer({
             <NativeSelect.Root>
               <NativeSelect.Field
                 value={localCustomGraphId ?? ""}
-                onChange={(e) =>
-                  setLocalCustomGraphId(e.target.value || null)
-                }
+                onChange={(e) => setLocalCustomGraphId(e.target.value || null)}
               >
                 <option value="">Select a graph…</option>
                 {(graphs.data ?? []).map((g) => (
@@ -253,8 +258,8 @@ export function FiltersSecondaryDrawer({
       ) : (
         <VStack align="stretch" gap={2}>
           <Text textStyle="xs" color="fg.muted">
-            The automation fires when an incoming trace matches every
-            condition you set below.
+            The automation fires when an incoming trace matches every condition
+            you set below.
           </Text>
           <FieldsFilters
             filters={local as Record<FilterField, FilterParam>}
