@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "fs/promises";
 import os from "os";
 import path from "path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Environment simulation (not a mock of the I/O): force the local-filesystem
 // backend so the read/write/append/missing-chunk logic runs against a real fs.
@@ -9,9 +9,9 @@ import path from "path";
 vi.mock("~/env.mjs", () => ({ env: { DATASET_STORAGE_LOCAL: true } }));
 
 import {
-  writeDatasetChunks,
-  readDatasetChunks,
   chunkKey,
+  readDatasetChunks,
+  writeDatasetChunks,
 } from "../chunked-jsonl-storage";
 
 let storageDir: string;
