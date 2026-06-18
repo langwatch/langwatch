@@ -28,6 +28,22 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
+// The page lifted the dataset read to decide the I-READY gate (ADR-032), so it
+// now calls tRPC directly — stub it as a ready dataset so the editor chrome renders.
+vi.mock("~/utils/api", () => ({
+  api: {
+    dataset: {
+      getById: {
+        useQuery: () => ({
+          data: { status: "ready" },
+          isLoading: false,
+          refetch: vi.fn(),
+        }),
+      },
+    },
+  },
+}));
+
 vi.mock("~/components/DashboardLayout", () => ({
   DashboardLayout: ({ children }: { children?: ReactNode }) => (
     <div>{children}</div>
