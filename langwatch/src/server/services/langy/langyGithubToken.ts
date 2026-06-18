@@ -325,7 +325,7 @@ async function acquireLock(key: string): Promise<LockResult> {
   while (Date.now() < deadline) {
     try {
       const ok = await (
-        connection as {
+        connection as unknown as {
           set: (
             k: string,
             v: string,
