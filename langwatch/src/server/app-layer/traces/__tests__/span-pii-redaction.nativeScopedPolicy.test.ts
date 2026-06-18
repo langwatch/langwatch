@@ -23,8 +23,8 @@ vi.mock("~/server/featureFlag", () => ({
   featureFlagService: { isEnabled: vi.fn(async () => false) },
 }));
 
-import { featureFlagService } from "~/server/featureFlag";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
+import { featureFlagService } from "~/server/featureFlag";
 
 const TENANT = createTenantId("project-web-app");
 
