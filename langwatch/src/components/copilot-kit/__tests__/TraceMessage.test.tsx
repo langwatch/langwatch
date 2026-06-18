@@ -38,26 +38,28 @@ describe("TraceMessage", () => {
     vi.clearAllMocks();
   });
 
-  describe("when the referenced trace no longer exists", () => {
-    /** @scenario A prompt with a running conversation re-opens without crashing */
-    it("renders nothing instead of throwing when the trace query 404s", () => {
-      // A "View Trace" link is attached to each assistant turn. When that
-      // turn's trace cannot be fetched (it was never written, or expired),
-      // the link must degrade to an empty render, never throw to the page
-      // error boundary, so re-opening a prompt with an old conversation does
-      // not crash the playground. TraceMessage returns null while loading, on
-      // error, or with no data; here the query is in the 404 error state.
-      useGetByIdQueryMock.mockReturnValue({
-        isLoading: false,
-        isError: true,
-        data: undefined,
+  describe("given a prompt conversation references a trace that no longer exists", () => {
+    describe("when the trace query returns a 404", () => {
+      /** @scenario A prompt with a running conversation re-opens without crashing */
+      it("renders nothing instead of throwing", () => {
+        // A "View Trace" link is attached to each assistant turn. When that
+        // turn's trace cannot be fetched (it was never written, or expired),
+        // the link must degrade to an empty render, never throw to the page
+        // error boundary, so re-opening a prompt with an old conversation does
+        // not crash the playground. TraceMessage returns null while loading, on
+        // error, or with no data; here the query is in the 404 error state.
+        useGetByIdQueryMock.mockReturnValue({
+          isLoading: false,
+          isError: true,
+          data: undefined,
+        });
+
+        const { container } = render(
+          <TraceMessage traceId="ff364975e79bc3c1ad48c38024928fea" />,
+        );
+
+        expect(container.firstChild).toBeNull();
       });
-
-      const { container } = render(
-        <TraceMessage traceId="ff364975e79bc3c1ad48c38024928fea" />,
-      );
-
-      expect(container.firstChild).toBeNull();
     });
   });
 });

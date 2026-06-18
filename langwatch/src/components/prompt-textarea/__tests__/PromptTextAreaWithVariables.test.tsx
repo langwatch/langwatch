@@ -3,6 +3,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -760,6 +761,57 @@ describe("PromptTextAreaWithVariables", () => {
       // update depth" throw needs the full app re-render storm to manifest, so
       // the eliminated per-render churn is the faithful, deterministic proxy.
       expect(bannerHeightReads).toBe(0);
+    });
+
+    /** @scenario The undefined-variables warning stays clear of the prompt after a resize */
+    it("re-measures the banner on a resize even when the invalid-variable set is unchanged", () => {
+      // Review follow-up: keying the measurement on the name set alone goes
+      // stale when the SAME warning text reflows taller - the resizable prompt
+      // panel narrows and the names wrap onto another line without changing the
+      // set. A ResizeObserver re-measures on that layout change so the reserved
+      // padding tracks the real height and never covers the last prompt line.
+      const observerCallbacks: ResizeObserverCallback[] = [];
+      const RealResizeObserver = globalThis.ResizeObserver;
+      globalThis.ResizeObserver = class {
+        constructor(cb: ResizeObserverCallback) {
+          observerCallbacks.push(cb);
+        }
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      } as unknown as typeof ResizeObserver;
+
+      try {
+        renderComponent({
+          value: "Judge this: {{response}}",
+          variables: [],
+          onCreateVariable: vi.fn(),
+        });
+
+        // Initial measure ran against jsdom's offsetHeight 0, so the 28px floor.
+        const textarea = screen.getByRole("textbox");
+        expect(textarea.style.paddingBottom).toBe("28px");
+
+        // The names have not changed, but the banner now reflows to 100px.
+        const banner = screen.getByTestId("undefined-variables-banner");
+        Object.defineProperty(banner, "offsetHeight", {
+          configurable: true,
+          get: () => 100,
+        });
+
+        // A resize tick fires the observer; the padding must follow the height.
+        expect(observerCallbacks.length).toBeGreaterThan(0);
+        act(() => {
+          for (const cb of observerCallbacks) {
+            cb([], {} as ResizeObserver);
+          }
+        });
+
+        // 100 (height) + 8 (gap) = 108, above the 28px single-line floor.
+        expect(textarea.style.paddingBottom).toBe("108px");
+      } finally {
+        globalThis.ResizeObserver = RealResizeObserver;
+      }
     });
   });
 });

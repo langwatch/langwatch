@@ -17,6 +17,11 @@ Feature: Prompt playground stays stable when a prompt references undefined varia
     Then the editor shows an "Undefined variables" warning naming that variable
     And the playground keeps rendering the prompt instead of showing the error boundary
 
+  Scenario: The undefined-variables warning stays clear of the prompt after a resize
+    Given the message references a variable that is not declared as an input
+    When the editor is resized so the warning wraps onto more lines
+    Then the warning still does not cover the last line of the prompt
+
   Scenario: A prompt with a running conversation re-opens without crashing
     Given the prompt has a conversation whose assistant turn references a trace that no longer exists
     When the prompt tab is re-opened
