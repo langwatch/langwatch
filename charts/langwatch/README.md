@@ -140,6 +140,7 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `global.env`                      | Deployment environment for all components.                                   | `production` |
 | `global.podSecurityContext`       | Default pod security context (applied cluster-wide unless overridden).       | `{}`         |
 | `global.containerSecurityContext` | Default container security context (applied cluster-wide unless overridden). | `{}`         |
+| `global.automountServiceAccountToken` | Mount the ServiceAccount token into first-party workload pods. Defaults to false. | `false`  |
 | `global.scheduling`               | Global scheduling defaults for all pods.                                     |              |
 | `global.scheduling.nodeSelector`  | Node selector labels for all pods.                                           | `{}`         |
 | `global.scheduling.affinity`      | Affinity rules for all pods.                                                 | `{}`         |

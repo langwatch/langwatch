@@ -16,10 +16,16 @@ global:
   ## @param global.env [string, default: production] Deployment environment for all components.
   env: production
   ## @param global.podSecurityContext [object] Default pod security context (applied cluster-wide unless overridden).
+  # seccompProfile: RuntimeDefault is required by Pod Security Admission
+  # "restricted" and by most corporate Gatekeeper/Kyverno policies, which
+  # VALIDATE (not mutate) its presence and deny pods without it. Set at the
+  # pod level so it covers every container, including init containers.
   podSecurityContext:
     runAsNonRoot: true
     runAsUser: 1000
     fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
   ## @param global.containerSecurityContext [object] Default container security context (applied cluster-wide unless overridden).
   containerSecurityContext:
     allowPrivilegeEscalation: false
@@ -27,6 +33,8 @@ global:
       drop:
         - ALL
     readOnlyRootFilesystem: true
+  ## @param global.automountServiceAccountToken [default: false] Mount the ServiceAccount token into first-party workload pods (app, workers, nlp, langevals, cronjobs, postgresql, redis). Defaults to false — none of these call the Kubernetes API, and many clusters deny pods that automount the token. Set true only if a sidecar needs in-cluster API access.
+  automountServiceAccountToken: false
   ## @extra global.scheduling Global scheduling defaults for all pods.
   ## @param global.scheduling.nodeSelector [object] Node selector labels for all pods.
   ## @param global.scheduling.affinity [object] Affinity rules for all pods.

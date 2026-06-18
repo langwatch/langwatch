@@ -32,6 +32,8 @@ spec:
       securityContext:
         runAsNonRoot: true
         fsGroup: 101  # clickhouse group
+        seccompProfile:
+          type: RuntimeDefault
       terminationGracePeriodSeconds: 30
 
       {{- with .Values.scheduling.nodeSelector }}
@@ -97,6 +99,12 @@ spec:
           securityContext:
             runAsUser: 65534
             runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            # Only writes to the mounted keeper-config emptyDir, so a
+            # read-only root filesystem is safe here.
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           resources:
             requests: { cpu: 10m, memory: 16Mi }
             limits: { cpu: 100m, memory: 64Mi }
@@ -117,7 +125,11 @@ spec:
           securityContext:
             runAsUser: 101  # clickhouse user
             runAsNonRoot: true
+            # Keeper needs a writable /var/lib/clickhouse-keeper outside the PVC.
             readOnlyRootFilesystem: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           resources:
             {{- toYaml .Values.keeper.resources | nindent 12 }}
           livenessProbe:
