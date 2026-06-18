@@ -494,17 +494,25 @@ func attachmentError(rawURL, reason string, status int) *NodeError {
 	}
 }
 
-// redactURLForError strips the query string and fragment from a URL before it
-// is surfaced in a user-facing error (and stored on the node/trace). Presigned
-// S3/CDN URLs carry credentials (X-Amz-Signature, X-Amz-Credential, security
-// tokens) in the query string, so leaking the raw URL on a fetch failure would
-// expose them. The scheme, host, and path are kept so the attachment stays
-// identifiable.
+// redactURLForError strips the credential-bearing parts of a URL before it is
+// surfaced in a user-facing error (and stored on the node/trace): the query
+// string and fragment (presigned S3/CDN URLs carry X-Amz-Signature,
+// X-Amz-Credential, and security tokens there) and the userinfo component
+// (https://user:token@host/...). The scheme, host, and path are kept so the
+// attachment stays identifiable.
 func redactURLForError(rawURL string) string {
 	if u, err := url.Parse(rawURL); err == nil && u.Scheme != "" {
 		u.RawQuery = ""
 		u.Fragment = ""
+		u.User = nil
 		return u.String()
+	}
+	// Fallback for a URL that does not parse: cut at the userinfo separator and
+	// the query/fragment so neither embedded creds nor signed params survive.
+	if at := strings.LastIndex(rawURL, "@"); at >= 0 {
+		if slashes := strings.Index(rawURL, "://"); slashes >= 0 && at > slashes {
+			rawURL = rawURL[:slashes+3] + rawURL[at+1:]
+		}
 	}
 	if i := strings.IndexAny(rawURL, "?#"); i >= 0 {
 		return rawURL[:i]

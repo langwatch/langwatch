@@ -392,6 +392,15 @@ func TestAttachmentErrorRedactsURLQueryParams(t *testing.T) {
 	assert.Contains(t, ne.Message, "bucket.s3.amazonaws.com/private/img.png", "the attachment stays identifiable by host + path")
 }
 
+func TestAttachmentErrorStripsUserinfoCredentials(t *testing.T) {
+	// Some URLs carry credentials in the userinfo component (user:password@host).
+	withCreds := "https://svcuser:s3cr3ttoken@cdn.example.com/private/file.png"
+	ne := attachmentError(withCreds, "could not be reached", 0)
+	assert.NotContains(t, ne.Message, "s3cr3ttoken", "embedded userinfo password must not leak")
+	assert.NotContains(t, ne.Message, "svcuser", "embedded userinfo user must not leak")
+	assert.Contains(t, ne.Message, "cdn.example.com/private/file.png", "the attachment stays identifiable by host + path")
+}
+
 func TestRedactAttachmentsForTracingStripsInlineBytes(t *testing.T) {
 	bigB64 := strings.Repeat("A", 4096)
 	messages := []app.ChatMessage{{Role: "user", Content: []any{
