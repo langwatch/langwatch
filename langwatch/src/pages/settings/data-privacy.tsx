@@ -527,6 +527,42 @@ export function EffectiveSummary({
     scopeFilter,
     currentTeamId,
   );
+  const piiValue =
+    effective.pii.level === "custom"
+      ? `Custom (${effective.pii.entities.length} ${
+          effective.pii.entities.length === 1 ? "type" : "types"
+        })`
+      : PII_LABELS[effective.pii.level];
+  const secretsValue = `${effective.secrets.enabled ? "On" : "Off"}${
+    effective.secrets.customPatterns.length > 0
+      ? ` · ${effective.secrets.customPatterns.length} custom ${
+          effective.secrets.customPatterns.length === 1 ? "pattern" : "patterns"
+        }`
+      : ""
+  }`;
+  const effectiveRows: Array<{ term: string; value: string }> = [
+    ...CONTENT_CATEGORIES.map((category) => ({
+      term: CATEGORY_LABELS[category],
+      value: DISPOSITION_LABELS[effective.categories[category].disposition],
+    })),
+    ...(effective.customAttributes.length > 0
+      ? [
+          {
+            term: "Attribute rules",
+            value: effective.customAttributes
+              .map(
+                (rule) =>
+                  `${rule.pattern} ${
+                    rule.disposition === "drop" ? "dropped" : "restricted"
+                  }`,
+              )
+              .join(" · "),
+          },
+        ]
+      : []),
+    { term: "PII redaction", value: piiValue },
+    { term: "Secrets redaction", value: secretsValue },
+  ];
   return (
     <VStack gap={3} align="stretch" width="full" paddingTop={2}>
       <VStack gap={0} align="start">
@@ -537,54 +573,18 @@ export function EffectiveSummary({
           What is actually applied, after the rules above cascade down.
         </Text>
       </VStack>
-      <VStack gap={2} align="stretch">
-        {CONTENT_CATEGORIES.map((category) => (
-          <HStack key={category} justifyContent="space-between">
-            <Text color="fg.muted">{CATEGORY_LABELS[category]}</Text>
-            <Text>
-              {DISPOSITION_LABELS[effective.categories[category].disposition]}
+      <Box as="dl" display="flex" flexDirection="column" gap={3} margin={0}>
+        {effectiveRows.map(({ term, value }) => (
+          <Box key={term}>
+            <Text as="dt" fontSize="sm" color="fg.muted">
+              {term}
             </Text>
-          </HStack>
+            <Text as="dd" margin={0}>
+              {value}
+            </Text>
+          </Box>
         ))}
-        {effective.customAttributes.length > 0 && (
-          <HStack justifyContent="space-between">
-            <Text color="fg.muted">Attribute rules</Text>
-            <Text>
-              {effective.customAttributes
-                .map(
-                  (rule) =>
-                    `${rule.pattern} ${
-                      rule.disposition === "drop" ? "dropped" : "restricted"
-                    }`,
-                )
-                .join(" · ")}
-            </Text>
-          </HStack>
-        )}
-        <HStack justifyContent="space-between">
-          <Text color="fg.muted">PII redaction</Text>
-          <Text>
-            {effective.pii.level === "custom"
-              ? `Custom (${effective.pii.entities.length} ${
-                  effective.pii.entities.length === 1 ? "type" : "types"
-                })`
-              : PII_LABELS[effective.pii.level]}
-          </Text>
-        </HStack>
-        <HStack justifyContent="space-between">
-          <Text color="fg.muted">Secrets redaction</Text>
-          <Text>
-            {effective.secrets.enabled ? "On" : "Off"}
-            {effective.secrets.customPatterns.length > 0
-              ? ` · ${effective.secrets.customPatterns.length} custom ${
-                  effective.secrets.customPatterns.length === 1
-                    ? "pattern"
-                    : "patterns"
-                }`
-              : ""}
-          </Text>
-        </HStack>
-      </VStack>
+      </Box>
     </VStack>
   );
 }
