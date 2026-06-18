@@ -1,6 +1,13 @@
 import { Box, Button, HStack, Icon, Input, Text } from "@chakra-ui/react";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { LuCheck, LuCopy, LuEye, LuLock, LuPin, LuPinOff } from "react-icons/lu";
+import {
+  LuCheck,
+  LuCopy,
+  LuEye,
+  LuLock,
+  LuPin,
+  LuPinOff,
+} from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { RestrictedAttribute } from "~/server/api/routers/tracesV2.schemas";
