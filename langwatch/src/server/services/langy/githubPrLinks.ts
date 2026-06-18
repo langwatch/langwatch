@@ -34,6 +34,7 @@ export function extractGithubPrLinks(text: string): GithubPrLink[] {
   let m: RegExpExecArray | null;
   while ((m = PR_URL_RE.exec(text)) !== null) {
     const [url, owner, repo, numberStr] = m;
+    if (!owner || !repo || !numberStr) continue;
     const key = `${owner}/${repo}#${numberStr}`;
     if (seen.has(key)) continue;
     seen.add(key);

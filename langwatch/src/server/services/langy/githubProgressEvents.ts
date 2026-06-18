@@ -63,7 +63,7 @@ export function parseGithubProgressEvents(text: string): ProgressParse {
   let m: RegExpExecArray | null;
   while ((m = PROGRESS_RE.exec(text)) !== null) {
     const [, stage, detail] = m;
-    if (!isStage(stage)) continue;
+    if (!stage || !isStage(stage)) continue;
     events.push(detail ? { stage, detail } : { stage });
   }
   PROGRESS_RE.lastIndex = 0;
