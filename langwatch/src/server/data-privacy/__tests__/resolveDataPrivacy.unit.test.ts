@@ -259,7 +259,7 @@ describe("resolveDataPrivacy", () => {
     });
   });
 
-  describe("given a custom PII level with selected entities", () => {
+  describe("when a custom PII level selects entities", () => {
     it("carries the level and its entities through the cascade", () => {
       const rows = [
         rule("PROJECT", "web-app", {

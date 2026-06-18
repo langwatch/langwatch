@@ -1149,7 +1149,7 @@ function PrivacyRuleDrawer({
                           Strict (adds names, locations, and more)
                         </RadioGroup.ItemText>
                         <Tooltip
-                          content={`Deep detection with the Microsoft Presidio PII model. Everything in Essential, plus: ${STRICT_ADDED_PII_SUMMARY}.`}
+                          content={`Everything in Essential, plus deeper detection of: ${STRICT_ADDED_PII_SUMMARY}.`}
                           contentProps={{ maxWidth: "340px" }}
                         >
                           <Box color="fg.muted" display="inline-flex">

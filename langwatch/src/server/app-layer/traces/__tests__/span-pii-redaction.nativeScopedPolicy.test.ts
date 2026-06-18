@@ -285,7 +285,7 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
     });
   });
 
-  describe("given the essential level and a Brazilian CPF", () => {
+  describe("when the essential level processes a Brazilian CPF", () => {
     /** @scenario A Brazilian CPF is redacted at the essential level */
     it("redacts the CPF natively with no analysis-service call", async () => {
       const { service, batchSpy } = makeService(mkPolicy({}));
@@ -298,7 +298,7 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
     });
   });
 
-  describe("given a custom PII level", () => {
+  describe("when a custom PII level is configured", () => {
     /** @scenario A custom level redacts only the selected identifiers natively */
     it("redacts only the selected native identifiers, leaving the rest, with no analysis-service call", async () => {
       const { service, batchSpy } = makeService(

@@ -166,7 +166,7 @@ describe("redactEssentialPiiInText", () => {
     });
   });
 
-  describe("given a Brazilian CPF", () => {
+  describe("when the input contains a Brazilian CPF", () => {
     it("redacts a check-digit-valid formatted CPF", () => {
       expect(redact("cpf 529.982.247-25 ok").text).toBe("cpf [BR_CPF] ok");
     });
@@ -186,7 +186,7 @@ describe("redactEssentialPiiInText", () => {
     });
   });
 
-  describe("given an entity filter (the custom level)", () => {
+  describe("when an entity filter limits redaction to the custom level", () => {
     it("redacts only the selected identifiers", () => {
       const { text } = redactEssentialPiiInText({
         text: "mail test@example.com cpf 529.982.247-25 card 4111111111111111",
