@@ -271,6 +271,10 @@ export function DatasetModal({
         <UploadCSVModal
           isOpen={uploadCSVModal.open}
           onClose={uploadCSVModal.onClose}
+          // The workflow picker needs the dataset's columns synchronously to
+          // wire the node, which a still-processing direct upload doesn't have
+          // yet — keep the in-browser-parse flow here.
+          enableDirectUpload={false}
           onSuccess={(dataset) => {
             uploadCSVModal.onClose();
             handlePick({

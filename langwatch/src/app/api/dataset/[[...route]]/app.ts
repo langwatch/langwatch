@@ -1,14 +1,22 @@
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
-import { createProjectApp, requires } from "~/server/api/security";
+import {
+  createProjectApp,
+  handlerManagedAuth,
+  requires,
+} from "~/server/api/security";
 import { createManyDatasetRecords } from "../../../../server/api/routers/datasetRecord.utils";
 import { UploadValidationError } from "../../../../server/datasets/dataset.service";
 import type { DatasetNotReadyError } from "../../../../server/datasets/errors";
 import type { DatasetColumns } from "../../../../server/datasets/types";
 import { datasetColumnTypeSchema } from "../../../../server/datasets/types";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
-import { resourceLimitMiddleware } from "../../middleware";
+import {
+  enforceResourceLimitOrRespond,
+  resolveOrganizationId,
+  resourceLimitMiddleware,
+} from "../../middleware";
 import {
   type DatasetServiceMiddlewareVariables,
   datasetServiceMiddleware,
@@ -23,6 +31,7 @@ import {
 import { platformUrl } from "../../shared/platform-url";
 import { errorSchema } from "../../shared/schemas";
 import { MAX_LIMIT_MB } from "./constants";
+import { authorizeDirectUpload } from "./direct-upload-auth";
 import { handleDatasetError } from "./error-handler";
 import { datasetOutputSchema } from "./schemas";
 import { buildStandardSuccessResponse } from "./utils";
@@ -136,6 +145,13 @@ const secured = createProjectApp<DatasetServiceMiddlewareVariables>({
 
 // Preserve the dataset-specific error mapping (domain errors → HTTP codes).
 secured.hono.onError(handleDatasetError);
+
+// The browser→S3 direct-upload routes authenticate the in-app upload UI by
+// NextAuth session cookie (or API key), resolved in-handler — the rest of the
+// surface is API-key-only `requires(...)`, which would 401 a cookie request.
+const directUploadSessionAuth = handlerManagedAuth(
+  "upload UI authenticated in-handler via authorizeDirectUpload (session cookie or API key)",
+);
 
 // datasetServiceMiddleware runs AFTER the access chain (which authenticates and
 // sets `project`), so it is applied per-route rather than app-wide.
@@ -295,19 +311,46 @@ secured.access(requires("datasets:manage")).post(
 
 // ── Direct (browser→S3) upload: request a presigned PUT ─────────
 // Registered before /:slugOrId so "direct-upload" isn't matched as a slug.
-secured.access(requires("datasets:manage")).post(
+// Session-cookie (or API-key) authenticated in-handler — see directUploadSessionAuth.
+secured.access(directUploadSessionAuth).post(
   "/direct-upload",
   datasetServiceMiddleware,
   describeRoute({
     description:
       "Start a direct browser→S3 dataset upload (returns a presigned PUT)",
   }),
-  resourceLimitMiddleware("datasets"),
   async (c) => {
-    const project = c.get("project");
     const service = c.get("datasetService");
 
     const body = await c.req.parseBody();
+    const projectId = body.projectId;
+    if (
+      !projectId ||
+      typeof projectId !== "string" ||
+      projectId.trim() === ""
+    ) {
+      throw new UnprocessableEntityError("projectId field is required");
+    }
+    // Auth is in-handler (session cookie or API key) since there's no
+    // `authMiddleware` to set `c.get("project")` for this route.
+    const auth = await authorizeDirectUpload(c, projectId.trim());
+    if (!auth.ok) {
+      return c.json({ error: auth.error }, auth.status);
+    }
+
+    // Resource-limit enforcement runs inline here (not via
+    // `resourceLimitMiddleware`) because the org is only known after in-handler
+    // auth resolves the project.
+    const organizationId = await resolveOrganizationId(auth.teamId);
+    if (organizationId) {
+      const overLimit = await enforceResourceLimitOrRespond({
+        c,
+        organizationId,
+        limitType: "datasets",
+      });
+      if (overLimit) return overLimit;
+    }
+
     const name = body.name;
     if (!name || typeof name !== "string" || name.trim() === "") {
       throw new UnprocessableEntityError("name field is required");
@@ -321,7 +364,7 @@ secured.access(requires("datasets:manage")).post(
 
     try {
       const result = await service.createPendingUpload({
-        projectId: project.id,
+        projectId: auth.projectId,
         name: name.trim(),
         filename: filename.trim(),
       });
@@ -352,7 +395,8 @@ secured.access(requires("datasets:manage")).post(
 );
 
 // ── Direct upload: finalize after the browser has PUT the file ───
-secured.access(requires("datasets:manage")).post(
+// Session-cookie (or API-key) authenticated in-handler — see directUploadSessionAuth.
+secured.access(directUploadSessionAuth).post(
   "/direct-upload/:datasetId/finalize",
   datasetServiceMiddleware,
   describeRoute({
@@ -360,14 +404,21 @@ secured.access(requires("datasets:manage")).post(
   }),
   async (c) => {
     const { datasetId } = c.req.param();
-    const project = c.get("project");
+    const projectId = c.req.query("projectId");
+    if (!projectId || projectId.trim() === "") {
+      throw new UnprocessableEntityError("projectId query param is required");
+    }
+    const auth = await authorizeDirectUpload(c, projectId.trim());
+    if (!auth.ok) {
+      return c.json({ error: auth.error }, auth.status);
+    }
     const service = c.get("datasetService");
 
     // The staging key is the server-minted one bound to the row (C1); the
     // client no longer supplies it.
     try {
       const result = await service.finalizeUpload({
-        projectId: project.id,
+        projectId: auth.projectId,
         datasetId,
       });
       return c.json(result, 200);
@@ -393,7 +444,8 @@ secured.access(requires("datasets:manage")).post(
 );
 
 // ── Direct upload: manually retry a failed/stuck normalize (I-RECOVER) ──
-secured.access(requires("datasets:manage")).post(
+// Session-cookie (or API-key) authenticated in-handler — see directUploadSessionAuth.
+secured.access(directUploadSessionAuth).post(
   "/direct-upload/:datasetId/retry",
   datasetServiceMiddleware,
   describeRoute({
@@ -401,12 +453,19 @@ secured.access(requires("datasets:manage")).post(
   }),
   async (c) => {
     const { datasetId } = c.req.param();
-    const project = c.get("project");
+    const projectId = c.req.query("projectId");
+    if (!projectId || projectId.trim() === "") {
+      throw new UnprocessableEntityError("projectId query param is required");
+    }
+    const auth = await authorizeDirectUpload(c, projectId.trim());
+    if (!auth.ok) {
+      return c.json({ error: auth.error }, auth.status);
+    }
     const service = c.get("datasetService");
 
     try {
       const result = await service.retryNormalize({
-        projectId: project.id,
+        projectId: auth.projectId,
         datasetId,
       });
       return c.json(result, 200);

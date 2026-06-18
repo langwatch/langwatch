@@ -250,7 +250,21 @@ function DatasetsPage() {
                     onClick={() => goToDataset(dataset.id)}
                     key={dataset.id}
                   >
-                    <Table.Cell>{dataset.name}</Table.Cell>
+                    <Table.Cell>
+                      <HStack gap={2}>
+                        <Text>{dataset.name}</Text>
+                        {dataset.status === "processing" ||
+                        dataset.status === "uploading" ? (
+                          <Badge size="sm" colorPalette="blue">
+                            Processing
+                          </Badge>
+                        ) : dataset.status === "failed" ? (
+                          <Badge size="sm" colorPalette="red">
+                            Failed
+                          </Badge>
+                        ) : null}
+                      </HStack>
+                    </Table.Cell>
                     <Table.Cell maxWidth="250px">
                       <HStack wrap="wrap">
                         {((dataset.columnTypes as DatasetColumns) ?? []).map(

@@ -1,0 +1,106 @@
+/**
+ * Auth for the browser→S3 direct-upload routes (ADR-032 D4).
+ *
+ * These three routes (`/direct-upload`, `/direct-upload/:id/finalize`,
+ * `/direct-upload/:id/retry`) are driven by the in-app upload UI, which
+ * authenticates with the logged-in user's NextAuth session cookie — NOT an API
+ * key. The rest of the dataset REST surface is `requires("datasets:manage")`
+ * (API-key only via `authMiddleware`), which would 401 a cookie-only browser
+ * request. So these routes opt into the `handlerManagedAuth` pattern (same as
+ * the experiments-v3 session endpoints) and resolve auth here.
+ *
+ * Dual path so the routes keep working for both callers:
+ *   1. NextAuth session cookie (the upload UI) — verified with
+ *      `hasProjectPermission`.
+ *   2. Project API key / legacy key / PAT (parity with the rest of the surface)
+ *      — resolved via `TokenResolver` + `enforceApiKeyCeiling`.
+ *
+ * `projectId` comes from the request (the route reads it from the body/param
+ * and passes it in) since there is no `authMiddleware` to set `c.get("project")`.
+ */
+
+import type { Project } from "@prisma/client";
+import type { Context } from "hono";
+import { hasProjectPermission } from "~/server/api/rbac";
+import {
+  apiKeyCeilingDenialResponse,
+  enforceApiKeyCeiling,
+  extractCredentials,
+} from "~/server/api-key/auth-middleware";
+import { TokenResolver } from "~/server/api-key/token-resolver";
+import { getServerAuthSession } from "~/server/auth";
+import { prisma } from "~/server/db";
+
+const PERMISSION = "datasets:manage" as const;
+
+export type DirectUploadAuthResult =
+  | { ok: true; projectId: string; teamId: string }
+  | { ok: false; status: 401 | 403; error: string };
+
+/**
+ * Authorize a direct-upload request for `projectId` via session cookie OR API
+ * key, requiring `datasets:manage`. Returns the resolved `projectId` + `teamId`
+ * (the latter so the route can enforce resource limits in-handler) or a
+ * discriminated error the route maps to a JSON response.
+ */
+export async function authorizeDirectUpload(
+  c: Context,
+  projectId: string,
+): Promise<DirectUploadAuthResult> {
+  // 1. Session cookie (the upload UI).
+  const session = await getServerAuthSession({ req: c.req.raw as any });
+  if (session) {
+    const permitted = await hasProjectPermission(
+      { prisma, session },
+      projectId,
+      PERMISSION,
+    );
+    if (!permitted) {
+      return {
+        ok: false,
+        status: 403,
+        error: "You do not have permission to upload to this dataset.",
+      };
+    }
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { teamId: true },
+    });
+    if (!project) {
+      return { ok: false, status: 403, error: "Project not found" };
+    }
+    return { ok: true, projectId, teamId: project.teamId };
+  }
+
+  // 2. API key / legacy key / PAT (parity with the rest of the surface).
+  const credentials = extractCredentials((name) => c.req.header(name));
+  if (!credentials) {
+    return {
+      ok: false,
+      status: 401,
+      error: "You must be logged in to access this endpoint.",
+    };
+  }
+
+  const resolver = TokenResolver.create(prisma);
+  const resolved = await resolver.resolve({
+    token: credentials.token,
+    projectId: credentials.projectId ?? projectId,
+  });
+  if (!resolved || resolved.project.id !== projectId) {
+    return { ok: false, status: 401, error: "Invalid credentials" };
+  }
+
+  try {
+    await enforceApiKeyCeiling({ prisma, resolved, permission: PERMISSION });
+  } catch (error) {
+    const denial = apiKeyCeilingDenialResponse(error);
+    return { ok: false, status: denial.status, error: denial.message };
+  }
+
+  return {
+    ok: true,
+    projectId,
+    teamId: (resolved.project as Project).teamId,
+  };
+}

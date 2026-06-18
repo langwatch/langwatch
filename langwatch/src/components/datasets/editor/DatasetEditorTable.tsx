@@ -136,6 +136,7 @@ export function DatasetEditorTable({
   onColumnsChanged,
   editorPortalRef,
   headerActions,
+  readEnabled = true,
 }: {
   datasetId?: string;
   inMemoryDataset?: InMemoryDataset;
@@ -143,6 +144,10 @@ export function DatasetEditorTable({
   title?: ReactNode;
   hideButtons?: boolean;
   isEmbedded?: boolean;
+  /** Gate the record read: when false the editor does not fetch records (the
+   *  dataset is still preparing or failed, ADR-032 I-READY). Defaults to true
+   *  so existing hosts are unaffected. */
+  readEnabled?: boolean;
   /** Render the row-selection actions as a floating bottom-center bar instead
    *  of an inline toolbar button. For standalone pages (the dataset detail
    *  page); leave off inside modals/drawers where a viewport-fixed bar would
@@ -172,7 +177,9 @@ export function DatasetEditorTable({
   const databaseDataset = api.datasetRecord.getAll.useQuery(
     { projectId: project?.id ?? "", datasetId: datasetId ?? "" },
     {
-      enabled: !!project && !!datasetId,
+      // Gated on `readEnabled` so a still-preparing/failed dataset is never read
+      // (getAll → getFullDataset throws DatasetNotReadyError otherwise).
+      enabled: !!project && !!datasetId && readEnabled,
       refetchOnWindowFocus: false,
       onError: (error) => {
         if (isHandledByGlobalHandler(error)) return;

@@ -38,6 +38,18 @@ export const useGetDatasetData = ({
       refetchOnWindowFocus: false,
       refetchOnMount: false,
       staleTime: 1000 * 60 * 60,
+      // ADR-032 I-READY: a still-preparing/failed dataset read throws
+      // PRECONDITION_FAILED. Don't retry that — treat it as "no rows yet" (the
+      // hook returns `rows ?? []` below) instead of hammering the server.
+      retry: (failureCount, error) => {
+        if (
+          (error as { data?: { code?: string } })?.data?.code ===
+          "PRECONDITION_FAILED"
+        ) {
+          return false;
+        }
+        return failureCount < 3;
+      },
       trpc: {
         context: {
           skipBatch: true,

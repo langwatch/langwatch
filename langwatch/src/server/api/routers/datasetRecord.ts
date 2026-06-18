@@ -121,10 +121,17 @@ export const datasetRecordRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string(), datasetId: z.string() }))
     .use(checkProjectPermission("datasets:view"))
     .query(async ({ input }) => {
-      return getFullDataset({
-        datasetId: input.datasetId,
-        projectId: input.projectId,
-      });
+      try {
+        return await getFullDataset({
+          datasetId: input.datasetId,
+          projectId: input.projectId,
+        });
+      } catch (error) {
+        // Defense: a not-ready read surfaces as PRECONDITION_FAILED instead of
+        // INTERNAL_SERVER_ERROR (the UI already gates, but downstream consumers
+        // rely on a clean 4xx — see useGetDatasetData / useSavedDatasetLoader).
+        return rethrowDatasetNotReadyAsTRPC(error);
+      }
     }),
   download: protectedProcedure
     .input(z.object({ projectId: z.string(), datasetId: z.string() }))
@@ -140,57 +147,12 @@ export const datasetRecordRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string(), datasetId: z.string() }))
     .use(checkProjectPermission("datasets:view"))
     .query(async ({ input, ctx }) => {
-      const prisma = ctx.prisma;
-
-      const dataset = await prisma.dataset.findFirst({
-        where: { id: input.datasetId, projectId: input.projectId },
-      });
-
-      if (!dataset) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Dataset not found",
-        });
-      }
-
-      // ADR-032 Decision 6 / I-READY: s3_jsonl reads the first chunk only for
-      // the head preview, gated on `status='ready'`. Routed independently of the
-      // dead single-blob `useS3` path.
-      if (dataset.contentLayout === "s3_jsonl") {
-        const { records, total } = await readDatasetHeadS3Jsonl({
-          dataset,
-          projectId: input.projectId,
-        });
-        (dataset as any).datasetRecords = records;
-
-        return { dataset, total };
-      }
-
-      if (dataset.useS3) {
-        const { records, count } = await storageService.getObject(
-          input.projectId,
-          dataset.id,
-        );
-        const total = count;
-        (dataset as any).datasetRecords = records.slice(0, 5);
-
-        return { dataset, total };
-      } else {
-        const dataset = await prisma.dataset.findFirst({
-          where: { id: input.datasetId, projectId: input.projectId },
-          include: {
-            datasetRecords: {
-              orderBy: { createdAt: "asc" },
-              take: 5,
-            },
-          },
-        });
-
-        const total = await prisma.datasetRecord.count({
-          where: { datasetId: input.datasetId, projectId: input.projectId },
-        });
-
-        return { dataset, total };
+      try {
+        return await getDatasetHead({ input, ctx });
+      } catch (error) {
+        // Defense: surface a not-ready read as PRECONDITION_FAILED (4xx) rather
+        // than INTERNAL_SERVER_ERROR, matching the REST 425 mapping.
+        return rethrowDatasetNotReadyAsTRPC(error);
       }
     }),
   deleteMany: protectedProcedure
@@ -232,6 +194,67 @@ export const datasetRecordRouter = createTRPCRouter({
       }
     }),
 });
+
+const getDatasetHead = async ({
+  input,
+  ctx,
+}: {
+  input: { projectId: string; datasetId: string };
+  ctx: { prisma: PrismaClient };
+}) => {
+  const prisma = ctx.prisma;
+
+  const dataset = await prisma.dataset.findFirst({
+    where: { id: input.datasetId, projectId: input.projectId },
+  });
+
+  if (!dataset) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Dataset not found",
+    });
+  }
+
+  // ADR-032 Decision 6 / I-READY: s3_jsonl reads the first chunk only for
+  // the head preview, gated on `status='ready'`. Routed independently of the
+  // dead single-blob `useS3` path.
+  if (dataset.contentLayout === "s3_jsonl") {
+    const { records, total } = await readDatasetHeadS3Jsonl({
+      dataset,
+      projectId: input.projectId,
+    });
+    (dataset as any).datasetRecords = records;
+
+    return { dataset, total };
+  }
+
+  if (dataset.useS3) {
+    const { records, count } = await storageService.getObject(
+      input.projectId,
+      dataset.id,
+    );
+    const total = count;
+    (dataset as any).datasetRecords = records.slice(0, 5);
+
+    return { dataset, total };
+  } else {
+    const datasetWithRecords = await prisma.dataset.findFirst({
+      where: { id: input.datasetId, projectId: input.projectId },
+      include: {
+        datasetRecords: {
+          orderBy: { createdAt: "asc" },
+          take: 5,
+        },
+      },
+    });
+
+    const total = await prisma.datasetRecord.count({
+      where: { datasetId: input.datasetId, projectId: input.projectId },
+    });
+
+    return { dataset: datasetWithRecords, total };
+  }
+};
 
 const deleteManyDatasetRecords = async ({
   recordIds,

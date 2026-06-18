@@ -18,6 +18,7 @@ import type { InMemoryDataset } from "~/components/datasets/editor/DatasetEditor
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 import { createLogger } from "~/utils/logger";
 import { Dialog } from "../../components/ui/dialog";
 import type {
@@ -29,6 +30,12 @@ import {
   AddOrEditDatasetDrawer,
 } from "../AddOrEditDatasetDrawer";
 import { toaster } from "../ui/toaster";
+import {
+  DirectUploadUnavailableError,
+  finalizeDirectUpload,
+  putFileToPresignedUrl,
+  requestDirectUpload,
+} from "./services/directUpload";
 import { getSafeColumnName } from "./utils/reservedColumns";
 export const MAX_ROWS_LIMIT = 10_000;
 
@@ -39,11 +46,19 @@ export function UploadCSVModal({
   onClose: onClose_,
   onSuccess,
   onCreateFromScratch,
+  enableDirectUpload = true,
 }: {
   isOpen?: boolean;
   onClose?: () => void;
   onSuccess: AddDatasetDrawerProps["onSuccess"];
   onCreateFromScratch?: () => void;
+  /**
+   * When true (default), a successful upload streams the raw file directly to
+   * object storage and navigates to the dataset page while it is prepared.
+   * Hosts that need the dataset's columns synchronously (e.g. the workflow
+   * dataset picker) pass false to keep the in-browser-parse drawer flow.
+   */
+  enableDirectUpload?: boolean;
 }) {
   const { closeDrawer } = useDrawer();
   const onClose = onClose_ ?? closeDrawer;
@@ -87,6 +102,8 @@ export function UploadCSVModal({
               uploadedDataset={uploadedDataset}
               uploadCSVData={uploadCSVData}
               onCreateFromScratch={onCreateFromScratch}
+              enableDirectUpload={enableDirectUpload}
+              onClose={onClose}
             />
           </Dialog.Body>
         </Dialog.Content>
@@ -145,16 +162,31 @@ export function UploadCSVForm({
   onCreateFromScratch,
   uploadCSVData,
   disabled,
+  enableDirectUpload = false,
+  onClose,
 }: {
   setUploadedDataset: (dataset: InMemoryDataset | undefined) => void;
   uploadedDataset: InMemoryDataset | undefined;
   onCreateFromScratch?: () => void;
   uploadCSVData: () => void;
   disabled?: boolean;
+  /** When true, "Upload" streams the raw file to storage and navigates to the
+   *  dataset page; falls back to the parse-and-drawer flow if storage is off. */
+  enableDirectUpload?: boolean;
+  onClose?: () => void;
 }) {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
   const trpcUtils = api.useContext();
+  const router = useRouter();
+
+  // The raw file from the dropzone. The direct-upload path streams this as-is
+  // (no in-browser parse, so it never OOMs on big files and the columns are
+  // derived server-side by normalize). The parsed `uploadedDataset` is only
+  // used by the fallback (no-storage) flow.
+  const [rawFile, setRawFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const getValidName = async (proposedName: string): Promise<string> => {
     if (!projectId) return proposedName;
@@ -170,6 +202,8 @@ export function UploadCSVForm({
     acceptedFile: File;
   }) => {
     const { data, acceptedFile } = results;
+    setRawFile(acceptedFile);
+    setUploadError(null);
 
     // Check for reserved column names and rename them
     const originalColumnNames = data[0] ?? [];
@@ -225,23 +259,91 @@ export function UploadCSVForm({
     });
   };
 
+  /**
+   * Direct-to-storage path (ADR-032 D4): request a presigned PUT, stream the
+   * raw file, finalize, then navigate to the dataset page where the processing
+   * banner takes over. On no-storage installs this throws
+   * `DirectUploadUnavailableError` and we fall back to the parse-and-drawer
+   * flow so small/self-hosted setups are unaffected.
+   */
+  const handleUpload = async () => {
+    if (!enableDirectUpload || !rawFile || !projectId || !project) {
+      uploadCSVData();
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadError(null);
+    try {
+      const name = uploadedDataset?.name ?? (await getValidName("New Dataset"));
+      const { datasetId, uploadUrl } = await requestDirectUpload({
+        projectId,
+        name,
+        filename: rawFile.name,
+      });
+      await putFileToPresignedUrl(uploadUrl, rawFile);
+      await finalizeDirectUpload({ projectId, datasetId });
+
+      toaster.create({
+        title: "Preparing your dataset",
+        type: "success",
+        meta: { closable: true },
+      });
+      onClose?.();
+      void router.push(`/${project.slug}/datasets/${datasetId}`);
+    } catch (error) {
+      if (error instanceof DirectUploadUnavailableError) {
+        // No browser-reachable storage: keep the existing parse-and-drawer flow.
+        setIsUploading(false);
+        uploadCSVData();
+        return;
+      }
+      logger.error({ error }, "Direct dataset upload failed");
+      setUploadError(
+        error instanceof Error
+          ? error.message
+          : "Something went wrong uploading your file. Please try again.",
+      );
+      setIsUploading(false);
+    }
+  };
+
+  // The direct path streams the raw file, so it is not bound by the in-browser
+  // row limit. The limit only constrains the fallback (parse-and-drawer) flow.
+  const overRowLimitForFallback =
+    !enableDirectUpload &&
+    !!uploadedDataset &&
+    uploadedDataset.datasetRecords.length > MAX_ROWS_LIMIT;
+
+  const canUpload = enableDirectUpload
+    ? !!rawFile
+    : !!uploadedDataset &&
+      uploadedDataset.datasetRecords.length > 0 &&
+      !overRowLimitForFallback;
+
   return (
     <VStack width="full" align="start" gap={4}>
       <CSVReaderComponent
         onUploadAccepted={handleUploadAccepted}
         onUploadRemoved={() => {
           setUploadedDataset(undefined);
+          setRawFile(null);
+          setUploadError(null);
         }}
       />
       <HStack width="full" align="end">
-        {uploadedDataset &&
-          uploadedDataset.datasetRecords.length > MAX_ROWS_LIMIT && (
-            <Text color="red.500" paddingTop={4}>
-              Sorry, the max number of rows accepted for datasets is currently{" "}
-              {MAX_ROWS_LIMIT} rows. Please reduce the number of rows or contact
-              support.
-            </Text>
-          )}
+        {overRowLimitForFallback && (
+          <Text color="red.500" paddingTop={4}>
+            Sorry, the max number of rows accepted for datasets is currently{" "}
+            {MAX_ROWS_LIMIT} rows. Please reduce the number of rows or contact
+            support.
+          </Text>
+        )}
+        {uploadError && (
+          <Text color="red.500" paddingTop={4} data-testid="upload-error">
+            {uploadError}
+          </Text>
+        )}
 
         {onCreateFromScratch && (
           <Button
@@ -250,6 +352,7 @@ export function UploadCSVForm({
             fontWeight="normal"
             color="blue.700"
             onClick={onCreateFromScratch}
+            disabled={isUploading}
           >
             Skip, create empty dataset
           </Button>
@@ -257,13 +360,9 @@ export function UploadCSVForm({
         <Spacer />
         <Button
           colorPalette="blue"
-          disabled={
-            !!disabled ||
-            !uploadedDataset ||
-            uploadedDataset.datasetRecords.length === 0 ||
-            uploadedDataset.datasetRecords.length > MAX_ROWS_LIMIT
-          }
-          onClick={uploadCSVData}
+          loading={isUploading}
+          disabled={!!disabled || isUploading || !canUpload}
+          onClick={() => void handleUpload()}
         >
           Upload
         </Button>
