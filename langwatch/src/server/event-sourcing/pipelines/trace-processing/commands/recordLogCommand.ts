@@ -4,7 +4,12 @@ import { getLangWatchTracer } from "langwatch";
 import { OtlpSpanPiiRedactionService } from "~/server/app-layer/traces/span-pii-redaction.service";
 import { createLogger } from "../../../../../utils/logger/server";
 import type { Command, CommandHandler } from "../../../";
-import { createTenantId, defineCommandSchema, EventUtils } from "../../../";
+import {
+  createTenantId,
+  defineCommandSchema,
+  EventUtils,
+  type TenantId,
+} from "../../../";
 import {
   DEFAULT_PII_REDACTION_LEVEL,
   type PIIRedactionLevel,
@@ -32,7 +37,7 @@ export interface RecordLogCommandDependencies {
         resourceAttributes: Record<string, string>;
       },
       piiRedactionLevel: PIIRedactionLevel,
-      tenantId?: string,
+      tenantId?: TenantId,
     ) => Promise<void>;
   };
 }
@@ -126,7 +131,7 @@ export class RecordLogCommand
           await this.deps.piiRedactionService.redactLog(
             logToRedact,
             piiRedactionLevel,
-            tenantIdStr,
+            tenantId,
           );
         } catch (error) {
           this.logger.error(

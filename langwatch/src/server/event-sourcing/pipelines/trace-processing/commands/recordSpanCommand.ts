@@ -16,7 +16,12 @@ import {
 import { featureFlagService } from "~/server/featureFlag";
 import { createLogger } from "../../../../../utils/logger/server";
 import type { Command, CommandHandler } from "../../../";
-import { createTenantId, defineCommandSchema, EventUtils } from "../../../";
+import {
+  createTenantId,
+  defineCommandSchema,
+  EventUtils,
+  type TenantId,
+} from "../../../";
 import {
   DEFAULT_PII_REDACTION_LEVEL,
   type PIIRedactionLevel,
@@ -64,7 +69,7 @@ export interface RecordSpanCommandDependencies {
       span: OtlpSpan,
       resource: OtlpResource | null,
       piiRedactionLevel: PIIRedactionLevel,
-      tenantId?: string,
+      tenantId?: TenantId,
     ) => Promise<void>;
   };
   /** Service for enriching spans with custom LLM cost rates. */
@@ -281,7 +286,7 @@ export class RecordSpanCommand
             spanToProcess,
             resourceToProcess,
             piiRedactionLevel,
-            tenantIdStr,
+            tenantId,
           ),
           this.deps.costEnrichmentService.enrichSpan(
             spanToProcess,

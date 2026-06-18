@@ -24,8 +24,9 @@ vi.mock("~/server/featureFlag", () => ({
 }));
 
 import { featureFlagService } from "~/server/featureFlag";
+import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 
-const TENANT = "project-web-app";
+const TENANT = createTenantId("project-web-app");
 
 function mkPolicy({
   piiLevel = "essential" as PiiLevel,

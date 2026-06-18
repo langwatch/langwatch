@@ -18,6 +18,7 @@ import {
   redactStringNative,
 } from "~/server/data-privacy/redaction/applyContentRedaction";
 import { ESSENTIAL_PII_ENTITIES } from "~/server/data-privacy/redaction/essentialPii";
+import type { TenantId } from "~/server/event-sourcing/domain/tenantId";
 
 /**
  * Identifiers the strict analyzer detects that the native engine cannot
@@ -222,7 +223,7 @@ export class OtlpSpanPiiRedactionService {
    * analysis-service batch path and PII is never silently left in.
    */
   private async resolveNativeContext(
-    tenantId: string | undefined,
+    tenantId: TenantId | undefined,
     requestLevel: PIIRedactionLevel,
   ): Promise<{ policy: ResolvedDataPrivacy; level: PiiLevel } | null> {
     if (process.env.LANGWATCH_DATA_PRIVACY_ENFORCEMENT === "off") return null;
@@ -399,7 +400,7 @@ export class OtlpSpanPiiRedactionService {
     span: OtlpSpan,
     resource: OtlpResource | null,
     piiRedactionLevel: PIIRedactionLevel,
-    tenantId?: string,
+    tenantId?: TenantId,
   ): Promise<void> {
     const native = await this.resolveNativeContext(tenantId, piiRedactionLevel);
     if (!native) {
@@ -570,7 +571,7 @@ export class OtlpSpanPiiRedactionService {
       resourceAttributes: Record<string, string>;
     },
     piiRedactionLevel: PIIRedactionLevel,
-    tenantId?: string,
+    tenantId?: TenantId,
   ): Promise<void> {
     const native = await this.resolveNativeContext(tenantId, piiRedactionLevel);
     if (!native) {
@@ -617,7 +618,7 @@ export class OtlpSpanPiiRedactionService {
       resourceAttributes: Record<string, string>;
     },
     piiRedactionLevel: PIIRedactionLevel,
-    tenantId?: string,
+    tenantId?: TenantId,
   ): Promise<void> {
     const native = await this.resolveNativeContext(tenantId, piiRedactionLevel);
     if (!native) {

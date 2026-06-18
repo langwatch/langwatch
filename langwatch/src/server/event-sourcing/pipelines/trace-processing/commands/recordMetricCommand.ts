@@ -7,6 +7,7 @@ import {
   createTenantId,
   defineCommandSchema,
   EventUtils,
+  type TenantId,
 } from "../../../";
 import { createLogger } from "../../../../../utils/logger/server";
 import {
@@ -34,7 +35,7 @@ export interface RecordMetricCommandDependencies {
         resourceAttributes: Record<string, string>;
       },
       piiRedactionLevel: PIIRedactionLevel,
-      tenantId?: string,
+      tenantId?: TenantId,
     ) => Promise<void>;
   };
 }
@@ -107,7 +108,7 @@ export class RecordMetricCommand
           await this.deps.piiRedactionService.redactMetricAttributes(
             metricToRedact,
             piiRedactionLevel,
-            tenantIdStr,
+            tenantId,
           );
         } catch (error) {
           this.logger.error(
