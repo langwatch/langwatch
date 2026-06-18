@@ -1,8 +1,8 @@
 import type { ConnectionOptions } from "bullmq";
 import crypto from "crypto";
+import { QueueWithFallback } from "~/server/queues/queueWithFallback";
 import { prisma } from "../db";
 import { connection } from "../redis";
-import { QueueWithFallback } from "~/server/queues/queueWithFallback";
 import {
   TOPIC_CLUSTERING_QUEUE,
   type TopicClusteringJob,

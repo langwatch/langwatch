@@ -9,14 +9,14 @@ import {
 import { BullMQOtel } from "bullmq-otel";
 import { EventEmitter } from "events";
 import { getLangWatchTracer } from "langwatch";
-import { createLogger } from "~/utils/logger/server";
-import { connection } from "~/server/redis";
 import {
-  type JobDataWithContext,
   createContextFromJobData,
   getJobContextMetadata,
+  type JobDataWithContext,
   runWithContext,
 } from "~/server/context/asyncContext";
+import { connection } from "~/server/redis";
+import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:queueWithFallback");
 
@@ -46,7 +46,11 @@ export class QueueWithFallback<
       ...opts,
       telemetry: new BullMQOtel(name),
     } as QueueOptions;
-    super(name, optsWithTelemetry, connection ? undefined : (NoOpConnection as any));
+    super(
+      name,
+      optsWithTelemetry,
+      connection ? undefined : (NoOpConnection as any),
+    );
     this.worker = worker;
   }
 
@@ -65,7 +69,9 @@ export class QueueWithFallback<
         attributes: {
           "queue.name": name,
           "queue.id": opts?.jobId,
-          ...(contextMetadata.projectId && { "tenant.id": contextMetadata.projectId }),
+          ...(contextMetadata.projectId && {
+            "tenant.id": contextMetadata.projectId,
+          }),
         },
       },
       async () => {
@@ -147,7 +153,9 @@ export class QueueWithFallback<
         attributes: {
           "queue.name": jobs.map((job) => job.name).join(","),
           "jobs.count": jobs.length,
-          ...(contextMetadata.projectId && { "tenant.id": contextMetadata.projectId }),
+          ...(contextMetadata.projectId && {
+            "tenant.id": contextMetadata.projectId,
+          }),
         },
       },
       async () => {

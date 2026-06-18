@@ -18,11 +18,7 @@ import * as path from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("experiment-run.service dedup OOM safety", () => {
-  const sourcePath = path.resolve(
-    __dirname,
-    "..",
-    "experiment-run.service.ts",
-  );
+  const sourcePath = path.resolve(__dirname, "..", "experiment-run.service.ts");
   const source = fs.readFileSync(sourcePath, "utf-8");
 
   it("does not use LIMIT 1 BY anywhere in the file", () => {
