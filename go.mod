@@ -8,7 +8,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/bedrockruntime v1.52.0
 	github.com/aws/smithy-go v1.25.1
 	github.com/bytedance/sonic v1.15.0
-	github.com/go-chi/chi/v5 v5.2.2
+	github.com/go-chi/chi/v5 v5.2.4
 	github.com/go-playground/validator/v10 v10.30.2
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
