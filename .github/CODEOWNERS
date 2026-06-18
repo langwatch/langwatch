@@ -1,0 +1,191 @@
+# CODEOWNERS — GENERATED FILE, DO NOT EDIT BY HAND.
+#
+# Regenerated weekly by .github/workflows/codeowners-refresh.yml from
+# .github/scripts/generate-codeowners.sh. Owners are the top historical
+# `git log` contributors per area (merges, bots, and departed contributors
+# excluded). To change ownership, edit the generator script — not this file.
+#
+# GitHub applies the LAST matching pattern only — rules go from general (top)
+# to specific (bottom). Owners must have write access to the repo.
+
+# ===========================================================================
+# Global fallback — overall top contributor across the repo.
+# ===========================================================================
+*                                              @rogeriochaves @drewdrewthis
+
+# ===========================================================================
+# Repo-level config, build & dependency manifests
+# ===========================================================================
+/go.mod                                        @rogeriochaves @0xdeafcafe
+/go.sum                                        @rogeriochaves @0xdeafcafe
+/package.json                                  @0xdeafcafe @rogeriochaves
+/pnpm-workspace.yaml                           @rogeriochaves
+/pnpm-lock.yaml                                @rogeriochaves
+
+# ===========================================================================
+# CI, infra, deployment & dev environment
+# ===========================================================================
+/.github/                                      @0xdeafcafe @rogeriochaves
+/charts/                                       @rogeriochaves @0xdeafcafe
+/clickhouse-serverless/                        @0xdeafcafe
+/bullboard/                                    @0xdeafcafe @drewdrewthis
+/dev/                                          @rogeriochaves @drewdrewthis
+/agentic-e2e-tests/                            @drewdrewthis @rogeriochaves
+/Makefile                                      @drewdrewthis @rogeriochaves
+/boxd.mk                                       @drewdrewthis
+/*.mk                                          @drewdrewthis
+/compose*.yml                                  @rogeriochaves @drewdrewthis
+/Dockerfile                                    @rogeriochaves
+/Dockerfile.*                                  @rogeriochaves
+/CLAUDE.md                                     @rogeriochaves @drewdrewthis
+
+# ===========================================================================
+# Go services & shared Go code
+# ===========================================================================
+/services/nlpgo/                               @rogeriochaves @0xdeafcafe
+/services/aigateway/                           @rogeriochaves @0xdeafcafe
+/pkg/                                          @rogeriochaves @0xdeafcafe
+/cmd/                                          @rogeriochaves @0xdeafcafe
+/sdk-go/                                       @0xdeafcafe @rogeriochaves
+/Dockerfile.go_service                         @rogeriochaves @0xdeafcafe
+
+# ===========================================================================
+# SDKs & integrations
+# ===========================================================================
+/python-sdk/                                   @rogeriochaves
+/typescript-sdk/                               @rogeriochaves @0xdeafcafe
+/mcp-server/                                   @rogeriochaves @0xdeafcafe
+/langevals/                                    @rogeriochaves @sergioestebance
+
+# ===========================================================================
+# Specs (BDD .feature files)
+# ===========================================================================
+/specs/                                        @drewdrewthis @rogeriochaves
+/specs/ai-gateway/                             @rogeriochaves
+/specs/ai-governance/                          @rogeriochaves
+/specs/nlp-go/                                 @rogeriochaves
+/specs/model-providers/                        @rogeriochaves @drewdrewthis
+/specs/event-sourcing/                         @rogeriochaves @0xdeafcafe
+/specs/evaluators/                             @rogeriochaves @drewdrewthis
+/specs/monitors/                               @rogeriochaves @drewdrewthis
+/specs/licensing/                              @drewdrewthis @sergioestebance
+/specs/billing/                                @drewdrewthis @sergioestebance
+/specs/data-retention/                         @sergioestebance
+/specs/members/                                @sergioestebance @drewdrewthis
+/specs/api-keys/                               @sergioestebance @rogeriochaves
+/specs/prompts/                                @drewdrewthis @rogeriochaves
+
+# ===========================================================================
+# Docs
+# ===========================================================================
+/docs/                                         @rogeriochaves @drewdrewthis
+/docs/adr/                                     @drewdrewthis @0xdeafcafe
+/docs/api-reference/                           @sergioestebance @rogeriochaves
+/docs/integration/                             @rogeriochaves @sergioestebance
+/docs/self-hosting/                            @rogeriochaves
+
+# ===========================================================================
+# Skills
+# ===========================================================================
+/skills/                                       @rogeriochaves @0xdeafcafe
+
+# ===========================================================================
+# Main app (langwatch/) — schema, EE, optimization studio, top-level dirs
+# ===========================================================================
+/langwatch/prisma/                             @rogeriochaves
+/langwatch/ee/                                 @sergioestebance @rogeriochaves
+/langwatch/elastic/                            @rogeriochaves
+/langwatch/e2e/                                @rogeriochaves @drewdrewthis
+/langwatch/scripts/                            @rogeriochaves @drewdrewthis
+/langwatch/src/optimization_studio/            @rogeriochaves
+/langwatch/src/hooks/                          @rogeriochaves @drewdrewthis
+/langwatch/src/utils/                          @rogeriochaves @drewdrewthis
+/langwatch/src/tasks/                          @rogeriochaves
+/langwatch/src/features/                       @rogeriochaves @0xdeafcafe
+/langwatch/src/prompts/                        @rogeriochaves @drewdrewthis
+/langwatch/src/experiments-v3/                 @rogeriochaves @drewdrewthis
+/langwatch/src/app/api/                        @rogeriochaves @drewdrewthis
+
+# ---------------------------------------------------------------------------
+# Main app — pages
+# ---------------------------------------------------------------------------
+/langwatch/src/pages/api/                      @rogeriochaves
+/langwatch/src/pages/settings/                 @rogeriochaves @sergioestebance
+/langwatch/src/pages/onboarding/               @rogeriochaves
+/langwatch/src/pages/auth/                     @rogeriochaves
+
+# ===========================================================================
+# Main app — server domains
+# ===========================================================================
+/langwatch/src/server/analytics/               @rogeriochaves
+/langwatch/src/server/annotations/             @drewdrewthis
+/langwatch/src/server/api/                     @rogeriochaves
+/langwatch/src/server/app-layer/               @rogeriochaves @0xdeafcafe
+/langwatch/src/server/background/              @rogeriochaves
+/langwatch/src/server/clickhouse/              @0xdeafcafe @rogeriochaves
+/langwatch/src/server/datasets/                @rogeriochaves
+/langwatch/src/server/evaluations/             @rogeriochaves @0xdeafcafe
+/langwatch/src/server/evaluators/              @rogeriochaves @sergioestebance
+/langwatch/src/server/event-sourcing/          @0xdeafcafe @rogeriochaves
+/langwatch/src/server/experiments/             @rogeriochaves
+/langwatch/src/server/experiments-v3/          @rogeriochaves @0xdeafcafe
+/langwatch/src/server/featureFlag/             @rogeriochaves @drewdrewthis
+/langwatch/src/server/filters/                 @rogeriochaves @0xdeafcafe
+/langwatch/src/server/gateway/                 @rogeriochaves @0xdeafcafe
+/langwatch/src/server/modelProviders/          @rogeriochaves
+/langwatch/src/server/prompt-config/           @drewdrewthis @rogeriochaves
+/langwatch/src/server/repositories/            @drewdrewthis @sergioestebance
+/langwatch/src/server/routes/                  @rogeriochaves @sergioestebance
+/langwatch/src/server/scenarios/               @drewdrewthis @rogeriochaves
+/langwatch/src/server/simulations/             @0xdeafcafe @drewdrewthis
+/langwatch/src/server/suites/                  @drewdrewthis @rogeriochaves
+/langwatch/src/server/topicClustering/         @rogeriochaves @0xdeafcafe
+/langwatch/src/server/tracer/                  @rogeriochaves
+/langwatch/src/server/traces/                  @0xdeafcafe @rogeriochaves
+/langwatch/src/server/triggers/                @0xdeafcafe
+/langwatch/src/server/workflows/               @rogeriochaves @0xdeafcafe
+
+# Auth, permissions & multitenancy
+/langwatch/src/server/agents/                  @sergioestebance @drewdrewthis
+/langwatch/src/server/rbac/                    @sergioestebance
+/langwatch/src/server/role/                    @sergioestebance
+/langwatch/src/server/role-bindings/           @sergioestebance
+/langwatch/src/server/scim/                    @rogeriochaves
+/langwatch/src/server/teams/                   @sergioestebance
+/langwatch/src/server/invites/                 @sergioestebance
+/langwatch/src/server/api-key/                 @rogeriochaves @sergioestebance
+
+# Billing, licensing & data retention
+/langwatch/src/server/license-enforcement/     @sergioestebance @drewdrewthis
+/langwatch/src/server/data-retention/          @sergioestebance
+/langwatch/src/server/subscriptionHandler.ts   @rogeriochaves @sergioestebance
+
+# ===========================================================================
+# Main app — UI components
+# ===========================================================================
+/langwatch/src/components/agents/              @drewdrewthis @rogeriochaves
+/langwatch/src/components/analytics/           @rogeriochaves
+/langwatch/src/components/annotations/         @rogeriochaves @0xdeafcafe
+/langwatch/src/components/checks/              @rogeriochaves
+/langwatch/src/components/datasets/            @rogeriochaves
+/langwatch/src/components/drawers/             @0xdeafcafe
+/langwatch/src/components/evaluations/         @rogeriochaves @drewdrewthis
+/langwatch/src/components/evaluators/          @rogeriochaves @sergioestebance
+/langwatch/src/components/experiments/         @rogeriochaves
+/langwatch/src/components/filters/             @rogeriochaves
+/langwatch/src/components/forms/               @0xdeafcafe @Aryansharma28
+/langwatch/src/components/inputs/              @0xdeafcafe
+/langwatch/src/components/license/             @sergioestebance
+/langwatch/src/components/llmPromptConfigs/    @rogeriochaves @drewdrewthis
+/langwatch/src/components/messages/            @rogeriochaves
+/langwatch/src/components/plans/               @sergioestebance
+/langwatch/src/components/projects/            @sergioestebance @rogeriochaves
+/langwatch/src/components/scenarios/           @drewdrewthis
+/langwatch/src/components/settings/            @rogeriochaves @sergioestebance
+/langwatch/src/components/sidebar/             @rogeriochaves @0xdeafcafe
+/langwatch/src/components/simulations/         @drewdrewthis @rogeriochaves
+/langwatch/src/components/subscription/        @sergioestebance @drewdrewthis
+/langwatch/src/components/suites/              @drewdrewthis
+/langwatch/src/components/traces/              @rogeriochaves
+/langwatch/src/components/ui/                  @rogeriochaves @drewdrewthis
+/langwatch/src/components/workflows/           @sergioestebance @rogeriochaves
