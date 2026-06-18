@@ -10,7 +10,10 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { ScenarioRunStatus, Verdict } from "~/server/scenarios/scenario-event.enums";
+import {
+  ScenarioRunStatus,
+  Verdict,
+} from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioMessageSnapshotEvent } from "~/server/scenarios/scenario-event.types";
 import { Drawer } from "../../ui/drawer";
 import { ScenarioMessageRenderer } from "../ScenarioMessageRenderer";
@@ -64,9 +67,7 @@ describe("ScenarioRunDetailDrawer", () => {
           <ScenarioRunHeader
             name="Echo user request"
             status={ScenarioRunStatus.FAILED}
-            copyableIds={[
-              { label: "Scenario ID", value: "sc-123" },
-            ]}
+            copyableIds={[{ label: "Scenario ID", value: "sc-123" }]}
           />,
           { wrapper: DrawerWrapper },
         );
@@ -110,12 +111,8 @@ describe("ScenarioRunDetailDrawer", () => {
           { wrapper: DrawerWrapper },
         );
 
-        expect(
-          screen.getByText("Scenario ID: sc-123"),
-        ).toBeInTheDocument();
-        expect(
-          screen.getByText("Batch Run ID: br-456"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("Scenario ID: sc-123")).toBeInTheDocument();
+        expect(screen.getByText("Batch Run ID: br-456")).toBeInTheDocument();
         expect(screen.getByText("Run ID: sr-789")).toBeInTheDocument();
       });
     });

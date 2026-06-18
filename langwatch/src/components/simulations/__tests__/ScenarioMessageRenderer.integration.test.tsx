@@ -11,8 +11,8 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { ScenarioMessageRenderer } from "../ScenarioMessageRenderer";
 import type { ScenarioMessageSnapshotEvent } from "~/server/scenarios/scenario-event.types";
+import { ScenarioMessageRenderer } from "../ScenarioMessageRenderer";
 
 vi.mock("~/utils/api", () => ({
   api: {
@@ -26,7 +26,9 @@ vi.mock("~/utils/api", () => ({
 
 vi.mock("../../copilot-kit/TraceMessage", () => ({
   TraceMessage: ({ traceId }: { traceId: string }) => (
-    <button data-testid="trace-message" data-trace-id={traceId}>View Trace</button>
+    <button data-testid="trace-message" data-trace-id={traceId}>
+      View Trace
+    </button>
   ),
 }));
 
@@ -298,9 +300,7 @@ describe("<ScenarioMessageRenderer/>", () => {
     it("renders a media-part-audio element whose src is the file url (drawer variant)", () => {
       renderWith([urlShapeMessage]);
 
-      const audio = screen.getByTestId(
-        "media-part-audio",
-      ) as HTMLAudioElement;
+      const audio = screen.getByTestId("media-part-audio") as HTMLAudioElement;
       expect(audio).toBeInTheDocument();
       expect(audio.tagName.toLowerCase()).toBe("audio");
       expect(audio).toHaveAttribute("src", "/api/files/test-id");
@@ -312,9 +312,7 @@ describe("<ScenarioMessageRenderer/>", () => {
     it("renders a media-part-audio element whose src is the file url (grid variant)", () => {
       renderWithGrid([urlShapeMessage]);
 
-      const audio = screen.getByTestId(
-        "media-part-audio",
-      ) as HTMLAudioElement;
+      const audio = screen.getByTestId("media-part-audio") as HTMLAudioElement;
       expect(audio).toBeInTheDocument();
       expect(audio).toHaveAttribute("src", "/api/files/test-id");
       expect(audio).toHaveAttribute("controls");
@@ -435,7 +433,10 @@ describe("<ScenarioMessageRenderer/>", () => {
           content: [
             {
               type: "input_audio",
-              input_audio: { url: "/api/files/user-voice", mimeType: "audio/mpeg" },
+              input_audio: {
+                url: "/api/files/user-voice",
+                mimeType: "audio/mpeg",
+              },
             },
           ],
         } as unknown as ScenarioMessageSnapshotEvent["messages"][number],
@@ -457,7 +458,10 @@ describe("<ScenarioMessageRenderer/>", () => {
           content: [
             {
               type: "input_audio",
-              input_audio: { url: "/api/files/solo-voice", mimeType: "audio/mpeg" },
+              input_audio: {
+                url: "/api/files/solo-voice",
+                mimeType: "audio/mpeg",
+              },
             },
           ],
         } as unknown as ScenarioMessageSnapshotEvent["messages"][number],
