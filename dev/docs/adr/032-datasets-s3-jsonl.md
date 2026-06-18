@@ -103,7 +103,7 @@ Migration is additive (new nullable columns + defaults); existing rows become `s
 - A PG-only domain schedules work on GroupQueue via the `registerJob` escape hatch — a conscious exception to event-driven.
 - **Reads are not fixed by this epic** — the 5 MB run-time truncation persists, so uploaded multi-GB data is only partially consumed by runs until the batched-reads fast-follow.
 - Uploads gain an async `processing` lifecycle that every read consumer must gate on.
-- Presigned upload needs bucket CORS + a POST-policy; self-hosted needs browser-reachable S3/MinIO or the backend fallback.
+- Presigned upload needs bucket CORS (browser PUT) + a finalize-time size cap (HEAD); self-hosted needs browser-reachable S3/MinIO or the backend fallback.
 - A staging-prefix lifecycle rule is required or orphaned un-finalized uploads accumulate.
 - `DatasetRecord` lingers in PG until the deferred drop migration.
 
