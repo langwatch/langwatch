@@ -21,7 +21,9 @@ import { TraceSummaryStore } from "../projections/traceSummary.store";
 // Subclass that injects no-op span-enrichment deps so the production
 // `require("~/server/db")` default-dependency path never runs (that require
 // can't be resolved at runtime under vitest). Mirrors the pattern in
-// metricsSync.convergence.integration.test.ts.
+// metricsSync.convergence.integration.test.ts. A no-op contentDropService is
+// included so the deps are complete and the prisma default path stays skipped;
+// this test does not exercise the data-privacy drop.
 class TestRecordSpanCommand extends RecordSpanCommand {
   static override readonly schema = RecordSpanCommand.schema;
   constructor() {
@@ -29,6 +31,12 @@ class TestRecordSpanCommand extends RecordSpanCommand {
       piiRedactionService: { redactSpan: async () => {} },
       costEnrichmentService: { enrichSpan: async () => {} },
       tokenEstimationService: { estimateSpanTokens: async () => {} },
+      contentDropService: {
+        dropSpanContent: async () => ({
+          droppedCount: 0,
+          droppedCategories: [],
+        }),
+      },
     } as never);
   }
 }

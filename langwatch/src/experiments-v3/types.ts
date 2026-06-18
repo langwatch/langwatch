@@ -12,7 +12,7 @@ import {
   httpHeaderSchema,
 } from "~/optimization_studio/types/dsl";
 import type { DatasetColumnType } from "~/server/datasets/types";
-import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
+import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
 import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
 
 // ============================================================================

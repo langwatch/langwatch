@@ -24,7 +24,7 @@ import type {
 } from "~/optimization_studio/types/dsl";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import type { DatasetColumnType } from "~/server/datasets/types";
-import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
+import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
 import type {
   EvaluatorField,
   EvaluatorWithFields,

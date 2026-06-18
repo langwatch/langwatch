@@ -1,9 +1,16 @@
 # Scope selector and badges
 
 Settings surfaces that scope a row (model providers, virtual keys, budgets,
-routing policies, default models, data retention) use one shared selector,
-`ScopeChipPicker`, and one shared badge, `ProviderScopeChips`. Reuse them; do
-not hand-roll a checkbox list of teams/people or a bespoke scope dropdown.
+routing policies, default models, data retention, data privacy) use one shared
+selector, `ScopeChipPicker`, and one shared badge, `ProviderScopeChips`.
+
+**This is a hard rule for every NEW scoped-resource drawer too, not just the
+consumers listed above:** any form where the user picks which scope(s) a rule
+or resource applies to renders `ScopeChipPicker`. Never hand-roll a checkbox
+list of teams/people, a bespoke scope `<Select>`, or a one-off "scope + toggle"
+combination. Multi-scope selection is the default (one save can target several
+teams, a team and two projects, etc., producing one row per scope); rows that
+can live at exactly one scope pass `singleSelect`.
 
 ## The scope kinds
 
@@ -53,6 +60,31 @@ const [scopes, setScopes] = useState<ScopeChipPickerEntry[]>([]);
 - The picker collapses redundant picks (`collapseRedundantScopes`): picking
   `ORGANIZATION` clears narrower picks; departments are mutually-compatible
   siblings and an org-wide pick clears them.
+
+## Personal-projects variants: `personalScopes`
+
+Resources that can target personal workspaces (per-user CLI projects) opt in
+with the `personalScopes` prop instead of adding a separate toggle next to the
+picker. The dropdown gains a "Personal projects" group offering "All personal
+projects" (`ORGANIZATION` + `personalOnly: true`) and, when departments are
+available, each department's personal projects (`DEPARTMENT` +
+`personalOnly: true`); specific personal projects are ordinary `PROJECT`
+entries. Emitted entries carry `personalOnly: true`, and the personal variant
+of a scope is a DISTINCT selection from the plain scope (both can hold their
+own rule; redundancy collapse keys on the pair). Data privacy is the reference
+consumer.
+
+```tsx
+// Data privacy rule: any scope kind, personal variants included.
+const [scopes, setScopes] = useState<ScopeChipPickerEntry[]>([]);
+<ScopeChipPicker
+  value={scopes}
+  onChange={setScopes}
+  allowedScopeTypes={["ORGANIZATION", "DEPARTMENT", "TEAM", "PROJECT"]}
+  personalScopes
+  ...
+/>
+```
 
 ## Rendering a scope: `ProviderScopeChips`
 

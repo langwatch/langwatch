@@ -102,6 +102,9 @@ seed.spec.ts
 .playwright-mcp/
 .mcp.local.json
 
+# Browser-QA screenshot artifacts (published via the pr-screenshots repo, never committed here)
+/*.png
+
 **/**/.worktrees/**
 !.worktrees/.gitkeep
 

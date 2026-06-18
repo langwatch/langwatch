@@ -164,7 +164,6 @@ Static (computed from port-base — code in `buildEnv`):
 | `LANGWATCH_NLP_SERVICE`  | `http://localhost:${ports.nlp}`                                                                |
 | `LANGEVALS_ENDPOINT`     | `http://localhost:${ports.langevals}`                                                          |
 | `LW_GATEWAY_BASE_URL`    | `http://localhost:${ports.langwatch}`                                                          |
-| `DISABLE_PII_REDACTION`  | `true`                                                                                         |
 | `ENVIRONMENT`            | `local`                                                                                        |
 
 Provider keys (left blank in `.env`, propagated from process env if user has them set):

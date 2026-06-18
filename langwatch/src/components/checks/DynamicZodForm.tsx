@@ -24,7 +24,7 @@ import type {
   EvaluatorDefinition,
   Evaluators,
   EvaluatorTypes,
-} from "../../server/evaluations/evaluators.generated";
+} from "../../server/evaluations/evaluators";
 import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
 import { api } from "../../utils/api";
 import { camelCaseToTitleCase, titleCase } from "../../utils/stringCasing";

@@ -44,6 +44,8 @@ For per-PR / per-issue cloud environments via boxd, see `dev/docs/boxd-makefile.
 
 See `dev/docs/adr/004-docker-dev-environment.md` for architecture decisions.
 
+**Running the app outside Docker (the default for TS work):** just run `pnpm dev` from `langwatch/` (or `PORT=5570 pnpm dev` for a second instance). You never need to hunt processes by hand. If the ports are already held, `check-ports.sh` refuses to start and prints two ready-to-paste options: a free-port-slot command (`PORT=5570 pnpm dev`), and a one-liner that kills only the node processes holding those exact ports by process group (Docker and everything else are left alone). Paste whichever fits. Do not reinvent process-tree walking, `pkill -f`, or pgid hunting; the script already does it correctly and port-scoped.
+
 ### AI Gateway (Go, services/aigateway/)
 
 The gateway is a separate Go service (not in `compose.dev.yml`) that terminates
@@ -120,6 +122,8 @@ specs/               # BDD feature specs
 | Common Mistake | Correct Behavior |
 |----------------|------------------|
 | Building from scratch without checking existing code | Search the codebase first - follow existing patterns, extend existing systems, reuse existing abstractions |
+| Building settings UI without reading the UX guidelines | Read `dev/docs/best_practices/` first (`scope-selector-and-badges.md`, `drawers.md`, `row-actions-overflow-menu.md`, `scoped-resources.md`). Scope selection ALWAYS uses `ScopeChipPicker` (multi-scope, `personalScopes` for personal-project variants), never a hand-rolled Select |
+| Exposing internal technical details in user-facing copy ("in-process", "uses the analysis service") | Read `dev/docs/best_practices/copywriting.md`. Copy says what the feature does for the customer, never how it is built; descriptions stay short, full lists go in a `(?)` tooltip pinned to the code by a test |
 | Implementing without checking feature files | Check `specs/` for existing feature files first - they ARE the requirements. If none exists, create one before coding |
 | Using "should" in test descriptions | Use action-based descriptions: `it("checks local first")` not `it("should check local first")` |
 | Describe blocks without "when" context | Inner describe blocks must use "when" conditions: `describe("when user clicks submit", () => ...)` not `describe("submit behavior", ...)` |

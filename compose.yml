@@ -3,7 +3,6 @@ services:
     image: langwatch/langwatch:latest
     environment:
       SKIP_ENV_VALIDATION: true
-      DISABLE_PII_REDACTION: true
       DATABASE_URL: postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
       CLICKHOUSE_URL: http://default:langwatch@clickhouse:8123/langwatch
       REDIS_URL: redis://redis:6379
@@ -31,7 +30,6 @@ services:
     working_dir: /app/langwatch
     environment:
       SKIP_ENV_VALIDATION: true
-      DISABLE_PII_REDACTION: true
       DATABASE_URL: postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
       CLICKHOUSE_URL: http://default:langwatch@clickhouse:8123/langwatch
       REDIS_URL: redis://redis:6379

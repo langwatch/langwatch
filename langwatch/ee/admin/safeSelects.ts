@@ -53,9 +53,6 @@ export const PROJECT_SAFE_SELECT = {
   createdAt: true,
   updatedAt: true,
   userLinkTemplate: true,
-  piiRedactionLevel: true,
-  capturedInputVisibility: true,
-  capturedOutputVisibility: true,
   traceSharingEnabled: true,
   archivedAt: true,
 } as const satisfies Prisma.ProjectSelect;

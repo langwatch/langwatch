@@ -1,10 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { Span } from "~/server/tracer/types";
 import {
   extractEventsFromSpans,
   mapTraceSummaryToTrace,
 } from "../trace-summary.mapper";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { Span } from "~/server/tracer/types";
 
 function makeSpan(overrides: Partial<Span> = {}): Span {
   return {
@@ -30,11 +30,13 @@ function makeSpan(overrides: Partial<Span> = {}): Span {
 describe("extractEventsFromSpans", () => {
   describe("when spans have no event attributes", () => {
     it("returns empty array", () => {
-      const spans = [
-        makeSpan({ params: { "langwatch.span.type": "llm" } }),
-      ];
+      const spans = [makeSpan({ params: { "langwatch.span.type": "llm" } })];
 
-      const result = extractEventsFromSpans({ spans, projectId: "project-1", traceId: "trace-1" });
+      const result = extractEventsFromSpans({
+        spans,
+        projectId: "project-1",
+        traceId: "trace-1",
+      });
 
       expect(result).toEqual([]);
     });
@@ -55,7 +57,11 @@ describe("extractEventsFromSpans", () => {
         }),
       ];
 
-      const result = extractEventsFromSpans({ spans, projectId: "project-1", traceId: "trace-1" });
+      const result = extractEventsFromSpans({
+        spans,
+        projectId: "project-1",
+        traceId: "trace-1",
+      });
 
       expect(result).toEqual([
         {
@@ -96,7 +102,11 @@ describe("extractEventsFromSpans", () => {
         }),
       ];
 
-      const result = extractEventsFromSpans({ spans, projectId: "project-1", traceId: "trace-1" });
+      const result = extractEventsFromSpans({
+        spans,
+        projectId: "project-1",
+        traceId: "trace-1",
+      });
 
       expect(result).toHaveLength(2);
       expect(result[0]!.event_type).toBe("like");
@@ -113,7 +123,11 @@ describe("extractEventsFromSpans", () => {
         }),
       ];
 
-      const result = extractEventsFromSpans({ spans, projectId: "project-1", traceId: "trace-1" });
+      const result = extractEventsFromSpans({
+        spans,
+        projectId: "project-1",
+        traceId: "trace-1",
+      });
 
       expect(result).toHaveLength(1);
       expect(result[0]!.metrics).toEqual({});
@@ -129,13 +143,21 @@ describe("extractEventsFromSpans", () => {
           params: {
             event: {
               type: "test",
-              metrics: { valid: "42", invalid: "not-a-number", inf: "Infinity" },
+              metrics: {
+                valid: "42",
+                invalid: "not-a-number",
+                inf: "Infinity",
+              },
             },
           },
         }),
       ];
 
-      const result = extractEventsFromSpans({ spans, projectId: "project-1", traceId: "trace-1" });
+      const result = extractEventsFromSpans({
+        spans,
+        projectId: "project-1",
+        traceId: "trace-1",
+      });
 
       expect(result[0]!.metrics).toEqual({ valid: 42 });
     });
@@ -155,7 +177,11 @@ describe("extractEventsFromSpans", () => {
         }),
       ];
 
-      const result = extractEventsFromSpans({ spans, projectId: "project-1", traceId: "trace-1" });
+      const result = extractEventsFromSpans({
+        spans,
+        projectId: "project-1",
+        traceId: "trace-1",
+      });
 
       expect(result[0]!.timestamps.updated_at).toBe(6000);
     });

@@ -1,20 +1,14 @@
-import {
-  Box,
-  Field,
-  Input,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Field, Input, Text, VStack } from "@chakra-ui/react";
 import { ExternalLink } from "lucide-react";
 import type { UseFormReturn } from "react-hook-form";
 import { FormProvider } from "react-hook-form";
 import type { ZodType } from "zod";
 import DynamicZodForm from "~/components/checks/DynamicZodForm";
 import { Link } from "~/components/ui/link";
-import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import { WorkflowCardDisplay } from "~/optimization_studio/components/workflow/WorkflowCard";
-import { EvaluatorMappingsSection } from "./EvaluatorMappingsSection";
+import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
 import type { EvaluatorMappingsConfig } from "./EvaluatorEditorShared";
+import { EvaluatorMappingsSection } from "./EvaluatorMappingsSection";
 
 /**
  * Props for the evaluator editor content.
@@ -118,8 +112,8 @@ export function EvaluatorEditorContent({
         {isWorkflowEvaluator && workflow && (
           <VStack gap={4} paddingTop={4} align="stretch">
             <Text fontSize="sm" color="fg.muted">
-              This evaluator is powered by a workflow. Click below to
-              open the workflow editor:
+              This evaluator is powered by a workflow. Click below to open the
+              workflow editor:
             </Text>
             <Link
               href={`/${workflow.projectSlug}/studio/${workflow.id}`}

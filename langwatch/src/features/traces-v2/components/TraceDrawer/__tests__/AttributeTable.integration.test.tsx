@@ -46,4 +46,50 @@ describe("AttributeTable", () => {
       });
     });
   });
+
+  describe("given a custom attribute under a restrict rule", () => {
+    function renderWithRestriction(canSee: boolean) {
+      return render(
+        <ChakraProvider value={defaultSystem}>
+          <AttributeTable
+            attributes={{ "app.billing.plan": "pro", "service.name": "api" }}
+            restrictedAttributes={[
+              { pattern: "app.billing.*", visibleTo: "Admins", canSee },
+            ]}
+          />
+        </ChakraProvider>,
+      );
+    }
+
+    describe("when the viewer is in the audience", () => {
+      it("marks the matching row as visible to that audience", () => {
+        const { getByLabelText } = renderWithRestriction(true);
+
+        expect(
+          getByLabelText("Restricted attribute, visible to Admins"),
+        ).toBeInTheDocument();
+      });
+    });
+
+    describe("when the viewer is outside the audience", () => {
+      it("marks the matching row as hidden", () => {
+        const { getByLabelText } = renderWithRestriction(false);
+
+        expect(
+          getByLabelText("Restricted attribute, hidden, visible to Admins"),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("leaves attributes that match no rule unmarked", () => {
+      const { queryByLabelText } = renderWithRestriction(true);
+
+      // service.name does not match `app.billing.*`, so it gets no marker.
+      expect(queryByLabelText(/^Restricted attribute/)).toBeInTheDocument();
+      const markers = document.querySelectorAll(
+        '[aria-label^="Restricted attribute"]',
+      );
+      expect(markers).toHaveLength(1);
+    });
+  });
 });

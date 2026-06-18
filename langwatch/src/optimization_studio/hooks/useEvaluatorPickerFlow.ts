@@ -8,7 +8,7 @@ import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service"
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
-} from "~/server/evaluations/evaluators.generated";
+} from "~/server/evaluations/evaluators";
 
 const FIELD_TYPE_MAP: Record<string, string> = {
   contexts: "list",

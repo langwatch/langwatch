@@ -2,7 +2,6 @@ import {
   Badge,
   Button,
   Card,
-  createListCollection,
   Field,
   Heading,
   HStack,
@@ -12,11 +11,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import {
-  PIIRedactionLevel,
-  type Project,
-  ProjectSensitiveDataVisibilityLevel,
-} from "@prisma/client";
+import type { Project } from "@prisma/client";
 import isEqual from "lodash-es/isEqual";
 import { useState } from "react";
 import { Lock } from "react-feather";
@@ -24,9 +19,9 @@ import { Controller, type SubmitHandler, useForm } from "react-hook-form";
 import { HorizontalFormControl } from "~/components/HorizontalFormControl";
 import { Tooltip } from "~/components/ui/tooltip";
 import { ProjectSelector } from "../components/DashboardLayout";
+import SettingsLayout from "../components/SettingsLayout";
 import { DepartmentPicker } from "../components/settings/DepartmentPicker";
 import { useDepartmentColumn } from "../components/settings/useDepartmentColumn";
-import SettingsLayout from "../components/SettingsLayout";
 import {
   ProjectTechStackIcon,
   TechStackSelector,
@@ -36,10 +31,8 @@ import { Select } from "../components/ui/select";
 import { Switch } from "../components/ui/switch";
 import { toaster } from "../components/ui/toaster";
 import { withPermissionGuard } from "../components/WithPermissionGuard";
-import { useActivePlan } from "../hooks/useActivePlan";
 import { useLiteMemberGuard } from "../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
-import { usePublicEnv } from "../hooks/usePublicEnv";
 import type { FullyLoadedOrganization } from "../server/app-layer/organizations/repositories/organization.repository";
 import { api } from "../utils/api";
 
@@ -86,8 +79,7 @@ function SettingsForm({
     s3Bucket: organization.s3Bucket ?? "",
     presenceEnabled: organization.presenceEnabled,
     supportContact:
-      (organization as { supportContact?: string | null }).supportContact ??
-      "",
+      (organization as { supportContact?: string | null }).supportContact ?? "",
   });
   const { register, handleSubmit, getFieldState, control } = useForm({
     defaultValues,
@@ -196,12 +188,7 @@ function SettingsForm({
                 label="Project ID"
                 helper="Use this ID when authenticating with API Keys"
               >
-                <Input
-                  width="full"
-                  disabled
-                  type="text"
-                  value={project.id}
-                />
+                <Input width="full" disabled type="text" value={project.id} />
               </HorizontalFormControl>
 
               <HorizontalFormControl
@@ -370,91 +357,13 @@ type ProjectFormData = {
   s3AccessKeyId?: string;
   s3SecretAccessKey?: string;
   s3Bucket?: string;
-  piiRedactionLevel: PIIRedactionLevel;
-  capturedInputVisibility: ProjectSensitiveDataVisibilityLevel;
-  capturedOutputVisibility: ProjectSensitiveDataVisibilityLevel;
   traceSharingEnabled: boolean;
   presenceEnabled: boolean;
 };
 
 function ProjectSettingsForm({ project }: { project: Project }) {
   const { organization, organizations } = useOrganizationTeamProject();
-  const publicEnv = usePublicEnv();
-  const { isFree } = useActivePlan();
   const department = useDepartmentColumn(organization?.id ?? "");
-
-  const piiRedactionLevelCollection = createListCollection({
-    items: [
-      {
-        label: "Strict",
-        value: PIIRedactionLevel.STRICT,
-        description: "Redacts all PII data including names and addresses",
-      },
-      {
-        label: "Essential",
-        value: PIIRedactionLevel.ESSENTIAL,
-        description:
-          "Redacts only essential PII data like email addresses, phone numbers, credit card numbers and IP addresses",
-      },
-      ...(!!organization?.signedDPA ||
-      !publicEnv.data?.IS_SAAS ||
-      publicEnv.data?.NODE_ENV === "development"
-        ? [
-            {
-              label: "Disabled",
-              value: PIIRedactionLevel.DISABLED,
-              description: "PII data will not be redacted",
-            },
-          ]
-        : []),
-    ],
-  });
-
-  const capturedInputVisibilityCollection = createListCollection({
-    items: [
-      {
-        label: "Redacted to All",
-        value: ProjectSensitiveDataVisibilityLevel.REDACTED_TO_ALL,
-        description: "Redacts captured input for all users",
-        isPaidOnly: true,
-      },
-      {
-        label: "Visible to Admin",
-        value: ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ADMIN,
-        description: "Redacts captured input for all users except admins",
-        isPaidOnly: true,
-      },
-      {
-        label: "Visible to All",
-        value: ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
-        description: "Does not redact any captured input",
-        isPaidOnly: false,
-      },
-    ],
-  });
-
-  const capturedOutputVisibilityCollection = createListCollection({
-    items: [
-      {
-        label: "Redacted to All",
-        value: ProjectSensitiveDataVisibilityLevel.REDACTED_TO_ALL,
-        description: "Redacts captured output for all users",
-        isPaidOnly: true,
-      },
-      {
-        label: "Visible to Admin",
-        value: ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ADMIN,
-        description: "Redacts captured output for all users except admins",
-        isPaidOnly: true,
-      },
-      {
-        label: "Visible to All",
-        value: ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
-        description: "Does not redact any captured output",
-        isPaidOnly: false,
-      },
-    ],
-  });
 
   const { hasPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
@@ -470,9 +379,6 @@ function ProjectSettingsForm({ project }: { project: Project }) {
     s3AccessKeyId: project.s3AccessKeyId ?? "",
     s3SecretAccessKey: project.s3SecretAccessKey ?? "",
     s3Bucket: project.s3Bucket ?? "",
-    piiRedactionLevel: project.piiRedactionLevel,
-    capturedInputVisibility: project.capturedInputVisibility,
-    capturedOutputVisibility: project.capturedOutputVisibility,
     traceSharingEnabled: project.traceSharingEnabled,
     presenceEnabled: project.presenceEnabled,
   };
@@ -527,13 +433,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
         s3SecretAccessKey: data.s3SecretAccessKey ?? "",
         s3Bucket: data.s3Bucket ?? "",
 
-        // Only admins can change the visibility settings, this is enforced in the backend
-        capturedInputVisibility: userIsAdmin
-          ? data.capturedInputVisibility
-          : void 0,
-        capturedOutputVisibility: userIsAdmin
-          ? data.capturedOutputVisibility
-          : void 0,
+        // Only admins can change these settings, this is enforced in the backend
         traceSharingEnabled: userIsAdmin ? data.traceSharingEnabled : void 0,
         presenceEnabled: userIsAdmin ? data.presenceEnabled : void 0,
       },
@@ -634,198 +534,6 @@ function ProjectSettingsForm({ project }: { project: Project }) {
               </HStack>
             )}
           </HorizontalFormControl>
-          <HorizontalFormControl
-            label="PII Redaction Level"
-            helper="The level of redaction for PII"
-            invalid={!!formState.errors.piiRedactionLevel}
-          >
-            <Controller
-              control={control}
-              name="piiRedactionLevel"
-              rules={{ required: "PII Redaction Level is required" }}
-              render={({ field }) => (
-                <Select.Root
-                  collection={piiRedactionLevelCollection}
-                  {...field}
-                  onChange={undefined}
-                  value={[field.value]}
-                  onValueChange={(e) => {
-                    field.onChange(e.value[0]);
-                  }}
-                >
-                  <Select.Trigger width="full">
-                    <Select.ValueText placeholder="Select PII redaction level" />
-                  </Select.Trigger>
-                  <Select.Content width="300px" paddingY={2}>
-                    {piiRedactionLevelCollection.items.map((option) => (
-                      <Select.Item key={option.value} item={option}>
-                        <VStack align="start" gap={0}>
-                          <Text>{option.label}</Text>
-                          <Text fontSize="13px" color="fg.muted">
-                            {option.description}
-                          </Text>
-                        </VStack>
-                      </Select.Item>
-                    ))}
-                  </Select.Content>
-                </Select.Root>
-              )}
-            />
-          </HorizontalFormControl>
-
-          <HorizontalFormControl
-            label="Show Captured Input Data"
-            helper={
-              <VStack align="start" gap={1}>
-                <Text>Manage who can see input data on traces and spans</Text>
-                {!userIsAdmin && (
-                  <Badge colorPalette="blue" variant="surface" size={"xs"}>
-                    <Tooltip content="Contact your admin to change this setting">
-                      <HStack>
-                        <Lock size={10} />
-                        <Text>Admin only</Text>
-                      </HStack>
-                    </Tooltip>
-                  </Badge>
-                )}
-              </VStack>
-            }
-            invalid={!!formState.errors.capturedInputVisibility}
-          >
-            <Controller
-              control={control}
-              name="capturedInputVisibility"
-              rules={{
-                required: userIsAdmin
-                  ? "Captured input visibility is required"
-                  : undefined,
-              }}
-              render={({ field }) => (
-                <Select.Root
-                  collection={capturedInputVisibilityCollection}
-                  {...field}
-                  onChange={undefined}
-                  value={[field.value]}
-                  onValueChange={(e) => {
-                    const selected = capturedInputVisibilityCollection.items.find(
-                      (item) => item.value === e.value[0],
-                    );
-                    if (selected?.isPaidOnly && isFree) return;
-                    field.onChange(e.value[0]);
-                  }}
-                  disabled={!userIsAdmin}
-                >
-                  <Select.Trigger width="full">
-                    <Select.ValueText placeholder="Select captured input visibility" />
-                  </Select.Trigger>
-                  <Select.Content width="300px" paddingY={2}>
-                    {capturedInputVisibilityCollection.items.map((option) => {
-                      const isDisabled = option.isPaidOnly && isFree;
-                      return (
-                        <Select.Item
-                          key={option.value}
-                          item={option}
-                          opacity={isDisabled ? 0.5 : 1}
-                          cursor={isDisabled ? "not-allowed" : "pointer"}
-                        >
-                          <VStack align="start" gap={0}>
-                            <HStack>
-                              <Text>{option.label}</Text>
-                              {option.isPaidOnly && isFree && (
-                                <Badge colorPalette="orange" size="xs">
-                                  Paid
-                                </Badge>
-                              )}
-                            </HStack>
-                            <Text fontSize="13px" color="fg.muted">
-                              {option.description}
-                            </Text>
-                          </VStack>
-                        </Select.Item>
-                      );
-                    })}
-                  </Select.Content>
-                </Select.Root>
-              )}
-            />
-          </HorizontalFormControl>
-          <HorizontalFormControl
-            label="Show Captured Output Data"
-            helper={
-              <VStack align="start" gap={1}>
-                <Text>Manage who can see output data on traces and spans</Text>
-                {!userIsAdmin && (
-                  <Badge colorPalette="blue" variant="surface" size={"xs"}>
-                    <Tooltip content="Contact your admin to change this setting">
-                      <HStack>
-                        <Lock size={10} />
-                        <Text>Admin only</Text>
-                      </HStack>
-                    </Tooltip>
-                  </Badge>
-                )}
-              </VStack>
-            }
-            invalid={!!formState.errors.capturedOutputVisibility}
-          >
-            <Controller
-              control={control}
-              name="capturedOutputVisibility"
-              rules={{
-                required: userIsAdmin
-                  ? "Captured output visibility is required"
-                  : undefined,
-              }}
-              render={({ field }) => (
-                <Select.Root
-                  collection={capturedOutputVisibilityCollection}
-                  {...field}
-                  onChange={undefined}
-                  value={[field.value]}
-                  onValueChange={(e) => {
-                    const selected = capturedOutputVisibilityCollection.items.find(
-                      (item) => item.value === e.value[0],
-                    );
-                    if (selected?.isPaidOnly && isFree) return;
-                    field.onChange(e.value[0]);
-                  }}
-                  disabled={!userIsAdmin}
-                >
-                  <Select.Trigger width="full">
-                    <Select.ValueText placeholder="Select captured output visibility" />
-                  </Select.Trigger>
-                  <Select.Content width="300px" paddingY={2}>
-                    {capturedOutputVisibilityCollection.items.map((option) => {
-                      const isDisabled = option.isPaidOnly && isFree;
-                      return (
-                        <Select.Item
-                          key={option.value}
-                          item={option}
-                          opacity={isDisabled ? 0.5 : 1}
-                          cursor={isDisabled ? "not-allowed" : "pointer"}
-                        >
-                          <VStack align="start" gap={0}>
-                            <HStack>
-                              <Text>{option.label}</Text>
-                              {option.isPaidOnly && isFree && (
-                                <Badge colorPalette="orange" size="xs">
-                                  Paid
-                                </Badge>
-                              )}
-                            </HStack>
-                            <Text fontSize="13px" color="fg.muted">
-                              {option.description}
-                            </Text>
-                          </VStack>
-                        </Select.Item>
-                      );
-                    })}
-                  </Select.Content>
-                </Select.Root>
-              )}
-            />
-          </HorizontalFormControl>
-
           <HorizontalFormControl
             label="Live presence"
             helper={

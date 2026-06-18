@@ -32,6 +32,7 @@ import { isPythonRepr } from "../../utils/parsePythonInsideJson";
 import { getExtractedInput } from "../../utils/traceExtraction";
 import { SmallLabel } from "../SmallLabel";
 import { PIIRedactionNotice } from "../ui/PIIRedactionNotice";
+import { PrivacyDroppedNotice } from "../ui/PrivacyDroppedNotice";
 import { RedactedField } from "../ui/RedactedField";
 import { Tooltip } from "../ui/tooltip";
 import {
@@ -154,6 +155,9 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
             <PIIRedactionNotice
               content={`${getExtractedInput(trace) ?? ""}\n${stringifyIfObject(trace.output?.value) ?? ""}`}
             />
+            <PrivacyDroppedNotice
+              categories={trace.privacy?.droppedCategories}
+            />
             <Message
               author="Input"
               avatar={
@@ -242,7 +246,13 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
                   />
                 </VStack>
               ) : (
-                <Text paddingY={2}>{"<empty>"}</Text>
+                // Restricting output nulls trace.output upstream, so the value
+                // branches above are skipped. Wrap the fallback in RedactedField
+                // so a restricted output still shows the redaction reason here
+                // instead of a bare "<empty>".
+                <RedactedField field="output">
+                  <Text paddingY={2}>{"<empty>"}</Text>
+                </RedactedField>
               )}
               {trace.expected_output && (
                 <Alert.Root status="warning">

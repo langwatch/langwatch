@@ -10,7 +10,7 @@
  */
 
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
-import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.generated";
+import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
 import type { EvaluationV3Event } from "./types";
 
 /**

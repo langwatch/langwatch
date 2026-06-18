@@ -2,7 +2,7 @@ import type { Edge, Node } from "@xyflow/react";
 import { z } from "zod";
 
 import type { LocalPromptConfig } from "~/experiments-v3/types";
-import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
+import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
 import { FieldMappingSchema } from "~/server/scenarios/execution/types";
 import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
 

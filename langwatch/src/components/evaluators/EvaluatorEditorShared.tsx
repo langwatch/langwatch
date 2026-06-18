@@ -14,16 +14,16 @@ import {
 import debounce from "lodash-es/debounce";
 import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FormProvider, useForm, type UseFormReturn } from "react-hook-form";
+import { FormProvider, type UseFormReturn, useForm } from "react-hook-form";
 import { z } from "zod";
 
 import DynamicZodForm from "~/components/checks/DynamicZodForm";
 import { Link } from "~/components/ui/link";
-import { Tooltip } from "~/components/ui/tooltip";
 import { toaster } from "~/components/ui/toaster";
-import {
-  type AvailableSource,
-  type FieldMapping as UIFieldMapping,
+import { Tooltip } from "~/components/ui/tooltip";
+import type {
+  AvailableSource,
+  FieldMapping as UIFieldMapping,
 } from "~/components/variables";
 import type { LocalEvaluatorConfig } from "~/experiments-v3/types";
 import {
@@ -35,15 +35,15 @@ import {
 } from "~/hooks/useDrawer";
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { WorkflowCardDisplay } from "~/optimization_studio/components/workflow/WorkflowCard";
 import {
   AVAILABLE_EVALUATORS,
-  evaluatorsSchema,
   type EvaluatorTypes,
-} from "~/server/evaluations/evaluators.generated";
+  evaluatorsSchema,
+} from "~/server/evaluations/evaluators";
 import { getEvaluatorDefaultSettings } from "~/server/evaluations/getEvaluator";
 import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
-import { WorkflowCardDisplay } from "~/optimization_studio/components/workflow/WorkflowCard";
 
 import type { EvaluatorCategoryId } from "./EvaluatorCategorySelectorDrawer";
 import { EvaluatorMappingsSection } from "./EvaluatorMappingsSection";
@@ -792,8 +792,7 @@ export function EvaluatorEditorFooter({
         loading={isSaving}
         data-testid="save-evaluator-button"
       >
-        {saveButtonText ??
-          (evaluatorId ? "Save Changes" : "Create Evaluator")}
+        {saveButtonText ?? (evaluatorId ? "Save Changes" : "Create Evaluator")}
       </Button>
     </HStack>
   );

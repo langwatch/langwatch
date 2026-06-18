@@ -1,5 +1,5 @@
 import { DEFAULT_FORM_VALUES } from "~/prompts/utils/buildDefaultFormValues";
-import { AVAILABLE_EVALUATORS } from "../server/evaluations/evaluators.generated";
+import { AVAILABLE_EVALUATORS } from "../server/evaluations/evaluators";
 
 import type {
   BaseComponent,

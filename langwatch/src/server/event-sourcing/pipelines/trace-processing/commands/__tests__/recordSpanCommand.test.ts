@@ -59,6 +59,9 @@ function createMockDependencies(): {
   const mockRedactSpan = vi.fn();
   const mockEnrichSpan = vi.fn();
   const mockEstimateSpanTokens = vi.fn();
+  const mockDropSpanContent = vi
+    .fn()
+    .mockResolvedValue({ droppedCount: 0, droppedCategories: [] });
 
   return {
     deps: {
@@ -70,6 +73,9 @@ function createMockDependencies(): {
       },
       tokenEstimationService: {
         estimateSpanTokens: mockEstimateSpanTokens,
+      },
+      contentDropService: {
+        dropSpanContent: mockDropSpanContent,
       },
     },
     mockRedactSpan,
@@ -107,6 +113,7 @@ describe("RecordSpanCommand", () => {
           expect.objectContaining({ traceId: "trace-1", spanId: "span-1" }),
           expect.any(Object),
           "STRICT",
+          "project-123",
         );
       });
 
@@ -119,6 +126,7 @@ describe("RecordSpanCommand", () => {
           expect.any(Object),
           expect.anything(),
           "ESSENTIAL",
+          "project-456",
         );
       });
 
@@ -137,6 +145,7 @@ describe("RecordSpanCommand", () => {
           expect.any(Object),
           expect.anything(),
           "DISABLED",
+          "project-789",
         );
       });
     });
