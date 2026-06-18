@@ -81,6 +81,16 @@ containerSecurityContext:
   capabilities:
     drop: ["ALL"]
 
+# FUTURE HARDENING — gVisor sandbox (NOT wired yet, intentional reminder).
+# This pod runs LLM-driven arbitrary code: opencode workers shell out to
+# git/npm/gh, so the headline risk is a worker breaking OUT of the container
+# to the node. Running under gVisor (runsc) inserts a user-space kernel
+# between the worker and the host kernel, shrinking that node-escape surface.
+# To enable: add a `runtimeClassName` field to templates/deployment.yaml,
+# then set it here to a RuntimeClass the cluster defines (e.g. `gvisor` on
+# GKE Sandbox). Caveat: gVisor hardens pod->host only, NOT worker->worker
+# inside this single pod — that would need per-user pods, a separate design.
+
 networkPolicy:
   enabled: true
   # Only the control plane may call the agent. Adjust the selector to match
