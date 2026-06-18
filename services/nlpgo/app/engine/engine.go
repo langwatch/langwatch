@@ -36,6 +36,7 @@ import (
 // HTTP handler invokes per /go/studio/execute_sync request.
 type Engine struct {
 	http             *httpblock.Executor
+	attachments      *attachmentFetcher
 	code             *codeblock.Executor
 	llm              app.LLMClient
 	evaluator        *evaluatorblock.Executor
@@ -54,7 +55,10 @@ type Logger interface {
 
 // Options configures an Engine.
 type Options struct {
-	HTTP             *httpblock.Executor
+	HTTP *httpblock.Executor
+	// SSRF mirrors the HTTP block's destination policy so remote prompt
+	// attachments are fetched under the same private/loopback/metadata ban.
+	SSRF             httpblock.SSRFOptions
 	Code             *codeblock.Executor
 	LLM              app.LLMClient
 	Evaluator        *evaluatorblock.Executor
@@ -70,6 +74,7 @@ func New(opts Options) *Engine {
 	}
 	return &Engine{
 		http:             opts.HTTP,
+		attachments:      newAttachmentFetcher(opts.SSRF),
 		code:             opts.Code,
 		llm:              opts.LLM,
 		evaluator:        opts.Evaluator,
@@ -512,6 +517,17 @@ func (e *Engine) runSignature(ctx context.Context, execReq ExecuteRequest, node 
 	// Re-shape any template-interpolated image data URLs into multimodal
 	// content parts so the model receives actual images, not base64 text.
 	messages := splitMessagesWithImages(buildMessages(node, inputs))
+	// Fetch any remote attachment URLs (http/https) referenced in the messages
+	// and deliver them as content the model can open. A failed fetch aborts the
+	// run with a clear, user-facing error instead of a broken provider request.
+	if e.attachments != nil {
+		fetched, aerr := e.attachments.rewrite(ctx, messages)
+		if aerr != nil {
+			aerr.NodeID = node.ID
+			return nil, aerr
+		}
+		messages = fetched
+	}
 	req := app.LLMRequest{
 		Model:    model,
 		Provider: provider,
