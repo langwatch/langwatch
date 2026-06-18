@@ -1,0 +1,67 @@
+name: Refresh CODEOWNERS
+
+# Regenerates .github/CODEOWNERS from git history once a week and opens (or
+# updates) a PR when ownership has shifted. The generator
+# (.github/scripts/generate-codeowners.sh) recomputes each area's owners from
+# `git log` authorship, so reviewer assignments track who is actually working
+# where without anyone maintaining the file by hand.
+
+on:
+  schedule:
+    # Mondays 06:00 UTC
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+# Don't run on forks — this pushes a branch and opens a PR.
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: codeowners-refresh
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    if: github.repository == 'langwatch/langwatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Regenerate CODEOWNERS
+        run: bash .github/scripts/generate-codeowners.sh
+
+      - name: Open or update PR if CODEOWNERS changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          if git diff --quiet -- .github/CODEOWNERS; then
+            echo "CODEOWNERS is already up to date; nothing to do."
+            exit 0
+          fi
+
+          BRANCH="chore/codeowners-refresh"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git checkout -B "$BRANCH"
+          git add .github/CODEOWNERS
+          git commit -m "chore: refresh CODEOWNERS from git history"
+          git push --force-with-lease origin "$BRANCH"
+
+          BODY="Automated weekly refresh of \`.github/CODEOWNERS\` by the codeowners-refresh workflow. Owners are recomputed from \`git log\` authorship per area via \`.github/scripts/generate-codeowners.sh\`; the diff reflects how contribution has shifted across the codebase since the last refresh. To change ownership policy (identity map, exclusions, areas, or the Go co-owner rule), edit the generator script rather than this PR."
+
+          if gh pr view "$BRANCH" --json state --jq '.state' 2>/dev/null | grep -q OPEN; then
+            echo "PR already open for $BRANCH; force-pushed branch keeps it current."
+          else
+            gh pr create \
+              --base main \
+              --head "$BRANCH" \
+              --title "chore: refresh CODEOWNERS from git history" \
+              --body "$BODY"
+          fi
