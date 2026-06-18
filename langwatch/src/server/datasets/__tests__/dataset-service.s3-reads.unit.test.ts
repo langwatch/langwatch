@@ -73,12 +73,29 @@ const mockReadChunks = (rows: unknown[]) => {
   return readChunks;
 };
 
+/**
+ * Mock storage for the offset-aware pagination: `readChunk(index)` resolves the
+ * rows of `chunksByIndex[index]`; `readChunks` is a spy that must NOT be called
+ * when offsets are present (we read only the overlapping chunk(s)).
+ */
+const mockReadChunk = (chunksByIndex: Record<number, unknown[]>) => {
+  const readChunks = vi.fn();
+  const readChunk = vi.fn(({ index }: { index: number }) =>
+    Promise.resolve(chunksByIndex[index] ?? []),
+  );
+  vi.mocked(getDatasetStorage).mockResolvedValue({
+    readChunks,
+    readChunk,
+  } as never);
+  return { readChunks, readChunk };
+};
+
 beforeEach(() => vi.clearAllMocks());
 
 describe("DatasetService", () => {
   describe("listRecords()", () => {
-    describe("when the dataset is s3_jsonl and ready", () => {
-      it("reads chunks, paginates in-memory, and reports the PG row count", async () => {
+    describe("when the dataset is s3_jsonl and ready (no offsets — legacy)", () => {
+      it("falls back to reading all chunks and slices the page", async () => {
         const repository = {
           findBySlugOrId: vi.fn().mockResolvedValue({ ...baseS3Dataset }),
         };
@@ -93,6 +110,7 @@ describe("DatasetService", () => {
           recordRepository,
         }).listRecords({ slugOrId: "ds", projectId: "p1", page: 1, limit: 1 });
 
+        // No offsets on baseS3Dataset → defensive whole-read fallback.
         expect(readChunks).toHaveBeenCalledWith({
           projectId: "p1",
           datasetId: "dataset_1",
@@ -104,6 +122,117 @@ describe("DatasetService", () => {
         expect(result.pagination.total).toBe(2);
         // The PG paginator must NOT be touched for s3_jsonl.
         expect(recordRepository.listPaginated).not.toHaveBeenCalled();
+      });
+    });
+
+    // P2#1 — with chunkOffsets present, a page request reads ONLY the chunk(s)
+    // whose [startRow, endRow) overlap the page window — never non-overlapping
+    // chunks of a multi-GB dataset (I-MEM).
+    describe("when the dataset is s3_jsonl with offsets and a page falls in the second chunk", () => {
+      it("reads only the overlapping chunk (index 1), never the others", async () => {
+        const offsetDataset = {
+          ...baseS3Dataset,
+          rowCount: 6,
+          chunkCount: 3,
+          chunkOffsets: [
+            { index: 0, startRow: 0, endRow: 2, byteSize: 100 },
+            { index: 1, startRow: 2, endRow: 4, byteSize: 100 },
+            { index: 2, startRow: 4, endRow: 6, byteSize: 100 },
+          ],
+        };
+        const repository = {
+          findBySlugOrId: vi.fn().mockResolvedValue({ ...offsetDataset }),
+        };
+        const recordRepository = { listPaginated: vi.fn() };
+        const { readChunks, readChunk } = mockReadChunk({
+          0: [
+            { id: "r1", entry: { a: 1 } },
+            { id: "r2", entry: { a: 2 } },
+          ],
+          1: [
+            { id: "r3", entry: { a: 3 } },
+            { id: "r4", entry: { a: 4 } },
+          ],
+          2: [
+            { id: "r5", entry: { a: 5 } },
+            { id: "r6", entry: { a: 6 } },
+          ],
+        });
+
+        // page 2, limit 2 → global rows [2,4) → chunk 1 only.
+        const result = await makeService({
+          repository,
+          recordRepository,
+        }).listRecords({ slugOrId: "ds", projectId: "p1", page: 2, limit: 2 });
+
+        expect(readChunk).toHaveBeenCalledTimes(1);
+        expect(readChunk).toHaveBeenCalledWith({
+          projectId: "p1",
+          datasetId: "dataset_1",
+          index: 1,
+        });
+        expect(readChunks).not.toHaveBeenCalled();
+        expect(result.data.map((r) => r.id)).toEqual(["r3", "r4"]);
+        expect(result.pagination.total).toBe(6);
+        expect(recordRepository.listPaginated).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the page window straddles two chunks", () => {
+      it("reads both overlapping chunks and slices the exact rows", async () => {
+        const offsetDataset = {
+          ...baseS3Dataset,
+          rowCount: 6,
+          chunkCount: 3,
+          chunkOffsets: [
+            { index: 0, startRow: 0, endRow: 2, byteSize: 100 },
+            { index: 1, startRow: 2, endRow: 4, byteSize: 100 },
+            { index: 2, startRow: 4, endRow: 6, byteSize: 100 },
+          ],
+        };
+        const repository = {
+          findBySlugOrId: vi.fn().mockResolvedValue({ ...offsetDataset }),
+        };
+        const recordRepository = { listPaginated: vi.fn() };
+        const { readChunks, readChunk } = mockReadChunk({
+          0: [
+            { id: "r1", entry: { a: 1 } },
+            { id: "r2", entry: { a: 2 } },
+          ],
+          1: [
+            { id: "r3", entry: { a: 3 } },
+            { id: "r4", entry: { a: 4 } },
+          ],
+          2: [
+            { id: "r5", entry: { a: 5 } },
+            { id: "r6", entry: { a: 6 } },
+          ],
+        });
+
+        // page 1, limit 3 → global rows [0,3) → chunks 0 and 1 (chunk 2 untouched).
+        const result = await makeService({
+          repository,
+          recordRepository,
+        }).listRecords({ slugOrId: "ds", projectId: "p1", page: 1, limit: 3 });
+
+        expect(readChunk).toHaveBeenCalledTimes(2);
+        expect(readChunk).toHaveBeenCalledWith({
+          projectId: "p1",
+          datasetId: "dataset_1",
+          index: 0,
+        });
+        expect(readChunk).toHaveBeenCalledWith({
+          projectId: "p1",
+          datasetId: "dataset_1",
+          index: 1,
+        });
+        expect(readChunk).not.toHaveBeenCalledWith({
+          projectId: "p1",
+          datasetId: "dataset_1",
+          index: 2,
+        });
+        expect(readChunks).not.toHaveBeenCalled();
+        expect(result.data.map((r) => r.id)).toEqual(["r1", "r2", "r3"]);
       });
     });
 

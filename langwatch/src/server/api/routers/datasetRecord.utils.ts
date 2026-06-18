@@ -8,13 +8,30 @@ import {
   type DatasetStorage,
   getDatasetStorage,
 } from "../../datasets/dataset-storage";
-import { DatasetNotReadyError } from "../../datasets/errors";
+import {
+  DatasetNotReadyError,
+  DatasetTooLargeToExportError,
+} from "../../datasets/errors";
 import { stripNullBytes } from "../../datasets/sanitize";
 import type { DatasetRecordInput } from "../../datasets/types";
 import { prisma } from "../../db";
 import { StorageService } from "../../storage";
 
 const storageService = new StorageService();
+
+/**
+ * Safe ceiling for a full (unbounded) s3_jsonl export (`limitMb: null`). The
+ * `download` path asks for the whole dataset; on a multi-GB dataset that would
+ * materialize the entire file in heap and OOM the pod (I-MEM). Until the
+ * streaming-export fast-follow epic ships, reject a full export of a dataset
+ * whose PG-authoritative `sizeBytes` exceeds this with a clear, typed error
+ * (`DatasetTooLargeToExportError`) instead of trying to read it.
+ *
+ * FAST-FOLLOW: true streaming/batched export (read chunks → stream to the
+ * client without buffering) is the reads-at-scale epic; this is the bounded
+ * guard that keeps the pod alive in the meantime.
+ */
+export const DATASET_FULL_EXPORT_MAX_BYTES = 100 * 1024 * 1024;
 
 const createDatasetRecords = ({
   entries,
@@ -390,11 +407,11 @@ export const getFullDataset = async ({
 
     const storage = await getDatasetStorage(projectId);
 
+    const count = dataset.rowCount ?? 0;
+
     // M2: a single-row `entrySelection` reads ONLY the chunk that holds the row
     // (via `chunkOffsets`) — the same short-circuit the PG path gets from
-    // skip/take — so it's O(1 chunk), not O(dataset). "all" (and download /
-    // limitMb:null) still reads every chunk: batched/streaming reads are the
-    // documented fast-follow epic, so the full read stays the cliff for "all".
+    // skip/take — so it's O(1 chunk), not O(dataset).
     if (entrySelection !== "all") {
       const record = await selectS3JsonlRecordViaOffsets({
         dataset,
@@ -402,40 +419,81 @@ export const getFullDataset = async ({
         storage,
         entrySelection,
       });
-      // `record === null` means no short-circuit was possible (missing/legacy
-      // offsets); fall through to the full read below rather than serve nothing.
       if (record !== null) {
         return {
           ...dataset,
-          count: dataset.rowCount ?? 0,
+          count,
           datasetRecords: [record],
           truncated: false,
         };
       }
+      // `record === null`: no short-circuit possible (missing/legacy offsets).
+      // This rare defensive path reads the whole dataset to honour
+      // last/random/N correctly, then selects the single row. Bounded by the
+      // same in-memory read the rung accepts for legacy data without offsets.
+      const rows = await storage.readChunks({
+        projectId,
+        datasetId,
+        chunkCount: dataset.chunkCount ?? 0,
+      });
+      const allRecords = rows.map((line) => adaptS3JsonlRecord(line, dataset));
+      const selected = selectRecords(allRecords, entrySelection);
+      const { truncatedRecords, truncated } = processBatchedRecords({
+        records: selected,
+        limitMb,
+      });
+      return {
+        ...dataset,
+        count: dataset.rowCount ?? allRecords.length,
+        datasetRecords: truncatedRecords,
+        truncated,
+      };
     }
 
-    const rows = await storage.readChunks({
-      projectId,
-      datasetId,
-      chunkCount: dataset.chunkCount ?? 0,
-    });
+    // I-MEM: a full export (`limitMb: null`) would materialize the whole dataset
+    // in heap. The bounded reads below cap at the byte budget; an unbounded
+    // export can't, so guard it on the PG-authoritative size and reject a
+    // multi-GB download with a clear, typed error instead of OOMing the pod.
+    // (True streaming export is the reads-at-scale fast-follow epic.)
+    if (limitMb === null) {
+      const sizeBytes = Number(dataset.sizeBytes ?? 0n);
+      if (sizeBytes > DATASET_FULL_EXPORT_MAX_BYTES) {
+        throw new DatasetTooLargeToExportError({
+          sizeBytes,
+          maxBytes: DATASET_FULL_EXPORT_MAX_BYTES,
+        });
+      }
+    }
 
-    const allRecords = rows.map((line) => adaptS3JsonlRecord(line, dataset));
-    const selected = selectRecords(allRecords, entrySelection);
-
-    // Same 5 MB truncation the PG path applies (reads-at-scale is the
-    // fast-follow epic; in-memory + truncation is acceptable for now).
-    const { truncatedRecords, truncated } = processBatchedRecords({
-      records: selected,
-      limitMb,
-    });
+    // "all": read chunks ONE AT A TIME (I-MEM), accumulating rows until the
+    // `limitMb` byte budget is reached, then STOP — never reading the remaining
+    // chunks. `count` stays PG-authoritative (it is NOT the number of rows
+    // actually read). Equivalent to the prior read-all-then-truncate, minus the
+    // unbounded read.
+    const chunkCount = dataset.chunkCount ?? 0;
+    const accumulated: DatasetRecord[] = [];
+    let totalSize = 0;
+    let truncated = false;
+    for (let index = 0; index < chunkCount; index++) {
+      const rows = await storage.readChunk({ projectId, datasetId, index });
+      const records = rows.map((line) => adaptS3JsonlRecord(line, dataset));
+      const result = processBatchedRecords({
+        records,
+        limitMb,
+        totalSize,
+      });
+      accumulated.push(...result.truncatedRecords);
+      totalSize = result.totalSize;
+      if (result.truncated) {
+        truncated = true;
+        break;
+      }
+    }
 
     return {
       ...dataset,
-      // PG-authoritative count; falls back to the read length only if rowCount
-      // was never written (defensive — normalize always sets it).
-      count: dataset.rowCount ?? allRecords.length,
-      datasetRecords: truncatedRecords,
+      count,
+      datasetRecords: accumulated,
       truncated,
     };
   }

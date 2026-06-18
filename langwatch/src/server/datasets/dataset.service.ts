@@ -1,5 +1,5 @@
 import { generate } from "@langwatch/ksuid";
-import type { Prisma, PrismaClient } from "@prisma/client";
+import type { DatasetRecord, Prisma, PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { tryToMapPreviousColumnsToNewColumns } from "~/optimization_studio/utils/datasetUtils";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -11,6 +11,7 @@ import {
   getFullDataset,
 } from "../api/routers/datasetRecord.utils";
 import { DatasetRepository } from "./dataset.repository";
+import type { ChunkOffset } from "./dataset-chunking";
 import {
   appendS3JsonlRecords,
   deleteS3JsonlRecords,
@@ -558,11 +559,10 @@ export class DatasetService {
 
     // ADR-032: s3_jsonl content lives in chunk objects, not the PG
     // DatasetRecord table (I-PG → zero PG rows), so the PG-only paginator would
-    // silently return empty. Gate on ready (I-READY / Decision 6) and read the
-    // chunks, paginating in-memory. NOTE: this reads ALL chunks into memory then
-    // slices the page — bounded by the same in-memory read the rung accepts;
-    // true paginated/streaming record listing for very large datasets is the
-    // reads-at-scale fast-follow epic.
+    // silently return empty. Gate on ready (I-READY / Decision 6), then read
+    // ONLY the chunk(s) whose [startRow, endRow) overlap the requested
+    // page×limit window (via the PG-authoritative `chunkOffsets`) — I-MEM, so a
+    // page request never reads non-overlapping chunks of a multi-GB dataset.
     if (dataset.contentLayout === "s3_jsonl") {
       if (dataset.status !== "ready") {
         throw new DatasetNotReadyError({
@@ -572,17 +572,50 @@ export class DatasetService {
       }
 
       const storage = await getDatasetStorage(params.projectId);
-      const rows = await storage.readChunks({
-        projectId: params.projectId,
-        datasetId: dataset.id,
-        chunkCount: dataset.chunkCount ?? 0,
-      });
-      const records = rows.map((line) => adaptS3JsonlRecord(line, dataset));
-      // PG-authoritative count (Decision 1/2); fall back to read length.
-      const total = dataset.rowCount ?? records.length;
+      // PG-authoritative count (Decision 1/2); fall back to chunkCount-driven read.
+      const total = dataset.rowCount ?? 0;
+      const windowStart = skip;
+      const windowEnd = skip + params.limit; // exclusive
+
+      const offsets: ChunkOffset[] = Array.isArray(dataset.chunkOffsets)
+        ? (dataset.chunkOffsets as unknown as ChunkOffset[])
+        : [];
+
+      // Read only the chunks overlapping [windowStart, windowEnd). With offsets
+      // present this touches at most ⌈limit / rows-per-chunk⌉ + 1 chunks.
+      // Defensive fallback (legacy rows with no offsets): read every chunk in
+      // order, but still slice the page — no offsets means we can't locate the
+      // window cheaply, the same bound legacy data already lived under.
+      const pageRecords: DatasetRecord[] = [];
+      if (offsets.length > 0) {
+        const overlapping = offsets.filter(
+          (o) => o.startRow < windowEnd && o.endRow > windowStart,
+        );
+        for (const offset of overlapping) {
+          const rows = await storage.readChunk({
+            projectId: params.projectId,
+            datasetId: dataset.id,
+            index: offset.index,
+          });
+          rows.forEach((line, within) => {
+            const globalRow = offset.startRow + within;
+            if (globalRow >= windowStart && globalRow < windowEnd) {
+              pageRecords.push(adaptS3JsonlRecord(line, dataset));
+            }
+          });
+        }
+      } else {
+        const rows = await storage.readChunks({
+          projectId: params.projectId,
+          datasetId: dataset.id,
+          chunkCount: dataset.chunkCount ?? 0,
+        });
+        const records = rows.map((line) => adaptS3JsonlRecord(line, dataset));
+        pageRecords.push(...records.slice(windowStart, windowEnd));
+      }
 
       return {
-        data: records.slice(skip, skip + params.limit),
+        data: pageRecords,
         pagination: {
           page: params.page,
           limit: params.limit,

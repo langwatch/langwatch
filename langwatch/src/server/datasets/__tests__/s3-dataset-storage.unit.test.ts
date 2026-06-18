@@ -14,7 +14,8 @@ vi.mock("@aws-sdk/s3-request-presigner", () => ({
   getSignedUrl: (...args: unknown[]) => getSignedUrl(...args),
 }));
 
-import { StagedUploadNotFoundError } from "../errors";
+import { CHUNK_MAX_BYTES } from "../dataset-chunking";
+import { ChunkTooLargeError, StagedUploadNotFoundError } from "../errors";
 import { UPLOAD_TTL_SECONDS } from "../presigned-upload";
 import { S3DatasetStorage } from "../s3-dataset-storage";
 
@@ -162,6 +163,28 @@ describe("S3DatasetStorage", () => {
           endRow: 1,
           byteSize: Buffer.byteLength('{"id":"r1","entry":{"a":1}}\n', "utf8"),
         });
+      });
+    });
+
+    // P2#3 — an edit can replace a small row with a large value, growing the
+    // chunk past CHUNK_MAX_BYTES. Reject rather than write an oversized object.
+    describe("when the rewritten chunk would exceed CHUNK_MAX_BYTES", () => {
+      it("throws ChunkTooLargeError and never PUTs the object", async () => {
+        const { resolved, send } = makeFakeClient();
+        send.mockResolvedValue({});
+        createS3Client.mockResolvedValue(resolved);
+        // One row whose serialized size is over the cap.
+        const huge = "x".repeat(CHUNK_MAX_BYTES + 1024);
+
+        await expect(
+          new S3DatasetStorage().rewriteChunk({
+            projectId: "p1",
+            datasetId: "d1",
+            index: 0,
+            records: [{ id: "r1", entry: { a: huge } }],
+          }),
+        ).rejects.toBeInstanceOf(ChunkTooLargeError);
+        expect(send).not.toHaveBeenCalled();
       });
     });
   });

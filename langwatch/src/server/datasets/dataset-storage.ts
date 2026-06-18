@@ -80,10 +80,11 @@ export interface DatasetStorage {
    * caller can patch the PG-authoritative `chunkOffsets` entry (I-COUNT). The
    * same null-byte scrub (I-NULL) and key guard the append path uses apply.
    *
-   * NOTE: a single-row edit can't meaningfully grow a chunk, and delete only
-   * shrinks it, so a rewrite never crosses `CHUNK_MAX_BYTES` in practice. If a
-   * caller ever rewrote a chunk larger than the cap, it is still written as one
-   * object — splitting-on-rewrite is out of scope for this rung.
+   * NOTE: an edit CAN grow a chunk past `CHUNK_MAX_BYTES` — replacing a small
+   * row with a large value enlarges the chunk (only delete strictly shrinks).
+   * Implementations REJECT a rewrite whose serialized size exceeds the cap
+   * (`ChunkTooLargeError`) rather than writing an oversized object; splitting /
+   * rebalancing the chunk on rewrite is the fuller fix, deferred to a later rung.
    */
   rewriteChunk(params: {
     projectId: string;

@@ -179,6 +179,62 @@ describe("createDatasetNormalizeHandler()", () => {
     });
   });
 
+  // @regression P1#1 — the streaming writer must accumulate ONLY lightweight
+  // per-chunk metadata after each flush, never the chunk `jsonl` payloads
+  // (I-MEM). A 2–5 GB upload would otherwise hoard the whole normalized file in
+  // heap by finalize. Heap proxy: the meta the handler persists carries chunk
+  // offsets (metadata) and NO `jsonl` field anywhere, and the counts still match.
+  describe("when the input spans many chunks (memory contract)", () => {
+    it("persists chunk metadata only — no jsonl payloads retained — with matching counts", async () => {
+      const rows = Array.from(
+        { length: 6 },
+        (_, i) => `{"v":"${String(i).repeat(40)}"}`,
+      ).join("\n");
+      // Tiny per-flush cap so the single flush splits into several chunk objects.
+      const { storage } = makeStorage({
+        streamStaged: vi.fn().mockResolvedValue(Readable.from([rows + "\n"])),
+        writeChunks: vi.fn(async ({ records, fromIndex = 0 }: any) =>
+          toJsonlChunks(records, { maxBytes: 10 }).map((c) => ({
+            ...c,
+            index: c.index + fromIndex,
+          })),
+        ),
+      });
+      const repo = makeRepo({ id: "d1", status: "processing" });
+
+      const handler = createDatasetNormalizeHandler({
+        repository: repo as any,
+        getStorage: async () => storage as any,
+      });
+      await handler(basePayload);
+
+      const update = repo.update.mock.calls[0]![0];
+      // Counts still correct.
+      expect(update.data.rowCount).toBe(6);
+      expect(update.data.chunkCount).toBeGreaterThan(1);
+      // Metadata persisted; NO `jsonl` payload anywhere in what the handler kept.
+      const offsets = update.data.chunkOffsets as Array<
+        Record<string, unknown>
+      >;
+      expect(offsets).toHaveLength(update.data.chunkCount);
+      for (const offset of offsets) {
+        expect(offset).not.toHaveProperty("jsonl");
+        expect(offset).toMatchObject({
+          index: expect.any(Number),
+          startRow: expect.any(Number),
+          endRow: expect.any(Number),
+          byteSize: expect.any(Number),
+        });
+      }
+      // The whole persisted payload must not carry any serialized chunk body
+      // (BigInt-safe stringify since `sizeBytes` is a bigint).
+      const serialized = JSON.stringify(update.data, (_key, value) =>
+        typeof value === "bigint" ? value.toString() : value,
+      );
+      expect(serialized).not.toContain("jsonl");
+    });
+  });
+
   describe("when parsing fails", () => {
     it("flips the dataset to failed with a statusError, does NOT delete staging, and rethrows", async () => {
       const { storage, deleteStaged } = makeStorage({

@@ -17,6 +17,7 @@ import path from "path";
 import {
   assertKeyWithinProject,
   assertNoTraversal,
+  CHUNK_MAX_BYTES,
   type ChunkOffset,
   chunkKey,
   type DatasetChunk,
@@ -27,6 +28,7 @@ import {
 } from "./dataset-chunking";
 import type { DatasetStorage, PresignedUpload } from "./dataset-storage";
 import {
+  ChunkTooLargeError,
   DirectUploadUnavailableError,
   StagedUploadNotFoundError,
 } from "./errors";
@@ -155,6 +157,12 @@ export class LocalDatasetStorage implements DatasetStorage {
   }): Promise<ChunkOffset> {
     assertNoTraversal(projectId, datasetId);
     const { jsonl, byteSize } = toSingleJsonl(records);
+    // Decision 2: an edit can grow a chunk past the cap (small row → large
+    // value). Reject rather than write an oversized object (parity with the S3
+    // impl; splitting on rewrite is out of scope for this rung).
+    if (byteSize > CHUNK_MAX_BYTES) {
+      throw new ChunkTooLargeError({ byteSize, maxBytes: CHUNK_MAX_BYTES });
+    }
     const filePath = localPath(chunkKey(projectId, datasetId, index));
     await fs.mkdir(path.dirname(filePath), { recursive: true });
     await fs.writeFile(filePath, jsonl, "utf-8");

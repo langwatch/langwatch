@@ -144,3 +144,52 @@ export class DatasetNotRetryableError extends Error {
     this.name = "DatasetNotRetryableError";
   }
 }
+
+/**
+ * Thrown when a chunk rewrite (edit) would produce a single chunk object larger
+ * than `CHUNK_MAX_BYTES`, breaking the size invariant (Decision 2). An edit can
+ * replace a small row with a large value, so a rewrite CAN grow a chunk past the
+ * cap — splitting/rebalancing the chunk under the lock is the fuller fix and is
+ * out of scope for this rung, so we reject (safe + correct) rather than write an
+ * oversized object. Surfaced to the edit caller as a clear 4xx, not a 500.
+ */
+export class ChunkTooLargeError extends Error {
+  readonly byteSize: number;
+  readonly maxBytes: number;
+
+  constructor({ byteSize, maxBytes }: { byteSize: number; maxBytes: number }) {
+    super("Edit would exceed the maximum chunk size");
+    this.name = "ChunkTooLargeError";
+    this.byteSize = byteSize;
+    this.maxBytes = maxBytes;
+  }
+}
+
+/**
+ * Thrown when a full (unbounded) export of an s3_jsonl dataset would have to
+ * materialize more bytes than `DATASET_FULL_EXPORT_MAX_BYTES` in heap. The
+ * bounded reads in this rung truncate at a byte budget; a download asks for the
+ * whole dataset (`limitMb: null`), which on a multi-GB dataset would OOM the pod
+ * (I-MEM). Reject with a clear, actionable message until the streaming-export
+ * fast-follow epic ships. The route maps it to a 4xx (client must wait for
+ * streaming export), not a 500.
+ */
+export class DatasetTooLargeToExportError extends Error {
+  readonly sizeBytes: number;
+  readonly maxBytes: number;
+
+  constructor({
+    sizeBytes,
+    maxBytes,
+  }: {
+    sizeBytes: number;
+    maxBytes: number;
+  }) {
+    super(
+      "This dataset is too large to export here; streaming export is coming",
+    );
+    this.name = "DatasetTooLargeToExportError";
+    this.sizeBytes = sizeBytes;
+    this.maxBytes = maxBytes;
+  }
+}

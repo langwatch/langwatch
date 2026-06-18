@@ -4,13 +4,14 @@ import os from "os";
 import path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readDatasetHeadS3Jsonl } from "../../api/routers/datasetRecord.utils";
-import { chunkKey } from "../dataset-chunking";
+import { CHUNK_MAX_BYTES, chunkKey } from "../dataset-chunking";
 import {
   appendS3JsonlRecords,
   deleteS3JsonlRecords,
   editS3JsonlRecord,
 } from "../dataset-mutations";
 import { createDatasetNormalizeHandler } from "../dataset-normalize.job";
+import { ChunkTooLargeError } from "../errors";
 // Real-FS integration: exercise LocalDatasetStorage against a real temp dir.
 // No env mock — the factory selects this impl; here we instantiate it directly
 // and point its root at a tmp dir via LOCAL_STORAGE_PATH. Per
@@ -113,6 +114,47 @@ describe("LocalDatasetStorage", () => {
             records: [{ a: 1 }],
           }),
         ).rejects.toThrow(/traversal/);
+      });
+    });
+  });
+
+  describe("rewriteChunk()", () => {
+    describe("when the rewritten records fit under the cap", () => {
+      it("writes the chunk and returns its byteSize", async () => {
+        const offset = await storage.rewriteChunk({
+          projectId: "p1",
+          datasetId: "d-rw",
+          index: 0,
+          records: [{ id: "r1", entry: { a: 1 } }],
+        });
+
+        expect(offset.endRow).toBe(1);
+        const written = await fs.readFile(
+          path.join(storageDir, chunkKey("p1", "d-rw", 0)),
+          "utf-8",
+        );
+        expect(written).toBe('{"id":"r1","entry":{"a":1}}\n');
+      });
+    });
+
+    // P2#3 — an edit can grow a chunk past CHUNK_MAX_BYTES; reject rather than
+    // write an oversized object (no file should be left behind).
+    describe("when the rewritten chunk would exceed CHUNK_MAX_BYTES", () => {
+      it("throws ChunkTooLargeError and writes no file", async () => {
+        const huge = "x".repeat(CHUNK_MAX_BYTES + 1024);
+
+        await expect(
+          storage.rewriteChunk({
+            projectId: "p1",
+            datasetId: "d-too-big",
+            index: 0,
+            records: [{ id: "r1", entry: { a: huge } }],
+          }),
+        ).rejects.toBeInstanceOf(ChunkTooLargeError);
+
+        await expect(
+          fs.stat(path.join(storageDir, chunkKey("p1", "d-too-big", 0))),
+        ).rejects.toMatchObject({ code: "ENOENT" });
       });
     });
   });

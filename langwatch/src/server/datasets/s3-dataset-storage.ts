@@ -29,6 +29,7 @@ import { createS3Client } from "../storage";
 import {
   assertKeyWithinProject,
   assertNoTraversal,
+  CHUNK_MAX_BYTES,
   type ChunkOffset,
   chunkKey,
   type DatasetChunk,
@@ -38,7 +39,7 @@ import {
   toSingleJsonl,
 } from "./dataset-chunking";
 import type { DatasetStorage, PresignedUpload } from "./dataset-storage";
-import { StagedUploadNotFoundError } from "./errors";
+import { ChunkTooLargeError, StagedUploadNotFoundError } from "./errors";
 import { stagingUploadKey, UPLOAD_TTL_SECONDS } from "./presigned-upload";
 
 type ResolvedS3Client = { s3Client: S3Client; s3Bucket: string };
@@ -199,6 +200,12 @@ export class S3DatasetStorage implements DatasetStorage {
   }): Promise<ChunkOffset> {
     assertNoTraversal(projectId, datasetId);
     const { jsonl, byteSize } = toSingleJsonl(records);
+    // Decision 2: an edit can replace a small row with a large value, so a
+    // rewrite CAN grow a chunk past the cap. Reject rather than write an
+    // oversized object (splitting on rewrite is out of scope for this rung).
+    if (byteSize > CHUNK_MAX_BYTES) {
+      throw new ChunkTooLargeError({ byteSize, maxBytes: CHUNK_MAX_BYTES });
+    }
     const { s3Client, s3Bucket } = await this.client(projectId);
     await s3Client.send(
       new PutObjectCommand({

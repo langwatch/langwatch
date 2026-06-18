@@ -6,7 +6,11 @@ import {
   deleteS3JsonlRecords,
   editS3JsonlRecord,
 } from "../../datasets/dataset-mutations";
-import { DatasetNotReadyError } from "../../datasets/errors";
+import {
+  ChunkTooLargeError,
+  DatasetNotReadyError,
+  DatasetTooLargeToExportError,
+} from "../../datasets/errors";
 import { stripNullBytes } from "../../datasets/sanitize";
 import { newDatasetEntriesSchema } from "../../datasets/types";
 import { prisma } from "../../db";
@@ -34,6 +38,25 @@ const rethrowDatasetNotReadyAsTRPC = (error: unknown): never => {
   if (error instanceof DatasetNotReadyError) {
     throw new TRPCError({
       code: "PRECONDITION_FAILED",
+      message: error.message,
+      cause: error,
+    });
+  }
+  // A full export that would exceed the safe in-heap ceiling is a client-side
+  // precondition failure (the dataset must be exported via the streaming path
+  // once it ships), not a server fault — surface a clean 4xx, not a 500.
+  if (error instanceof DatasetTooLargeToExportError) {
+    throw new TRPCError({
+      code: "PAYLOAD_TOO_LARGE",
+      message: error.message,
+      cause: error,
+    });
+  }
+  // An edit that would grow a chunk past the cap is a client-side bad request
+  // (the new value is too large), not a server fault — clean 4xx, not a 500.
+  if (error instanceof ChunkTooLargeError) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
       message: error.message,
       cause: error,
     });

@@ -33,8 +33,10 @@ import Papa from "papaparse";
 import type { DatasetRepository } from "./dataset.repository";
 import {
   CHUNK_MAX_BYTES,
+  type ChunkedDatasetMeta,
+  type ChunkMeta,
   chunkedMeta,
-  type DatasetChunk,
+  chunkMetaOf,
 } from "./dataset-chunking";
 import type { DatasetStorage } from "./dataset-storage";
 import { UPLOAD_MAX_BYTES } from "./presigned-upload";
@@ -113,7 +115,13 @@ class StreamingChunkWriter {
   private buffer: unknown[] = [];
   private bufferBytes = 0;
   private nextIndex = 0;
-  private readonly chunks: DatasetChunk[] = [];
+  /**
+   * I-MEM: accumulate only lightweight per-chunk metadata (no `jsonl` payload).
+   * Each flush maps its written `DatasetChunk[]` to `ChunkMeta[]` and drops the
+   * serialized bodies, so a multi-GB upload never holds the whole normalized
+   * file in heap by the time `finalize()` runs.
+   */
+  private readonly chunkMetas: ChunkMeta[] = [];
 
   constructor(
     private readonly deps: {
@@ -144,16 +152,21 @@ class StreamingChunkWriter {
       records: this.buffer,
       fromIndex: this.nextIndex,
     });
-    this.chunks.push(...written);
+    // I-MEM: keep only the metadata; the `jsonl` payloads are released here so
+    // they can be garbage-collected immediately after the write returns.
+    this.chunkMetas.push(...written.map(chunkMetaOf));
     this.nextIndex += written.length;
     this.buffer = [];
     this.bufferBytes = 0;
   }
 
-  /** Flush the remainder and return every chunk written, in order. */
-  async finalize(): Promise<DatasetChunk[]> {
+  /**
+   * Flush the remainder and return the aggregated `ChunkedDatasetMeta`, computed
+   * from the accumulated per-chunk metadata alone (never the `jsonl` payloads).
+   */
+  async finalize(): Promise<ChunkedDatasetMeta> {
     await this.flush();
-    return this.chunks;
+    return chunkedMeta(this.chunkMetas);
   }
 }
 
@@ -356,8 +369,10 @@ export const createDatasetNormalizeHandler = (deps: DatasetNormalizeDeps) => {
         writer,
         sizeBytes,
       });
-      const chunks = await writer.finalize();
-      const meta = chunkedMeta(chunks);
+      // I-MEM: finalize returns the aggregated meta built from per-chunk
+      // metadata only — the chunk `jsonl` payloads were released at each flush,
+      // so the whole normalized file is never accumulated in heap.
+      const meta = await writer.finalize();
       const columnTypes = deriveColumnTypes(headers);
 
       // m5: an empty upload is a failure, not a 0-chunk `ready` dataset — this

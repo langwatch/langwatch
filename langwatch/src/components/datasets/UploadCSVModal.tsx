@@ -26,6 +26,7 @@ import type {
   DatasetColumns,
   DatasetRecordEntry,
 } from "../../server/datasets/types";
+import { MAX_FILE_SIZE_BYTES } from "../../server/datasets/upload-utils";
 import {
   type AddDatasetDrawerProps,
   AddOrEditDatasetDrawer,
@@ -281,8 +282,20 @@ export function UploadCSVForm({
    * 409-fallback only: lazily parse the raw file we captured up front, populate
    * `uploadedDataset`, and open the parse-and-drawer flow. This is the single
    * point where the direct path ever parses in-browser.
+   *
+   * Guarded on the legacy 25 MB limit (`MAX_FILE_SIZE_BYTES`): without object
+   * storage this path parses the whole file in the tab, so a multi-GB file would
+   * OOM the browser (the exact failure direct upload avoids). Over the limit we
+   * abort with a clear message instead of parsing.
    */
   const runFallbackParseAndDrawer = async (file: File) => {
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      setUploadError(
+        "This file is too large to upload on this deployment. Large uploads require object storage.",
+      );
+      setIsUploading(false);
+      return;
+    }
     try {
       const rows = await parseFileToRows(file);
       const validName = await proposeValidName(file.name);

@@ -66,23 +66,27 @@ beforeEach(() => vi.clearAllMocks());
 
 describe("getFullDataset()", () => {
   describe("when the dataset is s3_jsonl and ready", () => {
-    it("reads chunks, adapts {id,entry} lines to DatasetRecord shape, and reports the PG row count", async () => {
+    it("reads chunks incrementally, adapts {id,entry} lines to DatasetRecord shape, and reports the PG row count", async () => {
+      // baseDataset has chunkCount 1; "all" reads it one chunk at a time.
       findFirst.mockResolvedValue({ ...baseDataset });
-      const readChunks = mockReadChunks([
-        { id: "r1", entry: { a: 1 } },
-        { id: "r2", entry: { a: 2 } },
-      ]);
+      const { readChunks, readChunk } = mockReadChunk({
+        0: [
+          { id: "r1", entry: { a: 1 } },
+          { id: "r2", entry: { a: 2 } },
+        ],
+      });
 
       const result = await getFullDataset({
         datasetId: "dataset_1",
         projectId: "p1",
       });
 
-      expect(readChunks).toHaveBeenCalledWith({
+      expect(readChunk).toHaveBeenCalledWith({
         projectId: "p1",
         datasetId: "dataset_1",
-        chunkCount: 1,
+        index: 0,
       });
+      expect(readChunks).not.toHaveBeenCalled();
       expect(result?.count).toBe(2); // PG-authoritative rowCount, not read length
       expect(result?.datasetRecords).toEqual([
         {
@@ -215,16 +219,18 @@ describe("getFullDataset()", () => {
   });
 
   describe("when an entrySelection of 'all' is requested", () => {
-    it("reads every chunk (the documented full-read cliff), not a single chunk", async () => {
+    it("reads chunks incrementally (one at a time), never the whole-dataset readChunks", async () => {
       findFirst.mockResolvedValue({ ...twoChunkDataset });
-      const { readChunks, readChunk } = mockReadChunk({});
-      // "all" goes through readChunks (flattened whole-dataset read).
-      readChunks.mockResolvedValue([
-        { id: "r1", entry: { a: 1 } },
-        { id: "r2", entry: { a: 2 } },
-        { id: "r3", entry: { a: 3 } },
-        { id: "r4", entry: { a: 4 } },
-      ]);
+      const { readChunks, readChunk } = mockReadChunk({
+        0: [
+          { id: "r1", entry: { a: 1 } },
+          { id: "r2", entry: { a: 2 } },
+        ],
+        1: [
+          { id: "r3", entry: { a: 3 } },
+          { id: "r4", entry: { a: 4 } },
+        ],
+      });
 
       const result = await getFullDataset({
         datasetId: "dataset_1",
@@ -232,13 +238,118 @@ describe("getFullDataset()", () => {
         entrySelection: "all",
       });
 
-      expect(readChunks).toHaveBeenCalledWith({
+      // Incremental: readChunk per index; whole-dataset readChunks never used.
+      expect(readChunk).toHaveBeenCalledTimes(2);
+      expect(readChunk).toHaveBeenNthCalledWith(1, {
         projectId: "p1",
         datasetId: "dataset_1",
-        chunkCount: 2,
+        index: 0,
       });
-      expect(readChunk).not.toHaveBeenCalled();
+      expect(readChunk).toHaveBeenNthCalledWith(2, {
+        projectId: "p1",
+        datasetId: "dataset_1",
+        index: 1,
+      });
+      expect(readChunks).not.toHaveBeenCalled();
       expect(result?.datasetRecords).toHaveLength(4);
+      expect(result?.count).toBe(4);
+    });
+  });
+
+  // P1#2 — getAll (limitMb 5) on a multi-chunk dataset must STOP reading once
+  // the byte budget is reached and never touch the remaining chunks (I-MEM).
+  describe("when 'all' exceeds the byte budget partway through the chunks", () => {
+    it("stops reading after the limit and does NOT read chunks beyond the budget", async () => {
+      // Two chunks; chunk 0 alone overflows the 1 MB budget, so chunk 1 must
+      // never be read.
+      const bigEntry = "x".repeat(1_200_000); // ~1.2 MB JSON string
+      findFirst.mockResolvedValue({ ...twoChunkDataset });
+      const { readChunks, readChunk } = mockReadChunk({
+        0: [
+          { id: "r1", entry: { a: bigEntry } },
+          { id: "r2", entry: { a: bigEntry } },
+        ],
+        1: [
+          { id: "r3", entry: { a: 3 } },
+          { id: "r4", entry: { a: 4 } },
+        ],
+      });
+
+      const result = await getFullDataset({
+        datasetId: "dataset_1",
+        projectId: "p1",
+        entrySelection: "all",
+        limitMb: 1,
+      });
+
+      // Chunk 0 read; chunk 1 NEVER read (budget hit).
+      expect(readChunk).toHaveBeenCalledWith({
+        projectId: "p1",
+        datasetId: "dataset_1",
+        index: 0,
+      });
+      expect(readChunk).not.toHaveBeenCalledWith({
+        projectId: "p1",
+        datasetId: "dataset_1",
+        index: 1,
+      });
+      expect(readChunks).not.toHaveBeenCalled();
+      expect(result?.truncated).toBe(true);
+      // count stays PG-authoritative even though we stopped early.
+      expect(result?.count).toBe(4);
+    });
+  });
+
+  // P1#2 — a full export (limitMb: null) of a dataset over the safe ceiling must
+  // throw a clear typed error rather than materialize GBs in heap.
+  describe("when a full export would exceed the safe in-heap ceiling", () => {
+    it("throws DatasetTooLargeToExportError without reading any chunk", async () => {
+      findFirst.mockResolvedValue({
+        ...twoChunkDataset,
+        sizeBytes: BigInt(200 * 1024 * 1024), // 200 MB > 100 MB ceiling
+      });
+      const { readChunks, readChunk } = mockReadChunk({});
+
+      await expect(
+        getFullDataset({
+          datasetId: "dataset_1",
+          projectId: "p1",
+          entrySelection: "all",
+          limitMb: null,
+        }),
+      ).rejects.toMatchObject({ name: "DatasetTooLargeToExportError" });
+      expect(readChunk).not.toHaveBeenCalled();
+      expect(readChunks).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a full export is within the safe ceiling", () => {
+    it("reads chunks incrementally and returns every row", async () => {
+      findFirst.mockResolvedValue({
+        ...twoChunkDataset,
+        sizeBytes: BigInt(1024),
+      });
+      const { readChunk } = mockReadChunk({
+        0: [
+          { id: "r1", entry: { a: 1 } },
+          { id: "r2", entry: { a: 2 } },
+        ],
+        1: [
+          { id: "r3", entry: { a: 3 } },
+          { id: "r4", entry: { a: 4 } },
+        ],
+      });
+
+      const result = await getFullDataset({
+        datasetId: "dataset_1",
+        projectId: "p1",
+        entrySelection: "all",
+        limitMb: null,
+      });
+
+      expect(readChunk).toHaveBeenCalledTimes(2);
+      expect(result?.datasetRecords).toHaveLength(4);
+      expect(result?.truncated).toBe(false);
     });
   });
 
