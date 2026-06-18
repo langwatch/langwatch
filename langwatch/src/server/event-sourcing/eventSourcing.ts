@@ -1,15 +1,25 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { SpanKind } from "@opentelemetry/api";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import { getLangWatchTracer } from "langwatch";
 import type { ProcessRole } from "~/server/app-layer/config";
-import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
 import { makeQueueName } from "~/server/background/queues/makeQueueName";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
 import { createLogger } from "~/utils/logger/server";
 import { DisabledPipeline } from "./disabledPipeline";
 import type { Event, Projection } from "./domain/types";
+import type { OutboxReactorDefinition } from "./outbox/outboxReactor.types";
+import { adaptOutboxReactor } from "./outbox/outboxReactorAdapter";
+import {
+  cadenceGroupKey,
+  isCadence,
+  isSettle,
+  type OutboxJob,
+  settleGroupKey,
+} from "./outbox/payload";
+import type { OutboxRuntime } from "./outbox/setup";
 import type {
   NoCommands,
   RegisteredCommand,
@@ -22,29 +32,18 @@ import type {
 import { BILLING_REPORTING_PIPELINE_NAME } from "./pipelines/billing-reporting/pipeline";
 import { createBillingMeterDispatchReactor } from "./projections/global/billingMeterDispatch.reactor";
 import { orgBillableEventsMeterProjection } from "./projections/global/orgBillableEventsMeter.mapProjection";
-import type { ReactorDefinition } from "./reactors/reactor.types";
-import { RedisReplayMarkerChecker } from "./projections/replayMarkerCheck";
-import { ConfigurationError } from "./services/errorHandling";
-
 import { projectDailySdkUsageProjection } from "./projections/global/projectDailySdkUsage.foldProjection";
 import { ProjectionRegistry } from "./projections/projectionRegistry";
-import {
-  cadenceGroupKey,
-  isCadence,
-  isSettle,
-  settleGroupKey,
-  type OutboxJob,
-} from "./outbox/payload";
-import type { OutboxRuntime } from "./outbox/setup";
-import { adaptOutboxReactor } from "./outbox/outboxReactorAdapter";
-import type { OutboxReactorDefinition } from "./outbox/outboxReactor.types";
+import { RedisReplayMarkerChecker } from "./projections/replayMarkerCheck";
 import type {
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
 } from "./queues";
 import { GroupQueueProcessor } from "./queues/groupQueue/groupQueue";
 import { EventSourcedQueueProcessorMemory } from "./queues/memory";
+import type { ReactorDefinition } from "./reactors/reactor.types";
 import { EventSourcingPipeline } from "./runtimePipeline";
+import { ConfigurationError } from "./services/errorHandling";
 import type { JobRegistryEntry } from "./services/queues/queueManager";
 import type { EventStore } from "./stores/eventStore.types";
 import { EventStoreClickHouse } from "./stores/eventStoreClickHouse";

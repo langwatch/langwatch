@@ -1,53 +1,160 @@
-import type { PrismaClient } from "@prisma/client";
 import type { ClickHouseClient } from "@clickhouse/client";
-import { prisma as globalPrisma } from "~/server/db";
+import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
+import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
+import type { PrismaClient } from "@prisma/client";
+import { env } from "~/env.mjs";
 import {
-  clearCustomClientCache,
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
   type ClickHouseClientResolver,
+  clearCustomClientCache,
+  getClickHouseClientForProject,getSharedClickHouseClient, 
+  isClickHouseEnabled
 } from "~/server/clickhouse/clickhouseClient";
 import { closeClickHouseClient } from "~/server/clickhouse/client";
+import { prisma as globalPrisma } from "~/server/db";
+import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
+import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
+import { getEdgeSpoolFailOpenCounter } from "~/server/metrics";
+import { getPostHogInstance } from "~/server/posthog";
+import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
+import { createS3Client } from "~/server/storage";
+import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
+import { liveTriggerNotifier } from "~/server/triggers/triggerNotifier";
+import { createLogger } from "~/utils/logger/server";
+import { getSaaSPlanProvider } from "../../../ee/billing";
+import { NotificationService } from "../../../ee/billing/notifications/notification.service";
+import { NotificationRepository } from "../../../ee/billing/notifications/repositories/notification.repository";
+import { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
+import { NurturingService } from "../../../ee/billing/nurturing/nurturing.service";
+import { handleLicensePurchase } from "../../../ee/billing/services/licensePurchaseHandler";
+import { createSeatEventSubscriptionFns } from "../../../ee/billing/services/seatEventSubscription";
+import { EESubscriptionService } from "../../../ee/billing/services/subscription.service";
+import * as subscriptionItemCalculator from "../../../ee/billing/services/subscriptionItemCalculator";
+import { StripeUsageReportingService } from "../../../ee/billing/services/usageReportingService";
+import {
+  EEWebhookService,
+  type WebhookService,
+} from "../../../ee/billing/services/webhookService";
+import { createStripeClient } from "../../../ee/billing/stripe/stripeClient";
+import { meters } from "../../../ee/billing/stripe/stripePriceCatalog";
+import { FREE_PLAN } from "../../../ee/licensing/constants";
+import { StorageMeterService } from "../data-retention/metering/storageMeter.service";
+import { PinnedTraceRepository } from "../data-retention/pinning/pinnedTrace.repository";
+import { PinnedTraceService } from "../data-retention/pinning/pinnedTrace.service";
+import { DataRetentionPolicyRepository } from "../data-retention/policy/dataRetentionPolicy.repository";
+import { DataRetentionPolicyService } from "../data-retention/policy/dataRetentionPolicy.service";
+import { RetentionPolicyCache } from "../data-retention/retentionPolicyCache";
+import { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
 import { esClient, TRACE_INDEX, traceIndexId } from "../elasticsearch";
 import { EventSourcing } from "../event-sourcing";
 import { buildOutboxRuntime } from "../event-sourcing/outbox/setup";
+import type { PipelineRepositories } from "../event-sourcing/pipelineRegistry";
 import {
-  PipelineRegistry,
   type AppCommands,
+  PipelineRegistry,
 } from "../event-sourcing/pipelineRegistry";
+import { createExperimentRunItemAppendStore } from "../event-sourcing/pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
+import {
+  ExperimentRunStateRepositoryClickHouse,
+  ExperimentRunStateRepositoryMemory,
+} from "../event-sourcing/pipelines/experiment-run-processing/repositories";
 import type { ScenarioExecutionReactorHandle } from "../event-sourcing/pipelines/simulation-processing/reactors/scenarioExecution.reactor";
+import {
+  SimulationRunStateRepositoryClickHouse,
+  SimulationRunStateRepositoryMemory,
+} from "../event-sourcing/pipelines/simulation-processing/repositories";
+import {
+  SuiteRunStateRepositoryClickHouse,
+  SuiteRunStateRepositoryMemory,
+} from "../event-sourcing/pipelines/suite-run-processing/repositories";
+import { ExperimentService } from "../experiments/experiment.service";
+import { InviteService } from "../invites/invite.service";
+import { OrganizationRepository } from "../repositories/organization.repository";
+import { getLicenseHandler } from "../subscriptionHandler";
+import { EventUsageService } from "../traces/event-usage.service";
+import { TraceService } from "../traces/trace.service";
+import { TraceUsageService } from "../traces/trace-usage.service";
+import { runEvaluationWorkflow } from "../workflows/runWorkflow";
 import { App, getApp, globalForApp, initializeApp } from "./app";
+import { PrismaBillingCheckpointService } from "./billing/billingCheckpoint.service";
 import { BroadcastService } from "./broadcast/broadcast.service";
-import { PresenceService } from "./presence/presence.service";
-import { RedisPresenceRepository } from "./presence/repositories/presence.redis.repository";
-import { InMemoryPresenceRepository } from "./presence/repositories/presence.memory.repository";
 import { createClickHouseClientFromConfig } from "./clients/clickhouse.factory";
-import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
-import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
-import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
-import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { NullLangevalsClient } from "./clients/langevals/langevals.client";
 import { LangEvalsHttpClient } from "./clients/langevals/langevals.http.client";
 import { createRedisConnectionFromConfig } from "./clients/redis.factory";
 import { TiktokenClient } from "./clients/tokenizer/tiktoken.client";
 import { NullTokenizerClient } from "./clients/tokenizer/tokenizer.client";
 import {
-  createAppConfigFromEnv,
   type AppConfig,
+  createAppConfigFromEnv,
   type ProcessRole,
 } from "./config";
-import type { AppDependencies } from "./dependencies";
-import { EvaluationExecutionService } from "./evaluations/evaluation-execution.service";
+import type { AppDependencies, DataRetentionDependencies } from "./dependencies";
+import { DspyStepService } from "./dspy-steps/dspy-step.service";
+import { DspyStepClickHouseRepository } from "./dspy-steps/repositories/dspy-step.clickhouse.repository";
+import { NullDspyStepRepository } from "./dspy-steps/repositories/dspy-step.repository";
+import { PrismaEvaluationCostRecorder } from "./evaluations/evaluation-cost.recorder";
 import { createDefaultModelEnvResolver } from "./evaluations/evaluation-execution.factories";
+import { EvaluationExecutionService } from "./evaluations/evaluation-execution.service";
 import { EvaluationRunService } from "./evaluations/evaluation-run.service";
 import { EvaluationRunClickHouseRepository } from "./evaluations/repositories/evaluation-run.clickhouse.repository";
 import { NullEvaluationRunRepository } from "./evaluations/repositories/evaluation-run.repository";
 import { MonitorService } from "./monitors/monitor.service";
 import { PrismaMonitorRepository } from "./monitors/repositories/monitor.prisma.repository";
-import { TriggerService } from "./triggers/trigger.service";
-import { TriggerTemplateService } from "./triggers/trigger-template.service";
-import { PrismaTriggerRepository } from "./triggers/repositories/trigger.prisma.repository";
-import { NullTriggerRepository } from "./triggers/repositories/trigger.repository";
+import { EventExplorerService } from "./ops/event-explorer.service";
+import { getOpsMetricsCollector } from "./ops/metrics-collector";
+import { QueueService } from "./ops/queue.service";
+import { ReplayService } from "./ops/replay.service";
+import { EventExplorerClickHouseRepository } from "./ops/repositories/event-explorer.clickhouse.repository";
+import { NullEventExplorerRepository } from "./ops/repositories/event-explorer.repository";
+import { QueueRedisRepository } from "./ops/repositories/queue.redis.repository";
+import { NullQueueRepository } from "./ops/repositories/queue.repository";
+import { ReplayRedisRepository } from "./ops/repositories/replay.redis.repository";
+import { NullReplayRepository } from "./ops/repositories/replay.repository";
+import { OrganizationService } from "./organizations/organization.service";
+import { PrismaOrganizationRepository } from "./organizations/repositories/organization.prisma.repository";
+import { NullOrganizationRepository } from "./organizations/repositories/organization.repository";
+import { PresenceService } from "./presence/presence.service";
+import { InMemoryPresenceRepository } from "./presence/repositories/presence.memory.repository";
+import { RedisPresenceRepository } from "./presence/repositories/presence.redis.repository";
+import { ProjectService } from "./projects/project.service";
+import { PrismaProjectRepository } from "./projects/repositories/project.prisma.repository";
+import { NullProjectRepository } from "./projects/repositories/project.repository";
+import { PrismaShareRepository } from "./share/repositories/share.prisma.repository";
+import { ShareService } from "./share/share.service";
+import { SimulationRunService } from "./simulations/simulation-run.service";
+import { createCompositePlanProvider } from "./subscription/composite-plan-provider";
+import { PlanProviderService } from "./subscription/plan-provider";
+import type { SubscriptionService } from "./subscription/subscription.service";
+import { SuiteRunService } from "./suites/suite-run.service";
+import { NullTopicRepository } from "./topics/null-topic.repository";
+import { PrismaTopicRepository } from "./topics/topic.prisma.repository";
+import { TopicService } from "./topics/topic.service";
+import { maybeSpool } from "./traces/edge-spool";
+import { LogRecordStorageService } from "./traces/log-record-storage.service";
+import { LogRequestCollectionService } from "./traces/log-request-collection.service";
+import { MetricRecordStorageService } from "./traces/metric-record-storage.service";
+import { MetricRequestCollectionService } from "./traces/metric-request-collection.service";
+import { LogRecordStorageClickHouseRepository } from "./traces/repositories/log-record-storage.clickhouse.repository";
+import { NullLogRecordStorageRepository } from "./traces/repositories/log-record-storage.repository";
+import { MetricRecordStorageClickHouseRepository } from "./traces/repositories/metric-record-storage.clickhouse.repository";
+import { NullMetricRecordStorageRepository } from "./traces/repositories/metric-record-storage.repository";
+import { SpanStorageClickHouseRepository } from "./traces/repositories/span-storage.clickhouse.repository";
+import { NullSpanStorageRepository } from "./traces/repositories/span-storage.repository";
+import { TraceListClickHouseRepository } from "./traces/repositories/trace-list.clickhouse.repository";
+import { NullTraceListRepository } from "./traces/repositories/trace-list.repository";
+import { TraceSummaryClickHouseRepository } from "./traces/repositories/trace-summary.clickhouse.repository";
+import { NullTraceSummaryRepository } from "./traces/repositories/trace-summary.repository";
+import { createSpanDedupeService } from "./traces/span-dedupe.service";
+import { SpanStorageService } from "./traces/span-storage.service";
+import { TokenizerService } from "./traces/tokenizer.service";
+import {
+  setDiscoverBroadcaster,
+  TraceListService,
+} from "./traces/trace-list.service";
+import { TraceRequestCollectionService } from "./traces/trace-request-collection.service";
+import { TraceSummaryService } from "./traces/trace-summary.service";
+import { traced } from "./tracing";
 import { EmailSuppressionService } from "./triggers/emailSuppression.service";
 import {
   PrismaEmailSuppressionNameLookupRepository,
@@ -57,120 +164,11 @@ import {
   NullEmailSuppressionNameLookupRepository,
   NullEmailSuppressionRepository,
 } from "./triggers/repositories/emailSuppression.repository";
-import { liveTriggerNotifier } from "~/server/triggers/triggerNotifier";
-import { ExperimentService } from "../experiments/experiment.service";
-import { OrganizationService } from "./organizations/organization.service";
-import { PrismaOrganizationRepository } from "./organizations/repositories/organization.prisma.repository";
-import { NullOrganizationRepository } from "./organizations/repositories/organization.repository";
-import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
-import { ProjectService } from "./projects/project.service";
-import { PrismaProjectRepository } from "./projects/repositories/project.prisma.repository";
-import { NullProjectRepository } from "./projects/repositories/project.repository";
-import { DspyStepService } from "./dspy-steps/dspy-step.service";
-import { DspyStepClickHouseRepository } from "./dspy-steps/repositories/dspy-step.clickhouse.repository";
-import { NullDspyStepRepository } from "./dspy-steps/repositories/dspy-step.repository";
-import { SimulationRunService } from "./simulations/simulation-run.service";
-import { SuiteRunService } from "./suites/suite-run.service";
-import { createSpanDedupeService } from "./traces/span-dedupe.service";
-import { LogRecordStorageService } from "./traces/log-record-storage.service";
-import { LogRecordStorageClickHouseRepository } from "./traces/repositories/log-record-storage.clickhouse.repository";
-import { NullLogRecordStorageRepository } from "./traces/repositories/log-record-storage.repository";
-import { MetricRecordStorageService } from "./traces/metric-record-storage.service";
-import { MetricRecordStorageClickHouseRepository } from "./traces/repositories/metric-record-storage.clickhouse.repository";
-import { NullMetricRecordStorageRepository } from "./traces/repositories/metric-record-storage.repository";
-import { SpanStorageService } from "./traces/span-storage.service";
-import { SpanStorageClickHouseRepository } from "./traces/repositories/span-storage.clickhouse.repository";
-import { NullSpanStorageRepository } from "./traces/repositories/span-storage.repository";
-import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
-import { maybeSpool } from "./traces/edge-spool";
-import { createS3Client } from "~/server/storage";
-import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
-import { TokenizerService } from "./traces/tokenizer.service";
-import { LogRequestCollectionService } from "./traces/log-request-collection.service";
-import { MetricRequestCollectionService } from "./traces/metric-request-collection.service";
-import { TraceRequestCollectionService } from "./traces/trace-request-collection.service";
-import {
-  setDiscoverBroadcaster,
-  TraceListService,
-} from "./traces/trace-list.service";
-import { TraceListClickHouseRepository } from "./traces/repositories/trace-list.clickhouse.repository";
-import { NullTraceListRepository } from "./traces/repositories/trace-list.repository";
-import { PrismaTopicRepository } from "./topics/topic.prisma.repository";
-import { NullTopicRepository } from "./topics/null-topic.repository";
-import { TopicService } from "./topics/topic.service";
-import { TraceSummaryService } from "./traces/trace-summary.service";
-import { TraceSummaryClickHouseRepository } from "./traces/repositories/trace-summary.clickhouse.repository";
-import { NullTraceSummaryRepository } from "./traces/repositories/trace-summary.repository";
-import { PlanProviderService } from "./subscription/plan-provider";
-import { createCompositePlanProvider } from "./subscription/composite-plan-provider";
-import type { SubscriptionService } from "./subscription/subscription.service";
-import { EESubscriptionService } from "../../../ee/billing/services/subscription.service";
-import {
-  EEWebhookService,
-  type WebhookService,
-} from "../../../ee/billing/services/webhookService";
-import { handleLicensePurchase } from "../../../ee/billing/services/licensePurchaseHandler";
-import { getSaaSPlanProvider } from "../../../ee/billing";
-import { InviteService } from "../invites/invite.service";
-import { env } from "~/env.mjs";
-import { createLogger } from "~/utils/logger/server";
-import { getPostHogInstance } from "~/server/posthog";
-import { getLicenseHandler } from "../subscriptionHandler";
-import { FREE_PLAN } from "../../../ee/licensing/constants";
-import { createStripeClient } from "../../../ee/billing/stripe/stripeClient";
-import { createSeatEventSubscriptionFns } from "../../../ee/billing/services/seatEventSubscription";
-import * as subscriptionItemCalculator from "../../../ee/billing/services/subscriptionItemCalculator";
+import { PrismaTriggerRepository } from "./triggers/repositories/trigger.prisma.repository";
+import { NullTriggerRepository } from "./triggers/repositories/trigger.repository";
+import { TriggerService } from "./triggers/trigger.service";
+import { TriggerTemplateService } from "./triggers/trigger-template.service";
 import { UsageService } from "./usage/usage.service";
-import { TraceUsageService } from "../traces/trace-usage.service";
-import { EventUsageService } from "../traces/event-usage.service";
-import { OrganizationRepository } from "../repositories/organization.repository";
-import { StripeUsageReportingService } from "../../../ee/billing/services/usageReportingService";
-import { meters } from "../../../ee/billing/stripe/stripePriceCatalog";
-import { NotificationService } from "../../../ee/billing/notifications/notification.service";
-import { NurturingService } from "../../../ee/billing/nurturing/nurturing.service";
-import { NotificationRepository } from "../../../ee/billing/notifications/repositories/notification.repository";
-import { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
-import { QueueService } from "./ops/queue.service";
-import { EventExplorerService } from "./ops/event-explorer.service";
-import { ReplayService } from "./ops/replay.service";
-import { QueueRedisRepository } from "./ops/repositories/queue.redis.repository";
-import { NullQueueRepository } from "./ops/repositories/queue.repository";
-import { ReplayRedisRepository } from "./ops/repositories/replay.redis.repository";
-import { NullReplayRepository } from "./ops/repositories/replay.repository";
-import { EventExplorerClickHouseRepository } from "./ops/repositories/event-explorer.clickhouse.repository";
-import { NullEventExplorerRepository } from "./ops/repositories/event-explorer.repository";
-import { getOpsMetricsCollector } from "./ops/metrics-collector";
-import { getEdgeSpoolFailOpenCounter } from "~/server/metrics";
-import { getSharedClickHouseClient } from "~/server/clickhouse/clickhouseClient";
-import { traced } from "./tracing";
-import { TraceService } from "../traces/trace.service";
-import { runEvaluationWorkflow } from "../workflows/runWorkflow";
-import { PrismaEvaluationCostRecorder } from "./evaluations/evaluation-cost.recorder";
-import { PrismaBillingCheckpointService } from "./billing/billingCheckpoint.service";
-import {
-  SuiteRunStateRepositoryClickHouse,
-  SuiteRunStateRepositoryMemory,
-} from "../event-sourcing/pipelines/suite-run-processing/repositories";
-import {
-  SimulationRunStateRepositoryClickHouse,
-  SimulationRunStateRepositoryMemory,
-} from "../event-sourcing/pipelines/simulation-processing/repositories";
-import {
-  ExperimentRunStateRepositoryClickHouse,
-  ExperimentRunStateRepositoryMemory,
-} from "../event-sourcing/pipelines/experiment-run-processing/repositories";
-import { createExperimentRunItemAppendStore } from "../event-sourcing/pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
-import type { PipelineRepositories } from "../event-sourcing/pipelineRegistry";
-import { RetentionPolicyCache } from "../data-retention/retentionPolicyCache";
-import { DataRetentionPolicyRepository } from "../data-retention/policy/dataRetentionPolicy.repository";
-import { DataRetentionPolicyService } from "../data-retention/policy/dataRetentionPolicy.service";
-import { PinnedTraceRepository } from "../data-retention/pinning/pinnedTrace.repository";
-import { PinnedTraceService } from "../data-retention/pinning/pinnedTrace.service";
-import { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
-import { StorageMeterService } from "../data-retention/metering/storageMeter.service";
-import type { DataRetentionDependencies } from "./dependencies";
-import { ShareService } from "./share/share.service";
-import { PrismaShareRepository } from "./share/repositories/share.prisma.repository";
 
 /**
  * Late-bound handle for the scenario execution reactor.

@@ -1,5 +1,5 @@
-import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
+import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import {
@@ -11,23 +11,23 @@ import {
 } from "~/server/filters/triggerFilter.matcher";
 import { createLogger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
+import { createTenantId } from "../../../domain/tenantId";
 import { isDispatchError } from "../../../outbox/dispatchError";
+import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
 import type {
   ReactorContext,
   ReactorDefinition,
 } from "../../../reactors/reactor.types";
-import { createTenantId } from "../../../domain/tenantId";
-import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
-import type { EvaluationProcessingEvent } from "../schemas/events";
-import {
-  isEvaluationCompletedEvent,
-  isEvaluationReportedEvent,
-} from "../schemas/typeGuards";
 import {
   dispatchTriggerAction,
   NOTIFY_TRIGGER_ACTIONS,
   type TriggerActionDispatchDeps,
 } from "../../shared/triggerActionDispatch";
+import type { EvaluationProcessingEvent } from "../schemas/events";
+import {
+  isEvaluationCompletedEvent,
+  isEvaluationReportedEvent,
+} from "../schemas/typeGuards";
 
 const logger = createLogger(
   "langwatch:evaluation-processing:evaluation-alert-trigger-reactor",

@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
+import { DispatchError } from "../../../outbox/dispatchError";
 import {
+  ConfigurationError,
   categorizeError,
   ErrorCategory,
   QueueError,
-  ValidationError,
   SecurityError,
-  ConfigurationError,
+  ValidationError,
 } from "../../../services/errorHandling";
-import { DispatchError } from "../../../outbox/dispatchError";
 import { isRetryableJobError } from "../groupQueue";
 
 describe("groupQueue retry categorization", () => {

@@ -12,9 +12,9 @@ import {
 import type { Monitor, TriggerAction } from "@prisma/client";
 import { Bell, Edit2, Filter, MoreVertical, Plus, Trash } from "react-feather";
 import { CLIENT_PROVIDERS } from "~/automations/providers/client";
+import { FilterDisplay } from "~/components/automations/FilterDisplay";
 import { HoverableBigText } from "~/components/HoverableBigText";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
-import { FilterDisplay } from "~/components/automations/FilterDisplay";
 import { useDrawer } from "~/hooks/useDrawer";
 import { ProjectSelector } from "../../components/DashboardLayout";
 import SettingsLayout from "../../components/SettingsLayout";

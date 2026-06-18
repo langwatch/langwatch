@@ -1,9 +1,9 @@
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { definePipeline } from "../../";
+import type { OutboxReactorDefinition } from "../../outbox/outboxReactor.types";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { AppendStore } from "../../projections/mapProjection.types";
-import type { OutboxReactorDefinition } from "../../outbox/outboxReactor.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
 import { AddAnnotationCommand, BulkSyncAnnotationsCommand, RemoveAnnotationCommand } from "./commands/annotationCommands";
 import { AssignTopicCommand } from "./commands/assignTopicCommand";
@@ -11,8 +11,8 @@ import { ChangeTraceNameCommand } from "./commands/changeTraceNameCommand";
 import { RecordLogCommand } from "./commands/recordLogCommand";
 import { RecordMetricCommand } from "./commands/recordMetricCommand";
 import {
-  RecordSpanCommand,
   RECORD_SPAN_DEDUPLICATION,
+  RecordSpanCommand,
 } from "./commands/recordSpanCommand";
 import { ResolveOriginCommand } from "./commands/resolveOriginCommand";
 import { LogRecordStorageMapProjection } from "./projections/logRecordStorage.mapProjection";
