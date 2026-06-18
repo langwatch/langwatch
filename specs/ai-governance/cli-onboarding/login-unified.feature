@@ -144,7 +144,7 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
     And on selecting (3) it runs both flows in sequence
 
   @bdd @cli @login @endpoint @cloud-repoint @regression
-  Scenario: selecting "LangWatch Cloud" repoints away from a previously-local endpoint
+  Scenario: picking LangWatch Cloud repoints away from a previously-local endpoint
     Given the user has `control_plane_url = http://localhost:5560` persisted
       (or `LANGWATCH_ENDPOINT=http://localhost:5560` exported) from local dev
     And the user is in an interactive terminal

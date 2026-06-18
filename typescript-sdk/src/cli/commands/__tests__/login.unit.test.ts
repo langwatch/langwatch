@@ -215,6 +215,7 @@ describe("loginCommand", () => {
     });
 
     describe("when the user picks LangWatch Cloud despite the local endpoint", () => {
+      /** @scenario "picking LangWatch Cloud repoints away from a previously-local endpoint" */
       it("repoints the persisted endpoint to app.langwatch.ai", async () => {
         promptsMock
           .mockResolvedValueOnce({ where: "cloud" })
