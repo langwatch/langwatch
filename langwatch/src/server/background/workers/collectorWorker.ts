@@ -454,7 +454,10 @@ const processCollectorJob_ = async (
     "ops_pii_strict_presidio_redaction_disabled",
     { distinctId: project.id, defaultValue: false },
   );
-  if (!strictPiiRedactionDisabled && DEFAULT_PII_REDACTION_LEVEL !== "DISABLED") {
+  if (
+    !strictPiiRedactionDisabled &&
+    DEFAULT_PII_REDACTION_LEVEL !== "DISABLED"
+  ) {
     const piiEnforced = env.NODE_ENV === "production";
     await withSpan("cleanupPIIs", () =>
       cleanupPIIs(trace, esSpans, {
