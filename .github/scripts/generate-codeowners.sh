@@ -125,6 +125,32 @@ go_rule() {
   printf '%-46s %s\n' "$pattern" "$owners"
 }
 
+# warn_unmapped_contributors — the identity map in owners_for() drops any
+# author it doesn't recognise. That's correct for one-off external authors,
+# but it would also silently exclude a new *internal* contributor who simply
+# isn't in the map yet. Run once over all history and warn (to stderr, never
+# failing the run) about prolific authors that fall through the map, so the
+# map can be kept current. Keep the bot/exclude/map patterns below in sync
+# with owners_for().
+PROLIFIC_UNMAPPED_MIN=30
+warn_unmapped_contributors() {
+  git log --all --no-merges --format='%ae' 2>/dev/null | awk -v min="$PROLIFIC_UNMAPPED_MIN" '
+    {
+      e = tolower($0)
+      if (e ~ /\[bot\]|dependabot|github-actions|coderabbit|copilot|snyk-bot|langwatch-agent|langwatchagent|krusty@langwatch|orchardist/) next
+      if (e ~ /ip-[0-9].*compute\.internal/) next
+      if (e ~ /richhuth/) next            # intentionally excluded
+      if (e ~ /budnyk|eugenumber/) next   # intentionally excluded
+      if (e ~ /rogeriochaves|rogerio@langwatch|alex\.forbes\.red|0xdeafcafe|drewdrewthis|andrew@langwatch|sergioestebance|sergio\.esteban|aryansharma|aryan@langwatch|jpwakugawa|wakugawa/) next
+      u[e]++
+    }
+    END {
+      for (e in u)
+        if (u[e] >= min)
+          printf "WARNING: unmapped contributor %s (%d commits) is not in the identity map; add them to generate-codeowners.sh if they should be eligible for ownership.\n", e, u[e] > "/dev/stderr"
+    }'
+}
+
 generate() {
   cat <<'HEADER'
 # CODEOWNERS — GENERATED FILE, DO NOT EDIT BY HAND.
@@ -169,10 +195,12 @@ SECTION
   rule "/agentic-e2e-tests/"
   rule "/Makefile"
   rule "/boxd.mk"
-  rule "/*.mk" "*.mk"
-  rule "/compose*.yml" "compose*.yml"
-  rule "/Dockerfile" "Dockerfile"
-  rule "/Dockerfile.*" "Dockerfile.*"
+  # `:(glob)` keeps `*` from crossing `/`, so these pathspecs match only
+  # root-level files — mirroring the root-anchored CODEOWNERS patterns.
+  rule "/*.mk" ":(glob)*.mk"
+  rule "/compose*.yml" ":(glob)compose*.yml"
+  rule "/Dockerfile" ":(glob)Dockerfile"
+  rule "/Dockerfile.*" ":(glob)Dockerfile.*"
   rule "/CLAUDE.md"
 
   cat <<'SECTION'
@@ -360,5 +388,6 @@ SECTION
   rule "/langwatch/src/components/workflows/"
 }
 
+warn_unmapped_contributors
 generate > "$TARGET"
 echo "Wrote $TARGET"

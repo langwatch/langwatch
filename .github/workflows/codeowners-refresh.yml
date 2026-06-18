@@ -12,10 +12,9 @@ on:
     - cron: "0 6 * * 1"
   workflow_dispatch:
 
-# Don't run on forks — this pushes a branch and opens a PR.
-permissions:
-  contents: write
-  pull-requests: write
+# Least privilege: no permissions at the workflow level; the refresh job
+# escalates only the scopes it needs.
+permissions: {}
 
 concurrency:
   group: codeowners-refresh
@@ -23,8 +22,12 @@ concurrency:
 
 jobs:
   refresh:
+    # Don't run on forks — this pushes a branch and opens a PR.
     if: github.repository == 'langwatch/langwatch'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the chore/codeowners-refresh branch
+      pull-requests: write # open / update the refresh PR
     steps:
       - name: Checkout (full history)
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
