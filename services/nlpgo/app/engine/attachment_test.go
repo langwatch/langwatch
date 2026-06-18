@@ -297,7 +297,7 @@ func TestNormalizeMediaType(t *testing.T) {
 	assert.Equal(t, "image/png", normalizeMediaType("image/png"))
 	assert.Equal(t, "image/jpeg", normalizeMediaType("IMAGE/JPEG; charset=binary"))
 	assert.Equal(t, "text/html", normalizeMediaType("text/html;charset=utf-8"))
-	assert.Equal(t, "", normalizeMediaType(""))
+	assert.Empty(t, normalizeMediaType(""))
 }
 
 func TestTrimTrailingPunct(t *testing.T) {
@@ -307,5 +307,5 @@ func TestTrimTrailingPunct(t *testing.T) {
 
 	url, trailing = trimTrailingPunct("https://x/cat.png")
 	assert.Equal(t, "https://x/cat.png", url)
-	assert.Equal(t, "", trailing)
+	assert.Empty(t, trailing)
 }
