@@ -134,6 +134,22 @@ export const migrateDatasetToS3 = async (
         records: lines,
         fromIndex: 0,
       });
+
+      // Defensive orphan-chunk cleanup (I-IDEM). A crashed prior run could have
+      // written MORE chunks than this run does (e.g. if it failed mid-write, or
+      // a future change makes the corpus shrinkable) — those tail chunks would
+      // be orphaned, since `writeChunks` overwrites by key but never deletes
+      // beyond what it writes. Drop everything from `written.length` upward so a
+      // shorter re-run can never leave dangling `chunk-{n}` objects. Harmless
+      // today (the PG corpus is frozen → re-runs write the same count), but it
+      // future-proofs the flow and is cheap (stops at the first contiguous gap).
+      // Called unconditionally: simpler than gating on "could there be priors"
+      // and the no-op cost (one HEAD that 404s) is negligible.
+      await storage.deleteChunksFrom({
+        projectId,
+        datasetId: dataset.id,
+        fromIndex: written.length,
+      });
       const meta = chunkedMeta(written);
 
       // Flip the dataset onto the s3_jsonl layout in the SAME locked

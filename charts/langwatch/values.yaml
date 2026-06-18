@@ -721,6 +721,20 @@ workers:
 # S3-configured), so it is safe to fire on every `helm upgrade`. Image + env
 # mirror the workers Deployment (same app image, same shared env). See
 # templates/dataset-s3-migration-job.yaml.
+#
+# RELEASE-FAILURE SEMANTICS: this is a post-install,post-upgrade hook, so a
+# CATASTROPHIC, top-level task failure (DB unreachable, storage hard-down — NOT
+# a per-dataset error, which is caught and logged so the run continues) fails
+# the Helm release. This is deliberate: the task throws on such failures so the
+# problem stays visible rather than being silently swallowed. Recovery is
+# low-risk because the run is IDEMPOTENT and SELF-RESUMING — already-migrated
+# datasets are skipped under the advisory lock and a half-written dataset is
+# re-driven (overwrite-by-key + atomic flip), so simply re-running the upgrade
+# after fixing the underlying outage completes the migration. To unblock a
+# deploy WITHOUT waiting on the migration, set `datasetS3Migration.skip: true`
+# (below): the hook Job is not rendered and the release proceeds; datasets stay
+# on the `postgres` layout (and keep reading from PG) until a later upgrade with
+# `skip: false` migrates them.
 ## @section Dataset S3 migration
 datasetS3Migration:
   ## @param datasetS3Migration.enabled [default: true] Render the post-install/post-upgrade migration hook Job.

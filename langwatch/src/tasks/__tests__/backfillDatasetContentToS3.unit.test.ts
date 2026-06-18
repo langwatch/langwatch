@@ -73,8 +73,14 @@ const makePrisma = (row: Dataset | null) => {
   return { prisma, tx, update, findFirst, queryRaw };
 };
 
-const makeStorage = (writeChunks: ReturnType<typeof vi.fn>) => ({
+const makeStorage = (
+  writeChunks: ReturnType<typeof vi.fn>,
+  deleteChunksFrom: ReturnType<typeof vi.fn> = vi
+    .fn()
+    .mockResolvedValue(undefined),
+) => ({
   writeChunks,
+  deleteChunksFrom,
 });
 
 const makeDeps = (overrides: Partial<BackfillDeps> = {}): BackfillDeps =>
@@ -142,6 +148,87 @@ describe("backfillDatasetContentToS3", () => {
           chunkOffsets: [{ index: 0, startRow: 0, endRow: 2, byteSize: 42 }],
           contentLayout: "s3_jsonl",
         });
+      });
+
+      /**
+       * @scenario The storage migration is safe to run more than once
+       *
+       * Orphan-chunk cleanup (I-IDEM): after writing, the migration drops any
+       * chunk objects from `written.length` upward so a re-drive that produced
+       * fewer chunks than a crashed prior run can't leave dangling `chunk-{n}`
+       * objects (no duplicated or lost rows on re-run).
+       */
+      it("deletes orphan chunks from the written count upward (defensive, I-IDEM)", async () => {
+        const row = makeDataset({ contentLayout: "postgres" });
+        const { prisma } = makePrisma(row);
+        const findDatasetRecords = vi
+          .fn()
+          .mockResolvedValue([makeRecord("rec_a", { q: "1" })]);
+        const writeChunks = vi.fn().mockResolvedValue([
+          { index: 0, rowCount: 1, byteSize: 20, startRow: 0, endRow: 1 },
+          { index: 1, rowCount: 1, byteSize: 20, startRow: 1, endRow: 2 },
+        ]);
+        const deleteChunksFrom = vi.fn().mockResolvedValue(undefined);
+        const deps = makeDeps({
+          prisma: prisma as never,
+          recordRepository: { findDatasetRecords } as never,
+          getStorage: vi
+            .fn()
+            .mockResolvedValue(makeStorage(writeChunks, deleteChunksFrom)),
+        });
+
+        await migrateDatasetToS3({ dataset: row, projectId: "p1" }, deps);
+
+        // Wrote 2 chunks → delete everything from index 2 upward.
+        expect(deleteChunksFrom).toHaveBeenCalledWith({
+          projectId: "p1",
+          datasetId: "dataset_1",
+          fromIndex: 2,
+        });
+      });
+
+      /**
+       * @scenario An existing dataset stays usable after the storage migration
+       *
+       * "The same rows as before" includes row ORDER. The deterministic
+       * `createdAt asc, id asc` order is enforced at the `findDatasetRecords`
+       * repository read (asserted in dataset-record.repository.unit.test.ts);
+       * this guards the migration SIDE of the contract: it must write rows in
+       * exactly the order the repo returns them — never re-sorting or
+       * reshuffling — so chunk/row order matches the PG read paths and is stable
+       * across crash-resume re-runs.
+       */
+      it("writes rows to S3 in the exact order findDatasetRecords returns them (no reshuffle)", async () => {
+        const row = makeDataset({ contentLayout: "postgres" });
+        const { prisma } = makePrisma(row);
+        // Repo returns rows already in canonical createdAt/id order.
+        const findDatasetRecords = vi
+          .fn()
+          .mockResolvedValue([
+            makeRecord("rec_a", { n: 1 }),
+            makeRecord("rec_b", { n: 2 }),
+            makeRecord("rec_c", { n: 3 }),
+          ]);
+        const writeChunks = vi
+          .fn()
+          .mockResolvedValue([
+            { index: 0, rowCount: 3, byteSize: 60, startRow: 0, endRow: 3 },
+          ]);
+        const deps = makeDeps({
+          prisma: prisma as never,
+          recordRepository: { findDatasetRecords } as never,
+          getStorage: vi.fn().mockResolvedValue(makeStorage(writeChunks)),
+        });
+
+        await migrateDatasetToS3({ dataset: row, projectId: "p1" }, deps);
+
+        // writeChunks must receive the rows in the SAME order the repo yielded.
+        const writeArgs = writeChunks.mock.calls[0]![0];
+        expect(writeArgs.records).toEqual([
+          { id: "rec_a", entry: { n: 1 } },
+          { id: "rec_b", entry: { n: 2 } },
+          { id: "rec_c", entry: { n: 3 } },
+        ]);
       });
 
       it("does not delete the PG DatasetRecord rows (non-destructive, I-MIG)", async () => {
