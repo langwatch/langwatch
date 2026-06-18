@@ -265,12 +265,13 @@ export const projectRouter = createTRPCRouter({
           },
         });
 
-        // Audit log the security-critical action
+        // Audit log the security-critical action; non-fatal so an audit
+        // failure cannot prevent returning the new key to the user.
         await auditLog({
           action: "project.apiKey.regenerated",
           userId: ctx.session.user.id,
           projectId: input.projectId,
-        });
+        }).catch(captureException);
 
         return { apiKey: project.apiKey };
       } catch (error) {
