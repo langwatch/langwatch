@@ -6,8 +6,9 @@ import { env } from "~/env.mjs";
 import {
   type ClickHouseClientResolver,
   clearCustomClientCache,
-  getClickHouseClientForProject,getSharedClickHouseClient, 
-  isClickHouseEnabled
+  getClickHouseClientForProject,
+  getSharedClickHouseClient,
+  isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
 import { closeClickHouseClient } from "~/server/clickhouse/client";
 import { prisma as globalPrisma } from "~/server/db";
@@ -89,7 +90,10 @@ import {
   createAppConfigFromEnv,
   type ProcessRole,
 } from "./config";
-import type { AppDependencies, DataRetentionDependencies } from "./dependencies";
+import type {
+  AppDependencies,
+  DataRetentionDependencies,
+} from "./dependencies";
 import { DspyStepService } from "./dspy-steps/dspy-step.service";
 import { DspyStepClickHouseRepository } from "./dspy-steps/repositories/dspy-step.clickhouse.repository";
 import { NullDspyStepRepository } from "./dspy-steps/repositories/dspy-step.repository";
