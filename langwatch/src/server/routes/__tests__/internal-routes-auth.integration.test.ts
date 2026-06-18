@@ -28,18 +28,17 @@ describe("internal/service route authentication", () => {
   describe("when a destructive cron route is called", () => {
     /** @scenario "A destructive cron route rejects callers without the secret" */
     it("rejects a request with no Authorization header", async () => {
-      const res = await cronApp.request(
-        "/api/cron/old_lambdas_cleanup",
-        { method: "POST" },
-      );
+      const res = await cronApp.request("/api/cron/old_lambdas_cleanup", {
+        method: "POST",
+      });
       expect(res.status).toBe(401);
     });
 
     it("rejects a request with the wrong secret", async () => {
-      const res = await cronApp.request(
-        "/api/cron/old_lambdas_cleanup",
-        { method: "POST", headers: { authorization: "Bearer wrong" } },
-      );
+      const res = await cronApp.request("/api/cron/old_lambdas_cleanup", {
+        method: "POST",
+        headers: { authorization: "Bearer wrong" },
+      });
       expect(res.status).toBe(401);
     });
   });

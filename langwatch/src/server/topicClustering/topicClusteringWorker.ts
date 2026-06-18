@@ -2,14 +2,11 @@ import { type Job, Worker } from "bullmq";
 import { BullMQOtel } from "bullmq-otel";
 import { withJobContext } from "~/server/queues/withJobContext";
 import { createLogger } from "../../utils/logger/server";
+import { captureException, withScope } from "../../utils/posthogErrorCapture";
 import {
-  captureException,
-  withScope,
-} from "../../utils/posthogErrorCapture";
-import {
-  recordJobWaitDuration,
   getJobProcessingCounter,
   getJobProcessingDurationHistogram,
+  recordJobWaitDuration,
 } from "../metrics";
 import { connection } from "../redis";
 import { clusterTopicsForProject } from "./topicClustering";

@@ -11,11 +11,7 @@ import {
   getEvaluationStatusCounter,
   getPiiChecksCounter,
 } from "../../metrics";
-import type {
-  ElasticSearchSpan,
-  ElasticSearchTrace,
-  Trace,
-} from "../types";
+import type { ElasticSearchSpan, ElasticSearchTrace, Trace } from "../types";
 
 const logger = createLogger("langwatch:workers:collector:piiCheck");
 
