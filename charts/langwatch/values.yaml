@@ -711,6 +711,59 @@ workers:
   extraVolumeMounts: []
 
 # =============================================================================
+# Dataset PG→S3 backfill migration (ADR-032 Decision 7, rung 5)
+# =============================================================================
+# A post-install,post-upgrade hook Job that runs the
+# `backfillDatasetContentToS3` task — flipping existing datasets whose content
+# still lives in Postgres onto the chunked-JSONL S3 layout. It runs OFF the boot
+# path (after the deploy completes), is idempotent, advisory-locked and
+# self-skipping (no-op when no postgres-layout datasets remain or storage isn't
+# S3-configured), so it is safe to fire on every `helm upgrade`. Image + env
+# mirror the workers Deployment (same app image, same shared env). See
+# templates/dataset-s3-migration-job.yaml.
+## @section Dataset S3 migration
+datasetS3Migration:
+  ## @param datasetS3Migration.enabled [default: true] Render the post-install/post-upgrade migration hook Job.
+  enabled: true
+  # Operator opt-out for the migration (ADR-032 SKIP_DATASET_S3_MIGRATE). When
+  # true the hook Job is not rendered at all; the task additionally self-skips
+  # at runtime if it ever runs with this env set.
+  ## @param datasetS3Migration.skip [default: false] Disable the dataset PG→S3 backfill migration entirely.
+  skip: false
+  ## @param datasetS3Migration.backoffLimit [default: 3] Job backoffLimit — retries on transient failure (the task is idempotent).
+  backoffLimit: 3
+  ## @param datasetS3Migration.activeDeadlineSeconds [object] Hard runtime limit for the hook Job (unset = no limit).
+  activeDeadlineSeconds: ~
+  ## @param datasetS3Migration.ttlSecondsAfterFinished [default: 600] Clean up the finished Job after this many seconds.
+  ttlSecondsAfterFinished: 600
+  ## @extra datasetS3Migration.resources Resource requests and limits for the migration Job.
+  ## @param datasetS3Migration.resources.requests.cpu [string, default: 100m] Requested CPU.
+  ## @param datasetS3Migration.resources.requests.memory [string, default: 512Mi] Requested memory.
+  ## @param datasetS3Migration.resources.limits.cpu [string, default: 1000m] CPU limit.
+  ## @param datasetS3Migration.resources.limits.memory [string, default: 2Gi] Memory limit.
+  resources:
+    requests: { cpu: 100m, memory: 512Mi }
+    limits: { cpu: 1000m, memory: 2Gi }
+  # Per-hook overrides; empty defaults fall through to global.* via the
+  # coalesce chain in the template (same convention as workers / preflight).
+  ## @param datasetS3Migration.podSecurityContext [object] Pod security context override.
+  podSecurityContext: {}
+  ## @param datasetS3Migration.containerSecurityContext [object] Container security context override.
+  containerSecurityContext: {}
+  ## @param datasetS3Migration.nodeSelector [object] Node selector override.
+  nodeSelector: {}
+  ## @param datasetS3Migration.tolerations [array] Tolerations override.
+  tolerations: []
+  ## @param datasetS3Migration.affinity [object] Affinity override.
+  affinity: {}
+  ## @param datasetS3Migration.extraEnvs [array] Additional environment variables for the migration Job.
+  extraEnvs: []
+  ## @param datasetS3Migration.extraVolumes [array] Additional pod volumes.
+  extraVolumes: []
+  ## @param datasetS3Migration.extraVolumeMounts [array] Additional volume mounts.
+  extraVolumeMounts: []
+
+# =============================================================================
 # LangWatch NLP Service Configuration
 # =============================================================================
 # Configuration for the NLP service (nlpgo).

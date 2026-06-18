@@ -90,13 +90,13 @@ Feature: Large dataset storage
   # Migration of existing datasets
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: An existing dataset stays usable after the storage migration
     Given a dataset created before the storage migration
     When the migration runs
     Then reading the dataset returns the same rows as before
 
-  @integration @unimplemented
+  @integration
   Scenario: The storage migration is safe to run more than once
     Given a dataset that has already been migrated
     When the migration runs again
