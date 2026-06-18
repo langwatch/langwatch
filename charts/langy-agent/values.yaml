@@ -81,15 +81,16 @@ containerSecurityContext:
   capabilities:
     drop: ["ALL"]
 
-# FUTURE HARDENING — gVisor sandbox (NOT wired yet, intentional reminder).
-# This pod runs LLM-driven arbitrary code: opencode workers shell out to
-# git/npm/gh, so the headline risk is a worker breaking OUT of the container
-# to the node. Running under gVisor (runsc) inserts a user-space kernel
-# between the worker and the host kernel, shrinking that node-escape surface.
-# To enable: add a `runtimeClassName` field to templates/deployment.yaml,
-# then set it here to a RuntimeClass the cluster defines (e.g. `gvisor` on
-# GKE Sandbox). Caveat: gVisor hardens pod->host only, NOT worker->worker
-# inside this single pod — that would need per-user pods, a separate design.
+# Sandboxed container runtime for this pod. The agent runs LLM-driven
+# arbitrary code (opencode workers shell out to git/npm/gh), so the headline
+# risk is a worker breaking OUT of the container to the node. Set this to a
+# RuntimeClass the cluster defines that maps to a sandbox runtime — e.g.
+# `gvisor` (runsc), which inserts a user-space kernel between the worker and
+# the host kernel and shrinks that node-escape surface.
+# Empty (default) → field is omitted, kubelet uses the node's default runtime,
+# existing installs unchanged. Caveat: this hardens pod->host only, NOT
+# worker->worker inside this single pod — that would need per-user pods.
+runtimeClassName: ""
 
 networkPolicy:
   enabled: true
