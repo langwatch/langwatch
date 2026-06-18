@@ -354,6 +354,7 @@ run_frontend_only() {
   echo ""
   echo "Tip: pure UI / design / static iteration. URLs come from langwatch/.env."
   echo "     For services on top: switch to all-local, all-local-nlp, or full-local."
+  (cd langwatch && SKIP_CLICKHOUSE_MIGRATE=true SKIP_PRISMA_MIGRATE=true pnpm dev)
 }
 
 run_migration() {
