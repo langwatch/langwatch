@@ -11,6 +11,7 @@ Project coding conventions. See also `../TESTING_PHILOSOPHY.md`.
 - **icon-button-labels.md** - Pair icon buttons with a text label; when icon-only is OK
 - **copywriting.md** - User-facing copy: write for first-time customers, never leak internals or history
 - **drawers.md** - URL-routed drawers
+- **async-processing-ui.md** - Poll/banner/read-gate pattern for a processing→ready/failed resource
 - **soft-delete-vs-archive.md** - When to archive vs hard-delete
 - **logging-and-tracing.md** - Logging infrastructure and context propagation
 - **dependency-age-gates.md** - Dependency release-age gates and emergency security exceptions
