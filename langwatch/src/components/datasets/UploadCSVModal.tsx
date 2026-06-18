@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import {
   formatFileSize,
   jsonToCSV as papaparseJsonToCSV,
+  readString as papaparseReadString,
   useCSVReader,
   usePapaParse,
 } from "react-papaparse";
@@ -197,6 +198,19 @@ export function UploadCSVForm({
     return validName;
   };
 
+  const proposeValidName = async (filename: string): Promise<string> => {
+    let validName = "New Dataset";
+    try {
+      // Propose new name based on the file name.
+      validName = filename.split(".")[0] || validName;
+      // Try to get a valid name from the DB, in case it's already taken.
+      validName = await getValidName(validName);
+    } catch (error) {
+      logger.error({ error }, "Failed to get valid name");
+    }
+    return validName;
+  };
+
   const handleUploadAccepted = async (results: {
     data: string[][];
     acceptedFile: File;
@@ -205,66 +219,19 @@ export function UploadCSVForm({
     setRawFile(acceptedFile);
     setUploadError(null);
 
-    // Check for reserved column names and rename them
-    const originalColumnNames = data[0] ?? [];
-    const existingNames = new Set<string>();
-    const columns: DatasetColumns = originalColumnNames.map((col: string) => {
-      const safeColumnName = getSafeColumnName(col, existingNames);
-
-      // Add the safe name to the set to prevent future collisions
-      existingNames.add(safeColumnName);
-
-      // If this column name was changed, show a warning to the user
-      if (safeColumnName !== col) {
-        toaster.create({
-          title: "Column Renamed",
-          description: `Column "${col}" is reserved or conflicts with existing columns and has been renamed to "${safeColumnName}"`,
-          type: "warning",
-          meta: {
-            closable: true,
-          },
-        });
-      }
-
-      return {
-        name: safeColumnName,
-        type: "string" as const,
-      };
-    });
-
-    const now = new Date().getTime();
-    const records: DatasetRecordEntry[] = data
-      .slice(1)
-      .map((row: string[], index: number) => ({
-        id: `${now}-${index}`,
-        ...Object.fromEntries(row.map((col, i) => [columns[i]?.name, col])),
-      }));
-
-    let validName = "New Dataset";
-    try {
-      // Propose new name based on the file name
-      const proposedName = acceptedFile.name.split(".")[0];
-      // If the proposed name is undefined, use the default name
-      validName = proposedName ?? validName;
-      // Try to get a valid name from the DB, in case it's already taken
-      validName = await getValidName(validName);
-    } catch (error) {
-      logger.error({ error }, "Failed to get valid name");
-    }
-
-    setUploadedDataset({
-      datasetRecords: records,
-      columnTypes: columns,
-      name: validName,
-    });
+    const validName = await proposeValidName(acceptedFile.name);
+    setUploadedDataset(buildDatasetFromRows(data, validName));
   };
 
   /**
    * Direct-to-storage path (ADR-032 D4): request a presigned PUT, stream the
    * raw file, finalize, then navigate to the dataset page where the processing
-   * banner takes over. On no-storage installs this throws
-   * `DirectUploadUnavailableError` and we fall back to the parse-and-drawer
-   * flow so small/self-hosted setups are unaffected.
+   * banner takes over. The raw file is captured WITHOUT an in-browser parse
+   * (see `onRawFile` below), so a multi-GB file never OOMs the tab on the happy
+   * path. On no-storage installs `requestDirectUpload` throws
+   * `DirectUploadUnavailableError`; only THEN do we lazily parse the captured
+   * file and fall back to the parse-and-drawer flow, so small/self-hosted
+   * setups are unaffected.
    */
   const handleUpload = async () => {
     if (!enableDirectUpload || !rawFile || !projectId || !project) {
@@ -275,7 +242,8 @@ export function UploadCSVForm({
     setIsUploading(true);
     setUploadError(null);
     try {
-      const name = uploadedDataset?.name ?? (await getValidName("New Dataset"));
+      const name =
+        uploadedDataset?.name ?? (await proposeValidName(rawFile.name));
       const { datasetId, uploadUrl } = await requestDirectUpload({
         projectId,
         name,
@@ -293,9 +261,10 @@ export function UploadCSVForm({
       void router.push(`/${project.slug}/datasets/${datasetId}`);
     } catch (error) {
       if (error instanceof DirectUploadUnavailableError) {
-        // No browser-reachable storage: keep the existing parse-and-drawer flow.
-        setIsUploading(false);
-        uploadCSVData();
+        // No browser-reachable storage: parse the already-captured file NOW
+        // (the first and only in-browser parse on this path) and hand off to
+        // the existing parse-and-drawer flow.
+        await runFallbackParseAndDrawer(rawFile);
         return;
       }
       logger.error({ error }, "Direct dataset upload failed");
@@ -303,6 +272,29 @@ export function UploadCSVForm({
         error instanceof Error
           ? error.message
           : "Something went wrong uploading your file. Please try again.",
+      );
+      setIsUploading(false);
+    }
+  };
+
+  /**
+   * 409-fallback only: lazily parse the raw file we captured up front, populate
+   * `uploadedDataset`, and open the parse-and-drawer flow. This is the single
+   * point where the direct path ever parses in-browser.
+   */
+  const runFallbackParseAndDrawer = async (file: File) => {
+    try {
+      const rows = await parseFileToRows(file);
+      const validName = await proposeValidName(file.name);
+      setUploadedDataset(buildDatasetFromRows(rows, validName));
+      setIsUploading(false);
+      uploadCSVData();
+    } catch (error) {
+      logger.error({ error }, "Fallback parse of dataset file failed");
+      setUploadError(
+        error instanceof Error
+          ? error.message
+          : "Something went wrong reading your file. Please try again.",
       );
       setIsUploading(false);
     }
@@ -324,7 +316,14 @@ export function UploadCSVForm({
   return (
     <VStack width="full" align="start" gap={4}>
       <CSVReaderComponent
+        // Direct path: capture only the raw File (no parse). Fallback/picker
+        // path: parse immediately for synchronous columns/records.
+        parse={!enableDirectUpload}
         onUploadAccepted={handleUploadAccepted}
+        onRawFile={(file) => {
+          setRawFile(file);
+          setUploadError(null);
+        }}
         onUploadRemoved={() => {
           setUploadedDataset(undefined);
           setRawFile(null);
@@ -374,6 +373,59 @@ export function UploadCSVForm({
 export function CSVReaderComponent({
   onUploadAccepted,
   onUploadRemoved,
+  onRawFile,
+  parse = true,
+  children,
+}: {
+  onUploadAccepted: (results: {
+    data: string[][];
+    acceptedFile: File;
+  }) => void | Promise<void>;
+  onUploadRemoved?: () => void;
+  /**
+   * Raw-file callback for the no-parse path: receives the dropped `File` (or
+   * `null` on removal) WITHOUT any in-browser parse. Required when `parse` is
+   * false; ignored otherwise.
+   */
+  onRawFile?: (file: File | null) => void;
+  /**
+   * When false, the dropzone captures only the raw `File` and never runs
+   * PapaParse / `readString` — so a multi-GB file does not OOM the browser
+   * before the direct upload (ADR-032 D4). The default (true) keeps the
+   * parse-and-emit behaviour `AddRowsFromCSVModal` and the no-storage fallback
+   * rely on for synchronous columns/records.
+   */
+  parse?: boolean;
+  children?: (hasAcceptedFile: boolean) => React.ReactNode;
+}) {
+  if (!parse) {
+    return (
+      <RawFileDropzone onRawFile={onRawFile} onUploadRemoved={onUploadRemoved}>
+        {children}
+      </RawFileDropzone>
+    );
+  }
+
+  return (
+    <ParsingCSVReader
+      onUploadAccepted={onUploadAccepted}
+      onUploadRemoved={onUploadRemoved}
+    >
+      {children}
+    </ParsingCSVReader>
+  );
+}
+
+/**
+ * Parse-and-emit dropzone: runs PapaParse (and a JSON/JSONL→CSV pre-parse) on
+ * the dropped file so callers get `{ data, acceptedFile }` synchronously. Used
+ * by `AddRowsFromCSVModal` and the no-storage fallback, which need columns and
+ * records up front. NOT used on the direct-upload happy path (see
+ * `RawFileDropzone`) — this parse is what OOMs the browser on big files.
+ */
+function ParsingCSVReader({
+  onUploadAccepted,
+  onUploadRemoved,
   children,
 }: {
   onUploadAccepted: (results: {
@@ -409,23 +461,7 @@ export function CSVReaderComponent({
       onUploadAccepted={async (results: { data: string[][] }, file: File) => {
         if (file.name.endsWith(".jsonl") || file.name.endsWith(".json")) {
           try {
-            const contents = await file.text();
-            let jsonContents;
-            try {
-              jsonContents = JSON.parse(contents);
-            } catch {
-              // If the file is not a valid JSON, try to parse it as a JSONL file
-              jsonContents = JSON.parse(
-                "[" +
-                  contents
-                    .trim()
-                    .split("\n")
-                    .filter((line) => line.trim() !== "")
-                    .join(", ") +
-                  "]",
-              );
-            }
-            readString(jsonToCSV(jsonContents), {
+            readString(jsonFileTextToCSV(await file.text()), {
               skipEmptyLines: "greedy",
               complete: (results) => {
                 setResults({ data: results.data as string[][] });
@@ -487,6 +523,91 @@ export function CSVReaderComponent({
       }}
     </CSVReader>
   );
+}
+
+/**
+ * Build an in-memory dataset from already-parsed CSV rows (header + body),
+ * renaming reserved/colliding columns and toasting the rename. Shared by the
+ * immediate-parse path and the no-storage fallback so both produce identical
+ * datasets.
+ */
+function buildDatasetFromRows(data: string[][], name: string): InMemoryDataset {
+  const originalColumnNames = data[0] ?? [];
+  const existingNames = new Set<string>();
+  const columns: DatasetColumns = originalColumnNames.map((col: string) => {
+    const safeColumnName = getSafeColumnName(col, existingNames);
+
+    // Add the safe name to the set to prevent future collisions
+    existingNames.add(safeColumnName);
+
+    // If this column name was changed, show a warning to the user
+    if (safeColumnName !== col) {
+      toaster.create({
+        title: "Column Renamed",
+        description: `Column "${col}" is reserved or conflicts with existing columns and has been renamed to "${safeColumnName}"`,
+        type: "warning",
+        meta: {
+          closable: true,
+        },
+      });
+    }
+
+    return {
+      name: safeColumnName,
+      type: "string" as const,
+    };
+  });
+
+  const now = new Date().getTime();
+  const records: DatasetRecordEntry[] = data
+    .slice(1)
+    .map((row: string[], index: number) => ({
+      id: `${now}-${index}`,
+      ...Object.fromEntries(row.map((col, i) => [columns[i]?.name, col])),
+    }));
+
+  return { datasetRecords: records, columnTypes: columns, name };
+}
+
+/**
+ * Parse a raw CSV/JSON/JSONL file into header+body rows. Used ONLY by the
+ * no-storage fallback: the direct path captures the file unparsed and reaches
+ * here just when storage is unavailable. Mirrors the JSON/JSONL handling in
+ * `ParsingCSVReader` so both paths read the same file the same way.
+ */
+async function parseFileToRows(file: File): Promise<string[][]> {
+  const isJson = file.name.endsWith(".jsonl") || file.name.endsWith(".json");
+  const csvString = isJson
+    ? jsonFileTextToCSV(await file.text())
+    : await file.text();
+
+  return new Promise<string[][]>((resolve, reject) => {
+    papaparseReadString<string[]>(csvString, {
+      skipEmptyLines: "greedy",
+      complete: (results) => resolve(results.data),
+      error: (error: Error) => reject(error),
+    });
+  });
+}
+
+/** Convert raw JSON or JSONL text into CSV text (header + rows). */
+function jsonFileTextToCSV(contents: string): string {
+  let jsonContents: object[];
+  try {
+    jsonContents = JSON.parse(contents);
+  } catch {
+    // Not valid JSON; treat as JSONL (one object per line).
+    jsonContents = JSON.parse(
+      "[" +
+        contents
+          .trim()
+          .split("\n")
+          .filter((line) => line.trim() !== "")
+          .join(", ") +
+        "]",
+    );
+  }
+  return jsonToCSV(jsonContents);
 }
 
 function jsonToCSV(jsonContents: object[]): string {
@@ -570,5 +691,108 @@ function CSVReaderBox({
         <Text>Drop CSV or JSONL file or click here to upload</Text>
       )}
     </Box>
+  );
+}
+
+/**
+ * No-parse dropzone for the direct-upload happy path (ADR-032 D4). Captures the
+ * raw `File` via a native file input + drag handlers and never runs PapaParse —
+ * `react-papaparse`'s `CSVReader` parses the whole file in-browser before its
+ * `onUploadAccepted` fires, which OOMs the browser on a multi-GB file. Here the
+ * only thing the direct upload needs is the raw `File` (its name seeds the
+ * default dataset name; the columns are derived server-side by normalize).
+ */
+function RawFileDropzone({
+  onRawFile,
+  onUploadRemoved,
+  children,
+}: {
+  onRawFile?: (file: File | null) => void;
+  onUploadRemoved?: () => void;
+  children?: (hasAcceptedFile: boolean) => React.ReactNode;
+}) {
+  const [zoneHover, setZoneHover] = useState(false);
+  const [acceptedFile, setAcceptedFile] = useState<File | null>(null);
+
+  const setFile = (file: File | null) => {
+    setAcceptedFile(file);
+    if (file) {
+      onRawFile?.(file);
+    } else {
+      onRawFile?.(null);
+      onUploadRemoved?.();
+    }
+  };
+
+  return (
+    <>
+      <Box
+        as="label"
+        borderRadius={"lg"}
+        borderWidth={2}
+        borderColor={zoneHover ? "border.emphasized" : "border"}
+        borderStyle="dashed"
+        padding={10}
+        textAlign="center"
+        cursor="pointer"
+        width="full"
+        display="block"
+        onDragOver={(event) => {
+          event.preventDefault();
+          setZoneHover(true);
+        }}
+        onDragLeave={(event) => {
+          event.preventDefault();
+          setZoneHover(false);
+        }}
+        onDrop={(event) => {
+          event.preventDefault();
+          setZoneHover(false);
+          const file = event.dataTransfer?.files?.[0] ?? null;
+          if (file) setFile(file);
+        }}
+      >
+        <input
+          type="file"
+          accept=".csv,.json,.jsonl"
+          style={{ display: "none" }}
+          onChange={(event) => {
+            const file = event.target.files?.[0] ?? null;
+            if (file) setFile(file);
+          }}
+        />
+        {acceptedFile ? (
+          <Box
+            bg="bg.muted"
+            padding={4}
+            borderRadius={"lg"}
+            position="relative"
+          >
+            <VStack>
+              <Text>{formatFileSize(acceptedFile.size)}</Text>
+              <Text>{acceptedFile.name}</Text>
+            </VStack>
+            <Box
+              position="absolute"
+              right={-1}
+              top={-1}
+              onClick={(event) => {
+                // Prevent the label from re-opening the file picker on remove.
+                event.preventDefault();
+                event.stopPropagation();
+                setFile(null);
+              }}
+            >
+              <Text fontSize="lg" lineHeight="1" cursor="pointer">
+                ×
+              </Text>
+            </Box>
+          </Box>
+        ) : (
+          <Text>Drop CSV or JSONL file or click here to upload</Text>
+        )}
+      </Box>
+      {children ? children(acceptedFile !== null) : null}
+    </>
   );
 }

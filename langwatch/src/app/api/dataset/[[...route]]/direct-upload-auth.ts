@@ -98,6 +98,13 @@ export async function authorizeDirectUpload(
     return { ok: false, status: denial.status, error: denial.message };
   }
 
+  // Telemetry parity with the rest of the API-key surface: fire-and-forget
+  // bump of `lastUsedAt` on a successful API-key auth (no-op for legacy keys,
+  // which carry no `apiKeyId`). Matches the experiments-v3 `markUsed` pattern.
+  if (resolved.type === "apiKey") {
+    resolver.markUsed({ apiKeyId: resolved.apiKeyId });
+  }
+
   return {
     ok: true,
     projectId,

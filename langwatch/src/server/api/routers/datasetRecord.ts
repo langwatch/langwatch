@@ -137,11 +137,17 @@ export const datasetRecordRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string(), datasetId: z.string() }))
     .use(checkProjectPermission("datasets:view"))
     .mutation(async ({ input }) => {
-      return getFullDataset({
-        datasetId: input.datasetId,
-        projectId: input.projectId,
-        limitMb: null,
-      });
+      try {
+        return await getFullDataset({
+          datasetId: input.datasetId,
+          projectId: input.projectId,
+          limitMb: null,
+        });
+      } catch (error) {
+        // Defense: a not-ready download surfaces as PRECONDITION_FAILED instead
+        // of INTERNAL_SERVER_ERROR, matching getAll/getHead and the REST 425.
+        return rethrowDatasetNotReadyAsTRPC(error);
+      }
     }),
   getHead: protectedProcedure
     .input(z.object({ projectId: z.string(), datasetId: z.string() }))
