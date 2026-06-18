@@ -354,6 +354,10 @@ run_frontend_only() {
   echo ""
   echo "Tip: pure UI / design / static iteration. URLs come from langwatch/.env."
   echo "     For services on top: switch to all-local, all-local-nlp, or full-local."
+  # Skip flags must be on the shell env of the pnpm dev subprocess, NOT in
+  # .env.dev-up: start:prepare:db runs the migrations before the app boots
+  # dotenv, so it reads the shell environment, not the overlay file. Frontend-only
+  # targets shared dev infra whose ClickHouse schema we don't own, so skip migrate.
   (cd langwatch && SKIP_CLICKHOUSE_MIGRATE=true SKIP_PRISMA_MIGRATE=true pnpm dev)
 }
 
