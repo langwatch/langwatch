@@ -104,3 +104,9 @@ spec:
       {{- with .Values.tolerations }}
       tolerations: {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- with .Values.runtimeClassName }}
+      # Run under a sandboxed container runtime (e.g. gVisor/runsc) when the
+      # cluster defines a matching RuntimeClass. Empty → omitted entirely, so
+      # the kubelet uses the node's default runtime (existing installs unchanged).
+      runtimeClassName: {{ . }}
+      {{- end }}
