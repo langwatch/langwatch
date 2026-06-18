@@ -10,6 +10,9 @@ Feature: Diagnostic logging on auth failure
 
   @unit @unimplemented
   Scenario: extractCredentials returns null because no auth header was sent
+    # Partially bound: extractCredentials null-return is verified at
+    # api-key/__tests__/auth-middleware.unit.test.ts. WARN emission and
+    # diagnostic field content require middleware-level integration test fixtures.
     When the request has no Authorization, X-Auth-Token, or X-Project-Id headers
     Then the middleware emits a single WARN-level log line at "langwatch:api:unified-auth"
     And the log line contains userAgent, traceparent, x-forwarded-for, path, method
@@ -17,6 +20,9 @@ Feature: Diagnostic logging on auth failure
 
   @unit @unimplemented
   Scenario: extractCredentials returns null because X-Auth-Token was sent empty
+    # Partially bound: hasEmptyAuthToken field is verified at
+    # api-key/__tests__/auth-middleware.unit.test.ts (collectAuthDiagnostics).
+    # WARN emission and message content require middleware-level integration fixtures.
     When the request has X-Auth-Token: "" (empty string)
     Then the middleware emits a single WARN-level log line at "langwatch:api:unified-auth"
     And the log line records hasEmptyAuthToken=true
@@ -41,8 +47,11 @@ Feature: Diagnostic logging on auth failure
     Then the log NEVER includes the raw token value
     And the log NEVER includes the request body
     And only the prefix of the token (first 8 chars) is included when the resolver path is taken
+    # Currently bound only on the raw-token-omission assertion. Body-omission
+    # and resolver-prefix-only assertions are aspirational pending dedicated
+    # logger fixtures that observe the actual logger output.
 
-  @unit @unimplemented
+  @unit
   Scenario: Authorization header from a proxy does not poison X-Auth-Token fallback
     Given a corporate proxy injects "Authorization: Basic <its-own-base64>" into the request
     And the customer's request also carries "X-Auth-Token: <valid-key>"
@@ -51,7 +60,7 @@ Feature: Diagnostic logging on auth failure
     And the customer's legitimate token is used for project resolution
     And the request is not 401'd by the proxy header
 
-  @unit @unimplemented
+  @unit
   Scenario: Empty or whitespace-only Bearer token does not poison X-Auth-Token fallback
     Given a request carries "Authorization: Bearer " (empty or whitespace-only)
     And the same request carries "X-Auth-Token: <valid-key>"
