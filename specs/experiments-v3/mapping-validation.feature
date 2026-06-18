@@ -115,6 +115,28 @@ Feature: Mapping Validation and Missing Mapping Detection
     And the missing mappings are highlighted
 
   # ============================================================================
+  # Adding an Evaluator with Unmapped Required Fields
+  # ============================================================================
+  #
+  # Auto-inference cannot always satisfy every required input (e.g. an evaluator
+  # needs an "expected_output" the dataset does not carry). When that happens on
+  # ADD, silently closing the picker leaves the user with a freshly-added
+  # evaluator and no signpost to where the missing mapping lives. Instead the
+  # evaluator's mapping drawer opens straight onto the unmapped fields.
+
+  Scenario: Adding an evaluator with unmapped required fields opens its mapping drawer
+    Given the active dataset and runner cannot satisfy an evaluator's required input
+    When I add that evaluator to the workbench
+    Then the evaluator's mapping drawer opens automatically
+    And the unmapped required fields are highlighted
+    And the picker does not silently close without guiding me
+
+  Scenario: Adding an evaluator whose required fields all auto-map closes the picker
+    Given I add an evaluator whose required inputs are all auto-mapped
+    Then the picker closes
+    And the evaluator's mapping drawer does not open
+
+  # ============================================================================
   # Declared-but-unused prompt variables
   # ============================================================================
 
