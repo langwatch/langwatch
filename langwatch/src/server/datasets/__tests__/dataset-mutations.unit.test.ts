@@ -5,6 +5,7 @@ import {
   appendS3JsonlRecords,
   deleteS3JsonlRecords,
   editS3JsonlRecord,
+  recomputeDatasetCounts,
 } from "../dataset-mutations";
 
 /**
@@ -250,6 +251,45 @@ describe("dataset-mutations (s3_jsonl)", () => {
         });
       });
     });
+
+    // C1: an S3 rewrite failure throws out of the advisory-locked $transaction,
+    // so the PG counter update never runs → the throw rolls PG back cleanly. The
+    // residual (PG-commit failure AFTER the S3 write) is repaired by
+    // recomputeDatasetCounts; this guards the common S3-fails-first direction.
+    describe("when the S3 rewriteChunk fails mid-edit", () => {
+      it("propagates the error and never commits the PG counter update", async () => {
+        const row = makeDataset({
+          rowCount: 2,
+          sizeBytes: 100n,
+          chunkCount: 1,
+          chunkOffsets: [
+            { index: 0, startRow: 0, endRow: 2, byteSize: 100 },
+          ] as unknown as Dataset["chunkOffsets"],
+        });
+        const { prisma, update } = makePrisma(row);
+        const readChunk = vi.fn().mockResolvedValue([
+          { id: "r1", entry: { a: 1 } },
+          { id: "r2", entry: { a: 2 } },
+        ]);
+        const rewriteChunk = vi
+          .fn()
+          .mockRejectedValue(new Error("S3 PutObject failed"));
+        const storage = makeStorage({ readChunk, rewriteChunk });
+
+        await expect(
+          editS3JsonlRecord({
+            prisma: prisma as never,
+            dataset: row,
+            projectId: "p1",
+            recordId: "r1",
+            entry: { a: 99 },
+            storage: storage as never,
+          }),
+        ).rejects.toThrow("S3 PutObject failed");
+        // Counters never touched — the throw rolled the transaction back.
+        expect(update).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe("deleteS3JsonlRecords()", () => {
@@ -305,9 +345,71 @@ describe("dataset-mutations (s3_jsonl)", () => {
         expect(data.rowCount).toBe(3);
         expect(data.chunkCount).toBeUndefined();
         // Chunk 0 now holds 1 row → chunk 1's startRow/endRow shift down by 1.
+        // m1: pin the untouched chunk's concrete recomputed byteSize (56 =
+        // toSingleJsonl([r3,r4])) so any count-drift on the untouched chunk
+        // would fail the test, not pass under expect.any(Number).
         expect(data.chunkOffsets).toEqual([
           { index: 0, startRow: 0, endRow: 1, byteSize: 55 },
-          { index: 1, startRow: 1, endRow: 3, byteSize: expect.any(Number) },
+          { index: 1, startRow: 1, endRow: 3, byteSize: 56 },
+        ]);
+      });
+    });
+
+    describe("when every row in a chunk is deleted", () => {
+      it("leaves the chunk in place as empty (startRow===endRow) with chunkCount unchanged", async () => {
+        const row = makeDataset({
+          rowCount: 4,
+          sizeBytes: 200n,
+          chunkCount: 2,
+          chunkOffsets: [
+            { index: 0, startRow: 0, endRow: 2, byteSize: 100 },
+            { index: 1, startRow: 2, endRow: 4, byteSize: 100 },
+          ] as unknown as Dataset["chunkOffsets"],
+        });
+        const { prisma, update } = makePrisma(row);
+        const readChunk = vi
+          .fn()
+          .mockResolvedValueOnce([
+            { id: "r1", entry: { a: 1 } },
+            { id: "r2", entry: { a: 2 } },
+          ])
+          .mockResolvedValueOnce([
+            { id: "r3", entry: { a: 3 } },
+            { id: "r4", entry: { a: 4 } },
+          ]);
+        // chunk 0 emptied → rewritten with zero rows, 0 bytes.
+        const rewriteChunk = vi.fn().mockResolvedValue({
+          index: 0,
+          startRow: 0,
+          endRow: 0,
+          byteSize: 0,
+        });
+        const storage = makeStorage({ readChunk, rewriteChunk });
+
+        const result = await deleteS3JsonlRecords({
+          prisma: prisma as never,
+          dataset: row,
+          projectId: "p1",
+          recordIds: ["r1", "r2"],
+          storage: storage as never,
+        });
+
+        expect(result).toEqual({ deleted: 2 });
+        // chunk 0 rewritten with an empty record set; chunk 1 left alone.
+        expect(rewriteChunk).toHaveBeenCalledOnce();
+        expect(rewriteChunk.mock.calls[0]![0]).toMatchObject({
+          index: 0,
+          records: [],
+        });
+        const data = update.mock.calls[0]![0].data;
+        expect(data.rowCount).toBe(2);
+        // Empty chunk kept (no compaction): chunkCount stays 2.
+        expect(data.chunkCount).toBeUndefined();
+        // The emptied chunk has startRow===endRow (zero rows); chunk 1 shifts to
+        // [0, 2). Untouched chunk byteSize pinned (56 = toSingleJsonl([r3,r4])).
+        expect(data.chunkOffsets).toEqual([
+          { index: 0, startRow: 0, endRow: 0, byteSize: 0 },
+          { index: 1, startRow: 0, endRow: 2, byteSize: 56 },
         ]);
       });
     });
@@ -339,6 +441,101 @@ describe("dataset-mutations (s3_jsonl)", () => {
         expect(result).toEqual({ deleted: 0 });
         expect(rewriteChunk).not.toHaveBeenCalled();
         expect(update).not.toHaveBeenCalled();
+      });
+    });
+
+    // C1: same rollback guarantee for delete — an S3 rewrite failure throws out
+    // of the $transaction before the counter update, so PG rolls back cleanly.
+    describe("when the S3 rewriteChunk fails mid-delete", () => {
+      it("propagates the error and never commits the PG counter update", async () => {
+        const row = makeDataset({
+          rowCount: 2,
+          sizeBytes: 100n,
+          chunkCount: 1,
+          chunkOffsets: [
+            { index: 0, startRow: 0, endRow: 2, byteSize: 100 },
+          ] as unknown as Dataset["chunkOffsets"],
+        });
+        const { prisma, update } = makePrisma(row);
+        const readChunk = vi.fn().mockResolvedValue([
+          { id: "r1", entry: { a: 1 } },
+          { id: "r2", entry: { a: 2 } },
+        ]);
+        const rewriteChunk = vi
+          .fn()
+          .mockRejectedValue(new Error("S3 PutObject failed"));
+        const storage = makeStorage({ readChunk, rewriteChunk });
+
+        await expect(
+          deleteS3JsonlRecords({
+            prisma: prisma as never,
+            dataset: row,
+            projectId: "p1",
+            recordIds: ["r1"],
+            storage: storage as never,
+          }),
+        ).rejects.toThrow("S3 PutObject failed");
+        expect(update).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("recomputeDatasetCounts()", () => {
+    // C1 repair path: re-derive PG counters from S3 truth. Boundary-mock the
+    // storage to return known chunks; assert the recomputed rowCount/sizeBytes/
+    // chunkCount/chunkOffsets written back match the ACTUAL chunk bytes (the
+    // I-COUNT repair for any drift after a PG-commit-after-S3-write failure).
+    describe("when the persisted counters have drifted from the chunks on disk", () => {
+      it("re-derives rowCount/sizeBytes/chunkOffsets from the actual chunk bytes and writes them back", async () => {
+        // The row claims stale/zeroed counters; the real chunks hold 3 rows
+        // across 2 chunks. recompute must write the truth, not trust the row.
+        const row = makeDataset({
+          rowCount: 999,
+          sizeBytes: 1n,
+          chunkCount: 2,
+          chunkOffsets: [] as unknown as Dataset["chunkOffsets"],
+        });
+        const { prisma, update, queryRaw } = makePrisma(row);
+        const readChunk = vi
+          .fn()
+          .mockResolvedValueOnce([
+            { id: "r1", entry: { a: 1 } },
+            { id: "r2", entry: { a: 2 } },
+          ])
+          .mockResolvedValueOnce([{ id: "r3", entry: { a: 3 } }]);
+        const storage = makeStorage({ readChunk });
+
+        const result = await recomputeDatasetCounts({
+          prisma: prisma as never,
+          datasetId: "dataset_1",
+          projectId: "p1",
+          storage: storage as never,
+        });
+
+        // Lock taken; both chunks read to measure their real bytes.
+        expect(queryRaw).toHaveBeenCalledOnce();
+        expect(readChunk).toHaveBeenCalledTimes(2);
+
+        // Concrete bytes: toSingleJsonl of each chunk's actual rows.
+        // chunk 0 = [{r1},{r2}] = 56 bytes; chunk 1 = [{r3}] = 28 bytes.
+        const chunk0Bytes = 56;
+        const chunk1Bytes = 28;
+        const expected = {
+          rowCount: 3,
+          sizeBytes: chunk0Bytes + chunk1Bytes,
+          chunkCount: 2,
+          chunkOffsets: [
+            { index: 0, startRow: 0, endRow: 2, byteSize: chunk0Bytes },
+            { index: 1, startRow: 2, endRow: 3, byteSize: chunk1Bytes },
+          ],
+        };
+        expect(result).toEqual(expected);
+        expect(update.mock.calls[0]![0].data).toEqual({
+          rowCount: 3,
+          sizeBytes: BigInt(chunk0Bytes + chunk1Bytes),
+          chunkCount: 2,
+          chunkOffsets: expected.chunkOffsets,
+        });
       });
     });
   });

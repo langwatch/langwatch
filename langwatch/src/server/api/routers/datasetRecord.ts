@@ -6,6 +6,7 @@ import {
   deleteS3JsonlRecords,
   editS3JsonlRecord,
 } from "../../datasets/dataset-mutations";
+import { DatasetNotReadyError } from "../../datasets/errors";
 import { stripNullBytes } from "../../datasets/sanitize";
 import { newDatasetEntriesSchema } from "../../datasets/types";
 import { prisma } from "../../db";
@@ -21,6 +22,24 @@ import {
 export { createManyDatasetRecords, getFullDataset };
 
 const storageService = new StorageService();
+
+/**
+ * m5: surface a not-ready s3_jsonl write (I-READY) as a 4xx `PRECONDITION_FAILED`
+ * tRPC error rather than letting the plain `DatasetNotReadyError` fall through as
+ * INTERNAL_SERVER_ERROR. Mirrors the REST layer's 425 mapping — a write to a
+ * still-preparing dataset is a client-precondition failure, not a server fault.
+ * Re-throws anything else unchanged.
+ */
+const rethrowDatasetNotReadyAsTRPC = (error: unknown): never => {
+  if (error instanceof DatasetNotReadyError) {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: error.message,
+      cause: error,
+    });
+  }
+  throw error;
+};
 
 export const datasetRecordRouter = createTRPCRouter({
   create: protectedProcedure
@@ -49,11 +68,15 @@ export const datasetRecordRouter = createTRPCRouter({
         });
       }
 
-      return createManyDatasetRecords({
-        datasetId: input.datasetId,
-        projectId: input.projectId,
-        datasetRecords: input.entries,
-      });
+      try {
+        return await createManyDatasetRecords({
+          datasetId: input.datasetId,
+          projectId: input.projectId,
+          datasetRecords: input.entries,
+        });
+      } catch (error) {
+        return rethrowDatasetNotReadyAsTRPC(error);
+      }
     }),
   update: protectedProcedure
     .input(
@@ -81,14 +104,18 @@ export const datasetRecordRouter = createTRPCRouter({
         });
       }
 
-      return updateDatasetRecord({
-        recordId,
-        updatedRecord,
-        datasetId: input.datasetId,
-        projectId: input.projectId,
-        dataset,
-        prisma,
-      });
+      try {
+        return await updateDatasetRecord({
+          recordId,
+          updatedRecord,
+          datasetId: input.datasetId,
+          projectId: input.projectId,
+          dataset,
+          prisma,
+        });
+      } catch (error) {
+        return rethrowDatasetNotReadyAsTRPC(error);
+      }
     }),
   getAll: protectedProcedure
     .input(z.object({ projectId: z.string(), datasetId: z.string() }))
@@ -192,13 +219,17 @@ export const datasetRecordRouter = createTRPCRouter({
         });
       }
 
-      return deleteManyDatasetRecords({
-        recordIds: input.recordIds,
-        datasetId: input.datasetId,
-        projectId: input.projectId,
-        dataset,
-        prisma,
-      });
+      try {
+        return await deleteManyDatasetRecords({
+          recordIds: input.recordIds,
+          datasetId: input.datasetId,
+          projectId: input.projectId,
+          dataset,
+          prisma,
+        });
+      } catch (error) {
+        return rethrowDatasetNotReadyAsTRPC(error);
+      }
     }),
 });
 

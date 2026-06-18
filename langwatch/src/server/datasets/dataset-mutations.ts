@@ -24,6 +24,13 @@ import { withDatasetLock } from "./dataset-lock";
 import { type DatasetStorage, getDatasetStorage } from "./dataset-storage";
 import { DatasetNotReadyError } from "./errors";
 
+export type RecomputedDatasetCounts = {
+  rowCount: number;
+  sizeBytes: number;
+  chunkCount: number;
+  chunkOffsets: ChunkOffset[];
+};
+
 /** An s3_jsonl chunk line: the row entry tagged with a stable id so edit/delete
  * can target it. Mirrors the shape the normalize/append paths write. */
 type ChunkLine = { id: string; entry: unknown };
@@ -201,6 +208,9 @@ export const editS3JsonlRecord = async ({
     // Edits are rare (Decision 3 — the editor path, not a hot loop), so the
     // per-chunk read cost is acceptable; a future reads-at-scale epic can index
     // id→chunk if needed.
+    // m3: the advisory-lock + PG-connection hold time scales with `chunkCount`
+    // (this id-scan does O(chunkCount) S3 reads inside the lock) — acceptable
+    // because edits are rare; a hot path would need an id→chunk index instead.
     for (let index = 0; index < chunkCount; index++) {
       const rows = await datasetStorage.readChunk({
         projectId,
@@ -288,6 +298,9 @@ export const deleteS3JsonlRecords = async ({
     const perChunk: Array<{ rowCount: number; byteSize: number }> = [];
     let deleted = 0;
 
+    // m3: the advisory-lock + PG-connection hold time scales with `chunkCount` —
+    // this scan reads every chunk inside the lock (O(chunkCount) S3 reads).
+    // Acceptable because deletes are rare; a hot path would need an id→chunk index.
     for (let index = 0; index < chunkCount; index++) {
       const rows = await datasetStorage.readChunk({
         projectId,
@@ -339,5 +352,69 @@ export const deleteS3JsonlRecords = async ({
     });
 
     return { deleted };
+  });
+};
+
+/**
+ * I-COUNT repair: re-derive the PG-authoritative counters from S3 truth. Reads
+ * every chunk's actual bytes (`readChunk` per index, driven by `chunkCount`) and
+ * recomputes `rowCount`/`sizeBytes`/`chunkOffsets` from what's really on disk,
+ * then writes them back onto the Dataset row under the advisory lock.
+ *
+ * Runnable on a detected mismatch — the residual repair for the rare
+ * PG-commit-after-S3-write failure on edit/delete, where the chunk is mutated
+ * but the counters rolled back (Consequences → Negative: I-COUNT is eventually
+ * consistent / repairable, not unconditionally atomic). `chunkCount` itself is
+ * trusted as the chunk-set boundary (empty chunks are kept, never compacted), so
+ * this re-derives addressing within the known chunk set rather than re-discovering
+ * it via S3 LIST. Returns the recomputed counts that were persisted.
+ */
+export const recomputeDatasetCounts = async ({
+  prisma,
+  datasetId,
+  projectId,
+  storage,
+}: {
+  prisma: PrismaClient;
+  datasetId: string;
+  projectId: string;
+  storage?: DatasetStorage;
+}): Promise<RecomputedDatasetCounts> => {
+  const datasetStorage = storage ?? (await getDatasetStorage(projectId));
+
+  return withDatasetLock({ prisma, datasetId }, async (tx) => {
+    const current = await tx.dataset.findFirstOrThrow({
+      where: { id: datasetId, projectId },
+    });
+
+    const chunkCount = current.chunkCount ?? 0;
+    const perChunk: Array<{ rowCount: number; byteSize: number }> = [];
+    for (let index = 0; index < chunkCount; index++) {
+      const rows = await datasetStorage.readChunk({
+        projectId,
+        datasetId,
+        index,
+      });
+      // Measure bytes from the actual chunk rows so the recomputed totals reflect
+      // S3 truth, not a possibly-drifted offset entry.
+      perChunk.push({
+        rowCount: rows.length,
+        byteSize: toSingleJsonl(rows).byteSize,
+      });
+    }
+
+    const { offsets, rowCount, sizeBytes } = recomputeOffsets(perChunk);
+
+    await tx.dataset.update({
+      where: { id: datasetId, projectId },
+      data: {
+        rowCount,
+        sizeBytes: BigInt(sizeBytes),
+        chunkCount,
+        chunkOffsets: offsets as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    return { rowCount, sizeBytes, chunkCount, chunkOffsets: offsets };
   });
 };

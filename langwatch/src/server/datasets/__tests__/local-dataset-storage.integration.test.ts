@@ -463,5 +463,66 @@ describe("LocalDatasetStorage", () => {
       expect(rows.map((r) => r.id)).toEqual([r2!.id, r3!.id]);
       expect(rows.map((r) => r.entry)).toEqual([{ a: 99 }, { a: 3 }]);
     });
+
+    // m2: every row in a chunk deleted → the chunk is LEFT in place as an empty
+    // chunk (no compaction). A subsequent readChunks round-trip must skip the
+    // empty chunk and return exactly the remaining rows in order, with
+    // chunkCount unchanged and the emptied chunk's offset collapsed to
+    // startRow===endRow.
+    /** @scenario "Editing or deleting a row updates only that row" */
+    it("deletes every row in a chunk, leaving an empty chunk in place, and reads the remaining rows back", async () => {
+      const projectId = "p1";
+      const datasetId = "mut-empty-chunk";
+      // Two separate appends → two chunks (append always writes from chunkCount).
+      const { row, prisma } = await seed(projectId, datasetId, [
+        { a: 1 },
+        { a: 2 },
+      ]);
+      await appendS3JsonlRecords({
+        prisma: prisma as never,
+        dataset: row as never,
+        projectId,
+        entries: [{ a: 3 }, { a: 4 }],
+        storage,
+      });
+      expect(row.chunkCount).toBe(2);
+      expect(row.rowCount).toBe(4);
+
+      const seeded = await readAll(
+        projectId,
+        datasetId,
+        row.chunkCount as number,
+      );
+      // First chunk holds the first two rows; delete BOTH → chunk 0 emptied.
+      const [r1, r2] = seeded;
+      await deleteS3JsonlRecords({
+        prisma: prisma as never,
+        dataset: row as never,
+        projectId,
+        recordIds: [r1!.id, r2!.id],
+        storage,
+      });
+
+      // chunkCount unchanged (empty chunk kept); rowCount drops to 2.
+      expect(row.chunkCount).toBe(2);
+      expect(row.rowCount).toBe(2);
+      const offsets = row.chunkOffsets as Array<{
+        index: number;
+        startRow: number;
+        endRow: number;
+      }>;
+      // Emptied chunk 0 collapsed to startRow===endRow; chunk 1 shifted to [0,2).
+      expect(offsets[0]).toMatchObject({ index: 0, startRow: 0, endRow: 0 });
+      expect(offsets[1]).toMatchObject({ index: 1, startRow: 0, endRow: 2 });
+
+      // Round-trip: readChunks tolerates the empty chunk (parses to []) and
+      // returns exactly the remaining rows in order.
+      const rows = await readAll(
+        projectId,
+        datasetId,
+        row.chunkCount as number,
+      );
+      expect(rows.map((r) => r.entry)).toEqual([{ a: 3 }, { a: 4 }]);
+    });
   });
 });

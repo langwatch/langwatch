@@ -2,8 +2,12 @@ import type { Dataset, DatasetRecord, Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
+import type { ChunkOffset } from "../../datasets/dataset-chunking";
 import { appendS3JsonlRecords } from "../../datasets/dataset-mutations";
-import { getDatasetStorage } from "../../datasets/dataset-storage";
+import {
+  type DatasetStorage,
+  getDatasetStorage,
+} from "../../datasets/dataset-storage";
 import { DatasetNotReadyError } from "../../datasets/errors";
 import { stripNullBytes } from "../../datasets/sanitize";
 import type { DatasetRecordInput } from "../../datasets/types";
@@ -233,6 +237,78 @@ const selectRecords = (
   return [records[index]!];
 };
 
+/** Read the persisted `chunkOffsets` JSON back as a typed array (defensive
+ * against a null/legacy value — defaults to empty). */
+const readOffsets = (dataset: Pick<Dataset, "chunkOffsets">): ChunkOffset[] =>
+  Array.isArray(dataset.chunkOffsets)
+    ? (dataset.chunkOffsets as unknown as ChunkOffset[])
+    : [];
+
+/**
+ * Resolve a single-row `entrySelection` to one record by reading ONLY the chunk
+ * that holds it — the O(1)-chunk short-circuit the PG path gets for free via
+ * `skip`/`take`. Uses the PG-authoritative `chunkOffsets` (row position → chunk)
+ * so a single-row read never pulls the whole dataset into memory:
+ *   - "first"  → chunk 0, row 0
+ *   - "last"   → last chunk, its last row
+ *   - number N → the chunk whose `[startRow,endRow)` contains N, row N-startRow
+ *   - "random" → a random index in [0, rowCount), then same as number
+ * Falls back to reading all chunks (caller's slow path) when offsets are missing
+ * (legacy/never-written) or the resolved index lands outside the offset index —
+ * defensive, so a drifted offset never serves the wrong row silently.
+ * Returns `null` to signal "no short-circuit possible, use the full read".
+ */
+const selectS3JsonlRecordViaOffsets = async ({
+  dataset,
+  projectId,
+  storage,
+  entrySelection,
+}: {
+  dataset: Dataset;
+  projectId: string;
+  storage: DatasetStorage;
+  entrySelection: "first" | "last" | "random" | number;
+}): Promise<DatasetRecord | null> => {
+  const offsets = readOffsets(dataset);
+  const rowCount = dataset.rowCount ?? 0;
+  const chunkCount = dataset.chunkCount ?? 0;
+  if (offsets.length === 0 || chunkCount === 0 || rowCount === 0) {
+    return null;
+  }
+
+  // Resolve the global row index to read.
+  let targetRow: number;
+  if (entrySelection === "first") {
+    targetRow = 0;
+  } else if (entrySelection === "last") {
+    targetRow = rowCount - 1;
+  } else if (entrySelection === "random") {
+    targetRow = Math.floor(Math.random() * rowCount);
+  } else {
+    targetRow = Math.max(0, Math.min(entrySelection, rowCount - 1));
+  }
+
+  // Find the chunk whose [startRow, endRow) contains the target row.
+  const offset = offsets.find(
+    (o) => targetRow >= o.startRow && targetRow < o.endRow,
+  );
+  if (!offset) {
+    return null;
+  }
+
+  const rows = await storage.readChunk({
+    projectId,
+    datasetId: dataset.id,
+    index: offset.index,
+  });
+  const within = targetRow - offset.startRow;
+  const line = rows[within];
+  if (line === undefined) {
+    return null;
+  }
+  return adaptS3JsonlRecord(line, dataset);
+};
+
 /**
  * Read the head (first up-to-5 rows) of an s3_jsonl dataset for the preview,
  * gated on `status='ready'` (ADR-032 Decision 6 / I-READY). Reads only the
@@ -313,6 +389,31 @@ export const getFullDataset = async ({
     }
 
     const storage = await getDatasetStorage(projectId);
+
+    // M2: a single-row `entrySelection` reads ONLY the chunk that holds the row
+    // (via `chunkOffsets`) — the same short-circuit the PG path gets from
+    // skip/take — so it's O(1 chunk), not O(dataset). "all" (and download /
+    // limitMb:null) still reads every chunk: batched/streaming reads are the
+    // documented fast-follow epic, so the full read stays the cliff for "all".
+    if (entrySelection !== "all") {
+      const record = await selectS3JsonlRecordViaOffsets({
+        dataset,
+        projectId,
+        storage,
+        entrySelection,
+      });
+      // `record === null` means no short-circuit was possible (missing/legacy
+      // offsets); fall through to the full read below rather than serve nothing.
+      if (record !== null) {
+        return {
+          ...dataset,
+          count: dataset.rowCount ?? 0,
+          datasetRecords: [record],
+          truncated: false,
+        };
+      }
+    }
+
     const rows = await storage.readChunks({
       projectId,
       datasetId,

@@ -22,13 +22,35 @@ import { getDatasetStorage } from "../dataset-storage";
 const makeService = (overrides: {
   repository?: Record<string, unknown>;
   recordRepository?: Record<string, unknown>;
-}) =>
-  new DatasetService(
+  prisma?: unknown;
+}) => {
+  const service = new DatasetService(
     {} as never,
     (overrides.repository ?? {}) as never,
     (overrides.recordRepository ?? {}) as never,
     {} as never,
   );
+  if (overrides.prisma) {
+    (service as unknown as { prisma: unknown }).prisma = overrides.prisma;
+  }
+  return service;
+};
+
+/**
+ * A prisma stub whose `$transaction(fn)` runs `fn(tx)` with a tx that returns
+ * `row` from `findFirstOrThrow` (the advisory-lock seam the s3_jsonl write
+ * mutations open). Lets a service write path reach `assertReady` for real.
+ */
+const makeLockPrisma = (row: Record<string, unknown>) => ({
+  $transaction: async (fn: (tx: unknown) => unknown) =>
+    fn({
+      $queryRaw: async () => [],
+      dataset: {
+        findFirstOrThrow: async () => ({ ...row }),
+        update: async () => ({ ...row }),
+      },
+    }),
+});
 
 const baseS3Dataset = {
   id: "dataset_1",
@@ -131,6 +153,68 @@ describe("DatasetService", () => {
         expect(recordRepository.listPaginated).toHaveBeenCalledOnce();
         expect(result.data).toEqual([{ id: "pg1" }]);
         expect(getDatasetStorage).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  // M1/M5: a write to a still-preparing s3_jsonl dataset must surface
+  // DatasetNotReadyError (the route maps it to 425; tRPC to PRECONDITION_FAILED)
+  // — never silently append/edit/delete against a half-prepared dataset
+  // (I-READY). The write paths reach `assertReady` inside the advisory lock.
+  describe("write paths against a not-ready s3_jsonl dataset", () => {
+    const notReadyRow = { ...baseS3Dataset, status: "processing" };
+
+    describe("upsertRecord()", () => {
+      it("throws DatasetNotReadyError instead of editing the chunk", async () => {
+        const repository = {
+          findBySlugOrId: vi.fn().mockResolvedValue({ ...notReadyRow }),
+        };
+        vi.mocked(getDatasetStorage).mockResolvedValue({
+          readChunk: vi.fn(),
+          rewriteChunk: vi.fn(),
+          writeChunks: vi.fn(),
+        } as never);
+
+        await expect(
+          makeService({
+            repository,
+            prisma: makeLockPrisma(notReadyRow),
+          }).upsertRecord({
+            slugOrId: "ds",
+            projectId: "p1",
+            recordId: "r1",
+            entry: { a: 1 },
+          }),
+        ).rejects.toMatchObject({
+          name: "DatasetNotReadyError",
+          status: "processing",
+        });
+      });
+    });
+
+    describe("deleteRecords()", () => {
+      it("throws DatasetNotReadyError instead of rewriting chunks", async () => {
+        const repository = {
+          findBySlugOrId: vi.fn().mockResolvedValue({ ...notReadyRow }),
+        };
+        vi.mocked(getDatasetStorage).mockResolvedValue({
+          readChunk: vi.fn(),
+          rewriteChunk: vi.fn(),
+        } as never);
+
+        await expect(
+          makeService({
+            repository,
+            prisma: makeLockPrisma(notReadyRow),
+          }).deleteRecords({
+            slugOrId: "ds",
+            projectId: "p1",
+            recordIds: ["r1"],
+          }),
+        ).rejects.toMatchObject({
+          name: "DatasetNotReadyError",
+          status: "processing",
+        });
       });
     });
   });

@@ -582,14 +582,21 @@ secured.access(requires("datasets:manage")).post(
 
     const now = Date.now();
 
-    await createManyDatasetRecords({
-      datasetId: dataset.id,
-      projectId: project.id,
-      datasetRecords: entries.map((entry, index) => ({
-        id: `${now}-${index}`,
-        ...entry,
-      })),
-    });
+    try {
+      await createManyDatasetRecords({
+        datasetId: dataset.id,
+        projectId: project.id,
+        datasetRecords: entries.map((entry, index) => ({
+          id: `${now}-${index}`,
+          ...entry,
+        })),
+      });
+    } catch (error) {
+      // M1: an s3_jsonl dataset still preparing rejects the append (I-READY).
+      const notReady = mapDatasetNotReadyError(error, c);
+      if (notReady) return notReady;
+      return mapDatasetNotFoundError(error);
+    }
 
     return c.json({ success: true });
   },
@@ -797,6 +804,9 @@ secured.access(requires("datasets:manage")).patch(
 
       return c.json(record, created ? 201 : 200);
     } catch (error) {
+      // M1: a still-preparing s3_jsonl dataset rejects the upsert (I-READY) → 425.
+      const notReady = mapDatasetNotReadyError(error, c);
+      if (notReady) return notReady;
       return mapDatasetNotFoundError(error);
     }
   },
@@ -824,6 +834,9 @@ secured.access(requires("datasets:manage")).delete(
         recordIds,
       });
     } catch (error) {
+      // M1: a still-preparing s3_jsonl dataset rejects the delete (I-READY) → 425.
+      const notReady = mapDatasetNotReadyError(error, c);
+      if (notReady) return notReady;
       return mapDatasetNotFoundError(error);
     }
 

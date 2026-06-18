@@ -43,8 +43,23 @@ const baseDataset = {
 
 const mockReadChunks = (rows: unknown[]) => {
   const readChunks = vi.fn().mockResolvedValue(rows);
-  getDatasetStorage.mockResolvedValue({ readChunks });
+  const readChunk = vi.fn();
+  getDatasetStorage.mockResolvedValue({ readChunks, readChunk });
   return readChunks;
+};
+
+/**
+ * Mock storage for the M2 single-chunk short-circuit: `readChunk(index)`
+ * resolves the rows of `chunksByIndex[index]`; `readChunks` is a spy that must
+ * NOT be called when the short-circuit fires.
+ */
+const mockReadChunk = (chunksByIndex: Record<number, unknown[]>) => {
+  const readChunks = vi.fn();
+  const readChunk = vi.fn(({ index }: { index: number }) =>
+    Promise.resolve(chunksByIndex[index] ?? []),
+  );
+  getDatasetStorage.mockResolvedValue({ readChunks, readChunk });
+  return { readChunks, readChunk };
 };
 
 beforeEach(() => vi.clearAllMocks());
@@ -90,13 +105,155 @@ describe("getFullDataset()", () => {
     });
   });
 
+  // M2: a single-row `entrySelection` reads ONLY the chunk that holds the row
+  // (via chunkOffsets), never the whole dataset. Two chunks of 2 rows each;
+  // assert `readChunk` is called with the right index and `readChunks` isn't.
+  const twoChunkDataset = {
+    ...baseDataset,
+    rowCount: 4,
+    chunkCount: 2,
+    chunkOffsets: [
+      { index: 0, startRow: 0, endRow: 2, byteSize: 100 },
+      { index: 1, startRow: 2, endRow: 4, byteSize: 100 },
+    ] as unknown,
+  };
+
   describe("when an entrySelection of 'first' is requested", () => {
-    it("returns only the first adapted record", async () => {
-      findFirst.mockResolvedValue({ ...baseDataset, rowCount: 3 });
-      mockReadChunks([
+    it("reads only chunk 0 and returns its first row", async () => {
+      findFirst.mockResolvedValue({ ...twoChunkDataset });
+      const { readChunks, readChunk } = mockReadChunk({
+        0: [
+          { id: "r1", entry: { a: 1 } },
+          { id: "r2", entry: { a: 2 } },
+        ],
+        1: [
+          { id: "r3", entry: { a: 3 } },
+          { id: "r4", entry: { a: 4 } },
+        ],
+      });
+
+      const result = await getFullDataset({
+        datasetId: "dataset_1",
+        projectId: "p1",
+        entrySelection: "first",
+      });
+
+      // Only chunk 0 read; whole-dataset readChunks never touched.
+      expect(readChunk).toHaveBeenCalledWith({
+        projectId: "p1",
+        datasetId: "dataset_1",
+        index: 0,
+      });
+      expect(readChunks).not.toHaveBeenCalled();
+      expect(result?.datasetRecords).toHaveLength(1);
+      expect(result?.datasetRecords[0]?.id).toBe("r1");
+      expect(result?.count).toBe(4);
+    });
+  });
+
+  describe("when an entrySelection of 'last' is requested", () => {
+    it("reads only the last chunk and returns its last row", async () => {
+      findFirst.mockResolvedValue({ ...twoChunkDataset });
+      const { readChunks, readChunk } = mockReadChunk({
+        0: [
+          { id: "r1", entry: { a: 1 } },
+          { id: "r2", entry: { a: 2 } },
+        ],
+        1: [
+          { id: "r3", entry: { a: 3 } },
+          { id: "r4", entry: { a: 4 } },
+        ],
+      });
+
+      const result = await getFullDataset({
+        datasetId: "dataset_1",
+        projectId: "p1",
+        entrySelection: "last",
+      });
+
+      expect(readChunk).toHaveBeenCalledWith({
+        projectId: "p1",
+        datasetId: "dataset_1",
+        index: 1,
+      });
+      expect(readChunks).not.toHaveBeenCalled();
+      expect(result?.datasetRecords).toHaveLength(1);
+      expect(result?.datasetRecords[0]?.id).toBe("r4");
+    });
+  });
+
+  describe("when an entrySelection of a row number in the second chunk is requested", () => {
+    it("reads only the chunk whose range contains the row and returns it", async () => {
+      findFirst.mockResolvedValue({ ...twoChunkDataset });
+      const { readChunks, readChunk } = mockReadChunk({
+        0: [
+          { id: "r1", entry: { a: 1 } },
+          { id: "r2", entry: { a: 2 } },
+        ],
+        1: [
+          { id: "r3", entry: { a: 3 } },
+          { id: "r4", entry: { a: 4 } },
+        ],
+      });
+
+      // Global row 2 → chunk 1 (range [2,4)), local index 0 → r3.
+      const result = await getFullDataset({
+        datasetId: "dataset_1",
+        projectId: "p1",
+        entrySelection: 2,
+      });
+
+      expect(readChunk).toHaveBeenCalledWith({
+        projectId: "p1",
+        datasetId: "dataset_1",
+        index: 1,
+      });
+      expect(readChunks).not.toHaveBeenCalled();
+      expect(result?.datasetRecords).toHaveLength(1);
+      expect(result?.datasetRecords[0]?.id).toBe("r3");
+    });
+  });
+
+  describe("when an entrySelection of 'all' is requested", () => {
+    it("reads every chunk (the documented full-read cliff), not a single chunk", async () => {
+      findFirst.mockResolvedValue({ ...twoChunkDataset });
+      const { readChunks, readChunk } = mockReadChunk({});
+      // "all" goes through readChunks (flattened whole-dataset read).
+      readChunks.mockResolvedValue([
         { id: "r1", entry: { a: 1 } },
         { id: "r2", entry: { a: 2 } },
         { id: "r3", entry: { a: 3 } },
+        { id: "r4", entry: { a: 4 } },
+      ]);
+
+      const result = await getFullDataset({
+        datasetId: "dataset_1",
+        projectId: "p1",
+        entrySelection: "all",
+      });
+
+      expect(readChunks).toHaveBeenCalledWith({
+        projectId: "p1",
+        datasetId: "dataset_1",
+        chunkCount: 2,
+      });
+      expect(readChunk).not.toHaveBeenCalled();
+      expect(result?.datasetRecords).toHaveLength(4);
+    });
+  });
+
+  describe("when a single-row selection is requested but chunkOffsets are missing", () => {
+    it("falls back to the full read instead of serving nothing", async () => {
+      findFirst.mockResolvedValue({
+        ...baseDataset,
+        rowCount: 2,
+        chunkCount: 1,
+        chunkOffsets: null,
+      });
+      const { readChunks, readChunk } = mockReadChunk({});
+      readChunks.mockResolvedValue([
+        { id: "r1", entry: { a: 1 } },
+        { id: "r2", entry: { a: 2 } },
       ]);
 
       const result = await getFullDataset({
@@ -105,9 +262,11 @@ describe("getFullDataset()", () => {
         entrySelection: "first",
       });
 
+      // No offsets → no short-circuit; full read drives the selection.
+      expect(readChunk).not.toHaveBeenCalled();
+      expect(readChunks).toHaveBeenCalled();
       expect(result?.datasetRecords).toHaveLength(1);
       expect(result?.datasetRecords[0]?.id).toBe("r1");
-      expect(result?.count).toBe(3);
     });
   });
 
