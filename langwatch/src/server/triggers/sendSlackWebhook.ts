@@ -110,10 +110,16 @@ export const sendSlackWebhook = async ({
           .map((event: any) => {
             return `\n*Event Type:* ${escapeMrkdwn(event.event_type)}
           ${Object.entries(event.metrics || {})
-            .map(([key, value]) => `\n*${escapeMrkdwn(key)}:* ${escapeMrkdwn(value)}`)
+            .map(
+              ([key, value]) =>
+                `\n*${escapeMrkdwn(key)}:* ${escapeMrkdwn(value)}`,
+            )
             .join("")}
           ${Object.entries(event.event_details || {})
-            .map(([key, value]) => `\n*${escapeMrkdwn(key)}:* ${escapeMrkdwn(value)}`)
+            .map(
+              ([key, value]) =>
+                `\n*${escapeMrkdwn(key)}:* ${escapeMrkdwn(value)}`,
+            )
             .join("")}
           \n-------------------`;
           })

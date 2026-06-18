@@ -161,7 +161,12 @@ export default function SettingsLayout({
 
           <NavSection
             label="Features"
-            paths={["/settings/annotation-scores", "/settings/topic-clustering", "/settings/data-retention", "/settings/email-suppressions"]}
+            paths={[
+              "/settings/annotation-scores",
+              "/settings/topic-clustering",
+              "/settings/data-retention",
+              "/settings/email-suppressions",
+            ]}
           >
             <MenuLink href="/settings/data-retention">Data Retention</MenuLink>
             {hasPermission("triggers:view") && (

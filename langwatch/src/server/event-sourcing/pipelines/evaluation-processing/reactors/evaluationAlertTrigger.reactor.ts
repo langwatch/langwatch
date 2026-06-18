@@ -197,7 +197,9 @@ export function createEvaluationAlertTriggerReactor(
           // swallowed; surface its retryable classification for operators. The
           // claim already landed, so the in-line path does not retry — the
           // outbox migration is what adds durable retry.
-          const retryable = isDispatchError(error) ? error.retryable : undefined;
+          const retryable = isDispatchError(error)
+            ? error.retryable
+            : undefined;
           logger.error(
             {
               tenantId,

@@ -463,14 +463,17 @@ export class EventSourcing {
     // adapter from the outbox runtime is wired below — it gates internally
     // on `isSettle || isCadence`, so non-outbox queue events no-op cheaply.
     const outbox = this._outbox;
-    const isOutboxPayload = (payload: Record<string, unknown>): payload is OutboxJob =>
-      isSettle(payload) || isCadence(payload);
+    const isOutboxPayload = (
+      payload: Record<string, unknown>,
+    ): payload is OutboxJob => isSettle(payload) || isCadence(payload);
 
     const definition = {
       name: queueName,
       groupKey: (payload: Record<string, unknown>) => {
         if (isOutboxPayload(payload)) {
-          return isSettle(payload) ? settleGroupKey(payload) : cadenceGroupKey(payload);
+          return isSettle(payload)
+            ? settleGroupKey(payload)
+            : cadenceGroupKey(payload);
         }
         const result = this.lookupEntry(payload);
         if (!result) return "__unknown__";

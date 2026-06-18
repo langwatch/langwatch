@@ -523,14 +523,15 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     // payloads if two jobs share an object reference.
     if (this.auditAdapter) {
       await this.runAuditAll(
-        jobsToStage.map((job, i) => () =>
-          this.auditAdapter?.onEnqueue({
-            payload: payloads[i]!,
-            groupKey: job.groupId,
-            dedupKey: job.dedupId || undefined,
-            scheduledAt: new Date(job.dispatchAfterMs),
-            maxAttempts: JOB_RETRY_CONFIG.maxAttempts,
-          }),
+        jobsToStage.map(
+          (job, i) => () =>
+            this.auditAdapter?.onEnqueue({
+              payload: payloads[i]!,
+              groupKey: job.groupId,
+              dedupKey: job.dedupId || undefined,
+              scheduledAt: new Date(job.dispatchAfterMs),
+              maxAttempts: JOB_RETRY_CONFIG.maxAttempts,
+            }),
         ),
       );
     }
@@ -551,7 +552,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * the queue stays available. See ADR-025 revision for the "audit lags
    * but never blocks dispatch" property.
    */
-  private async runAudit(op: () => Promise<unknown> | undefined): Promise<void> {
+  private async runAudit(
+    op: () => Promise<unknown> | undefined,
+  ): Promise<void> {
     if (!this.auditAdapter) return;
     try {
       await op();
@@ -755,12 +758,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                 Date.now() + JOB_RETRY_CONFIG.maxBackoffMs,
               );
               await this.runAuditAll(
-                (batchPayloads ?? [payload]).map((p) => () =>
-                  this.auditAdapter?.onLeased({
-                    payload: p,
-                    attempt,
-                    leasedUntil,
-                  }),
+                (batchPayloads ?? [payload]).map(
+                  (p) => () =>
+                    this.auditAdapter?.onLeased({
+                      payload: p,
+                      attempt,
+                      leasedUntil,
+                    }),
                 ),
               );
 
@@ -792,12 +796,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
               // (dispatched + every drained sibling on success).
               const dispatchedAt = new Date();
               await this.runAuditAll(
-                (batchPayloads ?? [payload]).map((p) => () =>
-                  this.auditAdapter?.onDispatched({
-                    payload: p,
-                    at: dispatchedAt,
-                    attempt,
-                  }),
+                (batchPayloads ?? [payload]).map(
+                  (p) => () =>
+                    this.auditAdapter?.onDispatched({
+                      payload: p,
+                      at: dispatchedAt,
+                      attempt,
+                    }),
                 ),
               );
 
@@ -858,14 +863,15 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                 // payload + every drained sibling (they all get re-staged).
                 const nextAttemptAt = new Date(Date.now() + backoffMs);
                 await this.runAuditAll(
-                  (batchPayloads ?? [payload]).map((p) => () =>
-                    this.auditAdapter?.onFailed({
-                      payload: p,
-                      error: error.message,
-                      willRetry: true,
-                      nextAttemptAt,
-                      attempt,
-                    }),
+                  (batchPayloads ?? [payload]).map(
+                    (p) => () =>
+                      this.auditAdapter?.onFailed({
+                        payload: p,
+                        error: error.message,
+                        willRetry: true,
+                        nextAttemptAt,
+                        attempt,
+                      }),
                   ),
                 );
 
@@ -913,12 +919,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                 // Audit hook: terminal — onDead fires for the dispatched
                 // payload + every drained sibling.
                 await this.runAuditAll(
-                  (batchPayloads ?? [payload]).map((p) => () =>
-                    this.auditAdapter?.onDead({
-                      payload: p,
-                      lastError: error.message,
-                      attempt,
-                    }),
+                  (batchPayloads ?? [payload]).map(
+                    (p) => () =>
+                      this.auditAdapter?.onDead({
+                        payload: p,
+                        lastError: error.message,
+                        attempt,
+                      }),
                   ),
                 );
                 this.deleteEnvelopeBlobs([jobDataJson]);

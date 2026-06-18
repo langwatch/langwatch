@@ -46,7 +46,11 @@ export function createEvaluationProcessingPipeline(deps: EvaluationProcessingPip
       store: deps.evalRunStore,
     }))
     .withReactor("evaluationRun", "evaluationEsSync", deps.esSyncReactor)
-    .withReactor("evaluationRun", "evaluationAlertTrigger", deps.evaluationAlertTriggerReactor)
+    .withReactor(
+      "evaluationRun",
+      "evaluationAlertTrigger",
+      deps.evaluationAlertTriggerReactor,
+    )
     .withOutbox(
       "evaluationRun",
       "evaluationAlertTriggerNotifyOutbox",

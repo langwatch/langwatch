@@ -466,7 +466,15 @@ export const actionCommands: Command[] = [
     description: "Create a notification or action triggered by trace filters",
     icon: Bell,
     category: "actions",
-    keywords: ["create", "add", "automation", "trigger", "alert", "slack", "email"],
+    keywords: [
+      "create",
+      "add",
+      "automation",
+      "trigger",
+      "alert",
+      "slack",
+      "email",
+    ],
   },
   {
     id: "action-new-scenario",

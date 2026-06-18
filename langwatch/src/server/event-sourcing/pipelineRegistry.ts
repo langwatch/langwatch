@@ -380,9 +380,10 @@ export class PipelineRegistry {
       ...this.buildTraceReactorContext(),
     });
 
-    const alertTriggerNotifyOutboxReactor = createAlertTriggerNotifyOutboxReactor({
-      triggers: this.deps.triggers,
-    });
+    const alertTriggerNotifyOutboxReactor =
+      createAlertTriggerNotifyOutboxReactor({
+        triggers: this.deps.triggers,
+      });
 
     const customEvaluationSyncReactor = createCustomEvaluationSyncReactor({
       reportEvaluation: evalCommands.reportEvaluation,

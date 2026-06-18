@@ -256,120 +256,130 @@ function Automations() {
               overflow="hidden"
             >
               <Table.Root variant="line" width="full">
-              <Table.Header>
-                <Table.Row>
-                  <Table.ColumnHeader>Name</Table.ColumnHeader>
-                  <Table.ColumnHeader>Action</Table.ColumnHeader>
-                  <Table.ColumnHeader>Destination</Table.ColumnHeader>
-                  <Table.ColumnHeader>Filters</Table.ColumnHeader>
-                  <Table.ColumnHeader whiteSpace="nowrap">
-                    Last Triggered At
-                  </Table.ColumnHeader>
-                  <Table.ColumnHeader>Active</Table.ColumnHeader>
-                  <Table.ColumnHeader>Actions</Table.ColumnHeader>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-              {triggers.isLoading ? (
-                <Table.Row>
-                  <Table.Cell colSpan={7}>Loading...</Table.Cell>
-                </Table.Row>
-              ) : (
-                triggers.data?.map((trigger) => {
-                  return (
-                    <Table.Row key={trigger.id} data-trigger-id={trigger.id}>
-                      <Table.Cell>{trigger.name}</Table.Cell>
-                      <Table.Cell>
-                        {triggerActionName(trigger.action)}
-                      </Table.Cell>
-                      <Table.Cell>
-                        {actionItems(
-                          trigger.action,
-                          trigger.actionParams as ActionParams,
-                        )}
-                      </Table.Cell>
-
-                      <Table.Cell maxWidth="500px">
-                        <VStack gap={2}>
-                          {applyChecks(
-                            trigger.checks?.filter(
-                              (check): check is Monitor => !!check,
-                            ) ?? [],
-                          )}
-
-                          {trigger.filters &&
-                          typeof trigger.filters === "string" ? (
-                            <FilterDisplay
-                              filters={trigger.filters}
-                              hasBorder={true}
-                            />
-                          ) : null}
-                        </VStack>
-                      </Table.Cell>
-                      <Table.Cell whiteSpace="nowrap">
-                        {formatTimeAgo(trigger.lastRunAt)}
-                      </Table.Cell>
-                      <Table.Cell textAlign="center">
-                        <Switch
-                          checked={trigger.active}
-                          onChange={() => {
-                            handleToggleTrigger(trigger.id, !trigger.active);
-                          }}
-                        />
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Menu.Root>
-                          <Menu.Trigger asChild>
-                            <Button
-                              variant={"ghost"}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                              }}
-                            >
-                              <MoreVertical />
-                            </Button>
-                          </Menu.Trigger>
-                          <Menu.Content>
-                            <Menu.Item
-                              value="edit"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                openDrawer("automation", {
-                                  automationId: trigger.id,
-                                });
-                              }}
-                            >
-                              <Box display="flex" alignItems="center" gap={2}>
-                                <Edit2 size={14} />
-                                Edit
-                              </Box>
-                            </Menu.Item>
-                            <Menu.Item
-                              value="delete"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                deleteTrigger(trigger.id);
-                              }}
-                            >
-                              <Box
-                                display="flex"
-                                alignItems="center"
-                                gap={2}
-                                color="red.600"
-                              >
-                                <Trash size={14} />
-                                Delete
-                              </Box>
-                            </Menu.Item>
-                          </Menu.Content>
-                        </Menu.Root>
-                      </Table.Cell>
+                <Table.Header>
+                  <Table.Row>
+                    <Table.ColumnHeader>Name</Table.ColumnHeader>
+                    <Table.ColumnHeader>Action</Table.ColumnHeader>
+                    <Table.ColumnHeader>Destination</Table.ColumnHeader>
+                    <Table.ColumnHeader>Filters</Table.ColumnHeader>
+                    <Table.ColumnHeader whiteSpace="nowrap">
+                      Last Triggered At
+                    </Table.ColumnHeader>
+                    <Table.ColumnHeader>Active</Table.ColumnHeader>
+                    <Table.ColumnHeader>Actions</Table.ColumnHeader>
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  {triggers.isLoading ? (
+                    <Table.Row>
+                      <Table.Cell colSpan={7}>Loading...</Table.Cell>
                     </Table.Row>
-                  );
-                })
-              )}
-              </Table.Body>
-            </Table.Root>
+                  ) : (
+                    triggers.data?.map((trigger) => {
+                      return (
+                        <Table.Row
+                          key={trigger.id}
+                          data-trigger-id={trigger.id}
+                        >
+                          <Table.Cell>{trigger.name}</Table.Cell>
+                          <Table.Cell>
+                            {triggerActionName(trigger.action)}
+                          </Table.Cell>
+                          <Table.Cell>
+                            {actionItems(
+                              trigger.action,
+                              trigger.actionParams as ActionParams,
+                            )}
+                          </Table.Cell>
+
+                          <Table.Cell maxWidth="500px">
+                            <VStack gap={2}>
+                              {applyChecks(
+                                trigger.checks?.filter(
+                                  (check): check is Monitor => !!check,
+                                ) ?? [],
+                              )}
+
+                              {trigger.filters &&
+                              typeof trigger.filters === "string" ? (
+                                <FilterDisplay
+                                  filters={trigger.filters}
+                                  hasBorder={true}
+                                />
+                              ) : null}
+                            </VStack>
+                          </Table.Cell>
+                          <Table.Cell whiteSpace="nowrap">
+                            {formatTimeAgo(trigger.lastRunAt)}
+                          </Table.Cell>
+                          <Table.Cell textAlign="center">
+                            <Switch
+                              checked={trigger.active}
+                              onChange={() => {
+                                handleToggleTrigger(
+                                  trigger.id,
+                                  !trigger.active,
+                                );
+                              }}
+                            />
+                          </Table.Cell>
+                          <Table.Cell>
+                            <Menu.Root>
+                              <Menu.Trigger asChild>
+                                <Button
+                                  variant={"ghost"}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                  }}
+                                >
+                                  <MoreVertical />
+                                </Button>
+                              </Menu.Trigger>
+                              <Menu.Content>
+                                <Menu.Item
+                                  value="edit"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    openDrawer("automation", {
+                                      automationId: trigger.id,
+                                    });
+                                  }}
+                                >
+                                  <Box
+                                    display="flex"
+                                    alignItems="center"
+                                    gap={2}
+                                  >
+                                    <Edit2 size={14} />
+                                    Edit
+                                  </Box>
+                                </Menu.Item>
+                                <Menu.Item
+                                  value="delete"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    deleteTrigger(trigger.id);
+                                  }}
+                                >
+                                  <Box
+                                    display="flex"
+                                    alignItems="center"
+                                    gap={2}
+                                    color="red.600"
+                                  >
+                                    <Trash size={14} />
+                                    Delete
+                                  </Box>
+                                </Menu.Item>
+                              </Menu.Content>
+                            </Menu.Root>
+                          </Table.Cell>
+                        </Table.Row>
+                      );
+                    })
+                  )}
+                </Table.Body>
+              </Table.Root>
             </Box>
             <Text fontSize="sm" color="fg.muted">
               Learn more about creating automations on our{" "}

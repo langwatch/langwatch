@@ -540,9 +540,9 @@ describe("evaluationAlertTrigger reactor", () => {
   describe("when a trigger's dispatch fails", () => {
     it("surfaces the failure with its retryable flag and does not record the trigger as run", async () => {
       const trigger = createTrigger();
-      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue([
-        trigger,
-      ]);
+      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue(
+        [trigger],
+      );
       (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
         createEvalFoldState({ evaluatorId: "evaluator-1", passed: true }),
       ]);
@@ -574,10 +574,9 @@ describe("evaluationAlertTrigger reactor", () => {
     it("still dispatches the remaining triggers", async () => {
       const failing = createTrigger({ id: "trigger-failing" });
       const succeeding = createTrigger({ id: "trigger-ok" });
-      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue([
-        failing,
-        succeeding,
-      ]);
+      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue(
+        [failing, succeeding],
+      );
       (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
         createEvalFoldState({ evaluatorId: "evaluator-1", passed: true }),
       ]);

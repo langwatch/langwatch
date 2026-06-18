@@ -144,7 +144,9 @@ function toTemplateTRPCError(err: unknown): TRPCError {
   });
 }
 
-async function resolveProjectIdentity(projectId: string): Promise<DraftProject> {
+async function resolveProjectIdentity(
+  projectId: string,
+): Promise<DraftProject> {
   const project = await getApp().projects.getById(projectId);
   if (!project) throw new ProjectNotFoundError(projectId);
   return { name: project.name, slug: project.slug };
@@ -240,7 +242,10 @@ export const automationRouter = createTRPCRouter({
         // address so operators know what they're shipping. Two server
         // contracts for the same action would force the drawer to
         // branch on create-vs-edit, which is a footgun.
-        if (input.actionParams.members && input.actionParams.members.length > 0) {
+        if (
+          input.actionParams.members &&
+          input.actionParams.members.length > 0
+        ) {
           try {
             validateEmailRecipientFormats(input.actionParams.members);
           } catch (err) {
