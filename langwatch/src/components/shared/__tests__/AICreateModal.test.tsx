@@ -9,6 +9,7 @@ import {
   act,
   within,
   fireEvent,
+  cleanup,
 } from "@testing-library/react";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { AICreateModal } from "../AICreateModal";
@@ -50,6 +51,14 @@ function getDialogByState(state: "open" | "closed") {
 }
 
 describe("<AICreateModal/>", () => {
+  // Issue #4467: vitest runs without `globals: true`, so @testing-library/react's
+  // automatic per-test cleanup never registers. Without it every render() leaks its
+  // portaled Chakra Dialog into document.body; accumulated dialogs get aria-hidden by
+  // focus management, and role-based queries (getByRole) then intermittently fail to
+  // find the now-hidden dialog/close button — the CI-only flake. Unmounting after each
+  // test keeps exactly one live dialog.
+  afterEach(cleanup);
+
   describe("when open", () => {
     it("displays the provided title", () => {
       render(
@@ -452,6 +461,7 @@ describe("<AICreateModal/>", () => {
       });
     });
 
+    /** @scenario "Close button is present after generation fails" */
     it("displays close button", async () => {
       const onGenerate = vi.fn().mockRejectedValue(new Error("API error"));
 
@@ -508,21 +518,16 @@ describe("<AICreateModal/>", () => {
         within(dialog).getByRole("button", { name: /generate with ai/i })
       );
 
-      // Wait for the error state to render the Try again button. Re-resolve
-      // the dialog node afterwards because Chakra's portal can leave the
-      // original `dialog` reference pointing at a stale element across the
-      // idle → generating → error state transition (CI-only flake; locally
-      // the portal stays stable but on CI the timing exposes the swap).
       await waitFor(() => {
         expect(
-          within(getDialogContent()).getByRole("button", {
+          within(dialog).getByRole("button", {
             name: /try again/i,
           })
         ).toBeInTheDocument();
       });
 
       fireEvent.click(
-        within(getDialogContent()).getByRole("button", { name: /try again/i })
+        within(dialog).getByRole("button", { name: /try again/i })
       );
 
       await waitFor(() => {
@@ -783,6 +788,37 @@ describe("<AICreateModal/>", () => {
           expect(configureBtn).toHaveAttribute("target", "_blank");
         });
       });
+    });
+  });
+
+  // Regression guard for #4467: proves the suite's afterEach(cleanup) actually
+  // unmounts each test's portaled Chakra dialog. Without cleanup the first test's
+  // dialog leaks into document.body and the second test sees it (length > 0) —
+  // the accumulation that gets aria-hidden and makes getByRole(/close/i) flake on
+  // CI. With cleanup the DOM is clean between tests.
+  describe("when tests run in isolation (regression guard for #4467)", () => {
+    /** @scenario "An open modal renders a dialog into the document" */
+    it("renders a dialog", () => {
+      render(
+        <AICreateModal
+          open={true}
+          onClose={vi.fn()}
+          title="Create new scenario"
+          exampleTemplates={defaultExampleTemplates}
+          onGenerate={vi.fn()}
+          onSkip={vi.fn()}
+        />,
+        { wrapper: Wrapper }
+      );
+
+      expect(
+        screen.queryAllByRole("dialog", { hidden: true }).length
+      ).toBeGreaterThan(0);
+    });
+
+    /** @scenario "A new test starts with a clean DOM after the previous dialog is unmounted" */
+    it("sees a clean DOM in the next test because the prior dialog was cleaned up", () => {
+      expect(screen.queryAllByRole("dialog", { hidden: true })).toHaveLength(0);
     });
   });
 
