@@ -161,7 +161,7 @@ func TestRewriteHandlesMultipleAttachmentURLs(t *testing.T) {
 	assert.Equal(t, 2, images, "each URL must become its own image part")
 }
 
-// @scenario "An attachment URL in the system prompt is re-homed to a user message"
+// @scenario "An image mentioned in the system prompt still reaches the model"
 func TestRewriteRehomesSystemAttachmentToUser(t *testing.T) {
 	srv := attachmentServer(t)
 	defer srv.Close()
@@ -173,7 +173,10 @@ func TestRewriteRehomesSystemAttachmentToUser(t *testing.T) {
 	require.Nil(t, ne)
 	require.Len(t, out, 2, "the system message must split into system text + a user message")
 	assert.Equal(t, "system", out[0].Role)
-	assert.IsType(t, "", out[0].Content, "the system message keeps only the leading text")
+	systemText, ok := out[0].Content.(string)
+	require.True(t, ok, "the re-homed system message keeps plain text content")
+	assert.Equal(t, "You are a vision grader. Image:", strings.TrimSpace(systemText),
+		"the system message keeps only the text before the image, not the image link")
 	assert.Equal(t, "user", out[1].Role)
 	firstPartOfType(t, out[1], "image_url") // the image rode into the user message
 }

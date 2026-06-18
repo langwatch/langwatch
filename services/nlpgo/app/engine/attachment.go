@@ -175,7 +175,7 @@ func (f *attachmentFetcher) inlineImageInputs(ctx context.Context, node *dsl.Nod
 			continue
 		}
 		rawURL := strings.TrimSpace(raw)
-		if !strings.HasPrefix(strings.ToLower(rawURL), "http") {
+		if !isHTTPURL(rawURL) {
 			continue // already a data URL or not a remote reference
 		}
 		att, ne := f.fetch(ctx, rawURL)
@@ -278,7 +278,7 @@ func (f *attachmentFetcher) rewriteParts(ctx context.Context, in []any) ([]any, 
 		case "image_url":
 			img, _ := block["image_url"].(map[string]any)
 			url, _ := img["url"].(string)
-			if !strings.HasPrefix(strings.ToLower(url), "http") {
+			if !isHTTPURL(url) {
 				out = append(out, block) // already a data URL, leave as-is
 				continue
 			}
@@ -358,6 +358,14 @@ func audioFormat(mediaType string) string {
 	default:
 		return strings.TrimPrefix(mediaType, "audio/")
 	}
+}
+
+// isHTTPURL reports whether s is an http(s) URL — the schemes the attachment
+// fetcher handles. A bare "http" prefix check would also match non-fetchable
+// look-alikes like "httpfoo://", so the scheme separator is required.
+func isHTTPURL(s string) bool {
+	lower := strings.ToLower(s)
+	return strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://")
 }
 
 // normalizeMediaType strips parameters (charset, boundary) and lowercases a
