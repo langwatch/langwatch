@@ -7,8 +7,9 @@
  * its copy from this handler's forwarded `error.message`, so the
  * "friendly message, no stack trace" assertion lives here.
  */
-import { describe, expect, it } from "vitest";
+
 import { HTTPException } from "hono/http-exception";
+import { describe, expect, it } from "vitest";
 
 import {
   SystemPromptConflictError,

@@ -11,11 +11,12 @@
  * server error. Drawer-level concerns (tRPC plumbing, RBAC, project
  * context) are out of scope and exercised by `PromptEditorDrawer.test.tsx`.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useEffect } from "react";
 import { useWatch } from "react-hook-form";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 // Mock the model-limits hook so the form resolver doesn't pull in tRPC.
 // We only care about the system-prompt-required refinement; model limits
@@ -24,8 +25,8 @@ vi.mock("~/hooks/useModelLimits", () => ({
   useModelLimits: () => ({ limits: null }),
 }));
 
-import { buildDefaultFormValues } from "~/prompts/utils/buildDefaultFormValues";
 import { hasNonEmptySystemMessage } from "~/prompts/schemas/form-schema";
+import { buildDefaultFormValues } from "~/prompts/utils/buildDefaultFormValues";
 import { usePromptConfigForm } from "../usePromptConfigForm";
 
 interface MutationCall {

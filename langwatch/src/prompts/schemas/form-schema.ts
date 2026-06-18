@@ -1,10 +1,7 @@
 import { z } from "zod";
 
 import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
-import {
-  FALLBACK_MAX_TOKENS,
-  MIN_MAX_TOKENS,
-} from "~/utils/constants";
+import { FALLBACK_MAX_TOKENS, MIN_MAX_TOKENS } from "~/utils/constants";
 import {
   handleSchema,
   runtimeParametersSchema,
@@ -51,8 +48,10 @@ const baseFormSchema = z.object({
   version: z.object({
     parameters: runtimeParametersSchema,
     configData: z.object({
-      messages: latestConfigVersionSchema.shape.configData.shape.messages.removeDefault(),
-      inputs: latestConfigVersionSchema.shape.configData.shape.inputs.removeDefault(),
+      messages:
+        latestConfigVersionSchema.shape.configData.shape.messages.removeDefault(),
+      inputs:
+        latestConfigVersionSchema.shape.configData.shape.inputs.removeDefault(),
       outputs: latestConfigVersionSchema.shape.configData.shape.outputs,
       llm: llmSchema,
       demonstrations:
@@ -151,10 +150,7 @@ function baseFormSchemaWithModelLimits(
  * whitespace are functionally identical to the user.
  */
 export const hasNonEmptySystemMessage = (
-  messages:
-    | readonly { role?: string; content?: string }[]
-    | undefined
-    | null,
+  messages: readonly { role?: string; content?: string }[] | undefined | null,
 ): boolean =>
   !!messages?.some(
     (m) =>

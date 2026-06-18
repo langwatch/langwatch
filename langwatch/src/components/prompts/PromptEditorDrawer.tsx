@@ -43,13 +43,13 @@ import {
   SaveVersionDialog,
 } from "~/prompts/forms/SaveVersionDialog";
 import type { ChangeHandleFormValues } from "~/prompts/forms/schemas/change-handle-form.schema";
-import { hasNonEmptySystemMessage } from "~/prompts/schemas/form-schema";
-import { getSaveBlockerMessage } from "~/prompts/utils/getSaveBlockerMessage";
 import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
 import { usePromptConfigForm } from "~/prompts/hooks/usePromptConfigForm";
+import { hasNonEmptySystemMessage } from "~/prompts/schemas/form-schema";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import { areFormValuesEqual } from "~/prompts/utils/areFormValuesEqual";
 import { buildDefaultFormValues } from "~/prompts/utils/buildDefaultFormValues";
+import { getSaveBlockerMessage } from "~/prompts/utils/getSaveBlockerMessage";
 import {
   formValuesToTriggerSaveVersionParams,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
