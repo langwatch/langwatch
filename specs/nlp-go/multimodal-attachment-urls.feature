@@ -6,16 +6,14 @@ Feature: Remote attachment URLs are fetched and delivered to the model as conten
   document) instead of guessing from a link it cannot open
 
   Background:
-    Today an image only reaches the model when its value is an inline
-    data:image/...;base64,... URL; that base64 case is split into content parts
-    by the existing image splitter. A value that is a plain http(s) URL is
-    interpolated into the message as text and the model never sees the content.
-    The engine should instead fetch a referenced URL, detect its type from the
-    response, and deliver it as the right kind of content part so it works
-    across every provider, regardless of whether the provider can fetch URLs
-    itself. When a referenced attachment cannot be fetched, the run must fail
-    with a clear, user-facing message rather than silently sending a broken
-    request or a wall of URL text.
+    Today an image reaches the model only when its value is an inline
+    data:image/...;base64,... URL; a value that is a plain http(s) URL is passed
+    along as text and the model never sees the content. Instead, a referenced
+    URL should be fetched, its type detected from the response, and delivered as
+    the right kind of content so it works across every provider, regardless of
+    whether the provider can fetch URLs itself. When a referenced attachment
+    cannot be fetched, the run must fail with a clear, user-facing message
+    rather than silently sending a broken request or a wall of URL text.
 
     # Bindings: services/nlpgo/app/engine/attachment_test.go and
     # services/nlpgo/tests/integration/attachment_url_test.go
@@ -29,36 +27,35 @@ Feature: Remote attachment URLs are fetched and delivered to the model as conten
 
   @integration
   Scenario: An image referenced by an http URL is fetched and delivered as an image part
-    Given a user message whose text is an http URL pointing at a PNG image
-    When the engine builds the LLM messages
-    Then the message content becomes a parts list carrying an image part
-    And the image part carries the fetched image, not the original link text
+    Given a prompt that references an image by an http URL to a PNG
+    When I run the workflow
+    Then the model receives the fetched image as a picture, not the link text
 
   @integration
   Scenario: The attachment type is detected from the response, not the file extension
-    Given a user message whose http URL has no file extension but serves a JPEG
-    When the engine builds the LLM messages
-    Then the content still carries an image part for that attachment
+    Given a prompt referencing an image URL that has no file extension but serves a JPEG
+    When I run the workflow
+    Then the model still receives it as an image
 
   @unit
   Scenario: An image already given as a base64 data URL is delivered without fetching
-    Given a user message whose image is an inline base64 data URL
-    When the engine builds the LLM messages
-    Then the image reaches the model without any network fetch
-    # The existing data-URL split keeps working untouched; only http(s) URLs are fetched.
+    Given a prompt whose image is already an inline base64 data URL
+    When I run the workflow
+    Then the model receives the image with no network fetch
+    # The existing data-URL handling keeps working untouched; only http(s) URLs are fetched.
 
   @integration
   Scenario: Several attachment URLs in one message each become their own part
-    Given a user message referencing two image URLs around some text
-    When the engine builds the LLM messages
-    Then the content carries an image part for each, in their original positions
+    Given a prompt referencing two image URLs around some text
+    When I run the workflow
+    Then the model receives both images, each in the position it was mentioned
 
   @integration
   Scenario: An image mentioned in the system prompt still reaches the model
-    Given the system prompt text references an image by URL
-    When the engine builds the LLM messages
+    Given workflow instructions that reference an image by URL
+    When I run the workflow
     Then the model still receives that image as a picture
-    And the system instructions are kept
+    And the instructions are kept
 
   # ============================================================================
   # Clear failures when an attachment cannot be fetched
@@ -66,28 +63,28 @@ Feature: Remote attachment URLs are fetched and delivered to the model as conten
 
   @integration
   Scenario: An unreachable attachment URL fails the run with a clear message naming the URL
-    Given a user message referencing an attachment URL that cannot be reached
-    When the engine builds the LLM messages
+    Given a prompt referencing an attachment URL that cannot be reached
+    When I run the workflow
     Then the run fails with a clear error that names the URL and the reason
-    And no request is sent to the model
+    And nothing is sent to the model
 
   @integration
   Scenario: An attachment URL that responds with an error status fails the run clearly
-    Given a user message referencing an attachment URL that returns a not-found status
-    When the engine builds the LLM messages
+    Given a prompt referencing an attachment URL that returns a not-found status
+    When I run the workflow
     Then the run fails with a clear error that names the URL and the status
 
   @integration
   Scenario: An attachment larger than the allowed size is rejected with a clear message
-    Given a user message referencing an attachment URL whose body exceeds the size limit
-    When the engine builds the LLM messages
+    Given a prompt referencing an attachment URL whose body exceeds the size limit
+    When I run the workflow
     Then the run fails with a clear error explaining the attachment was too large
-    And no request is sent to the model
+    And nothing is sent to the model
 
   @integration
   Scenario: An attachment URL that redirects to a private address is refused
-    Given an attachment URL on an allowed host that redirects to a metadata address
-    When the engine builds the LLM messages
+    Given a prompt referencing an attachment URL that redirects to a private address
+    When I run the workflow
     Then the run fails rather than fetching the private address
     # The SSRF policy is re-applied at dial time, so a redirect cannot escape it.
 
@@ -97,18 +94,18 @@ Feature: Remote attachment URLs are fetched and delivered to the model as conten
 
   @integration
   Scenario: A link to a normal web page is left as text, not turned into an attachment
-    Given a user message referencing a URL that serves an HTML page
-    When the engine builds the LLM messages
-    Then the URL is left in the message as text
-    And no attachment part is created for it
+    Given a prompt referencing a link to a normal web page
+    When I run the workflow
+    Then the link reaches the model as text
+    And no attachment is created for it
     # A reachable, non-attachment response (a web page) is the author referencing
     # a link, not attaching a file, so it must not be force-attached.
 
   @integration
   Scenario: A broken link in prose does not fail the run
-    Given a user message whose text mentions an http URL that cannot be reached
-    When the engine builds the LLM messages
-    Then the URL is left in the message as text
+    Given a prompt whose text mentions a link that cannot be reached
+    When I run the workflow
+    Then the link reaches the model as text
     And the run is not failed by the broken link
     # A bare URL in prose is best-effort; only an explicit image attachment that
     # cannot be fetched fails the run.
@@ -118,29 +115,29 @@ Feature: Remote attachment URLs are fetched and delivered to the model as conten
   # ============================================================================
   # The studio lets an author declare an input as an Image. That is an explicit
   # statement of intent: the value is a picture, not prose that happens to carry
-  # a link. So an image-typed field is resolved before templating and fails the
-  # run with a clear error when its URL cannot be loaded as an image, rather than
-  # being passed to the model as text for it to guess from (e.g. from a filename).
+  # a link. So an image-typed field is resolved up front and fails the run with a
+  # clear error when its URL cannot be loaded as an image, rather than being
+  # passed to the model as text for it to guess from (e.g. from a filename).
 
   @integration
   Scenario: An image-typed field whose URL is an image is fetched and inlined
-    Given a signature input declared as an image whose value is an http URL to a PNG
-    When the engine builds the LLM messages
-    Then the image is fetched and delivered to the model as an image, not as the link text
+    Given a workflow input declared as an image whose value is an http URL to a picture
+    When I run the workflow
+    Then the model receives the fetched image, not the link text
 
   @integration
   Scenario: An image-typed field whose URL cannot be fetched fails the run with a clear error
-    Given a signature input declared as an image whose URL cannot be reached
-    When the engine builds the LLM messages
+    Given a workflow input declared as an image whose URL cannot be reached
+    When I run the workflow
     Then the run fails with a clear error that names the URL
-    And no request is sent to the model
+    And nothing is sent to the model
     # Contrast with the best-effort prose link above: the explicit image field
     # must not silently degrade to the model guessing from the URL text.
 
   @integration
   Scenario: An image-typed field whose URL is not an image fails the run with a clear error
-    Given a signature input declared as an image whose URL serves a web page
-    When the engine builds the LLM messages
+    Given a workflow input declared as an image whose URL serves a web page
+    When I run the workflow
     Then the run fails with a clear error explaining it could not be loaded as an image
 
   # ============================================================================
@@ -149,12 +146,12 @@ Feature: Remote attachment URLs are fetched and delivered to the model as conten
 
   @integration
   Scenario: An audio attachment referenced by URL reaches the model as audio
-    Given a user message whose http URL points at an audio file
-    When the engine builds the LLM messages
-    Then the content carries an audio attachment part for the model to hear
+    Given a prompt whose http URL points at an audio file
+    When I run the workflow
+    Then the model receives it as audio to hear
 
   @integration
   Scenario: A PDF attachment referenced by URL reaches the model as a document
-    Given a user message whose http URL points at a PDF document
-    When the engine builds the LLM messages
-    Then the content carries a document attachment part for the model to read
+    Given a prompt whose http URL points at a PDF document
+    When I run the workflow
+    Then the model receives it as a document to read
