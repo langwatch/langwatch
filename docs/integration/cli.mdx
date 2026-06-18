@@ -34,7 +34,7 @@ langwatch login
 
 You'll see two questions:
 
-1. **Where do you want to log in?**: LangWatch Cloud (`app.langwatch.ai`) or a self-hosted instance (custom URL).
+1. **Where do you want to log in?**: LangWatch Cloud (`app.langwatch.ai`) or a self-hosted instance (custom URL). LangWatch Cloud is the default, and picking it always repoints to `app.langwatch.ai`, even when you previously logged into a local or self-hosted endpoint. If you already have a non-cloud endpoint configured (through `LANGWATCH_ENDPOINT` or a prior login), the picker instead defaults to keeping that endpoint and adds a "different endpoint" option, with LangWatch Cloud still one keystroke away.
 2. **How do you want to use it?**: three options:
    - **AI tools, agentic flows**: `claude`, `codex`, `cursor`, `gemini`, `opencode`. Mints an OAuth-style device session in `~/.langwatch/config.json` (user-scoped) so `langwatch claude` etc. wrap any tool through your gateway.
    - **Project, SDK API key**: for `langwatch sync`, `langwatch eval`, and SDK auto-instrumentation. Mints a fresh project API key into `$CWD/.env` (project-scoped).
@@ -91,13 +91,14 @@ When you're driving the CLI from automation and already have a credential, skip 
 | Flag | Use case | Where it lands |
 |---|---|---|
 | `langwatch login --device` | AI tools mode, skip Q1/Q2 prompts | `~/.langwatch/config.json` |
+| `langwatch login --project` | Project SDK mode via browser, skip Q1/Q2 prompts; mints a fresh project key | `$CWD/.env` |
 | `langwatch login --api-key <KEY>` | CI pipeline that has `LANGWATCH_API_KEY` injected from secrets | `$CWD/.env` |
 | `langwatch login --token <TOKEN>` | Agent harness with a pre-minted device session token (issued via dashboard "Personal Access Tokens") | `~/.langwatch/config.json` |
 | `langwatch login --endpoint <URL>` | combine with any of the above to pin a self-hosted instance | persisted to config |
 
 The interactive `langwatch login` always shows these flags in a banner above the prompts, so a fake-TTY agent (`Claude Code`, certain Gemini CLI sandboxes) can detect the prompt and re-invoke with the right flag instead of getting stuck.
 
-When stdin is not a TTY (genuine CI), `langwatch login` with no flags errors out with the same flag list, explicit > implicit, no surprise API-key fall-throughs.
+When stdin is not a TTY (genuine CI or an agent's piped stdin), `langwatch login` with no flags defaults to **project login** (the same as `--project`): it mints a project key into `$CWD/.env`, which is what the SDK, `langwatch eval`, and `langwatch prompt` expect. AI-tools login stays explicit behind `--device`.
 
 ### Letting an agent do it
 

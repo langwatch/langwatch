@@ -132,13 +132,17 @@ program
 const loginCmd = program
   .command("login")
   .description(
-    "Login to LangWatch. With no flags, asks where (cloud vs self-hosted) and how (AI tools vs project SDK). For CI/agents pass --device, --api-key, or --token to skip prompts.",
+    "Login to LangWatch. With no flags, asks where (cloud vs self-hosted) and how (AI tools vs project SDK). For CI/agents pass --device, --project, --api-key, or --token to skip prompts.",
   )
   .option("--api-key <key>", "Set API key non-interactively (CI/agents that already have a project API key) — writes to .env")
   .option("--endpoint <url>", "Override the LangWatch control-plane URL for this login (self-hosted instances)")
   .option(
     "--device",
     "RFC 8628 device-flow login via your company SSO; provisions a personal virtual key for Claude Code / Codex / Cursor / Gemini CLI",
+  )
+  .option(
+    "--project",
+    "Force project login: mint a project SDK key via the browser and write it to .env (for the SDK, `langwatch eval`, prompts). The implicit default in non-TTY contexts.",
   )
   .option(
     "--token <token>",
@@ -149,7 +153,7 @@ const loginCmd = program
     "browser to open for device-flow approval (chrome|chromium|firefox|safari|none|<path>)",
   );
 
-loginCmd.action(async (options: { apiKey?: string; device?: boolean; browser?: string; endpoint?: string; token?: string }) => {
+loginCmd.action(async (options: { apiKey?: string; device?: boolean; project?: boolean; browser?: string; endpoint?: string; token?: string }) => {
   try {
     await loginCommand(options);
   } catch (error) {
