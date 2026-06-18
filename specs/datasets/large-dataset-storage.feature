@@ -37,7 +37,7 @@ Feature: Large dataset storage
     Then once ready the dataset reports 50 rows
     And the dataset reports its stored size
 
-  @integration @unimplemented
+  @integration
   Scenario: A dataset still being prepared is not used as data
     Given a dataset that is still processing
     When an experiment, the SDK, or the UI reads that dataset

@@ -6,6 +6,7 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 import { createLogger } from "~/utils/logger/server";
 import { slugify } from "~/utils/slugify";
 import {
+  adaptS3JsonlRecord,
   createManyDatasetRecords,
   getFullDataset,
 } from "../api/routers/datasetRecord.utils";
@@ -16,6 +17,7 @@ import { getDatasetStorage } from "./dataset-storage";
 import {
   DatasetConflictError,
   DatasetNotFoundError,
+  DatasetNotReadyError,
   DatasetNotRetryableError,
   InvalidColumnError,
   MalformedColumnTypesError,
@@ -210,6 +212,16 @@ export class DatasetService {
         JSON.stringify(existingDataset.columnTypes) !==
         JSON.stringify(columnTypes)
       ) {
+        // ADR-032: column migration rewrites every record's keys — for s3_jsonl
+        // that's a chunk-rewrite (write-mutation), which is a later rung. The PG
+        // record migrator would read zero rows (I-PG) and silently "migrate"
+        // nothing, leaving stored chunk keys out of sync with columnTypes.
+        // Refuse rather than corrupt. (Deferred: s3_jsonl column migration.)
+        if (existingDataset.contentLayout === "s3_jsonl") {
+          throw new Error(
+            "Changing column types is not yet supported for large (S3) datasets",
+          );
+        }
         await this.migrateDatasetRecordColumns(
           {
             datasetId,
@@ -538,6 +550,43 @@ export class DatasetService {
     });
 
     const skip = (params.page - 1) * params.limit;
+
+    // ADR-032: s3_jsonl content lives in chunk objects, not the PG
+    // DatasetRecord table (I-PG → zero PG rows), so the PG-only paginator would
+    // silently return empty. Gate on ready (I-READY / Decision 6) and read the
+    // chunks, paginating in-memory. NOTE: this reads ALL chunks into memory then
+    // slices the page — bounded by the same in-memory read the rung accepts;
+    // true paginated/streaming record listing for very large datasets is the
+    // reads-at-scale fast-follow epic.
+    if (dataset.contentLayout === "s3_jsonl") {
+      if (dataset.status !== "ready") {
+        throw new DatasetNotReadyError({
+          status: dataset.status,
+          statusError: dataset.statusError,
+        });
+      }
+
+      const storage = await getDatasetStorage(params.projectId);
+      const rows = await storage.readChunks({
+        projectId: params.projectId,
+        datasetId: dataset.id,
+        chunkCount: dataset.chunkCount ?? 0,
+      });
+      const records = rows.map((line) => adaptS3JsonlRecord(line, dataset));
+      // PG-authoritative count (Decision 1/2); fall back to read length.
+      const total = dataset.rowCount ?? records.length;
+
+      return {
+        data: records.slice(skip, skip + params.limit),
+        pagination: {
+          page: params.page,
+          limit: params.limit,
+          total,
+          totalPages: Math.ceil(total / params.limit),
+        },
+      };
+    }
+
     const { records, total } = await this.recordRepository.listPaginated({
       datasetId: dataset.id,
       projectId: params.projectId,
@@ -755,11 +804,41 @@ export class DatasetService {
       throw new DatasetNotFoundError();
     }
 
-    // Fetch source records
-    const sourceRecords = await this.recordRepository.findDatasetRecords({
-      datasetId: sourceDatasetId,
-      projectId: sourceProjectId,
-    });
+    // Fetch source records. ADR-032: an s3_jsonl source has its content in chunk
+    // objects, not the PG DatasetRecord table (I-PG), so reading PG would copy
+    // an empty dataset. Gate on ready (I-READY) and read the chunks instead.
+    // NOTE: reads all chunks in memory; large-dataset copy is bounded by the
+    // reads-at-scale fast-follow, same as every other read in this rung.
+    let sourceRecordEntries: Array<Record<string, unknown>>;
+    if (sourceDataset.contentLayout === "s3_jsonl") {
+      if (sourceDataset.status !== "ready") {
+        throw new DatasetNotReadyError({
+          status: sourceDataset.status,
+          statusError: sourceDataset.statusError,
+        });
+      }
+      const storage = await getDatasetStorage(sourceProjectId);
+      const rows = await storage.readChunks({
+        projectId: sourceProjectId,
+        datasetId: sourceDatasetId,
+        chunkCount: sourceDataset.chunkCount ?? 0,
+      });
+      sourceRecordEntries = rows.map((line) => {
+        const wrapped =
+          line && typeof line === "object" && "entry" in line
+            ? (line as { entry: unknown }).entry
+            : line;
+        return wrapped as Record<string, unknown>;
+      });
+    } else {
+      const sourceRecords = await this.recordRepository.findDatasetRecords({
+        datasetId: sourceDatasetId,
+        projectId: sourceProjectId,
+      });
+      sourceRecordEntries = sourceRecords.map(
+        (record) => record.entry as Record<string, unknown>,
+      );
+    }
 
     // Determine new name
     const newName = await this.findNextAvailableName(
@@ -767,13 +846,15 @@ export class DatasetService {
       sourceDataset.name,
     );
 
-    // Create new dataset
+    // Create new dataset. The copy target is created on the PG layout (the
+    // createNewDataset default); routing the copy *target* onto s3_jsonl is a
+    // write-mutation concern for a later rung — this rung only fixes reads.
     const newDataset = await this.createNewDataset({
       projectId: targetProjectId,
       name: newName,
       columnTypes: sourceDataset.columnTypes as DatasetColumns,
-      datasetRecords: sourceRecords.map((record) => ({
-        ...(record.entry as Record<string, any>),
+      datasetRecords: sourceRecordEntries.map((entry) => ({
+        ...entry,
         id: nanoid(),
       })),
     });

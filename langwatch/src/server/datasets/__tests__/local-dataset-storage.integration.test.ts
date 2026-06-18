@@ -3,6 +3,7 @@ import fs from "fs/promises";
 import os from "os";
 import path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { readDatasetHeadS3Jsonl } from "../../api/routers/datasetRecord.utils";
 import { chunkKey } from "../dataset-chunking";
 import { createDatasetNormalizeHandler } from "../dataset-normalize.job";
 // Real-FS integration: exercise LocalDatasetStorage against a real temp dir.
@@ -219,7 +220,9 @@ describe("LocalDatasetStorage", () => {
         });
 
         expect(ready.status).toBe("ready");
-        expect(rows).toEqual([
+        // Each chunk line is wrapped as { id, entry } so a later edit/delete
+        // can target the row by id; the entry holds the original row.
+        expect(rows.map((r) => (r as { entry: unknown }).entry)).toEqual([
           { a: "1", b: "x" },
           { a: "2", b: "y" },
         ]);
@@ -238,7 +241,7 @@ describe("LocalDatasetStorage", () => {
         });
 
         expect(ready.status).toBe("ready");
-        expect(rows).toEqual([
+        expect(rows.map((r) => (r as { entry: unknown }).entry)).toEqual([
           { a: "1", b: "x" },
           { a: "2", b: "y" },
         ]);
@@ -263,6 +266,37 @@ describe("LocalDatasetStorage", () => {
         expect(ready.rowCount).toBe(50);
         expect(ready.sizeBytes).toBeGreaterThan(0n);
         expect(rows).toHaveLength(50);
+      });
+    });
+
+    // ADR-032 Decision 6 / I-READY: a read against a still-preparing s3_jsonl
+    // dataset must refuse — never serve partial/half-prepared rows — across the
+    // read consumers. The status gate fires before any storage read, so a
+    // `processing`/`failed` dataset is treated as not ready. This drives the
+    // read path (`readDatasetHeadS3Jsonl`, shared by the head/UI read) with a
+    // real dataset row shape.
+    describe("given a dataset that is still processing", () => {
+      /** @scenario "A dataset still being prepared is not used as data" */
+      it("refuses the read as not-ready instead of serving partial rows", async () => {
+        await expect(
+          readDatasetHeadS3Jsonl({
+            dataset: {
+              id: "rt-processing",
+              projectId: "p1",
+              contentLayout: "s3_jsonl",
+              status: "processing",
+              statusError: null,
+              chunkCount: 0,
+              rowCount: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            } as never,
+            projectId: "p1",
+          }),
+        ).rejects.toMatchObject({
+          name: "DatasetNotReadyError",
+          status: "processing",
+        });
       });
     });
   });

@@ -28,6 +28,7 @@
 
 import readline from "node:readline";
 import type { Readable } from "node:stream";
+import { nanoid } from "nanoid";
 import Papa from "papaparse";
 import type { DatasetRepository } from "./dataset.repository";
 import {
@@ -100,6 +101,13 @@ export class LargeJsonUnsupportedError extends Error {
  * soon as their serialized size reaches `CHUNK_MAX_BYTES`, keeping memory
  * bounded regardless of the source file size. Each flush calls `writeChunks`
  * with the running `fromIndex`, so chunk keys stay contiguous across flushes.
+ *
+ * Each JSONL line is wrapped as `{ id, entry }` (mirroring the logical
+ * `DatasetRecord` shape) so every row carries a stable id a later edit/delete
+ * rung can target — the read adapter maps `{id, entry}` back to a
+ * `DatasetRecord`-shaped object. The id is assigned per-record here in the
+ * streaming writer so this stays streaming (never builds an in-memory array of
+ * the whole file).
  */
 class StreamingChunkWriter {
   private buffer: unknown[] = [];
@@ -115,7 +123,10 @@ class StreamingChunkWriter {
     },
   ) {}
 
-  async push(record: unknown): Promise<void> {
+  async push(entry: unknown): Promise<void> {
+    // Wrap the raw row as { id, entry } — the stable per-row id later
+    // edit/delete targets. nanoid() per record keeps this streaming.
+    const record = { id: `record_${nanoid()}`, entry };
     // Track an approximate serialized size to decide when to roll over. The
     // authoritative byteSize is recomputed inside toJsonlChunks on flush.
     this.bufferBytes += Buffer.byteLength(JSON.stringify(record), "utf8") + 1;

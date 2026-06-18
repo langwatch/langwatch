@@ -105,6 +105,33 @@ export class StagedUploadNotFoundError extends Error {
 }
 
 /**
+ * Thrown when a read consumer tries to read a dataset that is not yet `ready`
+ * (still `uploading`/`processing`, or `failed`). ADR-032 Decision 6 / I-READY:
+ * every read consumer gates on `status='ready'` so a half-normalized or failed
+ * dataset is never served as if empty. Carries the current `status` (+ optional
+ * `statusError`) so the router/REST layer can surface a clear, actionable error.
+ * The route maps it to 425 Too Early (a not-ready dataset is retryable once
+ * preparation finishes).
+ */
+export class DatasetNotReadyError extends Error {
+  readonly status: string;
+  readonly statusError: string | null;
+
+  constructor({
+    status,
+    statusError = null,
+  }: {
+    status: string;
+    statusError?: string | null;
+  }) {
+    super(`Dataset is not ready (status: ${status})`);
+    this.name = "DatasetNotReadyError";
+    this.status = status;
+    this.statusError = statusError;
+  }
+}
+
+/**
  * Thrown when a manual normalize retry is requested on a dataset that can't be
  * re-run: it's not in a recoverable state (`failed`/`processing`) or it carries
  * no staging key to re-read (no source to normalize). The route maps it to 409

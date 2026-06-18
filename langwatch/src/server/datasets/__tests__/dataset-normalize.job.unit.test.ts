@@ -270,9 +270,16 @@ describe("createDatasetNormalizeHandler()", () => {
       });
       await handler(basePayload);
 
-      // The stored row's keys are rewritten so they match columnTypes.
-      const pushed = writeChunks.mock.calls[0]![0].records;
-      expect(pushed).toEqual([{ id_: "x", b: "y" }]);
+      // The stored row's keys are rewritten so they match columnTypes. Each
+      // line is wrapped as { id, entry } so a later edit/delete can target the
+      // row by id.
+      const pushed = writeChunks.mock.calls[0]![0].records as Array<{
+        id: string;
+        entry: Record<string, unknown>;
+      }>;
+      expect(pushed).toHaveLength(1);
+      expect(pushed[0]!.id).toMatch(/^record_/);
+      expect(pushed[0]!.entry).toEqual({ id_: "x", b: "y" });
       const update = repo.update.mock.calls[0]![0];
       expect(update.data.columnTypes).toEqual([
         { name: "id_", type: "string" },

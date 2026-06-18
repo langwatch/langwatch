@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createProjectApp, requires } from "~/server/api/security";
 import { createManyDatasetRecords } from "../../../../server/api/routers/datasetRecord.utils";
 import { UploadValidationError } from "../../../../server/datasets/dataset.service";
+import type { DatasetNotReadyError } from "../../../../server/datasets/errors";
 import type { DatasetColumns } from "../../../../server/datasets/types";
 import { datasetColumnTypeSchema } from "../../../../server/datasets/types";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
@@ -102,6 +103,31 @@ function mapDatasetNotFoundError(error: unknown): never {
     throw new NotFoundError("Dataset not found");
   }
   throw error;
+}
+
+/**
+ * ADR-032 Decision 6 / I-READY: a still-preparing (or failed) dataset is not
+ * served as data. Map `DatasetNotReadyError` to 425 Too Early with the
+ * lifecycle `status` in the body so the caller knows whether to poll
+ * (`processing`) or stop (`failed`). Returns `undefined` when the error isn't a
+ * not-ready error, so the caller falls through to its existing mapping.
+ */
+function mapDatasetNotReadyError(
+  error: unknown,
+  c: { json: (body: unknown, status: 425) => Response },
+): Response | undefined {
+  if (error instanceof Error && error.name === "DatasetNotReadyError") {
+    const notReady = error as DatasetNotReadyError;
+    return c.json(
+      {
+        error: "DatasetNotReady",
+        status: notReady.status,
+        message: notReady.message,
+      },
+      425,
+    );
+  }
+  return undefined;
 }
 
 const secured = createProjectApp<DatasetServiceMiddlewareVariables>({
@@ -603,6 +629,8 @@ secured.access(requires("datasets:view")).get(
         limitMb: MAX_LIMIT_MB,
       });
     } catch (error) {
+      const notReady = mapDatasetNotReadyError(error, c);
+      if (notReady) return notReady;
       return mapDatasetNotFoundError(error);
     }
 
@@ -738,6 +766,8 @@ secured.access(requires("datasets:view")).get(
       });
       return c.json(result);
     } catch (error) {
+      const notReady = mapDatasetNotReadyError(error, c);
+      if (notReady) return notReady;
       return mapDatasetNotFoundError(error);
     }
   },

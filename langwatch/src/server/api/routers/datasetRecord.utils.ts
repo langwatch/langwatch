@@ -2,6 +2,8 @@ import type { Dataset, DatasetRecord, Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
+import { getDatasetStorage } from "../../datasets/dataset-storage";
+import { DatasetNotReadyError } from "../../datasets/errors";
 import { stripNullBytes } from "../../datasets/sanitize";
 import type { DatasetRecordInput } from "../../datasets/types";
 import { prisma } from "../../db";
@@ -147,6 +149,104 @@ const processBatchedRecords = ({
   return { truncatedRecords, truncated, totalSize };
 };
 
+type EntrySelection = "first" | "last" | "random" | "all" | number;
+
+/**
+ * Adapt an s3_jsonl chunk line `{ id, entry }` into the `DatasetRecord` shape
+ * consumers expect (`record.id` + `record.entry`). Timestamps come from the
+ * dataset row — individual rows don't carry their own. Defensive against legacy
+ * raw-row lines (no `id`/`entry` wrapper) by treating the whole line as the
+ * entry and minting an id.
+ */
+export const adaptS3JsonlRecord = (
+  line: unknown,
+  dataset: Pick<Dataset, "id" | "projectId" | "createdAt" | "updatedAt">,
+): DatasetRecord => {
+  const wrapped =
+    line && typeof line === "object" && "entry" in line
+      ? (line as { id?: string; entry: unknown })
+      : { id: undefined, entry: line };
+
+  return {
+    id: wrapped.id ?? `record_${nanoid()}`,
+    entry: wrapped.entry as Prisma.JsonValue,
+    datasetId: dataset.id,
+    projectId: dataset.projectId,
+    createdAt: dataset.createdAt,
+    updatedAt: dataset.updatedAt,
+  };
+};
+
+/**
+ * Apply the same `entrySelection` semantics the PG path uses, in-memory. For
+ * first/last/random/number it returns the single selected record; for "all" it
+ * returns every record. Mirrors the PG branch's skip arithmetic so consumers
+ * see identical behaviour regardless of `contentLayout`.
+ */
+const selectRecords = (
+  records: DatasetRecord[],
+  entrySelection: EntrySelection,
+): DatasetRecord[] => {
+  if (entrySelection === "all") {
+    return records;
+  }
+
+  const count = records.length;
+  if (count === 0) {
+    return [];
+  }
+
+  let index = 0;
+  if (entrySelection === "first") {
+    index = 0;
+  } else if (entrySelection === "last") {
+    index = Math.max(count - 1, 0);
+  } else if (entrySelection === "random") {
+    index = Math.floor(Math.random() * count);
+  } else {
+    index = Math.max(0, Math.min(entrySelection, count - 1));
+  }
+
+  return [records[index]!];
+};
+
+/**
+ * Read the head (first up-to-5 rows) of an s3_jsonl dataset for the preview,
+ * gated on `status='ready'` (ADR-032 Decision 6 / I-READY). Reads only the
+ * first chunk — never the whole dataset — and reports the PG-authoritative
+ * count. Extracted from the `getHead` tRPC procedure so the s3_jsonl read path
+ * is unit-testable at its boundaries (prisma already resolved the row).
+ *
+ * @throws {DatasetNotReadyError} if the dataset is not `ready`.
+ */
+export const readDatasetHeadS3Jsonl = async ({
+  dataset,
+  projectId,
+}: {
+  dataset: Dataset;
+  projectId: string;
+}): Promise<{ records: DatasetRecord[]; total: number }> => {
+  if (dataset.status !== "ready") {
+    throw new DatasetNotReadyError({
+      status: dataset.status,
+      statusError: dataset.statusError,
+    });
+  }
+
+  const storage = await getDatasetStorage(projectId);
+  // Read just the first chunk for the preview — never the whole dataset.
+  const rows = await storage.readChunks({
+    projectId,
+    datasetId: dataset.id,
+    chunkCount: Math.min(1, dataset.chunkCount ?? 0),
+  });
+
+  return {
+    records: rows.slice(0, 5).map((line) => adaptS3JsonlRecord(line, dataset)),
+    total: dataset.rowCount ?? rows.length,
+  };
+};
+
 export const getFullDataset = async ({
   datasetId,
   projectId,
@@ -155,7 +255,7 @@ export const getFullDataset = async ({
 }: {
   datasetId: string;
   projectId: string;
-  entrySelection?: "first" | "last" | "random" | "all" | number;
+  entrySelection?: EntrySelection;
   limitMb?: number | null;
 }): Promise<
   | (Dataset & {
@@ -176,6 +276,45 @@ export const getFullDataset = async ({
   const truncatedDatasetRecords: DatasetRecord[] = [];
 
   const BATCH_SIZE = 500;
+
+  // ADR-032 Decision 6 / I-READY: the s3_jsonl content layout reads from chunk
+  // objects, gated on `status='ready'`. Routed independently of the dead
+  // single-blob `useS3` path. Postgres datasets default `status:"ready"`, so the
+  // gate never fires for legacy data.
+  if (dataset.contentLayout === "s3_jsonl") {
+    if (dataset.status !== "ready") {
+      throw new DatasetNotReadyError({
+        status: dataset.status,
+        statusError: dataset.statusError,
+      });
+    }
+
+    const storage = await getDatasetStorage(projectId);
+    const rows = await storage.readChunks({
+      projectId,
+      datasetId,
+      chunkCount: dataset.chunkCount ?? 0,
+    });
+
+    const allRecords = rows.map((line) => adaptS3JsonlRecord(line, dataset));
+    const selected = selectRecords(allRecords, entrySelection);
+
+    // Same 5 MB truncation the PG path applies (reads-at-scale is the
+    // fast-follow epic; in-memory + truncation is acceptable for now).
+    const { truncatedRecords, truncated } = processBatchedRecords({
+      records: selected,
+      limitMb,
+    });
+
+    return {
+      ...dataset,
+      // PG-authoritative count; falls back to the read length only if rowCount
+      // was never written (defensive — normalize always sets it).
+      count: dataset.rowCount ?? allRecords.length,
+      datasetRecords: truncatedRecords,
+      truncated,
+    };
+  }
 
   if (dataset.useS3) {
     let records: any[] = [];

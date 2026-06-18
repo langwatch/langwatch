@@ -11,6 +11,7 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
   createManyDatasetRecords,
   getFullDataset,
+  readDatasetHeadS3Jsonl,
 } from "./datasetRecord.utils";
 
 export { createManyDatasetRecords, getFullDataset };
@@ -121,6 +122,19 @@ export const datasetRecordRouter = createTRPCRouter({
         });
       }
 
+      // ADR-032 Decision 6 / I-READY: s3_jsonl reads the first chunk only for
+      // the head preview, gated on `status='ready'`. Routed independently of the
+      // dead single-blob `useS3` path.
+      if (dataset.contentLayout === "s3_jsonl") {
+        const { records, total } = await readDatasetHeadS3Jsonl({
+          dataset,
+          projectId: input.projectId,
+        });
+        (dataset as any).datasetRecords = records;
+
+        return { dataset, total };
+      }
+
       if (dataset.useS3) {
         const { records, count } = await storageService.getObject(
           input.projectId,
@@ -213,9 +227,7 @@ const deleteManyDatasetRecords = async ({
           message: "No records found to delete",
         });
       }
-      captureException(
-        toError(error),
-      );
+      captureException(toError(error));
       throw error;
     }
 
@@ -348,4 +360,3 @@ const updateDatasetRecord = async ({
 
   return { success: true };
 };
-
