@@ -61,7 +61,7 @@ describe("OtlpSpanPiiRedactionService", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    delete process.env.DISABLE_PII_REDACTION;
+    delete process.env.OPS_PII_STRICT_PRESIDIO_REDACTION_DISABLED;
     const { mockBatchClearPII, batchSpy: spy } = createMockBatchClearPII();
     batchSpy = spy;
     service = new OtlpSpanPiiRedactionService({
@@ -76,9 +76,9 @@ describe("OtlpSpanPiiRedactionService", () => {
   });
 
   describe("redactSpan", () => {
-    describe("when DISABLE_PII_REDACTION env var is set", () => {
+    describe("when the strict-PII analysis kill switch is enabled", () => {
       it("does not modify the span regardless of redaction level", async () => {
-        process.env.DISABLE_PII_REDACTION = "true";
+        process.env.OPS_PII_STRICT_PRESIDIO_REDACTION_DISABLED = "1";
         const span = createMockOtlpSpan([
           { key: "gen_ai.prompt", value: { stringValue: "sensitive data" } },
         ]);
@@ -91,7 +91,7 @@ describe("OtlpSpanPiiRedactionService", () => {
       });
 
       it("skips redaction even for ESSENTIAL level", async () => {
-        process.env.DISABLE_PII_REDACTION = "1";
+        process.env.OPS_PII_STRICT_PRESIDIO_REDACTION_DISABLED = "1";
         const span = createMockOtlpSpan([
           { key: "gen_ai.prompt", value: { stringValue: "user@email.com" } },
         ]);

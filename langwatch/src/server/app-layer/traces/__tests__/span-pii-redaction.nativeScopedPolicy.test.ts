@@ -407,9 +407,9 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
     });
 
     it("does not mark the span when PII redaction is intentionally disabled by the kill switch", async () => {
-      // The ops kill switch (or its DISABLE_PII_REDACTION env alias) is on, so
-      // buildOptions returns null even though langevals is configured. That is a
-      // deliberate opt-out, not an outage, so the incomplete marker must NOT show.
+      // The strict-PII analysis kill switch is on, so buildOptions returns null
+      // even though langevals is configured. That is a deliberate opt-out, not an
+      // outage, so the incomplete marker must NOT show.
       vi.mocked(featureFlagService.isEnabled).mockResolvedValueOnce(true);
       const batchSpy = vi.fn<BatchClearPIIFunction>(async (texts) =>
         texts.map(() => "[REDACTED]"),

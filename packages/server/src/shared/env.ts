@@ -83,7 +83,6 @@ export function buildEnv({ ports, baseHost, overrides = {} }: EnvScaffoldInput):
   // just shows the evaluator title with no value. Pinning to our local
   // langwatch app routes those callbacks to the running stack.
   set("LANGWATCH_ENDPOINT", host);
-  set("DISABLE_PII_REDACTION", "true");
 
   sectionBreak("AI GATEWAY");
   set("LW_VIRTUAL_KEY_PEPPER", hex(32));

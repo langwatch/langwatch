@@ -404,8 +404,6 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
 - name: SKIP_ENV_VALIDATION
   value: {{ .Values.app.features.skipEnvValidation | default false | quote }}
-- name: DISABLE_PII_REDACTION
-  value: {{ .Values.app.features.disablePiiRedaction | default false | quote }}
 
 - name: LANGWATCH_NLP_SERVICE
   value: {{ .Values.app.upstreams.nlp.scheme | default "http" }}://{{ .Values.app.upstreams.nlp.name | default (printf "%s-langwatch-nlp" .Release.Name) }}:{{ .Values.app.upstreams.nlp.port | default 5561 }}
