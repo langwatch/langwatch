@@ -115,6 +115,36 @@ Feature: Remote attachment URLs are fetched and delivered to the model as conten
     # cannot be fetched fails the run.
 
   # ============================================================================
+  # An image-TYPED field is an explicit attachment, not a best-effort link
+  # ============================================================================
+  # The studio lets an author declare an input as an Image. That is an explicit
+  # statement of intent: the value is a picture, not prose that happens to carry
+  # a link. So an image-typed field is resolved before templating and fails the
+  # run with a clear error when its URL cannot be loaded as an image, rather than
+  # being passed to the model as text for it to guess from (e.g. from a filename).
+
+  @integration
+  Scenario: An image-typed field whose URL is an image is fetched and inlined
+    Given a signature input declared as an image whose value is an http URL to a PNG
+    When the engine builds the LLM messages
+    Then the image is fetched and delivered to the model as an image, not as the link text
+
+  @integration
+  Scenario: An image-typed field whose URL cannot be fetched fails the run with a clear error
+    Given a signature input declared as an image whose URL cannot be reached
+    When the engine builds the LLM messages
+    Then the run fails with a clear error that names the URL
+    And no request is sent to the model
+    # Contrast with the best-effort prose link above: the explicit image field
+    # must not silently degrade to the model guessing from the URL text.
+
+  @integration
+  Scenario: An image-typed field whose URL is not an image fails the run with a clear error
+    Given a signature input declared as an image whose URL serves a web page
+    When the engine builds the LLM messages
+    Then the run fails with a clear error explaining it could not be loaded as an image
+
+  # ============================================================================
   # Forward-looking: arbitrary attachment types pass through structured
   # ============================================================================
 

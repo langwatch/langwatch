@@ -514,9 +514,23 @@ func (e *Engine) runSignature(ctx context.Context, execReq ExecuteRequest, node 
 	// "(unsaved edits)".
 	emitPromptSpans(ctx, node, inputs)
 
+	// Resolve image-typed inputs that carry a remote URL into inline images
+	// before templating. An image-typed field is an explicit attachment, so a
+	// URL it holds that cannot be fetched as an image aborts the run with a
+	// clear error rather than being left as text for the model to guess from.
+	msgInputs := inputs
+	if e.attachments != nil {
+		inlined, aerr := e.attachments.inlineImageInputs(ctx, node, inputs)
+		if aerr != nil {
+			aerr.NodeID = node.ID
+			return nil, aerr
+		}
+		msgInputs = inlined
+	}
+
 	// Re-shape any template-interpolated image data URLs into multimodal
 	// content parts so the model receives actual images, not base64 text.
-	messages := splitMessagesWithImages(buildMessages(node, inputs))
+	messages := splitMessagesWithImages(buildMessages(node, msgInputs))
 	// Fetch any remote attachment URLs (http/https) referenced in the messages
 	// and deliver them as content the model can open. A failed fetch aborts the
 	// run with a clear, user-facing error instead of a broken provider request.

@@ -16,6 +16,7 @@ import (
 
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
+	"github.com/langwatch/langwatch/services/nlpgo/app/engine/dsl"
 )
 
 // Attachment fetching turns a remote URL referenced in a prompt message into
@@ -148,6 +149,50 @@ func (f *attachmentFetcher) rewrite(ctx context.Context, messages []app.ChatMess
 		}
 		m.Content = newContent
 		out = append(out, m)
+	}
+	return out, nil
+}
+
+// inlineImageInputs resolves image-typed inputs that carry a remote http(s)
+// URL into inline base64 data URLs before message templating, so the existing
+// data-URL image splitter delivers them as image parts. An image-typed input
+// is an explicit attachment: the author declared the field an image, so a URL
+// it carries that cannot be fetched as an image fails the run with a clear,
+// user-facing error rather than being left as text for the model to guess from
+// (e.g. from a filename). Inputs that are not image-typed, not http(s) URLs, or
+// already inline data URLs are left untouched. The returned map is a copy only
+// when a value was replaced, so the caller's original inputs (surfaced verbatim
+// in execution events) keep the readable URL rather than a base64 blob.
+func (f *attachmentFetcher) inlineImageInputs(ctx context.Context, node *dsl.Node, inputs map[string]any) (map[string]any, *NodeError) {
+	out := inputs
+	copied := false
+	for _, field := range node.Data.Inputs {
+		if field.Type != dsl.FieldTypeImage {
+			continue
+		}
+		raw, ok := inputs[field.Identifier].(string)
+		if !ok {
+			continue
+		}
+		rawURL := strings.TrimSpace(raw)
+		if !strings.HasPrefix(strings.ToLower(rawURL), "http") {
+			continue // already a data URL or not a remote reference
+		}
+		att, ne := f.fetch(ctx, rawURL)
+		if ne != nil {
+			return nil, ne
+		}
+		if !strings.HasPrefix(att.mediaType, "image/") {
+			return nil, attachmentError(rawURL, "could not be loaded as an image (its content type is "+att.mediaType+")", 0)
+		}
+		if !copied {
+			out = make(map[string]any, len(inputs))
+			for k, v := range inputs {
+				out[k] = v
+			}
+			copied = true
+		}
+		out[field.Identifier] = dataURL(att)
 	}
 	return out, nil
 }

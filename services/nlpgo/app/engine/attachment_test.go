@@ -12,6 +12,7 @@ import (
 
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
+	"github.com/langwatch/langwatch/services/nlpgo/app/engine/dsl"
 )
 
 // loopbackFetcher allows the httptest server (127.0.0.1) past the SSRF guard,
@@ -291,6 +292,76 @@ func TestRewriteFetchesPDFIntoFilePart(t *testing.T) {
 	data, _ := file["file"].(map[string]any)
 	fileData, _ := data["file_data"].(string)
 	assert.True(t, strings.HasPrefix(fileData, "data:application/pdf;base64,"), "pdf must inline as a data URL, got %q", fileData)
+}
+
+// imageTypedNode builds a signature node declaring the given inputs, used to
+// exercise the image-typed-input resolution that runs before message templating.
+func imageTypedNode(fields ...dsl.Field) *dsl.Node {
+	return &dsl.Node{ID: "sig", Type: dsl.ComponentSignature, Data: dsl.Component{Inputs: fields}}
+}
+
+// @scenario "An image-typed field whose URL is an image is fetched and inlined"
+func TestInlineImageInputsResolvesRemoteImageToDataURL(t *testing.T) {
+	srv := attachmentServer(t)
+	defer srv.Close()
+	f := loopbackFetcher()
+	node := imageTypedNode(dsl.Field{Identifier: "picture", Type: dsl.FieldTypeImage})
+	inputs := map[string]any{"picture": srv.URL + "/cat.png"}
+
+	out, ne := f.inlineImageInputs(context.Background(), node, inputs)
+	require.Nil(t, ne)
+	got, _ := out["picture"].(string)
+	assert.True(t, strings.HasPrefix(got, "data:image/png;base64,"),
+		"the image-typed URL must inline as a data URL, got %q", got)
+	assert.Equal(t, srv.URL+"/cat.png", inputs["picture"],
+		"the original inputs map must keep the readable URL, not a base64 blob")
+}
+
+// @scenario "An image-typed field whose URL cannot be fetched fails the run with a clear error"
+func TestInlineImageInputsFailsClearlyOnUnreachableImageURL(t *testing.T) {
+	srv := attachmentServer(t)
+	deadURL := srv.URL + "/cat.png"
+	srv.Close() // nothing is listening now
+	f := loopbackFetcher()
+	node := imageTypedNode(dsl.Field{Identifier: "picture", Type: dsl.FieldTypeImage})
+
+	out, ne := f.inlineImageInputs(context.Background(), node, map[string]any{"picture": deadURL})
+	require.Nil(t, out)
+	require.NotNil(t, ne, "an explicit image field with an unfetchable URL must fail the run")
+	assert.Equal(t, "attachment_fetch_error", ne.Type)
+	assert.Contains(t, ne.Message, deadURL, "the error must name the URL")
+}
+
+// @scenario "An image-typed field whose URL is not an image fails the run with a clear error"
+func TestInlineImageInputsFailsClearlyWhenNotAnImage(t *testing.T) {
+	srv := attachmentServer(t)
+	defer srv.Close()
+	f := loopbackFetcher()
+	node := imageTypedNode(dsl.Field{Identifier: "picture", Type: dsl.FieldTypeImage})
+
+	out, ne := f.inlineImageInputs(context.Background(), node, map[string]any{"picture": srv.URL + "/page"})
+	require.Nil(t, out)
+	require.NotNil(t, ne, "an image field pointing at a web page must fail the run")
+	assert.Equal(t, "attachment_fetch_error", ne.Type)
+	assert.Contains(t, ne.Message, "image", "the error must explain it could not be loaded as an image")
+}
+
+func TestInlineImageInputsLeavesDataURLAndTextInputsUntouched(t *testing.T) {
+	f := loopbackFetcher()
+	// picture is image-typed but already an inline data URL (no fetch needed);
+	// link is str-typed and must not be eagerly fetched even though it is a URL.
+	node := imageTypedNode(
+		dsl.Field{Identifier: "picture", Type: dsl.FieldTypeImage},
+		dsl.Field{Identifier: "link", Type: dsl.FieldTypeStr},
+	)
+	inputs := map[string]any{
+		"picture": "data:image/png;base64,AAAA",
+		"link":    "http://127.0.0.1:1/skip.png",
+	}
+	out, ne := f.inlineImageInputs(context.Background(), node, inputs)
+	require.Nil(t, ne)
+	assert.Equal(t, "data:image/png;base64,AAAA", out["picture"], "an inline data URL must pass through untouched")
+	assert.Equal(t, "http://127.0.0.1:1/skip.png", out["link"], "a str-typed URL must not be eagerly fetched")
 }
 
 func TestNormalizeMediaType(t *testing.T) {
