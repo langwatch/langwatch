@@ -24,6 +24,7 @@ import { MAX_FILE_SIZE_BYTES } from "../../../server/datasets/upload-utils";
 const requestDirectUpload = vi.fn();
 const putFileToPresignedUrl = vi.fn();
 const finalizeDirectUpload = vi.fn();
+const abortPendingUpload = vi.fn();
 vi.mock("../services/directUpload", async (importActual) => {
   const actual =
     await importActual<typeof import("../services/directUpload")>();
@@ -33,6 +34,7 @@ vi.mock("../services/directUpload", async (importActual) => {
     putFileToPresignedUrl: (...args: unknown[]) =>
       putFileToPresignedUrl(...args),
     finalizeDirectUpload: (...args: unknown[]) => finalizeDirectUpload(...args),
+    abortPendingUpload: (...args: unknown[]) => abortPendingUpload(...args),
   };
 });
 
@@ -60,7 +62,10 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-import { DirectUploadUnavailableError } from "../services/directUpload";
+import {
+  DirectUploadUnavailableError,
+  PresignedUploadFailedError,
+} from "../services/directUpload";
 import { UploadCSVForm } from "../UploadCSVModal";
 
 const renderForm = () =>
@@ -79,6 +84,7 @@ beforeEach(() => {
   requestDirectUpload.mockReset();
   putFileToPresignedUrl.mockReset();
   finalizeDirectUpload.mockReset();
+  abortPendingUpload.mockReset();
 });
 
 afterEach(() => {
@@ -160,6 +166,99 @@ describe("UploadCSVForm 409-fallback size guard", () => {
         expect(textSpy).toHaveBeenCalled();
       });
       expect(screen.queryByTestId("upload-error")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the presigned PUT fails (CORS/network) and the file is small", () => {
+    it("cleans up the pending upload and falls back to parsing instead of dead-ending", async () => {
+      // Backend mints a presign, but the cross-origin PUT fails (e.g. no bucket
+      // CORS rule). The modal must treat this like 'no storage' and fall back —
+      // first reaping the orphaned `uploading` row.
+      requestDirectUpload.mockResolvedValue({
+        datasetId: "dataset_pending",
+        slug: "s",
+        uploadUrl: "https://s3.example/put",
+        stagingKey: "staging/proj/u",
+      });
+      putFileToPresignedUrl.mockRejectedValue(new PresignedUploadFailedError());
+      abortPendingUpload.mockResolvedValue(undefined);
+      const uploadCSVData = vi.fn();
+      const user = userEvent.setup();
+
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <UploadCSVForm
+            setUploadedDataset={vi.fn()}
+            uploadedDataset={undefined}
+            uploadCSVData={uploadCSVData}
+            enableDirectUpload={true}
+          />
+        </ChakraProvider>,
+      );
+
+      const smallFile = new File(["a,b\n1,2\n"], "small.csv", {
+        type: "text/csv",
+      });
+      const textSpy = vi
+        .spyOn(smallFile, "text")
+        .mockResolvedValue("a,b\n1,2\n");
+
+      const input = document.querySelector(
+        'input[type="file"]',
+      ) as HTMLInputElement;
+      await user.upload(input, smallFile);
+      await user.click(screen.getByRole("button", { name: /upload/i }));
+
+      // Orphaned `uploading` row is cleaned up...
+      await waitFor(() => {
+        expect(abortPendingUpload).toHaveBeenCalledWith({
+          projectId: "proj_1",
+          datasetId: "dataset_pending",
+        });
+      });
+      // ...and the small file falls back to the in-browser parse path.
+      await waitFor(() => {
+        expect(textSpy).toHaveBeenCalled();
+      });
+      expect(screen.queryByTestId("upload-error")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the presigned PUT fails (CORS/network) and the file exceeds the size limit", () => {
+    it("shows the too-large error and does NOT parse the oversize file", async () => {
+      requestDirectUpload.mockResolvedValue({
+        datasetId: "dataset_pending",
+        slug: "s",
+        uploadUrl: "https://s3.example/put",
+        stagingKey: "staging/proj/u",
+      });
+      putFileToPresignedUrl.mockRejectedValue(new PresignedUploadFailedError());
+      abortPendingUpload.mockResolvedValue(undefined);
+      const user = userEvent.setup();
+
+      renderForm();
+
+      const oversize = new File(["x"], "big.csv", { type: "text/csv" });
+      Object.defineProperty(oversize, "size", {
+        value: MAX_FILE_SIZE_BYTES + 1,
+      });
+      const textSpy = vi
+        .spyOn(oversize, "text")
+        .mockResolvedValue("a,b\n1,2\n");
+
+      const input = document.querySelector(
+        'input[type="file"]',
+      ) as HTMLInputElement;
+      await user.upload(input, oversize);
+      await user.click(screen.getByRole("button", { name: /upload/i }));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("upload-error")).toHaveTextContent(
+          /too large to upload on this deployment/i,
+        );
+      });
+      // The size-guard fires before any in-browser parse of the oversize file.
+      expect(textSpy).not.toHaveBeenCalled();
     });
   });
 });

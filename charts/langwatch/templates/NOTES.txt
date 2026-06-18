@@ -95,7 +95,28 @@ docs/ai-gateway/self-hosting/helm.
 {{- end }}
 
 ──────────────────────────────────────────────────────────────────────
-6. Required Secrets — check before upgrading
+6. Dataset object storage (when S3 is enabled)
+──────────────────────────────────────────────────────────────────────
+Datasets store content as chunked JSONL in object storage. When you
+enable S3 (app.dataplane / S3_BUCKET_NAME), configure these on the
+bucket and deployment, or uploads and large datasets will not work:
+
+  • Bucket CORS: allow PUT from the app origin. The browser uploads
+    files straight to the bucket via a presigned PUT, so a missing CORS
+    rule fails the direct upload (small files fall back to a backend
+    upload; large files cannot).
+
+  • Lifecycle TTL on the staging/ prefix: expire un-finalized uploads
+    (e.g. 1-7 days) so abandoned uploads are reaped automatically.
+
+  • Worker + Redis (event sourcing): dataset normalization runs
+    off-request on the worker via the Redis-backed queue. Without a
+    worker and Redis, normalization falls back to running in the request
+    — fine for a single small pod, but a multi-pod S3 deployment must
+    run the worker so uploads are processed off-request.
+
+──────────────────────────────────────────────────────────────────────
+7. Required Secrets — check before upgrading
 ──────────────────────────────────────────────────────────────────────
 Each chart bump may introduce new required keys on the umbrella's app
 Secret. When upgrading, verify these are present in the Secret the app

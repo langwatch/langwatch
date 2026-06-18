@@ -211,6 +211,13 @@ export const editS3JsonlRecord = async ({
     // m3: the advisory-lock + PG-connection hold time scales with `chunkCount`
     // (this id-scan does O(chunkCount) S3 reads inside the lock) — acceptable
     // because edits are rare; a hot path would need an id→chunk index instead.
+    // The transaction timeout is widened (see `withDatasetLock`) so this scan
+    // can't P2028 on a multi-chunk dataset.
+    // TODO(scan-before-lock): the O(chunkCount) locate-scan could run BEFORE
+    // entering the lock, then re-read only the target chunk under the lock
+    // before rewriting — shrinking lock-hold to the rewrite + counter-write.
+    // Deferred: it risks the serialization guarantee if done carelessly (the
+    // target chunk may move between scan and lock), so it needs its own rung.
     for (let index = 0; index < chunkCount; index++) {
       const rows = await datasetStorage.readChunk({
         projectId,
@@ -301,6 +308,11 @@ export const deleteS3JsonlRecords = async ({
     // m3: the advisory-lock + PG-connection hold time scales with `chunkCount` —
     // this scan reads every chunk inside the lock (O(chunkCount) S3 reads).
     // Acceptable because deletes are rare; a hot path would need an id→chunk index.
+    // The transaction timeout is widened (see `withDatasetLock`) so this scan
+    // can't P2028 on a multi-chunk dataset.
+    // TODO(scan-before-lock): the locate-scan could run BEFORE the lock and only
+    // the affected-chunk rewrites + counter-write run under it — deferred for the
+    // same serialization-safety reason noted on `editS3JsonlRecord`.
     for (let index = 0; index < chunkCount; index++) {
       const rows = await datasetStorage.readChunk({
         projectId,

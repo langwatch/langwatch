@@ -21,12 +21,16 @@
  * the whole event-sourcing graph.
  */
 import type { PrismaClient } from "@prisma/client";
+import { env } from "~/env.mjs";
+import { createLogger } from "~/utils/logger/server";
 import { DatasetRepository } from "./dataset.repository";
 import {
   createDatasetNormalizeHandler,
   type DatasetNormalizePayload,
 } from "./dataset-normalize.job";
 import { getDatasetStorage } from "./dataset-storage";
+
+const logger = createLogger("langwatch:datasets:normalize:queue");
 
 type Enqueue = (payload: DatasetNormalizePayload) => Promise<void>;
 
@@ -62,6 +66,19 @@ export const enqueueDatasetNormalize = async (params: {
   prisma: PrismaClient;
   payload: DatasetNormalizePayload;
 }): Promise<void> => {
+  if (!registeredEnqueue && env.NODE_ENV === "production") {
+    // No queue sender registered in production means event sourcing / the worker
+    // isn't wired — normalize runs INLINE in the request thread. Fine for a
+    // single small pod, but on an S3-yes / Redis-no multi-pod deploy this blocks
+    // the request and won't scale. Surface it so the misconfiguration is visible.
+    logger.warn(
+      {
+        datasetId: params.payload.datasetId,
+        projectId: params.payload.projectId,
+      },
+      "dataset normalize running in-request (no queue/worker registered); configure event sourcing + a worker for off-request processing",
+    );
+  }
   const enqueue = registeredEnqueue ?? runInline(params.prisma);
   await enqueue(params.payload);
 };

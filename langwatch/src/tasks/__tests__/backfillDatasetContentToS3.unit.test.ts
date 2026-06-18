@@ -1,4 +1,4 @@
-import type { Dataset, DatasetRecord } from "@prisma/client";
+import { type Dataset, type DatasetRecord, Prisma } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // `execute()` touches the real prisma client + storage accessors only AFTER the
@@ -324,6 +324,25 @@ describe("backfillDatasetContentToS3", () => {
             }
           ).dataset.findMany,
         ).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the schema migration has not run yet (column missing)", () => {
+      it("self-skips cleanly (exit 0) instead of throwing and failing the Helm release", async () => {
+        // The post-upgrade hook can race the app-boot migration: the first
+        // findMany selecting `contentLayout` errors with P2022 ("column does not
+        // exist"). execute() must swallow it and return, not throw.
+        const p2022 = new Prisma.PrismaClientKnownRequestError(
+          "The column `Dataset.contentLayout` does not exist in the current database.",
+          { code: "P2022", clientVersion: "test" },
+        );
+        (
+          mockedPrisma as unknown as {
+            dataset: { findMany: ReturnType<typeof vi.fn> };
+          }
+        ).dataset.findMany.mockRejectedValueOnce(p2022);
+
+        await expect(execute()).resolves.toBeUndefined();
       });
     });
 

@@ -88,14 +88,11 @@ spec:
           env:
             {{- include "langwatch.sharedEnv" . | nindent 12 }}
 
-            # Opt-out switch (ADR-032 SKIP_DATASET_S3_MIGRATE). The task also
-            # self-skips when no postgres-layout datasets remain; this lets an
-            # operator disable the migration explicitly without removing the hook.
-            {{- if .Values.datasetS3Migration.skip }}
-            - name: SKIP_DATASET_S3_MIGRATE
-              value: "true"
-            {{- end }}
-
+            {{/* No SKIP_DATASET_S3_MIGRATE env here: the outer guard above
+                 (`and .enabled (not .skip)`) already excludes skip=true, so this
+                 Job only renders when the migration is meant to run. Setting
+                 skip=true omits the Job entirely rather than running it with the
+                 opt-out flag. */}}
             {{- with .Values.datasetS3Migration.extraEnvs }}
             {{- toYaml . | nindent 12 }}
             {{- end }}

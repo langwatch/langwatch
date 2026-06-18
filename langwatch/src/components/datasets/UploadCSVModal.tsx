@@ -33,8 +33,10 @@ import {
 } from "../AddOrEditDatasetDrawer";
 import { toaster } from "../ui/toaster";
 import {
+  abortPendingUpload,
   DirectUploadUnavailableError,
   finalizeDirectUpload,
+  PresignedUploadFailedError,
   putFileToPresignedUrl,
   requestDirectUpload,
 } from "./services/directUpload";
@@ -242,6 +244,9 @@ export function UploadCSVForm({
 
     setIsUploading(true);
     setUploadError(null);
+    // Track the pending dataset so a presigned-PUT failure can clean up the
+    // orphaned `uploading` row before falling back.
+    let pendingDatasetId: string | undefined;
     try {
       const name =
         uploadedDataset?.name ?? (await proposeValidName(rawFile.name));
@@ -250,6 +255,7 @@ export function UploadCSVForm({
         name,
         filename: rawFile.name,
       });
+      pendingDatasetId = datasetId;
       await putFileToPresignedUrl(uploadUrl, rawFile);
       await finalizeDirectUpload({ projectId, datasetId });
 
@@ -261,10 +267,34 @@ export function UploadCSVForm({
       onClose?.();
       void router.push(`/${project.slug}/datasets/${datasetId}`);
     } catch (error) {
-      if (error instanceof DirectUploadUnavailableError) {
-        // No browser-reachable storage: parse the already-captured file NOW
-        // (the first and only in-browser parse on this path) and hand off to
-        // the existing parse-and-drawer flow.
+      // Both "no browser-reachable storage" (backend never minted a presign) and
+      // "presigned PUT failed" (CORS/network/non-ok) mean: fall back to the
+      // backend upload path. The fallback is size-guarded, so a small file +
+      // missing CORS still works, and a large file + missing CORS shows the
+      // clear "large uploads require object storage" error. Either way, no dead
+      // end.
+      if (
+        error instanceof DirectUploadUnavailableError ||
+        error instanceof PresignedUploadFailedError
+      ) {
+        // A presigned-PUT failure already created the `uploading` row; reap it so
+        // a CORS-failed attempt doesn't leave a stuck dataset behind (the
+        // fallback creates a fresh one). Best-effort — never block the fallback.
+        if (error instanceof PresignedUploadFailedError && pendingDatasetId) {
+          try {
+            await abortPendingUpload({
+              projectId,
+              datasetId: pendingDatasetId,
+            });
+          } catch (cleanupError) {
+            logger.error(
+              { error: cleanupError },
+              "Failed to clean up pending upload after presigned PUT failure",
+            );
+          }
+        }
+        // Parse the already-captured file NOW (the first and only in-browser
+        // parse on this path) and hand off to the existing parse-and-drawer flow.
         await runFallbackParseAndDrawer(rawFile);
         return;
       }

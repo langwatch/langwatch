@@ -145,7 +145,11 @@ export const getDatasetStorage = async (
   projectId: string,
 ): Promise<DatasetStorage> => {
   const destination = await resolveProjectStorageDestination(projectId);
+  // The Local impl needs the resolver-provided `root` (the single source of
+  // truth for the local FS path, honoring LANGWATCH_LOCAL_STORAGE_PATH + the
+  // canonical default); the S3 impl resolves its own bucket/credentials per
+  // project and needs nothing here.
   return destination.kind === "s3"
     ? new S3DatasetStorage()
-    : new LocalDatasetStorage();
+    : new LocalDatasetStorage(destination.root);
 };

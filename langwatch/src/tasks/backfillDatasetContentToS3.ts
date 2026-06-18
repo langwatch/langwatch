@@ -32,7 +32,7 @@
  * cutover is confirmed (Decision 7 — "Drop-`DatasetRecord` migration", a
  * follow-up, not this rung).
  */
-import type { Dataset, PrismaClient } from "@prisma/client";
+import { type Dataset, Prisma, type PrismaClient } from "@prisma/client";
 import { chunkedMeta } from "../server/datasets/dataset-chunking";
 import { withDatasetLock } from "../server/datasets/dataset-lock";
 import { DatasetRecordRepository } from "../server/datasets/dataset-record.repository";
@@ -48,6 +48,22 @@ const logger = createLogger("langwatch:tasks:backfillDatasetContentToS3");
 
 /** How many `postgres` datasets to fetch per page when iterating. */
 const PAGE_SIZE = 50;
+
+/**
+ * True when a Prisma error means a column this task queries (`contentLayout` /
+ * the chunk-layout columns) doesn't exist in the DB yet — i.e. the schema
+ * migration hasn't run. P2022 = "the column `X` does not exist in the current
+ * database."
+ *
+ * This hook Job races the app-boot migration: on `helm upgrade` the
+ * post-upgrade hook can fire before the new app pod has applied the migration
+ * that adds `contentLayout`. We self-skip cleanly (exit 0) instead of throwing
+ * — a thrown error fails the Helm release; the migration will land and the next
+ * run (every upgrade re-fires this idempotent task) does the backfill.
+ */
+const isMissingColumnError = (error: unknown): boolean =>
+  error instanceof Prisma.PrismaClientKnownRequestError &&
+  error.code === "P2022";
 
 /** Outcome of attempting to migrate one dataset (for structured counts). */
 export type MigrateOutcome = "migrated" | "already-migrated" | "no-s3";
@@ -270,6 +286,20 @@ export default async function execute(): Promise<void> {
   };
 
   logger.info("Starting PG→S3 dataset content backfill");
-  const summary = await migrateAllPostgresDatasets(deps);
-  logger.info({ ...summary }, "Finished PG→S3 dataset content backfill");
+  try {
+    const summary = await migrateAllPostgresDatasets(deps);
+    logger.info({ ...summary }, "Finished PG→S3 dataset content backfill");
+  } catch (error) {
+    // Hook/schema race: the post-upgrade hook can run before the app pod's
+    // migration adds `contentLayout`. Self-skip (exit 0) so the Helm release
+    // doesn't fail; the idempotent task re-runs on the next upgrade once the
+    // column exists.
+    if (isMissingColumnError(error)) {
+      logger.info(
+        "Dataset chunk-layout columns not present yet (schema migration pending) — skipping backfill; it will run on the next upgrade",
+      );
+      return;
+    }
+    throw error;
+  }
 }

@@ -14,24 +14,25 @@ import { createDatasetNormalizeHandler } from "../dataset-normalize.job";
 import { ChunkTooLargeError } from "../errors";
 // Real-FS integration: exercise LocalDatasetStorage against a real temp dir.
 // No env mock — the factory selects this impl; here we instantiate it directly
-// and point its root at a tmp dir via LOCAL_STORAGE_PATH. Per
-// TESTING_PHILOSOPHY: use real implementations, mock only at boundaries (the
+// and pass its root (the resolver-provided value in production) as a tmp dir.
+// Per TESTING_PHILOSOPHY: use real implementations, mock only at boundaries (the
 // boundary here — the filesystem — is real, scoped to a temp dir).
 //
 // `.integration.test.ts` runs in CI under testcontainers; locally without
 // Docker the integration runner won't start — that's expected.
 import { LocalDatasetStorage } from "../local-dataset-storage";
 
-const storage = new LocalDatasetStorage();
+// Constructed in beforeEach once the temp root exists — the impl takes its root
+// as a constructor arg (threaded from the resolver in production), no env read.
+let storage: LocalDatasetStorage;
 let storageDir: string;
 
 beforeEach(async () => {
   storageDir = await fs.mkdtemp(path.join(os.tmpdir(), "ds-chunks-"));
-  process.env.LOCAL_STORAGE_PATH = storageDir;
+  storage = new LocalDatasetStorage(storageDir);
 });
 
 afterEach(async () => {
-  delete process.env.LOCAL_STORAGE_PATH;
   await fs.rm(storageDir, { recursive: true, force: true });
 });
 

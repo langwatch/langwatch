@@ -311,6 +311,34 @@ describe("createDatasetNormalizeHandler()", () => {
     });
   });
 
+  describe("when a CSV row exceeds the max row size (malformed / no delimiter)", () => {
+    it("aborts and fails the dataset instead of buffering the whole file (I-MEM)", async () => {
+      // A header + a single data row whose field is larger than MAX_CSV_ROW_BYTES
+      // (8 MB). papaparse would buffer the whole thing without the cursor guard;
+      // the guard aborts and the handler fails the dataset.
+      const giantField = "x".repeat(9 * 1024 * 1024);
+      const { storage, deleteStaged } = makeStorage({
+        streamStaged: vi
+          .fn()
+          .mockResolvedValue(Readable.from([`a,b\n1,${giantField}\n`])),
+      });
+      const repo = makeRepo({ id: "d1", status: "processing" });
+
+      const handler = createDatasetNormalizeHandler({
+        repository: repo as any,
+        getStorage: async () => storage as any,
+      });
+
+      await expect(
+        handler({ ...basePayload, filename: "malformed.csv" }),
+      ).rejects.toThrow(/CSV row exceeds max size/i);
+      const update = repo.update.mock.calls[0]![0];
+      expect(update.data.status).toBe("failed");
+      // Staging preserved for a manual retry; not deleted on failure.
+      expect(deleteStaged).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when a record carries a reserved column name", () => {
     it("renames the key in stored rows and columnTypes (id → id_)", async () => {
       const { storage, writeChunks } = makeStorage({

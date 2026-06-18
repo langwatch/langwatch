@@ -916,13 +916,15 @@ export class DatasetService {
         datasetId: sourceDatasetId,
         chunkCount: sourceDataset.chunkCount ?? 0,
       });
-      sourceRecordEntries = rows.map((line) => {
-        const wrapped =
-          line && typeof line === "object" && "entry" in line
-            ? (line as { entry: unknown }).entry
-            : line;
-        return wrapped as Record<string, unknown>;
-      });
+      // Reuse the shared {id, entry} → DatasetRecord adapter (the same unwrap the
+      // read paths use) and take just the entry; the copy mints fresh ids below.
+      sourceRecordEntries = rows.map(
+        (line) =>
+          adaptS3JsonlRecord(line, sourceDataset).entry as Record<
+            string,
+            unknown
+          >,
+      );
     } else {
       const sourceRecords = await this.recordRepository.findDatasetRecords({
         datasetId: sourceDatasetId,
@@ -1116,6 +1118,59 @@ export class DatasetService {
       uploadUrl: upload.url,
       stagingKey: upload.key,
     };
+  }
+
+  /**
+   * Abort a still-pending direct upload: archive the `uploading` dataset row and
+   * best-effort delete its staged object. Used by the browser when the presigned
+   * PUT fails (CORS / network) so a failed attempt doesn't leave a stuck
+   * `uploading` row before the modal falls back to the backend path.
+   *
+   * Gated to `status='uploading'`: a finalized (`processing`/`ready`/`failed`)
+   * dataset has real content or is mid-normalize and must NOT be reaped by this
+   * cleanup path — those are deleted through the normal archive route.
+   *
+   * @throws {DatasetNotFoundError} if the dataset is missing or archived
+   * @throws {UploadNotPendingError} if the dataset is not in `uploading`
+   */
+  async abortPendingUpload(params: {
+    projectId: string;
+    datasetId: string;
+  }): Promise<{ datasetId: string; aborted: true }> {
+    const { projectId, datasetId } = params;
+
+    const dataset = await this.repository.findOne({ id: datasetId, projectId });
+    if (!dataset || dataset.archivedAt) {
+      throw new DatasetNotFoundError();
+    }
+    // Only a pending upload can be aborted — never reap a dataset that already
+    // holds (or is normalizing) content.
+    if (dataset.status !== "uploading") {
+      throw new UploadNotPendingError();
+    }
+
+    // Best-effort delete of the staged object — non-fatal (the staging lifecycle
+    // rule reaps it otherwise; a failed delete must not block the cleanup).
+    if (dataset.stagingKey) {
+      try {
+        const storage = await getDatasetStorage(projectId);
+        await storage.deleteStaged({ projectId, key: dataset.stagingKey });
+      } catch {
+        // ignore
+      }
+    }
+
+    const slug = this.generateSlug(dataset.name);
+    await this.repository.update({
+      id: datasetId,
+      projectId,
+      data: {
+        slug: `${slug}-archived-${nanoid()}`,
+        archivedAt: new Date(),
+      },
+    });
+
+    return { datasetId, aborted: true };
   }
 
   /**

@@ -481,6 +481,46 @@ secured.access(directUploadSessionAuth).post(
   },
 );
 
+// ── Direct upload: abort a still-pending upload (CORS/network PUT failure) ──
+// Session-cookie (or API-key) authenticated in-handler — see directUploadSessionAuth.
+// Cleans up the orphaned `uploading` row so a failed presigned PUT isn't a dead
+// end before the browser falls back to the backend upload path.
+secured.access(directUploadSessionAuth).delete(
+  "/direct-upload/:datasetId",
+  datasetServiceMiddleware,
+  describeRoute({
+    description: "Abort a still-pending direct upload and clean up its row",
+  }),
+  async (c) => {
+    const { datasetId } = c.req.param();
+    const projectId = c.req.query("projectId");
+    if (!projectId || projectId.trim() === "") {
+      throw new UnprocessableEntityError("projectId query param is required");
+    }
+    const auth = await authorizeDirectUpload(c, projectId.trim());
+    if (!auth.ok) {
+      return c.json({ error: auth.error }, auth.status);
+    }
+    const service = c.get("datasetService");
+
+    try {
+      const result = await service.abortPendingUpload({
+        projectId: auth.projectId,
+        datasetId,
+      });
+      return c.json(result, 200);
+    } catch (error) {
+      if (error instanceof Error && error.name === "DatasetNotFoundError") {
+        return c.json({ error: "NotFound", message: error.message }, 404);
+      }
+      if (error instanceof Error && error.name === "UploadNotPendingError") {
+        return c.json({ error: "Conflict", message: error.message }, 409);
+      }
+      throw error;
+    }
+  },
+);
+
 // ── Upload File to Existing Dataset ─────────────────────────────
 secured.access(requires("datasets:manage")).post(
   "/:slugOrId/upload",

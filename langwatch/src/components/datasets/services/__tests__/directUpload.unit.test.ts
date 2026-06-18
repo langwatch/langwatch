@@ -3,9 +3,11 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  abortPendingUpload,
   DatasetNameConflictError,
   DirectUploadUnavailableError,
   finalizeDirectUpload,
+  PresignedUploadFailedError,
   putFileToPresignedUrl,
   requestDirectUpload,
   retryDatasetNormalize,
@@ -135,14 +137,51 @@ describe("directUpload service", () => {
       });
     });
 
-    describe("when the storage PUT fails", () => {
-      it("throws an Error", async () => {
+    describe("when the storage PUT returns a non-ok status", () => {
+      it("throws PresignedUploadFailedError with the status", async () => {
         mockFetch().mockResolvedValue({ ok: false, status: 403 });
         const file = new File(["x"], "data.csv");
 
         await expect(
           putFileToPresignedUrl("https://s3.example/put", file),
-        ).rejects.toThrow("Failed to upload file (status 403)");
+        ).rejects.toBeInstanceOf(PresignedUploadFailedError);
+        mockFetch().mockResolvedValue({ ok: false, status: 403 });
+        await expect(
+          putFileToPresignedUrl("https://s3.example/put", file),
+        ).rejects.toThrow(/status 403/);
+      });
+    });
+
+    describe("when the storage PUT fails with a network/CORS error", () => {
+      it("wraps the opaque fetch rejection in PresignedUploadFailedError", async () => {
+        // A bucket with no CORS rule rejects fetch with an opaque TypeError —
+        // no status to read. It must surface as the typed fallback error.
+        const cause = new TypeError("Failed to fetch");
+        mockFetch().mockRejectedValue(cause);
+        const file = new File(["x"], "data.csv");
+
+        await expect(
+          putFileToPresignedUrl("https://s3.example/put", file),
+        ).rejects.toBeInstanceOf(PresignedUploadFailedError);
+      });
+    });
+  });
+
+  describe("abortPendingUpload()", () => {
+    describe("when cleaning up a pending upload", () => {
+      it("DELETEs the direct-upload route with the projectId", async () => {
+        mockFetch().mockResolvedValue({ ok: true });
+
+        await abortPendingUpload({
+          projectId: "proj_1",
+          datasetId: "dataset_1",
+        });
+
+        const [url, init] = mockFetch().mock.calls[0]!;
+        expect(url).toBe(
+          "/api/dataset/direct-upload/dataset_1?projectId=proj_1",
+        );
+        expect(init.method).toBe("DELETE");
       });
     });
   });

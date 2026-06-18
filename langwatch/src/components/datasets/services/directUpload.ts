@@ -41,6 +41,25 @@ export class DatasetNameConflictError extends Error {
   }
 }
 
+/**
+ * Thrown when the presigned PUT to object storage fails — a non-ok response, or
+ * a network / CORS failure (a missing bucket CORS rule surfaces as an opaque
+ * `fetch` rejection / `TypeError`, never a status code). Distinct from
+ * `DirectUploadUnavailableError` (which means the backend never minted a presign
+ * at all): both signal the caller to fall back to the backend upload path, so a
+ * misconfigured bucket isn't a dead end for small files (the size-guard handles
+ * large ones). Carries the underlying cause for diagnostics.
+ */
+export class PresignedUploadFailedError extends Error {
+  constructor(
+    message = "Failed to upload the file to object storage",
+    cause?: unknown,
+  ) {
+    super(message, cause === undefined ? undefined : { cause });
+    this.name = "PresignedUploadFailedError";
+  }
+}
+
 export type DirectUploadHandle = {
   datasetId: string;
   slug: string;
@@ -103,15 +122,49 @@ export async function putFileToPresignedUrl(
   uploadUrl: string,
   file: File,
 ): Promise<void> {
-  const response = await fetch(uploadUrl, {
-    method: "PUT",
-    body: file,
-    credentials: "omit",
-  });
+  let response: Response;
+  try {
+    response = await fetch(uploadUrl, {
+      method: "PUT",
+      body: file,
+      credentials: "omit",
+    });
+  } catch (error) {
+    // A cross-origin PUT to a bucket with no CORS rule (or any network failure)
+    // rejects `fetch` with an opaque `TypeError` — there is no status to read.
+    // Wrap it so the modal can recognize it and fall back to the backend path
+    // instead of dead-ending on a generic error.
+    throw new PresignedUploadFailedError(
+      "Failed to upload the file to object storage (network or CORS error)",
+      error,
+    );
+  }
 
   if (!response.ok) {
-    throw new Error(`Failed to upload file (status ${response.status})`);
+    throw new PresignedUploadFailedError(
+      `Failed to upload the file to object storage (status ${response.status})`,
+    );
   }
+}
+
+/**
+ * Best-effort cleanup of the just-created pending (`uploading`) dataset after a
+ * presigned-PUT failure, so a CORS-failed attempt doesn't leave a stuck
+ * `uploading` row behind. Authenticated by the same session cookie the other
+ * direct-upload routes use; failures are swallowed (the fallback path creates a
+ * fresh dataset regardless).
+ */
+export async function abortPendingUpload({
+  projectId,
+  datasetId,
+}: {
+  projectId: string;
+  datasetId: string;
+}): Promise<void> {
+  await fetch(
+    `/api/dataset/direct-upload/${datasetId}?projectId=${encodeURIComponent(projectId)}`,
+    { method: "DELETE" },
+  );
 }
 
 /**

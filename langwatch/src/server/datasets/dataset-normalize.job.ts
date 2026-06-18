@@ -64,6 +64,16 @@ export const LARGE_JSON_MAX_BYTES = 100 * 1024 * 1024;
  */
 export const MAX_JSONL_LINE_BYTES = 8 * 1024 * 1024;
 
+/**
+ * Max bytes for a single CSV row (I-MEM), the CSV counterpart to
+ * `MAX_JSONL_LINE_BYTES`. papaparse buffers until it can emit a complete row, so
+ * a malformed CSV with no row delimiter (or one giant field) would make it
+ * accumulate the whole file in memory before the first `step`. We track the
+ * parser cursor delta between rows and `abort()` once a single row crosses this
+ * cap, failing the dataset rather than risking an OOM.
+ */
+export const MAX_CSV_ROW_BYTES = 8 * 1024 * 1024;
+
 /** Payload for the `datasetNormalize` GroupQueue job. */
 export type DatasetNormalizePayload = {
   /** Stable job id (datasetId) — used for staged-job debuggability + dedup. */
@@ -181,6 +191,25 @@ const NULL_BYTE_GLOBAL = /\u0000/g;
 const scrubNullBytes = (text: string): string =>
   text.includes(NULL_BYTE) ? text.replace(NULL_BYTE_GLOBAL, "") : text;
 
+/**
+ * Approximate the serialized byte size of one parsed CSV row from its field
+ * values (I-MEM guard). papaparse buffers until it can emit a complete row, so a
+ * malformed row (no delimiter / one giant field) shows up here as an oversized
+ * `row.data` — summing the field byte-lengths bounds it without re-reading the
+ * raw input. Cheap: one `Buffer.byteLength` per field on the rare large row.
+ */
+const csvRowBytes = (data: Record<string, unknown>): number => {
+  let bytes = 0;
+  for (const value of Object.values(data)) {
+    if (typeof value === "string") {
+      bytes += Buffer.byteLength(value, "utf8");
+    } else if (value != null) {
+      bytes += Buffer.byteLength(String(value), "utf8");
+    }
+  }
+  return bytes;
+};
+
 /** Read a whole stream into a single string (only the guarded small-json path). */
 const streamToString = async (stream: Readable): Promise<string> => {
   const parts: string[] = [];
@@ -276,7 +305,19 @@ const parseInto = async (params: {
       Papa.parse<Record<string, unknown>>(stream as unknown as Papa.LocalFile, {
         header: true,
         skipEmptyLines: true,
+        // Bound papaparse's read buffer so it pulls the stream in fixed-size
+        // chunks rather than draining it as fast as the chunk writer allows.
+        chunkSize: MAX_CSV_ROW_BYTES,
         step: (row, parser) => {
+          // I-MEM: reject a single row whose serialized fields cross
+          // MAX_CSV_ROW_BYTES (a malformed CSV with no row delimiter or one
+          // giant field), the CSV counterpart to the JSONL line cap — fail the
+          // dataset rather than risk an OOM accumulating an unbounded row.
+          if (csvRowBytes(row.data) > MAX_CSV_ROW_BYTES) {
+            parser.abort();
+            reject(new Error("CSV row exceeds max size — malformed file"));
+            return;
+          }
           if (headers.length === 0 && row.meta.fields) {
             captureHeaders(row.meta.fields);
           }
