@@ -229,10 +229,16 @@ app:
   # Feature flags to enable/disable specific functionality
   ## @extra app.features Feature flags for the app.
   ## @param app.features.skipEnvValidation [default: false] Skip env var validation (dev only).
+  ## @param app.features.disableStrictPiiRedaction [default: false] Skip the strict PII redaction pass (Presidio analysis service). Native secrets and essential PII redaction still run.
   ## @param app.features.topicClustering [default: true] Enable automatic topic clustering.
   features:
     # Skip environment variable validation (useful for development)
     skipEnvValidation: false
+    # Skip the strict PII redaction pass (Presidio analysis service) to shed
+    # analysis-service load. Native secrets and essential PII redaction still
+    # run; per-scope policy still governs strict requests on the dashboard.
+    # Leave false to keep dashboard and Ops UI control of the kill switch.
+    disableStrictPiiRedaction: false
 
   # Upstream service connections
   # Define how the main app connects to other LangWatch services
