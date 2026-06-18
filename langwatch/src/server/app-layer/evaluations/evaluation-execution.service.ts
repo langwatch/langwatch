@@ -211,11 +211,15 @@ export class EvaluationExecutionService {
       workflowId,
     } = params;
 
-    // 1. Fetch trace
+    // 1. Fetch trace. Evaluators must see the FULL IO values (not the 64 KB
+    // preview), so opt into blob resolution (#4888). Under the per-call gate
+    // (replacing construction-time gating) this is what keeps the eval path
+    // resolving offloaded event refs.
     const traces = await this.deps.traceService.getTracesWithSpans(
       projectId,
       [traceId],
       INTERNAL_PROTECTIONS,
+      { full: true },
     );
     const trace = traces[0];
 
@@ -362,6 +366,7 @@ export class EvaluationExecutionService {
               projectId,
               [threadId],
               INTERNAL_PROTECTIONS,
+              { full: true },
             ),
         });
       }
@@ -412,6 +417,7 @@ export class EvaluationExecutionService {
         projectId,
         [threadId],
         INTERNAL_PROTECTIONS,
+        { full: true },
       );
 
     const result: Record<string, unknown> = {};

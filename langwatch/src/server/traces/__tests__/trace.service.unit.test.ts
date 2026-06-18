@@ -1,11 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Protections } from "~/server/elasticsearch/protections";
 import type { Trace } from "~/server/tracer/types";
+import { AmbiguousTraceIdPrefixError, TraceService } from "../trace.service";
 import type { GetAllTracesForProjectInput } from "../types";
-import {
-  AmbiguousTraceIdPrefixError,
-  TraceService,
-} from "../trace.service";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks
@@ -61,7 +58,7 @@ vi.mock("langwatch", () => ({
     withActiveSpan: (
       _name: string,
       _opts: unknown,
-      fn: (span: { setAttribute: () => void }) => Promise<unknown>
+      fn: (span: { setAttribute: () => void }) => Promise<unknown>,
     ) => fn({ setAttribute: () => {} }),
   }),
 }));
@@ -178,6 +175,7 @@ describe("TraceService", () => {
           projectId,
           [fullId],
           protections,
+          { resolveBlobs: undefined },
         );
       });
 

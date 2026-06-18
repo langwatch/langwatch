@@ -243,12 +243,18 @@ export class ClickHouseTraceService {
    * @param projectId - The project ID
    * @param traceIds - Array of trace IDs to fetch
    * @param protections - Field redaction protections
+   * @param opts.resolveBlobs - When true AND a blob resolver is wired on this
+   *   instance, resolves offloaded eventref pointers from event_log so
+   *   over-threshold IO values read back full (#4888). Default
+   *   (undefined/false) maps the ≤64 KB preview as-is and issues zero
+   *   event_log SELECTs.
    * @returns Array of Trace objects with spans, or null if ClickHouse is not enabled
    */
   async getTracesWithSpans(
     projectId: string,
     traceIds: string[],
     protections: Protections,
+    opts?: { resolveBlobs?: boolean },
   ): Promise<Trace[] | null> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getTracesWithSpans",
@@ -285,6 +291,7 @@ export class ClickHouseTraceService {
               summary,
               spans,
               protections,
+              resolveBlobs: opts?.resolveBlobs,
             });
             traces.push(trace);
           }
@@ -491,12 +498,16 @@ export class ClickHouseTraceService {
    * @param projectId - The project ID
    * @param threadIds - Array of thread IDs to search for
    * @param protections - Field redaction protections
+   * @param opts.resolveBlobs - Forwarded to the per-trace fetch so the eval
+   *   path can read full thread IO (#4888). Customer thread views construct
+   *   without a blob resolver, so this is a no-op for them.
    * @returns Array of Trace objects with spans, or null if ClickHouse is not enabled
    */
   async getTracesWithSpansByThreadIds(
     projectId: string,
     threadIds: string[],
     protections: Protections,
+    opts?: { resolveBlobs?: boolean },
   ): Promise<Trace[] | null> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getTracesWithSpansByThreadIds",
@@ -547,11 +558,14 @@ export class ClickHouseTraceService {
             return [];
           }
 
-          // Fetch full traces with spans
+          // Fetch full traces with spans. Forward resolveBlobs so the eval
+          // path reads full thread IO (#4888); customer thread views pass
+          // nothing and have no resolver, so they stay on the preview.
           const traces = await this.getTracesWithSpans(
             projectId,
             traceIds,
             protections,
+            { resolveBlobs: opts?.resolveBlobs },
           );
           if (!traces) return null;
 
@@ -2223,17 +2237,25 @@ export class ClickHouseTraceService {
     summary,
     spans,
     protections,
+    resolveBlobs,
   }: {
     projectId: string;
     summary: TraceSummaryData;
     spans: NormalizedSpan[];
     protections: Protections;
+    /**
+     * Per-call gate (#4888): resolve offloaded eventref pointers from event_log
+     * ONLY when true. The resolver is constructed on the instance, but the read
+     * path opts in per call so list/search/collapsed reads keep the preview and
+     * issue zero event_log SELECTs (ADR-022). Defaults to false.
+     */
+    resolveBlobs?: boolean;
   }): Promise<Trace> {
     let resolvedSpans = spans;
     let recomputedInput: ExtractedIO | null = null;
     let recomputedOutput: ExtractedIO | null = null;
 
-    if (this.resolveTraceSpans) {
+    if (resolveBlobs === true && this.resolveTraceSpans) {
       const resolution = await this.resolveTraceSpans(projectId, spans);
       resolvedSpans = resolution.resolvedSpans;
       if (resolution.anyResolved) {
@@ -2289,11 +2311,15 @@ export class ClickHouseTraceService {
           return trace;
         }
 
+        // List/search path (getAllTracesForProject): NEVER resolve blobs, even
+        // on a deps-carrying instance — keep the ≤64 KB preview and issue zero
+        // event_log SELECTs (#4888 AC2 / ADR-022 binding constraint).
         return this.resolveAndMerge({
           projectId,
           summary: data.summary,
           spans: data.spans,
           protections,
+          resolveBlobs: false,
         });
       }),
     );
