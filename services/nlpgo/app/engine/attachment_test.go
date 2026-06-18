@@ -60,6 +60,14 @@ func userMessage(text string) []app.ChatMessage {
 	return []app.ChatMessage{{Role: "user", Content: text}}
 }
 
+// imagePartMessage models an explicit image attachment (an image_url part
+// carrying an http URL), the case that hard-fails on a bad fetch.
+func imagePartMessage(url string) []app.ChatMessage {
+	return []app.ChatMessage{{Role: "user", Content: []any{
+		map[string]any{"type": "image_url", "image_url": map[string]any{"url": url}},
+	}}}
+}
+
 // firstPartOfType returns the first content part of the given type from a
 // rewritten message, failing the test if the content is not a parts list.
 func firstPartOfType(t *testing.T, m app.ChatMessage, typ string) map[string]any {
@@ -115,8 +123,8 @@ func TestRewriteDetectsTypeFromResponseNotExtension(t *testing.T) {
 
 // @scenario "An image already given as a base64 data URL is delivered without fetching"
 func TestRewriteLeavesDataURLImagesWithoutFetching(t *testing.T) {
-	// Empty allow-list: any real fetch would be SSRF-blocked and error. A data
-	// URL must therefore pass through untouched, proving no fetch happens.
+	// A data URL is not an http(s) URL, so it is never matched for fetching and
+	// passes through untouched regardless of the SSRF policy.
 	f := newAttachmentFetcher(httpblock.SSRFOptions{})
 	dataURL := "data:image/png;base64,iVBORw0KGgo="
 
@@ -176,7 +184,7 @@ func TestRewriteFailsClearlyOnUnreachableURL(t *testing.T) {
 	srv.Close() // nothing is listening now
 	f := loopbackFetcher()
 
-	out, ne := f.rewrite(context.Background(), userMessage(deadURL))
+	out, ne := f.rewrite(context.Background(), imagePartMessage(deadURL))
 	require.Nil(t, out)
 	require.NotNil(t, ne)
 	assert.Equal(t, "attachment_fetch_error", ne.Type)
@@ -189,7 +197,7 @@ func TestRewriteFailsClearlyOnErrorStatus(t *testing.T) {
 	defer srv.Close()
 	f := loopbackFetcher()
 
-	out, ne := f.rewrite(context.Background(), userMessage(srv.URL+"/missing"))
+	out, ne := f.rewrite(context.Background(), imagePartMessage(srv.URL+"/missing"))
 	require.Nil(t, out)
 	require.NotNil(t, ne)
 	assert.Equal(t, "attachment_fetch_error", ne.Type)
@@ -209,7 +217,7 @@ func TestRewriteRejectsOversizedAttachment(t *testing.T) {
 	f := loopbackFetcher()
 	f.maxBytes = 1024 // smaller than the body
 
-	out, ne := f.rewrite(context.Background(), userMessage(srv.URL+"/big.png"))
+	out, ne := f.rewrite(context.Background(), imagePartMessage(srv.URL+"/big.png"))
 	require.Nil(t, out)
 	require.NotNil(t, ne)
 	assert.Equal(t, "attachment_fetch_error", ne.Type)
@@ -228,6 +236,35 @@ func TestRewriteLeavesHTMLLinkAsText(t *testing.T) {
 	assert.Equal(t, original, out[0].Content, "a web page link must stay as text, not become an attachment")
 }
 
+// @scenario "A broken link in prose does not fail the run"
+func TestRewriteLeavesBrokenBareLinkAsText(t *testing.T) {
+	srv := attachmentServer(t)
+	deadURL := srv.URL + "/cat.png"
+	srv.Close() // nothing is listening now
+	f := loopbackFetcher()
+	original := "See " + deadURL + " for the chart"
+
+	out, ne := f.rewrite(context.Background(), userMessage(original))
+	require.Nil(t, ne, "a broken bare link in prose must not fail the run")
+	assert.Equal(t, original, out[0].Content, "the broken link stays as text")
+}
+
+// @scenario "An attachment URL that redirects to a private address is refused"
+func TestRewriteRefusesRedirectToPrivateAddress(t *testing.T) {
+	// SafeDialer re-checks the SSRF policy at dial time, so a redirect from an
+	// allowed host to a metadata/private address must still be blocked.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "http://169.254.169.254/latest/meta-data", http.StatusFound)
+	}))
+	defer srv.Close()
+	f := loopbackFetcher()
+
+	out, ne := f.rewrite(context.Background(), imagePartMessage(srv.URL+"/redir.png"))
+	require.Nil(t, out)
+	require.NotNil(t, ne, "a redirect to a metadata address must be refused")
+	assert.Equal(t, "attachment_fetch_error", ne.Type)
+}
+
 // @scenario "An audio attachment referenced by URL reaches the model as audio"
 func TestRewriteFetchesAudioIntoAudioPart(t *testing.T) {
 	srv := attachmentServer(t)
@@ -238,7 +275,7 @@ func TestRewriteFetchesAudioIntoAudioPart(t *testing.T) {
 	require.Nil(t, ne)
 	audio := firstPartOfType(t, out[0], "input_audio")
 	data, _ := audio["input_audio"].(map[string]any)
-	assert.Equal(t, "mpeg", data["format"])
+	assert.Equal(t, "mp3", data["format"], "audio/mpeg must map to the mp3 format token providers expect")
 	assert.NotEmpty(t, data["data"], "audio bytes must be base64-encoded")
 }
 

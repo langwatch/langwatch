@@ -8,6 +8,8 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"net/url"
+	"path"
 	"regexp"
 	"strings"
 	"time"
@@ -68,6 +70,7 @@ func newAttachmentFetcher(ssrf httpblock.SSRFOptions) *attachmentFetcher {
 type fetchedAttachment struct {
 	mediaType string // normalized, lowercase, e.g. "image/png"
 	data      []byte
+	sourceURL string // the URL it came from, used to name file attachments
 }
 
 // fetch retrieves rawURL under the SSRF, timeout, and size guards. It returns a
@@ -85,7 +88,7 @@ func (f *attachmentFetcher) fetch(ctx context.Context, rawURL string) (*fetchedA
 		if errors.Is(err, httpblock.ErrSSRFBlocked) {
 			return nil, attachmentError(rawURL, "is blocked for security (it resolves to a private or metadata address)", 0)
 		}
-		return nil, attachmentError(rawURL, "could not be reached ("+err.Error()+")", 0)
+		return nil, attachmentError(rawURL, "could not be reached", 0)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode >= 400 {
@@ -105,7 +108,7 @@ func (f *attachmentFetcher) fetch(ctx context.Context, rawURL string) (*fetchedA
 	if mt == "" || mt == "application/octet-stream" {
 		mt = normalizeMediaType(http.DetectContentType(body))
 	}
-	return &fetchedAttachment{mediaType: mt, data: body}, nil
+	return &fetchedAttachment{mediaType: mt, data: body, sourceURL: rawURL}, nil
 }
 
 // rewrite fetches remote attachment URLs in every message and re-homes them
@@ -118,11 +121,7 @@ func (f *attachmentFetcher) rewrite(ctx context.Context, messages []app.ChatMess
 		newContent := m.Content
 		switch content := m.Content.(type) {
 		case string:
-			parts, replaced, ne := f.splitStringAttachments(ctx, content)
-			if ne != nil {
-				return nil, ne
-			}
-			if replaced {
+			if parts, replaced := f.splitStringAttachments(ctx, content); replaced {
 				newContent = parts
 			}
 		case []any:
@@ -165,13 +164,16 @@ func hasNonTextPart(parts []any) bool {
 }
 
 // splitStringAttachments scans text for http(s) URLs and, when any resolve to a
-// real attachment, returns the text rewritten as a content-part list. The
-// second return is false (and parts nil) when there is nothing to attach, so
-// the caller keeps the original string. A failed fetch returns a *NodeError.
-func (f *attachmentFetcher) splitStringAttachments(ctx context.Context, text string) ([]any, bool, *NodeError) {
+// real attachment, returns the text rewritten as a content-part list. A bare
+// URL in text is best-effort: a reachable non-attachment (an HTML page) and a
+// failed fetch both leave the URL as text, so an incidental link in prose never
+// fails the run. Explicit image_url parts (handled in rewriteParts) do hard-fail
+// on a bad fetch. The second return is false (parts nil) when there is nothing
+// to attach, so the caller keeps the original string.
+func (f *attachmentFetcher) splitStringAttachments(ctx context.Context, text string) ([]any, bool) {
 	locs := httpURLRe.FindAllStringIndex(text, -1)
 	if len(locs) == 0 {
-		return nil, false, nil
+		return nil, false
 	}
 	parts := make([]any, 0, len(locs)*2+1)
 	addText := func(seg string) {
@@ -184,13 +186,16 @@ func (f *attachmentFetcher) splitStringAttachments(ctx context.Context, text str
 	attached := false
 	for _, loc := range locs {
 		rawURL, trailing := trimTrailingPunct(text[loc[0]:loc[1]])
+		addText(text[last:loc[0]])
+		last = loc[1]
 		att, ne := f.fetch(ctx, rawURL)
 		if ne != nil {
-			return nil, false, ne
+			// Best-effort: a broken bare link stays as text rather than failing
+			// the whole run; only explicit image_url parts hard-fail.
+			addText(rawURL + trailing)
+			continue
 		}
-		part, ok := contentPartForAttachment(att)
-		addText(text[last:loc[0]])
-		if ok {
+		if part, ok := contentPartForAttachment(att); ok {
 			parts = append(parts, part)
 			addText(trailing)
 			attached = true
@@ -199,13 +204,12 @@ func (f *attachmentFetcher) splitStringAttachments(ctx context.Context, text str
 			// is referencing a link, so keep the URL verbatim as text.
 			addText(rawURL + trailing)
 		}
-		last = loc[1]
 	}
 	addText(text[last:])
 	if !attached {
-		return nil, false, nil
+		return nil, false
 	}
-	return parts, true, nil
+	return parts, true
 }
 
 // rewriteParts walks an existing content-part list, fetching http(s) URLs found
@@ -221,11 +225,7 @@ func (f *attachmentFetcher) rewriteParts(ctx context.Context, in []any) ([]any, 
 		switch block["type"] {
 		case "text":
 			t, _ := block["text"].(string)
-			sub, replaced, ne := f.splitStringAttachments(ctx, t)
-			if ne != nil {
-				return nil, ne
-			}
-			if replaced {
+			if sub, replaced := f.splitStringAttachments(ctx, t); replaced {
 				out = append(out, sub...)
 			} else {
 				out = append(out, block)
@@ -270,14 +270,14 @@ func contentPartForAttachment(att *fetchedAttachment) (map[string]any, bool) {
 			"type": "input_audio",
 			"input_audio": map[string]any{
 				"data":   base64.StdEncoding.EncodeToString(att.data),
-				"format": strings.TrimPrefix(att.mediaType, "audio/"),
+				"format": audioFormat(att.mediaType),
 			},
 		}, true
 	case att.mediaType == "application/pdf":
 		return map[string]any{
 			"type": "file",
 			"file": map[string]any{
-				"filename":  "attachment.pdf",
+				"filename":  fileNameFromURL(att.sourceURL, "attachment.pdf"),
 				"file_data": dataURL(att),
 			},
 		}, true
@@ -288,6 +288,31 @@ func contentPartForAttachment(att *fetchedAttachment) (map[string]any, bool) {
 
 func dataURL(att *fetchedAttachment) string {
 	return "data:" + att.mediaType + ";base64," + base64.StdEncoding.EncodeToString(att.data)
+}
+
+// fileNameFromURL derives a file name from a URL's last path segment, falling
+// back to the given default when the path has no usable segment.
+func fileNameFromURL(rawURL, fallback string) string {
+	if u, err := url.Parse(rawURL); err == nil {
+		if base := path.Base(u.Path); base != "" && base != "." && base != "/" {
+			return base
+		}
+	}
+	return fallback
+}
+
+// audioFormat maps an audio media type to the short format token providers
+// expect in an input_audio part (OpenAI accepts "mp3" and "wav"). audio/mpeg
+// is "mp3", not "mpeg".
+func audioFormat(mediaType string) string {
+	switch mediaType {
+	case "audio/mpeg", "audio/mp3":
+		return "mp3"
+	case "audio/wav", "audio/wave", "audio/x-wav":
+		return "wav"
+	default:
+		return strings.TrimPrefix(mediaType, "audio/")
+	}
 }
 
 // normalizeMediaType strips parameters (charset, boundary) and lowercases a

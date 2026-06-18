@@ -85,6 +85,13 @@ Feature: Remote attachment URLs are fetched and delivered to the model as conten
     Then the run fails with a clear error explaining the attachment was too large
     And no request is sent to the model
 
+  @integration
+  Scenario: An attachment URL that redirects to a private address is refused
+    Given an attachment URL on an allowed host that redirects to a metadata address
+    When the engine builds the LLM messages
+    Then the run fails rather than fetching the private address
+    # The SSRF policy is re-applied at dial time, so a redirect cannot escape it.
+
   # ============================================================================
   # A plain link the author is only mentioning is left alone
   # ============================================================================
@@ -97,6 +104,15 @@ Feature: Remote attachment URLs are fetched and delivered to the model as conten
     And no attachment part is created for it
     # A reachable, non-attachment response (a web page) is the author referencing
     # a link, not attaching a file, so it must not be force-attached.
+
+  @integration
+  Scenario: A broken link in prose does not fail the run
+    Given a user message whose text mentions an http URL that cannot be reached
+    When the engine builds the LLM messages
+    Then the URL is left in the message as text
+    And the run is not failed by the broken link
+    # A bare URL in prose is best-effort; only an explicit image attachment that
+    # cannot be fetched fails the run.
 
   # ============================================================================
   # Forward-looking: arbitrary attachment types pass through structured
