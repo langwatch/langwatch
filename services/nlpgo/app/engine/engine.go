@@ -571,7 +571,9 @@ func (e *Engine) runSignature(ctx context.Context, execReq ExecuteRequest, node 
 		}
 		req.ResponseFormat = composeSignatureResponseFormat(sanitizeSchemaName(schemaName), node.Data.Outputs)
 	}
-	llmCtx, llmSpan := startLLMSpan(ctx, model, provider, messages)
+	// Trace a redacted copy: the model gets the full fetched bytes (req.Messages),
+	// but the span's langwatch.input must not store the base64 attachment payload.
+	llmCtx, llmSpan := startLLMSpan(ctx, model, provider, redactAttachmentsForTracing(messages))
 	resp, err := e.llm.Execute(llmCtx, req)
 	endLLMSpan(llmSpan, resp, err)
 	if err != nil {

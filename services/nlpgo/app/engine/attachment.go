@@ -57,10 +57,17 @@ type attachmentFetcher struct {
 }
 
 func newAttachmentFetcher(ssrf httpblock.SSRFOptions) *attachmentFetcher {
+	// Clone the default transport so standard settings (notably
+	// Proxy: http.ProxyFromEnvironment) are inherited, then only override the
+	// dialer to re-apply the SSRF policy at dial time — the same construction the
+	// HTTP block uses, so attachment fetches work in restricted-egress
+	// deployments that require an outbound proxy.
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.DialContext = httpblock.SafeDialer(ssrf)
 	return &attachmentFetcher{
 		client: &http.Client{
 			Timeout:   defaultAttachmentTimeout,
-			Transport: &http.Transport{DialContext: httpblock.SafeDialer(ssrf)},
+			Transport: transport,
 		},
 		ssrf:     ssrf,
 		maxBytes: defaultMaxAttachmentBytes,
@@ -287,11 +294,14 @@ func (f *attachmentFetcher) rewriteParts(ctx context.Context, in []any) ([]any, 
 				return nil, ne
 			}
 			part, ok := contentPartForAttachment(att)
-			if ok {
-				out = append(out, part)
-			} else {
-				out = append(out, block)
+			if !ok {
+				// An image_url part is explicit attachment intent: a reachable
+				// response that is not a deliverable attachment must fail clearly
+				// rather than fall back to sending the raw URL to the provider and
+				// bypassing the server-side fetch entirely.
+				return nil, attachmentError(url, "could not be loaded as an image (its content type is "+att.mediaType+")", 0)
 			}
+			out = append(out, part)
 		default:
 			out = append(out, block)
 		}
@@ -333,6 +343,88 @@ func contentPartForAttachment(att *fetchedAttachment) (map[string]any, bool) {
 
 func dataURL(att *fetchedAttachment) string {
 	return "data:" + att.mediaType + ";base64," + base64.StdEncoding.EncodeToString(att.data)
+}
+
+// redactAttachmentsForTracing returns a copy of messages with heavy inline
+// attachment bytes (base64 data URLs in image_url / file parts and raw base64 in
+// input_audio parts) replaced by a short "[media-type, N bytes]" summary. The
+// model still receives the full bytes — only the copy handed to tracing is
+// shrunk — so a fetched 20 MB image/PDF/audio is not JSON-serialized into the
+// span's langwatch.input (which would blow OTLP/ClickHouse size limits and store
+// the private payload). Text and plain (non-data) URLs are left untouched.
+func redactAttachmentsForTracing(messages []app.ChatMessage) []app.ChatMessage {
+	out := make([]app.ChatMessage, len(messages))
+	for i, m := range messages {
+		out[i] = m
+		parts, ok := m.Content.([]any)
+		if !ok {
+			continue
+		}
+		redacted := make([]any, len(parts))
+		for j, p := range parts {
+			redacted[j] = redactPartForTracing(p)
+		}
+		out[i].Content = redacted
+	}
+	return out
+}
+
+// redactPartForTracing replaces the inline bytes of a single content part with a
+// summary, leaving every other part shape untouched.
+func redactPartForTracing(p any) any {
+	block, ok := p.(map[string]any)
+	if !ok {
+		return p
+	}
+	switch block["type"] {
+	case "image_url":
+		if img, ok := block["image_url"].(map[string]any); ok {
+			if u, _ := img["url"].(string); strings.HasPrefix(u, "data:") {
+				return map[string]any{"type": "image_url", "image_url": map[string]any{"url": summarizeDataURL(u)}}
+			}
+		}
+	case "file":
+		if file, ok := block["file"].(map[string]any); ok {
+			if fd, _ := file["file_data"].(string); strings.HasPrefix(fd, "data:") {
+				return map[string]any{"type": "file", "file": map[string]any{
+					"filename": file["filename"], "file_data": summarizeDataURL(fd),
+				}}
+			}
+		}
+	case "input_audio":
+		if audio, ok := block["input_audio"].(map[string]any); ok {
+			if data, _ := audio["data"].(string); data != "" {
+				format, _ := audio["format"].(string)
+				return map[string]any{"type": "input_audio", "input_audio": map[string]any{
+					"data": fmt.Sprintf("[audio, %d bytes]", approxBase64Bytes(data)), "format": format,
+				}}
+			}
+		}
+	}
+	return p
+}
+
+// summarizeDataURL turns "data:image/png;base64,AAAA..." into a short
+// "[image/png, 12345 bytes]" so the trace records the shape, not the payload.
+func summarizeDataURL(s string) string {
+	mediaType := "attachment"
+	if strings.HasPrefix(s, "data:") {
+		rest := s[len("data:"):]
+		if i := strings.IndexAny(rest, ";,"); i >= 0 {
+			mediaType = rest[:i]
+		}
+	}
+	n := 0
+	if comma := strings.IndexByte(s, ','); comma >= 0 {
+		n = approxBase64Bytes(s[comma+1:])
+	}
+	return fmt.Sprintf("[%s, %d bytes]", mediaType, n)
+}
+
+// approxBase64Bytes estimates the decoded byte length of a base64 string
+// without allocating the decoded buffer.
+func approxBase64Bytes(b64 string) int {
+	return len(strings.TrimRight(b64, "=")) * 3 / 4
 }
 
 // fileNameFromURL derives a file name from a URL's last path segment, falling
@@ -394,10 +486,28 @@ func trimTrailingPunct(token string) (url, trailing string) {
 // attachmentError builds the user-facing NodeError for a failed attachment
 // fetch. Status threads the upstream HTTP status when there was one (for fault
 // attribution), mirroring the llm_error path.
-func attachmentError(url, reason string, status int) *NodeError {
+func attachmentError(rawURL, reason string, status int) *NodeError {
 	return &NodeError{
 		Type:    "attachment_fetch_error",
-		Message: fmt.Sprintf("Could not load the attachment %s: it %s.", url, reason),
+		Message: fmt.Sprintf("Could not load the attachment %s: it %s.", redactURLForError(rawURL), reason),
 		Status:  status,
 	}
+}
+
+// redactURLForError strips the query string and fragment from a URL before it
+// is surfaced in a user-facing error (and stored on the node/trace). Presigned
+// S3/CDN URLs carry credentials (X-Amz-Signature, X-Amz-Credential, security
+// tokens) in the query string, so leaking the raw URL on a fetch failure would
+// expose them. The scheme, host, and path are kept so the attachment stays
+// identifiable.
+func redactURLForError(rawURL string) string {
+	if u, err := url.Parse(rawURL); err == nil && u.Scheme != "" {
+		u.RawQuery = ""
+		u.Fragment = ""
+		return u.String()
+	}
+	if i := strings.IndexAny(rawURL, "?#"); i >= 0 {
+		return rawURL[:i]
+	}
+	return rawURL
 }

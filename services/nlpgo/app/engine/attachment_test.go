@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -365,6 +366,54 @@ func TestInlineImageInputsLeavesDataURLAndTextInputsUntouched(t *testing.T) {
 	require.Nil(t, ne)
 	assert.Equal(t, "data:image/png;base64,AAAA", out["picture"], "an inline data URL must pass through untouched")
 	assert.Equal(t, "http://127.0.0.1:1/skip.png", out["link"], "a str-typed URL must not be eagerly fetched")
+}
+
+func TestRewriteFailsClearlyOnExplicitImageURLThatIsNotAnImage(t *testing.T) {
+	srv := attachmentServer(t)
+	defer srv.Close()
+	f := loopbackFetcher()
+
+	// An image_url part is explicit attachment intent; a reachable web page must
+	// fail rather than fall through and send the raw URL to the provider.
+	out, ne := f.rewrite(context.Background(), imagePartMessage(srv.URL+"/page"))
+	require.Nil(t, out)
+	require.NotNil(t, ne, "an explicit image_url pointing at a web page must fail the run")
+	assert.Equal(t, "attachment_fetch_error", ne.Type)
+	assert.Contains(t, ne.Message, "image", "the error must explain it could not be loaded as an image")
+}
+
+func TestAttachmentErrorRedactsURLQueryParams(t *testing.T) {
+	// Presigned S3 URLs carry the signature and credentials in the query string.
+	signed := "https://bucket.s3.amazonaws.com/private/img.png?X-Amz-Credential=AKIAEXAMPLE&X-Amz-Signature=deadbeefsecret&X-Amz-Security-Token=tok123"
+	ne := attachmentError(signed, "could not be reached", 0)
+	assert.NotContains(t, ne.Message, "deadbeefsecret", "the signature must not appear in the user-facing error")
+	assert.NotContains(t, ne.Message, "X-Amz-Signature", "query params must be stripped")
+	assert.NotContains(t, ne.Message, "tok123", "the security token must not leak")
+	assert.Contains(t, ne.Message, "bucket.s3.amazonaws.com/private/img.png", "the attachment stays identifiable by host + path")
+}
+
+func TestRedactAttachmentsForTracingStripsInlineBytes(t *testing.T) {
+	bigB64 := strings.Repeat("A", 4096)
+	messages := []app.ChatMessage{{Role: "user", Content: []any{
+		map[string]any{"type": "text", "text": "describe these"},
+		map[string]any{"type": "image_url", "image_url": map[string]any{"url": "data:image/png;base64," + bigB64}},
+		map[string]any{"type": "input_audio", "input_audio": map[string]any{"data": bigB64, "format": "mp3"}},
+		map[string]any{"type": "file", "file": map[string]any{"filename": "doc.pdf", "file_data": "data:application/pdf;base64," + bigB64}},
+	}}}
+
+	traced := redactAttachmentsForTracing(messages)
+	tracedJSON, err := json.Marshal(traced)
+	require.NoError(t, err)
+	assert.NotContains(t, string(tracedJSON), bigB64, "the base64 payload must not survive into the trace copy")
+	assert.Contains(t, string(tracedJSON), "image/png", "the media-type summary is kept for the trace")
+	assert.Contains(t, string(tracedJSON), "bytes]", "a size summary is kept for the trace")
+	assert.Contains(t, string(tracedJSON), "describe these", "text content is preserved")
+
+	// The original messages still carry the full bytes — the model gets the real
+	// attachment, only the traced copy is shrunk.
+	origJSON, err := json.Marshal(messages)
+	require.NoError(t, err)
+	assert.Contains(t, string(origJSON), bigB64, "the original messages must keep the full bytes for the model")
 }
 
 func TestNormalizeMediaType(t *testing.T) {
