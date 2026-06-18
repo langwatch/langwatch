@@ -115,6 +115,7 @@ func (f *attachmentFetcher) fetch(ctx context.Context, rawURL string) (*fetchedA
 func (f *attachmentFetcher) rewrite(ctx context.Context, messages []app.ChatMessage) ([]app.ChatMessage, *NodeError) {
 	out := make([]app.ChatMessage, 0, len(messages))
 	for _, m := range messages {
+		newContent := m.Content
 		switch content := m.Content.(type) {
 		case string:
 			parts, replaced, ne := f.splitStringAttachments(ctx, content)
@@ -122,18 +123,45 @@ func (f *attachmentFetcher) rewrite(ctx context.Context, messages []app.ChatMess
 				return nil, ne
 			}
 			if replaced {
-				m.Content = parts
+				newContent = parts
 			}
 		case []any:
 			parts, ne := f.rewriteParts(ctx, content)
 			if ne != nil {
 				return nil, ne
 			}
-			m.Content = parts
+			newContent = parts
 		}
+		// A system message that gained an attachment part must be re-homed:
+		// providers reject non-text parts in system role. Mirrors the same
+		// re-homing splitMessagesWithImages does for inline data-URL images.
+		if m.Role == "system" {
+			if parts, ok := newContent.([]any); ok && hasNonTextPart(parts) {
+				systemText, rest := splitLeadingText(parts)
+				if systemText != "" {
+					out = append(out, app.ChatMessage{Role: "system", Content: systemText})
+				}
+				if len(rest) > 0 {
+					out = append(out, app.ChatMessage{Role: "user", Content: rest})
+				}
+				continue
+			}
+		}
+		m.Content = newContent
 		out = append(out, m)
 	}
 	return out, nil
+}
+
+// hasNonTextPart reports whether a content-part list contains any part that is
+// not a plain text block (an attachment that must not sit in a system message).
+func hasNonTextPart(parts []any) bool {
+	for _, p := range parts {
+		if block, ok := p.(map[string]any); ok && block["type"] != "text" {
+			return true
+		}
+	}
+	return false
 }
 
 // splitStringAttachments scans text for http(s) URLs and, when any resolve to a

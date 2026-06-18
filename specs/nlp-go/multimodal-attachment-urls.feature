@@ -53,6 +53,14 @@ Feature: Remote attachment URLs are fetched and delivered to the model as conten
     When the engine builds the LLM messages
     Then the content carries an image part for each, in their original positions
 
+  @integration
+  Scenario: An attachment URL in the system prompt is re-homed to a user message
+    Given the system prompt references an image by URL
+    When the engine builds the LLM messages
+    Then the system message keeps only the text before the image
+    And the image is delivered in a user message instead
+    # Providers reject image parts in system-role messages.
+
   # ============================================================================
   # Clear failures when an attachment cannot be fetched
   # ============================================================================

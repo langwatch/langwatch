@@ -152,6 +152,23 @@ func TestRewriteHandlesMultipleAttachmentURLs(t *testing.T) {
 	assert.Equal(t, 2, images, "each URL must become its own image part")
 }
 
+// @scenario "An attachment URL in the system prompt is re-homed to a user message"
+func TestRewriteRehomesSystemAttachmentToUser(t *testing.T) {
+	srv := attachmentServer(t)
+	defer srv.Close()
+	f := loopbackFetcher()
+
+	out, ne := f.rewrite(context.Background(), []app.ChatMessage{
+		{Role: "system", Content: "You are a vision grader. Image: " + srv.URL + "/cat.png"},
+	})
+	require.Nil(t, ne)
+	require.Len(t, out, 2, "the system message must split into system text + a user message")
+	assert.Equal(t, "system", out[0].Role)
+	assert.IsType(t, "", out[0].Content, "the system message keeps only the leading text")
+	assert.Equal(t, "user", out[1].Role)
+	firstPartOfType(t, out[1], "image_url") // the image rode into the user message
+}
+
 // @scenario "An unreachable attachment URL fails the run with a clear message naming the URL"
 func TestRewriteFailsClearlyOnUnreachableURL(t *testing.T) {
 	srv := attachmentServer(t)
