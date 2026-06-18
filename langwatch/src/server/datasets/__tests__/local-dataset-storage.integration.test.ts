@@ -5,6 +5,11 @@ import path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readDatasetHeadS3Jsonl } from "../../api/routers/datasetRecord.utils";
 import { chunkKey } from "../dataset-chunking";
+import {
+  appendS3JsonlRecords,
+  deleteS3JsonlRecords,
+  editS3JsonlRecord,
+} from "../dataset-mutations";
 import { createDatasetNormalizeHandler } from "../dataset-normalize.job";
 // Real-FS integration: exercise LocalDatasetStorage against a real temp dir.
 // No env mock — the factory selects this impl; here we instantiate it directly
@@ -298,6 +303,165 @@ describe("LocalDatasetStorage", () => {
           status: "processing",
         });
       });
+    });
+  });
+
+  // Write-mutations round-trip (rung 6b): drive the real append/edit/delete
+  // mutations against the real LocalDatasetStorage, with a prisma stub that
+  // serves the live dataset row through the advisory-lock transaction seam. The
+  // chunk files on disk and the recomputed PG counters are both asserted, so the
+  // bound scenarios are backed by actual stored bytes — not just a write-side
+  // `update` spy.
+  describe("append / edit / delete round-trip", () => {
+    /**
+     * A prisma stub whose `$transaction(fn)` runs `fn(tx)` against a mutable
+     * in-memory `Dataset` row. `tx.dataset.findFirstOrThrow` returns the live
+     * row; `tx.dataset.update` applies the data patch to it (so a later
+     * mutation sees the advanced counters). `tx.$queryRaw` stands in for the
+     * advisory lock.
+     */
+    const makePrismaOver = (row: Record<string, unknown>) => {
+      const prisma = {
+        $transaction: async (fn: (tx: unknown) => unknown) =>
+          fn({
+            $queryRaw: async () => [],
+            dataset: {
+              findFirstOrThrow: async () => ({ ...row }),
+              update: async ({ data }: { data: Record<string, unknown> }) => {
+                Object.assign(row, data);
+                return { ...row };
+              },
+            },
+          }),
+      };
+      return prisma;
+    };
+
+    /** Seed a ready s3_jsonl dataset on disk via the append path, returning the
+     * mutable row + the storage to keep mutating. */
+    const seed = async (
+      projectId: string,
+      datasetId: string,
+      entries: unknown[],
+    ) => {
+      const row: Record<string, unknown> = {
+        id: datasetId,
+        projectId,
+        contentLayout: "s3_jsonl",
+        status: "ready",
+        statusError: null,
+        rowCount: 0,
+        sizeBytes: 0n,
+        chunkCount: 0,
+        chunkOffsets: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const prisma = makePrismaOver(row);
+      await appendS3JsonlRecords({
+        prisma: prisma as never,
+        dataset: row as never,
+        projectId,
+        entries,
+        storage,
+      });
+      return { row, prisma };
+    };
+
+    /** Read every chunk's lines back from disk in order. */
+    const readAll = async (
+      projectId: string,
+      datasetId: string,
+      chunkCount: number,
+    ) =>
+      (await storage.readChunks({
+        projectId,
+        datasetId,
+        chunkCount,
+      })) as Array<{ id: string; entry: unknown }>;
+
+    /** @scenario "Appending rows adds new data and preserves existing rows" */
+    it("appends new rows, preserves the originals, and updates the counts", async () => {
+      const projectId = "p1";
+      const datasetId = "mut-append";
+      const { row, prisma } = await seed(projectId, datasetId, [
+        { a: 1 },
+        { a: 2 },
+        { a: 3 },
+        { a: 4 },
+        { a: 5 },
+        { a: 6 },
+        { a: 7 },
+        { a: 8 },
+        { a: 9 },
+        { a: 10 },
+      ]);
+      expect(row.rowCount).toBe(10);
+
+      await appendS3JsonlRecords({
+        prisma: prisma as never,
+        dataset: row as never,
+        projectId,
+        entries: [{ a: 11 }, { a: 12 }, { a: 13 }, { a: 14 }, { a: 15 }],
+        storage,
+      });
+
+      // PG-authoritative count reflects the append.
+      expect(row.rowCount).toBe(15);
+      const rows = await readAll(
+        projectId,
+        datasetId,
+        row.chunkCount as number,
+      );
+      // Original 10 unchanged, 5 appended in order.
+      expect(rows.map((r) => r.entry)).toEqual(
+        Array.from({ length: 15 }, (_, i) => ({ a: i + 1 })),
+      );
+    });
+
+    /** @scenario "Editing or deleting a row updates only that row" */
+    it("edits one row and deletes another, leaving the rest unaffected", async () => {
+      const projectId = "p1";
+      const datasetId = "mut-edit-delete";
+      const { row, prisma } = await seed(projectId, datasetId, [
+        { a: 1 },
+        { a: 2 },
+        { a: 3 },
+      ]);
+      const seeded = await readAll(
+        projectId,
+        datasetId,
+        row.chunkCount as number,
+      );
+      const [r1, r2, r3] = seeded;
+
+      // Edit r2.
+      await editS3JsonlRecord({
+        prisma: prisma as never,
+        dataset: row as never,
+        projectId,
+        recordId: r2!.id,
+        entry: { a: 99 },
+        storage,
+      });
+      // Delete r1.
+      await deleteS3JsonlRecords({
+        prisma: prisma as never,
+        dataset: row as never,
+        projectId,
+        recordIds: [r1!.id],
+        storage,
+      });
+
+      expect(row.rowCount).toBe(2);
+      const rows = await readAll(
+        projectId,
+        datasetId,
+        row.chunkCount as number,
+      );
+      // r1 gone; r2 carries the edited entry; r3 unaffected.
+      expect(rows.map((r) => r.id)).toEqual([r2!.id, r3!.id]);
+      expect(rows.map((r) => r.entry)).toEqual([{ a: 99 }, { a: 3 }]);
     });
   });
 });

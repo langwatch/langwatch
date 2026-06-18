@@ -94,6 +94,78 @@ describe("S3DatasetStorage", () => {
     });
   });
 
+  describe("readChunk()", () => {
+    describe("when the chunk resolves", () => {
+      it("parses just that one chunk's rows", async () => {
+        const { resolved, send } = makeFakeClient();
+        send.mockResolvedValue({
+          Body: {
+            transformToString: () => Promise.resolve('{"a":1}\n{"a":2}\n'),
+          },
+        });
+        createS3Client.mockResolvedValue(resolved);
+
+        const rows = await new S3DatasetStorage().readChunk({
+          projectId: "p1",
+          datasetId: "d1",
+          index: 2,
+        });
+
+        expect(rows).toEqual([{ a: 1 }, { a: 2 }]);
+        expect(send.mock.calls[0]![0].input.Key).toBe(
+          "datasets/p1/d1/chunk-00002.jsonl",
+        );
+      });
+    });
+
+    // @regression — a single-chunk read must throw on a missing object, not
+    // return empty, mirroring readChunks (corruption, not emptiness).
+    describe("when the chunk object is missing (NoSuchKey)", () => {
+      it("throws the missing-chunk error", async () => {
+        const { resolved, send } = makeFakeClient();
+        send.mockRejectedValue({ name: "NoSuchKey" });
+        createS3Client.mockResolvedValue(resolved);
+
+        await expect(
+          new S3DatasetStorage().readChunk({
+            projectId: "p1",
+            datasetId: "d1",
+            index: 0,
+          }),
+        ).rejects.toThrow(/Missing dataset chunk/);
+      });
+    });
+  });
+
+  describe("rewriteChunk()", () => {
+    describe("when overwriting a chunk in place", () => {
+      it("puts exactly these rows to the right key and returns the new byteSize", async () => {
+        const { resolved, send } = makeFakeClient();
+        send.mockResolvedValue({});
+        createS3Client.mockResolvedValue(resolved);
+
+        const offset = await new S3DatasetStorage().rewriteChunk({
+          projectId: "p1",
+          datasetId: "d1",
+          index: 3,
+          records: [{ id: "r1", entry: { a: 1 } }],
+        });
+
+        expect(send).toHaveBeenCalledOnce();
+        const put = send.mock.calls[0]![0];
+        expect(put.constructor.name).toBe("PutObjectCommand");
+        expect(put.input.Key).toBe("datasets/p1/d1/chunk-00003.jsonl");
+        expect(put.input.Body).toBe('{"id":"r1","entry":{"a":1}}\n');
+        expect(offset).toEqual({
+          index: 3,
+          startRow: 0,
+          endRow: 1,
+          byteSize: Buffer.byteLength('{"id":"r1","entry":{"a":1}}\n', "utf8"),
+        });
+      });
+    });
+  });
+
   describe("deleteChunksFrom()", () => {
     // @regression — a re-drive that wrote fewer chunks than a crashed prior run
     // leaves orphan chunk objects; deleteChunksFrom must reap them from the new

@@ -21,7 +21,7 @@
  */
 import type { Readable } from "node:stream";
 import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
-import type { DatasetChunk } from "./dataset-chunking";
+import type { ChunkOffset, DatasetChunk } from "./dataset-chunking";
 import { LocalDatasetStorage } from "./local-dataset-storage";
 import { S3DatasetStorage } from "./s3-dataset-storage";
 
@@ -59,6 +59,38 @@ export interface DatasetStorage {
     datasetId: string;
     chunkCount: number;
   }): Promise<unknown[]>;
+
+  /**
+   * Read a single chunk object's rows (ADR-032 Decision 3 — edit/delete locate
+   * and rewrite only the affected chunk, so they read just that chunk rather
+   * than the whole dataset). Throws on a missing chunk, consistent with
+   * `readChunks` (a chunk `chunkCount` claims exists but is missing is
+   * corruption, not emptiness — never silently truncate).
+   */
+  readChunk(params: {
+    projectId: string;
+    datasetId: string;
+    index: number;
+  }): Promise<unknown[]>;
+
+  /**
+   * Overwrite `chunk-{index}.jsonl` with exactly these records as a single
+   * object (ADR-032 Decision 3 — edit/delete rewrite one chunk in place under
+   * the advisory lock). Returns the new offset/byteSize for that index so the
+   * caller can patch the PG-authoritative `chunkOffsets` entry (I-COUNT). The
+   * same null-byte scrub (I-NULL) and key guard the append path uses apply.
+   *
+   * NOTE: a single-row edit can't meaningfully grow a chunk, and delete only
+   * shrinks it, so a rewrite never crosses `CHUNK_MAX_BYTES` in practice. If a
+   * caller ever rewrote a chunk larger than the cap, it is still written as one
+   * object — splitting-on-rewrite is out of scope for this rung.
+   */
+  rewriteChunk(params: {
+    projectId: string;
+    datasetId: string;
+    index: number;
+    records: unknown[];
+  }): Promise<ChunkOffset>;
 
   /**
    * Mint a presigned upload for a heavy browser→storage direct upload. The

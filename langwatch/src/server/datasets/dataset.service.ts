@@ -11,6 +11,11 @@ import {
   getFullDataset,
 } from "../api/routers/datasetRecord.utils";
 import { DatasetRepository } from "./dataset.repository";
+import {
+  appendS3JsonlRecords,
+  deleteS3JsonlRecords,
+  editS3JsonlRecord,
+} from "./dataset-mutations";
 import { enqueueDatasetNormalize } from "./dataset-normalize.queue";
 import { DatasetRecordRepository } from "./dataset-record.repository";
 import { getDatasetStorage } from "./dataset-storage";
@@ -626,6 +631,29 @@ export class DatasetService {
       params.entry,
     ) as Prisma.InputJsonValue;
 
+    // ADR-032 rung 6b: s3_jsonl content lives in chunk objects (I-PG → zero PG
+    // rows), so the upsert is a chunk-rewrite (edit existing id) or chunk-append
+    // (new id), serialized by the per-dataset advisory lock (Decision 9). The
+    // returned record mirrors the PG shape for the editor UI.
+    if (dataset.contentLayout === "s3_jsonl") {
+      const { updated } = await editS3JsonlRecord({
+        prisma: this.prisma,
+        dataset,
+        projectId: params.projectId,
+        recordId: params.recordId,
+        entry: sanitisedEntry,
+      });
+      const record = {
+        id: params.recordId,
+        entry: sanitisedEntry as Prisma.JsonValue,
+        datasetId: dataset.id,
+        projectId: params.projectId,
+        createdAt: dataset.createdAt,
+        updatedAt: new Date(),
+      };
+      return { record, created: !updated };
+    }
+
     const existing = await this.recordRepository.findOne({
       id: params.recordId,
       datasetId: dataset.id,
@@ -716,6 +744,25 @@ export class DatasetService {
       };
     });
 
+    // ADR-032 rung 6b: an s3_jsonl dataset appends to chunk objects (new chunks
+    // from `chunkCount`), not the PG table (I-PG), under the per-dataset advisory
+    // lock (Decision 9). The shared column validation/fill above is reused; only
+    // the persistence target differs.
+    if (dataset.contentLayout === "s3_jsonl") {
+      await appendS3JsonlRecords({
+        prisma: this.prisma,
+        dataset,
+        projectId: params.projectId,
+        entries: records.map((r) => r.entry),
+      });
+      const createdAt = new Date();
+      return records.map((record) => ({
+        id: record.id,
+        entry: record.entry as Prisma.JsonValue,
+        createdAt,
+      }));
+    }
+
     const created = await this.recordRepository.createMany({
       records,
       datasetId: dataset.id,
@@ -744,6 +791,19 @@ export class DatasetService {
       slugOrId: params.slugOrId,
       projectId: params.projectId,
     });
+
+    // ADR-032 rung 6b: s3_jsonl rows live in chunk objects (I-PG), so a delete
+    // rewrites the affected chunk(s) without the removed rows and recomputes the
+    // offset index, under the per-dataset advisory lock (Decision 9).
+    if (dataset.contentLayout === "s3_jsonl") {
+      const { deleted } = await deleteS3JsonlRecords({
+        prisma: this.prisma,
+        dataset,
+        projectId: params.projectId,
+        recordIds: params.recordIds,
+      });
+      return { count: deleted };
+    }
 
     const { count } = await this.recordRepository.deleteMany({
       recordIds: params.recordIds,

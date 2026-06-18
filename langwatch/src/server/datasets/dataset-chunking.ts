@@ -100,6 +100,22 @@ export const toJsonlChunks = (
   return chunks;
 };
 
+/**
+ * Serialize exactly these records into ONE JSONL blob (no byte-cap roll-over),
+ * scrubbing null bytes per row (I-NULL) like `toJsonlChunks`. The single-chunk
+ * rewrite path (`rewriteChunk`) uses this so an edit/delete writes the affected
+ * chunk back as one object with the same on-disk shape the append path produces.
+ * Returns the blob and its UTF-8 byte size for the PG `chunkOffsets` patch.
+ */
+export const toSingleJsonl = (
+  records: unknown[],
+): { jsonl: string; byteSize: number } => {
+  const jsonl =
+    records.map((record) => JSON.stringify(stripNullBytes(record))).join("\n") +
+    (records.length > 0 ? "\n" : "");
+  return { jsonl, byteSize: Buffer.byteLength(jsonl, "utf8") };
+};
+
 /** Aggregate per-dataset metadata from a chunk list (PG-authoritative). */
 export const chunkedMeta = (chunks: DatasetChunk[]): ChunkedDatasetMeta => ({
   rowCount: chunks.reduce((n, c) => n + c.rowCount, 0),

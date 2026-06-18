@@ -1,7 +1,11 @@
-import type { PrismaClient } from "@prisma/client";
+import type { Dataset, PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
+import {
+  deleteS3JsonlRecords,
+  editS3JsonlRecord,
+} from "../../datasets/dataset-mutations";
 import { stripNullBytes } from "../../datasets/sanitize";
 import { newDatasetEntriesSchema } from "../../datasets/types";
 import { prisma } from "../../db";
@@ -82,7 +86,7 @@ export const datasetRecordRouter = createTRPCRouter({
         updatedRecord,
         datasetId: input.datasetId,
         projectId: input.projectId,
-        useS3: dataset.useS3,
+        dataset,
         prisma,
       });
     }),
@@ -192,7 +196,7 @@ export const datasetRecordRouter = createTRPCRouter({
         recordIds: input.recordIds,
         datasetId: input.datasetId,
         projectId: input.projectId,
-        useS3: dataset.useS3,
+        dataset,
         prisma,
       });
     }),
@@ -202,16 +206,36 @@ const deleteManyDatasetRecords = async ({
   recordIds,
   datasetId,
   projectId,
-  useS3,
+  dataset,
   prisma,
 }: {
   recordIds: string[];
   datasetId: string;
   projectId: string;
-  useS3: boolean;
+  dataset: Dataset;
   prisma: PrismaClient;
 }) => {
-  if (useS3) {
+  // ADR-032 rung 6b: s3_jsonl rows live in chunk objects (I-PG); a delete
+  // rewrites the affected chunk(s) without the removed rows and recomputes the
+  // offset index, under the per-dataset advisory lock (Decision 9). Replaces the
+  // dead single-blob `useS3` path below for the new layout.
+  if (dataset.contentLayout === "s3_jsonl") {
+    const { deleted } = await deleteS3JsonlRecords({
+      prisma,
+      dataset,
+      projectId,
+      recordIds,
+    });
+    if (deleted === 0) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "No matching records found to delete",
+      });
+    }
+    return { deletedCount: deleted };
+  }
+
+  if (dataset.useS3) {
     // Get existing records
     let records: any[] = [];
     try {
@@ -279,14 +303,14 @@ const updateDatasetRecord = async ({
   updatedRecord,
   datasetId,
   projectId,
-  useS3,
+  dataset,
   prisma,
 }: {
   recordId: string;
   updatedRecord: any;
   datasetId: string;
   projectId: string;
-  useS3: boolean;
+  dataset: Dataset;
   prisma: PrismaClient;
 }) => {
   // Strip Postgres-incompatible U+0000 null bytes from any user-supplied
@@ -295,7 +319,22 @@ const updateDatasetRecord = async ({
   // of storage backend.
   const sanitisedRecord = stripNullBytes(updatedRecord);
 
-  if (useS3) {
+  // ADR-032 rung 6b: an s3_jsonl edit locates the row by id, rewrites only its
+  // chunk in place (or appends if the id is new), under the per-dataset advisory
+  // lock (Decision 9). Replaces the dead single-blob `useS3` path below for the
+  // new layout.
+  if (dataset.contentLayout === "s3_jsonl") {
+    await editS3JsonlRecord({
+      prisma,
+      dataset,
+      projectId,
+      recordId,
+      entry: sanitisedRecord,
+    });
+    return { success: true };
+  }
+
+  if (dataset.useS3) {
     const { records } = await storageService.getObject(projectId, datasetId);
 
     const recordIndex = records.findIndex(

@@ -44,7 +44,7 @@ Feature: Large dataset storage
     Then it is treated as not ready
     And no partial or half-prepared rows are ever served
 
-  @integration @unimplemented
+  @integration
   Scenario: Appending rows adds new data and preserves existing rows
     Given a ready dataset with 10 rows
     When I append 5 more rows
@@ -123,7 +123,7 @@ Feature: Large dataset storage
   # Editing
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: Editing or deleting a row updates only that row
     Given a ready dataset with several rows
     When I edit one row and delete another

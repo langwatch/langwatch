@@ -17,11 +17,13 @@ import path from "path";
 import {
   assertKeyWithinProject,
   assertNoTraversal,
+  type ChunkOffset,
   chunkKey,
   type DatasetChunk,
   errorHasProp,
   parseJsonl,
   toJsonlChunks,
+  toSingleJsonl,
 } from "./dataset-chunking";
 import type { DatasetStorage, PresignedUpload } from "./dataset-storage";
 import {
@@ -115,6 +117,49 @@ export class LocalDatasetStorage implements DatasetStorage {
       rows.push(...parseJsonl(jsonl));
     }
     return rows;
+  }
+
+  async readChunk({
+    projectId,
+    datasetId,
+    index,
+  }: {
+    projectId: string;
+    datasetId: string;
+    index: number;
+  }): Promise<unknown[]> {
+    assertNoTraversal(projectId, datasetId);
+    const key = chunkKey(projectId, datasetId, index);
+    let jsonl: string;
+    try {
+      jsonl = await fs.readFile(localPath(key), "utf-8");
+    } catch (error: unknown) {
+      if (errorHasProp(error, "code", "ENOENT")) {
+        throw new Error(`Missing dataset chunk: ${key}`);
+      }
+      throw error;
+    }
+    return parseJsonl(jsonl);
+  }
+
+  async rewriteChunk({
+    projectId,
+    datasetId,
+    index,
+    records,
+  }: {
+    projectId: string;
+    datasetId: string;
+    index: number;
+    records: unknown[];
+  }): Promise<ChunkOffset> {
+    assertNoTraversal(projectId, datasetId);
+    const { jsonl, byteSize } = toSingleJsonl(records);
+    const filePath = localPath(chunkKey(projectId, datasetId, index));
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.writeFile(filePath, jsonl, "utf-8");
+    // startRow/endRow are chunk-LOCAL here; the caller recomputes global offsets.
+    return { index, startRow: 0, endRow: records.length, byteSize };
   }
 
   /**

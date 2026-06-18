@@ -2,6 +2,7 @@ import type { Dataset, DatasetRecord, Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
+import { appendS3JsonlRecords } from "../../datasets/dataset-mutations";
 import { getDatasetStorage } from "../../datasets/dataset-storage";
 import { DatasetNotReadyError } from "../../datasets/errors";
 import { stripNullBytes } from "../../datasets/sanitize";
@@ -71,6 +72,28 @@ export const createManyDatasetRecords = async ({
       code: "NOT_FOUND",
       message: "Dataset not found",
     });
+  }
+
+  // ADR-032 rung 6b: an s3_jsonl dataset appends to chunk objects (new chunks
+  // from `chunkCount`) under the per-dataset advisory lock (Decision 9), not the
+  // PG table (I-PG). The entry's stable id is minted inside the mutation as
+  // `record_<nanoid>`; any caller-supplied id is dropped (s3_jsonl rows are
+  // addressed by the chunk-line id, not a PG primary key). Replaces the dead
+  // single-blob `useS3` path below for the new layout. `tx` does not apply — the
+  // mutation owns its own advisory-locked transaction; createNewDataset only
+  // ever creates `postgres` datasets, so a tx is never paired with s3_jsonl.
+  if (dataset.contentLayout === "s3_jsonl") {
+    const sanitisedEntries = datasetRecords.map((entry) => {
+      const { id: _id, ...entryWithoutId } = entry;
+      return stripNullBytes(entryWithoutId);
+    });
+    await appendS3JsonlRecords({
+      prisma,
+      dataset,
+      projectId,
+      entries: sanitisedEntries,
+    });
+    return { success: true } as const;
   }
 
   if (dataset.useS3) {
