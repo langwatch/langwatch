@@ -11,20 +11,17 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
 import type { Trace } from "~/server/tracer/types";
+import type { TraceService } from "~/server/traces/trace.service";
 import type { LangEvalsClient } from "../../clients/langevals/langevals.client";
+import { EvaluatorNotFoundError, TraceNotEvaluatableError } from "../errors";
 import {
-  EvaluatorNotFoundError,
-  TraceNotEvaluatableError,
-} from "../errors";
-import {
+  type EvaluationExecutionDeps,
   EvaluationExecutionService,
   extractParentTraceForNlpgo,
-  maxCausalityDepthOfSpans,
-  type EvaluationExecutionDeps,
   type ModelEnvResolver,
+  maxCausalityDepthOfSpans,
   type WorkflowExecutor,
 } from "../evaluation-execution.service";
-import type { TraceService } from "~/server/traces/trace.service";
 
 // Uses a real evaluator from AVAILABLE_EVALUATORS — no vi.mock needed.
 // openai/moderation: requiredFields=[], optionalFields=["input","output"], envVars=[]
@@ -51,7 +48,9 @@ function buildTrace(overrides?: Partial<Trace>): Trace {
 // ---------------------------------------------------------------------------
 
 interface TestOverrides {
-  traceService?: Partial<Pick<TraceService, "getTracesWithSpans" | "getTracesWithSpansByThreadIds">>;
+  traceService?: Partial<
+    Pick<TraceService, "getTracesWithSpans" | "getTracesWithSpansByThreadIds">
+  >;
   modelEnvResolver?: Partial<ModelEnvResolver>;
   workflowExecutor?: Partial<WorkflowExecutor>;
   client?: Partial<LangEvalsClient>;
@@ -62,7 +61,9 @@ function createTestService(overrides: TestOverrides = {}) {
   const defaultTrace = "trace" in overrides ? overrides.trace : buildTrace();
 
   const mockTraceService = {
-    getTracesWithSpans: vi.fn().mockResolvedValue(defaultTrace ? [defaultTrace] : []),
+    getTracesWithSpans: vi
+      .fn()
+      .mockResolvedValue(defaultTrace ? [defaultTrace] : []),
     getTracesWithSpansByThreadIds: vi.fn().mockResolvedValue([]),
     ...overrides.traceService,
   } as unknown as TraceService;
@@ -299,7 +300,11 @@ describe("EvaluationExecutionService", () => {
       it("returns skipped status", async () => {
         const { service } = createTestService({
           trace: buildTrace({
-            error: { has_error: true, message: "something broke", stacktrace: [] },
+            error: {
+              has_error: true,
+              message: "something broke",
+              stacktrace: [],
+            },
             input: undefined,
             output: undefined,
           }),
@@ -455,7 +460,9 @@ describe("EvaluationExecutionService", () => {
             } as any,
           });
 
-          expect(mockTraceService.getTracesWithSpansByThreadIds).toHaveBeenCalledWith(
+          expect(
+            mockTraceService.getTracesWithSpansByThreadIds,
+          ).toHaveBeenCalledWith(
             "proj-1",
             ["thread-1"],
             expect.objectContaining({
@@ -463,6 +470,7 @@ describe("EvaluationExecutionService", () => {
               canSeeCapturedInput: true,
               canSeeCapturedOutput: true,
             }),
+            { full: true },
           );
         });
 

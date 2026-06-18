@@ -300,6 +300,7 @@ export function CodeEditor({
   const { project } = useOrganizationTeamProject();
   const { colorMode } = useColorMode();
   const providersRef = useRef<PythonProviderHandle | null>(null);
+  const editorRef = useRef<MonacoEditorInstance | null>(null);
 
   // Live-fetched secret names; passed into the completion provider so
   // `secrets.<Tab>` suggests names the moment they appear in Settings.
@@ -335,6 +336,19 @@ export function CodeEditor({
     });
   }, [secretNames, inputFields, outputFields]);
 
+  // Monaco is seeded from defaultValue on mount only, so an inline editor would
+  // otherwise show a stale signature when an external change rewrites the code
+  // (e.g. adding or removing an input field rewrites the entrypoint signature).
+  // Reflect those changes into the editor, but skip while it is focused: live
+  // edits already flow through onChange, and setValue would jump the cursor.
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor || editor.hasTextFocus()) return;
+    if (editor.getValue() !== code) {
+      editor.setValue(code);
+    }
+  }, [code]);
+
   useEffect(() => {
     return () => {
       providersRef.current?.dispose();
@@ -366,6 +380,7 @@ export function CodeEditor({
             // ignore corrupted state
           }
         }
+        editorRef.current = editor;
         editor.focus();
         onEditorMount?.(editor, monaco);
 

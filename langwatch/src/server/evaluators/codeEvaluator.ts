@@ -28,11 +28,37 @@ export const codeEvaluatorConfigSchema = z.object({
 
 export type CodeEvaluatorConfig = z.infer<typeof codeEvaluatorConfigSchema>;
 
+/**
+ * The fixed evaluator result contract. A code evaluator's function returns a
+ * dictionary with any subset of these keys; whichever are present become the
+ * evaluation result. These mirror the studio's evaluator End node, so the
+ * outputs are not user-customizable, only the inputs are.
+ *
+ * This is the full result contract from `evaluationResultSchema`, in the same
+ * details-first order as `EVALUATOR_RESULT_FIELDS` in EndPropertiesPanel so
+ * the two evaluator surfaces stay consistent (reasoning before verdict). It is
+ * intentionally distinct from `STANDARD_EVALUATOR_OUTPUT_FIELDS` in
+ * evaluator.service.ts, which drops the free-text `details`: that is the
+ * evaluator-as-target mapping set, not the return contract. It is defined here,
+ * rather than imported from either, to stay client-safe for the evaluator
+ * drawer and avoid a circular import.
+ */
+export const CODE_EVALUATOR_OUTPUT_FIELDS: Array<{
+  identifier: string;
+  type: Field["type"];
+}> = [
+  { identifier: "details", type: "str" },
+  { identifier: "passed", type: "bool" },
+  { identifier: "score", type: "float" },
+  { identifier: "label", type: "str" },
+];
+
 /** Default shape new code evaluators are seeded with in the editor. */
 export const DEFAULT_CODE_EVALUATOR_CONFIG: CodeEvaluatorConfig = {
   code: `class Code:
     def __call__(self, output: str, expected_output: str):
-        # Your evaluation logic goes here
+        # Return a dict with any of: passed (bool), score (float),
+        # label (str), details (str). All are optional.
         passed = output.strip() == expected_output.strip()
 
         return {"passed": passed, "score": 1.0 if passed else 0.0}
@@ -41,10 +67,7 @@ export const DEFAULT_CODE_EVALUATOR_CONFIG: CodeEvaluatorConfig = {
     { identifier: "output", type: "str" },
     { identifier: "expected_output", type: "str" },
   ],
-  outputs: [
-    { identifier: "passed", type: "bool" },
-    { identifier: "score", type: "float" },
-  ],
+  outputs: CODE_EVALUATOR_OUTPUT_FIELDS.map((field) => ({ ...field })),
 };
 
 /** checkType prefix routing a monitor/evaluation to a stored code evaluator. */
@@ -110,7 +133,12 @@ export const buildCodeEvaluatorDsl = ({
       name,
       cls: "Code",
       inputs: stripValues(config.inputs),
-      outputs: stripValues(config.outputs),
+      // No declared outputs: the engine only enforces that *declared* code
+      // outputs are present in the returned dict (a "missing_output" error).
+      // An evaluator returns any subset of the contract, so declaring them
+      // would break a function that returns only `passed`. The end node below
+      // carries the contract and surfaces whichever keys the code returns.
+      outputs: [],
       parameters: [{ identifier: "code", type: "code", value: config.code }],
     } as Code,
   };
@@ -127,7 +155,10 @@ export const buildCodeEvaluatorDsl = ({
     data: {
       name: "End",
       behave_as: "evaluator",
-      inputs: stripValues(config.outputs),
+      // Always the fixed evaluator contract, independent of what the code
+      // returns. resolveInputs only binds an input when the upstream key
+      // exists, so a partial return surfaces just the keys it produced.
+      inputs: stripValues(CODE_EVALUATOR_OUTPUT_FIELDS),
     } as End,
   };
 
@@ -155,7 +186,7 @@ export const buildCodeEvaluatorDsl = ({
         targetHandle: `inputs.${identifier}`,
         type: "default",
       })),
-      ...config.outputs.map(({ identifier }) => ({
+      ...CODE_EVALUATOR_OUTPUT_FIELDS.map(({ identifier }) => ({
         id: `code_to_end_${identifier}`,
         source: "code_evaluator",
         sourceHandle: `outputs.${identifier}`,

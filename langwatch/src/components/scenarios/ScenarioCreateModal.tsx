@@ -8,6 +8,7 @@ import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { generateScenarioWithAI } from "./services/scenarioGeneration";
+import { storePromptForScenario } from "./services/scenarioPromptStorage";
 import type { ScenarioFormData, ScenarioInitialData } from "./ScenarioForm";
 import { getDefaultModelState } from "./utils/defaultModelState";
 
@@ -101,6 +102,7 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
 
       try {
         const generatedData = await generateScenarioWithAI(description, project.id);
+        storePromptForScenario(description);
         openEditorWithData(generatedData);
       } catch (error) {
         if (isHandledByGlobalHandler(error)) return;

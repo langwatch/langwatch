@@ -27,6 +27,7 @@ import {
   AmbiguousTraceIdPrefixError,
   TraceService,
 } from "~/server/traces/trace.service";
+import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import {
   formatTraceSummaryDigest,
   generateAsciiTree,
@@ -364,11 +365,16 @@ export function registerTracesRoutes(
       const protections = await getProtectionsForProject(prisma, {
         projectId: project.id,
       });
-      const traceService = TraceService.create(prisma);
+      const traceService = TraceService.create(
+        prisma,
+        buildTraceBlobResolutionDeps(),
+      );
 
       let trace;
       try {
-        trace = await traceService.getById(project.id, traceId, protections);
+        trace = await traceService.getById(project.id, traceId, protections, {
+          full: true,
+        });
       } catch (err) {
         if (err instanceof AmbiguousTraceIdPrefixError) {
           return c.json(

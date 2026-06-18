@@ -12,7 +12,6 @@ import {
   Background,
   BackgroundVariant,
   Controls,
-  Panel as FlowPanel,
   ReactFlow,
   type ReactFlowProps,
   ReactFlowProvider,
@@ -52,7 +51,6 @@ import { PostEventProvider, usePostEvent } from "../hooks/usePostEvent";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { isConnectionAllowed } from "../utils/controlFlow";
 import { AutoSave } from "./AutoSave";
-import { PlaygroundButton } from "./ChatWindow";
 import { StudioNodeDrawer } from "./drawers/StudioNodeDrawer";
 import DefaultEdge from "./Edge";
 import { Evaluate } from "./Evaluate";
@@ -364,14 +362,6 @@ export default function OptimizationStudio() {
                               marginBottom: "15px",
                             }}
                           />
-
-                          <FlowPanel position="bottom-right">
-                            <PlaygroundButton
-                              nodes={nodes}
-                              edges={edges}
-                              executionStatus={executionStatus ?? ""}
-                            />
-                          </FlowPanel>
                         </OptimizationStudioCanvas>
                       </DragDropArea>
                     </Panel>

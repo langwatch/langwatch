@@ -7,8 +7,11 @@ import {
   publicProcedure,
 } from "~/server/api/trpc";
 import { TraceService } from "~/server/traces/trace.service";
-import { checkPermissionOrPubliclyShared } from "../rbac";
-import { checkProjectPermission } from "../rbac";
+import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
+import {
+  checkPermissionOrPubliclyShared,
+  checkProjectPermission,
+} from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
 
 export const spansRouter = createTRPCRouter({
@@ -25,11 +28,15 @@ export const spansRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      const traceService = TraceService.create(ctx.prisma);
+      const traceService = TraceService.create(
+        ctx.prisma,
+        buildTraceBlobResolutionDeps(),
+      );
       const traces = await traceService.getTracesWithSpans(
         input.projectId,
         [input.traceId],
         protections,
+        { full: true },
       );
       if (traces.length === 0) {
         return [];

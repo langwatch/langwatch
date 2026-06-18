@@ -315,10 +315,18 @@ secured.access(sessionAuth).post("/abort", async (c) => {
   // Ownership check: holding evaluations:manage on `projectId` does NOT grant
   // the right to abort a run that belongs to a different project. The runId is
   // attacker-controlled, so verify the run is owned by the authenticated
-  // project before signaling an abort (mirrors GET /runs/:runId). Without this,
-  // a user could abort another tenant's experiment run by guessing its runId.
-  const runState = await runStateManager.getRunState(runId);
-  if (!runState || runState.projectId !== projectId) {
+  // project before signaling an abort. Without this, a user could abort another
+  // tenant's experiment run by guessing its runId.
+  //
+  // In-flight runs register their owner via abortManager.setRunning, which
+  // covers the interactive workbench SSE path — that path streams results
+  // directly and never creates a polling run-state record, so consulting only
+  // runStateManager would 404 every workbench abort. runStateManager remains
+  // the fallback for the CI/CD polling path.
+  const ownerProjectId =
+    (await abortManager.getRunningProjectId(runId)) ??
+    (await runStateManager.getRunState(runId))?.projectId;
+  if (!ownerProjectId || ownerProjectId !== projectId) {
     return c.json({ error: "Run not found" }, { status: 404 });
   }
 

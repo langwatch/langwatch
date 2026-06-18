@@ -41,7 +41,7 @@ export function transpostRowsFirstToColumnsFirstWithoutId(
 
 const fieldToColumnTypeMap: Record<Field["type"], DatasetColumnType> = {
   str: "string",
-  image: "string",
+  image: "image",
   float: "number",
   int: "number",
   bool: "boolean",
@@ -72,7 +72,7 @@ const columnTypeToFieldTypeMap: Record<DatasetColumnType, Field["type"]> = {
   chat_messages: "chat_messages",
   annotations: "dict",
   evaluations: "dict",
-  image: "str",
+  image: "image",
 };
 
 /**

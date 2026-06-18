@@ -31,6 +31,11 @@ Feature: Custom evaluator from workflow scaffold
     Then the LLM node "reasoning" output is connected to the end node "details"
 
   @unit
+  Scenario: Custom evaluator template lists details first on the end node
+    Given the custom evaluator template
+    Then the end node results start with "details" so the reasoning edge does not cross the verdict edge
+
+  @unit
   Scenario: Custom evaluator template has no extra ExactMatch evaluator
     Given the custom evaluator template
     Then the only nodes are the entry, the sample LLM node and the end node

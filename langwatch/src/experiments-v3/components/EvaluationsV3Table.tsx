@@ -31,9 +31,11 @@ import type {
 } from "~/server/evaluators/evaluator.service";
 import { api } from "~/utils/api";
 import { DRAWER_WIDTH } from "../constants";
+import { resolveTargetNameFromCache } from "../hooks/resolveTargetName";
 import { useDatasetSync } from "../hooks/useDatasetSync";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { useExecuteEvaluation } from "../hooks/useExecuteEvaluation";
+import { useOpenEvaluatorEditor } from "../hooks/useOpenEvaluatorEditor";
 import {
   scrollToTargetColumn,
   useOpenTargetEditor,
@@ -61,6 +63,7 @@ import {
   buildInputsFromBodyTemplate,
   convertHttpComponentConfig,
 } from "../utils/httpAgentUtils";
+import { evaluatorHasMissingMappings } from "../utils/mappingValidation";
 import { createPromptEditorCallbacks } from "../utils/promptEditorCallbacks";
 import { ColumnTypeIcon } from "./ColumnTypeIcon";
 import { DatasetSuperHeader } from "./DatasetSuperHeader";
@@ -276,6 +279,10 @@ export function EvaluationsV3Table({
   const { openTargetEditor, buildAvailableSources, isDatasetSource } =
     useOpenTargetEditor();
 
+  // Hook for opening the grading-evaluator mapping drawer. Used to guide the
+  // user to unmapped fields right after adding an evaluator (see Issue A).
+  const openEvaluatorEditor = useOpenEvaluatorEditor();
+
   // Track pending mappings for new prompts (before they become targets)
   const pendingMappingsRef = useRef<Record<string, UIFieldMapping>>({});
 
@@ -465,9 +472,12 @@ export function EvaluationsV3Table({
    * Helper to add an evaluator to the workbench from an EvaluatorWithFields.
    * Used by both onSelect (existing evaluator) and onSave (newly created evaluator).
    * Fields are pre-computed by the API including type and optional flag.
+   *
+   * Returns the new workbench config id, or null when the evaluator was already
+   * present (so callers can skip the post-add auto-open).
    */
   const addEvaluatorToWorkbench = useCallback(
-    (evaluator: EvaluatorWithFields) => {
+    (evaluator: EvaluatorWithFields): string | null => {
       // Extract evaluator config from the Prisma evaluator
       const config = evaluator.config as EvaluatorDbConfig | null;
 
@@ -478,7 +488,7 @@ export function EvaluationsV3Table({
 
       // If already exists, no need to add again (it applies to all targets)
       if (existingEvaluator) {
-        return;
+        return null;
       }
 
       // Create a new EvaluatorConfig from the evaluator
@@ -496,10 +506,58 @@ export function EvaluationsV3Table({
         dbEvaluatorId: evaluator.id,
       };
 
-      // Add the evaluator globally (applies to all targets automatically)
+      // Add the evaluator globally (applies to all targets automatically).
+      // The store runs auto-inference on add, so any auto-mappable fields are
+      // already mapped by the time we read it back below.
       addEvaluator(evaluatorConfig);
+      return evaluatorConfig.id;
     },
     [evaluators, addEvaluator],
+  );
+
+  /**
+   * After adding an evaluator, decide whether to close the picker or guide the
+   * user to its mapping drawer. Auto-inference cannot always satisfy every
+   * required input (e.g. the dataset has no column for a required field), so
+   * silently closing would leave a freshly added evaluator with no signpost to
+   * where the missing mapping lives. When fields remain unmapped we open the
+   * evaluator's mapping drawer instead (see Issue A).
+   */
+  const guideOrCloseAfterAdd = useCallback(
+    (addedId: string | null, isCodeEvaluator: boolean) => {
+      // Read fresh state: the just-added config (with inferred mappings) is not
+      // yet reflected in this closure's `evaluators`.
+      const state = useEvaluationsV3Store.getState();
+      const added = state.evaluators.find((e) => e.id === addedId);
+      // The first target provides the mapping context for the drawer.
+      const firstTarget = state.targets[0];
+
+      if (
+        addedId &&
+        added &&
+        firstTarget &&
+        evaluatorHasMissingMappings(
+          added,
+          state.activeDatasetId,
+          firstTarget.id,
+        )
+      ) {
+        openEvaluatorEditor({
+          evaluator: added,
+          target: firstTarget,
+          targetName:
+            resolveTargetNameFromCache({
+              target: firstTarget,
+              utils: trpcUtils,
+              projectId: project?.id,
+            }) ?? "",
+          isCodeEvaluator,
+        });
+        return;
+      }
+      closeDrawer();
+    },
+    [openEvaluatorEditor, closeDrawer, trpcUtils, project?.id],
   );
 
   // Handler for opening the evaluator selector (evaluators apply to ALL targets)
@@ -508,8 +566,8 @@ export function EvaluationsV3Table({
     // Note: EvaluatorListDrawer does NOT navigate after onSelect - caller must handle it
     setFlowCallbacks("evaluatorList", {
       onSelect: (evaluator) => {
-        addEvaluatorToWorkbench(evaluator);
-        closeDrawer(); // Close drawer after adding evaluator to workbench
+        const addedId = addEvaluatorToWorkbench(evaluator);
+        guideOrCloseAfterAdd(addedId, evaluator.type === "code");
       },
     });
 
@@ -517,7 +575,7 @@ export function EvaluationsV3Table({
     // When user creates a new evaluator via the editor drawer, we need to:
     // 1. Fetch the newly created evaluator from DB
     // 2. Add it to the workbench
-    // 3. Close the drawer
+    // 3. Either close the drawer, or open its mapping drawer if fields are unmapped
     setFlowCallbacks(
       "evaluatorEditor",
       createEvaluatorEditorCallbacks({
@@ -529,9 +587,11 @@ export function EvaluationsV3Table({
           });
 
           if (evaluator) {
-            addEvaluatorToWorkbench(evaluator);
+            const addedId = addEvaluatorToWorkbench(evaluator);
+            guideOrCloseAfterAdd(addedId, evaluator.type === "code");
+          } else {
+            closeDrawer();
           }
-          closeDrawer(); // Close drawer after adding evaluator to workbench
           return true; // Indicate navigation was handled to prevent default back behavior
         },
       }),
@@ -542,6 +602,7 @@ export function EvaluationsV3Table({
     openDrawer,
     closeDrawer,
     addEvaluatorToWorkbench,
+    guideOrCloseAfterAdd,
     trpcUtils.evaluators.getById,
     project?.id,
   ]);

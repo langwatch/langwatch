@@ -365,7 +365,15 @@ export const inferEvaluatorMappings = (
       findMatchingColumn(input.identifier, dataset.columns);
 
     if (isTargetOnly) {
-      const m = targetMatch();
+      // Prefer a name/semantic match; otherwise, when the target exposes
+      // exactly one output it is the only sensible source for an output-like
+      // field, so auto-map to it (the single-output classifier case where the
+      // sole output is named e.g. "category", not "output").
+      const m =
+        targetMatch() ??
+        (target.outputs.length === 1
+          ? target.outputs[0]?.identifier
+          : undefined);
       if (m) {
         newMappings[input.identifier] = {
           type: "source",

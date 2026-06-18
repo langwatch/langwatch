@@ -4,8 +4,11 @@ import { DEFAULT_MAX_TOKENS } from "../utils/registryUtils";
 export const entryNode = () => ({
   id: "entry",
   type: "entry",
+  // x is offset so the gap to the sample node matches the sample -> end gap:
+  // the sample node is wider than entry, so equal left-edge spacing would
+  // leave a visibly larger gap on the entry side.
   position: {
-    x: 0,
+    x: 84,
     y: 0,
   },
   deletable: false,
@@ -117,12 +120,14 @@ Return your judgment as either TRUE (no significant cognitive biases) or FALSE (
         behave_as: "evaluator",
         // The fixed evaluator result vocabulary - see
         // EVALUATOR_RESULT_FIELDS in EndPropertiesPanel. Unconnected
-        // fields are simply omitted from the evaluator's result.
+        // fields are simply omitted from the evaluator's result. `details`
+        // is first so the reasoning -> details edge from the sample node
+        // does not cross the verdict edge.
         inputs: [
+          { identifier: "details", type: "str", optional: true },
           { identifier: "passed", type: "bool", optional: true },
           { identifier: "score", type: "float", optional: true },
           { identifier: "label", type: "str", optional: true },
-          { identifier: "details", type: "str", optional: true },
         ],
       } satisfies End,
     },

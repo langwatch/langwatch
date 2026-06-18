@@ -221,6 +221,30 @@ describe("given the run-until-here dialog", () => {
     });
   });
 
+  describe("when Enter is pressed in a field", () => {
+    /** @scenario Pressing Enter runs the partial execution */
+    it("starts the scoped execution with the typed values", async () => {
+      renderDialog();
+
+      const questionInput = await screen.findByTestId(
+        "run-until-here-input-question",
+      );
+      await waitFor(() => {
+        expect(questionInput).toHaveValue("What is up?");
+      });
+      fireEvent.change(questionInput, {
+        target: { value: "typed then enter" },
+      });
+      fireEvent.keyDown(questionInput, { key: "Enter" });
+
+      expect(mockStartWorkflowExecution).toHaveBeenCalledWith({
+        untilNodeId: "node-7",
+        inputs: [{ question: "typed then enter", context: "ctx-1" }],
+      });
+      expect(useRunUntilHereDialogStore.getState().untilNodeId).toBeUndefined();
+    });
+  });
+
   describe("when the entry point has no dataset attached", () => {
     /** @scenario Select dataset value is only offered with an attached dataset */
     it("offers no Select dataset value button", async () => {
