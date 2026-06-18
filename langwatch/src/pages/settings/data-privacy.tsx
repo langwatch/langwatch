@@ -573,18 +573,16 @@ export function EffectiveSummary({
           What is actually applied, after the rules above cascade down.
         </Text>
       </VStack>
-      <Box as="dl" display="flex" flexDirection="column" gap={3} margin={0}>
-        {effectiveRows.map(({ term, value }) => (
-          <Box key={term}>
-            <Text as="dt" fontSize="sm" color="fg.muted">
-              {term}
-            </Text>
-            <Text as="dd" margin={0}>
-              {value}
-            </Text>
-          </Box>
-        ))}
-      </Box>
+      <Table.Root variant="line" size="sm" width="full">
+        <Table.Body>
+          {effectiveRows.map(({ term, value }) => (
+            <Table.Row key={term}>
+              <Table.Cell color="fg.muted">{term}</Table.Cell>
+              <Table.Cell textAlign="end">{value}</Table.Cell>
+            </Table.Row>
+          ))}
+        </Table.Body>
+      </Table.Root>
     </VStack>
   );
 }
