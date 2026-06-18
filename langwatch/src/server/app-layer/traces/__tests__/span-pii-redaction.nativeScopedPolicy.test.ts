@@ -23,6 +23,8 @@ vi.mock("~/server/featureFlag", () => ({
   featureFlagService: { isEnabled: vi.fn(async () => false) },
 }));
 
+import { featureFlagService } from "~/server/featureFlag";
+
 const TENANT = "project-web-app";
 
 function mkPolicy({
@@ -402,6 +404,27 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
       expect(attr(span, "input")).not.toContain("a@b.com");
       expect(attr(span, PII_INCOMPLETE)).toBe("strict");
       expect(batchSpy).toHaveBeenCalled();
+    });
+
+    it("does not mark the span when PII redaction is intentionally disabled by the kill switch", async () => {
+      // The ops kill switch (or its DISABLE_PII_REDACTION env alias) is on, so
+      // buildOptions returns null even though langevals is configured. That is a
+      // deliberate opt-out, not an outage, so the incomplete marker must NOT show.
+      vi.mocked(featureFlagService.isEnabled).mockResolvedValueOnce(true);
+      const batchSpy = vi.fn<BatchClearPIIFunction>(async (texts) =>
+        texts.map(() => "[REDACTED]"),
+      );
+      const service = strictService({
+        isLangevalsConfigured: true,
+        isProduction: false,
+        batchClearPII: batchSpy,
+      });
+      const span = spanWith({ input: "mail a@b.com, I am John from New York" });
+
+      await service.redactSpan(span, null, "STRICT", TENANT);
+
+      expect(attr(span, PII_INCOMPLETE)).toBeUndefined();
+      expect(batchSpy).not.toHaveBeenCalled();
     });
 
     it("re-throws in production so the span is blocked rather than stored unredacted", async () => {

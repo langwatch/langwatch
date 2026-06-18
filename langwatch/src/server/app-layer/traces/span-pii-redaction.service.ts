@@ -416,11 +416,16 @@ export class OtlpSpanPiiRedactionService {
           "STRICT",
           lambda.entities,
         );
-        // The native floor already redacted the pattern-based identifiers; the
-        // analysis service (names/locations) did not run, so mark the span. The
-        // read path then tells the viewer the deep redaction is incomplete
-        // instead of presenting partially-scrubbed content as fully redacted.
-        if (!ran) this.markPiiAnalysisIncomplete(span);
+        // Mark the span only when strict could not run because the analysis
+        // service is genuinely unavailable (not configured in dev): the native
+        // floor redacted the pattern-based identifiers but names/locations slip
+        // through, so the read path warns instead of implying it is fully
+        // scrubbed. When PII redaction is intentionally turned off by the kill
+        // switch the lambda is skipped on purpose (with langevals configured),
+        // so no warning is shown.
+        if (!ran && !this.deps.isLangevalsConfigured) {
+          this.markPiiAnalysisIncomplete(span);
+        }
       } catch (error) {
         // In production the analysis service is enforced: re-throw so the
         // pipeline aborts the span rather than storing names/locations. In
