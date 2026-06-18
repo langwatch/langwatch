@@ -112,7 +112,7 @@ Feature: Large dataset storage
   # Self-hosted
   # ============================================================================
 
-  @integration @unimplemented
+  @unit
   Scenario: Datasets work on a minimal self-hosted install
     Given a self-hosted install without extra storage set up
     When I create and read a dataset
