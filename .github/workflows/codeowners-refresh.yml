@@ -55,7 +55,11 @@ jobs:
           git checkout -B "$BRANCH"
           git add .github/CODEOWNERS
           git commit -m "chore: refresh CODEOWNERS from git history"
-          git push --force-with-lease origin "$BRANCH"
+          # Plain --force (not --force-with-lease): the runner only checks out
+          # the triggering ref, so it has no remote-tracking ref for $BRANCH to
+          # base a lease on. This branch is bot-owned and runs are serialized by
+          # the concurrency group, so there is nothing to clobber.
+          git push --force origin "$BRANCH"
 
           BODY="Automated weekly refresh of \`.github/CODEOWNERS\` by the codeowners-refresh workflow. Owners are recomputed from \`git log\` authorship per area via \`.github/scripts/generate-codeowners.sh\`; the diff reflects how contribution has shifted across the codebase since the last refresh. To change ownership policy (identity map, exclusions, areas, or the Go co-owner rule), edit the generator script rather than this PR."
 
