@@ -19,19 +19,15 @@ import {
 } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { TraceIdPeek } from "~/features/traces-v2/components/TraceIdPeek";
-import type { FieldMapping as UIFieldMapping } from "~/components/variables";
+import { useDrawer } from "~/hooks/useDrawer";
 import { parseLLMError } from "~/utils/formatLLMError";
 import { formatTargetOutput } from "~/utils/formatTargetOutput";
-import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
+import { useCodeEvaluatorIds } from "../../hooks/useEvaluatorName";
+import { useOpenEvaluatorEditor } from "../../hooks/useOpenEvaluatorEditor";
 import { useTargetName } from "../../hooks/useTargetName";
 import type { EvaluatorConfig, TargetConfig } from "../../types";
 import { formatLatency } from "../../utils/computeAggregates";
-import {
-  convertFromUIMapping,
-  convertToUIMapping,
-} from "../../utils/fieldMappingConverters";
-import { createEvaluatorEditorCallbacks } from "../../utils/evaluatorEditorCallbacks";
 import { evaluatorHasMissingMappings } from "../../utils/mappingValidation";
 import { EvaluatorChip } from "../TargetSection/EvaluatorChip";
 
@@ -87,23 +83,16 @@ export function TargetCellContent({
 }: TargetCellContentProps) {
   const { openDrawer } = useDrawer();
   const targetName = useTargetName(target);
-  const {
-    evaluators,
-    activeDatasetId,
-    datasets,
-    removeEvaluator,
-    updateEvaluator,
-    setEvaluatorMapping,
-    removeEvaluatorMapping,
-  } = useEvaluationsV3Store((state) => ({
-    evaluators: state.evaluators,
-    activeDatasetId: state.activeDatasetId,
-    datasets: state.datasets,
-    removeEvaluator: state.removeEvaluator,
-    updateEvaluator: state.updateEvaluator,
-    setEvaluatorMapping: state.setEvaluatorMapping,
-    removeEvaluatorMapping: state.removeEvaluatorMapping,
-  }));
+  const openEvaluatorEditor = useOpenEvaluatorEditor();
+  const { evaluators, activeDatasetId, removeEvaluator } =
+    useEvaluationsV3Store((state) => ({
+      evaluators: state.evaluators,
+      activeDatasetId: state.activeDatasetId,
+      removeEvaluator: state.removeEvaluator,
+    }));
+
+  // Code evaluators (DB type "code") route their edit flow to the code editor.
+  const codeEvaluatorIds = useCodeEvaluatorIds(evaluators);
 
   // State for expanded output view
   const [isOutputExpanded, setIsOutputExpanded] = useState(false);
@@ -172,86 +161,6 @@ export function TargetCellContent({
     return missing;
   }, [evaluators, activeDatasetId, target.id]);
 
-  // Build the serializable `mappingsConfig` for an evaluator. Stays
-  // serializable because it goes through the drawer's ephemeral complexProps
-  // path (cleared on ErrorBoundary remount — see issue #3087).
-  const buildMappingsConfig = useCallback(
-    (evaluator: EvaluatorConfig) => {
-      // Build available sources
-      const activeDataset = datasets.find((d) => d.id === activeDatasetId);
-      const availableSources = [];
-      if (activeDataset) {
-        availableSources.push({
-          id: activeDataset.id,
-          name: activeDataset.name,
-          type: "dataset" as const,
-          fields: activeDataset.columns.map((col) => ({
-            name: col.name,
-            type: "str" as const,
-          })),
-        });
-      }
-      // Use local config outputs if available (unsaved changes), fallback to saved outputs
-      const effectiveOutputs = target.localPromptConfig?.outputs ?? target.outputs;
-      availableSources.push({
-        id: target.id,
-        name: targetName,
-        type: "signature" as const,
-        fields: effectiveOutputs.map((o) => ({
-          name: o.identifier,
-          type: o.type as "str" | "float" | "bool",
-        })),
-      });
-
-      // Get current mappings in UI format (used as initial state in the drawer)
-      const storeMappings =
-        evaluator.mappings[activeDatasetId]?.[target.id] ?? {};
-      const initialMappings: Record<string, UIFieldMapping> = {};
-      for (const [key, mapping] of Object.entries(storeMappings)) {
-        initialMappings[key] = convertToUIMapping(mapping);
-      }
-
-      return { availableSources, initialMappings };
-    },
-    [datasets, activeDatasetId, target, targetName],
-  );
-
-  // Build the durable `onMappingChange` callback for an evaluator. Lives
-  // separately from `mappingsConfig` because it must survive the drawer's
-  // complexProps clears — registered via `setFlowCallbacks` instead (#3441).
-  const buildOnMappingChange = useCallback(
-    (evaluator: EvaluatorConfig) => {
-      const datasetIds = new Set(datasets.map((d) => d.id));
-      const isDatasetSource = (sourceId: string) => datasetIds.has(sourceId);
-      return (identifier: string, mapping: UIFieldMapping | undefined) => {
-        if (mapping) {
-          const storeMapping = convertFromUIMapping(mapping, isDatasetSource);
-          setEvaluatorMapping(
-            evaluator.id,
-            activeDatasetId,
-            target.id,
-            identifier,
-            storeMapping,
-          );
-        } else {
-          removeEvaluatorMapping(
-            evaluator.id,
-            activeDatasetId,
-            target.id,
-            identifier,
-          );
-        }
-      };
-    },
-    [
-      datasets,
-      activeDatasetId,
-      target.id,
-      setEvaluatorMapping,
-      removeEvaluatorMapping,
-    ],
-  );
-
   // Use shared utility for consistent output formatting
   // Handles the "single output key" unwrap rule:
   // - {output: "hello"} -> "hello"
@@ -289,14 +198,23 @@ export function TargetCellContent({
             color="red.fg"
             fontSize="13px"
             align="start"
-            cursor={isErrorOverflowing && !isErrorExpanded ? "pointer" : undefined}
+            cursor={
+              isErrorOverflowing && !isErrorExpanded ? "pointer" : undefined
+            }
             onClick={() => setIsErrorExpanded(true)}
-            onDoubleClick={isErrorOverflowing ? () => setIsErrorExpanded(false) : undefined}
+            onDoubleClick={
+              isErrorOverflowing ? () => setIsErrorExpanded(false) : undefined
+            }
           >
             <Box flexShrink={0} paddingTop={0.5}>
               <LuCircleAlert size={16} />
             </Box>
-            <Text lineClamp={expanded || isErrorExpanded ? undefined : 2} userSelect="text" whiteSpace="pre-wrap" wordBreak="break-word">
+            <Text
+              lineClamp={expanded || isErrorExpanded ? undefined : 2}
+              userSelect="text"
+              whiteSpace="pre-wrap"
+              wordBreak="break-word"
+            >
               {parseLLMError(error).message}
             </Text>
           </HStack>
@@ -402,33 +320,14 @@ export function TargetCellContent({
           hasTargetOutput={output !== undefined && output !== null}
           hasAnyTargetOutputs={hasAnyTargetOutputs}
           targetType={target.type}
-          onEdit={() => {
-            // Route all non-serializable callbacks through setFlowCallbacks.
-            // onMappingChange + onLocalConfigChange must live here (not in
-            // mappingsConfig) so the drawer's mappings section renders — see
-            // issue #3441.
-            //
-            // We use the direct `onLocalConfigChange` form (not the
-            // target-bound `targetId + updateTarget` convenience) because
-            // the chip's local config persists onto the evaluator, not the
-            // target.
-            setFlowCallbacks(
-              "evaluatorEditor",
-              createEvaluatorEditorCallbacks({
-                onLocalConfigChange: (localEvaluatorConfig) => {
-                  updateEvaluator(evaluator.id, { localEvaluatorConfig });
-                },
-                onMappingChange: buildOnMappingChange(evaluator),
-              }),
-            );
-
-            openDrawer("evaluatorEditor", {
-              evaluatorId: evaluator.dbEvaluatorId,
-              evaluatorType: evaluator.evaluatorType,
-              mappingsConfig: buildMappingsConfig(evaluator),
-              initialLocalConfig: evaluator.localEvaluatorConfig,
-            });
-          }}
+          onEdit={() =>
+            openEvaluatorEditor({
+              evaluator,
+              target,
+              targetName,
+              isCodeEvaluator: codeEvaluatorIds.has(evaluator.id),
+            })
+          }
           onRemove={() => removeEvaluator(evaluator.id)}
           onRerun={
             onRerunEvaluator ? () => onRerunEvaluator(evaluator.id) : undefined

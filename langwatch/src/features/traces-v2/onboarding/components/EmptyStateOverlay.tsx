@@ -65,9 +65,7 @@ export const EmptyStateOverlay = () => {
         justify="center"
         zIndex={1}
         pointerEvents="none"
-        opacity={
-          stage === "settle" || heroLayout === "topBanner" ? 0 : 1
-        }
+        opacity={stage === "settle" || heroLayout === "topBanner" ? 0 : 1}
         transition="opacity 0.7s ease-out"
       >
         <Box

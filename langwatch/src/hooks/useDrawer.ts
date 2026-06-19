@@ -8,6 +8,7 @@ import type {
 } from "../components/drawerRegistry";
 import { getTracesV2Preferred } from "../features/traces-v2/hooks/useTracesV2Preference";
 import { createLogger } from "../utils/logger";
+import { URL_QS_PARSE_OPTIONS } from "../utils/qsParseOptions";
 import { routeTraceDrawerForV2 } from "./traceDrawerV2Routing";
 
 const logger = createLogger("useDrawer");
@@ -161,11 +162,10 @@ export const useUpdateDrawerParams = () => {
     ) => {
       const push = options.push ?? true;
       const { path, queryString, hash } = splitAsPath(router.asPath);
-      const parsed = qs.parse(queryString, {
-        allowDots: true,
-        comma: true,
-        allowEmptyArrays: true,
-      }) as Record<string, unknown>;
+      const parsed = qs.parse(queryString, URL_QS_PARSE_OPTIONS) as Record<
+        string,
+        unknown
+      >;
       // `parsed.drawer` is whatever qs parsed out of the URL — for a malformed
       // query like `?drawer=foo` it's a string, not the object we mutate below.
       // Guard the shape so the mutation loop can't throw at runtime.
@@ -327,13 +327,9 @@ export const useDrawer = () => {
       // This preserves filter params that only exist in the asPath URL.
       const { path, queryString, hash } = splitAsPath(router.asPath);
       const currentQueryOnly = Object.fromEntries(
-        Object.entries(
-          qs.parse(queryString, {
-            allowDots: true,
-            comma: true,
-            allowEmptyArrays: true,
-          }),
-        ).filter(([key]) => !key.startsWith("drawer")),
+        Object.entries(qs.parse(queryString, URL_QS_PARSE_OPTIONS)).filter(
+          ([key]) => !key.startsWith("drawer"),
+        ),
       );
 
       const newQuery = qs.stringify(
@@ -485,11 +481,7 @@ export const useDrawer = () => {
     // Build clean URL from asPath (not router.query which may be stale
     // after (url, as) shallow pushes and misses filter params).
     const { path, queryString: currentQs, hash } = splitAsPath(router.asPath);
-    const parsedQuery = qs.parse(currentQs, {
-      allowDots: true,
-      comma: true,
-      allowEmptyArrays: true,
-    });
+    const parsedQuery = qs.parse(currentQs, URL_QS_PARSE_OPTIONS);
     const cleanQuery = Object.fromEntries(
       Object.entries(parsedQuery).filter(
         ([key]) => !key.startsWith("drawer") && key !== "span",

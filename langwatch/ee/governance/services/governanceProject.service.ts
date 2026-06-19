@@ -104,10 +104,6 @@ export async function ensureHiddenGovernanceProject(
         // queries.
         language: "internal",
         framework: "governance",
-        // PII redaction stays at the org's effective default; receiver
-        // can override per-source if compliance retention demands it.
-        // The trace pipeline reads piiRedactionLevel at write time.
-        piiRedactionLevel: "ESSENTIAL",
         // Trace sharing disabled — governance data must not be sharable
         // out of the org's RBAC perimeter via public-share links.
         traceSharingEnabled: false,

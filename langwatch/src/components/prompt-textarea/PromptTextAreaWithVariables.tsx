@@ -1,33 +1,38 @@
-import { Box, HStack, Text } from "@chakra-ui/react";
+import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import {
   type ChangeEvent,
   type DragEvent,
   type KeyboardEvent,
   useCallback,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
-import { RichTextarea, type RichTextareaHandle } from "rich-textarea";
 import type { CaretPosition } from "rich-textarea";
+import { RichTextarea, type RichTextareaHandle } from "rich-textarea";
 import { useLayoutMode } from "~/prompts/prompt-playground/components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent";
 import { VariableInsertMenu } from "../variables/VariableInsertMenu";
 import type { AvailableSource } from "../variables/VariableMappingInput";
 import { AddLogicButton } from "./components/AddLogicButton";
 import { AddVariableButton } from "./components/AddVariableButton";
-import { TemplateLogicMenu } from "./components/TemplateLogicMenu";
 import { GripHandles, LineHighlights } from "./components/ParagraphOverlay";
+import { TemplateLogicMenu } from "./components/TemplateLogicMenu";
 import { useDebouncedTextarea } from "./hooks/useDebouncedTextarea";
 import { useParagraphDragDrop } from "./hooks/useParagraphDragDrop";
 import { useTemplateLogicMenu } from "./hooks/useTemplateLogicMenu";
 import { useTextareaResize } from "./hooks/useTextareaResize";
 import { useVariableMenu } from "./hooks/useVariableMenu";
-import type { PromptTextAreaWithVariablesProps } from "./types";
 import {
   extractLiquidVariables,
   tokenizeLiquidTemplate,
 } from "./liquidTokenizer";
-import { findUnclosedBraces, findUnclosedPercentBraces } from "./utils";
+import type { PromptTextAreaWithVariablesProps } from "./types";
+import {
+  findJustCompletedVariable,
+  findUnclosedBraces,
+  findUnclosedPercentBraces,
+} from "./utils";
 
 export const PromptTextAreaWithVariables = ({
   value,
@@ -152,10 +157,32 @@ export const PromptTextAreaWithVariables = ({
         const nativeTextarea = containerRef.current?.querySelector("textarea");
         if (nativeTextarea?.selectionStart !== undefined) {
           lastUserCursorPosRef.current = nativeTextarea.selectionStart;
+
+          // A typed-trigger menu follows the cursor: once the caret
+          // leaves both the in-progress `{{…` and a just-completed
+          // `{{name}}`, the menu no longer applies - close it. The
+          // button-opened menu manages its own lifecycle.
+          if (variableMenu.menuOpen && !variableMenu.buttonMenuMode) {
+            const cursor = nativeTextarea.selectionStart;
+            const stillTyping = findUnclosedBraces(localValue, cursor);
+            const stillOnCompleted = findJustCompletedVariable(
+              localValue,
+              cursor,
+            );
+            if (!stillTyping && !stillOnCompleted) {
+              variableMenu.closeMenu();
+            }
+          }
         }
       }
     },
-    [containerRef, caretPositionRef, lastUserCursorPosRef],
+    [
+      containerRef,
+      caretPositionRef,
+      lastUserCursorPosRef,
+      variableMenu,
+      localValue,
+    ],
   );
 
   // Textarea resize detection
@@ -208,6 +235,46 @@ export const PromptTextAreaWithVariables = ({
     () => usedVariables.filter((v) => !existingVariableIds.has(v)),
     [usedVariables, existingVariableIds],
   );
+
+  // The undefined-variables banner overlays the bottom edge of the
+  // textarea, so the textarea reserves matching bottom padding -
+  // otherwise the banner hides the last line of the prompt. The banner
+  // height is measured (it grows when many names wrap onto two lines);
+  // 28px is the single-line floor, which also keeps jsdom (offsetHeight
+  // always 0) on the legacy reservation.
+  const bannerRef = useRef<HTMLDivElement>(null);
+  const [bannerHeight, setBannerHeight] = useState(0);
+  // Keep the reserved padding in sync with the banner's real height. The
+  // banner grows taller both when the set of undefined names changes and on
+  // layout-only changes: the prompt panel is resizable, so the same names can
+  // wrap onto more lines as it narrows. A ResizeObserver catches every height
+  // change, including reflows that do not re-render this component, so the
+  // reserved padding never lags behind the banner and hides the last line.
+  //
+  // Re-attaching the observer is keyed on a primitive signature of the names,
+  // not the `invalidVariables` array identity: that array is rebuilt upstream
+  // on every render, so an array dependency re-ran this effect every render and
+  // the per-render setState churned the commit phase into React's nested-update
+  // limit ("Maximum update depth exceeded"). The equal-bail guard stops a
+  // same-height measurement from re-triggering the effect.
+  const invalidVariablesKey = invalidVariables.join("\n");
+  useLayoutEffect(() => {
+    const node = bannerRef.current;
+    if (!node) {
+      setBannerHeight((prev) => (prev === 0 ? prev : 0));
+      return;
+    }
+    const measure = () => {
+      const measured = node.offsetHeight;
+      setBannerHeight((prev) => (prev === measured ? prev : measured));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [invalidVariablesKey]);
+  const reservedBottomPadding =
+    invalidVariables.length > 0 ? Math.max(bannerHeight + 8, 28) : null;
 
   // Handle keyboard input - dispatches to whichever menu is active
   const handleKeyDown = useCallback(
@@ -294,20 +361,48 @@ export const PromptTextAreaWithVariables = ({
         if (!variableMenu.menuOpen) {
           setTimeout(
             () =>
-              variableMenu.openMenu(
-                unclosedBraces.start,
-                unclosedBraces.query,
-              ),
+              variableMenu.openMenu(unclosedBraces.start, unclosedBraces.query),
             0,
           );
         } else {
           variableMenu.setMenuQuery(unclosedBraces.query);
         }
+        return;
+      }
+
+      // Typing the final `}` completes the reference and would normally
+      // dismiss the menu - exactly when the user finished typing the
+      // name they want to create. Keep the menu open for a completed
+      // {{name}} that doesn't resolve, so "Create variable" stays one
+      // click away.
+      const completed = findJustCompletedVariable(newValue, cursorPos);
+      const completedIsUnknown =
+        completed &&
+        onCreateVariable &&
+        !existingVariableIds.has(completed.name) &&
+        !locallyDefinedVariables.has(completed.name);
+
+      if (completedIsUnknown) {
+        if (!variableMenu.menuOpen) {
+          setTimeout(
+            () => variableMenu.openMenu(completed.start, completed.name),
+            0,
+          );
+        } else {
+          variableMenu.setMenuQuery(completed.name);
+        }
       } else if (variableMenu.menuOpen) {
         variableMenu.closeMenu();
       }
     },
-    [handleValueChange, variableMenu, logicMenu],
+    [
+      handleValueChange,
+      variableMenu,
+      logicMenu,
+      onCreateVariable,
+      existingVariableIds,
+      locallyDefinedVariables,
+    ],
   );
 
   // Render function for rich-textarea - highlights Liquid tags and variables
@@ -364,9 +459,7 @@ export const PromptTextAreaWithVariables = ({
             style={{
               color: tagColor,
               fontWeight: borderless ? undefined : 600,
-              textShadow: borderless
-                ? `0px 0px 1px ${tagColor}`
-                : undefined,
+              textShadow: borderless ? `0px 0px 1px ${tagColor}` : undefined,
             }}
           >
             {token.value}
@@ -438,7 +531,9 @@ export const PromptTextAreaWithVariables = ({
             fontSize: borderless ? "14px" : "13px",
             lineHeight: borderless ? "28px" : "1.5",
             padding: borderless ? "0 0 0 24px" : "8px 10px",
-            ...(invalidVariables.length > 0 ? { paddingBottom: "28px" } : {}),
+            ...(reservedBottomPadding !== null
+              ? { paddingBottom: `${reservedBottomPadding}px` }
+              : {}),
             border: borderless
               ? "none"
               : `1px solid ${
@@ -458,6 +553,11 @@ export const PromptTextAreaWithVariables = ({
               : "var(--chakra-colors-blue-500)";
             e.currentTarget.style.borderWidth = "2px";
             e.currentTarget.style.padding = "7px 9px";
+            // The padding shorthand above wipes the banner reservation -
+            // re-apply it or focusing hides the last line again.
+            if (reservedBottomPadding !== null) {
+              e.currentTarget.style.paddingBottom = `${reservedBottomPadding}px`;
+            }
           }}
           onBlur={(e) => {
             if (borderless) return;
@@ -466,6 +566,9 @@ export const PromptTextAreaWithVariables = ({
               : "var(--chakra-colors-border)";
             e.currentTarget.style.borderWidth = "1px";
             e.currentTarget.style.padding = "8px 10px";
+            if (reservedBottomPadding !== null) {
+              e.currentTarget.style.paddingBottom = `${reservedBottomPadding}px`;
+            }
           }}
         >
           {renderText}
@@ -487,9 +590,8 @@ export const PromptTextAreaWithVariables = ({
         <Box position="sticky" bottom={0} width="full">
           {/* Invalid variables warning */}
           {invalidVariables.length > 0 && (
-            <Text
-              fontSize="xs"
-              color="red.fg"
+            <HStack
+              ref={bannerRef}
               backgroundColor="red.subtle"
               borderRadius="lg"
               padding={1}
@@ -499,9 +601,32 @@ export const PromptTextAreaWithVariables = ({
               bottom={borderless ? -2 : 0}
               marginLeft={1}
               width="calc(100% - 8px)"
+              justifyContent="space-between"
+              gap={2}
+              data-testid="undefined-variables-banner"
             >
-              Undefined variables: {invalidVariables.join(", ")}
-            </Text>
+              <Text fontSize="xs" color="red.fg">
+                Undefined variables: {invalidVariables.join(", ")}
+              </Text>
+              {onCreateVariable && (
+                <Button
+                  size="xs"
+                  height="20px"
+                  variant="surface"
+                  colorPalette="red"
+                  flexShrink={0}
+                  data-testid="create-missing-variable-button"
+                  onClick={() =>
+                    onCreateVariable({
+                      identifier: invalidVariables[0]!,
+                      type: "str",
+                    })
+                  }
+                >
+                  Create {`"${invalidVariables[0]}"`}
+                </Button>
+              )}
+            </HStack>
           )}
 
           {/* Add variable and Add logic buttons */}
@@ -509,7 +634,11 @@ export const PromptTextAreaWithVariables = ({
             <HStack
               position="absolute"
               bottom={
-                (invalidVariables.length > 0 ? 9 : 2.5) - (borderless ? 2 : 0)
+                reservedBottomPadding !== null
+                  ? `${reservedBottomPadding + (borderless ? 0 : 8)}px`
+                  : borderless
+                    ? "2px"
+                    : "10px"
               }
               right={2}
               gap={1.5}
@@ -537,9 +666,7 @@ export const PromptTextAreaWithVariables = ({
           availableSources={availableSources}
           query={variableMenu.menuQuery}
           onQueryChange={
-            variableMenu.buttonMenuMode
-              ? variableMenu.setMenuQuery
-              : undefined
+            variableMenu.buttonMenuMode ? variableMenu.setMenuQuery : undefined
           }
           highlightedIndex={variableMenu.highlightedIndex}
           onHighlightChange={variableMenu.setHighlightedIndex}

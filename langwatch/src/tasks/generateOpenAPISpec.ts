@@ -8,6 +8,7 @@ import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
 import { app as dashboardsApp } from "../app/api/dashboards/[[...route]]/app";
 import { app as datasetApp } from "../app/api/dataset/[[...route]]/app";
 import { app as evaluatorsApp } from "../app/api/evaluators/[[...route]]/app";
+import { app as eventsApp } from "../app/api/events/[[...route]]/app";
 import { app as gatewayPlatformApp } from "../app/api/gateway-platform/[[...route]]/app";
 import { app as governanceApp } from "../app/api/governance/[[...route]]/app";
 import { app as graphsApp } from "../app/api/graphs/[[...route]]/app";
@@ -56,6 +57,8 @@ export default async function execute() {
   const datasetSpec = await generateSpecs(datasetApp);
   console.log("Building evaluators spec...");
   const evaluatorsSpec = await generateSpecs(evaluatorsApp);
+  console.log("Building events spec...");
+  const eventsSpec = await generateSpecs(eventsApp);
   console.log("Building gateway-platform spec...");
   const gatewayPlatformSpec = await generateSpecs(gatewayPlatformApp);
   console.log("Building governance spec...");
@@ -96,6 +99,7 @@ export default async function execute() {
       dashboardsSpec,
       datasetSpec,
       evaluatorsSpec,
+      eventsSpec,
       gatewayPlatformSpec,
       governanceSpec,
       graphsSpec,
@@ -123,6 +127,7 @@ export default async function execute() {
           key.includes("/api/analytics") ||
           key.includes("/api/dashboards") ||
           key.includes("/api/evaluators") ||
+          key.includes("/api/events") ||
           key.includes("/api/gateway/v1") ||
           key.includes("/api/governance") ||
           key.includes("/api/graphs") ||

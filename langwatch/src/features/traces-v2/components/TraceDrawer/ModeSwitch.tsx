@@ -15,6 +15,15 @@ interface ModeSwitchProps {
   onViewModeChange: (mode: DrawerViewMode) => void;
   turnLabel?: string;
   hasConversation?: boolean;
+  /**
+   * True while the conversation context (turns) is still being fetched
+   * for a trace that declares a conversationId. In that window the
+   * Conversation tab is gated off with a "Loading conversation…"
+   * tooltip rather than enabled-but-empty — clicking through to a
+   * "no turns found" pane the moment the user opens the drawer reads
+   * as broken even though the data is en route.
+   */
+  isConversationLoading?: boolean;
   /** Trace id used to scope the per-mode peer presence dots. */
   traceId?: string;
   /**
@@ -134,9 +143,19 @@ export function ModeSwitch({
   onViewModeChange,
   turnLabel,
   hasConversation = true,
+  isConversationLoading = false,
   traceId,
   endSlot,
 }: ModeSwitchProps) {
+  // Tristate gate: no conversationId → permanently disabled; has id
+  // but turns still in flight → disabled with loading copy; has id +
+  // turns → enabled.
+  const conversationDisabled = !hasConversation || isConversationLoading;
+  const conversationDisabledReason = !hasConversation
+    ? "This trace is not part of a conversation"
+    : isConversationLoading
+      ? "Loading conversation…"
+      : undefined;
   const presenceFor = (mode: DrawerViewMode) =>
     traceId ? <ModePresenceDot traceId={traceId} mode={mode} /> : null;
 
@@ -170,12 +189,8 @@ export function ModeSwitch({
         label="Conversation"
         shortcut="C"
         active={viewMode === "conversation"}
-        disabled={!hasConversation}
-        disabledReason={
-          hasConversation
-            ? undefined
-            : "This trace is not part of a conversation"
-        }
+        disabled={conversationDisabled}
+        disabledReason={conversationDisabledReason}
         onClick={() => onViewModeChange("conversation")}
         presence={presenceFor("conversation")}
       />

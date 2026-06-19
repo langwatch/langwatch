@@ -33,7 +33,12 @@ import { setOpencodeOpenTelemetryFlag } from "@/cli/utils/opencode-config-flag";
 import { lwTag } from "./brand";
 import type { GovernanceConfig } from "./config";
 import { saveConfig } from "./config";
-import { GovernanceCliError, mintIngestionKey } from "./cli-api";
+import {
+  extractLookupIdFromToken,
+  GovernanceCliError,
+  listIngestionKeys,
+  mintIngestionKey,
+} from "./cli-api";
 import { warnIfGeminiOAuthSelected } from "./gemini-settings-preflight";
 import { resolvePlatformToolPolicy } from "./platform-tool-policy";
 
@@ -74,6 +79,14 @@ export interface WrapperModeResult {
   clears?: string[];
   /** True when the wrapper minted a fresh ingest key (vs reused a cached one). */
   newKeyMinted?: boolean;
+  /**
+   * Path B (ingestion) only: the OTLP base endpoint (`.../api/otel`) and the
+   * ingest key. The wrapper uses these AFTER the child exits to POST codex's
+   * recovered turn input/output (from the rollout transcript) onto codex's own
+   * trace_ids, since codex never puts content on the wire itself.
+   */
+  endpoint?: string;
+  ingestionToken?: string;
   /**
    * Optional one-line notice for the wrapper to print to stderr, set when
    * the platform policy changed the resolved path (e.g. the org admin turned
@@ -230,16 +243,50 @@ export async function resolveWrapperMode(
   // present; otherwise mint a fresh one. The mint route returns the
   // plaintext key once, so we persist it to the per-tool cache below
   // and read it back on subsequent invocations rather than re-minting.
+  //
+  // Stale-cache check (#4755): before reusing a cached key, confirm it is
+  // still live on the platform. Token format: `ik-lw-{16-char lookupId}_{secret}`.
+  // If the server resolves and the lookupId is absent → the key was revoked
+  // (hard-cut rotation also invalidates the cache) → mint fresh and overwrite.
+  // If the request rejects (offline / older server without this endpoint) →
+  // offline-first fallback: reuse the cache so air-gapped / degraded environments
+  // still work.
   const cached = cfg.default_personal_ingest_keys?.[sourceType];
   let token: string;
   let prefix: string | undefined;
   let endpoint: string;
   let minted: boolean;
   if (cached?.secret) {
-    token = cached.secret;
-    prefix = cached.prefix;
-    endpoint = `${cfg.control_plane_url.replace(/\/+$/, "")}/api/otel`;
-    minted = false;
+    const cachedLookupId = extractLookupIdFromToken(cached.secret);
+    let cacheIsLive = true; // assume live; falsified when server confirms otherwise
+    try {
+      const liveKeys = await listIngestionKeys(cfg);
+      // Server resolved — verify the cached lookupId is still present for this sourceType
+      const liveEntry = liveKeys.find(
+        (k) => k.sourceType === sourceType && k.lookupId === cachedLookupId,
+      );
+      if (!liveEntry) {
+        // Key was revoked or rotated on the platform — treat as no cache
+        cacheIsLive = false;
+      }
+    } catch {
+      // Network error / older server without the endpoint: reuse cache as-is
+      // (offline-first fallback — hard-cut rotation is a re-mint-kills-old
+      // invariant, so a genuinely revoked key will self-correct next time the
+      // device is online).
+    }
+    if (cacheIsLive) {
+      token = cached.secret;
+      prefix = cached.prefix;
+      endpoint = `${cfg.control_plane_url.replace(/\/+$/, "")}/api/otel`;
+      minted = false;
+    } else {
+      const r = await mintIngestionKey(cfg, sourceType);
+      token = r.token;
+      prefix = r.prefix;
+      endpoint = r.endpoint;
+      minted = true;
+    }
   } else {
     const r = await mintIngestionKey(cfg, sourceType);
     token = r.token;
@@ -294,7 +341,15 @@ export async function resolveWrapperMode(
     // Best-effort cache - failure to persist doesn't block this run.
   }
 
-  return { mode, vars, codexConfigPath, newKeyMinted: minted, notice };
+  return {
+    mode,
+    vars,
+    codexConfigPath,
+    newKeyMinted: minted,
+    notice,
+    endpoint,
+    ingestionToken: token,
+  };
 }
 
 function buildOtelEnvBlock(

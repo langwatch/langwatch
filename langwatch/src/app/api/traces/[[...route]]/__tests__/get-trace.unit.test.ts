@@ -43,7 +43,9 @@ vi.mock("~/server/tracer/spanToReadableSpan", () => ({
 
 vi.mock("~/server/traces/trace-formatting", () => ({
   generateAsciiTree: vi.fn().mockReturnValue("ascii tree"),
-  formatTraceSummaryDigest: vi.fn().mockReturnValue("Input: hello\nOutput: world"),
+  formatTraceSummaryDigest: vi
+    .fn()
+    .mockReturnValue("Input: hello\nOutput: world"),
 }));
 
 vi.mock("~/utils/logger/server", () => ({
@@ -71,14 +73,19 @@ vi.mock("~/server/api/routers/traces.schemas", () => {
 // strategy runs the real authMiddleware. Mock it to a passthrough so these
 // unit tests exercise the handler logic with an injected project, not real auth.
 vi.mock("~/app/api/middleware/auth", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("~/app/api/middleware/auth")>();
+  const actual =
+    await importOriginal<typeof import("~/app/api/middleware/auth")>();
   return {
     ...actual,
-    authMiddleware: async (c: { set: (k: string, v: unknown) => void }, next: () => Promise<void>) => {
+    authMiddleware: async (
+      c: { set: (k: string, v: unknown) => void },
+      next: () => Promise<void>,
+    ) => {
       c.set("project", { id: "project-123", apiKey: "key-123" });
       await next();
     },
-    requirePermission: () => async (_c: unknown, next: () => Promise<void>) => next(),
+    requirePermission: () => async (_c: unknown, next: () => Promise<void>) =>
+      next(),
   };
 });
 
@@ -106,10 +113,7 @@ testApp.onError((err, c) => {
   return c.json({ message: err.message }, status as 404 | 500);
 });
 
-function makeRequest(
-  traceId: string,
-  query: Record<string, string> = {},
-) {
+function makeRequest(traceId: string, query: Record<string, string> = {}) {
   const searchParams = new URLSearchParams(query).toString();
   const url = `http://localhost/${traceId}${searchParams ? `?${searchParams}` : ""}`;
 
@@ -158,6 +162,7 @@ describe("GET /:traceId", () => {
         "project-123",
         "trace-abc",
         expect.any(Object),
+        { full: true },
       );
     });
 

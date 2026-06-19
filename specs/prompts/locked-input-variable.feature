@@ -1,28 +1,37 @@
-Feature: Mandatory Input Variable
+Feature: Default input variable
   As a user configuring prompts
-  I want the "input" variable to be mandatory and clearly explained
-  So that I understand how user messages work with my prompt
+  I want the default "input" variable to behave like any other variable
+  So that prompts that take different inputs (response, context, ...) are
+  not forced to carry an unused "input"
+
+  # Customer context: an LLM-judge prompt only needed "response" and
+  # "context". Removing the default "input" was blocked with "it's
+  # required", forcing the same upstream value to be mapped into both
+  # "input" and "response". The engine has no such contract: template
+  # turns referencing an unfilled variable render empty and are
+  # dropped, and the no-messages path falls back across
+  # question/prompt/input/all-inputs.
 
   Background:
     Given a new prompt with default configuration
     And the prompt has an "input" variable
 
-  # Locked Variable Behavior
-  Scenario: Input variable cannot be deleted
+  @integration
+  Scenario: Input variable can be deleted like any other
     When I view the Variables section
-    Then the "input" variable does not have a delete button
-    And other variables I add can be deleted
+    Then the "input" variable has a delete button
+    When I delete the "input" variable
+    Then the prompt only keeps the variables I defined
+
+  @integration
+  Scenario: Input variable can be renamed
+    When I rename the "input" variable to "response"
+    Then the variable list shows "response"
+    And no locked variable behavior applies
 
   Scenario: Input variable has info tooltip explaining its purpose
     When I hover over the info icon next to "input"
     Then I see a tooltip explaining "This is the user message input. It will be sent as the user message to the LLM."
-
-  Scenario: Adding additional variables alongside input
-    Given I have the locked "input" variable
-    When I add a new variable "context"
-    Then I have both "input" and "context" variables
-    And "input" still cannot be deleted
-    And "context" can be deleted
 
   # Evaluations V3 / Drawer Context
   Scenario: Input variable mapping in Evaluations V3
@@ -30,7 +39,6 @@ Feature: Mandatory Input Variable
     When I view the Variables section
     Then the "input" variable shows a mapping dropdown
     And I can map "input" to a dataset column
-    And the info icon tooltip says "This is the user message input. It will be sent as the user message to the LLM."
 
   # Playground Context - Special Behavior
   Scenario: Input variable mapping disabled in Playground
@@ -46,22 +54,3 @@ Feature: Mandatory Input Variable
     And I send the message
     Then the "input" variable is populated with "Hello world"
     And the user message "{{input}}" becomes "Hello world"
-
-  # Edge Cases
-  Scenario: Existing prompt with custom variable names
-    Given I open an existing prompt with variable "question" instead of "input"
-    Then "question" is not locked (can be deleted)
-    And there is no special locked variable behavior
-    # Only the default "input" variable is locked
-
-  Scenario: Deleting all messages still preserves input variable
-    Given I am in Messages mode
-    When I remove the user message containing "{{input}}"
-    Then the "input" variable is still present and locked
-    And I can re-add a user message with "{{input}}"
-
-  Scenario: Renaming input variable is not allowed
-    Given I view the Variables section
-    When I try to edit the "input" variable name
-    Then the name field is read-only or disabled
-    # The input variable name cannot be changed

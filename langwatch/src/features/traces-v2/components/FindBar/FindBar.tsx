@@ -1,6 +1,7 @@
-import { Box, Flex, Icon, IconButton, Input } from "@chakra-ui/react";
+import { Box, Flex, Icon, IconButton, Input, Text } from "@chakra-ui/react";
 import { ChevronDown, ChevronUp, Search, X } from "lucide-react";
 import { type KeyboardEvent, useDeferredValue, useState } from "react";
+import { Kbd } from "~/components/ops/shared/Kbd";
 import { useTraceList } from "../../hooks/useTraceList";
 import { useFindStore } from "../../stores/findStore";
 import { CurrentMatchHighlight } from "./CurrentMatchHighlight";
@@ -9,6 +10,11 @@ import { useAutoFocusInput } from "./useAutoFocusInput";
 import { useMatchCycling } from "./useMatchCycling";
 import { useScrollTraceIntoView } from "./useScrollTraceIntoView";
 import { MIN_QUERY_LENGTH, useTraceSearchIndex } from "./useTraceSearchIndex";
+
+const IS_MAC =
+  typeof navigator !== "undefined" &&
+  /Mac|iPhone|iPad/.test(navigator.platform);
+const MOD_KEY_SYMBOL = IS_MAC ? "⌘" : "Ctrl";
 
 const ICON_SIZE = 14;
 
@@ -124,6 +130,42 @@ export function FindBar() {
             <X size={ICON_SIZE} />
           </IconButton>
         </Flex>
+      </Box>
+      {/* Separate banner under the FindBar — distinct surface (blue tint,
+          gap from the bar above) so the hint reads as its own callout
+          rather than fine-print under the search input. Used to sit
+          under the *main* search bar where it felt like ambient noise
+          for users who never opened Find; promoting it here means it
+          only shows while LW's find is actually open AND it visually
+          breaks out from the search surface so the eye notices it. */}
+      <Box
+        position="absolute"
+        top="56px"
+        right="16px"
+        zIndex={20}
+        width="360px"
+        bg="blue.subtle"
+        borderWidth="1px"
+        borderColor="blue.muted"
+        borderRadius="md"
+        paddingX={3}
+        paddingY={1.5}
+        shadow="sm"
+        role="note"
+        aria-label="Find shortcut hint"
+      >
+        <Text
+          as="span"
+          color="blue.fg"
+          fontSize="2xs"
+          lineHeight="1.4"
+          display="inline-flex"
+          alignItems="center"
+          gap={1}
+        >
+          Press <Kbd>{MOD_KEY_SYMBOL}</Kbd>
+          <Kbd>F</Kbd> again to switch to your browser's find.
+        </Text>
       </Box>
     </>
   );

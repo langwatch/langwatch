@@ -22,5 +22,6 @@ export const localPromptConfigFactory = Factory.define<LocalPromptConfig>(
         content: "Tell me about {{topic}}",
       },
     ],
+    parameters: {},
   }),
 );

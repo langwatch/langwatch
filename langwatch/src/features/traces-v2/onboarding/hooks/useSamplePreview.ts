@@ -41,11 +41,18 @@ export interface SamplePreviewResult {
 export function useSamplePreview(): SamplePreviewResult | null {
   const previewActive = usePreviewTracesActive();
   const queryText = useFilterStore((s) => s.debouncedQueryText);
+  // Stage is still used by the legacy tourActive path. Phase 2 (spotlights)
+  // doesn't gate sample data by stage.
   const onboardingStage = useOnboardingStore((s) => s.stage);
+  const tourActive = useOnboardingStore((s) => s.tourActive);
 
   if (!previewActive) return null;
 
-  const arrivalsVisible = shouldShowArrivals(onboardingStage);
+  // For the legacy journey (tourActive), gate arrivals by the journey stage
+  // so the aurora beat's before/after distinction still works. For all other
+  // preview modes (no-traces default, toolbar opt-in, spotlights) always
+  // show the full set — the journey stage gate is irrelevant outside the tour.
+  const arrivalsVisible = !tourActive || shouldShowArrivals(onboardingStage);
   const previewSet = arrivalsVisible
     ? [...ARRIVAL_PREVIEW_TRACES, ...SAMPLE_PREVIEW_TRACES]
     : SAMPLE_PREVIEW_TRACES;

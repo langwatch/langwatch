@@ -3,6 +3,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -11,7 +12,7 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { forwardRef } from "react";
+import { forwardRef, useReducer } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AvailableSource } from "../../variables/VariableMappingInput";
 import type { Variable } from "../../variables/VariablesSection";
@@ -547,6 +548,270 @@ describe("PromptTextAreaWithVariables", () => {
 
       // Component should render without menu issues
       expect(screen.getByDisplayValue("Hello world")).toBeInTheDocument();
+    });
+  });
+
+  describe("when typing the closing braces of an unknown variable", () => {
+    /** @scenario Create suggestion persists after typing the closing braces */
+    it("keeps the insertion menu open offering create", async () => {
+      const onCreateVariable = vi.fn();
+      renderComponent({
+        variables: [],
+        onCreateVariable,
+        availableSources: [],
+      });
+
+      const textarea = screen.getByRole("textbox");
+      fireEvent.change(textarea, {
+        target: { value: "{{myvar}}", selectionStart: 9 },
+      });
+
+      expect(await screen.findByText(/Create variable/)).toBeInTheDocument();
+    });
+
+    /** @scenario Creating from the persisted menu fixes the reference */
+    it("creates the variable from the persisted menu", async () => {
+      const onCreateVariable = vi.fn();
+      renderComponent({
+        variables: [],
+        onCreateVariable,
+        availableSources: [],
+      });
+
+      const textarea = screen.getByRole("textbox");
+      fireEvent.change(textarea, {
+        target: { value: "{{myvar}}", selectionStart: 9 },
+      });
+
+      const createOption = await screen.findByText(/Create variable/);
+      fireEvent.click(createOption);
+
+      expect(onCreateVariable).toHaveBeenCalledWith({
+        identifier: "myvar",
+        type: "str",
+      });
+      await waitFor(() => {
+        expect(screen.queryByText(/Create variable/)).not.toBeInTheDocument();
+      });
+    });
+
+    /** @scenario Menu does not persist for known variables after closing braces */
+    it("closes the menu after completing a known variable", async () => {
+      const onCreateVariable = vi.fn();
+      renderComponent({
+        variables: mockVariables,
+        onCreateVariable,
+        availableSources: [],
+      });
+
+      const textarea = screen.getByRole("textbox");
+      fireEvent.change(textarea, {
+        target: { value: "{{question}}", selectionStart: 12 },
+      });
+
+      // Defer past the menu's setTimeout(0) open window
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(screen.queryByText(/Create variable/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the prompt references undefined variables", () => {
+    /** @scenario Variable-not-found banner offers a Create action */
+    it("shows the banner with a Create button for the first missing variable", () => {
+      renderComponent({
+        value: "Judge this: {{response}}",
+        variables: [],
+        onCreateVariable: vi.fn(),
+      });
+
+      const banner = screen.getByTestId("undefined-variables-banner");
+      expect(banner).toHaveTextContent("Undefined variables: response");
+      expect(
+        screen.getByTestId("create-missing-variable-button"),
+      ).toHaveTextContent('Create "response"');
+    });
+
+    /** @scenario Create button defines the missing variable */
+    it("creates the missing variable when the Create button is clicked", () => {
+      const onCreateVariable = vi.fn();
+      renderComponent({
+        value: "Judge this: {{response}}",
+        variables: [],
+        onCreateVariable,
+      });
+
+      fireEvent.click(screen.getByTestId("create-missing-variable-button"));
+
+      expect(onCreateVariable).toHaveBeenCalledWith({
+        identifier: "response",
+        type: "str",
+      });
+    });
+
+    /** @scenario Create resolves one missing variable at a time */
+    it("creates only the first missing variable when several are missing", () => {
+      const onCreateVariable = vi.fn();
+      renderComponent({
+        value: "{{query}} with {{context}}",
+        variables: [],
+        onCreateVariable,
+      });
+
+      fireEvent.click(screen.getByTestId("create-missing-variable-button"));
+
+      expect(onCreateVariable).toHaveBeenCalledTimes(1);
+      expect(onCreateVariable).toHaveBeenCalledWith({
+        identifier: "query",
+        type: "str",
+      });
+    });
+
+    it("hides the Create button when no creation callback is provided", () => {
+      renderComponent({
+        value: "Judge this: {{response}}",
+        variables: [],
+      });
+
+      expect(
+        screen.getByTestId("undefined-variables-banner"),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId("create-missing-variable-button"),
+      ).not.toBeInTheDocument();
+    });
+
+    /** @scenario Error banner never covers the last line of the prompt */
+    it("reserves bottom padding on the textarea while the banner shows, including on focus", () => {
+      renderComponent({
+        value: "line one\n{{missing}}",
+        variables: [],
+        onCreateVariable: vi.fn(),
+      });
+
+      const textarea = screen.getByRole("textbox");
+      // jsdom reports offsetHeight 0, so the 28px floor applies.
+      expect(textarea.style.paddingBottom).toBe("28px");
+
+      // Focusing rewrites the padding shorthand for the thicker border -
+      // the banner reservation must survive it (this was the bug: the
+      // last line was only covered while actually typing).
+      fireEvent.focus(textarea);
+      expect(textarea.style.paddingBottom).toBe("28px");
+
+      fireEvent.blur(textarea);
+      expect(textarea.style.paddingBottom).toBe("28px");
+    });
+
+    /** @scenario An undefined variable is flagged without crashing the page */
+    it("does not re-measure the banner on every parent re-render when the invalid-variable set is unchanged", () => {
+      // Regression: the banner useLayoutEffect depended on the `invalidVariables`
+      // array identity. The prompt editor rebuilds the variables array on every
+      // render, so the effect re-ran and called setState on every render, which
+      // churned the commit phase into React's "Maximum update depth exceeded"
+      // crash (it threw the page to the top-level error boundary). The fix keys
+      // the effect on a stable primitive signature of the invalid names, so it
+      // only re-measures when the set of undefined variables actually changes.
+      // Each re-measure here stands in for one of the per-render setStates that
+      // fed the crash, so a non-zero count on stable input is the regression.
+      function Harness() {
+        const [, forceRerender] = useReducer((n: number) => n + 1, 0);
+        // Mirrors PromptMessagesEditor: a brand-new array (and objects) each render.
+        const variables: Variable[] = [{ identifier: "question", type: "str" }];
+        return (
+          <ChakraProvider value={defaultSystem}>
+            <button
+              type="button"
+              data-testid="rerender"
+              onClick={() => forceRerender()}
+            >
+              rerender
+            </button>
+            <PromptTextAreaWithVariables
+              value="Judge this: {{response}}"
+              onChange={vi.fn()}
+              variables={variables}
+            />
+          </ChakraProvider>
+        );
+      }
+
+      render(<Harness />);
+
+      // `response` is undefined, so the banner is mounted. Spy on the exact node
+      // the layout effect measures, so we count only its reads (not Chakra's).
+      const banner = screen.getByTestId("undefined-variables-banner");
+      let bannerHeightReads = 0;
+      Object.defineProperty(banner, "offsetHeight", {
+        configurable: true,
+        get() {
+          bannerHeightReads += 1;
+          return 24;
+        },
+      });
+
+      // Re-render the parent repeatedly; each pass hands down a fresh variables
+      // array, exactly as the real editor does on every render.
+      for (let i = 0; i < 5; i += 1) {
+        fireEvent.click(screen.getByTestId("rerender"));
+      }
+
+      // This proves the proximate cause is gone: with the invalid-variable set
+      // unchanged, the layout effect no longer re-measures and re-setStates on
+      // every render (pre-fix this was 5, one per render). The literal "Maximum
+      // update depth" throw needs the full app re-render storm to manifest, so
+      // the eliminated per-render churn is the faithful, deterministic proxy.
+      expect(bannerHeightReads).toBe(0);
+    });
+
+    /** @scenario The undefined-variables warning stays clear of the prompt after a resize */
+    it("re-measures the banner on a resize even when the invalid-variable set is unchanged", () => {
+      // Review follow-up: keying the measurement on the name set alone goes
+      // stale when the SAME warning text reflows taller - the resizable prompt
+      // panel narrows and the names wrap onto another line without changing the
+      // set. A ResizeObserver re-measures on that layout change so the reserved
+      // padding tracks the real height and never covers the last prompt line.
+      const observerCallbacks: ResizeObserverCallback[] = [];
+      const RealResizeObserver = globalThis.ResizeObserver;
+      globalThis.ResizeObserver = class {
+        constructor(cb: ResizeObserverCallback) {
+          observerCallbacks.push(cb);
+        }
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      } as unknown as typeof ResizeObserver;
+
+      try {
+        renderComponent({
+          value: "Judge this: {{response}}",
+          variables: [],
+          onCreateVariable: vi.fn(),
+        });
+
+        // Initial measure ran against jsdom's offsetHeight 0, so the 28px floor.
+        const textarea = screen.getByRole("textbox");
+        expect(textarea.style.paddingBottom).toBe("28px");
+
+        // The names have not changed, but the banner now reflows to 100px.
+        const banner = screen.getByTestId("undefined-variables-banner");
+        Object.defineProperty(banner, "offsetHeight", {
+          configurable: true,
+          get: () => 100,
+        });
+
+        // A resize tick fires the observer; the padding must follow the height.
+        expect(observerCallbacks.length).toBeGreaterThan(0);
+        act(() => {
+          for (const cb of observerCallbacks) {
+            cb([], {} as ResizeObserver);
+          }
+        });
+
+        // 100 (height) + 8 (gap) = 108, above the 28px single-line floor.
+        expect(textarea.style.paddingBottom).toBe("108px");
+      } finally {
+        globalThis.ResizeObserver = RealResizeObserver;
+      }
     });
   });
 });

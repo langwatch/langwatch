@@ -11,6 +11,7 @@ import type {
   SpanTreeNode,
   TraceHeader,
 } from "~/server/api/routers/tracesV2.schemas";
+import { useConversationContext } from "../../../hooks/useConversationContext";
 import { useDrawerStore } from "../../../stores/drawerStore";
 import { ConversationContext } from "../ConversationContext";
 import { VizPlaceholder } from "../VizPlaceholder";
@@ -21,7 +22,7 @@ interface PaneLayoutProps {
   trace: TraceHeader;
   spans: SpanTreeNode[];
   selectedSpan: SpanTreeNode | null;
-  spansLoading: boolean;
+  isSpansLoading: boolean;
   layout: DrawerLayout;
 }
 
@@ -29,8 +30,7 @@ interface PaneLayoutProps {
 // react-resizable-panels persists sizes keyed on `autoSaveId`, and a
 // stale snapshot from a previous structure can leave one Panel sized
 // at 100% / another at 0%, which reads as "body content disappeared".
-const PANE_GROUP_STORAGE_PREFIX =
-  "langwatch:traces-v2:drawer-panel-sizes:v3";
+const PANE_GROUP_STORAGE_PREFIX = "langwatch:traces-v2:drawer-panel-sizes:v3";
 
 // SpanTabBar minHeight. Keep in sync with SpanTabBar.tsx.
 const SPAN_TAB_BAR_HEIGHT_PX = 38;
@@ -50,6 +50,13 @@ const CTX_HEADER_HEIGHT_PX = 36;
 // `header + scroll-container-padding + content`.
 const CTX_SCROLL_VPAD_PX = 24;
 
+// Pixel ceiling for the ctx pane's default / max height. Content shorter
+// than this still caps at its natural height ("never taller than actual
+// content"); long conversations stop here so the pane can't eat the
+// whole drawer. Was 350px — raised ~40% per operator feedback that the
+// default strip was too short to read a turn comfortably.
+const CTX_MAX_HEIGHT_PX = 500;
+
 /**
  * Renders the trace drawer body as a stack of independently sized,
  * scrollable panels — Chrome DevTools "Network → Headers / Preview"
@@ -66,7 +73,7 @@ export function PaneLayout({
   trace,
   spans,
   selectedSpan,
-  spansLoading,
+  isSpansLoading,
   layout,
 }: PaneLayoutProps) {
   const vizTab = useDrawerStore((s) => s.vizTab);
@@ -78,15 +85,18 @@ export function PaneLayout({
   const paneState = useDrawerStore((s) => s.paneState);
   const togglePaneCollapsed = useDrawerStore((s) => s.togglePaneCollapsed);
 
-  // Conversation context pane slot is keyed on `conversationId` alone —
-  // a stable boolean per trace. We do NOT gate the surrounding layout
-  // structure on async `ctx.total`: flipping the top-level <PanelGroup>
-  // mid-load unmounts the body group too, which loses viz / detail
-  // sizes (some renders ended up blanking the body entirely).
-  // Single-turn conversations are handled inside `ConversationContext`
-  // by returning null; the Panel slot still exists, it just renders
-  // nothing.
-  const hasConversation = !!trace.conversationId;
+  // Conversation context pane slot only exists for genuinely multi-turn
+  // conversations. `ConversationContext` itself returns null for
+  // single-turn threads, so without this gate the ctx Panel would sit
+  // there as an empty band (the Panel sizes itself, not its content).
+  // The hook hits the same cached query the component uses, so the two
+  // reads always agree. While loading we keep the slot mounted (the
+  // strip shows its loading header) — it unmounts only once the count
+  // resolves to ≤1. autoSaveId restores the body group's sizes across
+  // that remount.
+  const ctx = useConversationContext(trace.conversationId, trace.traceId);
+  const hasConversation =
+    !!trace.conversationId && (ctx.isLoading || ctx.total > 1);
   const ctxState = paneState.conversationContext;
   const detailState = paneState.spanDetail;
 
@@ -177,10 +187,10 @@ export function PaneLayout({
       setCtxCollapsedSize(Math.min(20, Math.max(1, headerPct)));
 
       // +6px so the bottom row's border isn't visually clipped at the
-      // max drag position. Cap pixel-wise at 350px first (operator
-      // spec — even a long conversation shouldn't eat the whole
-      // drawer), then convert to a percentage.
-      const cappedPx = Math.min(effectivePx + 6, 350);
+      // max drag position. Cap pixel-wise first (operator spec — even
+      // a long conversation shouldn't eat the whole drawer), then
+      // convert to a percentage.
+      const cappedPx = Math.min(effectivePx + 6, CTX_MAX_HEIGHT_PX);
       const naturalPct = (cappedPx / dim) * 100;
       // Lower bound — at least 12pct above header so a single
       // placeholder turn still opens to a visible strip.
@@ -296,17 +306,12 @@ export function PaneLayout({
         const headerPx = headerEl?.offsetHeight ?? CTX_HEADER_HEIGHT_PX;
         const bodyPx = contentEl?.scrollHeight ?? 0;
         const fullPx =
-          bodyPx > 0
-            ? headerPx + CTX_SCROLL_VPAD_PX + bodyPx + 6
-            : headerPx;
-        // 350px ceiling on first-open even for long conversations;
+          bodyPx > 0 ? headerPx + CTX_SCROLL_VPAD_PX + bodyPx + 6 : headerPx;
+        // Pixel ceiling on first-open even for long conversations;
         // the operator can still drag larger up to ctxMaxSize.
-        const cappedPx = Math.min(fullPx, 350);
+        const cappedPx = Math.min(fullPx, CTX_MAX_HEIGHT_PX);
         const headerPct = (headerPx / dim) * 100;
-        const targetPct = Math.max(
-          headerPct + 12,
-          (cappedPx / dim) * 100,
-        );
+        const targetPct = Math.max(headerPct + 12, (cappedPx / dim) * 100);
         const currentPct = h.getSize();
         // Only grow — if a later rAF measures smaller (e.g., layout
         // settled into a slimmer state) leave the pane where it is
@@ -347,8 +352,7 @@ export function PaneLayout({
       return;
     }
     const target =
-      lastExpandedDetailSize.current ??
-      (layout === "horizontal" ? 45 : 50);
+      lastExpandedDetailSize.current ?? (layout === "horizontal" ? 45 : 50);
     const current = handle.getSize();
     // Below the min floor → panel was collapsed-or-near-it, expand.
     // Library's own `isCollapsed()` is unreliable post-drag, so size
@@ -385,7 +389,7 @@ export function PaneLayout({
           onVizTabChange={setVizTab}
           trace={trace}
           spans={spans}
-          isLoading={spansLoading}
+          isLoading={isSpansLoading}
           selectedSpanId={selectedSpanId}
           onSelectSpan={selectSpan}
           onClearSpan={clearSpan}
@@ -406,6 +410,7 @@ export function PaneLayout({
       spans={spans}
       selectedSpan={selectedSpan}
       layout={layout}
+      isSpansLoading={isSpansLoading}
     />
   );
 
@@ -588,14 +593,18 @@ export function PaneLayout({
             // appear to no-op (it's "already" in the state the store
             // thinks it should reach).
             onCollapse={() => {
-              if (!useDrawerStore.getState().paneState.conversationContext
-                .collapsed) {
+              if (
+                !useDrawerStore.getState().paneState.conversationContext
+                  .collapsed
+              ) {
                 togglePaneCollapsed("conversationContext");
               }
             }}
             onExpand={() => {
-              if (useDrawerStore.getState().paneState.conversationContext
-                .collapsed) {
+              if (
+                useDrawerStore.getState().paneState.conversationContext
+                  .collapsed
+              ) {
                 togglePaneCollapsed("conversationContext");
               }
             }}

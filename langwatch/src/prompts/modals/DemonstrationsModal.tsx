@@ -1,5 +1,6 @@
 import { Box, Button, Heading } from "@chakra-ui/react";
-import { DatasetTable } from "~/components/datasets/DatasetTable";
+import { useRef } from "react";
+import { DatasetEditorTable } from "~/components/datasets/editor/DatasetEditorTable";
 import { Dialog } from "~/components/ui/dialog";
 import type { PromptConfigFormValues } from "~/prompts";
 import {
@@ -21,13 +22,15 @@ export function DemonstrationsModal({
   demonstrations: Demonstrations;
   onChange: (demonstrations: Demonstrations) => void;
 }) {
+  const editorPortalRef = useRef<HTMLDivElement | null>(null);
   const transposedRecords = transposeColumnsFirstToRowsFirstWithId(
     demonstrations?.inline?.records ?? {},
   );
 
   return (
     <Dialog.Root open={open} onOpenChange={({ open }) => !open && onClose()}>
-      <Dialog.Content bg="bg"
+      <Dialog.Content
+        bg="bg"
         marginX="32px"
         marginTop="32px"
         maxWidth="calc(100vw - 64px)"
@@ -41,9 +44,10 @@ export function DemonstrationsModal({
         <Dialog.Header>
           <Heading size="md">Edit Demonstrations</Heading>
         </Dialog.Header>
-        <Dialog.Body paddingBottom="32px">
-          <Box position="relative">
-            <DatasetTable
+        <Dialog.Body paddingBottom="16px">
+          <Box ref={editorPortalRef} width="full" height="full">
+            <DatasetEditorTable
+              editorPortalRef={editorPortalRef}
               inMemoryDataset={{
                 name: "Demonstrations",
                 datasetRecords: transposedRecords,
@@ -61,20 +65,13 @@ export function DemonstrationsModal({
               }
               canEditDatasetRecord={false}
             />
-            {/** This is a hacky way to get a button on here, but we're pressed for time */}
-            <Button
-              colorPalette="blue"
-              position="absolute"
-              bottom="0"
-              right="24px"
-              onClick={() => {
-                onClose();
-              }}
-            >
-              Close
-            </Button>
           </Box>
         </Dialog.Body>
+        <Dialog.Footer>
+          <Button colorPalette="blue" onClick={onClose}>
+            Close
+          </Button>
+        </Dialog.Footer>
       </Dialog.Content>
     </Dialog.Root>
   );

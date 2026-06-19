@@ -7,8 +7,8 @@ import type {
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  buildVersionCreateInput,
   llmPromptConfigFactory,
-  llmPromptConfigVersionFactory,
 } from "~/factories/llm-config.factory";
 import { projectFactory } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
@@ -203,7 +203,7 @@ describe("Prompts API", () => {
         });
 
         await prisma.llmPromptConfigVersion.create({
-          data: llmPromptConfigVersionFactory.build({
+          data: buildVersionCreateInput({
             configId: config.id,
             projectId: testProjectId,
           }),
@@ -376,6 +376,41 @@ describe("Prompts API", () => {
       const body = await res.json();
       expect(body).toHaveProperty("id");
       expect(body).toHaveProperty("handle", "test-handle/chunky-bacon");
+    });
+
+    describe("when the project has no default model configured", () => {
+      it("creates a prompt that ships its own model", async () => {
+        // Remove the seeded default: a prompt that specifies its model,
+        // like every prompt pushed by `langwatch prompt sync`, must not
+        // depend on the project having a default model.
+        await prisma.modelDefaultConfig.deleteMany({
+          where: { id: testDefaultConfigId },
+        });
+
+        const res = await helpers.api.post(`/api/prompts`, {
+          handle: "synced-from-cli",
+          prompt: "You are a helpful assistant.",
+          model: "openai/gpt-4o-mini",
+        });
+
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body).toHaveProperty("id");
+        expect(body).toHaveProperty("model", "openai/gpt-4o-mini");
+      });
+
+      it("still reports the missing model when none is provided", async () => {
+        await prisma.modelDefaultConfig.deleteMany({
+          where: { id: testDefaultConfigId },
+        });
+
+        const res = await helpers.api.post(`/api/prompts`, {
+          handle: "needs-a-default",
+          prompt: "test",
+        });
+
+        expect(res.status).toBeGreaterThanOrEqual(400);
+      });
     });
 
     it("validates input when creating a prompt", async () => {

@@ -228,7 +228,7 @@ langyRoute().post("/langy/chat", async (c) => {
   const lastUserMessage = messages[messages.length - 1];
 
   try {
-    await getVercelAIModel(projectId);
+    await getVercelAIModel({ projectId });
   } catch (error) {
     return c.json(
       {

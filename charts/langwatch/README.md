@@ -140,6 +140,7 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `global.env`                      | Deployment environment for all components.                                   | `production` |
 | `global.podSecurityContext`       | Default pod security context (applied cluster-wide unless overridden).       | `{}`         |
 | `global.containerSecurityContext` | Default container security context (applied cluster-wide unless overridden). | `{}`         |
+| `global.automountServiceAccountToken` | Mount the ServiceAccount token into first-party workload pods. Defaults to false. | `false`  |
 | `global.scheduling`               | Global scheduling defaults for all pods.                                     |              |
 | `global.scheduling.nodeSelector`  | Node selector labels for all pods.                                           | `{}`         |
 | `global.scheduling.affinity`      | Affinity rules for all pods.                                                 | `{}`         |
@@ -200,7 +201,7 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `app.http.publicUrl`                                                    | Public URL for users.                                                                     | `http://localhost:5560` |
 | `app.features`                                                          | Feature flags for the app.                                                                |                         |
 | `app.features.skipEnvValidation`                                        | Skip env var validation (dev only).                                                       | `false`                 |
-| `app.features.disablePiiRedaction`                                      | Disable PII redaction.                                                                    | `false`                 |
+| `app.features.disableStrictPiiRedaction`                                | Skip the strict PII redaction pass (Presidio analysis service).                           | `false`                 |
 | `app.upstreams`                                                         | Upstream connections from app to internal services.                                       |                         |
 | `app.upstreams.nlp.scheme`                                              | Scheme for NLP upstream.                                                                  | `http`                  |
 | `app.upstreams.nlp.name`                                                | Service name for NLP upstream. If empty, defaults to {{ .Release.Name }}-langwatch-nlp.   | `""`                    |

@@ -37,6 +37,23 @@ const repoCapturingInsert = () => {
 const insertedRow = (insert: ReturnType<typeof vi.fn>) =>
   insert.mock.calls[0]![0].values[0] as { _retention_days: number };
 
+const repoCapturingQuery = () => {
+  const query = vi
+    .fn()
+    .mockResolvedValue({ json: async () => [] as unknown[] });
+  const resolveClient = (async () => ({ query })) as unknown as ConstructorParameters<
+    typeof LogRecordStorageClickHouseRepository
+  >[0];
+  const repo = new LogRecordStorageClickHouseRepository(resolveClient);
+  return { repo, query };
+};
+
+const capturedQuery = (query: ReturnType<typeof vi.fn>) =>
+  query.mock.calls[0]![0] as {
+    query: string;
+    query_params: Record<string, unknown>;
+  };
+
 describe("LogRecordStorageClickHouseRepository.insertLogRecord", () => {
   describe("when the log record is part of a Claude Code fold", () => {
     /** @scenario "A folded Claude Code log is retained only briefly" */
@@ -84,6 +101,46 @@ describe("LogRecordStorageClickHouseRepository.insertLogRecord", () => {
       await repo.insertLogRecord(makeRecord({ attributes: {} }), 308);
 
       expect(insertedRow(insert)._retention_days).toBe(308);
+    });
+  });
+});
+
+describe("LogRecordStorageClickHouseRepository.getMarkedClaudeCodeLogsByTrace", () => {
+  // stored_log_records is PARTITION BY toYearWeek(TimeUnixMs); the read must
+  // carry a TimeUnixMs predicate to prune partitions instead of cold-scanning
+  // every weekly partition (incl. cold S3).
+  describe("when the caller provides the turn's approximate time", () => {
+    it("bounds the scan to a TimeUnixMs window in both the outer and dedup scopes", async () => {
+      const { repo, query } = repoCapturingQuery();
+      const occurredAtMs = 1_700_000_000_000;
+
+      await repo.getMarkedClaudeCodeLogsByTrace(
+        "project_test",
+        "trace-1",
+        occurredAtMs,
+      );
+
+      const { query: sql, query_params } = capturedQuery(query);
+      // Predicate present in both the outer SELECT and the dedup subquery.
+      expect(sql.match(/TimeUnixMs >= fromUnixTimestamp64Milli/g)).toHaveLength(
+        2,
+      );
+      const windowMs = 2 * 24 * 60 * 60 * 1000;
+      expect(query_params.fromMs).toBe(occurredAtMs - windowMs);
+      expect(query_params.toMs).toBe(occurredAtMs + windowMs);
+    });
+  });
+
+  describe("when the caller does not provide a time", () => {
+    it("omits the TimeUnixMs predicate (unbounded fallback, unchanged behavior)", async () => {
+      const { repo, query } = repoCapturingQuery();
+
+      await repo.getMarkedClaudeCodeLogsByTrace("project_test", "trace-1");
+
+      const { query: sql, query_params } = capturedQuery(query);
+      expect(sql).not.toContain("TimeUnixMs >= fromUnixTimestamp64Milli");
+      expect(query_params.fromMs).toBeUndefined();
+      expect(query_params.toMs).toBeUndefined();
     });
   });
 });

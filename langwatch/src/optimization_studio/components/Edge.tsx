@@ -1,5 +1,5 @@
 import { BaseEdge, type EdgeProps, getBezierPath } from "@xyflow/react";
-import { useColorModeValue, useColorRawValue } from "../../components/ui/color-mode";
+import { useColorModeValue } from "../../components/ui/color-mode";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { selectionColor } from "./nodes/Nodes";
 
@@ -24,10 +24,10 @@ export default function DefaultEdge(props: EdgeProps) {
 
   const [edgePath] = getBezierPath(props);
 
-  const edgeColor = useColorModeValue(
-    useColorRawValue("gray.400"),
-    useColorRawValue("gray.600"),
-  );
+  // Hardcoded to the pre-redesign edge grays (old gray.350 in light, gray.600
+  // in dark). The gray scale shift darkened gray.400, making the connecting
+  // lines read much heavier than they did for years; pin them to the old look.
+  const edgeColor = useColorModeValue("#DDDDDD", "#3d3d4d");
 
   return (
     <>

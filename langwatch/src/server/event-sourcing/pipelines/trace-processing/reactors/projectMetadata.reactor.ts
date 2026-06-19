@@ -21,11 +21,25 @@ export interface ProjectMetadataReactorDeps {
  *
  * Uses a long dedup TTL so we only hit the database once per project in a given window.
  */
+/**
+ * Pure relevance guard, shared by shouldReact (pre-enqueue) and handle
+ * (fail-open path). Sample traces (seeded from the empty-state "Seed
+ * sample traces" path; every span carries `langwatch.origin = "sample"`)
+ * are not a real first ingest. Flipping `firstMessage` / `integrated` on
+ * them would prematurely dismiss the empty-state onboarding card even
+ * though the user hasn't connected their own app yet. Skip entirely —
+ * a real trace will trigger this reactor again.
+ */
+function isRealFirstIngest(foldState: TraceSummaryData): boolean {
+  return foldState.attributes?.["langwatch.origin"] !== "sample";
+}
+
 export function createProjectMetadataReactor(
   deps: ProjectMetadataReactorDeps,
 ): ReactorDefinition<TraceProcessingEvent, TraceSummaryData> {
   return {
     name: "projectMetadata",
+    shouldReact: (_event, context) => isRealFirstIngest(context.foldState),
     options: {
       runIn: ["worker"],
       makeJobId: (payload) =>
@@ -40,15 +54,7 @@ export function createProjectMetadataReactor(
       const { tenantId, foldState } = context;
       const attrs = foldState.attributes ?? {};
 
-      // Sample traces (seeded from the empty-state "Seed sample traces"
-      // path; every span carries `langwatch.origin = "sample"`) are not
-      // a real first ingest. Flipping `firstMessage` / `integrated` on
-      // them would prematurely dismiss the empty-state onboarding card
-      // even though the user hasn't connected their own app yet. Skip
-      // entirely — a real trace will trigger this reactor again.
-      if (attrs["langwatch.origin"] === "sample") {
-        return;
-      }
+      if (!isRealFirstIngest(foldState)) return;
 
       try {
         const project = await deps.projects.getById(tenantId);

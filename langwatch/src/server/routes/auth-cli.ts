@@ -49,6 +49,7 @@ import { IngestionSourceService } from "@ee/governance/services/activity-monitor
 import { ActivityMonitorService } from "@ee/governance/services/activity-monitor/activityMonitor.service";
 import { GovernanceSetupStateService } from "@ee/governance/services/setupState.service";
 import { CliBootstrapService } from "@ee/governance/services/cliBootstrap.service";
+import { featureFlagService } from "~/server/featureFlag";
 import { IngestionTemplateService } from "@ee/governance/services/ingestionTemplate.service";
 import { IngestionKeyService } from "@ee/governance/services/ingestionKey.service";
 import {
@@ -1364,6 +1365,56 @@ secured.access(CLI_POLICY).post(
 );
 
 // ---------------------------------------------------------------------------
+// GET /api/auth/cli/governance/ingestion-keys
+// ---------------------------------------------------------------------------
+// Returns all live (non-revoked) personal-project ingestion keys for the
+// caller's org. The CLI uses this as a cache-liveness preflight (#4755) —
+// revoking a key on the platform silently bricks Path B telemetry because
+// the wrapper reuses a locally cached token forever. By calling this list
+// before reusing a cached key, the wrapper can detect the revocation and
+// re-mint rather than repeatedly sending unauthenticated spans.
+//
+// Response: { keys: [{ source_type, lookup_id, ingestion_template_id }] }
+//
+// lookup_id is the 16-char identifier embedded in the token prefix
+// (`ik-lw-{lookupId}_…`) so the CLI can match the cached token against a
+// live server entry without possessing the full secret.
+// ---------------------------------------------------------------------------
+secured.access(CLI_POLICY).get(
+  "/governance/ingestion-keys",
+  async (c: Context) => {
+    const tokenRecord = await validateAccessToken(
+      c.req.header("Authorization"),
+    );
+    if (!tokenRecord) {
+      return c.json(
+        {
+          error: "unauthorized",
+          error_description:
+            "Bearer access token is missing, malformed, or expired",
+        },
+        401,
+      );
+    }
+    const service = IngestionKeyService.create(prisma);
+    const keys = await service.listForPersonalProject({
+      userId: tokenRecord.user_id,
+      organizationId: tokenRecord.organization_id,
+    });
+    return c.json(
+      {
+        keys: keys.map((k) => ({
+          source_type: k.sourceType,
+          lookup_id: k.lookupId,
+          ingestion_template_id: k.ingestionTemplateId,
+        })),
+      },
+      200,
+    );
+  },
+);
+
+// ---------------------------------------------------------------------------
 // GET /api/auth/cli/lookup?user_code=XXXX-YYYY
 // ---------------------------------------------------------------------------
 // Used by the browser-side approval page to surface the device-code
@@ -1515,30 +1566,51 @@ secured.access(CLI_POLICY).post("/approve", async (c: Context) => {
         400,
       );
     }
-    // Verify the user actually has access to the project: the project must
-    // belong to a team in the chosen org, and the user must be a member of
-    // that team (PG schema enforces this via TeamUser; we re-check here so
-    // a hostile browser request can't be tricked into leaking another org's
-    // key by spoofing project_id).
+    // Resolve the picked project: it must live in the chosen org and not be
+    // archived. Authorization is NOT decided by this lookup. The
+    // `hasProjectPermission(..., "project:update")` check below is the source
+    // of truth, and it re-derives the org from the project id and inspects
+    // project-, team- and org-scoped role bindings plus the org role. So an
+    // org-level admin (or an org/team-scoped role-binding admin) who sees the
+    // project in the picker via `organization.getAll`, but is not a direct
+    // TeamUser member, is authorized by their real permission instead of
+    // being pre-filtered out. The org-scoping predicate here plus that RBAC
+    // check together stop a spoofed `project_id` from leaking another org's
+    // key.
     const project = await prisma.project.findFirst({
       where: {
         id: project_id,
         archivedAt: null,
         team: {
           organizationId: organization_id,
-          members: { some: { userId: session.user.id } },
         },
       },
-      select: { id: true, slug: true, name: true, apiKey: true },
+      select: { id: true, slug: true, name: true, apiKey: true, isPersonal: true },
     });
     if (!project) {
       return c.json(
         {
           error: "forbidden",
           error_description:
-            "Project not found in this organization, or you do not have access to it",
+            "Project not found or unavailable in this organization",
         },
         403,
+      );
+    }
+
+    // Project login must target a real, shared project, never a personal
+    // workspace project. A coding agent that picked (or had auto-selected)
+    // the personal project silently sent the user's evaluations there
+    // (customer report). The browser picker hides personal projects; this
+    // is the server-side guarantee.
+    if (project.isPersonal) {
+      return c.json(
+        {
+          error: "personal_project_not_allowed",
+          error_description:
+            "Personal projects can't back a project API key. Pick a shared team project so your evaluations, prompts and traces land on a real project.",
+        },
+        400,
       );
     }
 
@@ -1582,6 +1654,30 @@ secured.access(CLI_POLICY).post("/approve", async (c: Context) => {
         organization_id,
       },
       200,
+    );
+  }
+
+  // Governance gate: the device-session flow provisions a personal
+  // workspace (Team + Project) and a personal virtual key for the user.
+  // That is a governance-plane capability; for an org without governance
+  // enabled it silently created a personal project that then captured the
+  // user's evaluations (customer report). Refuse it and point at project
+  // login, which writes a real project's API key to `.env`.
+  const governanceEnabled = await featureFlagService
+    .isEnabled("release_ui_ai_governance_enabled", {
+      distinctId: session.user.id,
+      organizationId: organization_id,
+      defaultValue: false,
+    })
+    .catch(() => false);
+  if (!governanceEnabled) {
+    return c.json(
+      {
+        error: "governance_required",
+        error_description:
+          "AI-tools (device) login needs governance enabled for your organization. Re-run `langwatch login` and choose project login. It writes a project API key to your .env.",
+      },
+      403,
     );
   }
 

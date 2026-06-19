@@ -44,6 +44,8 @@ spec:
         prometheus.io/port: "{{ .Values.app.service.port }}"
         {{- end }}
     spec:
+      # The app does not call the Kubernetes API, so don't mount the SA token.
+      automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
       # Pod security context - https://kubespec.dev/v1/Pod#spec.securityContext
       {{- with (coalesce .Values.app.podSecurityContext .Values.global.podSecurityContext)}}
       securityContext:

@@ -9,15 +9,13 @@ import {
 } from "@chakra-ui/react";
 import type { Edge, Node } from "@xyflow/react";
 import { useCallback, useEffect, useState } from "react";
-import { Play, Send } from "react-feather";
+import { Send } from "react-feather";
 import { useForm } from "react-hook-form";
 import { SmallLabel } from "~/components/SmallLabel";
 import { Dialog } from "~/components/ui/dialog";
 import { InputGroup } from "~/components/ui/input-group";
-import { Tooltip } from "~/components/ui/tooltip";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { usePostEvent } from "../hooks/usePostEvent";
 import { useWorkflowExecution } from "../hooks/useWorkflowExecution";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { getEntryInputs } from "../utils/nodeUtils";
@@ -32,46 +30,6 @@ interface ChatWindowProps {
   edges: Edge[];
   executionStatus?: string;
 }
-
-export const PlaygroundButton = ({
-  nodes,
-  edges,
-  executionStatus,
-}: {
-  nodes: Node[];
-  edges: Edge[];
-  executionStatus: string;
-}) => {
-  const { socketStatus } = usePostEvent();
-  const isDisabled = socketStatus !== "connected";
-  const { playgroundOpen, setPlaygroundOpen } = useWorkflowStore((state) => ({
-    playgroundOpen: state.playgroundOpen,
-    setPlaygroundOpen: state.setPlaygroundOpen,
-  }));
-
-  return (
-    <>
-      <Tooltip content={isDisabled ? "Studio is not connected" : undefined}>
-        <Button
-          onClick={() => setPlaygroundOpen(true)}
-          variant="outline"
-          size="sm"
-          background="bg"
-          disabled={isDisabled}
-        >
-          <Play size={16} /> Playground
-        </Button>
-      </Tooltip>
-      <ChatWindow
-        open={playgroundOpen}
-        onClose={() => setPlaygroundOpen(false)}
-        nodes={nodes}
-        edges={edges}
-        executionStatus={executionStatus}
-      />
-    </>
-  );
-};
 
 export const ChatWindow = ({
   open,

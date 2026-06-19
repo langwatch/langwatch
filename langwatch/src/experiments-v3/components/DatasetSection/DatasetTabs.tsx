@@ -1,11 +1,4 @@
-import {
-  Box,
-  Button,
-  HStack,
-  IconButton,
-  Spacer,
-  Text,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, Spacer, Text } from "@chakra-ui/react";
 import { generate } from "@langwatch/ksuid";
 import {
   ChevronDown,
@@ -129,15 +122,15 @@ export function DatasetTabs({
       {/* Add dataset button */}
       <Menu.Root positioning={{ placement: "bottom-start" }}>
         <Menu.Trigger asChild>
-          <IconButton
-            aria-label="Add dataset"
+          <Button
             size="xs"
             variant="ghost"
             color="fg.muted"
             _hover={{ color: "fg", bg: "bg.subtle" }}
           >
             <Plus size={14} />
-          </IconButton>
+            Add
+          </Button>
         </Menu.Trigger>
         <Menu.Content minWidth="200px">
           <Menu.Item value="select" onClick={onSelectExisting}>
@@ -164,8 +157,7 @@ export function DatasetTabs({
       <Spacer />
 
       {/* Edit current dataset button */}
-      <IconButton
-        aria-label="Edit dataset columns"
+      <Button
         size="xs"
         variant="ghost"
         color="fg.muted"
@@ -173,7 +165,8 @@ export function DatasetTabs({
         onClick={onEditDataset}
       >
         <Settings2 size={14} />
-      </IconButton>
+        Edit columns
+      </Button>
     </HStack>
   );
 }

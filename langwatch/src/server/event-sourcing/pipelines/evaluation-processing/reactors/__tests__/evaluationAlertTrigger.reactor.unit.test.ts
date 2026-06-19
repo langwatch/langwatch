@@ -21,6 +21,7 @@ vi.mock("~/utils/logger/server", () => ({
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
+  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
 // Heavy I/O bound dependencies pulled in transitively via dispatchTriggerAction
@@ -190,7 +191,9 @@ describe("evaluationAlertTrigger reactor", () => {
 
       await reactor.handle(event, context);
 
-      expect(deps.triggers.getActiveTraceTriggersForProject).not.toHaveBeenCalled();
+      expect(
+        deps.triggers.getActiveTraceTriggersForProject,
+      ).not.toHaveBeenCalled();
     });
   });
 
@@ -206,7 +209,9 @@ describe("evaluationAlertTrigger reactor", () => {
 
       await reactor.handle(event, context);
 
-      expect(deps.triggers.getActiveTraceTriggersForProject).not.toHaveBeenCalled();
+      expect(
+        deps.triggers.getActiveTraceTriggersForProject,
+      ).not.toHaveBeenCalled();
     });
   });
 
@@ -222,7 +227,9 @@ describe("evaluationAlertTrigger reactor", () => {
 
       await reactor.handle(event, context);
 
-      expect(deps.triggers.getActiveTraceTriggersForProject).not.toHaveBeenCalled();
+      expect(
+        deps.triggers.getActiveTraceTriggersForProject,
+      ).not.toHaveBeenCalled();
     });
   });
 
@@ -240,7 +247,9 @@ describe("evaluationAlertTrigger reactor", () => {
 
       await reactor.handle(event, context);
 
-      expect(deps.triggers.getActiveTraceTriggersForProject).not.toHaveBeenCalled();
+      expect(
+        deps.triggers.getActiveTraceTriggersForProject,
+      ).not.toHaveBeenCalled();
     });
   });
 
@@ -249,7 +258,9 @@ describe("evaluationAlertTrigger reactor", () => {
       const trigger = createTrigger({
         filters: { "traces.origin": ["application"] },
       });
-      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue([trigger]);
+      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue(
+        [trigger],
+      );
 
       const reactor = createEvaluationAlertTriggerReactor(deps);
       const event = createEvent();
@@ -269,7 +280,9 @@ describe("evaluationAlertTrigger reactor", () => {
   describe("when trace summary is not found", () => {
     it("skips processing", async () => {
       const trigger = createTrigger();
-      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue([trigger]);
+      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue(
+        [trigger],
+      );
       (deps.traceSummaryStore.get as any).mockResolvedValue(null);
 
       const reactor = createEvaluationAlertTriggerReactor(deps);
@@ -293,7 +306,9 @@ describe("evaluationAlertTrigger reactor", () => {
           "evaluations.passed": { "evaluator-1": ["true"] },
         },
       });
-      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue([trigger]);
+      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue(
+        [trigger],
+      );
       (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
         createEvalFoldState({ evaluatorId: "evaluator-1", passed: true }),
       ]);
@@ -327,7 +342,9 @@ describe("evaluationAlertTrigger reactor", () => {
           "evaluations.passed": { "evaluator-1": ["true"] },
         },
       });
-      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue([trigger]);
+      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue(
+        [trigger],
+      );
       (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
         createEvalFoldState({ evaluatorId: "evaluator-1", passed: false }),
       ]);
@@ -354,7 +371,9 @@ describe("evaluationAlertTrigger reactor", () => {
           "evaluations.passed": { "evaluator-1": ["true"] },
         },
       });
-      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue([trigger]);
+      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue(
+        [trigger],
+      );
       (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
         createEvalFoldState({ evaluatorId: "evaluator-1", passed: true }),
       ]);
@@ -387,9 +406,9 @@ describe("evaluationAlertTrigger reactor", () => {
           "evaluations.passed": { "evaluator-1": ["true"] },
         },
       });
-      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue([
-        trigger,
-      ]);
+      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue(
+        [trigger],
+      );
       (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
         createEvalFoldState({ evaluatorId: "evaluator-1", passed: true }),
       ]);
@@ -426,9 +445,9 @@ describe("evaluationAlertTrigger reactor", () => {
           "evaluations.passed": { "evaluator-1": ["true"] },
         },
       });
-      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue([
-        trigger,
-      ]);
+      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue(
+        [trigger],
+      );
       (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
         createEvalFoldState({ evaluatorId: "evaluator-1", passed: true }),
       ]);
@@ -450,7 +469,9 @@ describe("evaluationAlertTrigger reactor", () => {
   describe("when trigger was already sent for this trace", () => {
     it("skips dispatch (dedup)", async () => {
       const trigger = createTrigger();
-      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue([trigger]);
+      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue(
+        [trigger],
+      );
       (deps.triggers.claimSend as any).mockResolvedValue(false);
       (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
         createEvalFoldState({ evaluatorId: "evaluator-1", passed: true }),
@@ -475,7 +496,9 @@ describe("evaluationAlertTrigger reactor", () => {
   describe("when handling reported events", () => {
     it("processes reported events the same as completed", async () => {
       const trigger = createTrigger();
-      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue([trigger]);
+      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue(
+        [trigger],
+      );
       (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
         createEvalFoldState({ evaluatorId: "evaluator-1", passed: true }),
       ]);
@@ -495,6 +518,39 @@ describe("evaluationAlertTrigger reactor", () => {
     });
   });
 
+  describe("when an evaluation filter is combined with an unmet event condition", () => {
+    it("does not dispatch when the events.metrics.value condition is not satisfied", async () => {
+      const trigger = createTrigger({
+        filters: {
+          "events.metrics.value": { thumbs_up_down: { vote: ["-1", "-1"] } },
+          "evaluations.passed": { "evaluator-1": ["true"] },
+        },
+      });
+      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue(
+        [trigger],
+      );
+      // Evaluation half is satisfied...
+      (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
+        createEvalFoldState({ evaluatorId: "evaluator-1", passed: true }),
+      ]);
+      // ...but the trace has no down-vote, so the event condition is unmet.
+      (deps.deriveEvents as any).mockResolvedValue([]);
+
+      const reactor = createEvaluationAlertTriggerReactor(deps);
+      const event = createEvent();
+      const context: ReactorContext<EvaluationRunData> = {
+        tenantId: "tenant-1",
+        aggregateId: "eval-1",
+        foldState: createEvalFoldState(),
+      };
+
+      await reactor.handle(event, context);
+
+      expect(deps.deriveEvents).toHaveBeenCalled();
+      expect(deps.triggers.claimSend).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when both trace and evaluation filters match", () => {
     it("dispatches trigger action for mixed filter triggers", async () => {
       const trigger = createTrigger({
@@ -504,7 +560,9 @@ describe("evaluationAlertTrigger reactor", () => {
           "evaluations.passed": { "evaluator-1": ["true"] },
         },
       });
-      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue([trigger]);
+      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue(
+        [trigger],
+      );
       (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
         createEvalFoldState({ evaluatorId: "evaluator-1", passed: true }),
       ]);

@@ -19,6 +19,9 @@ const traceListItemSchema = z.object({
   totalTokens: z.number(),
   inputTokens: z.number().nullable().optional(),
   outputTokens: z.number().nullable().optional(),
+  cacheReadTokens: z.number().nullable().optional(),
+  cacheCreationTokens: z.number().nullable().optional(),
+  reasoningTokens: z.number().nullable().optional(),
   models: z.array(z.string()),
   status: z.enum(["ok", "error", "warning"]),
   spanCount: z.number().int().nonnegative().default(0),
@@ -63,6 +66,15 @@ const traceHeaderSchema = z.object({
   error: z.string().nullish(),
   input: z.string().nullish(),
   output: z.string().nullish(),
+  // Set when a restrict privacy rule hides the content from this viewer, so the
+  // header shows a labeled placeholder instead of nothing.
+  inputRedacted: z.boolean().nullish(),
+  outputRedacted: z.boolean().nullish(),
+  inputVisibleTo: z.string().nullish(),
+  outputVisibleTo: z.string().nullish(),
+  // True when input/output/error were teaser-redacted by the plan's
+  // visibility window — drives the blurred-content upgrade treatment.
+  redactedByVisibilityWindow: z.boolean().optional(),
   models: z.array(z.string()),
   /**
    * Grand list-price cost of the trace (sum of span costs). LangWatch bills
@@ -97,6 +109,15 @@ const traceHeaderSchema = z.object({
   lastUsedPromptVersionId: z.string().nullable().default(null),
   lastUsedPromptSpanId: z.string().nullable().default(null),
   attributes: z.record(z.string()),
+  /**
+   * Read-time privacy markers for the trace. `droppedCategories` lists content
+   * categories (`input` / `output`) that a `drop` data-privacy policy stripped
+   * at ingestion, so the drawer can surface the "dropped, cannot be recovered"
+   * banner. Absent/null when nothing was dropped.
+   */
+  privacy: z
+    .object({ droppedCategories: z.array(z.string()).optional() })
+    .nullish(),
 });
 
 export type TraceHeader = z.infer<typeof traceHeaderSchema>;
@@ -116,12 +137,20 @@ const spanTreeNodeSchema = z.object({
   status: z.enum(["ok", "error", "unset"]),
   model: z.string().nullable(),
   /**
-   * USD cost from `gen_ai.usage.cost` — null when the span had none.
+   * USD cost — `gen_ai.usage.cost` when the SDK reported one, otherwise
+   * computed server-side from token counts × model pricing (same cascade
+   * the trace-level fold uses). Null when neither yields a value.
    * `.nullish()` so older clients (or sample fixtures) that don't set
    * the field at all stay compatible; readers should treat `undefined`
    * and `null` identically.
    */
   cost: z.number().nullish(),
+  /** Token usage counts — surfaced so the waterfall's model pill can
+   * show the input/output/cache breakdown without a spanDetail call. */
+  inputTokens: z.number().nullish(),
+  outputTokens: z.number().nullish(),
+  cacheReadTokens: z.number().nullish(),
+  cacheCreationTokens: z.number().nullish(),
 });
 
 export type SpanTreeNode = z.infer<typeof spanTreeNodeSchema>;
@@ -153,6 +182,53 @@ export const spanLangwatchSignalsSchema = z.object({
 export type SpanLangwatchSignals = z.infer<typeof spanLangwatchSignalsSchema>;
 
 /**
+ * Per-category read-time privacy status for a span, one entry per content
+ * category (input / output / system instructions / tool calls). Lets the drawer
+ * present every category the same way so an absent or hidden category never
+ * reads as missing instrumentation.
+ *
+ * - `visible` + `visibleTo` null: ordinary captured content.
+ * - `visible` + `visibleTo` set: restricted, but THIS viewer is in the audience
+ *   (the "visible to you" badge naming who else can see it).
+ * - `restricted`: stored but hidden from this viewer; `visibleTo` names who can.
+ * - `dropped`: removed by a `drop` policy at ingestion, not stored, unrecoverable.
+ */
+export const CONTENT_PRIVACY_STATES = [
+  "visible",
+  "restricted",
+  "dropped",
+] as const;
+
+const categoryPrivacySchema = z.object({
+  state: z.enum(CONTENT_PRIVACY_STATES),
+  visibleTo: z.string().nullable(),
+});
+
+export const contentPrivacySchema = z.object({
+  input: categoryPrivacySchema,
+  output: categoryPrivacySchema,
+  system: categoryPrivacySchema,
+  tools: categoryPrivacySchema,
+});
+
+export type CategoryPrivacy = z.infer<typeof categoryPrivacySchema>;
+export type ContentPrivacy = z.infer<typeof contentPrivacySchema>;
+
+/**
+ * A custom-attribute `restrict` rule that applies to THIS viewer. The
+ * attributes table marks any row whose key matches `pattern` (which may carry
+ * `*` wildcards): `canSee` true means the viewer is in the audience and the
+ * value shows with a "visible to you" marker; false means the value is hidden
+ * (already redacted server-side). `visibleTo` is the human audience label.
+ */
+export const restrictedAttributeSchema = z.object({
+  pattern: z.string(),
+  visibleTo: z.string(),
+  canSee: z.boolean(),
+});
+export type RestrictedAttribute = z.infer<typeof restrictedAttributeSchema>;
+
+/**
  * Span detail: full span data for the accordion when a span is selected.
  * Returned by `tracesV2.spanDetail`.
  */
@@ -169,6 +245,25 @@ export const spanDetailSchema = z.object({
   vendor: z.string().nullish(),
   input: z.string().nullish(),
   output: z.string().nullish(),
+  // Set when a restrict privacy rule hides the content from this viewer, so the
+  // drawer shows a labeled placeholder instead of nothing. `*VisibleTo` is the
+  // human audience label ("Admins, Security group" or "no one").
+  inputRedacted: z.boolean().nullish(),
+  outputRedacted: z.boolean().nullish(),
+  inputVisibleTo: z.string().nullish(),
+  outputVisibleTo: z.string().nullish(),
+  // Generic per-category privacy status (input/output/system/tools), so the
+  // drawer marks every category consistently — restricted, restricted-but-
+  // visible-to-you, or dropped. Absent on older cached responses.
+  contentPrivacy: contentPrivacySchema.nullish(),
+  // True when strict PII redaction was requested but the analysis service
+  // (names/locations) did not run, so the content may still contain names or
+  // locations. The drawer warns instead of implying it is fully scrubbed.
+  piiAnalysisIncomplete: z.boolean().nullish(),
+  // Custom-attribute restrict rules that apply to this viewer, so the
+  // attributes table can mark a matching row as restricted and name who can
+  // read it. Absent on older cached responses.
+  restrictedAttributes: z.array(restrictedAttributeSchema).nullish(),
   error: z
     .object({
       message: z.string(),
@@ -191,6 +286,12 @@ export const spanDetailSchema = z.object({
       attributes: z.record(z.unknown()),
     }),
   ),
+  /**
+   * Present when the span names a model and carries token usage but nothing
+   * (custom rule or static registry) prices it, the UI offers to create a
+   * model cost mapping for `model`. Only computed by `spanDetail`.
+   */
+  costSuggestion: z.object({ model: z.string() }).nullish(),
 });
 
 export type SpanDetail = z.infer<typeof spanDetailSchema>;

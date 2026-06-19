@@ -24,6 +24,7 @@ export interface LogRecordStorageRepository {
   getMarkedClaudeCodeLogsByTrace(
     tenantId: string,
     traceId: string,
+    occurredAtMs?: number,
   ): Promise<StoredLogRecordRow[]>;
 }
 
@@ -34,6 +35,7 @@ export class NullLogRecordStorageRepository
   async getMarkedClaudeCodeLogsByTrace(
     _tenantId: string,
     _traceId: string,
+    _occurredAtMs?: number,
   ): Promise<StoredLogRecordRow[]> {
     return [];
   }

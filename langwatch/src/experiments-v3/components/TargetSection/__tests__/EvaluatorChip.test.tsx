@@ -13,6 +13,7 @@ import { EvaluatorChip } from "../EvaluatorChip";
 vi.mock("../../../hooks/useEvaluatorName", () => ({
   useEvaluatorName: () => "Exact Match",
   useEvaluatorNames: () => new Map(),
+  useCodeEvaluatorIds: () => new Set(),
 }));
 
 const Wrapper = ({ children }: { children: ReactNode }) => (

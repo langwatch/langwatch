@@ -44,6 +44,50 @@ export const normalizeErrorCode = (
   return error;
 };
 
+/**
+ * Auth errors that represent a *stable* failure the user has to act on (wrong
+ * sign-in method / account collision), not a transient glitch we can silently
+ * retry. For these we must NOT auto-redirect back to the identity provider:
+ * the IdP still holds a live session for the failing identity, so bouncing
+ * straight back silently re-authenticates the same identity and traps the user
+ * in a loop (the exact symptom behind the "stuck in the sign-in loop" report).
+ * Recovery instead goes through a federated logout so the IdP session is
+ * cleared first and the next attempt lets them pick a different method.
+ *
+ * Shared between this page and the sign-in page so the two auto-redirect gates
+ * can never drift apart.
+ */
+export const STABLE_AUTH_ERRORS = [
+  "OAuthAccountNotLinked",
+  "DIFFERENT_EMAIL_NOT_ALLOWED",
+  "SSO_PROVIDER_NOT_ALLOWED",
+] as const;
+
+export const isStableAuthError = (error: string | null | undefined): boolean =>
+  !!error && (STABLE_AUTH_ERRORS as readonly string[]).includes(error);
+
+/**
+ * Server route that clears the app session and, on Auth0 deployments,
+ * federates to Auth0 `/v2/logout` to clear the identity-provider session too
+ * (see logoutHandler in server/routes/auth.ts). Other providers just clear the
+ * app session and return to sign-in.
+ */
+export const FEDERATED_LOGOUT_PATH = "/api/auth/logout";
+
+/** Friendly heading for known error codes; falls back to the raw code. */
+const errorTitle = (error: string): string => {
+  switch (error) {
+    case "OAuthAccountNotLinked":
+      return "Account already exists";
+    case "DIFFERENT_EMAIL_NOT_ALLOWED":
+      return "Can't link this account";
+    case "SSO_PROVIDER_NOT_ALLOWED":
+      return "Use your organization's sign-in";
+    default:
+      return error;
+  }
+};
+
 export default function Error() {
   const { data: session } = useSession();
   const query = useSearchParams();
@@ -56,14 +100,7 @@ export default function Error() {
       return;
     }
 
-    if (
-      error &&
-      [
-        "DIFFERENT_EMAIL_NOT_ALLOWED",
-        "OAuthAccountNotLinked",
-        "SSO_PROVIDER_NOT_ALLOWED",
-      ].includes(error)
-    ) {
+    if (isStableAuthError(error)) {
       return;
     }
 
@@ -121,28 +158,23 @@ export function SignInError({ error: rawError }: { error: string }) {
           >
             <Alert.Indicator />
             <Alert.Content gap={4}>
-              <Alert.Title fontWeight="bold">
-                {error === "OAuthAccountNotLinked"
-                  ? "Account already exists"
-                  : error}
-              </Alert.Title>
+              <Alert.Title fontWeight="bold">{errorTitle(error)}</Alert.Title>
               {error === "OAuthAccountNotLinked" ? (
                 <Alert.Description>
                   <VStack gap={1} align="start">
                     <Text>
-                      An account with this email already exists but was created
-                      with a different sign-in method (e.g. Google, GitHub).
+                      This email is already registered with a different sign-in
+                      method. To get back in, sign out completely and sign in
+                      again using the method you used originally.
                       <br />
                       <br />
-                      To link this method, sign in with the method you used
-                      originally, then go to{" "}
-                      <b>Settings &gt; Authentication</b> to link additional
-                      sign-in methods.
+                      If your organization uses single sign-on, enter your work
+                      email and choose your company login.
                     </Text>
                     <Button asChild marginTop={4} color="white">
-                      <Link href="/auth/signin">
-                        Sign in with another method
-                      </Link>
+                      <a href={FEDERATED_LOGOUT_PATH}>
+                        Sign out &amp; try again
+                      </a>
                     </Button>
                   </VStack>
                 </Alert.Description>
@@ -164,12 +196,14 @@ export function SignInError({ error: rawError }: { error: string }) {
                 <Alert.Description>
                   <VStack gap={1} align="start">
                     <Text>
-                      Your organization requires SSO login. Please go back
-                      and sign in by entering your company email address in
-                      the login form.
+                      Your organization requires single sign-on. Sign out and
+                      sign in again by entering your company email address, then
+                      choose your organization's login.
                     </Text>
                     <Button asChild marginTop={4} color="white">
-                      <Link href="/">Back to Login</Link>
+                      <a href={FEDERATED_LOGOUT_PATH}>
+                        Sign out &amp; try again
+                      </a>
                     </Button>
                   </VStack>
                 </Alert.Description>

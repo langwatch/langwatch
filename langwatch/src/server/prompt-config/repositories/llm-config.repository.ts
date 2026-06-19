@@ -16,29 +16,15 @@ import {
   LATEST_SCHEMA_VERSION,
   type LatestConfigVersionSchema,
   parseLlmConfigVersion,
+  parseRuntimeParameters,
 } from "./llm-config-version-schema";
 import {
   type CreateLlmConfigVersionParams,
   LlmConfigVersionsRepository,
 } from "./llm-config-versions.repository";
+import { sortKeysDeep } from "./sortKeysDeep";
 
 const logger = createLogger("langwatch:prompt-config:llm-config.repository");
-
-/**
- * Recursively sort all object keys for deterministic JSON serialization.
- * Arrays preserve element order but their object elements get sorted keys.
- */
-function sortKeysDeep(obj: unknown): unknown {
-  if (Array.isArray(obj)) return obj.map(sortKeysDeep);
-  if (obj && typeof obj === "object" && obj !== null) {
-    return Object.fromEntries(
-      Object.entries(obj)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([k, v]) => [k, sortKeysDeep(v)]),
-    );
-  }
-  return obj;
-}
 
 /**
  * Interface for LLM Config data transfer objects
@@ -59,6 +45,7 @@ export type CreateLlmConfigParams = Omit<
 export interface LlmConfigWithLatestVersion extends LlmPromptConfig {
   latestVersion: LatestConfigVersionSchema & {
     author?: { name: string } | null;
+    runtimeParameters: Record<string, unknown>;
   };
   _count?: {
     copiedPrompts?: number;
@@ -131,9 +118,14 @@ export class LlmConfigRepository {
             throw new Error(`Prompt config ${config.id} has no versions.`);
           }
 
+          const rawVersion = config.versions[0]!;
           return {
             ...config,
-            latestVersion: parseLlmConfigVersion(config.versions[0]),
+            latestVersion: {
+              ...parseLlmConfigVersion(rawVersion),
+              runtimeParameters:
+                parseRuntimeParameters(rawVersion.runtimeParameters),
+            },
           };
         } catch (error) {
           logger.error(
@@ -286,9 +278,14 @@ export class LlmConfigRepository {
     );
 
     try {
+      const rawVersion = config.versions[0]!;
       return {
         ...config,
-        latestVersion: parseLlmConfigVersion(config.versions[0]),
+        latestVersion: {
+          ...parseLlmConfigVersion(rawVersion),
+          runtimeParameters:
+            parseRuntimeParameters(rawVersion.runtimeParameters),
+        },
       };
     } catch (error) {
       throw new Error(
@@ -458,6 +455,7 @@ export class LlmConfigRepository {
       "configId" | "projectId"
     > & {
       prompt?: string;
+      runtimeParameters?: Record<string, unknown>;
     };
   }): Promise<LlmConfigWithLatestVersion> {
     const { configData, versionData } = params;
@@ -491,21 +489,26 @@ export class LlmConfigRepository {
           scope: configData.scope,
         },
       });
-      // Resolve the project's DEFAULT model via the cascade. We let
+      // Resolve the project's DEFAULT model via the cascade, but only on
+      // the paths that actually need one: no version data at all, or a
+      // version without a model. A prompt that ships its own model, like
+      // every prompt pushed by the CLI's sync, must not require the
+      // project to have a default model configured. We let
       // ModelNotConfiguredError propagate so the missing-model toast
       // fires; only swallow resolver-internal crashes and fall back to
       // DEFAULT_MODEL as a last-resort placeholder.
-      let defaultModel: string;
-      try {
-        const resolved = await resolveModelForFeature(
-          "prompt.create_default",
-          { prisma: this.prisma, projectId: configData.projectId },
-        );
-        defaultModel = resolved.model;
-      } catch (err) {
-        if (err instanceof ModelNotConfiguredError) throw err;
-        defaultModel = DEFAULT_MODEL;
-      }
+      const resolveDefaultModel = async (): Promise<string> => {
+        try {
+          const resolved = await resolveModelForFeature(
+            "prompt.create_default",
+            { prisma: this.prisma, projectId: configData.projectId },
+          );
+          return resolved.model;
+        } catch (err) {
+          if (err instanceof ModelNotConfiguredError) throw err;
+          return DEFAULT_MODEL;
+        }
+      };
 
       // Set the version data to the provided version data, or undefined if no version data is provided.
       let newVersionData: Partial<CreateLlmConfigVersionParams> | undefined =
@@ -514,7 +517,7 @@ export class LlmConfigRepository {
       // If no version data is provided, we'll create a default (draft) version.
       if (!newVersionData) {
         const configData = this.buildDefaultVersionConfigData({
-          model: defaultModel,
+          model: await resolveDefaultModel(),
         });
 
         newVersionData = {
@@ -526,7 +529,7 @@ export class LlmConfigRepository {
 
       // Ensure a model is set if configData is provided
       if (newVersionData.configData && !newVersionData.configData.model) {
-        newVersionData.configData.model = defaultModel;
+        newVersionData.configData.model = await resolveDefaultModel();
       }
 
       const newVersion = await tx.llmPromptConfigVersion.create({
@@ -534,6 +537,8 @@ export class LlmConfigRepository {
           ...newVersionData,
           version: 1,
           configData: newVersionData.configData as Prisma.InputJsonValue,
+          runtimeParameters:
+            (versionData?.runtimeParameters as Prisma.InputJsonValue) ?? {},
           id: this.versions.generateVersionId(),
           configId: newConfig.id,
           projectId: newConfig.projectId,
@@ -556,7 +561,11 @@ export class LlmConfigRepository {
 
       return {
         ...updatedConfig,
-        latestVersion: parseLlmConfigVersion(newVersion),
+        latestVersion: {
+          ...parseLlmConfigVersion(newVersion),
+          runtimeParameters:
+            parseRuntimeParameters(newVersion.runtimeParameters),
+        },
       };
     });
   }

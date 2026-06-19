@@ -1,10 +1,8 @@
 import {
   type Organization,
   OrganizationUserRole,
-  PIIRedactionLevel,
   Prisma,
   type Project,
-  ProjectSensitiveDataVisibilityLevel,
   type Team,
   TeamUserRole,
   type User,
@@ -175,11 +173,6 @@ export async function getTestProject(namespace: string): Promise<Project> {
         framework: "openai",
         apiKey: `test-auth-token-${nanoid()}`,
         teamId: team.id,
-        piiRedactionLevel: PIIRedactionLevel.ESSENTIAL,
-        capturedInputVisibility:
-          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
-        capturedOutputVisibility:
-          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
       },
     });
   }

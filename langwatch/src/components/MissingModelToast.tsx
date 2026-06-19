@@ -7,8 +7,10 @@ import { toaster } from "./ui/toaster";
  *
  * Why toast and not modal: the previous design opened a full Dialog,
  * which felt heavy for background flows (AI search, auto-saved
- * commit-message generation). A sticky orange toast with a deep-link
- * action button is just as discoverable but doesn't trap focus.
+ * commit-message generation). A sticky info toast with a deep-link
+ * action button is just as discoverable but doesn't trap focus. Info,
+ * not error: a missing model is a configuration nudge, nothing failed
+ * from the user's point of view.
  *
  * The toaster system already lives at the app root; we don't mount any
  * extra component for this. Stable per-(featureKey, role) toast IDs
@@ -64,7 +66,7 @@ export function showMissingModelToast(info: MissingModelInfo): void {
 
   toaster.create({
     id,
-    type: "error",
+    type: "info",
     duration: Infinity,
     title: `Model not configured for ${info.featureDisplayName}`,
     description,
@@ -116,7 +118,10 @@ export function showAiCallFailedToast(info: AiCallFailedInfo): void {
 
   toaster.create({
     id,
-    type: "error",
+    // Warning, not error: the AI call is an assistive convenience (commit
+    // messages, AI search, ...). It failing nudges the user to check their
+    // model configuration; nothing the user was doing actually broke.
+    type: "warning",
     duration: 10000,
     title: `${info.featureDisplayName} failed`,
     description,
@@ -128,5 +133,86 @@ export function showAiCallFailedToast(info: AiCallFailedInfo): void {
       },
     },
     meta: { closable: true, type: "ai-call-failed" },
+  });
+}
+
+/**
+ * Toast variant for `ModelProviderDisabledError` — the cascade DID
+ * resolve a model, but that model's backing provider is currently
+ * disabled. The primary CTA is a one-click swap to the cascade-next
+ * candidate (if any) by deleting the disabled scope's key for this
+ * feature; the fallback is a deep-link to settings.
+ *
+ * UX contract: specs/model-providers/missing-model-popup.feature
+ * (the "Provider disabled" rule).
+ */
+export type ProviderDisabledInfo = {
+  featureKey: string;
+  featureDisplayName: string;
+  role: MissingModelInfo["role"];
+  projectId: string;
+  resolvedScope: "project" | "team" | "organization";
+  resolvedModel: string;
+  providerKey: string;
+  alternate: {
+    scope: "team" | "organization";
+    model: string;
+    providerKey: string;
+    providerEnabled: boolean;
+  } | null;
+  /**
+   * Called when the user clicks "Use {alternate.scope} default" — must
+   * delete the disabled-scope's feature key so the next resolve falls
+   * back to the alternate. Injected by the caller (interceptor) to
+   * avoid a circular import between this module and `~/utils/api`.
+   */
+  onSwapToAlternate?: () => Promise<void> | void;
+};
+
+export function providerDisabledToastId(info: ProviderDisabledInfo): string {
+  return `provider-disabled:${info.role}:${info.featureKey}:${info.resolvedScope}`;
+}
+
+const SCOPE_LABEL: Record<ProviderDisabledInfo["resolvedScope"], string> = {
+  project: "project",
+  team: "team",
+  organization: "organization",
+};
+
+export function showProviderDisabledToast(info: ProviderDisabledInfo): void {
+  const id = providerDisabledToastId(info);
+  if (toaster.isVisible(id)) return;
+  const href = settingsHref({ ...info, canConfigure: true });
+
+  const swapAvailable =
+    info.alternate?.providerEnabled === true && info.onSwapToAlternate;
+  const altSummary = info.alternate ? info.alternate.model : null;
+
+  const description = swapAvailable
+    ? `${info.resolvedModel} is set at ${SCOPE_LABEL[info.resolvedScope]} scope, but its provider "${info.providerKey}" is disabled. The ${info.alternate?.scope} default (${info.alternate?.model}) is still available.`
+    : `${info.resolvedModel} is set at ${SCOPE_LABEL[info.resolvedScope]} scope, but its provider "${info.providerKey}" is disabled. Re-enable it in Settings, or pick a different default.`;
+
+  toaster.create({
+    id,
+    type: "error",
+    duration: Infinity,
+    title: `Model unavailable for ${info.featureDisplayName}`,
+    description,
+    action: swapAvailable
+      ? {
+          label: `Use ${info.alternate?.scope} default${altSummary ? ` (${altSummary})` : ""}`,
+          onClick: () => {
+            toaster.dismiss(id);
+            void Promise.resolve(info.onSwapToAlternate?.());
+          },
+        }
+      : {
+          label: "Open settings",
+          onClick: () => {
+            toaster.dismiss(id);
+            window.location.assign(href);
+          },
+        },
+    meta: { closable: true, type: "provider-disabled" },
   });
 }

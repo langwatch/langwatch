@@ -3,7 +3,6 @@ import {
   Button,
   HStack,
   Input,
-  NativeSelect,
   Spacer,
   Text,
   useDisclosure,
@@ -20,6 +19,7 @@ import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { CodeEditor } from "~/optimization_studio/components/code/CodeEditorModal";
 import type { Field } from "~/optimization_studio/types/dsl";
+import { FieldTypeSelect } from "~/prompts/components/ui/FieldTypeSelect";
 import {
   TYPE_LABELS,
   VariableTypeIcon,
@@ -210,7 +210,12 @@ export const OutputsSection = ({
     <VStack align="stretch" gap={3} width="full">
       {/* Header */}
       <HStack width="full">
-        <Text fontSize="xs" fontWeight="bold" textTransform="uppercase" color="fg.muted">
+        <Text
+          fontSize="xs"
+          fontWeight="bold"
+          textTransform="uppercase"
+          color="fg.muted"
+        >
           {title}
         </Text>
         <Spacer />
@@ -358,53 +363,21 @@ const OutputRow = ({
 
   return (
     <HStack gap={2} width="full">
-      {/* Type Icon with selector */}
-      {readOnly ? (
-        <Box flexShrink={0} padding={1}>
-          <VariableTypeIcon type={output.type} size={14} />
-        </Box>
-      ) : (
-        <NativeSelect.Root size="xs" width="30px" marginX={-2} flexShrink={0}>
-          <NativeSelect.Field
-            value={output.type}
-            onChange={(e) => {
-              const newType = e.target.value as OutputType;
-              if (newType === "json_schema" && output.type !== "json_schema") {
-                onUpdate({ type: newType, json_schema: DEFAULT_JSON_SCHEMA });
-                onEditJsonSchema();
-              } else {
-                onUpdate({ type: newType });
-              }
-            }}
-            border="1px solid"
-            borderColor="transparent"
-            borderRadius="lg"
-            padding={1}
-            paddingRight={5}
-            _hover={{ borderColor: "border" }}
-            css={{
-              color: "transparent",
-              "& option": { color: "black" },
-            }}
-            background="transparent"
-          >
-            {typeOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </NativeSelect.Field>
-          <Box
-            position="absolute"
-            left={2}
-            top="50%"
-            transform="translateY(-50%)"
-            pointerEvents="none"
-          >
-            <VariableTypeIcon type={output.type} size={14} />
-          </Box>
-        </NativeSelect.Root>
-      )}
+      <FieldTypeSelect
+        value={output.type}
+        options={typeOptions}
+        onChange={(newTypeStr) => {
+          const newType = newTypeStr as OutputType;
+          if (newType === "json_schema" && output.type !== "json_schema") {
+            onUpdate({ type: newType, json_schema: DEFAULT_JSON_SCHEMA });
+            onEditJsonSchema();
+          } else {
+            onUpdate({ type: newType });
+          }
+        }}
+        readOnly={readOnly}
+        testId={`output-type-select-${output.identifier}`}
+      />
 
       {/* Output Name */}
       {isEditing && !readOnly ? (

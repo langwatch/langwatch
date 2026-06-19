@@ -1,6 +1,7 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { useMemo, useRef } from "react";
-import { useFocusSectionStore } from "../../../stores/focusSectionStore";
+import { PrivacyDroppedNotice } from "~/components/ui/PrivacyDroppedNotice";
+import { RedactedField } from "~/components/ui/RedactedField";
 import type {
   SpanTreeNode,
   TraceHeader,
@@ -8,17 +9,18 @@ import type {
 import { useTraceEvaluations } from "../../../hooks/useTraceEvaluations";
 import { useTraceEvents } from "../../../hooks/useTraceEvents";
 import { useTraceResources } from "../../../hooks/useTraceResources";
+import { useFocusSectionStore } from "../../../stores/focusSectionStore";
 import { rankedErrorSpans } from "../../../utils/errorSpans";
 import { AttributeTable } from "../AttributeTable";
-import { EvalsList } from "../evalCards";
 import { ExceptionsContent } from "../ExceptionsContent";
+import { EvalsList } from "../evalCards";
 import { IOViewer } from "../IOViewer";
 import { ScopeBlock } from "../ScopeChip";
 import { AccordionShell, Section } from "./AccordionShell";
 import { EmptyEventsState, EmptyHint } from "./EmptyStates";
 import { EventCard } from "./EventCard";
-import { useAutoOpenSections } from "./sectionPresence";
 import { SectionFocusGlow } from "./SectionFocusGlow";
+import { useAutoOpenSections } from "./sectionPresence";
 import { useSectionFocusGlow } from "./useSectionFocusGlow";
 import { countFlatLeaves } from "./utils";
 
@@ -149,11 +151,15 @@ export function TraceSummaryAccordions({
                 value="io"
                 title="Input and Output"
                 empty={!hasIO}
+                spotlightAnchor={hasIO ? "drawer-io" : undefined}
                 isFirst={isFirst}
                 open={isOpen}
               >
-                {hasIO ? (
-                  <VStack align="stretch" gap={2}>
+                <VStack align="stretch" gap={2}>
+                  <PrivacyDroppedNotice
+                    categories={trace.privacy?.droppedCategories ?? undefined}
+                  />
+                  <RedactedField field="input">
                     {trace.input ? (
                       <IOViewer
                         label="Input"
@@ -163,6 +169,8 @@ export function TraceSummaryAccordions({
                     ) : (
                       <MissingIORow label="Input" mode="input" />
                     )}
+                  </RedactedField>
+                  <RedactedField field="output">
                     {trace.output ? (
                       <IOViewer
                         label="Output"
@@ -173,10 +181,8 @@ export function TraceSummaryAccordions({
                     ) : (
                       <MissingIORow label="Output" mode="output" />
                     )}
-                  </VStack>
-                ) : (
-                  <EmptyHint>No I/O captured for this trace</EmptyHint>
-                )}
+                  </RedactedField>
+                </VStack>
               </Section>
             );
           }
@@ -232,7 +238,8 @@ export function TraceSummaryAccordions({
             // without a count, leaving users to expand it to find out whether
             // they were looking at one bad span or twenty.
             const exceptionsCount =
-              errorSpans.length + (trace.error && errorSpans.length === 0 ? 1 : 0);
+              errorSpans.length +
+              (trace.error && errorSpans.length === 0 ? 1 : 0);
             return (
               <Section
                 key="exceptions"
@@ -262,6 +269,7 @@ export function TraceSummaryAccordions({
                 key="evals"
                 value="evals"
                 title="Evals"
+                spotlightAnchor={hasEvalsContent ? "drawer-evals" : undefined}
                 count={
                   evalsForList.length > 0 ? evalsForList.length : undefined
                 }
@@ -298,6 +306,7 @@ export function TraceSummaryAccordions({
               key="events"
               value="events"
               title="Events"
+              spotlightAnchor={hasEventsContent ? "drawer-events" : undefined}
               count={traceEvents.length > 0 ? traceEvents.length : undefined}
               empty={traceEvents.length === 0}
               isFirst={isFirst}

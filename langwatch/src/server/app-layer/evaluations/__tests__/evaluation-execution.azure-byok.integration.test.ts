@@ -13,7 +13,7 @@
  * without hitting Prisma. LangEvals client is mocked to capture the env payload.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.generated";
+import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
 import type { Trace } from "~/server/tracer/types";
 import type { LangEvalsClient } from "../../clients/langevals/langevals.client";
 import type { TraceService } from "~/server/traces/trace.service";

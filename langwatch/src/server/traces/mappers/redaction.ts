@@ -1,3 +1,8 @@
+import {
+  redactSpanContent,
+  redactTraceContent,
+} from "~/server/app-layer/traces/visibility-window.service";
+import { PRIVACY_DROPPED_MARKER_ATTR } from "~/server/data-privacy/dropKeyCatalog";
 import type { Protections } from "~/server/elasticsearch/protections";
 import type {
   Event,
@@ -9,6 +14,47 @@ import type {
   TraceOutput,
 } from "~/server/tracer/types";
 import { parsePythonInsideJson } from "~/utils/parsePythonInsideJson";
+import { redactHiddenAttributes } from "./redactAttributes";
+
+// Stable display order for the content categories a drop policy can strip, so
+// the trace-view marker always lists them the same way ("input, output").
+const DROP_CATEGORY_ORDER = ["input", "output", "system", "tools"];
+
+/**
+ * Reads the drop marker that `stripOtlpSpanContent` stamps on a span when a
+ * `drop` privacy policy is active, listing the content categories it removed.
+ * The span mapper unflattens dotted attribute keys into nested objects, so the
+ * `langwatch.privacy.dropped` attribute arrives at the matching nested path
+ * inside `span.params` rather than as a flat key.
+ */
+function readSpanDropMarker(span: Span): string[] {
+  let node: unknown = span.params;
+  for (const key of PRIVACY_DROPPED_MARKER_ATTR.split(".")) {
+    if (typeof node !== "object" || node === null) return [];
+    node = (node as Record<string, unknown>)[key];
+  }
+  if (typeof node !== "string") return [];
+  return node
+    .split(",")
+    .map((category) => category.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Collects the union of content categories any span reports as dropped by a
+ * `drop` privacy policy, in a stable order, so the trace view can explain the
+ * absence instead of rendering a blank that looks like missing instrumentation.
+ */
+export function collectDroppedCategories(spans: Span[] | undefined): string[] {
+  const found = new Set<string>();
+  for (const span of spans ?? []) {
+    for (const category of readSpanDropMarker(span)) found.add(category);
+  }
+  return [
+    ...DROP_CATEGORY_ORDER.filter((category) => found.has(category)),
+    ...[...found].filter((category) => !DROP_CATEGORY_ORDER.includes(category)),
+  ];
+}
 
 /**
  * Extracts string values from an object for redaction purposes.
@@ -169,12 +215,37 @@ export function applySpanProtections(
     }
   }
 
-  return {
+  // Custom attribute rules with a restrict disposition: replace matched span
+  // params (the mapper unflattens dotted keys into nested objects, so the
+  // matcher walks the nested paths) with the placeholder naming who can see
+  // them. Hidden input/output content riding along inside params (e.g. the
+  // raw gen_ai message attributes) is scrubbed by the redactions set.
+  const transformedParams = redactObject(
+    redactHiddenAttributes(
+      span.params as Record<string, unknown> | null | undefined,
+      protections.hiddenAttributes,
+    ),
+    redactions,
+  );
+
+  const transformed = {
     ...span,
     input: transformedInput,
     output: transformedOutput,
     metrics: transformedMetrics,
+    params: transformedParams as Span["params"],
   };
+
+  // Teaser-redact content of spans beyond the plan's visibility window
+  if (
+    protections.visibilityCutoffMs !== null &&
+    protections.visibilityCutoffMs !== undefined &&
+    span.timestamps.started_at < protections.visibilityCutoffMs
+  ) {
+    return redactSpanContent(transformed);
+  }
+
+  return transformed;
 }
 
 /**
@@ -278,12 +349,40 @@ export function applyTraceProtections(
     applyEventProtections(event, protections, redactions),
   );
 
-  return {
+  // Surface which categories a drop policy stripped at ingestion so the view can
+  // mark the absence. Read from the span marker (which follows the data), not
+  // the project's current settings, so old traces are not mislabeled after a
+  // rule changes.
+  const droppedCategories = collectDroppedCategories(trace.spans);
+
+  const transformed = {
     ...trace,
     input: transformedInput,
     output: transformedOutput,
     metrics: transformedMetrics,
     spans: transformedSpans,
     events: transformedEvents,
+    ...(droppedCategories.length > 0
+      ? { privacy: { ...trace.privacy, droppedCategories } }
+      : {}),
   };
+
+  // Teaser-redact content of traces beyond the plan's visibility window.
+  // Spans were already age-checked and teased individually in
+  // applySpanProtections — exclude them here so they are not double-teased;
+  // this pass covers the trace-level content fields and stamps the redacted
+  // flag for the upgrade CTA.
+  if (
+    protections.visibilityCutoffMs !== null &&
+    protections.visibilityCutoffMs !== undefined &&
+    trace.timestamps.started_at < protections.visibilityCutoffMs
+  ) {
+    const { spans, ...traceWithoutSpans } = transformed;
+    return {
+      ...redactTraceContent({ ...traceWithoutSpans, spans: [] }),
+      spans,
+    };
+  }
+
+  return transformed;
 }

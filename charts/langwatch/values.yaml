@@ -16,10 +16,16 @@ global:
   ## @param global.env [string, default: production] Deployment environment for all components.
   env: production
   ## @param global.podSecurityContext [object] Default pod security context (applied cluster-wide unless overridden).
+  # seccompProfile: RuntimeDefault is required by Pod Security Admission
+  # "restricted" and by most corporate Gatekeeper/Kyverno policies, which
+  # VALIDATE (not mutate) its presence and deny pods without it. Set at the
+  # pod level so it covers every container, including init containers.
   podSecurityContext:
     runAsNonRoot: true
     runAsUser: 1000
     fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
   ## @param global.containerSecurityContext [object] Default container security context (applied cluster-wide unless overridden).
   containerSecurityContext:
     allowPrivilegeEscalation: false
@@ -27,6 +33,8 @@ global:
       drop:
         - ALL
     readOnlyRootFilesystem: true
+  ## @param global.automountServiceAccountToken [default: false] Mount the ServiceAccount token into first-party workload pods (app, workers, nlp, langevals, cronjobs, postgresql, redis). Defaults to false — none of these call the Kubernetes API, and many clusters deny pods that automount the token. Set true only if a sidecar needs in-cluster API access.
+  automountServiceAccountToken: false
   ## @extra global.scheduling Global scheduling defaults for all pods.
   ## @param global.scheduling.nodeSelector [object] Node selector labels for all pods.
   ## @param global.scheduling.affinity [object] Affinity rules for all pods.
@@ -229,13 +237,16 @@ app:
   # Feature flags to enable/disable specific functionality
   ## @extra app.features Feature flags for the app.
   ## @param app.features.skipEnvValidation [default: false] Skip env var validation (dev only).
-  ## @param app.features.disablePiiRedaction [default: false] Disable PII redaction.
+  ## @param app.features.disableStrictPiiRedaction [default: false] Skip the strict PII redaction pass (Presidio analysis service). Native secrets and essential PII redaction still run.
   ## @param app.features.topicClustering [default: true] Enable automatic topic clustering.
   features:
     # Skip environment variable validation (useful for development)
     skipEnvValidation: false
-    # Disable PII (Personally Identifiable Information) redaction
-    disablePiiRedaction: false
+    # Skip the strict PII redaction pass (Presidio analysis service) to shed
+    # analysis-service load. Native secrets and essential PII redaction still
+    # run; per-scope policy still governs strict requests on the dashboard.
+    # Leave false to keep dashboard and Ops UI control of the kill switch.
+    disableStrictPiiRedaction: false
 
   # Upstream service connections
   # Define how the main app connects to other LangWatch services

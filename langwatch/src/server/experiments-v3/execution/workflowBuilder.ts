@@ -28,8 +28,8 @@ type HttpNodeData = {
   parameters: Field[];
 };
 import type { TypedAgent } from "~/server/agents/agent.repository";
-import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
-import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators.generated";
+import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
+import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { buildLLMConfig } from "~/server/prompt-config/llmConfigBuilder";
 import type { ChatMessage } from "~/server/tracer/types";

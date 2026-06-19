@@ -423,14 +423,23 @@ vi.mock("@copilotkit/react-ui", () => ({
 /**
  * Wrapper component that provides FormContext
  */
-function FormWrapper({ children }: { children: React.ReactNode }) {
+function FormWrapper({
+  children,
+  defaultValues,
+}: {
+  children: React.ReactNode;
+  defaultValues?: Partial<PromptConfigFormValues>;
+}) {
   const methods = useForm<PromptConfigFormValues>({
     defaultValues: {
+      ...defaultValues,
       version: {
+        parameters: {},
         configData: {
           inputs: [],
           demonstrations: { inline: { records: {} } },
         },
+        ...(defaultValues?.version ?? {}),
       },
     },
   });
@@ -440,6 +449,7 @@ function FormWrapper({ children }: { children: React.ReactNode }) {
 
 const renderPromptTabbedSection = (
   props: Partial<Parameters<typeof PromptTabbedSection>[0]> = {},
+  formValues?: Partial<PromptConfigFormValues>,
 ) => {
   const defaultProps = {
     layoutMode: "vertical" as const,
@@ -452,7 +462,7 @@ const renderPromptTabbedSection = (
 
   return render(
     <ChakraProvider value={defaultSystem}>
-      <FormWrapper>
+      <FormWrapper defaultValues={formValues}>
         <PromptTabbedSection {...defaultProps} />
       </FormWrapper>
     </ChakraProvider>,
@@ -536,6 +546,55 @@ describe("PromptTabbedSection Layout Modes", () => {
       renderPromptTabbedSection({ layoutMode: "horizontal" });
       expect(
         screen.getByRole("button", { name: /reset chat/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("shows editable runtime parameters in the Parameters tab", async () => {
+      const user = userEvent.setup();
+      renderPromptTabbedSection(
+        { layoutMode: "vertical" },
+        {
+          version: {
+            parameters: { environment: "production" },
+            configData: {
+              inputs: [],
+              demonstrations: { inline: { records: {} } },
+            },
+          } as any,
+        },
+      );
+
+      await user.click(screen.getByRole("tab", { name: /parameters/i }));
+
+      expect(screen.getByTestId("param-key-0")).toHaveValue("environment");
+      expect(screen.getByTestId("param-value-0")).toHaveValue("production");
+      expect(screen.getByTestId("add-parameter-button")).toBeInTheDocument();
+    });
+
+    /** @scenario Parameters tab shows explanation text distinguishing parameters from variables */
+    it("shows explanation text on Parameters and Variables tabs", async () => {
+      const user = userEvent.setup();
+      renderPromptTabbedSection(
+        { layoutMode: "vertical" },
+        {
+          version: {
+            parameters: {},
+            configData: {
+              inputs: [{ identifier: "input", type: "str" }],
+              demonstrations: { inline: { records: {} } },
+            },
+          } as any,
+        },
+      );
+
+      await user.click(screen.getByRole("tab", { name: /parameters/i }));
+      expect(
+        screen.getByText(/parameters are arbitrary configurations/i),
+      ).toBeInTheDocument();
+
+      await user.click(screen.getByRole("tab", { name: /variables/i }));
+      expect(
+        screen.getByText(/variables are substituted into the prompt/i),
       ).toBeInTheDocument();
     });
   });

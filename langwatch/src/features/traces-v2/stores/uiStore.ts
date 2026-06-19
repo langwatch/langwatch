@@ -20,6 +20,12 @@ interface UIState {
   mobileExpandedOverride: boolean;
   syntaxHelpOpen: boolean;
   shortcutsHelpOpen: boolean;
+  /**
+   * Whether the FacetManagerPopover is open. Hoisted here so multiple
+   * triggers can drive the same popover instance without each keeping
+   * its own copy of the state.
+   */
+  facetManagerOpen: boolean;
 
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
@@ -34,6 +40,7 @@ interface UIState {
   setSyntaxHelpOpen: (open: boolean) => void;
   setShortcutsHelpOpen: (open: boolean) => void;
   toggleShortcutsHelp: () => void;
+  setFacetManagerOpen: (open: boolean) => void;
 }
 
 const STORAGE_KEY = "langwatch:traces-v2:ui";
@@ -98,6 +105,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   mobileExpandedOverride: false,
   syntaxHelpOpen: false,
   shortcutsHelpOpen: false,
+  facetManagerOpen: false,
 
   toggleSidebar: () => {
     // On mobile we don't touch the persisted desktop preference — the
@@ -115,7 +123,10 @@ export const useUIStore = create<UIState>((set, get) => ({
 
   setSidebarCollapsed: (collapsed) => {
     set({ sidebarCollapsed: collapsed });
-    persistUI({ sidebarCollapsed: collapsed, sidebarWidth: get().sidebarWidth });
+    persistUI({
+      sidebarCollapsed: collapsed,
+      sidebarWidth: get().sidebarWidth,
+    });
   },
 
   setSidebarWidth: (width) => {
@@ -136,4 +147,6 @@ export const useUIStore = create<UIState>((set, get) => ({
   setShortcutsHelpOpen: (open) => set({ shortcutsHelpOpen: open }),
   toggleShortcutsHelp: () =>
     set((s) => ({ shortcutsHelpOpen: !s.shortcutsHelpOpen })),
+
+  setFacetManagerOpen: (open) => set({ facetManagerOpen: open }),
 }));

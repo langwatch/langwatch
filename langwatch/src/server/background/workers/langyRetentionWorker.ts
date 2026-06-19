@@ -4,6 +4,7 @@ import { withJobContext } from "../../context/asyncContext";
 import { createLogger } from "../../../utils/logger/server";
 import {
   captureException,
+  toError,
   withScope,
 } from "../../../utils/posthogErrorCapture";
 import {
@@ -41,7 +42,7 @@ export async function runLangyRetentionJob(
     logger.error({ jobId: job.id, error }, "langy retention sweep failed");
     await withScope(async (scope) => {
       scope.setTag?.("worker", "langyRetention");
-      captureException(error);
+      captureException(toError(error));
     });
     throw error;
   }

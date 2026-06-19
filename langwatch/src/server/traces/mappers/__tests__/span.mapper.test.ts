@@ -1,14 +1,12 @@
-import { describe, it, expect } from "vitest";
-import { mapNormalizedSpanToSpan, unflattenDotNotation } from "../span.mapper";
+import { describe, expect, it } from "vitest";
+import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import {
   NormalizedSpanKind,
   NormalizedStatusCode,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
-import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import { mapNormalizedSpanToSpan, unflattenDotNotation } from "../span.mapper";
 
-const makeSpan = (
-  overrides: Partial<NormalizedSpan> = {},
-): NormalizedSpan => ({
+const makeSpan = (overrides: Partial<NormalizedSpan> = {}): NormalizedSpan => ({
   id: "test-id",
   traceId: "trace-123",
   spanId: "span-456",
@@ -29,9 +27,9 @@ const makeSpan = (
   statusMessage: null,
   statusCode: null,
   instrumentationScope: { name: "test", version: null },
-  droppedAttributesCount: 0 as 0,
-  droppedEventsCount: 0 as 0,
-  droppedLinksCount: 0 as 0,
+  droppedAttributesCount: 0 as const,
+  droppedEventsCount: 0 as const,
+  droppedLinksCount: 0 as const,
   ...overrides,
 });
 
@@ -61,9 +59,7 @@ describe("mapNormalizedSpanToSpan", () => {
       const span = makeSpan({
         spanAttributes: {
           "langwatch.span.type": "llm",
-          "gen_ai.input.messages": [
-            { role: "user", content: "hello" },
-          ],
+          "gen_ai.input.messages": [{ role: "user", content: "hello" }],
         },
       });
 
@@ -71,8 +67,12 @@ describe("mapNormalizedSpanToSpan", () => {
 
       const params = result.params as Record<string, unknown>;
       expect(
-        ((params.gen_ai as Record<string, unknown>).input as Record<string, unknown>)
-          .messages,
+        (
+          (params.gen_ai as Record<string, unknown>).input as Record<
+            string,
+            unknown
+          >
+        ).messages,
       ).toEqual([{ role: "user", content: "hello" }]);
     });
 
@@ -80,7 +80,7 @@ describe("mapNormalizedSpanToSpan", () => {
       const span = makeSpan({
         spanAttributes: {
           "langwatch.span.type": "span",
-          "simple_key": "value",
+          simple_key: "value",
         },
       });
 
@@ -335,7 +335,10 @@ describe("mapNormalizedSpanToSpan", () => {
       const span = makeSpan({
         spanAttributes: {
           "langwatch.span.type": "evaluation",
-          "langwatch.output": { type: "evaluation_result", value: { passed: true, score: 0.9 } },
+          "langwatch.output": {
+            type: "evaluation_result",
+            value: { passed: true, score: 0.9 },
+          },
         },
       });
 
@@ -353,8 +356,14 @@ describe("mapNormalizedSpanToSpan", () => {
       const span = makeSpan({
         spanAttributes: {
           "langwatch.span.type": "evaluation",
-          "langwatch.output": { status: "processed", passed: true, score: 0.95 },
-          "langwatch.reserved.value_types": ["langwatch.output=evaluation_result"],
+          "langwatch.output": {
+            status: "processed",
+            passed: true,
+            score: 0.95,
+          },
+          "langwatch.reserved.value_types": [
+            "langwatch.output=evaluation_result",
+          ],
         },
       });
 
@@ -370,8 +379,15 @@ describe("mapNormalizedSpanToSpan", () => {
       const span = makeSpan({
         spanAttributes: {
           "langwatch.span.type": "evaluation",
-          "langwatch.output": JSON.stringify({ status: "processed", passed: true, score: 99, details: "This is a custom manual evaluation" }),
-          "langwatch.reserved.value_types": JSON.stringify(["langwatch.output=evaluation_result"]),
+          "langwatch.output": JSON.stringify({
+            status: "processed",
+            passed: true,
+            score: 99,
+            details: "This is a custom manual evaluation",
+          }),
+          "langwatch.reserved.value_types": JSON.stringify([
+            "langwatch.output=evaluation_result",
+          ]),
         },
       });
 
@@ -379,7 +395,12 @@ describe("mapNormalizedSpanToSpan", () => {
 
       expect(result.output).toEqual({
         type: "evaluation_result",
-        value: { status: "processed", passed: true, score: 99, details: "This is a custom manual evaluation" },
+        value: {
+          status: "processed",
+          passed: true,
+          score: 99,
+          details: "This is a custom manual evaluation",
+        },
       });
     });
   });
@@ -389,8 +410,14 @@ describe("mapNormalizedSpanToSpan", () => {
       const span = makeSpan({
         spanAttributes: {
           "langwatch.span.type": "guardrail",
-          "langwatch.output": JSON.stringify({ status: "processed", passed: false, score: 0.1 }),
-          "langwatch.reserved.value_types": JSON.stringify(["langwatch.output=guardrail_result"]),
+          "langwatch.output": JSON.stringify({
+            status: "processed",
+            passed: false,
+            score: 0.1,
+          }),
+          "langwatch.reserved.value_types": JSON.stringify([
+            "langwatch.output=guardrail_result",
+          ]),
         },
       });
 

@@ -1723,6 +1723,8 @@
                             "performance.completion_time",
                             "performance.first_token",
                             "performance.total_cost",
+                            "performance.cost_billed",
+                            "performance.cost_non_billed",
                             "performance.prompt_tokens",
                             "performance.completion_tokens",
                             "performance.total_tokens",
@@ -12747,6 +12749,11 @@
                           ]
                         },
                         "default": []
+                      },
+                      "parameters": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "default": {}
                       }
                     },
                     "required": [
@@ -12765,7 +12772,8 @@
                       "inputs",
                       "outputs",
                       "model",
-                      "tags"
+                      "tags",
+                      "parameters"
                     ]
                   }
                 }
@@ -13290,6 +13298,11 @@
                         ]
                       },
                       "default": []
+                    },
+                    "parameters": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "default": {}
                     }
                   },
                   "required": [
@@ -13308,7 +13321,8 @@
                     "inputs",
                     "outputs",
                     "model",
-                    "tags"
+                    "tags",
+                    "parameters"
                   ]
                 }
               }
@@ -13565,6 +13579,10 @@
                       "type": "string",
                       "minLength": 1
                     }
+                  },
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": {}
                   }
                 },
                 "required": [
@@ -14511,6 +14529,11 @@
                         ]
                       },
                       "default": []
+                    },
+                    "parameters": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "default": {}
                     }
                   },
                   "required": [
@@ -14529,7 +14552,8 @@
                     "inputs",
                     "outputs",
                     "model",
-                    "tags"
+                    "tags",
+                    "parameters"
                   ]
                 }
               }
@@ -15103,6 +15127,11 @@
                         ]
                       },
                       "default": []
+                    },
+                    "parameters": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "default": {}
                     }
                   },
                   "required": [
@@ -15121,7 +15150,8 @@
                     "inputs",
                     "outputs",
                     "model",
-                    "tags"
+                    "tags",
+                    "parameters"
                   ]
                 }
               }
@@ -15396,6 +15426,10 @@
                       "type": "string",
                       "minLength": 1
                     }
+                  },
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": {}
                   },
                   "scope": {
                     "type": "string",
@@ -16000,6 +16034,11 @@
                             ]
                           },
                           "default": []
+                        },
+                        "parameters": {
+                          "type": "object",
+                          "additionalProperties": {},
+                          "default": {}
                         }
                       },
                       "required": [
@@ -16018,7 +16057,8 @@
                         "inputs",
                         "outputs",
                         "model",
-                        "tags"
+                        "tags",
+                        "parameters"
                       ]
                     },
                     "conflictInfo": {
@@ -16436,6 +16476,10 @@
                             "outputs",
                             "model"
                           ]
+                        },
+                        "remoteConfig": {
+                          "type": "object",
+                          "additionalProperties": {}
                         }
                       },
                       "required": [
@@ -16954,6 +16998,10 @@
                       "outputs",
                       "model"
                     ]
+                  },
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": {}
                   },
                   "localVersion": {
                     "type": "number",
@@ -17583,6 +17631,11 @@
                           ]
                         },
                         "default": []
+                      },
+                      "parameters": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "default": {}
                       }
                     },
                     "required": [
@@ -17601,7 +17654,8 @@
                       "inputs",
                       "outputs",
                       "model",
-                      "tags"
+                      "tags",
+                      "parameters"
                     ]
                   }
                 }
@@ -18158,6 +18212,11 @@
                         ]
                       },
                       "default": []
+                    },
+                    "parameters": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "default": {}
                     }
                   },
                   "required": [
@@ -18176,7 +18235,8 @@
                     "inputs",
                     "outputs",
                     "model",
-                    "tags"
+                    "tags",
+                    "parameters"
                   ]
                 }
               }
@@ -19156,18 +19216,6 @@
                                                   },
                                                   "text": {
                                                     "type": "string"
-                                                  }
-                                                },
-                                                "required": [
-                                                  "type"
-                                                ]
-                                              },
-                                              {
-                                                "type": "object",
-                                                "properties": {
-                                                  "type": {
-                                                    "type": "string",
-                                                    "const": "text"
                                                   },
                                                   "content": {
                                                     "type": "string"
@@ -19316,18 +19364,6 @@
                                               },
                                               "text": {
                                                 "type": "string"
-                                              }
-                                            },
-                                            "required": [
-                                              "type"
-                                            ]
-                                          },
-                                          {
-                                            "type": "object",
-                                            "properties": {
-                                              "type": {
-                                                "type": "string",
-                                                "const": "text"
                                               },
                                               "content": {
                                                 "type": "string"
@@ -24312,6 +24348,41 @@
                       "required": [
                         "totalHits"
                       ]
+                    },
+                    "schema": {
+                      "type": "object",
+                      "properties": {
+                        "from": {
+                          "type": "string"
+                        },
+                        "columns": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "path": {
+                                "type": "string"
+                              },
+                              "type": {
+                                "type": "string"
+                              },
+                              "collection": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "path",
+                              "type",
+                              "collection"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "from",
+                        "columns"
+                      ],
+                      "description": "Present only when 'select' is provided. Describes the resolved columns — the dotted path, its value type, and whether it belongs to a nested child collection — so callers can pre-allocate a typed reader."
                     }
                   },
                   "required": [
@@ -25361,6 +25432,30 @@
                   },
                   "llmMode": {
                     "type": "boolean"
+                  },
+                  "dateField": {
+                    "type": "string",
+                    "enum": [
+                      "occurred",
+                      "updated"
+                    ],
+                    "description": "Which timestamp the startDate/endDate window filters on. 'occurred' (default) selects traces by when they happened. 'updated' selects traces by when they were last modified — use this for incremental ETL ('give me everything changed since my last pull'), since a trace can occur long before it gains a later evaluation or annotation."
+                  },
+                  "from": {
+                    "type": "string",
+                    "enum": [
+                      "traces"
+                    ],
+                    "description": "Entity root to read from. Only 'traces' is supported today. Defaults to 'traces' when 'select' is present."
+                  },
+                  "select": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1,
+                    "description": "Flat list of dotted-path columns to project, e.g. ['trace_id','metadata.user_id','events.type','evaluations.score']. Paths group by root in the response: scalar fields stay top-level, 'metadata.*' nests under a metadata object, and 'events.*'/'annotations.*'/'evaluations.*' return as nested arrays (one row per trace). When present, the response gains a top-level 'schema' field describing the resolved columns. When omitted, the response is unchanged from the legacy shape."
                   }
                 },
                 "required": [
@@ -29314,6 +29409,283 @@
         "parameters": [],
         "summary": "Clone a platform-published template into the caller's org",
         "description": "Forks the source row's source_type / display_name / OTTL into a fresh org-authored row that the admin can then edit via PATCH /ingestion-templates/:id/ottl-rules."
+      }
+    },
+    "/api/events/track": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Event tracked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "const": "Event tracked"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid event payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postApiEventsTrack",
+        "parameters": [],
+        "description": "Record a user event (e.g. thumbs up/down, selected text) attached to a trace. Predefined event types validate against their schemas; custom event types pass through `trackEventRESTParamsValidatorSchema`."
+      }
+    },
+    "/api/traces/{traceId}/metadata": {
+      "patch": {
+        "responses": {
+          "200": {
+            "description": "Metadata updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "traceId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "traceId"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "patchApiTracesByTraceIdMetadata",
+        "tags": [
+          "Traces"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "traceId",
+            "required": true
+          }
+        ],
+        "summary": "Update trace metadata",
+        "description": "Update metadata on a trace after creation. Inserts a synthetic span carrying the new attributes through the standard ingestion pipeline. New keys are added, existing keys are updated, missing keys are preserved. Labels replace entirely.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "metadata": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 4096
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": {}
+                        }
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "metadata"
+                ]
+              }
+            }
+          }
+        }
       }
     }
   },

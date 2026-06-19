@@ -14,7 +14,7 @@ import type {
 } from "~/server/gateway/budget.repository";
 import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
 import { createLogger } from "~/utils/logger/server";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import type { ReactorContext, ReactorDefinition } from "~/server/event-sourcing/reactors/reactor.types";
 import type { TraceSummaryData } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
@@ -259,7 +259,7 @@ export function createGatewayBudgetSyncReactor(
           },
           "failed to fold gateway trace into CH budget ledger",
         );
-        captureException(error);
+        captureException(toError(error));
       }
     },
   };

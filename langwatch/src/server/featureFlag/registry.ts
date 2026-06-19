@@ -80,18 +80,17 @@ export const FEATURE_FLAGS = [
     family: "Event sourcing",
     legacyEnvVar: "LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD",
   },
-  // Hot-path SYSTEM toggles outside event-sourcing. Both were previously
-  // raw `process.env.DISABLE_*` reads with no UI surface; registering
-  // them lets operators flip from /ops/feature-flags. Env aliases stay
-  // for self-host installs that already set the variables.
+  // Strict-PII analysis-service kill switch. The native secrets + essential
+  // PII floor in the ingestion pipeline is light and always runs; this only
+  // sheds the heavy strict pass that calls the external analysis service
+  // (Presidio via langevals). Operators flip it from /ops/feature-flags.
   {
-    key: "ops_pii_redaction_disabled",
+    key: "ops_pii_strict_presidio_redaction_disabled",
     scope: "SYSTEM",
     defaultValue: false,
     description:
-      "Disables PII redaction in the trace collector and span PII service. Treat as emergency operator override; production must run with redaction enabled.",
+      "Skips the strict PII redaction pass that calls the external analysis service (Presidio via langevals). The native secrets and essential PII redaction in the ingestion pipeline are unaffected. Emergency operator override to shed analysis-service load.",
     family: "Collector",
-    legacyEnvVar: "DISABLE_PII_REDACTION",
   },
   // Per-span token estimation kill switches. Hardcoded raw keys before;
   // each `record_span` job was a PostHog /flags call for the global key

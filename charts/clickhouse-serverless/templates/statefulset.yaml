@@ -32,6 +32,8 @@ spec:
       securityContext:
         runAsNonRoot: true
         fsGroup: 101  # clickhouse group
+        seccompProfile:
+          type: RuntimeDefault
       terminationGracePeriodSeconds: 60
 
       {{- with .Values.scheduling.nodeSelector }}
@@ -77,6 +79,13 @@ spec:
         - name: clickhouse
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # readOnlyRootFilesystem is intentionally omitted — ClickHouse writes
+          # to paths outside the data PVC (e.g. /tmp, format schemas) and would
+          # crashloop under a read-only root.
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           ports:
             - name: http
               containerPort: 8123

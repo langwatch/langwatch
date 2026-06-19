@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo } from "react";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   analyzeOrGroups,
   buildFacetStateLookup,
   getFacetValues,
 } from "~/server/app-layer/traces/query-language/queries";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useTraceFacets } from "../../../hooks/useTraceFacets";
 import { useDensityStore } from "../../../stores/densityStore";
 import {
@@ -26,6 +26,7 @@ import {
   FACET_GROUPS,
   type FacetGroupDef,
   getFacetGroupId,
+  RANGE_DEFAULTS,
   SPAN_ATTRIBUTES_SECTION_KEY,
   VIBRANT_FIELDS,
 } from "../constants";
@@ -44,8 +45,8 @@ import { facetLabel, sortBySectionOrder } from "../utils";
 export function useFilterSidebarData() {
   const ast = useFilterStore((s) => s.ast);
   const storeToggleFacet = useFilterStore((s) => s.toggleFacet);
-  const setRange = useFilterStore((s) => s.setRange);
-  const removeRange = useFilterStore((s) => s.removeRange);
+  const storeSetRange = useFilterStore((s) => s.setRange);
+  const storeRemoveRange = useFilterStore((s) => s.removeRange);
 
   // Cross-facet OR analysis. Sections whose field shows up in
   // `fieldToGroupIds` are part of (at least) one OR group; the colour is
@@ -61,19 +62,37 @@ export function useFilterSidebarData() {
   // glue that hands the analysis + field to the helper and forwards
   // the result.
   const toggleFacet = useCallback(
-    (
-      field: string,
-      value: string,
-      options?: { modifierKey?: boolean },
-    ) => {
+    ({
+      field,
+      value,
+      isModifierKey = false,
+    }: {
+      field: string;
+      value: string;
+      isModifierKey?: boolean;
+    }) => {
       const routing = routeToggleViaOrGroups({
         analysis: orAnalysisRaw,
         field,
-        modifierKey: options?.modifierKey ?? false,
+        modifierKey: isModifierKey,
       });
       storeToggleFacet(field, value, routing);
     },
     [storeToggleFacet, orAnalysisRaw],
+  );
+
+  const setRange = useCallback(
+    ({ field, from, to }: { field: string; from: string; to: string }) => {
+      storeSetRange(field, from, to);
+    },
+    [storeSetRange],
+  );
+
+  const removeRange = useCallback(
+    ({ field }: { field: string }) => {
+      storeRemoveRange(field);
+    },
+    [storeRemoveRange],
   );
 
   const { data: descriptors, isLoading: facetsLoading } = useTraceFacets();
@@ -96,7 +115,9 @@ export function useFilterSidebarData() {
   const showFacet = useFacetVisibilityStore((s) => s.showFacet);
   const hideFacet = useFacetVisibilityStore((s) => s.hideFacet);
   const resetAllVisibility = useFacetVisibilityStore((s) => s.resetAll);
-  const visibilityHydrate = useFacetVisibilityStore((s) => s.hydrateFromStorage);
+  const visibilityHydrate = useFacetVisibilityStore(
+    (s) => s.hydrateFromStorage,
+  );
   const visibilityPrefs = useFacetVisibilityStore((s) =>
     selectVisibilityFor(s, projectId),
   );
@@ -158,20 +179,19 @@ export function useFilterSidebarData() {
     [facetStateLookup],
   );
 
-  // While the discover request is in flight (no descriptors back yet),
-  // synthesise categorical sections from FACET_DEFAULTS so the sidebar
-  // renders immediately with the well-known facets (origin, status,
-  // spanType, …) instead of a blank skeleton. Rows are flagged
-  // `synthetic` so FacetRow hides the missing count + value bar; the
-  // affordance is fully clickable so a user can apply a filter before
-  // discover completes. Once real descriptors arrive `partitionDescriptors`
-  // takes over and the synthetic rows merge into the real data.
+  // Synthesise when (a) discover is still in flight, or (b) discover
+  // completed but returned no descriptors (project has no traces yet).
+  // Case (b) used to collapse the sidebar to zero sections — confusing
+  // for new users who had just signed up. The synthetic rows are fully
+  // interactive (clicks still apply against the AST) but flagged so
+  // FacetRow / RangeSection can render a "no data yet" placeholder
+  // instead of lying with a zero count / flat range bar.
   const effectiveDescriptors = useMemo(() => {
-    if (!facetsLoading || (descriptors && descriptors.length > 0)) {
-      return { items: descriptors ?? [], synthetic: false };
+    if (descriptors && descriptors.length > 0) {
+      return { items: descriptors, synthetic: false };
     }
     return { items: synthesizeDefaultDescriptors(), synthetic: true };
-  }, [descriptors, facetsLoading]);
+  }, [descriptors]);
 
   const {
     categoricals,
@@ -221,7 +241,7 @@ export function useFilterSidebarData() {
   const facetItems = useMemo(() => {
     const map = new Map<string, FacetItem[]>();
     for (const cat of categoricals) {
-      const baseItems = buildFacetItems(cat, isSynthetic);
+      const baseItems = buildFacetItems(cat, cat.synthetic ?? isSynthetic);
       // Surface values that the user typed in the search bar but that
       // discover didn't return (rare value, custom label, paste from
       // another query). Without this, an active filter like
@@ -309,7 +329,7 @@ export function useFilterSidebarData() {
     const out: Record<string, Array<{ key: string; label: string }>> = {};
     for (const key of orderedKeysAll) {
       if (isSectionVisibleForDensity(key)) continue;
-      const groupId = getFacetGroupId(key) ?? "trace";
+      const groupId = getFacetGroupId(key) ?? "custom";
       const label = sectionByKey.get(key)?.label ?? key;
       (out[groupId] ??= []).push({ key, label });
     }
@@ -371,7 +391,10 @@ export function useFilterSidebarData() {
 }
 
 export interface FacetGroupSlice {
-  id: FacetGroupDef["id"];
+  // `"other"` is the synthetic trailing bucket for keys that don't map
+  // to any registered FACET_GROUPS entry — kept distinct from the
+  // user-facing `"custom"` group so the two never collide on `.id`.
+  id: FacetGroupDef["id"] | "other";
   label: string;
   keys: string[];
 }
@@ -420,7 +443,7 @@ export function partitionIntoGroups(
   }));
 
   if (ungrouped.length > 0) {
-    slices.push({ id: "trace", label: "Other", keys: ungrouped });
+    slices.push({ id: "other", label: "Other", keys: ungrouped });
   }
   return slices;
 }
@@ -436,30 +459,40 @@ function partitionDescriptors(
   let eventAttrs: AttributeKey[] = [];
 
   for (const d of descriptors) {
-    // Keep a categorical section mounted when (a) it has buckets to
-    // show OR (b) the AST has an active filter on this field. Without
-    // (b), filtering on a categorical with zero matching distinct
-    // values would drop the section from the sidebar — and the user
-    // would have no way to clear the filter from there. (a) alone was
-    // the previous behaviour, which made cold tenants feel less noisy
-    // but stranded active-but-empty filters.
-    if (d.kind === "categorical" && (d.topValues.length > 0 || activeFieldSet.has(d.key))) {
-      cats.push({
-        kind: "cat",
-        key: d.key,
-        label: d.label,
-        group: d.group,
-        topValues: d.topValues,
-      });
-    } else if (d.kind === "range" && d.max > 0) {
-      rngs.push({
-        kind: "range",
-        key: d.key,
-        label: d.label,
-        group: d.group,
-        min: d.min,
-        max: d.max,
-      });
+    if (d.kind === "categorical") {
+      // Keep a categorical section mounted when (a) it has buckets to
+      // show, (b) the AST has an active filter on this field, or (c) it
+      // was synthesised as a placeholder before traces arrive. Without
+      // (b), filtering on a categorical with zero matching distinct
+      // values would drop the section from the sidebar — the user would
+      // have no way to clear the filter. Without (c), cold tenants see
+      // a blank sidebar on first load.
+      const isSynthetic = (d as { synthetic?: boolean }).synthetic;
+      if (d.topValues.length > 0 || activeFieldSet.has(d.key) || isSynthetic) {
+        cats.push({
+          kind: "cat",
+          key: d.key,
+          label: d.label,
+          group: d.group,
+          topValues: d.topValues,
+          synthetic: isSynthetic,
+        });
+      }
+    } else if (d.kind === "range") {
+      // Keep range sections when (a) the span is non-zero, (b) the AST
+      // has an active filter, or (c) it was synthesised as a placeholder.
+      const isSynthetic = (d as { synthetic?: boolean }).synthetic;
+      if (d.max > 0 || activeFieldSet.has(d.key) || isSynthetic) {
+        rngs.push({
+          kind: "range",
+          key: d.key,
+          label: d.label,
+          group: d.group,
+          min: d.min,
+          max: d.max,
+          synthetic: isSynthetic,
+        });
+      }
     } else if (d.kind === "dynamic_keys") {
       // Three parallel attribute discovery streams. Each one corresponds
       // to a distinct `Map` (or `Array(Map)`) column in ClickHouse:
@@ -485,15 +518,22 @@ function partitionDescriptors(
 }
 
 /**
- * Build a synthetic descriptor list from FACET_DEFAULTS — used to render
- * the sidebar before discover responds, so users see the well-known
- * facets immediately instead of a blank skeleton. Each value carries
- * count=0; `partitionDescriptors` keeps these because their key matches
- * a FACET_DEFAULTS entry.
+ * Build a synthetic descriptor list from FACET_DEFAULTS and RANGE_DEFAULTS
+ * — used to render the sidebar before discover responds (or when discover
+ * returns empty because the project has no traces yet), so users see the
+ * well-known facets immediately instead of a blank sidebar.
+ *
+ * Categorical rows carry count=0 and are flagged synthetic so FacetRow
+ * hides the count + value bar. Range descriptors use min=0, max=0 and are
+ * flagged synthetic so RangeSection renders a placeholder caption.
+ *
+ * `partitionDescriptors` keeps synthetic rows even when empty because of
+ * the `isSynthetic` guard — no filter needed here.
  */
 type Descriptors = NonNullable<ReturnType<typeof useTraceFacets>["data"]>;
 function synthesizeDefaultDescriptors(): Descriptors {
-  const out: Descriptors[number][] = [];
+  const out: (Descriptors[number] & { synthetic?: boolean })[] = [];
+
   for (const [key, values] of Object.entries(FACET_DEFAULTS)) {
     // `descriptor.group` here uses the backend's `SectionGroup`
     // taxonomy (evaluation/metadata/prompt/span/trace), which is
@@ -516,9 +556,23 @@ function synthesizeDefaultDescriptors(): Descriptors {
       group: "trace",
       topValues: values.map((value) => ({ value, count: 0 })),
       totalDistinct: 0,
+      synthetic: true,
     });
   }
-  return out;
+
+  for (const key of RANGE_DEFAULTS) {
+    out.push({
+      kind: "range",
+      key,
+      label: key,
+      group: "trace",
+      min: 0,
+      max: 0,
+      synthetic: true,
+    });
+  }
+
+  return out as Descriptors;
 }
 
 function buildFacetItems(
@@ -529,6 +583,15 @@ function buildFacetItems(
   const dimmed = !VIBRANT_FIELDS.has(cat.key);
   const counts = new Map(cat.topValues.map((v) => [v.value, v.count]));
   const labels = new Map(cat.topValues.map((v) => [v.value, v.label]));
+  // Evaluator-only — every other facet skips this map entirely. We
+  // forward the descriptor's per-value aggregates onto FacetItem so
+  // the sidebar drilldown for `evaluator:<id>` can show pass/fail /
+  // score-range without a second round-trip.
+  const aggregates = new Map(
+    cat.topValues
+      .filter((v) => v.aggregates !== undefined)
+      .map((v) => [v.value, v.aggregates!]),
+  );
   const orderedValues = orderValues({
     defaults: FACET_DEFAULTS[cat.key],
     fallback: cat.topValues.map((v) => v.value),
@@ -545,6 +608,7 @@ function buildFacetItems(
     dotColor: dotColorFor(value),
     dimmed,
     synthetic,
+    aggregates: aggregates.get(value),
   }));
 }
 

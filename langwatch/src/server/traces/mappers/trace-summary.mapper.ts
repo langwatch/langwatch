@@ -1,8 +1,8 @@
-import type { TraceSummaryData } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
 import {
   extractLastUserMessageText,
   extractMessageContentText,
 } from "~/server/app-layer/traces/canonicalisation/extractors/_messages";
+import type { TraceSummaryData } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
 import type {
   ErrorCapture,
   Event,
@@ -120,7 +120,9 @@ export function mapAttributesToMetadata(
   for (const [key, value] of Object.entries(attributes)) {
     if (knownKeys.has(key)) continue;
     // Strip internal metadata. prefix so API returns bare keys (e.g., "user" not "metadata.user")
-    const bareKey = key.startsWith("metadata.") ? key.slice("metadata.".length) : key;
+    const bareKey = key.startsWith("metadata.")
+      ? key.slice("metadata.".length)
+      : key;
     if (bareKey && metadata[bareKey] === undefined) metadata[bareKey] = value;
   }
 

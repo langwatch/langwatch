@@ -70,16 +70,14 @@ export class SimulationRunnerService {
       //    ModelNotConfiguredError if no scope has one configured; the
       //    surrounding catch logs and bails so the user is prompted to add
       //    a default before retrying.
-      const simulatorModel = await getVercelAIModel(
+      const simulatorModel = await getVercelAIModel({
         projectId,
-        undefined,
-        "scenarios.user_simulator",
-      );
-      const judgeModel = await getVercelAIModel(
+        featureKey: "scenarios.user_simulator",
+      });
+      const judgeModel = await getVercelAIModel({
         projectId,
-        undefined,
-        "scenarios.judge",
-      );
+        featureKey: "scenarios.judge",
+      });
 
       // 4. Resolve target to adapter
       logger.debug(

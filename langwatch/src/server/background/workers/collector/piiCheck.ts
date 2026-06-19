@@ -1,10 +1,11 @@
 import { DlpServiceClient } from "@google-cloud/dlp";
 import type { google } from "@google-cloud/dlp/build/protos/protos";
-import type { PIIRedactionLevel } from "@prisma/client";
+import type { PIIRedactionLevel } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import { env } from "../../../../env.mjs";
 import { createLogger } from "../../../../utils/logger/server";
 import { startSpan } from "../../../../utils/posthogErrorCapture";
-import type { BatchEvaluationResult } from "../../../evaluations/evaluators.generated";
+import { normalizePresidioMarkers } from "../../../data-privacy/redaction/markers";
+import type { BatchEvaluationResult } from "../../../evaluations/evaluators";
 import {
   evaluationDurationHistogram,
   getEvaluationStatusCounter,
@@ -62,6 +63,38 @@ function getDlpClient(): DlpServiceClient {
   return dlpClient;
 }
 
+/**
+ * Entities the Presidio analyzer detects at the strict level. Exported so the
+ * settings tooltip's entity labels are test-pinned to this list.
+ */
+export const PRESIDIO_STRICT_ENTITIES = [
+  "CREDIT_CARD",
+  "CRYPTO",
+  "EMAIL_ADDRESS",
+  "IBAN_CODE",
+  "IP_ADDRESS",
+  "LOCATION",
+  "PERSON",
+  "PHONE_NUMBER",
+  "MEDICAL_LICENSE",
+  "US_BANK_NUMBER",
+  "US_DRIVER_LICENSE",
+  "US_ITIN",
+  "US_PASSPORT",
+  "US_SSN",
+  "UK_NHS",
+  "SG_NRIC_FIN",
+  "AU_ABN",
+  "AU_ACN",
+  "AU_TFN",
+  "AU_MEDICARE",
+  "IN_PAN",
+  "IN_AADHAAR",
+  "IN_VEHICLE_REGISTRATION",
+  "IN_VOTER",
+  "IN_PASSPORT",
+] as const;
+
 const strictInfoTypes = {
   google_dlp: [
     "FIRST_NAME",
@@ -79,33 +112,7 @@ const strictInfoTypes = {
     "VAT_NUMBER",
     "MEDICAL_RECORD_NUMBER",
   ],
-  presidio: [
-    "CREDIT_CARD",
-    "CRYPTO",
-    "EMAIL_ADDRESS",
-    "IBAN_CODE",
-    "IP_ADDRESS",
-    "LOCATION",
-    "PERSON",
-    "PHONE_NUMBER",
-    "MEDICAL_LICENSE",
-    "US_BANK_NUMBER",
-    "US_DRIVER_LICENSE",
-    "US_ITIN",
-    "US_PASSPORT",
-    "US_SSN",
-    "UK_NHS",
-    "SG_NRIC_FIN",
-    "AU_ABN",
-    "AU_ACN",
-    "AU_TFN",
-    "AU_MEDICARE",
-    "IN_PAN",
-    "IN_AADHAAR",
-    "IN_VEHICLE_REGISTRATION",
-    "IN_VOTER",
-    "IN_PASSPORT",
-  ],
+  presidio: [...PRESIDIO_STRICT_ENTITIES],
 };
 
 const essentialInfoTypes = {
@@ -265,10 +272,27 @@ export const googleDLPClearPII = async (
   }
 };
 
+/**
+ * The Presidio `entities` request setting. Uses the explicit override when given
+ * (the custom level passes only the analysis-service identifiers a team chose),
+ * otherwise the level's default list. Names are lowercased for the analyzer.
+ */
+function presidioEntitiesSetting(
+  piiRedactionLevel: PIIRedactionLevel,
+  entities?: readonly string[],
+): Record<string, boolean> {
+  const names =
+    entities ??
+    (piiRedactionLevel === "ESSENTIAL" ? essentialInfoTypes : strictInfoTypes)
+      .presidio;
+  return Object.fromEntries(names.map((name) => [name.toLowerCase(), true]));
+}
+
 export const presidioClearPII = async (
   currentObject: Record<string | number, any>,
   lastKey: string | number,
   piiRedactionLevel: PIIRedactionLevel,
+  entities?: readonly string[],
 ): Promise<void> => {
   getPiiChecksCounter("presidio").inc();
   const timeout = 60_000;
@@ -292,12 +316,7 @@ export const presidioClearPII = async (
       body: JSON.stringify({
         data: [{ input: text }],
         settings: {
-          entities: Object.fromEntries(
-            (piiRedactionLevel === "ESSENTIAL"
-              ? essentialInfoTypes
-              : strictInfoTypes
-            ).presidio.map((name) => [name.toLowerCase(), true]),
-          ),
+          entities: presidioEntitiesSetting(piiRedactionLevel, entities),
           min_threshold: 0.5,
         },
         env: {},
@@ -331,7 +350,8 @@ export const presidioClearPII = async (
     throw new Error(result.details);
   }
   if (result.status === "processed" && result.raw_response?.anonymized) {
-    currentObject[lastKey] = result.raw_response.anonymized + remaining;
+    currentObject[lastKey] =
+      normalizePresidioMarkers(result.raw_response.anonymized) + remaining;
   }
 };
 
@@ -344,6 +364,7 @@ export const presidioClearPII = async (
 export const batchPresidioClearPII = async (
   texts: string[],
   piiRedactionLevel: PIIRedactionLevel,
+  entities?: readonly string[],
 ): Promise<(string | null)[]> => {
   if (texts.length === 0) return [];
 
@@ -370,12 +391,7 @@ export const batchPresidioClearPII = async (
         body: JSON.stringify({
           data: truncated.map((t) => ({ input: t.input })),
           settings: {
-            entities: Object.fromEntries(
-              (piiRedactionLevel === "ESSENTIAL"
-                ? essentialInfoTypes
-                : strictInfoTypes
-              ).presidio.map((name) => [name.toLowerCase(), true]),
-            ),
+            entities: presidioEntitiesSetting(piiRedactionLevel, entities),
             min_threshold: 0.5,
           },
           env: {},
@@ -416,7 +432,10 @@ export const batchPresidioClearPII = async (
       throw new Error(result.details);
     }
     if (result.status === "processed" && result.raw_response?.anonymized) {
-      return result.raw_response.anonymized + entry.remaining;
+      return (
+        normalizePresidioMarkers(result.raw_response.anonymized) +
+        entry.remaining
+      );
     }
     return null;
   });
@@ -426,6 +445,12 @@ export type PIICheckOptions = {
   piiRedactionLevel: PIIRedactionLevel;
   enforced?: boolean;
   mainMethod?: "google_dlp" | "presidio";
+  /**
+   * Explicit analyzer entity names (uppercase, e.g. "PERSON") to detect,
+   * overriding the level's default set. The custom PII level uses this to scan
+   * only the analysis-service identifiers a team selected.
+   */
+  entities?: readonly string[];
 };
 
 export const cleanupPIIs = async (

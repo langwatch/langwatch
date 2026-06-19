@@ -1,6 +1,5 @@
 import { Box, Container, HStack, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { usePathname } from "~/utils/compat/next-navigation";
 import { type PropsWithChildren, useEffect, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
@@ -10,6 +9,7 @@ import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { api } from "~/utils/api";
+import { usePathname } from "~/utils/compat/next-navigation";
 import { PageLayout } from "./ui/layouts/PageLayout";
 
 // ── Collapsible nav section ───────────────────────────────────────────────────
@@ -119,7 +119,9 @@ export default function SettingsLayout({
               "/settings/secrets",
             ]}
           >
-            <MenuLink href="/settings/model-providers">Model Providers</MenuLink>
+            <MenuLink href="/settings/model-providers">
+              Model Providers
+            </MenuLink>
             <MenuLink href="/settings/model-costs">Model Costs</MenuLink>
             {!isLiteMember && (
               <MenuLink href="/settings/secrets">Secrets</MenuLink>
@@ -139,7 +141,9 @@ export default function SettingsLayout({
               "/settings/audit-log",
             ]}
           >
-            <MenuLink href="/settings/members" includePath="members">Members</MenuLink>
+            <MenuLink href="/settings/members" includePath="members">
+              Members
+            </MenuLink>
             <MenuLink href="/settings/teams">Teams & Projects</MenuLink>
             {showEnterpriseNav && !isLiteMember && (
               <MenuLink href="/settings/groups">Groups</MenuLink>
@@ -154,9 +158,11 @@ export default function SettingsLayout({
             {showEnterpriseNav && !isLiteMember && (
               <MenuLink href="/settings/role-bindings">Role Bindings</MenuLink>
             )}
-            {showEnterpriseNav && !isLiteMember && hasPermission("auditLog:view") && (
-              <MenuLink href="/settings/audit-log">Audit Log</MenuLink>
-            )}
+            {showEnterpriseNav &&
+              !isLiteMember &&
+              hasPermission("auditLog:view") && (
+                <MenuLink href="/settings/audit-log">Audit Log</MenuLink>
+              )}
           </NavSection>
 
           <NavSection
@@ -166,15 +172,23 @@ export default function SettingsLayout({
               "/settings/topic-clustering",
               "/settings/data-retention",
               "/settings/integrations",
+              "/settings/data-privacy",
             ]}
           >
             <MenuLink href="/settings/data-retention">Data Retention</MenuLink>
-            <MenuLink href="/settings/annotation-scores">Annotation Scores</MenuLink>
+            <MenuLink href="/settings/data-privacy">Data Privacy</MenuLink>
+            <MenuLink href="/settings/annotation-scores">
+              Annotation Scores
+            </MenuLink>
             {!isLiteMember && project?.slug && (
-              <MenuLink href={`/${project.slug}/automations`}>Automations</MenuLink>
+              <MenuLink href={`/${project.slug}/automations`}>
+                Automations
+              </MenuLink>
             )}
             {!isLiteMember && (
-              <MenuLink href="/settings/topic-clustering">Topic Clustering</MenuLink>
+              <MenuLink href="/settings/topic-clustering">
+                Topic Clustering
+              </MenuLink>
             )}
             <MenuLink href="/settings/integrations">Integrations</MenuLink>
           </NavSection>
@@ -182,23 +196,22 @@ export default function SettingsLayout({
           {!isLiteMember && (
             <NavSection
               label="Billing"
-              paths={["/settings/usage", "/settings/subscription", "/settings/license"]}
+              paths={[
+                "/settings/usage",
+                "/settings/subscription",
+                "/settings/license",
+              ]}
             >
               <MenuLink href="/settings/usage">Usage & Billing</MenuLink>
               {isSaaS && (
                 <MenuLink href="/settings/subscription">Subscription</MenuLink>
               )}
-              {!isSaaS && (
-                <MenuLink href="/settings/license">License</MenuLink>
-              )}
+              {!isSaaS && <MenuLink href="/settings/license">License</MenuLink>}
             </NavSection>
           )}
 
           {hasOpsAccess && (
-            <NavSection
-              label="Ops"
-              paths={["/ops"]}
-            >
+            <NavSection label="Ops" paths={["/ops"]}>
               <MenuLink href="/ops">Dashboard</MenuLink>
               <MenuLink href="/ops/projections" includePath="/ops/projections">
                 Projection Replay

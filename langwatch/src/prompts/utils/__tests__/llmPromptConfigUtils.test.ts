@@ -306,6 +306,7 @@ describe("versionedPromptToPromptConfigFormValues", () => {
     updatedAt: new Date(),
     createdAt: new Date(),
     tags: [],
+    parameters: {},
   });
 
   describe("when prompt handle has no prefix", () => {
@@ -397,6 +398,20 @@ describe("versionedPromptToPromptConfigFormValues", () => {
       expect(result.version.configData.llm.reasoning).toBeUndefined();
     });
   });
+
+  describe("when prompt has runtime parameters", () => {
+    it("maps runtime parameters onto form values", () => {
+      /**
+       * @scenario Prompt form values preserve runtime parameters during API mapping
+       */
+      const prompt = createMockPrompt("test-prompt");
+      prompt.parameters = { mapped: true };
+
+      const result = versionedPromptToPromptConfigFormValues(prompt);
+
+      expect(result.version.parameters).toEqual({ mapped: true });
+    });
+  });
 });
 
 describe("versionedPromptToPromptConfigFormValuesWithSystemMessage", () => {
@@ -426,6 +441,7 @@ describe("versionedPromptToPromptConfigFormValuesWithSystemMessage", () => {
     updatedAt: new Date(),
     createdAt: new Date(),
     tags: [],
+    parameters: {},
     ...overrides,
   });
 
@@ -769,6 +785,21 @@ describe("formValuesToTriggerSaveVersionParams", () => {
       expect(result).not.toHaveProperty("reasoningEffort");
     });
   });
+
+  describe("when form values include runtime parameters", () => {
+    it("propagates parameters to the save payload", () => {
+      /**
+       * @scenario Prompt form values preserve runtime parameters during API mapping
+       */
+      const formValues = buildDefaultFormValues({
+        version: { parameters: { mapped: true } },
+      });
+
+      const result = formValuesToTriggerSaveVersionParams(formValues);
+
+      expect(result.parameters).toEqual({ mapped: true });
+    });
+  });
 });
 
 describe("formSchema reasoning validation", () => {
@@ -804,6 +835,37 @@ describe("formSchema reasoning validation", () => {
       const values = buildDefaultFormValues();
       expect(formSchema.safeParse(values).success).toBe(true);
       expect(values.version.configData.llm.reasoning).toBeUndefined();
+    });
+  });
+});
+
+describe("formSchema runtime parameters validation", () => {
+  describe("when parameters are object JSON", () => {
+    it("accepts nested object values", () => {
+      /**
+       * @scenario Runtime parameters validation accepts object JSON values
+       */
+      const values = buildDefaultFormValues({
+        version: {
+          parameters: { nested: { array: [1, true, { leaf: "value" }] } },
+        },
+      });
+
+      expect(formSchema.safeParse(values).success).toBe(true);
+    });
+  });
+
+  describe("when parameters root is not an object", () => {
+    it("rejects non-object values", () => {
+      /**
+       * @scenario Runtime parameters validation rejects non-object root values
+       */
+      for (const params of [null, [1, 2], "value", 1, true]) {
+        const values = buildDefaultFormValues({
+          version: { parameters: params as any },
+        });
+        expect(formSchema.safeParse(values).success).toBe(false);
+      }
     });
   });
 });

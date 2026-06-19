@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 
 import { parseVirtualKeyConfig } from "~/server/gateway/virtualKey.config";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { createLogger } from "~/utils/logger/server";
 import { provisionLangyApiKey, getLangyApiKeyToken } from "./langyApiKey";
 import { getGithubTokenForUser } from "./langyGithubToken";
@@ -162,7 +162,7 @@ export class LangyCredentialService {
         { error, projectId, userId: actorUserId },
         "github token mint failed; chat continues without it",
       );
-      captureException(error, {
+      captureException(toError(error), {
         extra: {
           projectId,
           context: "getGithubTokenForUser:LangyCredentialService.getOrProvision",

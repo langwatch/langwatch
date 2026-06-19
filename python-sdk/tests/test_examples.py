@@ -247,6 +247,12 @@ async def test_example(example_file: str):
         else:
             try:
                 trace_urls[example_file] = trace.share()
-            except (httpx.TimeoutException, httpx.ConnectError):
+            except (
+                httpx.TimeoutException,
+                httpx.ConnectError,
+                httpx.HTTPStatusError,
+            ):
+                # The share URL is a nice-to-have for the report; a flaky
+                # server response must not fail the example run itself.
                 trace_urls[example_file] = trace.trace_id or "share-failed"
         print(json.dumps(trace_urls, indent=2))

@@ -1,19 +1,25 @@
-import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
-import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
+import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
+import {
+  mapNormalizedSpansToSpans,
+  mapNormalizedSpanToSpan,
+} from "~/server/traces/mappers/span.mapper";
+import { resolveOffloadedTraces } from "~/server/traces/resolve-offloaded-traces";
+import { createLogger } from "~/utils/logger/server";
+import { redactSpanContent } from "./visibility-window.service";
+import type { BlobStore } from "./blob-store.service";
 import type {
+  ModelSpanSampleRow,
+  ModelUsageStatsRow,
   OccurredAtHint,
   SpanLangwatchSignalsRow,
   SpanResourceInfo,
   SpanStorageRepository,
   SpanSummaryRow,
 } from "./repositories/span-storage.repository";
-import type { SpanInsertData } from "./types";
-import type { BlobStore } from "./blob-store.service";
 import type { TraceIOExtractionService } from "./trace-io-extraction.service";
-import { resolveOffloadedTraces } from "~/server/traces/resolve-offloaded-traces";
-import { mapNormalizedSpanToSpan, mapNormalizedSpansToSpans } from "~/server/traces/mappers/span.mapper";
-import { createLogger } from "~/utils/logger/server";
+import type { SpanInsertData } from "./types";
 
 /**
  * Optional blob-offload resolution dependencies for the v2 read path (ADR-022).
@@ -33,9 +39,33 @@ type BySpanId = ByTraceId & { spanId: string };
 type Paginated = ByTraceId & { limit: number; offset: number };
 type Since = ByTraceId & { sinceStartTimeMs: number };
 
+/**
+ * Read-side visibility gate. Read routes pass the caller's plan cutoff
+ * (from `getVisibilityCutoffMsForProject`); spans started before it get
+ * their content teaser-redacted. Omitted/null = ungated — internal callers
+ * (ingestion, enrichment, derivations) never pass it.
+ */
+type VisibilityGate = { visibilityCutoffMs?: number | null };
+
+const applyVisibilityGate = <T extends Span>(
+  spans: T[],
+  visibilityCutoffMs: number | null | undefined,
+): T[] => {
+  if (visibilityCutoffMs === null || visibilityCutoffMs === undefined) {
+    return spans;
+  }
+  return spans.map((span) =>
+    span.timestamps.started_at < visibilityCutoffMs
+      ? redactSpanContent(span)
+      : span,
+  );
+};
+
 export class SpanStorageService {
   private readonly blobResolutionDeps?: SpanReadBlobResolutionDeps;
-  private readonly logger = createLogger("langwatch:traces:span-storage-service");
+  private readonly logger = createLogger(
+    "langwatch:traces:span-storage-service",
+  );
 
   constructor(
     readonly repository: SpanStorageRepository,
@@ -59,13 +89,19 @@ export class SpanStorageService {
    * kept in place and the error is logged at warn level; the call never
    * throws due to a stale ref.
    */
-  async getSpansByTraceId(params: ByTraceId & { limit?: number }): Promise<Span[]> {
+  async getSpansByTraceId(
+    params: ByTraceId & { limit?: number } & VisibilityGate,
+  ): Promise<Span[]> {
     if (!this.blobResolutionDeps) {
-      return this.repository.getSpansByTraceId(params);
+      return applyVisibilityGate(
+        await this.repository.getSpansByTraceId(params),
+        params.visibilityCutoffMs,
+      );
     }
 
     // Fetch normalized spans so resolution can access raw spanAttributes.
-    const normalizedSpans = await this.repository.getNormalizedSpansByTraceId(params);
+    const normalizedSpans =
+      await this.repository.getNormalizedSpansByTraceId(params);
     const { resolvedSpans } = await resolveOffloadedTraces({
       projectId: params.tenantId,
       normalizedSpans,
@@ -73,7 +109,10 @@ export class SpanStorageService {
       ioExtractionService: this.blobResolutionDeps.ioExtractionService,
       logger: this.logger,
     });
-    return mapNormalizedSpansToSpans(resolvedSpans);
+    return applyVisibilityGate(
+      mapNormalizedSpansToSpans(resolvedSpans),
+      params.visibilityCutoffMs,
+    );
   }
 
   async getNormalizedSpansByTraceId(
@@ -91,13 +130,19 @@ export class SpanStorageService {
    * `resolveOffloadedTraces` path as `getSpansByTraceId` so that sibling
    * eventref pointers on the same trace are also resolved consistently.
    */
-  async getSpanById(params: BySpanId): Promise<Span | null> {
+  async getSpanById(params: BySpanId & VisibilityGate): Promise<Span | null> {
+    const gateOne = (span: Span | null): Span | null =>
+      span
+        ? (applyVisibilityGate([span], params.visibilityCutoffMs)[0] ?? null)
+        : null;
+
     if (!this.blobResolutionDeps) {
-      return this.repository.getSpanByIds(params);
+      return gateOne(await this.repository.getSpanByIds(params));
     }
 
     // Resolve the single span via the normalized+resolve path.
-    const normalizedSpans = await this.repository.getNormalizedSpansByTraceId(params);
+    const normalizedSpans =
+      await this.repository.getNormalizedSpansByTraceId(params);
     const { resolvedSpans } = await resolveOffloadedTraces({
       projectId: params.tenantId,
       normalizedSpans,
@@ -107,10 +152,12 @@ export class SpanStorageService {
     });
     const resolved = resolvedSpans.find((s) => s.spanId === params.spanId);
     if (!resolved) return null;
-    return mapNormalizedSpanToSpan(resolved);
+    return gateOne(mapNormalizedSpanToSpan(resolved));
   }
 
-  async getTraceEventsByTraceId(params: ByTraceId): Promise<DerivedTraceEvent[]> {
+  async getTraceEventsByTraceId(
+    params: ByTraceId,
+  ): Promise<DerivedTraceEvent[]> {
     return this.repository.getTraceEventsByTraceId(params);
   }
 
@@ -139,13 +186,20 @@ export class SpanStorageService {
   }
 
   async getSpansPaginated(
-    params: Paginated,
+    params: Paginated & VisibilityGate,
   ): Promise<{ spans: Span[]; total: number }> {
-    return this.repository.findSpansPaginated(params);
+    const page = await this.repository.findSpansPaginated(params);
+    return {
+      ...page,
+      spans: applyVisibilityGate(page.spans, params.visibilityCutoffMs),
+    };
   }
 
-  async getSpansSince(params: Since): Promise<Span[]> {
-    return this.repository.findSpansSince(params);
+  async getSpansSince(params: Since & VisibilityGate): Promise<Span[]> {
+    return applyVisibilityGate(
+      await this.repository.findSpansSince(params),
+      params.visibilityCutoffMs,
+    );
   }
 
   async getSpanSummariesPaginated(
@@ -156,5 +210,23 @@ export class SpanStorageService {
 
   async getSpanSummariesSince(params: Since): Promise<SpanSummaryRow[]> {
     return this.repository.findSpanSummariesSince(params);
+  }
+
+  async getModelUsageStats(params: {
+    tenantId: string;
+    fromMs: number;
+    limit: number;
+  }): Promise<ModelUsageStatsRow[]> {
+    return this.repository.findModelUsageStats(params);
+  }
+
+  async getRecentSpansByModels(params: {
+    tenantId: string;
+    models: string[];
+    fromMs: number;
+    perModelLimit: number;
+    limit: number;
+  }): Promise<ModelSpanSampleRow[]> {
+    return this.repository.findRecentSpansByModels(params);
   }
 }

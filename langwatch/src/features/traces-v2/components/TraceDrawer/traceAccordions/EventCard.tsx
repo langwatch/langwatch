@@ -1,6 +1,7 @@
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { LuArrowUpRight, LuCalendar } from "react-icons/lu";
+import { AttributeValue } from "../AttributeValue";
 
 interface EventCardProps {
   /** Event display name (e.g. "thumbs_up_down", "exception"). */
@@ -81,26 +82,27 @@ export const EventCard: React.FC<EventCardProps> = ({
           borderTopColor="border.subtle"
         >
           {attributeEntries.map(([key, value]) => (
-            <HStack key={key} gap={3} align="flex-start">
+            <HStack key={key} gap={2} align="center" minWidth={0}>
               <Text
                 textStyle="2xs"
                 color="fg.muted"
                 fontFamily="mono"
                 minWidth="120px"
+                maxWidth="160px"
                 flexShrink={0}
                 truncate
               >
                 {key}
               </Text>
-              <Text
-                textStyle="2xs"
-                color="fg"
-                fontFamily="mono"
-                wordBreak="break-word"
-                flex={1}
-              >
-                {formatValue(value)}
-              </Text>
+              {/* Delegate to the shared AttributeValue renderer: JSON
+                  / chat payloads get format detection + a click-to-open
+                  popover with the prettified body; leaves stay inline.
+                  Same affordance the span attributes table uses, so
+                  large event payloads like `langwatch.evaluation.custom`
+                  are no longer dumped as a flat 200-char string. */}
+              <Box flex={1} minWidth={0}>
+                <AttributeValue attrKey={key} value={value} />
+              </Box>
             </HStack>
           ))}
         </VStack>
@@ -108,31 +110,3 @@ export const EventCard: React.FC<EventCardProps> = ({
     </Box>
   );
 };
-
-// Cap serialised attribute payloads so a single span dropping a 200KB
-// object doesn't blow up the renderer (the event drawer is a sibling of
-// the trace timeline — a freeze here means the whole drawer goes
-// unresponsive). Truncation keeps the first chunk so the user still
-// recognises the value.
-const MAX_VALUE_LENGTH = 500;
-
-function formatValue(value: unknown): string {
-  if (value === null) return "null";
-  if (value === undefined) return "—";
-  if (typeof value === "string") {
-    return value.length > MAX_VALUE_LENGTH
-      ? value.slice(0, MAX_VALUE_LENGTH) + "… (truncated)"
-      : value;
-  }
-  if (typeof value === "number" || typeof value === "boolean") {
-    return String(value);
-  }
-  try {
-    const serialised = JSON.stringify(value);
-    return serialised.length > MAX_VALUE_LENGTH
-      ? serialised.slice(0, MAX_VALUE_LENGTH) + "… (truncated)"
-      : serialised;
-  } catch {
-    return String(value);
-  }
-}

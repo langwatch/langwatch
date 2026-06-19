@@ -8,7 +8,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
 import { formatDistanceToNow } from "date-fns";
 import { CheckCircle, Code, Plus, Workflow } from "lucide-react";
 import { useState } from "react";
@@ -23,7 +22,8 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
-} from "~/server/evaluations/evaluators.generated";
+} from "~/server/evaluations/evaluators";
+import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
 import { api } from "~/utils/api";
 import { evaluatorTempNameMap } from "../checks/EvaluatorSelection";
 import { Menu } from "../ui/menu";
@@ -87,6 +87,10 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
   };
 
   const handleEditEvaluator = (evaluator: EvaluatorWithFields) => {
+    if (evaluator.type === "code") {
+      openDrawer("codeEvaluatorEditor", { evaluatorId: evaluator.id });
+      return;
+    }
     const config = evaluator.config as { evaluatorType?: string } | null;
     openDrawer("evaluatorEditor", {
       evaluatorId: evaluator.id,
@@ -256,12 +260,27 @@ function EvaluatorCard({
   const displayName =
     evaluator.type === "workflow"
       ? "Workflow"
-      : getEvaluatorDisplayName(evaluatorType);
+      : evaluator.type === "code"
+        ? "Code"
+        : getEvaluatorDisplayName(evaluatorType);
 
   return (
     <Box
-      as="button"
+      // role+tabIndex instead of as="button": the card hosts the Actions
+      // menu trigger, and nested native buttons are invalid HTML.
+      role="button"
+      tabIndex={0}
+      cursor="pointer"
       onClick={onClick}
+      onKeyDown={(e) => {
+        // Keys bubbling up from the nested actions menu (trigger or items)
+        // must not select the card; only act when the card itself has focus.
+        if (e.target !== e.currentTarget) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
       padding={4}
       borderRadius="md"
       border="1px solid"
@@ -278,6 +297,8 @@ function EvaluatorCard({
         <Box color="green.fg" paddingTop={1}>
           {evaluator.type === "workflow" ? (
             <Workflow size={16} />
+          ) : evaluator.type === "code" ? (
+            <Code size={16} />
           ) : (
             <CheckCircle size={16} />
           )}

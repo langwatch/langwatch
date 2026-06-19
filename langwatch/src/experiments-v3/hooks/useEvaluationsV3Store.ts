@@ -2,11 +2,9 @@ import isDeepEqual from "fast-deep-equal";
 import debounce from "lodash-es/debounce";
 import { temporal } from "zundo";
 import { create, type StateCreator } from "zustand";
-
+import type { CellPosition } from "~/components/datasets/editor/DatasetTableContext";
 import type { DatasetColumnType } from "~/server/datasets/types";
-
 import {
-  type CellPosition,
   createInitialResults,
   createInitialState,
   type DatasetColumn,

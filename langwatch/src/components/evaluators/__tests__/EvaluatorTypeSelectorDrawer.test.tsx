@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EvaluatorTypeSelectorDrawer } from "../EvaluatorTypeSelectorDrawer";
 
 // Mock AVAILABLE_EVALUATORS
-vi.mock("~/server/evaluations/evaluators.generated", () => ({
+vi.mock("~/server/evaluations/evaluators", () => ({
   AVAILABLE_EVALUATORS: {
     "langevals/exact_match": {
       name: "Exact Match",

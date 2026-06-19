@@ -4,11 +4,15 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
@@ -85,4 +89,74 @@ func TestEnrichRequestLogContext_OmitsAbsentFields(t *testing.T) {
 			t.Errorf("expected %s absent for empty WorkflowRequest, got line %q", key, out)
 		}
 	}
+}
+
+// failingExecutor stubs app.WorkflowExecutor so handler tests can force
+// the sync-execute and stream-start failure paths.
+type failingExecutor struct {
+	execErr   error
+	streamErr error
+}
+
+func (f *failingExecutor) Execute(context.Context, app.WorkflowRequest) (*app.WorkflowResult, error) {
+	return nil, f.execErr
+}
+func (f *failingExecutor) ExecuteStream(context.Context, app.WorkflowRequest, app.WorkflowStreamOptions) (<-chan app.WorkflowStreamEvent, error) {
+	return nil, f.streamErr
+}
+
+const enrichedEventBody = `{"type":"execute_flow","payload":{"trace_id":"trace_abc123","project_id":"proj_acme","origin":"workflow","workflow":{"workflow_id":"wf","nodes":[],"edges":[]}}}`
+
+func observedHandlerRequest(t *testing.T, handler http.HandlerFunc) *observer.ObservedLogs {
+	t.Helper()
+	core, logs := observer.New(zapcore.DebugLevel)
+	req := httptest.NewRequest(http.MethodPost, "/go/studio/execute_sync", strings.NewReader(enrichedEventBody))
+	req = req.WithContext(clog.Set(req.Context(), zap.New(core)))
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+	return logs
+}
+
+func requireEnrichedFields(t *testing.T, fields map[string]any) {
+	t.Helper()
+	for key, want := range map[string]string{
+		"project_id": "proj_acme",
+		"trace_id":   "trace_abc123",
+		"origin":     "workflow",
+	} {
+		if got := fields[key]; got != want {
+			t.Errorf("%s = %v; want %s (the failure log must carry the enriched request context)", key, got, want)
+		}
+	}
+}
+
+// A sync executor failure must log request_failed on the ENRICHED context:
+// dropping project_id/trace_id/origin would make the line unfilterable to
+// the affected customer/run, defeating the per-customer attribution.
+func TestExecuteSyncHandlerLogsEngineErrorWithEnrichedContext(t *testing.T) {
+	application := app.New(app.WithWorkflowExecutor(&failingExecutor{execErr: errors.New("engine exploded")}))
+	logs := observedHandlerRequest(t, executeSyncHandler(application))
+
+	entries := logs.FilterMessage("request_failed").All()
+	if len(entries) != 1 {
+		t.Fatalf("want exactly 1 request_failed log, got %d", len(entries))
+	}
+	fields := entries[0].ContextMap()
+	if fields["reason"] != "engine_error" {
+		t.Errorf("reason = %v; want engine_error", fields["reason"])
+	}
+	requireEnrichedFields(t, fields)
+}
+
+// A stream-start failure must log studio_stream_failed on the ENRICHED
+// context for the same reason: it is the server-side trail for the SSE
+// error frame the client sees.
+func TestExecuteStreamHandlerLogsStartFailureWithEnrichedContext(t *testing.T) {
+	application := app.New(app.WithWorkflowExecutor(&failingExecutor{streamErr: errors.New("stream refused to start")}))
+	logs := observedHandlerRequest(t, executeStreamHandler(application))
+
+	entries := logs.FilterMessage("studio_stream_failed").All()
+	if len(entries) != 1 {
+		t.Fatalf("want exactly 1 studio_stream_failed log, got %d", len(entries))
+	}
+	requireEnrichedFields(t, entries[0].ContextMap())
 }

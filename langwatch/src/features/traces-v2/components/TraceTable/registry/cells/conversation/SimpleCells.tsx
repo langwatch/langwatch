@@ -5,6 +5,7 @@ import type { ConversationGroup } from "../../../conversationGroups";
 import { MonoCell } from "../../../MonoCell";
 import { StatusDot, StatusIndicator } from "../../../StatusRow";
 import type { CellDef } from "../../types";
+import { dash } from "../dashPlaceholder";
 import {
   createCostCell,
   createDurationCell,
@@ -28,12 +29,12 @@ export const ModelCell: CellDef<ConversationGroup> = {
   label: "Model",
   render: ({ row }) => (
     <MonoCell truncate whiteSpace={undefined}>
-      {row.primaryModel ? abbreviateModel(row.primaryModel) : "—"}
+      {row.primaryModel ? abbreviateModel(row.primaryModel) : dash}
     </MonoCell>
   ),
   renderComfortable: ({ row }) => (
     <Text textStyle="xs" color="fg.muted" truncate>
-      {row.primaryModel ? abbreviateModel(row.primaryModel) : "—"}
+      {row.primaryModel ? abbreviateModel(row.primaryModel) : dash}
     </Text>
   ),
 };
@@ -43,12 +44,12 @@ export const ServiceCell: CellDef<ConversationGroup> = {
   label: "Service",
   render: ({ row }) => (
     <Text textStyle="xs" color="fg.subtle" truncate>
-      {row.serviceName || "—"}
+      {row.serviceName || dash}
     </Text>
   ),
   renderComfortable: ({ row }) => (
     <Text textStyle="xs" color="fg.muted" truncate>
-      {row.serviceName || "—"}
+      {row.serviceName || dash}
     </Text>
   ),
 };

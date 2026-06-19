@@ -2,9 +2,9 @@
  * @vitest-environment jsdom
  */
 import { renderHook } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
-import type { WorkflowStore } from "../useWorkflowStore";
+import { describe, expect, it, vi } from "vitest";
 import type { StudioServerEvent } from "../../types/events";
+import type { WorkflowStore } from "../useWorkflowStore";
 
 // Mock toaster
 vi.mock("../../../components/ui/toaster", () => ({
@@ -129,6 +129,76 @@ describe("useHandleServerMessage", () => {
 
       expect(store.setSelectedNode).not.toHaveBeenCalled();
       expect(store.setPropertiesExpanded).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given run-until-here ends in error", () => {
+    describe("when one upstream node carries the error", () => {
+      /** @scenario An errored run opens the node that failed */
+      it("selects the failing node instead of the run target", () => {
+        const store = createMockStore({
+          getWorkflow: vi.fn().mockReturnValue({
+            state: { execution: { until_node_id: "end-node" } },
+            nodes: [
+              { id: "end-node", data: {} },
+              {
+                id: "llm-node",
+                data: {
+                  execution_state: {
+                    status: "error",
+                    error: "Invalid messages",
+                  },
+                },
+              },
+            ],
+            edges: [],
+          }),
+        } as unknown as Partial<WorkflowStore>);
+
+        const { result } = renderHook(() =>
+          useHandleServerMessage({
+            workflowStore: store,
+            alertOnComponent: vi.fn(),
+          }),
+        );
+
+        result.current({
+          type: "execution_state_change",
+          payload: {
+            execution_state: { status: "error", error: "Invalid messages" },
+          },
+        } as StudioServerEvent);
+
+        expect(store.setSelectedNode).toHaveBeenCalledWith("llm-node");
+        expect(store.setSelectedNode).not.toHaveBeenCalledWith("end-node");
+        expect(store.setPropertiesExpanded).toHaveBeenCalledWith(true);
+      });
+    });
+
+    describe("when no single node carries the error", () => {
+      it("falls back to the run target", () => {
+        const store = createMockStore({
+          getWorkflow: vi.fn().mockReturnValue({
+            state: { execution: { until_node_id: "end-node" } },
+            nodes: [{ id: "end-node", data: {} }],
+            edges: [],
+          }),
+        } as unknown as Partial<WorkflowStore>);
+
+        const { result } = renderHook(() =>
+          useHandleServerMessage({
+            workflowStore: store,
+            alertOnComponent: vi.fn(),
+          }),
+        );
+
+        result.current({
+          type: "execution_state_change",
+          payload: { execution_state: { status: "error", error: "boom" } },
+        } as StudioServerEvent);
+
+        expect(store.setSelectedNode).toHaveBeenCalledWith("end-node");
+      });
     });
   });
 });

@@ -42,6 +42,7 @@ vi.mock("~/server/app-layer/app", () => ({
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: mockCaptureException,
+  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
 }));
 
 vi.mock("../../../auditLog", () => ({

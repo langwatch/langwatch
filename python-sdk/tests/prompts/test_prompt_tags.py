@@ -18,7 +18,7 @@ import pytest
 import langwatch
 from langwatch.prompts.prompt_api_service import PromptApiService
 from langwatch.prompts.prompt_facade import PromptsFacade
-from langwatch.prompts.types import FetchPolicy
+from langwatch.prompts.types import FetchPolicy, Message, PromptData
 
 pytestmark = pytest.mark.unit
 
@@ -471,6 +471,53 @@ class TestPromptApiServiceCreateUpdateWithTags:
 
             body_arg = mock_module.sync_detailed.call_args[1]["body"]
             assert body_arg.tags == ["staging", "canary"]
+
+    def test_create_includes_parameters_in_request_body(self):
+        """
+        @scenario Python prompt API writes runtime config on create and update
+        """
+        parsed = _make_api_response_200()
+        mock_resp = _mock_sync_detailed_response(parsed)
+
+        with patch(
+            "langwatch.prompts.prompt_api_service.post_api_prompts"
+        ) as mock_module, patch(
+            "langwatch.prompts.prompt_api_service.unwrap_response",
+            return_value=parsed,
+        ):
+            mock_module.sync_detailed.return_value = mock_resp
+            client = Mock()
+            service = PromptApiService(client)
+            service.create(handle="pizza-prompt", parameters={"sdk_write": True})
+
+            body_arg = mock_module.sync_detailed.call_args[1]["body"]
+            assert body_arg.to_dict()["parameters"] == {"sdk_write": True}
+
+    def test_update_includes_parameters_in_request_body(self):
+        """
+        @scenario Python prompt API writes runtime config on create and update
+        """
+        parsed = _make_api_response_200()
+        mock_resp = _mock_sync_detailed_response(parsed)
+
+        with patch(
+            "langwatch.prompts.prompt_api_service.put_api_prompts_by_id"
+        ) as mock_module, patch(
+            "langwatch.prompts.prompt_api_service.unwrap_response",
+            return_value=parsed,
+        ):
+            mock_module.sync_detailed.return_value = mock_resp
+            client = Mock()
+            service = PromptApiService(client)
+            service.update(
+                prompt_id_or_handle="pizza-prompt",
+                scope="PROJECT",
+                commit_message="update config",
+                parameters={"sdk_write": True},
+            )
+
+            body_arg = mock_module.sync_detailed.call_args[1]["body"]
+            assert body_arg.to_dict()["parameters"] == {"sdk_write": True}
 
 
 # ---------------------------------------------------------------------------
@@ -1324,3 +1371,63 @@ class TestLangwatchPromptsGlobalInterface:
         """langwatch.prompts.tags exists and has an assign method."""
         assert hasattr(langwatch.prompts, "tags")
         assert callable(getattr(langwatch.prompts.tags, "assign", None))
+
+
+# ---------------------------------------------------------------------------
+# PromptsFacade.create() / update() -- parameters passthrough
+# ---------------------------------------------------------------------------
+
+
+class TestPromptsFacadeParameters:
+    """Tests for PromptsFacade forwarding runtime parameters to the API service."""
+
+    def _make_facade_with_mock_api(self) -> PromptsFacade:
+        mock_client = Mock()
+        return PromptsFacade(mock_client)
+
+    def _mock_prompt_data(self, parameters) -> PromptData:
+        return PromptData(
+            id="pizza-prompt", handle="pizza-prompt", scope="PROJECT",
+            version=1, version_id="v1_id", model="openai/gpt-4",
+            messages=[Message(role="system", content="v1")], prompt="v1",
+            parameters=parameters,
+        )
+
+    def test_create_forwards_parameters_to_api_service(self):
+        """
+        When create() is called with parameters
+        Then the API service receives the same parameters dict
+        """
+        facade = self._make_facade_with_mock_api()
+        facade._api_service.create = Mock(
+            return_value=self._mock_prompt_data({"max_iterations": 3})
+        )
+
+        result = facade.create("pizza-prompt", parameters={"max_iterations": 3})
+
+        assert facade._api_service.create.call_args[1]["parameters"] == {
+            "max_iterations": 3
+        }
+        assert result.parameters == {"max_iterations": 3}
+
+    def test_update_forwards_parameters_to_api_service(self):
+        """
+        When update() is called with parameters
+        Then the API service receives the same parameters dict
+        """
+        facade = self._make_facade_with_mock_api()
+        facade._api_service.update = Mock(
+            return_value=self._mock_prompt_data({"confidence_threshold": 0.8})
+        )
+
+        result = facade.update(
+            "pizza-prompt",
+            scope="PROJECT",
+            parameters={"confidence_threshold": 0.8},
+            commit_message="set threshold",
+        )
+
+        assert facade._api_service.update.call_args[1]["parameters"] == {
+            "confidence_threshold": 0.8
+        }
+        assert result.parameters == {"confidence_threshold": 0.8}
