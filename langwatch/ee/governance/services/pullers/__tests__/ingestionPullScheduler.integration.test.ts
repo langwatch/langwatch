@@ -138,7 +138,12 @@ describe.skipIf(!hasTestcontainers)(
     });
 
     beforeEach(async () => {
-      await redis.flushall();
+      // Scoped reset of just this run's event-sourcing queue keys (not a global
+      // FLUSHALL): clears staged jobs and dedup keys between tests so a stale
+      // job from a prior test cannot drive the shared fixture adapter, without
+      // touching unrelated tenant data.
+      const queueKeys = await redis.keys("*event-sourcing/jobs*");
+      if (queueKeys.length > 0) await redis.del(...queueKeys);
       control = freshControl();
     });
 
