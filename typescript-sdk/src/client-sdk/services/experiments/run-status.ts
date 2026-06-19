@@ -182,7 +182,11 @@ export const fetchResultsWithRetry = async <T>({
       return results;
     } catch (error) {
       lastError = error;
-      if (attempt < maxAttempts) {
+      // Only the rows-expected path waits out the post-completion projection
+      // lag (a 404 / "not yet available" right after the run finishes). With no
+      // rows expected a thrown error is terminal, so surface it immediately
+      // instead of delaying through every attempt.
+      if (expectsRows && attempt < maxAttempts) {
         await sleep(delay);
         continue;
       }
