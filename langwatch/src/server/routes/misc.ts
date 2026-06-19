@@ -76,7 +76,7 @@ import { runWorkflow as runWorkflowFn } from "~/server/workflows/runWorkflow";
 import type Stripe from "stripe";
 import { encrypt } from "~/utils/encryption";
 import { slugify } from "~/utils/slugify";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { createLogger } from "~/utils/logger/server";
 import { findOrCreateExperiment } from "~/pages/api/experiment/init";
 import {
@@ -299,7 +299,7 @@ secured.access(inRouteAuth).post(
         },
         "invalid log_steps data received",
       );
-      captureException(error, { extra: { projectId: project.id } });
+      captureException(toError(error), { extra: { projectId: project.id } });
       const validationError = fromZodError(error as ZodError);
       return c.json({ error: validationError.message }, 400);
     }
@@ -342,7 +342,7 @@ secured.access(inRouteAuth).post(
             },
             "failed to validate data for DSPy step",
           );
-          captureException(error, {
+          captureException(toError(error), {
             extra: { projectId: project.id, param },
           });
           const validationError = fromZodError(error);
@@ -357,7 +357,7 @@ secured.access(inRouteAuth).post(
             },
             "internal server error processing DSPy step",
           );
-          captureException(error, {
+          captureException(toError(error), {
             extra: { projectId: project.id, param },
           });
           return c.json(
@@ -417,7 +417,7 @@ secured.access(inRouteAuth).post(
       { error, body, projectId: project.id },
       "invalid init data received",
     );
-    captureException(error, { extra: { projectId: project.id } });
+    captureException(toError(error), { extra: { projectId: project.id } });
     const validationError = fromZodError(error as ZodError);
     return c.json({ error: validationError.message }, 400);
   }
@@ -722,7 +722,7 @@ secured.access(inRouteAuth).post("/track_event", authMiddleware, requireTracesCr
       { error, body: rawBody, projectId: project.id },
       "invalid event received",
     );
-    captureException(error);
+    captureException(toError(error));
     const validationError = fromZodError(error as ZodError);
     return c.json({ error: validationError.message }, 400);
   }
@@ -735,7 +735,7 @@ secured.access(inRouteAuth).post("/track_event", authMiddleware, requireTracesCr
         { error, body: rawBody, projectId: project.id },
         "invalid event received",
       );
-      captureException(error);
+      captureException(toError(error));
       const validationError = fromZodError(error as ZodError);
       return c.json({ error: validationError.message }, 400);
     }
@@ -774,7 +774,7 @@ secured.access(publicEndpoint("anonymous product telemetry, no credential")).pos
         properties,
       });
     } catch (error) {
-      captureException(error);
+      captureException(toError(error));
     }
   }
 

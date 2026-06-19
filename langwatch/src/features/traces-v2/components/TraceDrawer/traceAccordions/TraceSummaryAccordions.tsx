@@ -1,5 +1,7 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { useMemo, useRef } from "react";
+import { PrivacyDroppedNotice } from "~/components/ui/PrivacyDroppedNotice";
+import { RedactedField } from "~/components/ui/RedactedField";
 import type {
   SpanTreeNode,
   TraceHeader,
@@ -153,8 +155,11 @@ export function TraceSummaryAccordions({
                 isFirst={isFirst}
                 open={isOpen}
               >
-                {hasIO ? (
-                  <VStack align="stretch" gap={2}>
+                <VStack align="stretch" gap={2}>
+                  <PrivacyDroppedNotice
+                    categories={trace.privacy?.droppedCategories ?? undefined}
+                  />
+                  <RedactedField field="input">
                     {trace.input ? (
                       <IOViewer
                         label="Input"
@@ -164,6 +169,8 @@ export function TraceSummaryAccordions({
                     ) : (
                       <MissingIORow label="Input" mode="input" />
                     )}
+                  </RedactedField>
+                  <RedactedField field="output">
                     {trace.output ? (
                       <IOViewer
                         label="Output"
@@ -174,10 +181,8 @@ export function TraceSummaryAccordions({
                     ) : (
                       <MissingIORow label="Output" mode="output" />
                     )}
-                  </VStack>
-                ) : (
-                  <EmptyHint>No I/O captured for this trace</EmptyHint>
-                )}
+                  </RedactedField>
+                </VStack>
               </Section>
             );
           }

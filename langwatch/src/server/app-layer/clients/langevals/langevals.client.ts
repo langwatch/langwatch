@@ -1,4 +1,4 @@
-import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.generated";
+import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
 
 export interface LangEvalsEvaluateParams {
   evaluatorType: string;

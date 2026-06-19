@@ -20,22 +20,34 @@ const EVALUATION_FIELDS: ReadonlySet<string> = new Set([
   "evaluations.label",
 ]);
 
-/** Fields that have no in-memory matcher (key-selectors, numeric-only). Skipped during matching. */
+/**
+ * Fields the in-memory matcher cannot positively evaluate at trace time
+ * (key-selectors and phantom value fields). A NON-EMPTY actionable condition on
+ * one of these forces NO-MATCH for the whole filter set — it must never
+ * silently skip-to-pass, which made every such automation fire on every trace
+ * (issue #4805).
+ *
+ * - `metadata.key`: a key-presence selector, not a standalone precondition.
+ * - `events.event_details.value`: a phantom field — not in the filter registry
+ *   or the ClickHouse builder — so it can never match; treat as unevaluable.
+ *
+ * `events.metrics.value` is intentionally NOT here: it is now matched in-memory
+ * as an inclusive numeric range (mirroring the ClickHouse builder).
+ */
 const UNSUPPORTED_FIELDS: ReadonlySet<string> = new Set([
   "metadata.key",
-  "events.metrics.value",
   "events.event_details.value",
 ]);
 
 /**
  * Event filter fields that ARE matched in-memory and therefore need the
- * trace-level events list. The value-only fields (`events.metrics.value`,
- * `events.event_details.value`) are unsupported in-memory (see
- * UNSUPPORTED_FIELDS) so they do not require deriving events.
+ * trace-level events list. Reactors gate event derivation on this set, so any
+ * field matched against `traceData.events` must be listed here.
  */
 const MATCHABLE_EVENT_FILTER_FIELDS: ReadonlySet<string> = new Set([
   "events.event_type",
   "events.metrics.key",
+  "events.metrics.value",
   "events.event_details.key",
 ]);
 
@@ -44,12 +56,13 @@ const MATCHABLE_EVENT_FILTER_FIELDS: ReadonlySet<string> = new Set([
  * events list. Reactors use this to derive events from stored_spans only when a
  * trigger actually filters on them, keeping the common path off the read.
  */
-export function triggerFiltersReferenceEvents(filters: TriggerFilters): boolean {
+export function triggerFiltersReferenceEvents(
+  filters: TriggerFilters,
+): boolean {
   return Object.keys(filters).some((field) =>
     MATCHABLE_EVENT_FILTER_FIELDS.has(field),
   );
 }
-
 
 /**
  * Splits trigger filters into trace-time-available and evaluation-time-available groups.
@@ -153,8 +166,15 @@ function buildPreconditionEvents(
  * - Within a field: OR (any filter value matches → field passes)
  * - Across fields: AND (all fields must pass)
  *
- * Evaluation fields are skipped (they return false for the whole trigger
- * if present — the caller should use classifyTriggerFilters to check first).
+ * Fail-closed (issue #4805): a filter set passes ONLY when every actionable
+ * condition positively matched. An actionable (non-empty) condition on a field
+ * the in-memory matcher cannot positively evaluate — an evaluation field, an
+ * UNSUPPORTED_FIELDS key-selector, or any value the matcher rejects — forces
+ * NO-MATCH for the whole set. Empty-array conditions stay vacuous (they pass),
+ * so a filter set with no actionable conditions at all still returns true.
+ *
+ * Evaluation fields here return false for the whole trigger when actionable;
+ * the caller should use classifyTriggerFilters to route them first.
  */
 export function matchesTriggerFilters(
   traceData: PreconditionTraceData,
@@ -166,11 +186,14 @@ export function matchesTriggerFilters(
   ][]) {
     if (!filterValue) continue;
 
-    // Skip evaluation fields — not available at trace time
-    if (EVALUATION_FIELDS.has(field)) return false;
-
-    // Skip fields with no in-memory matcher (key-selectors, numeric-only)
-    if (UNSUPPORTED_FIELDS.has(field)) continue;
+    // A non-empty condition on a field we cannot positively evaluate
+    // (evaluation field or unsupported key-selector/phantom field) must NOT
+    // skip-to-pass — that is the #4805 fire-on-everything defect. Empty
+    // conditions are vacuous and skipped.
+    if (EVALUATION_FIELDS.has(field) || UNSUPPORTED_FIELDS.has(field)) {
+      if (filterValueHasActionableCondition(filterValue)) return false;
+      continue;
+    }
 
     if (!matchField(traceData, field, filterValue)) {
       return false;
@@ -178,6 +201,31 @@ export function matchesTriggerFilters(
   }
 
   return true;
+}
+
+/**
+ * Whether a filter value carries at least one non-empty (actionable) condition.
+ * Empty arrays — at any nesting depth — are vacuous and do not constrain the
+ * match, mirroring the ClickHouse builder which emits no SQL for them.
+ */
+function filterValueHasActionableCondition(
+  filterValue: TriggerFilterValue,
+): boolean {
+  if (Array.isArray(filterValue)) {
+    return filterValue.length > 0;
+  }
+
+  for (const subValue of Object.values(filterValue)) {
+    if (Array.isArray(subValue)) {
+      if (subValue.length > 0) return true;
+    } else if (typeof subValue === "object" && subValue !== null) {
+      for (const values of Object.values(subValue)) {
+        if (Array.isArray(values) && values.length > 0) return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 /**
@@ -192,6 +240,12 @@ function matchField(
   field: FilterField,
   filterValue: TriggerFilterValue,
 ): boolean {
+  // events.metrics.value is a numeric range, not membership — handle it with a
+  // dedicated matcher that mirrors the ClickHouse range guards.
+  if (field === "events.metrics.value") {
+    return matchEventMetricRange(traceData, filterValue);
+  }
+
   // Simple array: resolve field and check if any value matches
   if (Array.isArray(filterValue)) {
     if (filterValue.length === 0) return true;
@@ -256,6 +310,76 @@ function matchSimpleArray(
   }
 
   return false;
+}
+
+/**
+ * Matches the `events.metrics.value` numeric-range filter in-memory.
+ *
+ * The filter value is double-keyed: `{ [eventType]: { [metricKey]: [min, max] } }`.
+ * OR across every event-type / metric-key pair. A pair matches iff some event of
+ * that type carries a metric with that key whose value is within the inclusive
+ * `[min, max]` range.
+ *
+ * Mirrors the ClickHouse builder (`filter-conditions.ts` → "events.metrics.value")
+ * exactly: a range needs >= 2 values, both parse as finite numbers, and min <= max;
+ * any range failing those guards contributes no match (matches the CH `1=0`).
+ * With no actionable (non-empty) range, the condition is vacuous and passes.
+ */
+function matchEventMetricRange(
+  traceData: PreconditionTraceData,
+  filterValue: TriggerFilterValue,
+): boolean {
+  // Defensive guard for an unreachable shape: events.metrics.value is always
+  // double-keyed in production, never a bare array. An empty array is vacuous
+  // (no conditions to fail); a non-empty bare array cannot be evaluated.
+  if (Array.isArray(filterValue)) {
+    return filterValue.length === 0;
+  }
+
+  const events = traceData.events;
+  let matched = false;
+
+  for (const [eventType, metricMap] of Object.entries(filterValue)) {
+    if (typeof metricMap !== "object" || metricMap === null) continue;
+
+    for (const [metricKey, values] of Object.entries(metricMap)) {
+      if (!Array.isArray(values) || values.length === 0) continue;
+
+      // A non-empty range is actionable. If it is malformed (fewer than two
+      // values, non-numeric, or min > max) the CH builder emits `1=0` (never
+      // matches); in-memory that means this condition cannot pass — it must not
+      // skip-to-vacuous-pass, which would re-open the #4805 fire-on-everything
+      // hole. So mark it actionable and contribute no match.
+      if (values.length < 2) continue;
+
+      const min = parseFloat(values[0] ?? "");
+      const max = parseFloat(values[1] ?? "");
+      if (!Number.isFinite(min) || !Number.isFinite(max) || min > max) {
+        continue;
+      }
+
+      if (
+        (events ?? []).some(
+          (event) =>
+            event.event_type === eventType &&
+            event.metrics.some(
+              (metric) =>
+                metric.key === metricKey &&
+                metric.value >= min &&
+                metric.value <= max,
+            ),
+        )
+      ) {
+        matched = true;
+        break;
+      }
+    }
+    if (matched) break;
+  }
+
+  // No actionable range → vacuous (pass). Actionable ranges present but none
+  // matched → no match. Reuse the shared predicate for a single source of truth.
+  return matched || !filterValueHasActionableCondition(filterValue);
 }
 
 /**

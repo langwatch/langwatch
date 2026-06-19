@@ -18,9 +18,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  AI_CALL_FAILED_CAUSE,
-} from "../../utils/trpcError";
+import { AI_CALL_FAILED_CAUSE } from "../../utils/trpcError";
 import {
   aiCallFailedToastId,
   missingModelToastId,
@@ -70,6 +68,25 @@ describe("showMissingModelToast", () => {
     ).toBeInTheDocument();
   });
 
+  /** @scenario The toast names the feature, the role, and the scope it couldn't resolve from */
+  it("renders as an info toast, not an error", async () => {
+    mountToaster();
+    showMissingModelToast({
+      featureKey: "traces.ai_search",
+      featureDisplayName: "AI search",
+      role: "FAST",
+      projectSlug: "acme-app",
+      canConfigure: true,
+    });
+
+    const title = await screen.findByText(
+      /Model not configured for AI search/i,
+    );
+    const root = title.closest("[data-type]");
+    expect(root).not.toBeNull();
+    expect(root!.getAttribute("data-type")).toBe("info");
+  });
+
   /** @scenario The modal carries one primary CTA to the right settings page and role */
   it("renders a Configure action that deep-links to the role anchor", async () => {
     mountToaster();
@@ -82,9 +99,7 @@ describe("showMissingModelToast", () => {
     });
 
     await waitFor(() => {
-      expect(
-        screen.getByText(/Configure Fast model/i),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Configure Fast model/i)).toBeInTheDocument();
     });
   });
 
@@ -158,6 +173,23 @@ describe("showAiCallFailedToast", () => {
     expect(
       screen.getByText(/401 Unauthorized from provider/i),
     ).toBeInTheDocument();
+  });
+
+  /** @scenario A failed assistive AI call warns, it does not error */
+  it("renders as a warning toast, not an error", async () => {
+    mountToaster();
+    showAiCallFailedToast({
+      featureKey: "workflows.commit_message",
+      featureDisplayName: "Workflow commit message",
+      role: "FAST",
+      projectSlug: "acme-app",
+      errorMessage: "boom",
+    });
+
+    const title = await screen.findByText(/Workflow commit message failed/i);
+    const root = title.closest("[data-type]");
+    expect(root).not.toBeNull();
+    expect(root!.getAttribute("data-type")).toBe("warning");
   });
 
   it("dedupes by stable id", async () => {

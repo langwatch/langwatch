@@ -535,18 +535,12 @@ Let's get cracking.
   <Step title="Let LangWatch MCP do the rest for you (Optional)">
     Install the [LangWatch MCP Server](/integration/mcp) and ask your coding assistant (Cursor, Claude Code, Codex, etc.) to instrument your codebase with LangWatch, OR keep following the steps below to instrument your codebase manually.
 
-    Add the LangWatch MCP to your editor:
+    Add the LangWatch MCP to your editor. Under the `mcpServers` object of your editor's MCP settings file, add an entry named `langwatch` with these fields:
 
-    ```json
-    {
-      "mcpServers": {
-        "langwatch": {
-          "command": "npx",
-          "args": ["-y", "@langwatch/mcp-server"]
-        }
-      }
-    }
-    ```
+    - `command`: `npx`
+    - `args`: `-y`, then the package name `@langwatch/mcp-server` on a separate token
+
+    See [LangWatch MCP](/integration/mcp) for per-editor instructions and the API key field.
 
     Then ask your coding assistant to instrument your codebase with LangWatch:
 
@@ -5406,99 +5400,68 @@ Once traces share a `thread_id`, you can:
 ---
 title: Tracking LLM Costs and Tokens
 sidebarTitle: Python
-description: Track LLM costs and tokens with LangWatch to monitor efficiency and support performance evaluations in agent testing.
+description: How LangWatch counts input, output, cached, and reasoning tokens, calculates costs from a daily-updated price registry of 350+ models, and how to adjust any of it manually.
 icon: python
-keywords: LangWatch, cost tracking, token counting, debugging, troubleshooting, model costs, metrics, LLM spans
+keywords: LangWatch, cost tracking, token counting, cached tokens, reasoning tokens, model costs, pricing, tokenizer, metrics, LLM spans
 ---
 
-By default, LangWatch will automatically capture cost and token data for your LLM calls.
+By default, LangWatch automatically captures token usage and calculates cost for your LLM calls, no configuration needed.
 
 <img
   src="/images/costs/llm-costs-analytics.png"
   alt="LLM costs analytics graph"
 />
 
-If you don't see costs being tracked or you see it being tracked as $0, this guide will help you identify and fix issues when cost and token tracking is not working as expected.
+This page explains exactly how that works, which token types are captured, which OpenTelemetry attributes are read, what happens when token counts are missing, and how to adjust costs manually when you need to.
 
-## Understanding Cost and Token Tracking
+## How cost calculation works
 
-LangWatch calculates costs and tracks tokens by:
+LangWatch calculates costs in three steps:
 
-1. **Capturing model names** in LLM spans to match against cost tables
-2. **Recording token metrics** (`prompt_tokens`, `completion_tokens`) in span data, or estimating when not available
-3. **Mapping models to costs** using the pricing table in Settings > Model Costs
+1. **Capture the model name** from the LLM span (e.g. `openai/gpt-5-mini`)
+2. **Capture token usage** from the span's attributes, or estimate it when missing
+3. **Multiply by the model's per-token prices** from the pricing registry in Settings > Model Costs
 
-When any of these components are missing, you might see missing or $0 costs and tokens.
+### The model price registry
 
-## Step 1: Verify LLM Span Data Capture
-
-The most common issue is that your LLM spans aren't capturing the required data: model name, inputs, outputs, and token metrics.
-
-### Check Your Current Spans
-
-First, examine what data is being captured in your LLM spans. In the LangWatch dashboard:
-
-1. Navigate to a trace that should have cost/token data
-2. Click on the LLM span to inspect its details
-3. Look for these key fields:
-   - **Model**: Should show the model identifier (e.g., `openai/gpt-5`)
-   - **Input/Output**: Should contain the actual messages sent and received
-   - **Metrics**: Should show prompt + completion tokens
+LangWatch ships a registry of **350+ models** with input, output, cache read, and cache write prices per token. Prices are checked **every day** against the providers' public pricing and the registry is updated as soon as a price or model changes, so the costs you see track what providers actually charge.
 
 <img
-  src="/images/costs/llm-span-details.png"
-  alt="LLM span showing model, input/output, and token metrics"
+  src="/images/costs/model-costs-settings.webp"
+  alt="Model Costs settings page listing 350+ models with input, output, cache read and cache write prices"
 />
 
-## Step 2: Fix Missing Model Information
+Each entry has a regex match rule, so the same price matches the different spellings instrumentation libraries use for the same model (`gpt-5-mini`, `openai/gpt-5-mini`, `openai.responses/gpt-5-mini`). Bedrock-style identifiers like `eu.anthropic.claude-sonnet-4-5-20250929-v1:0` are normalized and matched too.
 
-If your spans don't show model information, the integration framework you're using might not be capturing it automatically.
+If a model isn't in the registry, LangWatch does **not** invent a price: the cost shows as $0 until you add a custom entry (see [Custom model costs](#custom-model-costs)).
 
-### Solution A: Use Framework Auto-tracking
+## Which tokens are captured
 
-LangWatch provides auto-tracking for popular frameworks that automatically captures all the necessary data for cost calculation.
+LangWatch captures the full token breakdown reported by your LLM provider:
 
-Check the **Integrations** menu in the sidebar to find specific setup instructions for your framework, which will show you how to properly configure automatic model and token tracking.
+| Token type | What it is | Pricing |
+|------------|-----------|---------|
+| **Input tokens** | The prompt sent to the model | Input rate |
+| **Output tokens** | The completion generated by the model | Output rate |
+| **Cache read tokens** | Prompt tokens served from the provider's prompt cache | Cache read rate (falls back to input rate) |
+| **Cache write tokens** | Prompt tokens written into the provider's prompt cache | Cache write rate (falls back to input rate) |
+| **Reasoning tokens** | Thinking tokens from reasoning models (o-series, Claude extended thinking, etc.) | Already included in the provider's output token count, so they are billed as output tokens; LangWatch captures the breakdown separately so you can see how much of the output was reasoning |
 
-### Solution B: Manually Set Model Information
+All of these are summed across the spans of a trace and shown in the trace details, the traces table (Tokens, Tokens In, Tokens Out columns), and analytics.
 
-If auto-tracking isn't available for your framework, manually update the span with model information:
+### OpenTelemetry attributes reference
 
-```python
-import langwatch
+If you use OpenTelemetry instrumentation directly (or want to patch what a framework emits), these are the span attributes LangWatch reads, in their order of precedence:
 
-# Mark the span as an LLM type span
-@langwatch.span(type="llm")
-def custom_llm_call(prompt: str):
-    # Update the current span with model information
-    langwatch.get_current_span().update(
-        model="openai/gpt-5",  # Use the exact model identifier
-        input=prompt,
-    )
-
-    # Simulate an LLM response
-    response = your_custom_llm_client.generate(prompt)
-
-    # Update with output and metrics
-    langwatch.get_current_span().update(
-        output=response.text,
-        metrics={
-            "prompt_tokens": response.usage.prompt_tokens,
-            "completion_tokens": response.usage.completion_tokens,
-        }
-    )
-
-    return response.text
-
-@langwatch.trace()
-def main_handler():
-    result = custom_llm_call("Tell me about LangWatch")
-    return result
-```
-
-### Solution C: Direct OpenTelemetry Integration (without LangWatch SDK)
-
-If you're using a framework with built-in OpenTelemetry integration or community instrumentors, they should be following the [GenAI Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/). However, if the integration isn't capturing model information or token counts correctly, you can wrap your LLM calls with a custom span to patch the missing data:
+| Data | Attributes |
+|------|-----------|
+| Input tokens | `gen_ai.usage.input_tokens`, `gen_ai.usage.prompt_tokens`, `ai.usage.promptTokens` (Vercel), `llm.token_count.prompt` (OpenInference) |
+| Output tokens | `gen_ai.usage.output_tokens`, `gen_ai.usage.completion_tokens`, `ai.usage.completionTokens` (Vercel), `llm.token_count.completion` (OpenInference) |
+| Cache read tokens | `gen_ai.usage.cache_read.input_tokens`, `gen_ai.usage.cached_tokens`, `llm.token_count.prompt_details.cache_read` (OpenInference) |
+| Cache write tokens | `gen_ai.usage.cache_creation.input_tokens`, `llm.token_count.prompt_details.cache_write` (OpenInference) |
+| Reasoning tokens | `gen_ai.usage.reasoning_tokens`, `llm.token_count.completion_details.reasoning` (OpenInference) |
+| Model | `gen_ai.response.model`, `gen_ai.request.model` |
+| Pre-computed cost | `langwatch.span.cost` (a number, in USD) |
 
 ```python
 from opentelemetry import trace
@@ -5507,109 +5470,111 @@ tracer = trace.get_tracer(__name__)
 
 def my_llm_call_with_tracking(prompt):
     with tracer.start_as_current_span("llm_call_wrapper") as span:
-        # Set the required attributes for cost calculation
         span.set_attribute("gen_ai.operation.name", "chat")
-        span.set_attribute("gen_ai.request.model", "gpt-5")
+        span.set_attribute("gen_ai.request.model", "gpt-5-mini")
 
-        # Your existing LLM call (may create its own spans)
         response = your_framework_llm_client.generate(prompt)
 
-        # Extract and set token information if available
-        if hasattr(response, 'usage'):
+        if hasattr(response, "usage"):
             span.set_attribute("gen_ai.usage.input_tokens", response.usage.input_tokens)
-            span.set_attribute("gen_ai.usage.completion_tokens", response.usage.completion_tokens)
+            span.set_attribute("gen_ai.usage.output_tokens", response.usage.output_tokens)
+            # Optional breakdowns
+            span.set_attribute("gen_ai.usage.cache_read.input_tokens", response.usage.cached_tokens)
+            span.set_attribute("gen_ai.usage.reasoning_tokens", response.usage.reasoning_tokens)
 
         return response
 ```
 
-## Step 3: Configure Model Cost Mapping
+## When token counts are missing
 
-If your model information is being captured but costs still show $0, you need to configure the cost mapping.
+Some providers and frameworks don't report usage on streamed responses, and some integrations drop it. When an LLM span arrives with the model and input/output captured but no token counts, LangWatch **estimates them by tokenizing the captured input and output text** with OpenAI's `o200k_base` encoding, the same tokenizer used by the GPT-5 model family.
 
-### Check Existing Model Costs
+Estimated tokens (and the costs computed from them) are marked with a `~` prefix in the UI, so you always know which numbers are exact and which are approximations. Exact counts reported by your provider always win over estimation.
 
-1. Go to **Settings > Model Costs** in your LangWatch dashboard
-2. Look for your model in the list
-3. Check if the regex pattern matches your model identifier
+## Adjusting tokens and costs manually
 
-<img
-  src="/images/costs/model-costs-settings.webp"
-  alt="Model Costs settings page showing cost configuration"
-/>
+If automatic capture doesn't fit your setup, a proxy strips usage data, a provider isn't supported, or you negotiate custom pricing, you can set token counts and cost explicitly with the Python SDK:
 
-### Add Custom Model Costs
+```python
+import langwatch
 
-If your model isn't in the cost table, add it:
+@langwatch.span(type="llm")
+def custom_llm_call(prompt: str):
+    langwatch.get_current_span().update(
+        model="my-custom-model-v1",
+        input=prompt,
+    )
 
-1. Click **"Add New Model"** in Settings > Model Costs
-2. Configure the model entry:
-   - **Model Name**: Descriptive name (e.g., "gpt-5")
-   - **Regex Match Rule**: Pattern to match your model identifier (e.g., `^gpt-5$`)
-   - **Input Cost**: Cost per input token (e.g., `0.0000004`)
-   - **Output Cost**: Cost per output token (e.g., `0.0000016`)
+    response = your_custom_llm_client.generate(prompt)
 
-### Common Model Identifier Patterns
+    langwatch.get_current_span().update(
+        output=response.text,
+        metrics={
+            "prompt_tokens": response.usage.prompt_tokens,
+            "completion_tokens": response.usage.completion_tokens,
+            "reasoning_tokens": response.usage.reasoning_tokens,  # optional
+            "cost": 0.042,  # optional: explicit cost in USD, wins over computation
+        },
+    )
 
-Make sure your regex patterns match how the model names appear in your spans:
+    return response.text
+```
+
+When `cost` is set, it is used as-is, even for a known model with token counts: an explicit cost is treated as authoritative and overrides the registry calculation. When only token counts are set, LangWatch multiplies them by the model's registry prices as usual.
+
+## Custom model costs
+
+For self-hosted models, fine-tunes, or negotiated pricing, add your own entries in **Settings > Model Costs**:
+
+1. Click **"Add New Model"**
+2. Configure the entry:
+   - **Model Name**: descriptive name (e.g. `my-custom-model-v1`)
+   - **Regex Match Rule**: pattern matching your model identifier (e.g. `^my-custom-model-v1$`)
+   - **Input / Output Cost**: price per token
+   - **Cache Read / Cache Write Cost**: optional cache rates
+
+Custom costs can be scoped to a project, a team, or the whole organization, the most specific scope wins, and custom entries take precedence over the built-in registry.
+
+### Common model identifier patterns
+
+Make sure your regex matches how the model name appears in your spans:
 
 | Framework    | Model Identifier Format | Regex Pattern          |
 | ------------ | ----------------------- | ---------------------- |
-| OpenAI SDK   | `gpt-5`           | `^gpt-5$`        |
-| Azure OpenAI | `gpt-5`           | `^gpt-5$`        |
-| LangChain    | `openai/gpt-5`    | `^openai/gpt-5$` |
+| OpenAI SDK   | `gpt-5`                 | `^gpt-5$`              |
+| Azure OpenAI | `gpt-5`                 | `^gpt-5$`              |
+| LangChain    | `openai/gpt-5`          | `^openai/gpt-5$`       |
 | Custom       | `my-custom-model-v1`    | `^my-custom-model-v1$` |
 
+## Troubleshooting
 
-### Verification Checklist
+### Costs show $0 or are missing
 
-After running your test, verify in the LangWatch dashboard:
+1. Open a trace that should have cost data and click the LLM span
+2. Check these fields:
+   - **Model**: must show the model identifier (e.g. `openai/gpt-5`)
+   - **Input/Output**: must contain the captured messages
+   - **Metrics**: must show prompt + completion tokens
 
-✅ **Trace appears** in the dashboard \
-✅ **LLM span shows model name** (e.g., `gpt-5`) \
-✅ **Input and output are captured** \
-✅ **Token metrics are present** (`prompt_tokens`, `completion_tokens`) \
-✅ **Cost is calculated and displayed** (non-zero value)
+<img
+  src="/images/costs/llm-span-details.png"
+  alt="LLM span showing model, input/output, and token metrics"
+/>
 
-## Common Issues and Solutions
+Then work through:
 
-### Issue: Auto-tracking not working
+- **Model missing**: your framework isn't capturing it. Use the framework auto-tracking from the **Integrations** menu, or set it manually with `update(model=...)` as shown above.
+- **Model present but cost is $0**: the model isn't matching the registry. Check **Settings > Model Costs**, the regex must match your exact model identifier. Add a custom entry if it's not there.
+- **Tokens are 0 but model is captured**: your provider isn't returning usage (common with streaming). Either enable usage on streaming (e.g. `stream_options={"include_usage": True}` for OpenAI), set metrics manually, or let LangWatch estimate them from the captured text.
+- **Tokens show but with a `~`**: they were estimated by the tokenizer because the provider didn't report exact counts. This is expected; report exact counts to remove the marker.
 
-**Symptoms**: Spans appear but without model/metrics data
+### Auto-tracking not working
 
-**Solutions**:
+**Symptoms**: spans appear but without model/metrics data
 
 - Ensure `autotrack_*()` is called on an active trace
 - Check that the client instance being tracked is the same one making calls
 - Verify the integration is initialized correctly
-
-### Issue: Custom models not calculating costs
-
-**Symptoms**: Model name appears but cost remains $0
-
-**Solutions**:
-
-- Check regex pattern in Model Costs settings
-- Ensure the pattern exactly matches your model identifier
-- Verify input and output costs are configured correctly
-
-### Issue: Token counts are 0 but model is captured
-
-**Symptoms**: Model name is present but token metrics are missing
-
-**Solutions**:
-
-- Manually set metrics in span updates if not automatically captured
-- Check if your LLM provider returns usage information
-- Ensure the integration is extracting token counts from responses
-
-### Issue: Framework with OpenTelemetry not capturing model data
-
-**Symptoms**: Using a framework with OpenTelemetry integration that's not capturing model names or token counts
-
-**Solutions**:
-- Follow the guidance in [Solution C: Framework with OpenTelemetry Integration](#solution-c-framework-with-opentelemetry-integration) above
-- Wrap your LLM calls with custom spans to patch missing data
-
 
 ## Getting Help
 
@@ -5623,7 +5588,164 @@ If you're still experiencing issues after following this guide:
    - Framework versions
    - Sample span data from the dashboard
 
-Cost and token tracking should work reliably once the model information and metrics are properly captured. Most issues stem from missing model identifiers or incorrect cost table configuration.
+---
+
+# FILE: ./integration/python/tutorials/tracking-time-to-first-token.mdx
+
+---
+title: Tracking Time to First Token (TTFT)
+sidebarTitle: Python
+description: Capture time to first token on your LLM spans with the LangWatch Python SDK, automatically or manually, and monitor streaming latency with p95 comparisons.
+icon: python
+keywords: LangWatch, TTFT, time to first token, first_token_at, streaming latency, gen_ai.server.time_to_first_token, python, latency monitoring
+---
+
+Time to First Token (TTFT) measures how long your users wait between sending a request and seeing the first piece of the streamed answer. For streaming LLM applications it is usually a better proxy for perceived speed than total duration: a response can take 20 seconds to finish and still feel instant if the first token arrives in 300ms.
+
+LangWatch captures TTFT per LLM span, rolls it up to the trace, and surfaces it across the product:
+
+<Frame>
+  <img
+    src="/images/ttft/ttft-column-traces.png"
+    alt="Traces table with the TTFT column enabled, showing values and p95-scaled bars"
+  />
+</Frame>
+
+## Automatic capture
+
+If your instrumentation already emits any of the signals below, TTFT shows up without any extra code:
+
+| Source | Signal |
+|--------|--------|
+| OpenLLMetry / OpenLIT instrumentors | `llm.content.completion.chunk` / `First Token Stream Event` span events |
+| OTel GenAI semconv emitters | `gen_ai.server.time_to_first_token` span attribute (milliseconds) |
+| Vercel AI SDK | `ai.response.msToFirstChunk` span attribute |
+| LangWatch SDKs | `timestamps.first_token_at` on the span (see below) |
+
+When more than one LLM span in a trace reports a TTFT, the trace-level value is the smallest one, the first token the user could have seen.
+
+## Setting TTFT manually
+
+If you handle streaming yourself, capture the timestamp of the first chunk and pass it through `update(timestamps=...)`. The value is the **unix epoch timestamp in milliseconds at which the first token arrived**, not the elapsed duration:
+
+```python
+import time
+import langwatch
+from openai import OpenAI
+
+client = OpenAI()
+
+
+@langwatch.span(type="llm")
+def stream_completion(prompt: str) -> str:
+    span = langwatch.get_current_span()
+    span.update(model="openai/gpt-5-mini", input=prompt)
+
+    first_token_at = None
+    chunks = []
+    stream = client.chat.completions.create(
+        model="gpt-5-mini",
+        messages=[{"role": "user", "content": prompt}],
+        stream=True,
+    )
+    for chunk in stream:
+        if first_token_at is None:
+            first_token_at = round(time.time() * 1000)  # epoch milliseconds
+        if chunk.choices and chunk.choices[0].delta.content:
+            chunks.append(chunk.choices[0].delta.content)
+
+    span.update(
+        output="".join(chunks),
+        timestamps={"first_token_at": first_token_at},
+    )
+    return "".join(chunks)
+
+
+@langwatch.trace()
+def main():
+    return stream_completion("Tell me about LangWatch")
+```
+
+LangWatch computes TTFT as `first_token_at - started_at`. You don't need to set `started_at` or `finished_at`, those fall back to the span's own start and end times.
+
+<Warning>
+  Assigning to the dict directly, e.g. `langwatch.get_current_span().timestamps["first_token_at"] = ...`, does **not** work. The timestamps are only exported to the underlying OpenTelemetry span when they go through `update(timestamps=...)`.
+</Warning>
+
+### If you already have the duration
+
+When your code measures the elapsed time instead of the wall-clock timestamp, report it through either of these equivalents:
+
+```python
+span = langwatch.get_current_span()
+
+# Option A: OTel GenAI semconv attribute, duration in milliseconds
+span.set_attributes({"gen_ai.server.time_to_first_token": ttft_ms})
+
+# Option B: LangWatch metrics field, duration in milliseconds
+span.update(metrics={"first_token_ms": ttft_ms})
+```
+
+### REST API
+
+If you send spans through the [REST API](/integration/rest-api) instead of the SDK, set `first_token_at` (epoch milliseconds) in the span's `timestamps` object:
+
+```json
+{
+  "type": "llm",
+  "span_id": "span-123",
+  "timestamps": {
+    "started_at": 1718886000000,
+    "first_token_at": 1718886000800,
+    "finished_at": 1718886004200
+  }
+}
+```
+
+## Where TTFT shows up
+
+### Traces table column
+
+On the Traces page, open the columns picker (the columns icon in the toolbar) and enable **TTFT**. The column behaves like the Duration column: each cell shows the value plus an inline bar scaled to the 95th percentile of the visible page, so one slow outlier doesn't flatten every other row. Rows at or above the page's TTFT p95 render a full red bar.
+
+<Frame>
+  <img
+    src="/images/ttft/ttft-enable-column.png"
+    alt="Columns picker with the TTFT column"
+  />
+</Frame>
+
+Hovering a cell shows how that trace compares against the page's TTFT p95:
+
+<Frame>
+  <img
+    src="/images/ttft/ttft-tooltip.png"
+    alt="TTFT cell tooltip showing the percentage of the page's TTFT p95"
+  />
+</Frame>
+
+The column is sortable, so you can order by TTFT to chase your slowest streaming starts.
+
+### Trace details
+
+The trace drawer shows a TTFT pill in the header next to duration, cost, and tokens:
+
+<Frame>
+  <img
+    src="/images/ttft/ttft-drawer.png"
+    alt="Trace drawer header showing the TTFT pill"
+  />
+</Frame>
+
+### Analytics
+
+In **Analytics > LLM Metrics** you get time-to-first-token graphs with the usual aggregations (median, p90, p95, p99), and you can build custom graphs on the same metric for dashboards and alerting.
+
+## Troubleshooting
+
+- **TTFT shows "—" in the table**: the trace has no LLM span reporting any of the signals above. For non-streaming calls this is expected, there is no "first token" moment distinct from the response itself.
+- **Value looks wrong by orders of magnitude**: check the units. `first_token_at` is an epoch timestamp in milliseconds; `gen_ai.server.time_to_first_token` and `first_token_ms` are durations in milliseconds.
+- **You set timestamps but nothing shows**: make sure the values go through `span.update(timestamps=...)` rather than mutating `span.timestamps` in place.
 
 ---
 
@@ -9000,88 +9122,126 @@ Once traces share a `thread_id`, you can:
 ---
 title: Tracking LLM Costs and Tokens
 sidebarTitle: TypeScript/JS
-description: Track LLM costs and tokens with LangWatch to monitor efficiency and support performance evaluations in agent testing.
+description: How LangWatch counts input, output, cached, and reasoning tokens, calculates costs from a daily-updated price registry of 350+ models, and how to adjust any of it manually.
 icon: square-js
-keywords: LangWatch, cost tracking, token counting, debugging, troubleshooting, model costs, metrics, LLM spans
+keywords: LangWatch, cost tracking, token counting, cached tokens, reasoning tokens, model costs, pricing, tokenizer, metrics, LLM spans
 ---
 
-By default, LangWatch will automatically capture cost and token data for your LLM calls.
+By default, LangWatch automatically captures token usage and calculates cost for your LLM calls, no configuration needed.
 
 <img
   src="/images/costs/llm-costs-analytics.png"
   alt="LLM costs analytics graph"
 />
 
-If you don't see costs being tracked or you see it being tracked as $0, this guide will help you identify and fix issues when cost and token tracking is not working as expected.
+This page explains exactly how that works, which token types are captured, which OpenTelemetry attributes are read, what happens when token counts are missing, and how to adjust costs manually when you need to.
 
-## Understanding Cost and Token Tracking
+## How cost calculation works
 
-LangWatch calculates costs and tracks tokens by:
+LangWatch calculates costs in three steps:
 
-1. **Capturing model names** in LLM spans to match against cost tables
-2. **Recording token metrics** (`prompt_tokens`, `completion_tokens`) in span data, or estimating when not available
-3. **Mapping models to costs** using the pricing table in Settings > Model Costs
+1. **Capture the model name** from the LLM span (e.g. `openai/gpt-5-mini`)
+2. **Capture token usage** from the span's attributes, or estimate it when missing
+3. **Multiply by the model's per-token prices** from the pricing registry in Settings > Model Costs
 
-When any of these components are missing, you might see missing or $0 costs and tokens.
+### The model price registry
 
-## Step 1: Verify LLM Span Data Capture
-
-The most common issue is that your LLM spans aren't capturing the required data: model name, inputs, outputs, and token metrics.
-
-### Check Your Current Spans
-
-First, examine what data is being captured in your LLM spans. In the LangWatch dashboard:
-
-1. Navigate to a trace that should have cost/token data
-2. Click on the LLM span to inspect its details
-3. Look for these key fields:
-   - **Model**: Should show the model identifier (e.g., `openai/gpt-5`)
-   - **Input/Output**: Should contain the actual messages sent and received
-   - **Metrics**: Should show prompt + completion tokens
+LangWatch ships a registry of **350+ models** with input, output, cache read, and cache write prices per token. Prices are checked **every day** against the providers' public pricing and the registry is updated as soon as a price or model changes, so the costs you see track what providers actually charge.
 
 <img
-  src="/images/costs/llm-span-details.png"
-  alt="LLM span showing model, input/output, and token metrics"
+  src="/images/costs/model-costs-settings.webp"
+  alt="Model Costs settings page listing 350+ models with input, output, cache read and cache write prices"
 />
 
-## Step 2: Fix Missing Model Information
+Each entry has a regex match rule, so the same price matches the different spellings instrumentation libraries use for the same model (`gpt-5-mini`, `openai/gpt-5-mini`, `openai.responses/gpt-5-mini`). Bedrock-style identifiers like `eu.anthropic.claude-sonnet-4-5-20250929-v1:0` are normalized and matched too.
 
-If your spans don't show model information, the integration framework you're using might not be capturing it automatically.
+If a model isn't in the registry, LangWatch does **not** invent a price: the cost shows as $0 until you add a custom entry (see [Custom model costs](#custom-model-costs)).
 
-### Solution A: Use Framework Auto-tracking
+## Which tokens are captured
 
-LangWatch provides auto-tracking for popular frameworks that automatically captures all the necessary data for cost calculation.
+LangWatch captures the full token breakdown reported by your LLM provider:
 
-Check the **Integrations** menu in the sidebar to find specific setup instructions for your framework, which will show you how to properly configure automatic model and token tracking.
+| Token type | What it is | Pricing |
+|------------|-----------|---------|
+| **Input tokens** | The prompt sent to the model | Input rate |
+| **Output tokens** | The completion generated by the model | Output rate |
+| **Cache read tokens** | Prompt tokens served from the provider's prompt cache | Cache read rate (falls back to input rate) |
+| **Cache write tokens** | Prompt tokens written into the provider's prompt cache | Cache write rate (falls back to input rate) |
+| **Reasoning tokens** | Thinking tokens from reasoning models (o-series, Claude extended thinking, etc.) | Already included in the provider's output token count, so they are billed as output tokens; LangWatch captures the breakdown separately so you can see how much of the output was reasoning |
 
-### Solution B: Manually Set Model Information
+All of these are summed across the spans of a trace and shown in the trace details, the traces table (Tokens, Tokens In, Tokens Out columns), and analytics.
 
-If auto-tracking isn't available for your framework, manually update the span with model information:
+### OpenTelemetry attributes reference
+
+If you use OpenTelemetry instrumentation directly (or want to patch what a framework emits), these are the span attributes LangWatch reads, in their order of precedence:
+
+| Data | Attributes |
+|------|-----------|
+| Input tokens | `gen_ai.usage.input_tokens`, `gen_ai.usage.prompt_tokens`, `ai.usage.promptTokens` (Vercel), `llm.token_count.prompt` (OpenInference) |
+| Output tokens | `gen_ai.usage.output_tokens`, `gen_ai.usage.completion_tokens`, `ai.usage.completionTokens` (Vercel), `llm.token_count.completion` (OpenInference) |
+| Cache read tokens | `gen_ai.usage.cache_read.input_tokens`, `gen_ai.usage.cached_tokens`, `llm.token_count.prompt_details.cache_read` (OpenInference) |
+| Cache write tokens | `gen_ai.usage.cache_creation.input_tokens`, `llm.token_count.prompt_details.cache_write` (OpenInference) |
+| Reasoning tokens | `gen_ai.usage.reasoning_tokens`, `llm.token_count.completion_details.reasoning` (OpenInference) |
+| Model | `gen_ai.response.model`, `gen_ai.request.model` |
+| Pre-computed cost | `langwatch.span.cost` (a number, in USD) |
+
+```typescript
+import { trace } from "@opentelemetry/api";
+
+const tracer = trace.getTracer("my-service");
+
+async function myLLMCallWithTracking(prompt: string) {
+  return await tracer.startActiveSpan("llm_call_wrapper", async (span) => {
+    span.setAttribute("gen_ai.operation.name", "chat");
+    span.setAttribute("gen_ai.request.model", "gpt-5-mini");
+
+    const response = await yourFrameworkLLMClient.generate(prompt);
+
+    if (response.usage) {
+      span.setAttribute("gen_ai.usage.input_tokens", response.usage.inputTokens);
+      span.setAttribute("gen_ai.usage.output_tokens", response.usage.outputTokens);
+      // Optional breakdowns
+      span.setAttribute("gen_ai.usage.cache_read.input_tokens", response.usage.cachedTokens);
+      span.setAttribute("gen_ai.usage.reasoning_tokens", response.usage.reasoningTokens);
+    }
+
+    span.end();
+    return response;
+  });
+}
+```
+
+## When token counts are missing
+
+Some providers and frameworks don't report usage on streamed responses, and some integrations drop it. When an LLM span arrives with the model and input/output captured but no token counts, LangWatch **estimates them by tokenizing the captured input and output text** with OpenAI's `o200k_base` encoding, the same tokenizer used by the GPT-5 model family.
+
+Estimated tokens (and the costs computed from them) are marked with a `~` prefix in the UI, so you always know which numbers are exact and which are approximations. Exact counts reported by your provider always win over estimation.
+
+## Adjusting tokens and costs manually
+
+If automatic capture doesn't fit your setup, a proxy strips usage data, a provider isn't supported, or you negotiate custom pricing, you can set token counts and cost explicitly with the TypeScript SDK:
 
 ```typescript
 import { setupObservability } from "langwatch/observability/node";
 import { getLangWatchTracer } from "langwatch";
 
-// Setup observability
 setupObservability();
 
 const tracer = getLangWatchTracer("cost-tracking-example");
 
 async function customLLMCall(prompt: string): Promise<string> {
   return await tracer.withActiveSpan("CustomLLMCall", async (span) => {
-    // Mark the span as an LLM type span
     span.setType("llm");
-    span.setRequestModel("gpt-5-mini"); // Use the exact model identifier
+    span.setRequestModel("my-custom-model-v1"); // Use the exact model identifier
     span.setInput("text", prompt);
 
-    // Simulate an LLM response
     const response = await yourCustomLLMClient.generate(prompt);
 
-    // Set output and token metrics
     span.setOutput("text", response.text);
     span.setMetrics({
-      promptTokens: response.usage.prompt_tokens,
-      completionTokens: response.usage.completion_tokens,
+      promptTokens: response.usage.promptTokens,
+      completionTokens: response.usage.completionTokens,
+      cost: 0.042, // optional: explicit cost in USD, wins over computation
     });
 
     return response.text;
@@ -9089,145 +9249,70 @@ async function customLLMCall(prompt: string): Promise<string> {
 }
 ```
 
-## Step 3: Configure Model Cost Mapping
+When `cost` is set, it is used as-is, even for a known model with token counts: an explicit cost is treated as authoritative and overrides the registry calculation. When only token counts are set, LangWatch multiplies them by the model's registry prices as usual.
 
-If your model information is being captured but costs still show $0, you need to configure the cost mapping.
+## Custom model costs
 
-### Check Existing Model Costs
+For self-hosted models, fine-tunes, or negotiated pricing, add your own entries in **Settings > Model Costs**:
 
-1. Go to **Settings > Model Costs** in your LangWatch dashboard
-2. Look for your model in the list
-3. Check if the regex pattern matches your model identifier
+1. Click **"Add New Model"**
+2. Configure the entry:
+   - **Model Name**: descriptive name (e.g. `my-custom-model-v1`)
+   - **Regex Match Rule**: pattern matching your model identifier (e.g. `^my-custom-model-v1$`)
+   - **Input / Output Cost**: price per token
+   - **Cache Read / Cache Write Cost**: optional cache rates
 
-<img
-  src="/images/costs/model-costs-settings.webp"
-  alt="Model Costs settings page showing cost configuration"
-/>
+Custom costs can be scoped to a project, a team, or the whole organization, the most specific scope wins, and custom entries take precedence over the built-in registry.
 
-### Add Custom Model Costs
+### Common model identifier patterns
 
-If your model isn't in the cost table, add it:
-
-1. Click **"Add New Model"** in Settings > Model Costs
-2. Configure the model entry:
-   - **Model Name**: Descriptive name (e.g., "gpt-5-mini")
-   - **Regex Match Rule**: Pattern to match your model identifier (e.g., `^gpt-5-mini$`)
-   - **Input Cost**: Cost per input token (e.g., `0.0000004`)
-   - **Output Cost**: Cost per output token (e.g., `0.0000016`)
-
-### Common Model Identifier Patterns
-
-Make sure your regex patterns match how the model names appear in your spans:
+Make sure your regex matches how the model name appears in your spans:
 
 | Framework    | Model Identifier Format | Regex Pattern          |
 | ------------ | ----------------------- | ---------------------- |
-| OpenAI SDK   | `gpt-5-mini`           | `^gpt-5-mini$`        |
-| Azure OpenAI | `gpt-5-mini`           | `^gpt-5-mini$`        |
-| LangChain    | `openai/gpt-5-mini`    | `^openai/gpt-5-mini$` |
+| OpenAI SDK   | `gpt-5`                 | `^gpt-5$`              |
+| Azure OpenAI | `gpt-5`                 | `^gpt-5$`              |
+| LangChain    | `openai/gpt-5`          | `^openai/gpt-5$`       |
 | Custom       | `my-custom-model-v1`    | `^my-custom-model-v1$` |
 
-### Verification Checklist
+## Troubleshooting
 
-After running your test, verify in the LangWatch dashboard:
+### Costs show $0 or are missing
 
-✅ **Trace appears** in the dashboard \
-✅ **LLM span shows model name** (e.g., `gpt-5-mini`) \
-✅ **Input and output are captured** \
-✅ **Token metrics are present** (`prompt_tokens`, `completion_tokens`) \
-✅ **Cost is calculated and displayed** (non-zero value)
+1. Open a trace that should have cost data and click the LLM span
+2. Check these fields:
+   - **Model**: must show the model identifier (e.g. `openai/gpt-5`)
+   - **Input/Output**: must contain the captured messages
+   - **Metrics**: must show prompt + completion tokens
 
-## Common Issues and Solutions
+<img
+  src="/images/costs/llm-span-details.png"
+  alt="LLM span showing model, input/output, and token metrics"
+/>
 
-### Issue: Auto-tracking not working
+Then work through:
 
-**Symptoms**: Spans appear but without model/metrics data
+- **Model missing**: your framework isn't capturing it. Use the framework auto-tracking from the **Integrations** menu, or set it manually with `span.setRequestModel(...)` as shown above.
+- **Model present but cost is $0**: the model isn't matching the registry. Check **Settings > Model Costs**, the regex must match your exact model identifier. Add a custom entry if it's not there.
+- **Tokens are 0 but model is captured**: your provider isn't returning usage (common with streaming). Either enable usage on streaming (e.g. `stream_options: { include_usage: true }` for OpenAI), set metrics manually, or let LangWatch estimate them from the captured text.
+- **Tokens show but with a `~`**: they were estimated by the tokenizer because the provider didn't report exact counts. This is expected; report exact counts to remove the marker.
 
-**Solutions**:
+### Vercel AI SDK
 
-- Ensure `setupObservability()` is called before any LLM operations
-- Check that the client instance being tracked is the same one making calls
-- Verify the integration is initialized correctly
-
-### Issue: Custom models not calculating costs
-
-**Symptoms**: Model name appears but cost remains $0
-
-**Solutions**:
-
-- Check regex pattern in Model Costs settings
-- Ensure the pattern exactly matches your model identifier
-- Verify input and output costs are configured correctly
-
-### Issue: Token counts are 0 but model is captured
-
-**Symptoms**: Model name is present but token metrics are missing
-
-**Solutions**:
-
-- Manually set token metrics using `span.setMetrics()` if not automatically captured
-- Check if your LLM provider returns usage information
-- Ensure the integration is extracting token counts from responses
-
-### Issue: Framework with OpenTelemetry not capturing model data
-
-**Symptoms**: Using a framework with OpenTelemetry integration that's not capturing model names or token counts
-
-**Solutions**:
-- Follow the guidance in [Solution C: Framework with OpenTelemetry Integration](#solution-c-framework-with-opentelemetry-integration) above
-- Wrap your LLM calls with custom spans to patch missing data
-
-## Advanced Examples
-
-### LangChain Integration
-
-The `LangWatchCallbackHandler` automatically captures model information and token metrics:
+When using the Vercel AI SDK, enable telemetry so usage is captured:
 
 ```typescript
-import { setupObservability } from "langwatch/observability/node";
-import { LangWatchCallbackHandler } from "langwatch/instrumentation/langchain";
-import { ChatOpenAI } from "@langchain/openai";
+import { generateText } from "ai";
+import { openai } from "@ai-sdk/openai";
 
-setupObservability();
-
-const llm = new ChatOpenAI({
-  modelName: "gpt-5-mini",
-  temperature: 0.7,
-  callbacks: [new LangWatchCallbackHandler()],
+const result = await generateText({
+  model: openai("gpt-5-mini"),
+  prompt: "Hello!",
+  experimental_telemetry: { isEnabled: true },
 });
 ```
 
-### Manual Token Counting
-
-If your LLM provider doesn't return token counts:
-
-```typescript
-import { setupObservability } from "langwatch/observability/node";
-import { getLangWatchTracer } from "langwatch";
-
-const tracer = getLangWatchTracer("manual-token-counting");
-
-async function llmWithManualTokenCounting(prompt: string): Promise<string> {
-  return await tracer.withActiveSpan("LLMWithManualCounting", async (span) => {
-    span.setType("llm");
-    span.setRequestModel("custom-model-v1");
-    span.setInput("text", prompt);
-
-    const response = await yourCustomLLMClient.generate(prompt);
-
-    // Manual token counting (simplified example)
-    const estimatedPromptTokens = Math.ceil(prompt.length / 4);
-    const estimatedCompletionTokens = Math.ceil(response.text.length / 4);
-
-    span.setOutput("text", response.text);
-    span.setMetrics({
-      promptTokens: estimatedPromptTokens,
-      completionTokens: estimatedCompletionTokens,
-    });
-
-    return response.text;
-  });
-}
-```
+Token usage flows through the `ai.usage.promptTokens` / `ai.usage.completionTokens` attributes automatically.
 
 ## Getting Help
 
@@ -9236,8 +9321,166 @@ If you're still experiencing issues after following this guide:
 1. **Check the LangWatch logs** for any error messages
 2. **Verify your API key** and endpoint configuration
 3. **Share a minimal reproduction** with the specific framework you're using
+4. **Contact support** at [support@langwatch.ai](mailto:support@langwatch.ai) with:
+   - Your integration method (SDK, OpenTelemetry, etc.)
+   - Framework versions
+   - Sample span data from the dashboard
 
-Cost and token tracking should work reliably once the model information and metrics are properly captured. Most issues stem from missing model identifiers or incorrect cost table configuration.
+---
+
+# FILE: ./integration/typescript/tutorials/tracking-time-to-first-token.mdx
+
+---
+title: Tracking Time to First Token (TTFT)
+sidebarTitle: TypeScript/JS
+description: Capture time to first token on your LLM spans with the LangWatch TypeScript SDK, automatically or manually, and monitor streaming latency with p95 comparisons.
+icon: square-js
+keywords: LangWatch, TTFT, time to first token, streaming latency, gen_ai.server.time_to_first_token, typescript, javascript, latency monitoring
+---
+
+Time to First Token (TTFT) measures how long your users wait between sending a request and seeing the first piece of the streamed answer. For streaming LLM applications it is usually a better proxy for perceived speed than total duration: a response can take 20 seconds to finish and still feel instant if the first token arrives in 300ms.
+
+LangWatch captures TTFT per LLM span, rolls it up to the trace, and surfaces it across the product:
+
+<Frame>
+  <img
+    src="/images/ttft/ttft-column-traces.png"
+    alt="Traces table with the TTFT column enabled, showing values and p95-scaled bars"
+  />
+</Frame>
+
+## Automatic capture
+
+If your instrumentation already emits any of the signals below, TTFT shows up without any extra code:
+
+| Source | Signal |
+|--------|--------|
+| Vercel AI SDK | `ai.response.msToFirstChunk` span attribute |
+| OpenLLMetry / OpenLIT instrumentors | `llm.content.completion.chunk` / `First Token Stream Event` span events |
+| OTel GenAI semconv emitters | `gen_ai.server.time_to_first_token` span attribute (milliseconds) |
+| LangWatch SDKs | `timestamps.first_token_at` on the span (see below) |
+
+When more than one LLM span in a trace reports a TTFT, the trace-level value is the smallest one, the first token the user could have seen.
+
+<Note>
+  If you stream through the Vercel AI SDK with `experimental_telemetry` enabled, TTFT is captured automatically from `ai.response.msToFirstChunk`, nothing to do.
+</Note>
+
+## Setting TTFT manually
+
+If you handle streaming yourself, measure the time between starting the call and the first chunk, then set the `gen_ai.server.time_to_first_token` attribute (duration in milliseconds) on your LLM span:
+
+```typescript
+import { getLangWatchTracer } from "langwatch";
+import OpenAI from "openai";
+
+const tracer = getLangWatchTracer("my-service");
+const client = new OpenAI();
+
+async function streamCompletion(prompt: string): Promise<string> {
+  return await tracer.withActiveSpan("LLM call", async (span) => {
+    span.setType("llm");
+    span.setRequestModel("gpt-5-mini");
+    span.setInput(prompt);
+
+    const startedAt = Date.now();
+    let firstTokenAt: number | null = null;
+    const chunks: string[] = [];
+
+    const stream = await client.chat.completions.create({
+      model: "gpt-5-mini",
+      messages: [{ role: "user", content: prompt }],
+      stream: true,
+    });
+
+    for await (const chunk of stream) {
+      if (firstTokenAt === null) {
+        firstTokenAt = Date.now();
+        // Duration in milliseconds until the first streamed token
+        span.setAttribute(
+          "gen_ai.server.time_to_first_token",
+          firstTokenAt - startedAt
+        );
+      }
+      chunks.push(chunk.choices[0]?.delta?.content ?? "");
+    }
+
+    span.setOutput(chunks.join(""));
+    return chunks.join("");
+  });
+}
+```
+
+Alternatively, if you track the wall-clock timestamp of the first token instead of the elapsed duration, send the LangWatch timestamps attribute, with values in **unix epoch milliseconds**:
+
+```typescript
+span.setAttribute(
+  "langwatch.timestamps",
+  JSON.stringify({ first_token_at: firstTokenAt })  // epoch milliseconds
+);
+```
+
+LangWatch computes TTFT as `first_token_at - started_at`, falling back to the span's own start time when `started_at` isn't provided.
+
+### REST API
+
+If you send spans through the [REST API](/integration/rest-api) instead of the SDK, set `first_token_at` (epoch milliseconds) in the span's `timestamps` object:
+
+```json
+{
+  "type": "llm",
+  "span_id": "span-123",
+  "timestamps": {
+    "started_at": 1718886000000,
+    "first_token_at": 1718886000800,
+    "finished_at": 1718886004200
+  }
+}
+```
+
+## Where TTFT shows up
+
+### Traces table column
+
+On the Traces page, open the columns picker (the columns icon in the toolbar) and enable **TTFT**. The column behaves like the Duration column: each cell shows the value plus an inline bar scaled to the 95th percentile of the visible page, so one slow outlier doesn't flatten every other row. Rows at or above the page's TTFT p95 render a full red bar.
+
+<Frame>
+  <img
+    src="/images/ttft/ttft-enable-column.png"
+    alt="Columns picker with the TTFT column"
+  />
+</Frame>
+
+Hovering a cell shows how that trace compares against the page's TTFT p95:
+
+<Frame>
+  <img
+    src="/images/ttft/ttft-tooltip.png"
+    alt="TTFT cell tooltip showing the percentage of the page's TTFT p95"
+  />
+</Frame>
+
+The column is sortable, so you can order by TTFT to chase your slowest streaming starts.
+
+### Trace details
+
+The trace drawer shows a TTFT pill in the header next to duration, cost, and tokens:
+
+<Frame>
+  <img
+    src="/images/ttft/ttft-drawer.png"
+    alt="Trace drawer header showing the TTFT pill"
+  />
+</Frame>
+
+### Analytics
+
+In **Analytics > LLM Metrics** you get time-to-first-token graphs with the usual aggregations (median, p90, p95, p99), and you can build custom graphs on the same metric for dashboards and alerting.
+
+## Troubleshooting
+
+- **TTFT shows "—" in the table**: the trace has no LLM span reporting any of the signals above. For non-streaming calls this is expected, there is no "first token" moment distinct from the response itself.
+- **Value looks wrong by orders of magnitude**: check the units. `gen_ai.server.time_to_first_token` is a duration in milliseconds; `first_token_at` inside `langwatch.timestamps` is an epoch timestamp in milliseconds.
 
 ---
 
@@ -10625,6 +10868,7 @@ curl -X POST "$LANGWATCH_ENDPOINT/api/collector" \
       },
       "timestamps": {
         "started_at": $(($(date +%s) * 1000)),
+        "first_token_at": $((($(date +%s) * 1000) + 300)),
         "finished_at": $((($(date +%s) + 1) * 1000))
       }
     }
@@ -10640,6 +10884,8 @@ EOF
 ```
 
 Replace the placeholders with your actual data. The `@-` tells `curl` to read the JSON data from the standard input, which we provide via the `EOF`-delimited here-document.
+
+All `timestamps` are unix epoch **milliseconds**. The optional `first_token_at` records when the first streamed token reached the user and powers the Time to First Token (TTFT) metric, see [Tracking Time to First Token](/integration/python/tutorials/tracking-time-to-first-token). Token counts and cost are derived from `metrics` and the model pricing registry, see [Tracking LLM Costs and Tokens](/integration/python/tutorials/tracking-llm-costs).
 
 For the type reference of how a `span` should look like, check out our [types definitions](https://github.com/langwatch/langwatch/blob/main/python-sdk/src/langwatch/types.py).
 
@@ -11266,62 +11512,39 @@ Run this command to add the MCP server:
 claude mcp add langwatch -- npx -y @langwatch/mcp-server --apiKey your-api-key-here
 ```
 
-Or add it manually to your `~/.claude.json`:
+Or add it manually to your `~/.claude.json`. Under the `mcpServers` object, add an entry named `langwatch` with these fields:
 
-```json
-{
-  "mcpServers": {
-    "langwatch": {
-      "command": "npx",
-      "args": ["-y", "@langwatch/mcp-server"],
-      "env": {
-        "LANGWATCH_API_KEY": "your-api-key-here"
-      }
-    }
-  }
-}
-```
+- `command`: `npx`
+- `args`: `-y`, then the package name `@langwatch/mcp-server` on a separate token
+- `env.LANGWATCH_API_KEY`: your LangWatch API key
 
 See the [Claude Code MCP documentation](https://code.claude.com/docs/en/mcp#plugin-provided-mcp-servers) for more details.
+
+<Info>
+This page intentionally describes the config in prose rather than as a JSON snippet. Some CLI agents (notably Gemini CLI 0.36.0 and earlier) parse `@`-prefixed runs as file paths and can crash with `ENAMETOOLONG` when a multi-line JSON snippet wraps the scoped package name in double quotes. See [#3104](https://github.com/langwatch/langwatch/issues/3104) for details. The bash `claude mcp add` form above is safe — the package name is followed by a whitespace terminator.
+</Info>
 
 
 ### Copilot
 
-Add to `.vscode/mcp.json` in your project (or use **MCP: Add Server** from the Command Palette):
+Add to `.vscode/mcp.json` in your project (or use **MCP: Add Server** from the Command Palette).
 
-```json
-{
-  "servers": {
-    "langwatch": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@langwatch/mcp-server"],
-      "env": { "LANGWATCH_API_KEY": "your-api-key-here" }
-    }
-  }
-}
-```
+Under the `servers` object, add an entry named `langwatch` with these fields:
+
+- `type`: `stdio`
+- `command`: `npx`
+- `args`: `-y`, then the package name `@langwatch/mcp-server` on a separate token
+- `env.LANGWATCH_API_KEY`: your LangWatch API key
 
 
 ### Cursor
 
 1. Open Cursor Settings
 2. Navigate to the **Tools and MCP** section in the sidebar
-3. Add the LangWatch MCP server:
-
-```json
-{
-  "mcpServers": {
-    "langwatch": {
-      "command": "npx",
-      "args": ["-y", "@langwatch/mcp-server"],
-      "env": {
-        "LANGWATCH_API_KEY": "your-api-key-here"
-      }
-    }
-  }
-}
-```
+3. Add the LangWatch MCP server. Under the `mcpServers` object, add an entry named `langwatch` with these fields:
+   - `command`: `npx`
+   - `args`: `-y`, then the package name `@langwatch/mcp-server` on a separate token
+   - `env.LANGWATCH_API_KEY`: your LangWatch API key
 
 
 ### ChatGPT
@@ -11358,21 +11581,11 @@ The server supports OAuth Authorization Code + PKCE with Dynamic Client Registra
 
 ### Other
 
-For other MCP-compatible editors, add the following configuration to your MCP settings file:
+For other MCP-compatible editors, add an entry named `langwatch` under the `mcpServers` object of your editor's MCP settings file with these fields:
 
-```json
-{
-  "mcpServers": {
-    "langwatch": {
-      "command": "npx",
-      "args": ["-y", "@langwatch/mcp-server"],
-      "env": {
-        "LANGWATCH_API_KEY": "your-api-key-here"
-      }
-    }
-  }
-}
-```
+- `command`: `npx`
+- `args`: `-y`, then the package name `@langwatch/mcp-server` on a separate token
+- `env.LANGWATCH_API_KEY`: your LangWatch API key
 
 Refer to your editor's MCP documentation for the specific configuration file location.
 
@@ -13920,6 +14133,14 @@ Once you select the image type, the dataset will be updated to show the image co
 <Frame  caption="Dataset image preview">
 <img className="block" src="/images/dataset-image-preview.png" alt="LangWatch"  />
 </Frame>
+
+## How attachment URLs reach the model
+
+When an image URL feeds a vision workflow or evaluation, LangWatch fetches the URL server-side and delivers the actual image to the model as image content, so the model sees the picture instead of the link text. This works across every model provider, whether or not the provider fetches URLs itself. The attachment type is detected from the response rather than the file extension, so extension-less links such as signed S3 or CDN URLs are classified correctly.
+
+Audio and PDF URLs are delivered the same way when referenced from a prompt: an audio URL reaches the model as audio for it to hear, and a PDF URL reaches it as a document for it to read.
+
+If a field is declared as an image and its URL cannot be loaded as an image (the URL is unreachable, returns an error status, is too large, or serves something other than an image), the run fails with a clear message naming the URL and the reason, instead of passing the raw link to the model as text. A plain link mentioned in prose is left as text and never fails the run.
 
 ---
 
@@ -16688,11 +16909,21 @@ LangWatch offers evaluators across several categories:
 | Category | Examples | Use Case |
 |----------|----------|----------|
 | **RAG Quality** | `ragas/faithfulness`, `ragas/context_precision` | Evaluate retrieval-augmented generation |
-| **Safety** | `presidio/pii_detection`, `azure/jailbreak` | Detect PII, jailbreaks, harmful content |
+| **Safety** | `presidio/pii_detection`, `langwatch/api_keys_and_secrets_detection`, `azure/jailbreak` | Detect PII, leaked credentials, jailbreaks, harmful content |
 | **Correctness** | `langevals/exact_match`, `langevals/llm_boolean` | Check answer accuracy |
 | **Custom Criteria** | `langevals/llm_boolean`, `langevals/llm_score` | LLM-as-Judge for custom checks |
 
 [Browse all evaluators →](/evaluations/evaluators/list)
+
+### API Keys & Secrets Detection
+
+`langwatch/api_keys_and_secrets_detection` flags leaked credentials in trace content: provider and cloud API keys, tokens, private keys, and database connection strings. It uses the same detection rules as secrets redaction and works as a guardrail.
+
+### Seeing through privacy redaction
+
+PII redaction and secrets redaction run when a trace is ingested, before an evaluation reads the stored content. So redaction does not silently turn these evaluators green, redaction replaces a removed value with a typed marker that names what it was (`[PHONE_NUMBER]`, `[SECRET]`, and so on), and the PII and secrets evaluators read those markers back: a value that was already redacted still counts as a detection. The PII evaluator only counts a marker when its settings still check that entity. The markers are read from every field the evaluation is mapped to, so a secret hidden in a mapped span attribute is covered just like input or output.
+
+If a content category was dropped at ingestion (removed entirely rather than masked) and the evaluation has nothing else to read, the evaluation fails, since a leak cannot be ruled out. If the evaluation is instead mapped to a field that still has content, that field is evaluated normally.
 
 ## Using Built-in Evaluators
 
@@ -25083,7 +25314,6 @@ When running on AWS with IRSA (IAM Roles for Service Accounts), you don't need t
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `SKIP_ENV_VALIDATION` | Skip environment variable validation on startup | `false` |
-| `DISABLE_PII_REDACTION` | Disable automatic PII redaction in traces | `false` |
 | `SKIP_PRISMA_MIGRATE` | Skip PostgreSQL migrations on startup | `false` |
 
 ## Telemetry
@@ -25107,7 +25337,6 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `app.credentialsEncryptionKey.value` | `CREDENTIALS_SECRET` |
 | `app.cronApiKey.value` | `CRON_API_KEY` |
 | `app.features.skipEnvValidation` | `SKIP_ENV_VALIDATION` |
-| `app.features.disablePiiRedaction` | `DISABLE_PII_REDACTION` |
 | `app.email.enabled` | `EMAIL_ENABLED` |
 | `app.email.provider` | `EMAIL_PROVIDER` |
 | `app.email.providers.sendgrid.apiKey.value` | `SENDGRID_API_KEY` |

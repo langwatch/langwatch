@@ -3,6 +3,7 @@ import { defineCommandSchema } from "../../../";
 import { createLogger } from "~/utils/logger/server";
 import {
   captureException,
+  toError,
   withScope,
 } from "~/utils/posthogErrorCapture";
 import type { UsageReportingService } from "../../../../../../ee/billing/services/usageReportingService";
@@ -159,7 +160,7 @@ export class ReportUsageForMonthCommand
         scope.setTag?.("handler", "reportUsageForMonth");
         scope.setExtra?.("organizationId", organizationId);
         scope.setExtra?.("billingMonth", billingMonth);
-        captureException(error);
+        captureException(toError(error));
       });
       return [];
     }

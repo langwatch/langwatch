@@ -9,7 +9,7 @@ import {
   GOVERNANCE_ORIGIN_KIND_VALUE,
 } from "@ee/governance/services/governanceAttributeKeys";
 import { createLogger } from "~/utils/logger/server";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import type {
   ReactorContext,
   ReactorDefinition,
@@ -125,7 +125,7 @@ export function createGovernanceKpisSyncReactor(
           },
           "failed to fold governance trace into governance_kpis",
         );
-        captureException(error);
+        captureException(toError(error));
       }
     },
   };

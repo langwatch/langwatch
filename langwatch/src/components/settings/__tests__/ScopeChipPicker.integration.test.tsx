@@ -8,7 +8,7 @@
  * the caller explicitly disallowed.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -96,6 +96,31 @@ describe("ScopeChipPicker single-select variant", () => {
       expect(screen.getAllByText("web-app").length).toBeGreaterThan(0);
       // showSummary={false} keeps the config-oriented helper line out.
       expect(screen.queryByText(/can use this configuration/)).toBeNull();
+    });
+  });
+
+  describe("given the personal variant of a scope is selected", () => {
+    it("resolves the trigger to the personal option, not the plain scope", () => {
+      // The personal variant shares scopeType+scopeId with the plain scope,
+      // so the selection lookup must compare the personalOnly flag too.
+      renderPicker(
+        <ScopeChipPicker
+          variant="single-select"
+          allowedScopeTypes={["ORGANIZATION"]}
+          organizationId="org-1"
+          organizationName="ACME Inc"
+          personalScopes
+          value={[
+            { scopeType: "ORGANIZATION", scopeId: "org-1", personalOnly: true },
+          ]}
+          onChange={vi.fn()}
+          showSummary={false}
+        />,
+      );
+
+      const trigger = screen.getByRole("combobox");
+      expect(within(trigger).getByText("All personal projects")).toBeTruthy();
+      expect(within(trigger).queryByText("ACME Inc")).toBeNull();
     });
   });
 

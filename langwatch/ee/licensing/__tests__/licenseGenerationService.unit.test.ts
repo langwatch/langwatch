@@ -1,8 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import { DEFAULT_LIMIT } from "../constants";
 import { generateLicenseKey } from "../licenseGenerationService";
 import { validateLicense } from "../validation";
 import { TEST_PRIVATE_KEY, TEST_PUBLIC_KEY } from "./fixtures/testKeys";
-import { DEFAULT_LIMIT } from "../constants";
 
 const baseParams = {
   organizationName: "Acme Corp",
@@ -13,11 +13,21 @@ const baseParams = {
   now: new Date("2025-06-15T12:00:00Z"),
 };
 
+// Round-trip validation runs at the license's issue time so the test is
+// time-independent: a license is issued for one year, so validating "now =
+// issue time" is always within the validity window regardless of the wall
+// clock the suite runs on.
+const validationNow = baseParams.now;
+
 describe("generateLicenseKey", () => {
   describe("when generating a GROWTH license", () => {
     it("generates a valid license key that passes round-trip validation", () => {
       const { licenseKey } = generateLicenseKey(baseParams);
-      const result = validateLicense(licenseKey, TEST_PUBLIC_KEY);
+      const result = validateLicense(
+        licenseKey,
+        TEST_PUBLIC_KEY,
+        validationNow,
+      );
 
       expect(result.valid).toBe(true);
     });
@@ -72,7 +82,11 @@ describe("generateLicenseKey", () => {
         maxMembers: 10,
       });
 
-      const result = validateLicense(licenseKey, TEST_PUBLIC_KEY);
+      const result = validateLicense(
+        licenseKey,
+        TEST_PUBLIC_KEY,
+        validationNow,
+      );
       expect(result.valid).toBe(true);
       expect(licenseData.plan.type).toBe("PRO");
       expect(licenseData.plan.maxMembers).toBe(10);
@@ -88,7 +102,11 @@ describe("generateLicenseKey", () => {
         maxMembers: 50,
       });
 
-      const result = validateLicense(licenseKey, TEST_PUBLIC_KEY);
+      const result = validateLicense(
+        licenseKey,
+        TEST_PUBLIC_KEY,
+        validationNow,
+      );
       expect(result.valid).toBe(true);
       expect(licenseData.plan.type).toBe("ENTERPRISE");
       expect(licenseData.plan.maxMembers).toBe(50);
@@ -160,7 +178,7 @@ describe("generateLicenseKey", () => {
         generateLicenseKey({
           ...baseParams,
           planType: "CUSTOM",
-        })
+        }),
       ).toThrow("Unknown plan type: CUSTOM");
     });
   });
@@ -198,7 +216,11 @@ describe("generateLicenseKey", () => {
   describe("when validating round-trip integrity", () => {
     it("produces a license that can be parsed and verified", () => {
       const { licenseKey, licenseData } = generateLicenseKey(baseParams);
-      const result = validateLicense(licenseKey, TEST_PUBLIC_KEY);
+      const result = validateLicense(
+        licenseKey,
+        TEST_PUBLIC_KEY,
+        validationNow,
+      );
 
       expect(result.valid).toBe(true);
       if (result.valid) {

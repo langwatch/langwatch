@@ -41,7 +41,7 @@ import {
   ENTERPRISE_FEATURE_ERRORS,
 } from "../enterprise";
 import { LimitExceededError } from "../../license-enforcement/errors";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { skipPermissionCheck } from "../rbac";
 import {
   checkOrganizationPermission,
@@ -1115,7 +1115,7 @@ export const organizationRouter = createTRPCRouter({
         // operators catch systemic provisioning regressions (bad
         // migration, schema drift, Prisma constraint violation) before
         // users start complaining about missing personal workspaces.
-        captureException(err, {
+        captureException(toError(err), {
           extra: {
             origin: "governance.acceptInvite",
             userId: session.user.id,

@@ -99,10 +99,8 @@ export const PRECONDITION_FIELD_MATCHERS: Record<
   "spans.model": (data) => data.spanModels,
 
   // Topic fields
-  "topics.topics": (data) =>
-    data.topicId ? [data.topicId] : null,
-  "topics.subtopics": (data) =>
-    data.subTopicId ? [data.subTopicId] : null,
+  "topics.topics": (data) => (data.topicId ? [data.topicId] : null),
+  "topics.subtopics": (data) => (data.subTopicId ? [data.subTopicId] : null),
 
   // Evaluation fields — not available at trace arrival time
   "evaluations.evaluator_id": null,
@@ -116,14 +114,13 @@ export const PRECONDITION_FIELD_MATCHERS: Record<
   "evaluations.label": null,
 
   // Event fields — fetched on demand when event preconditions exist
-  "events.event_type": (data) =>
-    data.events?.map((e) => e.event_type) ?? null,
+  "events.event_type": (data) => data.events?.map((e) => e.event_type) ?? null,
   "events.metrics.key": (data, _value, key) => {
     if (!key || !data.events) return null;
     const event = data.events.find((e) => e.event_type === key);
     return event?.metrics.map((m) => m.key) ?? null;
   },
-  "events.metrics.value": null, // numeric — not supported in string-based preconditions
+  "events.metrics.value": null, // numeric range — matched in-memory via matchEventMetricRange in triggerFilter.matcher.ts, not through this string-based registry
   "events.event_details.key": (data, _value, key) => {
     if (!key || !data.events) return null;
     const event = data.events.find((e) => e.event_type === key);
@@ -137,7 +134,6 @@ export const PRECONDITION_FIELD_MATCHERS: Record<
         ? "true"
         : "false"
       : null,
-
 };
 
 // ---------------------------------------------------------------------------

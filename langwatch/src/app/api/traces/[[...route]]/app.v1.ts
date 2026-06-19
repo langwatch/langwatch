@@ -7,6 +7,7 @@ import { requires, type SecuredApp } from "~/server/api/security";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
+import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
 import type {
   CustomMetadata,
@@ -26,6 +27,7 @@ import {
   AmbiguousTraceIdPrefixError,
   TraceService,
 } from "~/server/traces/trace.service";
+import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import {
   formatTraceSummaryDigest,
   generateAsciiTree,
@@ -303,7 +305,7 @@ export function registerTracesRoutes(
           name: "format",
           in: "query",
           description:
-            "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)",
+            "Output format: 'digest' (AI-readable) or 'json' (full raw data, default)",
           required: false,
           schema: { type: "string", enum: ["digest", "json"] },
         },
@@ -363,11 +365,16 @@ export function registerTracesRoutes(
       const protections = await getProtectionsForProject(prisma, {
         projectId: project.id,
       });
-      const traceService = TraceService.create(prisma);
+      const traceService = TraceService.create(
+        prisma,
+        buildTraceBlobResolutionDeps(),
+      );
 
       let trace;
       try {
-        trace = await traceService.getById(project.id, traceId, protections);
+        trace = await traceService.getById(project.id, traceId, protections, {
+          full: true,
+        });
       } catch (err) {
         if (err instanceof AmbiguousTraceIdPrefixError) {
           return c.json(
@@ -535,7 +542,7 @@ export function registerTracesRoutes(
         },
         resource,
         instrumentationScope: { name: "langwatch.api.metadata_update" },
-        piiRedactionLevel: project.piiRedactionLevel,
+        piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
         occurredAt: now,
       });
 

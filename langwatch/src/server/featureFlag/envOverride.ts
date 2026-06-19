@@ -7,8 +7,8 @@
  *
  * Optional `legacyEnvVar` lets a flag honor an extra, differently-named
  * env var so installations carrying over an older variable name (e.g.
- * `LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD`, `DISABLE_PII_REDACTION`)
- * keep working when the flag is migrated into the registry.
+ * `LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD`) keep working when the flag is
+ * migrated into the registry.
  *
  * Primary env key accepts only `=1` (true) or `=0` (false). Anything
  * else returns undefined so the caller falls through to the next
@@ -16,8 +16,8 @@
  *
  * Legacy aliases use a looser truthy semantic that matches the
  * pre-registry behaviour where most of these were checked as
- * `if (process.env.DISABLE_PII_REDACTION)`. Accepts 1/true (case
- * insensitive) as on; 0/false/empty/unset as off.
+ * `if (process.env.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD)`. Accepts
+ * 1/true (case insensitive) as on; 0/false/empty/unset as off.
  */
 export function checkFlagEnvOverride(
   flagKey: string,

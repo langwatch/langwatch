@@ -1,34 +1,42 @@
 import { SpanKind } from "@opentelemetry/api";
+import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
+import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
+import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
+import {
+  createCostEnrichmentDeps,
+  OtlpSpanCostEnrichmentService,
+} from "~/server/app-layer/traces/span-cost-enrichment.service";
+import { OtlpSpanPiiRedactionService } from "~/server/app-layer/traces/span-pii-redaction.service";
+import { OtlpSpanTokenEstimationService } from "~/server/app-layer/traces/span-token-estimation.service";
+import {
+  applyOtlpSpanContentDrop,
+  type SpanContentDropResult,
+} from "~/server/data-privacy/applyOtlpSpanContentDrop";
+import { featureFlagService } from "~/server/featureFlag";
+import { createLogger } from "../../../../../utils/logger/server";
 import type { Command, CommandHandler } from "../../../";
 import {
-	createTenantId,
-	defineCommandSchema,
-	EventUtils,
+  createTenantId,
+  defineCommandSchema,
+  EventUtils,
+  type TenantId,
 } from "../../../";
-import { createLogger } from "../../../../../utils/logger/server";
 import {
-	DEFAULT_PII_REDACTION_LEVEL,
-	recordSpanCommandDataSchema,
-	type PIIRedactionLevel,
-	type RecordSpanCommandData,
+  DEFAULT_PII_REDACTION_LEVEL,
+  type PIIRedactionLevel,
+  type RecordSpanCommandData,
+  recordSpanCommandDataSchema,
 } from "../schemas/commands";
 import {
-	RECORD_SPAN_COMMAND_TYPE,
-	SPAN_RECEIVED_EVENT_TYPE,
-	SPAN_RECEIVED_EVENT_VERSION_LATEST,
+  RECORD_SPAN_COMMAND_TYPE,
+  SPAN_RECEIVED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_VERSION_LATEST,
 } from "../schemas/constants";
 import type { SpanReceivedEvent } from "../schemas/events";
 import type { OtlpResource, OtlpSpan } from "../schemas/otlp";
-import { OtlpSpanCostEnrichmentService, createCostEnrichmentDeps } from "~/server/app-layer/traces/span-cost-enrichment.service";
-import { OtlpSpanPiiRedactionService } from "~/server/app-layer/traces/span-pii-redaction.service";
-import { OtlpSpanTokenEstimationService } from "~/server/app-layer/traces/span-token-estimation.service";
-import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
-import { featureFlagService } from "~/server/featureFlag";
-import { TraceRequestUtils } from "../utils/traceRequest.utils";
 import { capOversizedAttributes } from "../utils/capOversizedAttributes";
-import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
-import type { PrismaClient } from "@prisma/client";
+import { TraceRequestUtils } from "../utils/traceRequest.utils";
 
 /**
  * Deduplication options for the `recordSpan` command at the GroupQueue layer.
@@ -61,6 +69,7 @@ export interface RecordSpanCommandDependencies {
       span: OtlpSpan,
       resource: OtlpResource | null,
       piiRedactionLevel: PIIRedactionLevel,
+      tenantId?: TenantId,
     ) => Promise<void>;
   };
   /** Service for enriching spans with custom LLM cost rates. */
@@ -73,6 +82,13 @@ export interface RecordSpanCommandDependencies {
       span: OtlpSpan;
       tenantId?: string;
     }) => Promise<void>;
+  };
+  /** Service for dropping configured content categories per the data-privacy policy. */
+  contentDropService: {
+    dropSpanContent: (args: {
+      span: OtlpSpan;
+      projectId: string;
+    }) => Promise<SpanContentDropResult>;
   };
   /**
    * ADR-022: Optional BlobStore for spool fetch (when command carries spoolRef)
@@ -94,16 +110,16 @@ function createDefaultDependencies(): RecordSpanCommandDependencies {
       tokenizer: new TiktokenClient(),
       featureFlagService,
     }),
+    contentDropService: { dropSpanContent: applyOtlpSpanContentDrop },
   };
 }
 
 /**
  * Command handler for recording spans in the trace processing pipeline.
  */
-export class RecordSpanCommand implements CommandHandler<
-  Command<RecordSpanCommandData>,
-  SpanReceivedEvent
-> {
+export class RecordSpanCommand
+  implements CommandHandler<Command<RecordSpanCommandData>, SpanReceivedEvent>
+{
   static readonly schema = defineCommandSchema(
     RECORD_SPAN_COMMAND_TYPE,
     recordSpanCommandDataSchema,
@@ -138,7 +154,8 @@ export class RecordSpanCommand implements CommandHandler<
     } else if (
       deps.piiRedactionService &&
       deps.costEnrichmentService &&
-      deps.tokenEstimationService
+      deps.tokenEstimationService &&
+      deps.contentDropService
     ) {
       // Caller provided every required field — use as-is, skip the prisma require.
       resolved = deps as RecordSpanCommandDependencies;
@@ -191,7 +208,9 @@ export class RecordSpanCommand implements CommandHandler<
           // ADR-022: spool body is the full serialized RecordSpanCommandData.
           // Merge the spooled span/resource/instrumentationScope fields back into
           // the in-flight command (the queue message carries only spoolRef + id fields).
-          const parsed = JSON.parse(spoolBody.toString("utf-8")) as RecordSpanCommandData;
+          const parsed = JSON.parse(
+            spoolBody.toString("utf-8"),
+          ) as RecordSpanCommandData;
           resolvedCommandData = {
             ...commandData,
             span: parsed.span,
@@ -267,6 +286,7 @@ export class RecordSpanCommand implements CommandHandler<
             spanToProcess,
             resourceToProcess,
             piiRedactionLevel,
+            tenantId,
           ),
           this.deps.costEnrichmentService.enrichSpan(
             spanToProcess,
@@ -303,6 +323,30 @@ export class RecordSpanCommand implements CommandHandler<
           throw piiResult.reason instanceof Error
             ? piiResult.reason
             : new Error(String(piiResult.reason));
+        }
+
+        // Apply the scoped data-privacy DROP at this single span choke point,
+        // AFTER redaction (dropping a whole category makes redacting it moot).
+        // Doing it here, before the event is emitted, means both the stored
+        // span and the trace-summary fold (which derives ComputedInput/Output
+        // from the same event) never see the dropped categories. The drop fails
+        // open internally (a policy-resolution error keeps the span intact and
+        // is logged), so this call never aborts span processing.
+        const dropResult = await this.deps.contentDropService.dropSpanContent({
+          span: spanToProcess,
+          projectId: tenantIdStr,
+        });
+        if (dropResult.droppedCount > 0) {
+          this.logger.debug(
+            {
+              tenantId,
+              traceId,
+              spanId,
+              droppedCount: dropResult.droppedCount,
+              droppedCategories: dropResult.droppedCategories,
+            },
+            "Dropped span content per data-privacy policy",
+          );
         }
 
         const spanReceivedEvent = EventUtils.createEvent<SpanReceivedEvent>({
@@ -350,7 +394,9 @@ export class RecordSpanCommand implements CommandHandler<
    * state, eliminating the race bug that arose when a single handler instance was
    * shared across parallel queue jobs (pipeline.ts uses withCommandInstance).
    */
-  async cleanupAfterStore(command: Command<RecordSpanCommandData>): Promise<void> {
+  async cleanupAfterStore(
+    command: Command<RecordSpanCommandData>,
+  ): Promise<void> {
     const spoolRef = command.data.spoolRef;
     if (spoolRef && this.blobStore) {
       await this.blobStore.deleteSpool(spoolRef).catch((err: unknown) => {
@@ -411,7 +457,9 @@ export class RecordSpanCommand implements CommandHandler<
   ): void {
     const RESERVED_PREFIX = "langwatch.reserved.";
 
-    const strip = (attributes: OtlpSpan["attributes"]): OtlpSpan["attributes"] => {
+    const strip = (
+      attributes: OtlpSpan["attributes"],
+    ): OtlpSpan["attributes"] => {
       const filtered = attributes.filter((attr) => {
         if (
           attr.key.startsWith(RESERVED_PREFIX) &&

@@ -560,10 +560,23 @@ export const rESTEvaluationSchema = evaluationSchema
 
 export type RESTEvaluation = z.infer<typeof rESTEvaluationSchema>;
 
+export const tracePrivacySchema = z.object({
+  // Content categories that a `drop` privacy policy stripped before the spans
+  // were stored, derived at read time from the marker the drop stamps on each
+  // span. The content was never stored and cannot be recovered, which is what
+  // distinguishes it from a read-time `restrict` (the data is kept and hidden by
+  // audience, surfaced through the field-redaction path). Absent when nothing
+  // was dropped.
+  droppedCategories: z.array(z.string()).optional(),
+});
+
+export type TracePrivacy = z.infer<typeof tracePrivacySchema>;
+
 export const traceSchema = z.object({
   trace_id: z.string(),
   project_id: z.string(),
   metadata: traceMetadataSchema,
+  privacy: tracePrivacySchema.optional(),
   timestamps: z.object({
     started_at: z.number(),
     inserted_at: z.number(),
@@ -595,6 +608,9 @@ export const traceSchema = z.object({
   events: z.array(eventSchema).optional(),
   evaluations: z.array(evaluationSchema).optional(),
   spans: z.array(spanSchema),
+  // Set server-side when content was teaser-redacted by the plan's
+  // visibility window — the UI renders the upgrade CTA off this flag.
+  redacted_by_visibility_window: z.boolean().optional(),
 });
 
 export type Trace = z.infer<typeof traceSchema>;
@@ -617,7 +633,7 @@ export type LLMModeTrace = z.infer<typeof lLMModeTraceSchema>;
 // Dead ElasticSearch shape kept as a structural type only (no schema needed).
 export type ElasticSearchTrace = Omit<
   Trace,
-  "metadata" | "timestamps" | "events"
+  "metadata" | "timestamps" | "events" | "privacy"
 > & {
   metadata: ReservedTraceMetadata & {
     custom?: CustomMetadata;

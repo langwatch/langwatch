@@ -8,7 +8,7 @@ import {
   targetConfigSchema,
 } from "~/experiments-v3/types";
 import type { Workflow } from "~/optimization_studio/types/dsl";
-import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.generated";
+import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
 
 // ============================================================================
 // Execution Request Types

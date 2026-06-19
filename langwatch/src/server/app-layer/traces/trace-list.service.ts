@@ -15,6 +15,7 @@ import type {
   RangeFacetDef,
 } from "./facet-registry";
 import { FACET_REGISTRY, TABLE_TIME_COLUMNS } from "./facet-registry";
+import { teaserOf } from "./visibility-window.service";
 import type {
   BatchedFacetResult,
   CategoricalFacetResult,
@@ -93,6 +94,11 @@ interface ListParams {
   page: number;
   pageSize: number;
   filterWhere?: { sql: string; params: Record<string, unknown> };
+  /**
+   * Visibility gate: list items older than this cutoff get their
+   * input/output previews teaser-redacted. Omitted/null = ungated.
+   */
+  visibilityCutoffMs?: number | null;
 }
 
 interface FacetParams {
@@ -474,8 +480,25 @@ export class TraceListService {
       params.timeRange.from,
     );
 
+    // Tease input/output previews of items beyond the caller's visibility
+    // window — existence, counts, and metadata stay untouched.
+    const gatedItems =
+      params.visibilityCutoffMs === null ||
+      params.visibilityCutoffMs === undefined
+        ? items
+        : items.map((item) =>
+            item.timestamp < params.visibilityCutoffMs!
+              ? {
+                  ...item,
+                  input: item.input ? teaserOf(item.input) : item.input,
+                  output: item.output ? teaserOf(item.output) : item.output,
+                  error: item.error ? teaserOf(item.error) : item.error,
+                }
+              : item,
+          );
+
     return {
-      items,
+      items: gatedItems,
       totalHits: result.totalHits,
       evaluations,
     };

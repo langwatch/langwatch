@@ -9,10 +9,18 @@ import { coerceToNumber } from "~/utils/coerceToNumber";
 
 /**
  * Computes per-span cost using a priority cascade:
- * 1. Custom cost rates from enrichment attributes
- * 2. Static model registry lookup (with provider subtype + date fallbacks)
- * 3. SDK-provided cost fallback
+ * 1. Custom cost rates from enrichment attributes (per-token override policy)
+ * 2. Explicit / provider-reported total cost (langwatch.span.cost)
+ * 3. Static model registry lookup (with provider subtype + date fallbacks)
  * 4. Guardrail cost extraction
+ *
+ * An explicit cost is an authoritative figure — the LangWatch SDK's
+ * metrics.cost, or a provider's own billed number (e.g. Claude Code's
+ * cost_usd) — so it wins over our token×registry ESTIMATE. The registry
+ * is the fallback for when nobody told us the cost, not an override of a
+ * known-good one. (Per-token enrichment rates still rank first: they are a
+ * deliberate "price everything my way" policy, more specific than a single
+ * span's total.)
  */
 export function computeSpanCost({
   attrs,
@@ -39,9 +47,8 @@ export function computeSpanCost({
   );
   const cacheCreationTokens = Math.max(
     0,
-    coerceToNumber(
-      attrs[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS],
-    ) ?? 0,
+    coerceToNumber(attrs[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]) ??
+      0,
   );
 
   // Priority 1: Custom cost rates from enrichment. A custom cost may carry
@@ -71,7 +78,16 @@ export function computeSpanCost({
     );
   }
 
-  // Priority 2: Static model registry with fallbacks
+  // Priority 2: Explicit / provider-reported total cost. An authoritative
+  // figure (the SDK's metrics.cost or a provider's own billed number such as
+  // Claude Code's cost_usd) is trusted over the token×registry estimate
+  // below — when the cost is known exactly, don't re-derive an approximation
+  // of it. A zero or absent value falls through to the registry, so this
+  // never suppresses costing for spans that didn't report a cost.
+  const numSpanCost = coerceToNumber(attrs[ATTR_KEYS.LANGWATCH_SPAN_COST]);
+  if (numSpanCost !== null && numSpanCost > 0) return numSpanCost;
+
+  // Priority 3: Static model registry with fallbacks
   const resolvedModel =
     model ??
     (typeof attrs[ATTR_KEYS.GEN_AI_RESPONSE_MODEL] === "string"
@@ -103,10 +119,6 @@ export function computeSpanCost({
       if (computed !== undefined && computed > 0) return computed;
     }
   }
-
-  // Priority 3: SDK-provided cost
-  const numSpanCost = coerceToNumber(attrs[ATTR_KEYS.LANGWATCH_SPAN_COST]);
-  if (numSpanCost !== null && numSpanCost > 0) return numSpanCost;
 
   // Priority 4: Guardrail cost
   if (attrs[ATTR_KEYS.SPAN_TYPE] === "guardrail") {

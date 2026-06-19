@@ -1,11 +1,9 @@
+import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
 import type {
   NormalizedAttributes,
   NormalizedSpan,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { NormalizedStatusCode } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
-import { coerceToNumber } from "~/utils/coerceToNumber";
-import { safeUnflatten } from "~/utils/safeUnflatten";
-import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
 import type {
   BaseSpan,
   ChatMessage,
@@ -17,6 +15,8 @@ import type {
   SpanTimestamps,
   SpanTypes,
 } from "~/server/tracer/types";
+import { coerceToNumber } from "~/utils/coerceToNumber";
+import { safeUnflatten } from "~/utils/safeUnflatten";
 
 type JsonSerializable =
   | string
@@ -25,7 +25,6 @@ type JsonSerializable =
   | null
   | Record<string, unknown>
   | unknown[];
-
 
 /**
  * Converts attribute values to JSON-serializable format.
@@ -64,9 +63,7 @@ const KNOWN_WRAPPER_TYPES = new Set([
  * or preserved by canonicalization for chat_messages.
  * After ClickHouse deserialization, these appear as objects with `type` and `value`.
  */
-function isLegacyWrapper(
-  v: unknown,
-): v is { type: string; value: unknown } {
+function isLegacyWrapper(v: unknown): v is { type: string; value: unknown } {
   return (
     typeof v === "object" &&
     v !== null &&
@@ -88,13 +85,22 @@ function unwrapLegacyWrapper(
 ): SpanInputOutput {
   const { type, value } = wrapper;
   if (type === "chat_messages" && Array.isArray(value)) {
-    return { type: "chat_messages", value: toJsonSerializable(value) as ChatMessage[] };
+    return {
+      type: "chat_messages",
+      value: toJsonSerializable(value) as ChatMessage[],
+    };
   }
   if (type === "text") {
-    return { type: "text", value: typeof value === "string" ? value : JSON.stringify(value) };
+    return {
+      type: "text",
+      value: typeof value === "string" ? value : JSON.stringify(value),
+    };
   }
   if (type === "evaluation_result" || type === "guardrail_result") {
-    return { type, value: toJsonSerializable(value) } as unknown as SpanInputOutput;
+    return {
+      type,
+      value: toJsonSerializable(value),
+    } as unknown as SpanInputOutput;
   }
   return { type: "json", value: toJsonSerializable(value) };
 }
@@ -255,7 +261,6 @@ function extractOutput(
   return null;
 }
 
-
 /**
  * Extracts metrics from canonical span attributes only.
  * After canonicalization, tokens are at gen_ai.usage.input_tokens/output_tokens.
@@ -288,7 +293,11 @@ function extractMetrics(
     spanAttributes["gen_ai.usage.cache_creation.input_tokens"],
   );
 
-  const rawCost = computeSpanCost({ attrs: spanAttributes, promptTokens, completionTokens });
+  const rawCost = computeSpanCost({
+    attrs: spanAttributes,
+    promptTokens,
+    completionTokens,
+  });
   const cost = rawCost > 0 ? rawCost : null;
 
   if (
@@ -333,8 +342,7 @@ function extractModel(spanAttributes: NormalizedAttributes): string | null {
  */
 function extractVendor(spanAttributes: NormalizedAttributes): string | null {
   const vendor =
-    spanAttributes["gen_ai.provider.name"] ??
-    spanAttributes["gen_ai.system"];
+    spanAttributes["gen_ai.provider.name"] ?? spanAttributes["gen_ai.system"];
 
   return typeof vendor === "string" ? vendor : null;
 }
@@ -413,7 +421,8 @@ function extractError(
     statusMessage ??
     "Unknown error";
 
-  const eventStacktrace = latestExceptionEvent?.attributes["exception.stacktrace"];
+  const eventStacktrace =
+    latestExceptionEvent?.attributes["exception.stacktrace"];
   const attrStacktrace = spanAttributes["exception.stacktrace"];
   const stacktrace =
     (typeof eventStacktrace === "string" ? eventStacktrace : undefined) ??

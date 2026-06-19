@@ -4,6 +4,7 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import type { Workflow } from "../../../optimization_studio/types/dsl";
 import { getWorkflowEntryOutputs } from "../../../optimization_studio/utils/workflowFields";
+import { codeEvaluatorConfigSchema } from "../../evaluators/codeEvaluator";
 import { EvaluatorService } from "../../evaluators/evaluator.service";
 import { enforceLicenseLimit } from "../../license-enforcement";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
@@ -13,7 +14,7 @@ import { copyEvaluatorToProject } from "./copyEvaluatorToProject";
 /**
  * Evaluator type enum for validation
  */
-const evaluatorTypeSchema = z.enum(["evaluator", "workflow"]);
+const evaluatorTypeSchema = z.enum(["evaluator", "code", "workflow"]);
 
 /**
  * Evaluator Router - Manages evaluator CRUD operations
@@ -86,6 +87,16 @@ export const evaluatorsRouter = createTRPCRouter({
       // Enforce evaluator limit before creation
       await enforceLicenseLimit(ctx, input.projectId, "evaluators");
 
+      if (input.type === "code") {
+        const parsed = codeEvaluatorConfigSchema.safeParse(input.config);
+        if (!parsed.success) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Code evaluators need code, inputs, and outputs",
+          });
+        }
+      }
+
       // If workflowId is provided, check if an evaluator already exists for this workflow
       if (input.workflowId) {
         const existingEvaluator = await ctx.prisma.evaluator.findFirst({
@@ -131,6 +142,15 @@ export const evaluatorsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("evaluations:manage"))
     .mutation(async ({ ctx, input }) => {
+      if (input.type === "code" && input.config !== undefined) {
+        const parsed = codeEvaluatorConfigSchema.safeParse(input.config);
+        if (!parsed.success) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Code evaluators need code, inputs, and outputs",
+          });
+        }
+      }
       const evaluatorService = EvaluatorService.create(ctx.prisma);
       return await evaluatorService.update({
         id: input.id,

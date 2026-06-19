@@ -25,6 +25,7 @@ const { mockDetailState } = vi.hoisted(() => ({
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1", slug: "test-project" },
+    hasPermission: () => true,
   }),
 }));
 
@@ -37,6 +38,17 @@ vi.mock("../../../../hooks/useSpanDetail", () => ({
 
 vi.mock("../../../../hooks/useTraceResources", () => ({
   useTraceResources: () => ({ bySpanId: {}, isLoading: false }),
+}));
+
+// RedactedField (wrapping the IO viewers) reads field-redaction status via a
+// tRPC query; this test renders without that provider, so stub the hook to the
+// not-redacted passthrough — redaction is out of scope for the cost suggestion.
+vi.mock("~/hooks/useFieldRedaction", () => ({
+  useFieldRedaction: () => ({
+    isRedacted: false,
+    isLoading: false,
+    visibleTo: null,
+  }),
 }));
 
 const span: SpanTreeNode = {

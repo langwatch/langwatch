@@ -7,6 +7,7 @@ import { SpendSpikeAnomalyEvaluator } from "@ee/governance/services/spendSpikeAn
 import { createLogger } from "../../../utils/logger/server";
 import {
   captureException,
+  toError,
   withScope,
 } from "../../../utils/posthogErrorCapture";
 import {
@@ -64,7 +65,7 @@ export async function runAnomalyDetectionJob(
     await withScope(async (scope) => {
       scope.setTag?.("worker", "anomalyDetection");
       scope.setExtra?.("job", job.data);
-      captureException(error);
+      captureException(toError(error));
     });
   }
 }

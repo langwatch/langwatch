@@ -14,6 +14,7 @@ import {
   useCSVReader,
   usePapaParse,
 } from "react-papaparse";
+import type { InMemoryDataset } from "~/components/datasets/editor/DatasetEditorTable";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -28,7 +29,6 @@ import {
   AddOrEditDatasetDrawer,
 } from "../AddOrEditDatasetDrawer";
 import { toaster } from "../ui/toaster";
-import type { InMemoryDataset } from "./DatasetTable";
 import { getSafeColumnName } from "./utils/reservedColumns";
 export const MAX_ROWS_LIMIT = 10_000;
 
@@ -302,6 +302,11 @@ export function CSVReaderComponent({
   return (
     <CSVReader
       accept=".csv,.json,.jsonl"
+      config={{
+        // Every well-formed CSV ends with a newline; without this the final
+        // line parses as [""] and uploads as an empty record
+        skipEmptyLines: "greedy",
+      }}
       onUploadAccepted={async (results: { data: string[][] }, file: File) => {
         if (file.name.endsWith(".jsonl") || file.name.endsWith(".json")) {
           try {
@@ -322,6 +327,7 @@ export function CSVReaderComponent({
               );
             }
             readString(jsonToCSV(jsonContents), {
+              skipEmptyLines: "greedy",
               complete: (results) => {
                 setResults({ data: results.data as string[][] });
               },

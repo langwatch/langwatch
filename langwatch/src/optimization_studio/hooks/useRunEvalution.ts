@@ -2,17 +2,17 @@ import { nanoid } from "nanoid";
 import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useShallow } from "zustand/react/shallow";
+import { createLogger } from "~/utils/logger";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import { createLogger } from "~/utils/logger";
 import { useVersionState } from "../components/History";
 import type { StudioClientEvent } from "../types/events";
 import { hasDSLChanged } from "../utils/dslUtils";
 import { mergeLocalConfigsIntoDsl } from "../utils/mergeLocalConfigs";
 import { usePostEvent } from "./usePostEvent";
 
-import { useWorkflowStore, serializeWorkflow } from "./useWorkflowStore";
+import { serializeWorkflow, useWorkflowStore } from "./useWorkflowStore";
 
 const logger = createLogger("langwatch:studio:evaluation");
 
@@ -50,6 +50,19 @@ export const useRunEvalution = () => {
 
   const generateCommitMessage =
     api.workflow.generateCommitMessage.useMutation();
+
+  // Cascade-resolved Fast model for commit-message autogen: null when
+  // nothing is configured at any scope. Gates the generation call so a
+  // missing model never auto-fires a doomed request (and its
+  // missing-model toast) from a background autosave.
+  const resolvedCommitMessageModel =
+    api.modelProvider.getResolvedDefault.useQuery(
+      {
+        projectId: project?.id ?? "",
+        featureKey: "workflows.commit_message",
+      },
+      { enabled: !!project?.id },
+    );
 
   const trpc = api.useContext();
 
@@ -136,7 +149,7 @@ export const useRunEvalution = () => {
       // Automatically generate a new version if there are changes and no version id was provided (e.g. when running from the wizard)
       if (hasChanges && !workflow_version_id) {
         let commitMessage = previousVersion ? "autosaved" : "first version";
-        if (previousVersion?.dsl) {
+        if (previousVersion?.dsl && resolvedCommitMessageModel.data != null) {
           try {
             const commitMessageResponse =
               await generateCommitMessage.mutateAsync({
@@ -146,16 +159,13 @@ export const useRunEvalution = () => {
               });
             commitMessage = (commitMessageResponse as string) ?? "autosaved";
           } catch (err) {
+            // Autogen is cosmetic sugar over the "autosaved" fallback;
+            // surfacing it as an error toast mid-evaluate reads like the
+            // run itself failed.
             logger.error(
               { error: err },
               "evaluation: error auto-generating version description",
             );
-            toaster.create({
-              title: "Error auto-generating version description",
-              type: "error",
-              duration: 5000,
-              meta: { closable: true },
-            });
           }
         }
 
@@ -223,6 +233,7 @@ export const useRunEvalution = () => {
       setEvaluationState,
       postEvent,
       generateCommitMessage,
+      resolvedCommitMessageModel.data,
       commitVersion,
       nextVersion,
       setWorkflow,

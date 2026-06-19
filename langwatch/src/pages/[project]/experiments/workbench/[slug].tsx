@@ -1,7 +1,5 @@
 import { Alert, Box, HStack, Spacer, VStack } from "@chakra-ui/react";
-import { useRouter } from "~/utils/compat/next-router";
 import { useEffect } from "react";
-
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { AutosaveStatus } from "~/experiments-v3/components/AutosaveStatus";
@@ -17,6 +15,7 @@ import { useEvaluationsV3Store } from "~/experiments-v3/hooks/useEvaluationsV3St
 import { useLambdaWarmup } from "~/experiments-v3/hooks/useLambdaWarmup";
 import { useSavedDatasetLoader } from "~/experiments-v3/hooks/useSavedDatasetLoader";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useRouter } from "~/utils/compat/next-router";
 
 /**
  * Experiments Workbench Page
@@ -79,7 +78,7 @@ export default function ExperimentsWorkbenchPage() {
   // Show 404 if experiment doesn't exist
   if (!slug || isNotFound) {
     return (
-      <DashboardLayout backgroundColor="bg.panel" compactMenu={true}>
+      <DashboardLayout backgroundColor="bg.panel">
         <Box padding={6}>
           <Alert.Root status="warning">
             <Alert.Indicator />
@@ -97,7 +96,7 @@ export default function ExperimentsWorkbenchPage() {
   // Show error for other failures (permissions, network, etc.)
   if (isError) {
     return (
-      <DashboardLayout backgroundColor="bg.panel" compactMenu={true}>
+      <DashboardLayout backgroundColor="bg.panel">
         <Box padding={6}>
           <Alert.Root status="error">
             <Alert.Indicator />
@@ -113,7 +112,7 @@ export default function ExperimentsWorkbenchPage() {
   }
 
   return (
-    <DashboardLayout backgroundColor="bg.panel" compactMenu={true}>
+    <DashboardLayout backgroundColor="bg.panel">
       <VStack
         width="full"
         height="calc(100vh - 50px)"
@@ -122,7 +121,7 @@ export default function ExperimentsWorkbenchPage() {
         overflow="hidden"
       >
         {/* Header */}
-        <HStack paddingX={6} paddingY={3} flexShrink={0}>
+        <HStack paddingX={6} paddingTop={5} paddingBottom={3} flexShrink={0}>
           <EditableHeading
             value={name}
             onSave={setName}
@@ -151,7 +150,6 @@ export default function ExperimentsWorkbenchPage() {
           position="relative"
           overflow="hidden"
           marginLeft={4}
-          marginTop={2}
           borderTopLeftRadius="xl"
           borderLeft="1px solid"
           borderTop="1px solid"

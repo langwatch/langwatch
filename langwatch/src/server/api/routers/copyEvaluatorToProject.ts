@@ -77,7 +77,11 @@ async function copyWorkflowForEvaluator(
       commitMessage: "Copied from " + source.workflow.name,
     });
   } catch (saveError) {
-    await ctx.prisma.workflow.delete({ where: { id: workflowId } }).catch(() => {});
+    // deleteMany (not delete) so the multitenancy guard accepts the projectId
+    // scope — a bare { id } delete is rejected and the rollback silently no-ops.
+    await ctx.prisma.workflow
+      .deleteMany({ where: { id: workflowId, projectId: targetProjectId } })
+      .catch(() => {});
     throw saveError;
   }
 
@@ -132,7 +136,7 @@ export async function copyEvaluatorToProject({
   } catch (createError) {
     if (newWorkflowId) {
       await ctx.prisma.workflow
-        .delete({ where: { id: newWorkflowId } })
+        .deleteMany({ where: { id: newWorkflowId, projectId: targetProjectId } })
         .catch(() => {});
     }
     throw createError;

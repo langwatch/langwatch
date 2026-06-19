@@ -158,7 +158,6 @@ When running on AWS with IRSA (IAM Roles for Service Accounts), you don't need t
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `SKIP_ENV_VALIDATION` | Skip environment variable validation on startup | `false` |
-| `DISABLE_PII_REDACTION` | Disable automatic PII redaction in traces | `false` |
 | `SKIP_PRISMA_MIGRATE` | Skip PostgreSQL migrations on startup | `false` |
 
 ## Telemetry
@@ -182,7 +181,6 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `app.credentialsEncryptionKey.value` | `CREDENTIALS_SECRET` |
 | `app.cronApiKey.value` | `CRON_API_KEY` |
 | `app.features.skipEnvValidation` | `SKIP_ENV_VALIDATION` |
-| `app.features.disablePiiRedaction` | `DISABLE_PII_REDACTION` |
 | `app.email.enabled` | `EMAIL_ENABLED` |
 | `app.email.provider` | `EMAIL_PROVIDER` |
 | `app.email.providers.sendgrid.apiKey.value` | `SENDGRID_API_KEY` |

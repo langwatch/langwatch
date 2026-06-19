@@ -127,6 +127,7 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   "VirtualKey",
   "CustomLLMModelCost",
   "RetentionPolicy",
+  "DataPrivacyPolicy",
   "ModelProvider",
   "ModelDefaultConfig",
   // organizationId is NULLABLE here (NULL = platform-published default), so a

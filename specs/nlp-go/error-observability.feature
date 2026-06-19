@@ -38,6 +38,15 @@ Feature: Workflow and evaluation failures are logged with fault attribution
     And the fault is customer for a rejection and provider for a server error
 
   @unit
+  Scenario: A provider rejection names the provider in the user-facing message
+    Given a provider rejects an LLM call with its own error body
+    When the failure surfaces to the user
+    Then the message names the provider followed by the provider's reason verbatim
+    # An ambiguous provider-edge rejection like "Request headers are too
+    # large." must not read as a LangWatch failure; the user needs to see
+    # WHO rejected the call to know where to act.
+
+  @unit
   Scenario: An engine bug is logged as a platform fault
     Given a node fails because of an engine-side problem
     When the node failure is recorded

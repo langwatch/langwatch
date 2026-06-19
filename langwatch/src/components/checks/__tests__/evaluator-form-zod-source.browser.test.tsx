@@ -20,11 +20,11 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it } from "vitest";
 import { page } from "vitest/browser";
-import { z } from "zod";
+import type { z } from "zod";
 import {
   AVAILABLE_EVALUATORS,
   evaluatorsSchema,
-} from "../../../server/evaluations/evaluators.generated";
+} from "../../../server/evaluations/evaluators";
 
 afterEach(() => cleanup());
 
