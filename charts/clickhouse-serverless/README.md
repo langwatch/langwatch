@@ -70,7 +70,7 @@ See the [Docker image README](../../clickhouse-serverless/README.md) for the ful
 | Name | Description | Default |
 |------|-------------|---------|
 | `image.repository` | Image repository | `langwatch/clickhouse-serverless` |
-| `image.tag` | Image tag | `0.1.0` |
+| `image.tag` | Image tag | `0.2.0` |
 | `image.pullPolicy` | Pull policy | `IfNotPresent` |
 
 ### Storage
@@ -106,6 +106,8 @@ Shared by cold storage and backups. Required when either `cold.enabled` or `back
 |------|-------------|---------|
 | `backup.enabled` | Enable native ClickHouse BACKUP/RESTORE to S3 (requires `objectStorage`) | `false` |
 | `backup.database` | Database to back up | `langwatch` |
+| `backup.user` | ClickHouse user for backup/restore operations | `default` |
+| `backup.resources` | CPU/memory requests + limits for the backup/restore Job containers | requests `100m`/`128Mi`, limits `500m`/`512Mi` |
 | `backup.full.schedule` | Cron schedule for full backups | `0 */12 * * *` |
 | `backup.incremental.schedule` | Cron schedule for incremental backups | `0 * * * *` |
 
@@ -160,6 +162,25 @@ This creates two users: `analyst` with read-only access to all databases, and `e
 | `scheduling.nodeSelector` | Node selector labels | `{}` |
 | `scheduling.affinity` | Affinity rules | `{}` |
 | `scheduling.tolerations` | Tolerations | `[]` |
+
+### ServiceAccount
+
+| Name | Description | Default |
+|------|-------------|---------|
+| `serviceAccount.create` | Create a dedicated ServiceAccount | `true` |
+| `serviceAccount.name` | ServiceAccount name (defaults to the chart fullname) | `""` |
+| `serviceAccount.automountServiceAccountToken` | Mount the SA token; ClickHouse/Keeper need no Kubernetes API access. Also set on the pod specs so policies that inspect the pod (not the SA) accept it. | `false` |
+| `serviceAccount.annotations` | ServiceAccount annotations (e.g. IRSA role ARN) | `{}` |
+
+## Pod Security
+
+ClickHouse, Keeper, and the backup/restore Jobs run non-root (uid 101) with a
+read-only root filesystem, `RuntimeDefault` seccomp, dropped capabilities, no
+privilege escalation, and no mounted ServiceAccount token. The paths ClickHouse
+writes at runtime (server logs, the pid directory, `/tmp`, and the rendered
+`config.d`/`users.d`) are `emptyDir` volumes; data stays on the PVC, so the
+image layer is never writable. This clears Pod Security Admission `restricted`
+and Gatekeeper / Kyverno policies, including "read-only root on every container".
 
 ## Deployment Modes
 
