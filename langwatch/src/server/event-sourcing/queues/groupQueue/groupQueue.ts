@@ -963,7 +963,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         )
         .ltrim(`${this.queueName}:gq:stats:latencies-ms`, 0, 199)
         .exec()
-        .catch(() => {});
+        .catch(() => {
+          // best-effort stats write; failures are non-fatal
+        });
     }
   }
 
@@ -979,7 +981,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     for (const value of values) {
       const blobId = readEnvelopeBlobId(value);
       if (blobId) {
-        void this.blobs.delete({ id: blobId }).catch(() => {});
+        void this.blobs.delete({ id: blobId }).catch(() => {
+          // best-effort cleanup; the blob TTL is the correctness backstop
+        });
       }
     }
   }
@@ -1192,7 +1196,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     // Wake the BRPOP so the dispatcher exits immediately
     await this.redisConnection
       .lpush(this.scripts.getSignalKey(), "1")
-      .catch(() => {});
+      .catch(() => {
+        // best-effort wake; a failed signal only delays dispatcher exit
+      });
     this.logger.debug(
       { queueName: this.queueName },
       "Closing group queue processor",
