@@ -6,15 +6,19 @@ configured in the LangWatch platform from CI/CD pipelines or scripts.
 """
 
 from dataclasses import dataclass, field
-from typing import Callable, List, Literal, Optional
-from urllib.parse import urlparse, urlunparse
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Literal, Optional, Union
+from urllib.parse import quote, urlparse, urlunparse
 import sys
 import time
 import httpx
 
 import langwatch
+from langwatch.experiment._results_df import build_results_df
 from langwatch.state import get_api_key, get_endpoint
 from langwatch.utils.auth import build_auth_headers
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 
 def _replace_url_domain(url: str, new_base: str) -> str:
@@ -127,6 +131,78 @@ class ExperimentRunResult:
     duration: int
     run_url: str
     summary: ExperimentRunSummary
+    experiment_slug: str = ""
+    api_key: str = field(default="", repr=False)
+    _cached_results_df: Optional["pd.DataFrame"] = field(
+        default=None, repr=False, compare=False
+    )
+
+    @property
+    def results(self) -> "pd.DataFrame":
+        """
+        Per-row evaluation results as a pandas DataFrame, fetched from the platform.
+
+        Each row corresponds to one dataset entry (or one entry per target in
+        multi-target runs). Columns include the input data, ``output``,
+        ``trace_id``, ``duration_ms``, ``cost``, plus one column per evaluation
+        metric and its ``<name>_passed`` companion.
+
+        The platform is the single source of truth — costs are computed from
+        traces, durations are accurate, and all data is consistent.
+
+        Example::
+
+            result = langwatch.experiment.run("my-experiment", data=[...])
+            result.results                       # renders as table in Jupyter
+            result.results["my_metric"].mean()   # aggregate a metric
+        """
+        if self._cached_results_df is not None:
+            return self._cached_results_df
+
+        df = self._fetch_results_as_df()
+        self._cached_results_df = df
+        return df
+
+    def _fetch_results_as_df(
+        self, retries: int = 5, delay: float = 3.0
+    ) -> "pd.DataFrame":
+        """Fetch per-row results from the platform and build a DataFrame.
+
+        ClickHouse can lag for a moment right after a run completes, so we retry
+        with a short backoff. On persistent failure we return an empty DataFrame
+        rather than raising — the run already succeeded, only the read is late.
+        """
+        import pandas as pd
+
+        endpoint = get_endpoint()
+        api_key = self.api_key or get_api_key() or ""
+
+        url = (
+            f"{endpoint}/api/evaluations/v3/runs/"
+            f"{quote(self.run_id)}/results"
+            f"?experimentSlug={quote(self.experiment_slug)}"
+        )
+
+        for attempt in range(retries):
+            try:
+                with httpx.Client(timeout=30) as client:
+                    response = client.get(url, headers=build_auth_headers(api_key))
+
+                if response.status_code == 404:
+                    if attempt < retries - 1:
+                        time.sleep(delay)
+                        continue
+                    return pd.DataFrame()
+
+                if response.is_success:
+                    return build_results_df(response.json())
+
+            except Exception:
+                if attempt < retries - 1:
+                    time.sleep(delay)
+                    continue
+
+        return pd.DataFrame()
 
     def print_summary(self, exit_on_failure: Optional[bool] = None) -> None:
         """
@@ -212,6 +288,10 @@ def _is_notebook() -> bool:
 def run(
     slug: str,
     *,
+    data: Optional[Union[List[dict], "pd.DataFrame"]] = None,
+    dataset_id: Optional[str] = None,
+    parameters: Optional[Dict[str, Any]] = None,
+    row_indices: Optional[List[int]] = None,
     poll_interval: float = 2.0,
     timeout: float = 600.0,
     on_progress: Optional[Callable[[int, int], None]] = None,
@@ -225,6 +305,13 @@ def run(
 
     Args:
         slug: The slug of the experiment to run (found in the experiment URL)
+        data: Optional inline rows to evaluate. Accepts a list of dicts or a
+            pandas DataFrame (converted with ``to_dict(orient="records")``).
+            Mutually exclusive with ``dataset_id``.
+        dataset_id: Optional id of a platform dataset to evaluate. Mutually
+            exclusive with ``data``.
+        parameters: Optional constants applied to every row (e.g. ``{"model": ...}``).
+        row_indices: Optional subset of row indices to evaluate.
         poll_interval: Seconds between status checks (default: 2.0)
         timeout: Maximum seconds to wait for completion (default: 600.0 = 10 minutes)
         on_progress: Optional callback for progress updates (completed, total)
@@ -232,9 +319,11 @@ def run(
 
     Returns:
         ExperimentRunResult with pass rate and summary. Call result.print_summary()
-        to display results and exit with code 1 on failure.
+        to display results and exit with code 1 on failure. Access ``result.results``
+        for a per-row pandas DataFrame.
 
     Raises:
+        ValueError: If both ``data`` and ``dataset_id`` are provided
         ExperimentNotFoundError: If the experiment slug doesn't exist
         ExperimentTimeoutError: If the experiment doesn't complete within timeout
         ExperimentRunFailedError: If the experiment fails
@@ -246,8 +335,14 @@ def run(
 
         result = langwatch.experiment.run("my-experiment-slug")
         result.print_summary()
+        result.results  # per-row DataFrame
         ```
     """
+    if data is not None and dataset_id is not None:
+        raise ValueError(
+            "Pass either `data` or `dataset_id`, not both — they are mutually exclusive."
+        )
+
     langwatch.ensure_setup()
 
     effective_api_key = api_key or get_api_key()
@@ -258,8 +353,15 @@ def run(
             "API key not set. Set LANGWATCH_API_KEY environment variable or pass api_key parameter."
         )
 
+    body = _build_run_body(
+        data=data,
+        dataset_id=dataset_id,
+        parameters=parameters,
+        row_indices=row_indices,
+    )
+
     # Start the run
-    start_response = _start_run(slug, endpoint, effective_api_key)
+    start_response = _start_run(slug, endpoint, effective_api_key, body)
     run_id = start_response["runId"]
     total = start_response.get("total", 0)
 
@@ -271,6 +373,60 @@ def run(
     if run_url:
         print(f"Follow live: {run_url}")
 
+    return _poll_until_complete(
+        run_id,
+        endpoint,
+        effective_api_key,
+        run_url=run_url,
+        total=total,
+        poll_interval=poll_interval,
+        timeout=timeout,
+        on_progress=on_progress,
+        experiment_slug=slug,
+    )
+
+
+def _build_run_body(
+    *,
+    data: Optional[Union[List[dict], "pd.DataFrame"]] = None,
+    dataset_id: Optional[str] = None,
+    parameters: Optional[Dict[str, Any]] = None,
+    row_indices: Optional[List[int]] = None,
+) -> Dict[str, Any]:
+    """Assemble the JSON body for a run request, including only provided keys."""
+    body: Dict[str, Any] = {}
+    if data is not None:
+        if hasattr(data, "to_dict"):
+            body["data"] = data.to_dict(orient="records")  # type: ignore[union-attr]
+        else:
+            body["data"] = data
+    if dataset_id is not None:
+        body["dataset_id"] = dataset_id
+    if parameters is not None:
+        body["parameters"] = parameters
+    if row_indices is not None:
+        body["row_indices"] = row_indices
+    return body
+
+
+def _poll_until_complete(
+    run_id: str,
+    endpoint: str,
+    api_key: str,
+    *,
+    run_url: str,
+    total: int,
+    poll_interval: float,
+    timeout: float,
+    on_progress: Optional[Callable[[int, int], None]],
+    experiment_slug: str = "",
+) -> ExperimentRunResult:
+    """Poll a run to completion, rendering progress, and build the result.
+
+    Shared by the experiment ``run()`` and the workflow ``run()`` entry points so
+    both surface the same progress UX and the same ``ExperimentRunResult`` (with a
+    lazy ``.results`` DataFrame).
+    """
     # Track last progress for change detection
     last_progress = 0
 
@@ -280,19 +436,18 @@ def run(
     if on_progress:
         on_progress(0, total)
 
-    # Poll until complete
     start_time = time.time()
     while True:
         if time.time() - start_time > timeout:
             print()  # Newline after progress
-            status = _get_run_status(run_id, endpoint, effective_api_key)
+            status = _get_run_status(run_id, endpoint, api_key)
             raise ExperimentTimeoutError(
                 run_id, status.get("progress", 0), status.get("total", 0)
             )
 
         time.sleep(poll_interval)
 
-        status = _get_run_status(run_id, endpoint, effective_api_key)
+        status = _get_run_status(run_id, endpoint, api_key)
         progress = status.get("progress", 0)
         total = status.get("total", total)
 
@@ -311,7 +466,9 @@ def run(
         if run_status == "completed":
             print()  # Newline after progress
             summary_data = status.get("summary", {})
-            return _build_result(run_id, "completed", summary_data, run_url)
+            return _build_result(
+                run_id, "completed", summary_data, run_url, experiment_slug, api_key
+            )
 
         if run_status == "failed":
             print()  # Newline after progress
@@ -322,15 +479,24 @@ def run(
         if run_status == "stopped":
             print()  # Newline after progress
             summary_data = status.get("summary", {})
-            return _build_result(run_id, "stopped", summary_data, run_url)
+            return _build_result(
+                run_id, "stopped", summary_data, run_url, experiment_slug, api_key
+            )
 
 
-def _start_run(slug: str, endpoint: str, api_key: str) -> dict:
-    """Start an experiment run."""
+def _start_run(
+    slug: str, endpoint: str, api_key: str, body: Optional[Dict[str, Any]] = None
+) -> dict:
+    """Start an experiment run.
+
+    ``body`` carries the optional inline data / dataset_id / parameters / row_indices.
+    When empty we send ``json=None`` so the historical no-body request is preserved.
+    """
     with httpx.Client(timeout=60) as client:
         response = client.post(
             f"{endpoint}/api/evaluations/v3/{slug}/run",
             headers=build_auth_headers(api_key),
+            json=body or None,
         )
 
     if response.status_code == 404:
@@ -374,6 +540,8 @@ def _build_result(
     status: Literal["completed", "failed", "stopped"],
     summary_data: dict,
     run_url: str,
+    experiment_slug: str = "",
+    api_key: str = "",
 ) -> ExperimentRunResult:
     """Build the result object from API response."""
     total_cells = summary_data.get("totalCells", 0)
@@ -440,6 +608,8 @@ def _build_result(
         duration=duration,
         run_url=summary.run_url,
         summary=summary,
+        experiment_slug=experiment_slug,
+        api_key=api_key,
     )
 
 
