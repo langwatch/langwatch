@@ -8,8 +8,8 @@
  *      audit-log feed (page 1 → page 2 → drained).
  *   2. Create a fresh org + team + IngestionSource with `pullConfig`
  *      pointing at the fixture server and `adapter: "http_polling"`.
- *   3. Invoke `runIngestionPullerJob` directly — same code path the
- *      production BullMQ worker hits per scheduled tick.
+ *   3. Invoke `runIngestionPullForSource` directly — same code path the
+ *      event-sourcing pull scheduler hits per scheduled tick.
  *   4. Read `governance_ocsf_events` from ClickHouse and print one
  *      OCSF row per event for visual confirmation.
  *   5. Print PG IngestionSource state (cursor + status) so the admin
@@ -21,18 +21,18 @@
  *
  * Exit code: 0 = OCSF rows landed + cursor drained; 1 = anything else.
  */
-import http from "http";
-import { randomBytes } from "crypto";
-import type { AddressInfo } from "net";
 
 import { createClient } from "@clickhouse/client";
-
-import { prisma } from "../../../src/server/db";
-import { runIngestionPullerJob } from "../../../ee/governance/services/pullers/pullerWorker";
+import { randomBytes } from "crypto";
+import http from "http";
+import type { AddressInfo } from "net";
 import { ensureHiddenGovernanceProject } from "../../../ee/governance/services/governanceProject.service";
+import { runIngestionPullForSource } from "../../../ee/governance/services/pullers/pullerWorker";
+import { prisma } from "../../../src/server/db";
 
 const CLICKHOUSE_URL =
-  process.env.CLICKHOUSE_URL ?? "http://default:langwatch@localhost:8123/langwatch";
+  process.env.CLICKHOUSE_URL ??
+  "http://default:langwatch@localhost:8123/langwatch";
 
 function rid(prefix: string) {
   return `${prefix}_${randomBytes(8).toString("hex")}`;
@@ -73,7 +73,10 @@ const fixturePage2 = {
   next_cursor: null,
 };
 
-async function startFixtureServer(): Promise<{ url: string; close: () => Promise<void> }> {
+async function startFixtureServer(): Promise<{
+  url: string;
+  close: () => Promise<void>;
+}> {
   const server = http.createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
     const cursor = url.searchParams.get("cursor");
@@ -141,11 +144,8 @@ async function main(): Promise<void> {
   });
   console.log(`[smoke-puller] IngestionSource minted: id=${source.id}`);
 
-  await runIngestionPullerJob({
-    id: rid("job"),
-    data: { ingestionSourceId: source.id, scheduledAt: Date.now() },
-  } as any);
-  console.log(`[smoke-puller] runIngestionPullerJob completed`);
+  await runIngestionPullForSource({ ingestionSourceId: source.id });
+  console.log(`[smoke-puller] runIngestionPullForSource completed`);
 
   const govProject = await ensureHiddenGovernanceProject(prisma, org.id);
   console.log(`[smoke-puller] hidden Governance Project: id=${govProject.id}`);
@@ -178,7 +178,9 @@ async function main(): Promise<void> {
       `[smoke-puller] CH governance_ocsf_events rows for tenant=${govProject.id}: ${rows.length}`,
     );
     for (const row of rows) {
-      console.log(`  - ${row.EventId} | actor=${row.ActorEmail} | model=${row.TargetName} | trace=${row.TraceId}`);
+      console.log(
+        `  - ${row.EventId} | actor=${row.ActorEmail} | model=${row.TargetName} | trace=${row.TraceId}`,
+      );
     }
 
     const updated = await prisma.ingestionSource.findUnique({

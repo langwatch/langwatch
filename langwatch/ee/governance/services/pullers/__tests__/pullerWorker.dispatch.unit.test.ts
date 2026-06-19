@@ -129,12 +129,9 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
         ),
       );
 
-      const { runIngestionPullerJob } = await import("../pullerWorker");
+      const { runIngestionPullForSource } = await import("../pullerWorker");
 
-      await runIngestionPullerJob({
-        id: "job-1",
-        data: { ingestionSourceId: sourceId, scheduledAt: Date.now() },
-      } as any);
+      await runIngestionPullForSource({ ingestionSourceId: sourceId });
 
       // Two OCSF rows landed
       expect(ocsfInsert).toHaveBeenCalledTimes(2);
@@ -152,10 +149,7 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
         actionName: "completion",
         targetName: "gpt-5-mini",
       });
-      expect(ensureGovProject).toHaveBeenCalledWith(
-        expect.anything(),
-        "org-1",
-      );
+      expect(ensureGovProject).toHaveBeenCalledWith(expect.anything(), "org-1");
       // Cursor advanced + status promoted to active + lastEventAt stamped
       expect(sourceUpdate).toHaveBeenCalledTimes(1);
       const updateCall = sourceUpdate.mock.calls[0]![0];
@@ -169,11 +163,8 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
   describe("source lookup fails: bail without adapter dispatch", () => {
     it("logs + returns when IngestionSource is missing", async () => {
       sourceFindUnique.mockResolvedValueOnce(null);
-      const { runIngestionPullerJob } = await import("../pullerWorker");
-      await runIngestionPullerJob({
-        id: "job-1",
-        data: { ingestionSourceId: "missing-src", scheduledAt: Date.now() },
-      } as any);
+      const { runIngestionPullForSource } = await import("../pullerWorker");
+      await runIngestionPullForSource({ ingestionSourceId: "missing-src" });
       expect(ocsfInsert).not.toHaveBeenCalled();
       expect(sourceUpdate).not.toHaveBeenCalled();
     });
@@ -187,11 +178,8 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
         parserConfig: HTTP_POLLING_CONFIG,
         pollerCursor: null,
       });
-      const { runIngestionPullerJob } = await import("../pullerWorker");
-      await runIngestionPullerJob({
-        id: "job-1",
-        data: { ingestionSourceId: "src-disabled", scheduledAt: Date.now() },
-      } as any);
+      const { runIngestionPullForSource } = await import("../pullerWorker");
+      await runIngestionPullForSource({ ingestionSourceId: "src-disabled" });
       expect(fetchStub).not.toHaveBeenCalled();
       expect(ocsfInsert).not.toHaveBeenCalled();
     });
@@ -207,11 +195,8 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
         parserConfig: { adapter: "definitely_not_registered" },
         pollerCursor: null,
       });
-      const { runIngestionPullerJob } = await import("../pullerWorker");
-      await runIngestionPullerJob({
-        id: "job-1",
-        data: { ingestionSourceId: "src-unknown", scheduledAt: Date.now() },
-      } as any);
+      const { runIngestionPullForSource } = await import("../pullerWorker");
+      await runIngestionPullForSource({ ingestionSourceId: "src-unknown" });
       expect(sourceUpdate).toHaveBeenCalledTimes(1);
       expect(sourceUpdate.mock.calls[0]![0].data).toEqual({
         errorCount: { increment: 1 },
@@ -238,11 +223,8 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
       fetchStub.mockResolvedValueOnce(r503());
       fetchStub.mockResolvedValueOnce(r503());
 
-      const { runIngestionPullerJob } = await import("../pullerWorker");
-      await runIngestionPullerJob({
-        id: "job-1",
-        data: { ingestionSourceId: "src-error", scheduledAt: Date.now() },
-      } as any);
+      const { runIngestionPullForSource } = await import("../pullerWorker");
+      await runIngestionPullForSource({ ingestionSourceId: "src-error" });
 
       expect(ocsfInsert).not.toHaveBeenCalled();
       // Adapter returned errorCount=1 + cursor=options.cursor;
@@ -284,11 +266,8 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
         ),
       );
 
-      const { runIngestionPullerJob } = await import("../pullerWorker");
-      await runIngestionPullerJob({
-        id: "job-1",
-        data: { ingestionSourceId: "src-idem", scheduledAt: Date.now() },
-      } as any);
+      const { runIngestionPullForSource } = await import("../pullerWorker");
+      await runIngestionPullForSource({ ingestionSourceId: "src-idem" });
 
       const row = ocsfInsert.mock.calls[0]![0];
       expect(row.eventId).toBe("copilot_studio:uuid-deadbeef");

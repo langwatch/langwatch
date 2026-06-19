@@ -19,15 +19,14 @@
 import { JSONPath } from "jsonpath-plus";
 import type { Response as FetchResponse } from "undici";
 import { z } from "zod";
-
-import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 import { createLogger } from "~/utils/logger/server";
+import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 
 import type {
   NormalizedPullEvent,
+  PullerAdapter,
   PullResult,
   PullRunOptions,
-  PullerAdapter,
 } from "./pullerAdapter";
 
 const logger = createLogger("langwatch:puller:http_polling");
@@ -81,7 +80,7 @@ const httpPollingConfigSchema = z.object({
   cursorQueryParam: z.string().default("cursor"),
   /** JSONPath into the response body to extract the events array. */
   eventsJsonPath: z.string().min(1),
-  /** cron string for scheduling (validated upstream by BullMQ). */
+  /** cron string for scheduling (parsed in-process by the pull scheduler). */
   schedule: z.string().min(1),
   /** Per-event JSONPath mappings (NormalizedPullEvent shape). */
   eventMapping: eventMappingSchema,
@@ -108,10 +107,7 @@ export class HttpPollingPullerAdapter
 
     while (pageCount < MAX_PAGES_PER_RUN) {
       pageCount += 1;
-      if (
-        options.deadlineMs !== undefined &&
-        Date.now() > options.deadlineMs
-      ) {
+      if (options.deadlineMs !== undefined && Date.now() > options.deadlineMs) {
         logger.info(
           { adapter: this.id, pageCount, cursor },
           "Deadline reached mid-pagination, returning cursor for next run",
@@ -210,10 +206,7 @@ export class HttpPollingPullerAdapter
         lastError = error instanceof Error ? error : new Error(String(error));
         // 4xx errors land here too (re-thrown above); only retry on
         // network/transport errors and 5xx
-        if (
-          error instanceof Error &&
-          /^HTTP 4\d{2}/.test(error.message)
-        ) {
+        if (error instanceof Error && /^HTTP 4\d{2}/.test(error.message)) {
           throw error;
         }
       }
