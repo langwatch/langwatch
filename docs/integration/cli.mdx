@@ -91,20 +91,22 @@ When you're driving the CLI from automation and already have a credential, skip 
 | Flag | Use case | Where it lands |
 |---|---|---|
 | `langwatch login --device` | AI tools mode, skip Q1/Q2 prompts | `~/.langwatch/config.json` |
+| `langwatch login --project` | Project SDK mode via browser, skip Q1/Q2 prompts; mints a fresh project key | `$CWD/.env` |
 | `langwatch login --api-key <KEY>` | CI pipeline that has `LANGWATCH_API_KEY` injected from secrets | `$CWD/.env` |
 | `langwatch login --token <TOKEN>` | Agent harness with a pre-minted device session token (issued via dashboard "Personal Access Tokens") | `~/.langwatch/config.json` |
 | `langwatch login --endpoint <URL>` | combine with any of the above to pin a self-hosted instance | persisted to config |
 
 The interactive `langwatch login` always shows these flags in a banner above the prompts, so a fake-TTY agent (`Claude Code`, certain Gemini CLI sandboxes) can detect the prompt and re-invoke with the right flag instead of getting stuck.
 
-When stdin is not a TTY (genuine CI), `langwatch login` with no flags errors out with the same flag list, explicit > implicit, no surprise API-key fall-throughs.
+When stdin is not a TTY (genuine CI or an agent's piped stdin), `langwatch login` with no flags defaults to **project login** (the same as `--project`): it mints a project key into `$CWD/.env`, which is what the SDK, `langwatch eval`, and `langwatch prompt` expect. AI-tools login stays explicit behind `--device`.
 
 ### Letting an agent do it
 
-A coding assistant driving `langwatch` will see the always-on banner naming `--device`, `--api-key`, `--token`, `--endpoint` whenever the interactive prompt fires. If the assistant's harness reports as a TTY but can't actually answer prompts, the banner gives it everything it needs to re-invoke:
+A coding assistant driving `langwatch` will see the always-on banner naming `--device`, `--project`, `--api-key`, `--token`, `--endpoint` whenever the interactive prompt fires. If the assistant's harness reports as a TTY but can't actually answer prompts, the banner gives it everything it needs to re-invoke:
 
 ```bash
 langwatch login --device                # AI tools mode (recommended for assistants)
+langwatch login --project               # project SDK key into .env via the browser
 langwatch login --api-key sk-lw-...     # if a project key was injected from secrets
 langwatch login --token lwc_...         # if a device session token was pre-minted
 langwatch login --endpoint https://...  # combine with any of the above for self-hosted
