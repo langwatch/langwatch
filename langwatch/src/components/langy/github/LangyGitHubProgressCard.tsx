@@ -10,7 +10,14 @@
  * Spec: specs/assistant/langy-github-prs.feature. Issue: #4747.
  */
 import { Box, HStack, Text } from "@chakra-ui/react";
-import { Check, GitBranch, GitCommit, GitPullRequest, Loader, Upload } from "lucide-react";
+import {
+  Check,
+  GitBranch,
+  GitCommit,
+  GitPullRequest,
+  Loader,
+  Upload,
+} from "lucide-react";
 import type {
   GithubProgressEvent,
   GithubProgressStage,
@@ -53,7 +60,13 @@ export function LangyGitHubProgressCard({
       background="bg.subtle"
     >
       <HStack gap={2} marginBottom={2}>
-        <Text textStyle="2xs" fontWeight="600" letterSpacing="0.08em" textTransform="uppercase" color="fg.muted">
+        <Text
+          textStyle="2xs"
+          fontWeight="600"
+          letterSpacing="0.08em"
+          textTransform="uppercase"
+          color="fg.muted"
+        >
           {opened ? "Opened" : "Working on it"}
         </Text>
         {latest && (
@@ -87,7 +100,10 @@ export function LangyGitHubProgressCard({
   );
 }
 
-function isDoneFor(stage: GithubProgressStage, reached: Set<GithubProgressStage>): boolean {
+function isDoneFor(
+  stage: GithubProgressStage,
+  reached: Set<GithubProgressStage>,
+): boolean {
   if (reached.has(stage)) return true;
   // 'cloning' arrives before 'cloned'; cap intermediate states so the cloned
   // pill lights up the moment a clone is in progress.

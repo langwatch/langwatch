@@ -16,28 +16,28 @@ import {
 import { nanoid } from "nanoid";
 import {
   afterAll,
+  afterEach,
   beforeAll,
   beforeEach,
-  afterEach,
   describe,
   expect,
   it,
   vi,
 } from "vitest";
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
+import {
+  type PlanProvider,
+  PlanProviderService,
+} from "~/server/app-layer/subscription/plan-provider";
+import {
+  backfillLangyApiKeys,
+  LANGY_API_KEY_NAME,
+} from "~/server/services/langy/langyApiKey";
+import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
-import { createTestApp } from "~/server/app-layer/presets";
-import { globalForApp, resetApp } from "~/server/app-layer/app";
-import {
-  PlanProviderService,
-  type PlanProvider,
-} from "~/server/app-layer/subscription/plan-provider";
-import { FREE_PLAN } from "../../../../../ee/licensing/constants";
-import {
-  LANGY_API_KEY_NAME,
-  backfillLangyApiKeys,
-} from "~/server/services/langy/langyApiKey";
 
 const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;
 
@@ -75,8 +75,8 @@ describe.skipIf(isTestcontainersOnly)("Langy API key provisioning", () => {
     });
   });
 
-  beforeEach(() => {
-    resetApp();
+  beforeEach(async () => {
+    await resetApp();
     globalForApp.__langwatch_app = createTestApp({
       planProvider: PlanProviderService.create({
         getActivePlan: vi.fn().mockResolvedValue({
@@ -96,13 +96,21 @@ describe.skipIf(isTestcontainersOnly)("Langy API key provisioning", () => {
 
   afterAll(async () => {
     // RoleBindings + ApiKeys are org-scoped; delete them before the org.
-    await prisma.roleBinding.deleteMany({ where: { organizationId } }).catch(() => {});
-    await prisma.apiKey.deleteMany({ where: { organizationId } }).catch(() => {});
+    await prisma.roleBinding
+      .deleteMany({ where: { organizationId } })
+      .catch(() => {});
+    await prisma.apiKey
+      .deleteMany({ where: { organizationId } })
+      .catch(() => {});
     await prisma.project.deleteMany({ where: { teamId } }).catch(() => {});
     await prisma.teamUser.deleteMany({ where: { teamId } }).catch(() => {});
     await prisma.team.deleteMany({ where: { id: teamId } }).catch(() => {});
-    await prisma.organizationUser.deleteMany({ where: { organizationId } }).catch(() => {});
-    await prisma.organization.deleteMany({ where: { id: organizationId } }).catch(() => {});
+    await prisma.organizationUser
+      .deleteMany({ where: { organizationId } })
+      .catch(() => {});
+    await prisma.organization
+      .deleteMany({ where: { id: organizationId } })
+      .catch(() => {});
     await prisma.user.deleteMany({ where: { id: userId } }).catch(() => {});
   });
 

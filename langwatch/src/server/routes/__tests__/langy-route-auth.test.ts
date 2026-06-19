@@ -30,10 +30,9 @@ const REMOVED_GATE_MESSAGE = "Langy is not currently enabled";
 
 async function requestLangy() {
   const { app } = await import("../langy");
-  return app.request(
-    "http://localhost/api/langy/conversations?projectId=p1",
-    { method: "GET" },
-  );
+  return app.request("http://localhost/api/langy/conversations?projectId=p1", {
+    method: "GET",
+  });
 }
 
 describe("Langy access (post-#4558: no staff or rollout gate)", () => {

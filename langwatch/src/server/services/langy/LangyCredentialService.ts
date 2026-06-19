@@ -1,9 +1,9 @@
 import type { PrismaClient } from "@prisma/client";
 
 import { parseVirtualKeyConfig } from "~/server/gateway/virtualKey.config";
-import { captureException } from "~/utils/posthogErrorCapture";
 import { createLogger } from "~/utils/logger/server";
-import { provisionLangyApiKey, getLangyApiKeyToken } from "./langyApiKey";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
+import { getLangyApiKeyToken, provisionLangyApiKey } from "./langyApiKey";
 import { getGithubTokenForUser } from "./langyGithubToken";
 import {
   LANGY_VK_DISPLAY_NAME,
@@ -165,7 +165,8 @@ export class LangyCredentialService {
       captureException(error, {
         extra: {
           projectId,
-          context: "getGithubTokenForUser:LangyCredentialService.getOrProvision",
+          context:
+            "getGithubTokenForUser:LangyCredentialService.getOrProvision",
         },
       });
     }

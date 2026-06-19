@@ -1,4 +1,5 @@
 import type { ConnectionOptions } from "bullmq";
+import { createLogger } from "../../../utils/logger/server";
 import { connection } from "../../redis";
 import {
   type LangyRetentionJob,
@@ -6,7 +7,6 @@ import {
 } from "../workers/langyRetentionWorker";
 import { LANGY_RETENTION_QUEUE } from "./constants";
 import { QueueWithFallback } from "./queueWithFallback";
-import { createLogger } from "../../../utils/logger/server";
 
 export { LANGY_RETENTION_QUEUE } from "./constants";
 

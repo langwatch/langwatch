@@ -1,5 +1,5 @@
 import { Button, Circle, HStack, Text, VStack } from "@chakra-ui/react";
-import React from "react";
+import type React from "react";
 import {
   AI_BG_HOVER,
   AI_BG_SUBTLE,

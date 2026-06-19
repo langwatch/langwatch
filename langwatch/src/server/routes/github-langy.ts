@@ -18,17 +18,11 @@
  * Spec: specs/assistant/langy-github-prs.feature. Issue: #4747.
  */
 import { randomBytes } from "crypto";
-
-import {
-  createServiceApp,
-  publicEndpoint,
-} from "~/server/api/security";
+import { env } from "~/env.mjs";
+import { createServiceApp, publicEndpoint } from "~/server/api/security";
+import { auditLog } from "~/server/auditLog";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
-import { auditLog } from "~/server/auditLog";
-import { encrypt } from "~/utils/encryption";
-import { env } from "~/env.mjs";
-import { createLogger } from "~/utils/logger/server";
 import {
   exchangeCode,
   fetchGithubUser,
@@ -40,10 +34,10 @@ import {
   popupResponseHtml,
 } from "~/server/services/langy/githubOauthPopupHtml";
 import {
-  signGithubOauthState,
-  STATE_TTL_MS,
-  verifyGithubOauthState,
   type GithubOauthStatePayload,
+  STATE_TTL_MS,
+  signGithubOauthState,
+  verifyGithubOauthState,
 } from "~/server/services/langy/githubOauthState";
 import {
   isOrganizationMember,
@@ -54,6 +48,8 @@ import {
   consumeGithubOauthNonce,
   registerGithubOauthNonce,
 } from "~/server/services/langy/langyGithubToken";
+import { encrypt } from "~/utils/encryption";
+import { createLogger } from "~/utils/logger/server";
 
 import type { NextRequestShim } from "./types";
 
@@ -116,9 +112,7 @@ function appOrigin(reqUrl: string): string {
 }
 
 function appConfigured() {
-  return Boolean(
-    env.GITHUB_LANGY_CLIENT_ID && env.GITHUB_LANGY_CLIENT_SECRET,
-  );
+  return Boolean(env.GITHUB_LANGY_CLIENT_ID && env.GITHUB_LANGY_CLIENT_SECRET);
 }
 
 // encrypt() (utils/encryption) requires a 32-byte hex CREDENTIALS_SECRET.

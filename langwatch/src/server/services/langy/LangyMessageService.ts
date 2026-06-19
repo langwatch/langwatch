@@ -60,7 +60,6 @@ export class LangyMessageRepository {
       },
     });
   }
-
 }
 
 export class LangyMessageService {

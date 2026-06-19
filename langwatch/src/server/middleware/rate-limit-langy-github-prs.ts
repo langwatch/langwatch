@@ -41,7 +41,11 @@ export async function getLangyGithubPrUsage({
   limit?: number;
 }): Promise<GithubPrLimitResult> {
   if (!connection) {
-    return { allowed: true, remaining: limit, resetAt: resetAtForBucket(dayBucket()) };
+    return {
+      allowed: true,
+      remaining: limit,
+      resetAt: resetAtForBucket(dayBucket()),
+    };
   }
   const bucket = dayBucket();
   const key = `langy:gh:prs:${userId}:${bucket}`;
@@ -52,7 +56,11 @@ export async function getLangyGithubPrUsage({
     ).get(key);
     count = raw ? Number.parseInt(raw, 10) : 0;
   } catch {
-    return { allowed: true, remaining: limit, resetAt: resetAtForBucket(bucket) };
+    return {
+      allowed: true,
+      remaining: limit,
+      resetAt: resetAtForBucket(bucket),
+    };
   }
   return {
     allowed: count < limit,
@@ -79,7 +87,11 @@ export async function recordLangyGithubPr({
   limit?: number;
 }): Promise<GithubPrLimitResult> {
   if (!connection) {
-    return { allowed: true, remaining: limit, resetAt: resetAtForBucket(dayBucket()) };
+    return {
+      allowed: true,
+      remaining: limit,
+      resetAt: resetAtForBucket(dayBucket()),
+    };
   }
   const bucket = dayBucket();
   const key = `langy:gh:prs:${userId}:${bucket}`;
@@ -96,7 +108,11 @@ export async function recordLangyGithubPr({
       ).expire(key, 60 * 60 * 24 * 2);
     }
   } catch {
-    return { allowed: true, remaining: limit, resetAt: resetAtForBucket(bucket) };
+    return {
+      allowed: true,
+      remaining: limit,
+      resetAt: resetAtForBucket(bucket),
+    };
   }
   return {
     allowed: count <= limit,

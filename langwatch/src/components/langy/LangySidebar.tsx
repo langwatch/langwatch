@@ -1,19 +1,22 @@
 import { useChat } from "@ai-sdk/react";
 import {
   Box,
+  chakra,
   HStack,
   IconButton,
   Separator,
   Text,
   VStack,
-  chakra,
 } from "@chakra-ui/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { ChevronsRight, Plus, Sparkles, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { isLangyManagedVk } from "~/components/gateway/langyVk";
+import { allModelOptions } from "~/components/ModelSelector";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
+import { ModelProviderScreen } from "~/features/onboarding/components/sections/ModelProviderScreen";
 import {
   AI_SHADOW,
   AI_SHADOW_SOFT,
@@ -28,25 +31,22 @@ import {
 } from "~/features/traces-v2/components/ai/useCyclingVerb";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { api } from "~/utils/api";
-import { allModelOptions } from "~/components/ModelSelector";
-import { isLangyManagedVk } from "~/components/gateway/langyVk";
-import { ModelProviderScreen } from "~/features/onboarding/components/sections/ModelProviderScreen";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { Composer } from "./Composer";
 import { EmptyState } from "./EmptyState";
 import { LangyGitHubMenu } from "./github/LangyGitHubMenu";
 import {
-  MessageContent,
   type LangyProposal,
+  MessageContent,
   type ProposalHandlers,
 } from "./MessageContent";
 import { RecentChatsMenu } from "./RecentChatsMenu";
 import { useGlobalLangyShortcut } from "./useGlobalLangyShortcut";
 import {
-  useLangyConversations,
   type LangyConversationSummary,
   type LangyMessageRecord,
+  useLangyConversations,
 } from "./useLangyConversations";
 
 // The same feature key Langy's chat route resolves against. Used to seed the
@@ -139,9 +139,7 @@ function LangyHandle({
       borderColor={isOpen ? "border.muted" : "rgba(255,255,255,0.18)"}
       borderRightWidth={0}
       color={isOpen ? "fg.muted" : "white"}
-      boxShadow={
-        isOpen ? "sm" : hover ? AI_SHADOW : AI_SHADOW_SOFT
-      }
+      boxShadow={isOpen ? "sm" : hover ? AI_SHADOW : AI_SHADOW_SOFT}
       transform={hover ? "translate(-2px, -50%)" : "translateY(-50%)"}
       transition={`right ${LANGY_TRANSITION}, background 180ms ease, color 180ms ease, transform 180ms ease, box-shadow 180ms ease`}
       overflow="hidden"
@@ -313,7 +311,10 @@ function LangyPanel({
   useEffect(() => {
     if (modelOverride) return;
     const resolved = resolvedDefaultQuery.data?.model;
-    if (resolved && (!langyModelsAllowed || langyModelsAllowed.includes(resolved))) {
+    if (
+      resolved &&
+      (!langyModelsAllowed || langyModelsAllowed.includes(resolved))
+    ) {
       setModelOverride(resolved);
     } else if (langyModelsAllowed) {
       setModelOverride(langyModelsAllowed[0]!);
@@ -435,10 +436,7 @@ function LangyPanel({
     void selectConversation(id);
   };
 
-  const applyProposal = async (
-    proposalId: string,
-    proposal: LangyProposal,
-  ) => {
+  const applyProposal = async (proposalId: string, proposal: LangyProposal) => {
     if (applyingProposals.has(proposalId)) return;
     if (proposalId in appliedOutcomes) return;
     if (discardedProposals.has(proposalId)) return;
@@ -512,9 +510,7 @@ function LangyPanel({
       // the page chrome (a docked drawer), not a floating popover.
       overflow="hidden"
       transition={`transform ${LANGY_TRANSITION}, opacity 220ms ease`}
-      transform={
-        isOpen ? "translateX(0)" : `translateX(${PANEL_WIDTH}px)`
-      }
+      transform={isOpen ? "translateX(0)" : `translateX(${PANEL_WIDTH}px)`}
       opacity={isOpen ? 1 : 0}
       pointerEvents={isOpen ? "auto" : "none"}
       aria-hidden={!isOpen}

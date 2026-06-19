@@ -11,10 +11,12 @@
  * src/server/routes/github-langy.ts — OAuth redirect_uri can't live behind
  * tRPC. Issue #4747.
  */
+
+import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-
 import { env } from "~/env.mjs";
+import { authorizeInResolver } from "~/server/api/rbac";
 import { auditLog } from "~/server/auditLog";
 import {
   deleteGithubConnection,
@@ -25,10 +27,8 @@ import {
   clearGithubTokenCache,
   getGithubTokenForUser,
 } from "~/server/services/langy/langyGithubToken";
-import { authorizeInResolver } from "~/server/api/rbac";
 import { createLogger } from "~/utils/logger/server";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import type { PrismaClient } from "@prisma/client";
 
 const logger = createLogger("langwatch:trpc:langyGithub");
 

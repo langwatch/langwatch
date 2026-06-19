@@ -1,20 +1,20 @@
-import { Box, Button, HStack, Text, VStack, chakra } from "@chakra-ui/react";
+import { Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import type { UIMessage } from "ai";
 import { ArrowRight, Check } from "lucide-react";
-import React from "react";
+import type React from "react";
 import { Markdown } from "~/components/Markdown";
-import { LangyGitHubConnectCard } from "./github/LangyGitHubConnectCard";
-import { LangyGitHubPrCard } from "./github/LangyGitHubPrCard";
-import { LangyGitHubProgressCard } from "./github/LangyGitHubProgressCard";
-import { extractGithubPrLinks } from "~/server/services/langy/githubPrLinks";
-import { parseGithubProgressEvents } from "~/server/services/langy/githubProgressEvents";
-import { CONNECT_GITHUB_SENTINEL } from "~/server/services/langy/langySentinels";
 import {
   AI_SHADOW,
   GradientSparkle,
   MeshGradientLayer,
   SparkleTile,
 } from "~/features/traces-v2/components/ai/aiBrandVisuals";
+import { extractGithubPrLinks } from "~/server/services/langy/githubPrLinks";
+import { parseGithubProgressEvents } from "~/server/services/langy/githubProgressEvents";
+import { CONNECT_GITHUB_SENTINEL } from "~/server/services/langy/langySentinels";
+import { LangyGitHubConnectCard } from "./github/LangyGitHubConnectCard";
+import { LangyGitHubPrCard } from "./github/LangyGitHubPrCard";
+import { LangyGitHubProgressCard } from "./github/LangyGitHubProgressCard";
 
 export interface LangyProposal {
   langyProposal: true;
@@ -66,8 +66,7 @@ export function MessageContent({
     .map((part) => part.text)
     .join("");
 
-  const showConnectCard =
-    !isUser && rawText.includes(CONNECT_GITHUB_SENTINEL);
+  const showConnectCard = !isUser && rawText.includes(CONNECT_GITHUB_SENTINEL);
   const afterConnectStrip = showConnectCard
     ? rawText.split(CONNECT_GITHUB_SENTINEL).join("").trim()
     : rawText;
@@ -128,8 +127,7 @@ export function MessageContent({
                 padding: "1px 5px",
                 borderRadius: "4px",
                 background: "var(--chakra-colors-bg-subtle)",
-                fontFamily:
-                  "ui-monospace, SFMono-Regular, Menlo, monospace",
+                fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
               },
             }}
           >
@@ -257,7 +255,9 @@ function ProposalCard({
         triggerOpen();
       }}
       transition="border-color 150ms ease, box-shadow 150ms ease"
-      _hover={hasOpen ? { borderColor: "green.fg", boxShadow: "sm" } : undefined}
+      _hover={
+        hasOpen ? { borderColor: "green.fg", boxShadow: "sm" } : undefined
+      }
     >
       <HStack
         gap={1.5}

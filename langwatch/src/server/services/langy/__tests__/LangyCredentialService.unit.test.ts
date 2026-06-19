@@ -291,7 +291,10 @@ describe("LangyCredentialService", () => {
         const svc = new LangyCredentialService(prisma);
 
         expect(
-          await svc.getModelsAllowed({ projectId: "p1", organizationId: "org-1" }),
+          await svc.getModelsAllowed({
+            projectId: "p1",
+            organizationId: "org-1",
+          }),
         ).toBeNull();
       });
     });
@@ -302,7 +305,10 @@ describe("LangyCredentialService", () => {
         const svc = new LangyCredentialService(prisma);
 
         expect(
-          await svc.getModelsAllowed({ projectId: "p1", organizationId: "org-1" }),
+          await svc.getModelsAllowed({
+            projectId: "p1",
+            organizationId: "org-1",
+          }),
         ).toBeNull();
       });
     });
@@ -316,7 +322,10 @@ describe("LangyCredentialService", () => {
         const svc = new LangyCredentialService(prisma);
 
         expect(
-          await svc.getModelsAllowed({ projectId: "p1", organizationId: "org-1" }),
+          await svc.getModelsAllowed({
+            projectId: "p1",
+            organizationId: "org-1",
+          }),
         ).toBeNull();
       });
     });

@@ -2,7 +2,11 @@
 // tests below. Maintains a sessionId between turns so we exercise the
 // session-per-conversation path.
 
-import type { AgentAdapter, AgentInput, AgentReturnTypes } from "@langwatch/scenario";
+import type {
+  AgentAdapter,
+  AgentInput,
+  AgentReturnTypes,
+} from "@langwatch/scenario";
 import { AgentRole } from "@langwatch/scenario";
 
 const AGENT_URL = process.env.LANGY_AGENT_URL ?? "http://localhost:8081";
@@ -11,7 +15,9 @@ interface LangySessionState {
   sessionId: string | null;
 }
 
-export function makeLangyAdapter(): AgentAdapter & { state: LangySessionState } {
+export function makeLangyAdapter(): AgentAdapter & {
+  state: LangySessionState;
+} {
   const state: LangySessionState = { sessionId: null };
   const adapter: AgentAdapter = {
     role: AgentRole.AGENT,
@@ -39,7 +45,9 @@ export function makeLangyAdapter(): AgentAdapter & { state: LangySessionState } 
         signal: AbortSignal.timeout(240_000),
       });
       if (!res.ok) {
-        throw new Error(`Langy /run returned ${res.status}: ${await res.text()}`);
+        throw new Error(
+          `Langy /run returned ${res.status}: ${await res.text()}`,
+        );
       }
       const reader = res.body!.getReader();
       const decoder = new TextDecoder();
@@ -49,10 +57,16 @@ export function makeLangyAdapter(): AgentAdapter & { state: LangySessionState } 
       const handleRecord = (line: string) => {
         if (!line) return;
         let event: any;
-        try { event = JSON.parse(line); }
-        catch { return; }
+        try {
+          event = JSON.parse(line);
+        } catch {
+          return;
+        }
         // Capture session id for the next turn — mirrors the langy.ts behavior.
-        if (event.type === "langy.session" && typeof event.sessionId === "string") {
+        if (
+          event.type === "langy.session" &&
+          typeof event.sessionId === "string"
+        ) {
           state.sessionId = event.sessionId;
           return;
         }

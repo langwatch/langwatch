@@ -77,7 +77,8 @@ function IntegrationsContent({ organizationId }: { organizationId: string }) {
                 <Box>
                   <HStack gap={3}>
                     <Text fontSize="sm">
-                      Connected as <strong>@{connection.data.githubLogin}</strong>
+                      Connected as{" "}
+                      <strong>@{connection.data.githubLogin}</strong>
                     </Text>
                     <Button
                       size="sm"
