@@ -125,7 +125,7 @@ describe("extractInlineMediaFromEvent", () => {
 
   describe("when an event has an audio part with source.type=data", () => {
     /** @scenario "Inline file part is externalized and the event payload is rewritten by id" */
-    it("calls storeFromBytes with the decoded bytes and the mimeType, replaces the part with source.type=url referencing /api/files/{id}, and returns one ref", async () => {
+    it("calls storeFromBytes with the decoded bytes and the mimeType, replaces the part with source.type=url referencing /api/files/{projectId}/{id}, and returns one ref", async () => {
       const base64Payload = makeBase64Payload("audio-data");
       const mimeType = "audio/mp3";
       const storedId = "stored-audio-id";
@@ -169,7 +169,7 @@ describe("extractInlineMediaFromEvent", () => {
       expect(content).toHaveLength(1);
       expect(content[0]).toMatchObject({
         type: "audio",
-        source: { type: "url", value: `/api/files/${storedId}`, mimeType },
+        source: { type: "url", value: `/api/files/proj-1/${storedId}`, mimeType },
       });
 
       // One ref returned
@@ -222,8 +222,8 @@ describe("extractInlineMediaFromEvent", () => {
 
       const content = (rewrittenEvent as { message: { content: unknown[] } }).message.content;
       expect(content).toHaveLength(2);
-      expect((content[0] as { source: { value: string } }).source.value).toBe("/api/files/stored-id-1");
-      expect((content[1] as { source: { value: string } }).source.value).toBe("/api/files/stored-id-2");
+      expect((content[0] as { source: { value: string } }).source.value).toBe("/api/files/proj-1/stored-id-1");
+      expect((content[1] as { source: { value: string } }).source.value).toBe("/api/files/proj-1/stored-id-2");
     });
   });
 
@@ -276,7 +276,7 @@ describe("extractInlineMediaFromEvent", () => {
       };
       expect(part.type).toBe("binary");
       expect(part.id).toBe(storedId);
-      expect(part.url).toBe(`/api/files/${storedId}`);
+      expect(part.url).toBe(`/api/files/proj-1/${storedId}`);
       expect(part.data).toBeUndefined();
       // Non-data fields preserved
       expect(part.filename).toBe("file.bin");
@@ -363,7 +363,7 @@ describe("extractInlineMediaFromEvent", () => {
 
   describe("when an event has an image_url part with a base64 data URI (production shape)", () => {
     /** @scenario "OpenAI-shaped image_url parts with data: URIs are extracted to stored objects" */
-    it("extracts the bytes and rewrites image_url.url to /api/files/<id>", async () => {
+    it("extracts the bytes and rewrites image_url.url to /api/files/<projectId>/<id>", async () => {
       const base64Payload = makeBase64Payload("image-bytes");
       const mimeType = "image/png";
       const service = makeService({
@@ -408,7 +408,7 @@ describe("extractInlineMediaFromEvent", () => {
       expect(rewritten.message.content[0]).toEqual({
         type: "image_url",
         image_url: {
-          url: "/api/files/so_image_url_one",
+          url: "/api/files/proj-1/so_image_url_one",
           detail: "high",
         },
       });
@@ -495,7 +495,7 @@ describe("extractInlineMediaFromEvent", () => {
         type: "input_audio",
         input_audio: {
           data: undefined,
-          url: `/api/files/${storedId}`,
+          url: `/api/files/proj-1/${storedId}`,
           mimeType: "audio/pcm16",
         },
       });
@@ -542,7 +542,7 @@ describe("extractInlineMediaFromEvent", () => {
         type: "input_audio",
         input_audio: {
           data: undefined,
-          url: `/api/files/${storedId}`,
+          url: `/api/files/proj-1/${storedId}`,
           mimeType: "audio/wav",
         },
       });
@@ -597,7 +597,7 @@ describe("extractInlineMediaFromEvent", () => {
       };
       expect(part.type).toBe("binary");
       expect(part.id).toBe(storedId);
-      expect(part.url).toBe(`/api/files/${storedId}`);
+      expect(part.url).toBe(`/api/files/proj-1/${storedId}`);
       expect(part.data).toBeUndefined();
       expect(part.filename).toBe("preview.png");
 
@@ -706,7 +706,7 @@ describe("extractInlineMediaFromEvent", () => {
       expect(secondMsg.content).toHaveLength(1);
       expect(secondMsg.content[0]!.type).toBe("audio");
       expect(secondMsg.content[0]!.source.type).toBe("url");
-      expect(secondMsg.content[0]!.source.value).toBe("/api/files/stored-id-1");
+      expect(secondMsg.content[0]!.source.value).toBe("/api/files/proj-1/stored-id-1");
     });
   });
 
@@ -820,7 +820,7 @@ describe("extractInlineMediaFromEvent", () => {
       expect(content).toHaveLength(1);
       expect(content[0]).toMatchObject({
         type: "document",
-        source: { type: "url", value: `/api/files/${storedId}`, mimeType },
+        source: { type: "url", value: `/api/files/proj-1/${storedId}`, mimeType },
       });
     });
   });

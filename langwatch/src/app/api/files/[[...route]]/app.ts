@@ -153,13 +153,22 @@ function streamFileResponse({
 }
 
 /**
- * GET /api/files/:id
+ * GET /api/files/:projectId/:id  (project-scoped — issue #4947)
+ * GET /api/files/:id             (legacy id-only — backward compatible)
  *
  * Streams the bytes for the given stored object id.
  *
  * Auth: either an API key scoped to the file's project, or a session cookie
- * belonging to a user with `scenarios:view` on that project. The owning
- * project is resolved from the stored_objects row (NOT from any header).
+ * belonging to a user with `scenarios:view` on that project.
+ *
+ * Owner resolution:
+ *  - Project-scoped URL: the owning project is taken from the URL path. No
+ *    cross-tenant lookup — the read is scoped directly to that project, and a
+ *    URL whose `projectId` is not the caller's (403) or does not own the row
+ *    (404) cannot serve another tenant's bytes.
+ *  - Legacy id-only URL: the owning project is resolved from the
+ *    stored_objects row via the cross-tenant fallback (NOT from any header),
+ *    retained so URLs minted before #4947 keep resolving.
  *
  * Responses:
  *  200 — bytes streamed with a coerced Content-Type and Content-Length.
@@ -169,9 +178,9 @@ function streamFileResponse({
  *  429 — per-caller rate limit exceeded (keyed before owner resolution).
  *  502 — row exists, storage returned a non-404 error.
  *
- * HEAD /api/files/:id mirrors GET for byte-free probes (used by the UI
- * MediaPart to disambiguate "missing" vs "transient error" without paying
- * for a full body download).
+ * HEAD mirrors GET for byte-free probes (used by the UI MediaPart to
+ * disambiguate "missing" vs "transient error" without paying for a full body
+ * download).
  */
 async function handleFileRead(
   c: Parameters<MiddlewareHandler<{ Variables: DualAuthVariables }>>[0],
@@ -181,6 +190,9 @@ async function handleFileRead(
   if (!id) {
     return jsonResponse({ status: "not_found" }, 404);
   }
+  // Present only on the project-scoped route (`/api/files/:projectId/:id`).
+  // Undefined on the legacy id-only route (`/api/files/:id`).
+  const projectIdFromUrl = c.req.param("projectId");
 
   // Step 1: per-caller rate limit (AC12). Keyed on the caller's identity
   // (apiKeyProjectId or userId) so that enumeration attempts are throttled
@@ -217,27 +229,40 @@ async function handleFileRead(
     );
   }
 
-  // Step 2: resolve the owning project from the row id (cross-tenant lookup).
+  // Step 2: resolve the owning project.
   //
-  // The lookup fans out across every configured ClickHouse instance with
-  // failure isolation: a transient outage on a private/BYOC instance
-  // throws `StoredObjectOwnerLookupUnavailableError` so this route can
-  // return 502 rather than masking the degraded instance as a 404
-  // (Sergio review 2026-05-20).
+  // Project-scoped URL (`/api/files/:projectId/:id`, issue #4947): the URL
+  // carries the claimed owner, so take it directly — no cross-tenant lookup.
+  // The authorization gate (step 3) rejects a claim that is not the caller's
+  // own project, and the project-scoped read (step 4) returns 404 when the
+  // claim does not actually own the row. So a tampered or foreign `projectId`
+  // in the URL can never serve another tenant's bytes, and the 403-vs-404
+  // cross-tenant existence oracle is closed (a foreign claim is always 403,
+  // regardless of whether the row exists).
+  //
+  // Legacy id-only URL (`/api/files/:id`): no project context in the URL, so
+  // fall back to the cross-tenant owner lookup. The lookup fans out across
+  // every configured ClickHouse instance with failure isolation: a transient
+  // outage on a private/BYOC instance throws
+  // `StoredObjectOwnerLookupUnavailableError` so this route can return 502
+  // rather than masking the degraded instance as a 404 (Sergio review
+  // 2026-05-20). Retained so URLs embedded in historical message content keep
+  // resolving — no backfill (see #4947).
   let owner: { projectId: string } | null;
-  try {
-    owner = await resolveStoredObjectOwner({ id });
-  } catch (err) {
-    if (err instanceof StoredObjectOwnerLookupUnavailableError) {
-      return jsonResponse(
-        { error: "file temporarily unavailable" },
-        502,
-      );
+  if (projectIdFromUrl) {
+    owner = { projectId: projectIdFromUrl };
+  } else {
+    try {
+      owner = await resolveStoredObjectOwner({ id });
+    } catch (err) {
+      if (err instanceof StoredObjectOwnerLookupUnavailableError) {
+        return jsonResponse({ error: "file temporarily unavailable" }, 502);
+      }
+      throw err;
     }
-    throw err;
-  }
-  if (!owner) {
-    return jsonResponse({ status: "not_found" }, 404);
+    if (!owner) {
+      return jsonResponse({ status: "not_found" }, 404);
+    }
   }
 
   // Step 3: project-membership gate.
@@ -270,6 +295,18 @@ async function handleFileRead(
   });
 }
 
+// Project-scoped routes (issue #4947) — registered before the legacy
+// id-only routes. Hono matches by path-segment count, so a two-segment
+// request resolves here and a one-segment request resolves to the legacy
+// handler below; the ordering is belt-and-suspenders.
+secured.access(anyAuthenticated()).get("/:projectId/:id", (c) =>
+  handleFileRead(c, { method: "GET" }),
+);
+secured.access(anyAuthenticated()).head("/:projectId/:id", (c) =>
+  handleFileRead(c, { method: "HEAD" }),
+);
+
+// Legacy id-only routes — retained for URLs minted before #4947.
 secured.access(anyAuthenticated()).get("/:id", (c) =>
   handleFileRead(c, { method: "GET" }),
 );

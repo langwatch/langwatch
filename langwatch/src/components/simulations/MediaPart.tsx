@@ -44,11 +44,15 @@ export type MediaPartData =
 // ---------------------------------------------------------------------------
 
 /**
- * Extracts the stored-object id from a /api/files/:id URL, or returns null
+ * Extracts the stored-object id from a stored-object URL, or returns null
  * when the URL does not match that pattern (e.g. an external URL).
+ *
+ * Handles both shapes: the project-scoped `/api/files/<projectId>/<id>`
+ * (issue #4947) and the legacy id-only `/api/files/<id>`. The id is always
+ * the final path segment; an optional project segment may precede it.
  */
 function extractStoredObjectId(url: string): string | null {
-  const match = /\/api\/files\/([^/?#]+)/.exec(url);
+  const match = /\/api\/files\/(?:[^/?#]+\/)?([^/?#]+)/.exec(url);
   return match?.[1] ?? null;
 }
 
