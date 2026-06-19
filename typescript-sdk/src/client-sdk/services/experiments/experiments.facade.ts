@@ -148,9 +148,6 @@ export class ExperimentsFacade {
 
     const startResponse = await this.apiService.startV3Run({ slug, body });
     const { runId } = startResponse;
-    const runUrl = startResponse.runUrl
-      ? this.replaceUrlDomain(startResponse.runUrl, this.config.endpoint)
-      : "";
 
     const { status, summary } = await pollExperimentRun({
       runId,
@@ -165,9 +162,18 @@ export class ExperimentsFacade {
       experimentSlug: slug,
     });
 
+    // Always return the URL rebased onto the configured endpoint, so a
+    // self-hosted run does not surface a cloud (app.langwatch.ai) link. Both
+    // the start response and the summary carry the platform's own URL; whichever
+    // is present gets its domain replaced. Mirrors the python SDK.
+    const rawRunUrl = startResponse.runUrl ?? summary.runUrl;
+    const runUrl = rawRunUrl
+      ? this.replaceUrlDomain(rawRunUrl, this.config.endpoint)
+      : "";
+
     return {
       runId,
-      runUrl: summary.runUrl ?? runUrl,
+      runUrl,
       status,
       summary,
       rows: mapRunResultsToRows(results),
