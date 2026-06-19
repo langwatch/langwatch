@@ -38,6 +38,17 @@ Now, let's get granular! **Spans** are the individual steps or operations *withi
 
 Each `span_id` pinpoints a specific action taken by your system or an LLM call.
 
+### Events: The Unit You're Billed On
+
+You'll see the word **event** on your usage and [pricing](/pricing) pages, so it's worth pinning down. An **event** is a single telemetry point, and the most common one is a **Span** (the building block above): one LLM call, one tool execution, one retrieval step.
+
+For billing, a **billable event** is either:
+
+* **A span within a trace**: any of the individual steps that make up a request, or
+* **A scenario or evaluation run**: a single execution used to test your agents.
+
+Threads and Traces are *groupings*, so they aren't billed on their own; the Spans inside them are what count. So the running **event total** on the **Usage & Billing** page (under your project settings) is the sum of the spans you've ingested plus any scenario and evaluation runs for the period. See [Pricing](/pricing) for how events map to plans and retention.
+
 ### User ID: Who's Using the App?
 
 Field: `user_id`

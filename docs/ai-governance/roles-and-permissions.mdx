@@ -22,9 +22,47 @@ The three pre-built org roles. Each user in the org has exactly one.
 |---|---|---|
 | **ADMIN** | First user to sign in becomes admin | `organization:view`, `organization:manage`, `organization:delete`; the full governance surface (`governance:view`, `governance:manage`, `ingestionSources:*`, `anomalyRules:*`, `complianceExport:view`, `activityMonitor:view`); `aiTools:view` + `aiTools:manage`. |
 | **MEMBER** | Default for invitees | `organization:view`, `aiTools:view`. **No** governance permissions, **no** member-list reads, **no** audit log access by default. The team-role (below) is what gives them anything beyond `/me`. |
-| **EXTERNAL** | Lite-member shape, opt-in via the invite drawer | Same as MEMBER. EXTERNAL also has stricter team-level defaults: even when on a team they default to view-only on most resources. |
+| **EXTERNAL** | [Lite member](#lite-members-the-external-role) shape, opt-in via the invite drawer | Same as MEMBER. EXTERNAL also has stricter team-level defaults: even when on a team they default to view-only on most resources. |
 
 The minimum-privilege default is intentional: an `ORGANIZATION` role binding for a MEMBER does **not** grant team-level access. Team-level permissions come from team-role bindings (next).
+
+## Lite members (the External role)
+
+The **EXTERNAL** org role is what the product calls a **Lite member** (and what billing calls a **lite user**). It's a read-only stakeholder seat: the shape you hand to leadership, support, or a customer who should *see* everything but never reconfigure anything or debug individual traces.
+
+Lite members are a separate seat type from **core users** (the full, paid seats). On the Growth plan lite users are **unlimited**, so a read-only stakeholder seat is effectively free, and a lite member never counts against your core-user seats. Capped plans set their own lite-user allowance.
+
+### How a member becomes Lite vs Full
+
+Classification is by org role *plus* permissions:
+
+| Org role | Custom permissions | Classified as |
+|---|---|---|
+| `ADMIN` or `MEMBER` | anything | **Full member** |
+| `EXTERNAL` | none, or view-only | **Lite member** |
+| `EXTERNAL` | any non-view permission | **Full member** (elevated) |
+
+To turn a lite member into a full member, bind them a [custom role](#custom-roles) granting at least one non-view permission; they're counted as a core user from then on.
+
+### What a lite member can and can't do
+
+Lite members **browse the whole platform**, no redirects, no hidden pages, no grayed-out sidebar. They can:
+
+- View every page (messages, evaluations, experiments, simulations, prompts, datasets, settings), read-only.
+- Open a trace to read its **Thread**, **Evaluations**, and **Events** tabs.
+- **Annotate** traces with comments and **suggest** output.
+
+They **cannot** do the following; each blocked action opens a "Feature Not Available" modal rather than failing silently:
+
+- Open the **Trace Details** or **Sequence** debugging tabs, or use the "View Trace" hover action.
+- **Export** traces, or **add** them to a dataset or annotation queue.
+- **Create, edit, or delete** scenarios, evaluations, experiments, prompts, or datasets.
+- Delete other users' annotations, or manage scoring metrics.
+- Save edits on the settings pages.
+
+The boundary is enforced server-side as well: a mutation that slips past the UI returns an `UNAUTHORIZED` error and re-opens the modal, so it holds for direct API calls too.
+
+<Info>The lite-member modal is **role-based, not a sales prompt**. It's titled "Feature Not Available", explains the limit comes from the member's role, and offers **Contact Admin**, never "Upgrade your plan". Plan-limit upgrade prompts are a separate flow that lite members never trigger.</Info>
 
 ## Team roles
 

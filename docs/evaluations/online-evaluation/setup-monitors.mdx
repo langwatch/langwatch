@@ -106,3 +106,17 @@ That's it, we are now monitoring messages for any Jailbreak Attempts:
 <Frame>
 <img src="/images/real-time-evaluation/image 4.png" alt="" style={{ maxWidth: '400px' }} />
 </Frame>
+
+## Filtering traces by evaluation results
+
+Once a monitor is enabled, every matching trace is scored by the evaluator, and that result is attached to the trace: a **pass or fail**, a numeric **score**, and (for classifier-style evaluators) a **label**. You can then slice your production traffic by those results from the [Messages page](https://app.langwatch.ai/@project/messages).
+
+Open **Filters** in the top bar and you'll find the evaluation filters:
+
+- **Evaluators with Passed results**, to keep only traces an evaluator passed or failed.
+- **Evaluators with Score results**, to filter by the numeric score (for example, quality below a threshold).
+- **Evaluators with Label results**, to filter by a classifier label.
+
+Each filter lists your evaluators by name, so you can target the specific monitor you set up. For example, to triage everything your "Prompt Injection" monitor caught, filter by **Evaluators with Passed results** for that evaluator and keep the failures.
+
+<Tip>Save a filter you return to often as a **view**, or turn it into an **automation** to get alerted (Slack, email) whenever a trace matches, for instance whenever a safety evaluator fails in production.</Tip>
