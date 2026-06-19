@@ -17,6 +17,11 @@
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { generate, Ksuid } from "@langwatch/ksuid";
 import { describe, expect, it, vi } from "vitest";
+import {
+  EVENTREF_ATTR_PREFIX,
+  IO_PREVIEW_BYTES,
+} from "~/server/app-layer/traces/lean-for-projection";
+import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import {
   SPAN_RECEIVED_EVENT_TYPE,
@@ -24,17 +29,12 @@ import {
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import type { SpanReceivedEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import {
+  type NormalizedSpan,
   NormalizedSpanKind,
   NormalizedStatusCode,
-  type NormalizedSpan,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { eventToRecord } from "~/server/event-sourcing/stores/eventStoreUtils";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
-import {
-  EVENTREF_ATTR_PREFIX,
-  IO_PREVIEW_BYTES,
-} from "~/server/app-layer/traces/lean-for-projection";
-import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import {
   resolveOffloadedTraces,
   type WarnLogger,

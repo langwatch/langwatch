@@ -47,39 +47,37 @@
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
+import { BlobStore } from "~/server/app-layer/traces/blob-store.service";
+import {
+  EVENTREF_ATTR_PREFIX,
+  IO_PREVIEW_BYTES,
+  leanForProjection,
+} from "~/server/app-layer/traces/lean-for-projection";
+import { NullSpanStorageRepository } from "~/server/app-layer/traces/repositories/span-storage.repository";
+import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
+import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
+import type { Event } from "~/server/event-sourcing";
 import {
   getTestClickHouseClient,
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { generateTestTenantId } from "~/server/event-sourcing/__tests__/integration/testHelpers";
-
-import { BlobStore } from "~/server/app-layer/traces/blob-store.service";
-import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import {
-  leanForProjection,
-  EVENTREF_ATTR_PREFIX,
-  IO_PREVIEW_BYTES,
-} from "~/server/app-layer/traces/lean-for-projection";
-import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
-import { NullSpanStorageRepository } from "~/server/app-layer/traces/repositories/span-storage.repository";
+  LOG_RECORD_RECEIVED_EVENT_TYPE,
+  LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST,
+  SPAN_RECEIVED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_VERSION_LATEST,
+} from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+import {
+  type NormalizedSpan,
+  NormalizedSpanKind,
+  NormalizedStatusCode,
+} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import {
   resolveOffloadedTraces,
   type WarnLogger,
 } from "~/server/traces/resolve-offloaded-traces";
-import {
-  NormalizedSpanKind,
-  NormalizedStatusCode,
-  type NormalizedSpan,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
-import type { Event } from "~/server/event-sourcing";
-import {
-  SPAN_RECEIVED_EVENT_TYPE,
-  SPAN_RECEIVED_EVENT_VERSION_LATEST,
-  LOG_RECORD_RECEIVED_EVENT_TYPE,
-  LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 
 // Gate identically to the canonical event_log integration test: skip when no
 // real ClickHouse is reachable, run against the testcontainer otherwise.
@@ -345,7 +343,9 @@ describe.skipIf(!hasTestcontainers)(
       await startTestContainers();
       client = getTestClickHouseClient()!;
       if (!client) {
-        throw new Error("ClickHouse client not available; testcontainers required.");
+        throw new Error(
+          "ClickHouse client not available; testcontainers required.",
+        );
       }
     });
 
@@ -568,9 +568,9 @@ describe.skipIf(!hasTestcontainers)(
           string,
           string
         >;
-        expect(resolvedAttrs["body"]).toBe(LARGE_VALUE);
-        expect(resolvedAttrs["body"]).toContain(UNIQUE_TAIL);
-        expect(resolvedAttrs["body"]!.length).toBe(LARGE_VALUE.length);
+        expect(resolvedAttrs.body).toBe(LARGE_VALUE);
+        expect(resolvedAttrs.body).toContain(UNIQUE_TAIL);
+        expect(resolvedAttrs.body!.length).toBe(LARGE_VALUE.length);
 
         // eventref stripped; resolution succeeded.
         const hasRef = Object.keys(resolvedAttrs).some((k) =>
