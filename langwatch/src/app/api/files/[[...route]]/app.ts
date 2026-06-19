@@ -279,7 +279,9 @@ async function handleFileRead(
   });
 
   // Step 4: project-scoped read.
-  const service = createStoredObjectsService({ projectId: authorizedProjectId });
+  const service = createStoredObjectsService({
+    projectId: authorizedProjectId,
+  });
 
   let result;
   try {
