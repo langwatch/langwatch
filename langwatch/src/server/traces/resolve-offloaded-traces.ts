@@ -202,11 +202,6 @@ export async function resolveOffloadedTraces({
             tenantId: projectId,
             aggregateType,
             aggregateId,
-            // The referenced event was written during this span's ingestion, so
-            // its EventOccurredAt sits near the span start. Pass it as a
-            // partition-prune hint so the read stays on the span's week instead
-            // of walking every (S3-tiered) event_log partition.
-            occurredAtMs: span.startTimeUnixMs,
           });
           return { attrKey, fullValue };
         }),

@@ -15,6 +15,7 @@
  */
 
 import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { generate, Ksuid } from "@langwatch/ksuid";
 import { describe, expect, it, vi } from "vitest";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import {
@@ -178,15 +179,17 @@ describe("given an event_log row stored under tenantA with a known EventPayload"
 // getFromEventLog — EventOccurredAt partition-prune window
 // ---------------------------------------------------------------------------
 
-describe("given an occurredAtMs hint (the referencing span's start time)", () => {
+describe("given a KSUID EventId (the time is embedded in the id)", () => {
   const eventPayload = JSON.stringify({
     span: { attributes: [{ key: FIELD, value: { stringValue: FULL_VALUE } }] },
   });
-  const occurredAtMs = 1_700_000_000_000;
   const windowMs = 2 * 24 * 60 * 60 * 1000;
 
   describe("when getFromEventLog is called", () => {
-    it("adds a bounded EventOccurredAt window (keeping EventOccurredAt = 0) to prune partitions", async () => {
+    it("derives a bounded EventOccurredAt window from the EventId's KSUID timestamp (keeping EventOccurredAt = 0)", async () => {
+      const ksuidEventId = generate("event").toString();
+      const createdAtMs = Ksuid.parse(ksuidEventId).date.getTime();
+
       const { client, sqlCaptures, paramCaptures } = makeMockChClient({
         rows: [{ EventPayload: eventPayload }],
       });
@@ -196,12 +199,11 @@ describe("given an occurredAtMs hint (the referencing span's start time)", () =>
       );
 
       const result = await blobStore.getFromEventLog({
-        eventId: EVENT_ID,
+        eventId: ksuidEventId,
         field: FIELD,
         tenantId: TENANT_A,
         aggregateType: AGGREGATE_TYPE,
         aggregateId: AGGREGATE_ID,
-        occurredAtMs,
       });
 
       const sql = sqlCaptures[0] ?? "";
@@ -209,18 +211,18 @@ describe("given an occurredAtMs hint (the referencing span's start time)", () =>
       expect(sql).toContain("EventOccurredAt <= {occurredAtToMs:UInt64}");
       expect(sql).toContain("EventOccurredAt = 0");
       expect(paramCaptures[0]).toMatchObject({
-        occurredAtFromMs: occurredAtMs - windowMs,
-        occurredAtToMs: occurredAtMs + windowMs,
+        occurredAtFromMs: createdAtMs - windowMs,
+        occurredAtToMs: createdAtMs + windowMs,
       });
-      // The window never changes which row is returned.
+      // The window never changes which row is returned (still keyed by EventId).
       expect(result).toBe(FULL_VALUE);
     });
   });
 });
 
-describe("given no occurredAtMs hint", () => {
+describe("given a non-KSUID EventId (legacy / unparseable id)", () => {
   describe("when getFromEventLog is called", () => {
-    it("omits the EventOccurredAt predicate and its params (unchanged read)", async () => {
+    it("omits the EventOccurredAt predicate and falls back to an unpruned read", async () => {
       const eventPayload = JSON.stringify({
         span: {
           attributes: [{ key: FIELD, value: { stringValue: FULL_VALUE } }],
@@ -235,7 +237,7 @@ describe("given no occurredAtMs hint", () => {
       );
 
       await blobStore.getFromEventLog({
-        eventId: EVENT_ID,
+        eventId: "not-a-ksuid",
         field: FIELD,
         tenantId: TENANT_A,
         aggregateType: AGGREGATE_TYPE,
