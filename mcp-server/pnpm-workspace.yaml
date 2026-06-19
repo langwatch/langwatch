@@ -1,10 +1,10 @@
 minimumReleaseAge: 10080
 
 overrides:
-  # Security: protobufjs code execution + prototype-pollution + DoS
+  # Security: protobufjs code execution + prototype-pollution + DoS + Any-expansion DoS + property shadowing
   # (GHSA-xq3m-2v4x-88gg, GHSA-66ff-xgx4-vchm, GHSA-75px-5xx7-5xc7,
-  # GHSA-jvwf-75h9-cwgg, GHSA-685m-2w69-288q)
-  "protobufjs": ">=7.5.6 <8.0.0 || >=8.0.2"
+  # GHSA-jvwf-75h9-cwgg, GHSA-685m-2w69-288q, GHSA-wcpc-wj8m-hjx6, GHSA-f38q-mgvj-vph7)
+  "protobufjs": ">=7.5.6 <8.0.0 || >=8.6.0"
   # Security: langsmith untrusted manifest deserialization (GHSA-3644-q5cj-c5c7).
   # langsmith is only a transitive of the @langwatch/scenario devDependency
   # (via langchain / @langchain/core); pinned to a known-safe version.

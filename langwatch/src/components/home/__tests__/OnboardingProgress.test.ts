@@ -123,7 +123,9 @@ describe("OnboardingProgress", () => {
       it("generates correct hrefs with project slug", () => {
         const steps = buildOnboardingSteps(defaultData, "my-project");
 
-        expect(steps[1]?.href).toBe("/my-project/messages");
+        // "Sync your first message" lands on the new traces explorer, not
+        // the legacy /messages list.
+        expect(steps[1]?.href).toBe("/my-project/traces");
         expect(steps[4]?.href).toBe("/my-project/prompts");
         expect(steps[7]?.href).toBe("/my-project/workflows");
       });

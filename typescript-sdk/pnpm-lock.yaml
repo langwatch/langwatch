@@ -21,7 +21,7 @@ overrides:
   '@langchain/core@<0.3.80': 0.3.80
   langsmith@<0.6.0: 0.6.0
   protobufjs@<7.5.6: '>=7.5.6'
-  protobufjs@>=8.0.0 <8.2.0: '>=8.2.0'
+  protobufjs@>=8.0.0 <8.6.0: '>=8.6.0'
   uuid@<11.1.1: '>=11.1.1 <12'
   postcss@<8.5.10: '>=8.5.10'
   qs@>=6.11.1 <=6.15.1: '>=6.15.2'
@@ -2590,8 +2590,8 @@ packages:
     resolution: {integrity: sha512-vGrhOavPSTz4QVNuBNdcNXePNdNMaO1xj9yBeH1ScQPjk/rhg9sSlCXPhMkFuaNNW/syTvYqsnbIJxMBfRbbag==}
     engines: {node: '>= 8'}
 
-  protobufjs@8.5.0:
-    resolution: {integrity: sha512-df1jWDPA5VIBNRtuAHjqr09f2qN5D4Vke1wYqOQg1XJ7ZDpA7BD6L7E4tyChgGRLB5hqk2m79Zsy0WHwV9a84A==}
+  protobufjs@8.6.1:
+    resolution: {integrity: sha512-s4qQPr4pU0W95iYnUInh95skjIg+3aM2sakYsw60QYanU+qWRDY2zQxOAQV6zU7ROJpSNDG9B+VSmk4dqdWWSA==}
     engines: {node: '>=12.0.0'}
 
   punycode@2.3.1:
@@ -3399,7 +3399,7 @@ snapshots:
     dependencies:
       lodash.camelcase: 4.3.0
       long: 5.3.2
-      protobufjs: 8.5.0
+      protobufjs: 8.6.1
       yargs: 17.7.2
 
   '@humanfs/core@0.19.1': {}
@@ -3748,7 +3748,7 @@ snapshots:
       '@opentelemetry/sdk-logs': 0.205.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/sdk-metrics': 2.1.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/sdk-trace-base': 2.7.1(@opentelemetry/api@1.9.0)
-      protobufjs: 8.5.0
+      protobufjs: 8.6.1
 
   '@opentelemetry/otlp-transformer@0.216.0(@opentelemetry/api@1.9.0)':
     dependencies:
@@ -3759,7 +3759,7 @@ snapshots:
       '@opentelemetry/sdk-logs': 0.205.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/sdk-metrics': 2.7.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/sdk-trace-base': 2.7.1(@opentelemetry/api@1.9.0)
-      protobufjs: 8.5.0
+      protobufjs: 8.6.1
 
   '@opentelemetry/propagator-b3@2.7.1(@opentelemetry/api@1.9.0)':
     dependencies:
@@ -5178,7 +5178,7 @@ snapshots:
 
   propagate@2.0.1: {}
 
-  protobufjs@8.5.0:
+  protobufjs@8.6.1:
     dependencies:
       long: 5.3.2
 

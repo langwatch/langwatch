@@ -14,22 +14,23 @@
  * No "should" in it() names (project convention).
  */
 
-import { describe, it, expect, vi } from "vitest";
-import {
-  BlobStore,
-  BlobNotFoundError,
-  BlobFieldNotFoundError,
-  type S3ClientResolver,
-} from "../blob-store.service";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
-import { eventToRecord } from "~/server/event-sourcing/stores/eventStoreUtils";
+import { generate, Ksuid } from "@langwatch/ksuid";
+import { describe, expect, it, vi } from "vitest";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
-import type { SpanReceivedEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import {
   SPAN_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+import type { SpanReceivedEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
+import { eventToRecord } from "~/server/event-sourcing/stores/eventStoreUtils";
+import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
+import {
+  BlobFieldNotFoundError,
+  BlobNotFoundError,
+  BlobStore,
+  type S3ClientResolver,
+} from "../blob-store.service";
 
 // ---------------------------------------------------------------------------
 // Helpers — ClickHouse mock
@@ -57,27 +58,44 @@ function makeMockChClient({
   rows?: MockRow[];
 } = {}) {
   const sqlCaptures: string[] = [];
+  const paramCaptures: Record<string, unknown>[] = [];
   const client = {
-    query: vi.fn().mockImplementation(async ({ query }: { query: string }) => {
-      sqlCaptures.push(query);
-      // ClickHouse client's result.json<T>() returns ResponseJSON<T> with shape
-      // { data: T[], meta, rows, statistics, ... }. Match the real shape here so
-      // production code's `response.data` access works.
-      return {
-        json: async () => ({ data: rows, meta: [], rows: rows.length }),
-      };
-    }),
+    query: vi
+      .fn()
+      .mockImplementation(
+        async ({
+          query,
+          query_params,
+        }: {
+          query: string;
+          query_params?: Record<string, unknown>;
+        }) => {
+          sqlCaptures.push(query);
+          paramCaptures.push(query_params ?? {});
+          // ClickHouse client's result.json<T>() returns ResponseJSON<T> with shape
+          // { data: T[], meta, rows, statistics, ... }. Match the real shape here so
+          // production code's `response.data` access works.
+          return {
+            json: async () => ({ data: rows, meta: [], rows: rows.length }),
+          };
+        },
+      ),
   };
-  return { client, sqlCaptures };
+  return { client, sqlCaptures, paramCaptures };
 }
 
-/** Minimal S3 resolver used for spool tests. */
-function makeS3Resolver(s3Client: { send: ReturnType<typeof vi.fn> }): S3ClientResolver {
-  return async () => ({ s3Client: s3Client as never, s3Bucket: "test-spool-bucket" });
+function makeS3Resolver(s3Client: {
+  send: ReturnType<typeof vi.fn>;
+}): S3ClientResolver {
+  return async () => ({
+    s3Client: s3Client as never,
+    s3Bucket: "test-spool-bucket",
+  });
 }
 
-/** Wraps a mock ClickHouseClient object as a ClickHouseClientResolver (resolver returns the same client for any tenantId). */
-function makeChResolver(client: ReturnType<typeof makeMockChClient>["client"]): (tenantId: string) => Promise<typeof client> {
+function makeChResolver(
+  client: ReturnType<typeof makeMockChClient>["client"],
+): (tenantId: string) => Promise<typeof client> {
   return async (_tenantId) => client;
 }
 
@@ -93,16 +111,17 @@ describe("given an event_log row stored under tenantA with a known EventPayload"
     it("issues a CH SELECT with TenantId as the FIRST predicate and returns the correct field value", async () => {
       const eventPayload = JSON.stringify({
         span: {
-          attributes: [
-            { key: FIELD, value: { stringValue: FULL_VALUE } },
-          ],
+          attributes: [{ key: FIELD, value: { stringValue: FULL_VALUE } }],
         },
       });
       const { client, sqlCaptures } = makeMockChClient({
         rows: [{ EventPayload: eventPayload }],
       });
 
-      const blobStore = new BlobStore(makeS3Resolver({ send: vi.fn() }), makeChResolver(client) as never);
+      const blobStore = new BlobStore(
+        makeS3Resolver({ send: vi.fn() }),
+        makeChResolver(client) as never,
+      );
 
       const result = await blobStore.getFromEventLog({
         eventId: EVENT_ID,
@@ -128,13 +147,18 @@ describe("given an event_log row stored under tenantA with a known EventPayload"
 
     it("SQL contains 'TenantId' as the first predicate (substring assertion)", async () => {
       const eventPayload = JSON.stringify({
-        span: { attributes: [{ key: FIELD, value: { stringValue: FULL_VALUE } }] },
+        span: {
+          attributes: [{ key: FIELD, value: { stringValue: FULL_VALUE } }],
+        },
       });
       const { client, sqlCaptures } = makeMockChClient({
         rows: [{ EventPayload: eventPayload }],
       });
 
-      const blobStore = new BlobStore(makeS3Resolver({ send: vi.fn() }), makeChResolver(client) as never);
+      const blobStore = new BlobStore(
+        makeS3Resolver({ send: vi.fn() }),
+        makeChResolver(client) as never,
+      );
 
       await blobStore.getFromEventLog({
         eventId: EVENT_ID,
@@ -150,6 +174,82 @@ describe("given an event_log row stored under tenantA with a known EventPayload"
 });
 
 // ---------------------------------------------------------------------------
+// getFromEventLog — EventOccurredAt partition-prune window
+// ---------------------------------------------------------------------------
+
+describe("given a KSUID EventId (the time is embedded in the id)", () => {
+  const eventPayload = JSON.stringify({
+    span: { attributes: [{ key: FIELD, value: { stringValue: FULL_VALUE } }] },
+  });
+  const windowMs = 2 * 24 * 60 * 60 * 1000;
+
+  describe("when getFromEventLog is called", () => {
+    it("derives a bounded EventOccurredAt window from the EventId's KSUID timestamp (keeping EventOccurredAt = 0)", async () => {
+      const ksuidEventId = generate("event").toString();
+      const createdAtMs = Ksuid.parse(ksuidEventId).date.getTime();
+
+      const { client, sqlCaptures, paramCaptures } = makeMockChClient({
+        rows: [{ EventPayload: eventPayload }],
+      });
+      const blobStore = new BlobStore(
+        makeS3Resolver({ send: vi.fn() }),
+        makeChResolver(client) as never,
+      );
+
+      const result = await blobStore.getFromEventLog({
+        eventId: ksuidEventId,
+        field: FIELD,
+        tenantId: TENANT_A,
+        aggregateType: AGGREGATE_TYPE,
+        aggregateId: AGGREGATE_ID,
+      });
+
+      const sql = sqlCaptures[0] ?? "";
+      expect(sql).toContain("EventOccurredAt >= {occurredAtFromMs:UInt64}");
+      expect(sql).toContain("EventOccurredAt <= {occurredAtToMs:UInt64}");
+      expect(sql).toContain("EventOccurredAt = 0");
+      expect(paramCaptures[0]).toMatchObject({
+        occurredAtFromMs: createdAtMs - windowMs,
+        occurredAtToMs: createdAtMs + windowMs,
+      });
+      // The window never changes which row is returned (still keyed by EventId).
+      expect(result).toBe(FULL_VALUE);
+    });
+  });
+});
+
+describe("given a non-KSUID EventId (legacy / unparseable id)", () => {
+  describe("when getFromEventLog is called", () => {
+    it("omits the EventOccurredAt predicate and falls back to an unpruned read", async () => {
+      const eventPayload = JSON.stringify({
+        span: {
+          attributes: [{ key: FIELD, value: { stringValue: FULL_VALUE } }],
+        },
+      });
+      const { client, sqlCaptures, paramCaptures } = makeMockChClient({
+        rows: [{ EventPayload: eventPayload }],
+      });
+      const blobStore = new BlobStore(
+        makeS3Resolver({ send: vi.fn() }),
+        makeChResolver(client) as never,
+      );
+
+      await blobStore.getFromEventLog({
+        eventId: "not-a-ksuid",
+        field: FIELD,
+        tenantId: TENANT_A,
+        aggregateType: AGGREGATE_TYPE,
+        aggregateId: AGGREGATE_ID,
+      });
+
+      expect(sqlCaptures[0]).not.toContain("EventOccurredAt");
+      expect(paramCaptures[0]).not.toHaveProperty("occurredAtFromMs");
+      expect(paramCaptures[0]).not.toHaveProperty("occurredAtToMs");
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // getFromEventLog — cross-tenant denial
 // ---------------------------------------------------------------------------
 
@@ -159,7 +259,10 @@ describe("given an event_log row under tenantA when tenantB attempts to read it"
       // No rows returned — cross-tenant query returns empty set
       const { client } = makeMockChClient({ rows: [] });
 
-      const blobStore = new BlobStore(makeS3Resolver({ send: vi.fn() }), makeChResolver(client) as never);
+      const blobStore = new BlobStore(
+        makeS3Resolver({ send: vi.fn() }),
+        makeChResolver(client) as never,
+      );
 
       await expect(
         blobStore.getFromEventLog({
@@ -185,7 +288,10 @@ describe("given an event_log row with a corrupt (non-JSON) EventPayload", () => 
         rows: [{ EventPayload: "not-valid-json{{{{" }],
       });
 
-      const blobStore = new BlobStore(makeS3Resolver({ send: vi.fn() }), makeChResolver(client) as never);
+      const blobStore = new BlobStore(
+        makeS3Resolver({ send: vi.fn() }),
+        makeChResolver(client) as never,
+      );
 
       await expect(
         blobStore.getFromEventLog({
@@ -214,7 +320,10 @@ describe("given a valid event_log row whose EventPayload does not contain the re
         rows: [{ EventPayload: eventPayload }],
       });
 
-      const blobStore = new BlobStore(makeS3Resolver({ send: vi.fn() }), makeChResolver(client) as never);
+      const blobStore = new BlobStore(
+        makeS3Resolver({ send: vi.fn() }),
+        makeChResolver(client) as never,
+      );
 
       await expect(
         blobStore.getFromEventLog({
@@ -241,21 +350,25 @@ describe("given a span that exceeds COMMAND_INLINE_THRESHOLD", () => {
         throw new Error("unexpected command");
       });
 
-      const blobStore = new BlobStore(
-        makeS3Resolver({ send: sendMock }),
-      );
+      const blobStore = new BlobStore(makeS3Resolver({ send: sendMock }));
 
       const projectId = "proj-aaa";
       const traceId = "trace-001";
       const spanId = "span-001";
       const body = Buffer.from("full span JSON here", "utf-8");
 
-      const spoolRef = await blobStore.putSpool({ projectId, traceId, spanId, body });
+      const spoolRef = await blobStore.putSpool({
+        projectId,
+        traceId,
+        spanId,
+        body,
+      });
 
-      // Returns a string
       expect(typeof spoolRef).toBe("string");
       // Key shape pinned: trace-blobs/spool/{projectId}/{traceId}/{spanId}
-      expect(spoolRef).toBe(`trace-blobs/spool/${projectId}/${traceId}/${spanId}`);
+      expect(spoolRef).toBe(
+        `trace-blobs/spool/${projectId}/${traceId}/${spanId}`,
+      );
 
       // S3 PUT was issued
       expect(sendMock).toHaveBeenCalledOnce();
@@ -459,9 +572,7 @@ describe("given a deployment with no object storage (resolveS3Client throws)", (
     it("reads the field from event_log without touching S3", async () => {
       const eventPayload = JSON.stringify({
         span: {
-          attributes: [
-            { key: FIELD, value: { stringValue: FULL_VALUE } },
-          ],
+          attributes: [{ key: FIELD, value: { stringValue: FULL_VALUE } }],
         },
       });
       const { client } = makeMockChClient({
@@ -474,7 +585,10 @@ describe("given a deployment with no object storage (resolveS3Client throws)", (
         throw new Error("no object storage configured");
       };
 
-      const blobStore = new BlobStore(noStorageResolver, makeChResolver(client) as never);
+      const blobStore = new BlobStore(
+        noStorageResolver,
+        makeChResolver(client) as never,
+      );
 
       const result = await blobStore.getFromEventLog({
         eventId: EVENT_ID,

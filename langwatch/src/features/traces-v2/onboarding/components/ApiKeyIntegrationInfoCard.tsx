@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { toaster } from "~/components/ui/toaster";
 import { CodePreview } from "~/features/onboarding/components/sections/observability/CodePreview";
 import { CLOUD_ENDPOINT } from "~/features/onboarding/components/sections/shared/build-mcp-config";
+import { InlineCopyButton } from "~/features/onboarding/components/sections/shared/InlineCopyButton";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { api } from "~/utils/api";
 
@@ -67,19 +68,18 @@ function buildEnvLines({
   endpoint: string;
   showEndpoint: boolean;
 }): EnvLine[] {
-  // Only the API key line gets the highlight treatment — the project id
-  // and endpoint are already known to the user (project id is shown in
-  // the URL, endpoint defaults are obvious). Highlighting every line
-  // dilutes the hint and turns the block into a wall of orange.
+  // Highlight every line so the whole block reads as "this is what you
+  // copy" at a glance — the API key, the project id, and (when self-
+  // hosted) the endpoint all matter to get traces flowing.
   // `ENDPOINT` is only emitted when self-hosted — on cloud the SDK
   // falls back to the default URL, so surfacing the line at all would
   // just be noise.
   const lines: EnvLine[] = [
     { key: "LANGWATCH_API_KEY", value: token, highlight: true },
-    { key: "LANGWATCH_PROJECT_ID", value: projectId },
+    { key: "LANGWATCH_PROJECT_ID", value: projectId, highlight: true },
   ];
   if (showEndpoint) {
-    lines.push({ key: "LANGWATCH_ENDPOINT", value: endpoint });
+    lines.push({ key: "LANGWATCH_ENDPOINT", value: endpoint, highlight: true });
   }
   return lines;
 }
@@ -117,7 +117,11 @@ export function ApiKeyIntegrationInfoCard({
   const endpoint = baseHost || CLOUD_ENDPOINT;
   const showEndpoint = !!baseHost && baseHost !== CLOUD_ENDPOINT;
 
-  const [revealed, setRevealed] = useState(false);
+  // Default to revealed: this token is shown exactly once, so the whole
+  // point of the card is to let the user copy it. Masking it by default
+  // ("sk-l***...***rKF") just gets in the way. The eye toggle still lets
+  // them hide it again.
+  const [revealed, setRevealed] = useState(true);
 
   const createMutation = api.apiKey.create.useMutation();
 
@@ -235,6 +239,7 @@ export function ApiKeyIntegrationInfoCard({
                       It won&apos;t be shown again.
                     </Text>
                   </Text>
+                  <InlineCopyButton text={token} label="Token" />
                 </HStack>
                 <Button
                   size="xs"

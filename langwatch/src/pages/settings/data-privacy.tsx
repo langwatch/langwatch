@@ -30,7 +30,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import SettingsLayout from "~/components/SettingsLayout";
 import {
@@ -39,18 +39,21 @@ import {
   applyAudienceSelection,
   audienceToSelection,
   buildRuleConfig,
+  type CategoryChoice,
   type CustomAttributeFormRow,
   configsEqual,
   configToFormState,
   EMPTY_AUDIENCE_FORM,
-  inheritedFormState,
+  inheritedBaselineForScope,
+  inheritFormState,
   isEmptyRuleConfig,
+  type PiiChoice,
   PROJECT_OWNER_VALUE,
   ROLE_VALUES,
+  type RuleFormState,
   ruleSummary,
+  type SecretsChoice,
   selectionToAudience,
-  type TouchedControls,
-  touchedFromConfig,
 } from "~/components/settings/dataPrivacyRuleConfig";
 import {
   ESSENTIAL_PII_ENTITY_LABELS,
@@ -72,10 +75,10 @@ import { Checkbox } from "~/components/ui/checkbox";
 import { Drawer } from "~/components/ui/drawer";
 import { Menu } from "~/components/ui/menu";
 import { Select } from "~/components/ui/select";
-import { Switch } from "~/components/ui/switch";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useUrlScopeFilter } from "~/hooks/useUrlScopeFilter";
 import {
@@ -177,13 +180,11 @@ export default withPermissionGuard("project:view", {
   layoutComponent: SettingsLayout,
 })(DataPrivacySettings);
 
-function DataPrivacyPage({ projectId }: { projectId: string }) {
+export function DataPrivacyPage({ projectId }: { projectId: string }) {
   const utils = api.useUtils();
-  const { project: currentProject, organization } =
-    useOrganizationTeamProject();
+  const { project: currentProject } = useOrganizationTeamProject();
   const snapshotQuery = api.dataPrivacy.getSnapshot.useQuery({ projectId });
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [editingRule, setEditingRule] = useState<DataPrivacyRule | null>(null);
+  const { openDrawer } = useDrawer();
 
   const available = snapshotQuery.data?.available;
   const filterAvailable = useMemo<AvailableScopes>(
@@ -206,7 +207,6 @@ function DataPrivacyPage({ projectId }: { projectId: string }) {
   const invalidate = () =>
     utils.dataPrivacy.getSnapshot.invalidate({ projectId });
 
-  const setForScope = api.dataPrivacy.setForScope.useMutation();
   const removeForScope = api.dataPrivacy.removeForScope.useMutation();
 
   if (snapshotQuery.isLoading) {
@@ -244,14 +244,13 @@ function DataPrivacyPage({ projectId }: { projectId: string }) {
   };
   const filteredRules = snapshot ? snapshot.rules.filter(matchesFilter) : [];
 
-  const openAdd = () => {
-    setEditingRule(null);
-    setDrawerOpen(true);
-  };
-  const openEdit = (rule: DataPrivacyRule) => {
-    setEditingRule(rule);
-    setDrawerOpen(true);
-  };
+  const openAdd = () => openDrawer("dataPrivacyRule", {});
+  const openEdit = (rule: DataPrivacyRule) =>
+    openDrawer("dataPrivacyRule", {
+      editScopeType: rule.scopeType,
+      editScopeId: rule.scopeId,
+      editPersonalOnly: String(rule.personalOnly),
+    });
 
   const removeRule = async (rule: DataPrivacyRule) => {
     try {
@@ -425,60 +424,6 @@ function DataPrivacyPage({ projectId }: { projectId: string }) {
             currentTeamId={currentProject?.teamId ?? null}
           />
         )}
-
-        {available && snapshot && (
-          <PrivacyRuleDrawer
-            open={drawerOpen}
-            editingRule={editingRule}
-            onClose={() => {
-              setDrawerOpen(false);
-              setEditingRule(null);
-            }}
-            available={available}
-            audienceOptions={snapshot.audienceOptions}
-            effective={snapshot.effective}
-            projectId={projectId}
-            currentTeamId={currentProject?.teamId ?? null}
-            currentOrganizationId={organization?.id ?? null}
-            isSaving={setForScope.isLoading}
-            onSave={async (scopes, config) => {
-              try {
-                await Promise.all(
-                  scopes.map((scope) =>
-                    setForScope.mutateAsync({
-                      projectId,
-                      scope: {
-                        scopeType: scope.scopeType,
-                        scopeId: scope.scopeId,
-                      },
-                      personalOnly: !!scope.personalOnly,
-                      config,
-                    }),
-                  ),
-                );
-                void invalidate();
-                toaster.create({
-                  title:
-                    scopes.length > 1
-                      ? `Privacy rule saved for ${scopes.length} scopes`
-                      : "Privacy rule saved",
-                  type: "success",
-                });
-                setDrawerOpen(false);
-                setEditingRule(null);
-              } catch (error) {
-                // Partial failure leaves the already-saved scopes in place;
-                // the snapshot refresh shows exactly which rows exist.
-                void invalidate();
-                toaster.create({
-                  title: "Failed to save rule",
-                  description: (error as Error).message,
-                  type: "error",
-                });
-              }
-            }}
-          />
-        )}
       </VStack>
     </SettingsLayout>
   );
@@ -589,6 +534,11 @@ export function EffectiveSummary({
 const dispositionCollection = createListCollection({
   items: [
     {
+      value: "inherit",
+      label: "Inherit",
+      description: "Use the value from the wider scope.",
+    },
+    {
       value: "capture",
       label: "Captured",
       description: "Stored and visible to your team.",
@@ -606,18 +556,32 @@ const dispositionCollection = createListCollection({
   ],
 });
 
+const secretsChoiceCollection = createListCollection({
+  items: [
+    { value: "inherit", label: "Inherit" },
+    { value: "on", label: "On" },
+    { value: "off", label: "Off" },
+  ],
+});
+
+const PII_VALUE_LABELS: Record<PiiLevel, string> = {
+  disabled: "Off",
+  essential: "Essential",
+  strict: "Strict",
+  custom: "Custom",
+};
+
+/** Human label for what an inherited control currently resolves to. */
+function inheritedHint(label: string): string {
+  return `Inherits ${label}`;
+}
+
 const attributeDispositionCollection = createListCollection({
   items: [
     { value: "restrict", label: "Restricted" },
     { value: "drop", label: "Dropped" },
   ],
 });
-
-const NO_CONTROLS_TOUCHED: TouchedControls = {
-  categories: {},
-  pii: false,
-  secrets: false,
-};
 
 function describeAudienceSelection(
   audience: AudienceFormState,
@@ -659,13 +623,14 @@ function attributePatternError(pattern: string): string | null {
   return null;
 }
 
-function PrivacyRuleDrawer({
+export function PrivacyRuleDrawer({
   open,
   editingRule,
   onClose,
   available,
   audienceOptions,
-  effective,
+  effectiveTeam,
+  effectiveOrganization,
   projectId,
   currentTeamId,
   currentOrganizationId,
@@ -677,7 +642,8 @@ function PrivacyRuleDrawer({
   onClose: () => void;
   available: DataPrivacyScopeAvailable;
   audienceOptions: DataPrivacyAudienceOptions;
-  effective: ResolvedDataPrivacy;
+  effectiveTeam: ResolvedDataPrivacy | null;
+  effectiveOrganization: ResolvedDataPrivacy | null;
   projectId: string;
   currentTeamId: string | null;
   currentOrganizationId: string | null;
@@ -686,36 +652,24 @@ function PrivacyRuleDrawer({
 }) {
   const [scopes, setScopes] = useState<ScopeChipPickerEntry[]>([]);
   const [dispositions, setDispositions] = useState<
-    Record<ContentCategory, Disposition>
+    Record<ContentCategory, CategoryChoice>
   >({
-    input: "capture",
-    output: "capture",
-    system: "capture",
-    tools: "capture",
+    input: "inherit",
+    output: "inherit",
+    system: "inherit",
+    tools: "inherit",
   });
   const [audience, setAudience] = useState<AudienceFormState>({
     ...EMPTY_AUDIENCE_FORM,
     admins: true,
   });
-  const [piiLevel, setPiiLevel] = useState<PiiLevel>("essential");
+  const [piiChoice, setPiiChoice] = useState<PiiChoice>("inherit");
   const [piiEntities, setPiiEntities] = useState<string[]>([]);
-  const [secretsEnabled, setSecretsEnabled] = useState(true);
+  const [secretsChoice, setSecretsChoice] = useState<SecretsChoice>("inherit");
   const [secretsPatterns, setSecretsPatterns] = useState<string[]>([]);
   const [customAttributes, setCustomAttributes] = useState<
     CustomAttributeFormRow[]
   >([]);
-  // Controls the user explicitly changed, so they persist as overrides. On an
-  // edit it starts as the rule's existing fields, so they re-persist untouched.
-  const [touched, setTouched] = useState<TouchedControls>(NO_CONTROLS_TOUCHED);
-  // Read inside the scope-change effect without re-deriving on every touch.
-  const touchedRef = useRef(touched);
-  touchedRef.current = touched;
-  // Remember the last enabled PII level so toggling redaction off and back on
-  // restores the chosen level instead of silently dropping Strict to Essential.
-  const lastEnabledPiiLevel = useRef<PiiLevel>("essential");
-  useEffect(() => {
-    if (piiLevel !== "disabled") lastEnabledPiiLevel.current = piiLevel;
-  }, [piiLevel]);
 
   const togglePiiEntity = (entity: string) => {
     setPiiEntities((prev) =>
@@ -723,44 +677,21 @@ function PrivacyRuleDrawer({
         ? prev.filter((e) => e !== entity)
         : [...prev, entity],
     );
-    setTouched((prev) => ({ ...prev, pii: true }));
   };
 
-  const touchCategory = (category: ContentCategory) =>
-    setTouched((prev) => ({
-      ...prev,
-      categories: { ...prev.categories, [category]: true },
-    }));
-  const touchRestrictedCategories = () =>
-    setTouched((prev) => {
-      const categories = { ...prev.categories };
-      for (const c of CONTENT_CATEGORIES) {
-        if (dispositions[c] === "restrict") categories[c] = true;
-      }
-      return { ...prev, categories };
-    });
-
-  const isCurrentProjectScope =
-    scopes.length === 1 &&
-    scopes[0]!.scopeType === "PROJECT" &&
-    scopes[0]!.scopeId === projectId &&
-    !scopes[0]!.personalOnly;
-
-  const applyForm = (form: ReturnType<typeof configToFormState>) => {
+  const applyForm = (form: RuleFormState) => {
     setDispositions(form.dispositions);
     setAudience(form.audience);
-    setPiiLevel(form.piiLevel);
+    setPiiChoice(form.piiChoice);
     setPiiEntities(form.piiEntities);
-    setSecretsEnabled(form.secretsEnabled);
+    setSecretsChoice(form.secretsChoice);
     setSecretsPatterns(form.secretsPatterns);
     setCustomAttributes(form.customAttributes);
   };
 
-  // Open transition: seed the drawer. Edit prefills from the rule and marks its
-  // existing fields touched so they re-persist. Add prefills from the values the
-  // new rule would inherit (the current-project scope shows the resolved
-  // effective; any other scope the platform defaults), with nothing touched yet,
-  // so the user sees the parent restriction they're about to override.
+  // Open transition: seed the drawer. Edit hydrates from the rule, so a field
+  // the rule does not set shows as "Inherit" rather than a concrete default. Add
+  // starts every control on "Inherit", so a saved-as-is rule changes nothing.
   useEffect(() => {
     if (!open) return;
     if (editingRule) {
@@ -772,9 +703,6 @@ function PrivacyRuleDrawer({
         },
       ]);
       applyForm(configToFormState(editingRule.config));
-      const editTouched = touchedFromConfig(editingRule.config);
-      setTouched(editTouched);
-      touchedRef.current = editTouched;
       return;
     }
     const projectInAvailable = available.projects.some(
@@ -784,28 +712,19 @@ function PrivacyRuleDrawer({
       ? [{ scopeType: "PROJECT", scopeId: projectId }]
       : [];
     setScopes(initialScopes);
-    setTouched(NO_CONTROLS_TOUCHED);
-    touchedRef.current = NO_CONTROLS_TOUCHED;
-    applyForm(
-      inheritedFormState({
-        effective,
-        isCurrentProjectScope: projectInAvailable,
-      }),
-    );
+    applyForm(inheritFormState());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editingRule]);
 
-  // Re-derive the Add baseline when the user switches scope before touching
-  // anything; once a control is touched their choices stand and aren't clobbered.
-  useEffect(() => {
-    if (!open || editingRule) return;
-    const t = touchedRef.current;
-    const anyTouched =
-      t.pii || t.secrets || Object.values(t.categories).some(Boolean);
-    if (anyTouched) return;
-    applyForm(inheritedFormState({ effective, isCurrentProjectScope }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isCurrentProjectScope]);
+  // The policy a left-on-inherit field resolves to, so each control can show the
+  // value it inherits. Keyed off the scope being edited (or the first picked).
+  const inheritScopeType: "ORGANIZATION" | "DEPARTMENT" | "TEAM" | "PROJECT" =
+    editingRule?.scopeType ?? scopes[0]?.scopeType ?? "PROJECT";
+  const inheritedBaseline = inheritedBaselineForScope({
+    scopeType: inheritScopeType,
+    effectiveTeam,
+    effectiveOrganization,
+  });
 
   const anyRestrict =
     CONTENT_CATEGORIES.some((c) => dispositions[c] === "restrict") ||
@@ -816,22 +735,20 @@ function PrivacyRuleDrawer({
       buildRuleConfig({
         dispositions,
         audience,
-        piiLevel,
+        piiChoice,
         piiEntities,
-        secretsEnabled,
+        secretsChoice,
         secretsPatterns,
         customAttributes,
-        touched,
       }),
     [
       dispositions,
       audience,
-      piiLevel,
+      piiChoice,
       piiEntities,
-      secretsEnabled,
+      secretsChoice,
       secretsPatterns,
       customAttributes,
-      touched,
     ],
   );
 
@@ -916,43 +833,57 @@ function PrivacyRuleDrawer({
               <Text fontWeight="600" fontSize="sm">
                 Content
               </Text>
-              {CONTENT_CATEGORIES.map((category) => (
-                <HStack key={category} justifyContent="space-between" gap={4}>
-                  <Text fontSize="sm">{CATEGORY_LABELS[category]}</Text>
-                  <Select.Root
-                    collection={dispositionCollection}
-                    value={[dispositions[category]]}
-                    size="sm"
-                    width="200px"
-                    onValueChange={(d) => {
-                      setDispositions((prev) => ({
-                        ...prev,
-                        [category]: (d.value[0] as Disposition) ?? "capture",
-                      }));
-                      touchCategory(category);
-                    }}
-                  >
-                    <Select.Trigger
-                      background="bg"
-                      aria-label={CATEGORY_LABELS[category]}
-                    >
-                      <Select.ValueText />
-                    </Select.Trigger>
-                    <Select.Content>
-                      {dispositionCollection.items.map((item) => (
-                        <Select.Item key={item.value} item={item}>
-                          <VStack align="start" gap={0}>
-                            <Text fontSize="sm">{item.label}</Text>
-                            <Text fontSize="xs" color="fg.muted">
-                              {item.description}
-                            </Text>
-                          </VStack>
-                        </Select.Item>
-                      ))}
-                    </Select.Content>
-                  </Select.Root>
-                </HStack>
-              ))}
+              {CONTENT_CATEGORIES.map((category) => {
+                const choice = dispositions[category];
+                return (
+                  <VStack key={category} align="stretch" gap={0.5}>
+                    <HStack justifyContent="space-between" gap={4}>
+                      <Text fontSize="sm">{CATEGORY_LABELS[category]}</Text>
+                      <Select.Root
+                        collection={dispositionCollection}
+                        value={[choice]}
+                        size="sm"
+                        width="200px"
+                        onValueChange={(d) =>
+                          setDispositions((prev) => ({
+                            ...prev,
+                            [category]:
+                              (d.value[0] as CategoryChoice) ?? "inherit",
+                          }))
+                        }
+                      >
+                        <Select.Trigger
+                          background="bg"
+                          aria-label={CATEGORY_LABELS[category]}
+                        >
+                          <Select.ValueText />
+                        </Select.Trigger>
+                        <Select.Content>
+                          {dispositionCollection.items.map((item) => (
+                            <Select.Item key={item.value} item={item}>
+                              <VStack align="start" gap={0}>
+                                <Text fontSize="sm">{item.label}</Text>
+                                <Text fontSize="xs" color="fg.muted">
+                                  {item.description}
+                                </Text>
+                              </VStack>
+                            </Select.Item>
+                          ))}
+                        </Select.Content>
+                      </Select.Root>
+                    </HStack>
+                    {choice === "inherit" && (
+                      <Text fontSize="xs" color="fg.muted" textAlign="end">
+                        {inheritedHint(
+                          DISPOSITION_LABELS[
+                            inheritedBaseline.categories[category].disposition
+                          ],
+                        )}
+                      </Text>
+                    )}
+                  </VStack>
+                );
+              })}
             </VStack>
 
             <VStack gap={2} align="stretch">
@@ -1069,10 +1000,7 @@ function PrivacyRuleDrawer({
                 <AudiencePicker
                   audience={audience}
                   options={audienceOptions}
-                  onChange={(next) => {
-                    setAudience(next);
-                    touchRestrictedCategories();
-                  }}
+                  onChange={setAudience}
                 />
                 <Text fontSize="xs" color="fg.muted">
                   {describeAudienceSelection(audience, audienceOptions)}
@@ -1083,119 +1011,111 @@ function PrivacyRuleDrawer({
             <Separator />
 
             <VStack gap={2} align="stretch">
-              <HStack gap={3} align="start">
-                <Switch
-                  checked={piiLevel !== "disabled"}
-                  onCheckedChange={({ checked }) => {
-                    setPiiLevel(
-                      checked === true
-                        ? lastEnabledPiiLevel.current
-                        : "disabled",
+              <VStack align="start" gap={0}>
+                <Text fontWeight="600" fontSize="sm">
+                  PII redaction
+                </Text>
+                <Text fontSize="xs" color="fg.muted">
+                  Masks personal data like emails, phones, cards, and IDs in
+                  stored content.
+                </Text>
+              </VStack>
+              <RadioGroup.Root
+                value={piiChoice}
+                onValueChange={(d) => {
+                  const next = (d.value as PiiChoice) ?? "inherit";
+                  setPiiChoice(next);
+                  // Seed custom with the native essentials the first time so
+                  // it starts from a sensible base the customer can pare down.
+                  if (next === "custom") {
+                    setPiiEntities((prev) =>
+                      prev.length > 0
+                        ? prev
+                        : Object.keys(ESSENTIAL_PII_ENTITY_LABELS),
                     );
-                    setTouched((prev) => ({ ...prev, pii: true }));
-                  }}
-                />
-                <VStack align="start" gap={0}>
-                  <Text fontWeight="600" fontSize="sm">
-                    PII redaction
-                  </Text>
-                  <Text fontSize="xs" color="fg.muted">
-                    Masks personal data like emails, phones, cards, and IDs in
-                    stored content.
-                  </Text>
+                  }
+                }}
+              >
+                <VStack align="start" gap={1}>
+                  <RadioGroup.Item value="inherit">
+                    <RadioGroup.ItemHiddenInput />
+                    <RadioGroup.ItemIndicator />
+                    <RadioGroup.ItemText>
+                      Inherit
+                      {piiChoice === "inherit" && (
+                        <Text as="span" color="fg.muted">
+                          {" · "}
+                          {PII_VALUE_LABELS[inheritedBaseline.pii.level]}
+                        </Text>
+                      )}
+                    </RadioGroup.ItemText>
+                  </RadioGroup.Item>
+                  <RadioGroup.Item value="disabled">
+                    <RadioGroup.ItemHiddenInput />
+                    <RadioGroup.ItemIndicator />
+                    <RadioGroup.ItemText>Off</RadioGroup.ItemText>
+                  </RadioGroup.Item>
+                  <RadioGroup.Item value="essential">
+                    <RadioGroup.ItemHiddenInput />
+                    <RadioGroup.ItemIndicator />
+                    <RadioGroup.ItemText>
+                      Essential (emails, phones, cards, IPs, national IDs)
+                    </RadioGroup.ItemText>
+                    <Tooltip
+                      content={`Detects and masks: ${ESSENTIAL_PII_SUMMARY}.`}
+                      contentProps={{ maxWidth: "340px" }}
+                    >
+                      <Box color="fg.muted" display="inline-flex">
+                        <HelpCircle size={13} />
+                      </Box>
+                    </Tooltip>
+                  </RadioGroup.Item>
+                  <RadioGroup.Item value="strict">
+                    <RadioGroup.ItemHiddenInput />
+                    <RadioGroup.ItemIndicator />
+                    <RadioGroup.ItemText>
+                      Strict (adds names, locations, and more)
+                    </RadioGroup.ItemText>
+                    <Tooltip
+                      content={`Everything in Essential, plus deeper detection of: ${STRICT_ADDED_PII_SUMMARY}.`}
+                      contentProps={{ maxWidth: "340px" }}
+                    >
+                      <Box color="fg.muted" display="inline-flex">
+                        <HelpCircle size={13} />
+                      </Box>
+                    </Tooltip>
+                  </RadioGroup.Item>
+                  <RadioGroup.Item value="custom">
+                    <RadioGroup.ItemHiddenInput />
+                    <RadioGroup.ItemIndicator />
+                    <RadioGroup.ItemText>
+                      Custom (choose exactly what to redact)
+                    </RadioGroup.ItemText>
+                  </RadioGroup.Item>
                 </VStack>
-              </HStack>
-              {piiLevel !== "disabled" && (
-                <>
-                  <RadioGroup.Root
-                    value={piiLevel}
-                    paddingLeft={10}
-                    onValueChange={(d) => {
-                      const next = (d.value as PiiLevel) ?? "essential";
-                      setPiiLevel(next);
-                      // Seed custom with the native essentials the first time so
-                      // it starts from a sensible base the customer can pare down.
-                      if (next === "custom") {
-                        setPiiEntities((prev) =>
-                          prev.length > 0
-                            ? prev
-                            : Object.keys(ESSENTIAL_PII_ENTITY_LABELS),
-                        );
-                      }
-                      setTouched((prev) => ({ ...prev, pii: true }));
-                    }}
-                  >
-                    <VStack align="start" gap={1}>
-                      <RadioGroup.Item value="essential">
-                        <RadioGroup.ItemHiddenInput />
-                        <RadioGroup.ItemIndicator />
-                        <RadioGroup.ItemText>
-                          Essential (emails, phones, cards, IPs, national IDs)
-                        </RadioGroup.ItemText>
-                        <Tooltip
-                          content={`Detects and masks: ${ESSENTIAL_PII_SUMMARY}.`}
-                          contentProps={{ maxWidth: "340px" }}
-                        >
-                          <Box color="fg.muted" display="inline-flex">
-                            <HelpCircle size={13} />
-                          </Box>
-                        </Tooltip>
-                      </RadioGroup.Item>
-                      <RadioGroup.Item value="strict">
-                        <RadioGroup.ItemHiddenInput />
-                        <RadioGroup.ItemIndicator />
-                        <RadioGroup.ItemText>
-                          Strict (adds names, locations, and more)
-                        </RadioGroup.ItemText>
-                        <Tooltip
-                          content={`Everything in Essential, plus deeper detection of: ${STRICT_ADDED_PII_SUMMARY}.`}
-                          contentProps={{ maxWidth: "340px" }}
-                        >
-                          <Box color="fg.muted" display="inline-flex">
-                            <HelpCircle size={13} />
-                          </Box>
-                        </Tooltip>
-                      </RadioGroup.Item>
-                      <RadioGroup.Item value="custom">
-                        <RadioGroup.ItemHiddenInput />
-                        <RadioGroup.ItemIndicator />
-                        <RadioGroup.ItemText>
-                          Custom (choose exactly what to redact)
-                        </RadioGroup.ItemText>
-                      </RadioGroup.Item>
-                    </VStack>
-                  </RadioGroup.Root>
-                  {piiLevel === "custom" && (
-                    <VStack align="stretch" gap={3} paddingLeft={10}>
-                      <PiiEntityToggleGroup
-                        title="Fast detection"
-                        hint="Redacted instantly as data arrives, at no extra cost."
-                        labels={ESSENTIAL_PII_ENTITY_LABELS}
-                        selected={piiEntities}
-                        onToggle={togglePiiEntity}
-                      />
-                      <PiiEntityToggleGroup
-                        title="Deep detection"
-                        hint="Also finds names and locations. May add some latency."
-                        labels={STRICT_ADDED_PII_ENTITY_LABELS}
-                        selected={piiEntities}
-                        onToggle={togglePiiEntity}
-                      />
-                    </VStack>
-                  )}
-                </>
+              </RadioGroup.Root>
+              {piiChoice === "custom" && (
+                <VStack align="stretch" gap={3} paddingLeft={6}>
+                  <PiiEntityToggleGroup
+                    title="Fast detection"
+                    hint="Redacted instantly as data arrives, at no extra cost."
+                    labels={ESSENTIAL_PII_ENTITY_LABELS}
+                    selected={piiEntities}
+                    onToggle={togglePiiEntity}
+                  />
+                  <PiiEntityToggleGroup
+                    title="Deep detection"
+                    hint="Also finds names and locations. May add some latency."
+                    labels={STRICT_ADDED_PII_ENTITY_LABELS}
+                    selected={piiEntities}
+                    onToggle={togglePiiEntity}
+                  />
+                </VStack>
               )}
             </VStack>
 
             <VStack gap={2} align="stretch">
-              <HStack gap={3} align="start">
-                <Switch
-                  checked={secretsEnabled}
-                  onCheckedChange={({ checked }) => {
-                    setSecretsEnabled(checked === true);
-                    setTouched((prev) => ({ ...prev, secrets: true }));
-                  }}
-                />
+              <HStack justifyContent="space-between" gap={4} align="start">
                 <VStack align="start" gap={0}>
                   <Text fontWeight="600" fontSize="sm">
                     Secrets redaction
@@ -1205,9 +1125,39 @@ function PrivacyRuleDrawer({
                     by default.
                   </Text>
                 </VStack>
+                <Select.Root
+                  collection={secretsChoiceCollection}
+                  value={[secretsChoice]}
+                  size="sm"
+                  width="120px"
+                  onValueChange={(d) =>
+                    setSecretsChoice((d.value[0] as SecretsChoice) ?? "inherit")
+                  }
+                >
+                  <Select.Trigger
+                    background="bg"
+                    aria-label="Secrets redaction"
+                  >
+                    <Select.ValueText />
+                  </Select.Trigger>
+                  <Select.Content>
+                    {secretsChoiceCollection.items.map((item) => (
+                      <Select.Item key={item.value} item={item}>
+                        {item.label}
+                      </Select.Item>
+                    ))}
+                  </Select.Content>
+                </Select.Root>
               </HStack>
-              {secretsEnabled && (
-                <VStack gap={2} align="stretch" paddingLeft={10}>
+              {secretsChoice === "inherit" && (
+                <Text fontSize="xs" color="fg.muted" textAlign="end">
+                  {inheritedHint(
+                    inheritedBaseline.secrets.enabled ? "On" : "Off",
+                  )}
+                </Text>
+              )}
+              {secretsChoice === "on" && (
+                <VStack gap={2} align="stretch" paddingLeft={6}>
                   {secretsPatterns.length > 0 && (
                     <Text fontWeight="600" fontSize="sm">
                       Custom patterns
@@ -1225,17 +1175,13 @@ function PrivacyRuleDrawer({
                             value={pattern}
                             aria-label={`Custom secret pattern ${index + 1}`}
                             borderColor={error ? "red.500" : undefined}
-                            onChange={(e) => {
+                            onChange={(e) =>
                               setSecretsPatterns((prev) =>
                                 prev.map((p, i) =>
                                   i === index ? e.target.value : p,
                                 ),
-                              );
-                              setTouched((prev) => ({
-                                ...prev,
-                                secrets: true,
-                              }));
-                            }}
+                              )
+                            }
                           />
                           <Button
                             size="xs"
@@ -1243,15 +1189,11 @@ function PrivacyRuleDrawer({
                             aria-label={`Remove custom secret pattern ${
                               index + 1
                             }`}
-                            onClick={() => {
+                            onClick={() =>
                               setSecretsPatterns((prev) =>
                                 prev.filter((_, i) => i !== index),
-                              );
-                              setTouched((prev) => ({
-                                ...prev,
-                                secrets: true,
-                              }));
-                            }}
+                              )
+                            }
                           >
                             <X size={14} />
                           </Button>
@@ -1268,10 +1210,9 @@ function PrivacyRuleDrawer({
                     <Button
                       size="xs"
                       variant="ghost"
-                      onClick={() => {
-                        setSecretsPatterns((prev) => [...prev, ""]);
-                        setTouched((prev) => ({ ...prev, secrets: true }));
-                      }}
+                      onClick={() =>
+                        setSecretsPatterns((prev) => [...prev, ""])
+                      }
                     >
                       <Plus size={14} /> Add custom pattern
                     </Button>

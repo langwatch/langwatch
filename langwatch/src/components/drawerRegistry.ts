@@ -41,6 +41,7 @@ import { EvaluatorHistoryDrawer } from "./evaluators/EvaluatorHistoryDrawer";
 import { EvaluatorListDrawer } from "./evaluators/EvaluatorListDrawer";
 import { EvaluatorTypeSelectorDrawer } from "./evaluators/EvaluatorTypeSelectorDrawer";
 import { WorkflowSelectorForEvaluatorDrawer } from "./evaluators/WorkflowSelectorForEvaluatorDrawer";
+import { DataPrivacyRuleDrawer } from "./settings/DataPrivacyRuleDrawer";
 
 // Lazy-loaded: FoundryDrawer transitively imports the OTel SDK which has
 // side effects that break React if evaluated eagerly at app startup.
@@ -123,6 +124,8 @@ export const drawers = {
   scenarioRunDetail: ScenarioRunDetailDrawer,
   // Suites
   suiteEditor: SuiteFormDrawer,
+  // Data privacy
+  dataPrivacyRule: DataPrivacyRuleDrawer,
   // Project management
   createProject: CreateProjectDrawer,
   editProject: EditProjectDrawer,
