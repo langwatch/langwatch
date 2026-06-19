@@ -74,4 +74,3 @@ export const ORPHAN_SWEEP_CHAIN_QUEUE = {
   NAME: makeQueueName("orphan_sweep_chain"),
   JOB: "orphan_sweep_chain",
 } as const;
-
