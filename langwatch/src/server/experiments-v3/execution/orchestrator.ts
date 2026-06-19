@@ -889,8 +889,12 @@ export async function* executeWorkflowCell(
     const inputs = buildTargetInputs(cell);
 
     // The workflow's own evaluator nodes carry the scores we surface per row.
-    const evaluatorNodeIds = new Set(
-      workflowDsl.nodes.filter((n) => n.type === "evaluator").map((n) => n.id),
+    // Keep each node's display name so results show it (e.g. "Exact Match")
+    // instead of the raw node id; these nodes have no DB evaluator to resolve.
+    const evaluatorNodeNames = new Map(
+      workflowDsl.nodes
+        .filter((n) => n.type === "evaluator")
+        .map((n) => [n.id, n.data?.name]),
     );
 
     const rawEvent = {
@@ -963,7 +967,7 @@ export async function* executeWorkflowCell(
       }
 
       if (
-        evaluatorNodeIds.has(component_id) &&
+        evaluatorNodeNames.has(component_id) &&
         (execution_state.status === "success" ||
           execution_state.status === "error")
       ) {
@@ -972,6 +976,7 @@ export async function* executeWorkflowCell(
             cell.rowIndex,
             cell.targetId,
             component_id,
+            evaluatorNodeNames.get(component_id),
             {
               status: execution_state.status,
               outputs: execution_state.outputs,
@@ -1467,7 +1472,9 @@ export async function* runOrchestrator(
             index: event.rowIndex,
             targetId: event.targetId,
             evaluatorId: event.evaluatorId,
-            evaluatorName: dbEvaluator?.name ?? null,
+            // Workflow evaluator nodes have no DB record, so fall back to the
+            // name the event carries from the DSL node.
+            evaluatorName: dbEvaluator?.name ?? event.evaluatorName ?? null,
             status: result.status,
             score: result.status === "processed" ? result.score : null,
             label: result.status === "processed" ? result.label : null,

@@ -368,6 +368,7 @@ export const mapWorkflowEvaluatorResult = (
   rowIndex: number,
   targetId: string,
   evaluatorId: string,
+  evaluatorName: string | undefined,
   executionState: {
     status: string;
     outputs?: Record<string, unknown>;
@@ -416,6 +417,7 @@ export const mapWorkflowEvaluatorResult = (
     rowIndex,
     targetId,
     evaluatorId,
+    evaluatorName,
     result,
   };
 };
