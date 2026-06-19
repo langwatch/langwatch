@@ -9,10 +9,16 @@
 import type { LangwatchApiClient } from "@/internal/api/client";
 import type { Logger } from "@/logger";
 import { Experiment } from "./experiment";
+import {
+  ExperimentsApiService,
+  toRunStartRequest,
+} from "./experiments-api.service";
 import type { ExperimentInitOptions } from "./types";
 import type {
   ExperimentRunResult,
   RunExperimentOptions,
+  RunWithResultsOptions,
+  ExperimentRunWithResults,
   ExperimentRunSummary,
 } from "./platformTypes";
 import {
@@ -21,6 +27,8 @@ import {
   ExperimentTimeoutError,
   ExperimentRunFailedError,
 } from "./platformErrors";
+import { pollExperimentRun } from "./run-status";
+import { mapRunResultsToRows } from "./mapResults";
 import { printSummary } from "./printSummary";
 
 const DEFAULT_POLL_INTERVAL = 2000;
@@ -38,9 +46,13 @@ type ExperimentsFacadeConfig = {
  */
 export class ExperimentsFacade {
   private readonly config: ExperimentsFacadeConfig;
+  private readonly apiService: ExperimentsApiService;
 
   constructor(config: ExperimentsFacadeConfig) {
     this.config = config;
+    this.apiService = new ExperimentsApiService({
+      langwatchApiClient: config.langwatchApiClient,
+    });
   }
 
   /**
@@ -95,6 +107,71 @@ export class ExperimentsFacade {
     this.config.logger.info(`Running platform experiment: ${slug}`);
     const result = await this.runWithPolling(slug, options);
     return result;
+  }
+
+  /**
+   * Run a platform experiment and return per-row structured results.
+   *
+   * Starts the run through the unified evaluations-v3 backend (optionally
+   * overriding the configured inputs via `data` / `datasetId` / `parameters` /
+   * `rowIndices`), polls to completion, fetches the per-row results, and maps
+   * them to the same row structure as the python SDK's results DataFrame.
+   *
+   * @param slug - The slug of the experiment (found in the experiment URL)
+   * @param options - Optional inputs and polling configuration
+   * @returns The run id, results URL, status, summary, and per-row results
+   *
+   * @example
+   * ```typescript
+   * const langwatch = new LangWatch();
+   * const { rows, runUrl } = await langwatch.experiments.runWithResults(
+   *   "my-experiment-slug",
+   *   { data: [{ question: "What is 2 + 2?" }] },
+   * );
+   * for (const row of rows) {
+   *   console.log(row.output, row.evaluations);
+   * }
+   * ```
+   */
+  async runWithResults(
+    slug: string,
+    options: RunWithResultsOptions = {},
+  ): Promise<ExperimentRunWithResults> {
+    this.config.logger.info(`Running platform experiment with results: ${slug}`);
+
+    const body = toRunStartRequest({
+      data: options.data,
+      datasetId: options.datasetId,
+      parameters: options.parameters,
+      rowIndices: options.rowIndices,
+    });
+
+    const startResponse = await this.apiService.startV3Run({ slug, body });
+    const { runId } = startResponse;
+    const runUrl = startResponse.runUrl
+      ? this.replaceUrlDomain(startResponse.runUrl, this.config.endpoint)
+      : "";
+
+    const { status, summary } = await pollExperimentRun({
+      runId,
+      getStatus: (id) => this.apiService.getV3RunStatus(id),
+      pollInterval: options.pollInterval,
+      timeout: options.timeout,
+      onProgress: options.onProgress,
+    });
+
+    const results = await this.apiService.getV3RunResults({
+      runId,
+      experimentSlug: slug,
+    });
+
+    return {
+      runId,
+      runUrl: summary.runUrl ?? runUrl,
+      status,
+      summary,
+      rows: mapRunResultsToRows(results),
+    };
   }
 
   /**
