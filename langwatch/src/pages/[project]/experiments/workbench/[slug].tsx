@@ -7,6 +7,7 @@ import { EditableHeading } from "~/experiments-v3/components/EditableHeading";
 import { EvaluationsV3Table } from "~/experiments-v3/components/EvaluationsV3Table";
 import { HistoryButton } from "~/experiments-v3/components/HistoryButton";
 import { RunEvaluationButton } from "~/experiments-v3/components/RunEvaluationButton";
+import { RunViaApiButtonContainer } from "~/experiments-v3/components/RunViaApiButton";
 import { SavedDatasetLoaders } from "~/experiments-v3/components/SavedDatasetLoaders";
 import { TableSettingsMenu } from "~/experiments-v3/components/TableSettingsMenu";
 import { UndoRedo } from "~/experiments-v3/components/UndoRedo";
@@ -14,7 +15,6 @@ import { useAutosaveEvaluationsV3 } from "~/experiments-v3/hooks/useAutosaveEval
 import { useEvaluationsV3Store } from "~/experiments-v3/hooks/useEvaluationsV3Store";
 import { useLambdaWarmup } from "~/experiments-v3/hooks/useLambdaWarmup";
 import { useSavedDatasetLoader } from "~/experiments-v3/hooks/useSavedDatasetLoader";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRouter } from "~/utils/compat/next-router";
 
 /**
@@ -24,7 +24,6 @@ import { useRouter } from "~/utils/compat/next-router";
  */
 export default function ExperimentsWorkbenchPage() {
   const router = useRouter();
-  const { project } = useOrganizationTeamProject();
   const slug = router.query.slug as string | undefined;
 
   const { name, setName, datasets, reset, autosaveStatus } =
@@ -138,6 +137,7 @@ export default function ExperimentsWorkbenchPage() {
             <UndoRedo />
             <TableSettingsMenu disabled={isLoadingExperiment} />
             <HistoryButton disabled={isLoadingExperiment} />
+            <RunViaApiButtonContainer disabled={isLoadingExperiment} />
             <RunEvaluationButton
               disabled={isLoadingExperiment || isLoadingDatasets}
             />

@@ -8,6 +8,24 @@ import { uppercaseFirstLetter } from "~/utils/stringCasing";
 import { RenderCode } from "./code/RenderCode";
 import { Dialog } from "./ui/dialog";
 import { Menu } from "./ui/menu";
+import { SegmentedControl } from "./ui/segmented-control";
+
+/**
+ * A language tab for the segmented language picker. When `tabs` is provided the
+ * dialog renders a SegmentedControl instead of the language dropdown, and the
+ * caller owns snippet generation. Tabs render in the order given (Python first,
+ * then TypeScript, then Shell).
+ */
+export interface ApiSnippetTab {
+  /** Stable value, e.g. "python". */
+  value: string;
+  /** Human-readable label shown in the segmented control. */
+  label: string;
+  /** The snippet body to render for this language. */
+  content: string;
+  /** Prism language id used to highlight the snippet. */
+  language: PrismLanguage;
+}
 
 // Add context for dialog state
 const ApiSnippetDialogContext = createContext<{
@@ -23,6 +41,18 @@ interface GenerateApiSnippetProps {
   title?: string;
   description?: React.ReactNode;
   children?: React.ReactNode;
+  /**
+   * Optional language tabs. When provided, the dialog renders a segmented
+   * language picker (in the order given) and shows the selected tab's snippet,
+   * bypassing the `snippets` / `targets` dropdown. Existing call sites that omit
+   * `tabs` keep the dropdown behavior unchanged.
+   */
+  tabs?: ApiSnippetTab[];
+  /**
+   * Optional extra controls rendered under the header (for example a data-source
+   * picker). Only rendered when `tabs` is provided.
+   */
+  controls?: React.ReactNode;
 }
 
 /**
@@ -41,6 +71,8 @@ export function GenerateApiSnippetDialog({
   title,
   description,
   children,
+  tabs,
+  controls,
 }: GenerateApiSnippetProps) {
   const { open, onOpen, onClose } = useDisclosure();
   const [selectedTarget, setSelectedTarget] = useState<Target>(
@@ -48,6 +80,9 @@ export function GenerateApiSnippetDialog({
   );
   const [selectedSnippet, setSelectedSnippet] = useState<Snippet | undefined>(
     snippets[0],
+  );
+  const [selectedTab, setSelectedTab] = useState<string>(
+    tabs?.[0]?.value ?? "python",
   );
 
   const handleOpen = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -65,7 +100,12 @@ export function GenerateApiSnippetDialog({
     }
   }, [snippets, selectedTarget]);
 
-  if (!selectedSnippet) {
+  const useTabs = !!tabs && tabs.length > 0;
+  const activeTab = useTabs
+    ? (tabs.find((tab) => tab.value === selectedTab) ?? tabs[0])
+    : undefined;
+
+  if (!useTabs && !selectedSnippet) {
     return null;
   }
 
@@ -82,26 +122,51 @@ export function GenerateApiSnippetDialog({
         <Dialog.Content bg="bg">
           <Dialog.CloseTrigger />
           <Dialog.Header width="100%" marginTop={4}>
-            <HStack
-              justifyContent="space-between"
-              width="100%"
-              alignItems="flex-start"
-            >
-              <VStack alignItems="flex-start" gap={2}>
-                <Dialog.Title>{title ?? "API Usage"}</Dialog.Title>
-                <Dialog.Description>{description}</Dialog.Description>
-              </VStack>
-              <LanguageMenu
-                selectedTarget={selectedTarget}
-                setSelectedTarget={setSelectedTarget}
-                targets={targets}
-              />
-            </HStack>
+            <VStack alignItems="stretch" gap={3} width="100%">
+              <HStack
+                justifyContent="space-between"
+                width="100%"
+                alignItems="flex-start"
+              >
+                <VStack alignItems="flex-start" gap={2}>
+                  <Dialog.Title>{title ?? "API Usage"}</Dialog.Title>
+                  <Dialog.Description>{description}</Dialog.Description>
+                </VStack>
+                {useTabs ? (
+                  <SegmentedControl
+                    size="sm"
+                    value={selectedTab}
+                    onValueChange={({ value }) => {
+                      if (value) setSelectedTab(value);
+                    }}
+                    items={tabs!.map((tab) => ({
+                      value: tab.value,
+                      label: tab.label,
+                    }))}
+                  />
+                ) : (
+                  <LanguageMenu
+                    selectedTarget={selectedTarget}
+                    setSelectedTarget={setSelectedTarget}
+                    targets={targets}
+                  />
+                )}
+              </HStack>
+              {useTabs && controls ? <HStack>{controls}</HStack> : null}
+            </VStack>
           </Dialog.Header>
           <Dialog.Body>
             <RenderCode
-              code={selectedSnippet.content}
-              language={SnippetTargetToPrismLanguageMap[selectedTarget]}
+              code={
+                useTabs
+                  ? (activeTab?.content ?? "")
+                  : (selectedSnippet?.content ?? "")
+              }
+              language={
+                useTabs
+                  ? (activeTab?.language ?? "bash")
+                  : SnippetTargetToPrismLanguageMap[selectedTarget]
+              }
               style={{
                 fontSize: "12px",
                 lineHeight: "1.5",
