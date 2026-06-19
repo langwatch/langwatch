@@ -30,10 +30,12 @@ export class FoldProjectionExecutor {
     }
 
     const key = context.key ?? context.aggregateId;
-    let state = await projection.store.get(key, context) ?? projection.init();
+    let state = (await projection.store.get(key, context)) ?? projection.init();
 
     // Capture the highest occurredAt before applying the new event.
-    const prevLastOccurred = (state as Record<string, unknown>)[projection.LastEventOccurredAtKey] ?? 0;
+    const prevLastOccurred =
+      (state as Record<string, unknown>)[projection.LastEventOccurredAtKey] ??
+      0;
 
     state = projection.apply(state, event);
 
@@ -60,6 +62,8 @@ export class FoldProjectionExecutor {
       const allEvents = await projection.eventLoader({
         tenantId: context.tenantId,
         aggregateId: context.aggregateId,
+        occurredAtMs:
+          typeof eventOccurredAt === "number" ? eventOccurredAt : undefined,
       });
 
       logger.info(
@@ -102,7 +106,9 @@ export class FoldProjectionExecutor {
     events: E[],
     context: ProjectionStoreContext,
   ): Promise<State> {
-    const matching = events.filter((event) => this.matchesEventTypes(projection, event));
+    const matching = events.filter((event) =>
+      this.matchesEventTypes(projection, event),
+    );
     if (matching.length === 0) {
       return projection.init();
     }
@@ -122,8 +128,10 @@ export class FoldProjectionExecutor {
     let state = (await projection.store.get(key, context)) ?? projection.init();
 
     const prevLastOccurred =
-      (state as Record<string, unknown>)[projection.LastEventOccurredAtKey] ?? 0;
-    const earliestOccurredAt = (ordered[0] as Record<string, unknown>).occurredAt;
+      (state as Record<string, unknown>)[projection.LastEventOccurredAtKey] ??
+      0;
+    const earliestOccurredAt = (ordered[0] as Record<string, unknown>)
+      .occurredAt;
 
     // Out-of-order vs the persisted checkpoint: the batch starts earlier than
     // what we've already folded. Re-fold from scratch when we can load the full
@@ -139,6 +147,10 @@ export class FoldProjectionExecutor {
       const allEvents = await projection.eventLoader({
         tenantId: context.tenantId,
         aggregateId: context.aggregateId,
+        occurredAtMs:
+          typeof earliestOccurredAt === "number"
+            ? earliestOccurredAt
+            : undefined,
       });
       logger.info(
         {
@@ -176,6 +188,9 @@ export class FoldProjectionExecutor {
     projection: FoldProjectionDefinition<State, E>,
     event: E,
   ): boolean {
-    return projection.eventTypes.length === 0 || projection.eventTypes.includes(event.type);
+    return (
+      projection.eventTypes.length === 0 ||
+      projection.eventTypes.includes(event.type)
+    );
   }
 }
