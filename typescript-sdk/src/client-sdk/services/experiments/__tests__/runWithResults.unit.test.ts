@@ -129,6 +129,12 @@ describe("ExperimentsFacade.runWithResults", () => {
         expect(result.runId).toBe("run_1");
         expect(result.status).toBe("completed");
         expect(result.runUrl).toContain("/experiments/exp?runId=run_1");
+        // The run URL is rebased onto the configured endpoint, not the
+        // platform's own (cloud) domain, so a self-hosted run gets a local
+        // link. The fixtures use app.langwatch.test; the endpoint is
+        // api.langwatch.test.
+        expect(result.runUrl).toContain(ENDPOINT);
+        expect(result.runUrl).not.toContain("app.langwatch.test");
         expect(result.rows).toHaveLength(1);
         expect(result.rows[0]).toMatchObject({
           index: 0,
