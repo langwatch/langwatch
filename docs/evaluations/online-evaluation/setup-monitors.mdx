@@ -113,10 +113,10 @@ Once a monitor is enabled, every matching trace is scored by the evaluator, and 
 
 Open **Filters** in the top bar and you'll find the evaluation filters:
 
-- **Evaluators with Passed results**, to keep only traces an evaluator passed or failed.
-- **Evaluators with Score results**, to filter by the numeric score (for example, quality below a threshold).
-- **Evaluators with Label results**, to filter by a classifier label.
+- **Evaluation Passed**, to keep only traces an evaluator passed or failed.
+- **Evaluation Score**, to filter by the numeric score (for example, quality below a threshold).
+- **Evaluation Label**, to filter by a classifier label.
 
-Each filter lists your evaluators by name, so you can target the specific monitor you set up. For example, to triage everything your "Prompt Injection" monitor caught, filter by **Evaluators with Passed results** for that evaluator and keep the failures.
+Each filter lets you pick the specific evaluator by name, so you can target the exact monitor you set up. For example, to triage everything your "Prompt Injection" monitor caught, filter by **Evaluation Passed** for that evaluator and keep the failures.
 
 <Tip>Save a filter you return to often as a **view**, or turn it into an **automation** to get alerted (Slack, email) whenever a trace matches, for instance whenever a safety evaluator fails in production.</Tip>
