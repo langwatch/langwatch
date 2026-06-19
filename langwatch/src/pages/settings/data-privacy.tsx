@@ -78,6 +78,7 @@ import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useUrlScopeFilter } from "~/hooks/useUrlScopeFilter";
 import {
@@ -181,11 +182,9 @@ export default withPermissionGuard("project:view", {
 
 function DataPrivacyPage({ projectId }: { projectId: string }) {
   const utils = api.useUtils();
-  const { project: currentProject, organization } =
-    useOrganizationTeamProject();
+  const { project: currentProject } = useOrganizationTeamProject();
   const snapshotQuery = api.dataPrivacy.getSnapshot.useQuery({ projectId });
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [editingRule, setEditingRule] = useState<DataPrivacyRule | null>(null);
+  const { openDrawer } = useDrawer();
 
   const available = snapshotQuery.data?.available;
   const filterAvailable = useMemo<AvailableScopes>(
@@ -208,7 +207,6 @@ function DataPrivacyPage({ projectId }: { projectId: string }) {
   const invalidate = () =>
     utils.dataPrivacy.getSnapshot.invalidate({ projectId });
 
-  const setForScope = api.dataPrivacy.setForScope.useMutation();
   const removeForScope = api.dataPrivacy.removeForScope.useMutation();
 
   if (snapshotQuery.isLoading) {
@@ -246,14 +244,13 @@ function DataPrivacyPage({ projectId }: { projectId: string }) {
   };
   const filteredRules = snapshot ? snapshot.rules.filter(matchesFilter) : [];
 
-  const openAdd = () => {
-    setEditingRule(null);
-    setDrawerOpen(true);
-  };
-  const openEdit = (rule: DataPrivacyRule) => {
-    setEditingRule(rule);
-    setDrawerOpen(true);
-  };
+  const openAdd = () => openDrawer("dataPrivacyRule", {});
+  const openEdit = (rule: DataPrivacyRule) =>
+    openDrawer("dataPrivacyRule", {
+      editScopeType: rule.scopeType,
+      editScopeId: rule.scopeId,
+      editPersonalOnly: String(rule.personalOnly),
+    });
 
   const removeRule = async (rule: DataPrivacyRule) => {
     try {
@@ -425,61 +422,6 @@ function DataPrivacyPage({ projectId }: { projectId: string }) {
             snapshot={snapshot}
             scopeFilter={scopeFilter}
             currentTeamId={currentProject?.teamId ?? null}
-          />
-        )}
-
-        {available && snapshot && (
-          <PrivacyRuleDrawer
-            open={drawerOpen}
-            editingRule={editingRule}
-            onClose={() => {
-              setDrawerOpen(false);
-              setEditingRule(null);
-            }}
-            available={available}
-            audienceOptions={snapshot.audienceOptions}
-            effectiveTeam={snapshot.effectiveTeam}
-            effectiveOrganization={snapshot.effectiveOrganization}
-            projectId={projectId}
-            currentTeamId={currentProject?.teamId ?? null}
-            currentOrganizationId={organization?.id ?? null}
-            isSaving={setForScope.isLoading}
-            onSave={async (scopes, config) => {
-              try {
-                await Promise.all(
-                  scopes.map((scope) =>
-                    setForScope.mutateAsync({
-                      projectId,
-                      scope: {
-                        scopeType: scope.scopeType,
-                        scopeId: scope.scopeId,
-                      },
-                      personalOnly: !!scope.personalOnly,
-                      config,
-                    }),
-                  ),
-                );
-                void invalidate();
-                toaster.create({
-                  title:
-                    scopes.length > 1
-                      ? `Privacy rule saved for ${scopes.length} scopes`
-                      : "Privacy rule saved",
-                  type: "success",
-                });
-                setDrawerOpen(false);
-                setEditingRule(null);
-              } catch (error) {
-                // Partial failure leaves the already-saved scopes in place;
-                // the snapshot refresh shows exactly which rows exist.
-                void invalidate();
-                toaster.create({
-                  title: "Failed to save rule",
-                  description: (error as Error).message,
-                  type: "error",
-                });
-              }
-            }}
           />
         )}
       </VStack>
