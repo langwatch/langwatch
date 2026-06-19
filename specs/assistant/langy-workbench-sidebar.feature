@@ -12,14 +12,14 @@ Feature: Langy assistant sidebar in the experiment workbench
   # Opening and closing the sidebar
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: Opening Langy reveals an empty chat panel
     When I open the Langy assistant
     Then a right-side chat panel appears
     And the panel shows a welcome message from Langy
     And my workbench content remains visible and usable
 
-  @integration
+  @integration @unimplemented
   Scenario: Closing Langy collapses the panel
     Given the Langy panel is open
     When I close the Langy panel
@@ -30,7 +30,7 @@ Feature: Langy assistant sidebar in the experiment workbench
   # Listing evaluators
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: Asking which evaluators exist in my project
     Given the Langy panel is open
     When I ask "what evaluators do I have available?"
@@ -42,7 +42,7 @@ Feature: Langy assistant sidebar in the experiment workbench
   # Explaining a specific evaluator
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: Asking for details about a specific evaluator
     Given the Langy panel is open
     And my project has an evaluator named "Answer Relevancy"
@@ -54,7 +54,7 @@ Feature: Langy assistant sidebar in the experiment workbench
   # Suggesting an evaluator for a goal
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: Asking Langy to suggest an evaluator for a goal
     Given the Langy panel is open
     When I describe my goal: "I want to measure hallucinations in a RAG pipeline"
@@ -66,7 +66,7 @@ Feature: Langy assistant sidebar in the experiment workbench
   # Read-only boundary (v1 does not take actions on the user's behalf)
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: Langy proposes an action but does not execute it
     Given the Langy panel is open
     When I ask "run Answer Relevancy on my current experiment"
@@ -77,7 +77,7 @@ Feature: Langy assistant sidebar in the experiment workbench
   # Project isolation
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: Langy only sees the current project's data
     Given I belong to multiple projects
     And another project of mine has an evaluator named "Secret Eval"
@@ -88,7 +88,7 @@ Feature: Langy assistant sidebar in the experiment workbench
   # Authorization
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: A user without evaluation view permission cannot use Langy
     Given my role in the project does not grant evaluation view permission
     When I try to open the Langy assistant
