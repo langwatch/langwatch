@@ -8,6 +8,7 @@ const logger = createLogger("langwatch:event-sourcing:test-containers");
 
 let clickHouseClient: ClickHouseClient | null = null;
 let redisConnection: Redis | null = null;
+const migratedUrls = new Set<string>();
 
 /**
  * Checks if we're running in CI with service containers (GitHub Actions).
@@ -64,8 +65,12 @@ export async function startTestContainers(): Promise<{
       });
     }
 
-    // Run goose migrations to create database and tables
-    await initializeClickHouseSchema(clickHouseUrl, TEST_DATABASE);
+    // Run goose migrations once per URL per process — subsequent test files in the
+    // same shard skip this (migrations are already applied and goose spawnSync is blocking).
+    if (!migratedUrls.has(clickHouseUrl)) {
+      await initializeClickHouseSchema(clickHouseUrl, TEST_DATABASE);
+      migratedUrls.add(clickHouseUrl);
+    }
 
     // Create client with the database in the URL path
     const urlWithDatabase = new URL(clickHouseUrl);
