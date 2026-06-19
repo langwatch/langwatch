@@ -24,13 +24,13 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "../../../db";
-import { appRouter } from "../../root";
-import type { Permission } from "../../rbac";
-import { createInnerTRPCContext } from "../../trpc";
 import {
   startTestContainers,
   stopTestContainers,
 } from "../../../event-sourcing/__tests__/integration/testContainers";
+import type { Permission } from "../../rbac";
+import { appRouter } from "../../root";
+import { createInnerTRPCContext } from "../../trpc";
 
 type Caller = ReturnType<typeof appRouter.createCaller>;
 
@@ -155,7 +155,10 @@ describe("virtualKeys — scope-aware RBAC", () => {
 
   async function seedVk(
     name: string,
-    scopes: { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[],
+    scopes: {
+      scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+      scopeId: string;
+    }[],
   ): Promise<string> {
     const id = `vk-${ns}-${name}`;
     await prisma.virtualKey.create({
@@ -212,10 +215,16 @@ describe("virtualKeys — scope-aware RBAC", () => {
     await prisma.virtualKey.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.roleBinding.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.customRole.deleteMany({ where: { organizationId: ORG_ID } });
-    await prisma.teamUser.deleteMany({ where: { team: { organizationId: ORG_ID } } });
-    await prisma.project.deleteMany({ where: { team: { organizationId: ORG_ID } } });
+    await prisma.teamUser.deleteMany({
+      where: { team: { organizationId: ORG_ID } },
+    });
+    await prisma.project.deleteMany({
+      where: { team: { organizationId: ORG_ID } },
+    });
     await prisma.team.deleteMany({ where: { organizationId: ORG_ID } });
-    await prisma.organizationUser.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.organizationUser.deleteMany({
+      where: { organizationId: ORG_ID },
+    });
     await prisma.user.deleteMany({ where: { email: { contains: ns } } });
     await prisma.organization.deleteMany({ where: { id: ORG_ID } });
     await stopTestContainers();
@@ -228,7 +237,10 @@ describe("virtualKeys — scope-aware RBAC", () => {
   describe("given create authorizes virtualKeys:manage per requested scope", () => {
     /** @scenario Creating an ORG-scoped VK requires virtualKeys:manage at ORGANIZATION scope */
     it("allows an ORG-manage holder to create an ORG-scoped VK", async () => {
-      const alice = await seedUser(["virtualKeys:manage"], [{ scopeType: ORG, scopeId: ORG_ID }]);
+      const alice = await seedUser(
+        ["virtualKeys:manage"],
+        [{ scopeType: ORG, scopeId: ORG_ID }],
+      );
       const res = await alice.virtualKeys.create({
         organizationId: ORG_ID,
         name: "alice-org",
@@ -241,7 +253,10 @@ describe("virtualKeys — scope-aware RBAC", () => {
 
     /** @scenario Creating an ORG-scoped VK without org:manage on virtualKeys is rejected */
     it("rejects an ORG-scoped create from a team-only manage holder", async () => {
-      const bob = await seedUser(["virtualKeys:manage"], [{ scopeType: TEAM, scopeId: TEAM_PLATFORM }]);
+      const bob = await seedUser(
+        ["virtualKeys:manage"],
+        [{ scopeType: TEAM, scopeId: TEAM_PLATFORM }],
+      );
       await expect(
         bob.virtualKeys.create({
           organizationId: ORG_ID,
@@ -249,13 +264,18 @@ describe("virtualKeys — scope-aware RBAC", () => {
           scopes: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
         }),
       ).rejects.toMatchObject({
-        message: expect.stringContaining(`virtualKeys:manage at ORGANIZATION:${ORG_ID}`),
+        message: expect.stringContaining(
+          `virtualKeys:manage at ORGANIZATION:${ORG_ID}`,
+        ),
       });
     });
 
     /** @scenario Creating a TEAM-scoped VK requires virtualKeys:manage at that team */
     it("allows a team-manage holder to create a TEAM-scoped VK", async () => {
-      const carol = await seedUser(["virtualKeys:manage"], [{ scopeType: TEAM, scopeId: TEAM_PLATFORM }]);
+      const carol = await seedUser(
+        ["virtualKeys:manage"],
+        [{ scopeType: TEAM, scopeId: TEAM_PLATFORM }],
+      );
       const res = await carol.virtualKeys.create({
         organizationId: ORG_ID,
         name: "carol-team",
@@ -266,7 +286,10 @@ describe("virtualKeys — scope-aware RBAC", () => {
 
     /** @scenario User with TEAM "platform" perm cannot create a VK in TEAM "data-sci" */
     it("rejects creating a VK in a team the caller does not manage", async () => {
-      const carol = await seedUser(["virtualKeys:manage"], [{ scopeType: TEAM, scopeId: TEAM_PLATFORM }]);
+      const carol = await seedUser(
+        ["virtualKeys:manage"],
+        [{ scopeType: TEAM, scopeId: TEAM_PLATFORM }],
+      );
       await expect(
         carol.virtualKeys.create({
           organizationId: ORG_ID,
@@ -278,7 +301,10 @@ describe("virtualKeys — scope-aware RBAC", () => {
 
     /** @scenario Creating a PROJECT-scoped VK requires virtualKeys:manage at that project (or upward) */
     it("allows a project-manage holder to create a PROJECT-scoped VK", async () => {
-      const dave = await seedUser(["virtualKeys:manage"], [{ scopeType: PROJECT, scopeId: PROJECT_DEMO }]);
+      const dave = await seedUser(
+        ["virtualKeys:manage"],
+        [{ scopeType: PROJECT, scopeId: PROJECT_DEMO }],
+      );
       const res = await dave.virtualKeys.create({
         organizationId: ORG_ID,
         name: "dave-proj",
@@ -291,7 +317,10 @@ describe("virtualKeys — scope-aware RBAC", () => {
   describe("given the upward cascade (broader grant covers narrower scopes)", () => {
     /** @scenario virtualKeys:manage at ORGANIZATION scope allows creating VKs at any narrower scope */
     it("lets an ORG-manage holder create at team, project, and org scopes", async () => {
-      const eve = await seedUser(["virtualKeys:manage"], [{ scopeType: ORG, scopeId: ORG_ID }]);
+      const eve = await seedUser(
+        ["virtualKeys:manage"],
+        [{ scopeType: ORG, scopeId: ORG_ID }],
+      );
       for (const scope of [
         { scopeType: "TEAM" as const, scopeId: TEAM_PLATFORM },
         { scopeType: "PROJECT" as const, scopeId: PROJECT_DEMO },
@@ -308,7 +337,10 @@ describe("virtualKeys — scope-aware RBAC", () => {
 
     /** @scenario virtualKeys:manage at TEAM scope allows creating VKs at projects within that team */
     it("lets a team-manage holder create at projects within the team but not outside", async () => {
-      const frank = await seedUser(["virtualKeys:manage"], [{ scopeType: TEAM, scopeId: TEAM_PLATFORM }]);
+      const frank = await seedUser(
+        ["virtualKeys:manage"],
+        [{ scopeType: TEAM, scopeId: TEAM_PLATFORM }],
+      );
       const ok = await frank.virtualKeys.create({
         organizationId: ORG_ID,
         name: "frank-in-team",
@@ -328,7 +360,10 @@ describe("virtualKeys — scope-aware RBAC", () => {
   describe("given a multi-scope create needs manage on every scope", () => {
     /** @scenario Creating a VK with multiple scopes requires manage on EACH scope (intersection of grants) */
     it("rejects when the caller manages only one of the requested scopes", async () => {
-      const grace = await seedUser(["virtualKeys:manage"], [{ scopeType: TEAM, scopeId: TEAM_PLATFORM }]);
+      const grace = await seedUser(
+        ["virtualKeys:manage"],
+        [{ scopeType: TEAM, scopeId: TEAM_PLATFORM }],
+      );
       await expect(
         grace.virtualKeys.create({
           organizationId: ORG_ID,
@@ -339,7 +374,9 @@ describe("virtualKeys — scope-aware RBAC", () => {
           ],
         }),
       ).rejects.toMatchObject({
-        message: expect.stringContaining(`virtualKeys:manage at TEAM:${TEAM_DATA_SCI}`),
+        message: expect.stringContaining(
+          `virtualKeys:manage at TEAM:${TEAM_DATA_SCI}`,
+        ),
       });
     });
 
@@ -370,9 +407,10 @@ describe("virtualKeys — scope-aware RBAC", () => {
       // Caller legitimately manages TEAM_PLATFORM in ORG_ID, so the
       // per-scope manage gate passes — only the org-ownership check stops
       // the cross-org write.
-      const caller = await seedUser(["virtualKeys:manage"], [
-        { scopeType: TEAM, scopeId: TEAM_PLATFORM },
-      ]);
+      const caller = await seedUser(
+        ["virtualKeys:manage"],
+        [{ scopeType: TEAM, scopeId: TEAM_PLATFORM }],
+      );
       await expect(
         caller.virtualKeys.create({
           organizationId: `org-foreign-${ns}`,
@@ -387,9 +425,10 @@ describe("virtualKeys — scope-aware RBAC", () => {
 
     /** @scenario An ORGANIZATION scope must equal the organizationId */
     it("rejects a create whose ORGANIZATION scope differs from organizationId", async () => {
-      const caller = await seedUser(["virtualKeys:manage"], [
-        { scopeType: ORG, scopeId: ORG_ID },
-      ]);
+      const caller = await seedUser(
+        ["virtualKeys:manage"],
+        [{ scopeType: ORG, scopeId: ORG_ID }],
+      );
       await expect(
         caller.virtualKeys.create({
           organizationId: `org-foreign-${ns}`,
@@ -406,8 +445,13 @@ describe("virtualKeys — scope-aware RBAC", () => {
   describe("given update / rotate / delete authorize the op-perm on one existing scope", () => {
     /** @scenario Updating a VK requires virtualKeys:update at one of the VK's scopes */
     it("allows an update-holder on the VK's team to rename it", async () => {
-      const vkId = await seedVk("update-target", [{ scopeType: "PROJECT", scopeId: PROJECT_DEMO }]);
-      const ian = await seedUser(["virtualKeys:update"], [{ scopeType: PROJECT, scopeId: PROJECT_DEMO }]);
+      const vkId = await seedVk("update-target", [
+        { scopeType: "PROJECT", scopeId: PROJECT_DEMO },
+      ]);
+      const ian = await seedUser(
+        ["virtualKeys:update"],
+        [{ scopeType: PROJECT, scopeId: PROJECT_DEMO }],
+      );
       const res = await ian.virtualKeys.update({
         organizationId: ORG_ID,
         id: vkId,
@@ -418,19 +462,36 @@ describe("virtualKeys — scope-aware RBAC", () => {
 
     /** @scenario Rotating a VK requires virtualKeys:rotate */
     it("allows a rotate-holder on the VK's team to rotate it", async () => {
-      const vkId = await seedVk("rotate-target", [{ scopeType: "TEAM", scopeId: TEAM_PLATFORM }]);
-      const jane = await seedUser(["virtualKeys:rotate"], [{ scopeType: TEAM, scopeId: TEAM_PLATFORM }]);
-      const before = await prisma.virtualKey.findUniqueOrThrow({ where: { id: vkId } });
-      const res = await jane.virtualKeys.rotate({ organizationId: ORG_ID, id: vkId });
+      const vkId = await seedVk("rotate-target", [
+        { scopeType: "TEAM", scopeId: TEAM_PLATFORM },
+      ]);
+      const jane = await seedUser(
+        ["virtualKeys:rotate"],
+        [{ scopeType: TEAM, scopeId: TEAM_PLATFORM }],
+      );
+      const before = await prisma.virtualKey.findUniqueOrThrow({
+        where: { id: vkId },
+      });
+      const res = await jane.virtualKeys.rotate({
+        organizationId: ORG_ID,
+        id: vkId,
+      });
       expect(res.secret).toBeTruthy();
-      const after = await prisma.virtualKey.findUniqueOrThrow({ where: { id: vkId } });
+      const after = await prisma.virtualKey.findUniqueOrThrow({
+        where: { id: vkId },
+      });
       expect(after.revision).toBeGreaterThan(before.revision);
     });
 
     /** @scenario Deleting a VK requires virtualKeys:delete at one of the VK's scopes */
     it("rejects a delete from a view-only holder", async () => {
-      const vkId = await seedVk("delete-target", [{ scopeType: "TEAM", scopeId: TEAM_PLATFORM }]);
-      const karen = await seedUser(["virtualKeys:view"], [{ scopeType: TEAM, scopeId: TEAM_PLATFORM }]);
+      const vkId = await seedVk("delete-target", [
+        { scopeType: "TEAM", scopeId: TEAM_PLATFORM },
+      ]);
+      const karen = await seedUser(
+        ["virtualKeys:view"],
+        [{ scopeType: TEAM, scopeId: TEAM_PLATFORM }],
+      );
       await expect(
         karen.virtualKeys.revoke({ organizationId: ORG_ID, id: vkId }),
       ).rejects.toMatchObject({ code: "FORBIDDEN" });
@@ -450,9 +511,9 @@ describe("virtualKeys — scope-aware RBAC", () => {
         { scopeType: "TEAM", scopeId: TEAM_DATA_SCI },
       ]);
       const olive = await seedTeamMember([TEAM_PLATFORM]);
-      const ids = (await olive.virtualKeys.list({ organizationId: ORG_ID })).map(
-        (vk) => vk.id,
-      );
+      const ids = (
+        await olive.virtualKeys.list({ organizationId: ORG_ID })
+      ).map((vk) => vk.id);
       expect(ids).toContain(vkOrg);
       expect(ids).toContain(vkPlatform);
       expect(ids).not.toContain(vkDataSci);
