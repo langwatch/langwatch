@@ -1103,9 +1103,7 @@ export function PrivacyRuleDrawer({
                       {piiChoice === "inherit" && (
                         <Text as="span" color="fg.muted">
                           {" · "}
-                          {inheritedHint(
-                            PII_VALUE_LABELS[inheritedBaseline.pii.level],
-                          )}
+                          {PII_VALUE_LABELS[inheritedBaseline.pii.level]}
                         </Text>
                       )}
                     </RadioGroup.ItemText>
