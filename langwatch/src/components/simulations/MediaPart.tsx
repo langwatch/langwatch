@@ -50,9 +50,14 @@ export type MediaPartData =
  * Handles both shapes: the project-scoped `/api/files/<projectId>/<id>`
  * (issue #4947) and the legacy id-only `/api/files/<id>`. The id is always
  * the final path segment; an optional project segment may precede it.
+ *
+ * Anchored to the start of the string: our minted URLs are root-relative
+ * (`/api/files/...`), so a genuinely external URL that merely contains
+ * "/api/files/" later in its path (e.g. `https://cdn.example/api/files/x`)
+ * does NOT match and correctly returns null.
  */
 function extractStoredObjectId(url: string): string | null {
-  const match = /\/api\/files\/(?:[^/?#]+\/)?([^/?#]+)/.exec(url);
+  const match = /^\/api\/files\/(?:[^/?#]+\/)?([^/?#]+)/.exec(url);
   return match?.[1] ?? null;
 }
 

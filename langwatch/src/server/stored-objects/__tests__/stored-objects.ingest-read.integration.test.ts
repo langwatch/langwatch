@@ -475,7 +475,10 @@ describe("StoredObjectsService (ingest + read path)", () => {
             mediaType: "text/plain",
             bytes,
           });
-          await waitForRow(ch, PROJECT_A, id);
+          // Assert the row is visible before reading — a bare await would let
+          // a CH async-insert timeout (waitForRow → false) pass silently and
+          // flake the cross-tenant assertion below.
+          expect(await waitForRow(ch, PROJECT_A, id)).toBe(true);
 
           // Project B scoping the read by A's object id finds nothing: the CH
           // query is `WHERE project_id = B AND id = ...`, which prunes to B's
