@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import { OrganizationUserRole, type PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 
 import type { Session } from "~/server/auth";
@@ -125,6 +125,14 @@ export async function assertCanOperateOnAnyScope(
  */
 export type MembershipSet = {
   isOrgMember: boolean;
+  /**
+   * The caller is an ORG-level admin. Admins manage the whole org, so VK
+   * visibility short-circuits to "sees everything in the org" (see
+   * `isVisibleToMembership`). Real org owners hold no per-team `TeamUser`
+   * rows, so without this the per-project auto-provisioned Langy VK is
+   * invisible to the very admin who owns it.
+   */
+  isOrgAdmin: boolean;
   teamIds: Set<string>;
   projectIds: Set<string>;
 };
@@ -137,7 +145,7 @@ export async function loadMembershipSet(
   const [orgMembership, teamMemberships] = await Promise.all([
     prisma.organizationUser.findUnique({
       where: { userId_organizationId: { userId, organizationId } },
-      select: { userId: true },
+      select: { role: true },
     }),
     prisma.teamUser.findMany({
       where: { userId, team: { organizationId } },
@@ -154,6 +162,7 @@ export async function loadMembershipSet(
       : [];
   return {
     isOrgMember: orgMembership !== null,
+    isOrgAdmin: orgMembership?.role === OrganizationUserRole.ADMIN,
     teamIds,
     projectIds: new Set(projects.map((p) => p.id)),
   };
@@ -163,6 +172,13 @@ export function isVisibleToMembership(
   membership: MembershipSet,
   scopes: Scope[],
 ): boolean {
+  // Org admins manage the whole org, so list/get visibility mirrors the
+  // permission cascade (an org binding already covers team + project). The
+  // list/get procedures only ever pass VKs already scoped to the caller's
+  // org, so a blanket `true` here can't leak another org's keys. Without
+  // this, the auto-provisioned per-project Langy VK is invisible to the org
+  // admin who owns it (real admins hold no per-team TeamUser rows).
+  if (membership.isOrgAdmin) return true;
   return scopes.some((scope) => {
     if (scope.scopeType === "ORGANIZATION") return membership.isOrgMember;
     if (scope.scopeType === "TEAM") return membership.teamIds.has(scope.scopeId);
