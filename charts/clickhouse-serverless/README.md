@@ -65,6 +65,13 @@ See the [Docker image README](../../clickhouse-serverless/README.md) for the ful
 | `replicas` | Number of ClickHouse nodes. 1 = standalone MergeTree, 3+ = ReplicatedMergeTree + Keeper (must be odd) | `1` |
 | `clusterName` | ClickHouse cluster name used in macros and remote_servers config | `langwatch` |
 
+> **`memory` scales with ingest, not just stored size.** The image auto-tunes
+> `max_server_memory_usage` (~85% of the limit) and per-query limits from
+> `memory`, and large/concurrent inserts plus background merges spike well above
+> idle. Sub-2Gi values are fine for smoke or light local use, but raise `memory`
+> (and `cpu`) before pushing real trace throughput or a big ingest burst will
+> OOM the pod.
+
 ### Image
 
 | Name | Description | Default |

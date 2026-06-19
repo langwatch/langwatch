@@ -70,6 +70,8 @@ All overlays live in `examples/overlays/`:
 | `cold-storage-s3` | S3 cold storage tiering + backups |
 | `strict-admission` | Toggles for Pod Security Admission `restricted` / Gatekeeper / Kyverno clusters |
 
+> **Sizing notes.** The Node app and workers need roughly **2Gi to boot** (they cold-load the TS server through tsx); the `size-minimal` and `size-dev` overlays account for this, so don't trim app/worker memory below ~2Gi or they OOM at startup. **ClickHouse memory scales with ingest volume** - the chart-managed defaults in `size-minimal`/`size-dev` (1-2Gi) are for light/local use; raise `clickhouse.memory` (and `cpu`) before pushing real trace throughput, or a large ingest burst will OOM it.
+
 ### All-in-one profiles
 
 For common scenarios, use the bundled profiles in `examples/`:
