@@ -47,6 +47,13 @@ export type CreateVirtualKeyData = {
    */
   scopes: ScopeInput[];
   routingPolicyId?: string | null;
+  /**
+   * USER (default) for keys created via the gateway UI / API; LANGY when
+   * auto-provisioned by `langyVirtualKey.provisionLangyVirtualKey` for the
+   * Langy in-product assistant. Drives the managed-row badge + lock-down on
+   * the gateway/virtual-keys page.
+   */
+  purpose?: "USER" | "LANGY";
 };
 
 export class VirtualKeyRepository {
@@ -174,6 +181,7 @@ export class VirtualKeyRepository {
         config: data.config,
         createdById: data.createdById,
         routingPolicyId: data.routingPolicyId ?? null,
+        purpose: data.purpose ?? "USER",
         revision: 1n,
         scopes: {
           create: data.scopes.map((s) => ({

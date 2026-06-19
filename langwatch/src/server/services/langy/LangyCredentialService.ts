@@ -5,10 +5,7 @@ import { createLogger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { getLangyApiKeyToken, provisionLangyApiKey } from "./langyApiKey";
 import { getGithubTokenForUser } from "./langyGithubToken";
-import {
-  LANGY_VK_DISPLAY_NAME,
-  provisionLangyVirtualKey,
-} from "./langyVirtualKey";
+import { provisionLangyVirtualKey } from "./langyVirtualKey";
 
 const githubLogger = createLogger("langwatch:langy:credentials:github");
 
@@ -226,8 +223,7 @@ export class LangyCredentialService {
     const langyVk = await this.prisma.virtualKey.findFirst({
       where: {
         organizationId,
-        name: LANGY_VK_DISPLAY_NAME,
-        principalUserId: null,
+        purpose: "LANGY",
         scopes: {
           some: { scopeType: "PROJECT", scopeId: projectId },
         },
