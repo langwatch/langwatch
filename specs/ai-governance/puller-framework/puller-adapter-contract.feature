@@ -3,7 +3,7 @@ Feature: PullerAdapter framework contract
   (S3 NDJSON drop, audit-log REST API, custom polling endpoint, etc.)
   I want a stable adapter contract — interface, lifecycle, error handling,
   cursor semantics — that I can implement against
-  So that pull-mode ingestion is universal: the BullMQ worker + the admin UI
+  So that pull-mode ingestion is universal: the puller job + the admin UI
   + the CH ingest path are the same regardless of source-type
 
   Inspired by Singer Tap / Airbyte CDK / Apache Camel / Kafka Connect — pull side.
@@ -27,7 +27,7 @@ Feature: PullerAdapter framework contract
     And the adapter resumes pulling from where it left off (no missed events, no duplicates beyond the source's own at-least-once guarantees)
 
   Scenario: Adapter is restart-safe
-    Given a puller is mid-run when its BullMQ worker is killed
+    Given a puller is mid-run when its worker process is killed
     When the worker comes back up + the job is re-scheduled
     Then the new run uses the LAST PERSISTED cursor (not in-memory cursor; the in-flight run's events were never persisted because runOnce hadn't returned)
     And no events are dropped (worst case = small re-pull window if source is at-least-once)

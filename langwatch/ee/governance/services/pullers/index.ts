@@ -2,8 +2,8 @@
 
 /**
  * PullerAdapter registry bootstrap. Importing this module wires the
- * built-in adapters into the singleton registry — the BullMQ worker
- * imports it once at startup and then dispatches lookups by adapter id.
+ * built-in adapters into the singleton registry — the pull body imports
+ * it once and then dispatches lookups by adapter id.
  *
  * Add new adapters by registering them here AND exporting them from
  * this module so admin-UI source-type discovery picks them up.
@@ -27,26 +27,22 @@ export function registerBuiltInPullers(): void {
   registered = true;
 }
 
+export { CLAUDE_COMPLIANCE_PULL_CONFIG } from "./claudeCompliance.puller";
+export { COPILOT_STUDIO_PULL_CONFIG } from "./copilotStudio.puller";
+export type { HttpPollingConfig } from "./httpPollingPullerAdapter";
+export { OPENAI_COMPLIANCE_PULL_CONFIG } from "./openaiCompliance.puller";
+export type {
+  NormalizedPullEvent,
+  PullerAdapter,
+  PullResult,
+  PullRunOptions,
+} from "./pullerAdapter";
+export type { S3PollingConfig } from "./s3PollingPullerAdapter";
 export {
   ClaudeComplianceReferencePuller,
   CopilotStudioReferencePuller,
   HttpPollingPullerAdapter,
   OpenAiComplianceReferencePuller,
-  S3PollingPullerAdapter,
   pullerAdapterRegistry,
+  S3PollingPullerAdapter,
 };
-export type {
-  HttpPollingConfig,
-} from "./httpPollingPullerAdapter";
-export type {
-  S3PollingConfig,
-} from "./s3PollingPullerAdapter";
-export type {
-  NormalizedPullEvent,
-  PullResult,
-  PullRunOptions,
-  PullerAdapter,
-} from "./pullerAdapter";
-export { CLAUDE_COMPLIANCE_PULL_CONFIG } from "./claudeCompliance.puller";
-export { COPILOT_STUDIO_PULL_CONFIG } from "./copilotStudio.puller";
-export { OPENAI_COMPLIANCE_PULL_CONFIG } from "./openaiCompliance.puller";

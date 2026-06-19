@@ -4,7 +4,7 @@
  * PullerAdapter — universal contract for pull-mode IngestionSources.
  *
  * Inspired by Singer Tap, Airbyte CDK, Apache Camel, and Kafka Connect.
- * Every adapter implements the same lifecycle so the BullMQ worker that
+ * Every adapter implements the same lifecycle so the pull body that
  * drives them is source-agnostic — it doesn't care whether the events
  * came from an HTTP audit-log API, an S3 NDJSON drop, or a Microsoft
  * Graph endpoint.
@@ -15,7 +15,8 @@
  *   2. `validateConfig(config)` runs at create time — bad config is
  *      rejected BEFORE the row lands in PG, so the admin sees the
  *      error inline rather than silently failing later
- *   3. BullMQ schedules `runOnce({ cursor })` per the configured cron
+ *   3. The event-sourcing pull scheduler fires `runOnce({ cursor })` at
+ *      the configured cron expression's next fire time
  *   4. Adapter pulls events, maps them to NormalizedEvent, returns
  *      `{ events, cursor, errorCount }`
  *   5. Worker persists `cursor` → `IngestionSource.pollerCursor` so the
@@ -155,10 +156,7 @@ export interface PullerAdapter<Config = unknown> {
    *   - never advance the cursor on partial-failure (caller relies
    *     on at-least-once semantics from the cursor)
    */
-  runOnce(
-    options: PullRunOptions,
-    config: Config,
-  ): Promise<PullResult>;
+  runOnce(options: PullRunOptions, config: Config): Promise<PullResult>;
 }
 
 /**
@@ -171,9 +169,7 @@ export class PullerAdapterRegistry {
 
   register<C>(adapter: PullerAdapter<C>): void {
     if (this.adapters.has(adapter.id)) {
-      throw new Error(
-        `PullerAdapter "${adapter.id}" is already registered`,
-      );
+      throw new Error(`PullerAdapter "${adapter.id}" is already registered`);
     }
     this.adapters.set(adapter.id, adapter as PullerAdapter<unknown>);
   }

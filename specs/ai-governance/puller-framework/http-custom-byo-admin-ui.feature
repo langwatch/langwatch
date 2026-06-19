@@ -50,7 +50,7 @@ Feature: http_custom — BYO HTTP-polling ingestion source admin UI
       | cursorJsonPath  | $.next_cursor                                   |
       | cursorQueryParam| cursor                                          |
       | eventMappingDsl | source_event_id=$.id\nevent_timestamp=$.created_at\nactor=$.user.email\naction=$.event_type\ntarget=$.model |
-      | pullSchedule    | (blank — adapter default)                       |
+      | pullSchedule    | (blank, adapter default)                        |
     When the admin clicks "Create source"
     Then `api.ingestionSources.create` is called with `pullConfig` shaped as:
       """
@@ -126,7 +126,7 @@ Feature: http_custom — BYO HTTP-polling ingestion source admin UI
       }
       """
     And the admin has saved an http_custom source pointing at it (with the standard mapping)
-    And `scheduleIngestionPullers` has registered the BullMQ repeat job
+    And the source has been seeded as an event-sourcing scheduled job
     When the puller worker fires the next tick
     Then `HttpPollingPullerAdapter.runOnce` calls the fixture endpoint
     And one normalized event lands in `governance_ocsf_events` with `class_uid=6003` and `actor.user.email_addr="alex@acme.com"`

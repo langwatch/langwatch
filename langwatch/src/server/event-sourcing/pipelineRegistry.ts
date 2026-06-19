@@ -12,6 +12,7 @@ import {
   createGovernanceOcsfEventsSyncReactor,
   type GovernanceOcsfEventsSyncReactorDeps,
 } from "@ee/governance/reactors/governanceOcsfEventsSync.reactor";
+import { registerIngestionPullJob } from "@ee/governance/services/pullers/ingestionPullScheduler";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import type { Cluster, Redis } from "ioredis";
@@ -688,6 +689,10 @@ export class PipelineRegistry {
     }
     // No else: when the global queue is absent the dataset module falls back to
     // running the handler inline at enqueue time (dev/test without a worker).
+
+    // Pull-mode ingestion recurrence lives on the same durable GroupQueue.
+    // Worker startup seeds active sources after this registration completes.
+    registerIngestionPullJob(tracePipeline.service);
 
     return {
       pipeline: tracePipeline,

@@ -1,6 +1,6 @@
 /**
  * Unit coverage for the puller worker's NormalizedPullEvent → OCSF
- * row mapping. The full worker shape (Prisma + CH + BullMQ) is
+ * row mapping. The full pull-body shape (Prisma + CH) is
  * exercised by the integration tier; this file documents the
  * pure-function shape of the mapping that's hardest to get right
  * (eventId composition, raw_event preservation, time-coercion fallback).
@@ -40,8 +40,7 @@ const baseEvent: NormalizedPullEvent = {
 describe("PullerWorker — OCSF mapping (semantic contract)", () => {
   it("loads the worker module without crashing", async () => {
     const mod = await loadMapper();
-    expect(mod.startIngestionPullerWorker).toBeTypeOf("function");
-    expect(mod.runIngestionPullerJob).toBeTypeOf("function");
+    expect(mod.runIngestionPullForSource).toBeTypeOf("function");
   });
 
   // Direct test of the semantic shape — this matches the implementation

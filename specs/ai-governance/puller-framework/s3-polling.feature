@@ -49,7 +49,7 @@ Feature: S3PollingPullerAdapter (universal S3-polling adapter)
     Given `IngestionSource.lastCursor` is at the latest key
     When the worker calls `runOnce({ cursor: <latest> })`
     Then the adapter returns `{ events: [], cursor: <latest>, errorCount: 0 }`
-    And the BullMQ job schedules next per the cron schedule
+    And the puller job schedules next per the cron schedule
 
   Scenario: Parser switches per config
     | parser     | example body                          | event count |

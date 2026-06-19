@@ -41,21 +41,12 @@ async function verifyDatabaseReady(): Promise<void> {
   }
 }
 
-async function bootIngestionPuller(
-  shutdownHandles: ShutdownHandles,
-): Promise<void> {
-  const { startIngestionPullerWorker } = await import(
-    "@ee/governance/services/pullers/pullerWorker"
+async function bootIngestionPuller(): Promise<void> {
+  const { seedIngestionPullers } = await import(
+    "@ee/governance/services/pullers/ingestionPullScheduler"
   );
-  const { scheduleIngestionPullers } = await import(
-    "@ee/governance/services/pullers/pullerQueue"
-  );
-  const ingestionPullerWorker = startIngestionPullerWorker();
-  if (ingestionPullerWorker) {
-    shutdownHandles.push(() => ingestionPullerWorker.close());
-  }
-  await scheduleIngestionPullers();
-  logger.info("ingestion puller worker ready");
+  await seedIngestionPullers();
+  logger.info("ingestion pull scheduler ready");
 }
 
 async function bootTopicClustering(
@@ -252,7 +243,7 @@ export async function startWorkers(
   await verifyDatabaseReady();
 
   try {
-    await bootIngestionPuller(shutdownHandles);
+    await bootIngestionPuller();
     await bootTopicClustering(shutdownHandles);
     await bootStorageStatsCollection(shutdownHandles);
     await bootScenarioProcessor(shutdownHandles);
