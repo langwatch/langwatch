@@ -88,6 +88,10 @@ spec:
           # remaining writable paths (logs, pid, /tmp) are emptyDir-mounted
           # below, so the image layer itself never needs to be writable.
           securityContext:
+            # The image already runs as uid 101 via its USER directive; pin it
+            # explicitly so it matches Keeper/backup and satisfies runAsUser /
+            # MustRunAs policies that read the pod spec.
+            runAsUser: 101
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities:
