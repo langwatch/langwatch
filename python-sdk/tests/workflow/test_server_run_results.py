@@ -17,6 +17,8 @@ from langwatch import workflow as workflow_module
 from langwatch.experiment import platform_run
 from langwatch.workflow import run as workflow_run
 
+pytestmark = pytest.mark.unit
+
 
 class _FakeResponse:
     def __init__(self, status_code: int, json_body: Optional[dict] = None):

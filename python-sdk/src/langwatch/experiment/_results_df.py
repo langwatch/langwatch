@@ -6,13 +6,18 @@ and turn it into the same per-row DataFrame. Keeping the builder in one place me
 every entry point returns an identical column shape.
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, TYPE_CHECKING
 
-import pandas as pd
+if TYPE_CHECKING:
+    import pandas as pd
 
 
-def build_results_df(data: Dict[str, Any]) -> pd.DataFrame:
+def build_results_df(data: Dict[str, Any]) -> "pd.DataFrame":
     """Build a DataFrame from the platform API response (ExperimentRunWithItems)."""
+    # Imported lazily so importing langwatch.experiment / langwatch.workflow does
+    # not require pandas; it is only needed when reading per-row results back.
+    import pandas as pd
+
     dataset_entries = data.get("dataset", [])
     evaluations = data.get("evaluations", [])
 
@@ -30,8 +35,12 @@ def build_results_df(data: Dict[str, Any]) -> pd.DataFrame:
                 row[k] = v
         # Output from the target
         predicted = entry.get("predicted")
-        if predicted:
-            row["output"] = predicted.get("output", predicted) if isinstance(predicted, dict) else predicted
+        if predicted is not None:
+            row["output"] = (
+                predicted.get("output", predicted)
+                if isinstance(predicted, dict)
+                else predicted
+            )
         row["trace_id"] = entry.get("traceId", "")
         row["duration_ms"] = entry.get("duration", 0)
         cost = entry.get("cost")
