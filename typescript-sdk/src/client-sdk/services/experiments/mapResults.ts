@@ -42,7 +42,7 @@ export const mapRunResultsToRows = (
     const predicted = entry.predicted;
     const output =
       predicted && typeof predicted === "object" && "output" in predicted
-        ? (predicted as Record<string, unknown>).output
+        ? (predicted).output
         : predicted;
 
     const row: ExperimentRowResult = {
@@ -63,7 +63,13 @@ export const mapRunResultsToRows = (
 
   for (const evaluation of evaluations) {
     const index = evaluation.index;
-    const name = evaluation.name || evaluation.evaluator;
+    // A null, undefined, or empty name falls through to the evaluator id
+    // (matching the python builder); the length check keeps the empty-string
+    // case from being collapsed by nullish coalescing.
+    const name =
+      evaluation.name && evaluation.name.length > 0
+        ? evaluation.name
+        : evaluation.evaluator;
     if (index == null || !name) continue;
 
     for (const row of rows) {
