@@ -2,10 +2,10 @@ import type { PrismaClient } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import {
-  computePermissionsFromSelections,
   type AccessLevel,
+  computePermissionsFromSelections,
 } from "~/server/api-key/permission-categories";
-import { encrypt, decrypt } from "~/utils/encryption";
+import { decrypt, encrypt } from "~/utils/encryption";
 import { createLogger } from "~/utils/logger/server";
 import { resolveAttributionUserId } from "./langyAttribution";
 import { backfillLangyCredentialPerProject } from "./langyBackfill";

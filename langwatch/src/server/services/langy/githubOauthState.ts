@@ -54,7 +54,9 @@ export function verifyGithubOauthState(
   if (dot < 0) return null;
   const body = token.slice(0, dot);
   const sig = token.slice(dot + 1);
-  const expected = createHmac("sha256", signingKey).update(body).digest("base64url");
+  const expected = createHmac("sha256", signingKey)
+    .update(body)
+    .digest("base64url");
   const a = Buffer.from(sig, "base64url");
   const b = Buffer.from(expected, "base64url");
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null;

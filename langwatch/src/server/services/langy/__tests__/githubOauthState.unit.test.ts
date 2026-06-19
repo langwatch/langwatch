@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  type GithubOauthStatePayload,
   STATE_TTL_MS,
   signGithubOauthState,
   verifyGithubOauthState,
-  type GithubOauthStatePayload,
 } from "../githubOauthState";
 
 const SIGNING_KEY = "test-secret-not-real";

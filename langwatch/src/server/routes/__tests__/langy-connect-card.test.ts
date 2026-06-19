@@ -117,7 +117,9 @@ vi.mock("~/server/services/langy/LangyMessageService", async () => {
   return {
     ...actual,
     LangyMessageService: {
-      create: () => ({ append: (...args: unknown[]) => appendMessage(...args) }),
+      create: () => ({
+        append: (...args: unknown[]) => appendMessage(...args),
+      }),
     },
   };
 });

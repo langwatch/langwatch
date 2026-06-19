@@ -12,7 +12,9 @@ async function lwGet(path: string): Promise<any> {
     signal: AbortSignal.timeout(15_000),
   });
   if (!res.ok) {
-    throw new Error(`GET ${path} -> ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    throw new Error(
+      `GET ${path} -> ${res.status}: ${(await res.text()).slice(0, 200)}`,
+    );
   }
   return res.json();
 }
@@ -32,35 +34,51 @@ function toArray<T>(payload: unknown): T[] {
   return [];
 }
 
-export async function listDatasets(): Promise<Array<{ id: string; name: string; recordCount: number }>> {
+export async function listDatasets(): Promise<
+  Array<{ id: string; name: string; recordCount: number }>
+> {
   return toArray(await lwGet("/api/dataset"));
 }
 
-export async function listAgents(): Promise<Array<{ id: string; name: string }>> {
+export async function listAgents(): Promise<
+  Array<{ id: string; name: string }>
+> {
   return toArray(await lwGet("/api/agents"));
 }
 
-export async function listEvaluators(): Promise<Array<{ id: string; name: string }>> {
+export async function listEvaluators(): Promise<
+  Array<{ id: string; name: string }>
+> {
   return toArray(await lwGet("/api/evaluators"));
 }
 
-export async function listScenarios(): Promise<Array<{ id: string; name: string }>> {
+export async function listScenarios(): Promise<
+  Array<{ id: string; name: string }>
+> {
   return toArray(await lwGet("/api/scenarios"));
 }
 
-export async function listPrompts(): Promise<Array<{ id: string; name?: string; handle?: string }>> {
+export async function listPrompts(): Promise<
+  Array<{ id: string; name?: string; handle?: string }>
+> {
   return toArray(await lwGet("/api/prompts"));
 }
 
-export async function listMonitors(): Promise<Array<{ id: string; name?: string }>> {
+export async function listMonitors(): Promise<
+  Array<{ id: string; name?: string }>
+> {
   return toArray(await lwGet("/api/monitors"));
 }
 
-export async function listDashboards(): Promise<Array<{ id: string; name?: string }>> {
+export async function listDashboards(): Promise<
+  Array<{ id: string; name?: string }>
+> {
   return toArray(await lwGet("/api/dashboards"));
 }
 
-export async function listWorkflows(): Promise<Array<{ id: string; name?: string }>> {
+export async function listWorkflows(): Promise<
+  Array<{ id: string; name?: string }>
+> {
   return toArray(await lwGet("/api/workflows"));
 }
 
@@ -68,6 +86,8 @@ export async function listAnnotations(): Promise<Array<{ id: string }>> {
   return toArray(await lwGet("/api/annotations"));
 }
 
-export async function listTriggers(): Promise<Array<{ id: string; name?: string }>> {
+export async function listTriggers(): Promise<
+  Array<{ id: string; name?: string }>
+> {
   return toArray(await lwGet("/api/triggers"));
 }

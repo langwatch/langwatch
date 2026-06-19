@@ -15,8 +15,14 @@ const POPUP_WIDTH = 600;
 const POPUP_HEIGHT = 760;
 const POPUP_FEATURES = (() => {
   if (typeof window === "undefined") return "";
-  const left = Math.max(0, (window.outerWidth - POPUP_WIDTH) / 2 + window.screenX);
-  const top = Math.max(0, (window.outerHeight - POPUP_HEIGHT) / 2 + window.screenY);
+  const left = Math.max(
+    0,
+    (window.outerWidth - POPUP_WIDTH) / 2 + window.screenX,
+  );
+  const top = Math.max(
+    0,
+    (window.outerHeight - POPUP_HEIGHT) / 2 + window.screenY,
+  );
   return [
     `width=${POPUP_WIDTH}`,
     `height=${POPUP_HEIGHT}`,
@@ -58,13 +64,19 @@ export function useGitHubConnectPopup() {
       if (ev.origin !== window.location.origin) return;
       const data = ev.data as IncomingMessage | undefined;
       if (!data || typeof data !== "object") return;
-      if (data.type === "langy-github-connected" && typeof data.login === "string") {
+      if (
+        data.type === "langy-github-connected" &&
+        typeof data.login === "string"
+      ) {
         resolverRef.current?.({ ok: true, login: data.login });
         cleanup();
       } else if (data.type === "langy-github-error") {
         resolverRef.current?.({
           ok: false,
-          error: typeof data.message === "string" ? data.message : "connection failed",
+          error:
+            typeof data.message === "string"
+              ? data.message
+              : "connection failed",
         });
         cleanup();
       }
@@ -95,7 +107,10 @@ export function useGitHubConnectPopup() {
         const url = `/api/github-langy/connect?mode=popup&organizationId=${encodeURIComponent(organizationId)}`;
         const win = window.open(url, "langy-github-connect", POPUP_FEATURES);
         if (!win) {
-          resolve({ ok: false, error: "Popup blocked. Allow popups and try again." });
+          resolve({
+            ok: false,
+            error: "Popup blocked. Allow popups and try again.",
+          });
           return;
         }
         popupRef.current = win;

@@ -67,7 +67,10 @@ export function parseGithubProgressEvents(text: string): ProgressParse {
     events.push(detail ? { stage, detail } : { stage });
   }
   PROGRESS_RE.lastIndex = 0;
-  const cleanedText = text.replace(PROGRESS_RE, "").replace(/\n{3,}/g, "\n\n").trim();
+  const cleanedText = text
+    .replace(PROGRESS_RE, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
   return { events, cleanedText };
 }
 

@@ -18,20 +18,23 @@
  * `release_langy_enabled`, which is the lever for opening Langy beyond staff
  * (see the middleware below). Staff therefore bypass the flag entirely.
  */
-import {
-  createUIMessageStream,
-  createUIMessageStreamResponse,
-} from "ai";
+import { createUIMessageStream, createUIMessageStreamResponse } from "ai";
 import type { Context } from "hono";
 import { z } from "zod";
-import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { hasProjectPermission } from "~/server/api/rbac";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
+import { auditLog } from "~/server/auditLog";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
+import { checkLangyMessageRateLimit } from "~/server/middleware/rate-limit-langy";
+import {
+  getLangyGithubPrUsage,
+  LANGY_GITHUB_PRS_PER_DAY,
+  recordLangyGithubPr,
+} from "~/server/middleware/rate-limit-langy-github-prs";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
-import { createLogger } from "~/utils/logger/server";
-import { auditLog } from "~/server/auditLog";
-import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
+import { extractOpenedPrLinks } from "~/server/services/langy/githubPrLinks";
 import {
   LangyConversationNotOwnedError,
   LangyConversationService,
@@ -44,14 +47,8 @@ import {
   extractTextFromParts,
   LangyMessageService,
 } from "~/server/services/langy/LangyMessageService";
-import { checkLangyMessageRateLimit } from "~/server/middleware/rate-limit-langy";
-import {
-  getLangyGithubPrUsage,
-  LANGY_GITHUB_PRS_PER_DAY,
-  recordLangyGithubPr,
-} from "~/server/middleware/rate-limit-langy-github-prs";
-import { extractOpenedPrLinks } from "~/server/services/langy/githubPrLinks";
 import { stripLangySentinels } from "~/server/services/langy/langySentinels";
+import { createLogger } from "~/utils/logger/server";
 import type { NextRequestShim } from "./types";
 
 const logger = createLogger("langwatch:api:langy");
@@ -81,7 +78,10 @@ const chatRequestSchema = z.object({
    */
   modelOverride: z
     .string()
-    .regex(/^[a-zA-Z0-9_-]+\/[a-zA-Z0-9._-]+$/, "modelOverride must be in 'provider/model' shape")
+    .regex(
+      /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9._-]+$/,
+      "modelOverride must be in 'provider/model' shape",
+    )
     .max(200)
     .optional(),
 });
@@ -294,7 +294,9 @@ langyRoute().post("/langy/chat", async (c) => {
   // We don't try to detect PR intent — capped users get the system note on
   // every chat turn until the bucket resets; the agent only mentions it
   // if the user is in fact asking for a PR. Cheap and correct.
-  const githubPrUsage = await getLangyGithubPrUsage({ userId: session.user.id });
+  const githubPrUsage = await getLangyGithubPrUsage({
+    userId: session.user.id,
+  });
   const capReachedNote = !githubPrUsage.allowed
     ? [
         "",
@@ -348,7 +350,9 @@ langyRoute().post("/langy/chat", async (c) => {
     body: JSON.stringify({
       conversationId: conversation.id,
       prompt: userText,
-      system: capReachedNote ? `${langyOverride}\n\n${capReachedNote}` : langyOverride,
+      system: capReachedNote
+        ? `${langyOverride}\n\n${capReachedNote}`
+        : langyOverride,
       credentials,
       // Forwarded for the agent to thread through to the gateway as the
       // `model` parameter when its support lands. Today the agent ignores
@@ -360,7 +364,10 @@ langyRoute().post("/langy/chat", async (c) => {
   });
 
   if (!agentResponse.ok) {
-    logger.error({ status: agentResponse.status }, "opencode agent request failed");
+    logger.error(
+      { status: agentResponse.status },
+      "opencode agent request failed",
+    );
     return c.json({ error: "Agent request failed" }, { status: 502 });
   }
 
@@ -390,7 +397,11 @@ langyRoute().post("/langy/chat", async (c) => {
           // Legacy shape (kept for older agent versions).
           if (event.type === "text" && event.part?.text) {
             fullText += event.part.text;
-            writer.write({ type: "text-delta", delta: event.part.text, id: textId });
+            writer.write({
+              type: "text-delta",
+              delta: event.part.text,
+              id: textId,
+            });
             return;
           }
           // OpenCode shape: text deltas arrive as message.part.delta with field=text.
@@ -471,10 +482,7 @@ langyRoute().post("/langy/chat", async (c) => {
           });
         }
       } catch (error) {
-        logger.error(
-          { error },
-          "failed to record langy github PR usage",
-        );
+        logger.error({ error }, "failed to record langy github PR usage");
       }
     },
     onError: (error) => {
@@ -503,8 +511,10 @@ async function requireSessionAndPermission(
   const session = await getServerAuthSession({
     req: c.req.raw as NextRequestShim,
   });
-  if (!session) return { error: c.json({ error: "Unauthorized" }, { status: 401 }) };
-  if (!projectId) return { error: c.json({ error: "Missing projectId" }, { status: 400 }) };
+  if (!session)
+    return { error: c.json({ error: "Unauthorized" }, { status: 401 }) };
+  if (!projectId)
+    return { error: c.json({ error: "Missing projectId" }, { status: 400 }) };
   const ok = await hasProjectPermission(
     { prisma, session },
     projectId,
@@ -656,6 +666,5 @@ langyRoute().get("/langy/memory/export", async (c) => {
     conversations: conversationsWithMessages,
   });
 });
-
 
 export const app = secured.hono;

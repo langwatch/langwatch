@@ -28,7 +28,9 @@ export async function checkLangyMessageRateLimit({
   const key = `langy:rl:msg:${projectId}:${userId}:${bucket}`;
   let count: number;
   try {
-    count = await (connection as { incr: (k: string) => Promise<number> }).incr(key);
+    count = await (connection as { incr: (k: string) => Promise<number> }).incr(
+      key,
+    );
     if (count === 1) {
       await (
         connection as { expire: (k: string, s: number) => Promise<number> }
@@ -45,7 +47,10 @@ export async function checkLangyMessageRateLimit({
     return {
       allowed: false,
       remaining: 0,
-      retryAfterSeconds: Math.max(1, Math.ceil((nextBucket - Date.now()) / 1000)),
+      retryAfterSeconds: Math.max(
+        1,
+        Math.ceil((nextBucket - Date.now()) / 1000),
+      ),
     };
   }
   return { allowed: true, remaining };

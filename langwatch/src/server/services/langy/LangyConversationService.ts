@@ -114,11 +114,7 @@ export class LangyConversationRepository {
     });
   }
 
-  async hardDeleteOlderThan({
-    cutoff,
-  }: {
-    cutoff: Date;
-  }) {
+  async hardDeleteOlderThan({ cutoff }: { cutoff: Date }) {
     // Multi-tenancy guard requires projectId (or projectId.in) in WHERE.
     // Project is exempt from the guard — enumerate projects, then sweep
     // each one's soft-deleted conversations in a batched IN clause.
@@ -146,7 +142,9 @@ export class LangyConversationService {
   constructor(private readonly repository: LangyConversationRepository) {}
 
   static create(prisma: PrismaClient): LangyConversationService {
-    return new LangyConversationService(new LangyConversationRepository(prisma));
+    return new LangyConversationService(
+      new LangyConversationRepository(prisma),
+    );
   }
 
   async getById({
@@ -251,7 +249,8 @@ export class LangyConversationService {
     if (!conv || conv.userId !== userId) {
       throw new Error("conversation not found or not owned");
     }
-    const data: Parameters<LangyConversationRepository["update"]>[0]["data"] = {};
+    const data: Parameters<LangyConversationRepository["update"]>[0]["data"] =
+      {};
     if (title !== undefined) data.title = title;
     if (isShared !== undefined) {
       data.isShared = isShared;

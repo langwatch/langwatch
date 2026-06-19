@@ -228,9 +228,7 @@ type RefreshOutcome =
 // the lock and let a second caller race the single-use rotation.
 const REFRESH_FETCH_TIMEOUT_MS = (LOCK_TTL_SEC - 2) * 1000;
 
-async function refreshAtGitHub(
-  refreshToken: string,
-): Promise<RefreshOutcome> {
+async function refreshAtGitHub(refreshToken: string): Promise<RefreshOutcome> {
   let res: Response;
   let body: {
     access_token?: string;
@@ -290,9 +288,9 @@ async function refreshAtGitHub(
 async function redisGet(key: string): Promise<string | null> {
   if (!connection) return null;
   try {
-    return await (connection as { get: (k: string) => Promise<string | null> }).get(
-      key,
-    );
+    return await (
+      connection as { get: (k: string) => Promise<string | null> }
+    ).get(key);
   } catch {
     return null;
   }
@@ -307,7 +305,12 @@ async function redisSetEx(
   try {
     await (
       connection as {
-        set: (k: string, v: string, mode: string, ttl: number) => Promise<string>;
+        set: (
+          k: string,
+          v: string,
+          mode: string,
+          ttl: number,
+        ) => Promise<string>;
       }
     ).set(key, value, "EX", ttlSec);
   } catch {
@@ -360,7 +363,12 @@ export async function registerGithubOauthNonce(
   try {
     await (
       connection as {
-        set: (k: string, v: string, mode: string, ttl: number) => Promise<string>;
+        set: (
+          k: string,
+          v: string,
+          mode: string,
+          ttl: number,
+        ) => Promise<string>;
       }
     ).set(`langy:gh:nonce:${nonce}`, "1", "EX", ttlSec);
     return true;

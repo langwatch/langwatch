@@ -1,20 +1,17 @@
 import { type Job, Worker } from "bullmq";
 import { BullMQOtel } from "bullmq-otel";
-import { withJobContext } from "../../context/asyncContext";
 import { createLogger } from "../../../utils/logger/server";
 import {
   captureException,
   toError,
   withScope,
 } from "../../../utils/posthogErrorCapture";
-import {
-  getJobProcessingCounter,
-  recordJobWaitDuration,
-} from "../../metrics";
-import { connection } from "../../redis";
+import { withJobContext } from "../../context/asyncContext";
 import { prisma } from "../../db";
-import { LANGY_RETENTION_QUEUE } from "../queues/constants";
+import { getJobProcessingCounter, recordJobWaitDuration } from "../../metrics";
+import { connection } from "../../redis";
 import { LangyConversationService } from "../../services/langy/LangyConversationService";
+import { LANGY_RETENTION_QUEUE } from "../queues/constants";
 
 const logger = createLogger("langwatch:workers:langyRetentionWorker");
 
@@ -66,7 +63,10 @@ export const startLangyRetentionWorker = () => {
     logger.info("langy retention worker active");
   });
   worker.on("failed", async (job, err) => {
-    logger.error({ jobId: job?.id, error: err.message }, "retention job failed");
+    logger.error(
+      { jobId: job?.id, error: err.message },
+      "retention job failed",
+    );
     getJobProcessingCounter("langy_retention", "failed").inc();
     await withScope((scope) => {
       scope.setTag?.("worker", "langyRetention");

@@ -15,7 +15,9 @@ import { extractGithubPrLinks, extractOpenedPrLinks } from "../githubPrLinks";
 describe("extractGithubPrLinks", () => {
   describe("when the text has no GitHub URLs", () => {
     it("returns an empty list", () => {
-      expect(extractGithubPrLinks("I checked the dataset and it looks fine.")).toEqual([]);
+      expect(
+        extractGithubPrLinks("I checked the dataset and it looks fine."),
+      ).toEqual([]);
     });
   });
 

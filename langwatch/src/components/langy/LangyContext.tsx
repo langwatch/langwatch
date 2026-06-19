@@ -1,11 +1,11 @@
 import {
   createContext,
+  type ReactNode,
   useCallback,
   useContext,
   useEffect,
   useMemo,
   useState,
-  type ReactNode,
 } from "react";
 import type { ProposalHandlers } from "./MessageContent";
 
@@ -52,16 +52,12 @@ export function LangyProvider({ children }: { children: ReactNode }) {
       registerHandlers,
       clearHandlers,
     }),
-    [
-      isOpen,
-      proposalHandlers,
-      experimentSlug,
-      registerHandlers,
-      clearHandlers,
-    ],
+    [isOpen, proposalHandlers, experimentSlug, registerHandlers, clearHandlers],
   );
 
-  return <LangyContext.Provider value={value}>{children}</LangyContext.Provider>;
+  return (
+    <LangyContext.Provider value={value}>{children}</LangyContext.Provider>
+  );
 }
 
 export function useLangy(): LangyContextValue {

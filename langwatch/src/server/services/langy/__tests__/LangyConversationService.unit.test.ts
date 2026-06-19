@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   LangyConversationNotOwnedError,
-  LangyConversationRepository,
+  type LangyConversationRepository,
   LangyConversationService,
 } from "../LangyConversationService";
 

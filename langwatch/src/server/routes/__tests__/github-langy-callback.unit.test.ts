@@ -120,7 +120,10 @@ describe("GET /api/github-langy/callback", () => {
     vi.clearAllMocks();
     vi.unstubAllGlobals();
     getServerAuthSession.mockResolvedValue({ user: { id: "u1" } });
-    membershipFindUnique.mockResolvedValue({ userId: "u1", organizationId: "org1" });
+    membershipFindUnique.mockResolvedValue({
+      userId: "u1",
+      organizationId: "org1",
+    });
   });
 
   describe("when the state user is not a member of the state organization", () => {
@@ -155,7 +158,9 @@ describe("GET /api/github-langy/callback", () => {
       );
       expect(res.status).toBe(302);
       const location = res.headers.get("location") ?? "";
-      expect(location).toMatch(/^\/settings\/integrations\?githubError=.+#github$/);
+      expect(location).toMatch(
+        /^\/settings\/integrations\?githubError=.+#github$/,
+      );
     });
   });
 
@@ -204,10 +209,10 @@ describe("GET /api/github-langy/callback", () => {
       const state = await makeState({ mode: "popup" });
       mockGithubFetch({
         exchange: () =>
-          new Response(
-            JSON.stringify({ error: "bad_verification_code" }),
-            { status: 400, headers: { "Content-Type": "application/json" } },
-          ),
+          new Response(JSON.stringify({ error: "bad_verification_code" }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          }),
       });
       const res = await callCallback(
         `http://localhost/api/github-langy/callback?code=c&state=${encodeURIComponent(state)}`,
@@ -259,9 +264,7 @@ describe("GET /api/github-langy/callback", () => {
         `http://localhost/api/github-langy/callback?code=c&state=${encodeURIComponent(state)}`,
       );
       expect(res.status).toBe(302);
-      expect(res.headers.get("location")).toBe(
-        "/settings/integrations#github",
-      );
+      expect(res.headers.get("location")).toBe("/settings/integrations#github");
     });
   });
 });

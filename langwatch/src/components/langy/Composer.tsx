@@ -1,14 +1,15 @@
 import {
   Box,
+  chakra,
   Flex,
   HStack,
   Separator,
   Text,
   Textarea,
-  chakra,
 } from "@chakra-ui/react";
 import { Send, Square } from "lucide-react";
-import React, { useMemo, useState } from "react";
+import type React from "react";
+import { useMemo, useState } from "react";
 import { ModelSelector } from "~/components/ModelSelector";
 import {
   AI_BG_SUBTLE,
@@ -208,9 +209,7 @@ export function Composer({
                 if (!isBusy && canSend) onSend();
               }
             }}
-            placeholder={
-              isBusy ? "Langy is working…" : typewriterPlaceholder
-            }
+            placeholder={isBusy ? "Langy is working…" : typewriterPlaceholder}
             disabled={disabled || isBusy}
             rows={1}
             autoresize

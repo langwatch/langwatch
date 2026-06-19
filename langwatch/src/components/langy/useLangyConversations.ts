@@ -82,9 +82,9 @@ export function useLangyConversations({
   onError,
   onActiveCleared,
 }: UseLangyConversationsArgs): UseLangyConversationsResult {
-  const [conversations, setConversations] = useState<LangyConversationSummary[]>(
-    [],
-  );
+  const [conversations, setConversations] = useState<
+    LangyConversationSummary[]
+  >([]);
   const [currentConversationId, setCurrentConversationId] = useState<
     string | null
   >(null);
@@ -133,7 +133,7 @@ export function useLangyConversations({
     setMessages([]);
     setIsLoading(true);
     setHasListError(false);
-    (async () => {
+    void (async () => {
       try {
         const res = await fetch(
           `/api/langy/conversations?projectId=${encodeURIComponent(projectId)}`,
@@ -193,35 +193,32 @@ export function useLangyConversations({
     onActiveCleared?.();
   }, [projectId, setMessages, onActiveCleared]);
 
-  const adopt = useCallback(
-    (id: string) => {
-      const currentProjectId = projectIdRef.current;
-      if (!currentProjectId) return;
-      setCurrentConversationId(id);
-      writeLastConversationId(currentProjectId, id);
-      // Refresh the list in the background so the adopted conversation (and
-      // its server-derived title) appears in the recents list. Best-effort:
-      // a failure here only leaves the list slightly stale.
-      void (async () => {
-        try {
-          const res = await fetch(
-            `/api/langy/conversations?projectId=${encodeURIComponent(currentProjectId)}`,
-          );
-          if (!res.ok) return;
-          const data = (await res.json()) as ConversationsListResponse;
-          if (projectIdRef.current !== currentProjectId) return;
-          setConversations(
-            [...data.conversations].sort((a, b) =>
-              b.lastActivityAt.localeCompare(a.lastActivityAt),
-            ),
-          );
-        } catch {
-          // ignore — recents list refresh is cosmetic
-        }
-      })();
-    },
-    [],
-  );
+  const adopt = useCallback((id: string) => {
+    const currentProjectId = projectIdRef.current;
+    if (!currentProjectId) return;
+    setCurrentConversationId(id);
+    writeLastConversationId(currentProjectId, id);
+    // Refresh the list in the background so the adopted conversation (and
+    // its server-derived title) appears in the recents list. Best-effort:
+    // a failure here only leaves the list slightly stale.
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/langy/conversations?projectId=${encodeURIComponent(currentProjectId)}`,
+        );
+        if (!res.ok) return;
+        const data = (await res.json()) as ConversationsListResponse;
+        if (projectIdRef.current !== currentProjectId) return;
+        setConversations(
+          [...data.conversations].sort((a, b) =>
+            b.lastActivityAt.localeCompare(a.lastActivityAt),
+          ),
+        );
+      } catch {
+        // ignore — recents list refresh is cosmetic
+      }
+    })();
+  }, []);
 
   const remove = useCallback(
     async (id: string) => {

@@ -11,8 +11,8 @@
 import { describe, expect, it } from "vitest";
 
 import type { NormalizedSpan } from "../../../schemas/spans";
-import type { TraceOriginService } from "../trace-origin.service";
 import { TraceAttributeAccumulationService } from "../trace-attribute-accumulation.service";
+import type { TraceOriginService } from "../trace-origin.service";
 
 function makeService() {
   return new TraceAttributeAccumulationService(
@@ -22,7 +22,9 @@ function makeService() {
 }
 
 function makeSpan(
-  overrides: Partial<Pick<NormalizedSpan, "spanAttributes" | "resourceAttributes">> = {},
+  overrides: Partial<
+    Pick<NormalizedSpan, "spanAttributes" | "resourceAttributes">
+  > = {},
 ): NormalizedSpan {
   return {
     spanAttributes: {},

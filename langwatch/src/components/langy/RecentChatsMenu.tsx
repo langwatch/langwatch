@@ -106,7 +106,10 @@ export function RecentChatsMenu({
                 as="li"
                 gap={1}
                 borderRadius="sm"
-                _hover={{ background: "bg.subtle", "& .row-delete": { opacity: 1 } }}
+                _hover={{
+                  background: "bg.subtle",
+                  "& .row-delete": { opacity: 1 },
+                }}
               >
                 <Button
                   size="xs"

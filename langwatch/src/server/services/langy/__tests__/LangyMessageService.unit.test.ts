@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  LangyMessageRepository,
+  type LangyMessageRepository,
   LangyMessageService,
 } from "../LangyMessageService";
 
