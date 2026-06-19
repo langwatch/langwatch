@@ -190,8 +190,16 @@ function makeSpanReceivedEvent({
         startTimeUnixNano: String(now * 1_000_000),
         endTimeUnixNano: String((now + 1000) * 1_000_000),
         attributes: [
+          // langwatch.input MUST stay first: the offloaded IO field.
           { key: "langwatch.input", value: { stringValue: inputValue } },
-        ],
+          // Mixed-type siblings (#4888): real OTLP spans carry non-string
+          // AnyValue attributes. These must NOT be IO keys and carry NO
+          // eventref — they exist to prove the real CH round-trip would catch a
+          // regression where a non-string sibling fails the whole-array parse.
+          { key: "gen_ai.usage.input_tokens", value: { intValue: "100" } },
+          { key: "gen_ai.request.temperature", value: { doubleValue: 0.7 } },
+          { key: "langwatch.streaming", value: { boolValue: true } },
+        ] as never,
         events: [],
         links: [],
         status: { code: 1, message: null },
