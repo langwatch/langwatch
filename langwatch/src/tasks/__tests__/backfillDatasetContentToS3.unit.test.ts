@@ -6,7 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // stubbed to a no-op prisma to keep the unit test from opening a connection.
 // `vi.mock` is hoisted above these imports by vitest.
 vi.mock("../../server/db", () => ({
-  prisma: { dataset: { findMany: vi.fn() } },
+  prisma: {
+    project: { findMany: vi.fn() },
+    dataset: { findMany: vi.fn() },
+  },
 }));
 
 import { prisma as mockedPrisma } from "../../server/db";
@@ -21,7 +24,7 @@ import execute, {
  * the `DatasetStorage` chunk writer is a fake passed via `getStorage`, the
  * record repository's `findDatasetRecords` is stubbed, the storage destination
  * resolver is stubbed, and Prisma is stubbed at the `$transaction` /
- * advisory-lock (`$queryRaw`) seam. The chunk math + flip logic under test stay
+ * advisory-lock (`$executeRaw`) seam. The chunk math + flip logic under test stay
  * real.
  */
 
@@ -56,21 +59,21 @@ const makeRecord = (id: string, entry: unknown): DatasetRecord =>
 /**
  * A Prisma stub whose `$transaction(fn)` runs `fn` with a tx whose
  * `dataset.findFirst` returns `row` and whose `dataset.update` is a spy.
- * `$queryRaw` is the advisory-lock seam — spied so a test can assert the lock
+ * `$executeRaw` is the advisory-lock seam — spied so a test can assert the lock
  * was taken (mirrors the 6b mutations test).
  */
 const makePrisma = (row: Dataset | null) => {
   const update = vi.fn().mockResolvedValue(undefined);
   const findFirst = vi.fn().mockResolvedValue(row);
-  const queryRaw = vi.fn().mockResolvedValue([]);
+  const executeRaw = vi.fn().mockResolvedValue([]);
   const tx = {
-    $queryRaw: queryRaw,
+    $executeRaw: executeRaw,
     dataset: { findFirst, update },
   };
   const prisma = {
     $transaction: vi.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)),
   };
-  return { prisma, tx, update, findFirst, queryRaw };
+  return { prisma, tx, update, findFirst, executeRaw };
 };
 
 const makeStorage = (
@@ -103,7 +106,7 @@ describe("backfillDatasetContentToS3", () => {
       /** @scenario An existing dataset stays usable after the storage migration */
       it("writes its rows to S3 as chunks (ids preserved) and flips the dataset to s3_jsonl with correct counts", async () => {
         const row = makeDataset({ contentLayout: "postgres" });
-        const { prisma, update, queryRaw } = makePrisma(row);
+        const { prisma, update, executeRaw } = makePrisma(row);
         const findDatasetRecords = vi
           .fn()
           .mockResolvedValue([
@@ -132,7 +135,7 @@ describe("backfillDatasetContentToS3", () => {
 
         expect(outcome).toBe("migrated");
         // Advisory lock taken inside the transaction.
-        expect(queryRaw).toHaveBeenCalledOnce();
+        expect(executeRaw).toHaveBeenCalledOnce();
         // Rows written from index 0, wrapped { id, entry } with ids PRESERVED.
         const writeArgs = writeChunks.mock.calls[0]![0];
         expect(writeArgs.fromIndex).toBe(0);
@@ -284,13 +287,21 @@ describe("backfillDatasetContentToS3", () => {
       });
     });
 
-    describe("when the project has no S3 storage configured", () => {
-      it("skips the dataset, leaves it on postgres, and never takes the lock", async () => {
+    describe("when the project resolves to local filesystem storage (no S3)", () => {
+      it("migrates the dataset to the local backend (S3 preferred, local fallback)", async () => {
         const row = makeDataset({ contentLayout: "postgres" });
-        const { prisma, queryRaw } = makePrisma(row);
-        const writeChunks = vi.fn();
+        const { prisma, executeRaw } = makePrisma(row);
+        const findDatasetRecords = vi
+          .fn()
+          .mockResolvedValue([makeRecord("rec_a", { q: "1" })]);
+        const writeChunks = vi
+          .fn()
+          .mockResolvedValue([
+            { index: 0, rowCount: 1, byteSize: 20, startRow: 0, endRow: 1 },
+          ]);
         const deps = makeDeps({
           prisma: prisma as never,
+          recordRepository: { findDatasetRecords } as never,
           resolveStorage: vi
             .fn()
             .mockResolvedValue({ kind: "file", root: "/x" }),
@@ -302,10 +313,34 @@ describe("backfillDatasetContentToS3", () => {
           deps,
         );
 
-        expect(outcome).toBe("no-s3");
+        expect(outcome).toBe("migrated");
+        expect(writeChunks).toHaveBeenCalled();
+        // The advisory lock IS taken for the local-FS migration.
+        expect(executeRaw).toHaveBeenCalled();
+      });
+    });
+
+    describe("in dry-run mode", () => {
+      it("reports the dataset without taking the lock, writing chunks, or flipping it", async () => {
+        const row = makeDataset({ contentLayout: "postgres" });
+        const { prisma, update, executeRaw } = makePrisma(row);
+        const writeChunks = vi.fn();
+        const deps = makeDeps({
+          prisma: prisma as never,
+          getStorage: vi.fn().mockResolvedValue(makeStorage(writeChunks)),
+        });
+
+        const outcome = await migrateDatasetToS3(
+          { dataset: row, projectId: "p1" },
+          deps,
+          { dryRun: true },
+        );
+
+        expect(outcome).toBe("would-migrate");
         expect(writeChunks).not.toHaveBeenCalled();
-        // No advisory lock taken — the transaction is never entered.
-        expect(queryRaw).not.toHaveBeenCalled();
+        // No advisory lock and no contentLayout flip.
+        expect(executeRaw).not.toHaveBeenCalled();
+        expect(update).not.toHaveBeenCalled();
       });
     });
   });
@@ -315,44 +350,49 @@ describe("backfillDatasetContentToS3", () => {
       it("no-ops entirely (the task returns before touching the DB)", async () => {
         process.env.SKIP_DATASET_S3_MIGRATE = "1";
         // The SKIP guard returns before any DB / storage access — observable as
-        // the mocked prisma.dataset.findMany never being called.
+        // the mocked prisma.project.findMany (the project walk) never being called.
         await expect(execute()).resolves.toBeUndefined();
         expect(
           (
             mockedPrisma as unknown as {
-              dataset: { findMany: ReturnType<typeof vi.fn> };
+              project: { findMany: ReturnType<typeof vi.fn> };
             }
-          ).dataset.findMany,
+          ).project.findMany,
         ).not.toHaveBeenCalled();
       });
     });
 
     describe("when the schema migration has not run yet (column missing)", () => {
       it("self-skips cleanly (exit 0) instead of throwing and failing the Helm release", async () => {
-        // The post-upgrade hook can race the app-boot migration: the first
-        // findMany selecting `contentLayout` errors with P2022 ("column does not
-        // exist"). execute() must swallow it and return, not throw.
+        // The post-upgrade hook can race the app-boot migration: the scan
+        // selecting `contentLayout` errors with P2022 ("column does not exist").
+        // execute() must swallow it and return, not throw.
         const p2022 = new Prisma.PrismaClientKnownRequestError(
           "The column `Dataset.contentLayout` does not exist in the current database.",
           { code: "P2022", clientVersion: "test" },
         );
-        (
-          mockedPrisma as unknown as {
-            dataset: { findMany: ReturnType<typeof vi.fn> };
-          }
-        ).dataset.findMany.mockRejectedValueOnce(p2022);
+        const pm = mockedPrisma as unknown as {
+          project: { findMany: ReturnType<typeof vi.fn> };
+          dataset: { findMany: ReturnType<typeof vi.fn> };
+        };
+        pm.project.findMany.mockResolvedValueOnce([{ id: "p1" }]);
+        pm.dataset.findMany.mockRejectedValueOnce(p2022);
 
         await expect(execute()).resolves.toBeUndefined();
       });
     });
 
     describe("when there are postgres datasets across pages", () => {
-      it("tallies migrated / already-migrated / no-s3 outcomes", async () => {
+      it("tallies migrated / already-migrated outcomes", async () => {
         const d1 = makeDataset({ id: "d1", contentLayout: "postgres" });
         const d2 = makeDataset({ id: "d2", contentLayout: "postgres" });
 
-        // First page returns two; second page is empty → loop terminates.
-        const findMany = vi
+        // One project; its first dataset page returns two, the second is empty
+        // → loop terminates. The per-dataset lock is a separate tx-scoped
+        // $executeRaw. Datasets are queried per-project WITH projectId (the
+        // middleware requires it); the project list is the exempt walk.
+        const projectFindMany = vi.fn().mockResolvedValue([{ id: "p1" }]);
+        const datasetFindMany = vi
           .fn()
           .mockResolvedValueOnce([
             {
@@ -370,14 +410,15 @@ describe("backfillDatasetContentToS3", () => {
           ])
           .mockResolvedValueOnce([]);
 
-        // Per-dataset transaction stub: d1 migrates, d2 has no s3.
+        // Per-dataset transaction stub: d1 → s3, d2 → local FS, both migrate.
         const update = vi.fn().mockResolvedValue(undefined);
-        const queryRaw = vi.fn().mockResolvedValue([]);
+        const lockExecuteRaw = vi.fn().mockResolvedValue([]);
         const prisma = {
-          dataset: { findMany },
+          project: { findMany: projectFindMany },
+          dataset: { findMany: datasetFindMany },
           $transaction: vi.fn(async (fn: (t: unknown) => unknown) =>
             fn({
-              $queryRaw: queryRaw,
+              $executeRaw: lockExecuteRaw,
               dataset: {
                 findFirst: vi.fn().mockResolvedValue(d1),
                 update,
@@ -401,16 +442,16 @@ describe("backfillDatasetContentToS3", () => {
           resolveStorage: vi
             .fn()
             .mockResolvedValueOnce({ kind: "s3", bucket: "b" }) // d1 → s3
-            .mockResolvedValueOnce({ kind: "file", root: "/x" }), // d2 → no s3
+            .mockResolvedValueOnce({ kind: "file", root: "/x" }), // d2 → local FS
           getStorage: vi.fn().mockResolvedValue(makeStorage(writeChunks)),
         });
 
         const summary = await migrateAllPostgresDatasets(deps);
 
         expect(summary).toEqual({
-          migrated: 1,
+          migrated: 2,
+          wouldMigrate: 0,
           alreadyMigrated: 0,
-          noS3: 1,
           failed: 0,
         });
         // d2's id reference keeps the linter happy that both fixtures are used.
@@ -432,6 +473,7 @@ describe("backfillDatasetContentToS3", () => {
           ])
           .mockResolvedValueOnce([]);
         const prisma = {
+          project: { findMany: vi.fn().mockResolvedValue([{ id: "p1" }]) },
           dataset: { findMany },
           $transaction: vi.fn(async () => {
             throw new Error("S3 write failed");

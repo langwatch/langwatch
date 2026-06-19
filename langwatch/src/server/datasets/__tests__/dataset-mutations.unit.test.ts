@@ -37,21 +37,21 @@ const makeDataset = (overrides: Partial<Dataset> = {}): Dataset =>
 /**
  * A Prisma stub whose `$transaction(fn)` runs `fn` with a tx whose
  * `dataset.findFirstOrThrow` returns `row` and whose `dataset.update` is a spy.
- * `$queryRaw` is the advisory-lock seam — spied so a test can assert the lock
+ * `$executeRaw` is the advisory-lock seam — spied so a test can assert the lock
  * was taken. Returns the spies for assertions.
  */
 const makePrisma = (row: Dataset) => {
   const update = vi.fn().mockResolvedValue(undefined);
   const findFirstOrThrow = vi.fn().mockResolvedValue(row);
-  const queryRaw = vi.fn().mockResolvedValue([]);
+  const executeRaw = vi.fn().mockResolvedValue([]);
   const tx = {
-    $queryRaw: queryRaw,
+    $executeRaw: executeRaw,
     dataset: { findFirstOrThrow, update },
   };
   const prisma = {
     $transaction: vi.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)),
   };
-  return { prisma, tx, update, findFirstOrThrow, queryRaw };
+  return { prisma, tx, update, findFirstOrThrow, executeRaw };
 };
 
 /** A storage fake with controllable chunk I/O spies. */
@@ -82,7 +82,7 @@ describe("dataset-mutations (s3_jsonl)", () => {
             { index: 0, startRow: 0, endRow: 10, byteSize: 100 },
           ] as unknown as Dataset["chunkOffsets"],
         });
-        const { prisma, update, queryRaw } = makePrisma(row);
+        const { prisma, update, executeRaw } = makePrisma(row);
         const storage = makeStorage({
           writeChunks: vi
             .fn()
@@ -101,7 +101,7 @@ describe("dataset-mutations (s3_jsonl)", () => {
 
         expect(result).toEqual({ appended: 2 });
         // Advisory lock taken inside the transaction.
-        expect(queryRaw).toHaveBeenCalledOnce();
+        expect(executeRaw).toHaveBeenCalledOnce();
         // Appends from the existing chunkCount, never overwriting chunk 0.
         const writeArgs = storage.writeChunks.mock.calls[0]![0];
         expect(writeArgs.fromIndex).toBe(1);
@@ -156,7 +156,7 @@ describe("dataset-mutations (s3_jsonl)", () => {
             { index: 1, startRow: 2, endRow: 4, byteSize: 100 },
           ] as unknown as Dataset["chunkOffsets"],
         });
-        const { prisma, update, queryRaw } = makePrisma(row);
+        const { prisma, update, executeRaw } = makePrisma(row);
         const readChunk = vi
           .fn()
           .mockResolvedValueOnce([
@@ -185,7 +185,7 @@ describe("dataset-mutations (s3_jsonl)", () => {
         });
 
         expect(result).toEqual({ updated: true });
-        expect(queryRaw).toHaveBeenCalledOnce();
+        expect(executeRaw).toHaveBeenCalledOnce();
         // Scanned chunk 0 then chunk 1; rewrote ONLY chunk 1 with r3 replaced.
         expect(readChunk).toHaveBeenCalledTimes(2);
         expect(rewriteChunk).toHaveBeenCalledOnce();
@@ -304,7 +304,7 @@ describe("dataset-mutations (s3_jsonl)", () => {
             { index: 1, startRow: 2, endRow: 4, byteSize: 100 },
           ] as unknown as Dataset["chunkOffsets"],
         });
-        const { prisma, update, queryRaw } = makePrisma(row);
+        const { prisma, update, executeRaw } = makePrisma(row);
         const readChunk = vi
           .fn()
           .mockResolvedValueOnce([
@@ -333,7 +333,7 @@ describe("dataset-mutations (s3_jsonl)", () => {
         });
 
         expect(result).toEqual({ deleted: 1 });
-        expect(queryRaw).toHaveBeenCalledOnce();
+        expect(executeRaw).toHaveBeenCalledOnce();
         // Only chunk 0 (the affected one) is rewritten; chunk 1 is left alone.
         expect(rewriteChunk).toHaveBeenCalledOnce();
         expect(rewriteChunk.mock.calls[0]![0]).toMatchObject({
@@ -495,7 +495,7 @@ describe("dataset-mutations (s3_jsonl)", () => {
           chunkCount: 2,
           chunkOffsets: [] as unknown as Dataset["chunkOffsets"],
         });
-        const { prisma, update, queryRaw } = makePrisma(row);
+        const { prisma, update, executeRaw } = makePrisma(row);
         const readChunk = vi
           .fn()
           .mockResolvedValueOnce([
@@ -513,7 +513,7 @@ describe("dataset-mutations (s3_jsonl)", () => {
         });
 
         // Lock taken; both chunks read to measure their real bytes.
-        expect(queryRaw).toHaveBeenCalledOnce();
+        expect(executeRaw).toHaveBeenCalledOnce();
         expect(readChunk).toHaveBeenCalledTimes(2);
 
         // Concrete bytes: toSingleJsonl of each chunk's actual rows.

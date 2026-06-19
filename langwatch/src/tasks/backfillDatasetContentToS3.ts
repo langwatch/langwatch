@@ -10,9 +10,12 @@
  * Job, or the self-hosted Helm `post-install,post-upgrade` hook Job — never in
  * `start.sh`), and is safe to fire on every upgrade because it self-skips when:
  *   - `SKIP_DATASET_S3_MIGRATE` is set (global opt-out), or
- *   - no datasets remain on `contentLayout='postgres'`, or
- *   - a given project has no S3 storage configured (can't migrate to S3 without
- *     S3 — that dataset is LEFT on `postgres` and keeps reading from PG).
+ *   - no datasets remain on `contentLayout='postgres'`.
+ * Each dataset migrates to whatever backend the resolver provides: S3 when
+ * configured, otherwise the local filesystem (`LocalDatasetStorage`). The
+ * resolver always returns a backend, so there is no "no storage" skip — a
+ * self-hosted no-S3 install backfills to its local path, which must be a
+ * persistent volume (else a restart loses chunks the row now points to).
  *
  * Idempotency + resume (I-MIG / I-IDEM):
  *   - The loop paginates `postgres` datasets by id and, for EACH, re-reads the
@@ -66,7 +69,7 @@ const isMissingColumnError = (error: unknown): boolean =>
   error.code === "P2022";
 
 /** Outcome of attempting to migrate one dataset (for structured counts). */
-export type MigrateOutcome = "migrated" | "already-migrated" | "no-s3";
+export type MigrateOutcome = "migrated" | "already-migrated" | "would-migrate";
 
 /**
  * Boundaries the per-dataset migrate logic depends on. Injected so the core can
@@ -102,18 +105,28 @@ export const migrateDatasetToS3 = async (
     projectId: string;
   },
   deps: BackfillDeps,
+  options: { dryRun?: boolean } = {},
 ): Promise<MigrateOutcome> => {
-  // Can't migrate to S3 without S3 — leave it on `postgres` so it keeps
-  // reading from PG (I-SELFHOST). Checked before taking the lock since it
-  // needs no serialization.
+  // Migrate to whatever storage the resolver provides — S3 when configured,
+  // otherwise the local filesystem (LocalDatasetStorage fully supports chunked
+  // JSONL). The resolver always returns a backend, so there is no "no storage"
+  // skip; a self-hosted no-S3 install backfills to its local path (which must
+  // be a persistent volume, else a restart loses chunks the row now points to).
+  // Resolved before the lock (no serialization needed) for the log line only.
   const destination = await deps.resolveStorage(projectId);
-  if (destination.kind !== "s3") {
+  if (options.dryRun) {
+    // Read-only: resolve the target backend and report, but take no lock, write
+    // no chunks, and never flip `contentLayout`.
     logger.info(
-      { datasetId: dataset.id, projectId },
-      "Skipping dataset — project has no S3 storage configured, leaving on postgres",
+      { datasetId: dataset.id, projectId, backend: destination.kind },
+      "[dry-run] would migrate dataset content to chunked JSONL — no changes written",
     );
-    return "no-s3";
+    return "would-migrate";
   }
+  logger.info(
+    { datasetId: dataset.id, projectId, backend: destination.kind },
+    "Migrating dataset content to chunked JSONL",
+  );
 
   const storage = await deps.getStorage(projectId);
 
@@ -193,7 +206,7 @@ export const migrateDatasetToS3 = async (
           chunkCount: meta.chunkCount,
           sizeBytes: meta.sizeBytes,
         },
-        "Migrated dataset content to S3 (s3_jsonl)",
+        "Migrated dataset content to chunked JSONL (s3_jsonl)",
       );
       return "migrated";
     },
@@ -203,8 +216,9 @@ export const migrateDatasetToS3 = async (
 /** Running tally of per-dataset outcomes. */
 export type BackfillSummary = {
   migrated: number;
+  /** Dry-run only: datasets that WOULD be migrated (nothing was written). */
+  wouldMigrate: number;
   alreadyMigrated: number;
-  noS3: number;
   failed: number;
 };
 
@@ -216,46 +230,63 @@ export type BackfillSummary = {
  */
 export const migrateAllPostgresDatasets = async (
   deps: BackfillDeps,
+  options: { dryRun?: boolean } = {},
 ): Promise<BackfillSummary> => {
   const summary: BackfillSummary = {
     migrated: 0,
+    wouldMigrate: 0,
     alreadyMigrated: 0,
-    noS3: 0,
     failed: 0,
   };
 
-  let cursor: string | undefined;
-  for (;;) {
-    const page = await deps.prisma.dataset.findMany({
-      where: {
-        contentLayout: "postgres",
-        ...(cursor ? { id: { gt: cursor } } : {}),
-      },
-      select: { id: true, projectId: true, contentLayout: true, status: true },
-      orderBy: { id: "asc" },
-      take: PAGE_SIZE,
-    });
-    if (page.length === 0) break;
+  // `Project` is a GLOBAL_MODEL (exempt from the projectId guard), so list every
+  // project, then scan each project's `postgres` datasets WITH `projectId` — the
+  // multitenancy middleware requires it on model-level queries (a bare
+  // cross-tenant Dataset query is rejected by design). Mirrors the cross-tenant
+  // walk in `migrateCustomModels`.
+  const projects = await deps.prisma.project.findMany({ select: { id: true } });
 
-    for (const dataset of page) {
-      try {
-        const outcome = await migrateDatasetToS3(
-          { dataset, projectId: dataset.projectId },
-          deps,
-        );
-        if (outcome === "migrated") summary.migrated += 1;
-        else if (outcome === "already-migrated") summary.alreadyMigrated += 1;
-        else summary.noS3 += 1;
-      } catch (error) {
-        summary.failed += 1;
-        logger.error(
-          { error, datasetId: dataset.id, projectId: dataset.projectId },
-          "Failed to migrate dataset to S3 — will retry on the next run",
-        );
+  for (const project of projects) {
+    let cursor: string | undefined;
+    for (;;) {
+      const page = await deps.prisma.dataset.findMany({
+        where: {
+          projectId: project.id,
+          contentLayout: "postgres",
+          ...(cursor ? { id: { gt: cursor } } : {}),
+        },
+        select: {
+          id: true,
+          projectId: true,
+          contentLayout: true,
+          status: true,
+        },
+        orderBy: { id: "asc" },
+        take: PAGE_SIZE,
+      });
+      if (page.length === 0) break;
+
+      for (const dataset of page) {
+        try {
+          const outcome = await migrateDatasetToS3(
+            { dataset, projectId: dataset.projectId },
+            deps,
+            options,
+          );
+          if (outcome === "migrated") summary.migrated += 1;
+          else if (outcome === "would-migrate") summary.wouldMigrate += 1;
+          else summary.alreadyMigrated += 1;
+        } catch (error) {
+          summary.failed += 1;
+          logger.error(
+            { error, datasetId: dataset.id, projectId: dataset.projectId },
+            "Failed to migrate dataset to S3 — will retry on the next run",
+          );
+        }
       }
-    }
 
-    cursor = page[page.length - 1]!.id;
+      cursor = page[page.length - 1]!.id;
+    }
   }
 
   return summary;
@@ -285,10 +316,28 @@ export default async function execute(): Promise<void> {
     getStorage: getDatasetStorage,
   };
 
-  logger.info("Starting PG→S3 dataset content backfill");
+  // Dry-run: report what WOULD migrate (and to which backend) without taking a
+  // lock, writing chunks, or flipping `contentLayout`. Via env or CLI flag:
+  //   DATASET_S3_MIGRATE_DRY_RUN=1 pnpm run task backfillDatasetContentToS3
+  //   pnpm run task backfillDatasetContentToS3 --dry-run
+  const dryRun =
+    !!process.env.DATASET_S3_MIGRATE_DRY_RUN ||
+    process.argv.includes("--dry-run");
+
+  logger.info(
+    { dryRun },
+    dryRun
+      ? "Starting PG→S3 dataset content backfill (DRY RUN — no changes will be written)"
+      : "Starting PG→S3 dataset content backfill",
+  );
   try {
-    const summary = await migrateAllPostgresDatasets(deps);
-    logger.info({ ...summary }, "Finished PG→S3 dataset content backfill");
+    const summary = await migrateAllPostgresDatasets(deps, { dryRun });
+    logger.info(
+      { ...summary, dryRun },
+      dryRun
+        ? "Finished PG→S3 dataset content backfill (DRY RUN — nothing written)"
+        : "Finished PG→S3 dataset content backfill",
+    );
   } catch (error) {
     // Hook/schema race: the post-upgrade hook can run before the app pod's
     // migration adds `contentLayout`. Self-skip (exit 0) so the Helm release

@@ -60,7 +60,10 @@ export const withDatasetLock = async <T>(
 ): Promise<T> =>
   prisma.$transaction(
     async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
+      // `$executeRaw` (not `$queryRaw`): pg_advisory_xact_lock returns `void`,
+      // which $queryRaw can't deserialize. $executeRaw runs the statement and
+      // ignores the result, acquiring the lock as a side effect.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
       return fn(tx);
     },
     {

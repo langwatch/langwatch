@@ -44,7 +44,7 @@ const makeService = (overrides: {
 const makeLockPrisma = (row: Record<string, unknown>) => ({
   $transaction: async (fn: (tx: unknown) => unknown) =>
     fn({
-      $queryRaw: async () => [],
+      $executeRaw: async () => [],
       dataset: {
         findFirstOrThrow: async () => ({ ...row }),
         update: async () => ({ ...row }),

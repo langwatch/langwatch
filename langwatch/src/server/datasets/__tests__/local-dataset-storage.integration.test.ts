@@ -360,14 +360,14 @@ describe("LocalDatasetStorage", () => {
      * A prisma stub whose `$transaction(fn)` runs `fn(tx)` against a mutable
      * in-memory `Dataset` row. `tx.dataset.findFirstOrThrow` returns the live
      * row; `tx.dataset.update` applies the data patch to it (so a later
-     * mutation sees the advanced counters). `tx.$queryRaw` stands in for the
+     * mutation sees the advanced counters). `tx.$executeRaw` stands in for the
      * advisory lock.
      */
     const makePrismaOver = (row: Record<string, unknown>) => {
       const prisma = {
         $transaction: async (fn: (tx: unknown) => unknown) =>
           fn({
-            $queryRaw: async () => [],
+            $executeRaw: async () => [],
             dataset: {
               findFirstOrThrow: async () => ({ ...row }),
               update: async ({ data }: { data: Record<string, unknown> }) => {
