@@ -105,6 +105,52 @@ describe("PrivacyRuleDrawer inherit controls", () => {
       const piiInherit = screen.getByRole("radio", { name: /Inherit/ });
       expect(piiInherit).toBeChecked();
     });
+
+    /** @scenario Every control offers Inherit as a choice */
+    it("offers Inherit on every category, PII, and secrets control", () => {
+      renderDrawer();
+
+      for (const label of [
+        "Input",
+        "Output",
+        "System instructions",
+        "Tool calls",
+        "Secrets redaction",
+      ]) {
+        expect(categoryValue(label)).toContain("Inherit");
+      }
+
+      for (const name of [
+        /Inherit/,
+        /^Off$/,
+        /^Essential/,
+        /^Strict/,
+        /^Custom/,
+      ]) {
+        expect(screen.getByRole("radio", { name })).toBeInTheDocument();
+      }
+    });
+  });
+
+  describe("when adding a rule at the organization scope", () => {
+    /** @scenario At the organization scope, Inherit resolves to the platform default */
+    it("shows every inheriting control resolving to the platform default", () => {
+      renderDrawer({
+        editingRule: {
+          scopeType: "ORGANIZATION",
+          scopeId: "org-1",
+          personalOnly: false,
+          name: "Acme",
+          config: {},
+        },
+      });
+
+      expect(screen.getAllByText("Inherits Captured")).toHaveLength(4);
+      expect(
+        screen.getByRole("radio", { name: /Inherit.*Essential/ }),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Inherits On")).toBeInTheDocument();
+    });
   });
 
   describe("when adding a rule under a parent that drops input", () => {
@@ -138,6 +184,7 @@ describe("PrivacyRuleDrawer inherit controls", () => {
   });
 
   describe("when editing a rule that sets strict PII", () => {
+    /** @scenario Editing a rule that only sets PII leaves secrets inheriting */
     it("shows the PII level as the explicit choice, secrets still inheriting", () => {
       renderDrawer({
         editingRule: {

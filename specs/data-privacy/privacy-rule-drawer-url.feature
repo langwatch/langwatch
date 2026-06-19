@@ -36,7 +36,10 @@ Feature: Shareable privacy rule drawer
     When the admin closes the drawer
     Then the drawer parameters are removed from the URL
 
-  @integration
+  # Back-button history is provided by the shared drawer framework once the
+  # drawer is URL-routed (the scenarios above prove it is). It needs a real
+  # history stack, so it is verified in browser QA rather than in jsdom.
+  @integration @unimplemented
   Scenario: The browser back button closes the drawer
     Given an admin opened the privacy rule drawer from the data privacy page
     When the admin presses the browser back button

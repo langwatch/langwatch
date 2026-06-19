@@ -180,7 +180,7 @@ export default withPermissionGuard("project:view", {
   layoutComponent: SettingsLayout,
 })(DataPrivacySettings);
 
-function DataPrivacyPage({ projectId }: { projectId: string }) {
+export function DataPrivacyPage({ projectId }: { projectId: string }) {
   const utils = api.useUtils();
   const { project: currentProject } = useOrganizationTeamProject();
   const snapshotQuery = api.dataPrivacy.getSnapshot.useQuery({ projectId });

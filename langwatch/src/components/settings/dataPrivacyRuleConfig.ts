@@ -23,11 +23,8 @@ import {
  * hands the field back to the wider scope.
  */
 
-/** The four content categories plus the explicit "inherit from parent" choice. */
 export type CategoryChoice = "inherit" | Disposition;
-/** The PII levels plus the explicit "inherit from parent" choice. */
 export type PiiChoice = "inherit" | PiiLevel;
-/** Secrets redaction as a tri-state: inherit, explicitly on, explicitly off. */
 export type SecretsChoice = "inherit" | "on" | "off";
 
 /**
@@ -194,7 +191,9 @@ export function buildRuleConfig({
     const patterns = secretsPatterns.map((p) => p.trim()).filter(Boolean);
     config.secrets = {
       enabled: secretsChoice === "on",
-      ...(patterns.length > 0 ? { customPatterns: patterns } : {}),
+      ...(secretsChoice === "on" && patterns.length > 0
+        ? { customPatterns: patterns }
+        : {}),
     };
   }
   const attributeRows = validCustomAttributeRows(customAttributes);

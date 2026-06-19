@@ -170,6 +170,15 @@ describe("buildRuleConfig", () => {
         customPatterns: ["acme_live_[a-z0-9]+"],
       });
     });
+
+    it("discards leftover patterns when redaction is turned off", () => {
+      const config = build({
+        secretsChoice: "off",
+        secretsPatterns: ["acme_live_[a-z0-9]+"],
+      });
+
+      expect(config.secrets).toEqual({ enabled: false });
+    });
   });
 
   describe("given custom attribute rows", () => {

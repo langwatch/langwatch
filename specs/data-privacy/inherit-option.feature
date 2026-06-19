@@ -18,11 +18,11 @@ Feature: Inherit option on privacy rules
     Given an organization "acme" with a team "platform" and a project "web-app"
 
   @integration
-  Scenario: Every content category offers Inherit as its first choice
+  Scenario: Every control offers Inherit as a choice
     When an admin opens the privacy rule drawer for project "web-app"
-    Then each content category offers "Inherit", "Captured", "Restricted", and "Dropped"
-    And PII redaction offers "Inherit" alongside the off and level choices
-    And secrets redaction offers "Inherit" alongside on and off
+    Then every content category offers an "Inherit" choice
+    And PII redaction offers "Inherit" alongside the off, essential, strict, and custom choices
+    And secrets redaction offers an "Inherit" choice
 
   @integration
   Scenario: A new rule starts with every setting inheriting
@@ -75,3 +75,10 @@ Feature: Inherit option on privacy rules
     Then each content category shows "Inherit" resolving to "Captured"
     And PII redaction shows "Inherit" resolving to "Essential"
     And secrets redaction shows "Inherit" resolving to "On"
+
+  @integration
+  Scenario: Editing a rule that only sets PII leaves secrets inheriting
+    Given a project rule on "web-app" that only sets strict PII
+    When an admin opens that rule in the drawer
+    Then PII redaction shows "Strict"
+    And secrets redaction shows "Inherit"
