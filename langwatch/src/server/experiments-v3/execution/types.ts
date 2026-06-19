@@ -202,6 +202,9 @@ export type EvaluationV3Event =
       rowIndex: number;
       targetId: string;
       evaluatorId: string;
+      // Display name for evaluators that carry one without a DB record (workflow
+      // evaluator nodes). DB-backed evaluators resolve their name at storage time.
+      evaluatorName?: string;
       result: SingleEvaluationResult;
     }
   | { type: "progress"; completed: number; total: number }
