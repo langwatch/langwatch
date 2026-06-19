@@ -349,8 +349,11 @@ function LangyPanel({
         id: m.id,
         role: m.role,
         parts: [{ type: "text" as const, text: m.content }],
-      })) as unknown as UIMessage[];
-      setMessages(uiMessages);
+      }));
+      // Cast to setMessages's own parameter type rather than `ai`'s UIMessage:
+      // useChat is typed via @ai-sdk/react's nested `ai`, a different version
+      // than the app's direct `ai`, so an `ai` UIMessage[] isn't assignable here.
+      setMessages(uiMessages as unknown as Parameters<typeof setMessages>[0]);
     },
     [setMessages],
   );
