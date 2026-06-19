@@ -386,8 +386,18 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
     return c.json({ error: "No dataset configured" }, { status: 400 });
   }
 
-  const rawBody = (await c.req.json().catch(() => ({}))) as unknown;
-  const inputsParse = runInputsBodySchema.safeParse(rawBody ?? {});
+  // An empty body is allowed (a full run); malformed JSON must 400 rather than
+  // silently default to {} and start a full run on invalid input.
+  const bodyText = await c.req.text();
+  let rawBody: unknown = {};
+  if (bodyText.trim()) {
+    try {
+      rawBody = JSON.parse(bodyText);
+    } catch {
+      return c.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+  }
+  const inputsParse = runInputsBodySchema.safeParse(rawBody);
   if (!inputsParse.success) {
     return c.json(
       {

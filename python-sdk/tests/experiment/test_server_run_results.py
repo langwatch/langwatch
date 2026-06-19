@@ -13,7 +13,6 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-import langwatch
 from langwatch.experiment import platform_run
 from langwatch.experiment.platform_run import run as experiment_run
 
@@ -78,7 +77,7 @@ class _FakeClient:
 @pytest.fixture(autouse=True)
 def _no_setup_no_sleep(monkeypatch):
     """Neutralize side effects: real setup, env credentials, and poll sleeps."""
-    monkeypatch.setattr(langwatch, "ensure_setup", lambda: None)
+    monkeypatch.setattr("langwatch.ensure_setup", lambda: None)
     monkeypatch.setattr(platform_run, "get_api_key", lambda: "sk-lw-test")
     monkeypatch.setattr(
         platform_run, "get_endpoint", lambda: "https://app.langwatch.ai"

@@ -13,7 +13,6 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-import langwatch
 from langwatch import workflow as workflow_module
 from langwatch.experiment import platform_run
 from langwatch.workflow import run as workflow_run
@@ -74,7 +73,7 @@ class _FakeClient:
 
 @pytest.fixture(autouse=True)
 def _no_setup_no_sleep(monkeypatch):
-    monkeypatch.setattr(langwatch, "ensure_setup", lambda: None)
+    monkeypatch.setattr("langwatch.ensure_setup", lambda: None)
     monkeypatch.setattr(workflow_module, "get_api_key", lambda: "sk-lw-test")
     monkeypatch.setattr(
         workflow_module, "get_endpoint", lambda: "https://app.langwatch.ai"

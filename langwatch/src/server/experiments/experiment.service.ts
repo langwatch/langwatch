@@ -167,22 +167,34 @@ export class ExperimentService {
 
     const baseSlug = slugify(name) || "workflow-evaluation";
     const initialSlug = await this.generateUniqueSlug({ baseSlug, projectId });
-    const { result } = await this.saveWithSlugRetry({
+    // A deterministic id keeps the create idempotent under concurrent
+    // evaluations: two requests that both miss the lookup above upsert the same
+    // row instead of creating two experiments for one workflow.
+    const id = `experiment_${workflowId}`;
+    const { slug } = await this.saveWithSlugRetry({
       initialSlug,
-      execute: (slug) =>
-        this.repository.create({
-          data: {
+      execute: (candidateSlug) =>
+        this.repository.upsertById({
+          id,
+          projectId,
+          create: {
+            id,
             name,
-            slug,
+            slug: candidateSlug,
             projectId,
             type: ExperimentType.EVALUATIONS_V3,
             workflowId,
             workbenchState: workbenchStateJson,
           },
+          update: {
+            name,
+            slug: candidateSlug,
+            workbenchState: workbenchStateJson,
+          },
         }),
       regenerateSlug: () => this.generateUniqueSlug({ baseSlug, projectId }),
     });
-    return { id: result.id, slug: result.slug };
+    return { id, slug };
   }
 
   /**

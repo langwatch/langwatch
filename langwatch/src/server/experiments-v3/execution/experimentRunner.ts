@@ -38,9 +38,13 @@ export const startPollingRun = async (
 ): Promise<{ runId: string; runUrl: string; total: number }> => {
   const { projectSlug, experimentSlug, scope, ...orchestratorInput } = input;
   const effectiveScope: ExecutionScope = scope ?? { type: "full" };
-  const totalCells =
-    orchestratorInput.datasetRows.length *
-    orchestratorInput.state.targets.length;
+  const rowCount =
+    effectiveScope.type === "rows"
+      ? effectiveScope.rowIndices.filter(
+          (i) => i >= 0 && i < orchestratorInput.datasetRows.length,
+        ).length
+      : orchestratorInput.datasetRows.length;
+  const totalCells = rowCount * orchestratorInput.state.targets.length;
   const runId = generateHumanReadableId();
   const runUrl = getRunUrl(projectSlug, experimentSlug, runId);
 
@@ -93,7 +97,10 @@ export const startPollingRun = async (
           projectId: orchestratorInput.projectId,
         },
       });
-      await runStateManager.failRun(runId, (error as Error).message);
+      await runStateManager.failRun(
+        runId,
+        error instanceof Error ? error.message : String(error),
+      );
     }
   };
 
