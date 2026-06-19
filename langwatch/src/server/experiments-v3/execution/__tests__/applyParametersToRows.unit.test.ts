@@ -31,7 +31,7 @@ describe("applyParametersToRows", () => {
       /** @scenario "A parameter that names a dataset column overrides it for every row" */
       it("overrides that column on every row without duplicating it", () => {
         const { rows, columns } = applyParametersToRows({
-          rows: [{ model: "gpt-4o" }, { model: "claude" }],
+          rows: [{ model: "gpt-5-nano" }, { model: "gpt-5" }],
           columns: [{ id: "model", name: "model", type: "string" }],
           parameters: { model: "gpt-5-mini" },
         });
