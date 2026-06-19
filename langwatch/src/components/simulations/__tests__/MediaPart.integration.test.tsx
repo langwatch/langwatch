@@ -139,6 +139,11 @@ describe("<MediaPart/>", () => {
 
   describe("when the url carries a project-id segment (#4947)", () => {
     it("probes with the id from the final path segment, not the project segment", () => {
+      // The project segment ("owner_proj") is deliberately DIFFERENT from the
+      // component's projectId prop, so this proves the extracted id is the
+      // URL's final segment — not the project segment, and not the prop echoed
+      // back. A parser that returned the first segment would yield "owner_proj"
+      // and fail the assertion.
       render(
         <MediaPart
           projectId={TEST_PROJECT_ID}
@@ -146,7 +151,7 @@ describe("<MediaPart/>", () => {
             type: "image",
             source: {
               type: "url",
-              value: `/api/files/${TEST_PROJECT_ID}/so_scoped_id`,
+              value: "/api/files/owner_proj/so_scoped_id",
               mimeType: "image/png",
             },
           }}
@@ -154,15 +159,15 @@ describe("<MediaPart/>", () => {
         { wrapper: Wrapper },
       );
 
-      // The probe input is rebuilt every render with the extracted id; the id
-      // is the FINAL path segment (so_scoped_id), never the project segment.
       expect(headByIdInputs.at(-1)).toEqual({
         projectId: TEST_PROJECT_ID,
         id: "so_scoped_id",
       });
     });
+  });
 
-    it("extracts the id from a legacy id-only url for backward compatibility", () => {
+  describe("when the url is the legacy id-only shape", () => {
+    it("probes with the id from the single path segment", () => {
       render(
         <MediaPart
           projectId={TEST_PROJECT_ID}

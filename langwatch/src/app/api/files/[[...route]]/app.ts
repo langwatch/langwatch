@@ -265,15 +265,25 @@ async function handleFileRead(
     }
   }
 
+  // Pin the authorized project once: the membership gate (step 3) and the
+  // project-scoped read (step 4) MUST use the same value, or a future edit
+  // could authorize one project and read another (cross-tenant leak). One
+  // binding makes that divergence impossible to introduce by accident.
+  const authorizedProjectId = owner.projectId;
+
   // Step 3: project-membership gate.
-  await authorizeFileRead({ apiKeyProjectId, userId, ownerProjectId: owner.projectId });
+  await authorizeFileRead({
+    apiKeyProjectId,
+    userId,
+    ownerProjectId: authorizedProjectId,
+  });
 
   // Step 4: project-scoped read.
-  const service = createStoredObjectsService({ projectId: owner.projectId });
+  const service = createStoredObjectsService({ projectId: authorizedProjectId });
 
   let result;
   try {
-    result = await service.getById({ projectId: owner.projectId, id });
+    result = await service.getById({ projectId: authorizedProjectId, id });
   } catch {
     return jsonResponse({ error: "file temporarily unavailable" }, 502);
   }

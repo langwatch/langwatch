@@ -493,6 +493,40 @@ describe("GET /api/files/:projectId/:id (project-scoped — #4947)", () => {
     });
   });
 
+  describe("when a HEAD request is made for a project-scoped url", () => {
+    it("returns 200 with the length but no body, scoped to the URL's project", async () => {
+      const fileId = `stored-${nanoid(8)}`;
+      const content = "head-probe-bytes";
+      const row = makeStoredObjectRow({
+        id: fileId,
+        project_id: projectAId,
+        media_type: "image/png",
+        size_bytes: Buffer.from(content).length,
+      });
+      mockGetById.mockResolvedValueOnce({
+        row,
+        stream: makeReadableStream(content),
+      });
+
+      const res = await app.request(`/api/files/${projectAId}/${fileId}`, {
+        method: "HEAD",
+        headers: { "X-Auth-Token": projectAKey },
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("Content-Length")).toBe(
+        String(Buffer.from(content).length),
+      );
+      // HEAD must not stream a body.
+      expect(await res.text()).toBe("");
+      expect(mockResolveOwnerProject).not.toHaveBeenCalled();
+      expect(mockGetById).toHaveBeenCalledWith({
+        projectId: projectAId,
+        id: fileId,
+      });
+    });
+  });
+
   describe("when a caller requests another project's object id under their OWN project scope", () => {
     it("scopes the read to the URL's project and returns 404 — the other tenant's bytes are never served", async () => {
       // The id belongs (conceptually) to project A. The caller is
