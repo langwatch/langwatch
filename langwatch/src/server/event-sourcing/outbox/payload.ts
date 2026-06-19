@@ -40,6 +40,22 @@
 export const TRIGGER_NOTIFY_REACTOR_NAME = "triggerNotify" as const;
 
 /**
+ * Which dispatch class a settle/cadence payload belongs to (ADR-032).
+ * Both action classes now ride the same settle → cadence outbox path,
+ * so the marker is what lets `handleSettle` / `handleCadenceBatch`
+ * branch on dispatch shape without re-classifying `trigger.action`:
+ *
+ * - `notify`  → SEND_EMAIL / SEND_SLACK_MESSAGE: digest-cadence aware,
+ *   rendered + provider-sent in `handleCadenceBatch`.
+ * - `persist` → ADD_TO_DATASET / ADD_TO_ANNOTATION_QUEUE: immediate
+ *   cadence (no digest), dispatched per-match via `dispatchTriggerAction`.
+ *
+ * The reactor stamps it at enqueue; settle copies it onto the cadence
+ * payload it re-enqueues; cadence reads it to pick the dispatch branch.
+ */
+export type TriggerActionClass = "notify" | "persist";
+
+/**
  * Both stages carry the SAME `auditDedupKey` so they project onto one
  * `ReactorOutbox` row through the lifecycle: settle's INSERT,
  * settle's leased/dispatched-or-noMatch, cadence's UPDATE, cadence's
@@ -52,6 +68,15 @@ interface CommonStagePayload {
   triggerId: string;
   reactorName: typeof TRIGGER_NOTIFY_REACTOR_NAME;
   auditDedupKey: string;
+  /**
+   * Dispatch class of the underlying trigger action (ADR-032). Carried
+   * on the payload so the cadence handler routes persist vs notify
+   * without re-reading `trigger.action`. Optional for backwards
+   * compatibility with rows enqueued before ADR-032: a missing marker
+   * is treated as `notify` by the dispatcher (the only class that rode
+   * the outbox in v1).
+   */
+  actionClass?: TriggerActionClass;
 }
 
 export interface SettleStagePayload

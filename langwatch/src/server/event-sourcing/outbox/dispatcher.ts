@@ -3,7 +3,9 @@ import { createHash } from "crypto";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TriggerSummary } from "~/server/app-layer/triggers/repositories/trigger.repository";
 import type { TriggerService } from "~/server/app-layer/triggers/trigger.service";
+import type { DatasetRecordEntry } from "~/server/datasets/types";
 import {
   buildPreconditionTraceDataFromFoldState,
   classifyTriggerFilters,
@@ -31,6 +33,7 @@ import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { createTenantId } from "../domain/tenantId";
 import {
   computeScheduledFor,
+  dispatchTriggerAction,
   NOTIFY_TRIGGER_ACTIONS,
 } from "../pipelines/shared/triggerActionDispatch";
 import type { DerivedTraceEvent } from "../pipelines/trace-processing/projections/services/trace-events.derivation";
@@ -41,6 +44,7 @@ import {
   type OutboxJob,
   type SettleStagePayload,
   TRIGGER_NOTIFY_REACTOR_NAME,
+  type TriggerActionClass,
 } from "./payload";
 
 const logger = createLogger("langwatch:outbox:dispatcher");
@@ -66,6 +70,25 @@ export interface OutboxDispatcherDeps {
     foldVersion?: number;
   }) => Promise<DerivedTraceEvent[]>;
   traceById: (projectId: string, traceId: string) => Promise<Trace | undefined>;
+  /**
+   * ADR-032: persist-class dispatch dependencies. Persist actions
+   * (ADD_TO_DATASET / ADD_TO_ANNOTATION_QUEUE) now ride the same
+   * settle/cadence outbox as notify, so the cadence handler calls
+   * `dispatchTriggerAction` for them — which needs these two side-effect
+   * sinks. Notify dispatch never touches them. Injected the same way the
+   * notify deps are, so the dispatcher stays testable.
+   */
+  addToAnnotationQueue: (params: {
+    traceIds: string[];
+    projectId: string;
+    annotators: string[];
+    userId: string;
+  }) => Promise<void>;
+  addToDataset: (params: {
+    datasetId: string;
+    projectId: string;
+    datasetRecords: DatasetRecordEntry[];
+  }) => Promise<void>;
   /**
    * Late-bound — settle stage's match-confirmed branch calls this to
    * re-enqueue as `cadence`. The queue ref is filled in by `buildOutboxRuntime`
@@ -134,14 +157,18 @@ export interface OutboxDispatcherDeps {
 
 /**
  * Unified outbox process callback. Branches on `stage` so one queue
- * carries both ADR-026 settle and ADR-027 cadence digest stages with
- * the operator's two knobs (`traceDebounceMs`, `notificationCadence`)
- * still independently tunable.
+ * carries both ADR-026 settle and ADR-027 cadence stages with the
+ * operator's two knobs (`traceDebounceMs`, `notificationCadence`) still
+ * independently tunable. Both action classes ride this path now: notify
+ * (email / Slack, digest-coalesced) and persist (dataset / annotation,
+ * immediate per-match — ADR-032). `handleCadenceBatch` picks the branch
+ * from the payload's `actionClass`.
  *
  * `process(payload)` is invoked by the GroupQueue for single-job
  * paths (settle is never coalesced). `processBatch(payloads)` is
- * invoked when `coalesceMaxBatch` opens a digest — only cadence-stage
- * payloads coalesce.
+ * invoked when `coalesceMaxBatch` opens a window — only cadence-stage
+ * payloads coalesce (persist cadences share a per-trigger group too, but
+ * dispatch one match at a time).
  */
 export function createOutboxDispatcher(deps: OutboxDispatcherDeps): {
   process: (payload: OutboxJob) => Promise<void>;
@@ -152,8 +179,8 @@ export function createOutboxDispatcher(deps: OutboxDispatcherDeps): {
       if (payload.stage === "settle") {
         await handleSettle(deps, payload);
       } else {
-        // Single-job cadence path (no coalescing this round) — render
-        // and send a one-match digest.
+        // Single-job cadence path (no coalescing this round) — one-match
+        // notify digest, or one persist dispatch.
         await handleCadenceBatch(deps, [payload]);
       }
     },
@@ -177,13 +204,32 @@ export function createOutboxDispatcher(deps: OutboxDispatcherDeps): {
 }
 
 /**
+ * Resolves the dispatch class for a settle/cadence payload (ADR-032).
+ * Prefers the marker the reactor stamped; falls back to deriving it from
+ * `trigger.action` for rows enqueued before ADR-032 (which carried no
+ * marker and were always notify-class — persist rode the inline reactor
+ * back then). Deriving from the live trigger is safe because the
+ * notify/persist split is a fixed partition of `TriggerAction`.
+ */
+function resolveActionClass(
+  payload: { actionClass?: TriggerActionClass },
+  action: TriggerAction,
+): TriggerActionClass {
+  if (payload.actionClass) return payload.actionClass;
+  return NOTIFY_TRIGGER_ACTIONS.has(action) ? "notify" : "persist";
+}
+
+/**
  * Settle stage: trace has been quiet for `traceDebounceMs`. Re-read
  * the fold, re-run filters against the now-settled state, and
- * re-enqueue as cadence so the digest window can coalesce.
+ * re-enqueue as cadence. For notify the cadence delay snaps to the next
+ * digest boundary so the window can coalesce; for persist it is an
+ * immediate same-tick hand-off (ADR-032) — `computeScheduledFor`
+ * already returns `now` for persist actions.
  *
  * The `TriggerSent` at-most-once gate is owned entirely by
  * `handleCadenceBatch` (read pre-dispatch, written post-dispatch), so
- * settle does no claiming itself.
+ * settle does no claiming itself — for either action class.
  */
 async function handleSettle(
   deps: OutboxDispatcherDeps,
@@ -245,23 +291,23 @@ async function handleSettle(
     }
   }
 
-  if (!NOTIFY_TRIGGER_ACTIONS.has(trigger.action)) {
-    // Persist actions don't take the outbox path — the inline
-    // dispatchTriggerAction caller routed them separately.
-    return;
-  }
+  // ADR-032: both notify and persist ride this path now. The cadence
+  // payload carries the action class forward so `handleCadenceBatch`
+  // picks the right dispatch branch without re-reading `trigger.action`.
+  const actionClass = resolveActionClass(payload, trigger.action);
 
   // No claim here. Settle just re-enqueues — the at-most-once gate is
   // owned by `handleCadenceBatch`, which reads `isSendClaimed` before
   // dispatch and writes `claimSend` after success. Committing the claim
   // pre-dispatch (here or in cadence) breaks outbox retry semantics: a
-  // retryable provider failure on the first cadence attempt would see
-  // claim=true on retry and silently no-op the resend.
+  // retryable provider/side-effect failure on the first cadence attempt
+  // would see claim=true on retry and silently no-op the re-dispatch.
   const cadencePayload: CadenceStagePayload = {
     stage: "cadence",
     projectId,
     triggerId,
     reactorName: TRIGGER_NOTIFY_REACTOR_NAME,
+    actionClass,
     auditDedupKey: payload.auditDedupKey,
     match: {
       traceId,
@@ -283,9 +329,18 @@ async function handleSettle(
 
 /**
  * Cadence stage: one or more matched (trigger, trace) pairs landed in
- * the same wall-clock cadence boundary. Renders one digest and sends.
+ * the same wall-clock cadence boundary.
+ *
+ * For NOTIFY triggers this renders one digest and sends (email / Slack).
+ * For PERSIST triggers (ADR-032) it dispatches each match individually
+ * via `dispatchTriggerAction` — persist never digest-batches, so the
+ * batch is just the same-tick collection of immediate cadences for one
+ * trigger. The `actionClass` carried on the payload picks the branch.
+ *
  * The group invariant (single triggerId per batch) is enforced by the
- * queue's `groupKey` configuration.
+ * queue's `groupKey` configuration. A mixed-class batch can never occur:
+ * the group key is per-trigger and a trigger's action — hence its class
+ * — is fixed, so every payload in a batch shares one class.
  */
 async function handleCadenceBatch(
   deps: OutboxDispatcherDeps,
@@ -311,6 +366,15 @@ async function handleCadenceBatch(
       { projectId, triggerId, batchSize: payloads.length },
       "Trigger gone / deactivated since enqueue — dropping digest",
     );
+    return;
+  }
+
+  // ADR-032: persist-class triggers branch off here. They run
+  // `dispatchTriggerAction` per match (no digest, no template render, no
+  // email caps) so the rest of this function — which is the notify
+  // digest path — is reached only for notify triggers.
+  if (resolveActionClass(payloads[0]!, trigger.action) === "persist") {
+    await dispatchPersistBatch(deps, trigger, payloads);
     return;
   }
 
@@ -752,5 +816,151 @@ async function handleCadenceBatch(
       digestSize: candidatePayloads.length,
     },
     "Outbox cadence digest dispatched",
+  );
+}
+
+/**
+ * Persist-class cadence dispatch (ADR-032). Runs each matched
+ * (trigger, trace) pair through `dispatchTriggerAction` — the dataset
+ * write / annotation-queue add the operator configured — instead of
+ * rendering a notification digest. Persist never coalesces into a
+ * digest, so a "batch" here is just the same-tick collection of
+ * immediate cadences for one trigger; each match is dispatched on its
+ * own.
+ *
+ * At-most-once and retry semantics mirror the notify path exactly:
+ *
+ *   1. In-batch dedup via `seenTraceIds` — a (trigger, trace) pair can
+ *      appear twice (settle retry after a Redis blip).
+ *   2. Cross-batch dedup via the read-only `isSendClaimed` check —
+ *      suppresses pairs an earlier cadence batch (or the sibling
+ *      pipeline) already dispatched.
+ *   3. The `claimSend` WRITE is deferred to AFTER a successful
+ *      `dispatchTriggerAction`. Writing the claim pre-dispatch would
+ *      defeat outbox retry: a retryable side-effect failure on the first
+ *      attempt would see claim=true on retry and silently no-op the
+ *      re-dispatch, recording a write that never landed. This is the
+ *      same hazard the notify path guards against (claim-after-send).
+ *
+ * A failed `dispatchTriggerAction` re-throws so the outbox retries the
+ * whole batch; already-claimed matches are claim-suppressed on the
+ * retry, and persist side effects are idempotent at the row level
+ * (deterministic dataset entry ids / annotation-queue upsert), so the
+ * re-run only re-dispatches the unfinished matches.
+ *
+ * The settled fold is re-read per trace so `dispatchTriggerAction`
+ * captures the now-complete trace — the whole point of riding settle.
+ */
+async function dispatchPersistBatch(
+  deps: OutboxDispatcherDeps,
+  trigger: TriggerSummary,
+  payloads: CadenceStagePayload[],
+): Promise<void> {
+  const projectId = payloads[0]!.projectId;
+  const triggerId = trigger.id;
+  const brandedTenantId = createTenantId(projectId);
+
+  const seenTraceIds = new Set<string>();
+  let dispatchedCount = 0;
+  for (const p of payloads) {
+    const traceId = p.match.traceId;
+    if (seenTraceIds.has(traceId)) continue;
+    seenTraceIds.add(traceId);
+
+    // Cross-batch dedup: a pair already dispatched by an earlier cadence
+    // batch (or the sibling pipeline) is suppressed before the side
+    // effect. The claim WRITE happens post-dispatch below.
+    const alreadySent = await deps.triggers.isSendClaimed({
+      triggerId,
+      traceId,
+      projectId,
+    });
+    if (alreadySent) continue;
+
+    // Re-read the settled fold so the dataset / annotation row captures
+    // the complete trace. Missing fold (evicted / trace gone) → skip
+    // this match; nothing to persist.
+    const foldState = await deps.traceSummaryStore.get(traceId, {
+      tenantId: brandedTenantId,
+      aggregateId: traceId,
+    });
+    if (!foldState) {
+      logger.debug(
+        { projectId, triggerId, traceId },
+        "Trace fold gone during persist cadence — skipping match",
+      );
+      continue;
+    }
+
+    // dispatchTriggerAction performs the side effect and, on success,
+    // its own `updateLastRunAt`. A failure throws DispatchError; capture
+    // it for operators, then let it propagate so the outbox retries
+    // (claim not yet written for this match, so the retry re-dispatches
+    // it). Mirrors the notify path's capture-then-rethrow.
+    try {
+      await dispatchTriggerAction({
+        deps,
+        trigger,
+        traceId,
+        tenantId: projectId,
+        foldState,
+      });
+    } catch (error) {
+      const retryable = isDispatchError(error) ? error.retryable : true;
+      logger.error(
+        {
+          projectId,
+          triggerId,
+          traceId,
+          retryable,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Persist cadence dispatch failed",
+      );
+      captureException(toError(error), {
+        extra: { projectId, triggerId, traceId, triggerAction: trigger.action },
+      });
+      throw error;
+    }
+
+    // Post-dispatch at-most-once write. Best-effort: a failure here must
+    // not throw — the side effect already landed and re-throwing would
+    // let the outbox retry and double-dispatch. claimSend is INSERT
+    // IGNORE, so a racing worker seeing `false` is also fine.
+    try {
+      await deps.triggers.claimSend({ triggerId, traceId, projectId });
+    } catch (claimErr) {
+      logger.warn(
+        {
+          projectId,
+          triggerId,
+          traceId,
+          error:
+            claimErr instanceof Error ? claimErr.message : String(claimErr),
+        },
+        "claimSend failed post-persist-dispatch — swallowing to avoid double-dispatch on retry",
+      );
+      captureException(toError(claimErr), {
+        extra: {
+          projectId,
+          triggerId,
+          traceId,
+          phase: "claimSend-post-persist-dispatch",
+        },
+      });
+    }
+    dispatchedCount++;
+  }
+
+  if (dispatchedCount === 0) {
+    logger.debug(
+      { projectId, triggerId, batchSize: payloads.length },
+      "Persist cadence batch fully suppressed (prior claims / missing folds) — no dispatch",
+    );
+    return;
+  }
+  logger.info(
+    { projectId, triggerId, action: trigger.action, dispatchedCount },
+    "Outbox persist cadence dispatched",
   );
 }

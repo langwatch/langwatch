@@ -14,10 +14,6 @@ import {
 } from "@ee/governance/reactors/governanceOcsfEventsSync.reactor";
 import type { PrismaClient } from "@prisma/client";
 import type { Cluster, Redis } from "ioredis";
-import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
-import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
-import { getProtectionsForProject } from "~/server/api/utils";
-import { TraceService } from "~/server/traces/trace.service";
 import { createLogger } from "~/utils/logger/server";
 import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
 import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
@@ -67,7 +63,6 @@ import { createExperimentRunStateFoldStore } from "./pipelines/experiment-run-pr
 import { createExperimentRunEsSyncReactor } from "./pipelines/experiment-run-processing/reactors/experimentRunEsSync.reactor";
 import type { ExperimentRunStateRepository } from "./pipelines/experiment-run-processing/repositories/experimentRunState.repository";
 import type { ComputeExperimentRunMetricsCommandData } from "./pipelines/experiment-run-processing/schemas/commands";
-import type { TriggerActionDispatchDeps } from "./pipelines/shared/triggerActionDispatch";
 import {
   COMPUTE_METRICS_RETRY_DELAY_MS,
   ComputeRunMetricsCommand,
@@ -90,7 +85,6 @@ import { SUITE_RUN_PROJECTION_VERSIONS } from "./pipelines/suite-run-processing/
 import { createTraceProcessingPipeline } from "./pipelines/trace-processing/pipeline";
 import { LogRecordAppendStore } from "./pipelines/trace-processing/projections/logRecordStorage.store";
 import { MetricRecordAppendStore } from "./pipelines/trace-processing/projections/metricRecordStorage.store";
-import type { DerivedTraceEvent } from "./pipelines/trace-processing/projections/services/trace-events.derivation";
 import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
 import { createClaudeCodeSpanSyncReactor } from "./pipelines/trace-processing/reactors/claudeCodeSpanSync.reactor";
@@ -209,10 +203,11 @@ export interface PipelineRegistryDeps {
   governanceOcsfEventsSync?: GovernanceOcsfEventsSyncReactorDeps;
   /**
    * Wired by the worker composition root (`presets.ts`) and `undefined`
-   * on the web process. When set, both trigger reactors route
-   * NOTIFY-class matches into the unified outbox queue's settle stage
-   * (ADR-030 + ADR-026) instead of inline-dispatching. Persist
-   * actions always run inline regardless.
+   * on the web process. When set, all four trigger reactors route their
+   * matches into the unified outbox queue's settle stage (ADR-030 +
+   * ADR-026 + ADR-032) — both NOTIFY (email / Slack) and PERSIST
+   * (dataset / annotation) classes now ride settle → cadence; nothing
+   * dispatches inline.
    */
   outbox?: OutboxRuntime;
   retentionPolicyResolver?: RetentionPolicyResolver;
@@ -235,44 +230,6 @@ export class PipelineRegistry {
     return new RedisCachedFoldStore<State>(inner, this.deps.redis as Redis, {
       keyPrefix,
     });
-  }
-
-  /**
-   * Wires the trace-loading + dataset/queue dispatcher trio shared by the
-   * trace-pipeline `alertTrigger` reactor and the evaluation-pipeline
-   * `evaluationAlertTrigger` reactor. Both consume the same shape, so
-   * keep the wiring in one place.
-   */
-  private buildTraceReactorContext(): Pick<
-    TriggerActionDispatchDeps,
-    "traceById" | "addToAnnotationQueue" | "addToDataset"
-  > & {
-    deriveEvents: (params: {
-      tenantId: string;
-      traceId: string;
-      occurredAtMs?: number;
-      foldVersion?: number;
-    }) => Promise<DerivedTraceEvent[]>;
-  } {
-    const traceReadDerivation = new TraceReadDerivationService(
-      this.deps.traces.spans,
-    );
-    return {
-      traceById: async (projectId, traceId) => {
-        const traceService = TraceService.create(this.deps.prisma);
-        const protections = await getProtectionsForProject(this.deps.prisma, {
-          projectId,
-        });
-        return traceService.getById(projectId, traceId, protections);
-      },
-      addToAnnotationQueue: async (params) => {
-        await createOrUpdateQueueItems({ ...params, prisma: this.deps.prisma });
-      },
-      addToDataset: async (params) => {
-        await createManyDatasetRecords(params);
-      },
-      deriveEvents: (params) => traceReadDerivation.deriveEvents(params),
-    };
   }
 
   registerAll() {
@@ -323,12 +280,14 @@ export class PipelineRegistry {
 
     const esSyncReactor = createEvaluationEsSyncReactor(this.deps.esSync);
 
+    // ADR-032: the persist branch is now an outbox reactor that only
+    // enqueues settle payloads. Filter evaluation + dispatch (traceById /
+    // addToDataset / addToAnnotationQueue) moved to the outbox dispatcher
+    // (see buildOutboxRuntime), so this reactor needs just the trigger
+    // service and the trace fold store for the enqueue breadcrumb.
     const evaluationAlertTriggerReactor = createEvaluationAlertTriggerReactor({
       triggers: this.deps.triggers,
-      projects: this.deps.projects,
       traceSummaryStore,
-      evaluationRuns: this.deps.evaluations.runs,
-      ...this.buildTraceReactorContext(),
     });
 
     const evaluationAlertTriggerNotifyOutboxReactor =
@@ -373,10 +332,12 @@ export class PipelineRegistry {
       evaluation: evalCommands.executeEvaluation,
     });
 
+    // ADR-032: the persist branch is now an outbox reactor that only
+    // enqueues settle payloads; dispatch deps live on the outbox
+    // dispatcher (see buildOutboxRuntime), so this reactor needs just the
+    // trigger service.
     const alertTriggerReactor = createAlertTriggerReactor({
       triggers: this.deps.triggers,
-      projects: this.deps.projects,
-      ...this.buildTraceReactorContext(),
     });
 
     const alertTriggerNotifyOutboxReactor =

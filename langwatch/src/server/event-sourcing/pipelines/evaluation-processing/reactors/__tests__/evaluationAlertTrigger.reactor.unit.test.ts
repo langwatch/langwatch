@@ -3,8 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerSummary } from "~/server/app-layer/triggers/repositories/trigger.repository";
-import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
-import { captureException } from "~/utils/posthogErrorCapture";
 import type { ReactorContext } from "../../../../reactors/reactor.types";
 import type { EvaluationProcessingEvent } from "../../schemas/events";
 import {
@@ -19,23 +17,6 @@ vi.mock("~/utils/logger/server", () => ({
     warn: vi.fn(),
     error: vi.fn(),
   }),
-}));
-
-vi.mock("~/utils/posthogErrorCapture", () => ({
-  captureException: vi.fn(),
-  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
-}));
-
-// Heavy I/O bound dependencies pulled in transitively via dispatchTriggerAction
-// (email render + SES, Slack webhook, dataset row mapping). They throw on any
-// unconfigured env in CI, which would short-circuit dispatch before
-// `updateLastRunAt`. Stub them out so dispatch can complete its bookkeeping.
-vi.mock("~/server/mailer/triggerEmail", () => ({
-  sendTriggerEmail: vi.fn().mockResolvedValue(undefined),
-}));
-
-vi.mock("~/server/triggers/sendSlackWebhook", () => ({
-  sendSlackWebhook: vi.fn().mockResolvedValue(undefined),
 }));
 
 function createEvalFoldState(
@@ -126,20 +107,18 @@ function createEvent(
 function createTrigger(
   overrides: Partial<TriggerSummary> = {},
 ): TriggerSummary {
-  // Default to ADD_TO_ANNOTATION_QUEUE (persist-class with a one-step
-  // dispatch path) so these tests exercise the inline-dispatch path the
-  // reactor now owns. NOTIFY-class actions (SEND_EMAIL /
-  // SEND_SLACK_MESSAGE) are dispatched through the
-  // `.withOutbox`-registered evaluationAlertTriggerNotifyOutbox reactor
-  // — see `evaluationAlertTriggerNotifyOutbox.reactor.unit.test.ts`.
+  // Default to ADD_TO_DATASET (persist-class) so these tests exercise
+  // the persist branch this reactor now owns. NOTIFY-class actions
+  // (SEND_EMAIL / SEND_SLACK_MESSAGE) flow through the
+  // evaluationAlertTriggerNotifyOutbox reactor.
   return {
     id: "trigger-1",
     projectId: "tenant-1",
     name: "Quality Alert",
-    action: TriggerAction.ADD_TO_ANNOTATION_QUEUE,
+    action: TriggerAction.ADD_TO_DATASET,
     actionParams: {
-      annotators: [{ id: "annotator-1", name: "Ops" }],
-      createdByUserId: "user-1",
+      datasetId: "dataset-1",
+      datasetMapping: { mapping: {}, expansions: [] },
     },
     filters: {
       "evaluations.passed": { "evaluator-1": ["true"] },
@@ -159,38 +138,28 @@ function createTrigger(
   };
 }
 
+function createContext(
+  foldState: EvaluationRunData = createEvalFoldState(),
+): ReactorContext<EvaluationRunData> {
+  return { tenantId: "tenant-1", aggregateId: "eval-1", foldState };
+}
+
 function createDeps(
   overrides: Partial<EvaluationAlertTriggerReactorDeps> = {},
 ): EvaluationAlertTriggerReactorDeps {
   return {
     triggers: {
       getActiveTraceTriggersForProject: vi.fn().mockResolvedValue([]),
-      claimSend: vi.fn().mockResolvedValue(true),
-      updateLastRunAt: vi.fn().mockResolvedValue(undefined),
-      invalidate: vi.fn(),
-    } as any,
-    projects: {
-      getById: vi.fn().mockResolvedValue({
-        id: "tenant-1",
-        slug: "test-project",
-      }),
     } as any,
     traceSummaryStore: {
       get: vi.fn().mockResolvedValue(createTraceSummary()),
       store: vi.fn(),
     },
-    evaluationRuns: {
-      findByTraceId: vi.fn().mockResolvedValue([]),
-    } as any,
-    traceById: vi.fn().mockResolvedValue(undefined),
-    addToAnnotationQueue: vi.fn().mockResolvedValue(undefined),
-    addToDataset: vi.fn().mockResolvedValue(undefined),
-    deriveEvents: vi.fn().mockResolvedValue([]),
     ...overrides,
   };
 }
 
-describe("evaluationAlertTrigger reactor", () => {
+describe("evaluationAlertTrigger reactor (persist outbox)", () => {
   let deps: EvaluationAlertTriggerReactorDeps;
 
   beforeEach(() => {
@@ -199,17 +168,14 @@ describe("evaluationAlertTrigger reactor", () => {
   });
 
   describe("when event is not a terminal evaluation event", () => {
-    it("skips non-completion events", async () => {
+    it("emits nothing and never fetches triggers", async () => {
       const reactor = createEvaluationAlertTriggerReactor(deps);
-      const event = createEvent({ type: "lw.evaluation.scheduled" });
-      const context: ReactorContext<EvaluationRunData> = {
-        tenantId: "tenant-1",
-        aggregateId: "eval-1",
-        foldState: createEvalFoldState(),
-      };
+      const requests = await reactor.decide(
+        createEvent({ type: "lw.evaluation.scheduled" }),
+        createContext(),
+      );
 
-      await reactor.handle(event, context);
-
+      expect(requests).toHaveLength(0);
       expect(
         deps.triggers.getActiveTraceTriggersForProject,
       ).not.toHaveBeenCalled();
@@ -217,17 +183,14 @@ describe("evaluationAlertTrigger reactor", () => {
   });
 
   describe("when evaluation has no traceId", () => {
-    it("skips processing", async () => {
+    it("emits nothing", async () => {
       const reactor = createEvaluationAlertTriggerReactor(deps);
-      const event = createEvent();
-      const context: ReactorContext<EvaluationRunData> = {
-        tenantId: "tenant-1",
-        aggregateId: "eval-1",
-        foldState: createEvalFoldState({ traceId: null }),
-      };
+      const requests = await reactor.decide(
+        createEvent(),
+        createContext(createEvalFoldState({ traceId: null })),
+      );
 
-      await reactor.handle(event, context);
-
+      expect(requests).toHaveLength(0);
       expect(
         deps.triggers.getActiveTraceTriggersForProject,
       ).not.toHaveBeenCalled();
@@ -235,17 +198,14 @@ describe("evaluationAlertTrigger reactor", () => {
   });
 
   describe("when evaluation is still in progress", () => {
-    it("skips processing", async () => {
+    it("emits nothing", async () => {
       const reactor = createEvaluationAlertTriggerReactor(deps);
-      const event = createEvent();
-      const context: ReactorContext<EvaluationRunData> = {
-        tenantId: "tenant-1",
-        aggregateId: "eval-1",
-        foldState: createEvalFoldState({ status: "in_progress" }),
-      };
+      const requests = await reactor.decide(
+        createEvent(),
+        createContext(createEvalFoldState({ status: "in_progress" })),
+      );
 
-      await reactor.handle(event, context);
-
+      expect(requests).toHaveLength(0);
       expect(
         deps.triggers.getActiveTraceTriggersForProject,
       ).not.toHaveBeenCalled();
@@ -253,19 +213,14 @@ describe("evaluationAlertTrigger reactor", () => {
   });
 
   describe("when event is old (resyncing)", () => {
-    it("skips processing", async () => {
+    it("emits nothing", async () => {
       const reactor = createEvaluationAlertTriggerReactor(deps);
-      const event = createEvent({
-        occurredAt: Date.now() - 2 * 60 * 60 * 1000,
-      });
-      const context: ReactorContext<EvaluationRunData> = {
-        tenantId: "tenant-1",
-        aggregateId: "eval-1",
-        foldState: createEvalFoldState(),
-      };
+      const requests = await reactor.decide(
+        createEvent({ occurredAt: Date.now() - 2 * 60 * 60 * 1000 }),
+        createContext(),
+      );
 
-      await reactor.handle(event, context);
-
+      expect(requests).toHaveLength(0);
       expect(
         deps.triggers.getActiveTraceTriggersForProject,
       ).not.toHaveBeenCalled();
@@ -273,7 +228,7 @@ describe("evaluationAlertTrigger reactor", () => {
   });
 
   describe("when no triggers have evaluation filters", () => {
-    it("skips without querying evaluations", async () => {
+    it("emits nothing without reading the trace fold", async () => {
       const trigger = createTrigger({
         filters: { "traces.origin": ["application"] },
       });
@@ -282,22 +237,34 @@ describe("evaluationAlertTrigger reactor", () => {
       );
 
       const reactor = createEvaluationAlertTriggerReactor(deps);
-      const event = createEvent();
-      const context: ReactorContext<EvaluationRunData> = {
-        tenantId: "tenant-1",
-        aggregateId: "eval-1",
-        foldState: createEvalFoldState(),
-      };
+      const requests = await reactor.decide(createEvent(), createContext());
 
-      await reactor.handle(event, context);
-
+      expect(requests).toHaveLength(0);
       expect(deps.traceSummaryStore.get).not.toHaveBeenCalled();
-      expect(deps.evaluationRuns.findByTraceId).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the only eval-filter triggers are notify-class", () => {
+    it("emits nothing (the notify outbox reactor owns them)", async () => {
+      const trigger = createTrigger({
+        action: TriggerAction.SEND_EMAIL,
+        actionParams: { members: ["ops@example.com"] },
+      });
+      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue(
+        [trigger],
+      );
+
+      const reactor = createEvaluationAlertTriggerReactor(deps);
+      const requests = await reactor.decide(createEvent(), createContext());
+
+      expect(requests).toHaveLength(0);
+      // Pre-filter short-circuits before the cross-pipeline fold read.
+      expect(deps.traceSummaryStore.get).not.toHaveBeenCalled();
     });
   });
 
   describe("when trace summary is not found", () => {
-    it("skips processing", async () => {
+    it("emits nothing", async () => {
       const trigger = createTrigger();
       (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue(
         [trigger],
@@ -305,370 +272,107 @@ describe("evaluationAlertTrigger reactor", () => {
       (deps.traceSummaryStore.get as any).mockResolvedValue(null);
 
       const reactor = createEvaluationAlertTriggerReactor(deps);
-      const event = createEvent();
-      const context: ReactorContext<EvaluationRunData> = {
-        tenantId: "tenant-1",
-        aggregateId: "eval-1",
-        foldState: createEvalFoldState(),
-      };
+      const requests = await reactor.decide(createEvent(), createContext());
 
-      await reactor.handle(event, context);
-
-      expect(deps.triggers.claimSend).not.toHaveBeenCalled();
+      expect(requests).toHaveLength(0);
     });
   });
 
-  describe("when evaluation filters match", () => {
-    it("dispatches trigger action and records sent", async () => {
-      const trigger = createTrigger({
-        filters: {
-          "evaluations.passed": { "evaluator-1": ["true"] },
-        },
+  describe("given an active persist-class eval-filter trigger", () => {
+    describe("when the reactor decides on a completed event", () => {
+      it("emits a settle request stamped actionClass=persist with the debounce TTL and fold breadcrumb", async () => {
+        const trigger = createTrigger({ traceDebounceMs: 45_000 });
+        (
+          deps.triggers.getActiveTraceTriggersForProject as any
+        ).mockResolvedValue([trigger]);
+
+        const reactor = createEvaluationAlertTriggerReactor(deps);
+        const requests = await reactor.decide(createEvent(), createContext());
+
+        expect(requests).toHaveLength(1);
+        const [request] = requests;
+        expect(request!.dedupKey).toBe("tenant-1/trigger-1:trace:trace-1");
+        expect(request!.groupKey).toBe("tenant-1/triggerNotify:trigger-1");
+        expect(request!.enqueueOptions).toEqual({ ttlMs: 45_000 });
+        const payload = request!.payload as unknown as {
+          stage: string;
+          actionClass: string;
+          traceId: string;
+          foldSnapshotAtEnqueue: {
+            computedInput: string;
+            computedOutput: string;
+          };
+        };
+        expect(payload.stage).toBe("settle");
+        expect(payload.actionClass).toBe("persist");
+        expect(payload.traceId).toBe("trace-1");
+        expect(payload.foldSnapshotAtEnqueue).toEqual({
+          computedInput: "test input",
+          computedOutput: "test output",
+        });
       });
-      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue(
-        [trigger],
-      );
-      (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
-        createEvalFoldState({ evaluatorId: "evaluator-1", passed: true }),
-      ]);
+    });
 
-      const reactor = createEvaluationAlertTriggerReactor(deps);
-      const event = createEvent();
-      const context: ReactorContext<EvaluationRunData> = {
-        tenantId: "tenant-1",
-        aggregateId: "eval-1",
-        foldState: createEvalFoldState(),
-      };
+    describe("when the reactor decides on a reported event", () => {
+      it("emits a settle request the same as for a completed event", async () => {
+        const trigger = createTrigger();
+        (
+          deps.triggers.getActiveTraceTriggersForProject as any
+        ).mockResolvedValue([trigger]);
 
-      await reactor.handle(event, context);
+        const reactor = createEvaluationAlertTriggerReactor(deps);
+        const requests = await reactor.decide(
+          createEvent({ type: "lw.evaluation.reported" }),
+          createContext(),
+        );
 
-      expect(deps.triggers.claimSend).toHaveBeenCalledWith({
-        triggerId: "trigger-1",
-        traceId: "trace-1",
-        projectId: "tenant-1",
+        expect(requests).toHaveLength(1);
+        expect(
+          (requests[0]!.payload as unknown as { actionClass: string })
+            .actionClass,
+        ).toBe("persist");
       });
-      expect(deps.triggers.updateLastRunAt).toHaveBeenCalledWith(
-        "trigger-1",
-        "tenant-1",
-      );
     });
-  });
 
-  describe("when evaluation filters do not match", () => {
-    it("does not dispatch action", async () => {
-      const trigger = createTrigger({
-        filters: {
-          "evaluations.passed": { "evaluator-1": ["true"] },
-        },
+    describe("when the reactor decides", () => {
+      it("does not load evaluations or derive events itself (the settle stage re-reads + filters)", async () => {
+        const trigger = createTrigger({
+          filters: {
+            "events.event_type": ["thumbs_up_down"],
+            "evaluations.passed": { "evaluator-1": ["true"] },
+          },
+        });
+        (
+          deps.triggers.getActiveTraceTriggersForProject as any
+        ).mockResolvedValue([trigger]);
+
+        const reactor = createEvaluationAlertTriggerReactor(deps);
+        const requests = await reactor.decide(createEvent(), createContext());
+
+        // The reactor only enqueues; the settle dispatcher loads
+        // evaluations + derives events against the settled state. The
+        // reactor's only cross-pipeline read is the fold breadcrumb.
+        expect(requests).toHaveLength(1);
+        expect(deps.traceSummaryStore.get).toHaveBeenCalledTimes(1);
       });
-      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue(
-        [trigger],
-      );
-      (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
-        createEvalFoldState({ evaluatorId: "evaluator-1", passed: false }),
-      ]);
-
-      const reactor = createEvaluationAlertTriggerReactor(deps);
-      const event = createEvent();
-      const context: ReactorContext<EvaluationRunData> = {
-        tenantId: "tenant-1",
-        aggregateId: "eval-1",
-        foldState: createEvalFoldState(),
-      };
-
-      await reactor.handle(event, context);
-
-      expect(deps.triggers.claimSend).not.toHaveBeenCalled();
     });
   });
 
-  describe("when trace filters do not match", () => {
-    it("does not dispatch action even if evaluation filters match", async () => {
-      const trigger = createTrigger({
-        filters: {
-          "traces.origin": ["playground"],
-          "evaluations.passed": { "evaluator-1": ["true"] },
-        },
-      });
+  describe("given several persist eval-filter triggers on the same trace", () => {
+    it("emits one settle request per trigger", async () => {
+      const a = createTrigger({ id: "trig-a", traceDebounceMs: 30_000 });
+      const b = createTrigger({ id: "trig-b", traceDebounceMs: 60_000 });
       (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue(
-        [trigger],
-      );
-      (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
-        createEvalFoldState({ evaluatorId: "evaluator-1", passed: true }),
-      ]);
-      // Trace has origin "application", trigger wants "playground"
-      (deps.traceSummaryStore.get as any).mockResolvedValue(
-        createTraceSummary({
-          attributes: { "langwatch.origin": "application" },
-        }),
+        [a, b],
       );
 
       const reactor = createEvaluationAlertTriggerReactor(deps);
-      const event = createEvent();
-      const context: ReactorContext<EvaluationRunData> = {
-        tenantId: "tenant-1",
-        aggregateId: "eval-1",
-        foldState: createEvalFoldState(),
-      };
+      const requests = await reactor.decide(createEvent(), createContext());
 
-      await reactor.handle(event, context);
-
-      expect(deps.triggers.claimSend).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when a trigger filters on event fields", () => {
-    it("derives events from stored_spans and matches against them", async () => {
-      const trigger = createTrigger({
-        filters: {
-          "events.event_type": ["thumbs_up_down"],
-          "evaluations.passed": { "evaluator-1": ["true"] },
-        },
-      });
-      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue(
-        [trigger],
-      );
-      (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
-        createEvalFoldState({ evaluatorId: "evaluator-1", passed: true }),
+      expect(requests).toHaveLength(2);
+      expect(requests.map((r) => r.enqueueOptions?.ttlMs)).toEqual([
+        30_000, 60_000,
       ]);
-      (deps.deriveEvents as any).mockResolvedValue([
-        {
-          spanId: "span-1",
-          timestamp: 1700,
-          name: "thumbs_up_down",
-          attributes: {},
-        },
-      ]);
-
-      const reactor = createEvaluationAlertTriggerReactor(deps);
-      const event = createEvent();
-      const context: ReactorContext<EvaluationRunData> = {
-        tenantId: "tenant-1",
-        aggregateId: "eval-1",
-        foldState: createEvalFoldState(),
-      };
-
-      await reactor.handle(event, context);
-
-      expect(deps.deriveEvents).toHaveBeenCalledWith(
-        expect.objectContaining({ tenantId: "tenant-1", traceId: "trace-1" }),
-      );
-      expect(deps.triggers.claimSend).toHaveBeenCalled();
-    });
-  });
-
-  describe("when no trigger filters on event fields", () => {
-    it("does not derive events", async () => {
-      const trigger = createTrigger({
-        filters: {
-          "evaluations.passed": { "evaluator-1": ["true"] },
-        },
-      });
-      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue(
-        [trigger],
-      );
-      (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
-        createEvalFoldState({ evaluatorId: "evaluator-1", passed: true }),
-      ]);
-
-      const reactor = createEvaluationAlertTriggerReactor(deps);
-      const event = createEvent();
-      const context: ReactorContext<EvaluationRunData> = {
-        tenantId: "tenant-1",
-        aggregateId: "eval-1",
-        foldState: createEvalFoldState(),
-      };
-
-      await reactor.handle(event, context);
-
-      expect(deps.deriveEvents).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when trigger was already sent for this trace", () => {
-    it("skips dispatch (dedup)", async () => {
-      const trigger = createTrigger();
-      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue(
-        [trigger],
-      );
-      (deps.triggers.claimSend as any).mockResolvedValue(false);
-      (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
-        createEvalFoldState({ evaluatorId: "evaluator-1", passed: true }),
-      ]);
-
-      const reactor = createEvaluationAlertTriggerReactor(deps);
-      const event = createEvent();
-      const context: ReactorContext<EvaluationRunData> = {
-        tenantId: "tenant-1",
-        aggregateId: "eval-1",
-        foldState: createEvalFoldState(),
-      };
-
-      await reactor.handle(event, context);
-
-      // claim attempted but lost the race → no dispatch, no lastRunAt update.
-      expect(deps.triggers.claimSend).toHaveBeenCalled();
-      expect(deps.triggers.updateLastRunAt).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when handling reported events", () => {
-    it("processes reported events the same as completed", async () => {
-      const trigger = createTrigger();
-      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue(
-        [trigger],
-      );
-      (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
-        createEvalFoldState({ evaluatorId: "evaluator-1", passed: true }),
-      ]);
-
-      const reactor = createEvaluationAlertTriggerReactor(deps);
-      const event = createEvent({ type: "lw.evaluation.reported" });
-      const context: ReactorContext<EvaluationRunData> = {
-        tenantId: "tenant-1",
-        aggregateId: "eval-1",
-        foldState: createEvalFoldState(),
-      };
-
-      await reactor.handle(event, context);
-
-      expect(deps.triggers.claimSend).toHaveBeenCalled();
-      expect(deps.triggers.updateLastRunAt).toHaveBeenCalled();
-    });
-  });
-
-  describe("when a trigger's dispatch fails", () => {
-    it("surfaces the failure with its retryable flag and does not record the trigger as run", async () => {
-      const trigger = createTrigger();
-      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue(
-        [trigger],
-      );
-      (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
-        createEvalFoldState({ evaluatorId: "evaluator-1", passed: true }),
-      ]);
-      (deps.addToAnnotationQueue as any).mockRejectedValueOnce(
-        new DispatchError({ message: "provider 500", retryable: true }),
-      );
-
-      const reactor = createEvaluationAlertTriggerReactor(deps);
-      const context: ReactorContext<EvaluationRunData> = {
-        tenantId: "tenant-1",
-        aggregateId: "eval-1",
-        foldState: createEvalFoldState(),
-      };
-
-      await reactor.handle(createEvent(), context);
-
-      expect(deps.triggers.claimSend).toHaveBeenCalled();
-      expect(deps.triggers.updateLastRunAt).not.toHaveBeenCalled();
-      expect(captureException).toHaveBeenCalledWith(
-        expect.any(DispatchError),
-        expect.objectContaining({
-          extra: expect.objectContaining({ retryable: true }),
-        }),
-      );
-    });
-  });
-
-  describe("when one of several matching triggers fails to dispatch", () => {
-    it("still dispatches the remaining triggers", async () => {
-      const failing = createTrigger({ id: "trigger-failing" });
-      const succeeding = createTrigger({ id: "trigger-ok" });
-      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue(
-        [failing, succeeding],
-      );
-      (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
-        createEvalFoldState({ evaluatorId: "evaluator-1", passed: true }),
-      ]);
-      (deps.addToAnnotationQueue as any)
-        .mockRejectedValueOnce(
-          new DispatchError({ message: "revoked", retryable: false }),
-        )
-        .mockResolvedValueOnce(undefined);
-
-      const reactor = createEvaluationAlertTriggerReactor(deps);
-      const context: ReactorContext<EvaluationRunData> = {
-        tenantId: "tenant-1",
-        aggregateId: "eval-1",
-        foldState: createEvalFoldState(),
-      };
-
-      await reactor.handle(createEvent(), context);
-
-      expect(deps.triggers.claimSend).toHaveBeenCalledTimes(2);
-      expect(deps.triggers.updateLastRunAt).toHaveBeenCalledTimes(1);
-      expect(deps.triggers.updateLastRunAt).toHaveBeenCalledWith(
-        "trigger-ok",
-        "tenant-1",
-      );
-    });
-  });
-
-  // #4903 (#4805): a trace-event metric condition (thumbs-down vote = -1)
-  // combined with an evaluation filter must fail closed when the event half
-  // is unmet — the matcher previously skipped events.metrics.value and the
-  // all-skipped filter set matched every trace.
-  describe("when an evaluation filter is combined with an unmet event condition", () => {
-    it("does not dispatch when the events.metrics.value condition is not satisfied", async () => {
-      const trigger = createTrigger({
-        filters: {
-          "events.metrics.value": { thumbs_up_down: { vote: ["-1", "-1"] } },
-          "evaluations.passed": { "evaluator-1": ["true"] },
-        },
-      });
-      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue(
-        [trigger],
-      );
-      // Evaluation half is satisfied...
-      (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
-        createEvalFoldState({ evaluatorId: "evaluator-1", passed: true }),
-      ]);
-      // ...but the trace has no down-vote, so the event condition is unmet.
-      (deps.deriveEvents as any).mockResolvedValue([]);
-
-      const reactor = createEvaluationAlertTriggerReactor(deps);
-      const event = createEvent();
-      const context: ReactorContext<EvaluationRunData> = {
-        tenantId: "tenant-1",
-        aggregateId: "eval-1",
-        foldState: createEvalFoldState(),
-      };
-
-      await reactor.handle(event, context);
-
-      expect(deps.deriveEvents).toHaveBeenCalled();
-      expect(deps.triggers.claimSend).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when both trace and evaluation filters match", () => {
-    it("dispatches trigger action for mixed filter triggers", async () => {
-      const trigger = createTrigger({
-        filters: {
-          "traces.origin": ["application"],
-          "spans.model": ["gpt-5-mini"],
-          "evaluations.passed": { "evaluator-1": ["true"] },
-        },
-      });
-      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue(
-        [trigger],
-      );
-      (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
-        createEvalFoldState({ evaluatorId: "evaluator-1", passed: true }),
-      ]);
-
-      const reactor = createEvaluationAlertTriggerReactor(deps);
-      const event = createEvent();
-      const context: ReactorContext<EvaluationRunData> = {
-        tenantId: "tenant-1",
-        aggregateId: "eval-1",
-        foldState: createEvalFoldState(),
-      };
-
-      await reactor.handle(event, context);
-
-      expect(deps.triggers.claimSend).toHaveBeenCalled();
-      expect(deps.triggers.updateLastRunAt).toHaveBeenCalled();
     });
   });
 });

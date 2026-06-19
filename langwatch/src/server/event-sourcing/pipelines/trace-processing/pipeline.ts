@@ -36,7 +36,11 @@ export interface TraceProcessingPipelineDeps {
   projectMetadataReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   simulationMetricsSyncReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   experimentMetricsSyncReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
-  alertTriggerReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+  /** PERSIST-class branch of the alert trigger, routed through the
+   *  framework's `.withOutbox` plumbing (ADR-030 + ADR-032). Emits settle
+   *  payloads stamped `actionClass: "persist"`; the dispatcher's cadence
+   *  stage runs `dispatchTriggerAction` for them. */
+  alertTriggerReactor: OutboxReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   /** NOTIFY-class branch of the alert trigger, routed through the
    *  framework's `.withOutbox` plumbing (ADR-030). Always provided;
    *  the framework adapter no-ops on process roles without an outbox
@@ -90,7 +94,7 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
     .withReactor("traceSummary", "projectMetadata", deps.projectMetadataReactor)
     .withReactor("traceSummary", "simulationMetricsSync", deps.simulationMetricsSyncReactor)
     .withReactor("traceSummary", "experimentMetricsSync", deps.experimentMetricsSyncReactor)
-    .withReactor("traceSummary", "alertTrigger", deps.alertTriggerReactor)
+    .withOutbox("traceSummary", "alertTrigger", deps.alertTriggerReactor)
     .withOutbox(
       "traceSummary",
       "alertTriggerNotifyOutbox",

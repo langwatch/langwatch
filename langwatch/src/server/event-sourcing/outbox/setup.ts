@@ -1,6 +1,8 @@
 import type { PrismaClient } from "@prisma/client";
 import { Cluster, type Redis } from "ioredis";
 import { env } from "~/env.mjs";
+import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
+import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
 import { getProtectionsForProject } from "~/server/api/utils";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
@@ -62,9 +64,10 @@ export interface OutboxRuntime {
    *  the dispatcher's internal `enqueueCadence`) can send onto it. Call
    *  this once the main queue has been constructed. */
   attachQueue(queue: EventSourcedQueueProcessor<Record<string, unknown>>): void;
-  /** Producer entry point for the trigger reactors. Sends a settle
-   *  payload onto the attached queue with the per-trigger debounce TTL
-   *  as the Debounce Mode override. */
+  /** Producer entry point for the trigger reactors (both notify and
+   *  persist classes — ADR-032). Sends a settle payload onto the attached
+   *  queue with the per-trigger debounce TTL as the Debounce Mode
+   *  override. */
   enqueueSettle(
     payload: SettleStagePayload,
     options: { ttlMs: number },
@@ -181,6 +184,15 @@ export function buildOutboxRuntime({
     traceById: async (projectId, traceId) => {
       const protections = await getProtectionsDeduped(projectId);
       return traceService.getById(projectId, traceId, protections);
+    },
+    // ADR-032: persist-class side-effect sinks for the cadence stage's
+    // `dispatchTriggerAction`. Same wiring the inline reactor used before
+    // persist moved onto the outbox (see PipelineRegistry).
+    addToAnnotationQueue: async (params) => {
+      await createOrUpdateQueueItems({ ...params, prisma });
+    },
+    addToDataset: async (params) => {
+      await createManyDatasetRecords(params);
     },
     enqueueCadence: async (
       payload: CadenceStagePayload,

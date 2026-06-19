@@ -16,7 +16,10 @@ export interface EvaluationProcessingPipelineDeps {
   evalRunStore: FoldProjectionStore<EvaluationRunData>;
   executeEvaluationCommand: ExecuteEvaluationCommand;
   esSyncReactor: ReactorDefinition<EvaluationProcessingEvent, EvaluationRunData>;
-  evaluationAlertTriggerReactor: ReactorDefinition<EvaluationProcessingEvent, EvaluationRunData>;
+  /** PERSIST-class branch of the evaluation alert trigger, routed
+   *  through the framework's `.withOutbox` plumbing (ADR-030 + ADR-032).
+   *  Emits settle payloads stamped `actionClass: "persist"`. */
+  evaluationAlertTriggerReactor: OutboxReactorDefinition<EvaluationProcessingEvent, EvaluationRunData>;
   /** NOTIFY-class branch of the evaluation alert trigger, routed
    *  through the framework's `.withOutbox` plumbing (ADR-030). */
   evaluationAlertTriggerNotifyOutboxReactor: OutboxReactorDefinition<
@@ -46,7 +49,7 @@ export function createEvaluationProcessingPipeline(deps: EvaluationProcessingPip
       store: deps.evalRunStore,
     }))
     .withReactor("evaluationRun", "evaluationEsSync", deps.esSyncReactor)
-    .withReactor(
+    .withOutbox(
       "evaluationRun",
       "evaluationAlertTrigger",
       deps.evaluationAlertTriggerReactor,

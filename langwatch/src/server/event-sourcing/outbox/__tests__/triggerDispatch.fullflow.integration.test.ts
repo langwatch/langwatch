@@ -97,6 +97,10 @@ function makeNotifyDeps(opts?: { emailCap?: number }) {
     evaluationRuns: { findByTraceId: vi.fn().mockResolvedValue([]) } as any,
     deriveEvents: vi.fn().mockResolvedValue([]),
     traceById: vi.fn().mockResolvedValue(undefined),
+    // ADR-032: persist-class sinks. These notify-focused flows never
+    // dispatch persist, so simple stubs satisfy the dispatcher deps.
+    addToAnnotationQueue: vi.fn().mockResolvedValue(undefined),
+    addToDataset: vi.fn().mockResolvedValue(undefined),
     enqueueCadence: vi.fn().mockResolvedValue(undefined),
     emailHourlyCap: cap,
     consumeEmailCapSlot: (args: {

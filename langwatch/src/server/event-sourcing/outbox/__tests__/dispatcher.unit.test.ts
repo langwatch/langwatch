@@ -13,6 +13,7 @@ import { DispatchError } from "../dispatchError";
 import { createOutboxDispatcher } from "../dispatcher";
 import {
   type CadenceStagePayload,
+  type SettleStagePayload,
   TRIGGER_NOTIFY_REACTOR_NAME,
 } from "../payload";
 
@@ -115,6 +116,11 @@ function makeDeps(trigger: TriggerSummary = makeTrigger()) {
     evaluationRuns: { findByTraceId: vi.fn().mockResolvedValue([]) } as any,
     deriveEvents: vi.fn().mockResolvedValue([]),
     traceById: vi.fn().mockResolvedValue(undefined),
+    // ADR-032: persist-class side-effect sinks. Notify dispatch never
+    // touches them; persist cadence (ADD_TO_DATASET /
+    // ADD_TO_ANNOTATION_QUEUE) calls them via dispatchTriggerAction.
+    addToAnnotationQueue: vi.fn().mockResolvedValue(undefined),
+    addToDataset: vi.fn().mockResolvedValue(undefined),
     enqueueCadence: vi.fn().mockResolvedValue(undefined),
     emailHourlyCap: 100,
     consumeEmailCapSlot: vi.fn().mockResolvedValue({ allowed: true, count: 1 }),
@@ -704,6 +710,260 @@ describe("createOutboxDispatcher cadence stage", () => {
           expect.objectContaining({ triggerEmails: ["keep@example.com"] }),
         );
       });
+    });
+  });
+});
+
+// ADR-032: persist-class actions ride the same settle → cadence outbox
+// path as notify. These exercise the persist branches of handleSettle
+// and handleCadenceBatch and confirm they never touch the notify senders.
+function makePersistTrigger(
+  overrides: Partial<TriggerSummary> = {},
+): TriggerSummary {
+  return makeTrigger({
+    action: TriggerAction.ADD_TO_ANNOTATION_QUEUE,
+    actionParams: {
+      annotators: [{ id: "annotator-1", name: "Ops" }],
+      createdByUserId: "user-1",
+    },
+    ...overrides,
+  });
+}
+
+function makePersistFold(origin = "application") {
+  // A complete-enough fold: the settle stage builds precondition trace
+  // data from it (reads models / annotationIds / etc.), so a minimal stub
+  // would NPE in buildPreconditionTraceDataFromFoldState. The trace-origin
+  // filter reads langwatch.origin; dispatchTriggerAction reads only
+  // computedInput/Output.
+  return {
+    traceId: TRACE_ID,
+    spanCount: 1,
+    totalDurationMs: 100,
+    computedIOSchemaVersion: "1",
+    computedInput: "in",
+    computedOutput: "out",
+    timeToFirstTokenMs: null,
+    timeToLastTokenMs: null,
+    tokensPerSecond: null,
+    containsErrorStatus: false,
+    containsOKStatus: true,
+    errorMessage: null,
+    models: [],
+    totalCost: null,
+    tokensEstimated: false,
+    totalPromptTokenCount: null,
+    totalCompletionTokenCount: null,
+    outputFromRootSpan: false,
+    outputSpanEndTimeMs: 0,
+    blockedByGuardrail: false,
+    topicId: null,
+    subTopicId: null,
+    annotationIds: [],
+    occurredAt: Date.now(),
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    LastEventOccurredAt: Date.now(),
+    attributes: { "langwatch.origin": origin },
+  } as any;
+}
+
+function makePersistSettlePayload(
+  overrides: Partial<SettleStagePayload> = {},
+): SettleStagePayload {
+  return {
+    stage: "settle",
+    projectId: PROJECT_ID,
+    triggerId: TRIGGER_ID,
+    reactorName: TRIGGER_NOTIFY_REACTOR_NAME,
+    actionClass: "persist",
+    auditDedupKey: `${PROJECT_ID}/${TRIGGER_ID}:trace:${TRACE_ID}`,
+    traceId: TRACE_ID,
+    foldSnapshotAtEnqueue: { computedInput: "in", computedOutput: "out" },
+    ...overrides,
+  };
+}
+
+function makePersistCadencePayload(
+  overrides: Partial<CadenceStagePayload> = {},
+): CadenceStagePayload {
+  return makeCadencePayload({ actionClass: "persist", ...overrides });
+}
+
+describe("createOutboxDispatcher persist class (ADR-032)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe("given a persist settle payload", () => {
+    describe("when the settled fold matches the trace filters", () => {
+      it("re-enqueues an immediate cadence stamped actionClass=persist and dispatches nothing yet", async () => {
+        const deps = makeDeps(makePersistTrigger());
+        deps.traceSummaryStore.get.mockResolvedValue(makePersistFold());
+        const dispatcher = createOutboxDispatcher(deps);
+
+        await dispatcher.process(makePersistSettlePayload());
+
+        // Settle re-enqueues cadence; it claims/dispatches nothing itself.
+        expect(deps.enqueueCadence).toHaveBeenCalledTimes(1);
+        const [cadencePayload, options] = deps.enqueueCadence.mock.calls[0]!;
+        expect(cadencePayload.stage).toBe("cadence");
+        expect(cadencePayload.actionClass).toBe("persist");
+        expect(cadencePayload.match.traceId).toBe(TRACE_ID);
+        // Persist is immediate — no digest delay.
+        expect(options.delayMs).toBe(0);
+        // No side effect, no claim at the settle stage.
+        expect(deps.addToAnnotationQueue).not.toHaveBeenCalled();
+        expect(deps.triggers.claimSend).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the settled fold does not match the trace filters", () => {
+      it("dispatches nothing and enqueues no cadence", async () => {
+        const deps = makeDeps(
+          makePersistTrigger({ filters: { "traces.origin": ["playground"] } }),
+        );
+        // Fold origin is "application", filter wants "playground".
+        deps.traceSummaryStore.get.mockResolvedValue(
+          makePersistFold("application"),
+        );
+        const dispatcher = createOutboxDispatcher(deps);
+
+        await dispatcher.process(makePersistSettlePayload());
+
+        expect(deps.enqueueCadence).not.toHaveBeenCalled();
+        expect(deps.addToAnnotationQueue).not.toHaveBeenCalled();
+        expect(deps.triggers.claimSend).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the trace fold is gone", () => {
+      it("dispatches nothing and enqueues no cadence", async () => {
+        const deps = makeDeps(makePersistTrigger());
+        deps.traceSummaryStore.get.mockResolvedValue(null);
+        const dispatcher = createOutboxDispatcher(deps);
+
+        await dispatcher.process(makePersistSettlePayload());
+
+        expect(deps.enqueueCadence).not.toHaveBeenCalled();
+        expect(deps.addToAnnotationQueue).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a persist cadence payload", () => {
+    describe("when the pair has not been claimed", () => {
+      it("re-reads the settled fold, dispatches via dispatchTriggerAction, then claims post-success", async () => {
+        const deps = makeDeps(makePersistTrigger());
+        deps.traceSummaryStore.get.mockResolvedValue(makePersistFold());
+        const dispatcher = createOutboxDispatcher(deps);
+
+        await dispatcher.process(makePersistCadencePayload());
+
+        // Cross-batch dedup read ran first.
+        expect(deps.triggers.isSendClaimed).toHaveBeenCalledTimes(1);
+        // The persist side effect fired (ADD_TO_ANNOTATION_QUEUE).
+        expect(deps.addToAnnotationQueue).toHaveBeenCalledTimes(1);
+        expect(deps.addToAnnotationQueue).toHaveBeenCalledWith(
+          expect.objectContaining({
+            traceIds: [TRACE_ID],
+            projectId: PROJECT_ID,
+          }),
+        );
+        // Claim is written AFTER the successful dispatch (retry-safe).
+        expect(deps.triggers.claimSend).toHaveBeenCalledTimes(1);
+        expect(deps.triggers.claimSend).toHaveBeenCalledWith({
+          triggerId: TRIGGER_ID,
+          traceId: TRACE_ID,
+          projectId: PROJECT_ID,
+        });
+        // It must NOT touch the notify senders.
+        expect(sendTriggerEmail).not.toHaveBeenCalled();
+        expect(sendSlackWebhook).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the pair was already claimed by an earlier run", () => {
+      it("skips the dispatch via the read-only isSendClaimed check", async () => {
+        const deps = makeDeps(makePersistTrigger());
+        deps.traceSummaryStore.get.mockResolvedValue(makePersistFold());
+        deps.triggers.isSendClaimed.mockResolvedValueOnce(true);
+        const dispatcher = createOutboxDispatcher(deps);
+
+        await dispatcher.process(makePersistCadencePayload());
+
+        expect(deps.triggers.isSendClaimed).toHaveBeenCalledTimes(1);
+        expect(deps.addToAnnotationQueue).not.toHaveBeenCalled();
+        expect(deps.triggers.claimSend).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the same traceId appears twice in the batch", () => {
+      it("dedupes in-batch so the side effect fires once", async () => {
+        const deps = makeDeps(makePersistTrigger());
+        deps.traceSummaryStore.get.mockResolvedValue(makePersistFold());
+        const dispatcher = createOutboxDispatcher(deps);
+
+        await dispatcher.processBatch([
+          makePersistCadencePayload(),
+          makePersistCadencePayload(),
+        ]);
+
+        expect(deps.triggers.isSendClaimed).toHaveBeenCalledTimes(1);
+        expect(deps.addToAnnotationQueue).toHaveBeenCalledTimes(1);
+        expect(deps.triggers.claimSend).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when dispatchTriggerAction fails retryably", () => {
+      it("does not claim, so the outbox retry re-dispatches rather than no-opping", async () => {
+        const deps = makeDeps(makePersistTrigger());
+        deps.traceSummaryStore.get.mockResolvedValue(makePersistFold());
+        deps.addToAnnotationQueue
+          .mockRejectedValueOnce(
+            new DispatchError({ message: "queue 503", retryable: true }),
+          )
+          .mockResolvedValueOnce(undefined);
+        const dispatcher = createOutboxDispatcher(deps);
+
+        // First attempt throws (so the outbox marks it for retry)...
+        await expect(
+          dispatcher.process(makePersistCadencePayload()),
+        ).rejects.toBeInstanceOf(DispatchError);
+        // ...and crucially the claim did NOT land, or the retry would no-op.
+        expect(deps.triggers.claimSend).not.toHaveBeenCalled();
+
+        // Retry succeeds and now claims.
+        await dispatcher.process(makePersistCadencePayload());
+        expect(deps.addToAnnotationQueue).toHaveBeenCalledTimes(2);
+        expect(deps.triggers.claimSend).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
+
+  describe("at-most-once across a settle then cadence run for the same pair", () => {
+    it("claims exactly once: the settle re-enqueues, the cadence dispatches+claims, a replayed cadence no-ops", async () => {
+      const deps = makeDeps(makePersistTrigger());
+      deps.traceSummaryStore.get.mockResolvedValue(makePersistFold());
+      const dispatcher = createOutboxDispatcher(deps);
+
+      // 1) Settle matches → enqueues cadence, no claim yet.
+      await dispatcher.process(makePersistSettlePayload());
+      expect(deps.enqueueCadence).toHaveBeenCalledTimes(1);
+      expect(deps.triggers.claimSend).not.toHaveBeenCalled();
+      const enqueuedCadence = deps.enqueueCadence.mock
+        .calls[0]![0] as CadenceStagePayload;
+
+      // 2) Cadence runs → dispatch + claim once.
+      await dispatcher.process(enqueuedCadence);
+      expect(deps.addToAnnotationQueue).toHaveBeenCalledTimes(1);
+      expect(deps.triggers.claimSend).toHaveBeenCalledTimes(1);
+
+      // 3) A replayed cadence for the SAME pair sees the claim and no-ops.
+      deps.triggers.isSendClaimed.mockResolvedValueOnce(true);
+      await dispatcher.process(enqueuedCadence);
+      expect(deps.addToAnnotationQueue).toHaveBeenCalledTimes(1);
+      expect(deps.triggers.claimSend).toHaveBeenCalledTimes(1);
     });
   });
 });

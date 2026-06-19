@@ -32,9 +32,9 @@ export interface AlertTriggerNotifyOutboxReactorDeps {
  *
  * Triggers with evaluation filters are handled by
  * `evaluationAlertTriggerNotifyOutbox.reactor.ts` on the evaluation
- * pipeline. Persist-class actions (ADD_TO_DATASET, etc.) are still
- * handled by the inline `alertTrigger.reactor.ts` because they have
- * no outbox dispatcher.
+ * pipeline. Persist-class actions (ADD_TO_DATASET, etc.) ride the same
+ * settle/cadence outbox via `alertTrigger.reactor.ts` (ADR-032), stamped
+ * `actionClass: "persist"`; this reactor only emits the notify class.
  */
 export function createAlertTriggerNotifyOutboxReactor(
   deps: AlertTriggerNotifyOutboxReactorDeps,
@@ -65,6 +65,7 @@ export function createAlertTriggerNotifyOutboxReactor(
           triggerId: trigger.id,
           traceId,
           reactorName: TRIGGER_NOTIFY_REACTOR_NAME,
+          actionClass: "notify",
           auditDedupKey: auditDedupKey({
             projectId: tenantId,
             triggerId: trigger.id,

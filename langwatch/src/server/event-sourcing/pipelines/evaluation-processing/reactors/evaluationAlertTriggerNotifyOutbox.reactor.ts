@@ -41,9 +41,10 @@ export interface EvaluationAlertTriggerNotifyOutboxReactorDeps {
  * results after `traceDebounceMs`, so we deliberately skip the
  * expensive cross-pipeline evaluation load + events derivation here.
  *
- * Persist-class actions (ADD_TO_DATASET, etc.) stay in the inline
- * `evaluationAlertTrigger.reactor.ts` because they have no outbox
- * dispatcher.
+ * Persist-class actions (ADD_TO_DATASET, etc.) ride the same
+ * settle/cadence outbox via `evaluationAlertTrigger.reactor.ts`
+ * (ADR-032), stamped `actionClass: "persist"`; this reactor only emits
+ * the notify class.
  */
 export function createEvaluationAlertTriggerNotifyOutboxReactor(
   deps: EvaluationAlertTriggerNotifyOutboxReactorDeps,
