@@ -4,6 +4,7 @@ import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
 import { createProjectApp, requires } from "~/server/api/security";
+import { requireApiKeyPermission } from "~/server/api-key/auth-middleware";
 import { prisma } from "~/server/db";
 import {
   EvaluationInputError,
@@ -314,6 +315,10 @@ secured.access(requires("workflows:manage")).post(
       },
     },
   }),
+  // The caller polls the run + reads results on /api/experiments/runs/:runId(/results),
+  // which require evaluations:view. Enforce it here too so a workflows-only key
+  // cannot start a run it would then get 403 trying to read.
+  requireApiKeyPermission({ prisma, permission: "evaluations:view" }),
   zValidator("json", evaluateBodySchema),
   async (c) => {
     const project = c.get("project");

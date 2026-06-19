@@ -200,8 +200,15 @@ export const applyParametersToRows = ({
       : typeof value === "boolean"
         ? "boolean"
         : "string";
+  // A parameter overriding an existing column rewrites every row's value below,
+  // so the column's declared type must follow the parameter or the rows and the
+  // column metadata would disagree (e.g. a number written into a "string" column).
   const columnsWithParameters = [
-    ...columns,
+    ...columns.map((column) =>
+      Object.hasOwn(parameters, column.name)
+        ? { ...column, type: parameterColumnType(parameters[column.name]!) }
+        : column,
+    ),
     ...Object.entries(parameters)
       .filter(([key]) => !existingNames.has(key))
       .map(([key, value]) => ({
