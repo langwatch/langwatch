@@ -117,7 +117,13 @@ const logger = createLogger("langwatch:event-sourcing:pipeline-registry");
  * Creates an in-memory setTimeout-based fallback for deferred job processing.
  * Used when the event-sourcing queue is unavailable (e.g. no Redis).
  */
-function createInMemoryDeferredFallback<P>({ makeId, delayMs, process, logContext, errorMessage }: {
+function createInMemoryDeferredFallback<P>({
+  makeId,
+  delayMs,
+  process,
+  logContext,
+  errorMessage,
+}: {
   makeId?: (payload: P) => string;
   delayMs: number;
   process: (payload: P) => Promise<void>;
@@ -245,11 +251,22 @@ export class PipelineRegistry {
     );
 
     const evalPipeline = this.registerEvaluationPipeline({ traceSummaryStore });
-    const { pipeline: tracePipeline, simComputeRunMetrics, wireExperimentDeps } = this.registerTracePipeline({ evalPipeline, traceSummaryStore });
+    const {
+      pipeline: tracePipeline,
+      simComputeRunMetrics,
+      wireExperimentDeps,
+    } = this.registerTracePipeline({ evalPipeline, traceSummaryStore });
     const suiteRunPipeline = this.registerSuiteRunPipeline();
-    const { pipeline: simulationPipeline, scenarioExecutionHandle } = this.registerSimulationPipeline({ suiteRunPipeline, traceSummaryStore, simComputeRunMetrics });
+    const { pipeline: simulationPipeline, scenarioExecutionHandle } =
+      this.registerSimulationPipeline({
+        suiteRunPipeline,
+        traceSummaryStore,
+        simComputeRunMetrics,
+      });
 
-    const experimentRunPipeline = this.registerExperimentRunPipeline({ wireExperimentDeps });
+    const experimentRunPipeline = this.registerExperimentRunPipeline({
+      wireExperimentDeps,
+    });
     const billingPipeline = this.registerBillingReportingPipeline();
 
     logger.info("All pipelines registered");
@@ -266,7 +283,9 @@ export class PipelineRegistry {
     };
   }
 
-  private registerEvaluationPipeline({ traceSummaryStore }: {
+  private registerEvaluationPipeline({
+    traceSummaryStore,
+  }: {
     traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
   }) {
     const executeEvaluationCommand = new ExecuteEvaluationCommand({
@@ -309,19 +328,30 @@ export class PipelineRegistry {
     );
   }
 
-  private registerTracePipeline({ evalPipeline, traceSummaryStore }: {
+  private registerTracePipeline({
+    evalPipeline,
+    traceSummaryStore,
+  }: {
     evalPipeline: ReturnType<PipelineRegistry["registerEvaluationPipeline"]>;
     traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
   }) {
     const evalCommands = mapCommands(evalPipeline.commands);
 
     // Deferred dispatchers — resolved after pipeline registration.
-    const resolveOrigin = new Deferred<CommandDispatcher<ResolveOriginCommandData>>("resolveOrigin");
-    const scheduleDeferred = new Deferred<(payload: DeferredOriginPayload) => Promise<void>>("scheduleDeferred");
-    const simComputeRunMetrics = new Deferred<CommandDispatcher<ComputeRunMetricsCommandData>>("simComputeRunMetrics");
+    const resolveOrigin = new Deferred<
+      CommandDispatcher<ResolveOriginCommandData>
+    >("resolveOrigin");
+    const scheduleDeferred = new Deferred<
+      (payload: DeferredOriginPayload) => Promise<void>
+    >("scheduleDeferred");
+    const simComputeRunMetrics = new Deferred<
+      CommandDispatcher<ComputeRunMetricsCommandData>
+    >("simComputeRunMetrics");
     // recordSpan is a command of the trace pipeline itself, so the claude
     // span-sync reactor that dispatches it is wired after registration.
-    const recordSpanDispatch = new Deferred<CommandDispatcher<RecordSpanCommandData>>("recordSpan");
+    const recordSpanDispatch = new Deferred<
+      CommandDispatcher<RecordSpanCommandData>
+    >("recordSpan");
 
     const originGateReactor = createOriginGateReactor({
       scheduleDeferred: scheduleDeferred.fn,
@@ -380,20 +410,28 @@ export class PipelineRegistry {
     // Late-bound reference for experiment metrics sync reactor.
     // The experiment pipeline is registered after the trace pipeline,
     // so computeExperimentRunMetrics is wired after experiment pipeline registration.
-    let expComputeRunMetrics: ((data: ComputeExperimentRunMetricsCommandData) => Promise<void>) | null = null;
-    let expLookupExperimentId: ((tenantId: string, runId: string) => Promise<string | null>) | null = null;
+    let expComputeRunMetrics:
+      | ((data: ComputeExperimentRunMetricsCommandData) => Promise<void>)
+      | null = null;
+    let expLookupExperimentId:
+      | ((tenantId: string, runId: string) => Promise<string | null>)
+      | null = null;
 
     const experimentMetricsSyncReactor = createExperimentMetricsSyncReactor({
       computeExperimentRunMetrics: async (data) => {
         if (!expComputeRunMetrics) {
-          logger.warn("experiment computeExperimentRunMetrics not yet initialized, skipping");
+          logger.warn(
+            "experiment computeExperimentRunMetrics not yet initialized, skipping",
+          );
           return;
         }
         return expComputeRunMetrics(data);
       },
       lookupExperimentId: async (tenantId, runId) => {
         if (!expLookupExperimentId) {
-          logger.warn("experiment lookupExperimentId not yet initialized, skipping");
+          logger.warn(
+            "experiment lookupExperimentId not yet initialized, skipping",
+          );
           return null;
         }
         return expLookupExperimentId(tenantId, runId);
@@ -409,14 +447,20 @@ export class PipelineRegistry {
       : undefined;
 
     const governanceOcsfEventsSyncReactor = this.deps.governanceOcsfEventsSync
-      ? createGovernanceOcsfEventsSyncReactor(this.deps.governanceOcsfEventsSync)
+      ? createGovernanceOcsfEventsSyncReactor(
+          this.deps.governanceOcsfEventsSync,
+        )
       : undefined;
 
     const tracePipeline = this.deps.eventSourcing.register(
       createTraceProcessingPipeline({
         spanAppendStore: new SpanAppendStore(this.deps.traces.spans.repository),
-        logRecordAppendStore: new LogRecordAppendStore(this.deps.repositories.logRecordStorage),
-        metricRecordAppendStore: new MetricRecordAppendStore(this.deps.repositories.metricRecordStorage),
+        logRecordAppendStore: new LogRecordAppendStore(
+          this.deps.repositories.logRecordStorage,
+        ),
+        metricRecordAppendStore: new MetricRecordAppendStore(
+          this.deps.repositories.metricRecordStorage,
+        ),
         traceSummaryStore,
         originGateReactor,
         evaluationTriggerReactor,
@@ -446,22 +490,23 @@ export class PipelineRegistry {
     // Wire the deferred origin resolution queue (BullMQ-backed, survives process restart).
     // After 5 min, dispatches resolveOrigin command → OriginResolvedEvent → fold → reactor.
     const deferredOriginHandler = createDeferredOriginHandler(resolveOrigin.fn);
-    const deferredOriginQueue = tracePipeline.service.registerJob<DeferredOriginPayload>({
-      name: "deferredOriginResolution",
-      process: deferredOriginHandler,
-      delay: DEFERRED_CHECK_DELAY_MS,
-      deduplication: {
-        makeId: makeDeferredJobId,
-        ttlMs: DEFERRED_CHECK_DELAY_MS + 60_000, // 6 min — covers the 5-min delay + buffer
-        extend: false,  // Don't reset the 5-min timer on new spans
-        replace: false,  // Don't update payload (same trace, same data)
-      },
-      groupKeyFn: (p) => p.traceId,  // Per-trace parallelism (framework prepends tenantId)
-      spanAttributes: (payload) => ({
-        "deferred.tenant_id": payload.tenantId,
-        "deferred.trace_id": payload.traceId,
-      }),
-    });
+    const deferredOriginQueue =
+      tracePipeline.service.registerJob<DeferredOriginPayload>({
+        name: "deferredOriginResolution",
+        process: deferredOriginHandler,
+        delay: DEFERRED_CHECK_DELAY_MS,
+        deduplication: {
+          makeId: makeDeferredJobId,
+          ttlMs: DEFERRED_CHECK_DELAY_MS + 60_000, // 6 min — covers the 5-min delay + buffer
+          extend: false, // Don't reset the 5-min timer on new spans
+          replace: false, // Don't update payload (same trace, same data)
+        },
+        groupKeyFn: (p) => p.traceId, // Per-trace parallelism (framework prepends tenantId)
+        spanAttributes: (payload) => ({
+          "deferred.tenant_id": payload.tenantId,
+          "deferred.trace_id": payload.traceId,
+        }),
+      });
 
     if (deferredOriginQueue) {
       scheduleDeferred.resolve((payload) => deferredOriginQueue.send(payload));
@@ -489,8 +534,13 @@ export class PipelineRegistry {
        * Called after the experiment pipeline is registered.
        */
       wireExperimentDeps: (deps: {
-        computeExperimentRunMetrics: (data: ComputeExperimentRunMetricsCommandData) => Promise<void>;
-        lookupExperimentId: (tenantId: string, runId: string) => Promise<string | null>;
+        computeExperimentRunMetrics: (
+          data: ComputeExperimentRunMetricsCommandData,
+        ) => Promise<void>;
+        lookupExperimentId: (
+          tenantId: string,
+          runId: string,
+        ) => Promise<string | null>;
       }) => {
         expComputeRunMetrics = deps.computeExperimentRunMetrics;
         expLookupExperimentId = deps.lookupExperimentId;
@@ -512,10 +562,16 @@ export class PipelineRegistry {
     );
   }
 
-  private registerSimulationPipeline({ suiteRunPipeline, traceSummaryStore, simComputeRunMetrics }: {
+  private registerSimulationPipeline({
+    suiteRunPipeline,
+    traceSummaryStore,
+    simComputeRunMetrics,
+  }: {
     suiteRunPipeline: ReturnType<PipelineRegistry["registerSuiteRunPipeline"]>;
     traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
-    simComputeRunMetrics: Deferred<CommandDispatcher<ComputeRunMetricsCommandData>>;
+    simComputeRunMetrics: Deferred<
+      CommandDispatcher<ComputeRunMetricsCommandData>
+    >;
   }) {
     const simulationRunStore = this.cached<SimulationRunStateData>(
       new RepositoryFoldStore<SimulationRunStateData>(
@@ -544,8 +600,12 @@ export class PipelineRegistry {
     });
 
     // Deferred dispatchers — resolved after pipeline registration.
-    const selfComputeRunMetrics = new Deferred<CommandDispatcher<ComputeRunMetricsCommandData>>("selfComputeRunMetrics");
-    const scheduleRetry = new Deferred<(payload: ComputeRunMetricsCommandData) => Promise<void>>("scheduleRetry");
+    const selfComputeRunMetrics = new Deferred<
+      CommandDispatcher<ComputeRunMetricsCommandData>
+    >("selfComputeRunMetrics");
+    const scheduleRetry = new Deferred<
+      (payload: ComputeRunMetricsCommandData) => Promise<void>
+    >("scheduleRetry");
 
     const traceReadDerivation = new TraceReadDerivationService(
       this.deps.traces.spans,
@@ -584,24 +644,25 @@ export class PipelineRegistry {
     const retryJobId = (payload: ComputeRunMetricsCommandData) =>
       `compute-metrics-retry:${payload.tenantId}:${payload.scenarioRunId}:${payload.traceId}`;
 
-    const retryQueue = simulationPipeline.service.registerJob<ComputeRunMetricsCommandData>({
-      name: "deferredComputeRunMetrics",
-      process: async (payload) => {
-        await simCommands.computeRunMetrics(payload);
-      },
-      delay: COMPUTE_METRICS_RETRY_DELAY_MS,
-      deduplication: {
-        makeId: retryJobId,
-        extend: false,
-        replace: true,
-      },
-      spanAttributes: (payload) => ({
-        "deferred.tenant_id": payload.tenantId,
-        "deferred.scenario_run_id": payload.scenarioRunId,
-        "deferred.trace_id": payload.traceId,
-        "deferred.retry_count": payload.retryCount,
-      }),
-    });
+    const retryQueue =
+      simulationPipeline.service.registerJob<ComputeRunMetricsCommandData>({
+        name: "deferredComputeRunMetrics",
+        process: async (payload) => {
+          await simCommands.computeRunMetrics(payload);
+        },
+        delay: COMPUTE_METRICS_RETRY_DELAY_MS,
+        deduplication: {
+          makeId: retryJobId,
+          extend: false,
+          replace: true,
+        },
+        spanAttributes: (payload) => ({
+          "deferred.tenant_id": payload.tenantId,
+          "deferred.scenario_run_id": payload.scenarioRunId,
+          "deferred.trace_id": payload.traceId,
+          "deferred.retry_count": payload.retryCount,
+        }),
+      });
 
     if (retryQueue) {
       scheduleRetry.resolve((payload) => retryQueue.send(payload));
@@ -611,7 +672,11 @@ export class PipelineRegistry {
         createInMemoryDeferredFallback({
           delayMs: COMPUTE_METRICS_RETRY_DELAY_MS,
           process: (payload) => simCommands.computeRunMetrics(payload),
-          logContext: (p) => ({ tenantId: p.tenantId, scenarioRunId: p.scenarioRunId, traceId: p.traceId }),
+          logContext: (p) => ({
+            tenantId: p.tenantId,
+            scenarioRunId: p.scenarioRunId,
+            traceId: p.traceId,
+          }),
           errorMessage: "Deferred compute metrics retry failed",
         }),
       );
@@ -641,18 +706,25 @@ export class PipelineRegistry {
     );
   }
 
-  private registerExperimentRunPipeline({ wireExperimentDeps }: {
-    wireExperimentDeps: ReturnType<PipelineRegistry["registerTracePipeline"]>["wireExperimentDeps"];
+  private registerExperimentRunPipeline({
+    wireExperimentDeps,
+  }: {
+    wireExperimentDeps: ReturnType<
+      PipelineRegistry["registerTracePipeline"]
+    >["wireExperimentDeps"];
   }) {
     const experimentRunStore = this.cached<ExperimentRunStateData>(
-      createExperimentRunStateFoldStore(this.deps.repositories.experimentRunState),
+      createExperimentRunStateFoldStore(
+        this.deps.repositories.experimentRunState,
+      ),
       "experiment_runs",
     );
 
     const experimentRunPipeline = this.deps.eventSourcing.register(
       createExperimentRunProcessingPipeline({
         experimentRunStateFoldStore: experimentRunStore,
-        experimentRunItemAppendStore: this.deps.repositories.experimentRunItemStorage,
+        experimentRunItemAppendStore:
+          this.deps.repositories.experimentRunItemStorage,
         esSync: createExperimentRunEsSyncReactor({
           project: this.deps.projects,
           repository: createElasticsearchBatchEvaluationRepository(),
@@ -664,7 +736,10 @@ export class PipelineRegistry {
     const expCommands = mapCommands(experimentRunPipeline.commands);
 
     // Create the experimentId lookup function using the experiment run ClickHouse repository
-    const lookupExperimentId = async (tenantId: string, runId: string): Promise<string | null> => {
+    const lookupExperimentId = async (
+      tenantId: string,
+      runId: string,
+    ): Promise<string | null> => {
       try {
         const client = await getClickHouseClientForProject(tenantId);
         if (!client) return null;
@@ -726,7 +801,9 @@ export interface DejaViewProjection {
   apply: (state: unknown, event: { type: string }) => unknown;
 }
 
-function getDefinitions(): ReadonlyArray<StaticPipelineDefinition<any, any, any>> {
+function getDefinitions(): ReadonlyArray<
+  StaticPipelineDefinition<any, any, any>
+> {
   return getApp().eventSourcing?.definitions ?? [];
 }
 
@@ -746,12 +823,14 @@ export function getProjectionMetadata(): ProjectionMetadata[] {
 export function getReactorMetadata(): ReactorMetadata[] {
   return getDefinitions().flatMap((def) => {
     const { name: pipelineName, aggregateType } = def.metadata;
-    return Array.from(def.foldReactors.values()).map(({ projectionName, definition }) => ({
-      reactorName: definition.name,
-      pipelineName,
-      aggregateType,
-      afterProjection: projectionName,
-    }));
+    return Array.from(def.foldReactors.values()).map(
+      ({ projectionName, definition }) => ({
+        reactorName: definition.name,
+        pipelineName,
+        aggregateType,
+        afterProjection: projectionName,
+      }),
+    );
   });
 }
 

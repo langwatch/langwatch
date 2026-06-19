@@ -55,7 +55,10 @@ export interface ReactorOptions {
  *
  * See dev/docs/adr/026-reactor-should-react-predicate.md.
  */
-export interface ReactorDefinition<E extends Event = Event, FoldState = unknown> {
+export interface ReactorDefinition<
+  E extends Event = Event,
+  FoldState = unknown,
+> {
   /** Unique name for this reactor */
   name: string;
   /**

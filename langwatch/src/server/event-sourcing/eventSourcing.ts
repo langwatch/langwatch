@@ -177,7 +177,10 @@ export class EventSourcing {
       this.projectionRegistry.registerReactor(foldName, reactor);
     } catch (error) {
       // Only suppress "fold not registered" errors — let wiring bugs (duplicates, etc.) fail fast
-      if (error instanceof ConfigurationError && error.message.includes("fold not registered")) {
+      if (
+        error instanceof ConfigurationError &&
+        error.message.includes("fold not registered")
+      ) {
         logger.debug(
           { foldName, reactorName: reactor.name },
           "Skipping global fold reactor — fold not registered",
