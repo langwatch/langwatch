@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import { generateCells } from "../orchestrator";
 import {
   HEAVY_COLUMN_UNAVAILABLE,
+  isReservedResultKey,
+  leanResultEntry,
   RESERVED_DATASET_ID_KEY,
   RESERVED_ROW_ID_KEY,
   RESULT_INLINE_BYTES,
-  isReservedResultKey,
-  leanResultEntry,
   readRowReference,
   resolveLeanEntry,
   withRowReference,
@@ -92,7 +92,11 @@ describe("ADR-033 result-by-reference plumbing", () => {
 
     describe("when the row has no stable id (inline dataset)", () => {
       it("keeps the full row even with the flag on", () => {
-        const full = leanResultEntry(row, { rowId: undefined }, { enabled: true });
+        const full = leanResultEntry(
+          row,
+          { rowId: undefined },
+          { enabled: true },
+        );
         expect(full.image).toBe(heavyImage);
         expect(readRowReference(full)).toBeNull();
       });
@@ -117,7 +121,11 @@ describe("ADR-033 result-by-reference plumbing", () => {
         const display = resolveLeanEntry({
           storedEntry: leanStored,
           columnNames,
-          row: { question: "ignored", expected: 0, image: "data:image/png;base64,RESOLVED" },
+          row: {
+            question: "ignored",
+            expected: 0,
+            image: "data:image/png;base64,RESOLVED",
+          },
         });
 
         expect(display.question).toBe("how many units?"); // from the stored light column
@@ -143,7 +151,11 @@ describe("ADR-033 result-by-reference plumbing", () => {
 
     describe("given a legacy full-copy result (no reference)", () => {
       it("passes every column through unchanged, never 'unavailable'", () => {
-        const legacy = { question: "q", expected: 1, image: "data:image/png;base64,FULL" };
+        const legacy = {
+          question: "q",
+          expected: 1,
+          image: "data:image/png;base64,FULL",
+        };
 
         const display = resolveLeanEntry({
           storedEntry: legacy,
