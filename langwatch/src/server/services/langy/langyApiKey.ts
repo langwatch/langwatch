@@ -8,7 +8,6 @@ import {
 import { decrypt, encrypt } from "~/utils/encryption";
 import { createLogger } from "~/utils/logger/server";
 import { resolveAttributionUserId } from "./langyAttribution";
-import { backfillLangyCredentialPerProject } from "./langyBackfill";
 
 const logger = createLogger("langwatch:langy:api-key");
 
@@ -139,29 +138,3 @@ export async function provisionLangyApiKey({
   }
 }
 
-/**
- * Reconciles existing projects: provisions the Langy key + token for every
- * project that lacks one. Idempotent — safe to run repeatedly. Per-project
- * failures are logged and skipped so one bad project never aborts the sweep.
- */
-export async function backfillLangyApiKeys(
-  prisma: PrismaClient,
-  { dryRun = false }: { dryRun?: boolean } = {},
-) {
-  return await backfillLangyCredentialPerProject({
-    prisma,
-    dryRun,
-    label: "Langy key",
-    logger,
-    isProvisioned: async (project) =>
-      Boolean(await getLangyApiKeyToken({ prisma, projectId: project.id })),
-    provision: async (project) => {
-      await provisionLangyApiKey({
-        prisma,
-        projectId: project.id,
-        organizationId: project.organizationId,
-      });
-      return "provisioned";
-    },
-  });
-}

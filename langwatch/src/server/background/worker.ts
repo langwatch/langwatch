@@ -43,14 +43,12 @@ import { monitoredQueues } from "./queues";
 import { scheduleAnomalyDetection } from "./queues/anomalyDetectionQueue";
 import { registerEvaluationsFallbackWorker } from "./queues/evaluationsQueue";
 import { scheduleIngestionPullers } from "./queues/ingestionPullerQueue";
-import { scheduleLangyRetention } from "./queues/langyRetentionQueue";
 import { startAnomalyDetectionWorker } from "./workers/anomalyDetectionWorker";
 import { startCollectorWorker } from "./workers/collectorWorker";
 import {
   runEvaluationJob,
   startEvaluationsWorker,
 } from "./workers/evaluationsWorker";
-import { startLangyRetentionWorker } from "./workers/langyRetentionWorker";
 import { startTopicClusteringWorker } from "./workers/topicClusteringWorker";
 import { startUsageStatsWorker } from "./workers/usageStatsWorker";
 
@@ -173,8 +171,6 @@ export const start = async (
     void scheduleAnomalyDetection();
     const ingestionPullerWorker = startIngestionPullerWorker();
     void scheduleIngestionPullers();
-    const langyRetentionWorker = startLangyRetentionWorker();
-    void scheduleLangyRetention().catch(() => undefined);
     const metricsServer = startMetricsServer();
 
     // Register all closeables for graceful shutdown
@@ -186,7 +182,6 @@ export const start = async (
     if (ingestionPullerWorker) {
       registerCloseable("ingestionPuller", ingestionPullerWorker);
     }
-    registerCloseable("langyRetention", langyRetentionWorker);
     registerCloseable("scenario", scenarioProcessor);
     registerCloseable("metricsServer", {
       close: () =>
@@ -226,7 +221,6 @@ export const start = async (
     topicClusteringWorker?.on("closing", closingListener);
     usageStatsWorker?.on("closing", closingListener);
     anomalyDetectionWorker?.on("closing", closingListener);
-    langyRetentionWorker?.on("closing", closingListener);
     if (maxRuntimeMs) {
       setTimeout(() => {
         logger.info("max runtime reached, closing worker");
@@ -237,14 +231,12 @@ export const start = async (
           topicClusteringWorker?.off("closing", closingListener);
           usageStatsWorker?.off("closing", closingListener);
           anomalyDetectionWorker?.off("closing", closingListener);
-          langyRetentionWorker?.off("closing", closingListener);
           await Promise.all([
             collectorWorker?.close(),
             evaluationsWorker?.close(),
             topicClusteringWorker?.close(),
             usageStatsWorker?.close(),
             anomalyDetectionWorker?.close(),
-            langyRetentionWorker?.close(),
             scenarioProcessor?.close(),
             new Promise<void>((resolve) =>
               metricsServer.close(() => resolve()),

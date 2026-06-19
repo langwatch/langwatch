@@ -13,7 +13,6 @@ function makeRepo(overrides?: Partial<LangyConversationRepository>) {
     update: vi.fn(),
     softDelete: vi.fn(),
     softDeleteAllForUser: vi.fn(),
-    hardDeleteOlderThan: vi.fn(),
     touch: vi.fn(),
     ...overrides,
   } as unknown as LangyConversationRepository;

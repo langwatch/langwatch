@@ -114,22 +114,6 @@ export class LangyConversationRepository {
     });
   }
 
-  async hardDeleteOlderThan({ cutoff }: { cutoff: Date }) {
-    // Multi-tenancy guard requires projectId (or projectId.in) in WHERE.
-    // Project is exempt from the guard — enumerate projects, then sweep
-    // each one's soft-deleted conversations in a batched IN clause.
-    const projects = await this.prisma.project.findMany({
-      select: { id: true },
-    });
-    if (projects.length === 0) return { count: 0 };
-    return await this.prisma.langyConversation.deleteMany({
-      where: {
-        projectId: { in: projects.map((p) => p.id) },
-        deletedAt: { not: null, lt: cutoff },
-      },
-    });
-  }
-
   async touch({ id, projectId }: { id: string; projectId: string }) {
     return await this.prisma.langyConversation.updateMany({
       where: { id, projectId },
@@ -277,15 +261,6 @@ export class LangyConversationService {
       projectId,
       userId,
     });
-    return { deletedCount: result.count };
-  }
-
-  async hardDeleteOlderThan({
-    cutoff,
-  }: {
-    cutoff: Date;
-  }): Promise<{ deletedCount: number }> {
-    const result = await this.repository.hardDeleteOlderThan({ cutoff });
     return { deletedCount: result.count };
   }
 
