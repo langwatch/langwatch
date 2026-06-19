@@ -20,4 +20,12 @@ mkdir -p /workspace/skills
 cp /opt/langy-templates/skills/*.md /workspace/skills/
 cp /opt/langy-templates/AGENTS.md /workspace/AGENTS.md
 
+# Workers run as distinct non-root UIDs (see server.js workerUidFor); the
+# shared templates must be readable by all of them. World-readable +
+# root-owned + only-root-writable is the safest combination: any worker
+# UID can open(2) these for read, but no worker can modify them. The
+# manager wipes /workspace/sessions on startup separately (server.js).
+chown -R root:root /workspace/skills /workspace/AGENTS.md
+chmod -R a+rX,go-w /workspace/skills /workspace/AGENTS.md
+
 exec "$@"

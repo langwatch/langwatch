@@ -31,6 +31,7 @@ const http = require("http");
 const net = require("net");
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 const { spawn } = require("child_process");
 
 // ---------- Config ----------
@@ -49,6 +50,31 @@ const READINESS_TIMEOUT_MS = parseInt(
 const REAPER_INTERVAL_MS = 30_000;
 const SESSIONS_ROOT = "/workspace/sessions";
 const MAX_BODY_BYTES = 1_000_000; // 1MB — cap /chat body to avoid memory exhaustion.
+
+// Per-worker UID range. Workers run as distinct UIDs so worker A can never
+// open(2) worker B's per-session config (LANGWATCH API key, GH token,
+// repo clone) — the kernel enforces it via mode 0700 + chown to a unique
+// UID per conversation. UIDs are derived deterministically from the
+// conversation id so the same conversation always lands on the same UID,
+// and 2000+(hash%60000) keeps us above system reserved UIDs and below the
+// uid_t signed boundary on 32-bit platforms (well above 60000 system
+// reserved territory on most distros).
+//
+// Requires the container to run as root with CAP_SETUID + CAP_SETGID +
+// CAP_CHOWN + CAP_DAC_OVERRIDE so the manager can chown per-session
+// directories and `child_process.spawn({uid, gid})` into them. The chart
+// sets exactly that capability set; everything else stays dropped.
+const WORKER_UID_BASE = 2000;
+const WORKER_UID_RANGE = 60000;
+function workerUidFor(conversationId) {
+  const h = crypto.createHash("sha256").update(conversationId).digest();
+  // 32-bit unsigned; modulo the range, then offset by the base. Collisions
+  // across the 60k range are astronomically rare for the practical worker
+  // count (MAX_WORKERS=20 by default), and a collision is benign — same
+  // UID gets reused only when the prior worker for that UID was reaped.
+  const slot = h.readUInt32BE(0) % WORKER_UID_RANGE;
+  return WORKER_UID_BASE + slot;
+}
 
 // opencode has no native OpenTelemetry export, so each worker loads this
 // opencode plugin to emit session/llm/tool spans over OTLP. Version is pinned
@@ -136,10 +162,33 @@ async function readJson(res) {
 // Each worker reads from this directory (cwd + HOME both point at it)
 // so its config + agent guidance are isolated AND the URL placeholders
 // in AGENTS.md resolve to the per-session LangWatch endpoint.
-function setupWorkerHome(workerHome, credentials) {
+//
+// CROSS-WORKER ISOLATION: workerHome and every file under it are chown'd
+// to a per-conversation UID and chmod'd 0700 / 0600 BEFORE any credential
+// material lands. Without this, all workers (same UID 1000) could read
+// each other's config.json — a cross-tenant credential boundary failure
+// flagged by review on PR #4913. The chown/chmod calls require the
+// manager to hold CAP_CHOWN + CAP_DAC_OVERRIDE; the chart grants exactly
+// those + SETUID/SETGID. spawn({uid, gid}) then enters the worker UID,
+// so the OpenCode subprocess physically cannot open(2) a sibling
+// worker's path even with knowledge of it.
+function setupWorkerHome(workerHome, credentials, workerUid) {
+  // Lock down the worker's home dir BEFORE writing anything sensitive into
+  // it. Mode 0700 means only the chowned UID can list / traverse;
+  // any sibling-worker process running as a different UID gets EACCES.
+  fs.chownSync(workerHome, workerUid, workerUid);
+  fs.chmodSync(workerHome, 0o700);
+
   // 1. Per-worker opencode config.json — MCP gets the LangWatch API key.
   const configDir = path.join(workerHome, ".config", "opencode");
   fs.mkdirSync(configDir, { recursive: true });
+  // mkdirSync inherits the parent's owner only when fsGroup is set; the chart
+  // intentionally drops fsGroup (it would group-share every worker's files
+  // and re-open the boundary), so chown the new intermediates ourselves.
+  fs.chownSync(path.join(workerHome, ".config"), workerUid, workerUid);
+  fs.chmodSync(path.join(workerHome, ".config"), 0o700);
+  fs.chownSync(configDir, workerUid, workerUid);
+  fs.chmodSync(configDir, 0o700);
   const config = {
     $schema: "https://opencode.ai/config.json",
     model: credentials.model || "openai/gpt-5-mini",
@@ -158,10 +207,15 @@ function setupWorkerHome(workerHome, credentials) {
       },
     },
   };
-  fs.writeFileSync(
-    path.join(configDir, "config.json"),
-    JSON.stringify(config, null, 2),
-  );
+  const configPath = path.join(configDir, "config.json");
+  fs.writeFileSync(configPath, JSON.stringify(config, null, 2), {
+    mode: 0o600,
+  });
+  // Explicit chown — writeFileSync's mode option sets permission bits but
+  // ownership stays as the writing process (the manager, root). 0600 alone
+  // would still let root read it; the chown is what removes the manager's
+  // access surface and makes "only the worker UID" literal.
+  fs.chownSync(configPath, workerUid, workerUid);
 
   // 2. Per-worker AGENTS.md with ${LANGWATCH_ENDPOINT} substituted in.
   // The shared /workspace/AGENTS.md keeps the literal placeholder; we
@@ -171,10 +225,16 @@ function setupWorkerHome(workerHome, credentials) {
     "${LANGWATCH_ENDPOINT}",
     credentials.langwatchEndpoint,
   );
-  fs.writeFileSync(path.join(workerHome, "AGENTS.md"), perWorkerAgents);
+  const agentsPath = path.join(workerHome, "AGENTS.md");
+  fs.writeFileSync(agentsPath, perWorkerAgents, { mode: 0o600 });
+  fs.chownSync(agentsPath, workerUid, workerUid);
 
   // 3. Symlink skills/ to the shared template directory. Read-only
-  // references; no per-worker mutation expected.
+  // references; no per-worker mutation expected. The shared dir is
+  // root-owned and world-readable (set up in entrypoint.sh), so workers
+  // following the symlink can READ it but cannot mutate it — even if a
+  // worker writes through the symlink, lacking CAP_DAC_OVERRIDE means
+  // the kernel refuses.
   const skillsLink = path.join(workerHome, "skills");
   try {
     fs.symlinkSync("/workspace/skills", skillsLink);
@@ -182,6 +242,14 @@ function setupWorkerHome(workerHome, credentials) {
     // EEXIST is fine — leftover from a previous worker for the same
     // conversation that didn't get fully cleaned up.
     if (err.code !== "EEXIST") throw err;
+  }
+  // lchown the symlink itself so the link's metadata can't be tampered
+  // with by another UID. The target perms are what gate reads.
+  try {
+    fs.lchownSync(skillsLink, workerUid, workerUid);
+  } catch {
+    /* symlink chown can race with the EEXIST above; ignore — target
+       perms are what actually gate access */
   }
 }
 
@@ -329,8 +397,9 @@ async function spawnWorkerInner(conversationId, credentials) {
   if (!path.resolve(workerHome).startsWith(`${resolvedRoot}${path.sep}`)) {
     throw new Error("invalid conversationId");
   }
+  const workerUid = workerUidFor(conversationId);
   fs.mkdirSync(workerHome, { recursive: true });
-  setupWorkerHome(workerHome, credentials);
+  setupWorkerHome(workerHome, credentials, workerUid);
 
   const port = await getFreePort();
 
@@ -392,6 +461,14 @@ async function spawnWorkerInner(conversationId, credentials) {
       },
       cwd: workerHome,
       stdio: ["ignore", "inherit", "inherit"],
+      // Enter the per-worker UID before exec. Combined with chmod 0700 on
+      // workerHome and chmod 0600 on config.json, this makes a sibling
+      // worker's files unreachable to this process at the kernel level —
+      // open(2) returns EACCES regardless of how the path is constructed.
+      // Requires the manager to hold CAP_SETUID + CAP_SETGID (granted by
+      // the chart's containerSecurityContext.capabilities.add).
+      uid: workerUid,
+      gid: workerUid,
     },
   );
 

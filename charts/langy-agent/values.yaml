@@ -68,18 +68,44 @@ terminationGracePeriodSeconds: 30
 # large per-worker homes; leave {} for the cluster default.
 workspaceVolume: {}
 
+## SecurityContext.
+##
+## Why the manager runs as ROOT here (counter-intuitive but load-bearing):
+## per-worker UID isolation requires `child_process.spawn({uid, gid})` —
+## that syscall path needs CAP_SETUID + CAP_SETGID + CAP_CHOWN, which only
+## a root-effective-uid process holds inside a container. With the manager
+## as UID 1000, every OpenCode subprocess inherited UID 1000 too, so worker
+## A could `cat /workspace/sessions/<worker-B>/.config/opencode/config.json`
+## and steal worker B's project API key + GitHub token (PR #4913 review).
+##
+## Mitigations that keep the blast radius small even with root in the pod:
+##   - Drop ALL caps and add back ONLY the four required for the per-UID
+##     handoff (SETUID/SETGID/CHOWN/DAC_OVERRIDE). No NET_*, no SYS_*.
+##   - allowPrivilegeEscalation: false → no_new_privs is set, so children
+##     cannot regain caps via setuid binaries.
+##   - readOnlyRootFilesystem stays on so a worker can't pivot through
+##     `/etc` or `/usr`.
+##   - fsGroup intentionally OMITTED — setting it would group-share every
+##     worker's files and re-open the cross-worker boundary.
+##   - runtimeClassName: gvisor (operator-set) hardens the pod->node escape
+##     surface, complementary to the in-pod per-UID isolation.
 podSecurityContext:
-  runAsNonRoot: true
-  runAsUser: 1000
-  fsGroup: 1000
+  runAsNonRoot: false
+  runAsUser: 0
+  # fsGroup intentionally absent — see header.
 
 containerSecurityContext:
-  runAsNonRoot: true
-  runAsUser: 1000
+  runAsNonRoot: false
+  runAsUser: 0
   readOnlyRootFilesystem: true
   allowPrivilegeEscalation: false
   capabilities:
     drop: ["ALL"]
+    # These four are required so the manager can chown per-session dirs to
+    # a unique UID, write 0600 config blobs as that UID, and spawn the
+    # OpenCode subprocess directly into it. Any addition beyond this needs
+    # to be justified in the SecurityContext header above.
+    add: ["CHOWN", "DAC_OVERRIDE", "SETUID", "SETGID"]
 
 # Sandboxed container runtime for this pod. The agent runs LLM-driven
 # arbitrary code (opencode workers shell out to git/npm/gh), so the headline
