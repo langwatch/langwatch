@@ -11,7 +11,7 @@ import type { OutboxPayload } from "./outbox.types";
 export interface OutboxEnqueueRequest {
   /**
    * Stable identity of the match. (reactorName, dedupKey) is the
-   * claim primitive — collisions deduplicate. See ADR-025.
+   * claim primitive — collisions deduplicate. See ADR-030.
    *
    * Convention (mirrors `groupKey` shape with a `${projectId}/`
    * prefix so dedup/group identifiers stay self-describing for
@@ -69,7 +69,7 @@ export interface OutboxEnqueueRequest {
  * Use `.withOutbox(projection, name, definition)` instead of
  * `.withReactor(...)` when the side effect MUST not be silently
  * swallowed (customer emails, Slack messages, dataset writes). See
- * ADR-025 for the criteria.
+ * ADR-030 for the criteria.
  *
  * Unlike a `ReactorDefinition`, an outbox reactor does not perform
  * the side effect inline. It only decides — by returning enqueue

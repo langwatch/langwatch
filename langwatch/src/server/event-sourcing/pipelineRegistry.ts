@@ -211,7 +211,7 @@ export interface PipelineRegistryDeps {
    * Wired by the worker composition root (`presets.ts`) and `undefined`
    * on the web process. When set, both trigger reactors route
    * NOTIFY-class matches into the unified outbox queue's settle stage
-   * (ADR-025 + ADR-026) instead of inline-dispatching. Persist
+   * (ADR-030 + ADR-026) instead of inline-dispatching. Persist
    * actions always run inline regardless.
    */
   outbox?: OutboxRuntime;

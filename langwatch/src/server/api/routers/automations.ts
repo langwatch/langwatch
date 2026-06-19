@@ -54,7 +54,7 @@ const traceDebounceMsSchema = z
   .min(MIN_TRACE_DEBOUNCE_MS)
   .max(MAX_TRACE_DEBOUNCE_MS);
 
-// ADR-025: cadence applies to notify actions only. New notify triggers default
+// ADR-026: cadence applies to notify actions only. New notify triggers default
 // to a 5-minute digest (operator-friendly storm protection); persist actions
 // are pinned to immediate at the storage boundary so a stale value can't leak
 // into the dispatch path.

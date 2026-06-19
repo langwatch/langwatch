@@ -1,5 +1,5 @@
 /**
- * Single queue, two stages (ADR-025 revision + ADR-027 + ADR-026).
+ * Single queue, two stages (ADR-030 revision + ADR-027 + ADR-026).
  *
  * The unified outbox queue carries both trace-readiness settling and
  * cadence digest dispatch in one `process` callback via the `stage`
@@ -95,7 +95,7 @@ export type OutboxJob = SettleStagePayload | CadenceStagePayload;
 
 // Widened to accept any unknown payload — these are the discriminators
 // the main event-sourcing queue uses to pick off outbox jobs from
-// non-outbox jobs (ADR-025 r3), so they need to be safe to call on
+// non-outbox jobs (ADR-030 r3), so they need to be safe to call on
 // arbitrary `Record<string, unknown>`.
 export function isSettle(
   job: Record<string, unknown>,
@@ -126,7 +126,7 @@ export function settleDedupId(params: {
  * Per-(trigger, trace) audit row identity. Both settle and cadence
  * payloads carry this on `auditDedupKey` so they target one row in
  * `ReactorOutbox` through the full lifecycle. Collisions are the
- * replay-safe claim primitive (ADR-025).
+ * replay-safe claim primitive (ADR-030).
  */
 export function auditDedupKey(params: {
   projectId: string;

@@ -61,7 +61,7 @@ export interface OutboxRepository {
    * Insert a row if one does not already exist for (reactorName,
    * dedupKey). Returns true when a row was inserted, false when a
    * pre-existing row deduplicated the call. This is the claim
-   * primitive — see ADR-025.
+   * primitive — see ADR-030.
    */
   insertIfAbsent(row: OutboxInsertRow): Promise<boolean>;
 

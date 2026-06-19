@@ -18,7 +18,7 @@ export interface EvaluationProcessingPipelineDeps {
   esSyncReactor: ReactorDefinition<EvaluationProcessingEvent, EvaluationRunData>;
   evaluationAlertTriggerReactor: ReactorDefinition<EvaluationProcessingEvent, EvaluationRunData>;
   /** NOTIFY-class branch of the evaluation alert trigger, routed
-   *  through the framework's `.withOutbox` plumbing (ADR-025). */
+   *  through the framework's `.withOutbox` plumbing (ADR-030). */
   evaluationAlertTriggerNotifyOutboxReactor: OutboxReactorDefinition<
     EvaluationProcessingEvent,
     EvaluationRunData

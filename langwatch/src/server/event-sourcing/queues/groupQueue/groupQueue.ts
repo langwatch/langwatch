@@ -380,7 +380,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       if (tenantId) {
         void this.rateTracker.record(tenantId);
       }
-      // Audit hook (ADR-025 revision): only on the new-stage path, not on
+      // Audit hook (ADR-030 revision): only on the new-stage path, not on
       // dedup-collapse. The adapter's audit row already exists for the
       // first send under this dedup ID.
       await this.runAudit(() =>
@@ -514,7 +514,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       gqJobsDedupedTotal.inc({ queue_name: this.queueName }, dedupedCount);
     }
 
-    // Audit hooks (ADR-025 revision). The Lua's stageBatch returns a count,
+    // Audit hooks (ADR-030 revision). The Lua's stageBatch returns a count,
     // not a per-payload new/dedup map, so we fire onEnqueue for every
     // payload and let the adapter's idempotency (createMany skipDuplicates)
     // absorb dedup-collapsed duplicates. Index alignment is by position —
@@ -549,7 +549,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
   /**
    * Best-effort audit-adapter invocation. PG outages log + continue;
-   * the queue stays available. See ADR-025 revision for the "audit lags
+   * the queue stays available. See ADR-030 revision for the "audit lags
    * but never blocks dispatch" property.
    */
   private async runAudit(

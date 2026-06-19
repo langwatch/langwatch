@@ -4,7 +4,7 @@ import { TraceDebounceField } from "../TraceDebounceField";
 import { SecondaryDrawerShell } from "./SecondaryDrawerShell";
 
 /**
- * Cadence secondary drawer. Hosts the per-trigger digest cadence (ADR-025)
+ * Cadence secondary drawer. Hosts the per-trigger digest cadence (ADR-026)
  * and the trace-readiness settle window (ADR-030) — both notify-only
  * knobs that previously sat inline on the main pane. The fields dispatch
  * straight to the store (same live-edit pattern as the configuration

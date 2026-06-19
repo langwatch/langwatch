@@ -21,7 +21,7 @@ export interface EnqueueOutboxParams {
   /**
    * Stable identifier of the match. Collisions on (reactorName, dedupKey)
    * are the claim primitive that makes pipeline replays safe — see
-   * ADR-025.
+   * ADR-030.
    *
    * Convention (per-trigger subject scoping; the `${projectId}/` prefix
    * mirrors the `groupKey` shape so every dedup/group identifier in the

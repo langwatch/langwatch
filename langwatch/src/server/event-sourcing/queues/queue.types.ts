@@ -161,7 +161,7 @@ export interface EventSourcedQueueDefinition<Payload extends Record<string, unkn
   /**
    * Optional audit adapter that mirrors every job lifecycle event to a
    * durable side-store (typically PG). Used by the outbox dispatch queue
-   * per ADR-025 revision: the queue owns scheduling and execution, and
+   * per ADR-030 revision: the queue owns scheduling and execution, and
    * the adapter projects each transition into a row that operator
    * dashboards query against.
    *
@@ -175,7 +175,7 @@ export interface EventSourcedQueueDefinition<Payload extends Record<string, unkn
 
 /**
  * Lifecycle hooks for queues that want to project state into a durable
- * side-store. Used by the outbox dispatch queue (ADR-025 revision).
+ * side-store. Used by the outbox dispatch queue (ADR-030 revision).
  *
  * The queue invokes:
  *   - `onEnqueue` on a successful new-stage `send` (skipped on a

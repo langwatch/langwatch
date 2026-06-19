@@ -38,7 +38,7 @@ export interface TraceProcessingPipelineDeps {
   experimentMetricsSyncReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   alertTriggerReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   /** NOTIFY-class branch of the alert trigger, routed through the
-   *  framework's `.withOutbox` plumbing (ADR-025). Always provided;
+   *  framework's `.withOutbox` plumbing (ADR-030). Always provided;
    *  the framework adapter no-ops on process roles without an outbox
    *  runtime, so unconditional registration is safe. */
   alertTriggerNotifyOutboxReactor: OutboxReactorDefinition<

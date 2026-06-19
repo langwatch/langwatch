@@ -9,7 +9,7 @@ const SETTLE_NO_MATCH_REASON = "settle: no match";
 
 /**
  * Projects every outbox queue lifecycle event into a `ReactorOutbox`
- * row (ADR-025 revision).
+ * row (ADR-030 revision).
  *
  * One row per (trigger, trace) — both settle and cadence stages
  * target the same row via the shared `auditDedupKey` on the payload.

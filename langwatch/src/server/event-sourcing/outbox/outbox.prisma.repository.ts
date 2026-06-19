@@ -14,7 +14,7 @@ import type { OutboxRow } from "./outbox.types";
  * `leaseNext` and `recoverExpiredLeases` use raw SQL with
  * `FOR UPDATE SKIP LOCKED` so concurrent drainers across processes
  * race cleanly without dead-locking. See ADR-026 for the lease
- * design and ADR-025 for the claim primitive.
+ * design and ADR-030 for the claim primitive.
  */
 export class PrismaOutboxRepository implements OutboxRepository {
   constructor(private readonly prisma: PrismaClient) {}

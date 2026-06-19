@@ -728,7 +728,7 @@ export function initializeDefaultApp(options?: {
     },
   });
   // The outbox runtime piggy-backs on the main event-sourcing queue
-  // (ADR-025 revision 3), so there's nothing outbox-specific to close —
+  // (ADR-030 revision 3), so there's nothing outbox-specific to close —
   // the event-sourcing queue's own close registration covers it.
   gracefulCloseables.push({
     name: "prisma",

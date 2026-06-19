@@ -151,7 +151,7 @@ export const TEMPLATE_VARIABLES: VariableInfo[] = [
 ];
 
 /** Notification cadence the variable surface is filtered for. Only "immediate"
- *  is live today; "digest" is reserved for ADR-025. */
+ *  is live today; "digest" is reserved for ADR-026. */
 export type TemplateCadence = "immediate" | "digest";
 
 /** Filters the variable list down to what's *actually available* at the given

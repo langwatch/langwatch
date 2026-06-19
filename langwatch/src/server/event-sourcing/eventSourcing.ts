@@ -62,7 +62,7 @@ export interface EventSourcingOptions {
   enabled?: boolean; // defaults to true
   isSaas?: boolean; // defaults to false
   processRole?: ProcessRole;
-  /** Optional outbox runtime (ADR-025 revision 3). When provided, the
+  /** Optional outbox runtime (ADR-030 revision 3). When provided, the
    *  global queue routes settle/cadence payloads to its dispatcher and
    *  wires its audit adapter onto every lifecycle event. Non-outbox
    *  payloads flow through the normal registry — the runtime piggy-backs
@@ -456,7 +456,7 @@ export class EventSourcing {
   private createGlobalQueue(): void {
     const queueName = makeQueueName("event-sourcing/jobs");
 
-    // ADR-025 revision 3: outbox payloads (settle/cadence) ride this same
+    // ADR-030 revision 3: outbox payloads (settle/cadence) ride this same
     // queue. Each callback peels off the outbox case first; everything else
     // falls through to the existing registry-based dispatch. The audit
     // adapter from the outbox runtime is wired below — it gates internally
