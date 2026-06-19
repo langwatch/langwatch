@@ -8,9 +8,10 @@ import (
 	langwatch "github.com/langwatch/langwatch/sdk-go"
 	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
 
-	"github.com/openai/openai-go"
-	oaioption "github.com/openai/openai-go/option"
+	"github.com/openai/openai-go/v3"
+	oaioption "github.com/openai/openai-go/v3/option"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
@@ -51,10 +52,10 @@ func main() {
 	// Create instrumented OpenAI client
 	client := openai.NewClient(
 		oaioption.WithAPIKey(openaiAPIKey),
+		// This example records input/output manually on its own LLM span, so the
+		// middleware is told not to also capture content on the auto HTTP span.
 		oaioption.WithMiddleware(otelopenai.Middleware("custom-input-output-openai-client",
-			// Optional: Capture request/response content (be mindful of sensitive data)
-			otelopenai.WithCaptureInput(),
-			otelopenai.WithCaptureOutput(),
+			otelopenai.WithDataCapture(langwatch.DataCaptureNone),
 		)),
 	)
 
@@ -69,8 +70,21 @@ func main() {
 
 	userMessage := "Hello, OpenAI!"
 
-	// Record the user message as input, will be shown in the LangWatch UI
-	span.RecordInputString(userMessage)
+	// Mark the span as an LLM step, record the typed input, set a trace name and
+	// the trace identity (conversation/user/labels), and attach custom metadata.
+	// Identity has dedicated setters; SetTraceMetadata is for custom fields. All
+	// LangWatch setters chain.
+	span.
+		SetType(langwatch.SpanTypeLLM).
+		SetInputText(userMessage).
+		SetTraceName("Custom input/output demo").
+		SetThreadID("custom-input-output-demo"). // → gen_ai.conversation.id
+		SetUserID("demo-user").
+		SetLabels("example", "go-sdk").
+		SetTraceMetadata(
+			langwatch.Origin("e2e-example"),
+			attribute.String("feature", "custom-input-output"),
+		)
 
 	// Make API calls as usual
 	response, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
@@ -84,8 +98,14 @@ func main() {
 		log.Fatalf("Chat completion failed: %v", err)
 	}
 
-	// Record the preferred choice as output, it will be shown in the LangWatch UI
-	span.RecordOutputString(response.Choices[0].Message.Content)
+	// Record the preferred choice as output, plus token/cost metrics. The output
+	// will be shown in the LangWatch UI and the metrics roll up to the trace.
+	span.
+		SetOutputText(response.Choices[0].Message.Content).
+		SetMetrics(langwatch.SpanMetrics{
+			PromptTokens:     langwatch.Int(int(response.Usage.PromptTokens)),
+			CompletionTokens: langwatch.Int(int(response.Usage.CompletionTokens)),
+		})
 
 	// This whole journey will now be available in the LangWatch UI
 	log.Printf("Chat completion response: %v", response.Choices[0].Message.Content)

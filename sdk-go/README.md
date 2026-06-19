@@ -36,8 +36,8 @@ import (
 	langwatch "github.com/langwatch/langwatch/sdk-go"
 	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
 
-	"github.com/openai/openai-go"
-	oaioption "github.com/openai/openai-go/option"
+	"github.com/openai/openai-go/v3"
+	oaioption "github.com/openai/openai-go/v3/option"
 	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
@@ -55,13 +55,12 @@ func main() {
 	otel.SetTracerProvider(tp)
 	defer tp.Shutdown(ctx)
 
-	// 🔸 Second - add the middleware to your OpenAI client
+	// 🔸 Second - add the middleware to your OpenAI client.
+	// The middleware captures request + response content by default; pass
+	// otelopenai.WithDataCapture(langwatch.DataCaptureNone) to opt out.
 	client := openai.NewClient(
 		oaioption.WithAPIKey(os.Getenv("OPENAI_API_KEY")),
-		oaioption.WithMiddleware(otelopenai.Middleware("my-app",
-			otelopenai.WithCaptureInput(),
-			otelopenai.WithCaptureOutput(),
-		)),
+		oaioption.WithMiddleware(otelopenai.Middleware("my-app")),
 	)
 
 	// 🔸 Optionally, create spans for your operations (recommended)
@@ -179,9 +178,7 @@ client := openai.NewClient(
 	option.WithBaseURL("https://api.anthropic.com/v1"),
 	option.WithAPIKey(os.Getenv("ANTHROPIC_API_KEY")),
 	option.WithMiddleware(otelopenai.Middleware("my-app-anthropic",
-		otelopenai.WithCaptureInput(),
-		otelopenai.WithCaptureOutput(),
-		otelopenai.WithGenAISystem(semconv.GenAISystemKey.String("anthropic")),
+		otelopenai.WithGenAIProvider(semconv.GenAIProviderNameKey.String("anthropic")),
 	)),
 )
 ```
@@ -193,9 +190,7 @@ client := openai.NewClient(
 	option.WithBaseURL("https://your-resource.openai.azure.com/openai/deployments/your-deployment"),
 	option.WithAPIKey(os.Getenv("AZURE_OPENAI_API_KEY")),
 	option.WithMiddleware(otelopenai.Middleware("my-app-azure",
-		otelopenai.WithCaptureInput(),
-		otelopenai.WithCaptureOutput(),
-		otelopenai.WithGenAISystem(semconv.GenAISystemKey.String("azure.openai")),
+		otelopenai.WithGenAIProvider(semconv.GenAIProviderNameKey.String("azure.openai")),
 	)),
 )
 ```
@@ -207,12 +202,69 @@ client := openai.NewClient(
 	option.WithBaseURL("http://localhost:11434/v1"),
 	option.WithAPIKey("not-needed"),
 	option.WithMiddleware(otelopenai.Middleware("my-app-local",
-		otelopenai.WithCaptureInput(),
-		otelopenai.WithCaptureOutput(),
-		otelopenai.WithGenAISystem(semconv.GenAISystemKey.String("ollama")),
+		otelopenai.WithGenAIProvider(semconv.GenAIProviderNameKey.String("ollama")),
 	)),
 )
 ```
+
+## Instrumentations
+
+Each provider instrumentation is a **separate Go module** so that importing one
+never pulls in the others' SDKs — and the core SDK (`github.com/langwatch/langwatch/sdk-go`)
+has **no provider dependencies at all**. Add only the one(s) you use:
+
+| Module | Provider SDK | Hook | What it captures |
+|--------|--------------|------|------------------|
+| `…/instrumentation/openai` | `github.com/openai/openai-go/v3` | `option.Middleware` | Chat / Responses / Embeddings, streaming, all token + cached/reasoning |
+| `…/instrumentation/anthropic` | `github.com/anthropics/anthropic-sdk-go` | `option.Middleware` | Messages API, streaming, input/output/**cache-read + cache-creation** tokens, thinking |
+| `…/instrumentation/gopenai` | `github.com/sashabaranov/go-openai` | `http.RoundTripper` | OpenAI-wire chat/embeddings (+ OpenAI-compatible providers), cached/reasoning |
+| `…/instrumentation/googlegenai` | `google.golang.org/genai` | `http.RoundTripper` | Gemini generateContent (+ Vertex), streaming, cached + thoughts(reasoning) tokens |
+| `…/instrumentation/bedrock` | `github.com/aws/aws-sdk-go-v2/service/bedrockruntime` | smithy-go middleware | Converse / ConverseStream / InvokeModel, cache read+write tokens, latency |
+| `…/instrumentation/ollama` | `github.com/ollama/ollama/api` | `http.RoundTripper` | Native `/api/chat`/`generate`/`embed`, NDJSON streaming, eval-count tokens, durations |
+| `…/instrumentation/azureopenai` | (via the openai module) | `option.Middleware` | Azure OpenAI — reuses all OpenAI capture, provider `azure.openai` |
+| `…/instrumentation/genkit` | `github.com/firebase/genkit/go` | OTel-native | Exports Genkit's own flow/model/tool spans to LangWatch |
+
+All HTTP-based instrumentations (openai, anthropic, gopenai, googlegenai) share a
+lightweight base, `…/instrumentation/otelhttp`, which **passes request/response
+bodies through to the caller** while capturing a bounded copy off the critical
+path — so tracing adds negligible latency and memory. Every instrumentation
+captures the maximum available GenAI data: request + response model, every token
+type (input / output / total / cache-read / cache-creation / reasoning), cost
+where the provider returns it, finish reasons, request params, system
+instructions, tool definitions, and (capture-gated) input/output. Data capture
+is controlled per-instrumentation via `WithDataCapture(...)` and globally via the
+exporter's `langwatch.WithDataCapture(...)`. See each module's README for setup.
+
+```go
+// e.g. Anthropic — pulls in only anthropic-sdk-go + the core SDK
+import (
+	langwatch "github.com/langwatch/langwatch/sdk-go"
+	otelanthropic "github.com/langwatch/langwatch/sdk-go/instrumentation/anthropic"
+	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/anthropics/anthropic-sdk-go/option"
+)
+
+client := anthropic.NewClient(option.WithMiddleware(otelanthropic.Middleware("my-app")))
+```
+
+## API Client SDK
+
+Separate from tracing, [`…/sdk-go/client`](./client/) is a typed REST client for
+the LangWatch API — prompts, datasets, traces, annotations, triggers, monitors,
+scenarios, projects. It is generated from the OpenAPI spec with oapi-codegen and
+wrapped in a hand-written, fully-documented service layer. It lives in its **own
+module** so the generated code stays out of the core graph:
+
+```go
+import "github.com/langwatch/langwatch/sdk-go/client"
+
+lw, _ := client.New(client.WithAPIKey("pat-lw-..."), client.WithProjectID("project_abc"))
+prompt, err := lw.Prompts.Get(ctx, "support-greeting", &client.GetPromptOptions{Tag: "production"})
+```
+
+Auth uses the same credentials as the exporter (`sk-lw-*` keys or `pat-lw-*` PATs
+with a project id). See [`client/README.md`](./client/README.md) for the full
+service list, pagination, retries and typed error handling.
 
 ## Examples
 
@@ -277,20 +329,22 @@ defer span.End()
 
 `LangWatchSpan` embeds the standard OpenTelemetry span with additional helper methods:
 
+All LangWatch setters return the span, so they can be chained:
+
 ```go
-// Set span type for LangWatch categorization
-span.SetType(langwatch.SpanTypeLLM)
-
-// Record input and output
-span.RecordInputString("What is the capital of France?")
-span.RecordOutputString("The capital of France is Paris.")
-
-// Set model information
-span.SetRequestModel("gpt-4-turbo")
-span.SetResponseModel("gpt-4-turbo-2024-04-09")
-
-// Group related spans
-span.SetThreadID("conversation-123")
+span.
+    // Set span type for LangWatch categorization
+    SetType(langwatch.SpanTypeLLM).
+    // Record typed input and output (type is inferred; see typed variants below)
+    SetInput("What is the capital of France?").
+    SetOutput("The capital of France is Paris.").
+    // Set model information
+    SetRequestModel("gpt-4-turbo").
+    SetResponseModel("gpt-4-turbo-2024-04-09").
+    // Attach trace identity (hoisted to the trace by the server)
+    SetThreadID("conversation-123").
+    SetUserID("user-42").
+    SetLabels("production", "qa")
 ```
 
 ### Span Types
@@ -298,30 +352,77 @@ span.SetThreadID("conversation-123")
 LangWatch categorizes spans to provide specialized processing and visualization:
 
 ```go
-langwatch.SpanTypeLLM      // LLM API calls
-langwatch.SpanTypeChain    // Chain of operations
-langwatch.SpanTypeTool     // Tool/function calls
-langwatch.SpanTypeAgent    // Agent operations
-langwatch.SpanTypeRAG      // Retrieval Augmented Generation
-langwatch.SpanTypeQuery    // Database queries
-langwatch.SpanTypeRetrieval // Document retrieval
+langwatch.SpanTypeLLM        // LLM API calls
+langwatch.SpanTypeChain      // Chain of operations
+langwatch.SpanTypeTool       // Tool/function calls
+langwatch.SpanTypeAgent      // Agent operations
+langwatch.SpanTypeRAG        // Retrieval Augmented Generation
+langwatch.SpanTypeGuardrail  // Guardrail checks
+langwatch.SpanTypeEvaluation // Evaluations
+langwatch.SpanTypePrompt     // Prompt rendering
+langwatch.SpanTypeWorkflow   // Workflow / component / module
+langwatch.SpanTypeTask       // Background tasks
+langwatch.SpanTypeSpan       // Generic span (default)
 ```
 
 ## Advanced Features
 
-### Recording Custom Input/Output
+### Recording Typed Input/Output
 
-For fine-grained control over what's captured:
+`SetInput` / `SetOutput` infer a value type (text, json, chat_messages, list,
+…) from the Go value, or you can force one with a typed variant:
 
 ```go
-// Record custom user input
-userMessage := "What's the weather like?"
-span.RecordInputString(userMessage)
+// Inferred: a string becomes "text", a struct/map becomes "json".
+span.SetInput("What's the weather like?")
+span.SetOutput(response.Choices[0].Message.Content)
 
-// Make your LLM call here...
+// Explicit value types when you want control:
+span.SetInputJSON(map[string]any{"query": "weather", "units": "metric"})
+span.SetOutputChatMessages([]langwatch.ChatMessage{
+    langwatch.TextMessage(langwatch.ChatRoleAssistant, "It's sunny."),
+})
+```
 
-// Record the response you want to show in LangWatch
-span.RecordOutputString(response.Choices[0].Message.Content)
+#### Multimodal / binary attachments ("data content")
+
+Binary parts carry audio/image/video/file attachments inside a chat message.
+Inline bytes are externalised to a stored object by the ingest pipeline:
+
+```go
+span.SetInputChatMessages([]langwatch.ChatMessage{
+    langwatch.MultiContentMessage(langwatch.ChatRoleUser,
+        langwatch.TextPart("What is in this image?"),
+        langwatch.BinaryPart("image/png", pngBytes, "screenshot.png"), // inline base64
+        // or reference an already-hosted file / stored object:
+        // langwatch.BinaryURLPart("audio/mpeg", "https://example.com/a.mp3"),
+        // langwatch.BinaryRefPart("application/pdf", "file-123"),
+    ),
+})
+```
+
+### Recording Metrics
+
+```go
+span.SetMetrics(langwatch.SpanMetrics{
+    PromptTokens:     langwatch.Int(120),
+    CompletionTokens: langwatch.Int(48),
+    Cost:             langwatch.Float64(0.0021),
+})
+```
+
+### Recording Metadata (hoisted to the trace)
+
+Reserved keys (`thread_id`, `user_id`, `customer_id`, `labels`) become trace
+identity; every other key is hoisted as a `metadata.<key>` trace attribute:
+
+```go
+span.SetMetadata(map[string]any{
+    "thread_id": "conversation-123",
+    "user_id":   "user-42",
+    "labels":    []string{"production"},
+    "feature":   "checkout",
+})
 ```
 
 ### Recording RAG Context
@@ -333,7 +434,7 @@ chunks := []langwatch.SpanRAGContextChunk{
 	{DocumentID: "doc1", ChunkID: "chunk1", Content: "Relevant context..."},
 	{DocumentID: "doc2", ChunkID: "chunk2", Content: "More context..."},
 }
-span.SetRAGContextChunks(chunks)
+span.SetRAGContexts(chunks)
 ```
 
 ### Custom Timestamps
@@ -341,9 +442,10 @@ span.SetRAGContextChunks(chunks)
 Record precise timing information:
 
 ```go
+firstTokenAt := firstTokenTime.UnixMilli()
 span.SetTimestamps(langwatch.SpanTimestamps{
 	StartedAtUnix:    startTime.UnixMilli(),
-	FirstTokenAtUnix: &firstTokenTime.UnixMilli(),
+	FirstTokenAtUnix: &firstTokenAt,
 	FinishedAtUnix:   endTime.UnixMilli(),
 })
 ```
@@ -372,9 +474,35 @@ langwatch.NewDefaultExporter(ctx, opts...)
 langwatch.WithAPIKey(key string)
 langwatch.WithEndpoint(url string)
 langwatch.WithFilters(filters ...Filter)
+langwatch.WithDataCapture(mode DataCaptureMode)            // none | input | output | all
+langwatch.WithDataCaptureFunc(predicate DataCapturePredicate)
 
 // Wrap any exporter with filtering
 langwatch.NewFilteringExporter(wrapped, filters...)
+```
+
+### Data Capture
+
+Data capture controls whether span **input/output content** leaves the process.
+It is enforced at export time, so one setting governs every instrumentation
+(the OpenAI middleware, manual spans, …). Span structure, metrics, metadata,
+models and identity are always kept; only the content attributes
+(`langwatch.input`/`output` and the `gen_ai.*` message/prompt/completion
+equivalents) are stripped. The default, unconfigured, captures everything.
+
+```go
+// Fixed mode for all spans
+exporter, _ := langwatch.NewExporter(ctx, langwatch.WithDataCapture(langwatch.DataCaptureNone))
+
+// Or decide per span from its type / name / attributes
+exporter, _ := langwatch.NewExporter(ctx, langwatch.WithDataCaptureFunc(
+	func(c langwatch.DataCaptureContext) langwatch.DataCaptureMode {
+		if c.SpanType == "tool" {
+			return langwatch.DataCaptureNone // never capture tool I/O
+		}
+		return langwatch.DataCaptureAll
+	},
+))
 ```
 
 ### Filters
@@ -405,25 +533,45 @@ langwatch.MustMatchRegex(pattern)
 
 ### LangWatchSpan Methods
 
-The `LangWatchSpan` embeds the standard `go.opentelemetry.io/otel/trace.Span`, so you can use all standard OpenTelemetry span methods. Additional methods:
+The `*Span` embeds the standard `go.opentelemetry.io/otel/trace.Span`, so you can use all standard OpenTelemetry span methods. The LangWatch helpers below all return the span for chaining.
 
-**Input/Output Recording:**
-- `RecordInput(input any)` - Records structured input (JSON-serialized)
-- `RecordInputString(input string)` - Records raw string input
-- `RecordOutput(output any)` - Records structured output (JSON-serialized)
-- `RecordOutputString(output string)` - Records raw string output
+**Input/Output (`langwatch.input` / `langwatch.output`):**
+- `SetInput(input any)` / `SetOutput(output any)` - Records a value, inferring the type (text, json, chat_messages, list, …)
+- `SetInputText` / `SetOutputText` - Force the `text` type
+- `SetInputJSON` / `SetOutputJSON` - Force the `json` type
+- `SetInputChatMessages` / `SetOutputChatMessages` - Force `chat_messages` (`[]langwatch.ChatMessage`)
+- `SetInputRaw` / `SetOutputRaw` - Force the `raw` type
+- `SetInputList` / `SetOutputList` - Force a `list` of nested typed values
+- `SetInputGuardrailResult` / `SetOutputGuardrailResult` and `…EvaluationResult` - Record an `EvaluationResult`
+- `SetInputTyped` / `SetOutputTyped` - Record an explicit `langwatch.TypedValue`
 
-**Model Information:**
-- `SetRequestModel(model string)` - Model used for request
-- `SetResponseModel(model string)` - Model that generated response
+**Metrics, metadata & identity:**
+- `SetMetrics(metrics SpanMetrics)` - Token counts and cost (`langwatch.metrics`)
+- `SetMetadata(metadata map[string]any)` - Metadata blob hoisted to the trace (`langwatch.metadata`)
+- `SetThreadID` / `SetUserID` / `SetCustomerID` / `SetLabels(...string)` - Reserved trace identity
+- `SetParams(params map[string]any)` - LLM invocation parameters (`langwatch.params`)
+- `SetSelectedPrompt(prompt SelectedPrompt)` - Attach a saved prompt to the trace
 
-**Categorization:**
+**Model, provider & GenAI (handy for manual instrumentation):**
+- `SetRequestModel(model string)` - `gen_ai.request.model`
+- `SetResponseModel(model string)` - `gen_ai.response.model`
+- `SetGenAIProvider(provider string)` - `gen_ai.provider.name`
+- `SetGenAIOperation(op string)` - `gen_ai.operation.name`
+- `SetGenAIRequestParams(GenAIRequestParams)` - temperature, top_p, max_tokens, stop, reasoning_effort, … (`gen_ai.request.*`)
+- `SetGenAIUsage(GenAIUsage)` - input/output/total/cached/reasoning tokens (`gen_ai.usage.*`)
+- `SetGenAIResponseFinishReasons(...string)` - `gen_ai.response.finish_reasons`
+
+**Categorization & context:**
 - `SetType(spanType SpanType)` - Span type for LangWatch processing
-- `SetThreadID(threadID string)` - Groups related spans together
-
-**Advanced:**
+- `SetRAGContexts(contexts []SpanRAGContextChunk)` / `SetRAGContext(context)` - RAG context (`langwatch.rag.contexts`)
 - `SetTimestamps(timestamps SpanTimestamps)` - Fine-grained timing
-- `SetRAGContextChunks(contexts []SpanRAGContextChunk)` - RAG context
+
+**Multimodal content helpers:**
+- `TextMessage`, `MultiContentMessage` - Build `ChatMessage` values
+- `TextPart`, `ImageURLPart`, `BinaryPart`, `BinaryURLPart`, `BinaryRefPart` - Build `ChatRichContent` parts (incl. binary attachments)
+
+**Tracer:**
+- `tracer.WithActiveSpan(ctx, name, fn)` - Run `fn` with a span that auto-ends and records error status
 
 ## Environment Variables
 
