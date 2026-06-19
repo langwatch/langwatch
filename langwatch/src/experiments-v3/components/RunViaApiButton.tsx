@@ -46,9 +46,9 @@ export function RunViaApiDialog({
       ? window.location.origin
       : "https://app.langwatch.ai";
 
-  const { dataSource, setDataSource, tabs } = useRunViaApiTabs((lang, source) =>
-    buildRunSnippet(
-      {
+  const { dataSource, setDataSource, tabs } = useRunViaApiTabs(
+    ({ lang, dataSource: source }) =>
+      buildRunSnippet({
         kind: "experiment",
         identifier: experimentSlug,
         baseUrl,
@@ -57,9 +57,8 @@ export function RunViaApiDialog({
         datasetName,
         dataSource: source,
         projectSlug,
-      },
-      lang,
-    ),
+        lang,
+      }),
   );
 
   return (

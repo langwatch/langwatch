@@ -61,6 +61,16 @@ export const mapRunResultsToRows = (
     return row;
   });
 
+  // Index rows by their dataset index so each evaluation joins against just the
+  // rows for that index (one per target) instead of scanning every row, which
+  // would be O(evaluations x rows) on large result sets.
+  const rowsByIndex = new Map<number, ExperimentRowResult[]>();
+  for (const row of rows) {
+    const bucket = rowsByIndex.get(row.index);
+    if (bucket) bucket.push(row);
+    else rowsByIndex.set(row.index, [row]);
+  }
+
   for (const evaluation of evaluations) {
     const index = evaluation.index;
     // A null, undefined, or empty name falls through to the evaluator id
@@ -72,7 +82,7 @@ export const mapRunResultsToRows = (
         : evaluation.evaluator;
     if (index == null || !name) continue;
 
-    for (const row of rows) {
+    for (const row of rowsByIndex.get(index) ?? []) {
       if (!matchesRow({ row, index, targetId: evaluation.targetId })) continue;
 
       const metric = row.evaluations[name] ?? {};

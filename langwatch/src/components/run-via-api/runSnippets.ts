@@ -16,7 +16,6 @@
 import {
   buildEvaluateParameters,
   exampleParameterValue,
-  IMAGE_EXAMPLE,
   PLACEHOLDER_PARAMETERS,
 } from "~/optimization_studio/utils/evaluateApiSnippet";
 import type { WorkflowField } from "~/optimization_studio/utils/workflowFields";
@@ -40,8 +39,13 @@ export interface BuildRunSnippetInput {
   datasetName?: string;
   /** Which data source the snippet demonstrates. */
   dataSource: RunSnippetDataSource;
-  /** Project slug, used when constructing example dataset ids. */
+  /**
+   * Project slug. Reserved for per-project example dataset ids; the current
+   * snippets use a fixed placeholder, so it is not read yet.
+   */
   projectSlug?: string;
+  /** Language the snippet is generated for. */
+  lang: RunSnippetLang;
 }
 
 /** Placeholder a reader replaces with a real platform dataset id. */
@@ -306,11 +310,8 @@ curl -s "${baseUrl}/api/experiments/runs/$RUN_ID/results" \\
 /**
  * Build the Run via API snippet for one (language x data source) combination.
  */
-export function buildRunSnippet(
-  input: BuildRunSnippetInput,
-  lang: RunSnippetLang,
-): string {
-  if (lang === "python") return buildPythonSnippet(input);
-  if (lang === "typescript") return buildTypescriptSnippet(input);
+export function buildRunSnippet(input: BuildRunSnippetInput): string {
+  if (input.lang === "python") return buildPythonSnippet(input);
+  if (input.lang === "typescript") return buildTypescriptSnippet(input);
   return buildShellSnippet(input);
 }

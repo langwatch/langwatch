@@ -62,7 +62,7 @@ describe("RunViaApiButton", () => {
       expect(snippet).toContain("attached dataset");
     });
 
-    describe("and the Shell language is selected", () => {
+    describe("when the Shell language is selected", () => {
       /** @scenario The run-via-API dialog shows a copyable snippet for this workflow */
       it("shows a curl snippet posting to this workflow's evaluate endpoint", async () => {
         render(
