@@ -67,6 +67,11 @@ export interface ReadOnlyEventStore<EventType extends Event = Event> {
    * @param aggregateId - The aggregate to fetch events for
    * @param context - Security context with required tenantId
    * @param aggregateType - The type of aggregate root (e.g., "trace", "user")
+   * @param anchorOccurredAtMs - Optional reference time (ms) of the work that
+   *   triggered this read. For time-local aggregate types it lets the store
+   *   lower-bound the scan to a window around this time so ClickHouse can prune
+   *   old partitions; it never changes the result set for such aggregates. See
+   *   `rehydrationLowerBoundMs`.
    * @returns Readonly array of events, typically ordered by timestamp
    * @throws {Error} If tenantId is missing or invalid
    *
@@ -77,6 +82,7 @@ export interface ReadOnlyEventStore<EventType extends Event = Event> {
     aggregateId: string,
     context: EventStoreReadContext<EventType>,
     aggregateType: AggregateType,
+    anchorOccurredAtMs?: number,
   ): Promise<readonly EventType[]>;
 
   /**

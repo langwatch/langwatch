@@ -13,6 +13,7 @@ import {
   validateEventAggregateType,
   validateEventTenant,
 } from "./eventStoreUtils";
+import { rehydrationLowerBoundMs } from "./rehydrationWindow";
 import type {
   EventRecord,
   EventRepository,
@@ -143,6 +144,7 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
     aggregateId: string,
     context: EventStoreReadContext<EventType>,
     aggregateType: AggregateType,
+    anchorOccurredAtMs?: number,
   ): Promise<readonly EventType[]> {
     EventUtils.validateTenantId(context, `${this.constructor.name}.getEvents`);
 
@@ -154,6 +156,16 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
       );
       return [];
     }
+
+    // For time-local aggregate types, lower-bound the event_log scan to a
+    // window around the triggering work's time so ClickHouse prunes old weekly
+    // partitions instead of cold-scanning every partition on S3. Returns
+    // undefined (unbounded scan) for long-lived aggregate types or when no
+    // usable anchor time is available, so behaviour is unchanged there.
+    const occurredAtFromMs = rehydrationLowerBoundMs(
+      aggregateType,
+      anchorOccurredAtMs,
+    );
 
     return await this.instrument(
       `${this.constructor.name}.getEvents`,
@@ -168,6 +180,7 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
             context.tenantId,
             aggregateType,
             aggregateId,
+            occurredAtFromMs,
           );
 
           const events = records.map((record) =>
