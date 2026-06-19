@@ -120,3 +120,96 @@ export async function recordLangyGithubPr({
     resetAt: resetAtForBucket(bucket),
   };
 }
+
+/**
+ * Atomically reserve a per-turn PR permit BEFORE handing the worker the
+ * GitHub token. Replaces the prompt-only cap: the previous behaviour added
+ * a system note asking the model not to use the token, which is not an
+ * authorisation boundary — the worker could ignore it, and N concurrent
+ * requests could all observe `allowed=true` and all exceed the cap. Here
+ * the permit is granted by INCR (atomic across replicas); a permit that
+ * pushes the post-count past `limit` is immediately revoked via DECR and
+ * `allowed: false` is returned, so the caller can strip the token from the
+ * worker's credentials entirely.
+ *
+ * A permit reserved here that never produces an actual PR (the turn was
+ * read-only, or the worker crashed pre-push) should be released via
+ * `releaseLangyGithubPrPermit` once the chat ends so the user isn't
+ * silently penalised for asking questions.
+ */
+export async function reserveLangyGithubPrPermit({
+  userId,
+  limit = LANGY_GITHUB_PRS_PER_DAY,
+}: {
+  userId: string;
+  limit?: number;
+}): Promise<GithubPrLimitResult> {
+  if (!connection) {
+    return {
+      allowed: true,
+      remaining: limit,
+      resetAt: resetAtForBucket(dayBucket()),
+    };
+  }
+  const bucket = dayBucket();
+  const key = `langy:gh:prs:${userId}:${bucket}`;
+  try {
+    const count = await (
+      connection as { incr: (k: string) => Promise<number> }
+    ).incr(key);
+    if (count === 1) {
+      await (
+        connection as { expire: (k: string, s: number) => Promise<number> }
+      ).expire(key, 60 * 60 * 24 * 2);
+    }
+    if (count > limit) {
+      // Over-cap: roll back our INCR so the counter still reflects committed
+      // permits (otherwise N concurrent over-cap reservers would each leave
+      // the counter inflated by 1, pushing the visible "remaining" further
+      // negative without granting anyone access).
+      await (
+        connection as { decr: (k: string) => Promise<number> }
+      ).decr(key);
+      return {
+        allowed: false,
+        remaining: 0,
+        resetAt: resetAtForBucket(bucket),
+      };
+    }
+    return {
+      allowed: true,
+      remaining: Math.max(0, limit - count),
+      resetAt: resetAtForBucket(bucket),
+    };
+  } catch {
+    // Redis blip — fail open so a Redis hiccup doesn't strip GitHub
+    // capability from every connected user. Same shape as the no-Redis
+    // branch above, matching the project-wide rate-limit convention.
+    return {
+      allowed: true,
+      remaining: limit,
+      resetAt: resetAtForBucket(bucket),
+    };
+  }
+}
+
+/**
+ * Release a previously-reserved permit (DECR) when the turn ended without
+ * opening any PR. Best-effort: on Redis blip we just drop the call. The
+ * reservation will expire with the bucket TTL anyway; releasing is a
+ * fairness optimisation, not a correctness boundary.
+ */
+export async function releaseLangyGithubPrPermit({
+  userId,
+}: {
+  userId: string;
+}): Promise<void> {
+  if (!connection) return;
+  const bucket = dayBucket();
+  const key = `langy:gh:prs:${userId}:${bucket}`;
+  try {
+    await (connection as { decr: (k: string) => Promise<number> }).decr(key);
+  } catch {
+    /* best-effort */
+  }
+}
