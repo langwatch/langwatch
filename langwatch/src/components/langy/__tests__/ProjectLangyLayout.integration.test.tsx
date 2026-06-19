@@ -152,21 +152,32 @@ describe("ProjectLangyLayout", () => {
     });
   });
 
-  // #4558 dropped the staff + rollout-flag visibility gate; Langy is shown to
-  // every team member regardless of those inputs. These pin that contract so
-  // re-introducing either gate would fail loudly.
-  describe("given the staff / rollout-flag gates were removed in #4558", () => {
-    it("renders Langy for a team member even when the rollout flag is off", () => {
+  // Visibility gate (re-instated for PR #4913, mirrors the server-side gate in
+  // routes/langy.ts). Staff bypass the rollout flag; for everyone else the
+  // flag must resolve true. The registry default is off, so non-staff are
+  // dark by default and the panel must not render.
+  describe("given the staff + rollout-flag visibility gate", () => {
+    it("renders Langy for staff even when the rollout flag is off", () => {
+      gate.staff = true;
       gate.flagEnabled = false;
       renderAt("/demo/traces");
       expect(screen.getByText("traces page")).toBeTruthy();
       expect(drawer()).not.toBeNull();
     });
 
-    it("renders Langy for a non-staff team member", () => {
+    it("renders Langy for a non-staff team member when the rollout flag is on", () => {
       gate.staff = false;
+      gate.flagEnabled = true;
       renderAt("/demo/traces");
       expect(drawer()).not.toBeNull();
+    });
+
+    it("hides Langy for a non-staff team member when the rollout flag is off", () => {
+      gate.staff = false;
+      gate.flagEnabled = false;
+      renderAt("/demo/traces");
+      expect(screen.getByText("traces page")).toBeTruthy();
+      expect(drawer()).toBeNull();
     });
   });
 });

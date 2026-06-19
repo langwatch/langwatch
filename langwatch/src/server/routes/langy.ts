@@ -27,6 +27,7 @@ import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.cl
 import { auditLog } from "~/server/auditLog";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
+import { featureFlagService } from "~/server/featureFlag";
 import { checkLangyMessageRateLimit } from "~/server/middleware/rate-limit-langy";
 import {
   getLangyGithubPrUsage,
@@ -48,6 +49,7 @@ import {
   LangyMessageService,
 } from "~/server/services/langy/LangyMessageService";
 import { stripLangySentinels } from "~/server/services/langy/langySentinels";
+import { isLangwatchStaff } from "~/utils/isLangwatchStaff";
 import { createLogger } from "~/utils/logger/server";
 import type { NextRequestShim } from "./types";
 
@@ -133,6 +135,29 @@ secured.hono.use("/langy/*", async (c, next) => {
       { error: "You must be logged in to access this endpoint." },
       { status: 401 },
     );
+  }
+  // Staff bypass the rollout flag so a global kill-switch still leaves us able
+  // to debug. Non-staff are gated by `release_langy_enabled`, which defaults
+  // off (see featureFlag/registry.ts) — that registry default IS the
+  // staff-only behaviour. Without this gate, ordinary project/team members
+  // would see and call Langy regardless of the flag, defeating the stated
+  // staff-only-by-default policy.
+  if (!isLangwatchStaff(session.user.email)) {
+    // User-level targeting only: the langy/* surface is varied (chat takes
+    // projectId in body, others take it in query) so the middleware can't
+    // cleanly enrich with org context without re-parsing every request. The
+    // flag is "is Langy enabled for THIS user" — operator-store rules or
+    // PostHog targeting at the user level is the lever.
+    const allowed = await featureFlagService.isEnabled(
+      "release_langy_enabled",
+      { distinctId: session.user.id },
+    );
+    if (!allowed) {
+      return c.json(
+        { error: "Langy is not currently enabled for this account." },
+        { status: 404 },
+      );
+    }
   }
   await next();
 });
