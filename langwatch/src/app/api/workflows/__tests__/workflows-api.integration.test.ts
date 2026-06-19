@@ -472,6 +472,7 @@ describe("Workflows REST API", () => {
         await expectRunResponse(res);
       });
 
+      /** @scenario "The endpoint rejects inline data and a dataset id together" */
       it("rejects inline data and a dataset id together", async () => {
         await createVersion("1", entryDsl());
 

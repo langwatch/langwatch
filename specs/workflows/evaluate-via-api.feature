@@ -47,6 +47,11 @@ Feature: Trigger workflow evaluations via the API
     Then the run starts and a results url is returned
 
   @integration
+  Scenario: The endpoint rejects inline data and a dataset id together
+    When I POST with both inline data and a dataset id
+    Then the response is a 400
+
+  @integration
   Scenario: Unknown workflow returns not found
     When I POST to the evaluate endpoint of a workflow id from another project
     Then the response is a 404
