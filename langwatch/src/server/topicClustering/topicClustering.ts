@@ -341,6 +341,15 @@ export async function fetchTracesFromClickHouse(
         : {}),
     },
     format: "JSONEachRow",
+    // The outer query reads ComputedInput (a potentially large payload) for the
+    // page of <=2000 traces. Even though rows stream (no outer sort/LIMIT), the
+    // dedup still resolves the latest version per trace, and peak memory scales
+    // with the number of read streams holding a ComputedInput block at once. For
+    // tenants with large inputs that peak crossed max_memory_usage_per_query
+    // (MEMORY_LIMIT_EXCEEDED). This is a background clustering batch, not a
+    // latency-critical path, so cap the read streams to keep peak memory well
+    // under the per-query limit; the returned rows are unchanged.
+    clickhouse_settings: { max_threads: 2 },
   });
 
   const rawRows = (await result.json()) as Array<{

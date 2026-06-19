@@ -7,11 +7,17 @@ import {
   VStack,
   Wrap,
 } from "@chakra-ui/react";
-import { Boxes, Building2, CheckCheck, Folder, Users } from "lucide-react";
+import {
+  Boxes,
+  Building2,
+  CheckCheck,
+  Folder,
+  UserLock,
+  Users,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-
-import { Select } from "../ui/select";
 import { SmallLabel } from "../SmallLabel";
+import { Select } from "../ui/select";
 import { ProviderScopeChips } from "./ProviderScopeChips";
 
 /**
@@ -51,6 +57,23 @@ export const DEFAULT_SCOPE_TYPES: ScopeTriadType[] = [
 export interface ScopeChipPickerEntry {
   scopeType: ScopeChipPickerScopeType;
   scopeId: string;
+  /** Personal-projects variant of the scope (opt-in via `personalScopes`):
+   *  ORGANIZATION+personalOnly = every personal workspace in the org,
+   *  DEPARTMENT+personalOnly = the personal workspaces of that department's
+   *  members. Distinct from the plain scope - both can carry their own rule. */
+  personalOnly?: boolean;
+}
+
+/** Selection identity: the personal variant of a scope is a different target
+ *  than the plain scope, so it gets its own key. */
+function entryKey(entry: {
+  scopeType: ScopeChipPickerScopeType;
+  scopeId: string;
+  personalOnly?: boolean;
+}): string {
+  return entry.personalOnly
+    ? `${entry.scopeType}:${entry.scopeId}:personal`
+    : `${entry.scopeType}:${entry.scopeId}`;
 }
 
 /** A scope selection constrained to the model-provider triad. Resource
@@ -68,12 +91,14 @@ interface ScopeOption {
   label: string;
   scopeType: ScopeChipPickerScopeType;
   scopeId: string;
+  personalOnly?: boolean;
 }
 
 const SCOPE_DESCRIPTION_SINGLE: Record<ScopeChipPickerScopeType, string> = {
   PROJECT: "Only this project can use this configuration.",
   TEAM: "Every project in the team inherits this configuration.",
-  ORGANIZATION: "Every project in the organization inherits this configuration.",
+  ORGANIZATION:
+    "Every project in the organization inherits this configuration.",
   DEPARTMENT: "Every member of this department can use this configuration.",
 };
 
@@ -82,9 +107,17 @@ function summariseSelection(scopes: ScopeChipPickerEntry[]): string {
     return "Pick at least one scope.";
   }
   if (scopes.length === 1) {
-    return SCOPE_DESCRIPTION_SINGLE[scopes[0]!.scopeType];
+    const only = scopes[0]!;
+    if (only.personalOnly) {
+      return only.scopeType === "ORGANIZATION"
+        ? "Every personal workspace in the organization inherits this configuration."
+        : "The personal workspaces of this department's members inherit this configuration.";
+    }
+    return SCOPE_DESCRIPTION_SINGLE[only.scopeType];
   }
-  const counts = scopes.reduce(
+  const personal = scopes.filter((s) => s.personalOnly);
+  const plain = scopes.filter((s) => !s.personalOnly);
+  const counts = plain.reduce(
     (acc, s) => {
       acc[s.scopeType] = (acc[s.scopeType] ?? 0) + 1;
       return acc;
@@ -105,6 +138,19 @@ function summariseSelection(scopes: ScopeChipPickerEntry[]): string {
     parts.push(
       counts.PROJECT === 1 ? "1 project" : `${counts.PROJECT} projects`,
     );
+  if (personal.some((s) => s.scopeType === "ORGANIZATION")) {
+    parts.push("all personal projects");
+  }
+  const personalDepartments = personal.filter(
+    (s) => s.scopeType === "DEPARTMENT",
+  ).length;
+  if (personalDepartments > 0) {
+    parts.push(
+      personalDepartments === 1
+        ? "1 department's personal projects"
+        : `${personalDepartments} departments' personal projects`,
+    );
+  }
   return `Shared across ${parts.join(" + ")}.`;
 }
 
@@ -150,20 +196,20 @@ export function collapseRedundantScopes(
     availableProjects: Array<{ id: string; teamId?: string }>;
   },
 ): ScopeChipPickerEntry[] {
-  const prevKey = new Set(prev.map((s) => `${s.scopeType}:${s.scopeId}`));
-  const added = next.filter(
-    (s) => !prevKey.has(`${s.scopeType}:${s.scopeId}`),
-  );
+  const prevKey = new Set(prev.map(entryKey));
+  const added = next.filter((s) => !prevKey.has(entryKey(s)));
   if (added.length === 0) return next;
 
   const { organizationId, availableProjects } = context;
   let cleaned = next;
   for (const picked of added) {
-    if (picked.scopeType === "ORGANIZATION") {
+    if (picked.scopeType === "ORGANIZATION" && !picked.personalOnly) {
       // The picker is single-org-scoped, so every team and project in
       // `next` belongs to this org by construction. Dropping them - plus
-      // every department - collapses to the single ORG chip.
+      // every department and every personal variant (the org-wide rule
+      // covers personal projects too) - collapses to the single ORG chip.
       cleaned = cleaned.filter((s) => {
+        if (s.personalOnly) return false;
         if (s.scopeType === "DEPARTMENT") return false;
         if (s.scopeType === "TEAM" || s.scopeType === "PROJECT") {
           // Defensive guard: only collapse children that belong to the
@@ -175,6 +221,18 @@ export function collapseRedundantScopes(
         }
         return true;
       });
+    } else if (picked.scopeType === "ORGANIZATION" && picked.personalOnly) {
+      // "All personal projects" subsumes the per-department personal picks
+      // but coexists with every plain scope (it targets a different slice).
+      cleaned = cleaned.filter(
+        (s) => !(s.personalOnly && s.scopeType === "DEPARTMENT"),
+      );
+    } else if (picked.scopeType === "DEPARTMENT" && picked.personalOnly) {
+      // A department's personal projects narrow from "all personal
+      // projects", so the org-personal pick goes; siblings coexist.
+      cleaned = cleaned.filter(
+        (s) => !(s.personalOnly && s.scopeType === "ORGANIZATION"),
+      );
     } else if (picked.scopeType === "DEPARTMENT") {
       // A department narrows from org-wide, so it clears the org pick.
       // Sibling departments are mutually compatible and left untouched.
@@ -182,15 +240,18 @@ export function collapseRedundantScopes(
         (s) =>
           !(
             s.scopeType === "ORGANIZATION" &&
+            !s.personalOnly &&
             organizationId !== undefined &&
             s.scopeId === organizationId
           ),
       );
     } else if (picked.scopeType === "TEAM") {
       cleaned = cleaned.filter((s) => {
-        // Parent org goes - team narrows the scope.
+        // Parent org goes - team narrows the scope. Personal variants
+        // target a different slice and stay.
         if (
           s.scopeType === "ORGANIZATION" &&
+          !s.personalOnly &&
           organizationId !== undefined &&
           s.scopeId === organizationId
         ) {
@@ -211,6 +272,7 @@ export function collapseRedundantScopes(
       cleaned = cleaned.filter((s) => {
         if (
           s.scopeType === "ORGANIZATION" &&
+          !s.personalOnly &&
           organizationId !== undefined &&
           s.scopeId === organizationId
         ) {
@@ -260,6 +322,7 @@ export function ScopeChipPicker<
   showSummary = true,
   showQuickPicks = false,
   singleSelect = false,
+  personalScopes = false,
   variant = "chips",
   placeholder,
   currentOrganizationId,
@@ -270,8 +333,10 @@ export function ScopeChipPicker<
    *  caller passing `ModelProviderScopeType` entries gets the same narrow
    *  type back from `onChange` - DEPARTMENT only flows where a caller opts
    *  in by passing wider entries + `allowedScopeTypes`. */
-  value: Array<{ scopeType: T; scopeId: string }>;
-  onChange: (next: Array<{ scopeType: T; scopeId: string }>) => void;
+  value: Array<{ scopeType: T; scopeId: string; personalOnly?: boolean }>;
+  onChange: (
+    next: Array<{ scopeType: T; scopeId: string; personalOnly?: boolean }>,
+  ) => void;
   organizationId: string | undefined;
   organizationName?: string;
   teamId?: string | undefined;
@@ -324,6 +389,12 @@ export function ScopeChipPicker<
    *  one scope; this keeps the picker quiet for that case and the
    *  rare multi-scope policies stay one click away. */
   showQuickPicks?: boolean;
+  /** Offer the personal-projects variants in the dropdown: "All personal
+   *  projects" (ORGANIZATION + personalOnly) and, when departments are
+   *  available, each department's personal projects (DEPARTMENT +
+   *  personalOnly). Emitted entries carry `personalOnly: true`. Off by
+   *  default so existing consumers are unchanged. */
+  personalScopes?: boolean;
   /** Current org/team/project IDs that drive the quick-pick chips.
    *  Independent from `organizationId/teamId/projectId` (which feed
    *  the dropdown options) so the quick-picks always pin to the
@@ -338,12 +409,15 @@ export function ScopeChipPicker<
   // which kinds can ever be emitted, so the cast back to T on emit is sound.
   const value = inputValue as ScopeChipPickerEntry[];
   const onChange = (next: ScopeChipPickerEntry[]) =>
-    inputOnChange(next as Array<{ scopeType: T; scopeId: string }>);
+    inputOnChange(
+      next as Array<{ scopeType: T; scopeId: string; personalOnly?: boolean }>,
+    );
 
   const allowed = useMemo<Set<ScopeChipPickerScopeType>>(
     () =>
       new Set(
-        (allowedScopeTypes ?? DEFAULT_SCOPE_TYPES) as ScopeChipPickerScopeType[],
+        (allowedScopeTypes ??
+          DEFAULT_SCOPE_TYPES) as ScopeChipPickerScopeType[],
       ),
     [allowedScopeTypes],
   );
@@ -400,6 +474,28 @@ export function ScopeChipPicker<
         });
       }
     }
+    if (personalScopes) {
+      if (organizationId && allowed.has("ORGANIZATION")) {
+        out.push({
+          value: `ORGANIZATION:${organizationId}:personal`,
+          label: "All personal projects",
+          scopeType: "ORGANIZATION",
+          scopeId: organizationId,
+          personalOnly: true,
+        });
+      }
+      if (allowed.has("DEPARTMENT")) {
+        for (const dept of availableDepartments ?? []) {
+          out.push({
+            value: `DEPARTMENT:${dept.id}:personal`,
+            label: `Personal projects of ${dept.name}`,
+            scopeType: "DEPARTMENT",
+            scopeId: dept.id,
+            personalOnly: true,
+          });
+        }
+      }
+    }
     return out;
   }, [
     allowed,
@@ -412,6 +508,7 @@ export function ScopeChipPicker<
     projectName,
     availableTeams,
     availableProjects,
+    personalScopes,
   ]);
 
   const collection = useMemo(
@@ -424,10 +521,7 @@ export function ScopeChipPicker<
   // this is identical to `value`, so nothing downstream changes.
   const scopes = singleSelect ? value.slice(0, 1) : value;
 
-  const selectedValues = useMemo(
-    () => scopes.map((s) => `${s.scopeType}:${s.scopeId}`),
-    [scopes],
-  );
+  const selectedValues = useMemo(() => scopes.map(entryKey), [scopes]);
 
   // Quick-pick row + collapsible-multi mode. See `showQuickPicks` prop.
   const quickPicks = useMemo(() => {
@@ -491,15 +585,14 @@ export function ScopeChipPicker<
     if (derivedMultiple) setMultipleMode(true);
   }, [derivedMultiple]);
 
-  const dropdownVisible = singleSelect ? false : !showQuickPicks || multipleMode;
+  const dropdownVisible = singleSelect
+    ? false
+    : !showQuickPicks || multipleMode;
 
   if (variant === "single-select") {
     const selected = scopes[0] ?? null;
     const selectedOption = selected
-      ? options.find(
-          (o) =>
-            o.scopeType === selected.scopeType && o.scopeId === selected.scopeId,
-        )
+      ? options.find((o) => entryKey(o) === entryKey(selected))
       : null;
 
     // Group PROJECT options under their parent team so the list stays organised
@@ -540,7 +633,7 @@ export function ScopeChipPicker<
         {label && <SmallLabel>{label}</SmallLabel>}
         <Select.Root
           collection={collection}
-          value={selected ? [`${selected.scopeType}:${selected.scopeId}`] : []}
+          value={selected ? [entryKey(selected)] : []}
           onValueChange={(details) => {
             const pickedValue = details.value[0];
             const option = pickedValue
@@ -548,7 +641,13 @@ export function ScopeChipPicker<
               : undefined;
             onChange(
               option
-                ? [{ scopeType: option.scopeType, scopeId: option.scopeId }]
+                ? [
+                    {
+                      scopeType: option.scopeType,
+                      scopeId: option.scopeId,
+                      ...(option.personalOnly ? { personalOnly: true } : {}),
+                    },
+                  ]
                 : [],
             );
           }}
@@ -692,112 +791,135 @@ export function ScopeChipPicker<
         </Wrap>
       )}
       {dropdownVisible && (
-      <Select.Root
-        collection={collection}
-        value={selectedValues}
-        multiple
-        onValueChange={(details) => {
-          const picked = new Set(details.value);
-          const next = options
-            .filter((o) => picked.has(o.value))
-            .map((o) => ({ scopeType: o.scopeType, scopeId: o.scopeId }));
-          onChange(
-            collapseRedundantScopes(next, scopes, {
-              organizationId,
-              availableProjects:
-                availableProjects && availableProjects.length > 0
-                  ? availableProjects
-                  : projectId
-                    ? [{ id: projectId, name: projectName ?? "Project" }]
-                    : [],
-            }),
-          );
-        }}
-      >
-        <Select.Trigger>
-          <Select.ValueText placeholder="Pick one or more scopes">
-            {() => {
-              if (scopes.length === 0) return "Pick one or more scopes";
-              // Hydrate the chips with names looked up from the picker's
-              // `options` so each chip reads "LangWatch" / "Acme Team" /
-              // "web-app" instead of bare "Organization" / "Team" /
-              // "Project". Without this, multiple teams render as
-              // identical "Team", "Team" pills - the bug rchaves caught
-              // in the model-provider drawer screenshot.
-              const named = scopes.map((v) => {
-                const match = options.find(
-                  (o) =>
-                    o.scopeType === v.scopeType && o.scopeId === v.scopeId,
-                );
-                return {
-                  scopeType: v.scopeType,
-                  scopeId: v.scopeId,
-                  name: match?.label,
-                };
-              });
-              return <ProviderScopeChips scopes={named} />;
-            }}
-          </Select.ValueText>
-        </Select.Trigger>
-        <Select.Content>
-          {options.some((o) => o.scopeType === "ORGANIZATION") && (
-            <Select.ItemGroup label="Organization">
-              {options
-                .filter((o) => o.scopeType === "ORGANIZATION")
-                .map((option) => (
-                  <Select.Item key={option.value} item={option}>
-                    <HStack gap={2}>
-                      <ScopeIcon scopeType="ORGANIZATION" />
-                      <Text>{option.label}</Text>
-                    </HStack>
-                  </Select.Item>
-                ))}
-            </Select.ItemGroup>
-          )}
-          {options.some((o) => o.scopeType === "DEPARTMENT") && (
-            <Select.ItemGroup label="Departments">
-              {options
-                .filter((o) => o.scopeType === "DEPARTMENT")
-                .map((option) => (
-                  <Select.Item key={option.value} item={option}>
-                    <HStack gap={2}>
-                      <ScopeIcon scopeType="DEPARTMENT" />
-                      <Text>{option.label}</Text>
-                    </HStack>
-                  </Select.Item>
-                ))}
-            </Select.ItemGroup>
-          )}
-          {options.some((o) => o.scopeType === "TEAM") && (
-            <Select.ItemGroup label="Teams">
-              {options
-                .filter((o) => o.scopeType === "TEAM")
-                .map((option) => (
-                  <Select.Item key={option.value} item={option}>
-                    <HStack gap={2}>
-                      <ScopeIcon scopeType="TEAM" />
-                      <Text>{option.label}</Text>
-                    </HStack>
-                  </Select.Item>
-                ))}
-            </Select.ItemGroup>
-          )}
-          {options.some((o) => o.scopeType === "PROJECT") && (
-            <Select.ItemGroup label="Projects">
-              {options
-                .filter((o) => o.scopeType === "PROJECT")
-                .map((option) => (
-                  <Select.Item key={option.value} item={option}>
-                    <HStack gap={2}>
-                      <ScopeIcon scopeType="PROJECT" />
-                      <Text>{option.label}</Text>
-                    </HStack>
-                  </Select.Item>
-                ))}
-            </Select.ItemGroup>
-          )}
-        </Select.Content>
-      </Select.Root>
+        <Select.Root
+          collection={collection}
+          value={selectedValues}
+          multiple
+          onValueChange={(details) => {
+            const picked = new Set(details.value);
+            const next = options
+              .filter((o) => picked.has(o.value))
+              .map((o) => ({
+                scopeType: o.scopeType,
+                scopeId: o.scopeId,
+                ...(o.personalOnly ? { personalOnly: true } : {}),
+              }));
+            onChange(
+              collapseRedundantScopes(next, scopes, {
+                organizationId,
+                availableProjects:
+                  availableProjects && availableProjects.length > 0
+                    ? availableProjects
+                    : projectId
+                      ? [{ id: projectId, name: projectName ?? "Project" }]
+                      : [],
+              }),
+            );
+          }}
+        >
+          <Select.Trigger>
+            <Select.ValueText placeholder="Pick one or more scopes">
+              {() => {
+                if (scopes.length === 0) return "Pick one or more scopes";
+                // Hydrate the chips with names looked up from the picker's
+                // `options` so each chip reads "LangWatch" / "Acme Team" /
+                // "web-app" instead of bare "Organization" / "Team" /
+                // "Project". Without this, multiple teams render as
+                // identical "Team", "Team" pills - the bug rchaves caught
+                // in the model-provider drawer screenshot.
+                const named = scopes.map((v) => {
+                  const match = options.find((o) => o.value === entryKey(v));
+                  return {
+                    scopeType: v.scopeType,
+                    scopeId: v.scopeId,
+                    name: match?.label,
+                  };
+                });
+                return <ProviderScopeChips scopes={named} />;
+              }}
+            </Select.ValueText>
+          </Select.Trigger>
+          <Select.Content>
+            {options.some(
+              (o) => o.scopeType === "ORGANIZATION" && !o.personalOnly,
+            ) && (
+              <Select.ItemGroup label="Organization">
+                {options
+                  .filter(
+                    (o) => o.scopeType === "ORGANIZATION" && !o.personalOnly,
+                  )
+                  .map((option) => (
+                    <Select.Item key={option.value} item={option}>
+                      <HStack gap={2}>
+                        <ScopeIcon scopeType="ORGANIZATION" />
+                        <Text>{option.label}</Text>
+                      </HStack>
+                    </Select.Item>
+                  ))}
+              </Select.ItemGroup>
+            )}
+            {options.some(
+              (o) => o.scopeType === "DEPARTMENT" && !o.personalOnly,
+            ) && (
+              <Select.ItemGroup label="Departments">
+                {options
+                  .filter(
+                    (o) => o.scopeType === "DEPARTMENT" && !o.personalOnly,
+                  )
+                  .map((option) => (
+                    <Select.Item key={option.value} item={option}>
+                      <HStack gap={2}>
+                        <ScopeIcon scopeType="DEPARTMENT" />
+                        <Text>{option.label}</Text>
+                      </HStack>
+                    </Select.Item>
+                  ))}
+              </Select.ItemGroup>
+            )}
+            {options.some((o) => o.scopeType === "TEAM") && (
+              <Select.ItemGroup label="Teams">
+                {options
+                  .filter((o) => o.scopeType === "TEAM")
+                  .map((option) => (
+                    <Select.Item key={option.value} item={option}>
+                      <HStack gap={2}>
+                        <ScopeIcon scopeType="TEAM" />
+                        <Text>{option.label}</Text>
+                      </HStack>
+                    </Select.Item>
+                  ))}
+              </Select.ItemGroup>
+            )}
+            {options.some((o) => o.scopeType === "PROJECT") && (
+              <Select.ItemGroup label="Projects">
+                {options
+                  .filter((o) => o.scopeType === "PROJECT")
+                  .map((option) => (
+                    <Select.Item key={option.value} item={option}>
+                      <HStack gap={2}>
+                        <ScopeIcon scopeType="PROJECT" />
+                        <Text>{option.label}</Text>
+                      </HStack>
+                    </Select.Item>
+                  ))}
+              </Select.ItemGroup>
+            )}
+            {options.some((o) => o.personalOnly) && (
+              <Select.ItemGroup label="Personal projects">
+                {options
+                  .filter((o) => o.personalOnly)
+                  .map((option) => (
+                    <Select.Item key={option.value} item={option}>
+                      <HStack gap={2}>
+                        <UserLock size={16} aria-hidden />
+                        <Text>{option.label}</Text>
+                      </HStack>
+                    </Select.Item>
+                  ))}
+              </Select.ItemGroup>
+            )}
+          </Select.Content>
+        </Select.Root>
       )}
       {showSummary && (
         <Box>

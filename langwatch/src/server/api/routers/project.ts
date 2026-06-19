@@ -1,16 +1,13 @@
+import { generate } from "@langwatch/ksuid";
 import {
   Prisma,
   type PrismaClient,
   type Project,
-  ProjectSensitiveDataVisibilityLevel,
   RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
-import type { Session } from "~/server/auth";
-import { KSUID_RESOURCES } from "~/utils/constants";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import {
@@ -19,14 +16,16 @@ import {
   publicProcedure,
 } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
+import type { Session } from "~/server/auth";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { encrypt } from "~/utils/encryption";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
 import { auditLog } from "../../auditLog";
 import {
   createLicenseEnforcementService,
   LimitExceededError,
 } from "../../license-enforcement";
-import { captureException } from "~/utils/posthogErrorCapture";
 import { generateApiKey } from "../../utils/apiKeyGenerator";
 import {
   checkOrganizationPermission,
@@ -78,7 +77,6 @@ export const projectRouter = createTRPCRouter({
         teamId: "",
         createdAt: new Date(),
         updatedAt: new Date(),
-        piiRedactionLevel: "STRICT",
       } as Project;
     }),
   create: protectedProcedure
@@ -116,7 +114,6 @@ export const projectRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const userId = ctx.session.user.id;
       const prisma = ctx.prisma;
-
 
       const enforcement = createLicenseEnforcementService(prisma);
       try {
@@ -211,14 +208,6 @@ export const projectRouter = createTRPCRouter({
           framework: input.framework,
           teamId: teamId,
           apiKey: generateApiKey(),
-          piiRedactionLevel:
-            env.NODE_ENV === "development" || !env.IS_SAAS
-              ? "DISABLED"
-              : "ESSENTIAL",
-          capturedInputVisibility:
-            ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
-          capturedOutputVisibility:
-            ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
         },
       });
 
@@ -276,12 +265,13 @@ export const projectRouter = createTRPCRouter({
           },
         });
 
-        // Audit log the security-critical action
+        // Audit log the security-critical action; non-fatal so an audit
+        // failure cannot prevent returning the new key to the user.
         await auditLog({
           action: "project.apiKey.regenerated",
           userId: ctx.session.user.id,
           projectId: input.projectId,
-        });
+        }).catch(captureException);
 
         return { apiKey: project.apiKey };
       } catch (error) {
@@ -306,14 +296,7 @@ export const projectRouter = createTRPCRouter({
           name: z.string().optional(),
           language: z.string().optional(),
           framework: z.string().optional(),
-          piiRedactionLevel: z.enum(["STRICT", "ESSENTIAL", "DISABLED"]).optional(),
           teamId: z.string().optional(),
-          capturedInputVisibility: z
-            .enum(["REDACTED_TO_ALL", "VISIBLE_TO_ADMIN", "VISIBLE_TO_ALL"])
-            .optional(),
-          capturedOutputVisibility: z
-            .enum(["REDACTED_TO_ALL", "VISIBLE_TO_ADMIN", "VISIBLE_TO_ALL"])
-            .optional(),
           traceSharingEnabled: z.boolean().optional(),
           presenceEnabled: z.boolean().optional(),
           userLinkTemplate: z.string().optional(),
@@ -350,21 +333,6 @@ export const projectRouter = createTRPCRouter({
         });
       }
 
-      if (
-        input.piiRedactionLevel !== undefined &&
-        input.piiRedactionLevel === "DISABLED" &&
-        !(
-          env.NODE_ENV === "development" ||
-          !env.IS_SAAS ||
-          project.team.organization.signedDPA
-        )
-      ) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "PII redation cannot be disabled",
-        });
-      }
-
       if (input.teamId) {
         const destinationTeam = await prisma.team.findFirst({
           where: {
@@ -389,21 +357,13 @@ export const projectRouter = createTRPCRouter({
           ...(input.name !== undefined && { name: input.name }),
           ...(input.language !== undefined && { language: input.language }),
           ...(input.framework !== undefined && { framework: input.framework }),
-          ...(input.piiRedactionLevel !== undefined && {
-            piiRedactionLevel: input.piiRedactionLevel,
-          }),
           ...(input.userLinkTemplate !== undefined && {
             userLinkTemplate: input.userLinkTemplate,
           }),
           ...(input.teamId && { teamId: input.teamId }),
-          capturedInputVisibility:
-            input.capturedInputVisibility ?? project.capturedInputVisibility,
-          capturedOutputVisibility:
-            input.capturedOutputVisibility ?? project.capturedOutputVisibility,
           traceSharingEnabled:
             input.traceSharingEnabled ?? project.traceSharingEnabled,
-          presenceEnabled:
-            input.presenceEnabled ?? project.presenceEnabled,
+          presenceEnabled: input.presenceEnabled ?? project.presenceEnabled,
           s3Endpoint: input.s3Endpoint ? encrypt(input.s3Endpoint) : null,
           s3AccessKeyId: input.s3AccessKeyId
             ? encrypt(input.s3AccessKeyId)
@@ -446,6 +406,13 @@ export const projectRouter = createTRPCRouter({
           input: !protections.canSeeCapturedInput,
           output: !protections.canSeeCapturedOutput,
         },
+        // Human label of who CAN see a restricted field (e.g. "Admins, Security"
+        // or "no one"), so the redaction placeholder can explain why content is
+        // hidden and who to ask. Null when the field is visible.
+        visibleTo: {
+          input: protections.capturedInputVisibleTo ?? null,
+          output: protections.capturedOutputVisibleTo ?? null,
+        },
       };
     }),
   archiveById: protectedProcedure
@@ -480,8 +447,9 @@ export const projectRouter = createTRPCRouter({
     .use(checkProjectPermission("project:update"))
     .mutation(async ({ input }) => {
       const { projectId } = input;
-      const { scheduleTopicClusteringForProject } =
-        await import("../../background/queues/topicClusteringQueue");
+      const { scheduleTopicClusteringForProject } = await import(
+        "../../background/queues/topicClusteringQueue"
+      );
 
       try {
         // Add the job directly to the queue for immediate processing
@@ -510,25 +478,18 @@ async function checkCapturedDataVisibilityPermission({
   ctx: { prisma: PrismaClient; session: Session; permissionChecked: boolean };
   input: {
     projectId: string;
-    capturedInputVisibility?: string;
-    capturedOutputVisibility?: string;
     traceSharingEnabled?: boolean;
   };
   next: () => Promise<any>;
 }) {
   if (
-    (input.capturedInputVisibility !== void 0 ||
-      input.capturedOutputVisibility !== void 0 ||
-      input.traceSharingEnabled !== void 0) &&
+    input.traceSharingEnabled !== void 0 &&
     !(await hasProjectPermission(ctx, input.projectId, "project:manage"))
   ) {
     throw new TRPCError({
       code: "FORBIDDEN",
-      message:
-        "You don't have permission to change captured data visibility settings",
+      message: "You don't have permission to change trace sharing settings",
     });
   }
   return next();
 }
-
-

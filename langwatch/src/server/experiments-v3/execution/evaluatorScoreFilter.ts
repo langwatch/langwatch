@@ -14,7 +14,7 @@
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
-} from "~/server/evaluations/evaluators.generated";
+} from "~/server/evaluations/evaluators";
 
 /**
  * Evaluator types that should always have their scores stripped,

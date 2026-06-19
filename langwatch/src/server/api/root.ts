@@ -19,6 +19,7 @@ import { batchRecordRouter } from "./routers/batchRecord";
 import { costsRouter } from "./routers/costs";
 import { currencyRouter } from "./routers/currency";
 import { dashboardsRouter } from "./routers/dashboards";
+import { dataPrivacyRouter } from "./routers/dataPrivacy";
 import { dataRetentionRouter } from "./routers/dataRetention";
 import { datasetRouter } from "./routers/dataset";
 import { datasetRecordRouter } from "./routers/datasetRecord";
@@ -116,6 +117,7 @@ const coreRouters = {
   pinnedTrace: pinnedTraceRouter,
   dataRetention: dataRetentionRouter,
   emailSuppression: emailSuppressionRouter,
+  dataPrivacy: dataPrivacyRouter,
   translate: translateRouter,
   workflow: workflowRouter,
   optimization: optimizationRouter,

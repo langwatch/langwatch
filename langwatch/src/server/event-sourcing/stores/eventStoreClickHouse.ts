@@ -62,6 +62,20 @@ export class EventStoreClickHouse<
     );
   }
 
+  protected override logWarning(
+    name: string,
+    context: Record<string, unknown>,
+    message: string,
+  ): void {
+    this.logger.warn(
+      {
+        ...context,
+        operation: name,
+      },
+      message,
+    );
+  }
+
   protected override onStoreSuccess(
     _context: EventStoreReadContext<EventType>,
     _events: readonly EventType[],

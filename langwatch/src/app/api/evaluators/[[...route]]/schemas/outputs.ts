@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators.generated";
+import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators";
 
 const evaluatorFieldSchema = z.object({
   identifier: z.string(),

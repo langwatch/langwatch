@@ -515,6 +515,39 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
       return null;
     },
   },
+  // Inline single-scope-per-row (ADR-021), one row per (scope, personalOnly).
+  // Same regime as RetentionPolicy: a query is bounded by a row id, the
+  // organizationId anchor, a (scopeType, scopeId) predicate, or the
+  // (scopeType, scopeId, personalOnly) compound unique used by per-scope
+  // upsert/delete. No projectId column - privacy rules are scope-based.
+  DataPrivacyPolicy: {
+    validateWhere: (where) => {
+      const reason =
+        "requires a row id, organizationId, or scope predicate in the where clause";
+      if (!where) return reason;
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          hasIdOrInPredicate(c) ||
+          typeof c.organizationId === "string" ||
+          (c.organizationId && Array.isArray(c.organizationId.in)) ||
+          hasScopePredicate(c) ||
+          (c.scopeType_scopeId_personalOnly &&
+            typeof c.scopeType_scopeId_personalOnly.scopeId === "string"),
+      );
+      return ok ? null : reason;
+    },
+    validateCreateData: (data) => {
+      const records = Array.isArray(data) ? data : [data];
+      for (const d of records) {
+        if (!d) return "create requires a data payload";
+        if (typeof d.organizationId !== "string") {
+          return "create requires an organizationId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
 };
 
 /**

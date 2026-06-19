@@ -3,6 +3,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -11,7 +12,7 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { forwardRef } from "react";
+import { forwardRef, useReducer } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AvailableSource } from "../../variables/VariableMappingInput";
 import type { Variable } from "../../variables/VariablesSection";
@@ -699,6 +700,118 @@ describe("PromptTextAreaWithVariables", () => {
 
       fireEvent.blur(textarea);
       expect(textarea.style.paddingBottom).toBe("28px");
+    });
+
+    /** @scenario An undefined variable is flagged without crashing the page */
+    it("does not re-measure the banner on every parent re-render when the invalid-variable set is unchanged", () => {
+      // Regression: the banner useLayoutEffect depended on the `invalidVariables`
+      // array identity. The prompt editor rebuilds the variables array on every
+      // render, so the effect re-ran and called setState on every render, which
+      // churned the commit phase into React's "Maximum update depth exceeded"
+      // crash (it threw the page to the top-level error boundary). The fix keys
+      // the effect on a stable primitive signature of the invalid names, so it
+      // only re-measures when the set of undefined variables actually changes.
+      // Each re-measure here stands in for one of the per-render setStates that
+      // fed the crash, so a non-zero count on stable input is the regression.
+      function Harness() {
+        const [, forceRerender] = useReducer((n: number) => n + 1, 0);
+        // Mirrors PromptMessagesEditor: a brand-new array (and objects) each render.
+        const variables: Variable[] = [{ identifier: "question", type: "str" }];
+        return (
+          <ChakraProvider value={defaultSystem}>
+            <button
+              type="button"
+              data-testid="rerender"
+              onClick={() => forceRerender()}
+            >
+              rerender
+            </button>
+            <PromptTextAreaWithVariables
+              value="Judge this: {{response}}"
+              onChange={vi.fn()}
+              variables={variables}
+            />
+          </ChakraProvider>
+        );
+      }
+
+      render(<Harness />);
+
+      // `response` is undefined, so the banner is mounted. Spy on the exact node
+      // the layout effect measures, so we count only its reads (not Chakra's).
+      const banner = screen.getByTestId("undefined-variables-banner");
+      let bannerHeightReads = 0;
+      Object.defineProperty(banner, "offsetHeight", {
+        configurable: true,
+        get() {
+          bannerHeightReads += 1;
+          return 24;
+        },
+      });
+
+      // Re-render the parent repeatedly; each pass hands down a fresh variables
+      // array, exactly as the real editor does on every render.
+      for (let i = 0; i < 5; i += 1) {
+        fireEvent.click(screen.getByTestId("rerender"));
+      }
+
+      // This proves the proximate cause is gone: with the invalid-variable set
+      // unchanged, the layout effect no longer re-measures and re-setStates on
+      // every render (pre-fix this was 5, one per render). The literal "Maximum
+      // update depth" throw needs the full app re-render storm to manifest, so
+      // the eliminated per-render churn is the faithful, deterministic proxy.
+      expect(bannerHeightReads).toBe(0);
+    });
+
+    /** @scenario The undefined-variables warning stays clear of the prompt after a resize */
+    it("re-measures the banner on a resize even when the invalid-variable set is unchanged", () => {
+      // Review follow-up: keying the measurement on the name set alone goes
+      // stale when the SAME warning text reflows taller - the resizable prompt
+      // panel narrows and the names wrap onto another line without changing the
+      // set. A ResizeObserver re-measures on that layout change so the reserved
+      // padding tracks the real height and never covers the last prompt line.
+      const observerCallbacks: ResizeObserverCallback[] = [];
+      const RealResizeObserver = globalThis.ResizeObserver;
+      globalThis.ResizeObserver = class {
+        constructor(cb: ResizeObserverCallback) {
+          observerCallbacks.push(cb);
+        }
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      } as unknown as typeof ResizeObserver;
+
+      try {
+        renderComponent({
+          value: "Judge this: {{response}}",
+          variables: [],
+          onCreateVariable: vi.fn(),
+        });
+
+        // Initial measure ran against jsdom's offsetHeight 0, so the 28px floor.
+        const textarea = screen.getByRole("textbox");
+        expect(textarea.style.paddingBottom).toBe("28px");
+
+        // The names have not changed, but the banner now reflows to 100px.
+        const banner = screen.getByTestId("undefined-variables-banner");
+        Object.defineProperty(banner, "offsetHeight", {
+          configurable: true,
+          get: () => 100,
+        });
+
+        // A resize tick fires the observer; the padding must follow the height.
+        expect(observerCallbacks.length).toBeGreaterThan(0);
+        act(() => {
+          for (const cb of observerCallbacks) {
+            cb([], {} as ResizeObserver);
+          }
+        });
+
+        // 100 (height) + 8 (gap) = 108, above the 28px single-line floor.
+        expect(textarea.style.paddingBottom).toBe("108px");
+      } finally {
+        globalThis.ResizeObserver = RealResizeObserver;
+      }
     });
   });
 });

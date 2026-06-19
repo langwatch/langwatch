@@ -120,13 +120,17 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
       not optional:
       "Running interactively. To skip these prompts (CI / agents that already have a credential):
          --device         AI tools / SSO (claude, codex, gemini, opencode)
-         --api-key <K>    project SDK key into .env (SDK, evals, prompts)
+         --project        project SDK key into .env via browser (SDK, evals, prompts)
+         --api-key <K>    project SDK key you already have, into .env
          --token <T>      pre-minted device session
          --endpoint <U>   self-hosted instance URL"
-    And the CLI prompts:
+    And the CLI prompts, with LangWatch Cloud as the default (option 1) because most
+      first-time logins target the SaaS:
       "Where do you want to log in?
         1) LangWatch Cloud (app.langwatch.ai)
         2) Self-hosted instance (custom URL)"
+    And on selecting (1) the CLI ALWAYS targets `https://app.langwatch.ai`, even if a
+      local endpoint was previously persisted or `LANGWATCH_ENDPOINT` is exported
     And on selecting (2) the CLI prompts for the URL and validates http(s) scheme
     And the CLI then prompts, with AI tools as the default (option 1) since a
       human running this interactively most likely wants to track their own
@@ -139,13 +143,61 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
     And on selecting (2) it runs the project API-key device-code flow → `$CWD/.env`
     And on selecting (3) it runs both flows in sequence
 
+  @bdd @cli @login @endpoint @cloud-repoint @regression
+  Scenario: picking LangWatch Cloud repoints away from a previously-local endpoint
+    Given the user has `control_plane_url = http://localhost:5560` persisted
+      (or `LANGWATCH_ENDPOINT=http://localhost:5560` exported) from local dev
+    And the user is in an interactive terminal
+    When the user runs `langwatch login` and selects "LangWatch Cloud"
+    Then the persisted config records `control_plane_url = https://app.langwatch.ai`
+    And the chosen auth flow (device session or project key) targets
+      `https://app.langwatch.ai`, NOT `http://localhost:5560`
+    # Rationale: choosing "Cloud" was a no-op that left the stale local
+    # control_plane_url in place, so the device flow dialled localhost:5560 and
+    # failed with ECONNREFUSED. "Cloud" must always repoint to app.langwatch.ai.
+
+  @bdd @cli @login @endpoint @context-aware
+  Scenario: the Where picker reorders when a non-cloud endpoint is already configured
+    Given the user already has a resolved endpoint that is NOT `https://app.langwatch.ai`
+      (e.g. `http://localhost:5560` from `LANGWATCH_ENDPOINT` or persisted config)
+    And the user is in an interactive terminal
+    When the user runs `langwatch login` with no flags
+    Then the "Where do you want to log in?" picker lists, in this order with the
+      current endpoint pre-selected (default):
+      "1) Self-hosted instance (http://localhost:5560)   ← current, default
+       2) Self-hosted instance (different endpoint)
+       3) LangWatch Cloud (app.langwatch.ai)"
+    And selecting (1) keeps `control_plane_url = http://localhost:5560`
+    And selecting (2) prompts for a new URL (validated http(s)) and persists it
+    And selecting (3) repoints `control_plane_url` to `https://app.langwatch.ai`
+    # Cloud stays the priority default for fresh installs; only when the user
+    # already has a custom endpoint do we default to keeping it (and still let
+    # them switch endpoint or jump to Cloud).
+
+  @bdd @cli @login @project @flag
+  Scenario: `langwatch login --project` forces project login, symmetric to `--device`
+    Given the user is in an interactive terminal
+    When the user runs `langwatch login --project`
+    Then the CLI runs the project API-key device-code flow directly → `$CWD/.env`
+    And it does NOT start the AI-tools / device-session flow
+    And no "Where do you want to log in?" or "How do you want to use it?" prompt fires
+    And the endpoint resolves via the 4-source resolver (default → app.langwatch.ai)
+
+  @bdd @cli @login @project @non-tty
+  Scenario: `--project` is the implicit default in a non-TTY context
+    Given the user is in a non-interactive context (CI, agent stdin, piped)
+    When the user runs `langwatch login` with no flags
+    Then the behavior is identical to `langwatch login --project`
+    And the CLI prints that project login is the default and names BOTH escape
+      hatches: `--device` for AI tools and `--project` to force project login
+
   @bdd @cli @login @agent-aware @fake-tty
   Scenario: agent-hint banner is shown EVEN when stdin reports as TTY (fake-TTY agents)
     Given the agent harness exposes a fake PTY where `process.stdin.isTTY === true`
       but no human is present at the keyboard
     When the agent invokes `langwatch login` with no flags expecting non-blocking behavior
     Then the agent-hint banner is the FIRST output stream the agent sees
-    And the banner explicitly names `--device`, `--api-key`, `--token`, `--endpoint`
+    And the banner explicitly names `--device`, `--project`, `--api-key`, `--token`, `--endpoint`
       so the agent can self-correct by re-invoking with the right flag
     And the human-facing prompt is rendered AFTER the banner so a real human still
       sees it correctly

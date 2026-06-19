@@ -7,7 +7,12 @@ import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
   type SingleEvaluationResult,
-} from "~/server/evaluations/evaluators.generated";
+} from "~/server/evaluations/evaluators";
+import { isNativeEvaluatorType } from "~/server/evaluations/evaluators.native";
+import {
+  augmentEvaluationResult,
+  executeNativeEvaluation,
+} from "~/server/evaluations/native/registry";
 import {
   hasThreadMappings,
   resolveThreadMappingsIntoData,
@@ -546,6 +551,25 @@ export class EvaluationExecutionService {
       throw new EvaluatorNotFoundError(evaluatorType);
     }
 
+    const droppedCategories = trace?.privacy?.droppedCategories ?? [];
+
+    // Native (in-process) evaluators skip the analysis service; both they and
+    // the remote ones run through the shared augmenter so redaction or drop at
+    // ingestion never hides a leak from the result.
+    if (isNativeEvaluatorType(builtInType)) {
+      const nativeResult = await executeNativeEvaluation({
+        evaluatorType: builtInType,
+        data: data.data,
+      });
+      return augmentEvaluationResult({
+        evaluatorType: builtInType,
+        mappedData: data.data,
+        settings,
+        droppedCategories,
+        result: nativeResult,
+      });
+    }
+
     const evaluatorEnv = await this.deps.modelEnvResolver.resolveForEvaluator({
       evaluatorType: builtInType,
       evaluator,
@@ -553,11 +577,19 @@ export class EvaluationExecutionService {
       settings,
     });
 
-    return this.deps.langevalsClient.evaluate({
+    const result = await this.deps.langevalsClient.evaluate({
       evaluatorType: builtInType,
       data: data.data,
       settings: settings ?? {},
       env: evaluatorEnv,
+    });
+
+    return augmentEvaluationResult({
+      evaluatorType: builtInType,
+      mappedData: data.data,
+      settings,
+      droppedCategories,
+      result,
     });
   }
 

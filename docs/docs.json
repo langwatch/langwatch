@@ -694,6 +694,7 @@
           {
             "group": "Privacy",
             "pages": [
+              "ai-governance/data-privacy",
               "ai-governance/no-spy-mode"
             ]
           },
@@ -1241,7 +1242,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1781782386",
+      "source": "/ci/cache/busted/1781862690",
       "destination": "/"
     },
     {

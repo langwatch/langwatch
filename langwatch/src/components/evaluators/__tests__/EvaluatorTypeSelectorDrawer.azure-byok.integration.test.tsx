@@ -25,7 +25,7 @@ import { EvaluatorTypeSelectorDrawer } from "../EvaluatorTypeSelectorDrawer";
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock("~/server/evaluations/evaluators.generated", () => ({
+vi.mock("~/server/evaluations/evaluators", () => ({
   AVAILABLE_EVALUATORS: {
     "presidio/pii_detection": {
       name: "PII Detection",

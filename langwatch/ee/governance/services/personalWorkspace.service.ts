@@ -24,9 +24,7 @@
  */
 import {
   Prisma,
-  PIIRedactionLevel,
   type PrismaClient,
-  ProjectSensitiveDataVisibilityLevel,
   RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
@@ -159,11 +157,6 @@ export class PersonalWorkspaceService {
           framework: "other",
           isPersonal: true,
           ownerUserId: userId,
-          piiRedactionLevel: PIIRedactionLevel.ESSENTIAL,
-          capturedInputVisibility:
-            ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
-          capturedOutputVisibility:
-            ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
         },
       });
 

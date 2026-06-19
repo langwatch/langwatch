@@ -12,7 +12,7 @@ import type {
 import type {
   EvaluatorTypes,
   SingleEvaluationResult,
-} from "../../server/evaluations/evaluators.generated";
+} from "../../server/evaluations/evaluators";
 import { createLogger } from "../../utils/logger/server";
 import { startCollectorWorker } from "./workers/collectorWorker";
 import {

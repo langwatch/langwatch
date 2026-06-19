@@ -13,7 +13,6 @@ import {
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { EvaluationExecutionMode } from "@prisma/client";
-import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, Edit2, HelpCircle } from "react-feather";
 import {
@@ -24,6 +23,7 @@ import {
   useForm,
 } from "react-hook-form";
 import { z } from "zod";
+import { useRouter } from "~/utils/compat/next-router";
 import { slugify } from "~/utils/slugify";
 import { useAvailableEvaluators } from "../../hooks/useAvailableEvaluators";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -32,16 +32,19 @@ import {
   migrateLegacyMappings,
 } from "../../server/evaluations/evaluationMappings";
 import {
-  evaluatorsSchema,
-  evaluatorTypesSchema,
   type Evaluators,
   type EvaluatorTypes,
-} from "../../server/evaluations/evaluators.generated";
+  evaluatorsSchema,
+  evaluatorTypesSchema,
+} from "../../server/evaluations/evaluators";
 import {
   getEvaluatorDefaultSettings,
   getEvaluatorDefinitions,
 } from "../../server/evaluations/getEvaluator";
-import { checkPreconditionsSchema, type CheckPreconditions } from "../../server/evaluations/types";
+import {
+  type CheckPreconditions,
+  checkPreconditionsSchema,
+} from "../../server/evaluations/types";
 import {
   type MappingState,
   mappingStateSchema,

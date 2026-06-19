@@ -8,10 +8,10 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import NextLink from "~/utils/compat/next-link";
 import { LuExternalLink } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import NextLink from "~/utils/compat/next-link";
 import { featureIcons } from "~/utils/featureIcons";
 import { Link } from "../ui/link";
 import { HomeCard } from "./HomeCard";
@@ -52,9 +52,7 @@ export const buildQuickAccessCards = (
         />
       ),
       color: tracesConfig.color.split(".")[0] ?? "blue",
-      href: isIntegrated
-        ? `/${projectSlug}/messages`
-        : `/${projectSlug}/messages`,
+      href: `/${projectSlug}/traces`,
       docsHref: "https://langwatch.ai/docs/integration/quick-start",
     },
     {
