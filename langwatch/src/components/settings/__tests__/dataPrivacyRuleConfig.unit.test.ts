@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   EMPTY_AUDIENCE,
+  PLATFORM_DEFAULT_DATA_PRIVACY,
   type ResolvedDataPrivacy,
 } from "~/server/data-privacy/dataPrivacy.types";
 import {
@@ -11,62 +12,66 @@ import {
   audienceConfig,
   audienceToSelection,
   buildRuleConfig,
+  type CategoryChoice,
   type CustomAttributeFormRow,
   configsEqual,
   configToFormState,
   EMPTY_AUDIENCE_FORM,
-  inheritedFormState,
+  inheritedBaselineForScope,
+  inheritFormState,
   isEmptyRuleConfig,
+  type PiiChoice,
   ROLE_VALUES,
   type RuleFormState,
   ruleSummary,
+  type SecretsChoice,
   selectionToAudience,
-  type TouchedControls,
-  touchedFromConfig,
 } from "../dataPrivacyRuleConfig";
 
-const defaultDispositions: RuleFormState["dispositions"] = {
-  input: "capture",
-  output: "capture",
-  system: "capture",
-  tools: "capture",
+const inheritDispositions: RuleFormState["dispositions"] = {
+  input: "inherit",
+  output: "inherit",
+  system: "inherit",
+  tools: "inherit",
 };
-
-const noTouch: TouchedControls = { categories: {}, pii: false, secrets: false };
 
 function audience(partial: Partial<AudienceFormState> = {}): AudienceFormState {
   return { ...EMPTY_AUDIENCE_FORM, ...partial };
 }
 
 function build({
-  dispositions = defaultDispositions,
+  dispositions = inheritDispositions,
   aud = audience({ admins: true }),
-  piiLevel = "essential" as const,
+  piiChoice = "inherit" as PiiChoice,
   piiEntities = [] as string[],
-  secretsEnabled = true,
+  secretsChoice = "inherit" as SecretsChoice,
   secretsPatterns = [] as string[],
   customAttributes = [] as CustomAttributeFormRow[],
-  touched = noTouch,
 }: {
   dispositions?: RuleFormState["dispositions"];
   aud?: AudienceFormState;
-  piiLevel?: RuleFormState["piiLevel"];
+  piiChoice?: PiiChoice;
   piiEntities?: string[];
-  secretsEnabled?: boolean;
+  secretsChoice?: SecretsChoice;
   secretsPatterns?: string[];
   customAttributes?: CustomAttributeFormRow[];
-  touched?: TouchedControls;
 }) {
   return buildRuleConfig({
     dispositions,
     audience: aud,
-    piiLevel,
+    piiChoice,
     piiEntities,
-    secretsEnabled,
+    secretsChoice,
     secretsPatterns,
     customAttributes,
-    touched,
   });
+}
+
+function withCategory(
+  category: keyof RuleFormState["dispositions"],
+  choice: CategoryChoice,
+): RuleFormState["dispositions"] {
+  return { ...inheritDispositions, [category]: choice };
 }
 
 function resolved(
@@ -86,7 +91,8 @@ function resolved(
 }
 
 describe("buildRuleConfig", () => {
-  describe("given everything at the platform defaults and nothing touched", () => {
+  describe("given every control left on inherit", () => {
+    /** @scenario Saving a rule with everything inheriting stores a rule that sets no fields */
     it("produces an empty config that changes nothing", () => {
       const config = build({});
 
@@ -94,37 +100,74 @@ describe("buildRuleConfig", () => {
     });
   });
 
-  describe("given a dropped category", () => {
-    it("includes only the dropped category and omits the untouched ones", () => {
-      const config = build({
-        dispositions: { ...defaultDispositions, input: "drop" },
-        touched: { ...noTouch, categories: { input: true } },
-      });
+  describe("given one category set and the rest inheriting", () => {
+    /** @scenario Setting one category leaves the rest inheriting */
+    it("includes only the set category and omits the inherited ones", () => {
+      const config = build({ dispositions: withCategory("input", "drop") });
 
       expect(config.categories?.input).toEqual({ disposition: "drop" });
       expect(config.categories?.output).toBeUndefined();
+      expect(config.categories?.system).toBeUndefined();
+      expect(config.categories?.tools).toBeUndefined();
+    });
+  });
+
+  describe("given a category explicitly set to capture over a stricter parent", () => {
+    it("persists the capture disposition instead of inheriting", () => {
+      const config = build({ dispositions: withCategory("input", "capture") });
+
+      expect(config.categories?.input).toEqual({ disposition: "capture" });
     });
   });
 
   describe("given a restricted category", () => {
     it("attaches the full structured audience", () => {
       const config = build({
-        dispositions: { ...defaultDispositions, output: "restrict" },
-        aud: audience({
-          viewers: true,
-          projectOwner: true,
-          groupIds: ["g1"],
-        }),
-        touched: { ...noTouch, categories: { output: true } },
+        dispositions: withCategory("output", "restrict"),
+        aud: audience({ viewers: true, projectOwner: true, groupIds: ["g1"] }),
       });
 
       expect(config.categories?.output).toEqual({
         disposition: "restrict",
-        audience: {
-          viewers: true,
-          projectOwner: true,
-          groupIds: ["g1"],
-        },
+        audience: { viewers: true, projectOwner: true, groupIds: ["g1"] },
+      });
+    });
+  });
+
+  describe("given a PII choice", () => {
+    it("omits PII when inheriting and writes the level when set", () => {
+      expect(build({ piiChoice: "inherit" }).pii).toBeUndefined();
+      expect(build({ piiChoice: "essential" }).pii).toEqual({
+        level: "essential",
+      });
+      expect(build({ piiChoice: "disabled" }).pii).toEqual({
+        level: "disabled",
+      });
+      expect(
+        build({ piiChoice: "custom", piiEntities: ["BR_CPF", "EMAIL_ADDRESS"] })
+          .pii,
+      ).toEqual({ level: "custom", entities: ["BR_CPF", "EMAIL_ADDRESS"] });
+    });
+  });
+
+  describe("given a secrets choice", () => {
+    it("omits secrets when inheriting and writes the flag when on or off", () => {
+      expect(build({ secretsChoice: "inherit" }).secrets).toBeUndefined();
+      expect(build({ secretsChoice: "on" }).secrets).toEqual({ enabled: true });
+      expect(build({ secretsChoice: "off" }).secrets).toEqual({
+        enabled: false,
+      });
+    });
+
+    it("persists trimmed custom patterns alongside the enabled flag", () => {
+      const config = build({
+        secretsChoice: "on",
+        secretsPatterns: [" acme_live_[a-z0-9]+ ", ""],
+      });
+
+      expect(config.secrets).toEqual({
+        enabled: true,
+        customPatterns: ["acme_live_[a-z0-9]+"],
       });
     });
   });
@@ -163,48 +206,6 @@ describe("buildRuleConfig", () => {
       ]);
     });
   });
-
-  describe("given custom secret patterns with secrets touched", () => {
-    it("persists the trimmed patterns alongside the enabled flag", () => {
-      const config = build({
-        secretsPatterns: [" acme_live_[a-z0-9]+ ", ""],
-        touched: { ...noTouch, secrets: true },
-      });
-
-      expect(config.secrets).toEqual({
-        enabled: true,
-        customPatterns: ["acme_live_[a-z0-9]+"],
-      });
-    });
-  });
-
-  describe("given a touched control left at a default-looking value", () => {
-    describe("when a category is touched to capture over an inherited drop", () => {
-      it("persists the capture disposition explicitly instead of omitting it", () => {
-        const config = build({
-          touched: { ...noTouch, categories: { input: true } },
-        });
-
-        expect(config.categories?.input).toEqual({ disposition: "capture" });
-      });
-    });
-
-    describe("when PII is touched to essential over an inherited strict", () => {
-      it("persists the essential level explicitly", () => {
-        const config = build({ touched: { ...noTouch, pii: true } });
-
-        expect(config.pii).toEqual({ level: "essential" });
-      });
-    });
-
-    describe("when secrets are touched back on over an inherited off", () => {
-      it("persists secrets enabled explicitly", () => {
-        const config = build({ touched: { ...noTouch, secrets: true } });
-
-        expect(config.secrets).toEqual({ enabled: true });
-      });
-    });
-  });
 });
 
 describe("audienceConfig", () => {
@@ -222,20 +223,41 @@ describe("audienceConfig", () => {
   });
 });
 
-describe("configToFormState and touchedFromConfig", () => {
+describe("configToFormState", () => {
+  describe("given a config that only sets one category", () => {
+    it("shows the set category and leaves the rest on inherit", () => {
+      const state = configToFormState({
+        categories: { input: { disposition: "drop" } },
+      });
+
+      expect(state.dispositions.input).toBe("drop");
+      expect(state.dispositions.output).toBe("inherit");
+      expect(state.dispositions.system).toBe("inherit");
+      expect(state.dispositions.tools).toBe("inherit");
+      expect(state.piiChoice).toBe("inherit");
+      expect(state.secretsChoice).toBe("inherit");
+    });
+  });
+
+  describe("given a config that disables secrets", () => {
+    it("reads secrets as explicitly off, not inherit", () => {
+      expect(
+        configToFormState({ secrets: { enabled: false } }).secretsChoice,
+      ).toBe("off");
+      expect(
+        configToFormState({ secrets: { enabled: true } }).secretsChoice,
+      ).toBe("on");
+    });
+  });
+
   describe("given a config with every kind of field", () => {
     const config = build({
-      dispositions: { ...defaultDispositions, input: "restrict" },
+      dispositions: withCategory("input", "restrict"),
       aud: audience({ projectOwner: true, groupIds: ["g1"] }),
-      piiLevel: "strict",
-      secretsEnabled: true,
+      piiChoice: "strict",
+      secretsChoice: "on",
       secretsPatterns: ["acme_[0-9]+"],
       customAttributes: [{ pattern: "app.token", disposition: "drop" }],
-      touched: {
-        categories: { input: true },
-        pii: true,
-        secrets: true,
-      },
     });
 
     it("hydrates the form state back, including the structured audience", () => {
@@ -244,33 +266,17 @@ describe("configToFormState and touchedFromConfig", () => {
       expect(state.dispositions.input).toBe("restrict");
       expect(state.audience.projectOwner).toBe(true);
       expect(state.audience.groupIds).toEqual(["g1"]);
-      expect(state.piiLevel).toBe("strict");
+      expect(state.piiChoice).toBe("strict");
+      expect(state.secretsChoice).toBe("on");
       expect(state.secretsPatterns).toEqual(["acme_[0-9]+"]);
       expect(state.customAttributes).toEqual([
         { pattern: "app.token", disposition: "drop" },
       ]);
     });
 
-    it("marks exactly the present fields as touched", () => {
-      const touched = touchedFromConfig(config);
-
-      expect(touched.categories).toEqual({ input: true });
-      expect(touched.pii).toBe(true);
-      expect(touched.secrets).toBe(true);
-    });
-
     it("round-trips back to an equal config", () => {
       const state = configToFormState(config);
-      const rebuilt = buildRuleConfig({
-        dispositions: state.dispositions,
-        audience: state.audience,
-        piiLevel: state.piiLevel,
-        piiEntities: state.piiEntities,
-        secretsEnabled: state.secretsEnabled,
-        secretsPatterns: state.secretsPatterns,
-        customAttributes: state.customAttributes,
-        touched: touchedFromConfig(config),
-      });
+      const rebuilt = buildRuleConfig(state);
 
       expect(configsEqual(rebuilt, config)).toBe(true);
     });
@@ -291,46 +297,86 @@ describe("configToFormState and touchedFromConfig", () => {
       expect(state.audience.viewers).toBe(true);
     });
   });
-});
 
-describe("inheritedFormState", () => {
-  describe("given the current project scope under a restrictive parent", () => {
-    it("seeds the form from the resolved effective so the parent restriction shows", () => {
-      const state = inheritedFormState({
-        effective: resolved({
-          categories: {
-            input: { disposition: "drop", audience: { ...EMPTY_AUDIENCE } },
-            output: {
-              disposition: "restrict",
-              audience: { ...EMPTY_AUDIENCE, projectOwner: true },
-            },
-            system: { disposition: "capture", audience: { ...EMPTY_AUDIENCE } },
-            tools: { disposition: "capture", audience: { ...EMPTY_AUDIENCE } },
-          },
-          pii: { level: "strict", entities: [] },
-        }),
-        isCurrentProjectScope: true,
+  describe("when a previously-set field is reverted to inherit", () => {
+    /** @scenario Reverting a field to Inherit removes it from the rule */
+    it("drops that field from the rebuilt config", () => {
+      const original = build({
+        dispositions: {
+          ...inheritDispositions,
+          input: "drop",
+          output: "capture",
+        },
+      });
+      const state = configToFormState(original);
+
+      const reverted = buildRuleConfig({
+        ...state,
+        dispositions: { ...state.dispositions, input: "inherit" },
       });
 
-      expect(state.dispositions.input).toBe("drop");
-      expect(state.dispositions.output).toBe("restrict");
-      expect(state.audience.projectOwner).toBe(true);
-      expect(state.piiLevel).toBe("strict");
-      expect(state.customAttributes).toEqual([]);
+      expect(reverted.categories?.input).toBeUndefined();
+      expect(reverted.categories?.output).toEqual({ disposition: "capture" });
     });
   });
+});
 
-  describe("given any other scope", () => {
-    it("falls back to the platform defaults", () => {
-      const state = inheritedFormState({
-        effective: resolved({ pii: { level: "strict", entities: [] } }),
-        isCurrentProjectScope: false,
-      });
+describe("inheritFormState", () => {
+  it("starts every control on inherit", () => {
+    const state = inheritFormState();
 
-      expect(state.dispositions.input).toBe("capture");
-      expect(state.piiLevel).toBe("essential");
-      expect(state.secretsEnabled).toBe(true);
+    expect(state.dispositions).toEqual({
+      input: "inherit",
+      output: "inherit",
+      system: "inherit",
+      tools: "inherit",
     });
+    expect(state.piiChoice).toBe("inherit");
+    expect(state.secretsChoice).toBe("inherit");
+    expect(state.customAttributes).toEqual([]);
+    expect(isEmptyRuleConfig(buildRuleConfig(state))).toBe(true);
+  });
+});
+
+describe("inheritedBaselineForScope", () => {
+  const team = resolved({ pii: { level: "strict", entities: [] } });
+  const org = resolved({ secrets: { enabled: false, customPatterns: [] } });
+
+  it("resolves a project to its team baseline", () => {
+    expect(
+      inheritedBaselineForScope({
+        scopeType: "PROJECT",
+        effectiveTeam: team,
+        effectiveOrganization: org,
+      }),
+    ).toBe(team);
+  });
+
+  it("resolves a team or department to the organization baseline", () => {
+    expect(
+      inheritedBaselineForScope({
+        scopeType: "TEAM",
+        effectiveTeam: team,
+        effectiveOrganization: org,
+      }),
+    ).toBe(org);
+    expect(
+      inheritedBaselineForScope({
+        scopeType: "DEPARTMENT",
+        effectiveTeam: team,
+        effectiveOrganization: org,
+      }),
+    ).toBe(org);
+  });
+
+  it("resolves an organization to the platform default", () => {
+    expect(
+      inheritedBaselineForScope({
+        scopeType: "ORGANIZATION",
+        effectiveTeam: team,
+        effectiveOrganization: org,
+      }),
+    ).toBe(PLATFORM_DEFAULT_DATA_PRIVACY);
   });
 });
 
@@ -351,29 +397,8 @@ describe("ruleSummary", () => {
     );
   });
 
-  it("reads PII redaction without a level prefix, and Strict when strict", () => {
-    expect(ruleSummary({ pii: { level: "essential" } })).toBe("PII redaction");
-    expect(ruleSummary({ pii: { level: "strict" } })).toBe(
-      "Strict PII redaction",
-    );
-    expect(ruleSummary({ secrets: { enabled: true } })).toBe(
-      "Secrets redaction",
-    );
-  });
-
-  it("reads a custom level as the count of selected identifiers", () => {
-    expect(
-      ruleSummary({
-        pii: { level: "custom", entities: ["EMAIL_ADDRESS", "BR_CPF"] },
-      }),
-    ).toBe("Custom PII (2 types)");
-    expect(
-      ruleSummary({ pii: { level: "custom", entities: ["BR_CPF"] } }),
-    ).toBe("Custom PII (1 type)");
-  });
-
-  it("reads as no changes for an empty config", () => {
-    expect(ruleSummary({})).toBe("No changes");
+  it("reads as inherits everything for an empty config", () => {
+    expect(ruleSummary({})).toBe("Inherits everything");
   });
 });
 
@@ -393,18 +418,6 @@ describe("audience selection", () => {
         "group:security",
       ]);
       expect(widened).toEqual(["group:security"]);
-    });
-
-    it("keeps any combination of narrower groups", () => {
-      const next = applyAudienceSelection(
-        ["projectOwner"],
-        ["projectOwner", ROLE_VALUES.admins, "group:auditors"],
-      );
-      expect(next).toEqual([
-        "projectOwner",
-        ROLE_VALUES.admins,
-        "group:auditors",
-      ]);
     });
   });
 
