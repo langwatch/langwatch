@@ -265,7 +265,7 @@ const evaluateBodySchema = z
         "Constant entry inputs applied to every row, e.g. a feature flag or PR number",
       ),
     row_indices: z
-      .array(z.number())
+      .array(z.number().int().nonnegative())
       .optional()
       .describe("Subset of dataset row indices to evaluate"),
   })

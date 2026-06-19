@@ -194,11 +194,21 @@ export const applyParametersToRows = ({
   }
 
   const existingNames = new Set(columns.map((c) => c.name));
+  const parameterColumnType = (value: string | number | boolean): string =>
+    typeof value === "number"
+      ? "number"
+      : typeof value === "boolean"
+        ? "boolean"
+        : "string";
   const columnsWithParameters = [
     ...columns,
-    ...Object.keys(parameters)
-      .filter((key) => !existingNames.has(key))
-      .map((key) => ({ id: key, name: key, type: "string" })),
+    ...Object.entries(parameters)
+      .filter(([key]) => !existingNames.has(key))
+      .map(([key, value]) => ({
+        id: key,
+        name: key,
+        type: parameterColumnType(value),
+      })),
   ];
 
   // With no rows, the parameters themselves form a single synthetic row.
@@ -329,7 +339,9 @@ export const loadExecutionData = async (
     ).map((c) => ({ id: c.name, name: c.name, type: c.type }));
     const jsonColumnKeys = new Set(
       columns
-        .filter((c) => JSON_COLUMN_TYPES.includes(c.type as any))
+        .filter((c) =>
+          (JSON_COLUMN_TYPES as readonly string[]).includes(c.type),
+        )
         .map((c) => c.name),
     );
     baseDataset = {

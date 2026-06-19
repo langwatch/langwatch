@@ -131,7 +131,7 @@ export const executionRequestSchema = z
       .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
       .optional(),
     /** Subset of dataset row indices to evaluate. */
-    row_indices: z.array(z.number()).optional(),
+    row_indices: z.array(z.number().int().nonnegative()).optional(),
   })
   .refine((req) => !(req.data && req.dataset_id), {
     message: "Pass either inline data or a dataset_id, not both",
@@ -151,7 +151,7 @@ export const runInputsBodySchema = z
     parameters: z
       .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
       .optional(),
-    row_indices: z.array(z.number()).optional(),
+    row_indices: z.array(z.number().int().nonnegative()).optional(),
   })
   .refine((b) => !(b.data && b.dataset_id), {
     message: "Pass either inline data or a dataset_id, not both",
