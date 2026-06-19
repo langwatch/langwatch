@@ -295,12 +295,12 @@ export const monitorsRouter = createTRPCRouter({
         if (newEvaluatorId) {
           await prisma.evaluator
             .deleteMany({ where: { id: newEvaluatorId, projectId } })
-            .catch(() => {});
+            .catch(() => undefined);
         }
         if (newWorkflowId) {
           await prisma.workflow
             .deleteMany({ where: { id: newWorkflowId, projectId } })
-            .catch(() => {});
+            .catch(() => undefined);
         }
         throw createError;
       }

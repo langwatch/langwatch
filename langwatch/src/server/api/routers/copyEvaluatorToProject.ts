@@ -1,4 +1,4 @@
-import { type PrismaClient, Prisma } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import type { Session } from "~/server/auth";
@@ -81,7 +81,7 @@ async function copyWorkflowForEvaluator(
     // scope — a bare { id } delete is rejected and the rollback silently no-ops.
     await ctx.prisma.workflow
       .deleteMany({ where: { id: workflowId, projectId: targetProjectId } })
-      .catch(() => {});
+      .catch(() => undefined);
     throw saveError;
   }
 
@@ -136,8 +136,10 @@ export async function copyEvaluatorToProject({
   } catch (createError) {
     if (newWorkflowId) {
       await ctx.prisma.workflow
-        .deleteMany({ where: { id: newWorkflowId, projectId: targetProjectId } })
-        .catch(() => {});
+        .deleteMany({
+          where: { id: newWorkflowId, projectId: targetProjectId },
+        })
+        .catch(() => undefined);
     }
     throw createError;
   }
