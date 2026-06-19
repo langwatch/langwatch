@@ -57,7 +57,7 @@ They **cannot** do the following; each blocked action opens a "Feature Not Avail
 - Open the **Trace Details** or **Sequence** debugging tabs, or use the "View Trace" hover action.
 - **Export** traces, or **add** them to a dataset or annotation queue.
 - **Create, edit, or delete** scenarios, evaluations, experiments, prompts, or datasets.
-- Delete other users' annotations, or manage scoring metrics.
+- Delete annotations, or manage scoring metrics.
 - Save edits on the settings pages.
 
 The boundary is enforced server-side as well: a mutation that slips past the UI returns an `UNAUTHORIZED` error and re-opens the modal, so it holds for direct API calls too.
