@@ -70,6 +70,14 @@ const routes: RouteObject[] = [
   // Auth (public)
   { path: "/auth/signin", ...page(() => import("./pages/auth/signin")) },
   { path: "/auth/signup", ...page(() => import("./pages/auth/signup")) },
+  {
+    path: "/auth/forgot-password",
+    ...page(() => import("./pages/auth/forgot-password")),
+  },
+  {
+    path: "/auth/reset-password",
+    ...page(() => import("./pages/auth/reset-password")),
+  },
   { path: "/auth/error", ...page(() => import("./pages/auth/error")) },
 
   // Top-level pages

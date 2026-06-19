@@ -1,7 +1,14 @@
 import { useRouter } from "~/utils/compat/next-router";
 import { useSession } from "~/utils/auth-client";
 
-export const publicRoutes = ["/share/[id]", "/auth/signin", "/auth/signup", "/auth/error"];
+export const publicRoutes = [
+  "/share/[id]",
+  "/auth/signin",
+  "/auth/signup",
+  "/auth/forgot-password",
+  "/auth/reset-password",
+  "/auth/error",
+];
 
 /**
  * Routes that REQUIRE authentication but should NOT be subject to the

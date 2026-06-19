@@ -7,7 +7,7 @@ LangWatch integrates with several third-party services for notifications, error 
 
 ## Email (SendGrid)
 
-Email is used for alerts, team invitations, and system notifications.
+Email is used for alerts, team invitations, password resets, and system notifications. In `NEXTAUTH_PROVIDER="email"` mode, the sign-in screen's "Forgot password?" link sends the reset email through this same provider, so configuring it here is what enables self-service password recovery.
 
 ### Helm Configuration
 
