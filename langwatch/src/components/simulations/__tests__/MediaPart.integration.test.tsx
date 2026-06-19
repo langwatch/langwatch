@@ -22,16 +22,22 @@ type HeadByIdProbeResult =
   | { status: "missing"; mediaType: string }
   | { status: "not_found" };
 
-const mockHeadByIdData = vi.fn(() => undefined as undefined | HeadByIdProbeResult);
+const mockHeadByIdData = vi.fn(
+  () => undefined as undefined | HeadByIdProbeResult,
+);
+
+// Records every input the component passes to the existence probe. The probe
+// input is rebuilt on each render with the stored-object id extracted from the
+// media URL, so these capture how the id is parsed out of the URL — including
+// the project-scoped `/api/files/<projectId>/<id>` shape (issue #4947).
+const headByIdInputs: Array<{ projectId: string; id: string }> = [];
 
 vi.mock("~/utils/api", () => ({
   api: {
     storedObjects: {
       headById: {
-        useQuery: (
-          _input: unknown,
-          opts: { enabled?: boolean } | undefined,
-        ) => {
+        useQuery: (input: unknown, opts: { enabled?: boolean } | undefined) => {
+          headByIdInputs.push(input as { projectId: string; id: string });
           // Only return data when the query is enabled (i.e. after an error event).
           if (!opts?.enabled) return { data: undefined };
           return { data: mockHeadByIdData() };
@@ -57,6 +63,7 @@ describe("<MediaPart/>", () => {
     mockHeadByIdData.mockReset();
     // Default: no data (probe not yet completed)
     mockHeadByIdData.mockReturnValue(undefined);
+    headByIdInputs.length = 0;
   });
 
   describe("when a message has a url-shape audio part", () => {
@@ -130,6 +137,59 @@ describe("<MediaPart/>", () => {
     });
   });
 
+  describe("when the url carries a project-id segment (#4947)", () => {
+    it("probes with the id from the final path segment, not the project segment", () => {
+      // The project segment ("owner_proj") is deliberately DIFFERENT from the
+      // component's projectId prop, so this proves the extracted id is the
+      // URL's final segment — not the project segment, and not the prop echoed
+      // back. A parser that returned the first segment would yield "owner_proj"
+      // and fail the assertion.
+      render(
+        <MediaPart
+          projectId={TEST_PROJECT_ID}
+          part={{
+            type: "image",
+            source: {
+              type: "url",
+              value: "/api/files/owner_proj/so_scoped_id",
+              mimeType: "image/png",
+            },
+          }}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(headByIdInputs.at(-1)).toEqual({
+        projectId: TEST_PROJECT_ID,
+        id: "so_scoped_id",
+      });
+    });
+  });
+
+  describe("when the url is the legacy id-only shape", () => {
+    it("probes with the id from the single path segment", () => {
+      render(
+        <MediaPart
+          projectId={TEST_PROJECT_ID}
+          part={{
+            type: "image",
+            source: {
+              type: "url",
+              value: "/api/files/so_legacy_id",
+              mimeType: "image/png",
+            },
+          }}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(headByIdInputs.at(-1)).toEqual({
+        projectId: TEST_PROJECT_ID,
+        id: "so_legacy_id",
+      });
+    });
+  });
+
   describe("when a message has an inline-data audio part (legacy)", () => {
     /** @scenario "Trace timeline still renders legacy inline base64 file shapes unchanged" */
     it("renders an <audio> element with a data: URI", () => {
@@ -183,7 +243,10 @@ describe("<MediaPart/>", () => {
   describe("when the tRPC probe returns status: 'missing' (row exists, blob gone)", () => {
     /** @scenario "Trace timeline shows a missing badge when the byte content is no longer retrievable" */
     it("renders a missing-badge placeholder labeled with the mediaType", async () => {
-      mockHeadByIdData.mockReturnValue({ status: "missing", mediaType: "audio/mp3" });
+      mockHeadByIdData.mockReturnValue({
+        status: "missing",
+        mediaType: "audio/mp3",
+      });
 
       render(
         <MediaPart
@@ -209,8 +272,12 @@ describe("<MediaPart/>", () => {
         expect(screen.getByTestId("media-part-missing")).toBeInTheDocument();
       });
 
-      expect(screen.getByTestId("media-part-missing")).toHaveTextContent("audio");
-      expect(screen.getByTestId("media-part-missing")).toHaveTextContent("missing");
+      expect(screen.getByTestId("media-part-missing")).toHaveTextContent(
+        "audio",
+      );
+      expect(screen.getByTestId("media-part-missing")).toHaveTextContent(
+        "missing",
+      );
     });
   });
 
@@ -250,7 +317,10 @@ describe("<MediaPart/>", () => {
       // Row exists AND storage confirms bytes are present, but the browser
       // element still errored — transient decode / network failure. MediaPart
       // should land on "error", not "missing".
-      mockHeadByIdData.mockReturnValue({ status: "available", mediaType: "audio/mp3" });
+      mockHeadByIdData.mockReturnValue({
+        status: "available",
+        mediaType: "audio/mp3",
+      });
 
       render(
         <MediaPart
@@ -277,7 +347,9 @@ describe("<MediaPart/>", () => {
       expect(screen.getByTestId("media-part-error")).toHaveTextContent("audio");
       expect(screen.getByTestId("media-part-error")).toHaveTextContent("error");
       // The "missing" placeholder must NOT be shown — that's a different state.
-      expect(screen.queryByTestId("media-part-missing")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("media-part-missing"),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -328,7 +400,9 @@ describe("<MediaPart/>", () => {
       expect(audio).toHaveAttribute("controls");
 
       // The "missing" / "error" placeholders must NOT appear.
-      expect(screen.queryByTestId("media-part-missing")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("media-part-missing"),
+      ).not.toBeInTheDocument();
       expect(screen.queryByTestId("media-part-error")).not.toBeInTheDocument();
     });
   });

@@ -222,6 +222,7 @@ export class TraceService {
           projectId,
           [traceId],
           protections,
+          undefined,
           { resolveBlobs: opts?.full },
         );
         if (traces === null) {
@@ -273,6 +274,7 @@ export class TraceService {
             projectId,
             [candidates[0]!],
             protections,
+            undefined,
             { resolveBlobs: opts?.full },
           );
           return resolved?.[0];
@@ -289,6 +291,9 @@ export class TraceService {
    * @param projectId - The project ID
    * @param traceIds - Array of trace IDs to fetch
    * @param protections - Field redaction protections
+   * @param occurredAt - Optional approximate trace time range (epoch ms). When
+   *   supplied, the trace_summaries read prunes to the matching weekly
+   *   partitions instead of scanning every partition (incl. cold S3).
    * @param opts.full - When true AND blob-resolution deps are present, resolves
    *   offloaded eventref pointers from event_log so over-threshold IO values
    *   read back full (#4888). Default (undefined/false) returns previews.
@@ -298,6 +303,7 @@ export class TraceService {
     projectId: string,
     traceIds: string[],
     protections: Protections,
+    occurredAt?: { from: number; to: number },
     opts?: { full?: boolean },
   ): Promise<Trace[]> {
     return this.tracer.withActiveSpan(
@@ -312,6 +318,7 @@ export class TraceService {
           projectId,
           traceIds,
           protections,
+          occurredAt,
           { resolveBlobs: opts?.full },
         );
         if (traces === null) {

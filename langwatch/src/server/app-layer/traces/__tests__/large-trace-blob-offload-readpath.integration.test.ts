@@ -47,39 +47,37 @@
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
+import { BlobStore } from "~/server/app-layer/traces/blob-store.service";
+import {
+  EVENTREF_ATTR_PREFIX,
+  IO_PREVIEW_BYTES,
+  leanForProjection,
+} from "~/server/app-layer/traces/lean-for-projection";
+import { NullSpanStorageRepository } from "~/server/app-layer/traces/repositories/span-storage.repository";
+import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
+import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
+import type { Event } from "~/server/event-sourcing";
 import {
   getTestClickHouseClient,
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { generateTestTenantId } from "~/server/event-sourcing/__tests__/integration/testHelpers";
-
-import { BlobStore } from "~/server/app-layer/traces/blob-store.service";
-import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import {
-  leanForProjection,
-  EVENTREF_ATTR_PREFIX,
-  IO_PREVIEW_BYTES,
-} from "~/server/app-layer/traces/lean-for-projection";
-import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
-import { NullSpanStorageRepository } from "~/server/app-layer/traces/repositories/span-storage.repository";
+  LOG_RECORD_RECEIVED_EVENT_TYPE,
+  LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST,
+  SPAN_RECEIVED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_VERSION_LATEST,
+} from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+import {
+  type NormalizedSpan,
+  NormalizedSpanKind,
+  NormalizedStatusCode,
+} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import {
   resolveOffloadedTraces,
   type WarnLogger,
 } from "~/server/traces/resolve-offloaded-traces";
-import {
-  NormalizedSpanKind,
-  NormalizedStatusCode,
-  type NormalizedSpan,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
-import type { Event } from "~/server/event-sourcing";
-import {
-  SPAN_RECEIVED_EVENT_TYPE,
-  SPAN_RECEIVED_EVENT_VERSION_LATEST,
-  LOG_RECORD_RECEIVED_EVENT_TYPE,
-  LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 
 // Gate identically to the canonical event_log integration test: skip when no
 // real ClickHouse is reachable, run against the testcontainer otherwise.
@@ -190,8 +188,16 @@ function makeSpanReceivedEvent({
         startTimeUnixNano: String(now * 1_000_000),
         endTimeUnixNano: String((now + 1000) * 1_000_000),
         attributes: [
+          // langwatch.input MUST stay first: the offloaded IO field.
           { key: "langwatch.input", value: { stringValue: inputValue } },
-        ],
+          // Mixed-type siblings (#4888): real OTLP spans carry non-string
+          // AnyValue attributes. These must NOT be IO keys and carry NO
+          // eventref — they exist to prove the real CH round-trip would catch a
+          // regression where a non-string sibling fails the whole-array parse.
+          { key: "gen_ai.usage.input_tokens", value: { intValue: "100" } },
+          { key: "gen_ai.request.temperature", value: { doubleValue: 0.7 } },
+          { key: "langwatch.streaming", value: { boolValue: true } },
+        ] as never,
         events: [],
         links: [],
         status: { code: 1, message: null },
@@ -337,7 +343,9 @@ describe.skipIf(!hasTestcontainers)(
       await startTestContainers();
       client = getTestClickHouseClient()!;
       if (!client) {
-        throw new Error("ClickHouse client not available; testcontainers required.");
+        throw new Error(
+          "ClickHouse client not available; testcontainers required.",
+        );
       }
     });
 
@@ -560,9 +568,9 @@ describe.skipIf(!hasTestcontainers)(
           string,
           string
         >;
-        expect(resolvedAttrs["body"]).toBe(LARGE_VALUE);
-        expect(resolvedAttrs["body"]).toContain(UNIQUE_TAIL);
-        expect(resolvedAttrs["body"]!.length).toBe(LARGE_VALUE.length);
+        expect(resolvedAttrs.body).toBe(LARGE_VALUE);
+        expect(resolvedAttrs.body).toContain(UNIQUE_TAIL);
+        expect(resolvedAttrs.body!.length).toBe(LARGE_VALUE.length);
 
         // eventref stripped; resolution succeeded.
         const hasRef = Object.keys(resolvedAttrs).some((k) =>

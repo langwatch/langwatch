@@ -30,6 +30,39 @@ export interface ClickHouseEvaluationRunRow {
 }
 
 /**
+ * evaluation_runs columns that back {@link ClickHouseEvaluationRunRow}, minus the
+ * heavy `Inputs` payload. Keep in sync with the interface above. Reading these
+ * explicitly avoids `SELECT *`, which also pulls columns no reader consumes
+ * (ErrorDetails, CostId, ArchivedAt, CreatedAt) — and, on the deduped read path,
+ * pulls them across every version before the IN-tuple discards the stale ones.
+ */
+export const EVALUATION_RUN_COLUMNS_LIGHT = [
+  "ProjectionId",
+  "TenantId",
+  "EvaluationId",
+  "Version",
+  "EvaluatorId",
+  "EvaluatorType",
+  "EvaluatorName",
+  "TraceId",
+  "IsGuardrail",
+  "Status",
+  "Score",
+  "Passed",
+  "Label",
+  "Details",
+  "Error",
+  "ScheduledAt",
+  "StartedAt",
+  "CompletedAt",
+  "LastProcessedEventId",
+  "UpdatedAt",
+].join(", ");
+
+/** Light columns plus the heavy `Inputs` payload. */
+export const EVALUATION_RUN_COLUMNS_WITH_INPUTS = `${EVALUATION_RUN_COLUMNS_LIGHT}, Inputs`;
+
+/**
  * Maps a ClickHouse evaluation_runs row to the canonical TraceEvaluation type.
  *
  * @param record - A row from the evaluation_runs table

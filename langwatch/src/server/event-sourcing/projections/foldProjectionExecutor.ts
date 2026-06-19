@@ -6,6 +6,19 @@ import type { ProjectionStoreContext } from "./projectionStoreContext";
 const logger = createLogger("langwatch:event-sourcing:fold-executor");
 
 /**
+ * Returns a context carrying the event's occurredAt as a store read hint, or
+ * the original context unchanged when the event has no usable occurredAt.
+ */
+function withOccurredAtHint(
+  context: ProjectionStoreContext,
+  event: Event,
+): ProjectionStoreContext {
+  const occurredAt = (event as Record<string, unknown>).occurredAt;
+  if (typeof occurredAt !== "number" || occurredAt <= 0) return context;
+  return { ...context, occurredAtMs: occurredAt };
+}
+
+/**
  * Executes a fold projection incrementally by applying a single event to existing state.
  *
  * Flow:
@@ -30,10 +43,18 @@ export class FoldProjectionExecutor {
     }
 
     const key = context.key ?? context.aggregateId;
-    let state = await projection.store.get(key, context) ?? projection.init();
+    // Pass the event's occurredAt so a time-partitioned store (e.g. the trace
+    // summary store) can prune its backing-table read to a window around this
+    // time instead of scanning every partition. Best-effort: the store falls
+    // back to an unbounded read when the hint misses.
+    const loadContext = withOccurredAtHint(context, event);
+    let state =
+      (await projection.store.get(key, loadContext)) ?? projection.init();
 
     // Capture the highest occurredAt before applying the new event.
-    const prevLastOccurred = (state as Record<string, unknown>)[projection.LastEventOccurredAtKey] ?? 0;
+    const prevLastOccurred =
+      (state as Record<string, unknown>)[projection.LastEventOccurredAtKey] ??
+      0;
 
     state = projection.apply(state, event);
 
@@ -60,6 +81,8 @@ export class FoldProjectionExecutor {
       const allEvents = await projection.eventLoader({
         tenantId: context.tenantId,
         aggregateId: context.aggregateId,
+        occurredAtMs:
+          typeof eventOccurredAt === "number" ? eventOccurredAt : undefined,
       });
 
       logger.info(
@@ -102,7 +125,9 @@ export class FoldProjectionExecutor {
     events: E[],
     context: ProjectionStoreContext,
   ): Promise<State> {
-    const matching = events.filter((event) => this.matchesEventTypes(projection, event));
+    const matching = events.filter((event) =>
+      this.matchesEventTypes(projection, event),
+    );
     if (matching.length === 0) {
       return projection.init();
     }
@@ -119,11 +144,19 @@ export class FoldProjectionExecutor {
     );
 
     const key = context.key ?? context.aggregateId;
-    let state = (await projection.store.get(key, context)) ?? projection.init();
+    // Hint the store with one event's occurredAt (any event in the batch is for
+    // the same aggregate, so it anchors the same partition window).
+    const loadContext = ordered[0]
+      ? withOccurredAtHint(context, ordered[0])
+      : context;
+    let state =
+      (await projection.store.get(key, loadContext)) ?? projection.init();
 
     const prevLastOccurred =
-      (state as Record<string, unknown>)[projection.LastEventOccurredAtKey] ?? 0;
-    const earliestOccurredAt = (ordered[0] as Record<string, unknown>).occurredAt;
+      (state as Record<string, unknown>)[projection.LastEventOccurredAtKey] ??
+      0;
+    const earliestOccurredAt = (ordered[0] as Record<string, unknown>)
+      .occurredAt;
 
     // Out-of-order vs the persisted checkpoint: the batch starts earlier than
     // what we've already folded. Re-fold from scratch when we can load the full
@@ -139,6 +172,10 @@ export class FoldProjectionExecutor {
       const allEvents = await projection.eventLoader({
         tenantId: context.tenantId,
         aggregateId: context.aggregateId,
+        occurredAtMs:
+          typeof earliestOccurredAt === "number"
+            ? earliestOccurredAt
+            : undefined,
       });
       logger.info(
         {
@@ -172,10 +209,17 @@ export class FoldProjectionExecutor {
     return state;
   }
 
+  /**
+   * Whether the projection cares about this event. An empty `eventTypes` list
+   * means the projection subscribes to every event type.
+   */
   private matchesEventTypes<State, E extends Event>(
     projection: FoldProjectionDefinition<State, E>,
     event: E,
   ): boolean {
-    return projection.eventTypes.length === 0 || projection.eventTypes.includes(event.type);
+    return (
+      projection.eventTypes.length === 0 ||
+      projection.eventTypes.includes(event.type)
+    );
   }
 }

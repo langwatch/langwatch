@@ -305,6 +305,7 @@ describe("TraceService — AC1: getTracesWithSpans with full=true resolves from 
           PROJECT_ID_A,
           [TRACE_ID],
           protections,
+          undefined,
           {
             full: true,
           },
@@ -320,6 +321,7 @@ describe("TraceService — AC1: getTracesWithSpans with full=true resolves from 
           PROJECT_ID_A,
           [TRACE_ID],
           protections,
+          undefined,
           { full: true },
         );
 
@@ -398,9 +400,15 @@ describe("TraceService — AC2: getTracesWithSpans without full resolves nothing
     it("BlobStore.getFromEventLog is called 0 times", async () => {
       setupGetTracesWithSpansMocks();
 
-      await service.getTracesWithSpans(PROJECT_ID_A, [TRACE_ID], protections, {
-        full: false,
-      });
+      await service.getTracesWithSpans(
+        PROJECT_ID_A,
+        [TRACE_ID],
+        protections,
+        undefined,
+        {
+          full: false,
+        },
+      );
 
       expect(blobStore.getFromEventLog).toHaveBeenCalledTimes(0);
     });
@@ -422,6 +430,7 @@ describe("TraceService — AC2: a service constructed without blobResolutionDeps
           PROJECT_ID_A,
           [TRACE_ID],
           protections,
+          undefined,
           { full: true },
         );
 
@@ -571,6 +580,7 @@ describe("ClickHouseTraceService — #4888 full resolution crosses the mapper", 
           PROJECT_ID_CH,
           [TRACE_ID_CH],
           protections,
+          undefined,
           {
             resolveBlobs: true,
           },
@@ -590,6 +600,7 @@ describe("ClickHouseTraceService — #4888 full resolution crosses the mapper", 
           PROJECT_ID_CH,
           [TRACE_ID_CH],
           protections,
+          undefined,
           { resolveBlobs: true },
         );
 
@@ -610,6 +621,7 @@ describe("ClickHouseTraceService — #4888 full resolution crosses the mapper", 
           PROJECT_ID_CH,
           [TRACE_ID_CH],
           protections,
+          undefined,
           { resolveBlobs: true },
         );
 
@@ -631,6 +643,7 @@ describe("ClickHouseTraceService — #4888 full resolution crosses the mapper", 
           PROJECT_ID_CH,
           [TRACE_ID_CH],
           protections,
+          undefined,
           { resolveBlobs: true },
         );
 
@@ -651,6 +664,7 @@ describe("ClickHouseTraceService — #4888 full resolution crosses the mapper", 
           PROJECT_ID_CH,
           [TRACE_ID_CH],
           protections,
+          undefined,
           { resolveBlobs: true },
         );
 
@@ -680,6 +694,7 @@ describe("ClickHouseTraceService — #4888 full resolution crosses the mapper", 
           PROJECT_ID_CH,
           [TRACE_ID_CH],
           protections,
+          undefined,
           { resolveBlobs: true },
         );
 
@@ -697,6 +712,7 @@ describe("ClickHouseTraceService — #4888 full resolution crosses the mapper", 
           PROJECT_ID_CH,
           [TRACE_ID_CH],
           protections,
+          undefined,
           { resolveBlobs: true },
         );
 
@@ -717,6 +733,7 @@ describe("ClickHouseTraceService — #4888 full resolution crosses the mapper", 
           PROJECT_ID_CH,
           [TRACE_ID_CH],
           protections,
+          undefined,
           { resolveBlobs: true },
         );
 
@@ -736,6 +753,7 @@ describe("ClickHouseTraceService — #4888 full resolution crosses the mapper", 
           PROJECT_ID_CH,
           [TRACE_ID_CH],
           protections,
+          undefined,
           {
             resolveBlobs: false,
           },
@@ -755,6 +773,7 @@ describe("ClickHouseTraceService — #4888 full resolution crosses the mapper", 
           PROJECT_ID_CH,
           [TRACE_ID_CH],
           protections,
+          undefined,
           { resolveBlobs: false },
         );
 

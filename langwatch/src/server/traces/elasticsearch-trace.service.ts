@@ -95,12 +95,15 @@ export class ElasticsearchTraceService {
    * @param projectId - The project ID
    * @param traceIds - Array of trace IDs to fetch
    * @param protections - Field redaction protections
+   * @param _occurredAt - Accepted for parity with the ClickHouse backend (which
+   *   uses it as a partition-pruning hint); Elasticsearch ignores it.
    * @returns Array of Trace objects with spans
    */
   async getTracesWithSpans(
     projectId: string,
     traceIds: string[],
     protections: Protections,
+    _occurredAt?: { from: number; to: number },
   ): Promise<Trace[]> {
     const traces = await searchTraces({
       connConfig: { projectId },

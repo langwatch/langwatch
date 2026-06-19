@@ -80,10 +80,28 @@ export class BlobFieldNotFoundError extends Error {
 /** ClickHouse query response row from the event_log SELECT. */
 const eventLogRowSchema = z.object({ EventPayload: z.string() });
 
-/** Span attribute entry inside EventPayload. */
+/**
+ * Span attribute entry inside EventPayload.
+ *
+ * EventPayload stores RAW OTLP spans (`EventPayload` IS `event.data`), whose
+ * attribute `value` is an OTLP `AnyValue` oneof —
+ * `stringValue | intValue | boolValue | doubleValue | arrayValue | kvlistValue |
+ * bytesValue` (see schemas/otlp.ts). The read path only ever needs the offloaded
+ * IO fields, which are stored as `stringValue`, so this schema reads ONLY
+ * `stringValue` and leaves it optional.
+ *
+ * Critically, `span.attributes` is parsed PER-ELEMENT and defensively (see the
+ * extraction loop in `getFromEventLog`): a single non-string or malformed
+ * sibling attribute can never fail the whole-array parse and mask the offloaded
+ * field. The old strict shape `value: { stringValue: z.string() }` rejected
+ * EVERY real span that carried a numeric/boolean attribute (e.g.
+ * `gen_ai.usage.input_tokens` = `{ intValue: "100" }`), which failed
+ * `z.array(...)`, failed `eventPayloadSchema.safeParse`, and degraded every
+ * > 64 KB read to the 64 KB preview (#4888).
+ */
 const spanAttributeSchema = z.object({
   key: z.string(),
-  value: z.object({ stringValue: z.string() }),
+  value: z.object({ stringValue: z.string().optional() }),
 });
 
 /**
@@ -94,11 +112,16 @@ const spanAttributeSchema = z.object({
  * with the span at the TOP level — there is NO outer `data` wrapper. Log-record events
  * instead carry the (full) log body at the top-level `body`, which `leanForProjection`
  * tags with an eventref whose field is `"body"` (resolved by `getFromEventLog`).
+ *
+ * `span.attributes` is modeled as `z.array(z.unknown())` so a single malformed
+ * or non-string sibling attribute can never fail the whole-array parse; each
+ * entry is validated per-element by `spanAttributeSchema` in the extraction loop
+ * below (#4888).
  */
 const eventPayloadSchema = z.object({
   span: z
     .object({
-      attributes: z.array(spanAttributeSchema),
+      attributes: z.array(z.unknown()),
     })
     .optional(),
   body: z.string().optional(),
@@ -291,18 +314,24 @@ export class BlobStore {
       return body;
     }
 
-    // Span attributes: extract by field name (the attribute key).
+    // Span attributes: extract by field name (the attribute key). EventPayload
+    // holds raw OTLP attributes of mixed value types — parse each entry
+    // defensively so a single non-string / malformed sibling attribute can
+    // never mask the offloaded IO field (#4888).
     const spanAttributes = payloadParse.data.span?.attributes;
     if (!spanAttributes || spanAttributes.length === 0) {
       throw new BlobFieldNotFoundError(eventId, field);
     }
 
-    const attr = spanAttributes.find((a) => a.key === field);
-    if (!attr) {
-      throw new BlobFieldNotFoundError(eventId, field);
+    for (const raw of spanAttributes) {
+      const attr = spanAttributeSchema.safeParse(raw);
+      if (!attr.success || attr.data.key !== field) continue;
+      if (typeof attr.data.value.stringValue === "string") {
+        return attr.data.value.stringValue;
+      }
     }
 
-    return attr.value.stringValue;
+    throw new BlobFieldNotFoundError(eventId, field);
   }
 
   /**

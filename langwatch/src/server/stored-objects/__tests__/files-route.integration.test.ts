@@ -2,13 +2,17 @@
  * @vitest-environment node
  * @integration
  *
- * Integration tests for the GET /api/files/:id route.
+ * Integration tests for the GET /api/files route (legacy id-only and the
+ * project-scoped /api/files/:projectId/:id form added in #4947).
  *
  * Covers:
  *  - Case 5: GET an existing row with backing storage → 200 + bytes streamed
  *  - Case 6: GET a row whose storage URI is missing → 404 { status: "missing" }
  *  - Case 7: GET a row id that does not exist in CH → 404 { status: "not_found" }
  *  - 403: caller authenticated for a different project → 403 forbidden
+ *  - #4947: project-scoped URL reads via the URL's project (no cross-tenant
+ *    lookup); a URL scoped to project A cannot serve project B's object
+ *    (404 under own scope, 403 for a foreign claim with no existence oracle)
  *
  * Strategy:
  *  - The files route calls `createStoredObjectsService` which calls
@@ -17,11 +21,20 @@
  *    be stubbed per case without needing a live ClickHouse.
  *  - Real Prisma projects are created so the authMiddleware resolves API keys.
  */
-import { nanoid } from "nanoid";
+
 import { Readable } from "node:stream";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { prisma } from "~/server/db";
+import { nanoid } from "nanoid";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { projectFactory } from "~/factories/project.factory";
+import { prisma } from "~/server/db";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks
@@ -85,12 +98,11 @@ vi.mock("~/utils/logger/server", () => ({
 // Tracer pass-through
 vi.mock("langwatch", () => ({
   getLangWatchTracer: () => ({
-    withActiveSpan: (
-      _name: string,
-      ...args: unknown[]
-    ) => {
+    withActiveSpan: (_name: string, ...args: unknown[]) => {
       const fn = args.length === 1 ? args[0] : args[1];
-      const span: { setAttribute: ReturnType<typeof vi.fn> } = { setAttribute: vi.fn() };
+      const span: { setAttribute: ReturnType<typeof vi.fn> } = {
+        setAttribute: vi.fn(),
+      };
       return (fn as (s: typeof span) => Promise<unknown>)(span);
     },
   }),
@@ -117,7 +129,9 @@ import type { StoredObject } from "~/server/stored-objects/stored-object";
 // ---------------------------------------------------------------------------
 
 /** Builds a minimal StoredObject row suitable for getById mock responses. */
-function makeStoredObjectRow(overrides: Partial<StoredObject> = {}): StoredObject {
+function makeStoredObjectRow(
+  overrides: Partial<StoredObject> = {},
+): StoredObject {
   return {
     id: `test-id-${nanoid(6)}`,
     project_id: "proj-test",
@@ -169,13 +183,21 @@ beforeAll(async () => {
   });
   teamId = team.id;
 
-  const projA = projectFactory.build({ slug: `--so-files-proj-a-${nanoid(6)}` });
-  const createdA = await prisma.project.create({ data: { ...projA, teamId: team.id, personalFeatures: {} } });
+  const projA = projectFactory.build({
+    slug: `--so-files-proj-a-${nanoid(6)}`,
+  });
+  const createdA = await prisma.project.create({
+    data: { ...projA, teamId: team.id, personalFeatures: {} },
+  });
   projectAKey = createdA.apiKey;
   projectAId = createdA.id;
 
-  const projB = projectFactory.build({ slug: `--so-files-proj-b-${nanoid(6)}` });
-  const createdB = await prisma.project.create({ data: { ...projB, teamId: team.id, personalFeatures: {} } });
+  const projB = projectFactory.build({
+    slug: `--so-files-proj-b-${nanoid(6)}`,
+  });
+  const createdB = await prisma.project.create({
+    data: { ...projB, teamId: team.id, personalFeatures: {} },
+  });
   projectBKey = createdB.apiKey;
   projectBId = createdB.id;
 });
@@ -202,7 +224,10 @@ afterAll(async () => {
       (error.code === "P2003" || error.code === "P2021");
     if (!knownMissingFixture) {
       // eslint-disable-next-line no-console
-      console.warn("Unexpected cleanup error in files-route integration suite:", error);
+      console.warn(
+        "Unexpected cleanup error in files-route integration suite:",
+        error,
+      );
     }
   }
 });
@@ -253,7 +278,9 @@ describe("GET /api/files/:id", () => {
 
       expect(res.status).toBe(200);
       expect(res.headers.get("Content-Type")).toBe("image/png");
-      expect(res.headers.get("Content-Length")).toBe(String(Buffer.from(content).length));
+      expect(res.headers.get("Content-Length")).toBe(
+        String(Buffer.from(content).length),
+      );
 
       const body = await res.text();
       expect(body).toBe(content);
@@ -409,7 +436,10 @@ describe("GET /api/files/:id", () => {
       });
 
       mockResolveOwnerProject.mockResolvedValueOnce({ projectId: projectAId });
-      mockGetById.mockResolvedValueOnce({ row, stream: makeReadableStream(content) });
+      mockGetById.mockResolvedValueOnce({
+        row,
+        stream: makeReadableStream(content),
+      });
 
       // Authenticate ONLY via header, no Cookie.
       const res = await app.request(`/api/files/${fileId}`, {
@@ -419,6 +449,157 @@ describe("GET /api/files/:id", () => {
       expect(res.status).toBe(200);
       const body = await res.text();
       expect(body).toBe(content);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Project-scoped route (issue #4947)
+// ---------------------------------------------------------------------------
+//
+// The project-scoped URL `/api/files/:projectId/:id` carries the owning
+// project, so the read path scopes directly to it and skips the cross-tenant
+// owner lookup. These tests pin the tenant-isolation contract: a URL scoped
+// to one project can never serve another project's object.
+describe("GET /api/files/:projectId/:id (project-scoped — #4947)", () => {
+  describe("when the URL's project matches the caller and the row exists", () => {
+    it("streams the bytes scoped to the URL's project and never runs the cross-tenant owner lookup", async () => {
+      const fileId = `stored-${nanoid(8)}`;
+      const content = "scoped-bytes";
+      const row = makeStoredObjectRow({
+        id: fileId,
+        project_id: projectAId,
+        media_type: "image/png",
+        size_bytes: Buffer.from(content).length,
+      });
+      mockGetById.mockResolvedValueOnce({
+        row,
+        stream: makeReadableStream(content),
+      });
+
+      const res = await app.request(`/api/files/${projectAId}/${fileId}`, {
+        headers: { "X-Auth-Token": projectAKey },
+      });
+
+      expect(res.status).toBe(200);
+      expect(await res.text()).toBe(content);
+      // Owner came from the URL — no cross-tenant fan-out.
+      expect(mockResolveOwnerProject).not.toHaveBeenCalled();
+      // The read was scoped to the project named in the URL.
+      expect(mockGetById).toHaveBeenCalledWith({
+        projectId: projectAId,
+        id: fileId,
+      });
+    });
+  });
+
+  describe("when a HEAD request is made for a project-scoped url", () => {
+    it("returns 200 with the length but no body, scoped to the URL's project", async () => {
+      const fileId = `stored-${nanoid(8)}`;
+      const content = "head-probe-bytes";
+      const row = makeStoredObjectRow({
+        id: fileId,
+        project_id: projectAId,
+        media_type: "image/png",
+        size_bytes: Buffer.from(content).length,
+      });
+      mockGetById.mockResolvedValueOnce({
+        row,
+        stream: makeReadableStream(content),
+      });
+
+      const res = await app.request(`/api/files/${projectAId}/${fileId}`, {
+        method: "HEAD",
+        headers: { "X-Auth-Token": projectAKey },
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("Content-Length")).toBe(
+        String(Buffer.from(content).length),
+      );
+      // HEAD must not stream a body.
+      expect(await res.text()).toBe("");
+      expect(mockResolveOwnerProject).not.toHaveBeenCalled();
+      expect(mockGetById).toHaveBeenCalledWith({
+        projectId: projectAId,
+        id: fileId,
+      });
+    });
+  });
+
+  describe("when a caller requests another project's object id under their OWN project scope", () => {
+    it("scopes the read to the URL's project and returns 404 — the other tenant's bytes are never served", async () => {
+      // The id belongs (conceptually) to project A. The caller is
+      // authenticated as project B and crafts a URL with their OWN project id
+      // but A's object id: /api/files/<B>/<A's id>. The read is scoped to B,
+      // where the row does not exist → 404. The project-scoped query
+      // (WHERE project_id = B AND id = ...) is exactly what blocks the
+      // cross-tenant read: without it (a blind WHERE id = ... lookup, as the
+      // legacy path does) the route would find A's row and stream A's bytes
+      // to B. THIS is the falsifiable tenant-isolation crux.
+      const crossTenantId = `stored-${nanoid(8)}`;
+      // B's scope has no such row.
+      mockGetById.mockResolvedValueOnce(null);
+
+      const res = await app.request(
+        `/api/files/${projectBId}/${crossTenantId}`,
+        {
+          headers: { "X-Auth-Token": projectBKey },
+        },
+      );
+
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ status: "not_found" });
+      // Proves the read used the URL's project (B), NOT a cross-tenant
+      // resolution of the true owner (A).
+      expect(mockGetById).toHaveBeenCalledWith({
+        projectId: projectBId,
+        id: crossTenantId,
+      });
+      expect(mockResolveOwnerProject).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a caller names a project other than their own in the URL", () => {
+    it("returns 403 before any storage read, regardless of whether the object exists", async () => {
+      // Caller authenticated as project B requests a URL naming project A.
+      // Authorization compares the caller (B) to the URL's claimed owner (A)
+      // and rejects BEFORE any storage read — so the response cannot
+      // distinguish "exists in A" from "absent". The 403-vs-404 cross-tenant
+      // existence oracle is closed for the new path.
+      const fileId = `stored-${nanoid(8)}`;
+
+      const res = await app.request(`/api/files/${projectAId}/${fileId}`, {
+        headers: { "X-Auth-Token": projectBKey },
+      });
+
+      expect(res.status).toBe(403);
+      expect(mockGetById).not.toHaveBeenCalled();
+      expect(mockResolveOwnerProject).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the URL's project is the caller's but storage no longer holds the blob", () => {
+    it("returns 404 with body { status: 'missing' } via the project-scoped read", async () => {
+      const fileId = `stored-${nanoid(8)}`;
+      const row = makeStoredObjectRow({ id: fileId, project_id: projectAId });
+      mockGetById.mockResolvedValueOnce({ row, status: "missing" });
+
+      const res = await app.request(`/api/files/${projectAId}/${fileId}`, {
+        headers: { "X-Auth-Token": projectAKey },
+      });
+
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ status: "missing" });
+      expect(mockResolveOwnerProject).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the caller is not authenticated", () => {
+    it("returns 401 without reading storage", async () => {
+      const res = await app.request(`/api/files/${projectAId}/some-id`);
+      expect(res.status).toBe(401);
+      expect(mockGetById).not.toHaveBeenCalled();
     });
   });
 });

@@ -29,11 +29,19 @@ export interface EventRepository {
   /**
    * Retrieves all event records for a given aggregate.
    * Returns raw records without validation or transformation.
+   *
+   * `occurredAtFromMs`, when provided, lower-bounds the scan to events with
+   * `EventOccurredAt >= occurredAtFromMs` (events with an unknown occurred time
+   * of 0 are always kept). Callers must only pass it when every event of the
+   * aggregate is guaranteed to be at or after that bound — see
+   * `rehydrationLowerBoundMs`. It is purely a partition-pruning optimisation and
+   * must never change the result set for a correctly-classified aggregate.
    */
   getEventRecords(
     tenantId: string,
     aggregateType: string,
     aggregateId: string,
+    occurredAtFromMs?: number,
   ): Promise<EventRecord[]>;
 
   /**
