@@ -6,6 +6,7 @@ import { badRequestSchema } from "~/app/api/shared/schemas";
 import { createProjectApp, requires } from "~/server/api/security";
 import { prisma } from "~/server/db";
 import {
+  EvaluationInputError,
   NoCommittedVersionError,
   WorkflowEvaluationService,
   WorkflowNotFoundError,
@@ -239,30 +240,49 @@ secured.access(requires("workflows:manage")).delete(
   },
 );
 
-const evaluateBodySchema = z.object({
-  version_id: z
-    .string()
-    .optional()
-    .describe("Committed version to evaluate; defaults to the latest commit"),
-  evaluate_on: z
-    .enum(["full", "test", "train"])
-    .optional()
-    .describe("Which dataset slice to evaluate; defaults to full"),
-  parameters: z
-    .record(z.union([z.string(), z.number(), z.boolean()]))
-    .optional()
-    .describe(
-      "Constant entry inputs applied to every row, e.g. a feature flag or PR number",
-    ),
-});
+const evaluateBodySchema = z
+  .object({
+    version_id: z
+      .string()
+      .optional()
+      .describe("Committed version to evaluate; defaults to the latest commit"),
+    data: z
+      .array(z.record(z.string(), z.unknown()))
+      .optional()
+      .describe(
+        "Inline rows to evaluate instead of the workflow's attached dataset",
+      ),
+    dataset_id: z
+      .string()
+      .optional()
+      .describe(
+        "Platform dataset id to evaluate; mutually exclusive with data",
+      ),
+    parameters: z
+      .record(z.union([z.string(), z.number(), z.boolean()]))
+      .optional()
+      .describe(
+        "Constant entry inputs applied to every row, e.g. a feature flag or PR number",
+      ),
+    row_indices: z
+      .array(z.number())
+      .optional()
+      .describe("Subset of dataset row indices to evaluate"),
+  })
+  .refine((b) => !(b.data && b.dataset_id), {
+    message: "Pass either data or a dataset_id, not both",
+    path: ["data"],
+  });
 
 secured.access(requires("workflows:manage")).post(
   "/:id/evaluate",
   describeRoute({
     description:
-      "Trigger an evaluation run of a workflow's committed version. " +
-      "Parameters bind as constant entry inputs on every dataset row; " +
-      "results land on the workflow's experiment like studio-triggered runs.",
+      "Trigger an evaluation run of a workflow's committed version through " +
+      "the evaluations pipeline. Evaluate the workflow's attached dataset, " +
+      "inline data, or a platform dataset id; parameters bind as constant " +
+      "entry inputs on every row. Returns a run id and a results URL to poll " +
+      "or open in the browser.",
     responses: {
       ...baseResponses,
       200: {
@@ -272,6 +292,7 @@ secured.access(requires("workflows:manage")).post(
             schema: resolver(
               z.object({
                 run_id: z.string(),
+                run_url: z.string(),
                 workflow_version_id: z.string(),
                 version: z.string(),
               }),
@@ -308,13 +329,17 @@ secured.access(requires("workflows:manage")).post(
         prisma,
       ).triggerEvaluation({
         projectId: project.id,
+        projectSlug: project.slug,
         workflowId: id,
         versionId: body.version_id,
-        evaluateOn: body.evaluate_on,
+        data: body.data,
+        datasetId: body.dataset_id,
         parameters: body.parameters,
+        rowIndices: body.row_indices,
       });
       return c.json({
         run_id: result.runId,
+        run_url: result.runUrl,
         workflow_version_id: result.workflowVersionId,
         version: result.version,
       });
@@ -324,6 +349,9 @@ secured.access(requires("workflows:manage")).post(
       }
       if (error instanceof NoCommittedVersionError) {
         return c.json({ error: error.message }, 400);
+      }
+      if (error instanceof EvaluationInputError) {
+        return c.json({ error: error.message }, error.status as 400 | 404);
       }
       throw error;
     }

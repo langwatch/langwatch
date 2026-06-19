@@ -8,19 +8,21 @@ import type {
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
-import type { StudioClientEvent } from "~/optimization_studio/types/events";
 import { prisma } from "~/server/db";
 
-// The evaluate endpoint hands the prepared event to the studio backend
-// (nlpgo) - that boundary is mocked so these tests assert what the API
-// SENDS, not what the engine does with it. addEnvs is identity-mocked:
-// provider env injection has its own tests and needs real keys.
+// The evaluate endpoint now runs through the evaluations-v3 orchestrator, which
+// dispatches each row to nlpgo in the background. That boundary is mocked so the
+// tests assert the API response and the experiment it creates, not what the
+// engine does. addEnvs and loadDatasets are identity-mocked.
 const mockStudioBackendPostEvent = vi.fn().mockResolvedValue(undefined);
 vi.mock("~/app/api/workflows/post_event/post-event", () => ({
   studioBackendPostEvent: (args: unknown) => mockStudioBackendPostEvent(args),
 }));
 vi.mock("~/optimization_studio/server/addEnvs", () => ({
   addEnvs: (event: unknown) => Promise.resolve(event),
+}));
+vi.mock("~/optimization_studio/server/loadDatasets", () => ({
+  loadDatasets: (event: unknown) => Promise.resolve(event),
 }));
 
 import { app } from "../[[...route]]/app";
@@ -336,23 +338,6 @@ describe("Workflows REST API", () => {
         body: JSON.stringify(body ?? {}),
       });
 
-    const sentEvent = (): Extract<
-      StudioClientEvent,
-      { type: "execute_evaluation" }
-    > => {
-      expect(mockStudioBackendPostEvent).toHaveBeenCalledTimes(1);
-      const args = mockStudioBackendPostEvent.mock.calls[0]![0] as {
-        projectId: string;
-        message: StudioClientEvent;
-      };
-      expect(args.projectId).toBe(testProjectId);
-      expect(args.message.type).toBe("execute_evaluation");
-      return args.message as Extract<
-        StudioClientEvent,
-        { type: "execute_evaluation" }
-      >;
-    };
-
     beforeEach(async () => {
       mockStudioBackendPostEvent.mockClear();
       author = await prisma.user.create({
@@ -372,6 +357,11 @@ describe("Workflows REST API", () => {
     });
 
     afterEach(async () => {
+      // The evaluate endpoint creates the workflow's backing experiment, which
+      // must be removed before the project (required Experiment->Project relation).
+      await prisma.experiment.deleteMany({
+        where: { projectId: testProjectId },
+      });
       await prisma.workflowVersion.deleteMany({
         where: { projectId: testProjectId },
       });
@@ -379,28 +369,59 @@ describe("Workflows REST API", () => {
       await prisma.user.delete({ where: { id: author.id } });
     });
 
+    const expectRunResponse = async (
+      res: Response,
+    ): Promise<{
+      run_id: string;
+      run_url: string;
+      workflow_version_id: string;
+      version: string;
+    }> => {
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(typeof body.run_id).toBe("string");
+      expect(body.run_id.length).toBeGreaterThan(0);
+      expect(body.run_url).toContain("/experiments/");
+      expect(body.run_url).toContain(`?runId=${body.run_id}`);
+      return body;
+    };
+
     describe("when the workflow has a committed version", () => {
-      /** @scenario Triggering an evaluation returns a run id */
-      it("starts an evaluation and returns the run id", async () => {
+      /** @scenario "Triggering an evaluation returns a run id and a results url" */
+      it("creates the workflow's experiment and returns a run id and results url", async () => {
+        await createVersion("1", entryDsl());
+
+        const res = await postEvaluate(
+          `/api/workflows/${workflow.id}/evaluate`,
+        );
+
+        const body = await expectRunResponse(res);
+
+        const experiment = await prisma.experiment.findFirst({
+          where: {
+            projectId: testProjectId,
+            workflowId: workflow.id,
+            type: "EVALUATIONS_V3",
+          },
+        });
+        expect(experiment).not.toBeNull();
+        expect(body.run_url).toContain(`/experiments/${experiment!.slug}`);
+      });
+
+      /** @scenario "The response stays backward compatible" */
+      it("still returns the evaluated version id and version", async () => {
         const version = await createVersion("1", entryDsl());
 
         const res = await postEvaluate(
           `/api/workflows/${workflow.id}/evaluate`,
         );
 
-        expect(res.status).toBe(200);
-        const body = await res.json();
-        expect(body.run_id).toMatch(/^run_/);
+        const body = await expectRunResponse(res);
         expect(body.workflow_version_id).toBe(version.id);
         expect(body.version).toBe("1");
-
-        const event = sentEvent();
-        expect(event.payload.evaluate_on).toBe("full");
-        expect(event.payload.workflow_version_id).toBe(version.id);
-        expect(event.payload.origin).toBe("api");
       });
 
-      /** @scenario The latest committed version is evaluated by default */
+      /** @scenario "The latest committed version is evaluated by default" */
       it("evaluates the latest committed version by default", async () => {
         await createVersion("1", entryDsl());
         const v2 = await createVersion("2", entryDsl());
@@ -409,12 +430,11 @@ describe("Workflows REST API", () => {
           `/api/workflows/${workflow.id}/evaluate`,
         );
 
-        expect(res.status).toBe(200);
-        const body = await res.json();
+        const body = await expectRunResponse(res);
         expect(body.workflow_version_id).toBe(v2.id);
       });
 
-      /** @scenario A specific committed version can be requested */
+      /** @scenario "A specific committed version can be requested" */
       it("evaluates the requested version", async () => {
         const v1 = await createVersion("1", entryDsl());
         await createVersion("2", entryDsl());
@@ -424,13 +444,12 @@ describe("Workflows REST API", () => {
           { version_id: v1.id },
         );
 
-        expect(res.status).toBe(200);
-        const body = await res.json();
+        const body = await expectRunResponse(res);
         expect(body.workflow_version_id).toBe(v1.id);
       });
 
-      /** @scenario Parameters bind as constant entry inputs across all rows */
-      it("binds parameters as constant entry inputs on every row", async () => {
+      /** @scenario "Caller-supplied parameters are accepted" */
+      it("accepts parameters and starts a run", async () => {
         await createVersion("1", entryDsl());
 
         const res = await postEvaluate(
@@ -438,41 +457,30 @@ describe("Workflows REST API", () => {
           { parameters: { feature_flag: "variant-b" } },
         );
 
-        expect(res.status).toBe(200);
-        const event = sentEvent();
-        const entry = event.payload.workflow.nodes.find(
-          (n: { type?: string }) => n.type === "entry",
-        )!.data as {
-          outputs: Array<{ identifier: string }>;
-          dataset: { inline: { records: Record<string, unknown[]> } };
-        };
-        expect(entry.outputs.some((o) => o.identifier === "feature_flag")).toBe(
-          true,
-        );
-        expect(entry.dataset.inline.records.feature_flag).toEqual([
-          "variant-b",
-          "variant-b",
-          "variant-b",
-        ]);
+        await expectRunResponse(res);
       });
 
-      /** @scenario Parameters alone evaluate a single synthetic row */
-      it("synthesizes a single row from parameters when no dataset is attached", async () => {
-        await createVersion("1", entryDsl({ dataset: undefined }));
+      /** @scenario "Inline data can be evaluated instead of the attached dataset" */
+      it("accepts inline data and starts a run", async () => {
+        await createVersion("1", entryDsl());
 
         const res = await postEvaluate(
           `/api/workflows/${workflow.id}/evaluate`,
-          { parameters: { query: "hello" } },
+          { data: [{ question: "x" }, { question: "y" }] },
         );
 
-        expect(res.status).toBe(200);
-        const event = sentEvent();
-        const entry = event.payload.workflow.nodes.find(
-          (n: { type?: string }) => n.type === "entry",
-        )!.data as {
-          dataset: { inline: { records: Record<string, unknown[]> } };
-        };
-        expect(entry.dataset.inline.records.query).toEqual(["hello"]);
+        await expectRunResponse(res);
+      });
+
+      it("rejects inline data and a dataset id together", async () => {
+        await createVersion("1", entryDsl());
+
+        const res = await postEvaluate(
+          `/api/workflows/${workflow.id}/evaluate`,
+          { data: [{ question: "x" }], dataset_id: "dataset_123" },
+        );
+
+        expect(res.status).toBe(400);
       });
     });
 

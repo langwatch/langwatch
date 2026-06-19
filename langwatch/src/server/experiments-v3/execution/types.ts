@@ -158,6 +158,27 @@ export const executionRequestSchema = z
     path: ["data"],
   });
 
+/**
+ * Optional run inputs accepted as a JSON body by the run API and the workflow
+ * evaluate endpoint: inline data, a saved dataset id, constant parameters that
+ * override every row, and a row-index subset. data and dataset_id are mutually
+ * exclusive.
+ */
+export const runInputsBodySchema = z
+  .object({
+    data: z.array(z.record(z.string(), z.unknown())).optional(),
+    dataset_id: z.string().optional(),
+    parameters: z
+      .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+      .optional(),
+    row_indices: z.array(z.number()).optional(),
+  })
+  .refine((b) => !(b.data && b.dataset_id), {
+    message: "Pass either inline data or a dataset_id, not both",
+    path: ["data"],
+  });
+export type RunInputsBody = z.infer<typeof runInputsBodySchema>;
+
 // ============================================================================
 // SSE Event Types
 // ============================================================================
