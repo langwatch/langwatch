@@ -84,7 +84,6 @@ function makeMockChClient({
   return { client, sqlCaptures, paramCaptures };
 }
 
-/** Minimal S3 resolver used for spool tests. */
 function makeS3Resolver(s3Client: {
   send: ReturnType<typeof vi.fn>;
 }): S3ClientResolver {
@@ -94,7 +93,6 @@ function makeS3Resolver(s3Client: {
   });
 }
 
-/** Wraps a mock ClickHouseClient object as a ClickHouseClientResolver (resolver returns the same client for any tenantId). */
 function makeChResolver(
   client: ReturnType<typeof makeMockChClient>["client"],
 ): (tenantId: string) => Promise<typeof client> {
@@ -366,7 +364,6 @@ describe("given a span that exceeds COMMAND_INLINE_THRESHOLD", () => {
         body,
       });
 
-      // Returns a string
       expect(typeof spoolRef).toBe("string");
       // Key shape pinned: trace-blobs/spool/{projectId}/{traceId}/{spanId}
       expect(spoolRef).toBe(
