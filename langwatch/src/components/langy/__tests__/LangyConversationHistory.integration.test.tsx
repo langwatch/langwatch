@@ -103,7 +103,13 @@ vi.mock("~/utils/api", () => ({
     }),
     modelProvider: {
       getResolvedDefault: {
-        useQuery: () => ({ data: undefined, isLoading: false }),
+        // A resolved model is configured: these tests exercise conversation
+        // history on a usable Langy, so langyNeedsModel must be false (else
+        // LangySidebar renders the inline model-setup screen over the panel).
+        useQuery: () => ({
+          data: { model: "openai/gpt-5-mini" },
+          isLoading: false,
+        }),
       },
       listAllForProjectForFrontend: {
         useQuery: () => ({
