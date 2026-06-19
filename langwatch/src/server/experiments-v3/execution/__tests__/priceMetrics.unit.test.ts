@@ -24,8 +24,8 @@ vi.mock("~/server/background/workers/collector/cost", async () => {
 
 import { priceMetrics } from "../orchestrator";
 
-const NANO_COST = {
-  model: "openai/gpt-5-nano",
+const MODEL_COST = {
+  model: "openai/gpt-5-mini",
   inputCostPerToken: 5e-8,
   outputCostPerToken: 4e-7,
 };
@@ -37,10 +37,10 @@ describe("priceMetrics", () => {
 
   describe("given a model and token usage", () => {
     it("prices the tokens at the model rate", async () => {
-      getMatchingLLMModelCost.mockResolvedValueOnce(NANO_COST);
+      getMatchingLLMModelCost.mockResolvedValueOnce(MODEL_COST);
 
       const cost = await priceMetrics("project-1", {
-        model: "openai/gpt-5-nano",
+        model: "openai/gpt-5-mini",
         prompt_tokens: 1000,
         completion_tokens: 500,
       });
@@ -49,7 +49,7 @@ describe("priceMetrics", () => {
       expect(cost).toBeCloseTo(0.00025, 10);
       expect(getMatchingLLMModelCost).toHaveBeenCalledWith(
         "project-1",
-        "openai/gpt-5-nano",
+        "openai/gpt-5-mini",
       );
     });
   });
@@ -68,7 +68,7 @@ describe("priceMetrics", () => {
   describe("given a model but zero tokens", () => {
     it("returns undefined without a cost lookup", async () => {
       const cost = await priceMetrics("project-1", {
-        model: "openai/gpt-5-nano",
+        model: "openai/gpt-5-mini",
         prompt_tokens: 0,
         completion_tokens: 0,
       });
