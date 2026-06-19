@@ -22,7 +22,10 @@ export const SPAN_ATTR_MAPPINGS = [
   // from the reasoning TOKEN count. Hoisted to the trace attribute map so
   // the drawer header can show it next to the model — the same lift that
   // surfaces the conversation id. First non-empty span value wins.
-  [ATTR_KEYS.GEN_AI_REQUEST_REASONING_EFFORT, "gen_ai.request.reasoning_effort"],
+  [
+    ATTR_KEYS.GEN_AI_REQUEST_REASONING_EFFORT,
+    "gen_ai.request.reasoning_effort",
+  ],
   [ATTR_KEYS.LANGWATCH_LANGGRAPH_THREAD_ID, "langgraph.thread_id"],
   // AI Gateway markers — stamped on every gateway-emitted customer span by
   // services/aigateway/adapters/customertracebridge/emitter.go so the
@@ -40,8 +43,14 @@ export const SPAN_ATTR_MAPPINGS = [
   // these keys; non-governance traces never carry them.
   ["langwatch.origin.kind", "langwatch.origin.kind"],
   ["langwatch.ingestion_source.id", "langwatch.ingestion_source.id"],
-  ["langwatch.ingestion_source.organization_id", "langwatch.ingestion_source.organization_id"],
-  ["langwatch.ingestion_source.source_type", "langwatch.ingestion_source.source_type"],
+  [
+    "langwatch.ingestion_source.organization_id",
+    "langwatch.ingestion_source.organization_id",
+  ],
+  [
+    "langwatch.ingestion_source.source_type",
+    "langwatch.ingestion_source.source_type",
+  ],
 ] as const;
 
 /**
@@ -188,7 +197,10 @@ export class TraceAttributeAccumulationService {
     const tagList = Array.isArray(tagTags)
       ? tagTags.filter((t): t is string => typeof t === "string")
       : typeof tagTags === "string"
-        ? tagTags.split(",").map((t) => t.trim()).filter(Boolean)
+        ? tagTags
+            .split(",")
+            .map((t) => t.trim())
+            .filter(Boolean)
         : [];
     if (tagList.length > 0) {
       const existing = parseJsonStringArray(result["langwatch.labels"]);
@@ -284,8 +296,16 @@ export class TraceAttributeAccumulationService {
     }
 
     this.traceOriginService.stripLegacyMarkers(merged);
-    this.traceOriginService.hoistOrigin({ state, span, mergedAttributes: merged });
-    this.traceOriginService.hoistSource({ state, span, mergedAttributes: merged });
+    this.traceOriginService.hoistOrigin({
+      state,
+      span,
+      mergedAttributes: merged,
+    });
+    this.traceOriginService.hoistSource({
+      state,
+      span,
+      mergedAttributes: merged,
+    });
 
     merged["langwatch.reserved.output_source"] = outputSource;
     if (inputIsFallback) {

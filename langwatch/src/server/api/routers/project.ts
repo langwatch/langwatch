@@ -17,6 +17,8 @@ import {
 } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import type { Session } from "~/server/auth";
+import { provisionLangyApiKey } from "~/server/services/langy/langyApiKey";
+import { provisionLangyVirtualKey } from "~/server/services/langy/langyVirtualKey";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { encrypt } from "~/utils/encryption";
 import { captureException } from "~/utils/posthogErrorCapture";
@@ -36,8 +38,6 @@ import {
   skipPermissionCheckProjectCreation,
 } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
-import { provisionLangyApiKey } from "~/server/services/langy/langyApiKey";
-import { provisionLangyVirtualKey } from "~/server/services/langy/langyVirtualKey";
 
 export const projectRouter = createTRPCRouter({
   publicGetById: publicProcedure

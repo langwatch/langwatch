@@ -13,12 +13,11 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useEffect, useMemo, useState } from "react";
-
+import { ModelMultiSelect } from "~/components/ModelMultiSelect";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { ModelMultiSelect } from "~/components/ModelMultiSelect";
 
 import {
   ConfigureModelProvidersLink,
@@ -27,8 +26,8 @@ import {
 } from "./EligibleModelProvidersPreview";
 import { FieldInfoTooltip } from "./FieldInfoTooltip";
 import {
-  VirtualKeyScopePicker,
   type VirtualKeyScopeEntry,
+  VirtualKeyScopePicker,
 } from "./VirtualKeyScopePicker";
 
 type VirtualKeyDetail = {
@@ -74,8 +73,9 @@ export function VirtualKeyEditDrawer({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [routingPolicyId, setRoutingPolicyId] = useState<string>("");
-  const [cacheMode, setCacheMode] =
-    useState<"respect" | "force" | "disable">("respect");
+  const [cacheMode, setCacheMode] = useState<"respect" | "force" | "disable">(
+    "respect",
+  );
   const [cacheTtlS, setCacheTtlS] = useState<number>(3600);
   const [rpm, setRpm] = useState<string>("");
   const [tpm, setTpm] = useState<string>("");
@@ -98,8 +98,7 @@ export function VirtualKeyEditDrawer({
   }, [vk]);
 
   const availableTeams = useMemo(
-    () =>
-      organization?.teams?.map((t) => ({ id: t.id, name: t.name })) ?? [],
+    () => organization?.teams?.map((t) => ({ id: t.id, name: t.name })) ?? [],
     [organization?.teams],
   );
   const availableProjects = useMemo(
@@ -119,10 +118,11 @@ export function VirtualKeyEditDrawer({
     { organizationId },
     { enabled: !!vk && !!organizationId },
   );
-  const orgProvidersQuery = api.modelProvider.listAllForOrganizationForFrontend.useQuery(
-    { organizationId },
-    { enabled: !!vk && !!organizationId },
-  );
+  const orgProvidersQuery =
+    api.modelProvider.listAllForOrganizationForFrontend.useQuery(
+      { organizationId },
+      { enabled: !!vk && !!organizationId },
+    );
   const updateMutation = api.virtualKeys.update.useMutation({
     onSuccess: async () => {
       await utils.virtualKeys.list.invalidate({ organizationId });
@@ -333,8 +333,8 @@ export function VirtualKeyEditDrawer({
                 </NativeSelect.Root>
                 <Field.HelperText>
                   Default cascade uses all eligible providers in fallback
-                  priority. Picking a policy constrains routing to its
-                  ordered provider list.
+                  priority. Picking a policy constrains routing to its ordered
+                  provider list.
                 </Field.HelperText>
               </Field.Root>
             )}
@@ -350,11 +350,11 @@ export function VirtualKeyEditDrawer({
               />
             </HStack>
             <Text fontSize="xs" color="fg.muted">
-              Provider-agnostic: Anthropic uses explicit cache_control
-              markers, OpenAI/Azure cache prompts automatically, Gemini
-              supports cachedContent references. Mode here applies to every
-              provider this VK routes to; the X-LangWatch-Cache request
-              header lets callers override per-request.
+              Provider-agnostic: Anthropic uses explicit cache_control markers,
+              OpenAI/Azure cache prompts automatically, Gemini supports
+              cachedContent references. Mode here applies to every provider this
+              VK routes to; the X-LangWatch-Cache request header lets callers
+              override per-request.
             </Text>
             <HStack gap={4} align="flex-start">
               <Field.Root flex={1}>
@@ -364,10 +364,8 @@ export function VirtualKeyEditDrawer({
                     value={cacheMode}
                     onChange={(e) =>
                       setCacheMode(
-                        (e.target.value as
-                          | "respect"
-                          | "force"
-                          | "disable") ?? "respect",
+                        (e.target.value as "respect" | "force" | "disable") ??
+                          "respect",
                       )
                     }
                   >
@@ -378,7 +376,8 @@ export function VirtualKeyEditDrawer({
                       Disable — strip cache directives before dispatch
                     </option>
                     <option value="force">
-                      Force — inject cache_control on Anthropic (OpenAI auto, Gemini WARN)
+                      Force — inject cache_control on Anthropic (OpenAI auto,
+                      Gemini WARN)
                     </option>
                   </NativeSelect.Field>
                 </NativeSelect.Root>
@@ -409,8 +408,9 @@ export function VirtualKeyEditDrawer({
             </HStack>
             <Text fontSize="xs" color="fg.muted">
               Enforced per-VK in-memory on every gateway replica. On breach the
-              gateway returns HTTP 429 with <Code fontSize="xs">Retry-After</Code>{" "}
-              and <Code fontSize="xs">X-LangWatch-RateLimit-Dimension</Code>.
+              gateway returns HTTP 429 with{" "}
+              <Code fontSize="xs">Retry-After</Code> and{" "}
+              <Code fontSize="xs">X-LangWatch-RateLimit-Dimension</Code>.
               Changes propagate to all replicas within ~60s.
             </Text>
             <HStack gap={4} align="flex-start">
@@ -425,9 +425,7 @@ export function VirtualKeyEditDrawer({
                 <Field.HelperText>Requests / minute</Field.HelperText>
               </Field.Root>
               <Field.Root flex={1}>
-                <Field.Label>
-                  tpm
-                </Field.Label>
+                <Field.Label>tpm</Field.Label>
                 <Input
                   value={tpm}
                   onChange={(e) => setTpm(e.target.value)}
@@ -436,8 +434,8 @@ export function VirtualKeyEditDrawer({
                   disabled
                 />
                 <Field.HelperText>
-                  Tokens / minute — requires pre-request token estimation;
-                  ships with Redis-coordinated cluster counters (v1.1).
+                  Tokens / minute — requires pre-request token estimation; ships
+                  with Redis-coordinated cluster counters (v1.1).
                 </Field.HelperText>
               </Field.Root>
               <Field.Root flex={1}>
@@ -451,7 +449,6 @@ export function VirtualKeyEditDrawer({
                 <Field.HelperText>Requests / day</Field.HelperText>
               </Field.Root>
             </HStack>
-
           </VStack>
         </Drawer.Body>
         <Drawer.Footer>

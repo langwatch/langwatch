@@ -1,7 +1,16 @@
-import { Button, Field, HStack, NativeSelect, Spinner, Text, VStack } from "@chakra-ui/react";
+import {
+  Button,
+  Field,
+  HStack,
+  NativeSelect,
+  Spinner,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
+import { CustomModelInputSection } from "../../../../../components/settings/ModelProviderCustomModelInput";
 import { Switch } from "../../../../../components/ui/switch";
 import { useModelProviderApiKeyValidation } from "../../../../../hooks/useModelProviderApiKeyValidation";
 import { useModelProviderFields } from "../../../../../hooks/useModelProviderFields";
@@ -30,7 +39,6 @@ import {
 import type { ModelProviderKey } from "../../../regions/model-providers/types";
 import { DocsLinks } from "../observability/DocsLinks";
 import { ModelProviderCredentialFields } from "./ModelProviderCredentialFields";
-import { CustomModelInputSection } from "../../../../../components/settings/ModelProviderCustomModelInput";
 import { ModelProviderExtraHeaders } from "./ModelProviderExtraHeaders";
 
 const logger = createLogger("ModelProviderSetup");
@@ -58,12 +66,14 @@ interface ModelProviderSetupProps {
   onComplete?: () => void;
 }
 
-const variantToDocsMapping: Record<"evaluations" | "prompts" | "langy", string> =
-  {
-    evaluations: "/llm-evaluation/overview",
-    prompts: "/prompt-management/overview",
-    langy: "/introduction",
-  };
+const variantToDocsMapping: Record<
+  "evaluations" | "prompts" | "langy",
+  string
+> = {
+  evaluations: "/llm-evaluation/overview",
+  prompts: "/prompt-management/overview",
+  langy: "/introduction",
+};
 
 export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
   modelProviderKey,
@@ -431,9 +441,7 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
                 <NativeSelect.Field
                   value={state.projectDefaultModel ?? ""}
                   onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
-                    actions.setProjectDefaultModel(
-                      event.target.value || null,
-                    )
+                    actions.setProjectDefaultModel(event.target.value || null)
                   }
                 >
                   <option value="">Select default model...</option>
@@ -464,12 +472,8 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
                 <NativeSelect.Root size="sm" bg="bg.muted/40">
                   <NativeSelect.Field
                     value={state.projectDefaultModel ?? ""}
-                    onChange={(
-                      event: React.ChangeEvent<HTMLSelectElement>,
-                    ) =>
-                      actions.setProjectDefaultModel(
-                        event.target.value || null,
-                      )
+                    onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
+                      actions.setProjectDefaultModel(event.target.value || null)
                     }
                   >
                     <option value="">Select default model...</option>
@@ -482,8 +486,8 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
                   <NativeSelect.Indicator />
                 </NativeSelect.Root>
                 <Field.HelperText>
-                  This model will be used for evaluations, prompt
-                  optimization, and dataset generation.
+                  This model will be used for evaluations, prompt optimization,
+                  and dataset generation.
                 </Field.HelperText>
               </Field.Root>
             </VStack>
