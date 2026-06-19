@@ -59,14 +59,16 @@ export function HistoryButton({ disabled = false }: HistoryButtonProps) {
       openDelay={100}
     >
       <Button
-        size="xs"
+        size="sm"
         variant="ghost"
+        color="fg.muted"
+        _hover={{ color: "fg", bg: "bg.subtle" }}
         disabled={disabled || !hasRuns || isLoading}
         aria-label="View results"
         asChild
       >
         <Link href={`/${project.slug}/experiments/${experimentSlug}`}>
-          <BarChart2 size={14} />
+          <BarChart2 size={18} />
           Results
         </Link>
       </Button>
