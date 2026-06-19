@@ -32,6 +32,7 @@ import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { api } from "~/utils/api";
 import { allModelOptions } from "~/components/ModelSelector";
 import { isLangyManagedVk } from "~/components/gateway/langyVk";
+import { ModelProviderScreen } from "~/features/onboarding/components/sections/ModelProviderScreen";
 import { Composer } from "./Composer";
 import { EmptyState } from "./EmptyState";
 import { LangyGitHubMenu } from "./github/LangyGitHubMenu";
@@ -259,6 +260,16 @@ function LangyPanel({
     { projectId: projectId ?? "", featureKey: LANGY_GATE_FEATURE_KEY },
     { enabled: !!projectId },
   );
+
+  // No model resolves for Langy's gate key => the chat route will 409 ("no
+  // model configured"). Surface an inline setup instead of letting the user
+  // type into a dead composer. The onboarding model-provider screen writes
+  // BOTH the key and the project default for LANGY_GATE_FEATURE_KEY — exactly
+  // what the gate resolves against — so saving unblocks Langy with no reload.
+  const langyNeedsModel =
+    !!projectId &&
+    !resolvedDefaultQuery.isLoading &&
+    !resolvedDefaultQuery.data?.model;
 
   // The project's Langy VK carries an optional `modelsAllowed` allowlist
   // (configured in the VK editor). When set, the composer's picker is
@@ -523,7 +534,21 @@ function LangyPanel({
           onDeleteConversation={(id) => void removeConversation(id)}
         />
         <Box ref={scrollRef} flex={1} overflowY="auto" aria-live="polite">
-          {isEmpty ? (
+          {langyNeedsModel ? (
+            <VStack align="stretch" gap={2} paddingX="18px" paddingTop="18px">
+              <Text fontSize="sm" fontWeight="semibold">
+                Langy needs a model to get started
+              </Text>
+              <Text fontSize="xs" color="fg.muted">
+                Add a provider key and pick a default model — Langy starts
+                working the moment you save.
+              </Text>
+              <ModelProviderScreen
+                variant="langy"
+                onComplete={() => void resolvedDefaultQuery.refetch()}
+              />
+            </VStack>
+          ) : isEmpty ? (
             <EmptyState onPick={(prompt) => void send(prompt)} />
           ) : (
             <VStack
