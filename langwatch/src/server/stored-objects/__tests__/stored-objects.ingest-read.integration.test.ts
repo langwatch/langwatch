@@ -18,13 +18,23 @@
  *  - LocalFilesystemDriver pointed at a per-test temp dir for real byte storage
  *  - vi.mock to wire getClickHouseClientForProject to the test container client
  */
+
+import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import crypto from "node:crypto";
-import { nanoid } from "nanoid";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
+import { nanoid } from "nanoid";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import * as clickhouseClientModule from "~/server/clickhouse/clickhouseClient";
 import {
   startTestContainers,
@@ -33,8 +43,8 @@ import {
 import { LocalFilesystemDriver } from "../local-filesystem-driver";
 import { StorageRegistry } from "../storage-registry";
 import { StoredObjectsRepository } from "../stored-objects.repository";
-import { StoredObjectsService } from "../stored-objects.service";
 import type { MintStorageUri } from "../stored-objects.service";
+import { StoredObjectsService } from "../stored-objects.service";
 import { mintFileUri } from "../uri";
 
 // ---------------------------------------------------------------------------
@@ -69,13 +79,12 @@ const { tracerSpanNames } = vi.hoisted(() => ({
 
 vi.mock("langwatch", () => ({
   getLangWatchTracer: () => ({
-    withActiveSpan: (
-      name: string,
-      ...args: unknown[]
-    ) => {
+    withActiveSpan: (name: string, ...args: unknown[]) => {
       tracerSpanNames.push(name);
       const fn = args.length === 1 ? args[0] : args[1];
-      const span: { setAttribute: ReturnType<typeof vi.fn> } = { setAttribute: vi.fn() };
+      const span: { setAttribute: ReturnType<typeof vi.fn> } = {
+        setAttribute: vi.fn(),
+      };
       return (fn as (s: typeof span) => Promise<unknown>)(span);
     },
   }),
@@ -161,8 +170,12 @@ beforeAll(async () => {
   // Wire the mock now that ch is available. The vi.mock factory above
   // replaced these exports with mock fns at module-load; we only need
   // to set their return values here, not re-import.
-  vi.mocked(clickhouseClientModule.getClickHouseClientForProject).mockResolvedValue(ch);
-  vi.mocked(clickhouseClientModule.getSharedClickHouseClient).mockReturnValue(ch);
+  vi.mocked(
+    clickhouseClientModule.getClickHouseClientForProject,
+  ).mockResolvedValue(ch);
+  vi.mocked(clickhouseClientModule.getSharedClickHouseClient).mockReturnValue(
+    ch,
+  );
 }, 90_000);
 
 afterAll(async () => {
@@ -415,7 +428,11 @@ describe("StoredObjectsService (ingest + read path)", () => {
 
           // Delete the file from storage so the next GET gets an ENOENT
           const sha256 = sha256Of(bytes);
-          const storageUri = mintFileUri({ root: tmpDir, projectId: PROJECT_A, sha256 });
+          const storageUri = mintFileUri({
+            root: tmpDir,
+            projectId: PROJECT_A,
+            sha256,
+          });
           const filePath = storageUri.slice("file://".length);
           await fs.rm(filePath, { force: true });
 
@@ -444,7 +461,6 @@ describe("StoredObjectsService (ingest + read path)", () => {
     });
 
     describe("when getById is called with a different project than the owner (#4947 tenant isolation)", () => {
-      /** @scenario "A project-scoped read cannot return an object owned by another project" */
       it("returns null for the wrong project but the bytes for the owning project", async () => {
         await withTmpStorage(async () => {
           const bytes = makeBytes("cross-tenant-read-isolation");
@@ -475,7 +491,10 @@ describe("StoredObjectsService (ingest + read path)", () => {
           expect(crossTenant).toBeNull();
 
           // The owning project still reads the bytes back.
-          const owned = await ownerService.getById({ projectId: PROJECT_A, id });
+          const owned = await ownerService.getById({
+            projectId: PROJECT_A,
+            id,
+          });
           expect(owned).not.toBeNull();
           expect(owned !== null && "stream" in owned).toBe(true);
         });
@@ -511,10 +530,14 @@ describe("StoredObjectsService (ingest + read path)", () => {
 
         expect(tracerSpanNames.length).toBeGreaterThanOrEqual(2);
         expect(
-          tracerSpanNames.some((s) => /storeFromBytes|StoredObjectsService\.store/i.test(s)),
+          tracerSpanNames.some((s) =>
+            /storeFromBytes|StoredObjectsService\.store/i.test(s),
+          ),
         ).toBe(true);
         expect(
-          tracerSpanNames.some((s) => /getById|StoredObjectsService\.get/i.test(s)),
+          tracerSpanNames.some((s) =>
+            /getById|StoredObjectsService\.get/i.test(s),
+          ),
         ).toBe(true);
       });
     });
@@ -544,7 +567,10 @@ describe("StoredObjectsService (ingest + read path)", () => {
             query_params: { id },
             format: "JSONEachRow",
           });
-          const rows = await result.json<{ project_id: string; storage_uri: string }>();
+          const rows = await result.json<{
+            project_id: string;
+            storage_uri: string;
+          }>();
 
           expect(rows.length).toBeGreaterThan(0);
           expect(rows[0]?.project_id).toBe(PROJECT_A);
@@ -587,8 +613,14 @@ describe("StoredObjectsService (ingest + read path)", () => {
           await waitForRow(ch, cascadeProj, stored2.id);
 
           // Sanity: both files are readable before the cascade runs.
-          const before1 = await service.getById({ projectId: cascadeProj, id: stored1.id });
-          const before2 = await service.getById({ projectId: cascadeProj, id: stored2.id });
+          const before1 = await service.getById({
+            projectId: cascadeProj,
+            id: stored1.id,
+          });
+          const before2 = await service.getById({
+            projectId: cascadeProj,
+            id: stored2.id,
+          });
           expect(before1).not.toBeNull();
           expect(before2).not.toBeNull();
           expect((before1 as { stream?: unknown }).stream).toBeDefined();
@@ -609,13 +641,18 @@ describe("StoredObjectsService (ingest + read path)", () => {
           expect(remaining.length).toBe(0);
 
           // Storage-level: getById returns null (no row anywhere).
-          const after1 = await service.getById({ projectId: cascadeProj, id: stored1.id });
-          const after2 = await service.getById({ projectId: cascadeProj, id: stored2.id });
+          const after1 = await service.getById({
+            projectId: cascadeProj,
+            id: stored1.id,
+          });
+          const after2 = await service.getById({
+            projectId: cascadeProj,
+            id: stored2.id,
+          });
           expect(after1).toBeNull();
           expect(after2).toBeNull();
         });
       });
     });
-
   });
 });

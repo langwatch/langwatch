@@ -152,7 +152,11 @@ async function processContentPart({
 
       const rewrittenPart = {
         ...(part as Record<string, unknown>),
-        source: { type: "url", value: `/api/files/${projectId}/${stored.id}`, mimeType },
+        source: {
+          type: "url",
+          value: `/api/files/${projectId}/${stored.id}`,
+          mimeType,
+        },
       };
 
       return { part: rewrittenPart, ref };

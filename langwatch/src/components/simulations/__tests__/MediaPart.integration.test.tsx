@@ -22,7 +22,9 @@ type HeadByIdProbeResult =
   | { status: "missing"; mediaType: string }
   | { status: "not_found" };
 
-const mockHeadByIdData = vi.fn(() => undefined as undefined | HeadByIdProbeResult);
+const mockHeadByIdData = vi.fn(
+  () => undefined as undefined | HeadByIdProbeResult,
+);
 
 // Records every input the component passes to the existence probe. The probe
 // input is rebuilt on each render with the stored-object id extracted from the
@@ -34,10 +36,7 @@ vi.mock("~/utils/api", () => ({
   api: {
     storedObjects: {
       headById: {
-        useQuery: (
-          input: unknown,
-          opts: { enabled?: boolean } | undefined,
-        ) => {
+        useQuery: (input: unknown, opts: { enabled?: boolean } | undefined) => {
           headByIdInputs.push(input as { projectId: string; id: string });
           // Only return data when the query is enabled (i.e. after an error event).
           if (!opts?.enabled) return { data: undefined };
@@ -139,7 +138,6 @@ describe("<MediaPart/>", () => {
   });
 
   describe("when the url carries a project-id segment (#4947)", () => {
-    /** @scenario "MediaPart extracts the stored-object id from a project-scoped url for the existence probe" */
     it("probes with the id from the final path segment, not the project segment", () => {
       render(
         <MediaPart
@@ -164,7 +162,6 @@ describe("<MediaPart/>", () => {
       });
     });
 
-    /** @scenario "MediaPart still extracts the id from a legacy id-only url" */
     it("extracts the id from a legacy id-only url for backward compatibility", () => {
       render(
         <MediaPart
@@ -241,7 +238,10 @@ describe("<MediaPart/>", () => {
   describe("when the tRPC probe returns status: 'missing' (row exists, blob gone)", () => {
     /** @scenario "Trace timeline shows a missing badge when the byte content is no longer retrievable" */
     it("renders a missing-badge placeholder labeled with the mediaType", async () => {
-      mockHeadByIdData.mockReturnValue({ status: "missing", mediaType: "audio/mp3" });
+      mockHeadByIdData.mockReturnValue({
+        status: "missing",
+        mediaType: "audio/mp3",
+      });
 
       render(
         <MediaPart
@@ -267,8 +267,12 @@ describe("<MediaPart/>", () => {
         expect(screen.getByTestId("media-part-missing")).toBeInTheDocument();
       });
 
-      expect(screen.getByTestId("media-part-missing")).toHaveTextContent("audio");
-      expect(screen.getByTestId("media-part-missing")).toHaveTextContent("missing");
+      expect(screen.getByTestId("media-part-missing")).toHaveTextContent(
+        "audio",
+      );
+      expect(screen.getByTestId("media-part-missing")).toHaveTextContent(
+        "missing",
+      );
     });
   });
 
@@ -308,7 +312,10 @@ describe("<MediaPart/>", () => {
       // Row exists AND storage confirms bytes are present, but the browser
       // element still errored — transient decode / network failure. MediaPart
       // should land on "error", not "missing".
-      mockHeadByIdData.mockReturnValue({ status: "available", mediaType: "audio/mp3" });
+      mockHeadByIdData.mockReturnValue({
+        status: "available",
+        mediaType: "audio/mp3",
+      });
 
       render(
         <MediaPart
@@ -335,7 +342,9 @@ describe("<MediaPart/>", () => {
       expect(screen.getByTestId("media-part-error")).toHaveTextContent("audio");
       expect(screen.getByTestId("media-part-error")).toHaveTextContent("error");
       // The "missing" placeholder must NOT be shown — that's a different state.
-      expect(screen.queryByTestId("media-part-missing")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("media-part-missing"),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -386,7 +395,9 @@ describe("<MediaPart/>", () => {
       expect(audio).toHaveAttribute("controls");
 
       // The "missing" / "error" placeholders must NOT appear.
-      expect(screen.queryByTestId("media-part-missing")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("media-part-missing"),
+      ).not.toBeInTheDocument();
       expect(screen.queryByTestId("media-part-error")).not.toBeInTheDocument();
     });
   });

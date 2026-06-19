@@ -30,15 +30,17 @@ import type { StoredObjectsService } from "../stored-objects.service";
 // ---------------------------------------------------------------------------
 
 /** Builds a minimal mock StoredObjectsService. */
-function makeService(overrides: {
-  storeFromBytes?: StoredObjectsService["storeFromBytes"];
-} = {}): StoredObjectsService {
+function makeService(
+  overrides: { storeFromBytes?: StoredObjectsService["storeFromBytes"] } = {},
+): StoredObjectsService {
   return {
-    storeFromBytes: overrides.storeFromBytes ?? vi.fn().mockResolvedValue({
-      id: "stored-id-1",
-      mediaType: "audio/mp3",
-      isDuplicate: false,
-    }),
+    storeFromBytes:
+      overrides.storeFromBytes ??
+      vi.fn().mockResolvedValue({
+        id: "stored-id-1",
+        mediaType: "audio/mp3",
+        isDuplicate: false,
+      }),
     getById: vi.fn(),
     deleteOwnedBy: vi.fn(),
   } as unknown as StoredObjectsService;
@@ -118,8 +120,12 @@ describe("extractInlineMediaFromEvent", () => {
       expect(refs).toHaveLength(0);
       expect(service.storeFromBytes).not.toHaveBeenCalled();
       // Content array must be identical
-      const rewrittenMessage = (rewrittenEvent as { message: { content: unknown[] } }).message;
-      expect(rewrittenMessage.content).toEqual([{ type: "text", text: "Hello, world!" }]);
+      const rewrittenMessage = (
+        rewrittenEvent as { message: { content: unknown[] } }
+      ).message;
+      expect(rewrittenMessage.content).toEqual([
+        { type: "text", text: "Hello, world!" },
+      ]);
     });
   });
 
@@ -165,11 +171,16 @@ describe("extractInlineMediaFromEvent", () => {
       );
 
       // The part must be rewritten to source.type="url"
-      const content = (rewrittenEvent as { message: { content: unknown[] } }).message.content;
+      const content = (rewrittenEvent as { message: { content: unknown[] } })
+        .message.content;
       expect(content).toHaveLength(1);
       expect(content[0]).toMatchObject({
         type: "audio",
-        source: { type: "url", value: `/api/files/proj-1/${storedId}`, mimeType },
+        source: {
+          type: "url",
+          value: `/api/files/proj-1/${storedId}`,
+          mimeType,
+        },
       });
 
       // One ref returned
@@ -220,10 +231,15 @@ describe("extractInlineMediaFromEvent", () => {
       expect(service.storeFromBytes).toHaveBeenCalledTimes(2);
       expect(refs).toHaveLength(2);
 
-      const content = (rewrittenEvent as { message: { content: unknown[] } }).message.content;
+      const content = (rewrittenEvent as { message: { content: unknown[] } })
+        .message.content;
       expect(content).toHaveLength(2);
-      expect((content[0] as { source: { value: string } }).source.value).toBe("/api/files/proj-1/stored-id-1");
-      expect((content[1] as { source: { value: string } }).source.value).toBe("/api/files/proj-1/stored-id-2");
+      expect((content[0] as { source: { value: string } }).source.value).toBe(
+        "/api/files/proj-1/stored-id-1",
+      );
+      expect((content[1] as { source: { value: string } }).source.value).toBe(
+        "/api/files/proj-1/stored-id-2",
+      );
     });
   });
 
@@ -265,7 +281,8 @@ describe("extractInlineMediaFromEvent", () => {
         }),
       );
 
-      const content = (rewrittenEvent as { message: { content: unknown[] } }).message.content;
+      const content = (rewrittenEvent as { message: { content: unknown[] } })
+        .message.content;
       expect(content).toHaveLength(1);
       const part = content[0] as {
         type: string;
@@ -293,7 +310,11 @@ describe("extractInlineMediaFromEvent", () => {
       const event = makeEventWithContent([
         {
           type: "audio",
-          source: { type: "url", value: "https://example.com/audio.mp3", mimeType: "audio/mp3" },
+          source: {
+            type: "url",
+            value: "https://example.com/audio.mp3",
+            mimeType: "audio/mp3",
+          },
         },
       ]);
 
@@ -700,13 +721,18 @@ describe("extractInlineMediaFromEvent", () => {
       // Second message's audio part is now a URL reference.
       const secondMsg = rewritten.messages[1] as {
         role: string;
-        content: Array<{ type: string; source: { type: string; value: string } }>;
+        content: Array<{
+          type: string;
+          source: { type: string; value: string };
+        }>;
       };
       expect(secondMsg.role).toBe("assistant");
       expect(secondMsg.content).toHaveLength(1);
       expect(secondMsg.content[0]!.type).toBe("audio");
       expect(secondMsg.content[0]!.source.type).toBe("url");
-      expect(secondMsg.content[0]!.source.value).toBe("/api/files/proj-1/stored-id-1");
+      expect(secondMsg.content[0]!.source.value).toBe(
+        "/api/files/proj-1/stored-id-1",
+      );
     });
   });
 
@@ -816,11 +842,16 @@ describe("extractInlineMediaFromEvent", () => {
       expect(refs).toHaveLength(1);
       expect(refs[0]!.id).toBe(storedId);
 
-      const content = (rewrittenEvent as { message: { content: unknown[] } }).message.content;
+      const content = (rewrittenEvent as { message: { content: unknown[] } })
+        .message.content;
       expect(content).toHaveLength(1);
       expect(content[0]).toMatchObject({
         type: "document",
-        source: { type: "url", value: `/api/files/proj-1/${storedId}`, mimeType },
+        source: {
+          type: "url",
+          value: `/api/files/proj-1/${storedId}`,
+          mimeType,
+        },
       });
     });
   });

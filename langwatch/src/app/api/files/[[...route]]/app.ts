@@ -299,20 +299,20 @@ async function handleFileRead(
 // id-only routes. Hono matches by path-segment count, so a two-segment
 // request resolves here and a one-segment request resolves to the legacy
 // handler below; the ordering is belt-and-suspenders.
-secured.access(anyAuthenticated()).get("/:projectId/:id", (c) =>
-  handleFileRead(c, { method: "GET" }),
-);
-secured.access(anyAuthenticated()).head("/:projectId/:id", (c) =>
-  handleFileRead(c, { method: "HEAD" }),
-);
+secured
+  .access(anyAuthenticated())
+  .get("/:projectId/:id", (c) => handleFileRead(c, { method: "GET" }));
+secured
+  .access(anyAuthenticated())
+  .head("/:projectId/:id", (c) => handleFileRead(c, { method: "HEAD" }));
 
 // Legacy id-only routes — retained for URLs minted before #4947.
-secured.access(anyAuthenticated()).get("/:id", (c) =>
-  handleFileRead(c, { method: "GET" }),
-);
-secured.access(anyAuthenticated()).head("/:id", (c) =>
-  handleFileRead(c, { method: "HEAD" }),
-);
+secured
+  .access(anyAuthenticated())
+  .get("/:id", (c) => handleFileRead(c, { method: "GET" }));
+secured
+  .access(anyAuthenticated())
+  .head("/:id", (c) => handleFileRead(c, { method: "HEAD" }));
 
 export const app = secured.hono;
 export type FilesAppType = typeof app;
