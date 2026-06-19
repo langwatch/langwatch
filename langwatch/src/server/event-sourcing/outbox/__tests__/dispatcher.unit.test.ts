@@ -315,6 +315,98 @@ describe("createOutboxDispatcher cadence stage", () => {
     });
   });
 
+  describe("given template render-diagnostics (ADR-028 / ADR-029)", () => {
+    describe("when a custom email template references variables the context does not supply", () => {
+      it("stamps the missing variables onto the payload's renderDiagnostics", async () => {
+        const trigger = makeTrigger({
+          action: TriggerAction.SEND_EMAIL,
+          name: "Latency alert",
+          templates: {
+            slackTemplateType: null,
+            slackTemplate: null,
+            emailSubjectTemplate: null,
+            emailBodyTemplate: "Hi {{ trigger.name }} — {{ does.not.exist }}",
+          },
+        });
+        const deps = makeDeps(trigger);
+        const dispatcher = createOutboxDispatcher(deps);
+        const payload = makeCadencePayload();
+
+        await dispatcher.process(payload);
+
+        // The render still succeeds (strictVariables: false renders the typo as
+        // empty), so the email is delivered — but the diagnostic is captured so
+        // the PG audit adapter can persist it to ReactorOutbox.renderDiagnostics.
+        expect(sendRenderedTriggerEmail).toHaveBeenCalledTimes(1);
+        expect(payload.renderDiagnostics).toEqual({
+          missingVariables: ["does.not.exist"],
+        });
+      });
+    });
+
+    describe("when a custom email template renders cleanly", () => {
+      it("sets renderDiagnostics to null so a clean render is distinguishable from one never computed", async () => {
+        const trigger = makeTrigger({
+          action: TriggerAction.SEND_EMAIL,
+          name: "Latency alert",
+          templates: {
+            slackTemplateType: null,
+            slackTemplate: null,
+            emailSubjectTemplate: null,
+            emailBodyTemplate: "Hello {{ trigger.name }}",
+          },
+        });
+        const deps = makeDeps(trigger);
+        const dispatcher = createOutboxDispatcher(deps);
+        const payload = makeCadencePayload();
+
+        await dispatcher.process(payload);
+
+        expect(sendRenderedTriggerEmail).toHaveBeenCalledTimes(1);
+        expect(payload.renderDiagnostics).toBeNull();
+      });
+    });
+
+    describe("when a custom Slack template references variables the context does not supply", () => {
+      it("stamps the missing variables onto the payload's renderDiagnostics", async () => {
+        const trigger = makeTrigger({
+          action: TriggerAction.SEND_SLACK_MESSAGE,
+          name: "Latency alert",
+          actionParams: { slackWebhook: "https://hooks.slack.com/services/x" },
+          templates: {
+            slackTemplateType: "string",
+            slackTemplate: "Hi {{ trigger.name }} — {{ does.not.exist }}",
+            emailSubjectTemplate: null,
+            emailBodyTemplate: null,
+          },
+        });
+        const deps = makeDeps(trigger);
+        const dispatcher = createOutboxDispatcher(deps);
+        const payload = makeCadencePayload();
+
+        await dispatcher.process(payload);
+
+        expect(sendRenderedSlackMessage).toHaveBeenCalledTimes(1);
+        expect(payload.renderDiagnostics).toEqual({
+          missingVariables: ["does.not.exist"],
+        });
+      });
+    });
+
+    describe("when the trigger has no custom template (legacy senders)", () => {
+      it("sets renderDiagnostics to null because nothing rendered", async () => {
+        const deps = makeDeps();
+        const dispatcher = createOutboxDispatcher(deps);
+        const payload = makeCadencePayload();
+
+        await dispatcher.process(payload);
+
+        expect(sendTriggerEmail).toHaveBeenCalledTimes(1);
+        expect(payload.renderDiagnostics).toBeNull();
+      });
+    });
+  });
+
   describe("given the per-trigger hourly email cap (ADR-031)", () => {
     describe("when the dispatch is under the cap", () => {
       it("sends the email normally and records the claim", async () => {

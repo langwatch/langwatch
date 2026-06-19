@@ -42,6 +42,7 @@ class InMemoryOutboxRepository implements OutboxRepository {
       nextAttemptAt: alwaysReady,
       lastError: null,
       lastErrorAt: null,
+      renderDiagnostics: null,
       dispatchedAt: null,
       createdAt: alwaysReady,
       updatedAt: alwaysReady,

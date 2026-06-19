@@ -89,6 +89,17 @@ export interface CadenceStagePayload
    * stay NON-retryable: the dispatcher returns normally rather than throwing.
    */
   dropReason?: string;
+  /**
+   * Set by the dispatcher after rendering a custom email/Slack template
+   * (ADR-028 / ADR-029). Carries the render-health diagnostics
+   * `renderTriggerEmail` / `renderTriggerSlack` compute — currently the
+   * `missingVariables` the template referenced but the render context did not
+   * supply. The PG audit adapter reads this in `onDispatched` and writes it to
+   * the row's `renderDiagnostics` so the operator surface can show
+   * "N missing variables" per dispatch. `null` on a clean render (no missing
+   * variables) and absent on dispatches that never rendered a custom template.
+   */
+  renderDiagnostics?: { missingVariables: string[] } | null;
 }
 
 export type OutboxJob = SettleStagePayload | CadenceStagePayload;

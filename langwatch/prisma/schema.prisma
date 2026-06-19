@@ -2830,6 +2830,15 @@ model ReactorOutbox {
     nextAttemptAt  DateTime?           @default(now())
     lastError      String?
     lastErrorAt    DateTime?
+    // Template render-health diagnostics captured at dispatch time
+    // (ADR-028 / ADR-029). Currently `{ missingVariables: string[] }` —
+    // the variables a custom email/Slack template referenced but the
+    // render context did not supply. NULL on a clean render (no missing
+    // variables) and on dispatches that never rendered a custom template.
+    // Lets the operator surface show "N missing variables" per dispatch
+    // instead of dropping the signal `renderTriggerEmail`/`renderTriggerSlack`
+    // already compute.
+    renderDiagnostics Json?
     dispatchedAt   DateTime?
     createdAt      DateTime            @default(now())
     updatedAt      DateTime            @default(now()) @updatedAt

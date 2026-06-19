@@ -51,6 +51,7 @@ function makeRow(overrides: Partial<OutboxRow> = {}): OutboxRow {
     nextAttemptAt: now,
     lastError: null,
     lastErrorAt: null,
+    renderDiagnostics: null,
     dispatchedAt: null,
     createdAt: now,
     updatedAt: now,

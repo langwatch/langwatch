@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import { createLogger } from "~/utils/logger/server";
 import type { QueueAuditAdapter } from "../queues/queue.types";
 import { isCadence, isSettle, type OutboxJob } from "./payload";
@@ -192,6 +192,14 @@ export class PgOutboxAuditAdapter implements QueueAuditAdapter<OutboxJob> {
       // operators can tell a drop from a delivery. A real delivery has no
       // `dropReason` and clears `lastError` to null.
       const lastError = p.dropReason ?? null;
+      // Template render-health diagnostics (ADR-028 / ADR-029): the dispatcher
+      // stamps `{ missingVariables }` onto the payload when a custom template
+      // referenced variables the render context didn't supply (`null` on a
+      // clean render). Persist it to the row so the operator surface can show
+      // "N missing variables" per dispatch instead of dropping the signal.
+      // `Prisma.DbNull` writes SQL NULL to the nullable JSON column — a bare
+      // `null` is not assignable to a Prisma JSON update input.
+      const renderDiagnostics = p.renderDiagnostics ?? Prisma.DbNull;
       // Cadence's terminal transitions CAS on (status='dispatching',
       // attempts=event.attempt) so a late event from a stale lease can't
       // overwrite a row that a stuck sweep re-leased to a new attempt.
@@ -208,6 +216,7 @@ export class PgOutboxAuditAdapter implements QueueAuditAdapter<OutboxJob> {
             status: "dispatched",
             dispatchedAt: event.at,
             lastError,
+            renderDiagnostics,
             leasedUntil: null,
           },
         }),

@@ -83,7 +83,7 @@ Enrich the automations list, plus a per-automation detail panel, with an operati
 
 - **Last triggered** and **fired count** — from `TriggerSent` ([ADR-030](./030-transactional-outbox-for-stake-sensitive-dispatch.md)), which already records every `(triggerId, traceId)` dispatch. Available immediately.
 - **Pending / failed / dead** — counts from `ReactorOutbox` ([ADR-030](./030-transactional-outbox-for-stake-sensitive-dispatch.md)) grouped by `status` for the trigger.
-- **Template-health warnings** — "rendered with the default due to a template error" and "N missing variables", the ADR-028 operator signals, surfaced from the outbox row's `lastError` / a render-diagnostics field on the dispatched row.
+- **Template-health warnings** — "rendered with the default due to a template error" and "N missing variables", the ADR-028 operator signals, surfaced from the outbox row's `lastError` / its `renderDiagnostics` field. The "N missing variables" count is now persisted: the dispatcher captures `missingVariables` from each custom email/Slack template render and stamps it onto the dispatched payload, and the PG audit adapter writes it to `ReactorOutbox.renderDiagnostics` (`{ missingVariables: string[] }`, NULL on a clean render). This resolves the earlier gap where `renderTriggerEmail` / `renderTriggerSlack` computed the missing-variable set but the dispatcher dropped it before it reached the audit row.
 - **Cadence and debounce** — the ADR-026 `notificationCadence` (notify triggers only) and `traceDebounceMs` shown as columns once those phases ship.
 - **Edit** opens the staged authoring drawer above.
 

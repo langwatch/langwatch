@@ -415,6 +415,15 @@ async function handleCadenceBatch(
   // `lastError` instead of a delivered-looking null — drops stay NON-retryable
   // (we return normally, never throw) but must be visible as drops, not sends.
   let dropReason: string | undefined;
+  // Render-health diagnostics from a custom email/Slack template render
+  // (ADR-028 / ADR-029): the variables the template referenced but the render
+  // context did not supply. Captured from whichever channel rendered (a
+  // dispatch is email XOR slack, so this is effectively one render's
+  // `missingVariables`); accumulated as a Set so the wiring stays correct if a
+  // dispatch ever renders both. Stamped onto each payload below as
+  // `renderDiagnostics` so the PG audit adapter persists it to the row. The
+  // legacy senders (NULL template) never render here and leave this empty.
+  const missingVariables = new Set<string>();
 
   try {
     switch (trigger.action) {
@@ -542,6 +551,7 @@ async function handleCadenceBatch(
             bodyTemplate: t.emailBodyTemplate,
             context: buildContext(),
           });
+          for (const v of rendered.missingVariables) missingVariables.add(v);
           if (rendered.errors.length > 0) {
             logger.warn(
               { projectId, triggerId, errors: rendered.errors },
@@ -583,6 +593,7 @@ async function handleCadenceBatch(
             template: t.slackTemplate,
             context: buildContext(),
           });
+          for (const v of rendered.missingVariables) missingVariables.add(v);
           if (rendered.errors.length > 0) {
             logger.warn(
               { projectId, triggerId, errors: rendered.errors },
@@ -628,6 +639,22 @@ async function handleCadenceBatch(
       extra: { projectId, triggerId, triggerAction: trigger.action },
     });
     throw error;
+  }
+
+  // Stamp render-health diagnostics onto every payload so the PG audit
+  // adapter's `onDispatched` hook persists them to the row's
+  // `renderDiagnostics` (ADR-028 / ADR-029). Mirrors the `dropReason` wiring
+  // below: only set when a custom template render surfaced missing variables;
+  // `null` otherwise so a clean render is distinguishable from "never
+  // computed". `payloads` (not just `candidatePayloads`) so the shared audit
+  // row keyed by `auditDedupKey` is covered even when a trace was in-batch
+  // deduped out of the candidate set.
+  const renderDiagnostics =
+    missingVariables.size > 0
+      ? { missingVariables: [...missingVariables] }
+      : null;
+  for (const p of payloads) {
+    p.renderDiagnostics = renderDiagnostics;
   }
 
   // Post-dispatch: write `TriggerSent` for each (trigger, trace) so a
