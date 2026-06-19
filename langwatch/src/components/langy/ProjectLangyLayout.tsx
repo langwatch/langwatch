@@ -3,9 +3,11 @@ import { OrganizationUserRole } from "@prisma/client";
 import type { ReactNode } from "react";
 import { Outlet, useParams } from "react-router";
 
+import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
+import { isLangwatchStaff } from "~/utils/isLangwatchStaff";
 
 import { LangyProvider, useLangy } from "./LangyContext";
 import {
@@ -43,12 +45,17 @@ export default function ProjectLangyLayout() {
 }
 
 /**
- * Langy's visibility gate, relocated verbatim from DashboardLayout. Langy is
- * shown on project routes the user belongs to. The original `!publicPage` and
- * `isProjectRoute` terms are implied here — this component only renders under
- * /:project/* routes, which are never public — so they drop out. Everything
- * else is derivable from app-level hooks, which is why Langy can live a level
- * above the page.
+ * Langy's visibility gate. Two layers:
+ *
+ * 1. Membership — user must belong to the team / be an org admin / be on a
+ *    demo or own personal project. This is the relocated DashboardLayout
+ *    gate; without it we'd render Langy for users who can't actually see
+ *    the project.
+ * 2. Rollout — staff bypass (LangWatch staff always have Langy). For
+ *    everyone else, the `release_langy_enabled` flag must be on for this
+ *    user. Defaults off in the registry, so non-staff are dark by default.
+ *    This mirrors the server-side gate in `routes/langy.ts` so the panel
+ *    can't render against an endpoint that would 404 anyway.
  */
 function useShowLangy(): boolean {
   const { data: session } = useRequiredSession();
@@ -68,7 +75,17 @@ function useShowLangy(): boolean {
     (team?.members?.some((member) => member.userId === user?.id) ?? false) ||
     organizationRole === OrganizationUserRole.ADMIN;
 
-  return userIsPartOfTeam;
+  const staff = isLangwatchStaff(user?.email);
+  // Skip the flag query entirely for staff (always allowed) and for non-members
+  // (never allowed); the answer is decided without it. This keeps the menu
+  // rendering on the first paint instead of waiting on a flag round-trip.
+  const flagQueryEnabled = userIsPartOfTeam && !staff;
+  const { enabled: releaseLangy } = useFeatureFlag("release_langy_enabled", {
+    projectId: project?.id,
+    enabled: flagQueryEnabled,
+  });
+
+  return userIsPartOfTeam && (staff || releaseLangy);
 }
 
 /**
