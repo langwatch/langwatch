@@ -20,6 +20,7 @@ const ENDPOINT = "https://api.langwatch.test";
 const makeService = () =>
   new WorkflowsApiService({
     langwatchApiClient: createLangWatchApiClient("sk-lw-test", ENDPOINT),
+    endpoint: ENDPOINT,
   });
 
 const evaluateResponse = {
@@ -122,7 +123,12 @@ describe("WorkflowsApiService.run", () => {
 
         expect(result.runId).toBe("run_42");
         expect(result.status).toBe("completed");
-        expect(result.runUrl).toBe(evaluateResponse.run_url);
+        // The run URL is rebased onto the configured endpoint, not the
+        // platform's own (cloud) domain. Fixtures use app.langwatch.test; the
+        // endpoint is api.langwatch.test.
+        expect(result.runUrl).toContain("/experiments/wf?runId=run_42");
+        expect(result.runUrl).toContain(ENDPOINT);
+        expect(result.runUrl).not.toContain("app.langwatch.test");
         expect(result.rows).toHaveLength(1);
         expect(result.rows[0]).toMatchObject({
           index: 0,
@@ -192,6 +198,53 @@ describe("WorkflowsApiService.run", () => {
           .catch((e) => e);
 
         expect(err).toBeInstanceOf(WorkflowsApiError);
+      });
+    });
+  });
+
+  describe("given the results lag behind completion", () => {
+    describe("when the first results fetch is empty", () => {
+      it("retries until the rows materialize", async () => {
+        const emptyResults = {
+          ...resultsResponse,
+          dataset: [],
+          evaluations: [],
+        };
+        mockFetch
+          .mockResolvedValueOnce(jsonResponse(evaluateResponse))
+          .mockResolvedValueOnce(jsonResponse(completedStatus))
+          .mockResolvedValueOnce(jsonResponse(emptyResults))
+          .mockResolvedValueOnce(jsonResponse(resultsResponse));
+
+        const service = makeService();
+        const result = await service.run("workflow_123", {
+          data: [{ input: "ping" }],
+          pollInterval: 0,
+        });
+
+        // evaluate + poll + results (empty) + results (materialized)
+        expect(mockFetch).toHaveBeenCalledTimes(4);
+        expect(result.rows).toHaveLength(1);
+      });
+    });
+
+    describe("when the first results fetch 404s", () => {
+      it("retries until the results are available", async () => {
+        mockFetch
+          .mockResolvedValueOnce(jsonResponse(evaluateResponse))
+          .mockResolvedValueOnce(jsonResponse(completedStatus))
+          .mockResolvedValueOnce(
+            jsonResponse({ error: "not yet available" }, { status: 404 }),
+          )
+          .mockResolvedValueOnce(jsonResponse(resultsResponse));
+
+        const service = makeService();
+        const result = await service.run("workflow_123", {
+          data: [{ input: "ping" }],
+          pollInterval: 0,
+        });
+
+        expect(result.rows).toHaveLength(1);
       });
     });
   });
