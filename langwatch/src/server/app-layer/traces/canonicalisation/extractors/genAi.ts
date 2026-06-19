@@ -43,7 +43,7 @@ import {
   recordValueType,
   spanTypeToGenAiOperationName,
 } from "./_extraction";
-import { asNumber, coerceToStringArray, isRecord } from "./_guards";
+import { asBoolean, asNumber, coerceToStringArray, isRecord } from "./_guards";
 import {
   extractSystemInstructionFromMessages,
   stripSystemMessages,
@@ -264,6 +264,57 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
       ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
       ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
     ]);
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Reasoning output tokens (OTel GenAI semconv v1.41)
+    // gen_ai.usage.reasoning.output_tokens supersedes the legacy
+    // gen_ai.usage.reasoning_tokens (still coerced above as a fallback).
+    // Canonicalise the new key onto reasoning_tokens so the metric/cost
+    // mapper keeps reading one key; the new key wins when both are present.
+    // ─────────────────────────────────────────────────────────────────────────
+    const reasoningOutputTokens = asNumber(
+      attrs.take(ATTR_KEYS.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS),
+    );
+    if (reasoningOutputTokens !== null) {
+      ctx.setAttr(ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS, reasoningOutputTokens);
+      ctx.recordRule(`${this.id}:usage.reasoning.output_tokens`);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Time to first streamed chunk (OTel GenAI semconv v1.41)
+    // gen_ai.response.time_to_first_chunk is a duration in SECONDS. Canonicalise
+    // it onto gen_ai.server.time_to_first_token (milliseconds) so the trace
+    // summary TTFT and the span first_token timing both populate. An explicit
+    // time_to_first_token already on the span wins.
+    // ─────────────────────────────────────────────────────────────────────────
+    const timeToFirstChunkSeconds = asNumber(
+      attrs.take(ATTR_KEYS.GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK),
+    );
+    if (
+      timeToFirstChunkSeconds !== null &&
+      timeToFirstChunkSeconds >= 0 &&
+      ctx.out[ATTR_KEYS.GEN_AI_SERVER_TIME_TO_FIRST_TOKEN] === undefined &&
+      !attrs.has(ATTR_KEYS.GEN_AI_SERVER_TIME_TO_FIRST_TOKEN)
+    ) {
+      ctx.setAttr(
+        ATTR_KEYS.GEN_AI_SERVER_TIME_TO_FIRST_TOKEN,
+        timeToFirstChunkSeconds * 1000,
+      );
+      ctx.recordRule(`${this.id}:response.time_to_first_chunk`);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Streaming flag (OTel GenAI semconv v1.41)
+    // gen_ai.request.stream marks whether the request was streamed. Stored as a
+    // canonical attribute (lands in span params via the span mapper); no
+    // dedicated metric column.
+    // ─────────────────────────────────────────────────────────────────────────
+    const rawStream = attrs.take(ATTR_KEYS.GEN_AI_REQUEST_STREAM);
+    const stream = asBoolean(rawStream);
+    if (stream !== null) {
+      ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_STREAM, stream);
+      ctx.recordRule(`${this.id}:request.stream`);
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // Request Parameter Coercion

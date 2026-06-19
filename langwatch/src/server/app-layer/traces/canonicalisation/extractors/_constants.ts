@@ -28,6 +28,8 @@ export const ATTR_KEYS = {
   // Reasoning effort knob (OpenAI low|medium|high; Anthropic emits it as
   // `effort`, e.g. xhigh, on its claude_code api_request events).
   GEN_AI_REQUEST_REASONING_EFFORT: "gen_ai.request.reasoning_effort",
+  // Whether the request was made in streaming mode (OTel GenAI semconv v1.41).
+  GEN_AI_REQUEST_STREAM: "gen_ai.request.stream",
   GEN_AI_INPUT_MESSAGES: "gen_ai.input.messages",
   GEN_AI_OUTPUT_MESSAGES: "gen_ai.output.messages",
   GEN_AI_OUTPUT_TYPE: "gen_ai.output.type",
@@ -35,6 +37,13 @@ export const ATTR_KEYS = {
   GEN_AI_USAGE_OUTPUT_TOKENS: "gen_ai.usage.output_tokens",
   GEN_AI_USAGE_PROMPT_TOKENS: "gen_ai.usage.prompt_tokens",
   GEN_AI_USAGE_COMPLETION_TOKENS: "gen_ai.usage.completion_tokens",
+  // Reasoning output tokens (OTel GenAI semconv v1.41). Supersedes the legacy
+  // gen_ai.usage.reasoning_tokens; canonicalised onto it so downstream
+  // metric/cost mapping keeps reading one key.
+  GEN_AI_USAGE_REASONING_OUTPUT_TOKENS: "gen_ai.usage.reasoning.output_tokens",
+  // Time to first streamed chunk, a duration in SECONDS (OTel GenAI semconv
+  // v1.41). Canonicalised onto gen_ai.server.time_to_first_token (in ms).
+  GEN_AI_RESPONSE_TIME_TO_FIRST_CHUNK: "gen_ai.response.time_to_first_chunk",
   // Time to first token in milliseconds, relative to the span start.
   GEN_AI_SERVER_TIME_TO_FIRST_TOKEN: "gen_ai.server.time_to_first_token",
   // Vercel AI SDK time to first token, a duration in milliseconds.
