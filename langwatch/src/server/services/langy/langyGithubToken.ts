@@ -134,6 +134,23 @@ async function refreshAccessTokenUnderLock({
       );
       return null;
     }
+    if (lockResult.kind === "no-redis") {
+      // Fail closed when we have no distributed lock to serialise rotations.
+      // The previous behaviour proceeded anyway, but the refresh token is
+      // single-use: with N concurrent callers and no lock, one wins and N-1
+      // lose; each loser then hits the grantDead path below and `deleteMany`s
+      // the healthy row the winner just stored. The lock is exactly the race
+      // guard for this; without it, refreshing is unsafe. Chat already
+      // tolerates a missing GitHub token (the skill tells the user to
+      // connect), so returning null here is the least-bad outcome.
+      // Follow-up: file an issue for a DB compare-and-swap fallback so we
+      // can still rotate when Redis is down without risk of the delete race.
+      logger.warn(
+        { userId, organizationId },
+        "github refresh: redis lock unavailable; failing closed instead of racing",
+      );
+      return null;
+    }
 
     // Re-read the row INSIDE the lock. The pre-lock read can be stale when a
     // peer rotated the refresh token but its best-effort cache write failed —

@@ -71,6 +71,12 @@ const workers = new Map();
 // two concurrent first-turn requests for the same conversation can't both miss
 // workers.get() and spawn duplicate (orphan) workers that bypass the cap.
 const workerSpawns = new Map();
+// Atomic slot reservation for spawnWorker(). Incremented synchronously BEFORE
+// the first await so concurrent first-turns for N distinct conversations can't
+// all see `workers.size === 0` and all pass the cap check. Decremented in the
+// spawn's finally, succeed or fail. The cap predicate is
+// `workers.size + pendingSpawns >= MAX_WORKERS`.
+let pendingSpawns = 0;
 
 // Restrict conversationId to a filesystem-safe charset before it ever reaches
 // path.join — otherwise values like "../../etc" escape SESSIONS_ROOT.
@@ -242,7 +248,12 @@ function eventBelongsToSession(event, sessionId) {
 }
 
 async function streamSessionEvents(port, sessionId, res, signal) {
-  const eventRes = await fetch(`http://127.0.0.1:${port}/event`);
+  // Thread the disconnect signal into the upstream fetch itself, not just the
+  // reader.cancel() listener — a fetch waiting on the SSE socket would
+  // otherwise stay alive after a client disconnect until OpenCode happens to
+  // send a byte. With { signal } the fetch errors as AbortError immediately
+  // and the catch below absorbs it.
+  const eventRes = await fetch(`http://127.0.0.1:${port}/event`, { signal });
   if (!eventRes.ok || !eventRes.body) {
     throw new Error(`event stream failed: ${eventRes.status}`);
   }
@@ -293,12 +304,24 @@ async function streamSessionEvents(port, sessionId, res, signal) {
 // ---------- Worker lifecycle ----------
 
 async function spawnWorker(conversationId, credentials) {
-  if (workers.size >= MAX_WORKERS) {
+  // Atomic capacity reservation: must increment BEFORE any await, otherwise
+  // 50 distinct conversations all observe `workers.size === 0` at the cap
+  // check and all start subprocesses (memory cap defeated precisely during
+  // the burst it exists to handle).
+  if (workers.size + pendingSpawns >= MAX_WORKERS) {
     const err = new Error("max-workers-reached");
     err.code = "max-workers-reached";
     throw err;
   }
+  pendingSpawns++;
+  try {
+    return await spawnWorkerInner(conversationId, credentials);
+  } finally {
+    pendingSpawns--;
+  }
+}
 
+async function spawnWorkerInner(conversationId, credentials) {
   const workerHome = path.join(SESSIONS_ROOT, conversationId);
   // Defense-in-depth: even with isValidConversationId at the edge, assert the
   // resolved path stays under SESSIONS_ROOT before we mkdir/spawn into it.
@@ -531,8 +554,19 @@ const server = http.createServer((req, res) => {
         "Cache-Control": "no-cache",
       });
 
+      // Cancel the OpenCode event stream if the client actually disconnects.
+      //
+      // `req.on("close")` would fire as soon as the request body has been read
+      // (i.e. immediately after the JSON body parsing above), not when the
+      // client closes the connection — that aborts a healthy response stream
+      // mid-flight or, if the listener attaches after `end`, never runs at
+      // all. The reliable signal is `res.on("close")` guarded by
+      // `res.writableFinished`, which only stays unset when the connection
+      // closes before res.end() — i.e. an actual disconnect.
       const abort = new AbortController();
-      req.on("close", () => abort.abort());
+      res.on("close", () => {
+        if (!res.writableFinished) abort.abort();
+      });
 
       try {
         let worker;
