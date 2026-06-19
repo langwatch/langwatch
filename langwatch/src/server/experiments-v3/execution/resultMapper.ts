@@ -230,16 +230,19 @@ export const mapEvaluatorResult = (
             ? undefined
             : coerceScore(executionState.outputs?.score),
           passed: coercePassed(executionState.outputs?.passed),
-          label: typeof executionState.outputs?.label === 'string'
-            ? executionState.outputs.label
-            : undefined,
+          label:
+            typeof executionState.outputs?.label === "string"
+              ? executionState.outputs.label
+              : undefined,
           // Only include details when it's a non-empty string.
           // Python's EvaluationResultWithMetadata always serializes details
           // (default None -> null), so we filter out null/undefined to prevent
           // the "sticky details" bug where details appears even after removal.
-          details: typeof executionState.outputs?.details === 'string' && executionState.outputs.details
-            ? executionState.outputs.details
-            : undefined,
+          details:
+            typeof executionState.outputs?.details === "string" &&
+            executionState.outputs.details
+              ? executionState.outputs.details
+              : undefined,
           cost: executionState.cost
             ? { currency: "USD", amount: executionState.cost }
             : undefined,
@@ -348,5 +351,71 @@ export const mapErrorEvent = (
     rowIndex,
     targetId,
     evaluatorId,
+  };
+};
+
+/**
+ * Maps a studio workflow evaluator node's execution state to an
+ * evaluator_result event.
+ *
+ * Unlike mapEvaluatorResult (which parses the v3 "{targetId}.{evaluatorId}"
+ * node-id convention of a generated mini-workflow), this maps an evaluator node
+ * from a real studio workflow run, keyed by the evaluator's own DSL node id.
+ * Workflow evaluators can return stringy score/passed values, so they go
+ * through coerceScore/coercePassed like the legacy workflow-evaluation path.
+ */
+export const mapWorkflowEvaluatorResult = (
+  rowIndex: number,
+  targetId: string,
+  evaluatorId: string,
+  executionState: {
+    status: string;
+    outputs?: Record<string, unknown>;
+    cost?: number;
+    error?: string;
+  },
+): EvaluationV3Event => {
+  const hasExecutionError = !!executionState.error;
+  const hasEvaluatorError =
+    executionState.status === "error" ||
+    executionState.outputs?.status === "error";
+
+  const result: SingleEvaluationResult =
+    hasExecutionError || hasEvaluatorError
+      ? {
+          status: "error",
+          error_type: "EvaluatorError",
+          details:
+            executionState.error ??
+            (typeof executionState.outputs?.details === "string"
+              ? executionState.outputs.details
+              : undefined) ??
+            "Unknown evaluator error",
+          traceback: [],
+        }
+      : {
+          status: "processed",
+          score: coerceScore(executionState.outputs?.score),
+          passed: coercePassed(executionState.outputs?.passed),
+          label:
+            typeof executionState.outputs?.label === "string"
+              ? executionState.outputs.label
+              : undefined,
+          details:
+            typeof executionState.outputs?.details === "string" &&
+            executionState.outputs.details
+              ? executionState.outputs.details
+              : undefined,
+          cost: executionState.cost
+            ? { currency: "USD", amount: executionState.cost }
+            : undefined,
+        };
+
+  return {
+    type: "evaluator_result",
+    rowIndex,
+    targetId,
+    evaluatorId,
+    result,
   };
 };

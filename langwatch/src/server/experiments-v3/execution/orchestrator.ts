@@ -16,6 +16,7 @@ import type { EvaluationsV3State, TargetConfig } from "~/experiments-v3/types";
 import { isRowEmpty } from "~/experiments-v3/utils/emptyRowDetection";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
+import type { Workflow } from "~/optimization_studio/types/dsl";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { getApp } from "~/server/app-layer/app";
@@ -27,10 +28,13 @@ import { generateHumanReadableId } from "~/utils/humanReadableId";
 import { createLogger } from "~/utils/logger/server";
 import { generateOtelTraceId } from "~/utils/trace";
 import { abortManager } from "./abortManager";
+import type { LoadedWorkflow } from "./dataLoader";
 import { buildStripScoreEvaluatorIds } from "./evaluatorScoreFilter";
 import {
+  extractTargetOutput,
   mapErrorEvent,
   mapNlpEvent,
+  mapWorkflowEvaluatorResult,
   type ResultMapperConfig,
 } from "./resultMapper";
 import { createSemaphore } from "./semaphore";
@@ -65,6 +69,8 @@ export type OrchestratorInput = {
   loadedAgents: Map<string, TypedAgent>;
   /** Evaluators loaded from DB - settings and names are fetched fresh from here */
   loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>;
+  /** Studio workflows loaded for workflow targets (committed DSL run per row) */
+  loadedWorkflows?: Map<string, LoadedWorkflow>;
   /** Optional run ID - if not provided, a human-readable ID will be generated */
   runId?: string;
   /** Concurrency limit for parallel execution (default 10) */
@@ -459,6 +465,152 @@ export async function* executeCell(
 }
 
 /**
+ * Executes a single cell whose target is a whole studio workflow.
+ *
+ * Runs the committed workflow DSL once for the row via execute_flow (the
+ * run-whole-workflow primitive), then surfaces the workflow's End-node result
+ * as the target output and each of the workflow's own evaluator nodes as an
+ * evaluator result. This replaces the legacy nlpgo execute_evaluation loop,
+ * keeping orchestration (parallelism, abort, storage) in TypeScript.
+ */
+export async function* executeWorkflowCell(
+  cell: ExecutionCell,
+  projectId: string,
+  workflowDsl: Workflow,
+  isAborted?: () => Promise<boolean>,
+): AsyncGenerator<EvaluationV3Event> {
+  yield {
+    type: "cell_started",
+    rowIndex: cell.rowIndex,
+    targetId: cell.targetId,
+  };
+
+  try {
+    const traceId = cell.traceId ?? generateOtelTraceId();
+    const inputs = buildTargetInputs(cell);
+
+    // The workflow's own evaluator nodes carry the scores we surface per row.
+    const evaluatorNodeIds = new Set(
+      workflowDsl.nodes.filter((n) => n.type === "evaluator").map((n) => n.id),
+    );
+
+    const rawEvent = {
+      type: "execute_flow" as const,
+      payload: {
+        trace_id: traceId,
+        workflow: {
+          ...workflowDsl,
+          state: { execution: { status: "idle" as const } },
+        },
+        inputs: [inputs],
+        manual_execution_mode: false,
+        do_not_trace: false,
+        run_evaluations: true,
+        origin: "evaluation",
+      },
+    };
+
+    const enrichedEvent = await loadDatasets(
+      await addEnvs(rawEvent, projectId),
+      projectId,
+    );
+
+    const events: StudioServerEvent[] = [];
+    await studioBackendPostEvent({
+      projectId,
+      message: enrichedEvent,
+      isAborted,
+      onEvent: (serverEvent) => {
+        events.push(serverEvent);
+      },
+    });
+
+    let targetOutput: unknown;
+    let totalCost = 0;
+    let sawCost = false;
+    let targetFailed = false;
+    let targetError: string | undefined;
+    let durationMs: number | undefined;
+    let finalTraceId = traceId;
+    const evaluatorEvents: EvaluationV3Event[] = [];
+
+    for (const event of events) {
+      if (event.type === "execution_state_change") {
+        const ex = event.payload.execution_state;
+        if (ex?.result !== undefined) {
+          targetOutput = extractTargetOutput(ex.result);
+        }
+        if (ex?.trace_id) finalTraceId = ex.trace_id;
+        if (
+          ex?.timestamps?.started_at !== undefined &&
+          ex?.timestamps?.finished_at !== undefined
+        ) {
+          durationMs = ex.timestamps.finished_at - ex.timestamps.started_at;
+        }
+        if (ex?.status === "error") {
+          targetFailed = true;
+          targetError = ex.error ?? targetError;
+        }
+        continue;
+      }
+
+      if (event.type !== "component_state_change") continue;
+      const { component_id, execution_state } = event.payload;
+      if (!execution_state) continue;
+
+      if (typeof execution_state.cost === "number") {
+        totalCost += execution_state.cost;
+        sawCost = true;
+      }
+
+      if (
+        evaluatorNodeIds.has(component_id) &&
+        (execution_state.status === "success" ||
+          execution_state.status === "error")
+      ) {
+        evaluatorEvents.push(
+          mapWorkflowEvaluatorResult(
+            cell.rowIndex,
+            cell.targetId,
+            component_id,
+            {
+              status: execution_state.status,
+              outputs: execution_state.outputs,
+              cost: execution_state.cost,
+              error: execution_state.error,
+            },
+          ),
+        );
+      }
+    }
+
+    // Yield the target result first so storage links evaluator results to it.
+    yield {
+      type: "target_result",
+      rowIndex: cell.rowIndex,
+      targetId: cell.targetId,
+      output: targetOutput,
+      cost: sawCost ? totalCost : undefined,
+      duration: durationMs,
+      traceId: finalTraceId,
+      error: targetFailed
+        ? (targetError ?? "Workflow execution failed")
+        : undefined,
+    };
+
+    for (const evaluatorEvent of evaluatorEvents) {
+      yield evaluatorEvent;
+    }
+  } catch (error) {
+    logger.error(
+      { error, rowIndex: cell.rowIndex, targetId: cell.targetId },
+      "Workflow cell execution failed",
+    );
+    yield mapErrorEvent((error as Error).message, cell.rowIndex, cell.targetId);
+  }
+}
+
+/**
  * Builds the input values for an evaluator from target output and dataset entry.
  *
  * Note: Dataset entries are normalized to use column NAMES as keys at the API boundary,
@@ -543,6 +695,7 @@ export async function* runOrchestrator(
     loadedPrompts,
     loadedAgents,
     loadedEvaluators,
+    loadedWorkflows,
     runId: providedRunId,
     concurrency: requestedConcurrency,
   } = input;
@@ -615,6 +768,8 @@ export async function* runOrchestrator(
       name = loadedAgents.get(t.dbAgentId)?.name ?? null;
     } else if (t.type === "evaluator" && t.targetEvaluatorId) {
       name = loadedEvaluators?.get(t.targetEvaluatorId)?.name ?? null;
+    } else if (t.type === "workflow" && t.workflowId) {
+      name = loadedWorkflows?.get(t.workflowId)?.name ?? null;
     }
 
     return {
@@ -649,7 +804,10 @@ export async function* runOrchestrator(
       });
     } catch (err) {
       chDispatchFailures++;
-      logger.error({ err, runId }, "Failed to dispatch startExperimentRun to CH");
+      logger.error(
+        { err, runId },
+        "Failed to dispatch startExperimentRun to CH",
+      );
       await abortManager.clearRunning(runId);
       throw err;
     }
@@ -683,10 +841,22 @@ export async function* runOrchestrator(
           evaluatorName: dbEvaluator?.name,
           traceId,
           status: evalResult.status,
-          score: evalResult.status === "processed" ? (evalResult.score ?? undefined) : undefined,
-          passed: evalResult.status === "processed" ? (evalResult.passed ?? undefined) : undefined,
-          label: evalResult.status === "processed" ? (evalResult.label ?? undefined) : undefined,
-          details: evalResult.status === "processed" ? (evalResult.details ?? undefined) : undefined,
+          score:
+            evalResult.status === "processed"
+              ? (evalResult.score ?? undefined)
+              : undefined,
+          passed:
+            evalResult.status === "processed"
+              ? (evalResult.passed ?? undefined)
+              : undefined,
+          label:
+            evalResult.status === "processed"
+              ? (evalResult.label ?? undefined)
+              : undefined,
+          details:
+            evalResult.status === "processed"
+              ? (evalResult.details ?? undefined)
+              : undefined,
           error: evalResult.status === "error" ? evalResult.details : undefined,
           occurredAt: Date.now(),
         });
@@ -703,46 +873,60 @@ export async function* runOrchestrator(
       if (event.type === "target_result") {
         const datasetEntry = datasetRows[event.rowIndex] ?? {};
         chDispatchTotal++;
-        await commands.recordTargetResult({
-          tenantId: projectId,
-          runId,
-          experimentId,
-          index: event.rowIndex,
-          targetId: event.targetId,
-          entry: datasetEntry,
-          predicted:
-            event.output === null || event.output === undefined
-              ? null
-              : { output: event.output },
-          cost: event.cost ?? null,
-          duration: event.duration ?? null,
-          error: event.error ?? null,
-          traceId: event.traceId ?? null,
-          occurredAt: Date.now(),
-        }).catch((err) => {
-          chDispatchFailures++;
-          logger.warn({ err, runId }, "Failed to dispatch recordTargetResult to CH");
-        });
-      } else if (event.type === "error" && event.rowIndex !== undefined && event.targetId) {
+        await commands
+          .recordTargetResult({
+            tenantId: projectId,
+            runId,
+            experimentId,
+            index: event.rowIndex,
+            targetId: event.targetId,
+            entry: datasetEntry,
+            predicted:
+              event.output === null || event.output === undefined
+                ? null
+                : { output: event.output },
+            cost: event.cost ?? null,
+            duration: event.duration ?? null,
+            error: event.error ?? null,
+            traceId: event.traceId ?? null,
+            occurredAt: Date.now(),
+          })
+          .catch((err) => {
+            chDispatchFailures++;
+            logger.warn(
+              { err, runId },
+              "Failed to dispatch recordTargetResult to CH",
+            );
+          });
+      } else if (
+        event.type === "error" &&
+        event.rowIndex !== undefined &&
+        event.targetId
+      ) {
         const datasetEntry = datasetRows[event.rowIndex] ?? {};
         chDispatchTotal++;
-        await commands.recordTargetResult({
-          tenantId: projectId,
-          runId,
-          experimentId,
-          index: event.rowIndex,
-          targetId: event.targetId,
-          entry: datasetEntry,
-          predicted: null,
-          cost: null,
-          duration: null,
-          error: event.message,
-          traceId: null,
-          occurredAt: Date.now(),
-        }).catch((err) => {
-          chDispatchFailures++;
-          logger.warn({ err, runId }, "Failed to dispatch recordTargetResult to CH");
-        });
+        await commands
+          .recordTargetResult({
+            tenantId: projectId,
+            runId,
+            experimentId,
+            index: event.rowIndex,
+            targetId: event.targetId,
+            entry: datasetEntry,
+            predicted: null,
+            cost: null,
+            duration: null,
+            error: event.message,
+            traceId: null,
+            occurredAt: Date.now(),
+          })
+          .catch((err) => {
+            chDispatchFailures++;
+            logger.warn(
+              { err, runId },
+              "Failed to dispatch recordTargetResult to CH",
+            );
+          });
       } else if (event.type === "evaluator_result") {
         const result = event.result as SingleEvaluationResult;
         const evaluatorConfig = state.evaluators.find(
@@ -752,36 +936,40 @@ export async function* runOrchestrator(
           ? loadedEvaluators?.get(evaluatorConfig.dbEvaluatorId)
           : null;
         chDispatchTotal++;
-        await commands.recordEvaluatorResult({
-          tenantId: projectId,
-          runId,
-          experimentId,
-          index: event.rowIndex,
-          targetId: event.targetId,
-          evaluatorId: event.evaluatorId,
-          evaluatorName: dbEvaluator?.name ?? null,
-          status: result.status,
-          score: result.status === "processed" ? result.score : null,
-          label: result.status === "processed" ? result.label : null,
-          passed: result.status === "processed" ? result.passed : null,
-          details:
-            result.status === "error"
-              ? result.details
-              : result.status === "processed"
+        await commands
+          .recordEvaluatorResult({
+            tenantId: projectId,
+            runId,
+            experimentId,
+            index: event.rowIndex,
+            targetId: event.targetId,
+            evaluatorId: event.evaluatorId,
+            evaluatorName: dbEvaluator?.name ?? null,
+            status: result.status,
+            score: result.status === "processed" ? result.score : null,
+            label: result.status === "processed" ? result.label : null,
+            passed: result.status === "processed" ? result.passed : null,
+            details:
+              result.status === "error"
                 ? result.details
+                : result.status === "processed"
+                  ? result.details
+                  : null,
+            occurredAt: Date.now(),
+            cost:
+              result.status === "processed" && result.cost
+                ? result.cost.amount
                 : null,
-          occurredAt: Date.now(),
-          cost:
-            result.status === "processed" && result.cost
-              ? result.cost.amount
-              : null,
-        }).catch((err) => {
-          chDispatchFailures++;
-          logger.warn({ err, runId }, "Failed to dispatch recordEvaluatorResult to CH");
-        });
+          })
+          .catch((err) => {
+            chDispatchFailures++;
+            logger.warn(
+              { err, runId },
+              "Failed to dispatch recordEvaluatorResult to CH",
+            );
+          });
       }
     }
-
   };
 
   // Emit execution_started
@@ -879,6 +1067,7 @@ export async function* runOrchestrator(
                 cell.targetConfig,
                 loadedPrompts,
                 loadedAgents,
+                loadedWorkflows,
               ),
               evaluators: loadedEvaluators,
             };
@@ -886,17 +1075,31 @@ export async function* runOrchestrator(
             // Create abort checker bound to this run
             const checkAbort = () => abortManager.isAborted(runId);
 
+            // Pick the executor: a workflow target runs the full studio workflow
+            // once per row via execute_flow; every other target runs a single
+            // component. Both yield the same target_result / evaluator_result
+            // events.
+            const cellEvents =
+              cell.targetConfig.type === "workflow" && loadedData.workflow
+                ? executeWorkflowCell(
+                    cell,
+                    projectId,
+                    loadedData.workflow.dsl,
+                    checkAbort,
+                  )
+                : executeCell(
+                    cell,
+                    projectId,
+                    datasetColumns,
+                    loadedData,
+                    resultMapperConfig,
+                    checkAbort,
+                  );
+
             // Execute cell and collect events
             let cellFailed = false;
             let cellAborted = false;
-            for await (const event of executeCell(
-              cell,
-              projectId,
-              datasetColumns,
-              loadedData,
-              resultMapperConfig,
-              checkAbort,
-            )) {
+            for await (const event of cellEvents) {
               // Check abort during cell processing
               if (await abortManager.isAborted(runId)) {
                 cellAborted = true;
@@ -993,17 +1196,22 @@ export async function* runOrchestrator(
     // Dispatch completion event to ClickHouse.
     if (experimentId) {
       chDispatchTotal++;
-      await commands.completeExperimentRun({
-        tenantId: projectId,
-        runId,
-        experimentId,
-        finishedAt: aborted ? null : finishedAt,
-        stoppedAt: aborted ? finishedAt : null,
-        occurredAt: Date.now(),
-      }).catch((err) => {
-        chDispatchFailures++;
-        logger.warn({ err, runId }, "Failed to dispatch completeExperimentRun to CH");
-      });
+      await commands
+        .completeExperimentRun({
+          tenantId: projectId,
+          runId,
+          experimentId,
+          finishedAt: aborted ? null : finishedAt,
+          stoppedAt: aborted ? finishedAt : null,
+          occurredAt: Date.now(),
+        })
+        .catch((err) => {
+          chDispatchFailures++;
+          logger.warn(
+            { err, runId },
+            "Failed to dispatch completeExperimentRun to CH",
+          );
+        });
     }
   }
 
@@ -1059,7 +1267,12 @@ const getLoadedDataForTarget = (
   targetConfig: TargetConfig,
   loadedPrompts: Map<string, VersionedPrompt>,
   loadedAgents: Map<string, TypedAgent>,
-): { prompt?: VersionedPrompt; agent?: TypedAgent } => {
+  loadedWorkflows?: Map<string, LoadedWorkflow>,
+): {
+  prompt?: VersionedPrompt;
+  agent?: TypedAgent;
+  workflow?: LoadedWorkflow;
+} => {
   if (targetConfig.type === "prompt" && targetConfig.promptId) {
     const prompt = loadedPrompts.get(targetConfig.promptId);
     if (prompt) {
@@ -1071,6 +1284,13 @@ const getLoadedDataForTarget = (
     const agent = loadedAgents.get(targetConfig.dbAgentId);
     if (agent) {
       return { agent };
+    }
+  }
+
+  if (targetConfig.type === "workflow" && targetConfig.workflowId) {
+    const workflow = loadedWorkflows?.get(targetConfig.workflowId);
+    if (workflow) {
+      return { workflow };
     }
   }
 
