@@ -199,7 +199,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
         ctx(),
       );
       const createdRow = await prisma.modelProvider.findFirst({
-        where: { id: created.id },
+        where: { id: created.id, projectId },
       });
 
       // The drawer's masked-only save: id + scopes, no customKeys. The row is
@@ -219,7 +219,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
 
       expect(updated.id).toBe(created.id);
       const rows = await prisma.modelProvider.findMany({
-        where: { name: `OpenAI Org Edit ${ns}` },
+        where: { name: `OpenAI Org Edit ${ns}`, projectId },
         include: { scopes: true },
       });
       expect(rows).toHaveLength(1);
