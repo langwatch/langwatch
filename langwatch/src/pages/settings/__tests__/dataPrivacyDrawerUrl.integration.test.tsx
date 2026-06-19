@@ -9,7 +9,7 @@
  * mirroring DrawerNavigation.integration.test.tsx.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
@@ -173,9 +173,13 @@ describe("Privacy rule drawer URL routing", () => {
         />,
       );
 
+      // Wait for the drawer to mount before dispatching Escape, then allow the
+      // close handler to fire — both are async on loaded CI runners, where the
+      // original bare assertion raced and flaked (passes locally in isolation).
+      await screen.findByText("Edit privacy rule");
       await user.keyboard("{Escape}");
 
-      expect(mockCloseDrawer).toHaveBeenCalled();
+      await waitFor(() => expect(mockCloseDrawer).toHaveBeenCalled());
     });
   });
 });
