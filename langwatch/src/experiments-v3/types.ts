@@ -257,7 +257,7 @@ export type HttpConfig = z.infer<typeof httpConfigSchema>;
  */
 export const targetConfigSchema = z.object({
   id: z.string(),
-  type: z.enum(["prompt", "agent", "evaluator"]),
+  type: z.enum(["prompt", "agent", "evaluator", "workflow"]),
   icon: z.string().optional(),
   promptId: z.string().optional(),
   promptVersionId: z.string().optional(),
@@ -306,12 +306,20 @@ export const targetConfigSchema = z.object({
    * variantA/variantB/goldenField at save time and run time.
    */
   pairwise: pairwiseEvaluatorConfigSchema.optional(),
+  /**
+   * Studio workflow target: the committed studio workflow evaluated as a whole
+   * per dataset row (distinct from an "agent" target with agentType "workflow",
+   * which is a saved agent built as a single code node). Only set when
+   * type === "workflow".
+   */
+  workflowId: z.string().optional(),
+  workflowVersionId: z.string().optional(),
   inputs: z.array(fieldSchema).optional(),
   outputs: z.array(fieldSchema).optional(),
   // Per-dataset mappings: datasetId -> inputFieldName -> FieldMapping
   mappings: z.record(z.string(), z.record(z.string(), fieldMappingSchema)),
 });
-export type TargetType = "prompt" | "agent" | "evaluator";
+export type TargetType = "prompt" | "agent" | "evaluator" | "workflow";
 export type TargetConfig = Omit<
   z.infer<typeof targetConfigSchema>,
   "inputs" | "outputs"
