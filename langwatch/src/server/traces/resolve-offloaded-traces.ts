@@ -22,10 +22,16 @@
  * the affected trace.
  */
 import type { Logger as PinoLogger } from "pino";
-import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
-import { BlobNotFoundError, BlobFieldNotFoundError } from "~/server/app-layer/traces/blob-store.service";
-import type { TraceIOExtractionService, ExtractedIO } from "~/server/app-layer/traces/trace-io-extraction.service";
+import {
+  BlobFieldNotFoundError,
+  BlobNotFoundError,
+} from "~/server/app-layer/traces/blob-store.service";
+import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
+import type {
+  ExtractedIO,
+  TraceIOExtractionService,
+} from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 
 /** Minimal logger interface required by this module (subset of PinoLogger). */
@@ -174,7 +180,10 @@ export async function resolveOffloadedTraces({
       if (eventrefEntries.length === 0) {
         // All ref keys were malformed JSON or missing eventId — strip
         // reserved keys anyway so the UI never sees the namespace.
-        return { span: { ...span, spanAttributes: cleanedAttrs }, resolvedCount: 0 };
+        return {
+          span: { ...span, spanAttributes: cleanedAttrs },
+          resolvedCount: 0,
+        };
       }
 
       // ADR-022: aggregateId for the trace-processing pipeline IS the traceId.
@@ -193,6 +202,11 @@ export async function resolveOffloadedTraces({
             tenantId: projectId,
             aggregateType,
             aggregateId,
+            // The referenced event was written during this span's ingestion, so
+            // its EventOccurredAt sits near the span start. Pass it as a
+            // partition-prune hint so the read stays on the span's week instead
+            // of walking every (S3-tiered) event_log partition.
+            occurredAtMs: span.startTimeUnixMs,
           });
           return { attrKey, fullValue };
         }),
@@ -207,7 +221,10 @@ export async function resolveOffloadedTraces({
           // Log and keep preview for this field; other fields are not affected.
           const err = result.reason;
           const attrKey = eventrefEntries[idx]?.attrKey ?? "unknown";
-          if (err instanceof BlobNotFoundError || err instanceof BlobFieldNotFoundError) {
+          if (
+            err instanceof BlobNotFoundError ||
+            err instanceof BlobFieldNotFoundError
+          ) {
             logger.warn(
               {
                 projectId,
@@ -233,29 +250,37 @@ export async function resolveOffloadedTraces({
         }
       }
 
-      return { span: { ...span, spanAttributes: resolvedAttrs }, resolvedCount };
+      return {
+        span: { ...span, spanAttributes: resolvedAttrs },
+        resolvedCount,
+      };
     }),
   );
 
   // Collect resolved spans; fall back to original span on unexpected rejection.
   let anyResolved = false;
-  const resolvedSpans: NormalizedSpan[] = spanSettlements.map((settlement, i) => {
-    if (settlement.status === "fulfilled") {
-      if (settlement.value.resolvedCount > 0) anyResolved = true;
-      return settlement.value.span;
-    }
-    // Unexpected uncaught error from the span's async mapper — log and fall back.
-    logger.warn(
-      {
-        projectId,
-        spanId: normalizedSpans[i]?.spanId,
-        traceId: normalizedSpans[i]?.traceId,
-        error: settlement.reason instanceof Error ? settlement.reason.message : String(settlement.reason),
-      },
-      "Failed to resolve offloaded event refs for span — keeping preview value",
-    );
-    return normalizedSpans[i]!;
-  });
+  const resolvedSpans: NormalizedSpan[] = spanSettlements.map(
+    (settlement, i) => {
+      if (settlement.status === "fulfilled") {
+        if (settlement.value.resolvedCount > 0) anyResolved = true;
+        return settlement.value.span;
+      }
+      // Unexpected uncaught error from the span's async mapper — log and fall back.
+      logger.warn(
+        {
+          projectId,
+          spanId: normalizedSpans[i]?.spanId,
+          traceId: normalizedSpans[i]?.traceId,
+          error:
+            settlement.reason instanceof Error
+              ? settlement.reason.message
+              : String(settlement.reason),
+        },
+        "Failed to resolve offloaded event refs for span — keeping preview value",
+      );
+      return normalizedSpans[i]!;
+    },
+  );
 
   if (!anyResolved) {
     return {

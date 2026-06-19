@@ -12,6 +12,16 @@ export interface S3ClientResolution {
   s3Bucket: string;
 }
 
+/**
+ * Half-width (ms) of the `EventOccurredAt` window applied to event_log blob
+ * reads when a time hint is available. The referenced event is written during
+ * span ingestion at roughly the span's start time, so ±2 days comfortably
+ * covers ingestion lag and clock skew while still pruning to the one or two
+ * weekly partitions around the span. Matches the ±2-day span partition hint
+ * used on the trace-fetch path.
+ */
+const EVENT_LOG_OCCURRED_AT_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
+
 /** Resolves the per-organization S3 client + bucket for a project. */
 export type S3ClientResolver = (
   projectId: string,
@@ -40,7 +50,10 @@ export class BlobNotFoundError extends Error {
  * present in the EventPayload. Indicates a corrupted event or a stale ref.
  */
 export class BlobFieldNotFoundError extends Error {
-  constructor(readonly key: string, readonly field: string) {
+  constructor(
+    readonly key: string,
+    readonly field: string,
+  ) {
     super(`Field "${field}" not found in event payload at key ${key}`);
     this.name = "BlobFieldNotFoundError";
   }
@@ -149,12 +162,23 @@ export class BlobStore {
     tenantId,
     aggregateType,
     aggregateId,
+    occurredAtMs,
   }: {
     eventId: string;
     field: string;
     tenantId: string;
     aggregateType: string;
     aggregateId: string;
+    /**
+     * Approximate time the referenced event occurred (ms), used only to prune
+     * `event_log` partitions. When provided, a ±2-day `EventOccurredAt` window
+     * is added so the read touches the one or two weekly partitions around that
+     * time instead of walking every partition (which tier to S3, turning each
+     * blob read into a burst of S3 GETs). The window never changes which row is
+     * returned — the lookup is still uniquely keyed by `EventId` — so an absent
+     * or slightly-off hint only affects cost, never correctness.
+     */
+    occurredAtMs?: number;
   }): Promise<string> {
     if (!this.resolveClickHouseClient) {
       throw new Error(
@@ -163,6 +187,36 @@ export class BlobStore {
     }
 
     const clickHouseClient = await this.resolveClickHouseClient(tenantId);
+
+    // Prune partitions when we know roughly when the event occurred. event_log
+    // is PARTITION BY toYearWeek(EventOccurredAt), monotonic in EventOccurredAt,
+    // so a window predicate prunes weeks. Rows with an unknown occurred time
+    // (EventOccurredAt = 0, the column default) are always kept so the hint can
+    // never hide a present row.
+    const hasOccurredAtHint =
+      typeof occurredAtMs === "number" &&
+      Number.isFinite(occurredAtMs) &&
+      occurredAtMs > 0;
+    const occurredAtPredicate = hasOccurredAtHint
+      ? `AND (
+            EventOccurredAt = 0
+            OR (
+              EventOccurredAt >= {occurredAtFromMs:UInt64}
+              AND EventOccurredAt <= {occurredAtToMs:UInt64}
+            )
+          )`
+      : "";
+    const occurredAtParams = hasOccurredAtHint
+      ? {
+          occurredAtFromMs: Math.max(
+            0,
+            Math.floor(occurredAtMs - EVENT_LOG_OCCURRED_AT_WINDOW_MS),
+          ),
+          occurredAtToMs: Math.floor(
+            occurredAtMs + EVENT_LOG_OCCURRED_AT_WINDOW_MS,
+          ),
+        }
+      : {};
 
     // TenantId MUST be the first predicate in the WHERE clause (ADR-022 cross-tenant denial).
     const result = await clickHouseClient.query({
@@ -173,9 +227,16 @@ export class BlobStore {
           AND AggregateType = {aggregateType:String}
           AND AggregateId = {aggregateId:String}
           AND EventId = {eventId:String}
+          ${occurredAtPredicate}
         LIMIT 1
       `,
-      query_params: { tenantId, aggregateType, aggregateId, eventId },
+      query_params: {
+        tenantId,
+        aggregateType,
+        aggregateId,
+        eventId,
+        ...occurredAtParams,
+      },
     });
 
     const response = await result.json<unknown>();
