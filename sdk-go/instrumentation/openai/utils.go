@@ -40,10 +40,38 @@ func getBool(data jsonData, key string) (bool, bool) {
 	return val, ok
 }
 
+// hasKey reports whether data contains key with a non-nil value.
+func hasKey(data jsonData, key string) bool {
+	v, ok := data[key]
+	return ok && v != nil
+}
+
 // getStreamingFlag checks if streaming is enabled in the request data.
 func getStreamingFlag(reqData jsonData) bool {
 	streamVal, ok := getBool(reqData, "stream")
 	return ok && streamVal
+}
+
+// parseBody unmarshals raw JSON into a generic map for cheap shape sniffing.
+// Returns nil (and false) when the payload is not a JSON object.
+func parseBody(raw []byte) (jsonData, bool) {
+	var data jsonData
+	if err := json.Unmarshal(raw, &data); err != nil {
+		return nil, false
+	}
+	return data, true
+}
+
+// peekObjectField reads the top-level "object" discriminator off a JSON body
+// without fully unmarshalling it. Returns "" if absent or unparseable.
+func peekObjectField(raw []byte) string {
+	var probe struct {
+		Object string `json:"object"`
+	}
+	if err := json.Unmarshal(raw, &probe); err != nil {
+		return ""
+	}
+	return probe.Object
 }
 
 // logError provides consistent error logging across the package.
@@ -74,9 +102,23 @@ func setJSONAttribute(span *langwatch.Span, key string, data interface{}) {
 	span.SetAttributes(attribute.String(key, string(jsonBytes)))
 }
 
-// setStringAttribute safely sets a string attribute if the value is not empty.
-func setStringAttribute(span *langwatch.Span, key, value string) {
-	if value != "" {
-		span.SetAttributes(attribute.String(key, value))
+// toChatMessages round-trips an arbitrary OpenAI message collection through JSON
+// into LangWatch chat messages. Because langwatch.ChatMessage uses the standard
+// role/content/tool_calls field names, the provider's wire shape maps cleanly.
+// Returns false (so the caller can fall back to a JSON value) if the payload
+// cannot be represented as chat messages.
+func toChatMessages(messages any) ([]langwatch.ChatMessage, bool) {
+	jsonBytes, err := json.Marshal(messages)
+	if err != nil {
+		logError("Failed to marshal messages to JSON: %v", err)
+		return nil, false
 	}
+
+	var chatMessages []langwatch.ChatMessage
+	if err := json.Unmarshal(jsonBytes, &chatMessages); err != nil {
+		logError("Failed to convert messages to chat messages: %v", err)
+		return nil, false
+	}
+
+	return chatMessages, len(chatMessages) > 0
 }

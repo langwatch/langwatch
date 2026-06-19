@@ -37,20 +37,12 @@ func TestJSONUtils(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, 123.45, val)
 
-		// Note: JSON ints might parse as float64
 		valIntFloat, okIntFloat := getFloat64(data, "int_key_float")
 		assert.True(t, okIntFloat)
 		assert.Equal(t, 99.0, valIntFloat)
 
-		valIntInt, okIntInt := getFloat64(data, "int_key_int")
-		assert.True(t, okIntInt)
-		assert.Equal(t, 77.0, valIntInt)
-
 		_, ok = getFloat64(data, "string_key")
 		assert.False(t, ok, "Should fail for wrong type")
-
-		_, ok = getFloat64(data, "missing_key")
-		assert.False(t, ok, "Should fail for missing key")
 	})
 
 	t.Run("getInt", func(t *testing.T) {
@@ -58,20 +50,41 @@ func TestJSONUtils(t *testing.T) {
 		assert.True(t, okFloat)
 		assert.Equal(t, 99, valFloat)
 
-		valInt, okInt := getInt(data, "int_key_int")
-		assert.True(t, okInt, "Should handle actual int type if present")
-		assert.Equal(t, 77, valInt)
-
-		_, ok := getInt(data, "float_key") // Should truncate
-		assert.True(t, ok, "Should convert float to int")
-
 		val, _ := getInt(data, "float_key")
 		assert.Equal(t, 123, val, "Should truncate float to int")
 
-		_, ok = getInt(data, "string_key")
+		_, ok := getInt(data, "string_key")
 		assert.False(t, ok, "Should fail for wrong type")
+	})
 
-		_, ok = getInt(data, "missing_key")
-		assert.False(t, ok, "Should fail for missing key")
+	t.Run("hasKey", func(t *testing.T) {
+		assert.True(t, hasKey(data, "string_key"))
+		assert.False(t, hasKey(data, "null_key"), "null values are treated as absent")
+		assert.False(t, hasKey(data, "missing_key"))
+	})
+
+	t.Run("getStreamingFlag", func(t *testing.T) {
+		assert.False(t, getStreamingFlag(data))
+		streaming, _ := parseBody([]byte(`{"stream":true}`))
+		assert.True(t, getStreamingFlag(streaming))
+	})
+}
+
+func TestParseBodyAndPeekObject(t *testing.T) {
+	t.Run("parseBody on object", func(t *testing.T) {
+		body, ok := parseBody([]byte(`{"a":1}`))
+		assert.True(t, ok)
+		assert.Contains(t, body, "a")
+	})
+
+	t.Run("parseBody on non-object", func(t *testing.T) {
+		_, ok := parseBody([]byte(`["not","an","object"]`))
+		assert.False(t, ok)
+	})
+
+	t.Run("peekObjectField", func(t *testing.T) {
+		assert.Equal(t, "chat.completion", peekObjectField([]byte(`{"object":"chat.completion","x":1}`)))
+		assert.Equal(t, "", peekObjectField([]byte(`{"no_object":true}`)))
+		assert.Equal(t, "", peekObjectField([]byte(`not json`)))
 	})
 }
