@@ -136,7 +136,7 @@ function setupWorkerHome(workerHome, credentials) {
   fs.mkdirSync(configDir, { recursive: true });
   const config = {
     $schema: "https://opencode.ai/config.json",
-    model: "openai/gpt-5-mini",
+    model: credentials.model || "openai/gpt-5-mini",
     // OTel plugin: opencode auto-loads it by name and exports spans using the
     // OPENCODE_OTLP_* env injected at spawn time (see spawnWorker).
     plugin: [OPENCODE_OTEL_PLUGIN],
@@ -498,7 +498,8 @@ const server = http.createServer((req, res) => {
         return;
       }
 
-      const { conversationId, prompt, system, credentials } = parsed;
+      const { conversationId, prompt, system, credentials, modelOverride } =
+        parsed;
       if (!conversationId || !prompt || !credentials) {
         badRequest(res, "missing required: conversationId, prompt, credentials");
         return;
@@ -515,6 +516,14 @@ const server = http.createServer((req, res) => {
       ) {
         badRequest(res, "credentials must include langwatchApiKey, llmVirtualKey, gatewayBaseUrl, langwatchEndpoint");
         return;
+      }
+
+      // Thread the user-selected/resolved model (already validated against the
+      // project's allow-list by the control plane) into the worker config so the
+      // picker actually takes effect; fall back to the default otherwise. The
+      // model is bound at worker creation, i.e. fixed per conversation.
+      if (typeof modelOverride === "string" && modelOverride.trim()) {
+        credentials.model = modelOverride.trim();
       }
 
       res.writeHead(200, {
@@ -589,6 +598,18 @@ const server = http.createServer((req, res) => {
   res.writeHead(404);
   res.end();
 });
+
+// Wipe stale per-session worker homes left by a previous manager that crashed
+// or was killed before its per-worker cleanup ran. /workspace is an emptyDir
+// that survives container restarts in the same pod, so plaintext per-session
+// credentials and cloned repos could otherwise persist indefinitely. Do this
+// before accepting traffic.
+try {
+  fs.rmSync(SESSIONS_ROOT, { recursive: true, force: true });
+} catch {
+  /* best-effort: a missing dir is fine */
+}
+fs.mkdirSync(SESSIONS_ROOT, { recursive: true });
 
 server.listen(PORT, () => {
   console.log(
