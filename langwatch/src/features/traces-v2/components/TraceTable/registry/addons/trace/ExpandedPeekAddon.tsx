@@ -83,7 +83,10 @@ function flattenPeekTree(nodes: PeekTreeNode[]): PeekTreeNode[] {
 }
 
 const InlinePeekContent: React.FC<{ trace: TraceListItem }> = ({ trace }) => {
-  const { data: spans, isLoading } = useTraceSpanTree(trace.traceId);
+  const { data: spans, isLoading } = useTraceSpanTree(
+    trace.traceId,
+    trace.timestamp,
+  );
 
   const flatSpans = useMemo(() => {
     if (!spans || spans.length === 0) return [];
@@ -113,7 +116,7 @@ const InlinePeekContent: React.FC<{ trace: TraceListItem }> = ({ trace }) => {
       }}
     >
       {isLoading ? (
-        <PeekSkeleton />
+        <PeekSkeleton spanCount={trace.spanCount} />
       ) : (
         <VStack align="stretch" gap={0}>
           {flatSpans.map((node) => (
@@ -166,38 +169,62 @@ const InlinePeekContent: React.FC<{ trace: TraceListItem }> = ({ trace }) => {
   );
 };
 
-const PeekSkeleton: React.FC = () => (
-  <VStack align="stretch" gap="6px" paddingY={1}>
-    {[
-      { indent: 0, name: "62%" },
-      { indent: 1, name: "48%" },
-      { indent: 2, name: "55%" },
-      { indent: 1, name: "40%" },
-    ].map((row, i) => (
-      <Flex
-        key={`peek-skel-${i}`}
-        align="center"
-        height="26px"
-        paddingLeft={`${row.indent * PEEK_INDENT_PX}px`}
-        gap={2}
-        css={{ animationDelay: `${i * 70}ms` }}
-        opacity={0.55}
-      >
-        <HStack gap={1} flexShrink={0} minWidth="180px" maxWidth="280px">
-          <Skeleton height="6px" width="6px" borderRadius="full" />
-          <Skeleton height="8px" width={row.name} borderRadius="full" />
-        </HStack>
-        <Box flex={1} height="6px" borderRadius="sm" bg="fg.subtle/8" />
-        <Skeleton
-          height="8px"
-          width="36px"
-          borderRadius="full"
-          flexShrink={0}
-        />
-      </Flex>
-    ))}
-  </VStack>
-);
+// Deterministic skeleton row shapes — looks like a real span tree
+// (indent cycles, label widths vary) so a low-spanCount trace doesn't
+// land on a row of identical-width bars. The list is sampled by index
+// modulo length when scaled up, keeping the visual rhythm.
+const PEEK_SKELETON_SHAPES: ReadonlyArray<{ indent: number; name: string }> = [
+  { indent: 0, name: "62%" },
+  { indent: 1, name: "48%" },
+  { indent: 2, name: "55%" },
+  { indent: 2, name: "42%" },
+  { indent: 1, name: "40%" },
+  { indent: 2, name: "58%" },
+  { indent: 3, name: "36%" },
+  { indent: 1, name: "52%" },
+];
+
+const PeekSkeleton: React.FC<{ spanCount?: number }> = ({ spanCount }) => {
+  // Width matters more than indent variance: the user already paid for
+  // a skeleton that LOOKS like their trace. If spanCount is positive,
+  // render exactly that many rows so the loading box matches the
+  // settled box once data lands. Otherwise the original 4-row generic
+  // pattern from the design — readable, no commitment.
+  const rowCount =
+    spanCount && Number.isFinite(spanCount) && spanCount > 0
+      ? Math.min(spanCount, 30)
+      : PEEK_SKELETON_SHAPES.length;
+  return (
+    <VStack align="stretch" gap="6px" paddingY={1}>
+      {Array.from({ length: rowCount }, (_, i) => {
+        const shape = PEEK_SKELETON_SHAPES[i % PEEK_SKELETON_SHAPES.length]!;
+        return (
+          <Flex
+            key={`peek-skel-${i}`}
+            align="center"
+            height="26px"
+            paddingLeft={`${shape.indent * PEEK_INDENT_PX}px`}
+            gap={2}
+            css={{ animationDelay: `${i * 70}ms` }}
+            opacity={0.55}
+          >
+            <HStack gap={1} flexShrink={0} minWidth="180px" maxWidth="280px">
+              <Skeleton height="6px" width="6px" borderRadius="full" />
+              <Skeleton height="8px" width={shape.name} borderRadius="full" />
+            </HStack>
+            <Box flex={1} height="6px" borderRadius="sm" bg="fg.subtle/8" />
+            <Skeleton
+              height="8px"
+              width="36px"
+              borderRadius="full"
+              flexShrink={0}
+            />
+          </Flex>
+        );
+      })}
+    </VStack>
+  );
+};
 
 const PeekSpanRow: React.FC<{
   node: PeekTreeNode;

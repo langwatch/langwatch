@@ -8,6 +8,32 @@ import type {
   Span,
   SpanTimestamps,
 } from "~/server/tracer/types";
+import type { ProjectionPlan } from "./projection/types";
+
+/** Time axis that `startDate`/`endDate` and the keyset cursor apply to. */
+export type TraceDateField = "occurred" | "updated";
+
+/**
+ * Options for getAllTracesForProject, shared by the TraceService facade and the
+ * ClickHouse implementation so the contract stays in one place.
+ */
+export interface GetAllTracesForProjectOptions {
+  downloadMode?: boolean;
+  includeSpans?: boolean;
+  scrollId?: string | null;
+  /**
+   * Which time axis the date window + keyset cursor filter on. "occurred"
+   * (default) keeps the legacy OccurredAt behavior; "updated" pages by last
+   * mutation time for incremental ETL (CDC) pulls.
+   */
+  dateField?: TraceDateField;
+  /**
+   * Compiled projection plan (from the projection DSL). Drives which child
+   * collections are JOINed and whether the heavy io columns are fetched.
+   * Opaque to callers — produced by `compileProjection`.
+   */
+  projection?: ProjectionPlan;
+}
 
 /**
  * Input parameters for getAllTracesForProject.

@@ -5,9 +5,28 @@ import {
   Icon,
   type SystemStyleObject,
 } from "@chakra-ui/react";
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  horizontalListSortingStrategy,
+  SortableContext,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { flexRender, type Header, type Table } from "@tanstack/react-table";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import type React from "react";
+import { useEffect, useRef } from "react";
+import {
+  COLUMN_DRAG_THRESHOLD_PX,
+  useColumnEducationStore,
+} from "../../stores/columnEducationStore";
 import { ColumnResizeGrip } from "./ColumnResizeGrip";
 import { Table as TableEl, Th, Thead, Tr } from "./TablePrimitives";
 
@@ -25,6 +44,21 @@ interface TraceTableShellProps<T> {
   minWidth: string;
   children: React.ReactNode;
   stickyFirstColumn?: boolean;
+  /**
+   * Fired when the user drags a column header to reorder. Receives the
+   * full ordered list of column ids (excluding any pinned-first
+   * select-checkbox column). Callers persist this to the active lens.
+   * When omitted, column headers render without a drag handle and the
+   * row is not wrapped in a DndContext — preserving the previous
+   * behaviour for tables that don't yet support reorder.
+   */
+  onColumnReorder?: (orderedIds: string[]) => void;
+  /**
+   * Column ids that must NOT participate in drag-reorder (typically
+   * the row-select checkbox at index 0). Reordering operates only on
+   * ids outside this set.
+   */
+  pinnedColumnIds?: ReadonlySet<string>;
 }
 
 export function TraceTableShell<T>({
@@ -32,10 +66,73 @@ export function TraceTableShell<T>({
   minWidth,
   children,
   stickyFirstColumn = false,
+  onColumnReorder,
+  pinnedColumnIds,
 }: TraceTableShellProps<T>): React.ReactElement {
+  // Drag-reorder requires the parent to opt-in via onColumnReorder.
+  // When opted in we build the list of reorderable header ids (the
+  // SortableContext items) and wrap the header row in a DndContext so
+  // any header can be dragged into a new slot. Without it the header
+  // row renders exactly as before.
+  const reorderable = !!onColumnReorder;
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      // Same activation distance the sidebar uses — small enough that
+      // intent is unambiguous, large enough that a sloppy click on the
+      // grip doesn't kick off a drag.
+      activationConstraint: { distance: 5 },
+    }),
+  );
+  // After a drag, the browser fires a synthetic click on pointerup —
+  // dnd-kit's PointerSensor doesn't suppress it. Because the drag zone
+  // lives inside the sort <Button onClick>, finishing a reorder would
+  // also toggle the column's sort. Flip this ref on drag start and
+  // clear it on the NEXT tick after drag end/cancel (the synthetic
+  // click fires synchronously before timers run), so the button's
+  // onClick can swallow exactly that one click. Plain clicks never
+  // start a drag, so the ref stays false and sorting works as normal.
+  const suppressSortClickRef = useRef(false);
+  const sortableHeaderIds =
+    table
+      .getHeaderGroups()[0]
+      ?.headers.map((h) => h.id)
+      .filter((id) => !pinnedColumnIds?.has(id)) ?? [];
+
+  const releaseSortClickSuppression = () => {
+    // setTimeout(0) defers past the synthetic click that the browser
+    // dispatches synchronously after pointerup — resetting inline here
+    // would re-enable sorting before that click reaches the button.
+    setTimeout(() => {
+      suppressSortClickRef.current = false;
+    }, 0);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    releaseSortClickSuppression();
+    if (!onColumnReorder) return;
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const ids = sortableHeaderIds;
+    const fromIdx = ids.indexOf(String(active.id));
+    const toIdx = ids.indexOf(String(over.id));
+    if (fromIdx < 0 || toIdx < 0) return;
+    const next = [...ids];
+    const [moved] = next.splice(fromIdx, 1);
+    if (!moved) return;
+    next.splice(toIdx, 0, moved);
+    onColumnReorder(next);
+  };
+
   return (
     <TableEl
       width="full"
+      // Anchor the table's underlying surface so alpha-blended row tints
+      // (red.fg/8, yellow.fg/8) composite over a known base. Without
+      // this, transparent body cells inherit from whichever ancestor
+      // paints next (page bg, drawer bg) and the sticky-first-cell
+      // color-mix below ends up mixing against a different base than
+      // the body cells — the row reads as two horizontal bands.
+      bg="bg.surface"
       css={{
         // `separate` + `border-spacing: 0` keeps the visual look of a
         // single-pixel grid (no gaps between cells) while letting each
@@ -75,33 +172,39 @@ export function TraceTableShell<T>({
           // sticky cell paints the SAME surface that's behind the
           // transparent row body. Still opaque, still covers any
           // horizontally-scrolled content underneath it.
-          "& tbody[data-row-variant='default'] > tr > td:first-child, & tbody:not([data-row-variant]) > tr > td:first-child": {
-            backgroundColor: "var(--chakra-colors-bg-surface)",
-          },
+          "& tbody[data-row-variant='default'] > tr > td:first-child, & tbody:not([data-row-variant]) > tr > td:first-child":
+            {
+              backgroundColor: "var(--chakra-colors-bg-surface)",
+            },
           // Default-row hover variant for the sticky cell. Mirrors the
           // `style.hoverBg = gray.subtle` painted on the main row's Tr
           // (see RegistryRow). Without this rule, only the row body
           // picked up the hover tint and the sticky cell kept its
           // resting bg — the row read as "half hovered".
-          "& tbody[data-row-variant='default']:hover > tr > td:first-child, & tbody:not([data-row-variant]):hover > tr > td:first-child": {
-            backgroundColor: "var(--chakra-colors-gray-subtle)",
-          },
+          "& tbody[data-row-variant='default']:hover > tr > td:first-child, & tbody:not([data-row-variant]):hover > tr > td:first-child":
+            {
+              backgroundColor: "var(--chakra-colors-gray-subtle)",
+            },
           "& tbody[data-row-variant='selected'] > tr > td:first-child": {
             backgroundColor: "var(--chakra-colors-blue-subtle)",
           },
           "& tbody[data-row-variant='error'] > tr > td:first-child": {
             // Match RegistryRow's `bg=red.fg/8` so the sticky cell reads
             // as part of the same red surface the rest of the row paints.
-            backgroundColor: "color-mix(in srgb, var(--chakra-colors-red-fg) 8%, var(--chakra-colors-bg-panel))",
+            backgroundColor:
+              "color-mix(in srgb, var(--chakra-colors-red-fg) 8%, var(--chakra-colors-bg-surface))",
           },
           "& tbody[data-row-variant='warning'] > tr > td:first-child": {
-            backgroundColor: "color-mix(in srgb, var(--chakra-colors-yellow-fg) 8%, var(--chakra-colors-bg-panel))",
+            backgroundColor:
+              "color-mix(in srgb, var(--chakra-colors-yellow-fg) 8%, var(--chakra-colors-bg-surface))",
           },
           "& tbody[data-row-variant='error']:hover > tr > td:first-child": {
-            backgroundColor: "color-mix(in srgb, var(--chakra-colors-red-fg) 14%, var(--chakra-colors-bg-panel))",
+            backgroundColor:
+              "color-mix(in srgb, var(--chakra-colors-red-fg) 14%, var(--chakra-colors-bg-surface))",
           },
           "& tbody[data-row-variant='warning']:hover > tr > td:first-child": {
-            backgroundColor: "color-mix(in srgb, var(--chakra-colors-yellow-fg) 14%, var(--chakra-colors-bg-panel))",
+            backgroundColor:
+              "color-mix(in srgb, var(--chakra-colors-yellow-fg) 14%, var(--chakra-colors-bg-surface))",
           },
         }),
       }}
@@ -118,25 +221,48 @@ export function TraceTableShell<T>({
         zIndex={2}
         bg={{ base: "bg.subtle", _dark: "bg.surface" }}
       >
-        {table.getHeaderGroups().map((headerGroup) => (
-          <Tr
-            key={headerGroup.id}
-            // Under `border-collapse: separate` the TR-level border
-            // doesn't paint reliably across cells — the row-level
-            // border needs to live on each TH (handled in HeaderCell
-            // below). Keeping the prop here for legacy SSR markup but
-            // it's a no-op under the new collapse mode.
-            borderBottomWidth="0"
+        {reorderable ? (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={() => {
+              suppressSortClickRef.current = true;
+            }}
+            onDragEnd={handleDragEnd}
+            onDragCancel={releaseSortClickSuppression}
           >
-            {headerGroup.headers.map((header, i) => (
-              <HeaderCell
-                key={header.id}
-                header={header}
-                isStickyFirst={stickyFirstColumn && i === 0}
-              />
-            ))}
-          </Tr>
-        ))}
+            <SortableContext
+              items={sortableHeaderIds}
+              strategy={horizontalListSortingStrategy}
+            >
+              {table.getHeaderGroups().map((headerGroup) => (
+                <Tr key={headerGroup.id} borderBottomWidth="0">
+                  {headerGroup.headers.map((header, i) => (
+                    <HeaderCell
+                      key={header.id}
+                      header={header}
+                      isStickyFirst={stickyFirstColumn && i === 0}
+                      reorderable={!pinnedColumnIds?.has(header.id)}
+                      suppressSortClickRef={suppressSortClickRef}
+                    />
+                  ))}
+                </Tr>
+              ))}
+            </SortableContext>
+          </DndContext>
+        ) : (
+          table.getHeaderGroups().map((headerGroup) => (
+            <Tr key={headerGroup.id} borderBottomWidth="0">
+              {headerGroup.headers.map((header, i) => (
+                <HeaderCell
+                  key={header.id}
+                  header={header}
+                  isStickyFirst={stickyFirstColumn && i === 0}
+                />
+              ))}
+            </Tr>
+          ))
+        )}
       </Thead>
       {children}
     </TableEl>
@@ -146,13 +272,102 @@ export function TraceTableShell<T>({
 interface HeaderCellProps<T> {
   header: Header<T, unknown>;
   isStickyFirst: boolean;
+  /**
+   * When true, the header cell is a sortable item — it picks up a
+   * drag-handle icon at the left of the title and registers with the
+   * surrounding SortableContext. False (the default) means the
+   * column is pinned in its current position (the row-select
+   * checkbox column uses this).
+   */
+  reorderable?: boolean;
+  /**
+   * Shared flag set by the surrounding DndContext while a column drag
+   * is in flight. The sort button checks it to swallow the synthetic
+   * click the browser fires right after a drag's pointerup — without
+   * it, dropping a column onto a sortable header also toggled sort.
+   */
+  suppressSortClickRef?: React.RefObject<boolean>;
 }
 
 function HeaderCell<T>({
   header,
   isStickyFirst,
+  reorderable = false,
+  suppressSortClickRef,
 }: HeaderCellProps<T>): React.ReactElement {
+  // Conditional `useSortable` — same hooks-discipline-friendly pattern
+  // the sidebar uses for SortableSection. We always call the hook so
+  // its call order is stable; the returned props are simply unused
+  // when `reorderable` is false.
+  const { listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: header.id, disabled: !reorderable });
+  // Drag zone gets ONLY the pointer listeners. The sortable
+  // `attributes` (role="button", tabIndex=0) are deliberately dropped:
+  // they'd nest an interactive element inside the sort <Button>
+  // (invalid HTML) and add a dead tab stop — we only wire the
+  // PointerSensor, so there's no keyboard reorder to expose anyway.
+  const dragHandleProps = (
+    reorderable ? { ...(listeners ?? {}) } : {}
+  ) as React.HTMLAttributes<HTMLElement>;
   const meta = header.column.columnDef.meta as ColumnMeta | undefined;
+  // Open the one-off education dialog the first time the user tries
+  // to drag a header to reorder it. v2 doesn't support native drag-
+  // reorder (yet), so without the dialog the drag attempt silently
+  // does nothing and operators walk away thinking "you can't change
+  // the columns" — they can, just from the Columns dropdown / floating
+  // Configure CTA, which the dialog points at. After the user
+  // dismisses with "Don't show again", `hasDismissed` in
+  // `columnEducationStore` flips true and the handler short-circuits.
+  const openEducation = useColumnEducationStore((s) => s.open);
+  const educationDismissed = useColumnEducationStore((s) => s.hasDismissed);
+  // Pinned headers (the row-select column) have no drag handle and no
+  // reorder path, so the education dialog is meaningless there — the
+  // checkbox would also open it on every click. Both handlers bail
+  // when `reorderable` is false.
+  const dragCleanupRef = useRef<(() => void) | null>(null);
+  useEffect(
+    () => () => {
+      dragCleanupRef.current?.();
+    },
+    [],
+  );
+  const onHeaderMouseDown = (e: React.MouseEvent<HTMLElement>) => {
+    if (!reorderable || educationDismissed) return;
+    // Skip drags that originate on the resize grip (legitimate sizing
+    // gesture) OR on the drag-reorder grip (legitimate reorder
+    // gesture) — surfacing the education dialog from either of those
+    // would be infuriating now that both paths work.
+    const target = e.target as HTMLElement | null;
+    if (target?.closest("[data-column-resize-grip]")) return;
+    if (target?.closest("[data-column-drag-handle]")) return;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const onMove = (ev: MouseEvent) => {
+      const dx = ev.clientX - startX;
+      const dy = ev.clientY - startY;
+      if (dx * dx + dy * dy >= COLUMN_DRAG_THRESHOLD_PX ** 2) {
+        openEducation();
+        cleanup();
+      }
+    };
+    const onUp = () => cleanup();
+    const cleanup = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      dragCleanupRef.current = null;
+    };
+    dragCleanupRef.current = cleanup;
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+  const onHeaderDoubleClick = () => {
+    // Double-click is the other common "I'm trying to do something to
+    // this header" gesture — treat it the same as a drag attempt for
+    // the education path so users who instinctively double-tap also
+    // see the dialog.
+    if (!reorderable || educationDismissed) return;
+    openEducation();
+  };
   const size = header.column.getSize();
   const declaredSize = header.column.columnDef.size;
   // Flex columns declare a sentinel `size` (9999) to absorb leftover
@@ -164,7 +379,8 @@ function HeaderCell<T>({
   // Without this, dragging the trace column's grip updated state but
   // visually nothing happened because `width` stayed undefined.
   const isFlex = meta?.flex;
-  const wasResized = isFlex && declaredSize !== undefined && size !== declaredSize;
+  const wasResized =
+    isFlex && declaredSize !== undefined && size !== declaredSize;
   const useFixedWidth = !isFlex || wasResized;
   const align = meta?.align ?? "left";
   const canSort = header.column.getCanSort();
@@ -173,6 +389,24 @@ function HeaderCell<T>({
 
   return (
     <Th
+      ref={reorderable ? setNodeRef : undefined}
+      // Apply ONLY the translation from the sortable transform —
+      // `CSS.Translate.toString` skips the scaleX/scaleY that
+      // horizontalListSortingStrategy bakes in to fit the source's
+      // visual box to the target slot's width. With variable-width
+      // columns (Time = 60px vs Trace = 400px), the scale was producing
+      // grotesque stretches as the user dragged a narrow column over a
+      // wide one. Translation alone keeps the source at its natural
+      // width while still tracking the pointer.
+      style={
+        reorderable
+          ? {
+              transform: CSS.Translate.toString(transform),
+              transition,
+              opacity: isDragging ? 0.6 : 1,
+            }
+          : undefined
+      }
       width={useFixedWidth ? `${size}px` : undefined}
       minWidth={`${header.column.columnDef.minSize}px`}
       // Clip header text at the cell boundary so labels like
@@ -190,7 +424,7 @@ function HeaderCell<T>({
       transition="none"
       position={isStickyFirst ? "sticky" : "relative"}
       left={isStickyFirst ? 0 : undefined}
-      zIndex={isStickyFirst ? 3 : undefined}
+      zIndex={isStickyFirst ? 3 : isDragging ? 4 : undefined}
       bg={
         isActiveSort
           ? { base: "bg.muted", _dark: "bg.muted" }
@@ -217,18 +451,40 @@ function HeaderCell<T>({
       // replacing it.
       paddingX={2}
       paddingY={1}
+      onMouseDown={onHeaderMouseDown}
+      onDoubleClick={onHeaderDoubleClick}
     >
-      {canSort ? (
-        <SortableHeaderButton
-          align={align}
-          sortDirection={sortDirection}
-          onToggle={header.column.getToggleSortingHandler()}
-        >
-          {flexRender(header.column.columnDef.header, header.getContext())}
-        </SortableHeaderButton>
-      ) : (
-        flexRender(header.column.columnDef.header, header.getContext())
-      )}
+      {/* No grip — the label itself is the drag zone (grab cursor on
+          hover). The sort chevron sits outside the drag zone so it
+          keeps the pointer cursor and never starts a reorder. Labels
+          own the cell's full width again, so narrow columns ("TIME")
+          aren't squeezed by handle chrome. */}
+      <Box flex={1} minWidth={0}>
+        {canSort ? (
+          <SortableHeaderButton
+            align={align}
+            sortDirection={sortDirection}
+            onToggle={header.column.getToggleSortingHandler()}
+            dragZoneProps={reorderable ? dragHandleProps : undefined}
+            suppressSortClickRef={suppressSortClickRef}
+          >
+            {flexRender(header.column.columnDef.header, header.getContext())}
+          </SortableHeaderButton>
+        ) : reorderable ? (
+          <Box
+            data-column-drag-handle="true"
+            cursor="grab"
+            _active={{ cursor: "grabbing" }}
+            truncate
+            title="Drag to reorder column"
+            {...dragHandleProps}
+          >
+            {flexRender(header.column.columnDef.header, header.getContext())}
+          </Box>
+        ) : (
+          flexRender(header.column.columnDef.header, header.getContext())
+        )}
+      </Box>
       <ColumnResizeGrip header={header} />
     </Th>
   );
@@ -239,6 +495,17 @@ interface SortableHeaderButtonProps {
   sortDirection: false | "asc" | "desc";
   onToggle: ((event: unknown) => void) | undefined;
   children: React.ReactNode;
+  /**
+   * dnd-kit sortable pointer listeners. When set, the label text
+   * becomes the drag-to-reorder zone (grab cursor); the sort chevron
+   * stays outside it so sorting keeps priority — hovering the chevron
+   * shows a pointer, not a grab. The PointerSensor's 5px activation
+   * distance means a plain click on the label still falls through to
+   * the button's sort toggle.
+   */
+  dragZoneProps?: React.HTMLAttributes<HTMLElement>;
+  /** See HeaderCellProps — true while a drag's synthetic click is pending. */
+  suppressSortClickRef?: React.RefObject<boolean>;
 }
 
 function SortableHeaderButton({
@@ -246,8 +513,18 @@ function SortableHeaderButton({
   sortDirection,
   onToggle,
   children,
+  dragZoneProps,
+  suppressSortClickRef,
 }: SortableHeaderButtonProps): React.ReactElement {
   const isActive = sortDirection !== false;
+  const handleClick = (event: React.MouseEvent) => {
+    // The browser fires a synthetic click on pointerup after a drag,
+    // and dnd-kit doesn't suppress it. If a reorder just finished
+    // (ref flipped on drag start, cleared on the next tick after drag
+    // end), swallow the click so dropping a column doesn't also sort.
+    if (suppressSortClickRef?.current) return;
+    onToggle?.(event);
+  };
   return (
     <Button
       type="button"
@@ -267,14 +544,28 @@ function SortableHeaderButton({
       letterSpacing="inherit"
       textTransform="inherit"
       bg="transparent"
-      onClick={onToggle}
+      onClick={handleClick}
       _hover={{ color: "fg", bg: "transparent" }}
       _active={{ bg: "transparent" }}
       _focusVisible={{ bg: "transparent" }}
       role="group"
     >
       <HStack gap={1} minWidth={0} flex={1}>
-        <Box truncate flex={1} minWidth={0} textAlign={align}>
+        <Box
+          truncate
+          flex={1}
+          minWidth={0}
+          textAlign={align}
+          {...(dragZoneProps
+            ? {
+                "data-column-drag-handle": "true",
+                cursor: "grab",
+                _active: { cursor: "grabbing" },
+                title: "Drag to reorder · click to sort",
+                ...dragZoneProps,
+              }
+            : {})}
+        >
           {children}
         </Box>
         {isActive ? (

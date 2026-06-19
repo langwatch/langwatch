@@ -43,20 +43,16 @@ vi.mock("~/hooks/useProjectSpanNames", () => ({
 }));
 
 vi.mock("~/hooks/useProjectEventTypes", () => ({
-  useProjectEventTypes: () => ({ eventTypes: [], isLoading: false, error: null }),
+  useProjectEventTypes: () => ({
+    eventTypes: [],
+    isLoading: false,
+    error: null,
+  }),
 }));
 
 vi.mock("~/hooks/useAnnotationsByTraceIds", () => ({
   useAnnotationsByTraceIds: () => ({ data: [] }),
 }));
-
-vi.mock(
-  "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore",
-  () => ({
-    useEvaluationWizardStore: (selector: (state: unknown) => unknown) =>
-      selector({ workbenchState: { task: undefined } }),
-  }),
-);
 
 vi.mock("~/utils/api", () => ({
   api: {
@@ -83,7 +79,9 @@ const traceWithoutEvaluations = {
 /** Render with a single column already mapped to the "evaluations" source. */
 function renderEvaluationsMapping() {
   const traceMapping: MappingState = {
-    mapping: { eval_col: { source: "evaluations" as never, key: "", subkey: "" } },
+    mapping: {
+      eval_col: { source: "evaluations" as never, key: "", subkey: "" },
+    },
     expansions: [],
   };
   return render(

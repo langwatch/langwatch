@@ -1,9 +1,16 @@
 import { Box, Button, Flex, Icon, IconButton } from "@chakra-ui/react";
-import { Bookmark, Compass, Download, Search, Tent } from "lucide-react";
+import { Bookmark, Compass, Download, Map, Tent } from "lucide-react";
 import type React from "react";
+import { useCallback } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
+import { useIsNewAccount } from "../../hooks/useIsNewAccount";
+import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
 import { useTourEntryPoints } from "../../onboarding";
-import { useFindStore } from "../../stores/findStore";
+import { writeSpotlightFragment } from "../../onboarding/spotlights/SpotlightOverlay";
+import { TRACE_EXPLORER_SPOTLIGHTS } from "../../onboarding/spotlights/spotlights";
+import { useOnboardingStore } from "../../onboarding/store/onboardingStore";
+import { useDrawerStore } from "../../stores/drawerStore";
+import { useFilterStore } from "../../stores/filterStore";
 import { useViewStore } from "../../stores/viewStore";
 import { AutomateButton } from "./AutomateButton";
 import { ColumnsDropdown } from "./ColumnsDropdown";
@@ -17,22 +24,103 @@ import { TimeRangePicker } from "./TimeRangePicker";
 
 interface ToolbarProps {
   onExportAll?: () => void;
+  /**
+   * When true, the "See sample data" toggle is rendered fully
+   * transparent (kept in the layout so the toolbar spacing doesn't
+   * jump but invisible to the user). IntegratePane uses this because
+   * the larger hero "See sample data" button alongside the page title
+   * is the canonical entry point in the empty-trace state — having
+   * two visible affordances for the same action splits the user's
+   * attention.
+   */
+  hideSampleDataAction?: boolean;
 }
 
-export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll }) => {
-  const findIsOpen = useFindStore((s) => s.isOpen);
-  const openFind = useFindStore((s) => s.open);
-  const closeFind = useFindStore((s) => s.close);
-  // Tour entry point — the toolbar's only onboarding affordance. The
-  // What's-new dialog used to live next to this button; it retired
-  // when the tour outro absorbed its content (release notes,
-  // multiplayer hint, shortcuts, beta note). Replaying the tour
-  // takes the user past the OutroPanel, which is now the only
-  // surface for that information. While the journey is rendering
-  // the same button doubles as the exit ("On safari" → click to
-  // end), so users have one consistent place to leave the demo
-  // instead of hunting for an exit in the empty-state body.
-  const { onLaunchTour, onEndTour, tourActive } = useTourEntryPoints();
+export const Toolbar: React.FC<ToolbarProps> = ({
+  onExportAll,
+  hideSampleDataAction = false,
+}) => {
+  // Tour entry point — kept for backwards compatibility. The journey
+  // state machine (Phase 2) may still use onLaunchTour / onEndTour
+  // internally. For Phase 1 the toolbar button exclusively toggles
+  // `showSamplePreview` and does NOT launch the journey.
+  const { onEndTour } = useTourEntryPoints();
+
+  const showSamplePreview = useOnboardingStore((s) => s.showSamplePreview);
+  const setShowSamplePreview = useOnboardingStore(
+    (s) => s.setShowSamplePreview,
+  );
+  // Sample data is an onboarding affordance — once the project has its
+  // own real traces (`Project.firstMessage = true`, set by the
+  // projectMetadata reactor on first non-sample ingest), the toggle is
+  // noise. We gate visibility on `hasAnyTraces === false` rather than
+  // `!== true` so the button stays put during the brief window where
+  // `firstMessage` is still unknown (avoids a flicker on first load).
+  // Note: this only filters out *real* traces — seeded sample traces
+  // continue to leave `firstMessage` false, so the toggle remains
+  // available during sample-data exploration.
+  const { hasAnyTraces } = useProjectHasTraces();
+  const isNewAccount = useIsNewAccount();
+  const showSampleDataToggle = hasAnyTraces === false;
+  const spotlightsActive = useOnboardingStore((s) => s.spotlightsActive);
+  const setSpotlightsActive = useOnboardingStore((s) => s.setSpotlightsActive);
+  const setCurrentSpotlightId = useOnboardingStore(
+    (s) => s.setCurrentSpotlightId,
+  );
+
+  const closeDrawer = useDrawerStore((s) => s.closeDrawer);
+  const handleSamplePreviewToggle = useCallback(() => {
+    if (showSamplePreview) {
+      setShowSamplePreview(false);
+      // Sample data + spotlights ride together — switching samples off
+      // dismisses any spotlight tour that was running over them so the
+      // page returns to a clean state in one click.
+      setSpotlightsActive(false);
+      setCurrentSpotlightId(null);
+      writeSpotlightFragment(null);
+      // A drawer left open over a sample trace would now point at a row
+      // that no longer exists in the table — close it with the samples.
+      closeDrawer();
+      // If the legacy journey was somehow also active, end it cleanly.
+      onEndTour();
+    } else {
+      setShowSamplePreview(true);
+      // Auto-start spotlights when the user opts into sample data — the
+      // whole point of "See sample data" is to give the user a tour of
+      // what the trace explorer looks like with content in it, which
+      // pairs naturally with contextual callouts that explain what each
+      // surface does. They can dismiss the spotlights from any step
+      // without turning samples off.
+      const first = TRACE_EXPLORER_SPOTLIGHTS[0];
+      const firstId = first?.id ?? null;
+      setCurrentSpotlightId(firstId);
+      setSpotlightsActive(true);
+      writeSpotlightFragment(firstId);
+    }
+  }, [
+    showSamplePreview,
+    setShowSamplePreview,
+    onEndTour,
+    setSpotlightsActive,
+    setCurrentSpotlightId,
+    closeDrawer,
+  ]);
+
+  const handleShowMeAround = useCallback(() => {
+    if (spotlightsActive) {
+      // Toggle off — dismiss the spotlight tour.
+      setSpotlightsActive(false);
+      setCurrentSpotlightId(null);
+      writeSpotlightFragment(null);
+    } else {
+      // Start the tour from the first spotlight.
+      const first = TRACE_EXPLORER_SPOTLIGHTS[0];
+      const firstId = first?.id ?? null;
+      setCurrentSpotlightId(firstId);
+      setSpotlightsActive(true);
+      writeSpotlightFragment(firstId);
+    }
+  }, [spotlightsActive, setSpotlightsActive, setCurrentSpotlightId]);
 
   // "Save Lens" outline button only surfaces when the active lens has
   // pending local changes. Clicking it opens the shared
@@ -46,6 +134,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll }) => {
       s.allLenses.find((l) => l.id === activeLensId)?.name ?? "Current view",
   );
   const createLens = useViewStore((s) => s.createLens);
+  // Hide "Save the result as a lens" when the current query has a parse
+  // error — saving a broken query as a lens would just create a lens
+  // that silently fails to filter on load. The button comes back the
+  // moment the error is resolved.
+  const hasParseError = useFilterStore((s) => Boolean(s.parseError));
 
   return (
     <Flex
@@ -57,54 +150,136 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll }) => {
       flexShrink={0}
       minHeight="36px"
     >
-      <LensTabs />
-      <Flex marginLeft="auto" gap={1.5} align="center" flexShrink={0}>
-        {activeLensIsDraft && (
-          <LensNamePopover
-            defaultName={`${activeLensName} (copy)`}
-            onSubmit={(name) => createLens(name)}
-          >
-            <Button
-              size="xs"
-              variant="outline"
-              colorPalette="orange"
-              aria-label="Save current view as a new lens"
-            >
-              <Icon boxSize={3.5}>
-                <Bookmark />
-              </Icon>
-              Save Lens
-            </Button>
-          </LensNamePopover>
-        )}
+      {/* Sample-data toggle sits at the front of the toolbar (before
+          the lens tabs) so it reads as a top-level "what am I looking
+          at?" affordance rather than a buried row in the right cluster.
+          The previous layout put it between Save-lens and Show-me-around,
+          which made the Save button feel orphaned from the rest of the
+          right-side actions. When `hideSampleDataAction` is set (the
+          IntegratePane case), the button is fully absent — no phantom
+          gap — because the inert chrome doesn't need to match the live
+          toolbar's exact pixel layout. */}
+      {!hideSampleDataAction && showSampleDataToggle && (
         <Tooltip
-          content={tourActive ? "Click to end the tour" : "Take the trace explorer tour"}
+          content={
+            showSamplePreview
+              ? "Hide sample traces"
+              : "See sample traces to explore the UI"
+          }
           positioning={{ placement: "bottom" }}
         >
           <Button
             size="xs"
-            variant={tourActive ? "subtle" : "ghost"}
-            colorPalette={tourActive ? "orange" : undefined}
-            onClick={tourActive ? onEndTour : onLaunchTour}
-            aria-label={tourActive ? "End the tour" : "Take the tour"}
-            aria-pressed={tourActive}
+            variant={showSamplePreview ? "subtle" : "ghost"}
+            colorPalette={showSamplePreview ? "orange" : undefined}
+            onClick={handleSamplePreviewToggle}
+            aria-label={
+              showSamplePreview ? "Hide sample data" : "See sample data"
+            }
+            aria-pressed={showSamplePreview}
           >
-            {/* Brighter orange in light mode (matches the orange
-                indicator dot on the "All" lens tab) — `orange.fg` was
-                rendering as muted brown on the white toolbar surface. */}
             <Icon
               boxSize={3.5}
               color={{ base: "orange.500", _dark: "orange.fg" }}
             >
-              {tourActive ? <Tent /> : <Compass />}
+              {showSamplePreview ? <Tent /> : <Compass />}
             </Icon>
-            {tourActive ? "On safari" : "Tour"}
+            {showSamplePreview ? "Hide sample data" : "See sample data"}
           </Button>
+        </Tooltip>
+      )}
+      <LensTabs />
+      <Flex marginLeft="auto" gap={1.5} align="center" flexShrink={0}>
+        {activeLensIsDraft && !hasParseError && (
+          <LensNamePopover
+            defaultName={`${activeLensName} (copy)`}
+            onSubmit={(name) => createLens(name)}
+          >
+            {/* Icon-only at rest — the full "Save current filtered view"
+                label made this the widest control in the toolbar. The
+                label slides out leftwards on hover (it precedes the icon
+                in DOM order, and the right-anchored cluster absorbs the
+                growth on the left edge), so the affordance still explains
+                itself before commit. */}
+            <Button
+              size="xs"
+              variant="outline"
+              colorPalette="orange"
+              aria-label="Save current filtered view as a new lens"
+              className="group"
+            >
+              <Box
+                as="span"
+                maxWidth={0}
+                opacity={0}
+                overflow="hidden"
+                whiteSpace="nowrap"
+                transition="max-width 0.25s ease, opacity 0.2s ease"
+                _groupHover={{ maxWidth: "170px", opacity: 1 }}
+                _groupFocusVisible={{ maxWidth: "170px", opacity: 1 }}
+              >
+                Save current filtered view
+              </Box>
+              <Icon boxSize={3.5}>
+                <Bookmark />
+              </Icon>
+            </Button>
+          </LensNamePopover>
+        )}
+        <Tooltip
+          content={
+            spotlightsActive
+              ? "End the guided tour"
+              : "Start the guided tour of this page"
+          }
+          positioning={{ placement: "bottom" }}
+        >
+          {/* Full "Show me around" label only for accounts younger than
+              7 days — the tour is an onboarding affordance, and the wide
+              label is wasted toolbar room for everyone who's already
+              been around. "End tour" always shows in full while a tour
+              is running so the escape hatch stays obvious. */}
+          {isNewAccount || spotlightsActive ? (
+            <Button
+              size="xs"
+              variant={spotlightsActive ? "subtle" : "ghost"}
+              colorPalette={spotlightsActive ? "blue" : undefined}
+              onClick={handleShowMeAround}
+              aria-label={spotlightsActive ? "End tour" : "Show me around"}
+              aria-pressed={spotlightsActive}
+            >
+              <Icon
+                boxSize={3.5}
+                color={
+                  spotlightsActive
+                    ? "blue.fg"
+                    : { base: "fg.muted", _dark: "fg.subtle" }
+                }
+              >
+                <Map />
+              </Icon>
+              {spotlightsActive ? "End tour" : "Show me around"}
+            </Button>
+          ) : (
+            <IconButton
+              size="xs"
+              variant="ghost"
+              onClick={handleShowMeAround}
+              aria-label="Show me around"
+            >
+              <Icon
+                boxSize={3.5}
+                color={{ base: "fg.muted", _dark: "fg.subtle" }}
+              >
+                <Map />
+              </Icon>
+            </IconButton>
+          )}
         </Tooltip>
         <LiveIndicator />
         {/* Vertical separator clusters the toolbar into:
               [Save · Tour · Live] · [Time] · [Display: cols, group, density]
-              · [Tools: find, export, automate] · [Help]
+              · [Tools: export, automate] · [Help]
             Previously these were a flat row of 10 controls with no
             visual hierarchy — auditor pain was "I don't know what
             each icon does, and they all blur together". */}
@@ -114,23 +289,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll }) => {
         <ColumnsDropdown />
         <GroupingSelector />
         <DensityToggle />
+        {/* Toolbar Find button retired in Round 3 — Find is bound to
+            ⌘/Ctrl+F, exactly where users expect it. The discoverability
+            hint moved underneath the search bar so first-time users
+            still learn the shortcut without a permanent toolbar icon
+            taking up scarce horizontal room. */}
         <ToolbarDivider />
-        <Tooltip
-          content="Search within currently loaded traces"
-          positioning={{ placement: "bottom" }}
-        >
-          <IconButton
-            size="xs"
-            variant={findIsOpen ? "subtle" : "ghost"}
-            onClick={() => (findIsOpen ? closeFind() : openFind())}
-            aria-label="Find in loaded traces"
-            aria-pressed={findIsOpen}
-          >
-            <Icon boxSize={3.5}>
-              <Search />
-            </Icon>
-          </IconButton>
-        </Tooltip>
         {onExportAll && (
           <Tooltip
             content="Export the current view to CSV or JSON"

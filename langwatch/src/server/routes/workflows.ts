@@ -26,7 +26,7 @@ import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 import { createLogger } from "~/utils/logger/server";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
 import type { NextRequestShim as any } from "./types";
 
@@ -67,7 +67,7 @@ secured.access(
   }
 
   try {
-    const model = await getVercelAIModel(projectId, undefined, "studio.autocomplete");
+    const model = await getVercelAIModel({ projectId, featureKey: "studio.autocomplete" });
 
     const copilot = new CompletionCopilot(undefined, {
       model: async (prompt) => {
@@ -105,7 +105,7 @@ secured.access(
       },
       "code-completion failed",
     );
-    captureException(error, { extra: { projectId } });
+    captureException(toError(error), { extra: { projectId } });
     return c.json(
       { error: error instanceof Error ? error.message : String(error) },
       { status: 500 },
@@ -158,7 +158,7 @@ secured.access(
       );
     } catch (error) {
       logger.error({ error, projectId }, "error");
-      captureException(error, { extra: { projectId } });
+      captureException(toError(error), { extra: { projectId } });
       return c.json({ error: (error as Error).message }, { status: 500 });
     }
 

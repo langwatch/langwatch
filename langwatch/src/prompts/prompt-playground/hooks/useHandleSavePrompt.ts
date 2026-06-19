@@ -5,6 +5,7 @@ import { toaster } from "~/components/ui/toaster";
 import type { PromptConfigFormValues } from "~/prompts";
 import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
 import { usePromptConfigContext } from "~/prompts/providers/PromptConfigProvider";
+import { getSaveBlockerMessage } from "~/prompts/utils/getSaveBlockerMessage";
 import {
   formValuesToTriggerSaveVersionParams,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
@@ -43,11 +44,13 @@ export function useHandleSavePrompt() {
    * Single Responsibility: Validates handle, triggers appropriate save operation, and updates UI state on success/error.
    */
   const handleSaveVersion = useCallback(async () => {
-    const isValid = await methods.trigger("version.configData.llm");
+    // Validate the full form so the save-time refinement (#3196: system
+    // prompt required) fires alongside the LLM config rules.
+    const isValid = await methods.trigger();
     if (!isValid) {
       toaster.create({
         title: "Validation error",
-        description: "Please fix the LLM configuration errors before saving",
+        description: getSaveBlockerMessage(methods),
         type: "error",
         meta: { closable: true },
       });

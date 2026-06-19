@@ -36,6 +36,7 @@ import { z } from "zod";
 import { createLogger } from "~/utils/logger/server";
 import {
   captureException,
+  toError,
   withScope,
 } from "~/utils/posthogErrorCapture";
 
@@ -135,7 +136,7 @@ export class S3PollingPullerAdapter
             await withScope(async (scope) => {
               scope.setTag?.("adapter", this.id);
               scope.setExtra?.("key", key);
-              captureException(error);
+              captureException(toError(error));
             });
           }
         }
@@ -160,7 +161,7 @@ export class S3PollingPullerAdapter
           scope.setTag?.("adapter", this.id);
           scope.setExtra?.("bucket", config.bucket);
           scope.setExtra?.("key", key);
-          captureException(error);
+          captureException(toError(error));
         });
         lastSuccessfulKey = key;
       }

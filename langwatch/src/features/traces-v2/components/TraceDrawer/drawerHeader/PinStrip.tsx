@@ -74,17 +74,14 @@ export function renderPinPills(
   const buckets = bucketByCategory(pins);
   const inline: ReactElement[] = [];
 
-  // Auto categories: always inline, divider between groups.
-  let firstSection = true;
+  // Auto categories always inline. No divider between category groups —
+  // the old 1px PinDivider rendered as a stray "pipe" between some chips
+  // and not others (it only appeared when two categories were both
+  // populated), which read as inconsistent chip styling rather than
+  // grouping. The pill borders provide enough separation on their own.
   for (const category of CATEGORY_ORDER) {
     if (category === "custom") continue;
-    const groupPins = buckets[category] ?? [];
-    if (groupPins.length === 0) continue;
-    if (!firstSection) {
-      inline.push(<PinDivider key={`divider-${category}`} />);
-    }
-    firstSection = false;
-    for (const p of groupPins) {
+    for (const p of buckets[category] ?? []) {
       inline.push(renderPinPill(p, onUnpin));
     }
   }
@@ -94,13 +91,8 @@ export function renderPinPills(
   const inlineCustom = customPins.slice(0, maxCustomInline);
   const overflowCustom = customPins.slice(maxCustomInline);
 
-  if (inlineCustom.length > 0) {
-    if (!firstSection) {
-      inline.push(<PinDivider key="divider-custom" />);
-    }
-    for (const p of inlineCustom) {
-      inline.push(renderPinPill(p, onUnpin));
-    }
+  for (const p of inlineCustom) {
+    inline.push(renderPinPill(p, onUnpin));
   }
 
   let overflow: ReactElement | null = null;
@@ -149,19 +141,6 @@ function renderPinPill(
       onFilter={p.onFilter}
       onNavigate={p.onNavigate}
       navigateLabel={p.navigateLabel}
-    />
-  );
-}
-
-export function PinDivider() {
-  return (
-    <Box
-      width="1px"
-      height="14px"
-      bg="border.muted"
-      marginX={0.5}
-      flexShrink={0}
-      aria-hidden="true"
     />
   );
 }

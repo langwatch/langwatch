@@ -14,7 +14,7 @@ import { createLicenseEnforcementService } from "~/server/license-enforcement";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
 import { buildResourceLimitMessage } from "~/server/license-enforcement/limit-message";
 import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
 import { createLogger } from "../../../utils/logger/server";
 
@@ -92,7 +92,10 @@ export default async function handler(
       "invalid init data received",
     );
     // TODO: should it be a warning instead of exception on sentry? here and all over our APIs
-    captureException(error, { extra: { projectId: project.id } });
+    captureException(
+      toError(error),
+      { extra: { projectId: project.id } },
+    );
 
     const validationError = fromZodError(error as ZodError);
     return res.status(400).json({ error: validationError.message });

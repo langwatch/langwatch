@@ -8,6 +8,7 @@ export interface TraceListResult {
   totalHits: number;
   isLoading: boolean;
   isFetching: boolean;
+  isPreviousData: boolean;
   isError: boolean;
   error: unknown;
   newIds: Set<string>;
@@ -33,6 +34,7 @@ export function useTraceList(): TraceListResult {
     totalHits: query.totalHits,
     isLoading: query.isLoading,
     isFetching: query.isFetching,
+    isPreviousData: query.isPreviousData,
     isError: query.isError,
     error: query.error,
     newIds,

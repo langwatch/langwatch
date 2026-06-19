@@ -84,7 +84,7 @@ export function ProviderScopeChips({
     // uses for the same conceptual tier (env-var-fed defaults).
     return (
       <HStack gap={1} wrap="wrap">
-        <Tooltip content="System (built-in or env-var fed)">
+        <Tooltip content="Managed by your LangWatch deployment — credentials live in the server environment and every project can use this provider out of the box. No configuration needed.">
           <Badge colorPalette="gray" variant="subtle" size={size}>
             <HStack gap={1}>
               <Server size={iconSize} aria-hidden />

@@ -979,19 +979,32 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       return new Set();
     }
 
+    // simulation_runs is a ReplacingMergeTree, so each run is read at its
+    // latest version. Rather than the IN-tuple dedup pattern — which scans the
+    // table twice (once to build the latest-version key set, once for the
+    // outer filter) and materialises a key set sized to every run — fold each
+    // run to its latest version in a single GROUP BY pass and keep the sets
+    // whose latest run is not archived. Light columns only; the distinct
+    // external set ids are identical.
+    //
+    // We fold over `argMax(ArchivedAt IS NULL, UpdatedAt)` rather than
+    // `argMax(ArchivedAt, UpdatedAt)`: ArchivedAt is Nullable, and argMax
+    // skips rows whose first argument is NULL, so a freshly un-archived run
+    // (latest ArchivedAt = NULL) would otherwise be ignored and the run would
+    // look archived. The `IS NULL` expression is non-nullable, so the fold
+    // reads the true latest version.
     const rows = await this.queryRows<{ ScenarioSetId: string }>(
       `SELECT DISTINCT IF(ScenarioSetId = '', '${DEFAULT_SET_ID}', ScenarioSetId) AS ScenarioSetId
-       FROM ${TABLE_NAME}
-       WHERE TenantId IN ({projectIds:Array(String)})
-         AND NOT startsWith(ScenarioSetId, '${INTERNAL_SET_PREFIX}')
-         AND ArchivedAt IS NULL
-         AND (TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, UpdatedAt) IN (
-           SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
-           FROM ${TABLE_NAME}
-           WHERE TenantId IN ({projectIds:Array(String)})
-             AND NOT startsWith(ScenarioSetId, '${INTERNAL_SET_PREFIX}')
-           GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
-         )`,
+       FROM (
+         SELECT
+           ScenarioSetId,
+           argMax(ArchivedAt IS NULL, UpdatedAt) AS latestIsActive
+         FROM ${TABLE_NAME}
+         WHERE TenantId IN ({projectIds:Array(String)})
+           AND NOT startsWith(ScenarioSetId, '${INTERNAL_SET_PREFIX}')
+         GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+       )
+       WHERE latestIsActive`,
       { tenantId: firstProjectId, projectIds },
     );
 

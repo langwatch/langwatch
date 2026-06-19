@@ -57,20 +57,13 @@ export const TimeRangePicker: React.FC = () => {
       positioning={{ placement: "bottom-end" }}
     >
       <Popover.Trigger asChild>
-        {/* The trigger reads as the page-global "what window am I
-            looking at" control. The previous `shortLabel` rendered as a
-            tiny "30d" chip indistinguishable from the secondary icon
-            buttons next to it — operator feedback was that this was
-            the single most important control on the toolbar but it
-            visually disappeared. Switched to the verbose `label`
-            (`Last 30 days`) at `size="sm"` so it carries its weight. */}
-        <Button
-          size="sm"
-          variant="outline"
-          fontWeight="medium"
-          paddingX={3}
-          gap={1.5}
-        >
+        {/* Verbose label (`Last 30 days`) rather than the cryptic `30d`
+            so the most-impactful control on the page actually reads.
+            Size matches the rest of the toolbar (`xs`) — and so does
+            the horizontal padding: the earlier paddingX={3} override
+            made this trigger visibly wider-set than every sibling
+            button in the strip. */}
+        <Button size="xs" variant="outline" fontWeight="medium" gap={1.5}>
           <Clock size={14} />
           {formatTriggerLabel(timeRange)}
         </Button>

@@ -60,6 +60,11 @@ export interface TraceListItem {
   totalTokens: number;
   inputTokens?: number;
   outputTokens?: number;
+  /** Cache + reasoning token sums (null when the model never reported them).
+   *  The Tokens cell shows input+output; these drive the hover breakdown. */
+  cacheReadTokens?: number | null;
+  cacheCreationTokens?: number | null;
+  reasoningTokens?: number | null;
   models: string[];
   status: TraceStatus;
   spanCount: number;

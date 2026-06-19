@@ -59,7 +59,7 @@ jobs:
       LW_GATEWAY_JWT_SECRET: "e2e-gateway-jwt-secret-00000000000000000000000000000000000000000"
       LW_VIRTUAL_KEY_PEPPER: "e2e-virtual-key-pepper-00000000000000000000000000000000000000000"
       SKIP_ENV_VALIDATION: "true"
-      DISABLE_PII_REDACTION: "true"
+      OPS_PII_STRICT_PRESIDIO_REDACTION_DISABLED: "1"
       NODE_ENV: "development"
       # Test runner configuration
       BASE_URL: "http://localhost:5570"

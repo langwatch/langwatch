@@ -1,14 +1,14 @@
 import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
-import { prisma as defaultPrisma } from "~/server/db";
-import type { Protections } from "~/server/elasticsearch/protections";
-import { mapTraceEvaluationsToLegacyEvaluations } from "~/server/evaluations/evaluation-run.mappers";
-import { EvaluationService } from "~/server/evaluations/evaluation.service";
-import type { Evaluation, Trace } from "~/server/tracer/types";
-import { createLogger } from "~/utils/logger/server";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
+import { prisma as defaultPrisma } from "~/server/db";
+import type { Protections } from "~/server/elasticsearch/protections";
+import { EvaluationService } from "~/server/evaluations/evaluation.service";
+import { mapTraceEvaluationsToLegacyEvaluations } from "~/server/evaluations/evaluation-run.mappers";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { Evaluation, Trace } from "~/server/tracer/types";
+import { createLogger } from "~/utils/logger/server";
 import { ClickHouseTraceService } from "./clickhouse-trace.service";
 import { ElasticsearchTraceService } from "./elasticsearch-trace.service";
 import { resolveOffloadedTraces } from "./resolve-offloaded-traces";
@@ -73,11 +73,13 @@ export class AmbiguousTraceIdPrefixError extends Error {
  * short-circuit to 404 without scanning.
  */
 const HEX_ONLY = /^[0-9a-f]+$/i;
+
 import type {
   AggregationFiltersInput,
   CustomersAndLabelsResult,
   DistinctFieldNamesResult,
   GetAllTracesForProjectInput,
+  GetAllTracesForProjectOptions,
   PromptStudioSpanResult,
   TopicCountsResult,
   TracesForProjectResult,
@@ -164,7 +166,10 @@ export class TraceService {
     // the only level where spanAttributes carry the eventref keys.
     const resolveTraceSpansFn =
       blobResolutionDeps !== undefined
-        ? new OffloadedSpanResolver(blobResolutionDeps, this.logger).toResolverFn()
+        ? new OffloadedSpanResolver(
+            blobResolutionDeps,
+            this.logger,
+          ).toResolverFn()
         : undefined;
 
     this.clickHouseService = ClickHouseTraceService.create(
@@ -179,7 +184,7 @@ export class TraceService {
    * Static factory method for creating TraceService with default dependencies.
    *
    * @param prisma - PrismaClient instance
-   * @param blobResolutionDeps - Optional blob-offload resolution deps (#4215)
+   * @param blobResolutionDeps - Optional blob-offload resolution deps (#4888)
    * @returns TraceService instance
    */
   static create(
@@ -195,12 +200,17 @@ export class TraceService {
    * @param projectId - The project ID
    * @param traceId - The trace ID to fetch
    * @param protections - Field redaction protections
+   * @param opts.full - When true AND blob-resolution deps are present, resolves
+   *   offloaded eventref pointers from event_log so over-threshold IO values
+   *   read back full (#4888). Default (undefined/false) returns the ≤64 KB
+   *   preview — identical to pre-#4888 behavior.
    * @returns The trace if found, undefined otherwise
    */
   async getById(
     projectId: string,
     traceId: string,
     protections: Protections,
+    opts?: { full?: boolean },
   ): Promise<Trace | undefined> {
     return this.tracer.withActiveSpan(
       "TraceService.getById",
@@ -212,6 +222,8 @@ export class TraceService {
           projectId,
           [traceId],
           protections,
+          undefined,
+          { resolveBlobs: opts?.full },
         );
         if (traces === null) {
           throw new Error(
@@ -232,17 +244,18 @@ export class TraceService {
           HEX_ONLY.test(traceId)
         ) {
           const now = Date.now();
-          const candidates = await this.clickHouseService.resolveTraceIdByPrefix(
-            {
+          const candidates =
+            await this.clickHouseService.resolveTraceIdByPrefix({
               projectId,
               prefix: traceId,
               occurredAt: {
-                from: now - TRACE_ID_PREFIX_LOOKUP_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+                from:
+                  now -
+                  TRACE_ID_PREFIX_LOOKUP_WINDOW_DAYS * 24 * 60 * 60 * 1000,
                 to: now,
               },
               limit: TRACE_ID_PREFIX_CANDIDATE_LIMIT,
-            },
-          );
+            });
           if (candidates === null) {
             throw new Error(
               "ClickHouse is enabled but returned null for resolveTraceIdByPrefix — check ClickHouse client configuration",
@@ -261,6 +274,8 @@ export class TraceService {
             projectId,
             [candidates[0]!],
             protections,
+            undefined,
+            { resolveBlobs: opts?.full },
           );
           return resolved?.[0];
         }
@@ -279,6 +294,9 @@ export class TraceService {
    * @param occurredAt - Optional approximate trace time range (epoch ms). When
    *   supplied, the trace_summaries read prunes to the matching weekly
    *   partitions instead of scanning every partition (incl. cold S3).
+   * @param opts.full - When true AND blob-resolution deps are present, resolves
+   *   offloaded eventref pointers from event_log so over-threshold IO values
+   *   read back full (#4888). Default (undefined/false) returns previews.
    * @returns Array of Trace objects with spans
    */
   async getTracesWithSpans(
@@ -286,6 +304,7 @@ export class TraceService {
     traceIds: string[],
     protections: Protections,
     occurredAt?: { from: number; to: number },
+    opts?: { full?: boolean },
   ): Promise<Trace[]> {
     return this.tracer.withActiveSpan(
       "TraceService.getTracesWithSpans",
@@ -300,6 +319,7 @@ export class TraceService {
           traceIds,
           protections,
           occurredAt,
+          { resolveBlobs: opts?.full },
         );
         if (traces === null) {
           throw new Error(
@@ -356,11 +376,7 @@ export class TraceService {
   async getAllTracesForProject(
     input: GetAllTracesForProjectInput,
     protections: Protections,
-    options: {
-      downloadMode?: boolean;
-      includeSpans?: boolean;
-      scrollId?: string | null;
-    } = {},
+    options: GetAllTracesForProjectOptions = {},
   ): Promise<TracesForProjectResult> {
     return this.tracer.withActiveSpan(
       "TraceService.getAllTracesForProject",
@@ -453,12 +469,18 @@ export class TraceService {
    * @param projectId - The project ID
    * @param threadIds - Array of thread IDs
    * @param protections - Field redaction protections
+   * @param opts.full - When true AND blob-resolution deps are present, resolves
+   *   offloaded eventref pointers so thread IO reads back full. Used by the
+   *   eval path (which needs full values for thread-mapped evaluators) — the
+   *   eval-path TraceService carries deps. Customer thread views pass nothing
+   *   and carry no deps, so they stay on the ≤64 KB preview (#4888 / ADR-022).
    * @returns Array of traces
    */
   async getTracesWithSpansByThreadIds(
     projectId: string,
     threadIds: string[],
     protections: Protections,
+    opts?: { full?: boolean },
   ): Promise<Trace[]> {
     return this.tracer.withActiveSpan(
       "TraceService.getTracesWithSpansByThreadIds",
@@ -476,6 +498,7 @@ export class TraceService {
             projectId,
             threadIds,
             protections,
+            { resolveBlobs: opts?.full },
           );
         if (traces === null) {
           throw new Error(
@@ -559,12 +582,11 @@ export class TraceService {
       async (span) => {
         span.setAttribute("backend", "clickhouse");
 
-        const result =
-          await this.clickHouseService.getDistinctFieldNames(
-            projectId,
-            startDate,
-            endDate,
-          );
+        const result = await this.clickHouseService.getDistinctFieldNames(
+          projectId,
+          startDate,
+          endDate,
+        );
         if (result === null) {
           throw new Error(
             "ClickHouse is enabled but returned null for getDistinctFieldNames — check ClickHouse client configuration",

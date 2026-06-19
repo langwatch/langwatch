@@ -21,6 +21,7 @@ import { Menu } from "~/components/ui/menu";
 import { Switch } from "~/components/ui/switch";
 import { toaster } from "~/components/ui/toaster";
 import NextLink from "~/utils/compat/next-link";
+import { useRouter } from "~/utils/compat/next-router";
 import { impersonateUser } from "../adminClient";
 import {
   BackofficeTable,
@@ -63,8 +64,17 @@ export interface AdminUser {
 const PAGE_SIZE = 25;
 
 export default function UsersView() {
+  const router = useRouter();
+  // Deep-link support: /ops/backoffice/users?q=<orgId|userId|email>. The
+  // RefChipList on this view already builds those URLs for Org / Project
+  // chips, and Customer Pulse links to this page from its registry. Seed the
+  // search input once from the URL so an external link lands on the matching
+  // row instead of an empty search.
+  const initialQueryRef = useRef<string>(
+    typeof router.query.q === "string" ? router.query.q : "",
+  );
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialQueryRef.current);
   const [debouncedSearch] = useDebounce(search, 300);
   const [editing, setEditing] = useState<AdminUser | null>(null);
   // Impersonation is driven by a dialog opened from the row-action menu so

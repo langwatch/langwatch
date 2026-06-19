@@ -36,6 +36,7 @@ import (
 // HTTP handler invokes per /go/studio/execute_sync request.
 type Engine struct {
 	http             *httpblock.Executor
+	attachments      *attachmentFetcher
 	code             *codeblock.Executor
 	llm              app.LLMClient
 	evaluator        *evaluatorblock.Executor
@@ -54,7 +55,10 @@ type Logger interface {
 
 // Options configures an Engine.
 type Options struct {
-	HTTP             *httpblock.Executor
+	HTTP *httpblock.Executor
+	// SSRF mirrors the HTTP block's destination policy so remote prompt
+	// attachments are fetched under the same private/loopback/metadata ban.
+	SSRF             httpblock.SSRFOptions
 	Code             *codeblock.Executor
 	LLM              app.LLMClient
 	Evaluator        *evaluatorblock.Executor
@@ -70,6 +74,7 @@ func New(opts Options) *Engine {
 	}
 	return &Engine{
 		http:             opts.HTTP,
+		attachments:      newAttachmentFetcher(opts.SSRF),
 		code:             opts.Code,
 		llm:              opts.LLM,
 		evaluator:        opts.Evaluator,
@@ -231,6 +236,15 @@ func (e *Engine) runLayer(ctx context.Context, req ExecuteRequest, plan *planner
 		go func() {
 			defer wg.Done()
 			node := state.nodes[nodeID]
+			// Branch gating: nodes behind a not-taken if/else branch are
+			// never dispatched - no cost, no latency, status "skipped".
+			if state.shouldSkip(nodeID) {
+				state.recordState(nodeID, &NodeState{
+					ID:     nodeID,
+					Status: string(dsl.StatusSkipped),
+				})
+				return
+			}
 			inputs := state.resolveInputs(plan, nodeID)
 			ns := &NodeState{ID: nodeID, Status: "running", Inputs: inputs}
 			// Skip the span for pass-through node kinds (Entry, End,
@@ -250,6 +264,7 @@ func (e *Engine) runLayer(ctx context.Context, req ExecuteRequest, plan *planner
 				ns.Error = derr
 				ns.Error.NodeID = nodeID
 				state.recordError(derr)
+				logNodeFailure(nodeCtx, node, derr)
 			} else {
 				ns.Status = "success"
 				ns.Outputs = outputs
@@ -293,9 +308,87 @@ func (e *Engine) dispatch(ctx context.Context, req ExecuteRequest, node *dsl.Nod
 		return e.runAgent(ctx, req, node, inputs, ns)
 	case dsl.ComponentCustom:
 		return e.runCustom(ctx, req, node, inputs, ns)
+	case dsl.ComponentIfElse:
+		return e.runIfElse(ctx, node, inputs, ns, req.Workflow.Secrets)
 	default:
 		return nil, &NodeError{Type: "unsupported_node_kind", Message: "node kind not supported on Go engine: " + string(node.Type)}
 	}
+}
+
+// runIfElse decides the branch and emits the two branch outputs. The
+// engine's branch gating (runState.shouldSkip) reads the emitted
+// booleans through the node's `outputs.true` / `outputs.false` edges
+// to decide which downstream nodes to skip.
+//
+// Two condition languages, picked by the `condition_language`
+// parameter: "liquid" (default) evaluates the `condition` parameter as
+// a Liquid boolean expression over the inputs; "python" runs the
+// `code` parameter through the code-block sandbox and requires its
+// execute() to return True or False.
+func (e *Engine) runIfElse(ctx context.Context, node *dsl.Node, inputs map[string]any, ns *NodeState, secrets map[string]string) (map[string]any, *NodeError) {
+	if paramString(node.Data.Parameters, "condition_language") == "python" {
+		return e.runIfElsePython(ctx, node, inputs, ns, secrets)
+	}
+	condition := paramString(node.Data.Parameters, "condition")
+	// Coerce string inputs to their declared types first, so a dataset/form
+	// "6" feeding a `float` input compares as 6 > 5, not the string "6" which
+	// Liquid treats as a type mismatch and silently evaluates to false. Same
+	// autoparse the python condition and code paths apply.
+	result, err := template.EvaluateCondition(
+		condition,
+		autoparseInputs(inputs, node.Data.Inputs),
+	)
+	if err != nil {
+		return nil, &NodeError{Type: "invalid_condition", Message: err.Error()}
+	}
+	return map[string]any{"true": result, "false": !result}, nil
+}
+
+// conditionResultAdapter renames the user's execute and wraps it: the
+// sandbox runner requires a dict return, while condition code promises
+// a plain True/False. The wrapper enforces the bool contract loudly
+// and adapts it to the runner's shape.
+const conditionResultAdapter = `
+
+__condition_execute = execute
+
+def execute(**inputs):
+    result = __condition_execute(**inputs)
+    if not isinstance(result, bool):
+        raise TypeError(
+            "condition code must return True or False, got "
+            + type(result).__name__
+        )
+    return {"result": result}
+`
+
+func (e *Engine) runIfElsePython(ctx context.Context, node *dsl.Node, inputs map[string]any, ns *NodeState, secrets map[string]string) (map[string]any, *NodeError) {
+	if e.code == nil {
+		return nil, &NodeError{Type: "code_runner_unavailable", Message: "no code runner configured"}
+	}
+	code := paramString(node.Data.Parameters, "code")
+	if strings.TrimSpace(code) == "" {
+		return nil, &NodeError{Type: "invalid_condition", Message: "condition code is empty"}
+	}
+	res, err := e.code.Execute(ctx, codeblock.Request{
+		Code:            code + conditionResultAdapter,
+		Inputs:          autoparseInputs(inputs, node.Data.Inputs),
+		DeclaredOutputs: []string{"result"},
+		Secrets:         secrets,
+	})
+	if err != nil {
+		return nil, &NodeError{Type: "code_runner_error", Message: err.Error()}
+	}
+	ns.Stdout = res.Stdout
+	ns.Stderr = res.Stderr
+	if res.Error != nil {
+		return nil, &NodeError{Type: res.Error.Type, Message: res.Error.Message, Traceback: res.Error.Traceback}
+	}
+	result, ok := res.Outputs["result"].(bool)
+	if !ok {
+		return nil, &NodeError{Type: "invalid_condition", Message: "condition code did not produce a boolean result"}
+	}
+	return map[string]any{"true": result, "false": !result}, nil
 }
 
 func (e *Engine) runEntry(node *dsl.Node, req ExecuteRequest) (map[string]any, *NodeError) {
@@ -343,7 +436,7 @@ func (e *Engine) runCode(ctx context.Context, node *dsl.Node, inputs map[string]
 	declared := outputNames(node.Data.Outputs)
 	res, err := e.code.Execute(ctx, codeblock.Request{
 		Code:            code,
-		Inputs:          inputs,
+		Inputs:          autoparseInputs(inputs, node.Data.Inputs),
 		DeclaredOutputs: declared,
 		Secrets:         secrets,
 	})
@@ -421,7 +514,34 @@ func (e *Engine) runSignature(ctx context.Context, execReq ExecuteRequest, node 
 	// "(unsaved edits)".
 	emitPromptSpans(ctx, node, inputs)
 
-	messages := buildMessages(node, inputs)
+	// Resolve image-typed inputs that carry a remote URL into inline images
+	// before templating. An image-typed field is an explicit attachment, so a
+	// URL it holds that cannot be fetched as an image aborts the run with a
+	// clear error rather than being left as text for the model to guess from.
+	msgInputs := inputs
+	if e.attachments != nil {
+		inlined, aerr := e.attachments.inlineImageInputs(ctx, node, inputs)
+		if aerr != nil {
+			aerr.NodeID = node.ID
+			return nil, aerr
+		}
+		msgInputs = inlined
+	}
+
+	// Re-shape any template-interpolated image data URLs into multimodal
+	// content parts so the model receives actual images, not base64 text.
+	messages := splitMessagesWithImages(buildMessages(node, msgInputs))
+	// Fetch any remote attachment URLs (http/https) referenced in the messages
+	// and deliver them as content the model can open. A failed fetch aborts the
+	// run with a clear, user-facing error instead of a broken provider request.
+	if e.attachments != nil {
+		fetched, aerr := e.attachments.rewrite(ctx, messages)
+		if aerr != nil {
+			aerr.NodeID = node.ID
+			return nil, aerr
+		}
+		messages = fetched
+	}
 	req := app.LLMRequest{
 		Model:    model,
 		Provider: provider,
@@ -451,11 +571,21 @@ func (e *Engine) runSignature(ctx context.Context, execReq ExecuteRequest, node 
 		}
 		req.ResponseFormat = composeSignatureResponseFormat(sanitizeSchemaName(schemaName), node.Data.Outputs)
 	}
-	llmCtx, llmSpan := startLLMSpan(ctx, model, provider, messages)
+	// Trace a redacted copy: the model gets the full fetched bytes (req.Messages),
+	// but the span's langwatch.input must not store the base64 attachment payload.
+	llmCtx, llmSpan := startLLMSpan(ctx, model, provider, redactAttachmentsForTracing(messages))
 	resp, err := e.llm.Execute(llmCtx, req)
 	endLLMSpan(llmSpan, resp, err)
 	if err != nil {
-		return nil, &NodeError{Type: "llm_error", Message: err.Error()}
+		ne := &NodeError{Type: "llm_error", Message: err.Error()}
+		// Thread the upstream HTTP status through for fault attribution
+		// (4xx = caller's key/credits/request, 5xx = provider failure).
+		// Duck-typed so the engine doesn't import the gateway adapter.
+		var hs interface{ HTTPStatusCode() int }
+		if errors.As(err, &hs) {
+			ne.Status = hs.HTTPStatusCode()
+		}
+		return nil, ne
 	}
 	if useStructured {
 		out, warnings := extractSignatureOutputs(resp.Content, node.Data.Outputs)
@@ -1065,13 +1195,73 @@ func (r *runState) resolveInputs(_ *planner.Plan, id string) map[string]any {
 			// No source key — bind all parent outputs under the target.
 			out[tgtKey] = parentOut
 		default:
-			// Control-flow edge with no handles: merge everything.
+			// Edge with no handles on either end: merge everything.
 			for k, v := range parentOut {
 				out[k] = v
 			}
 		}
 	}
 	return out
+}
+
+// shouldSkip reports whether a node must not be dispatched because it
+// sits behind an if/else branch that was not taken, or because nothing
+// feeding it actually ran (cascade behind a skipped/errored upstream).
+//
+// Rules:
+//   - Inbound edges from an if/else node's branch handles
+//     (outputs.true / outputs.false) are gates: grouped by source
+//     if/else node, at least one branch edge per gate must have fired
+//     true, else the node is skipped. Connecting BOTH handles of the
+//     same gate makes the node a merge point that runs either way.
+//   - Data edges from skipped or errored sources are inactive. A node
+//     whose inbound edges are ALL inactive is skipped (cascade); a node
+//     with at least one live data edge still runs and simply misses the
+//     dead inputs (merge-at-end pattern).
+func (r *runState) shouldSkip(id string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	// Single-node execution (Studio "run with manual input") bypasses
+	// edge resolution entirely - never gate it.
+	if id == r.manualInputsTarget && r.manualInputs != nil {
+		return false
+	}
+	edges := r.edgesByTarget[id]
+	if len(edges) == 0 {
+		return false
+	}
+	branchSeen := map[string]bool{}
+	branchTaken := map[string]bool{}
+	anyActive := false
+	for _, e := range edges {
+		src := r.nodes[e.Source]
+		srcState := r.states[e.Source]
+		srcDead := srcState != nil &&
+			(srcState.Status == "skipped" || srcState.Status == "error")
+		srcKey := stripHandlePrefix(e.SourceHandle, "outputs.")
+		if src != nil && src.Type == dsl.ComponentIfElse &&
+			(srcKey == "true" || srcKey == "false") {
+			branchSeen[e.Source] = true
+			if !srcDead {
+				if out, ok := r.outputs[e.Source]; ok {
+					if v, isBool := out[srcKey].(bool); isBool && v {
+						branchTaken[e.Source] = true
+						anyActive = true
+					}
+				}
+			}
+			continue
+		}
+		if !srcDead {
+			anyActive = true
+		}
+	}
+	for gate := range branchSeen {
+		if !branchTaken[gate] {
+			return true
+		}
+	}
+	return !anyActive
 }
 
 // stripHandlePrefix removes a leading "outputs." or "inputs." from a

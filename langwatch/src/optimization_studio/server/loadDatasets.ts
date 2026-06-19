@@ -8,6 +8,7 @@ import {
   transposeColumnsFirstToRowsFirstWithId,
   transpostRowsFirstToColumnsFirstWithoutId,
 } from "../utils/datasetUtils";
+import { applyEntryInputDefaults } from "./entryInputDefaults";
 
 export const loadDatasets = async (
   event: StudioClientEvent,
@@ -108,10 +109,10 @@ export const loadDatasets = async (
     }),
   );
 
-  const workflow: Workflow = {
+  const workflow: Workflow = applyEntryInputDefaults({
     ...(event.payload.workflow as Workflow),
     nodes,
-  };
+  });
 
   return {
     ...event,

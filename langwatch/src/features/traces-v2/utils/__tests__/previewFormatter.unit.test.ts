@@ -36,7 +36,8 @@ describe("formatPreview", () => {
 
     /** @scenario "A context-only message stays visible instead of blanking" */
     it("keeps a context-only message visible rather than blanking it", () => {
-      const input = "<system-reminder>only context, no human text</system-reminder>";
+      const input =
+        "<system-reminder>only context, no human text</system-reminder>";
       const result = formatPreview(input, opts);
       expect(result.text).toContain("only context");
     });
@@ -127,15 +128,20 @@ describe("formatPreview", () => {
 
   describe("given markdown images", () => {
     it("replaces ![alt](url) with 📷 alt and flags hadImage", () => {
-      const result = formatPreview("Look ![diagram](https://x.test/d.png) here", {
-        maxChars: 80,
-      });
+      const result = formatPreview(
+        "Look ![diagram](https://x.test/d.png) here",
+        {
+          maxChars: 80,
+        },
+      );
       expect(result.hadImage).toBe(true);
       expect(result.text).toBe("Look 📷 diagram here");
     });
 
     it("uses bare 📷 when alt is empty", () => {
-      const result = formatPreview("![](https://x.test/d.png)", { maxChars: 80 });
+      const result = formatPreview("![](https://x.test/d.png)", {
+        maxChars: 80,
+      });
       expect(result.hadImage).toBe(true);
       expect(result.text).toBe("📷");
     });
@@ -224,7 +230,10 @@ describe("formatPreview", () => {
         {
           role: "assistant",
           parts: [
-            { type: "text", content: "I can see this is a G'nger Refresh Juice" },
+            {
+              type: "text",
+              content: "I can see this is a G'nger Refresh Juice",
+            },
           ],
         },
       ]);
@@ -343,6 +352,68 @@ describe("formatPreview", () => {
       const result = formatPreview(input, { maxChars: 80 });
       expect(result.text).toBe("import time ↵ import os");
       expect(result.hadCode).toBe(true);
+    });
+  });
+
+  describe("given a Python-repr payload (single quotes)", () => {
+    it("unwraps a repr content-part array into text plus media glyphs", () => {
+      const input =
+        "[{'type': 'text', 'text': '[shouting] you charged me twice'}, {'type': 'input_audio', 'input_audio': 'UklGRiS'}]";
+      const result = formatPreview(input, { maxChars: 200 });
+      expect(result.text).toBe("[shouting] you charged me twice \u{1F399}️");
+    });
+
+    it("unwraps a repr chat array with None/True literals", () => {
+      const input =
+        "[{'role': 'user', 'content': 'hello there', 'name': None, 'cached': True}]";
+      const result = formatPreview(input, { maxChars: 80 });
+      expect(result.text).toBe("hello there");
+      expect(result.role).toBe("user");
+    });
+
+    it("keeps escaped apostrophes inside repr strings", () => {
+      const input = "[{'type': 'text', 'text': 'it\\'s fine'}]";
+      const result = formatPreview(input, { maxChars: 80 });
+      expect(result.text).toBe("it's fine");
+    });
+
+    it("handles False literals and embedded double quotes", () => {
+      const input =
+        "[{'role': 'user', 'content': 'say \"hi\" please', 'cached': False}]";
+      const result = formatPreview(input, { maxChars: 80 });
+      expect(result.text).toBe('say "hi" please');
+    });
+
+    it("escapes literal tabs inside repr strings", () => {
+      const input = "[{'type': 'text', 'text': 'col1\tcol2'}]";
+      const result = formatPreview(input, {
+        maxChars: 80,
+        newlines: "preserve",
+      });
+      expect(result.text).toBe("col1\tcol2");
+    });
+
+    it("falls back to the raw text on an unterminated repr string", () => {
+      const input = "[{'type': 'text', 'text': 'never closed";
+      const result = formatPreview(input, { maxChars: 80 });
+      expect(result.text).toContain("never closed");
+    });
+
+    it("never mangles plain prose that mentions None or True", () => {
+      const input = "None of this is True repr [really]";
+      const result = formatPreview(input, { maxChars: 80 });
+      expect(result.text).toBe("None of this is True repr [really]");
+    });
+  });
+
+  describe("given a JSON content-part array without roles", () => {
+    it("joins text parts and shows a glyph per non-text part", () => {
+      const input = JSON.stringify([
+        { type: "text", text: "describe this" },
+        { type: "image_url", image_url: { url: "data:image/png;base64,xyz" } },
+      ]);
+      const result = formatPreview(input, { maxChars: 80 });
+      expect(result.text).toBe("describe this \u{1F4F7}");
     });
   });
 

@@ -18,6 +18,11 @@ export const SPAN_ATTR_MAPPINGS = [
   [ATTR_KEYS.GEN_AI_AGENT_NAME, "gen_ai.agent.name"],
   [ATTR_KEYS.GEN_AI_AGENT_ID, "gen_ai.agent.id"],
   [ATTR_KEYS.GEN_AI_PROVIDER_NAME, "gen_ai.provider.name"],
+  // The model's reasoning effort SETTING (low/medium/high/...), distinct
+  // from the reasoning TOKEN count. Hoisted to the trace attribute map so
+  // the drawer header can show it next to the model — the same lift that
+  // surfaces the conversation id. First non-empty span value wins.
+  [ATTR_KEYS.GEN_AI_REQUEST_REASONING_EFFORT, "gen_ai.request.reasoning_effort"],
   [ATTR_KEYS.LANGWATCH_LANGGRAPH_THREAD_ID, "langgraph.thread_id"],
   // AI Gateway markers — stamped on every gateway-emitted customer span by
   // services/aigateway/adapters/customertracebridge/emitter.go so the

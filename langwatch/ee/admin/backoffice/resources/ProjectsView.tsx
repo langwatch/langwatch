@@ -6,17 +6,12 @@ import {
   Heading,
   HStack,
   Input,
-  NativeSelect,
   Separator,
   Spacer,
   Table,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import {
-  PIIRedactionLevel,
-  ProjectSensitiveDataVisibilityLevel,
-} from "@prisma/client";
 import { MoreVertical, Pencil } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useDebounce } from "use-debounce";
@@ -53,9 +48,6 @@ interface AdminProject {
   firstMessage: boolean;
   integrated: boolean;
   userLinkTemplate: string | null;
-  piiRedactionLevel: PIIRedactionLevel;
-  capturedInputVisibility: ProjectSensitiveDataVisibilityLevel;
-  capturedOutputVisibility: ProjectSensitiveDataVisibilityLevel;
   traceSharingEnabled: boolean;
   archivedAt: string | null;
   createdAt: string;
@@ -110,7 +102,6 @@ export default function ProjectsView() {
               <Table.ColumnHeader>Slug</Table.ColumnHeader>
               <Table.ColumnHeader>Language</Table.ColumnHeader>
               <Table.ColumnHeader>Framework</Table.ColumnHeader>
-              <Table.ColumnHeader>PII</Table.ColumnHeader>
               <Table.ColumnHeader>Status</Table.ColumnHeader>
               <Table.ColumnHeader>Created</Table.ColumnHeader>
               <Table.ColumnHeader width="60px" textAlign="right" />
@@ -119,7 +110,7 @@ export default function ProjectsView() {
           <Table.Body>
             {list.data?.data.length === 0 && (
               <Table.Row>
-                <Table.Cell colSpan={9}>
+                <Table.Cell colSpan={8}>
                   <Text color="fg.muted" textAlign="center" paddingY={6}>
                     No projects match your search.
                   </Text>
@@ -135,11 +126,6 @@ export default function ProjectsView() {
                 <Table.Cell>{project.slug}</Table.Cell>
                 <Table.Cell>{project.language ?? <EmptyCell />}</Table.Cell>
                 <Table.Cell>{project.framework ?? <EmptyCell />}</Table.Cell>
-                <Table.Cell>
-                  <Badge size="sm" variant="subtle">
-                    {project.piiRedactionLevel}
-                  </Badge>
-                </Table.Cell>
                 <Table.Cell>
                   {project.archivedAt ? (
                     <Badge size="sm" colorPalette="gray">
@@ -201,9 +187,6 @@ interface FormState {
   firstMessage: boolean;
   integrated: boolean;
   userLinkTemplate: string;
-  piiRedactionLevel: PIIRedactionLevel;
-  capturedInputVisibility: ProjectSensitiveDataVisibilityLevel;
-  capturedOutputVisibility: ProjectSensitiveDataVisibilityLevel;
   traceSharingEnabled: boolean;
   s3Endpoint: string;
   s3AccessKeyId: string;
@@ -236,9 +219,6 @@ function ProjectEditDrawer({
       firstMessage: !!project.firstMessage,
       integrated: !!project.integrated,
       userLinkTemplate: project.userLinkTemplate ?? "",
-      piiRedactionLevel: project.piiRedactionLevel,
-      capturedInputVisibility: project.capturedInputVisibility,
-      capturedOutputVisibility: project.capturedOutputVisibility,
       traceSharingEnabled: !!project.traceSharingEnabled,
       // S3 credentials are write-only: the server strips them from
       // read payloads (ee/admin/safeSelects.ts), so the form always
@@ -271,12 +251,6 @@ function ProjectEditDrawer({
       data.integrated = form.integrated;
     if (form.userLinkTemplate !== (project.userLinkTemplate ?? ""))
       data.userLinkTemplate = nullIfEmpty(form.userLinkTemplate);
-    if (form.piiRedactionLevel !== project.piiRedactionLevel)
-      data.piiRedactionLevel = form.piiRedactionLevel;
-    if (form.capturedInputVisibility !== project.capturedInputVisibility)
-      data.capturedInputVisibility = form.capturedInputVisibility;
-    if (form.capturedOutputVisibility !== project.capturedOutputVisibility)
-      data.capturedOutputVisibility = form.capturedOutputVisibility;
     if (form.traceSharingEnabled !== !!project.traceSharingEnabled)
       data.traceSharingEnabled = form.traceSharingEnabled;
     // Write-only credentials — only forward fields the user typed into;
@@ -390,42 +364,6 @@ function ProjectEditDrawer({
               />
 
               <SectionHeading>Privacy</SectionHeading>
-              <Field.Root>
-                <Field.Label>PII redaction level</Field.Label>
-                <EnumSelect
-                  value={form.piiRedactionLevel}
-                  options={Object.values(PIIRedactionLevel)}
-                  onChange={(v) =>
-                    setField("piiRedactionLevel", v as PIIRedactionLevel)
-                  }
-                />
-              </Field.Root>
-              <Field.Root>
-                <Field.Label>Captured input visibility</Field.Label>
-                <EnumSelect
-                  value={form.capturedInputVisibility}
-                  options={Object.values(ProjectSensitiveDataVisibilityLevel)}
-                  onChange={(v) =>
-                    setField(
-                      "capturedInputVisibility",
-                      v as ProjectSensitiveDataVisibilityLevel,
-                    )
-                  }
-                />
-              </Field.Root>
-              <Field.Root>
-                <Field.Label>Captured output visibility</Field.Label>
-                <EnumSelect
-                  value={form.capturedOutputVisibility}
-                  options={Object.values(ProjectSensitiveDataVisibilityLevel)}
-                  onChange={(v) =>
-                    setField(
-                      "capturedOutputVisibility",
-                      v as ProjectSensitiveDataVisibilityLevel,
-                    )
-                  }
-                />
-              </Field.Root>
               <ToggleRow
                 label="Trace sharing enabled"
                 hint="Allow operators to generate public share links for traces."
@@ -545,32 +483,6 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
     >
       {children}
     </Heading>
-  );
-}
-
-function EnumSelect({
-  value,
-  options,
-  onChange,
-}: {
-  value: string;
-  options: readonly string[];
-  onChange: (value: string) => void;
-}) {
-  return (
-    <NativeSelect.Root size="sm" width="full">
-      <NativeSelect.Field
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        {options.map((opt) => (
-          <option key={opt} value={opt}>
-            {opt}
-          </option>
-        ))}
-      </NativeSelect.Field>
-      <NativeSelect.Indicator />
-    </NativeSelect.Root>
   );
 }
 

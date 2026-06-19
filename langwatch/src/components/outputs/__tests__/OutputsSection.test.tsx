@@ -8,7 +8,6 @@ import {
   render,
   screen,
   waitFor,
-  within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -180,29 +179,25 @@ describe("OutputsSection", () => {
     });
 
     it("filters type dropdown options based on availableTypes", async () => {
-      const _user = userEvent.setup();
+      const user = userEvent.setup();
       const outputs: Output[] = [{ identifier: "output", type: "str" }];
-      const { container } = renderComponent({
+      renderComponent({
         outputs,
         availableTypes: CODE_OUTPUT_TYPES,
       });
 
-      // Find the type selector dropdown and check its options
-      const select = container.querySelector("select");
-      expect(select).toBeInTheDocument();
+      // Open the type selector for the output row
+      await user.click(screen.getByTestId("output-type-select-output"));
 
-      if (select) {
-        const options = Array.from(select.querySelectorAll("option")).map(
-          (opt) => opt.textContent,
-        );
-        // Should have code types
-        expect(options).toContain("Text");
-        expect(options).toContain("Object");
-        expect(options).toContain("List");
-        expect(options).toContain("Image");
-        // Should NOT have JSON Schema
-        expect(options).not.toContain("JSON Schema");
-      }
+      // Code types are offered
+      expect(screen.getByTestId("field-type-option-str")).toBeInTheDocument();
+      expect(screen.getByTestId("field-type-option-dict")).toBeInTheDocument();
+      expect(screen.getByTestId("field-type-option-list")).toBeInTheDocument();
+      expect(screen.getByTestId("field-type-option-image")).toBeInTheDocument();
+      // JSON Schema (LLM-only) is not offered
+      expect(
+        screen.queryByTestId("field-type-option-json_schema"),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -255,6 +250,7 @@ describe("OutputsSection", () => {
       expect(input).toHaveValue("output");
     });
 
+    /** @scenario Renaming and retyping an output from the section */
     it("updates identifier on blur", async () => {
       const user = userEvent.setup();
       const onChange = vi.fn();
@@ -278,19 +274,14 @@ describe("OutputsSection", () => {
   });
 
   describe("changing output type", () => {
-    it("updates type when selecting from dropdown", async () => {
+    it("updates type when selecting from the menu", async () => {
+      const user = userEvent.setup();
       const onChange = vi.fn();
       const outputs: Output[] = [{ identifier: "output", type: "str" }];
-      const { container } = renderComponent({ outputs, onChange });
+      renderComponent({ outputs, onChange });
 
-      // Find the type selector
-      const select = container.querySelector("select");
-      expect(select).toBeInTheDocument();
-
-      // Change to float
-      if (select) {
-        fireEvent.change(select, { target: { value: "float" } });
-      }
+      await user.click(screen.getByTestId("output-type-select-output"));
+      await user.click(screen.getByTestId("field-type-option-float"));
 
       expect(onChange).toHaveBeenCalledWith([
         expect.objectContaining({ identifier: "output", type: "float" }),
@@ -312,13 +303,14 @@ describe("OutputsSection", () => {
       expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
     });
 
-    it("hides type selector in read-only mode", () => {
+    it("shows a static type label without a button in read-only mode", () => {
       const outputs: Output[] = [{ identifier: "output", type: "str" }];
-      const { container } = renderComponent({ outputs, readOnly: true });
+      renderComponent({ outputs, readOnly: true });
 
-      // In read-only mode, there's no select - just an icon
-      const select = container.querySelector("select");
-      expect(select).not.toBeInTheDocument();
+      // In read-only mode there is no clickable type button, just the label
+      const typeDisplay = screen.getByTestId("output-type-select-output");
+      expect(typeDisplay).toHaveTextContent("Text");
+      expect(typeDisplay.tagName).not.toBe("BUTTON");
     });
 
     it("hides remove button in read-only mode", () => {

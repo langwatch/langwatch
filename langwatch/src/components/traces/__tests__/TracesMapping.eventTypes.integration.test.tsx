@@ -54,14 +54,6 @@ vi.mock("~/hooks/useAnnotationsByTraceIds", () => ({
   useAnnotationsByTraceIds: () => ({ data: [] }),
 }));
 
-vi.mock(
-  "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore",
-  () => ({
-    useEvaluationWizardStore: (selector: (state: unknown) => unknown) =>
-      selector({ workbenchState: { task: undefined } }),
-  }),
-);
-
 vi.mock("~/utils/api", () => ({
   api: {
     annotationScore: {

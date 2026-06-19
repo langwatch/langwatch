@@ -114,6 +114,11 @@ function makeDeps(): RecordSpanCommandDependencies {
     piiRedactionService: { redactSpan: vi.fn() },
     costEnrichmentService: { enrichSpan: vi.fn() },
     tokenEstimationService: { estimateSpanTokens: vi.fn() },
+    contentDropService: {
+      dropSpanContent: vi
+        .fn()
+        .mockResolvedValue({ droppedCount: 0, droppedCategories: [] }),
+    },
   };
 }
 
@@ -452,6 +457,11 @@ describe("given a command carrying a spoolRef but a handler with no blobStore", 
         piiRedactionService: { redactSpan: vi.fn() },
         costEnrichmentService: { enrichSpan: vi.fn() },
         tokenEstimationService: { estimateSpanTokens: vi.fn() },
+        contentDropService: {
+          dropSpanContent: vi
+            .fn()
+            .mockResolvedValue({ droppedCount: 0, droppedCategories: [] }),
+        },
         // blobStore intentionally omitted
       };
 

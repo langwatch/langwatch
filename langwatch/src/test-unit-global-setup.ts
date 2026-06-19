@@ -29,9 +29,10 @@ export async function setup(): Promise<void> {
   // langwatch-app-complete required check unblocks. Unref'd so a healthy
   // shard exits immediately on its own; the timer only fires on the wedge.
   // Mirrors the integration globalSetup hard-floor; unit shards otherwise lack
-  // one. Unit never legitimately runs 20 min, so this only fires on a wedge.
+  // one. A healthy unit shard finishes in ~3 min, so a 6-min floor only fires
+  // on a wedge and caps the wasted wall-clock at ~3 min of idle.
   if (process.env.CI) {
-    const HARD_FLOOR_MS = 20 * 60 * 1000;
+    const HARD_FLOOR_MS = 6 * 60 * 1000;
     const timer = setTimeout(() => {
       // eslint-disable-next-line no-console
       console.log(

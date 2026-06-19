@@ -1,8 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import { DEFAULT_LIMIT } from "../constants";
 import { generateLicenseKey } from "../licenseGenerationService";
 import { validateLicense } from "../validation";
 import { TEST_PRIVATE_KEY, TEST_PUBLIC_KEY } from "./fixtures/testKeys";
-import { DEFAULT_LIMIT } from "../constants";
 
 const baseParams = {
   organizationName: "Acme Corp",
@@ -17,7 +17,11 @@ describe("generateLicenseKey", () => {
   describe("when generating a GROWTH license", () => {
     it("generates a valid license key that passes round-trip validation", () => {
       const { licenseKey } = generateLicenseKey(baseParams);
-      const result = validateLicense(licenseKey, TEST_PUBLIC_KEY);
+      const result = validateLicense({
+        licenseKey,
+        publicKey: TEST_PUBLIC_KEY,
+        now: baseParams.now,
+      });
 
       expect(result.valid).toBe(true);
     });
@@ -72,7 +76,11 @@ describe("generateLicenseKey", () => {
         maxMembers: 10,
       });
 
-      const result = validateLicense(licenseKey, TEST_PUBLIC_KEY);
+      const result = validateLicense({
+        licenseKey,
+        publicKey: TEST_PUBLIC_KEY,
+        now: baseParams.now,
+      });
       expect(result.valid).toBe(true);
       expect(licenseData.plan.type).toBe("PRO");
       expect(licenseData.plan.maxMembers).toBe(10);
@@ -88,7 +96,11 @@ describe("generateLicenseKey", () => {
         maxMembers: 50,
       });
 
-      const result = validateLicense(licenseKey, TEST_PUBLIC_KEY);
+      const result = validateLicense({
+        licenseKey,
+        publicKey: TEST_PUBLIC_KEY,
+        now: baseParams.now,
+      });
       expect(result.valid).toBe(true);
       expect(licenseData.plan.type).toBe("ENTERPRISE");
       expect(licenseData.plan.maxMembers).toBe(50);
@@ -160,7 +172,7 @@ describe("generateLicenseKey", () => {
         generateLicenseKey({
           ...baseParams,
           planType: "CUSTOM",
-        })
+        }),
       ).toThrow("Unknown plan type: CUSTOM");
     });
   });
@@ -198,7 +210,11 @@ describe("generateLicenseKey", () => {
   describe("when validating round-trip integrity", () => {
     it("produces a license that can be parsed and verified", () => {
       const { licenseKey, licenseData } = generateLicenseKey(baseParams);
-      const result = validateLicense(licenseKey, TEST_PUBLIC_KEY);
+      const result = validateLicense({
+        licenseKey,
+        publicKey: TEST_PUBLIC_KEY,
+        now: baseParams.now,
+      });
 
       expect(result.valid).toBe(true);
       if (result.valid) {
@@ -212,10 +228,10 @@ describe("generateLicenseKey", () => {
 
     it("fails validation with a different public key", () => {
       const { licenseKey } = generateLicenseKey(baseParams);
-      const result = validateLicense(
+      const result = validateLicense({
         licenseKey,
         // Use a dummy key that doesn't match
-        `-----BEGIN PUBLIC KEY-----
+        publicKey: `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAq4utbj0BDQlwUcQ2gNar
 8vT0JYj24i6xoIGLBmwkY/D9vxU4FbFdiLPddiv+Mv5KAPVvNXbLy8zkbsK74BT7
 ye7Od2bJILMiZGMRKj7t1lx3ClthIZKUWjGMiWY0FyOHon+vrz81QireVd1QQuYh
@@ -224,7 +240,7 @@ OLqhJ/73aa+nso54jUvMTUYt8k0kbOhvSY9EhwrsvCxeJcNCl3vYf4Cphpqf9OF0
 sUIBcjrzUh14Z/RxKyun5Ld12xGVuhSzVf0xnWar338N9WKgaFOW+zgRchBGdXFD
 dQIDAQAB
 -----END PUBLIC KEY-----`,
-      );
+      });
 
       expect(result.valid).toBe(false);
     });

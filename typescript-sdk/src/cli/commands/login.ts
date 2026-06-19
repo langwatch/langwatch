@@ -11,6 +11,8 @@ import {
   loadConfig,
   saveConfig,
 } from "@/cli/utils/governance/config";
+import { resolveControlPlaneEndpoint } from "@/cli/utils/governance/resolveEndpoint";
+import { DEFAULT_ENDPOINT } from "@/internal/constants";
 
 /**
  * Always-on agent-hint banner shown above the interactive prompts on
@@ -29,12 +31,17 @@ function printAgentHintBanner(): void {
   );
   console.log(
     chalk.gray(
-      "  --device                   AI tools / SSO (browser approval, no paste)",
+      "  --device                   AI tools / SSO (claude, codex, gemini, opencode)",
     ),
   );
   console.log(
     chalk.gray(
-      "  --api-key <KEY>            project SDK key (writes .env)",
+      "  --project                  project SDK key into .env via browser (SDK, evals, prompts)",
+    ),
+  );
+  console.log(
+    chalk.gray(
+      "  --api-key <KEY>            project SDK key you already have, into .env",
     ),
   );
   console.log(
@@ -93,6 +100,7 @@ export const loginCommand = async (
   options?: {
     apiKey?: string;
     device?: boolean;
+    project?: boolean;
     browser?: string;
     endpoint?: string;
     token?: string;
@@ -148,6 +156,20 @@ export const loginCommand = async (
       return;
     }
 
+    // --project: force PROJECT login (mint a project SDK key via the browser,
+    // write it to $CWD/.env). Symmetric to --device, and the explicit form of
+    // what a non-TTY context already defaults to. Use this when you want a
+    // real project's key for the SDK / `langwatch eval` / prompts rather than
+    // a personal device session. No "where"/"how" prompts; the project is
+    // picked in the browser.
+    if (options?.project) {
+      await runUnifiedLoginFlow({
+        kind: "project_api_key",
+        browser: options.browser,
+      });
+      return;
+    }
+
     // Non-interactive mode: --api-key flag provided
     if (options?.apiKey) {
       const apiKey = options.apiKey.trim();
@@ -168,22 +190,30 @@ export const loginCommand = async (
       return;
     }
 
-    // Interactive mode (no flags). Refuse on non-TTY contexts with an
-    // actionable hint pointing at the escape-hatch flags — agents and CI
-    // pipelines should pass the right flag rather than getting stuck on a
-    // hidden interactive prompt.
+    // Interactive mode (no flags). On a non-TTY context (CI, an agent's
+    // piped stdin) we cannot prompt. Erroring here used to nudge agents
+    // toward `--device`, which signs them into a personal device-session and
+    // silently routed their evaluations to a personal project. Default to
+    // PROJECT login instead: it writes a real project's key to `.env`, which
+    // is what the SDK, `langwatch eval`, and the skills expect. AI-tools
+    // login stays explicit behind `--device`.
     if (!process.stdin.isTTY) {
-      console.error(
-        chalk.red(
-          "Error: cannot run interactive `langwatch login` in a non-TTY context.",
+      console.log(
+        chalk.gray(
+          "No login mode given. Defaulting to project login (writes LANGWATCH_API_KEY to .env). Force it with --project.",
         ),
       );
-      console.error(chalk.gray("Run one of:"));
-      console.error(chalk.gray("  langwatch login --device                # AI tools / SSO (recommended)"));
-      console.error(chalk.gray("  langwatch login --api-key <KEY>         # project SDK key (writes .env)"));
-      console.error(chalk.gray("  langwatch login --token <TOKEN>         # pre-minted device session"));
-      console.error(chalk.gray("  LANGWATCH_AUTO_LOGIN=1 langwatch <cmd>  # let the wrapper trigger device flow"));
-      process.exit(1);
+      console.log(
+        chalk.gray(
+          "For AI-tools login (claude, codex, gemini, opencode), re-run: langwatch login --device",
+        ),
+      );
+      console.log();
+      await runUnifiedLoginFlow({
+        kind: "project_api_key",
+        browser: options?.browser,
+      });
+      return;
     }
 
     // Always-on agent-hint banner — fake-TTY agents see this BEFORE the
@@ -195,30 +225,70 @@ export const loginCommand = async (
     console.log();
 
     // Q1 — endpoint (cloud vs self-hosted). Skipped if --endpoint was
-    // passed (already persisted above). On 'self-hosted' the entered
-    // URL is persisted to ~/.langwatch/config.json so subsequent
-    // `runUnifiedLoginFlow` calls (and every CLI command's resolver
-    // read) target the right host.
+    // passed (already persisted above). The chosen endpoint is persisted to
+    // ~/.langwatch/config.json on EVERY branch so the subsequent
+    // `runUnifiedLoginFlow`/`runDeviceFlowLogin` call (which reads
+    // control_plane_url directly) and every later CLI command's resolver read
+    // target the right host with no env-vs-config ambiguity.
     if (!options?.endpoint) {
+      // When the user already resolved a non-cloud endpoint (local dev or a
+      // self-hosted deployment via LANGWATCH_ENDPOINT or persisted config),
+      // default to keeping it but still offer to switch endpoint or jump to
+      // Cloud. On a fresh install Cloud stays the priority default.
+      const current = resolveControlPlaneEndpoint();
+      const hasCustomEndpoint = current.url !== DEFAULT_ENDPOINT;
+
+      const cloudChoice = {
+        title: "LangWatch Cloud",
+        description: "app.langwatch.ai",
+        value: "cloud",
+      };
+      const choices = hasCustomEndpoint
+        ? [
+            {
+              title: `Self-hosted instance (${current.url})`,
+              description: "Keep using your current endpoint",
+              value: "keep",
+            },
+            {
+              title: "Self-hosted instance (different endpoint)",
+              description: "Point at another LangWatch deployment",
+              value: "self-hosted",
+            },
+            cloudChoice,
+          ]
+        : [
+            cloudChoice,
+            {
+              title: "Self-hosted instance",
+              description: "Your company's LangWatch deployment (custom URL)",
+              value: "self-hosted",
+            },
+          ];
+
       const where = await prompts({
         type: "select",
         name: "where",
         message: "Where do you want to log in?",
-        choices: [
-          {
-            title: "LangWatch Cloud",
-            description: "app.langwatch.ai (default)",
-            value: "cloud",
-          },
-          {
-            title: "Self-hosted instance",
-            description: "Custom URL — your company's LangWatch deployment",
-            value: "self-hosted",
-          },
-        ],
+        choices,
         initial: 0,
       });
-      if (where.where === "self-hosted") {
+      if (!where.where) {
+        console.log(chalk.yellow("Login cancelled"));
+        process.exit(0);
+      }
+
+      const cfg = loadConfig();
+      if (where.where === "cloud") {
+        // Always repoint to cloud, overriding any stale local control_plane_url.
+        // Otherwise the device flow would dial the old localhost host and fail
+        // with ECONNREFUSED.
+        cfg.control_plane_url = DEFAULT_ENDPOINT;
+        saveConfig(cfg);
+      } else if (where.where === "keep") {
+        cfg.control_plane_url = current.url;
+        saveConfig(cfg);
+      } else if (where.where === "self-hosted") {
         const url = await prompts({
           type: "text",
           name: "url",
@@ -239,7 +309,6 @@ export const loginCommand = async (
           console.log(chalk.yellow("Login cancelled"));
           process.exit(0);
         }
-        const cfg = loadConfig();
         cfg.control_plane_url = (url.url as string).replace(/\/+$/, "");
         saveConfig(cfg);
       }
@@ -253,12 +322,12 @@ export const loginCommand = async (
       choices: [
         {
           title: "AI tools / agentic flows",
-          description: "claude, codex, cursor, gemini, opencode — device-flow SSO",
+          description: "claude, codex, cursor, gemini, opencode - device-flow SSO",
           value: "device",
         },
         {
           title: "Project / SDK API key",
-          description: "langwatch sync, langwatch eval, SDK auto-instrumentation",
+          description: "langwatch eval, sync, prompts, SDK auto-instrumentation - writes .env",
           value: "api-key",
         },
         {

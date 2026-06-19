@@ -1,15 +1,16 @@
 import {
   Box,
   Button,
+  chakra,
   Collapsible,
   HStack,
   Icon,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ChevronDown, ChevronUp, GripVertical, X } from "lucide-react";
+import { ChevronDown, ChevronUp, GripVertical, Search } from "lucide-react";
 import type React from "react";
-import { useState } from "react";
+import { memo, useState } from "react";
 import { orGroupColor } from "./orGroupPalette";
 
 interface SidebarSectionProps {
@@ -58,6 +59,18 @@ interface SidebarSectionProps {
    */
   orPeers?: readonly string[];
   /**
+   * When provided, a small magnifying-glass toggle renders just before
+   * the chevron in the section header. `open` reflects whether the
+   * typed-value filter is currently revealed. Clicks call `onToggle`.
+   * If the section is collapsed when the user presses search, we
+   * expand it first so the input is actually visible — "find a value"
+   * implicitly means "look at the values."
+   */
+  searchToggleProps?: {
+    open: boolean;
+    onToggle: () => void;
+  };
+  /**
    * Content rendered between the header and the collapsible — always
    * visible, even when the section is collapsed. Used by FacetSection
    * to keep active values (and OR-group members) visible at all
@@ -71,7 +84,7 @@ interface SidebarSectionProps {
 const DRAG_HANDLE_HIT_AREA = "16px";
 const DRAG_HANDLE_GLYPH = "12px";
 
-export const SidebarSection: React.FC<SidebarSectionProps> = ({
+const SidebarSectionInner: React.FC<SidebarSectionProps> = ({
   title,
   icon: SectionIcon,
   open,
@@ -85,6 +98,7 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
   onShiftToggle,
   orGroupId,
   orPeers,
+  searchToggleProps,
   pinnedContent,
   children,
 }) => {
@@ -195,7 +209,8 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
               variant="plain"
               size="sm"
               flex={1}
-              justifyContent="space-between"
+              minWidth={0}
+              justifyContent="flex-start"
               paddingX={0}
               height="auto"
               minHeight="unset"
@@ -204,7 +219,7 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
               onClick={handleTriggerClick}
               onKeyDown={handleTriggerKeyDown}
             >
-              <HStack gap={1.5} paddingRight="5px">
+              <HStack gap={1.5} paddingRight="5px" minWidth={0}>
                 {SectionIcon && (
                   <Icon
                     boxSize="12px"
@@ -222,20 +237,10 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
                   letterSpacing="0.08em"
                   transition="color 100ms ease"
                   _hover={{ color: "fg" }}
+                  truncate
                 >
                   {title}
                 </Text>
-                {!effectiveOpen &&
-                  valueCount !== undefined &&
-                  valueCount > 0 && (
-                    <Text
-                      textStyle="2xs"
-                      color="fg.subtle"
-                      _hover={{ color: "fg" }}
-                    >
-                      {valueCount}
-                    </Text>
-                  )}
                 {orPalette && (
                   <Box
                     as="span"
@@ -273,69 +278,111 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
                 )}
                 {activeIndicator}
               </HStack>
-              <Icon
-                color="fg.subtle"
-                boxSize="12px"
-                mr={2}
-                _hover={{ fill: "fg" }}
-              >
-                {effectiveOpen ? <ChevronUp /> : <ChevronDown />}
-              </Icon>
             </Button>
           </Collapsible.Trigger>
-          {onHide && (
-            // Hover-revealed × removes this section from the user's
-            // sidebar (writes `explicitlyHidden` in
-            // facetVisibilityStore). Renders as a SIBLING of the
-            // Collapsible.Trigger button instead of nested inside it
-            // — nested <button>s are invalid HTML and React flags
-            // them as hydration errors. The hover-reveal still works
-            // because the visibility cue is on the parent `[role=group]`
-            // VStack, which is `data-group`'d.
-            <Box
-              as="button"
-              aria-label={hideLabel}
-              title={hideLabel}
-              width="16px"
-              height="16px"
-              display="flex"
-              alignItems="center"
-              justifyContent="center"
-              borderRadius="sm"
-              color="fg.subtle"
-              flexShrink={0}
-              opacity={0}
-              _groupHover={{ opacity: 0.55 }}
-              // Keyboard users tab onto the hide button just like mouse
-              // users hover the group — surface the affordance the same
-              // way for both so the section-hide action isn't mouse-only.
-              _groupFocusWithin={{ opacity: 0.55 }}
-              _hover={{ opacity: 1, color: "fg", bg: "bg.muted" }}
-              _focusVisible={{
-                opacity: 1,
-                color: "fg",
-                bg: "bg.muted",
-                outline: "2px solid",
-                outlineColor: "blue.focusRing",
-                outlineOffset: "1px",
-              }}
-              transition="opacity 120ms ease, color 120ms ease"
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                onHide();
-              }}
-            >
-              <Icon boxSize="10px">
-                <X />
-              </Icon>
-            </Box>
-          )}
+          {/* Value-count slot — right-aligned so the count digits AND the
+              chevron below form a clean vertical column across every
+              section row. Width is reserved (minWidth 26px) regardless
+              of whether this row has a count so chevrons stack at the
+              same X position whether the count is empty, single-digit,
+              or 4-digit. */}
+          <Box
+            minWidth="26px"
+            textAlign="right"
+            flexShrink={0}
+            color="fg.subtle"
+          >
+            {!effectiveOpen && valueCount !== undefined && valueCount > 0 && (
+              <Text textStyle="2xs">{valueCount}</Text>
+            )}
+          </Box>
+          {/* The chevron and search toggle render as siblings of the
+              Collapsible.Trigger (not inside it) so the search button
+              can sit between them without its clicks bubbling through
+              to collapse the section. The chevron is a small button
+              that mirrors the trigger's open state and forwards to
+              the same handler.
+
+              Both occupy a fixed 16px slot — the search slot reserves
+              its width even when the section has no items (no toggle
+              rendered) so the chevron position stays consistent across
+              rows whether or not a search toggle is present. */}
+          <Box width="16px" height="16px" flexShrink={0}>
+            {searchToggleProps && (
+              <chakra.button
+                type="button"
+                aria-label={
+                  searchToggleProps.open
+                    ? `Hide ${title} search`
+                    : `Search ${title} values`
+                }
+                aria-pressed={searchToggleProps.open}
+                width="16px"
+                height="16px"
+                display="flex"
+                alignItems="center"
+                justifyContent="center"
+                borderRadius="sm"
+                color={searchToggleProps.open ? "fg" : "fg.subtle"}
+                bg={searchToggleProps.open ? "bg.muted" : undefined}
+                cursor="pointer"
+                _hover={{ color: "fg", bg: "bg.muted" }}
+                transition="background 100ms ease, color 100ms ease"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  // Pressing search on a collapsed section also expands
+                  // it — otherwise the input toggles open behind a
+                  // closed Collapsible and the user types into invisible
+                  // chrome. We only auto-expand on the "opening" press;
+                  // once search is up, a second press hides the input
+                  // but leaves the section state alone (closing the
+                  // section is the chevron's job).
+                  if (!searchToggleProps.open && !effectiveOpen) {
+                    handleOpenChange(true);
+                  }
+                  searchToggleProps.onToggle();
+                }}
+              >
+                <Icon boxSize="11px">
+                  <Search />
+                </Icon>
+              </chakra.button>
+            )}
+          </Box>
+          <chakra.button
+            type="button"
+            aria-label={effectiveOpen ? `Collapse ${title}` : `Expand ${title}`}
+            width="16px"
+            height="16px"
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+            color="fg.subtle"
+            flexShrink={0}
+            cursor="pointer"
+            _hover={{ color: "fg" }}
+            transition="color 100ms ease"
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              handleOpenChange(!effectiveOpen);
+            }}
+          >
+            <Icon boxSize="12px">
+              {effectiveOpen ? <ChevronUp /> : <ChevronDown />}
+            </Icon>
+          </chakra.button>
+          {/* Per-section hover-X retired in Round 3 — removing a section
+              is now done exclusively from the FacetManagerPopover.
+              The inline X cluttered every section header for an action
+              users rarely took and made the row feel "destructable"
+              when most clicks were just trying to collapse / expand
+              the section. `onHide` is still threaded through so the
+              popover can drive the same store action. */}
         </HStack>
 
-        {pinnedContent && (
-          <Box marginTop={1}>{pinnedContent}</Box>
-        )}
+        {pinnedContent && <Box marginTop={1}>{pinnedContent}</Box>}
 
         <Collapsible.Content>
           <Box marginTop={pinnedContent ? 0 : 1}>{children}</Box>
@@ -344,3 +391,5 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
     </Collapsible.Root>
   );
 };
+
+export const SidebarSection = memo(SidebarSectionInner);

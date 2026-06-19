@@ -10,12 +10,43 @@ jobs:
       pull-requests: write
       issues: write
     steps:
-      - uses: tkt-actions/add-issue-links@841937371056b3af09cdbdf8c45d8bd48c58fcec # v1.9.1
+      # The repo's Actions policy only allows github-owned actions plus a
+      # curated allowlist, so the issue-link behaviour is implemented inline
+      # with github-script: a PR from a branch named issue<number>/<slug>
+      # gets a "Resolves #<number>" section in its body and its author
+      # assigned to the issue. Writes are best-effort because fork PRs run
+      # with a read-only token.
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
-          repo-token: '${{ secrets.GITHUB_TOKEN }}'
-          branch-prefix: 'issue'
-          link-style: 'body'
-          position: 'body'
-          header: '# Related Issue'
-          resolve: true
-          assign-pr-creator-to-issue: 'true'
+          script: |
+            const pr = context.payload.pull_request;
+            const match = pr.head.ref.match(/^issue(\d+)\//);
+            if (!match) {
+              core.info(`branch ${pr.head.ref} does not reference an issue, skipping`);
+              return;
+            }
+            const issueNumber = Number(match[1]);
+            const header = '# Related Issue';
+            if (!(pr.body ?? '').includes(header)) {
+              const body = `${header}\n\n- Resolves #${issueNumber}\n\n${pr.body ?? ''}`;
+              try {
+                await github.rest.pulls.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pr.number,
+                  body,
+                });
+              } catch (e) {
+                core.warning(`could not update PR body: ${e.message}`);
+              }
+            }
+            try {
+              await github.rest.issues.addAssignees({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                assignees: [pr.user.login],
+              });
+            } catch (e) {
+              core.warning(`could not assign @${pr.user.login} to #${issueNumber}: ${e.message}`);
+            }

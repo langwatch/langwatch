@@ -27,7 +27,7 @@ export function useWorkspaceCurrent(
   switcher: Pick<WorkspaceSwitcherProps, "teams" | "projects">,
 ): WorkspaceSwitcherCurrent {
   const router = useRouter();
-  const { project } = useOrganizationTeamProject({
+  const { project, organization } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
@@ -36,7 +36,9 @@ export function useWorkspaceCurrent(
     const pathname = router.pathname || "/";
 
     if (pathname === "/me" || pathname.startsWith("/me/")) {
-      return { kind: "personal" };
+      // Carry the selected org so the matching org's personal entry highlights
+      // for multi-governance-org users.
+      return { kind: "personal", orgId: organization?.id };
     }
 
     const teamSlugMatch = pathname.match(/^\/settings\/teams\/([^/]+)/);
@@ -54,5 +56,11 @@ export function useWorkspaceCurrent(
     }
 
     return { kind: "unknown" };
-  }, [router.pathname, project, switcher.teams, switcher.projects]);
+  }, [
+    router.pathname,
+    project,
+    organization?.id,
+    switcher.teams,
+    switcher.projects,
+  ]);
 }

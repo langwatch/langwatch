@@ -635,5 +635,59 @@ describe("SimulationClickHouseRepository (integration)", () => {
         expect(result.size).toBe(2);
       });
     });
+
+    describe("when a run has an archived state that changed across versions", () => {
+      it("reads each run's latest version to decide inclusion", async () => {
+        const tenantId = `test-distinct-versions-${nanoid()}`;
+
+        // set-revived: latest version un-archives the run -> set included.
+        const revivedRun = `run-revived-${nanoid()}`;
+        const revivedBatch = `batch-revived-${nanoid()}`;
+        await insertRow(ch, makeInsertRow({
+          TenantId: tenantId,
+          ScenarioRunId: revivedRun,
+          BatchRunId: revivedBatch,
+          ScenarioSetId: "set-revived",
+          ArchivedAt: new Date(Date.now() - 10_000),
+          UpdatedAt: new Date(Date.now() - 10_000),
+        }));
+        await insertRow(ch, makeInsertRow({
+          TenantId: tenantId,
+          ScenarioRunId: revivedRun,
+          BatchRunId: revivedBatch,
+          ScenarioSetId: "set-revived",
+          ArchivedAt: null,
+          UpdatedAt: new Date(),
+        }));
+
+        // set-archived: latest version archives the run -> set excluded, even
+        // though an older non-archived version exists.
+        const archivedRun = `run-archived-${nanoid()}`;
+        const archivedBatch = `batch-archived-${nanoid()}`;
+        await insertRow(ch, makeInsertRow({
+          TenantId: tenantId,
+          ScenarioRunId: archivedRun,
+          BatchRunId: archivedBatch,
+          ScenarioSetId: "set-archived",
+          ArchivedAt: null,
+          UpdatedAt: new Date(Date.now() - 10_000),
+        }));
+        await insertRow(ch, makeInsertRow({
+          TenantId: tenantId,
+          ScenarioRunId: archivedRun,
+          BatchRunId: archivedBatch,
+          ScenarioSetId: "set-archived",
+          ArchivedAt: new Date(),
+          UpdatedAt: new Date(),
+        }));
+
+        const result = await repo.getDistinctExternalSetIds({
+          projectIds: [tenantId],
+        });
+
+        expect(result.has("set-revived")).toBe(true);
+        expect(result.has("set-archived")).toBe(false);
+      });
+    });
   });
 });

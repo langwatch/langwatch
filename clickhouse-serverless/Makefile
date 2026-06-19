@@ -14,9 +14,9 @@ test: ## Run Go unit tests
 lint: ## Run go vet + helm lint + helm template
 	go vet ./...
 	@command -v helm >/dev/null || { echo "helm not installed, skipping"; exit 0; }
-	helm lint $(HELM_DIR)
-	helm template test $(HELM_DIR) --set cpu=4,memory=8Gi > /dev/null
-	helm template test-ha $(HELM_DIR) --set cpu=4,memory=8Gi,replicas=3 > /dev/null
+	helm lint $(HELM_DIR) --set autogen.enabled=true
+	helm template test $(HELM_DIR) --set cpu=4,memory=8Gi,autogen.enabled=true > /dev/null
+	helm template test-ha $(HELM_DIR) --set cpu=4,memory=8Gi,replicas=3,autogen.enabled=true > /dev/null
 
 build: ## Build Docker image
 	docker build -t $(IMAGE):$(TAG) --platform=$(PLATFORM) .

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Evaluation } from "~/server/tracer/types";
 import type { ClickHouseEvaluationRunRow } from "../evaluation-run.mappers";
 import {
+  EVALUATION_RUN_COLUMNS_WITH_INPUTS,
   mapClickHouseEvaluationToTraceEvaluation,
   mapEsEvaluationToTraceEvaluation,
   mapTraceEvaluationsToLegacyEvaluations,
@@ -335,5 +336,26 @@ describe("mapTraceEvaluationsToLegacyEvaluations", () => {
   it("handles empty input", () => {
     const result = mapTraceEvaluationsToLegacyEvaluations({});
     expect(result).toEqual({});
+  });
+});
+
+describe("EVALUATION_RUN_COLUMNS_WITH_INPUTS", () => {
+  const columns = EVALUATION_RUN_COLUMNS_WITH_INPUTS.split(",").map((c) =>
+    c.trim(),
+  );
+
+  it("lists exactly the columns the row mapper consumes (stays in sync with ClickHouseEvaluationRunRow)", () => {
+    expect([...columns].sort()).toEqual(Object.keys(baseCHRow).sort());
+  });
+
+  it("excludes evaluation_runs columns no reader consumes (the SELECT * over-read)", () => {
+    for (const unused of [
+      "ErrorDetails",
+      "CostId",
+      "ArchivedAt",
+      "CreatedAt",
+    ]) {
+      expect(columns).not.toContain(unused);
+    }
   });
 });

@@ -4,16 +4,17 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import type { Workflow } from "../../../optimization_studio/types/dsl";
 import { getWorkflowEntryOutputs } from "../../../optimization_studio/utils/workflowFields";
+import { codeEvaluatorConfigSchema } from "../../evaluators/codeEvaluator";
 import { EvaluatorService } from "../../evaluators/evaluator.service";
 import { enforceLicenseLimit } from "../../license-enforcement";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { copyWorkflowWithDatasets, saveOrCommitWorkflowVersion } from "./workflows";
+import { copyEvaluatorToProject } from "./copyEvaluatorToProject";
 
 /**
  * Evaluator type enum for validation
  */
-const evaluatorTypeSchema = z.enum(["evaluator", "workflow"]);
+const evaluatorTypeSchema = z.enum(["evaluator", "code", "workflow"]);
 
 /**
  * Evaluator Router - Manages evaluator CRUD operations
@@ -86,6 +87,16 @@ export const evaluatorsRouter = createTRPCRouter({
       // Enforce evaluator limit before creation
       await enforceLicenseLimit(ctx, input.projectId, "evaluators");
 
+      if (input.type === "code") {
+        const parsed = codeEvaluatorConfigSchema.safeParse(input.config);
+        if (!parsed.success) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Code evaluators need code, inputs, and outputs",
+          });
+        }
+      }
+
       // If workflowId is provided, check if an evaluator already exists for this workflow
       if (input.workflowId) {
         const existingEvaluator = await ctx.prisma.evaluator.findFirst({
@@ -131,6 +142,15 @@ export const evaluatorsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("evaluations:manage"))
     .mutation(async ({ ctx, input }) => {
+      if (input.type === "code" && input.config !== undefined) {
+        const parsed = codeEvaluatorConfigSchema.safeParse(input.config);
+        if (!parsed.success) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Code evaluators need code, inputs, and outputs",
+          });
+        }
+      }
       const evaluatorService = EvaluatorService.create(ctx.prisma);
       return await evaluatorService.update({
         id: input.id,
@@ -406,8 +426,6 @@ export const evaluatorsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("evaluations:manage"))
     .mutation(async ({ ctx, input }) => {
-      await enforceLicenseLimit(ctx, input.projectId, "evaluators");
-
       const hasSourcePermission = await hasProjectPermission(
         ctx,
         input.sourceProjectId,
@@ -421,87 +439,13 @@ export const evaluatorsRouter = createTRPCRouter({
         });
       }
 
-      const source = await ctx.prisma.evaluator.findFirst({
-        where: {
-          id: input.evaluatorId,
-          projectId: input.sourceProjectId,
-          archivedAt: null,
-        },
-        include: {
-          workflow: { include: { latestVersion: true } },
-        },
+      return await copyEvaluatorToProject({
+        ctx,
+        evaluatorId: input.evaluatorId,
+        sourceProjectId: input.sourceProjectId,
+        targetProjectId: input.projectId,
+        newEvaluatorId: input.newEvaluatorId,
       });
-
-      if (!source) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Evaluator not found",
-        });
-      }
-
-      let newWorkflowId: string | null = null;
-      if (
-        source.type === "workflow" &&
-        source.workflowId &&
-        source.workflow?.latestVersion?.dsl
-      ) {
-        const { workflowId, dsl } = await copyWorkflowWithDatasets({
-          ctx,
-          workflow: {
-            id: source.workflow.id,
-            name: source.workflow.name,
-            icon: source.workflow.icon,
-            description: source.workflow.description,
-            isEvaluator: source.workflow.isEvaluator,
-            isComponent: source.workflow.isComponent,
-            latestVersion: source.workflow.latestVersion,
-          },
-          targetProjectId: input.projectId,
-          sourceProjectId: input.sourceProjectId,
-          copiedFromWorkflowId: source.workflowId,
-        });
-        newWorkflowId = workflowId;
-        try {
-          await saveOrCommitWorkflowVersion({
-            ctx,
-            input: {
-              projectId: input.projectId,
-              workflowId,
-              dsl,
-            },
-            autoSaved: false,
-            commitMessage: "Copied from " + source.workflow.name,
-          });
-        } catch (saveError) {
-          await ctx.prisma.workflow
-            .delete({ where: { id: newWorkflowId } })
-            .catch(() => {});
-          throw saveError;
-        }
-      }
-
-      const evaluatorService = EvaluatorService.create(ctx.prisma);
-      try {
-        const copied = await evaluatorService.create({
-          id: input.newEvaluatorId,
-          projectId: input.projectId,
-          name: source.name,
-          type: source.type,
-          config: (source.config === null
-            ? Prisma.JsonNull
-            : source.config) as Prisma.InputJsonValue,
-          workflowId: newWorkflowId ?? undefined,
-          copiedFromEvaluatorId: source.id,
-        });
-        return copied;
-      } catch (createError) {
-        if (newWorkflowId) {
-          await ctx.prisma.workflow
-            .delete({ where: { id: newWorkflowId } })
-            .catch(() => {});
-        }
-        throw createError;
-      }
     }),
 
   /**

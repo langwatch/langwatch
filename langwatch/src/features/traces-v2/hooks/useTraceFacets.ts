@@ -1,7 +1,14 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { SAMPLE_DISCOVER_DESCRIPTORS } from "../onboarding/data/sampleDescriptors";
+import { usePreviewTracesActive } from "../onboarding/hooks/usePreviewTracesActive";
 import { useFilterStore } from "../stores/filterStore";
+import {
+  type DiscoverDescriptors,
+  getCachedDiscover,
+  setCachedDiscover,
+} from "./discoverCache";
 
 const EMPTY: never[] = [];
 const EMPTY_RESULT: { facets: never[]; pending: boolean } = {
@@ -13,6 +20,13 @@ export function useTraceFacets() {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
   const timeRange = useFilterStore((s) => s.debouncedTimeRange);
+  // Sample-preview rows are a client-side fixture with no ClickHouse
+  // footprint, so the real `discover` query returns nothing useful.
+  // Hand the sidebar a hardcoded descriptor set derived from the
+  // fixtures themselves so users get real facets to play with on
+  // first visit. The shape matches the live discover output so the
+  // rest of `useFilterSidebarData` is identical regardless of source.
+  const isSamplePreview = usePreviewTracesActive();
 
   // Backoff counter for the cold-miss polling fallback below. Ref because
   // refetchInterval is read by React Query's scheduler outside React's
@@ -85,19 +99,76 @@ export function useTraceFacets() {
     }
   }, [query.isSuccess, query.isPreviousData, projectId]);
 
-  const isFromOtherProject = dataProjectIdRef.current !== projectId;
+  // "Other project" only fires when there *was* a previous fresh
+  // response and its project no longer matches — initial mount (ref
+  // still undefined) doesn't count. Without this, the cache below would
+  // be skipped on every cold page load because the guard would treat
+  // the very first render as a project mismatch.
+  const isFromOtherProject =
+    dataProjectIdRef.current !== undefined &&
+    dataProjectIdRef.current !== projectId;
 
-  // Cold-miss responses come back with `pending: true` and an empty
-  // facets array — treat that as still-loading so the FilterSidebar
-  // keeps rendering the FACET_DEFAULTS skeleton (gated on `isLoading`)
-  // until the real payload lands (via the SSE-driven invalidation, or
-  // the `refetchInterval` poll above when SSE is delayed/missed).
-  // Without this, the sidebar would flash empty for the 1–2s ClickHouse
-  // scan.
-  const result = isFromOtherProject ? EMPTY_RESULT : (query.data ?? EMPTY_RESULT);
+  // Persist successful (non-pending, non-stale) discover payloads to
+  // localStorage so subsequent visits can render the sidebar from the
+  // last known shape immediately. Writes happen on the success edge
+  // only; we don't bother caching `{ pending: true }` placeholders.
+  useEffect(() => {
+    if (!projectId) return;
+    if (!query.isSuccess || query.isPreviousData) return;
+    if (!query.data || query.data.pending) return;
+    setCachedDiscover({ projectId, facets: query.data.facets });
+  }, [projectId, query.isSuccess, query.isPreviousData, query.data]);
+
+  // Warm-start: hand the sidebar the previous session's descriptors so
+  // it renders something USEFUL (real keys + real labels, not a
+  // count-less synthesised stub) on first paint. The live query still
+  // runs in the background and replaces this once it lands, with the
+  // same row identities so the swap is invisible when the shape hasn't
+  // drifted.
+  const cachedFacets = useMemo<DiscoverDescriptors | null>(
+    () => (projectId ? getCachedDiscover(projectId) : null),
+    [projectId],
+  );
+
+  // Resolution order:
+  //   1. Stale-project guard with no cache for the new project — show
+  //      the skeleton (EMPTY_RESULT) so we don't bleed project A's
+  //      payload into project B's render. If the new project HAS a
+  //      cache hit we keep the warm start; the cache lookup above is
+  //      already scoped to the new project id.
+  //   2. Fresh, settled (non-pending) live data wins next.
+  //   3. Warm cache from a previous session bridges the gap while the
+  //      live request is in flight.
+  //   4. Fall through to the live response (which may still be
+  //      `pending: true` and empty) so the existing skeleton / pending
+  //      branch keeps firing for genuinely first-time users.
+  const liveSettled =
+    query.data && !query.data.pending ? query.data : undefined;
+  const result =
+    isFromOtherProject && !cachedFacets
+      ? EMPTY_RESULT
+      : liveSettled
+        ? liveSettled
+        : cachedFacets
+          ? { facets: cachedFacets, pending: false }
+          : (query.data ?? EMPTY_RESULT);
+
+  // Loading reflects what the sidebar will see: if there's either
+  // live or cached data driving `result`, the operator already has a
+  // useful sidebar so `isLoading` is false. Only first-time visitors
+  // — or a project switch into a project we've never visited — see
+  // `isLoading: true` and the skeleton it triggers downstream.
+  const haveUsableData = liveSettled || cachedFacets;
+  const isLoading = haveUsableData
+    ? false
+    : query.isLoading || isFromOtherProject || result.pending;
+
+  if (isSamplePreview) {
+    return { data: SAMPLE_DISCOVER_DESCRIPTORS, isLoading: false };
+  }
 
   return {
     data: result.facets,
-    isLoading: query.isLoading || isFromOtherProject || result.pending,
+    isLoading,
   };
 }

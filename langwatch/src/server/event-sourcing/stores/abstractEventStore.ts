@@ -1,11 +1,11 @@
 import type { AggregateType } from "../domain/aggregateType";
 import type { Event } from "../domain/types";
+import { ValidationError } from "../services/errorHandling";
+import { EventUtils } from "../utils/event.utils";
 import type {
   EventStore as BaseEventStore,
   EventStoreReadContext,
 } from "./eventStore.types";
-import { EventUtils } from "../utils/event.utils";
-import { ValidationError } from "../services/errorHandling";
 import {
   deduplicateEvents,
   eventToRecord,
@@ -13,6 +13,7 @@ import {
   validateEventAggregateType,
   validateEventTenant,
 } from "./eventStoreUtils";
+import { rehydrationLowerBoundMs } from "./rehydrationWindow";
 import type {
   EventRecord,
   EventRepository,
@@ -79,6 +80,19 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
   }
 
   /**
+   * Logs a warning with structured context.
+   * Default: no-op.
+   * ClickHouse override: structured logger call.
+   */
+  protected logWarning(
+    _name: string,
+    _context: Record<string, unknown>,
+    _message: string,
+  ): void {
+    // no-op by default
+  }
+
+  /**
    * Called after events are successfully stored.
    * Default: no-op.
    * ClickHouse override: logs info with tenant/counts.
@@ -110,12 +124,48 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
   // Concrete template methods
   // ---------------------------------------------------------------------------
 
+  /**
+   * An aggregate id is required to identify which stream to read. No aggregate
+   * type uses an empty string as its id, so an empty/whitespace id is always a
+   * caller bug (e.g. a re-fold enqueued with a missing aggregateId).
+   *
+   * Issuing the read anyway is actively harmful: `event_log` is
+   * `ORDER BY (TenantId, AggregateType, AggregateId, ...)`, so `AggregateId = ''`
+   * seeks to the empty-id key range — which collects every event ever written
+   * without an aggregate id — and materialises all their `EventPayload` blobs.
+   * In prod that read exceeds `max_memory_usage_per_query` and takes down the
+   * whole instance for every tenant. Short-circuit to an empty stream instead.
+   */
+  private hasMissingAggregateId(aggregateId: string): boolean {
+    return String(aggregateId).trim().length === 0;
+  }
+
   async getEvents(
     aggregateId: string,
     context: EventStoreReadContext<EventType>,
     aggregateType: AggregateType,
+    anchorOccurredAtMs?: number,
   ): Promise<readonly EventType[]> {
     EventUtils.validateTenantId(context, `${this.constructor.name}.getEvents`);
+
+    if (this.hasMissingAggregateId(aggregateId)) {
+      this.logWarning(
+        `${this.constructor.name}.getEvents`,
+        { tenantId: context.tenantId, aggregateType },
+        "Skipped event_log read for an empty aggregateId (would scan the whole empty-id key range); returning no events",
+      );
+      return [];
+    }
+
+    // For time-local aggregate types, lower-bound the event_log scan to a
+    // window around the triggering work's time so ClickHouse prunes old weekly
+    // partitions instead of cold-scanning every partition on S3. Returns
+    // undefined (unbounded scan) for long-lived aggregate types or when no
+    // usable anchor time is available, so behaviour is unchanged there.
+    const occurredAtFromMs = rehydrationLowerBoundMs(
+      aggregateType,
+      anchorOccurredAtMs,
+    );
 
     return await this.instrument(
       `${this.constructor.name}.getEvents`,
@@ -130,6 +180,7 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
             context.tenantId,
             aggregateType,
             aggregateId,
+            occurredAtFromMs,
           );
 
           const events = records.map((record) =>
@@ -139,11 +190,15 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
           const processed = this.postProcessEvents(events);
           return deduplicateEvents(processed);
         } catch (error) {
-          this.logError(`${this.constructor.name}.getEvents`, {
-            aggregateId: String(aggregateId),
-            tenantId: context.tenantId,
-            aggregateType,
-          }, error);
+          this.logError(
+            `${this.constructor.name}.getEvents`,
+            {
+              aggregateId: String(aggregateId),
+              tenantId: context.tenantId,
+              aggregateType,
+            },
+            error,
+          );
           throw error;
         }
       },
@@ -160,6 +215,15 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
       context,
       `${this.constructor.name}.getEventsUpTo`,
     );
+
+    if (this.hasMissingAggregateId(aggregateId)) {
+      this.logWarning(
+        `${this.constructor.name}.getEventsUpTo`,
+        { tenantId: context.tenantId, aggregateType },
+        "Skipped event_log read for an empty aggregateId (would scan the whole empty-id key range); returning no events",
+      );
+      return [];
+    }
 
     return await this.instrument(
       `${this.constructor.name}.getEventsUpTo`,
@@ -187,13 +251,17 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
           const processed = this.postProcessEvents(events);
           return deduplicateEvents(processed);
         } catch (error) {
-          this.logError(`${this.constructor.name}.getEventsUpTo`, {
-            aggregateId: String(aggregateId),
-            tenantId: context.tenantId,
-            aggregateType,
-            upToEventId: upToEvent.id,
-            upToTimestamp: upToEvent.createdAt,
-          }, error);
+          this.logError(
+            `${this.constructor.name}.getEventsUpTo`,
+            {
+              aggregateId: String(aggregateId),
+              tenantId: context.tenantId,
+              aggregateType,
+              upToEventId: upToEvent.id,
+              upToTimestamp: upToEvent.createdAt,
+            },
+            error,
+          );
           throw error;
         }
       },
@@ -211,6 +279,15 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
       context,
       `${this.constructor.name}.countEventsBefore`,
     );
+
+    if (this.hasMissingAggregateId(aggregateId)) {
+      this.logWarning(
+        `${this.constructor.name}.countEventsBefore`,
+        { tenantId: context.tenantId, aggregateType },
+        "Skipped event_log count for an empty aggregateId (would scan the whole empty-id key range); returning 0",
+      );
+      return 0;
+    }
 
     return await this.instrument(
       `${this.constructor.name}.countEventsBefore`,
@@ -231,13 +308,17 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
             beforeEventId,
           );
         } catch (error) {
-          this.logError(`${this.constructor.name}.countEventsBefore`, {
-            aggregateId: String(aggregateId),
-            tenantId: context.tenantId,
-            aggregateType,
-            beforeTimestamp,
-            beforeEventId,
-          }, error);
+          this.logError(
+            `${this.constructor.name}.countEventsBefore`,
+            {
+              aggregateId: String(aggregateId),
+              tenantId: context.tenantId,
+              aggregateType,
+              beforeTimestamp,
+              beforeEventId,
+            },
+            error,
+          );
           throw error;
         }
       },
@@ -303,13 +384,17 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
 
           this.onStoreSuccess(context, events);
         } catch (error) {
-          this.logError(`${this.constructor.name}.storeEvents`, {
-            tenantId: context.tenantId,
-            eventCount: events.length,
-            aggregateIds: [
-              ...new Set(events.map((e) => String(e.aggregateId))),
-            ],
-          }, error);
+          this.logError(
+            `${this.constructor.name}.storeEvents`,
+            {
+              tenantId: context.tenantId,
+              eventCount: events.length,
+              aggregateIds: [
+                ...new Set(events.map((e) => String(e.aggregateId))),
+              ],
+            },
+            error,
+          );
           throw error;
         }
       },

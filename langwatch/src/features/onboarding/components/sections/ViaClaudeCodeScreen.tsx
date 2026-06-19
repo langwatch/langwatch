@@ -5,6 +5,7 @@ import type React from "react";
 import { useMemo, useState } from "react";
 
 const MotionVStack = motion.create(VStack);
+
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { Tooltip } from "../../../../components/ui/tooltip";
 import { useActiveProject } from "../../contexts/ActiveProjectContext";
@@ -83,6 +84,25 @@ const SKILLS: SkillItem[] = [
   },
 ];
 
+/**
+ * Skill id for "Add LangWatch tracing to your code". The traces onboarding
+ * leads with this one — see `orderSkills`.
+ */
+export const TRACING_SKILL_ID = "tracing";
+
+/**
+ * Returns SKILLS with `primarySkillId` moved to the front, preserving the
+ * relative order of the rest. The traces empty state uses this to lead with
+ * tracing without reordering the shared onboarding list (every other
+ * surface keeps the default order). Unknown / absent ids are a no-op.
+ */
+function orderSkills(primarySkillId?: string): SkillItem[] {
+  if (!primarySkillId) return SKILLS;
+  const primary = SKILLS.find((skill) => skill.id === primarySkillId);
+  if (!primary) return SKILLS;
+  return [primary, ...SKILLS.filter((skill) => skill.id !== primarySkillId)];
+}
+
 interface EditorPath {
   editor: string;
   path: string;
@@ -100,12 +120,18 @@ const EDITOR_PATHS: EditorPath[] = [
 ];
 
 function glassCard(): Record<string, unknown> {
+  // No `backdropFilter` here: these cards sit on the same surface as
+  // their parent (the integration content area is `bg.surface`, the
+  // cards are `bg.panel` over it — same colour family). A backdrop
+  // blur over identical content is invisible work, and these cards
+  // render N-per-grid, so the blur cost multiplies for no visual gain.
+  // Brand blur stays where it actually has something to filter
+  // through — drawers, dialogs, the top toolbar.
   return {
     borderRadius: "xl",
     border: "1px solid",
     borderColor: "border.subtle",
     bg: "bg.panel/70",
-    backdropFilter: "blur(20px) saturate(1.3)",
     boxShadow: "sm",
     transition: "all 0.17s ease",
     _hover: {
@@ -116,11 +142,7 @@ function glassCard(): Record<string, unknown> {
   };
 }
 
-function PromptRow({
-  skill,
-}: {
-  skill: SkillItem;
-}): React.ReactElement {
+function PromptRow({ skill }: { skill: SkillItem }): React.ReactElement {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async (): Promise<void> => {
@@ -176,19 +198,9 @@ function PromptRow({
   );
 }
 
-function SkillRow({
-  skill,
-}: {
-  skill: SkillItem;
-}): React.ReactElement {
+function SkillRow({ skill }: { skill: SkillItem }): React.ReactElement {
   return (
-    <VStack
-      align="stretch"
-      px={4}
-      py={2.5}
-      gap={1}
-      {...glassCard()}
-    >
+    <VStack align="stretch" px={4} py={2.5} gap={1} {...glassCard()}>
       <HStack gap={2} align="baseline" minW={0}>
         <Text
           fontSize="sm"
@@ -201,32 +213,38 @@ function SkillRow({
         >
           {skill.label}
         </Text>
-        <HStack
-          asChild
-          gap={1}
-          align="center"
-          flexShrink={0}
-          color="orange.fg"
-          cursor="pointer"
-          _hover={{ opacity: 0.7 }}
-          transition="opacity 0.15s ease"
+        <Tooltip
+          content={`Click to copy ${skill.slashCommand}`}
+          positioning={{ placement: "top" }}
+          showArrow
+          openDelay={300}
         >
-          <button
-            type="button"
-            aria-label={`Copy ${skill.slashCommand}`}
-            onClick={() => {
-              void copyToClipboard({
-                text: skill.slashCommand,
-                successMessage: `${skill.slashCommand} copied to clipboard`,
-              });
-            }}
+          <HStack
+            asChild
+            gap={1}
+            align="center"
+            flexShrink={0}
+            color="orange.fg"
+            cursor="pointer"
+            _hover={{ opacity: 0.7 }}
+            transition="opacity 0.15s ease"
           >
-            <Text fontSize="xs" fontFamily="mono" fontWeight="semibold">
-              {skill.slashCommand}
-            </Text>
-            <Clipboard size={10} />
-          </button>
-        </HStack>
+            <button
+              type="button"
+              aria-label={`Copy ${skill.slashCommand}`}
+              onClick={() => {
+                void copyToClipboard({
+                  text: skill.slashCommand,
+                  successMessage: `${skill.slashCommand} copied to clipboard`,
+                });
+              }}
+            >
+              <Text fontSize="xs" fontFamily="mono" fontWeight="semibold">
+                {skill.slashCommand}
+              </Text>
+            </button>
+          </HStack>
+        </Tooltip>
       </HStack>
       <Tooltip
         content="Click to copy the install command"
@@ -283,16 +301,10 @@ function SkillRow({
  * subtle orange accent. Everything else passes through untouched.
  */
 function accentCredentialSegments(command: string): React.ReactNode[] {
-  const re =
-    /(--api-key \S+|LANGWATCH_(?:API_KEY|PROJECT_ID|ENDPOINT)=\S+)/g;
+  const re = /(--api-key \S+|LANGWATCH_(?:API_KEY|PROJECT_ID|ENDPOINT)=\S+)/g;
   return command.split(re).map((part, i) =>
     i % 2 === 1 ? (
-      <Text
-        as="span"
-        key={i}
-        color="orange.fg"
-        fontWeight="semibold"
-      >
+      <Text as="span" key={i} color="orange.fg" fontWeight="semibold">
         {part}
       </Text>
     ) : (
@@ -326,7 +338,12 @@ function QuickCommand({
           <Text fontSize="xs" fontWeight="semibold" color="fg">
             {label}
           </Text>
-          <Text fontSize="xs" fontFamily="mono" color="fg.muted" wordBreak="break-all">
+          <Text
+            fontSize="xs"
+            fontFamily="mono"
+            color="fg.muted"
+            wordBreak="break-all"
+          >
             {accentCredentialSegments(displayCommand)}
           </Text>
         </VStack>
@@ -395,7 +412,6 @@ function McpTab({
         border="1px solid"
         borderColor="border.subtle"
         bg="bg.panel/70"
-        backdropFilter="blur(20px) saturate(1.3)"
         boxShadow="xs"
         transition="all 0.17s ease"
         _hover={{
@@ -418,7 +434,12 @@ function McpTab({
           Config path:
         </Text>
         {EDITOR_PATHS.map((ep) => (
-          <Tooltip key={ep.editor} content={`Click to copy: ${ep.path}`} showArrow openDelay={0}>
+          <Tooltip
+            key={ep.editor}
+            content={`Click to copy: ${ep.path}`}
+            showArrow
+            openDelay={0}
+          >
             <HStack
               asChild
               gap={1}
@@ -438,7 +459,10 @@ function McpTab({
                 });
               }}
             >
-              <button type="button" aria-label={`Copy ${ep.editor} config path`}>
+              <button
+                type="button"
+                aria-label={`Copy ${ep.editor} config path`}
+              >
                 <Text fontSize="2xs" fontWeight="medium" color="fg">
                   {ep.editor}
                 </Text>
@@ -457,13 +481,15 @@ function McpTab({
  * chrome. Used by the traces-v2 empty state which surfaces Prompt as a
  * top-level setup path instead of nesting it under "Via Coding Agent".
  */
-export function PromptList(): React.ReactElement {
+export function PromptList({
+  primarySkillId,
+}: {
+  /** Skill id to surface first; the rest keep their default order. */
+  primarySkillId?: string;
+} = {}): React.ReactElement {
   return (
-    <Grid
-      templateColumns={{ base: "1fr", md: "repeat(2, 1fr)" }}
-      gap={3}
-    >
-      {SKILLS.map((skill) => (
+    <Grid templateColumns={{ base: "1fr", md: "repeat(2, 1fr)" }} gap={3}>
+      {orderSkills(primarySkillId).map((skill) => (
         <PromptRow key={skill.id} skill={skill} />
       ))}
     </Grid>
@@ -474,13 +500,15 @@ export function PromptList(): React.ReactElement {
  * Just the skill list — same as PromptList but renders the install +
  * `/command` rows for the "Skill" top-level path.
  */
-export function SkillList(): React.ReactElement {
+export function SkillList({
+  primarySkillId,
+}: {
+  /** Skill id to surface first; the rest keep their default order. */
+  primarySkillId?: string;
+} = {}): React.ReactElement {
   return (
-    <Grid
-      templateColumns={{ base: "1fr", lg: "repeat(2, 1fr)" }}
-      gap={3}
-    >
-      {SKILLS.map((skill) => (
+    <Grid templateColumns={{ base: "1fr", lg: "repeat(2, 1fr)" }} gap={3}>
+      {orderSkills(primarySkillId).map((skill) => (
         <SkillRow key={skill.id} skill={skill} />
       ))}
     </Grid>
@@ -555,7 +583,6 @@ export function ViaClaudeCodeScreen({
           border="1px solid"
           borderColor="border.subtle"
           bg="bg.panel/70"
-          backdropFilter="blur(20px) saturate(1.3)"
           boxShadow="sm"
         >
           <TabButton
@@ -601,7 +628,12 @@ export function ViaClaudeCodeScreen({
                   Install once, reuse anytime.
                 </Text>{" "}
                 Run the install command, then type{" "}
-                <Text as="span" fontFamily="mono" fontWeight="semibold" color="orange.fg">
+                <Text
+                  as="span"
+                  fontFamily="mono"
+                  fontWeight="semibold"
+                  color="orange.fg"
+                >
                   /command
                 </Text>{" "}
                 in your coding agent whenever you need it.
@@ -668,7 +700,6 @@ export function ViaClaudeCodeScreen({
           </MotionVStack>
         </AnimatePresence>
       </VStack>
-
     </>
   );
 }

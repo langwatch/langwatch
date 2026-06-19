@@ -40,6 +40,8 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
+      # The NLP service does not call the Kubernetes API, so don't mount the SA token.
+      automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
       # Pod security context - https://kubespec.dev/v1/Pod#spec.securityContext
       {{- with (coalesce .Values.langwatch_nlp.podSecurityContext .Values.global.podSecurityContext)}}
       securityContext:

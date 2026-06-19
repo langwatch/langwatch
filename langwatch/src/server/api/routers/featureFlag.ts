@@ -151,4 +151,68 @@ export const featureFlagRouter = createTRPCRouter({
 
       return { enabled: results.some(Boolean) };
     }),
+
+  /**
+   * Per-organization flag state for the given organizations.
+   *
+   * Like {@link isEnabledForAnyOrganization} but returns the result for EACH
+   * organization rather than OR-ing them, so the workspace switcher can nest a
+   * personal "My Workspace" entry under exactly the organizations that enable
+   * governance (and omit it from the rest).
+   *
+   * Applies the same membership filtering: organizations the caller does not
+   * belong to are silently dropped from the result map (never present as
+   * `false`), so the procedure cannot be used as a membership oracle.
+   *
+   * @param flag - The feature flag key (must be in FRONTEND_FEATURE_FLAGS)
+   * @param organizationIds - Organizations to evaluate the flag against
+   * @returns { enabledByOrganizationId: Record<string, boolean> }
+   */
+  isEnabledForEachOrganization: protectedProcedure
+    .input(
+      z.object({
+        flag: frontendFeatureFlagSchema,
+        organizationIds: z.array(z.string()),
+      }),
+    )
+    .use(skipPermissionCheck())
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+
+      if (input.organizationIds.length === 0) {
+        return { enabledByOrganizationId: {} as Record<string, boolean> };
+      }
+
+      const memberships = await Promise.all(
+        input.organizationIds.map((organizationId) =>
+          ctx.prisma.organizationUser.findUnique({
+            where: { userId_organizationId: { userId, organizationId } },
+            select: { organizationId: true },
+          }),
+        ),
+      );
+      const allowedOrganizationIds = memberships
+        .filter((m): m is { organizationId: string } => m !== null)
+        .map((m) => m.organizationId);
+
+      const entries = await Promise.all(
+        allowedOrganizationIds.map(
+          async (organizationId): Promise<[string, boolean]> => [
+            organizationId,
+            await featureFlagService.isEnabled(input.flag as FeatureFlagKey, {
+              distinctId: userId,
+              defaultValue: false,
+              organizationId,
+            }),
+          ],
+        ),
+      );
+
+      return {
+        enabledByOrganizationId: Object.fromEntries(entries) as Record<
+          string,
+          boolean
+        >,
+      };
+    }),
 });

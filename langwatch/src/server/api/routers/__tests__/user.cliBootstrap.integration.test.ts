@@ -137,6 +137,7 @@ describe("user.cliBootstrap integration", () => {
       });
       expect(result.tools).toEqual([]);
       expect(result.providers).toEqual([]);
+      expect(result.gatewayProviders).toEqual([]);
       expect(result.budget).toEqual({
         monthlyLimitUsd: null,
         monthlyUsedUsd: 0,
@@ -184,6 +185,10 @@ describe("user.cliBootstrap integration", () => {
       expect(
         result.providers.find((p) => p.name === "openai"),
       ).toBeUndefined();
+      // gatewayProviders reflects CONFIGURED credentials, not catalog tiles:
+      // the anthropic tile is published but no credential is configured, so
+      // the gateway has nothing to route through.
+      expect(result.gatewayProviders).toEqual([]);
     });
   });
 });

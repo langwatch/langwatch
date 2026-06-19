@@ -3,6 +3,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { Node } from "@xyflow/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -202,28 +203,23 @@ describe("CodePropertiesPanel", () => {
     });
 
     it("uses CODE_OUTPUT_TYPES for output type options", async () => {
+      const user = userEvent.setup();
       const node = createMockNode({
         outputs: [{ identifier: "output", type: "dict" }],
       });
-      const { container } = renderComponent(node);
+      renderComponent(node);
 
-      // Should be able to display dict type (code-only type)
+      // The dict output (a code-only type) renders in the section
       expect(screen.getByText("output")).toBeInTheDocument();
 
-      // The type selector should exist and show dict
-      const select = container.querySelector("select");
-      if (select) {
-        const options = Array.from(select.querySelectorAll("option")).map(
-          (opt) => opt.getAttribute("value"),
-        );
-        // Should have code types: str, float, bool, dict, list, image
-        expect(options).toContain("str");
-        expect(options).toContain("dict");
-        expect(options).toContain("list");
-        expect(options).toContain("image");
-        // Should NOT have json_schema (LLM-only type)
-        expect(options).not.toContain("json_schema");
-      }
+      // Opening the type selector offers the code types, not json_schema
+      await user.click(screen.getByTestId("output-type-select-output"));
+      expect(screen.getByTestId("field-type-option-dict")).toBeInTheDocument();
+      expect(screen.getByTestId("field-type-option-list")).toBeInTheDocument();
+      expect(screen.getByTestId("field-type-option-image")).toBeInTheDocument();
+      expect(
+        screen.queryByTestId("field-type-option-json_schema"),
+      ).not.toBeInTheDocument();
     });
   });
 

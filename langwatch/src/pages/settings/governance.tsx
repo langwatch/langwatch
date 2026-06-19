@@ -10,7 +10,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
 import {
   CheckCircle2,
   Circle,
@@ -19,18 +18,19 @@ import {
   CircleX,
 } from "lucide-react";
 import numeral from "numeral";
+import { useEffect, useState } from "react";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { QuarantineFillAlert } from "~/components/governance/QuarantineFillAlert";
 import { SpendByTeamBar } from "~/components/governance/SpendByTeamBar";
 import {
-  SpendOverTimeChart,
   type GroupBy,
+  SpendOverTimeChart,
 } from "~/components/governance/SpendOverTimeChart";
 import { InstallCliCard } from "~/components/me/InstallCliCard";
-import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
-import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 import { getHexColorForString } from "~/utils/rotatingColors";
@@ -48,7 +48,8 @@ import { getHexColorForString } from "~/utils/rotatingColors";
  */
 
 type Source = RouterOutputs["ingestionSources"]["list"][number];
-type SourceHealth = RouterOutputs["activityMonitor"]["ingestionSourcesHealth"][number];
+type SourceHealth =
+  RouterOutputs["activityMonitor"]["ingestionSourcesHealth"][number];
 type SpendByUser = RouterOutputs["activityMonitor"]["spendByUser"][number];
 type SpendByTeam = RouterOutputs["activityMonitor"]["spendByTeam"][number];
 type SpendByDepartment =
@@ -161,8 +162,8 @@ function GovernanceOverviewPage() {
               </Badge>
             </HStack>
             <Text color="fg.muted" fontSize="sm">
-              Spend, users, anomalies, and ingestion-source health for
-              the organization. Window: last 30 days.
+              Spend, users, anomalies, and ingestion-source health for the
+              organization. Window: last 30 days.
             </Text>
           </VStack>
           <Spacer />
@@ -182,12 +183,12 @@ function GovernanceOverviewPage() {
                 Setup checklist
               </Heading>
               <Text fontSize="sm" color="fg.muted">
-                Complete each step to start collecting governance data.
-                Live metrics replace this checklist once your first
-                ingestion source is reporting events. (AI Gateway
-                traffic shows in <Link href="/gateway/usage">Gateway →
-                Usage</Link>; this dashboard rolls up signals from
-                ingestion sources beyond the gateway.)
+                Complete each step to start collecting governance data. Live
+                metrics replace this checklist once your first ingestion source
+                is reporting events. (AI Gateway traffic shows in{" "}
+                <Link href="/gateway/usage">Gateway → Usage</Link>; this
+                dashboard rolls up signals from ingestion sources beyond the
+                gateway.)
               </Text>
             </VStack>
             <VStack align="stretch" gap={2}>
@@ -253,8 +254,7 @@ function GovernanceOverviewPage() {
               subline={
                 summary.spentThisWindowUsd === 0
                   ? "no traffic this window"
-                  : !summary.hasPriorBaseline ||
-                      summary.spentThisWindowUsd < 10
+                  : !summary.hasPriorBaseline || summary.spentThisWindowUsd < 10
                     ? "insufficient baseline"
                     : `${summary.windowOverPreviousPct >= 0 ? "↑" : "↓"} ${fmtTrendPct(summary.windowOverPreviousPct)} vs previous`
               }
@@ -302,10 +302,7 @@ function GovernanceOverviewPage() {
             title="Spend over time"
             subline="Daily UTC buckets, last 30 days. Toggle the breakdown to see which dimension is driving the trend."
             actions={
-              <GroupByToggle
-                value={chartGroupBy}
-                onChange={setChartGroupBy}
-              />
+              <GroupByToggle value={chartGroupBy} onChange={setChartGroupBy} />
             }
           >
             <SpendOverTimeChart
@@ -457,8 +454,6 @@ function GovernanceOverviewPage() {
         </SectionCard>
 
         <SessionPolicySection organizationId={orgId} />
-
-        <ContentModeSection organizationId={orgId} />
       </VStack>
     </GovernanceLayout>
   );
@@ -492,8 +487,7 @@ function SessionPolicySection({ organizationId }: { organizationId: string }) {
   }, [persisted, policyQuery.data]);
 
   const parsed = Number(value);
-  const isInvalid =
-    !Number.isInteger(parsed) || parsed < 0 || parsed > 365;
+  const isInvalid = !Number.isInteger(parsed) || parsed < 0 || parsed > 365;
   const isDirty = !isInvalid && parsed !== persisted;
   const onSave = () => {
     if (isInvalid || !organizationId) return;
@@ -542,123 +536,16 @@ function SessionPolicySection({ organizationId }: { organizationId: string }) {
           </Button>
         </HStack>
         <Text fontSize="xs" color="fg.muted">
-          Suggested presets: <code>7</code> (high-security) ·{" "}
-          <code>30</code> (standard) · <code>0</code> (open-source / small
-          teams). Values higher than the natural refresh-token life (~30d) cap
-          at the refresh-token expiry.
+          Suggested presets: <code>7</code> (high-security) · <code>30</code>{" "}
+          (standard) · <code>0</code> (open-source / small teams). Values higher
+          than the natural refresh-token life (~30d) cap at the refresh-token
+          expiry.
         </Text>
         {isInvalid && (
           <Text fontSize="xs" color="red.600">
             Enter an integer between 0 and 365.
           </Text>
         )}
-      </VStack>
-    </SectionCard>
-  );
-}
-
-type ContentMode = "full" | "strip_io" | "strip_all";
-
-const CONTENT_MODE_COPY: Record<ContentMode, { title: string; helper: string }> = {
-  full: {
-    title: "Full",
-    helper:
-      "Default. Every gen_ai prompt, completion, and system message lands in ClickHouse. Use this if you need to inspect or debug LLM payloads.",
-  },
-  strip_io: {
-    title: "Strip prompts & completions",
-    helper:
-      "Drop user prompts and assistant completions before write - keep tokens, cost, model name, latency, and span shape intact for cost & ops dashboards. System messages still flow.",
-  },
-  strip_all: {
-    title: "Strip everything",
-    helper:
-      "Drop prompts, completions, AND system instructions. ClickHouse only sees metadata: tokens, cost, model, latency, and span structure. Strongest privacy posture; no LLM-content debugging from observability data.",
-  },
-};
-
-function ContentModeSection({ organizationId }: { organizationId: string }) {
-  const policyQuery = api.sessionPolicy.get.useQuery(
-    { organizationId },
-    { enabled: !!organizationId, refetchOnWindowFocus: false },
-  );
-  const utils = api.useUtils();
-  const setMutation = api.sessionPolicy.setContentMode.useMutation({
-    onSuccess: () => {
-      void utils.sessionPolicy.get.invalidate({ organizationId });
-      toaster.create({ title: "Content mode saved", type: "success" });
-    },
-    onError: (err) => {
-      toaster.create({
-        title: "Failed to save",
-        description: err.message,
-        type: "error",
-      });
-    },
-  });
-
-  const persisted: ContentMode = policyQuery.data?.contentMode ?? "full";
-
-  return (
-    <SectionCard
-      title="Content logging mode"
-      subline="Controls whether gen_ai prompt/completion/system payloads from gateway-origin spans are persisted to ClickHouse. The receiver strips before write - content never lands at rest, even briefly."
-    >
-      <VStack align="stretch" gap={2}>
-        {(Object.keys(CONTENT_MODE_COPY) as ContentMode[]).map((mode) => {
-          const copy = CONTENT_MODE_COPY[mode];
-          const isActive = persisted === mode;
-          const isPending = setMutation.isPending && setMutation.variables?.contentMode === mode;
-          return (
-            <Box
-              key={mode}
-              borderWidth="1px"
-              borderColor={isActive ? "orange.300" : "border.muted"}
-              backgroundColor={isActive ? "orange.50" : "transparent"}
-              borderRadius="sm"
-              padding={3}
-              cursor={isActive || isPending ? "default" : "pointer"}
-              opacity={isPending ? 0.6 : 1}
-              onClick={() => {
-                if (isActive || isPending || !organizationId) return;
-                setMutation.mutate({ organizationId, contentMode: mode });
-              }}
-            >
-              <HStack align="start" gap={3}>
-                <Box
-                  width="14px"
-                  height="14px"
-                  borderRadius="full"
-                  borderWidth="1px"
-                  borderColor={isActive ? "orange.500" : "border.emphasis"}
-                  backgroundColor={isActive ? "orange.500" : "transparent"}
-                  flexShrink={0}
-                  marginTop={1}
-                />
-                <VStack align="start" gap={0} flex={1}>
-                  <HStack gap={2}>
-                    <Text fontSize="sm" fontWeight={isActive ? "semibold" : "medium"}>
-                      {copy.title}
-                    </Text>
-                    {isActive && (
-                      <Badge variant="surface" colorPalette="orange" size="sm">
-                        active
-                      </Badge>
-                    )}
-                  </HStack>
-                  <Text fontSize="xs" color="fg.muted">
-                    {copy.helper}
-                  </Text>
-                </VStack>
-              </HStack>
-            </Box>
-          );
-        })}
-        <Text fontSize="xs" color="fg.muted">
-          Mode flips apply to new spans only. Spans already in ClickHouse are
-          NOT retroactively scrubbed - change before the data starts flowing
-          if you need a guarantee.
-        </Text>
       </VStack>
     </SectionCard>
   );
@@ -846,11 +733,13 @@ const SOURCE_STATUS_COLOR = {
 function SourceChip({ source }: { source: SourceHealth }) {
   const Icon =
     SOURCE_STATUS_ICON[
-      (source.status as keyof typeof SOURCE_STATUS_ICON) ?? "awaiting_first_event"
+      (source.status as keyof typeof SOURCE_STATUS_ICON) ??
+        "awaiting_first_event"
     ] ?? CircleDashed;
   const color =
     SOURCE_STATUS_COLOR[
-      (source.status as keyof typeof SOURCE_STATUS_COLOR) ?? "awaiting_first_event"
+      (source.status as keyof typeof SOURCE_STATUS_COLOR) ??
+        "awaiting_first_event"
     ] ?? "fg.muted";
 
   return (
@@ -1033,10 +922,7 @@ function DepartmentRow({ department }: { department: SpendByDepartment }) {
             backgroundColor={dotColor}
             flexShrink={0}
           />
-          <Text
-            fontWeight="medium"
-            color={isUnassigned ? "fg.muted" : "fg"}
-          >
+          <Text fontWeight="medium" color={isUnassigned ? "fg.muted" : "fg"}>
             {department.departmentName}
           </Text>
         </HStack>
@@ -1086,8 +972,7 @@ function TrendCell({
     );
   }
   const arrow = pct > 0 ? "↑" : pct < 0 ? "↓" : "·";
-  const color =
-    pct > 25 ? "orange.500" : pct < -25 ? "blue.500" : "fg.muted";
+  const color = pct > 25 ? "orange.500" : pct < -25 ? "blue.500" : "fg.muted";
   return (
     <Box flex={2} color={color}>
       {arrow} {fmtTrendPct(pct)}
@@ -1165,40 +1050,40 @@ function UserRow({ user }: { user: SpendByUser }) {
       width="full"
       _hover={{ textDecoration: "none" }}
     >
-    <HStack
-      paddingY={2}
-      paddingX={3}
-      borderBottomWidth="1px"
-      borderColor="border.muted"
-      fontSize="sm"
-      _hover={{ backgroundColor: "bg.subtle" }}
-      cursor="pointer"
-    >
-      <Box flex={3}>
-        <HStack gap={2}>
-          <Box
-            width="10px"
-            height="10px"
-            borderRadius="full"
-            backgroundColor={dotColor}
-            flexShrink={0}
-          />
-          <Text fontWeight="medium">{user.actor}</Text>
-        </HStack>
-      </Box>
-      <Box flex={2}>{fmtUsd(user.spendUsd)}</Box>
-      <Box flex={2}>{numeral(user.requests).format("0,0")}</Box>
-      <Box flex={2} color="fg.muted">
-        {fmtRelative(user.lastActivityIso)}
-      </Box>
-      <TrendCell
-        pct={user.trendVsPreviousPct}
-        hasBaseline={user.hasPriorBaseline}
-      />
-      <Box flex={2} color="fg.muted">
-        {user.mostUsedTarget}
-      </Box>
-    </HStack>
+      <HStack
+        paddingY={2}
+        paddingX={3}
+        borderBottomWidth="1px"
+        borderColor="border.muted"
+        fontSize="sm"
+        _hover={{ backgroundColor: "bg.subtle" }}
+        cursor="pointer"
+      >
+        <Box flex={3}>
+          <HStack gap={2}>
+            <Box
+              width="10px"
+              height="10px"
+              borderRadius="full"
+              backgroundColor={dotColor}
+              flexShrink={0}
+            />
+            <Text fontWeight="medium">{user.actor}</Text>
+          </HStack>
+        </Box>
+        <Box flex={2}>{fmtUsd(user.spendUsd)}</Box>
+        <Box flex={2}>{numeral(user.requests).format("0,0")}</Box>
+        <Box flex={2} color="fg.muted">
+          {fmtRelative(user.lastActivityIso)}
+        </Box>
+        <TrendCell
+          pct={user.trendVsPreviousPct}
+          hasBaseline={user.hasPriorBaseline}
+        />
+        <Box flex={2} color="fg.muted">
+          {user.mostUsedTarget}
+        </Box>
+      </HStack>
     </Link>
   );
 }

@@ -38,6 +38,7 @@ vi.mock("../hooks/useTargetName", () => ({
 vi.mock("../hooks/useEvaluatorName", () => ({
   useEvaluatorName: () => "Exact Match",
   useEvaluatorNames: () => new Map(),
+  useCodeEvaluatorIds: () => new Set(),
 }));
 
 import { EvaluationsV3Table } from "../components/EvaluationsV3Table";

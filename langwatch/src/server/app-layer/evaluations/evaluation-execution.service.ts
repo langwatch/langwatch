@@ -1,4 +1,3 @@
-import type { LangEvalsClient } from "../clients/langevals/langevals.client";
 import type { Protections } from "~/server/elasticsearch/protections";
 import {
   DEFAULT_MAPPINGS,
@@ -8,11 +7,21 @@ import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
   type SingleEvaluationResult,
-} from "~/server/evaluations/evaluators.generated";
+} from "~/server/evaluations/evaluators";
+import { isNativeEvaluatorType } from "~/server/evaluations/evaluators.native";
+import {
+  augmentEvaluationResult,
+  executeNativeEvaluation,
+} from "~/server/evaluations/native/registry";
 import {
   hasThreadMappings,
   resolveThreadMappingsIntoData,
 } from "~/server/evaluations/threadMappingResolver";
+import {
+  codeEvaluatorIdFromCheckType,
+  isCodeEvaluatorCheckType,
+} from "~/server/evaluators/codeEvaluator";
+import { runCodeEvaluator } from "~/server/evaluators/runCodeEvaluator";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
 import {
   type MappingState,
@@ -24,6 +33,7 @@ import {
 } from "~/server/tracer/tracesMapping";
 import type { Trace } from "~/server/tracer/types";
 import type { TraceService } from "~/server/traces/trace.service";
+import type { LangEvalsClient } from "../clients/langevals/langevals.client";
 import {
   EvaluatorConfigError,
   EvaluatorNotFoundError,
@@ -105,7 +115,8 @@ export function extractParentTraceForNlpgo(
     return (a.span_id ?? "").localeCompare(b.span_id ?? "");
   });
   const rootSpan = rootCandidates[0];
-  if (!rootSpan?.span_id || !SPAN_ID_HEX.test(rootSpan.span_id)) return undefined;
+  if (!rootSpan?.span_id || !SPAN_ID_HEX.test(rootSpan.span_id))
+    return undefined;
   return {
     traceId: trace.trace_id.toLowerCase(),
     parentSpanId: rootSpan.span_id.toLowerCase(),
@@ -205,11 +216,16 @@ export class EvaluationExecutionService {
       workflowId,
     } = params;
 
-    // 1. Fetch trace
+    // 1. Fetch trace. Evaluators must see the FULL IO values (not the 64 KB
+    // preview), so opt into blob resolution (#4888). Under the per-call gate
+    // (replacing construction-time gating) this is what keeps the eval path
+    // resolving offloaded event refs.
     const traces = await this.deps.traceService.getTracesWithSpans(
       projectId,
       [traceId],
       INTERNAL_PROTECTIONS,
+      undefined,
+      { full: true },
     );
     const trace = traces[0];
 
@@ -264,7 +280,9 @@ export class EvaluationExecutionService {
     // Compute parent causality depth from the trace's spans; nlpgo
     // increments and stamps the result on every span it emits.
     const parentCausalityDepth = maxCausalityDepthOfSpans(
-      trace.spans as unknown as Array<{ attributes?: Record<string, unknown> | null }>,
+      trace.spans as unknown as Array<{
+        attributes?: Record<string, unknown> | null;
+      }>,
     );
 
     const result = await this.runEvaluation({
@@ -290,7 +308,7 @@ export class EvaluationExecutionService {
       passed: result.status === "processed" ? result.passed : undefined,
       label: result.status === "processed" ? result.label : undefined,
       details: isError ? undefined : rawDetails,
-      error: isError ? rawDetails ?? "Evaluator failed" : undefined,
+      error: isError ? (rawDetails ?? "Evaluator failed") : undefined,
       errorDetails: traceback,
       cost:
         result.status === "processed" && "cost" in result && result.cost
@@ -329,10 +347,13 @@ export class EvaluationExecutionService {
         for (const [field, config] of Object.entries(mappings.mapping)) {
           if (
             "source" in config &&
-            (SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(config.source)
+            (SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(
+              config.source,
+            )
           ) {
             if (config.source === "formatted_trace") {
-              (mappedData as Record<string, unknown>)[field] = await formatSpansDigest(trace.spans ?? []);
+              (mappedData as Record<string, unknown>)[field] =
+                await formatSpansDigest(trace.spans ?? []);
             }
           }
         }
@@ -351,13 +372,18 @@ export class EvaluationExecutionService {
               projectId,
               [threadId],
               INTERNAL_PROTECTIONS,
+              { full: true },
             ),
         });
       }
     }
 
-    // Workflow/custom evaluators pass data through as-is
-    if (evaluatorType.startsWith("custom/") || evaluatorType === "workflow") {
+    // Workflow/code/custom evaluators pass data through as-is
+    if (
+      evaluatorType.startsWith("custom/") ||
+      evaluatorType === "workflow" ||
+      isCodeEvaluatorCheckType(evaluatorType)
+    ) {
       return { type: "custom", data };
     }
 
@@ -392,15 +418,19 @@ export class EvaluationExecutionService {
       );
     }
 
-    const threadTraces = await this.deps.traceService.getTracesWithSpansByThreadIds(
-      projectId,
-      [threadId],
-      INTERNAL_PROTECTIONS,
-    );
+    const threadTraces =
+      await this.deps.traceService.getTracesWithSpansByThreadIds(
+        projectId,
+        [threadId],
+        INTERNAL_PROTECTIONS,
+        { full: true },
+      );
 
     const result: Record<string, unknown> = {};
 
-    for (const [targetField, mappingConfig] of Object.entries(mappings.mapping)) {
+    for (const [targetField, mappingConfig] of Object.entries(
+      mappings.mapping,
+    )) {
       const isThreadMapping =
         ("type" in mappingConfig && mappingConfig.type === "thread") ||
         ("source" in mappingConfig &&
@@ -417,8 +447,11 @@ export class EvaluationExecutionService {
           (SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(source)
         ) {
           if (source === "formatted_traces") {
-            result[targetField] = (await Promise.all(threadTraces.map((t) => formatSpansDigest(t.spans ?? []))))
-              .join("\n\n---\n\n");
+            result[targetField] = (
+              await Promise.all(
+                threadTraces.map((t) => formatSpansDigest(t.spans ?? [])),
+              )
+            ).join("\n\n---\n\n");
           }
         } else {
           const threadSource = source as keyof typeof THREAD_MAPPINGS;
@@ -442,7 +475,11 @@ export class EvaluationExecutionService {
             result[targetField] = await formatSpansDigest(trace.spans ?? []);
           }
         } else {
-          const traceMappingConfig: { source: string; key?: string; subkey?: string } = {
+          const traceMappingConfig: {
+            source: string;
+            key?: string;
+            subkey?: string;
+          } = {
             source: mappingConfig.source,
             key: mappingConfig.key,
             subkey: mappingConfig.subkey,
@@ -475,11 +512,37 @@ export class EvaluationExecutionService {
     workflowId?: string | null;
     parentCausalityDepth?: number;
   }): Promise<SingleEvaluationResult> {
-    const { projectId, evaluatorType, data, settings, trace, workflowId, parentCausalityDepth } = params;
+    const {
+      projectId,
+      evaluatorType,
+      data,
+      settings,
+      trace,
+      workflowId,
+      parentCausalityDepth,
+    } = params;
 
-    // Custom/workflow evaluators
+    // Custom/workflow/code evaluators
     if (data.type === "custom") {
-      return this.runCustomEvaluation(projectId, evaluatorType, data.data, trace, workflowId, parentCausalityDepth);
+      const codeEvaluatorId = codeEvaluatorIdFromCheckType(evaluatorType);
+      if (codeEvaluatorId) {
+        return runCodeEvaluator({
+          projectId,
+          evaluatorId: codeEvaluatorId,
+          data: data.data,
+          traceId: trace?.trace_id,
+          parentCausalityDepth,
+          parentTrace: extractParentTraceForNlpgo(trace),
+        });
+      }
+      return this.runCustomEvaluation(
+        projectId,
+        evaluatorType,
+        data.data,
+        trace,
+        workflowId,
+        parentCausalityDepth,
+      );
     }
 
     // Built-in evaluators
@@ -489,6 +552,25 @@ export class EvaluationExecutionService {
       throw new EvaluatorNotFoundError(evaluatorType);
     }
 
+    const droppedCategories = trace?.privacy?.droppedCategories ?? [];
+
+    // Native (in-process) evaluators skip the analysis service; both they and
+    // the remote ones run through the shared augmenter so redaction or drop at
+    // ingestion never hides a leak from the result.
+    if (isNativeEvaluatorType(builtInType)) {
+      const nativeResult = await executeNativeEvaluation({
+        evaluatorType: builtInType,
+        data: data.data,
+      });
+      return augmentEvaluationResult({
+        evaluatorType: builtInType,
+        mappedData: data.data,
+        settings,
+        droppedCategories,
+        result: nativeResult,
+      });
+    }
+
     const evaluatorEnv = await this.deps.modelEnvResolver.resolveForEvaluator({
       evaluatorType: builtInType,
       evaluator,
@@ -496,11 +578,19 @@ export class EvaluationExecutionService {
       settings,
     });
 
-    return this.deps.langevalsClient.evaluate({
+    const result = await this.deps.langevalsClient.evaluate({
       evaluatorType: builtInType,
       data: data.data,
       settings: settings ?? {},
       env: evaluatorEnv,
+    });
+
+    return augmentEvaluationResult({
+      evaluatorType: builtInType,
+      mappedData: data.data,
+      settings,
+      droppedCategories,
+      result,
     });
   }
 
@@ -545,7 +635,6 @@ export class EvaluationExecutionService {
 
     return { ...response.result, status: "processed" };
   }
-
 }
 
 // ---------------------------------------------------------------------------

@@ -1,34 +1,42 @@
 version: 2
+
+# The npm workspaces enforce pnpm's minimumReleaseAge (7 days) and the uv
+# projects enforce exclude-newer = "7 days", so dependabot must not propose
+# versions younger than that: the package manager would refuse to resolve
+# them and the update run would fail. The cooldowns below keep candidate
+# selection behind the same gate, with one extra day of margin.
 updates:
   - package-ecosystem: "npm"
     directory: "/langwatch"
     schedule:
       interval: "daily"
     open-pull-requests-limit: 50
+    cooldown:
+      default-days: 8
 
   - package-ecosystem: "npm"
     directory: "/typescript-sdk"
     schedule:
       interval: "daily"
     open-pull-requests-limit: 50
+    cooldown:
+      default-days: 8
 
   - package-ecosystem: "npm"
     directory: "/mcp-server"
     schedule:
       interval: "daily"
     open-pull-requests-limit: 50
+    cooldown:
+      default-days: 8
 
   - package-ecosystem: "uv"
     directory: "/python-sdk"
     schedule:
       interval: "daily"
     open-pull-requests-limit: 50
-
-  - package-ecosystem: "uv"
-    directory: "/langwatch_nlp"
-    schedule:
-      interval: "daily"
-    open-pull-requests-limit: 50
+    cooldown:
+      default-days: 8
 
   - package-ecosystem: "docker"
     directory: "/"

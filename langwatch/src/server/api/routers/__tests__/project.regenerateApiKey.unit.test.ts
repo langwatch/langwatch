@@ -1,9 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { TRPCError } from "@trpc/server";
 import { Prisma, type PrismaClient } from "@prisma/client";
-import { projectRouter } from "../project";
-import { createInnerTRPCContext } from "../../trpc";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { auditLog } from "../../../auditLog";
+import { createInnerTRPCContext } from "../../trpc";
+import { projectRouter } from "../project";
 
 /**
  * Unit tests for project.regenerateApiKey mutation
@@ -213,6 +212,52 @@ describe("project.regenerateApiKey mutation logic", () => {
         code: "INTERNAL_SERVER_ERROR",
         message: "Database connection failed",
       });
+    });
+
+    it("does not record the rotation as audited when the update fails", async () => {
+      // The mutation does a SINGLE atomic prisma.project.update before the
+      // success audit log. When that write rejects, the row — and thus the old
+      // key's validity — is left intact, so the rotation must NOT be recorded
+      // as a completed action. The generic tRPC error-audit middleware still
+      // fires (action: "regenerateApiKey", error: ...) — that is orthogonal
+      // platform telemetry for the failed call, not a half-rotation — so we
+      // assert specifically that the success-path "project.apiKey.regenerated"
+      // audit was never written.
+      const projectId = "project_123";
+      mockPrisma.project.update.mockRejectedValueOnce(
+        new Error("Database connection failed"),
+      );
+
+      await expect(
+        caller.regenerateApiKey({ projectId }),
+      ).rejects.toBeDefined();
+
+      expect(auditLog).not.toHaveBeenCalledWith(
+        expect.objectContaining({ action: "project.apiKey.regenerated" }),
+      );
+    });
+  });
+
+  describe("when the audit log fails after the key is rotated", () => {
+    it("still resolves with the new key so the user is not locked out", async () => {
+      // AC6: an audit failure must not prevent the caller from receiving the
+      // new key. The DB write already committed; swallowing the audit error
+      // and returning the key is the only safe path.
+      const projectId = "project_123";
+      const expectedApiKey =
+        "sk-lw-mock48characterrandomstringforapikeygeneration";
+      mockPrisma.project.update.mockResolvedValueOnce({
+        id: projectId,
+        apiKey: expectedApiKey,
+        slug: "test-project",
+      });
+      vi.mocked(auditLog).mockRejectedValueOnce(
+        new Error("audit service unavailable"),
+      );
+
+      const result = await caller.regenerateApiKey({ projectId });
+
+      expect(result).toEqual({ apiKey: expectedApiKey });
     });
   });
 });

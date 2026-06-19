@@ -1,10 +1,18 @@
-import { Badge, Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  Button,
+  chakra,
+  HStack,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { BookOpen } from "lucide-react";
 import type React from "react";
 import { useMemo } from "react";
 import {
-  type SearchFieldGroup,
   SEARCH_FIELDS,
+  type SearchFieldGroup,
   type SearchFieldMeta,
 } from "~/server/app-layer/traces/query-language/metadata";
 import { useUIStore } from "../../stores/uiStore";
@@ -203,7 +211,11 @@ function groupRows(items: SuggestionRow[]): GroupedSection[] {
   for (const spec of SUGGESTION_GROUPS) {
     const b = buckets.get(spec.id);
     if (b) {
-      ordered.push({ label: b.label, first: ordered.length === 0, rows: b.rows });
+      ordered.push({
+        label: b.label,
+        first: ordered.length === 0,
+        rows: b.rows,
+      });
       buckets.delete(spec.id);
     }
   }
@@ -239,6 +251,14 @@ const SuggestionRowView: React.FC<SuggestionRowProps> = ({
     state.mode === "field" && !row.isPrefix
       ? SEARCH_FIELDS[row.value]
       : undefined;
+  // In value-mode, when the row carries a human-readable label (e.g.
+  // evaluator name "Faithfulness") that differs from the raw id
+  // (`ragas/faithfulness`), surface the id as a muted hint after the
+  // label so the operator knows what's actually going into the query.
+  // The id is the canonical document value; the label is just the
+  // display overlay.
+  const idHint =
+    state.mode === "value" && row.label !== row.value ? row.value : null;
 
   return (
     <chakra.button
@@ -270,6 +290,18 @@ const SuggestionRowView: React.FC<SuggestionRowProps> = ({
             </Text>
           )}
         </Text>
+        {idHint && (
+          <Text
+            textStyle="2xs"
+            color="fg.subtle"
+            fontFamily="mono"
+            truncate
+            minWidth={0}
+            flexShrink={1}
+          >
+            {idHint}
+          </Text>
+        )}
         {fieldMeta && <FieldMetaSummary meta={fieldMeta} />}
         {row.isPrefix && (
           <Badge
@@ -283,11 +315,7 @@ const SuggestionRowView: React.FC<SuggestionRowProps> = ({
         )}
       </HStack>
       {count !== undefined && (
-        <Text
-          textStyle="2xs"
-          color="fg.subtle"
-          marginLeft={2}
-        >
+        <Text textStyle="2xs" color="fg.subtle" marginLeft={2}>
           {count}
         </Text>
       )}

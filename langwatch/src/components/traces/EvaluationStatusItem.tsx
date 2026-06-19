@@ -13,7 +13,7 @@ import { MoreVertical, Pencil } from "lucide-react";
 import { useRouter } from "~/utils/compat/next-router";
 import numeral from "numeral";
 import { useMemo } from "react";
-import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
+import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
 import { api } from "~/utils/api";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";

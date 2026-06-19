@@ -11,6 +11,7 @@ import { PlatformGrid } from "~/features/onboarding/components/sections/observab
 import {
   PromptList,
   SkillList,
+  TRACING_SKILL_ID,
 } from "~/features/onboarding/components/sections/ViaClaudeCodeScreen";
 import { ViaMcpClientScreen } from "~/features/onboarding/components/sections/ViaClaudeDesktopScreen";
 import {
@@ -29,7 +30,7 @@ import {
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { ApiKeyIntegrationInfoCard } from "./ApiKeyIntegrationInfoCard";
 
-type Segment = "skill" | "mcp" | "prompt" | "manually";
+export type Segment = "skill" | "mcp" | "prompt" | "sdk";
 
 interface SegmentDef {
   value: Segment;
@@ -38,7 +39,7 @@ interface SegmentDef {
   description: string;
 }
 
-const SEGMENTS: SegmentDef[] = [
+export const SEGMENTS: SegmentDef[] = [
   {
     value: "skill",
     label: "Skills",
@@ -59,9 +60,9 @@ const SEGMENTS: SegmentDef[] = [
     description: "A one-shot prompt to paste into your coding agent.",
   },
   {
-    value: "manually",
-    label: "Manually",
-    shortcut: "I",
+    value: "sdk",
+    label: "SDK",
+    shortcut: "D",
     description: "Use the LangWatch SDK directly in your codebase.",
   },
 ];
@@ -101,30 +102,13 @@ export function IntegrateDrawer({
   const activeSegment =
     SEGMENTS.find((s) => s.value === segment) ?? SEGMENTS[0];
 
-  // Tab letter shortcuts (S/M/P/I) only fire while the drawer is open
-  // and the user isn't typing in another input. Re-bound on `open` so
-  // we don't leak listeners while the drawer is closed.
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
-      if (isTypingTarget(e.target)) return;
-      const key = e.key.toLowerCase();
-      const match = SEGMENTS.find((s) => s.shortcut.toLowerCase() === key);
-      if (match) {
-        e.preventDefault();
-        setSegment(match.value);
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [open]);
-
   if (!project || !organization) return null;
 
   const activeProjectContext: ActiveProjectContextValue = {
     project: token ? { ...project, apiKey: token } : project,
     organization,
+    freshToken: token ?? undefined,
+    onFreshToken: setToken,
   };
 
   return (
@@ -146,67 +130,140 @@ export function IntegrateDrawer({
         </Drawer.Header>
         <Drawer.Body>
           <ActiveProjectProvider value={activeProjectContext}>
-            <VStack align="stretch" gap={6}>
-              {/* API key generator at the top of the drawer — minting a
-                  token is the first step of integration. The lifted
-                  onboarding screens below read the token via
-                  ActiveProjectProvider, so they automatically pick up
-                  the freshly-scoped credential. */}
-              <ApiKeyIntegrationInfoCard
-                organizationId={organization.id}
-                projectId={project.id}
-                token={token}
-                onTokenGenerated={setToken}
-              />
-
-              <Tabs.Root
-                value={segment}
-                onValueChange={(e) => setSegment(e.value as Segment)}
-                variant="line"
-                size="sm"
-                colorPalette="orange"
-              >
-                <Tabs.List>
-                  {SEGMENTS.map((s) => (
-                    <Tabs.Trigger key={s.value} value={s.value}>
-                      <HStack gap={1.5}>
-                        <Box as="span">{s.label}</Box>
-                        <Kbd>{s.shortcut}</Kbd>
-                      </HStack>
-                    </Tabs.Trigger>
-                  ))}
-                </Tabs.List>
-
-                <Box paddingTop={3} paddingBottom={4}>
-                  <Text
-                    color="fg"
-                    textStyle="md"
-                    fontWeight="medium"
-                    letterSpacing="-0.01em"
-                    lineHeight="snug"
-                  >
-                    {activeSegment?.description ?? ""}
-                  </Text>
-                </Box>
-
-                <Tabs.Content value="mcp" padding={0}>
-                  <ViaMcpClientScreen />
-                </Tabs.Content>
-                <Tabs.Content value="skill" padding={0}>
-                  <SkillList />
-                </Tabs.Content>
-                <Tabs.Content value="prompt" padding={0}>
-                  <PromptList />
-                </Tabs.Content>
-                <Tabs.Content value="manually" padding={0}>
-                  <ManualSetup />
-                </Tabs.Content>
-              </Tabs.Root>
-            </VStack>
+            <IntegrationContent
+              organizationId={organization.id}
+              projectId={project.id}
+              token={token}
+              onTokenGenerated={setToken}
+              segment={segment}
+              onSegmentChange={setSegment}
+              activeSegmentDescription={activeSegment?.description ?? ""}
+              enabled={open}
+            />
           </ActiveProjectProvider>
         </Drawer.Body>
       </Drawer.Content>
     </Drawer.Root>
+  );
+}
+
+/**
+ * Body of the integration journey — extracted from the drawer so the
+ * full-screen `IntegratePane` (no-traces page) can render the same
+ * content inline without re-implementing the API-key-then-tab pattern.
+ * The drawer wraps this in `Drawer.Body` chrome; the pane wraps it in
+ * its own focused layout.
+ *
+ * State is hoisted out (token, segment, active description) so the
+ * parent owns persistence across keyboard shortcut listeners etc.
+ */
+interface IntegrationContentProps {
+  organizationId: string;
+  projectId: string;
+  token: string | null;
+  onTokenGenerated: (token: string) => void;
+  segment: Segment;
+  onSegmentChange: (segment: Segment) => void;
+  activeSegmentDescription: string;
+  /**
+   * When false, the S/M/P/I keyboard shortcuts are suppressed. The
+   * drawer passes `enabled={open}` so shortcuts only fire while the
+   * drawer is open. `IntegratePane` omits this prop — it defaults to
+   * `true`, so shortcuts are always active when the pane is mounted.
+   */
+  enabled?: boolean;
+}
+
+export function IntegrationContent({
+  organizationId,
+  projectId,
+  token,
+  onTokenGenerated,
+  segment,
+  onSegmentChange,
+  activeSegmentDescription,
+  enabled = true,
+}: IntegrationContentProps): React.ReactElement {
+  // Tab letter shortcuts (S/M/P/I) fire whenever this component is
+  // active — always for IntegratePane, only while open for the drawer.
+  // Suppressed when the user is typing in an input or contentEditable.
+  useEffect(() => {
+    if (!enabled) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (isTypingTarget(e.target)) return;
+      const key = e.key.toLowerCase();
+      const match = SEGMENTS.find((s) => s.shortcut.toLowerCase() === key);
+      if (match) {
+        e.preventDefault();
+        onSegmentChange(match.value);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [enabled, onSegmentChange]);
+
+  return (
+    <VStack align="stretch" gap={6}>
+      {/* API key generator at the top — minting a token is the first
+          step of integration. The lifted onboarding screens below
+          read the token via ActiveProjectProvider, so they
+          automatically pick up the freshly-scoped credential. */}
+      <ApiKeyIntegrationInfoCard
+        organizationId={organizationId}
+        projectId={projectId}
+        token={token}
+        onTokenGenerated={onTokenGenerated}
+      />
+
+      <Tabs.Root
+        value={segment}
+        onValueChange={(e) => onSegmentChange(e.value as Segment)}
+        variant="line"
+        size="sm"
+        colorPalette="orange"
+      >
+        <Text textStyle="xs" color="fg.muted" marginBottom={2}>
+          All four end up in the same explorer.
+        </Text>
+        <Tabs.List>
+          {SEGMENTS.map((s) => (
+            <Tabs.Trigger key={s.value} value={s.value}>
+              <HStack gap={1.5}>
+                <Box as="span">{s.label}</Box>
+                <Kbd>{s.shortcut}</Kbd>
+              </HStack>
+            </Tabs.Trigger>
+          ))}
+        </Tabs.List>
+
+        <Box paddingTop={3} paddingBottom={4}>
+          <Text
+            color="fg"
+            textStyle="md"
+            fontWeight="medium"
+            letterSpacing="-0.01em"
+            lineHeight="snug"
+          >
+            {activeSegmentDescription}
+          </Text>
+        </Box>
+
+        <Tabs.Content value="mcp" padding={0}>
+          <ViaMcpClientScreen />
+        </Tabs.Content>
+        <Tabs.Content value="skill" padding={0}>
+          {/* Traces onboarding leads with tracing — that's the job here. */}
+          <SkillList primarySkillId={TRACING_SKILL_ID} />
+        </Tabs.Content>
+        <Tabs.Content value="prompt" padding={0}>
+          <PromptList primarySkillId={TRACING_SKILL_ID} />
+        </Tabs.Content>
+        <Tabs.Content value="sdk" padding={0}>
+          <ManualSetup />
+        </Tabs.Content>
+      </Tabs.Root>
+    </VStack>
   );
 }
 

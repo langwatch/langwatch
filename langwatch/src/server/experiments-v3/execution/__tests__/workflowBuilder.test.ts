@@ -491,7 +491,8 @@ describe("buildHttpNodeFromAgent", () => {
 
     // HTTP config is stored in parameters (consistent with other node types)
     const params = node.data.parameters ?? [];
-    const getParam = (id: string) => params.find((p) => p.identifier === id)?.value;
+    const getParam = (id: string) =>
+      params.find((p) => p.identifier === id)?.value;
 
     expect(getParam("url")).toBe("https://api.example.com/chat");
     expect(getParam("method")).toBe("POST");
@@ -521,9 +522,7 @@ describe("buildEvaluatorTargetNode", () => {
     id: "target-eval-1",
     type: "evaluator",
     targetEvaluatorId: "eval-abc-123",
-    inputs: [
-      { identifier: "output", type: "str" },
-    ],
+    inputs: [{ identifier: "output", type: "str" }],
     outputs: [
       { identifier: "passed", type: "bool" },
       { identifier: "score", type: "float" },
@@ -739,7 +738,6 @@ describe("buildEvaluatorTargetNode", () => {
 
     expect(node.data.name).toBe("target-eval-1");
   });
-
 });
 
 // Prompt-identity forwarding is what lets nlpgo emit the
@@ -751,7 +749,6 @@ describe("buildEvaluatorTargetNode", () => {
 // drawer's "Open in Prompts" resume is hidden.
 describe("buildSignatureNodeFromPrompt", () => {
   const createVersionedPrompt = (): VersionedPrompt => ({
-    parameters: {},
     id: "prompt_supportrouter_xyz",
     name: "support-router",
     handle: "support-router",
@@ -770,6 +767,7 @@ describe("buildSignatureNodeFromPrompt", () => {
     tags: [],
     inputs: [{ identifier: "input", type: "str" }],
     outputs: [{ identifier: "output", type: "str" }],
+    parameters: {},
   });
 
   const createPromptTargetConfig = (): TargetConfig => ({
@@ -832,7 +830,6 @@ describe("buildSignatureNodeFromPrompt", () => {
 
 describe("buildSignatureNodeFromLocalConfig", () => {
   const createBasePrompt = (): VersionedPrompt => ({
-    parameters: {},
     id: "prompt_supportrouter_xyz",
     name: "support-router",
     handle: "support-router",
@@ -851,6 +848,7 @@ describe("buildSignatureNodeFromLocalConfig", () => {
     tags: [],
     inputs: [{ identifier: "input", type: "str" }],
     outputs: [{ identifier: "output", type: "str" }],
+    parameters: {},
   });
 
   const createLocalPromptConfig = (): LocalPromptConfig => ({

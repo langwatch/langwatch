@@ -1,11 +1,25 @@
-import { Badge, Box, HStack, Text, VStack } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  HoverCard,
+  HStack,
+  Portal,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import type React from "react";
-import { Tooltip } from "~/components/ui/tooltip";
 import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
 import type { TraceListItem } from "../../../../../types/trace";
 import { abbreviateModel } from "../../../../../utils/formatters";
 import { MonoCell } from "../../../MonoCell";
 import type { CellDef } from "../../types";
+
+// When the +N popover would otherwise render a wall of model names,
+// cap the visible list and direct the user to the drawer for the rest.
+// Ten fits in a comfortable column-of-rows without scrolling on a
+// dense table; tune if the trace ecosystem starts producing wider
+// model mixes.
+const EXTRA_MODELS_VISIBLE_CAP = 10;
 
 type Density = "compact" | "comfortable";
 
@@ -87,7 +101,7 @@ const MONOCHROME_PROVIDER_ICONS = new Set<ProviderKey>([
  * icon stays at 12px / 14px so it complements the mono label without
  * dominating it.
  */
-function ProviderIcon({
+export function ProviderIcon({
   model,
   size,
 }: {
@@ -121,9 +135,7 @@ function ProviderIcon({
         // away from neutral. We want neutral white-ish, so just
         // invert. brightness(0.92) tones the result to off-white so
         // it doesn't hard-burn against the dark surface.
-        isMonochrome
-          ? { filter: "invert(1) brightness(0.92)" }
-          : undefined
+        isMonochrome ? { filter: "invert(1) brightness(0.92)" } : undefined
       }
       aria-hidden="true"
     >
@@ -139,23 +151,59 @@ export function ExtraModelsBadge({
   models: string[];
   size: "xs" | "sm";
 }) {
+  const visible = models.slice(0, EXTRA_MODELS_VISIBLE_CAP);
+  const overflow = models.length - visible.length;
   return (
-    <Tooltip
-      showArrow
-      content={
-        <VStack align="start" gap={0.5} paddingY={0.5}>
-          {models.map((m) => (
-            <Text key={m} textStyle="xs">
-              {m}
-            </Text>
-          ))}
-        </VStack>
-      }
+    <HoverCard.Root
+      openDelay={200}
+      closeDelay={150}
+      positioning={{ placement: "top" }}
     >
-      <Badge size={size} variant="outline" cursor="help">
-        +{models.length}
-      </Badge>
-    </Tooltip>
+      <HoverCard.Trigger asChild>
+        <Badge
+          size={size}
+          variant="outline"
+          cursor="help"
+          onClick={(e: React.MouseEvent) => e.stopPropagation()}
+        >
+          +{models.length}
+        </Badge>
+      </HoverCard.Trigger>
+      <Portal>
+        <HoverCard.Positioner>
+          <HoverCard.Content
+            width="auto"
+            minWidth="160px"
+            maxWidth="260px"
+            padding={3}
+            // Bumped from the default to read as a clearly-soft surface,
+            // matching the EvalChip drawer. The "+N" popover is a sibling
+            // affordance — same visual weight.
+            borderRadius="xl"
+            background="bg.panel"
+            boxShadow="lg"
+          >
+            <VStack align="start" gap={0.5}>
+              {visible.map((m) => (
+                <Text key={m} textStyle="xs">
+                  {m}
+                </Text>
+              ))}
+              {overflow > 0 && (
+                <Text
+                  textStyle="2xs"
+                  color="fg.muted"
+                  fontStyle="italic"
+                  paddingTop={1}
+                >
+                  +{overflow} more — click to see all
+                </Text>
+              )}
+            </VStack>
+          </HoverCard.Content>
+        </HoverCard.Positioner>
+      </Portal>
+    </HoverCard.Root>
   );
 }
 

@@ -14,22 +14,37 @@
  * No "should" in it() names (project convention).
  */
 
-import { describe, it, expect, vi } from "vitest";
-import {
-  BlobStore,
-  BlobNotFoundError,
-  BlobFieldNotFoundError,
-  type S3ClientResolver,
-} from "../blob-store.service";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
-import { eventToRecord } from "~/server/event-sourcing/stores/eventStoreUtils";
+import { generate, Ksuid } from "@langwatch/ksuid";
+import { describe, expect, it, vi } from "vitest";
+import {
+  EVENTREF_ATTR_PREFIX,
+  IO_PREVIEW_BYTES,
+} from "~/server/app-layer/traces/lean-for-projection";
+import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
-import type { SpanReceivedEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import {
   SPAN_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+import type { SpanReceivedEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
+import {
+  type NormalizedSpan,
+  NormalizedSpanKind,
+  NormalizedStatusCode,
+} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import { eventToRecord } from "~/server/event-sourcing/stores/eventStoreUtils";
+import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
+import {
+  resolveOffloadedTraces,
+  type WarnLogger,
+} from "~/server/traces/resolve-offloaded-traces";
+import {
+  BlobFieldNotFoundError,
+  BlobNotFoundError,
+  BlobStore,
+  type S3ClientResolver,
+} from "../blob-store.service";
 
 // ---------------------------------------------------------------------------
 // Helpers — ClickHouse mock
@@ -57,27 +72,44 @@ function makeMockChClient({
   rows?: MockRow[];
 } = {}) {
   const sqlCaptures: string[] = [];
+  const paramCaptures: Record<string, unknown>[] = [];
   const client = {
-    query: vi.fn().mockImplementation(async ({ query }: { query: string }) => {
-      sqlCaptures.push(query);
-      // ClickHouse client's result.json<T>() returns ResponseJSON<T> with shape
-      // { data: T[], meta, rows, statistics, ... }. Match the real shape here so
-      // production code's `response.data` access works.
-      return {
-        json: async () => ({ data: rows, meta: [], rows: rows.length }),
-      };
-    }),
+    query: vi
+      .fn()
+      .mockImplementation(
+        async ({
+          query,
+          query_params,
+        }: {
+          query: string;
+          query_params?: Record<string, unknown>;
+        }) => {
+          sqlCaptures.push(query);
+          paramCaptures.push(query_params ?? {});
+          // ClickHouse client's result.json<T>() returns ResponseJSON<T> with shape
+          // { data: T[], meta, rows, statistics, ... }. Match the real shape here so
+          // production code's `response.data` access works.
+          return {
+            json: async () => ({ data: rows, meta: [], rows: rows.length }),
+          };
+        },
+      ),
   };
-  return { client, sqlCaptures };
+  return { client, sqlCaptures, paramCaptures };
 }
 
-/** Minimal S3 resolver used for spool tests. */
-function makeS3Resolver(s3Client: { send: ReturnType<typeof vi.fn> }): S3ClientResolver {
-  return async () => ({ s3Client: s3Client as never, s3Bucket: "test-spool-bucket" });
+function makeS3Resolver(s3Client: {
+  send: ReturnType<typeof vi.fn>;
+}): S3ClientResolver {
+  return async () => ({
+    s3Client: s3Client as never,
+    s3Bucket: "test-spool-bucket",
+  });
 }
 
-/** Wraps a mock ClickHouseClient object as a ClickHouseClientResolver (resolver returns the same client for any tenantId). */
-function makeChResolver(client: ReturnType<typeof makeMockChClient>["client"]): (tenantId: string) => Promise<typeof client> {
+function makeChResolver(
+  client: ReturnType<typeof makeMockChClient>["client"],
+): (tenantId: string) => Promise<typeof client> {
   return async (_tenantId) => client;
 }
 
@@ -93,16 +125,17 @@ describe("given an event_log row stored under tenantA with a known EventPayload"
     it("issues a CH SELECT with TenantId as the FIRST predicate and returns the correct field value", async () => {
       const eventPayload = JSON.stringify({
         span: {
-          attributes: [
-            { key: FIELD, value: { stringValue: FULL_VALUE } },
-          ],
+          attributes: [{ key: FIELD, value: { stringValue: FULL_VALUE } }],
         },
       });
       const { client, sqlCaptures } = makeMockChClient({
         rows: [{ EventPayload: eventPayload }],
       });
 
-      const blobStore = new BlobStore(makeS3Resolver({ send: vi.fn() }), makeChResolver(client) as never);
+      const blobStore = new BlobStore(
+        makeS3Resolver({ send: vi.fn() }),
+        makeChResolver(client) as never,
+      );
 
       const result = await blobStore.getFromEventLog({
         eventId: EVENT_ID,
@@ -128,13 +161,18 @@ describe("given an event_log row stored under tenantA with a known EventPayload"
 
     it("SQL contains 'TenantId' as the first predicate (substring assertion)", async () => {
       const eventPayload = JSON.stringify({
-        span: { attributes: [{ key: FIELD, value: { stringValue: FULL_VALUE } }] },
+        span: {
+          attributes: [{ key: FIELD, value: { stringValue: FULL_VALUE } }],
+        },
       });
       const { client, sqlCaptures } = makeMockChClient({
         rows: [{ EventPayload: eventPayload }],
       });
 
-      const blobStore = new BlobStore(makeS3Resolver({ send: vi.fn() }), makeChResolver(client) as never);
+      const blobStore = new BlobStore(
+        makeS3Resolver({ send: vi.fn() }),
+        makeChResolver(client) as never,
+      );
 
       await blobStore.getFromEventLog({
         eventId: EVENT_ID,
@@ -150,6 +188,82 @@ describe("given an event_log row stored under tenantA with a known EventPayload"
 });
 
 // ---------------------------------------------------------------------------
+// getFromEventLog — EventOccurredAt partition-prune window
+// ---------------------------------------------------------------------------
+
+describe("given a KSUID EventId (the time is embedded in the id)", () => {
+  const eventPayload = JSON.stringify({
+    span: { attributes: [{ key: FIELD, value: { stringValue: FULL_VALUE } }] },
+  });
+  const windowMs = 2 * 24 * 60 * 60 * 1000;
+
+  describe("when getFromEventLog is called", () => {
+    it("derives a bounded EventOccurredAt window from the EventId's KSUID timestamp (keeping EventOccurredAt = 0)", async () => {
+      const ksuidEventId = generate("event").toString();
+      const createdAtMs = Ksuid.parse(ksuidEventId).date.getTime();
+
+      const { client, sqlCaptures, paramCaptures } = makeMockChClient({
+        rows: [{ EventPayload: eventPayload }],
+      });
+      const blobStore = new BlobStore(
+        makeS3Resolver({ send: vi.fn() }),
+        makeChResolver(client) as never,
+      );
+
+      const result = await blobStore.getFromEventLog({
+        eventId: ksuidEventId,
+        field: FIELD,
+        tenantId: TENANT_A,
+        aggregateType: AGGREGATE_TYPE,
+        aggregateId: AGGREGATE_ID,
+      });
+
+      const sql = sqlCaptures[0] ?? "";
+      expect(sql).toContain("EventOccurredAt >= {occurredAtFromMs:UInt64}");
+      expect(sql).toContain("EventOccurredAt <= {occurredAtToMs:UInt64}");
+      expect(sql).toContain("EventOccurredAt = 0");
+      expect(paramCaptures[0]).toMatchObject({
+        occurredAtFromMs: createdAtMs - windowMs,
+        occurredAtToMs: createdAtMs + windowMs,
+      });
+      // The window never changes which row is returned (still keyed by EventId).
+      expect(result).toBe(FULL_VALUE);
+    });
+  });
+});
+
+describe("given a non-KSUID EventId (legacy / unparseable id)", () => {
+  describe("when getFromEventLog is called", () => {
+    it("omits the EventOccurredAt predicate and falls back to an unpruned read", async () => {
+      const eventPayload = JSON.stringify({
+        span: {
+          attributes: [{ key: FIELD, value: { stringValue: FULL_VALUE } }],
+        },
+      });
+      const { client, sqlCaptures, paramCaptures } = makeMockChClient({
+        rows: [{ EventPayload: eventPayload }],
+      });
+      const blobStore = new BlobStore(
+        makeS3Resolver({ send: vi.fn() }),
+        makeChResolver(client) as never,
+      );
+
+      await blobStore.getFromEventLog({
+        eventId: "not-a-ksuid",
+        field: FIELD,
+        tenantId: TENANT_A,
+        aggregateType: AGGREGATE_TYPE,
+        aggregateId: AGGREGATE_ID,
+      });
+
+      expect(sqlCaptures[0]).not.toContain("EventOccurredAt");
+      expect(paramCaptures[0]).not.toHaveProperty("occurredAtFromMs");
+      expect(paramCaptures[0]).not.toHaveProperty("occurredAtToMs");
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // getFromEventLog — cross-tenant denial
 // ---------------------------------------------------------------------------
 
@@ -159,7 +273,10 @@ describe("given an event_log row under tenantA when tenantB attempts to read it"
       // No rows returned — cross-tenant query returns empty set
       const { client } = makeMockChClient({ rows: [] });
 
-      const blobStore = new BlobStore(makeS3Resolver({ send: vi.fn() }), makeChResolver(client) as never);
+      const blobStore = new BlobStore(
+        makeS3Resolver({ send: vi.fn() }),
+        makeChResolver(client) as never,
+      );
 
       await expect(
         blobStore.getFromEventLog({
@@ -185,7 +302,10 @@ describe("given an event_log row with a corrupt (non-JSON) EventPayload", () => 
         rows: [{ EventPayload: "not-valid-json{{{{" }],
       });
 
-      const blobStore = new BlobStore(makeS3Resolver({ send: vi.fn() }), makeChResolver(client) as never);
+      const blobStore = new BlobStore(
+        makeS3Resolver({ send: vi.fn() }),
+        makeChResolver(client) as never,
+      );
 
       await expect(
         blobStore.getFromEventLog({
@@ -214,7 +334,10 @@ describe("given a valid event_log row whose EventPayload does not contain the re
         rows: [{ EventPayload: eventPayload }],
       });
 
-      const blobStore = new BlobStore(makeS3Resolver({ send: vi.fn() }), makeChResolver(client) as never);
+      const blobStore = new BlobStore(
+        makeS3Resolver({ send: vi.fn() }),
+        makeChResolver(client) as never,
+      );
 
       await expect(
         blobStore.getFromEventLog({
@@ -241,21 +364,25 @@ describe("given a span that exceeds COMMAND_INLINE_THRESHOLD", () => {
         throw new Error("unexpected command");
       });
 
-      const blobStore = new BlobStore(
-        makeS3Resolver({ send: sendMock }),
-      );
+      const blobStore = new BlobStore(makeS3Resolver({ send: sendMock }));
 
       const projectId = "proj-aaa";
       const traceId = "trace-001";
       const spanId = "span-001";
       const body = Buffer.from("full span JSON here", "utf-8");
 
-      const spoolRef = await blobStore.putSpool({ projectId, traceId, spanId, body });
+      const spoolRef = await blobStore.putSpool({
+        projectId,
+        traceId,
+        spanId,
+        body,
+      });
 
-      // Returns a string
       expect(typeof spoolRef).toBe("string");
       // Key shape pinned: trace-blobs/spool/{projectId}/{traceId}/{spanId}
-      expect(spoolRef).toBe(`trace-blobs/spool/${projectId}/${traceId}/${spanId}`);
+      expect(spoolRef).toBe(
+        `trace-blobs/spool/${projectId}/${traceId}/${spanId}`,
+      );
 
       // S3 PUT was issued
       expect(sendMock).toHaveBeenCalledOnce();
@@ -459,9 +586,7 @@ describe("given a deployment with no object storage (resolveS3Client throws)", (
     it("reads the field from event_log without touching S3", async () => {
       const eventPayload = JSON.stringify({
         span: {
-          attributes: [
-            { key: FIELD, value: { stringValue: FULL_VALUE } },
-          ],
+          attributes: [{ key: FIELD, value: { stringValue: FULL_VALUE } }],
         },
       });
       const { client } = makeMockChClient({
@@ -474,7 +599,10 @@ describe("given a deployment with no object storage (resolveS3Client throws)", (
         throw new Error("no object storage configured");
       };
 
-      const blobStore = new BlobStore(noStorageResolver, makeChResolver(client) as never);
+      const blobStore = new BlobStore(
+        noStorageResolver,
+        makeChResolver(client) as never,
+      );
 
       const result = await blobStore.getFromEventLog({
         eventId: EVENT_ID,
@@ -485,6 +613,277 @@ describe("given a deployment with no object storage (resolveS3Client throws)", (
       });
 
       expect(result).toBe(FULL_VALUE);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getFromEventLog — mixed-type sibling attributes do not mask the offloaded
+// IO field (#4888 falsifiability proof)
+// ---------------------------------------------------------------------------
+
+/**
+ * FALSIFIABILITY (#4888): real OTLP spans carry attribute values of mixed types —
+ * `value` is an AnyValue oneof (stringValue | intValue | boolValue | doubleValue |
+ * arrayValue | kvlistValue | bytesValue). The offloaded IO field is stored as a
+ * `stringValue`, but its non-string SIBLINGS (e.g. gen_ai.usage.input_tokens =
+ * { intValue: "100" }) used to fail the strict whole-array parse, degrading every
+ * > 64 KB read to the 64 KB preview.
+ *
+ * This test feeds the REAL stored OTLP shape — derived from `eventToRecord` exactly
+ * like the read-vs-write contract test above — with mixed-type siblings present, and
+ * proves the FULL value comes back. It FAILS on the pre-fix strict schema
+ * (`value: { stringValue: z.string() }` + `z.array(spanAttributeSchema)`), which
+ * rejects the int/double/bool/array siblings and throws BlobFieldNotFoundError.
+ */
+describe("given a real OTLP EventPayload whose span carries mixed-type sibling attributes alongside a >64KB offloaded IO field", () => {
+  // >64 KB and includes a multibyte char so byte-identity is meaningfully asserted.
+  const BIG = "x".repeat(100 * 1024) + "🧪tail";
+  const BIG_OUTPUT = "y".repeat(100 * 1024) + "🧪out";
+
+  /**
+   * Builds a SpanReceivedEvent whose span.attributes mix the offloaded IO fields
+   * (stringValue) with non-string siblings the OLD schema rejected. Cast through
+   * `unknown` because the offloaded values plus the heterogeneous sibling shapes
+   * are the REAL stored OTLP payload, not the clean string-only shape.
+   */
+  function makeMixedTypeSpanEvent() {
+    return EventUtils.createEvent<SpanReceivedEvent>({
+      aggregateType: "trace",
+      aggregateId: AGGREGATE_ID,
+      tenantId: createTenantId(TENANT_A),
+      type: SPAN_RECEIVED_EVENT_TYPE,
+      version: SPAN_RECEIVED_EVENT_VERSION_LATEST,
+      data: {
+        span: {
+          traceId: "abcd1234abcd1234abcd1234abcd1234",
+          spanId: "abcd1234abcd1234",
+          name: "test-span",
+          kind: 1, // SPAN_KIND_INTERNAL
+          startTimeUnixNano: "0",
+          endTimeUnixNano: "1000000",
+          attributes: [
+            // Offloaded IO fields (the ONLY fields the read path needs).
+            { key: "langwatch.input", value: { stringValue: BIG } },
+            { key: "langwatch.output", value: { stringValue: BIG_OUTPUT } },
+            // Mixed-type siblings the OLD strict schema rejected.
+            { key: "gen_ai.usage.input_tokens", value: { intValue: "100" } },
+            { key: "gen_ai.request.temperature", value: { doubleValue: 0.7 } },
+            { key: "langwatch.streaming", value: { boolValue: true } },
+            {
+              key: "gen_ai.request.tools",
+              value: { arrayValue: { values: [{ stringValue: "a" }] } },
+            },
+          ] as never,
+          events: [],
+          links: [],
+          status: { message: null, code: null },
+          droppedAttributesCount: 0,
+          droppedEventsCount: 0,
+          droppedLinksCount: 0,
+        },
+        resource: null,
+        instrumentationScope: null,
+        piiRedactionLevel: "DISABLED",
+      },
+    });
+  }
+
+  describe("when getFromEventLog is called for the offloaded input field", () => {
+    it("returns the FULL >64KB value despite non-string sibling attributes", async () => {
+      const spanReceivedEvent = makeMixedTypeSpanEvent();
+      // EventPayload IS event.data — derive it exactly as the write path does.
+      const record = eventToRecord(spanReceivedEvent);
+      const { client } = makeMockChClient({
+        rows: [{ EventPayload: JSON.stringify(record.EventPayload) }],
+      });
+
+      const blobStore = new BlobStore(
+        makeS3Resolver({ send: vi.fn() }),
+        makeChResolver(client) as never,
+      );
+
+      const result = await blobStore.getFromEventLog({
+        eventId: spanReceivedEvent.id,
+        field: "langwatch.input",
+        tenantId: TENANT_A,
+        aggregateType: AGGREGATE_TYPE,
+        aggregateId: AGGREGATE_ID,
+      });
+
+      expect(result).toBe(BIG);
+      expect(Buffer.byteLength(result, "utf8")).toBe(
+        Buffer.byteLength(BIG, "utf8"),
+      );
+      expect(result.length).toBeGreaterThan(65536);
+    });
+  });
+
+  describe("when getFromEventLog is called for the offloaded output field", () => {
+    it("returns the FULL >64KB value for langwatch.output despite non-string sibling attributes", async () => {
+      const spanReceivedEvent = makeMixedTypeSpanEvent();
+      const record = eventToRecord(spanReceivedEvent);
+      const { client } = makeMockChClient({
+        rows: [{ EventPayload: JSON.stringify(record.EventPayload) }],
+      });
+
+      const blobStore = new BlobStore(
+        makeS3Resolver({ send: vi.fn() }),
+        makeChResolver(client) as never,
+      );
+
+      const result = await blobStore.getFromEventLog({
+        eventId: spanReceivedEvent.id,
+        field: "langwatch.output",
+        tenantId: TENANT_A,
+        aggregateType: AGGREGATE_TYPE,
+        aggregateId: AGGREGATE_ID,
+      });
+
+      expect(result).toBe(BIG_OUTPUT);
+      expect(Buffer.byteLength(result, "utf8")).toBe(
+        Buffer.byteLength(BIG_OUTPUT, "utf8"),
+      );
+      expect(result.length).toBeGreaterThan(65536);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveOffloadedTraces — END-TO-END customer read path with a REAL BlobStore
+// over a mixed-type EventPayload (#4888)
+// ---------------------------------------------------------------------------
+
+/**
+ * END-TO-END (#4888): drives the customer-facing `resolveOffloadedTraces` read
+ * orchestrator with a REAL `BlobStore` (NOT a mocked getFromEventLog), whose CH
+ * client returns the REAL mixed-type EventPayload produced by `eventToRecord`.
+ * This is the path that degraded in production: a leaned span carrying the
+ * preview + a `langwatch.reserved.eventref.langwatch.input` pointer is resolved
+ * back to the FULL value, and the reserved namespace is stripped.
+ *
+ * Pre-fix, `BlobStore.getFromEventLog` rejects the mixed-type payload and throws,
+ * the resolver degrades to preview, so the resolved attribute would equal the
+ * preview — this test fails. Post-fix the full value is restored.
+ */
+describe("given a leaned span pointing at a real mixed-type EventPayload offloaded to event_log", () => {
+  const BIG = "z".repeat(120 * 1024) + "🧪e2e";
+
+  describe("when resolveOffloadedTraces runs with a real BlobStore over event_log", () => {
+    it("restores the FULL langwatch.input into spanAttributes and strips the reserved eventref key", async () => {
+      // The FULL event the command worker writes to event_log, with mixed-type
+      // siblings present alongside the offloaded IO field.
+      const fullEvent = EventUtils.createEvent<SpanReceivedEvent>({
+        aggregateType: "trace",
+        aggregateId: AGGREGATE_ID,
+        tenantId: createTenantId(TENANT_A),
+        type: SPAN_RECEIVED_EVENT_TYPE,
+        version: SPAN_RECEIVED_EVENT_VERSION_LATEST,
+        data: {
+          span: {
+            traceId: "abcd1234abcd1234abcd1234abcd1234",
+            spanId: "abcd1234abcd1234",
+            name: "test-span",
+            kind: 1,
+            startTimeUnixNano: "0",
+            endTimeUnixNano: "1000000",
+            attributes: [
+              { key: "langwatch.input", value: { stringValue: BIG } },
+              { key: "gen_ai.usage.input_tokens", value: { intValue: "100" } },
+              {
+                key: "gen_ai.request.temperature",
+                value: { doubleValue: 0.7 },
+              },
+              { key: "langwatch.streaming", value: { boolValue: true } },
+              {
+                key: "gen_ai.request.tools",
+                value: { arrayValue: { values: [{ stringValue: "a" }] } },
+              },
+            ] as never,
+            events: [],
+            links: [],
+            status: { message: null, code: null },
+            droppedAttributesCount: 0,
+            droppedEventsCount: 0,
+            droppedLinksCount: 0,
+          },
+          resource: null,
+          instrumentationScope: null,
+          piiRedactionLevel: "DISABLED",
+        },
+      });
+
+      const record = eventToRecord(fullEvent);
+      const { client } = makeMockChClient({
+        rows: [{ EventPayload: JSON.stringify(record.EventPayload) }],
+      });
+
+      const blobStore = new BlobStore(
+        makeS3Resolver({ send: vi.fn() }),
+        makeChResolver(client) as never,
+      );
+
+      // The LEANED span as projected: preview value + the eventref pointer that
+      // leanForProjection embeds with the event's id (the read path JOINs on it).
+      const preview = "z".repeat(IO_PREVIEW_BYTES) + "…";
+      const stagedSpan: NormalizedSpan = {
+        id: "abcd1234abcd1234",
+        traceId: AGGREGATE_ID,
+        spanId: "abcd1234abcd1234",
+        tenantId: TENANT_A,
+        parentSpanId: null,
+        parentTraceId: null,
+        parentIsRemote: null,
+        sampled: true,
+        startTimeUnixMs: 0,
+        endTimeUnixMs: 1000,
+        durationMs: 1000,
+        name: "test-span",
+        kind: NormalizedSpanKind.INTERNAL,
+        resourceAttributes: {},
+        spanAttributes: {
+          "langwatch.input": preview,
+          [`${EVENTREF_ATTR_PREFIX}langwatch.input`]: JSON.stringify({
+            field: "langwatch.input",
+            eventId: fullEvent.id,
+          }),
+        },
+        events: [],
+        links: [],
+        statusMessage: null,
+        statusCode: NormalizedStatusCode.OK,
+        instrumentationScope: { name: "test", version: null },
+        droppedAttributesCount: 0,
+        droppedEventsCount: 0,
+        droppedLinksCount: 0,
+      };
+
+      const logger: WarnLogger = {
+        warn: vi.fn(),
+        error: vi.fn(),
+      };
+
+      const result = await resolveOffloadedTraces({
+        projectId: TENANT_A,
+        normalizedSpans: [stagedSpan],
+        blobStore,
+        ioExtractionService: new TraceIOExtractionService(),
+        logger,
+      });
+
+      const resolvedAttrs = result.resolvedSpans[0]!.spanAttributes as Record<
+        string,
+        string
+      >;
+      // FULL value restored from the mixed-type EventPayload — not the preview.
+      expect(resolvedAttrs["langwatch.input"]).toBe(BIG);
+      expect(resolvedAttrs["langwatch.input"]!.length).toBeGreaterThan(65536);
+      // Reserved eventref namespace never leaks to the UI.
+      const hasReserved = Object.keys(resolvedAttrs).some((k) =>
+        k.startsWith("langwatch.reserved."),
+      );
+      expect(hasReserved).toBe(false);
+      expect(result.anyResolved).toBe(true);
     });
   });
 });

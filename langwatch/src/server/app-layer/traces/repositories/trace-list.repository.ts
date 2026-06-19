@@ -34,8 +34,31 @@ export interface FacetCountResult {
   values: Record<string, number>;
 }
 
+/**
+ * Optional per-value aggregates the evaluator facet attaches alongside
+ * its row counts so the sidebar drilldown can render verdict pills and
+ * a score range slider inline without firing a second query per
+ * evaluator. Other facets leave this absent. The shape is intentionally
+ * generic ("aggregates") so future facets that want their own
+ * per-value tallies can reuse the same plumbing.
+ */
+export interface FacetValueAggregates {
+  passedCount: number;
+  failedCount: number;
+  erroredCount: number;
+  scoreMin: number | null;
+  scoreMax: number | null;
+  hasScore: boolean;
+  hasLabel: boolean;
+}
+
 export interface CategoricalFacetResult {
-  values: { value: string; label?: string; count: number }[];
+  values: {
+    value: string;
+    label?: string;
+    count: number;
+    aggregates?: FacetValueAggregates;
+  }[];
   totalDistinct: number;
 }
 

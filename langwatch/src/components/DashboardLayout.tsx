@@ -11,7 +11,12 @@ import {
   useBreakpointValue,
   VStack,
 } from "@chakra-ui/react";
-import { OrganizationUserRole, type Organization, type Project, type Team } from "@prisma/client";
+import {
+  type Organization,
+  OrganizationUserRole,
+  type Project,
+  type Team,
+} from "@prisma/client";
 import {
   Activity,
   ChevronDown,
@@ -22,25 +27,26 @@ import {
 } from "lucide-react";
 import numeral from "numeral";
 import React, { useEffect, useState } from "react";
-import { useLocalStorage } from "usehooks-ts";
 import { ErrorBoundary } from "react-error-boundary";
+import { useLocalStorage } from "usehooks-ts";
 import { NotFoundScene } from "~/components/NotFoundScene";
 import Head from "~/utils/compat/next-head";
 import { useRouter } from "~/utils/compat/next-router";
 import { ImpersonationBanner } from "../../ee/admin/ImpersonationBanner";
 import { ImpersonationSwitchBackMenuItem } from "../../ee/admin/ImpersonationSwitchBackMenuItem";
 import { CommandBarTrigger } from "../features/command-bar";
+import { GlobalTraceV2DrawerMount } from "../features/traces-v2/components/GlobalTraceV2DrawerMount";
 import { useDrawer } from "../hooks/useDrawer";
 import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useLiteMemberGuard } from "../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
+import { useOrgQueryParamSelection } from "../hooks/useOrgQueryParamSelection";
 import { usePlanManagementUrl } from "../hooks/usePlanManagementUrl";
 import { usePostHogIdentify } from "../hooks/usePostHogIdentify";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import { useRequiredSession } from "../hooks/useRequiredSession";
 import { SavedViewsProvider } from "../hooks/useSavedViews";
 import type { FullyLoadedOrganization } from "../server/app-layer/organizations/repositories/organization.repository";
-import { useUpgradeModalStore } from "../stores/upgradeModalStore";
 import { api } from "../utils/api";
 import {
   buildProjectSwitchHref,
@@ -49,25 +55,24 @@ import {
   type Route,
 } from "../utils/routes";
 import { trackEvent } from "../utils/tracking";
-import { GlobalTraceV2DrawerMount } from "../features/traces-v2/components/GlobalTraceV2DrawerMount";
 import { AnnouncementBanner } from "./AnnouncementBanner";
-import { AdminViewingAsBanner } from "./governance/AdminViewingAsBanner";
 import { CurrentDrawer } from "./CurrentDrawer";
+import { AdminViewingAsBanner } from "./governance/AdminViewingAsBanner";
 import { FullLogo } from "./icons/FullLogo";
 import { LogoIcon } from "./icons/LogoIcon";
 import { LoadingScreen } from "./LoadingScreen";
 import { MainMenu, MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
+import { SavedViewsBar } from "./messages/SavedViewsBar";
 import { PersonalSidebar } from "./PersonalSidebar";
 import { ProjectAvatar } from "./ProjectAvatar";
-import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
-import { useWorkspaceData } from "./useWorkspaceData";
-import { SavedViewsBar } from "./messages/SavedViewsBar";
-import { PresenceMenuItem } from "./sidebar/PresenceMenuItem";
 import { SdkRadarBanner } from "./SdkRadarBanner";
-import { UpgradeModal } from "./UpgradeModal";
+import { PresenceMenuItem } from "./sidebar/PresenceMenuItem";
+import { GlobalUpgradeModal } from "./UpgradeModal";
 import { Link } from "./ui/link";
 import { Menu } from "./ui/menu";
 import { PageErrorFallback } from "./ui/PageErrorFallback";
+import { useWorkspaceData } from "./useWorkspaceData";
+import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   // No redirects from the breadcrumb path - it only reads `project` for the
@@ -115,10 +120,12 @@ const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
  *
  * Spec: specs/ai-gateway/governance/persona-aware-chrome.feature
  */
-const PersonalScopeHeaderSwitcher = React.memo(function PersonalScopeHeaderSwitcher() {
-  const data = useWorkspaceData();
-  return <WorkspaceSwitcher {...data} current={{ kind: "personal" }} />;
-});
+const PersonalScopeHeaderSwitcher = React.memo(
+  function PersonalScopeHeaderSwitcher() {
+    const data = useWorkspaceData();
+    return <WorkspaceSwitcher {...data} current={{ kind: "personal" }} />;
+  },
+);
 
 /**
  * Header chip rendered on project-scope routes (`/[project]/*`,
@@ -133,10 +140,12 @@ const PersonalScopeHeaderSwitcher = React.memo(function PersonalScopeHeaderSwitc
  *
  * Spec: specs/ai-gateway/governance/workspace-switcher.feature
  */
-const ProjectScopeHeaderSwitcher = React.memo(function ProjectScopeHeaderSwitcher() {
-  const data = useWorkspaceData();
-  return <WorkspaceSwitcher {...data} />;
-});
+const ProjectScopeHeaderSwitcher = React.memo(
+  function ProjectScopeHeaderSwitcher() {
+    const data = useWorkspaceData();
+    return <WorkspaceSwitcher {...data} />;
+  },
+);
 
 /**
  * Header chip rendered on org-scope routes (`/settings/*`, `/governance`).
@@ -247,78 +256,78 @@ export const ProjectSelector = React.memo(function ProjectSelector({
           {open && (
             <Menu.Content>
               {projectGroups
-                  .filter((projectGroup) => {
-                    // Org admins created via RoleBinding-only flow have no TeamUser row
-                    // but still have full access. Resolve the current user's
-                    // organization role explicitly rather than relying on
-                    // members[0] being pre-filtered.
-                    const currentUserOrgRole =
-                      projectGroup.organization.members.find(
-                        (m) => m.userId === session?.user.id,
-                      )?.role;
-                    return (
-                      currentUserOrgRole === OrganizationUserRole.ADMIN ||
-                      (projectGroup.team.members?.some(
-                        (member) => member.userId === session?.user.id,
-                      ) ?? false)
-                    );
-                  })
-                  .map((projectGroup) => (
-                    <Menu.ItemGroup
-                      key={projectGroup.team.id}
-                      title={
-                        projectGroup.organization.name +
-                        (projectGroup.team.name !==
-                        projectGroup.organization.name
-                          ? " - " + projectGroup.team.name
-                          : "")
-                      }
-                    >
-                      {projectGroup.projects.map((project_) => (
-                        <Menu.Item
+                .filter((projectGroup) => {
+                  // Org admins created via RoleBinding-only flow have no TeamUser row
+                  // but still have full access. Resolve the current user's
+                  // organization role explicitly rather than relying on
+                  // members[0] being pre-filtered.
+                  const currentUserOrgRole =
+                    projectGroup.organization.members.find(
+                      (m) => m.userId === session?.user.id,
+                    )?.role;
+                  return (
+                    currentUserOrgRole === OrganizationUserRole.ADMIN ||
+                    (projectGroup.team.members?.some(
+                      (member) => member.userId === session?.user.id,
+                    ) ??
+                      false)
+                  );
+                })
+                .map((projectGroup) => (
+                  <Menu.ItemGroup
+                    key={projectGroup.team.id}
+                    title={
+                      projectGroup.organization.name +
+                      (projectGroup.team.name !== projectGroup.organization.name
+                        ? " - " + projectGroup.team.name
+                        : "")
+                    }
+                  >
+                    {projectGroup.projects.map((project_) => (
+                      <Menu.Item
+                        key={project_.id}
+                        value={project_.id}
+                        fontSize="14px"
+                        asChild
+                      >
+                        <Link
                           key={project_.id}
-                          value={project_.id}
-                          fontSize="14px"
-                          asChild
-                        >
-                          <Link
-                            key={project_.id}
-                            href={buildProjectSwitchHref({
-                              routePattern: router.pathname,
-                              resolvedPathname: window.location.pathname,
-                              currentProjectSlug: project.slug,
-                              targetSlug: project_.slug,
-                              homeFallback: "returnTo",
-                            })}
-                            onClick={() => {
-                              const currentPath = window.location.pathname;
-                              const hasProjectInPath = currentPath.includes(
-                                project.slug,
+                          href={buildProjectSwitchHref({
+                            routePattern: router.pathname,
+                            resolvedPathname: window.location.pathname,
+                            currentProjectSlug: project.slug,
+                            targetSlug: project_.slug,
+                            homeFallback: "returnTo",
+                          })}
+                          onClick={() => {
+                            const currentPath = window.location.pathname;
+                            const hasProjectInPath = currentPath.includes(
+                              project.slug,
+                            );
+                            if (!hasProjectInPath) {
+                              localStorage.setItem(
+                                "selectedProjectSlug",
+                                JSON.stringify(project_.slug),
                               );
-                              if (!hasProjectInPath) {
-                                localStorage.setItem(
-                                  "selectedProjectSlug",
-                                  JSON.stringify(project_.slug),
-                                );
-                              }
-                            }}
-                            _hover={{
-                              textDecoration: "none",
-                            }}
-                          >
-                            <HStack gap={2}>
-                              <ProjectAvatar name={project_.name} />
-                              <Text>{project_.name}</Text>
-                            </HStack>
-                          </Link>
-                        </Menu.Item>
-                      ))}
-                      <AddProjectButton
-                        team={projectGroup.team}
-                        organization={projectGroup.organization}
-                      />
-                    </Menu.ItemGroup>
-                  ))}
+                            }
+                          }}
+                          _hover={{
+                            textDecoration: "none",
+                          }}
+                        >
+                          <HStack gap={2}>
+                            <ProjectAvatar name={project_.name} />
+                            <Text>{project_.name}</Text>
+                          </HStack>
+                        </Link>
+                      </Menu.Item>
+                    ))}
+                    <AddProjectButton
+                      team={projectGroup.team}
+                      organization={projectGroup.organization}
+                    />
+                  </Menu.ItemGroup>
+                ))}
             </Menu.Content>
           )}
         </Box>
@@ -399,18 +408,34 @@ export const DashboardLayout = ({
   // fallback: "lg" tells Chakra to assume large screen during SSR/initial render,
   // so the menu starts expanded and only compacts after hydration on small screens.
   // This avoids the compact→expanded flicker on desktop page navigations.
-  const isSmallScreen = useBreakpointValue({ base: true, lg: false }, { fallback: "lg" });
+  const isSmallScreen = useBreakpointValue(
+    { base: true, lg: false },
+    { fallback: "lg" },
+  );
   const compactMenu = isSmallScreen ? true : compactMenuProp;
   const router = useRouter();
+
+  // Apply a one-shot `?org=<slug>` selection on any org-scoped page, then strip
+  // the param so the URL returns to its clean path. See
+  // useOrgQueryParamSelection — this is what the switcher's per-org "My
+  // Workspace" links and the in-place org switch target.
+  useOrgQueryParamSelection();
 
   const { data: session } = useRequiredSession({ required: !publicPage });
 
   const bypassProjectGating = personalScope || orgScope;
-  const { isLoading, organization, organizations, team, project, organizationRole, hasPermission } =
-    useOrganizationTeamProject({
-      redirectToOnboarding: !bypassProjectGating,
-      redirectToProjectOnboarding: !bypassProjectGating,
-    });
+  const {
+    isLoading,
+    organization,
+    organizations,
+    team,
+    project,
+    organizationRole,
+    hasPermission,
+  } = useOrganizationTeamProject({
+    redirectToOnboarding: !bypassProjectGating,
+    redirectToProjectOnboarding: !bypassProjectGating,
+  });
   const { isLiteMember } = useLiteMemberGuard();
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization?.id ?? "" },
@@ -477,8 +502,7 @@ export const DashboardLayout = ({
   const adminViewingAs: { label: string } | null =
     isProjectAnchoredRoute &&
     organizationRole === OrganizationUserRole.ADMIN &&
-    team &&
-    team.isPersonal &&
+    team?.isPersonal &&
     team.ownerUserId !== session?.user?.id
       ? { label: team.name }
       : null;
@@ -522,7 +546,10 @@ export const DashboardLayout = ({
       // (project chrome, ops, governance/orgScope) still require an
       // organization context.
       (!isPersonalScopeRoute && (!organization || !organizations)) ||
-      (!isOpsRoute && !isPersonalScopeRoute && !isOrgScopeRoute && (!team || !project)))
+      (!isOpsRoute &&
+        !isPersonalScopeRoute &&
+        !isOrgScopeRoute &&
+        (!team || !project)))
   ) {
     return <LoadingScreen />;
   }
@@ -757,9 +784,7 @@ export const DashboardLayout = ({
                     )}
                     {!isLiteMember && (
                       <Menu.Item value="api-keys" asChild>
-                        <Link href="/settings/api-keys">
-                          API Keys
-                        </Link>
+                        <Link href="/settings/api-keys">API Keys</Link>
                       </Menu.Item>
                     )}
                     <Menu.Item value="settings" asChild>
@@ -798,254 +823,261 @@ export const DashboardLayout = ({
           maxHeight="calc(100vh - 56px)"
           maxWidth={`calc(100vw - ${menuWidth})`}
         >
-        <Box
-          width="full"
-          height="full"
-          background="bg.surface"
-          borderTopLeftRadius="xl"
-          overflow="auto"
-          display="flex"
-          minHeight="calc(100vh - 56px)"
-          maxHeight="calc(100vh - 56px)"
-          position="relative"
-        >
-          <VStack width="full" gap={0} {...props}>
-            {/* Alert banners */}
-            {publicEnv.data &&
-              (!publicEnv.data?.HAS_LANGWATCH_NLP_SERVICE ||
-                !publicEnv.data?.HAS_LANGEVALS_ENDPOINT) && (
-                <Alert.Root
-                  status="warning"
-                  width="full"
-                  borderBottom="1px solid"
-                  borderBottomColor="yellow.300"
-                  borderTopLeftRadius="2xl"
-                >
-                  <Alert.Indicator />
-                  <Alert.Content>
-                    <Text>
-                      Please check your environment variables, the following
-                      variables are not set which are required for evaluations
-                      and workflows:
-                    </Text>
-                    {!publicEnv.data?.HAS_LANGWATCH_NLP_SERVICE && (
-                      <Text>LANGWATCH_NLP_SERVICE</Text>
-                    )}
-                    {!publicEnv.data?.HAS_LANGEVALS_ENDPOINT && (
-                      <Text>LANGEVALS_ENDPOINT</Text>
-                    )}
-                  </Alert.Content>
-                </Alert.Root>
-              )}
-            {usage.data?.messageLimitInfo &&
-              usage.data.messageLimitInfo.status !== "ok" && (
-                <Alert.Root
-                  status={
-                    usage.data.messageLimitInfo.status === "exceeded"
-                      ? "error"
-                      : "warning"
-                  }
-                  width="full"
-                  borderBottom="1px solid"
-                  borderBottomColor={
-                    usage.data.messageLimitInfo.status === "exceeded"
-                      ? "red.300"
-                      : "yellow.300"
-                  }
-                >
-                  <Alert.Indicator />
-                  <Alert.Content>
-                    <Text>
-                      {usage.data.messageLimitInfo.message}{" "}
-                      <Link
-                        href={planManagementUrl}
-                        textDecoration="underline"
-                        _hover={{
-                          textDecoration: "none",
-                        }}
-                        onClick={() => {
-                          trackEvent("subscription_hook_click", {
-                            project_id: project?.id,
-                            hook:
-                              usage.data?.messageLimitInfo.status === "exceeded"
-                                ? "messages_limit_reached"
-                                : "messages_limit_warning",
-                          });
-                        }}
-                      >
-                        Click here
-                      </Link>{" "}
-                      to upgrade your plan.
-                    </Text>
-                  </Alert.Content>
-                </Alert.Root>
-              )}
-            {usage.data &&
-              usage.data.currentMonthCost > usage.data.maxMonthlyUsageLimit && (
-                <Alert.Root
-                  status="warning"
-                  width="full"
-                  borderBottom="1px solid"
-                  borderBottomColor="yellow.300"
-                >
-                  <Alert.Indicator />
-                  <Alert.Content>
-                    <Text>
-                      You reached the limit of{" "}
-                      {numeral(usage.data.maxMonthlyUsageLimit).format("$0.00")}{" "}
-                      usage cost for this month, evaluations and guardrails will
-                      not be processed.{" "}
-                      <Link
-                        href="/settings/usage"
-                        textDecoration="underline"
-                        _hover={{
-                          textDecoration: "none",
-                        }}
-                        onClick={() => {
-                          trackEvent("subscription_hook_click", {
-                            project_id: project?.id,
-                            hook: "usage_cost_limit_reached",
-                          });
-                        }}
-                      >
-                        Go to settings
-                      </Link>{" "}
-                      to check your usage spending limit or upgrade your plan.
-                    </Text>
-                  </Alert.Content>
-                </Alert.Root>
-              )}
-
-            <AnnouncementBanner />
-            <SdkRadarBanner />
-
-            {adminViewingAs && (
-              <AdminViewingAsBanner workspaceLabel={adminViewingAs.label} />
-            )}
-
-            {ssoStatus?.pendingSsoSetup && (
-              <Alert.Root
-                status="error"
-                width="full"
-                border="1px solid"
-                borderColor="colorPalette.muted"
-                marginX={4}
-                marginTop={3}
-                borderRadius="lg"
-                maxWidth="calc(100% - 22px)"
-              >
-                <Alert.Indicator />
-                <Alert.Content>
-                  <HStack width="full" gap={4}>
-                    <VStack align="start" gap={0} flex={1}>
-                      <Alert.Title fontWeight="bold">
-                        Action Required: Link your SSO account
-                      </Alert.Title>
-                      <Text fontSize="sm">
-                        Your organization requires SSO login. Please link your
-                        account by logging in via the email input box on the
-                        sign-in page.
+          <Box
+            width="full"
+            height="full"
+            background="bg.surface"
+            borderTopLeftRadius="xl"
+            overflow="auto"
+            display="flex"
+            minHeight="calc(100vh - 56px)"
+            maxHeight="calc(100vh - 56px)"
+            position="relative"
+          >
+            <VStack width="full" gap={0} {...props}>
+              {/* Alert banners */}
+              {publicEnv.data &&
+                (!publicEnv.data?.HAS_LANGWATCH_NLP_SERVICE ||
+                  !publicEnv.data?.HAS_LANGEVALS_ENDPOINT) && (
+                  <Alert.Root
+                    status="warning"
+                    width="full"
+                    borderBottom="1px solid"
+                    borderBottomColor="yellow.300"
+                    borderTopLeftRadius="2xl"
+                  >
+                    <Alert.Indicator />
+                    <Alert.Content>
+                      <Text>
+                        Please check your environment variables, the following
+                        variables are not set which are required for evaluations
+                        and workflows:
                       </Text>
-                    </VStack>
-                    <Button
-                      size="sm"
-                      colorPalette="red"
-                      flexShrink={0}
-                      color="white"
-                      asChild
-                    >
-                      <Link href="/settings/authentication">
-                        <KeyRound size={14} />
-                        Link SSO Account
-                      </Link>
-                    </Button>
-                  </HStack>
-                </Alert.Content>
-              </Alert.Root>
-            )}
+                      {!publicEnv.data?.HAS_LANGWATCH_NLP_SERVICE && (
+                        <Text>LANGWATCH_NLP_SERVICE</Text>
+                      )}
+                      {!publicEnv.data?.HAS_LANGEVALS_ENDPOINT && (
+                        <Text>LANGEVALS_ENDPOINT</Text>
+                      )}
+                    </Alert.Content>
+                  </Alert.Root>
+                )}
+              {usage.data?.messageLimitInfo &&
+                usage.data.messageLimitInfo.status !== "ok" && (
+                  <Alert.Root
+                    status={
+                      usage.data.messageLimitInfo.status === "exceeded"
+                        ? "error"
+                        : "warning"
+                    }
+                    width="full"
+                    borderBottom="1px solid"
+                    borderBottomColor={
+                      usage.data.messageLimitInfo.status === "exceeded"
+                        ? "red.300"
+                        : "yellow.300"
+                    }
+                  >
+                    <Alert.Indicator />
+                    <Alert.Content>
+                      <Text>
+                        {usage.data.messageLimitInfo.message}{" "}
+                        <Link
+                          href={planManagementUrl}
+                          textDecoration="underline"
+                          _hover={{
+                            textDecoration: "none",
+                          }}
+                          onClick={() => {
+                            trackEvent("subscription_hook_click", {
+                              project_id: project?.id,
+                              hook:
+                                usage.data?.messageLimitInfo.status ===
+                                "exceeded"
+                                  ? "messages_limit_reached"
+                                  : "messages_limit_warning",
+                            });
+                          }}
+                        >
+                          Click here
+                        </Link>{" "}
+                        to upgrade your plan.
+                      </Text>
+                    </Alert.Content>
+                  </Alert.Root>
+                )}
+              {usage.data &&
+                usage.data.currentMonthCost >
+                  usage.data.maxMonthlyUsageLimit && (
+                  <Alert.Root
+                    status="warning"
+                    width="full"
+                    borderBottom="1px solid"
+                    borderBottomColor="yellow.300"
+                  >
+                    <Alert.Indicator />
+                    <Alert.Content>
+                      <Text>
+                        You reached the limit of{" "}
+                        {numeral(usage.data.maxMonthlyUsageLimit).format(
+                          "$0.00",
+                        )}{" "}
+                        usage cost for this month, evaluations and guardrails
+                        will not be processed.{" "}
+                        <Link
+                          href="/settings/usage"
+                          textDecoration="underline"
+                          _hover={{
+                            textDecoration: "none",
+                          }}
+                          onClick={() => {
+                            trackEvent("subscription_hook_click", {
+                              project_id: project?.id,
+                              hook: "usage_cost_limit_reached",
+                            });
+                          }}
+                        >
+                          Go to settings
+                        </Link>{" "}
+                        to check your usage spending limit or upgrade your plan.
+                      </Text>
+                    </Alert.Content>
+                  </Alert.Root>
+                )}
 
-            {publicEnv.data?.DEMO_PROJECT_SLUG &&
-              publicEnv.data.DEMO_PROJECT_SLUG === router.query.project && (
-                <HStack width="full" backgroundColor="orange.400" padding={1}>
-                  <Spacer />
-                  <Text fontSize="sm">
-                    Viewing Demo Project - Go back to yours{" "}
-                    <Link href="/" textDecoration="underline">
-                      here
-                    </Link>
-                  </Text>
-                  <Spacer />
-                </HStack>
+              <AnnouncementBanner />
+              <SdkRadarBanner />
+
+              {adminViewingAs && (
+                <AdminViewingAsBanner workspaceLabel={adminViewingAs.label} />
               )}
 
-            <CurrentDrawer />
-            {/* v2 trace drawer is mounted globally so cross-page opens
+              {ssoStatus?.pendingSsoSetup && (
+                <Alert.Root
+                  status="error"
+                  width="full"
+                  border="1px solid"
+                  borderColor="colorPalette.muted"
+                  marginX={4}
+                  marginTop={3}
+                  borderRadius="lg"
+                  maxWidth="calc(100% - 22px)"
+                >
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    <HStack width="full" gap={4}>
+                      <VStack align="start" gap={0} flex={1}>
+                        <Alert.Title fontWeight="bold">
+                          Action Required: Link your SSO account
+                        </Alert.Title>
+                        <Text fontSize="sm">
+                          Your organization requires SSO login. Please link your
+                          account by logging in via the email input box on the
+                          sign-in page.
+                        </Text>
+                      </VStack>
+                      <Button
+                        size="sm"
+                        colorPalette="red"
+                        flexShrink={0}
+                        color="white"
+                        asChild
+                      >
+                        <Link href="/settings/authentication">
+                          <KeyRound size={14} />
+                          Link SSO Account
+                        </Link>
+                      </Button>
+                    </HStack>
+                  </Alert.Content>
+                </Alert.Root>
+              )}
+
+              {publicEnv.data?.DEMO_PROJECT_SLUG &&
+                publicEnv.data.DEMO_PROJECT_SLUG === router.query.project && (
+                  <HStack width="full" backgroundColor="orange.400" padding={1}>
+                    <Spacer />
+                    <Text fontSize="sm">
+                      Viewing Demo Project - Go back to yours{" "}
+                      <Link href="/" textDecoration="underline">
+                        here
+                      </Link>
+                    </Text>
+                    <Spacer />
+                  </HStack>
+                )}
+
+              <CurrentDrawer />
+              {/* v2 trace drawer is mounted globally so cross-page opens
                 (e.g. clicking "Try the new one" from a /simulations
                 drawer) actually render the shell. Self-skips on
                 /[project]/traces where TracesPage already mounts it. */}
-            <GlobalTraceV2DrawerMount />
+              <GlobalTraceV2DrawerMount />
 
-            {userIsPartOfTeam ? (
-              // Page body absorbs leftover vertical space inside the
-              // scrollable VStack. Without `flex: 1` + `minHeight: 0`,
-              // pages that use `height="full"` interpret it as "100%
-              // of the VStack" - which includes banner height - so
-              // showing a banner pushed the bottom of the page off
-              // the viewport. Wrapping the body in a flex-1 box makes
-              // banners take their natural height above and leaves
-              // the page with `containerHeight − bannerStackHeight`,
-              // which is what `height="full"` should mean. Banners
-              // already render with their intrinsic heights because
-              // VStack defaults to `align-items: stretch` and Alert
-              // boxes don't shrink below content.
-              <Box
-                flex="1"
-                minHeight={0}
-                width="full"
-                display="flex"
-                flexDirection="column"
-              >
-              <ErrorBoundary FallbackComponent={PageErrorFallback} resetKeys={[router.pathname]}>
-                {showSavedViews ? (
-                  <SavedViewsProvider>
-                    {children}
-                    {/* Spacer to prevent fixed bottom bar from covering content */}
-                    <Box height="64px" flexShrink={0} />
-                    <SavedViewsBar />
-                  </SavedViewsProvider>
-                ) : (
-                  children
-                )}
-              </ErrorBoundary>
-              </Box>
-            ) : (
-              <Alert.Root
-                status="warning"
-                width="full"
-                border="1px solid"
-                borderColor="colorPalette.muted"
-                marginX={4}
-                marginTop={3}
-                borderRadius="lg"
-                maxWidth="calc(100% - 22px)"
-              >
-                <Alert.Indicator />
-                <Alert.Content>
-                  <HStack width="full" gap={4}>
-                    <Text flex={1}>
-                      You are not part of any team in this organization. Ask
-                      your administrator to add you, or{" "}
-                      <Link href="/" textDecoration="underline">
-                        go back to your home page
-                      </Link>
-                      .
-                    </Text>
-                  </HStack>
-                </Alert.Content>
-              </Alert.Root>
-            )}
-          </VStack>
-        </Box>
+              {userIsPartOfTeam ? (
+                // Page body absorbs leftover vertical space inside the
+                // scrollable VStack. Without `flex: 1` + `minHeight: 0`,
+                // pages that use `height="full"` interpret it as "100%
+                // of the VStack" - which includes banner height - so
+                // showing a banner pushed the bottom of the page off
+                // the viewport. Wrapping the body in a flex-1 box makes
+                // banners take their natural height above and leaves
+                // the page with `containerHeight − bannerStackHeight`,
+                // which is what `height="full"` should mean. Banners
+                // already render with their intrinsic heights because
+                // VStack defaults to `align-items: stretch` and Alert
+                // boxes don't shrink below content.
+                <Box
+                  flex="1"
+                  minHeight={0}
+                  width="full"
+                  display="flex"
+                  flexDirection="column"
+                >
+                  <ErrorBoundary
+                    FallbackComponent={PageErrorFallback}
+                    resetKeys={[router.pathname]}
+                  >
+                    {showSavedViews ? (
+                      <SavedViewsProvider>
+                        {children}
+                        {/* Spacer to prevent fixed bottom bar from covering content */}
+                        <Box height="64px" flexShrink={0} />
+                        <SavedViewsBar />
+                      </SavedViewsProvider>
+                    ) : (
+                      children
+                    )}
+                  </ErrorBoundary>
+                </Box>
+              ) : (
+                <Alert.Root
+                  status="warning"
+                  width="full"
+                  border="1px solid"
+                  borderColor="colorPalette.muted"
+                  marginX={4}
+                  marginTop={3}
+                  borderRadius="lg"
+                  maxWidth="calc(100% - 22px)"
+                >
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    <HStack width="full" gap={4}>
+                      <Text flex={1}>
+                        You are not part of any team in this organization. Ask
+                        your administrator to add you, or{" "}
+                        <Link href="/" textDecoration="underline">
+                          go back to your home page
+                        </Link>
+                        .
+                      </Text>
+                    </HStack>
+                  </Alert.Content>
+                </Alert.Root>
+              )}
+            </VStack>
+          </Box>
         </Box>
       </HStack>
       <GlobalUpgradeModal />
@@ -1058,10 +1090,3 @@ export const DashboardLayout = ({
     </Box>
   );
 };
-
-
-function GlobalUpgradeModal() {
-  const { isOpen, variant, close } = useUpgradeModalStore();
-  if (!variant) return null;
-  return <UpgradeModal open={isOpen} onClose={close} variant={variant} />;
-}

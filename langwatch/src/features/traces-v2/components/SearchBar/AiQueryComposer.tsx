@@ -1,5 +1,6 @@
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
+import { useFilterStore } from "../../stores/filterStore";
 import { AiPromptInput } from "../ai/AiPromptInput";
 import { useAiTraceAction } from "../ai/useAiTraceAction";
 
@@ -41,10 +42,18 @@ export const AiQueryComposer: React.FC<AiQueryComposerProps> = ({
     mode: "filter",
     onDone: onClose,
   });
+  const setAiError = useFilterStore((s) => s.setAiError);
 
   useEffect(() => {
     onPendingChange?.(isPending);
   }, [isPending, onPendingChange]);
+
+  // Push AI errors into the filter store so the unified banner in SearchBar
+  // can display them. The error persists after this composer unmounts —
+  // intentional: the user should see the failure even after closing AI mode.
+  useEffect(() => {
+    setAiError(error);
+  }, [error, setAiError]);
 
   // Auto-submit on mount when the caller seeded a prompt AND asked us
   // to fire it without a second Enter keystroke. Guarded by a ref so the
@@ -64,12 +73,14 @@ export const AiQueryComposer: React.FC<AiQueryComposerProps> = ({
       prompt={prompt}
       onPromptChange={(next) => {
         setPrompt(next);
-        if (error) clearError();
+        if (error) {
+          clearError();
+          setAiError(null);
+        }
       }}
       onSubmit={() => submit(prompt)}
       onClose={onClose}
       isPending={isPending}
-      error={error}
       placeholderExamples={PLACEHOLDERS}
     />
   );

@@ -20,6 +20,7 @@ import {
   getFacetValueState,
   validateAst,
 } from "~/server/app-layer/traces/query-language/queries";
+import type { AiActionError } from "~/server/app-layer/traces/ai-query";
 
 export interface TimeRange {
   from: number;
@@ -45,6 +46,22 @@ interface FilterState {
   debouncedQueryText: string;
   /** Debounced version of timeRange to drive network requests */
   debouncedTimeRange: TimeRange;
+
+  /**
+   * Structured error from the most recent Ask AI attempt. Persists until
+   * the user explicitly dismisses it, types a new query, submits a new AI
+   * prompt, or calls `clearAll`. Set by `AiQueryComposer` via `setAiError`
+   * so the unified error banner in `SearchBar` can read it.
+   */
+  aiError: AiActionError | null;
+  /** Set (or clear) the AI error shown in the unified banner. */
+  setAiError: (err: AiActionError | null) => void;
+  /**
+   * Dismiss the parse error banner without touching the query text. The
+   * invalid text stays in the editor so the user can correct it — the
+   * banner is just hidden until they trigger a new parse cycle.
+   */
+  dismissParseError: () => void;
 
   /**
    * The most recent successful Ask AI translation: the natural-language
@@ -194,12 +211,16 @@ export const useFilterStore = create<FilterState>((set, get) => ({
   ast: EMPTY_AST,
   queryText: "",
   parseError: null,
+  aiError: null,
   timeRange: INITIAL_TIME_RANGE,
   page: 1,
   pageSize: 50,
   debouncedQueryText: "",
   debouncedTimeRange: INITIAL_TIME_RANGE,
   lastAiTranslation: null,
+
+  setAiError: (err) => set({ aiError: err }),
+  dismissParseError: () => set({ parseError: null }),
 
   recordAiTranslation: (translation) => set({ lastAiTranslation: translation }),
 
@@ -216,16 +237,21 @@ export const useFilterStore = create<FilterState>((set, get) => ({
         return {
           queryText: text,
           parseError: result.parseError,
+          aiError: null,
           lastAiTranslation: null,
         };
       }
       // Canonical text matches and we're already error-free → the AST is
       // structurally the same. Keep the previous reference so `s.ast`
       // subscribers don't churn on a round-trip-equivalent edit.
-      if (result.queryText === state.queryText && state.parseError === null) {
+      if (
+        result.queryText === state.queryText &&
+        state.parseError === null &&
+        state.aiError === null
+      ) {
         return state;
       }
-      return { ...result, page: 1, lastAiTranslation: null };
+      return { ...result, aiError: null, page: 1, lastAiTranslation: null };
     }),
 
   setQuery: (text, ast) =>
@@ -343,6 +369,7 @@ export const useFilterStore = create<FilterState>((set, get) => ({
       ast: EMPTY_AST,
       queryText: "",
       parseError: null,
+      aiError: null,
       page: 1,
       lastAiTranslation: null,
     }),

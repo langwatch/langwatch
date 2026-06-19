@@ -34,18 +34,16 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
 import { useConversationContext } from "../../../hooks/useConversationContext";
 import { usePinnedAttributes } from "../../../hooks/usePinnedAttributes";
-import { useTraceDrawerNavigation } from "../../../hooks/useTraceDrawerNavigation";
 import { useSpanTree } from "../../../hooks/useSpanTree";
+import { useTraceDrawerNavigation } from "../../../hooks/useTraceDrawerNavigation";
 import { useTraceHeader } from "../../../hooks/useTraceHeader";
 import { useTraceRefresh } from "../../../hooks/useTraceRefresh";
 import { useTraceResources } from "../../../hooks/useTraceResources";
 import { useDrawerStore } from "../../../stores/drawerStore";
 import { useFilterStore } from "../../../stores/filterStore";
 import { useFocusSectionStore } from "../../../stores/focusSectionStore";
-import { rankedErrorSpans } from "../../../utils/errorSpans";
-import { ExceptionsContent } from "../ExceptionsContent";
-import { ExtraModelsBadge } from "../../TraceTable/registry/cells/trace/ModelCell";
 import type { PinnedAttribute } from "../../../stores/pinnedAttributesStore";
+import { rankedErrorSpans } from "../../../utils/errorSpans";
 import {
   abbreviateModel,
   formatAbsoluteTime,
@@ -56,10 +54,13 @@ import {
   SPAN_TYPE_COLORS,
   STATUS_COLORS,
 } from "../../../utils/formatters";
-import { Chip } from "../Chip";
 import { CostBreakdownTooltipContent } from "../../shared/CostBreakdownTooltip";
+import { TokenBreakdownTooltipContent } from "../../shared/TokenBreakdownTooltip";
 import { TooltipRow } from "../../shared/TooltipRow";
+import { ExtraModelsBadge } from "../../TraceTable/registry/cells/trace/ModelCell";
+import { Chip } from "../Chip";
 import { splitChipsForOverflow } from "../ChipBar";
+import { ExceptionsContent } from "../ExceptionsContent";
 import { ModeSwitch } from "../ModeSwitch";
 import { RawJsonDialog } from "../RawJsonDialog";
 import { useTraceHeaderChipDefs } from "../TraceHeaderChips";
@@ -68,11 +69,11 @@ import { MetricPill } from "./MetricPill";
 import {
   type CategorizedPin,
   type PinCategory,
-  PinDivider,
   renderPinPills,
 } from "./PinStrip";
 import { ThreadProgressIndicator } from "./ThreadProgressIndicator";
 import { TraceOverflowMenu } from "./TraceOverflowMenu";
+import { useRetainedTraceHeader } from "./useRetainedTraceHeader";
 import {
   formatPinValue,
   readNumberAttribute,
@@ -110,10 +111,7 @@ function TraceIdChip({ traceId }: { traceId: string }) {
     // a plain-http internal domain understand what went wrong instead of
     // seeing a silent no-op.
     try {
-      if (
-        typeof navigator !== "undefined" &&
-        navigator.clipboard?.writeText
-      ) {
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(traceId);
         toaster.create({
           title: "Trace ID copied",
@@ -154,7 +152,13 @@ function TraceIdChip({ traceId }: { traceId: string }) {
         ".chip-root:hover & [data-expanded]": { display: "inline" },
       }}
     >
-      <Text as="span" data-collapsed textStyle="xs" color="fg" fontWeight="medium">
+      <Text
+        as="span"
+        data-collapsed
+        textStyle="xs"
+        color="fg"
+        fontWeight="medium"
+      >
         {short}
       </Text>
       <Text
@@ -229,11 +233,18 @@ function StatusChip({
 
   const jumpToSpan = useCallback(
     (spanId: string) => {
-      // Land on the span detail tab — `selectSpan` flips activeTab to
-      // "span" internally, so we just ensure trace mode here. The
-      // accordion-side focus-glow observer on SpanAccordions will catch
-      // the follow-up `requestFocus({section: "exceptions"})` fired by
-      // ExceptionsContent and pulse the span's own Exceptions section.
+      // Land on the trace pane with the span selected. `setViewMode`
+      // flips the drawer to the trace-pane layout (PaneLayout); the
+      // SpanDetailPane mounts because `selectedSpanId` is now set, and
+      // the SpanTabBar highlights the selected span. The accordion-side
+      // focus-glow observer on SpanAccordions catches the follow-up
+      // `requestFocus({section: "exceptions"})` fired by
+      // ExceptionsContent and pulses the span's own Exceptions section.
+      //
+      // When the spanTree query is still in flight we'd previously fall
+      // through to the trace summary view; TraceAccordions now renders
+      // a span-shaped skeleton in that window so the jump reads as
+      // "landed, waiting for data" rather than "jump didn't take."
       setViewMode("trace");
       selectSpan(spanId);
     },
@@ -362,10 +373,13 @@ const SAFE_METADATA_KEY_RE = /^[A-Za-z0-9_.-]+$/;
  * key can't be safely round-tripped as a bare Liqe field, or the value
  * collapses to empty after escape.
  */
-function formatMetadataFilterQuery(
-  key: string,
-  value: string,
-): string | null {
+function formatMetadataFilterQuery({
+  key,
+  value,
+}: {
+  key: string;
+  value: string;
+}): string | null {
   if (!SAFE_METADATA_KEY_RE.test(key)) return null;
   const escaped = value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   if (!escaped) return null;
@@ -459,9 +473,13 @@ const HOISTED_AUTO_PINS: HoistedPinDef[] = [
 ];
 
 export const DrawerHeader = memo(function DrawerHeader({
-  trace,
+  trace: traceProp,
   onClose,
 }: DrawerHeaderProps) {
+  // Retain attribute-derived fields across payload flaps (row-data seed →
+  // full summary → refetch) so chips never vanish once shown for the same
+  // traceId — see useRetainedTraceHeader for the root-cause writeup.
+  const trace = useRetainedTraceHeader(traceProp);
   const isMaximized = useDrawerStore((s) => s.isMaximized);
   const pinned = useDrawerStore((s) => s.pinned);
   const togglePinned = useDrawerStore((s) => s.togglePinned);
@@ -518,6 +536,12 @@ export const DrawerHeader = memo(function DrawerHeader({
     "gen_ai.usage.reasoning_tokens",
   );
 
+  // The reasoning EFFORT request setting (low/medium/high/...), lifted onto
+  // the trace summary by the fold. Distinct from the reasoning TOKEN count
+  // above; shown next to the model since it is a per-request model setting.
+  const reasoningEffort =
+    trace.attributes?.["gen_ai.request.reasoning_effort"]?.trim() ?? null;
+
   // Total tokens the model actually processed = input + output PLUS cache
   // read + cache write. Anthropic reports `input_tokens` as the NON-cached
   // portion, so the cache counts are additive, not a subset (which is why a
@@ -563,7 +587,17 @@ export const DrawerHeader = memo(function DrawerHeader({
   // ThreadProgressIndicator already exposes the conversation id (with copy
   // + filter affordances), so the conversation / thread auto-pins would be
   // redundant. Skip them in that case to keep the strip lean.
-  const conversationCoveredByIndicator = conversationContext.total > 1;
+  // While the conversation context is still resolving we don't yet know
+  // whether the indicator will take over — render the chip optimistically
+  // and the half-second flap ("chip shows, context lands with total > 1,
+  // chip unmounts") is exactly the flash users reported. Treat "unknown"
+  // as covered so the chip only ever *appears* (once we know the trace is
+  // single-turn) and never appears-then-vanishes.
+  const conversationCoveredByIndicator =
+    conversationContext.total > 1 ||
+    (!!trace.conversationId &&
+      conversationContext.isLoading &&
+      conversationContext.turns.length === 0);
   // Resolve auto + user pins into a single array with category buckets so the
   // strip can group them with subtle dividers between identity / run / tag /
   // custom. Auto-pins are skipped when the user has already pinned the same
@@ -693,7 +727,7 @@ export const DrawerHeader = memo(function DrawerHeader({
       // field names and the backend's text search treats them as
       // attribute-key filters (same behaviour the search bar uses for
       // hand-typed `metadata.tenant:"org-acme"` queries).
-      const filterQuery = formatMetadataFilterQuery(key, value);
+      const filterQuery = formatMetadataFilterQuery({ key, value });
       out.push({
         pin: { source: "attribute", key, label },
         value,
@@ -916,11 +950,7 @@ export const DrawerHeader = memo(function DrawerHeader({
                         <Text textStyle="xs" color="fg.muted" minWidth="16px">
                           {stepsBack === 1 ? "←" : `${stepsBack}↑`}
                         </Text>
-                        <Text
-                          textStyle="xs"
-                          flex={1}
-                          truncate
-                        >
+                        <Text textStyle="xs" flex={1} truncate>
                           {entry.traceId.slice(0, 16)}
                           <Text
                             as="span"
@@ -1133,49 +1163,15 @@ export const DrawerHeader = memo(function DrawerHeader({
         {trace.totalTokens > 0 && (
           <Tooltip
             content={
-              <VStack align="stretch" gap={0.5} minWidth="180px">
-                <TooltipRow
-                  label="Input"
-                  value={trace.inputTokens?.toLocaleString() ?? "—"}
-                />
-                <TooltipRow
-                  label="Output"
-                  value={trace.outputTokens?.toLocaleString() ?? "—"}
-                />
-                {/* Cache + reasoning rows render only when the trace
-                    actually reported them. Anthropic never emits reasoning
-                    tokens, so a permanent "Reasoning —" row was pure noise;
-                    a model with no prompt caching likewise shouldn't carry
-                    empty cache rows. Show what we measured, hide the rest. */}
-                {cacheReadTokens != null && (
-                  <TooltipRow
-                    label="Cache read"
-                    value={cacheReadTokens.toLocaleString()}
-                  />
-                )}
-                {cacheCreationTokens != null && (
-                  <TooltipRow
-                    label="Cache write"
-                    value={cacheCreationTokens.toLocaleString()}
-                  />
-                )}
-                {reasoningTokens != null && (
-                  <TooltipRow
-                    label="Reasoning"
-                    value={reasoningTokens.toLocaleString()}
-                  />
-                )}
-                <Box height="1px" bg="border" marginY={1} />
-                <TooltipRow
-                  label="Total"
-                  value={totalTokensWithCache.toLocaleString()}
-                />
-                {trace.tokensEstimated && !hasAuthoritativeTokens && (
-                  <Text textStyle="2xs" color="fg.muted" paddingTop={1}>
-                    Tokens are estimated
-                  </Text>
-                )}
-              </VStack>
+              <TokenBreakdownTooltipContent
+                inputTokens={trace.inputTokens}
+                outputTokens={trace.outputTokens}
+                cacheReadTokens={cacheReadTokens}
+                cacheCreationTokens={cacheCreationTokens}
+                reasoningTokens={reasoningTokens}
+                totalWithCache={totalTokensWithCache}
+                estimated={trace.tokensEstimated && !hasAuthoritativeTokens}
+              />
             }
             positioning={{ placement: "top" }}
           >
@@ -1204,6 +1200,9 @@ export const DrawerHeader = memo(function DrawerHeader({
               <ExtraModelsBadge models={trace.models.slice(1)} size="sm" />
             )}
           </HStack>
+        )}
+        {reasoningEffort && (
+          <MetricPill label="Reasoning effort" value={reasoningEffort} />
         )}
 
         {/* Section 2: Source / tools chips (service, origin, scenario, sdk,
@@ -1246,6 +1245,16 @@ export const DrawerHeader = memo(function DrawerHeader({
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           hasConversation={!!trace.conversationId}
+          // `useConversationContext` returns `isLoading: true` while the
+          // turns are in flight; combined with `turns.length === 0` it
+          // means the conversation hasn't resolved yet. We only want the
+          // "loading" gate when a conversationId is declared — otherwise
+          // the tab is permanently disabled with a different reason.
+          isConversationLoading={
+            !!trace.conversationId &&
+            conversationContext.isLoading &&
+            conversationContext.turns.length === 0
+          }
           traceId={trace.traceId}
           endSlot={
             <HStack gap={2}>

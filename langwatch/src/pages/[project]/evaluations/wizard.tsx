@@ -1,89 +1,61 @@
-import { Alert, Box, useDisclosure } from "@chakra-ui/react";
-import { useRouter } from "~/utils/compat/next-router";
-import { useEffect } from "react";
-import { useShallow } from "zustand/react/shallow";
-import { CurrentDrawer } from "../../../components/CurrentDrawer";
-import { DashboardLayout } from "../../../components/DashboardLayout";
-import { EvaluationWizard as EvaluationWizardComponent } from "../../../components/evaluations/wizard/EvaluationWizard";
-import { useEvaluationWizardStore } from "../../../components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
-import useAutosaveWizard from "../../../components/evaluations/wizard/hooks/useAutosaveWizard";
-import { useInitialLoadExperiment } from "../../../components/evaluations/wizard/hooks/useInitialLoadExperiment";
-import { LoadingScreen } from "../../../components/LoadingScreen";
-import { Dialog } from "../../../components/ui/dialog";
-import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
-import { isNotFound } from "../../../utils/trpcError";
+import { ExperimentType } from "@prisma/client";
+import { useEffect, useRef } from "react";
 
-export default function EvaluationWizard() {
-  const { open, setOpen } = useDisclosure();
+import { LoadingScreen } from "~/components/LoadingScreen";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
+
+/**
+ * The evaluation wizard was removed in favor of the evaluations workbench.
+ * A brand-new evaluation opens the workbench directly. A saved experiment can
+ * only open in the workbench if it is workbench-native (EVALUATIONS_V3 or a
+ * legacy wizard run that carries workbenchState); older experiments predate
+ * that data model, so they route to the workflow they were run from instead
+ * of a workbench that cannot render them.
+ */
+export default function EvaluationWizardRedirect() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
+  const hasRedirectedRef = useRef(false);
+  const slug =
+    typeof router.query.slug === "string" ? router.query.slug : undefined;
 
-  useEffect(() => {
-    setOpen(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useAutosaveWizard();
-
-  const { initialLoadExperiment, initialLoadExperimentSlug } =
-    useInitialLoadExperiment();
-
-  const { skipNextAutosave, reset } = useEvaluationWizardStore(
-    useShallow((state) => {
-      return {
-        skipNextAutosave: state.skipNextAutosave,
-        reset: state.reset,
-      };
-    }),
+  const experiment = api.experiments.getExperimentBySlugOrId.useQuery(
+    { projectId: project?.id ?? "", experimentSlug: slug ?? "" },
+    { enabled: !!project && !!slug },
   );
 
+  // Fire the redirect once: the compat router is a fresh object each render, so
+  // without this guard the effect re-runs and re-fires replace every render.
   useEffect(() => {
-    return () => {
-      skipNextAutosave();
-      reset();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (!project || hasRedirectedRef.current) return;
 
-  if (isNotFound(initialLoadExperiment.error)) {
-    return (
-      <DashboardLayout>
-        <Box padding={6}>
-          <Alert.Root status="warning">
-            <Alert.Indicator />
-            <Alert.Title>Evaluation not found</Alert.Title>
-            <Alert.Description>
-              The evaluation you&apos;re looking for doesn&apos;t exist or you
-              don&apos;t have access to it.
-            </Alert.Description>
-          </Alert.Root>
-        </Box>
-      </DashboardLayout>
-    );
-  }
+    // No slug: a brand-new evaluation, the workbench is the entry point.
+    if (!slug) {
+      hasRedirectedRef.current = true;
+      void router.replace(`/${project.slug}/experiments/workbench`);
+      return;
+    }
 
-  if (!project) {
-    return <LoadingScreen />;
-  }
+    // With a slug we need the experiment to know where it can actually open.
+    if (!experiment.isFetched) return;
+    hasRedirectedRef.current = true;
 
-  return (
-    <>
-      <Dialog.Root
-        open={open}
-        onOpenChange={({ open }) => {
-          if (!open) {
-            void router.push(`/${project?.slug}/evaluations`);
-          }
-        }}
-        size="full"
-      >
-        <EvaluationWizardComponent
-          isLoading={
-            !!initialLoadExperimentSlug && initialLoadExperiment.isLoading
-          }
-        />
-      </Dialog.Root>
-      <CurrentDrawer />
-    </>
-  );
+    const data = experiment.data;
+    const isWorkbenchNative =
+      data?.type === ExperimentType.EVALUATIONS_V3 || !!data?.workbenchState;
+
+    if (isWorkbenchNative) {
+      void router.replace(`/${project.slug}/experiments/workbench/${slug}`);
+    } else if (data?.workflowId) {
+      void router.replace(`/${project.slug}/studio/${data.workflowId}`);
+    } else {
+      // No workflow to fall back to: the read-only experiment view still
+      // renders legacy results.
+      void router.replace(`/${project.slug}/experiments/${slug}`);
+    }
+  }, [project, router, slug, experiment.isFetched, experiment.data]);
+
+  return <LoadingScreen />;
 }

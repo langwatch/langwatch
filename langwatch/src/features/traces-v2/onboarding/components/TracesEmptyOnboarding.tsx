@@ -460,33 +460,33 @@ export function TracesEmptyOnboarding(): React.ReactElement {
         <AnimatePresence>
           {(stage === "welcome" || stage === "trace_explorer") &&
             !isReturningWelcome && (
-            <motion.div
-              key="agent-handoff"
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{
-                duration: 0.6,
-                delay: 0.4,
-                ease: [0.16, 1, 0.3, 1],
-              }}
-            >
-              <Button
-                variant="ghost"
-                size="sm"
-                colorPalette="gray"
-                color="fg.muted"
-                _hover={{ color: "fg", bg: "bg.softHover" }}
-                onClick={() => setDrawerOpen(true)}
+              <motion.div
+                key="agent-handoff"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{
+                  duration: 0.6,
+                  delay: 0.4,
+                  ease: [0.16, 1, 0.3, 1],
+                }}
               >
-                <Wrench size={12} />
-                <Text as="span">Or hand this to your coding agent</Text>
-                <Text as="span" aria-hidden color="fg.subtle">
-                  →
-                </Text>
-              </Button>
-            </motion.div>
-          )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  colorPalette="gray"
+                  color="fg.muted"
+                  _hover={{ color: "fg", bg: "bg.softHover" }}
+                  onClick={() => setDrawerOpen(true)}
+                >
+                  <Wrench size={12} />
+                  <Text as="span">Or hand this to your coding agent</Text>
+                  <Text as="span" aria-hidden color="fg.subtle">
+                    →
+                  </Text>
+                </Button>
+              </motion.div>
+            )}
         </AnimatePresence>
 
         {/* Primary Integrate CTA — visible per-stage via
@@ -575,19 +575,19 @@ export function TracesEmptyOnboarding(): React.ReactElement {
             overview" alongside the banner would re-introduce the
             duplicate-CTA problem the banner is here to fix. */}
         {stage !== "outro" && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.4, delay: 0.32 }}
-        >
-          <HStack
-            gap={3}
-            color="fg.muted"
-            textStyle="xs"
-            flexWrap="wrap"
-            justify="center"
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4, delay: 0.32 }}
           >
-            {/* Back + Replay sit before Continue / docs / skip — they
+            <HStack
+              gap={3}
+              color="fg.muted"
+              textStyle="xs"
+              flexWrap="wrap"
+              justify="center"
+            >
+              {/* Back + Replay sit before Continue / docs / skip — they
                 give the user a way out of "I missed that beat" without
                 forcing them to restart the whole tour. Hidden on the
                 density spotlight (its cards already double as advance
@@ -595,87 +595,87 @@ export function TracesEmptyOnboarding(): React.ReactElement {
                 chapter (the OutroPanel owns its own CTAs there). The
                 bullet separators are only rendered when an item is
                 shown so we don't get adjacent dots. */}
-            {!stageDef.showDensitySpotlight && !isReturningWelcome && (
-              <>
-                {canGoBack && (
-                  <>
-                    <Button
-                      size="xs"
-                      variant="ghost"
-                      colorPalette="gray"
-                      onClick={goBack}
-                      aria-label="Previous beat"
-                    >
-                      <Icon boxSize={3.5}>
-                        <ArrowLeft />
-                      </Icon>
-                      <Text>Back</Text>
-                    </Button>
-                    <Text aria-hidden color="fg.subtle">
-                      •
-                    </Text>
-                  </>
-                )}
-                <Button
-                  size="xs"
-                  variant="ghost"
-                  colorPalette="gray"
-                  onClick={replayStage}
-                  aria-label="Replay this beat"
-                >
-                  <Icon boxSize={3.5}>
-                    <RotateCcw />
-                  </Icon>
-                  <Text>Replay</Text>
-                </Button>
-                <Text aria-hidden color="fg.subtle">
-                  •
-                </Text>
-              </>
-            )}
-            {/* Stage-level "advance" CTA used to live here as a quiet
+              {!stageDef.showDensitySpotlight && !isReturningWelcome && (
+                <>
+                  {canGoBack && (
+                    <>
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        colorPalette="gray"
+                        onClick={goBack}
+                        aria-label="Previous beat"
+                      >
+                        <Icon boxSize={3.5}>
+                          <ArrowLeft />
+                        </Icon>
+                        <Text>Back</Text>
+                      </Button>
+                      <Text aria-hidden color="fg.subtle">
+                        •
+                      </Text>
+                    </>
+                  )}
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    colorPalette="gray"
+                    onClick={replayStage}
+                    aria-label="Replay this beat"
+                  >
+                    <Icon boxSize={3.5}>
+                      <RotateCcw />
+                    </Icon>
+                    <Text>Replay</Text>
+                  </Button>
+                  <Text aria-hidden color="fg.subtle">
+                    •
+                  </Text>
+                </>
+              )}
+              {/* Stage-level "advance" CTA used to live here as a quiet
                 ghost button. It's been promoted into a solid primary
                 button above the footer so the next action is
                 actually obvious — the footer is now reserved for
                 secondary affordances (Back / Replay / Docs / Skip)
                 only. */}
-            {!isReturningWelcome && (
-              <>
-                <Link
-                  href="https://docs.langwatch.ai/integration/overview"
-                  isExternal
-                  _hover={{ color: "fg" }}
-                >
-                  <HStack gap={1.5}>
-                    <Icon boxSize={3.5}>
-                      <BookOpen />
-                    </Icon>
-                    <Text>Integration overview</Text>
-                  </HStack>
-                </Link>
-                <Text aria-hidden color="fg.subtle">
-                  •
-                </Text>
-              </>
-            )}
-            <Button
-              variant="plain"
-              size="xs"
-              color="fg.muted"
-              onClick={handleHideForNow}
-              padding={0}
-              minHeight="auto"
-              _hover={{ color: "fg" }}
-            >
-              <Text>Skip for now</Text>
-              <Kbd>{SKIP_KEY}</Kbd>
-            </Button>
-            {/* No "watch the tour again" inline at outro — the toolbar's
+              {!isReturningWelcome && (
+                <>
+                  <Link
+                    href="https://docs.langwatch.ai/integration/overview"
+                    isExternal
+                    _hover={{ color: "fg" }}
+                  >
+                    <HStack gap={1.5}>
+                      <Icon boxSize={3.5}>
+                        <BookOpen />
+                      </Icon>
+                      <Text>Integration overview</Text>
+                    </HStack>
+                  </Link>
+                  <Text aria-hidden color="fg.subtle">
+                    •
+                  </Text>
+                </>
+              )}
+              <Button
+                variant="plain"
+                size="xs"
+                color="fg.muted"
+                onClick={handleHideForNow}
+                padding={0}
+                minHeight="auto"
+                _hover={{ color: "fg" }}
+              >
+                <Text>Skip for now</Text>
+                <Kbd>{SKIP_KEY}</Kbd>
+              </Button>
+              {/* No "watch the tour again" inline at outro — the toolbar's
                 Tour button (binoculars) is the canonical re-entry point.
                 Keeping a second copy here was redundant and made the
                 outro footer feel cluttered. */}
-          </HStack>
-        </motion.div>
+            </HStack>
+          </motion.div>
         )}
 
         {/* Chapter progress strip — sits at the bottom of the hero

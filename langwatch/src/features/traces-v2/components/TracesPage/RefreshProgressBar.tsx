@@ -1,5 +1,7 @@
 import { motion } from "motion/react";
 import type React from "react";
+import { useEffect } from "react";
+import { useTraceListRefresh } from "../../hooks/useTraceListRefresh";
 import { useRefreshUIStore } from "../../stores/refreshUIStore";
 import { AuroraSvg } from "./AuroraSvg";
 
@@ -14,8 +16,30 @@ interface RefreshProgressBarProps {
 export const RefreshProgressBar: React.FC<RefreshProgressBarProps> = ({
   forceVisible,
 }) => {
-  const isRefreshing = useRefreshUIStore((s) => s.isRefreshing);
-  const active = forceVisible ?? isRefreshing;
+  // Two sources, OR-ed:
+  //  - pulse: short fixed-duration flash for arrival moments that don't
+  //    kick a fetch (0→N new-trace transition, view switches).
+  //  - requested && fetching: an in-flight refetch, but ONLY when the
+  //    operator explicitly asked for it (refresh button, "N new" pill,
+  //    tab return). Keying off raw isFetching played the full aurora on
+  //    every SSE-invalidated background refetch — each arriving span or
+  //    trace update swept the table even though nothing the user asked
+  //    for was happening. Background updates keep their subtle per-row
+  //    pulse (rowPulseStore) as the signal instead.
+  const pulsed = useRefreshUIStore((s) => s.isRefreshing);
+  const requested = useRefreshUIStore((s) => s.refreshRequested);
+  const observeFetching = useRefreshUIStore((s) => s.observeFetching);
+  const { isRefreshing: fetching } = useTraceListRefresh();
+  // Pipe the live isFetching signal into the store; the request/settle
+  // lifecycle (including the saw-a-fetch latch) lives in the store
+  // action, not here. `requested` is a dependency so a request that
+  // arrives while a fetch is ALREADY in flight still registers it —
+  // keyed on `fetching` alone, the latch would miss that fetch and
+  // only clear via the safety timeout.
+  useEffect(() => {
+    observeFetching(fetching);
+  }, [fetching, requested, observeFetching]);
+  const active = forceVisible || pulsed || requested;
   if (!active) return null;
 
   return (

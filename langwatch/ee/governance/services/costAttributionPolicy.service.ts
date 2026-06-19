@@ -16,9 +16,9 @@
  * Gateway / virtual-key usage never reaches this path (it routes through a key
  * the customer pays per token) and is always billed.
  *
- * Per-(org, sourceType) results are cached in-process for 30s, mirroring
- * GovernanceContentStripService. The ingest path is bursty, so a brief window
- * sharply cuts Prisma load while keeping an admin's flip visible within ~30s.
+ * Per-(org, sourceType) results are cached in-process for 30s. The ingest path
+ * is bursty, so a brief window sharply cuts Prisma load while keeping an admin's
+ * flip visible within ~30s.
  */
 import type { PrismaClient } from "@prisma/client";
 

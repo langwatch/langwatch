@@ -17,12 +17,14 @@ import {
   type NodeProps,
   NodeToolbar,
   Position,
+  useUpdateNodeInternals,
 } from "@xyflow/react";
-import React, { forwardRef, type Ref, useMemo } from "react";
+import React, { forwardRef, type Ref, useEffect, useMemo } from "react";
 import { useDragLayer } from "react-dnd";
 import {
   Check,
   Copy,
+  MinusCircle,
   MoreHorizontal,
   Play,
   Square,
@@ -32,13 +34,12 @@ import {
 import { PulseLoader } from "react-spinners";
 import { useDebounceValue } from "usehooks-ts";
 import { useShallow } from "zustand/react/shallow";
-import { useWizardContext } from "../../../components/evaluations/wizard/hooks/useWizardContext";
 import { LLMModelDisplay } from "../../../components/llmPromptConfigs/LLMModelDisplay";
 import { useColorModeValue } from "../../../components/ui/color-mode";
 import { Menu } from "../../../components/ui/menu";
 import { Tooltip } from "../../../components/ui/tooltip";
 import { useComponentExecution } from "../../hooks/useComponentExecution";
-import { useWorkflowExecution } from "../../hooks/useWorkflowExecution";
+import { useRunUntilHereDialogStore } from "../../hooks/useRunUntilHereDialogStore";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import type {
   Component,
@@ -46,6 +47,11 @@ import type {
   Field,
   LLMConfig,
 } from "../../types/dsl";
+import {
+  GATE_FIELD,
+  GATE_HANDLE_ID,
+  showsTemporaryGate,
+} from "../../utils/controlFlow";
 import { checkIsEvaluator } from "../../utils/nodeUtils";
 import { hasUnsavedChanges } from "../../utils/unsavedChanges";
 import { ComponentIcon } from "../ColorfulBlockIcons";
@@ -60,11 +66,14 @@ function NodeInputs({
   namespace,
   inputs,
   selected,
+  showGateDropTarget,
 }: {
   node?: Node<Component>;
   namespace: string;
   inputs: Field[];
   selected: boolean;
+  /** Show the temporary green "gate" drop row while a branch is dragged. */
+  showGateDropTarget?: boolean;
 }) {
   return (
     <>
@@ -97,15 +106,40 @@ function NodeInputs({
           <Text color="fg.subtle">:</Text>
           <TypeLabel type={input.type} />
           <Spacer />
-          {input.optional &&
-            (!node ||
-              node.type !== "end" ||
-              (input.identifier !== "score" &&
-                input.identifier !== "passed")) && (
-              <Text color="fg.subtle">(optional)</Text>
-            )}
+          {input.optional && <Text color="fg.subtle">(optional)</Text>}
         </HStack>
       ))}
+      {showGateDropTarget && (
+        <HStack
+          key="__branch_gate__"
+          gap={1}
+          paddingX={2}
+          paddingY={1}
+          background="green.50"
+          borderRadius="8px"
+          width="full"
+          position="relative"
+          data-testid="branch-gate-drop-target"
+        >
+          <Handle
+            type="target"
+            id={`${namespace}.${GATE_FIELD}`}
+            position={Position.Left}
+            style={{
+              marginLeft: "-10px",
+              width: "9px",
+              height: "9px",
+              background: "var(--chakra-colors-bg)",
+              borderRadius: "100%",
+              border: "1px solid #22C55E",
+              boxShadow: "0px 0px 4px 0px #22C55E",
+            }}
+          />
+          <Text color="green.fg">{GATE_FIELD}</Text>
+          <Text color="green.fg">:</Text>
+          <TypeLabel type="bool" />
+        </HStack>
+      )}
     </>
   );
 }
@@ -215,6 +249,8 @@ export const ComponentNode = forwardRef(function ComponentNode(
     setPropertiesExpanded,
     deleteNode,
     duplicateNode,
+    branchConnectionInProgress,
+    branchConnectionSourceId,
   } = useWorkflowStore(
     useShallow(
       ({
@@ -226,6 +262,8 @@ export const ComponentNode = forwardRef(function ComponentNode(
         setNodes,
         deleteNode,
         duplicateNode,
+        branchConnectionInProgress,
+        branchConnectionSourceId,
       }) => ({
         node: nodes.find((node) => node.id === props.id),
         hoveredNodeId,
@@ -235,10 +273,26 @@ export const ComponentNode = forwardRef(function ComponentNode(
         setNodes,
         deleteNode,
         duplicateNode,
+        branchConnectionInProgress,
+        branchConnectionSourceId,
       }),
     ),
   );
   const isHovered = hoveredNodeId === props.id;
+
+  // While an If/Else branch is dragged, every connectable node without a gate
+  // input grows a temporary green "gate" drop row. Re-register handles with
+  // React Flow whenever that row appears/disappears so the drop target is live.
+  const showGateDropTarget =
+    branchConnectionInProgress &&
+    showsTemporaryGate({
+      node: { id: props.id, type: props.type, data: props.data },
+      sourceId: branchConnectionSourceId,
+    });
+  const updateNodeInternals = useUpdateNodeInternals();
+  useEffect(() => {
+    updateNodeInternals(props.id);
+  }, [props.id, showGateDropTarget, updateNodeInternals]);
 
   const { isDragging, item } = useDragLayer((monitor) => ({
     item: monitor.getItem(),
@@ -259,8 +313,6 @@ export const ComponentNode = forwardRef(function ComponentNode(
 
   const llmParams =
     props.data.parameters?.filter((p) => p.type === "llm") ?? [];
-
-  const { isInsideWizard } = useWizardContext();
 
   const nodeShadow = useColorModeValue(
     `0px 0px 4px 0px rgba(0, 0, 0, ${isHovered ? "0.2" : "0.1"})`,
@@ -299,45 +351,43 @@ export const ComponentNode = forwardRef(function ComponentNode(
         }
       }}
     >
-      {props.selected &&
-        !["entry", "end"].includes(props.type) &&
-        !isInsideWizard && (
-          <Menu.Root positioning={{ placement: "top-start" }}>
-            <Menu.Trigger asChild>
-              <Button
-                background="bg"
-                position="absolute"
-                top="-28px"
-                right={1}
-                paddingX={1}
-                paddingY={1}
-                borderRadius={6}
-                minWidth="auto"
-                minHeight="auto"
-                boxShadow="sm"
-                width="auto"
-                height="auto"
+      {props.selected && !["entry", "end"].includes(props.type) && (
+        <Menu.Root positioning={{ placement: "top-start" }}>
+          <Menu.Trigger asChild>
+            <Button
+              background="bg"
+              position="absolute"
+              top="-28px"
+              right={1}
+              paddingX={1}
+              paddingY={1}
+              borderRadius={6}
+              minWidth="auto"
+              minHeight="auto"
+              boxShadow="sm"
+              width="auto"
+              height="auto"
+            >
+              <MoreHorizontal size={11} />
+            </Button>
+          </Menu.Trigger>
+          <NodeToolbar>
+            <Menu.Content>
+              <Menu.Item
+                value="duplicate"
+                onClick={() => duplicateNode(props.id)}
               >
-                <MoreHorizontal size={11} />
-              </Button>
-            </Menu.Trigger>
-            <NodeToolbar>
-              <Menu.Content>
-                <Menu.Item
-                  value="duplicate"
-                  onClick={() => duplicateNode(props.id)}
-                >
-                  <Copy size={14} />
-                  Duplicate
-                </Menu.Item>
-                <Menu.Item value="delete" onClick={() => deleteNode(props.id)}>
-                  <Trash2 size={14} />
-                  Delete
-                </Menu.Item>
-              </Menu.Content>
-            </NodeToolbar>
-          </Menu.Root>
-        )}
+                <Copy size={14} />
+                Duplicate
+              </Menu.Item>
+              <Menu.Item value="delete" onClick={() => deleteNode(props.id)}>
+                <Trash2 size={14} />
+                Delete
+              </Menu.Item>
+            </Menu.Content>
+          </NodeToolbar>
+        </Menu.Root>
+      )}
       <HStack gap={2} width="full">
         <ComponentIcon
           type={props.type as ComponentType}
@@ -357,16 +407,25 @@ export const ComponentNode = forwardRef(function ComponentNode(
           {getNodeDisplayName(props)}
         </Text>
         {hasUnsavedChanges(props.data) && (
-          <Tooltip content="Unsaved changes" positioning={{ placement: "top" }} openDelay={0} showArrow>
-            <Circle size="8px" bg="orange.solid" flexShrink={0} data-testid="unsaved-changes-indicator" />
+          <Tooltip
+            content="Unsaved changes"
+            positioning={{ placement: "top" }}
+            openDelay={0}
+            showArrow
+          >
+            <Circle
+              size="8px"
+              bg="orange.solid"
+              flexShrink={0}
+              data-testid="unsaved-changes-indicator"
+            />
           </Tooltip>
         )}
-        {node && isExecutableComponent(node) && !isInsideWizard ? (
+        {node && isExecutableComponent(node) ? (
           <ComponentExecutionButton
             node={node}
             marginRight="-6px"
             marginLeft="-4px"
-
           />
         ) : (
           <Box width="54px" />
@@ -387,14 +446,15 @@ export const ComponentNode = forwardRef(function ComponentNode(
             </HStack>
           </React.Fragment>
         ))}
-      {props.data.inputs && (
+      {(props.data.inputs || showGateDropTarget) && (
         <>
           <NodeSectionTitle>{props.inputsTitle ?? "Inputs"}</NodeSectionTitle>
           <NodeInputs
             node={node}
             namespace="inputs"
-            inputs={props.data.inputs}
+            inputs={props.data.inputs ?? []}
             selected={!!props.selected || isHovered}
+            showGateDropTarget={showGateDropTarget}
           />
         </>
       )}
@@ -427,7 +487,9 @@ export function ComponentExecutionButton({
   const { startComponentExecution, stopComponentExecution } =
     useComponentExecution();
 
-  const { startWorkflowExecution } = useWorkflowExecution();
+  const openRunUntilHereDialog = useRunUntilHereDialogStore(
+    (state) => state.open,
+  );
 
   const [isWaitingLong] = useDebounceValue(
     node?.data.execution_state?.status === "waiting",
@@ -501,6 +563,12 @@ export function ComponentExecutionButton({
             >
               <Check size={iconSize} />
             </Box>
+          ) : node?.data.execution_state?.status === "skipped" ? (
+            // The node sat behind a not-taken if/else branch - muted,
+            // not red: skipping is the gate doing its job.
+            <Box color="gray.400" data-testid="node-status-skipped">
+              <MinusCircle size={iconSize} />
+            </Box>
           ) : null}
         </Center>
       </Tooltip>
@@ -557,9 +625,7 @@ export function ComponentExecutionButton({
             </Menu.Item>
             <Menu.Item
               value="run-workflow"
-              onClick={() =>
-                node && startWorkflowExecution({ untilNodeId: node.id })
-              }
+              onClick={() => node && openRunUntilHereDialog(node.id)}
             >
               <Play size={14} />
               Run workflow until here

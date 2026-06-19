@@ -12,7 +12,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { AlertTriangle, ArrowLeft, Check, Sparkles } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { useModelProvidersSettings } from "../../hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -25,6 +25,7 @@ import {
   type GeneratedScenario,
 } from "./services/scenarioGeneration";
 import { getDefaultModelState } from "./utils/defaultModelState";
+import { consumeStoredPrompt } from "./services/scenarioPromptStorage";
 
 const logger = createLogger("langwatch:scenarios:ai-generation");
 
@@ -48,6 +49,14 @@ export type { GeneratedScenario } from "./services/scenarioGeneration";
 
 export function usePromptHistory() {
   const [history, setHistory] = useState<string[]>([]);
+
+  // On mount, check sessionStorage for a stored prompt from the AI Create Modal
+  useEffect(() => {
+    const storedPrompt = consumeStoredPrompt();
+    if (storedPrompt) {
+      setHistory([storedPrompt]);
+    }
+  }, []);
 
   const addPrompt = useCallback((prompt: string) => {
     setHistory((prev) => [...prev, prompt]);

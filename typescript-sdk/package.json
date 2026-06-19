@@ -1,6 +1,6 @@
 {
   "name": "langwatch",
-  "version": "0.32.0",
+  "version": "0.33.2",
   "description": "LangWatch TypeScript/JavaScript SDK. Interact with the full LangWatch API and use the LangWatch OpenTelemetry SDK to instrument your application. For more information, see https://docs.langwatch.ai/integration/typescript/guide",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -78,7 +78,7 @@
     "@vercel/otel": "^1.13.0",
     "@vitest/coverage-v8": "^4.1.0",
     "dotenv-cli": "^11.0.0",
-    "esbuild": "^0.27.3",
+    "esbuild": "^0.28.1",
     "eslint": "^9.32.0",
     "fets": "^0.8.5",
     "fishery": "^2.3.1",
@@ -177,10 +177,12 @@
       "@langchain/core@<0.3.80": "0.3.80",
       "langsmith@<0.6.0": "0.6.0",
       "protobufjs@<7.5.6": ">=7.5.6",
-      "protobufjs@>=8.0.0 <8.2.0": ">=8.2.0",
+      "protobufjs@>=8.0.0 <8.6.0": ">=8.6.0",
       "uuid@<11.1.1": ">=11.1.1 <12",
       "postcss@<8.5.10": ">=8.5.10",
-      "qs@>=6.11.1 <=6.15.1": ">=6.15.2"
+      "qs@>=6.11.1 <=6.15.1": ">=6.15.2",
+      "esbuild@<0.28.1": ">=0.28.1",
+      "vite@>=7.0.0 <7.3.5": ">=7.3.5 <8"
     }
   }
 }

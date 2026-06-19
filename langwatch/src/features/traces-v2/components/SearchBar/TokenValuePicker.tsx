@@ -3,11 +3,12 @@ import {
   Button,
   chakra,
   HStack,
+  Icon,
   Input,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { BookOpen, Check, Search } from "lucide-react";
+import { BookOpen, Check, Plus, Search } from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -72,11 +73,42 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
     );
     if (!cat || cat.kind !== "categorical") return [];
     const q = filter.trim().toLowerCase();
+    // Match against value AND label so typing the friendly name (e.g.
+    // "Faithfulness") finds the id-keyed row ("ragas/faithfulness") —
+    // mirrors the sidebar facet section's search behaviour.
     const filtered = q
-      ? cat.topValues.filter((v) => v.value.toLowerCase().includes(q))
+      ? cat.topValues.filter(
+          (v) =>
+            v.value.toLowerCase().includes(q) ||
+            (v.label?.toLowerCase().includes(q) ?? false),
+        )
       : cat.topValues;
     return filtered.slice(0, MAX_VALUES_PER_PAGE);
   }, [facets, anchor, filter]);
+
+  // "Use <typed> as a new value" CTA — surfaced when the user has
+  // typed something that doesn't exactly match a known value's id.
+  // Commits whatever was typed verbatim (the query language is
+  // ID-rooted; the operator is telling us they know the id is rare
+  // / new / not yet ingested). Trimmed of surrounding whitespace.
+  const trimmedFilter = filter.trim();
+  const exactValueMatch = values.some((v) => {
+    const lower = trimmedFilter.toLowerCase();
+    return (
+      v.value.toLowerCase() === lower ||
+      // The picker now resolves by id AND label, so an exact label hit
+      // (e.g. typing "Faithfulness" against an evaluator whose id is a
+      // hash) must also suppress the "use as new value" custom row.
+      (v.label !== undefined && v.label.toLowerCase() === lower)
+    );
+  });
+  const customValue =
+    trimmedFilter.length > 0 && !exactValueMatch ? trimmedFilter : null;
+  // Total interactive rows for keyboard navigation: known values
+  // followed by the optional custom-value row at the end.
+  const interactiveRowCount = values.length + (customValue ? 1 : 0);
+  const isCustomRowActive =
+    customValue !== null && activeIndex === values.length;
 
   // Click-outside dismisses the popover. Listen on `mousedown` so the
   // dismiss fires before any subsequent click logic somewhere else.
@@ -84,7 +116,11 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
     if (!anchor) return;
     const handler = (e: MouseEvent) => {
       const target = e.target as Node | null;
-      if (containerRef.current && target && containerRef.current.contains(target)) {
+      if (
+        containerRef.current &&
+        target &&
+        containerRef.current.contains(target)
+      ) {
         return;
       }
       onClose();
@@ -115,7 +151,7 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
       if (e.key === "ArrowDown") {
         e.preventDefault();
         e.stopPropagation();
-        setActiveIndex((i) => Math.min(i + 1, values.length - 1));
+        setActiveIndex((i) => Math.min(i + 1, interactiveRowCount - 1));
         return;
       }
       if (e.key === "ArrowUp") {
@@ -127,16 +163,40 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
       if (e.key === "Enter") {
         e.preventDefault();
         e.stopPropagation();
+        // Custom row → commit the typed text verbatim. Known row →
+        // commit its id.
+        if (isCustomRowActive && customValue) {
+          setFacetValueAt(
+            anchor.location.start,
+            anchor.location.end,
+            customValue,
+          );
+          onClose();
+          return;
+        }
         const next = values[activeIndex];
         if (next) {
-          setFacetValueAt(anchor.location.start, anchor.location.end, next.value);
+          setFacetValueAt(
+            anchor.location.start,
+            anchor.location.end,
+            next.value,
+          );
           onClose();
         }
       }
     };
     node.addEventListener("keydown", handler);
     return () => node.removeEventListener("keydown", handler);
-  }, [anchor, values, activeIndex, onClose, setFacetValueAt]);
+  }, [
+    anchor,
+    values,
+    activeIndex,
+    onClose,
+    setFacetValueAt,
+    interactiveRowCount,
+    isCustomRowActive,
+    customValue,
+  ]);
 
   if (!anchor) return null;
   if (typeof document === "undefined") return null;
@@ -209,17 +269,93 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
           />
         </HStack>
         <VStack gap={0} align="stretch" maxHeight="320px" overflowY="auto">
-          {values.length === 0 ? (
+          {values.length === 0 && !customValue ? (
             <Text textStyle="2xs" color="fg.subtle" paddingX={3} paddingY={3}>
               No values match
             </Text>
           ) : (
-            values.map((v, i) => {
-              const isActive = i === activeIndex;
-              const isCurrent = v.value === anchor.currentValue;
-              return (
+            <>
+              {values.map((v, i) => {
+                const isActive = i === activeIndex;
+                const isCurrent = v.value === anchor.currentValue;
+                // Display name when the resolver emitted one and it
+                // differs from the raw id; muted id rendered on the
+                // right so the operator always sees what they're
+                // about to commit.
+                const displayLabel =
+                  v.label && v.label !== v.value ? v.label : null;
+                return (
+                  <chakra.button
+                    key={v.value}
+                    type="button"
+                    display="flex"
+                    alignItems="center"
+                    justifyContent="space-between"
+                    width="full"
+                    paddingX={3}
+                    paddingY={1.5}
+                    textAlign="left"
+                    bg={isActive ? "blue.solid/12" : "transparent"}
+                    color="fg"
+                    cursor="pointer"
+                    _hover={{ bg: "blue.solid/8" }}
+                    onMouseEnter={() => setActiveIndex(i)}
+                    onClick={() => {
+                      setFacetValueAt(
+                        anchor.location.start,
+                        anchor.location.end,
+                        v.value,
+                      );
+                      onClose();
+                    }}
+                  >
+                    <HStack gap={2} minWidth={0} flex={1}>
+                      <Text textStyle="xs" flexShrink={0}>
+                        <Text as="span" color="fg.muted">
+                          {anchor.field}
+                        </Text>
+                        <Text as="span" color="fg.muted">
+                          :
+                        </Text>
+                        <Text
+                          as="span"
+                          color={isCurrent ? "blue.fg" : "fg"}
+                          fontWeight={isCurrent ? "600" : "medium"}
+                        >
+                          {displayLabel ?? v.value}
+                        </Text>
+                      </Text>
+                      {displayLabel && (
+                        <Text
+                          textStyle="2xs"
+                          color="fg.subtle"
+                          fontFamily="mono"
+                          truncate
+                          minWidth={0}
+                          flexShrink={1}
+                        >
+                          {v.value}
+                        </Text>
+                      )}
+                      {isCurrent && (
+                        <Check size={12} color="var(--chakra-colors-blue-fg)" />
+                      )}
+                    </HStack>
+                    <Text textStyle="2xs" color="fg.subtle" marginLeft={2}>
+                      {v.count.toLocaleString()}
+                    </Text>
+                  </chakra.button>
+                );
+              })}
+              {customValue && (
+                // Custom-value row — committed verbatim as the field's
+                // value. Surfaced when the typed text doesn't match a
+                // known id; the operator is telling us they know
+                // exactly which id they want (rare value, new
+                // evaluator, paste from a log). Renders below the
+                // known values so it never displaces a top-N match.
                 <chakra.button
-                  key={v.value}
+                  key="__custom__"
                   type="button"
                   display="flex"
                   alignItems="center"
@@ -228,53 +364,41 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
                   paddingX={3}
                   paddingY={1.5}
                   textAlign="left"
-                  bg={isActive ? "blue.solid/12" : "transparent"}
+                  bg={isCustomRowActive ? "blue.solid/12" : "transparent"}
                   color="fg"
                   cursor="pointer"
+                  borderTopWidth={values.length > 0 ? "1px" : undefined}
+                  borderTopColor="border.subtle"
                   _hover={{ bg: "blue.solid/8" }}
-                  onMouseEnter={() => setActiveIndex(i)}
+                  onMouseEnter={() => setActiveIndex(values.length)}
                   onClick={() => {
                     setFacetValueAt(
                       anchor.location.start,
                       anchor.location.end,
-                      v.value,
+                      customValue,
                     );
                     onClose();
                   }}
                 >
                   <HStack gap={2} minWidth={0} flex={1}>
+                    <Icon as={Plus} boxSize={3} color="fg.subtle" />
                     <Text textStyle="xs" flexShrink={0}>
                       <Text as="span" color="fg.muted">
-                        {anchor.field}
-                      </Text>
-                      <Text as="span" color="fg.muted">
-                        :
+                        Use as {anchor.field}:
                       </Text>
                       <Text
                         as="span"
-                        color={isCurrent ? "blue.fg" : "fg"}
-                        fontWeight={isCurrent ? "600" : "medium"}
+                        color="fg"
+                        fontWeight="medium"
+                        fontFamily="mono"
                       >
-                        {v.value}
+                        {customValue}
                       </Text>
                     </Text>
-                    {isCurrent && (
-                      <Check
-                        size={12}
-                        color="var(--chakra-colors-blue-fg)"
-                      />
-                    )}
                   </HStack>
-                  <Text
-                    textStyle="2xs"
-                    color="fg.subtle"
-                    marginLeft={2}
-                  >
-                    {v.count.toLocaleString()}
-                  </Text>
                 </chakra.button>
-              );
-            })
+              )}
+            </>
           )}
         </VStack>
         <HStack

@@ -234,6 +234,15 @@ describe("PromptMessagesField", () => {
       expect(screen.getByTestId("editing-mode-messages")).toBeInTheDocument();
     });
 
+    /** @scenario The mode title reads as clickable without hovering */
+    it("shows the chevron next to the title without hovering", () => {
+      renderComponent();
+
+      const chevron = screen.getByTestId("editing-mode-chevron");
+      expect(chevron).toBeInTheDocument();
+      expect(window.getComputedStyle(chevron).opacity).not.toBe("0");
+    });
+
     it("switches to Messages mode when Messages option is clicked", async () => {
       const user = userEvent.setup();
       renderComponent();

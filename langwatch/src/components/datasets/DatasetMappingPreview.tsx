@@ -1,4 +1,3 @@
-import type { CustomCellRendererProps } from "@ag-grid-community/react";
 import {
   Badge,
   Box,
@@ -30,11 +29,7 @@ import {
   type ThreadMappingState,
 } from "../traces/ThreadMapping";
 import { TracesMapping } from "../traces/TracesMapping";
-import {
-  type DatasetColumnDef,
-  DatasetGrid,
-  HeaderCheckboxComponent,
-} from "./DatasetGrid";
+import { DatasetPreviewTable } from "./editor/DatasetPreviewTable";
 
 interface DatasetMappingPreviewProps {
   traces: Trace[]; // Replace 'any' with your trace type
@@ -45,6 +40,8 @@ interface DatasetMappingPreviewProps {
   onRowDataChange: (entries: DatasetRecordEntry[]) => void;
   paragraph?: string;
   setDatasetTriggerMapping?: (mapping: MappingState) => void;
+  /** Portal target for the floating cell editor when hosted in a drawer. */
+  editorPortalRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 /**
@@ -60,11 +57,19 @@ export function DatasetMappingPreview({
   paragraph,
   selectedDataset,
   setDatasetTriggerMapping,
+  editorPortalRef,
 }: DatasetMappingPreviewProps) {
   const [isThreadMapping, setIsThreadMapping] = useState(false);
   const [, setThreadMappingState] = useState<ThreadMappingState>();
 
   const { project } = useOrganizationTeamProject();
+
+  // The preview table's row contract is `isSelected`; entry rows keep the
+  // wider `selected` field consumed by the add-to-dataset submit filter.
+  const previewRows = useMemo(
+    () => rowData.map((row) => ({ ...row, isSelected: !!row.selected })),
+    [rowData],
+  );
 
   // Extract thread_ids from traces
   const threadIds = useMemo(() => {
@@ -93,50 +98,6 @@ export function DatasetMappingPreview({
     }
     return traces;
   }, [isThreadMapping, threadTraces.data, traces]);
-
-  const columnDefs = useMemo(() => {
-    if (!selectedDataset) {
-      return [];
-    }
-
-    const headers: DatasetColumnDef[] = (
-      (selectedDataset.columnTypes as DatasetColumns) ?? []
-    ).map(({ name, type }) => ({
-      headerName: name,
-      field: name,
-      type_: type,
-      cellClass: "v-align",
-      sortable: false,
-      minWidth: ["trace_id", "total_cost"].includes(name)
-        ? 120
-        : ["timestamp"].includes(name)
-          ? 160
-          : 200,
-    }));
-
-    // Add row number column
-    headers.unshift({
-      headerName: " ",
-      field: "selected",
-      type_: "boolean",
-      width: 46,
-      pinned: "left",
-      sortable: false,
-      filter: false,
-      enableCellChangeFlash: false,
-      headerComponent: HeaderCheckboxComponent,
-      cellRenderer: (props: CustomCellRendererProps) => (
-        <Checkbox
-          marginLeft="3px"
-          {...props}
-          checked={props.value}
-          onChange={(e) => props.setValue?.(e.target.checked)}
-        />
-      ),
-    });
-
-    return headers;
-  }, [selectedDataset]);
 
   const trpc = api.useContext();
   const updateStoredMapping_ = api.dataset.updateMapping.useMutation();
@@ -228,7 +189,10 @@ export function DatasetMappingPreview({
           >
             <Box
               as="button"
-              onClick={(e: React.MouseEvent) => { e.preventDefault(); setIsThreadMapping(false); }}
+              onClick={(e: React.MouseEvent) => {
+                e.preventDefault();
+                setIsThreadMapping(false);
+              }}
               bg={!isThreadMapping ? "white" : "transparent"}
               _dark={{
                 bg: !isThreadMapping ? "gray.700" : "transparent",
@@ -247,7 +211,10 @@ export function DatasetMappingPreview({
             </Box>
             <Box
               as="button"
-              onClick={(e: React.MouseEvent) => { e.preventDefault(); setIsThreadMapping(true); }}
+              onClick={(e: React.MouseEvent) => {
+                e.preventDefault();
+                setIsThreadMapping(true);
+              }}
               bg={isThreadMapping ? "white" : "transparent"}
               _dark={{
                 bg: isThreadMapping ? "gray.700" : "transparent",
@@ -323,7 +290,7 @@ export function DatasetMappingPreview({
               <Field.HelperText margin={0} fontSize="13px">
                 {paragraph
                   ? paragraph
-                  : "Those are the rows that are going to be added, double click on the cell to edit them"}
+                  : "Those are the rows that are going to be added, double click a cell to edit it"}
               </Field.HelperText>
             </VStack>
             <Spacer />
@@ -347,18 +314,36 @@ export function DatasetMappingPreview({
                 console.error(error);
               }}
             >
-              <DatasetGrid
-                columnDefs={columnDefs}
-                rowData={rowData}
-                onCellValueChanged={({
-                  data,
-                }: {
-                  data: DatasetRecordEntry;
-                }) => {
+              <DatasetPreviewTable
+                rows={previewRows}
+                columns={(selectedDataset.columnTypes as DatasetColumns) ?? []}
+                maxColumns={50}
+                maxHeight="400px"
+                isSelectable
+                onToggleRow={(rowIndex, isSelected) => {
                   onRowDataChange(
-                    rowData.map((row) => (row.id === data.id ? data : row)),
+                    rowData.map((row, index) =>
+                      index === rowIndex
+                        ? { ...row, selected: isSelected }
+                        : row,
+                    ),
                   );
                 }}
+                onToggleAll={(isSelected) => {
+                  onRowDataChange(
+                    rowData.map((row) => ({ ...row, selected: isSelected })),
+                  );
+                }}
+                onCellEdit={(rowIndex, columnName, value) => {
+                  onRowDataChange(
+                    rowData.map((row, index) =>
+                      index === rowIndex
+                        ? { ...row, [columnName]: value }
+                        : row,
+                    ),
+                  );
+                }}
+                editorPortalRef={editorPortalRef}
               />
             </ErrorBoundary>
           </Box>

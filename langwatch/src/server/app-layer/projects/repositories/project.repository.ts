@@ -1,4 +1,4 @@
-import type { Project, PIIRedactionLevel, ProjectSensitiveDataVisibilityLevel, Team } from "@prisma/client";
+import type { Project, Team } from "@prisma/client";
 
 export type ProjectWithTeam = Project & { team: Team };
 
@@ -15,9 +15,6 @@ export interface CreateProjectInput {
   framework: string;
   teamId: string;
   apiKey: string;
-  piiRedactionLevel: PIIRedactionLevel;
-  capturedInputVisibility: ProjectSensitiveDataVisibilityLevel;
-  capturedOutputVisibility: ProjectSensitiveDataVisibilityLevel;
 }
 
 export interface CreateTeamWithBindingInput {
@@ -33,7 +30,6 @@ export interface UpdateProjectInput {
   name?: string;
   language?: string;
   framework?: string;
-  piiRedactionLevel?: PIIRedactionLevel;
   teamId?: string;
 }
 
@@ -80,18 +76,41 @@ export interface ProjectRepository {
     limit?: number;
   }): Promise<SearchProjectsResult[]>;
   create(data: CreateProjectInput): Promise<Project>;
-  update(params: { id: string; organizationId: string; data: UpdateProjectInput }): Promise<Project | null>;
-  archive(params: { id: string; organizationId: string }): Promise<Project | null>;
+  update(params: {
+    id: string;
+    organizationId: string;
+    data: UpdateProjectInput;
+  }): Promise<Project | null>;
+  archive(params: {
+    id: string;
+    organizationId: string;
+  }): Promise<Project | null>;
   findAllByOrganization(params: {
     organizationId: string;
     page: number;
     limit: number;
   }): Promise<PaginatedResult<Project>>;
-  findBySlugInTeam(params: { slug: string; teamId: string }): Promise<Project | null>;
-  teamBelongsToOrganization(params: { teamId: string; organizationId: string }): Promise<boolean>;
-  findActiveTeamInOrganization(params: { teamId: string; organizationId: string }): Promise<{ id: string } | null>;
-  createTeamWithRoleBinding(input: CreateTeamWithBindingInput): Promise<{ id: string }>;
-  createTeam(input: { teamId: string; teamName: string; teamSlug: string; organizationId: string }): Promise<{ id: string }>;
+  findBySlugInTeam(params: {
+    slug: string;
+    teamId: string;
+  }): Promise<Project | null>;
+  teamBelongsToOrganization(params: {
+    teamId: string;
+    organizationId: string;
+  }): Promise<boolean>;
+  findActiveTeamInOrganization(params: {
+    teamId: string;
+    organizationId: string;
+  }): Promise<{ id: string } | null>;
+  createTeamWithRoleBinding(
+    input: CreateTeamWithBindingInput,
+  ): Promise<{ id: string }>;
+  createTeam(input: {
+    teamId: string;
+    teamName: string;
+    teamSlug: string;
+    organizationId: string;
+  }): Promise<{ id: string }>;
 }
 
 export class NullProjectRepository implements ProjectRepository {
@@ -127,11 +146,18 @@ export class NullProjectRepository implements ProjectRepository {
     throw new Error("NullProjectRepository.create not implemented");
   }
 
-  async update(_params: { id: string; organizationId: string; data: UpdateProjectInput }): Promise<Project | null> {
+  async update(_params: {
+    id: string;
+    organizationId: string;
+    data: UpdateProjectInput;
+  }): Promise<Project | null> {
     return null;
   }
 
-  async archive(_params: { id: string; organizationId: string }): Promise<Project | null> {
+  async archive(_params: {
+    id: string;
+    organizationId: string;
+  }): Promise<Project | null> {
     return null;
   }
 
@@ -143,23 +169,41 @@ export class NullProjectRepository implements ProjectRepository {
     return { data: [], pagination: { page: 1, limit: 50, total: 0 } };
   }
 
-  async findBySlugInTeam(_params: { slug: string; teamId: string }): Promise<Project | null> {
+  async findBySlugInTeam(_params: {
+    slug: string;
+    teamId: string;
+  }): Promise<Project | null> {
     return null;
   }
 
-  async teamBelongsToOrganization(_params: { teamId: string; organizationId: string }): Promise<boolean> {
+  async teamBelongsToOrganization(_params: {
+    teamId: string;
+    organizationId: string;
+  }): Promise<boolean> {
     return false;
   }
 
-  async findActiveTeamInOrganization(_params: { teamId: string; organizationId: string }): Promise<{ id: string } | null> {
+  async findActiveTeamInOrganization(_params: {
+    teamId: string;
+    organizationId: string;
+  }): Promise<{ id: string } | null> {
     return null;
   }
 
-  async createTeamWithRoleBinding(_input: CreateTeamWithBindingInput): Promise<{ id: string }> {
-    throw new Error("NullProjectRepository.createTeamWithRoleBinding not implemented");
+  async createTeamWithRoleBinding(
+    _input: CreateTeamWithBindingInput,
+  ): Promise<{ id: string }> {
+    throw new Error(
+      "NullProjectRepository.createTeamWithRoleBinding not implemented",
+    );
   }
 
-  async createTeam(_input: { teamId: string; teamName: string; teamSlug: string; organizationId: string }): Promise<{ id: string }> {
+  async createTeam(_input: {
+    teamId: string;
+    teamName: string;
+    teamSlug: string;
+    organizationId: string;
+  }): Promise<{ id: string }> {
     throw new Error("NullProjectRepository.createTeam not implemented");
   }
 }

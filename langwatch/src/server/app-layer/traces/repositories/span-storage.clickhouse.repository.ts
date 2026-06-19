@@ -1,8 +1,11 @@
+import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
+import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import {
+  type NormalizedAttributes,
   type NormalizedSpan,
   NormalizedSpanKind,
   NormalizedStatusCode,
@@ -15,6 +18,8 @@ import { createLogger } from "~/utils/logger/server";
 import type { SpanInsertData } from "../types";
 import type {
   LangwatchSignalBucket,
+  ModelSpanSampleRow,
+  ModelUsageStatsRow,
   OccurredAtHint,
   SpanLangwatchSignalsRow,
   SpanResourceInfo,
@@ -167,9 +172,80 @@ const SUMMARY_SPAN_SELECT = `
   StatusCode,
   SpanAttributes['langwatch.span.type'] AS SpanType,
   SpanAttributes['gen_ai.request.model'] AS Model,
+  SpanAttributes['gen_ai.response.model'] AS ResponseModel,
   SpanAttributes['gen_ai.usage.cost'] AS Cost,
+  SpanAttributes['gen_ai.usage.input_tokens'] AS InputTokens,
+  SpanAttributes['gen_ai.usage.output_tokens'] AS OutputTokens,
+  SpanAttributes['gen_ai.usage.cache_read.input_tokens'] AS CacheReadTokens,
+  SpanAttributes['gen_ai.usage.cache_creation.input_tokens'] AS CacheCreationTokens,
+  SpanAttributes['langwatch.model.inputCostPerToken'] AS CustomInputRate,
+  SpanAttributes['langwatch.model.outputCostPerToken'] AS CustomOutputRate,
+  SpanAttributes['langwatch.model.cacheReadCostPerToken'] AS CustomCacheReadRate,
+  SpanAttributes['langwatch.model.cacheCreationCostPerToken'] AS CustomCacheCreationRate,
+  SpanAttributes['langwatch.span.cost'] AS LwSpanCost,
   toUnixTimestamp64Milli(StartTime) AS StartTimeMs
 `;
+
+/**
+ * Canonical model-name expression, response model wins over request model,
+ * mirroring `extractModel` in span.mapper.ts so the cost-rule preview sees
+ * the same model string the cost pipeline matches against. Map subscripts
+ * return '' for missing keys, hence the nullIf/coalesce dance.
+ */
+const MODEL_ATTR_SELECT = `coalesce(
+    nullIf(SpanAttributes['gen_ai.response.model'], ''),
+    SpanAttributes['gen_ai.request.model']
+  )`;
+
+/**
+ * How many recent candidate traces the model-cost sample read pulls from
+ * `trace_summaries` before scanning their spans. Large enough that per-model
+ * token-bearing samples reliably resolve, small enough that the `TraceId IN`
+ * set still prunes `stored_spans` granules hard.
+ */
+const SAMPLE_CANDIDATE_TRACE_POOL = 500;
+
+interface ModelSpanSampleQueryRow {
+  TraceId: string;
+  SpanId: string;
+  SpanName: string;
+  Model: string;
+  InputTokensRaw: string;
+  PromptTokensRaw: string;
+  OutputTokensRaw: string;
+  CompletionTokensRaw: string;
+  CacheReadTokensRaw: string;
+  CacheCreationTokensRaw: string;
+  StartTimeMs: number | string;
+}
+
+/** Map-subscript token values arrive as strings ('' when absent). */
+function tokenCount(...raws: string[]): number | null {
+  for (const raw of raws) {
+    if (raw === "") continue;
+    const num = Number(raw);
+    return Number.isFinite(num) ? num : null;
+  }
+  return null;
+}
+
+function mapModelSpanSampleRow(
+  row: ModelSpanSampleQueryRow,
+): ModelSpanSampleRow {
+  return {
+    traceId: row.TraceId,
+    spanId: row.SpanId,
+    spanName: row.SpanName,
+    model: row.Model,
+    // Canonical key first, legacy alias as fallback, same coalesce order
+    // as extractMetrics in span.mapper.ts.
+    inputTokens: tokenCount(row.InputTokensRaw, row.PromptTokensRaw),
+    outputTokens: tokenCount(row.OutputTokensRaw, row.CompletionTokensRaw),
+    cacheReadTokens: tokenCount(row.CacheReadTokensRaw),
+    cacheCreationTokens: tokenCount(row.CacheCreationTokensRaw),
+    startTimeMs: Number(row.StartTimeMs),
+  };
+}
 
 /**
  * IN-tuple dedup subquery body. Renders the inner `SELECT … GROUP BY` that
@@ -204,14 +280,13 @@ const SIGNAL_BUCKET_PREDICATES: Record<LangwatchSignalBucket, string> = {
   user: "arrayExists(k -> k = 'langwatch.user_id' OR startsWith(k, 'langwatch.user.'), keys)",
   thread:
     "arrayExists(k -> k = 'gen_ai.conversation.id' OR k = 'langgraph.thread_id' OR startsWith(k, 'langwatch.thread.'), keys)",
-  evaluation:
-    "arrayExists(k -> startsWith(k, 'langwatch.evaluation'), keys)",
+  evaluation: "arrayExists(k -> startsWith(k, 'langwatch.evaluation'), keys)",
   rag: "arrayExists(k -> startsWith(k, 'langwatch.rag.'), keys)",
   metadata: "arrayExists(k -> startsWith(k, 'langwatch.metadata.'), keys)",
   genai: "arrayExists(k -> startsWith(k, 'gen_ai.'), keys)",
 };
 
-interface SpanSummaryQueryRow {
+export interface SpanSummaryQueryRow {
   SpanId: string;
   ParentSpanId: string | null;
   SpanName: string;
@@ -219,19 +294,72 @@ interface SpanSummaryQueryRow {
   StatusCode: number | null;
   SpanType: string;
   Model: string;
-  // `SpanAttributes['gen_ai.usage.cost']` materialises as the raw map value;
-  // ClickHouse Map values are typed `String`, so the wire payload is the
-  // stringified number (or "" when absent). Parsed to a number in the
-  // mapper below.
+  ResponseModel: string;
+  // `SpanAttributes[...]` materialises as the raw map value; ClickHouse
+  // Map values are typed `String`, so each numeric attribute arrives as
+  // a stringified number (or "" when absent). Parsed in the mapper.
   Cost: string;
+  InputTokens: string;
+  OutputTokens: string;
+  CacheReadTokens: string;
+  CacheCreationTokens: string;
+  CustomInputRate: string;
+  CustomOutputRate: string;
+  CustomCacheReadRate: string;
+  CustomCacheCreationRate: string;
+  LwSpanCost: string;
   StartTimeMs: number;
 }
 
-function mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
-  // Cost arrives as a string (Map values are typed String in CH); empty
-  // means the span has no cost attribute, NaN means a malformed value.
-  // Either falls through to null so the renderer doesn't paint `$NaN`.
-  const costNum = row.Cost ? Number(row.Cost) : NaN;
+/** "" → null, malformed → null, otherwise the parsed number. */
+function attrNumber(raw: string): number | null {
+  if (!raw) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
+export function mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
+  const explicitCost = attrNumber(row.Cost);
+  const inputTokens = attrNumber(row.InputTokens);
+  const outputTokens = attrNumber(row.OutputTokens);
+  const cacheReadTokens = attrNumber(row.CacheReadTokens);
+  const cacheCreationTokens = attrNumber(row.CacheCreationTokens);
+
+  // Most ingest paths emit token counts but no `gen_ai.usage.cost` —
+  // trace-level cost is computed at fold time from tokens × pricing.
+  // Mirror that here so the waterfall can show a per-span cost: feed
+  // the same priority cascade (custom enrichment rates → static model
+  // registry → SDK span cost) with the attributes this summary query
+  // already selects.
+  // Some SDKs emit `gen_ai.usage.cost = 0` meaning "unknown" — treat any
+  // non-positive explicit cost as absent so the computed fallback runs.
+  let cost = explicitCost !== null && explicitCost > 0 ? explicitCost : null;
+  if (cost === null) {
+    const computed = computeSpanCost({
+      attrs: {
+        [ATTR_KEYS.GEN_AI_RESPONSE_MODEL]: row.ResponseModel || undefined,
+        [ATTR_KEYS.GEN_AI_REQUEST_MODEL]: row.Model || undefined,
+        [ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]:
+          row.CacheReadTokens || undefined,
+        [ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]:
+          row.CacheCreationTokens || undefined,
+        [ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN]:
+          row.CustomInputRate || undefined,
+        [ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN]:
+          row.CustomOutputRate || undefined,
+        [ATTR_KEYS.LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN]:
+          row.CustomCacheReadRate || undefined,
+        [ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN]:
+          row.CustomCacheCreationRate || undefined,
+        [ATTR_KEYS.LANGWATCH_SPAN_COST]: row.LwSpanCost || undefined,
+      } as NormalizedAttributes,
+      model: row.ResponseModel || row.Model || undefined,
+      promptTokens: inputTokens,
+      completionTokens: outputTokens,
+    });
+    cost = computed > 0 ? computed : null;
+  }
+
   return {
     spanId: row.SpanId,
     parentSpanId: row.ParentSpanId,
@@ -240,7 +368,11 @@ function mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
     statusCode: row.StatusCode,
     spanType: row.SpanType || null,
     model: row.Model || null,
-    cost: Number.isFinite(costNum) ? costNum : null,
+    cost,
+    inputTokens,
+    outputTokens,
+    cacheReadTokens,
+    cacheCreationTokens,
     startTimeMs: Number(row.StartTimeMs),
   };
 }
@@ -1492,6 +1624,142 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         return rows.map(mapSpanSummaryRow);
       },
     );
+  }
+
+  async findModelUsageStats({
+    tenantId,
+    fromMs,
+    limit,
+  }: {
+    tenantId: string;
+    fromMs: number;
+    limit: number;
+  }): Promise<ModelUsageStatsRow[]> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "SpanStorageClickHouseRepository.findModelUsageStats",
+    );
+
+    const client = await this.resolveClient(tenantId);
+    // Cross-trace scan bounded by the StartTime window (partition pruning)
+    // and reading only two Map subscripts, no heavy attribute values.
+    // `uniq` (approximate) instead of count() so ReplacingMergeTree row
+    // versions don't inflate the per-model span counts.
+    const result = await client.query({
+      query: `
+        SELECT
+          ${MODEL_ATTR_SELECT} AS Model,
+          uniq(TraceId, SpanId) AS SpanCount,
+          toUnixTimestamp64Milli(max(StartTime)) AS LastSeenMs
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND StartTime >= fromUnixTimestamp64Milli({fromMs:Int64})
+          AND Model != ''
+        GROUP BY Model
+        ORDER BY SpanCount DESC, Model ASC
+        LIMIT {limit:UInt32}
+      `,
+      query_params: { tenantId, fromMs, limit },
+      format: "JSONEachRow",
+    });
+
+    const rows = await result.json<{
+      Model: string;
+      SpanCount: number | string;
+      LastSeenMs: number | string;
+    }>();
+    return rows.map((row) => ({
+      model: row.Model,
+      spanCount: Number(row.SpanCount),
+      lastSeenMs: Number(row.LastSeenMs),
+    }));
+  }
+
+  async findRecentSpansByModels({
+    tenantId,
+    models,
+    fromMs,
+    perModelLimit,
+    limit,
+  }: {
+    tenantId: string;
+    models: string[];
+    fromMs: number;
+    perModelLimit: number;
+    limit: number;
+  }): Promise<ModelSpanSampleRow[]> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "SpanStorageClickHouseRepository.findRecentSpansByModels",
+    );
+    if (models.length === 0) return [];
+
+    const client = await this.resolveClient(tenantId);
+    // The `Model IN` filter is computed from the SpanAttributes map, so on its
+    // own this read decodes that heavy map for every span in the window just to
+    // evaluate the predicate. Instead, first narrow to the recent traces that
+    // use one of these models via `trace_summaries.Models` (a small, deduped,
+    // bloom-indexed Array(String) populated at fold time), then constrain the
+    // span scan to `TraceId IN (...)`. `stored_spans` is
+    // `ORDER BY (TenantId, TraceId, SpanId)`, so the TraceId set prunes granules
+    // to just those traces' spans rather than the whole partition window.
+    //
+    // The candidate pool is generous so per-model token-bearing samples still
+    // resolve. Models is complete per trace, so the candidate set cannot drop a
+    // model the rule matches (a just-folded trace may lag by seconds, which is
+    // acceptable for a best-effort preview). Within `stored_spans` the read is
+    // unchanged: light columns, argMax dedup over ReplacingMergeTree versions,
+    // token-bearing spans first, then recency, and `LIMIT BY` so one chatty
+    // model can't crowd out the rest of the sample.
+    const result = await client.query({
+      query: `
+        WITH candidate_traces AS (
+          SELECT TraceId
+          FROM trace_summaries
+          WHERE TenantId = {tenantId:String}
+            AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
+            AND hasAny(Models, {models:Array(String)})
+          GROUP BY TraceId
+          ORDER BY max(OccurredAt) DESC
+          LIMIT {candidatePool:UInt32}
+        )
+        SELECT
+          TraceId,
+          SpanId,
+          ${MODEL_ATTR_SELECT} AS Model,
+          argMax(SpanName, UpdatedAt) AS SpanName,
+          argMax(SpanAttributes['gen_ai.usage.input_tokens'], UpdatedAt) AS InputTokensRaw,
+          argMax(SpanAttributes['gen_ai.usage.prompt_tokens'], UpdatedAt) AS PromptTokensRaw,
+          argMax(SpanAttributes['gen_ai.usage.output_tokens'], UpdatedAt) AS OutputTokensRaw,
+          argMax(SpanAttributes['gen_ai.usage.completion_tokens'], UpdatedAt) AS CompletionTokensRaw,
+          argMax(SpanAttributes['gen_ai.usage.cache_read.input_tokens'], UpdatedAt) AS CacheReadTokensRaw,
+          argMax(SpanAttributes['gen_ai.usage.cache_creation.input_tokens'], UpdatedAt) AS CacheCreationTokensRaw,
+          argMax(toUnixTimestamp64Milli(StartTime), UpdatedAt) AS StartTimeMs,
+          (InputTokensRaw != '' OR PromptTokensRaw != ''
+            OR OutputTokensRaw != '' OR CompletionTokensRaw != '') AS HasTokens
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND StartTime >= fromUnixTimestamp64Milli({fromMs:Int64})
+          AND TraceId IN (SELECT TraceId FROM candidate_traces)
+          AND Model IN {models:Array(String)}
+        GROUP BY TraceId, SpanId, Model
+        ORDER BY HasTokens DESC, StartTimeMs DESC
+        LIMIT {perModelLimit:UInt32} BY Model
+        LIMIT {limit:UInt32}
+      `,
+      query_params: {
+        tenantId,
+        models,
+        fromMs,
+        perModelLimit,
+        limit,
+        candidatePool: SAMPLE_CANDIDATE_TRACE_POOL,
+      },
+      format: "JSONEachRow",
+    });
+
+    const rows = await result.json<ModelSpanSampleQueryRow>();
+    return rows.map(mapModelSpanSampleRow);
   }
 
   private toClickHouseRecord(span: SpanInsertData): ClickHouseSpanWriteRecord {

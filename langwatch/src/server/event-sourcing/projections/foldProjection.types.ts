@@ -30,10 +30,7 @@ import type { ProjectionStoreContext } from "./projectionStoreContext";
  * };
  * ```
  */
-export interface FoldProjectionDefinition<
-  State,
-  E extends Event = Event,
-> {
+export interface FoldProjectionDefinition<State, E extends Event = Event> {
   /** Unique name for this projection within the pipeline. */
   name: string;
 
@@ -79,7 +76,13 @@ export interface FoldProjectionDefinition<
    * need to provide this themselves. Optional at the type level because it's set
    * after construction, but always present at runtime.
    */
-  eventLoader?: (context: { tenantId: string; aggregateId: string }) => Promise<Event[]>;
+  eventLoader?: (context: {
+    tenantId: string;
+    aggregateId: string;
+    /** occurredAt (ms) of the event that triggered the re-fold, used to
+     * lower-bound the event_log rehydration scan for time-local aggregates. */
+    occurredAtMs?: number;
+  }) => Promise<Event[]>;
 }
 
 /**
@@ -111,5 +114,8 @@ export interface FoldProjectionStore<State> {
   ): Promise<void>;
 
   /** Retrieves the stored state for an aggregate, or null if not found. */
-  get(aggregateId: string, context: ProjectionStoreContext): Promise<State | null>;
+  get(
+    aggregateId: string,
+    context: ProjectionStoreContext,
+  ): Promise<State | null>;
 }

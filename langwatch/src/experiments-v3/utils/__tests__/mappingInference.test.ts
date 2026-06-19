@@ -500,6 +500,68 @@ describe("inferEvaluatorMappings", () => {
     }
   });
 
+  describe("given an output-like field that matches no target output by name", () => {
+    describe("when the target exposes a single output", () => {
+      /** @scenario Auto-map a target-output field to the target's only output when no name matches */
+      it("maps the output field to that sole output", () => {
+        const dataset = createTestDataset("ds-1", "Dataset 1", [
+          createTestColumn("input"),
+          createTestColumn("expected_output"),
+        ]);
+        const target = createTestTarget(
+          "target-1",
+          [{ identifier: "input", type: "str" }],
+          // Single output whose name does not match "output" by any rule
+          [{ identifier: "category", type: "str" }],
+        );
+        const evaluatorInputs: Field[] = [
+          { identifier: "output", type: "str" },
+        ];
+
+        const mappings = inferEvaluatorMappings(
+          evaluatorInputs,
+          dataset,
+          target,
+        );
+
+        expect(mappings.output).toEqual({
+          type: "source",
+          source: "target",
+          sourceId: "target-1",
+          sourceField: "category",
+        });
+      });
+    });
+
+    describe("when the target exposes multiple outputs", () => {
+      /** @scenario An output field is left for me to map when the runner has several outputs to choose from */
+      it("leaves the output field unmapped", () => {
+        const dataset = createTestDataset("ds-1", "Dataset 1", [
+          createTestColumn("input"),
+        ]);
+        const target = createTestTarget(
+          "target-1",
+          [{ identifier: "input", type: "str" }],
+          [
+            { identifier: "category", type: "str" },
+            { identifier: "confidence", type: "str" },
+          ],
+        );
+        const evaluatorInputs: Field[] = [
+          { identifier: "output", type: "str" },
+        ];
+
+        const mappings = inferEvaluatorMappings(
+          evaluatorInputs,
+          dataset,
+          target,
+        );
+
+        expect(mappings.output).toBeUndefined();
+      });
+    });
+  });
+
   it("does not override existing mappings", () => {
     const dataset = createTestDataset("ds-1", "Dataset 1", [
       createTestColumn("input"),
@@ -587,12 +649,19 @@ describe("inferEvaluatorMappings", () => {
     /** @scenario "output" never falls back to a dataset column */
     it("leaves an `output` mapping empty rather than falling back to a same-named dataset column", () => {
       const dataset = createTestDataset("ds-1", "Dataset 1", [
-        createTestColumn("output"), // dataset has output, target does not
+        createTestColumn("output"), // tempting same-named dataset column
       ]);
+      // Multiple non-matching outputs: no name match AND no single-output
+      // shortcut, so `output` must stay empty rather than grab the dataset's
+      // "output" column (the customer-reported self-grading bug). The
+      // single-output auto-map is covered separately above.
       const target = createTestTarget(
         "target-1",
         [{ identifier: "input", type: "str" }],
-        [{ identifier: "irrelevant", type: "str" }], // no output-like output
+        [
+          { identifier: "irrelevant", type: "str" },
+          { identifier: "also_irrelevant", type: "str" },
+        ],
       );
       const evaluatorInputs: Field[] = [{ identifier: "output", type: "str" }];
 

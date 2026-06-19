@@ -10,9 +10,10 @@ Feature: PII Redaction in Trace Processing
     Then the attribute value is redacted
 
   @unit
-  Scenario: Skips redaction when globally disabled
-    Given DISABLE_PII_REDACTION environment variable is set
-    When a span is processed with any PII redaction level
+  Scenario: Operator kill switch skips the strict analysis-service redaction
+    Given the strict PII analysis-service redaction is turned off by the operator
+    And a span with no resolvable privacy policy
+    When the span is processed at any PII redaction level
     Then no redaction occurs
 
   @unit

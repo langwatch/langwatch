@@ -108,12 +108,19 @@ Feature: Variables section UI
   # Changing variable type
   # ============================================================================
 
-  @unimplemented
-  Scenario: Change variable type via dropdown
+  # The type selector reads as a real control, not decoration: an outline
+  # button that shows the type name (Text, Number, ...) next to its icon, so
+  # users know it is clickable. This is the same affordance for inputs and
+  # outputs, in every node panel and editor that lists fields.
+  Scenario: The type selector shows its type label as an outline button
     Given a variable "question" of type "str" exists
-    When I click on the type selector for "question"
-    Then a dropdown appears with type options
-    When I select "float"
+    Then the type selector for "question" shows the label "Text"
+    And the type selector reads as a clickable outline button
+
+  Scenario: Change variable type via the type selector
+    Given a variable "question" of type "str" exists
+    When I open the type selector for "question"
+    And I choose "Number"
     Then the variable type changes to "float"
     And the type icon updates to show a number icon
 

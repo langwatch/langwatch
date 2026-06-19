@@ -54,4 +54,45 @@ describe("EventRepositoryClickHouse.getEventRecords", () => {
       '{"data":{"value":"123.45","text":"still-string"}}',
     );
   });
+
+  describe("when an occurredAtFromMs lower bound is provided", () => {
+    it("adds the EventOccurredAt partition-prune predicate and binds the param", async () => {
+      const client = createMockClient({});
+      const repository = new EventRepositoryClickHouse(async () => client);
+
+      await repository.getEventRecords("tenant", "trace", "id", 1700000000000);
+
+      const call = (client.query as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+      expect(call.query).toContain(
+        "EventOccurredAt = 0 OR EventOccurredAt >= {occurredAtFromMs:UInt64}",
+      );
+      expect(call.query_params).toMatchObject({
+        occurredAtFromMs: 1700000000000,
+      });
+    });
+  });
+
+  describe("when no usable lower bound is provided", () => {
+    it("omits the EventOccurredAt predicate and the param", async () => {
+      const client = createMockClient({});
+      const repository = new EventRepositoryClickHouse(async () => client);
+
+      await repository.getEventRecords("tenant", "trace", "id");
+
+      const call = (client.query as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+      expect(call.query).not.toContain("EventOccurredAt >=");
+      expect(call.query_params).not.toHaveProperty("occurredAtFromMs");
+    });
+
+    it("treats a zero lower bound as unbounded", async () => {
+      const client = createMockClient({});
+      const repository = new EventRepositoryClickHouse(async () => client);
+
+      await repository.getEventRecords("tenant", "trace", "id", 0);
+
+      const call = (client.query as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+      expect(call.query).not.toContain("EventOccurredAt >=");
+      expect(call.query_params).not.toHaveProperty("occurredAtFromMs");
+    });
+  });
 });

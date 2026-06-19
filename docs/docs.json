@@ -65,7 +65,6 @@
                   "skills/pms-and-domain-experts"
                 ]
               },
-              "integration/install",
               "integration/cli",
               "integration/mcp",
               "better-agents/overview"
@@ -172,6 +171,7 @@
                   "prompt-management/features/essential/version-control",
                   "prompts/template-syntax",
                   "prompt-management/data-model",
+                  "prompt-management/features/essential/runtime-parameters",
                   "prompt-management/scope",
                   "prompt-management/features/essential/analytics",
                   "prompt-management/features/essential/github-integration",
@@ -212,7 +212,8 @@
                   "platform/rbac",
                   "platform/audit-log",
                   "platform/scim",
-                  "platform/model-providers"
+                  "platform/model-providers",
+                  "platform/data-retention"
                 ]
               }
             ]
@@ -245,6 +246,7 @@
           {
             "group": "Help",
             "pages": [
+              "pricing",
               "support",
               "status"
             ]
@@ -328,6 +330,13 @@
                     "pages": [
                       "integration/python/tutorials/tracking-llm-costs",
                       "integration/typescript/tutorials/tracking-llm-costs"
+                    ]
+                  },
+                  {
+                    "group": "Tracking Time to First Token",
+                    "pages": [
+                      "integration/python/tutorials/tracking-time-to-first-token",
+                      "integration/typescript/tutorials/tracking-time-to-first-token"
                     ]
                   },
                   {
@@ -685,6 +694,7 @@
           {
             "group": "Privacy",
             "pages": [
+              "ai-governance/data-privacy",
               "ai-governance/no-spy-mode"
             ]
           },
@@ -801,6 +811,7 @@
             "pages": [
               "api-reference/traces/overview",
               "api-reference/traces/search",
+              "api-reference/traces/projection-dsl",
               "api-reference/traces/get-trace",
               "api-reference/traces/update-metadata",
               "api-reference/traces/create-public-trace-path",
@@ -1231,7 +1242,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1781031520",
+      "source": "/ci/cache/busted/1781875878",
       "destination": "/"
     },
     {
@@ -1241,6 +1252,10 @@
     {
       "source": "/integration/cookbooks",
       "destination": "/integration/code-examples"
+    },
+    {
+      "source": "/integration/install",
+      "destination": "/integration/cli"
     },
     {
       "source": "/guardrails/:path*",

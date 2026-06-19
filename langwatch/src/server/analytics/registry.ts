@@ -263,6 +263,30 @@ export const analyticsMetrics = {
       increaseIs: "neutral",
 
     },
+    cache_read_tokens: {
+      ...numericFieldAnalyticsWithPercentiles("metrics.cache_read_tokens"),
+      label: "Cache Read Tokens",
+      colorSet: "tealTones",
+      increaseIs: "neutral",
+    },
+    cache_write_tokens: {
+      ...numericFieldAnalyticsWithPercentiles("metrics.cache_write_tokens"),
+      label: "Cache Write Tokens",
+      colorSet: "yellowTones",
+      increaseIs: "neutral",
+    },
+    reasoning_tokens: {
+      ...numericFieldAnalyticsWithPercentiles("metrics.reasoning_tokens"),
+      label: "Reasoning Tokens",
+      colorSet: "pinkTones",
+      increaseIs: "neutral",
+    },
+    total_processed_tokens: {
+      ...numericFieldAnalyticsWithPercentiles("metrics.total_processed_tokens"),
+      label: "Total Processed Tokens",
+      colorSet: "purpleTones",
+      increaseIs: "neutral",
+    },
     total_tokens: {
       ...numericFieldAnalyticsWithPercentiles("total_tokens"),
       label: "Total Tokens",

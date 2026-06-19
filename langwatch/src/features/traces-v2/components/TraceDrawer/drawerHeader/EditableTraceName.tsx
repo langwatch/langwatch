@@ -1,9 +1,9 @@
 import { Box, HStack, IconButton, Input, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useId, useRef, useState } from "react";
 import { LuCheck, LuX } from "react-icons/lu";
+import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { toaster } from "~/components/ui/toaster";
 import {
   TRACE_NAME_MAX_LENGTH,
   TRACE_NAME_MIN_LENGTH,
@@ -232,11 +232,7 @@ export function EditableTraceName({
         </Text>
       )}
       {!localValidationMessage && trimmed.length > 0 && (
-        <Text
-          textStyle="2xs"
-          color="fg.subtle"
-          marginTop={0.5}
-        >
+        <Text textStyle="2xs" color="fg.subtle" marginTop={0.5}>
           {trimmed.length}/{TRACE_NAME_MAX_LENGTH}
         </Text>
       )}

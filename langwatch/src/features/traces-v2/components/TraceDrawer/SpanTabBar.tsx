@@ -33,12 +33,12 @@ import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { useOverflowVisibility } from "../../hooks/useOverflowVisibility";
 import { usePrefetchSpanDetail } from "../../hooks/usePrefetchSpanDetail";
 import { type DrawerTab, useDrawerStore } from "../../stores/drawerStore";
-import { OverflowMenu } from "../shared/OverflowMenu";
 import {
   abbreviateModel,
   formatDuration,
   SPAN_TYPE_COLORS,
 } from "../../utils/formatters";
+import { OverflowMenu } from "../shared/OverflowMenu";
 
 /**
  * When more than this many spans are pinned, collapse the tail into a
@@ -57,7 +57,6 @@ const INLINE_KEEP_WHEN_OVERFLOW = 3;
  * scope dodges TDZ for the `tabIds` useMemo factory that references it.
  */
 const RIGHT_SLOT_OVERFLOW_ID = "right-slot:instrumentation";
-
 
 /** Map span type → Chakra colorPalette so Badge variants stay consistent. */
 const SPAN_TYPE_PALETTE: Record<string, string> = {
@@ -88,29 +87,6 @@ interface SpanTabBarProps {
    * decides which edge of the tab row gets the disclosure icon.
    */
   collapsePosition?: "leading" | "trailing";
-}
-
-function DrawerTabPresenceDot({
-  traceId,
-  tab,
-}: {
-  traceId: string;
-  tab: DrawerTab;
-}) {
-  const peers = usePresenceStore(
-    useShallow((s) =>
-      selectPeersMatching(
-        s,
-        (session) =>
-          session.location.route.traceId === traceId &&
-          session.location.view?.tab === tab,
-      ),
-    ),
-  );
-  if (peers.length === 0) return null;
-  return (
-    <PresenceMarker peers={peers} size={16} tooltipSuffix={`${tab} tab`} />
-  );
 }
 
 function SpanFocusPresenceDot({
@@ -359,8 +335,7 @@ export const SpanTabBar = memo(function SpanTabBar({
     if (rightSlot) ids.push(RIGHT_SLOT_OVERFLOW_ID);
     return ids;
   }, [tabDescriptors, rightSlot]);
-  const activeOverflowId =
-    tabDescriptors.find((d) => d.activeId)?.id ?? null;
+  const activeOverflowId = tabDescriptors.find((d) => d.activeId)?.id ?? null;
   const scrollerRef = useRef<HTMLDivElement>(null);
   // Reserve room for kebab trigger + optional rightSlot + the
   // pinned-span overflow menu + the trailing collapse toggle. 96px gives
@@ -474,73 +449,6 @@ export const SpanTabBar = memo(function SpanTabBar({
     </HStack>
   );
 });
-
-interface DrawerTabButtonProps {
-  label: string;
-  shortcut: string;
-  tooltip: string;
-  active: boolean;
-  activeColorPalette: "blue" | "purple";
-  onClick: () => void;
-  icon?: React.ReactNode;
-  badge?: React.ReactNode;
-  traceId: string | null;
-  tab: DrawerTab;
-  /** Marker for `useOverflowVisibility` measurement. */
-  overflowId?: string;
-}
-
-function DrawerTabButton({
-  label,
-  shortcut,
-  tooltip,
-  active,
-  activeColorPalette,
-  onClick,
-  icon,
-  badge,
-  traceId,
-  tab,
-  overflowId,
-}: DrawerTabButtonProps) {
-  const activeBorder =
-    activeColorPalette === "purple" ? "purple.solid" : "blue.solid";
-  const activeColor = activeColorPalette === "purple" ? "purple.fg" : "fg";
-  return (
-    <Tooltip
-      content={
-        <HStack gap={1}>
-          <Text>{tooltip}</Text>
-          <Kbd>{shortcut}</Kbd>
-        </HStack>
-      }
-      positioning={{ placement: "bottom" }}
-    >
-      <Button
-        size="sm"
-        variant="ghost"
-        borderRadius={0}
-        borderBottomWidth="2px"
-        borderBottomColor={active ? activeBorder : "transparent"}
-        color={active ? activeColor : "fg.muted"}
-        fontWeight={active ? "semibold" : "medium"}
-        onClick={onClick}
-        paddingX={3}
-        paddingY={0}
-        height="38px"
-        flexShrink={0}
-        gap={1.5}
-        data-overflow-id={overflowId}
-      >
-        {icon}
-        {label}
-        <Kbd>{shortcut}</Kbd>
-        {badge}
-        {traceId ? <DrawerTabPresenceDot traceId={traceId} tab={tab} /> : null}
-      </Button>
-    </Tooltip>
-  );
-}
 
 interface SpanTabProps {
   span: SpanTreeNode;
@@ -673,13 +581,22 @@ function SpanTab({
 }
 
 function SpanTypeBadge({ type }: { type: string }) {
-  const palette = SPAN_TYPE_PALETTE[type] ?? "gray";
+  // Span types in the catalog (llm / tool / agent / …) keep the
+  // `subtle` colour-tinted look so they read as the curated palette
+  // the rest of the drawer uses. Anything outside the catalog (the
+  // raw OTel SpanKind values "CLIENT", "SERVER", "INTERNAL",
+  // "PRODUCER", "CONSUMER" that come through unmapped, plus future
+  // custom types) falls through to a bordered `outline` variant on
+  // the gray palette so it stays readable in dark mode — the prior
+  // `subtle` + `gray` combination painted gray.fg on top of
+  // gray.subtle which collapsed to a dark-on-dark blob in dark theme.
+  const mappedPalette = SPAN_TYPE_PALETTE[type];
   const label = type === "llm" || type === "rag" ? type.toUpperCase() : type;
   return (
     <Badge
       size="sm"
-      variant="subtle"
-      colorPalette={palette}
+      variant={mappedPalette ? "subtle" : "outline"}
+      colorPalette={mappedPalette ?? "gray"}
       flexShrink={0}
       borderRadius="md"
       fontWeight="medium"
