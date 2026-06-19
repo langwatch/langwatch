@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.33.2](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.33.1...typescript-sdk@v0.33.2) (2026-06-19)
+
+
+### Bug Fixes
+
+* **cli:** repoint langwatch login to cloud when picked, add --project flag ([#4929](https://github.com/langwatch/langwatch/issues/4929)) ([ee1af5f](https://github.com/langwatch/langwatch/commit/ee1af5f70cbe1f808228c0952032689c9f60d613))
+* **security:** raise protobufjs override floor to &gt;=8.6.0 ([#4852](https://github.com/langwatch/langwatch/issues/4852)) ([77ce842](https://github.com/langwatch/langwatch/commit/77ce84205d28275021b02a5bb0c320b6947dd934))
+
 ## [0.33.1](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.33.0...typescript-sdk@v0.33.1) (2026-06-12)
 
 
