@@ -35,17 +35,21 @@ Feature: Dedicated Langy API key provisioning
   # Existing projects (backfill)
   # ---------------------------------------------------------------------------
 
+  # Bulk backfill scripts were dropped in PR #4913 per review — Langy
+  # auto-provisions its key on first use instead, so any project predating
+  # the feature self-heals the moment a chat is started against it.
+
   @integration
-  Scenario: Existing projects without a Langy key are backfilled
+  Scenario: Existing projects without a Langy key heal on first call
     Given a project that was created before Langy keys existed
     And that project has no Langy key
-    When the Langy key backfill runs
+    When provisionLangyApiKey runs for that project (first-chat heal path)
     Then that project has a dedicated Langy key named "Langy"
 
   @integration
-  Scenario: Backfill does not create duplicates
+  Scenario: Repeated heal calls do not create duplicates
     Given a project that already has a Langy key
-    When the Langy key backfill runs again
+    When provisionLangyApiKey runs again for that project
     Then the project still has exactly one Langy key
 
   # ---------------------------------------------------------------------------

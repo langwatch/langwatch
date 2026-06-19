@@ -167,9 +167,7 @@ export async function reserveLangyGithubPrPermit({
       // permits (otherwise N concurrent over-cap reservers would each leave
       // the counter inflated by 1, pushing the visible "remaining" further
       // negative without granting anyone access).
-      await (
-        connection as { decr: (k: string) => Promise<number> }
-      ).decr(key);
+      await (connection as { decr: (k: string) => Promise<number> }).decr(key);
       return {
         allowed: false,
         remaining: 0,

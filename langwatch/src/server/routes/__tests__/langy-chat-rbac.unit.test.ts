@@ -28,8 +28,7 @@ vi.mock("~/server/api/rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("~/server/api/rbac")>();
   return {
     ...actual,
-    hasProjectPermission: (...args: unknown[]) =>
-      hasProjectPermission(...args),
+    hasProjectPermission: (...args: unknown[]) => hasProjectPermission(...args),
   };
 });
 
