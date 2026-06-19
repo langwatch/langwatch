@@ -76,6 +76,12 @@ self-hosting. The values you most often override:
 | `autoscaling.minReplicas` / `maxReplicas` | HPA bounds                                              |
 | `resources`                   | Pod CPU/memory requests + limits                                     |
 | `otel.endpoint`               | Optional OTLP HTTP exporter URL (gateway emits its own spans)        |
+| `automountServiceAccountToken`| Mount the SA token into the pod (default `false`; the gateway needs no Kubernetes API access) |
+
+The pod ships hardened (`podSecurityContext` / `containerSecurityContext` in
+`values.yaml`): non-root, read-only root, dropped capabilities, `RuntimeDefault`
+seccomp, no mounted SA token. It clears Pod Security Admission `restricted` and
+Gatekeeper / Kyverno policies as-is.
 
 Many `values.yaml` knobs are exposed as forward-compat for v1.1 and
 have no effect in v1 (e.g. `cache.lruSize`, `redis.url`,

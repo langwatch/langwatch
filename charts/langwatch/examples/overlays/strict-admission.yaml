@@ -1,0 +1,48 @@
+# strict-admission.yaml - for clusters that enforce Pod Security Admission
+# "restricted" or an equivalent OPA Gatekeeper / Kyverno bundle.
+#
+# The hardened pod defaults (read-only root, non-root, dropped capabilities,
+# RuntimeDefault seccomp, no automounted token, resource requests+limits) are
+# already on by default, so this overlay only flips the three features that
+# need a token or an external API and would otherwise be rejected.
+#
+# Usage (stack on a size + access overlay):
+#   helm install lw . \
+#     -f examples/overlays/size-prod.yaml \
+#     -f examples/overlays/access-ingress.yaml \
+#     -f examples/overlays/strict-admission.yaml
+#
+# For production, also stack the external-datastore overlays. Managed databases
+# give you backups and HA and deploy no datastore pods at all. (In-cluster
+# datastores do comply with read-only-root, but external is the better choice.)
+#   -f examples/overlays/postgres-external.yaml
+#   -f examples/overlays/redis-external.yaml
+#   -f examples/overlays/clickhouse-external.yaml
+
+# Preflight runs kubectl to check Secret keys, so it needs an SA token.
+# Disable it where token automounting is denied.
+preflight:
+  enabled: false
+
+# Bundled Prometheus is an upstream subchart we don't harden; bring your own.
+prometheus:
+  chartManaged: false
+
+# The gateway's default HPA needs prometheus-adapter for its custom metric.
+# Run a fixed replica count instead unless you have a custom metrics API.
+gateway:
+  autoscaling:
+    enabled: false
+  replicaCount: 2
+
+app:
+  telemetry:
+    # Prometheus is off above, so don't expose app metrics either - nothing
+    # would scrape them. This is already the default; pinned here so the two
+    # stay coupled if a base values file turned metrics on.
+    metrics:
+      enabled: false
+    # Anonymous usage analytics phone home to LangWatch. Not an admission
+    # concern, but uncomment for an air-gapped / no-egress install.
+    # usage:
+    #   enabled: false

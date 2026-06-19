@@ -36,6 +36,7 @@ spec:
         - name: redis
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
           image: "{{ .Values.redis.image.repository }}:{{ .Values.redis.image.tag }}"
@@ -86,6 +87,12 @@ spec:
           volumeMounts:
             - name: redis-data
               mountPath: /data
+            # Writable /tmp so the container can run read-only root.
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
   volumeClaimTemplates:
     - metadata:
         name: redis-data

@@ -25,6 +25,10 @@ spec:
       {{- end }}
     spec:
       serviceAccountName: {{ include "clickhouse-serverless.serviceAccountName" . }}
+      # Set on the pod too (not just the SA) for policies that check the pod
+      # spec field rather than the ServiceAccount. ClickHouse never calls the
+      # Kubernetes API.
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -79,11 +83,13 @@ spec:
         - name: clickhouse
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          # readOnlyRootFilesystem is intentionally omitted — ClickHouse writes
-          # to paths outside the data PVC (e.g. /tmp, format schemas) and would
-          # crashloop under a read-only root.
+          # Read-only root: ch-config only writes into config.d/users.d (both
+          # emptyDir mounts) and ClickHouse data lives on the PVC. The few
+          # remaining writable paths (logs, pid, /tmp) are emptyDir-mounted
+          # below, so the image layer itself never needs to be writable.
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
           ports:
@@ -230,6 +236,15 @@ spec:
               mountPath: /etc/clickhouse-server/config.d
             - name: users-d
               mountPath: /etc/clickhouse-server/users.d
+            # Writable scratch so the container runs read-only root: server
+            # logs, the pid dir, and /tmp. (config.d/users.d above are also
+            # writable emptyDirs, which is where ch-config renders config.)
+            - name: ch-logs
+              mountPath: /var/log/clickhouse-server
+            - name: ch-run
+              mountPath: /var/run/clickhouse-server
+            - name: tmp
+              mountPath: /tmp
             - name: secrets
               mountPath: /mnt/secrets
               readOnly: true
@@ -238,6 +253,12 @@ spec:
         - name: config-d
           emptyDir: {}
         - name: users-d
+          emptyDir: {}
+        - name: ch-logs
+          emptyDir: {}
+        - name: ch-run
+          emptyDir: {}
+        - name: tmp
           emptyDir: {}
         - name: secrets
           secret:
