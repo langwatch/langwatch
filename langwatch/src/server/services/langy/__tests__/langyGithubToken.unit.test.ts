@@ -24,10 +24,21 @@ vi.mock("~/utils/encryption", () => ({
   decrypt: (v: string) => decrypt(v),
   encrypt: (v: string) => encrypt(v),
 }));
-// Redis layer off — the service's "no redis" path returns null on get and
-// no-ops on set, which is what we want under unit test (each call exercises
-// the real refresh path instead of a sticky cache).
-vi.mock("~/server/redis", () => ({ connection: null }));
+// Stub the Redis layer with a minimum-viable connection that satisfies
+// `acquireLock` (SET k v NX EX ttl → "OK") and `redisGet`/`redisSetEx`. We
+// must NOT use `connection: null` here — that path now fails the refresh
+// closed (no distributed lock to serialise rotations would otherwise let
+// concurrent callers race the single-use refresh token and delete the
+// rotated row; see refreshAccessTokenUnderLock's no-redis branch). Tests for
+// the locked refresh logic need a working lock; the no-redis fail-closed
+// path has its own dedicated test below.
+vi.mock("~/server/redis", () => ({
+  connection: {
+    get: vi.fn().mockResolvedValue(null),
+    set: vi.fn().mockResolvedValue("OK"),
+    del: vi.fn().mockResolvedValue(1),
+  },
+}));
 
 const prisma = {
   userGitHubCredential: {
@@ -202,5 +213,64 @@ describe("getGithubTokenForUser", () => {
       // We never reach the network on an unreadable refresh token.
       expect(fetchMock).not.toHaveBeenCalled();
     });
+  });
+});
+
+// Dedicated suite for the no-redis fail-closed branch. Two concurrent callers
+// hitting `refreshAccessTokenUnderLock` without a distributed lock race the
+// single-use refresh token: one wins (writes the rotated token), one loses
+// (sees the burned token return `bad_refresh_token` from GitHub and runs
+// `deleteMany` on the row the winner just stored). The fix is to fail closed
+// instead. Chat tolerates a missing GitHub token; the skill tells the user
+// to reconnect. This suite re-stubs `~/server/redis` with `connection: null`
+// to isolate that path, so it cannot share the outer `describe`'s mock.
+describe("getGithubTokenForUser without a distributed lock (Redis down)", () => {
+  const findUniqueNoLock = vi.fn();
+  const updateNoLock = vi.fn();
+  const deleteManyNoLock = vi.fn();
+
+  beforeEach(() => {
+    vi.resetModules();
+    vi.doMock("~/server/redis", () => ({ connection: null }));
+    vi.doMock("~/utils/encryption", () => ({
+      decrypt: (v: string) => `dec(${v})`,
+      encrypt: (v: string) => `enc(${v})`,
+    }));
+    findUniqueNoLock.mockReset();
+    updateNoLock.mockReset();
+    deleteManyNoLock.mockReset();
+  });
+
+  it("returns null without calling GitHub or deleting the row", async () => {
+    findUniqueNoLock.mockResolvedValue({
+      encryptedRefreshToken: "enc(refresh-old)",
+      githubLogin: "tester",
+    });
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    process.env.GITHUB_LANGY_CLIENT_ID = "id";
+    process.env.GITHUB_LANGY_CLIENT_SECRET = "secret";
+
+    const { getGithubTokenForUser } = await import("../langyGithubToken");
+    const result = await getGithubTokenForUser({
+      prisma: {
+        userGitHubCredential: {
+          findUnique: (...a: unknown[]) => findUniqueNoLock(...a),
+          update: (...a: unknown[]) => updateNoLock(...a),
+          deleteMany: (...a: unknown[]) => deleteManyNoLock(...a),
+        },
+      } as never,
+      userId: "u1",
+      organizationId: "org1",
+    });
+
+    // Fail-closed: never racing the rotation when there is no lock to
+    // serialise concurrent callers on the single-use refresh token.
+    expect(result).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(updateNoLock).not.toHaveBeenCalled();
+    // The row must NOT be deleted — that is exactly the bug the fail-closed
+    // path prevents (a loser would delete the winner's healthy rotated row).
+    expect(deleteManyNoLock).not.toHaveBeenCalled();
   });
 });
