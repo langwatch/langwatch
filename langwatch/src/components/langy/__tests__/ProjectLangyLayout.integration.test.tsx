@@ -118,6 +118,7 @@ afterEach(() => cleanup());
 
 describe("ProjectLangyLayout", () => {
   describe("given Langy is open on a project page", () => {
+    /** @scenario "The panel stays open when navigating between pages of the same project" */
     it("stays open when navigating to another page of the same project", async () => {
       const router = renderAt("/demo/traces");
       expect(screen.getByText("traces page")).toBeTruthy();
@@ -138,6 +139,7 @@ describe("ProjectLangyLayout", () => {
   });
 
   describe("given Langy is open in one project", () => {
+    /** @scenario "Switching projects resets Langy" */
     it("resets when switching to a different project", async () => {
       const router = renderAt("/demo/traces");
       await openLangy();
@@ -172,6 +174,7 @@ describe("ProjectLangyLayout", () => {
       expect(drawer()).not.toBeNull();
     });
 
+    /** @scenario "The visibility gate is not widened" */
     it("hides Langy for a non-staff team member when the rollout flag is off", () => {
       gate.staff = false;
       gate.flagEnabled = false;

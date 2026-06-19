@@ -27,14 +27,19 @@ Feature: Langy persists across in-project navigation
     And it shows the same conversation it had on the traces page
     And the panel was not remounted or reloaded
 
-  @integration
+  @integration @unimplemented
   Scenario: A half-typed message survives navigation
+    # Tracked: needs a draft store wired into LangyContext + a regression test
+    # that types into the composer then navigates without sending.
     Given I have typed a message into Langy but not sent it
     When I navigate from traces to prompts within "demo"
     Then my unsent message is still in the composer
 
-  @integration
+  @integration @unimplemented
   Scenario: An in-flight response keeps streaming across navigation
+    # Tracked: needs a streaming test that holds an active SSE while the
+    # router navigates; today the provider is keyed by project slug, so
+    # within-project nav already preserves state but no test pins it.
     Given Langy is streaming a response
     When I navigate from traces to prompts within "demo"
     Then the response continues streaming without being aborted
@@ -54,8 +59,10 @@ Feature: Langy persists across in-project navigation
   # Visibility is unchanged by the move
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: Langy is absent outside project routes
+    # Tracked: ProjectLangyLayout only mounts under /:project/*, but the
+    # negative case (non-project route) isn't pinned by a router test yet.
     When I navigate to a non-project route such as "/settings"
     Then Langy is not mounted
     And no Langy handle or panel is visible
