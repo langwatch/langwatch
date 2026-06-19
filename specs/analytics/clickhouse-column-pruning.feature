@@ -35,6 +35,12 @@ Feature: ClickHouse Analytics Column Pruning
     Then the dedup subquery includes the column mapped to "metadata.labels"
     And no other payload columns appear in the dedup subquery
 
+  @unit
+  Scenario: A pure numeric metric does not read the wide Attributes map
+    When an analytics query sums "total_cost" with no grouping or metadata filter
+    Then the dedup subquery includes the column mapped to "total_cost"
+    And the dedup subquery does not read the Attributes map
+
   # ---------------------------------------------------------------------------
   # Evaluation runs subquery JOIN
   # ---------------------------------------------------------------------------

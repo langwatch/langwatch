@@ -90,10 +90,10 @@ Feature: Analytics Chart Rendering
   # ---------------------------------------------------------------------------
 
   @unit
-  Scenario: Tokens per second metric resolves duration from stored spans
+  Scenario: Tokens per second metric reads the pre-aggregated trace column
     Given an analytics query for the performance tokens per second metric
     When the ClickHouse query is built
-    Then the stored spans data includes duration information needed to compute the rate
+    Then it reads the pre-aggregated tokens-per-second value from trace summaries
 
   # ---------------------------------------------------------------------------
   # Error state when query fails (bug fix #2599)
