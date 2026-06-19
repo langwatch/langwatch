@@ -1013,32 +1013,49 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
   async waitUntilReady(): Promise<void> {
     const bc = this.blockingConnection;
+    // The shared connection's readiness is owned by whoever created it.
     if (bc === this.redisConnection) return;
     if (bc.status === "ready") return;
+    // `end` is ioredis's terminal state — it fires only when no further
+    // reconnection will be attempted. If we already missed the window, fail
+    // fast rather than wait for an event that will never come.
+    if (bc.status === "end") {
+      throw new Error("Blocking Redis connection ended before ready");
+    }
     await new Promise<void>((resolve, reject) => {
-      const onReady = () => {
-        bc.off("error", onError);
+      const cleanup = () => {
+        bc.off("ready", onReady);
         bc.off("end", onEnd);
-        bc.off("close", onEnd);
+        bc.off("error", onError);
+      };
+      const onReady = () => {
+        cleanup();
         resolve();
       };
-      const onError = (err: unknown) => {
-        bc.off("ready", onReady);
-        bc.off("end", onEnd);
-        bc.off("close", onEnd);
-        reject(err instanceof Error ? err : new Error(String(err)));
-      };
       const onEnd = () => {
-        bc.off("ready", onReady);
-        bc.off("error", onError);
-        bc.off("end", onEnd);
-        bc.off("close", onEnd);
-        reject(new Error("Blocking Redis connection closed before ready"));
+        cleanup();
+        reject(new Error("Blocking Redis connection ended before ready"));
+      };
+      // Transient reconnect events are EXPECTED while ioredis retries with
+      // maxRetriesPerRequest: null — on an unavailable endpoint it emits
+      // `error` → `close` → `reconnecting` and can later recover with `ready`.
+      // Rejecting on `error`/`close` would turn a recoverable Redis blip into a
+      // pipeline-startup failure (the regression this guards). So we do NOT
+      // listen for `close` at all, and the `error` listener only absorbs the
+      // error (keeping a listener attached so ioredis' emit is never unhandled)
+      // and keeps waiting. Only the terminal `end` event fails readiness.
+      const onError = (err: unknown) => {
+        this.logger.debug(
+          {
+            queueName: this.queueName,
+            error: err instanceof Error ? err.message : String(err),
+          },
+          "Blocking connection error while awaiting readiness; awaiting reconnect",
+        );
       };
       bc.once("ready", onReady);
-      bc.once("error", onError);
       bc.once("end", onEnd);
-      bc.once("close", onEnd);
+      bc.on("error", onError);
     });
   }
 
