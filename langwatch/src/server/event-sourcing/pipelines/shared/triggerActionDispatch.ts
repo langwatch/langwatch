@@ -112,12 +112,14 @@ export async function dispatchTriggerAction({
   trigger,
   traceId,
   tenantId,
-  foldState,
 }: {
   deps: TriggerActionDispatchDeps;
   trigger: TriggerSummary;
   traceId: string;
   tenantId: string;
+  // Part of the dispatch envelope (the settled fold), accepted so callers can
+  // pass it uniformly, but not read here: the persist actions (annotation
+  // queue, dataset) work off the full trace, not the fold projection.
   foldState: TraceSummaryData;
 }): Promise<void> {
   const project = await deps.projects.getById(tenantId);
@@ -133,7 +135,6 @@ export async function dispatchTriggerAction({
     (await deps.traceById(tenantId, traceId)) ??
     ({ trace_id: traceId } as Trace);
 
-  const triggerData = buildTriggerData(traceId, tenantId, foldState, fullTrace);
   const params = (trigger.actionParams ?? {}) as ActionParams;
 
   let dispatched = true;
@@ -198,27 +199,6 @@ export async function dispatchTriggerAction({
     { tenantId, traceId, triggerId: trigger.id, action: trigger.action },
     "Trigger fired",
   );
-}
-
-function buildTriggerData(
-  traceId: string,
-  tenantId: string,
-  foldState: TraceSummaryData,
-  fullTrace: Trace,
-): {
-  traceId: string;
-  input: string;
-  output: string;
-  projectId: string;
-  fullTrace: Trace;
-} {
-  return {
-    traceId,
-    input: foldState.computedInput ?? "",
-    output: foldState.computedOutput ?? "",
-    projectId: tenantId,
-    fullTrace,
-  };
 }
 
 async function addTraceToDataset({
