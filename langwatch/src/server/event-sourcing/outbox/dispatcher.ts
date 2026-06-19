@@ -99,6 +99,27 @@ export interface OutboxDispatcherDeps {
   /** The configured cap, for operator-facing drop logs (ADR-031). */
   emailHourlyCap: number;
   /**
+   * ADR-031: per-PROJECT daily hard cap — a backstop ABOVE the per-trigger
+   * hourly cap, bounding the aggregate trigger-email volume a whole project can
+   * emit in 24h (SES sender-reputation protection). Consulted AFTER the hourly
+   * cap passes and the recipient set is known; counts RECIPIENTS (actual email
+   * volume), not dispatches. `allowed: false` means the project has already sent
+   * `cap` trigger emails today — this dispatch is dropped (not sent, not
+   * retried). Injected so tests can fake it. Slack never calls it.
+   *
+   * `dedupKey` is the stable per-dispatch identity so an outbox RETRY of the
+   * same digest does not re-count its recipients and burn the budget twice.
+   */
+  consumeTenantEmailCapSlot: (args: {
+    projectId: string;
+    now: Date;
+    cap: number;
+    recipientCount: number;
+    dedupKey: string;
+  }) => Promise<{ allowed: boolean; count: number }>;
+  /** The configured per-project daily cap, for operator-facing drop logs. */
+  tenantDailyCap: number;
+  /**
    * ADR-031: drops recipients who unsubscribed before the provider call.
    * Returns `emails` minus any address suppressed for this trigger
    * (trigger-scoped OR project-wide rows). Injected so tests can fake it.
@@ -458,6 +479,38 @@ async function handleCadenceBatch(
               "Switch this trigger to a digest cadence to coalesce its volume.",
           );
           dropReason = "dropped: over hourly cap";
+          break;
+        }
+        // ADR-031: per-PROJECT daily cap — a backstop ABOVE the per-trigger
+        // hourly cap, run only once the hourly cap has passed and the recipient
+        // set is known. Counts RECIPIENTS (`recipients.length`), the actual
+        // outbound email volume that hits SES, not dispatches. Over the cap the
+        // dispatch is a terminal drop with the same shape as the over-hourly-cap
+        // path: log loudly, fall through to claimSend below (so a replay no-ops),
+        // return WITHOUT sending and WITHOUT throwing (throwing would let the
+        // outbox retry the spam). The same `dispatchDigest`-derived dedupKey
+        // gates the recipient count so a retry of the same digest re-reads the
+        // daily total rather than counting its recipients twice.
+        const tenantSlot = await deps.consumeTenantEmailCapSlot({
+          projectId,
+          now: new Date(),
+          cap: deps.tenantDailyCap,
+          recipientCount: recipients.length,
+          dedupKey: `${projectId}:tenant:${dispatchDigest}`,
+        });
+        if (!tenantSlot.allowed) {
+          logger.warn(
+            {
+              projectId,
+              triggerId,
+              count: tenantSlot.count,
+              cap: deps.tenantDailyCap,
+            },
+            "Project exceeded its daily trigger-email cap — dropping this " +
+              "dispatch. This is a per-project backstop above the per-trigger " +
+              "hourly cap; investigate which triggers are driving the volume.",
+          );
+          dropReason = "dropped: over project daily email cap";
           break;
         }
         // Per-recipient idempotency (ADR-031): back the mailer's recipient

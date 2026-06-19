@@ -118,6 +118,10 @@ function makeDeps(trigger: TriggerSummary = makeTrigger()) {
     enqueueCadence: vi.fn().mockResolvedValue(undefined),
     emailHourlyCap: 100,
     consumeEmailCapSlot: vi.fn().mockResolvedValue({ allowed: true, count: 1 }),
+    tenantDailyCap: 10000,
+    consumeTenantEmailCapSlot: vi
+      .fn()
+      .mockResolvedValue({ allowed: true, count: 1 }),
     filterSuppressedEmails: vi
       .fn()
       .mockImplementation(async ({ emails }: { emails: string[] }) => emails),
@@ -409,6 +413,112 @@ describe("createOutboxDispatcher cadence stage", () => {
           }),
         );
         expect(sendTriggerEmail).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
+
+  describe("given the per-project daily email cap (ADR-031)", () => {
+    describe("when the dispatch is under the daily cap", () => {
+      it("consults the tenant cap by recipient count and sends normally", async () => {
+        const trigger = makeTrigger({
+          action: TriggerAction.SEND_EMAIL,
+          actionParams: {
+            members: ["a@example.com", "b@example.com", "c@example.com"],
+          },
+        });
+        const deps = makeDeps(trigger);
+        const dispatcher = createOutboxDispatcher(deps);
+
+        await dispatcher.process(makeCadencePayload());
+
+        expect(deps.consumeTenantEmailCapSlot).toHaveBeenCalledTimes(1);
+        // The daily cap counts RECIPIENTS, so recipientCount is the surviving
+        // recipient-list length, not 1-per-dispatch.
+        expect(deps.consumeTenantEmailCapSlot).toHaveBeenCalledWith(
+          expect.objectContaining({
+            projectId: PROJECT_ID,
+            recipientCount: 3,
+            cap: 10000,
+            dedupKey: expect.stringMatching(
+              new RegExp(`^${PROJECT_ID}:tenant:[0-9a-f]{16}$`),
+            ),
+          }),
+        );
+        expect(sendTriggerEmail).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when the dispatch exceeds the project's daily cap", () => {
+      it("drops without sending, stamps the project-daily drop reason, and logs at warn", async () => {
+        const deps = makeDeps();
+        deps.consumeTenantEmailCapSlot.mockResolvedValueOnce({
+          allowed: false,
+          count: 10001,
+        });
+        const dispatcher = createOutboxDispatcher(deps);
+        const payload = makeCadencePayload();
+
+        await expect(dispatcher.process(payload)).resolves.toBeUndefined();
+
+        // No send — the daily cap is a terminal, non-retryable drop.
+        expect(sendTriggerEmail).not.toHaveBeenCalled();
+        expect(sendRenderedTriggerEmail).not.toHaveBeenCalled();
+        // The hourly cap ran and passed; the tenant cap is what dropped it.
+        expect(deps.consumeEmailCapSlot).toHaveBeenCalledTimes(1);
+        // Claim recorded so a replay no-ops; delivery-only bookkeeping skipped.
+        expect(deps.triggers.claimSend).toHaveBeenCalledTimes(1);
+        expect(deps.triggers.updateLastRunAt).not.toHaveBeenCalled();
+        // Audit row reads as a drop, not a delivered send.
+        expect(payload.dropReason).toBe(
+          "dropped: over project daily email cap",
+        );
+        // The project-daily backstop logs the over-cap event at WARN.
+        expect(loggerMock.warn).toHaveBeenCalledWith(
+          expect.objectContaining({ cap: 10000, count: 10001 }),
+          expect.stringContaining("daily"),
+        );
+        // And the terminal drop log carries the reason.
+        expect(loggerMock.info).toHaveBeenCalledWith(
+          expect.objectContaining({
+            dropReason: "dropped: over project daily email cap",
+          }),
+          expect.stringContaining("dropped"),
+        );
+      });
+    });
+
+    describe("when the hourly cap has already dropped the dispatch", () => {
+      it("never consults the project daily cap", async () => {
+        const deps = makeDeps();
+        deps.consumeEmailCapSlot.mockResolvedValueOnce({
+          allowed: false,
+          count: 101,
+        });
+        const dispatcher = createOutboxDispatcher(deps);
+
+        await dispatcher.process(makeCadencePayload());
+
+        // Hourly cap is checked first; its drop short-circuits before the
+        // tenant cap so we don't count recipients against a dispatch we already
+        // dropped.
+        expect(deps.consumeTenantEmailCapSlot).not.toHaveBeenCalled();
+        expect(sendTriggerEmail).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the trigger sends Slack rather than email", () => {
+      it("never consults the project daily cap", async () => {
+        const trigger = makeTrigger({
+          action: TriggerAction.SEND_SLACK_MESSAGE,
+          actionParams: { slackWebhook: "https://hooks.slack.com/services/x" },
+        });
+        const deps = makeDeps(trigger);
+        const dispatcher = createOutboxDispatcher(deps);
+
+        await dispatcher.process(makeCadencePayload());
+
+        expect(deps.consumeTenantEmailCapSlot).not.toHaveBeenCalled();
+        expect(sendSlackWebhook).toHaveBeenCalledTimes(1);
       });
     });
   });

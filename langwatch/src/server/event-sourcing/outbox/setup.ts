@@ -16,7 +16,10 @@ import type { FoldProjectionStore } from "../projections/foldProjection.types";
 import { RedisCachedFoldStore } from "../projections/redisCachedFoldStore";
 import type { EventSourcedQueueProcessor } from "../queues/queue.types";
 import { createOutboxDispatcher } from "./dispatcher";
-import { consumeEmailCapSlot } from "./emailHourlyCap";
+import {
+  consumeEmailCapSlot,
+  consumeTenantEmailCapSlot,
+} from "./emailHourlyCap";
 import {
   type CadenceStagePayload,
   type SettleStagePayload,
@@ -153,6 +156,24 @@ export function buildOutboxRuntime({
         cap: env.TRIGGER_EMAIL_HOURLY_CAP,
         // ADR-031: the dispatcher's stable per-dispatch dedupKey gates the cap
         // INCR so an outbox retry of the same digest doesn't burn a second slot.
+        dedupKey,
+      }),
+    // ADR-031: per-project daily cap (backstop above the hourly cap), bound
+    // from env. Counts recipients; the cap consumer reads the shared Redis
+    // connection internally. `cap` is passed through from the dispatcher.
+    tenantDailyCap: env.TRIGGER_EMAIL_TENANT_DAILY_CAP,
+    consumeTenantEmailCapSlot: ({
+      projectId,
+      now,
+      cap,
+      recipientCount,
+      dedupKey,
+    }) =>
+      consumeTenantEmailCapSlot({
+        projectId,
+        now,
+        cap,
+        recipientCount,
         dedupKey,
       }),
     filterSuppressedEmails: ({ projectId, triggerId, emails }) =>

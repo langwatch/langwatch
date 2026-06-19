@@ -71,6 +71,53 @@ The cap default is **100 emails per trigger per hour**, env-configurable
 (`TRIGGER_EMAIL_HOURLY_CAP`). Digest cadences cannot exceed 12/hour, so the
 cap only ever bites `immediate`-cadence triggers — by design.
 
+### 2b. Per-project daily cap (backstop above the hourly cap)
+
+The per-trigger hourly cap above bounds a single noisy trigger, but a project
+with many immediate-cadence triggers can still aggregate a large daily email
+volume under it — each trigger independently sitting just under its own hourly
+ceiling. A second, coarser limit caps the *total* trigger-email volume a whole
+project can emit per 24h, protecting SES sender reputation (which is scored on
+aggregate outbound volume, not per-trigger).
+
+In the same email branch, **after** the hourly-cap check has passed and the
+recipient set is known, the dispatcher consults a Redis fixed-day counter:
+
+```text
+key:    trigger-email-tenant-cap:{projectId}:{floor(now / 24h)}
+INCRBY recipientCount + EXPIRE 25h; if count > cap → drop
+```
+
+Unlike the hourly cap — which counts *dispatches* — the daily cap counts
+**recipients**: trigger emails fan out one provider call per recipient
+(§3 below), so the recipient count is the actual outbound volume SES reputation
+is measured on. The counter advances by `recipients.length` (INCRBY), not by 1.
+Consumption is idempotent per logical dispatch via the same claim-gate pattern
+as the hourly cap (`tenant-cap-claimed:{dedupKey}` SET-NX), so an outbox retry
+of the same digest re-reads the running total instead of counting its
+recipients twice.
+
+Over the cap the dispatcher **does not send**: it logs `logger.warn` with
+project, trigger, and the running count, marks the outbox job done (a
+non-retryable drop — `dropReason: "dropped: over project daily email cap"` is
+stamped onto the audit row), and the send claim is recorded so replays stay
+no-ops. The drop logs at `warn` rather than the hourly cap's `error`: the
+hourly cap is the primary, per-trigger throttle, while this is a coarse
+project-wide backstop whose breach is operationally interesting but not a page.
+
+The cap default is **10000 recipient-emails per project per day**,
+env-configurable (`TRIGGER_EMAIL_TENANT_DAILY_CAP`). Generous by design — it is
+a runaway backstop, not a routine throttle, and should only bite a project that
+is genuinely misconfigured or abusing the channel.
+
+**v1 is per-PROJECT, not per-ORGANISATION.** The stronger SES-reputation
+boundary is per-organisation (one organisation's many projects share the same
+sending domain and reputation), but that requires threading the org id through
+the dispatch hot path and a per-org Redis counter. Per-project is shipped first
+because it is the cheaper change and already bounds the common single-tenant
+runaway; a per-organisation ceiling is the recommended follow-up if multi-
+project abuse within one organisation is observed in practice.
+
 ### 3. Unsubscribe link + suppression list
 
 A new Prisma model:
@@ -194,16 +241,21 @@ price, bounded by the hourly cap.
 - **Dropped sends are visible, not silent.** `logger.error` + a counter the
   ADR-029 health surface can read. Operators of high-volume immediate
   triggers should switch to a digest cadence — the error message says so.
-- **The cap is per-trigger, not per-project.** A project with many triggers
-  can still aggregate a large hourly volume; a per-project ceiling is a
-  follow-up knob if provider costs warrant it.
+- **Two caps: per-trigger hourly + per-project daily.** The hourly cap
+  (§2) bounds a single noisy trigger; the daily cap (§2b,
+  `TRIGGER_EMAIL_TENANT_DAILY_CAP`, default 10000 recipient-emails) bounds the
+  aggregate volume a whole project emits per 24h. Neither is per-organisation:
+  an organisation's projects share a sending domain and SES reputation, so a
+  per-org ceiling is the stronger boundary and the recommended follow-up if
+  multi-project abuse within one organisation is observed.
 - **Suppression management ships in v1.** A project-settings view lists
   suppression rows (email, scope, when) to operators with `triggers:view`
   and lets an operator with `triggers:manage` permission remove one — e.g. a
   recipient who unsubscribed by accident and asked to be re-added. Removal is
   a deliberate operator action; nothing re-suppresses automatically.
 - **Non-goals:** no Slack capping, no verification-email gate, no bounce
-  ingestion (schema-ready via `reason`), no per-project volume ceiling.
+  ingestion (schema-ready via `reason`), no per-ORGANISATION volume ceiling
+  (the per-project daily cap in §2b ships in v1; per-org is the follow-up).
 
 ## References
 

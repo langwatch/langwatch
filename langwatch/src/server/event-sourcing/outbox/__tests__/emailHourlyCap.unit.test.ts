@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   _resetMemoryEmailCapStore,
   consumeEmailCapSlot,
+  consumeTenantEmailCapSlot,
 } from "../emailHourlyCap";
 
 // `connection` is a mutable module-level binding; the mock lets each test
@@ -333,6 +334,239 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
 
         expect(a).toEqual({ allowed: true, count: 1 });
         expect(b).toEqual({ allowed: true, count: 1 });
+      });
+    });
+  });
+});
+
+// The per-project daily cap (ADR-031) — a backstop ABOVE the per-trigger hourly
+// cap. Counts RECIPIENTS (actual email volume), not dispatches; the day counter
+// advances by recipientCount (INCRBY). Same claim-gate idempotency + in-memory
+// fallback as the hourly cap, but degradation logs at WARN not ERROR.
+describe("consumeTenantEmailCapSlot in-memory fallback", () => {
+  beforeEach(() => {
+    _resetMemoryEmailCapStore();
+  });
+
+  describe("given a fresh day bucket", () => {
+    describe("when dispatches accumulate recipients up to the cap then over it", () => {
+      it("allows the dispatch that lands at the cap and drops the one that exceeds it", async () => {
+        const now = new Date("2026-06-11T10:15:00Z");
+        // cap=10, two dispatches of 6 recipients each: first → count 6 (under),
+        // second → count 12 (over). Proves the counter advances by recipientCount.
+        const first = await consumeTenantEmailCapSlot({
+          projectId: PROJECT_ID,
+          now,
+          cap: 10,
+          recipientCount: 6,
+          dedupKey: "proj-1:tenant:day-a",
+        });
+        const second = await consumeTenantEmailCapSlot({
+          projectId: PROJECT_ID,
+          now,
+          cap: 10,
+          recipientCount: 6,
+          dedupKey: "proj-1:tenant:day-b",
+        });
+
+        expect(first).toEqual({ allowed: true, count: 6 });
+        expect(second).toEqual({ allowed: false, count: 12 });
+      });
+    });
+
+    describe("when the SAME dispatch is consumed twice (outbox retry)", () => {
+      it("does not double-count: the retry re-reads the same total without INCRBY", async () => {
+        const now = new Date("2026-06-11T10:15:00Z");
+        const args = {
+          projectId: PROJECT_ID,
+          now,
+          cap: 100,
+          recipientCount: 4,
+          dedupKey: "proj-1:tenant:retry-me",
+        };
+        const firstCall = await consumeTenantEmailCapSlot(args);
+        const retry = await consumeTenantEmailCapSlot(args);
+        // A different dispatch advances the counter — proving the retry was
+        // suppressed by the claim gate, not by a frozen counter.
+        const other = await consumeTenantEmailCapSlot({
+          ...args,
+          recipientCount: 3,
+          dedupKey: "proj-1:tenant:other",
+        });
+
+        expect(firstCall).toEqual({ allowed: true, count: 4 });
+        expect(retry).toEqual({ allowed: true, count: 4 });
+        expect(other).toEqual({ allowed: true, count: 7 });
+      });
+    });
+  });
+
+  describe("given the cap was exhausted in the previous day", () => {
+    describe("when a dispatch arrives in the next day bucket", () => {
+      it("starts a fresh count and allows it again", async () => {
+        const firstDay = new Date("2026-06-11T23:00:00Z");
+        await consumeTenantEmailCapSlot({
+          projectId: PROJECT_ID,
+          now: firstDay,
+          cap: 5,
+          recipientCount: 5,
+          dedupKey: "proj-1:tenant:d1-a",
+        });
+        const overSameDay = await consumeTenantEmailCapSlot({
+          projectId: PROJECT_ID,
+          now: firstDay,
+          cap: 5,
+          recipientCount: 1,
+          dedupKey: "proj-1:tenant:d1-b",
+        });
+        expect(overSameDay.allowed).toBe(false);
+
+        const nextDay = new Date("2026-06-12T01:00:00Z");
+        const rolledOver = await consumeTenantEmailCapSlot({
+          projectId: PROJECT_ID,
+          now: nextDay,
+          cap: 5,
+          recipientCount: 2,
+          dedupKey: "proj-1:tenant:d2-a",
+        });
+
+        expect(rolledOver).toEqual({ allowed: true, count: 2 });
+      });
+    });
+  });
+
+  describe("given Redis is connected", () => {
+    afterEach(() => {
+      redisMock.connection = undefined;
+    });
+
+    describe("when a dispatch wins its claim", () => {
+      it("advances the counter via INCRBY recipientCount, not a plain INCR", async () => {
+        const incrby = vi.fn().mockResolvedValue(8);
+        redisMock.connection = {
+          set: vi.fn().mockResolvedValue("OK"),
+          get: vi.fn().mockResolvedValue(null),
+          incr: vi.fn(),
+          incrby,
+          expire: vi.fn().mockResolvedValue(1),
+        };
+
+        const now = new Date("2026-06-11T10:15:00Z");
+        const result = await consumeTenantEmailCapSlot({
+          projectId: PROJECT_ID,
+          now,
+          cap: 100,
+          recipientCount: 8,
+          dedupKey: "proj-1:tenant:incrby",
+        });
+
+        // INCRBY carried the recipient count; a plain INCR would have ignored it.
+        expect(incrby).toHaveBeenCalledTimes(1);
+        expect(incrby.mock.calls[0]![0]).toMatch(/^trigger-email-tenant-cap:/);
+        expect(incrby.mock.calls[0]![1]).toBe(8);
+        expect(result).toEqual({ allowed: true, count: 8 });
+      });
+    });
+
+    describe("when the SAME dispatch is retried (claim already won)", () => {
+      it("re-reads the counter via GET without a second INCRBY", async () => {
+        const incrby = vi.fn().mockResolvedValue(4);
+        const set = vi
+          .fn()
+          .mockResolvedValueOnce("OK")
+          .mockResolvedValueOnce(null);
+        redisMock.connection = {
+          set,
+          get: vi.fn().mockResolvedValue("4"),
+          incr: vi.fn(),
+          incrby,
+          expire: vi.fn().mockResolvedValue(1),
+        };
+
+        const now = new Date("2026-06-11T10:15:00Z");
+        const args = {
+          projectId: PROJECT_ID,
+          now,
+          cap: 100,
+          recipientCount: 4,
+          dedupKey: "proj-1:tenant:redis-retry",
+        };
+        const firstCall = await consumeTenantEmailCapSlot(args);
+        const retry = await consumeTenantEmailCapSlot(args);
+
+        expect(incrby).toHaveBeenCalledTimes(1);
+        expect(firstCall).toEqual({ allowed: true, count: 4 });
+        expect(retry).toEqual({ allowed: true, count: 4 });
+      });
+    });
+  });
+
+  describe("given Redis fails on every call (sustained outage)", () => {
+    afterEach(() => {
+      redisMock.connection = undefined;
+    });
+
+    describe("when distinct dispatches arrive through the outage", () => {
+      it("accumulates in the in-memory counter and logs the degradation at WARN", async () => {
+        loggerMock.warn.mockClear();
+        loggerMock.error.mockClear();
+        redisMock.connection = {
+          set: vi.fn().mockRejectedValue(new Error("connection refused")),
+          get: vi.fn().mockRejectedValue(new Error("connection refused")),
+          incr: vi.fn(),
+          incrby: vi.fn().mockRejectedValue(new Error("connection refused")),
+          expire: vi.fn().mockRejectedValue(new Error("connection refused")),
+        };
+
+        const now = new Date("2026-06-11T10:15:00Z");
+        const first = await consumeTenantEmailCapSlot({
+          projectId: PROJECT_ID,
+          now,
+          cap: 10,
+          recipientCount: 6,
+          dedupKey: "proj-1:tenant:outage-a",
+        });
+        const second = await consumeTenantEmailCapSlot({
+          projectId: PROJECT_ID,
+          now,
+          cap: 10,
+          recipientCount: 6,
+          dedupKey: "proj-1:tenant:outage-b",
+        });
+
+        // The per-worker counter kept climbing through the outage and tipped
+        // over the cap on the second dispatch.
+        expect(first).toEqual({ allowed: true, count: 6 });
+        expect(second).toEqual({ allowed: false, count: 12 });
+        // Backstop degradation surfaces at WARN, not ERROR (the hourly cap is
+        // the primary throttle and owns the ERROR-level degraded log).
+        expect(loggerMock.warn).toHaveBeenCalled();
+        expect(loggerMock.error).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given two distinct projects", () => {
+    describe("when each dispatches on the same day", () => {
+      it("counts them independently", async () => {
+        const now = new Date("2026-06-11T10:15:00Z");
+        const a = await consumeTenantEmailCapSlot({
+          projectId: "proj-a",
+          now,
+          cap: 5,
+          recipientCount: 5,
+          dedupKey: "proj-a:tenant:x",
+        });
+        const b = await consumeTenantEmailCapSlot({
+          projectId: "proj-b",
+          now,
+          cap: 5,
+          recipientCount: 5,
+          dedupKey: "proj-b:tenant:x",
+        });
+
+        expect(a).toEqual({ allowed: true, count: 5 });
+        expect(b).toEqual({ allowed: true, count: 5 });
       });
     });
   });

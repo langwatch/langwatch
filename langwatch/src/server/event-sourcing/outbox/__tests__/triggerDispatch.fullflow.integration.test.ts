@@ -105,6 +105,11 @@ function makeNotifyDeps(opts?: { emailCap?: number }) {
       now: Date;
       dedupKey: string;
     }) => consumeEmailCapSlot({ ...args, cap }),
+    // The per-project daily cap (ADR-031) isn't the focus here (the per-trigger
+    // hourly cap is) — wire a high ceiling and a pass-through that always
+    // allows, so the daily backstop never bites these flows.
+    tenantDailyCap: 1_000_000,
+    consumeTenantEmailCapSlot: async () => ({ allowed: true, count: 0 }),
     // Suppression isn't the focus here (the cap is) — pass recipients through.
     filterSuppressedEmails: async ({ emails }: { emails: string[] }) => emails,
   };

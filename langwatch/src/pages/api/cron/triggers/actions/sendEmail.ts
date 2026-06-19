@@ -2,7 +2,10 @@ import { TriggerAction } from "@prisma/client";
 import { createHash } from "crypto";
 import { env } from "~/env.mjs";
 import { getApp } from "~/server/app-layer/app";
-import { consumeEmailCapSlot } from "~/server/event-sourcing/outbox/emailHourlyCap";
+import {
+  consumeEmailCapSlot,
+  consumeTenantEmailCapSlot,
+} from "~/server/event-sourcing/outbox/emailHourlyCap";
 import { sendTriggerEmail } from "~/server/mailer/triggerEmail";
 import { createLogger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
@@ -62,6 +65,33 @@ export const handleSendEmail = async (context: TriggerContext) => {
           cap: env.TRIGGER_EMAIL_HOURLY_CAP,
         },
         "Custom-graph trigger exceeded its hourly email cap — dropping this dispatch",
+      );
+      return;
+    }
+
+    // ADR-031: per-PROJECT daily cap — a backstop ABOVE the per-trigger hourly
+    // cap, run only once the hourly cap has passed and the recipient set is
+    // known. Counts RECIPIENTS (`recipients.length`), the actual outbound email
+    // volume, not dispatches. Over the cap this dispatch is dropped (WARN, no
+    // send); the same `dispatchDigest`-derived dedupKey makes the count
+    // idempotent across cron re-ticks.
+    const tenantSlot = await consumeTenantEmailCapSlot({
+      projectId: trigger.projectId,
+      now: new Date(),
+      cap: env.TRIGGER_EMAIL_TENANT_DAILY_CAP,
+      recipientCount: recipients.length,
+      dedupKey: `${trigger.projectId}:tenant:${dispatchDigest}`,
+    });
+    if (!tenantSlot.allowed) {
+      logger.warn(
+        {
+          triggerId: trigger.id,
+          projectId: trigger.projectId,
+          count: tenantSlot.count,
+          cap: env.TRIGGER_EMAIL_TENANT_DAILY_CAP,
+        },
+        "Project exceeded its daily trigger-email cap — dropping this " +
+          "custom-graph dispatch. Backstop above the per-trigger hourly cap.",
       );
       return;
     }

@@ -35,8 +35,11 @@ vi.mock("~/server/app-layer/app", () => ({
 }));
 
 const consumeEmailCapSlot = vi.fn();
+const consumeTenantEmailCapSlot = vi.fn();
 vi.mock("~/server/event-sourcing/outbox/emailHourlyCap", () => ({
   consumeEmailCapSlot: (...args: unknown[]) => consumeEmailCapSlot(...args),
+  consumeTenantEmailCapSlot: (...args: unknown[]) =>
+    consumeTenantEmailCapSlot(...args),
 }));
 
 import { sendTriggerEmail } from "~/server/mailer/triggerEmail";
@@ -45,11 +48,12 @@ import { captureException } from "~/utils/posthogErrorCapture";
 describe("handleSendEmail", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Default: nothing suppressed, under the cap.
+    // Default: nothing suppressed, under both caps.
     filterSuppressed.mockImplementation(
       async ({ emails }: { emails: string[] }) => emails,
     );
     consumeEmailCapSlot.mockResolvedValue({ allowed: true, count: 1 });
+    consumeTenantEmailCapSlot.mockResolvedValue({ allowed: true, count: 1 });
   });
 
   describe("when email is sent successfully", () => {
@@ -208,6 +212,44 @@ describe("handleSendEmail", () => {
 
       await handleSendEmail(context);
 
+      expect(sendTriggerEmail).not.toHaveBeenCalled();
+      // Hourly cap drops first; the project daily cap is never reached.
+      expect(consumeTenantEmailCapSlot).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the project is over its daily email cap (ADR-031)", () => {
+    it("consults the daily cap by recipient count and drops without sending", async () => {
+      consumeTenantEmailCapSlot.mockResolvedValueOnce({
+        allowed: false,
+        count: 10001,
+      });
+      const context: TriggerContext = {
+        trigger: {
+          id: "trigger-1",
+          projectId: "project-1",
+          name: "Test Trigger",
+          actionParams: {
+            members: ["a@example.com", "b@example.com"],
+          },
+          alertType: null,
+          message: "",
+        } as any,
+        projects: [],
+        triggerData: [],
+        projectSlug: "test-project",
+      };
+
+      await handleSendEmail(context);
+
+      // The daily cap counts RECIPIENTS, so recipientCount is the surviving
+      // recipient-list length.
+      expect(consumeTenantEmailCapSlot).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: "project-1",
+          recipientCount: 2,
+        }),
+      );
       expect(sendTriggerEmail).not.toHaveBeenCalled();
     });
   });
