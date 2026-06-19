@@ -1,4 +1,5 @@
 import { ScenarioEventService } from "~/server/scenarios/scenario-event.service";
+import { resolveScopeChain } from "~/server/scopes/resolveScopeChain";
 import { prisma } from "../db";
 
 export type OnboardingCheckStatus = {
@@ -56,6 +57,7 @@ export class OnboardingChecksService {
         },
         team: {
           select: {
+            organizationId: true,
             members: {
               select: { userId: true },
             },
@@ -64,30 +66,32 @@ export class OnboardingChecksService {
       },
     });
 
-    // Project-visible MPs: any MP scoped at PROJECT, the project's TEAM,
-    // or the project's ORG (matches `findAllAccessibleForProject` in
-    // ModelProviderRepository). Project.modelProviders back-relation
-    // was dropped when the legacy projectId column went away.
+    // Project-visible MPs: any enabled MP scoped at PROJECT, the project's
+    // TEAM, or the project's ORG. This mirrors the PROJECT -> TEAM ->
+    // ORGANIZATION cascade that `findAllAccessibleForProject` in
+    // ModelProviderRepository uses for real reads, so an org-wide provider
+    // counts toward every project under that org. Matching only the PROJECT
+    // scope left this step stuck incomplete for org-scoped credentials.
     const modelProviders = project
       ? await prisma.modelProvider.findFirst({
           where: {
             enabled: true,
             scopes: {
-              some: { scopeType: "PROJECT", scopeId: projectId },
+              some: {
+                OR: resolveScopeChain({
+                  organizationId: project.team.organizationId,
+                  teamId: project.teamId,
+                  projectId,
+                }),
+              },
             },
           },
           select: { id: true },
         })
       : null;
 
-    const {
-      workflows,
-      customGraphs,
-      datasets,
-      experiments,
-      triggers,
-      team,
-    } = project ?? {};
+    const { workflows, customGraphs, datasets, experiments, triggers, team } =
+      project ?? {};
 
     // Check for simulations (scenario sets in ClickHouse)
     const simulations = await this.getSimulationsCount(projectId);
