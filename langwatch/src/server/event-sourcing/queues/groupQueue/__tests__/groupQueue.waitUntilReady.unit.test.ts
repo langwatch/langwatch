@@ -57,7 +57,9 @@ function makeDefinition(): EventSourcedQueueDefinition<TestPayload> {
 describe("GroupQueueProcessor waitUntilReady", () => {
   const connections: IORedis[] = [];
 
-  function makeProcessor(blocking: FakeConnection): GroupQueueProcessor<TestPayload> {
+  function makeProcessor(
+    blocking: FakeConnection,
+  ): GroupQueueProcessor<TestPayload> {
     const conn = new IORedis({ lazyConnect: true, maxRetriesPerRequest: 0 });
     connections.push(conn);
     // In consumer mode the processor builds its blocking connection via
@@ -92,7 +94,10 @@ describe("GroupQueueProcessor waitUntilReady", () => {
 
         // A normal ioredis reconnect cycle against an unavailable endpoint with
         // maxRetriesPerRequest: null.
-        blocking.emit("error", new Error("connect ECONNREFUSED 127.0.0.1:6379"));
+        blocking.emit(
+          "error",
+          new Error("connect ECONNREFUSED 127.0.0.1:6379"),
+        );
         blocking.emit("close");
         blocking.emit("reconnecting", 50);
         blocking.status = "ready";
@@ -115,7 +120,10 @@ describe("GroupQueueProcessor waitUntilReady", () => {
           (err: Error) => err.message,
         );
 
-        blocking.emit("error", new Error("connect ECONNREFUSED 127.0.0.1:6379"));
+        blocking.emit(
+          "error",
+          new Error("connect ECONNREFUSED 127.0.0.1:6379"),
+        );
         blocking.emit("close");
         blocking.emit("end");
 
