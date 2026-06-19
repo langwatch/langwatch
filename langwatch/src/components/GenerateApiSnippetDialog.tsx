@@ -53,6 +53,14 @@ interface GenerateApiSnippetProps {
    * picker). Only rendered when `tabs` is provided.
    */
   controls?: React.ReactNode;
+  /**
+   * Controlled open state. When provided, the caller owns opening and closing
+   * the dialog (for example a menu item that closes its own popover as it opens
+   * the dialog) and the internal `Trigger` is not needed. When omitted, the
+   * dialog manages its own open state and is opened via `Trigger`.
+   */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 /**
@@ -73,8 +81,22 @@ export function GenerateApiSnippetDialog({
   children,
   tabs,
   controls,
+  open: openProp,
+  onOpenChange,
 }: GenerateApiSnippetProps) {
-  const { open, onOpen, onClose } = useDisclosure();
+  const disclosure = useDisclosure();
+  const isControlled = openProp !== undefined;
+  const open = isControlled ? openProp : disclosure.open;
+  const setOpen = (next: boolean) => {
+    if (isControlled) {
+      onOpenChange?.(next);
+      return;
+    }
+    if (next) disclosure.onOpen();
+    else disclosure.onClose();
+  };
+  const onOpen = () => setOpen(true);
+  const onClose = () => setOpen(false);
   const [selectedTarget, setSelectedTarget] = useState<Target>(
     targets[0] ?? "python_python3",
   );

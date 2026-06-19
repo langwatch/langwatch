@@ -7,7 +7,6 @@ import { EditableHeading } from "~/experiments-v3/components/EditableHeading";
 import { EvaluationsV3Table } from "~/experiments-v3/components/EvaluationsV3Table";
 import { HistoryButton } from "~/experiments-v3/components/HistoryButton";
 import { RunEvaluationButton } from "~/experiments-v3/components/RunEvaluationButton";
-import { RunViaApiButtonContainer } from "~/experiments-v3/components/RunViaApiButton";
 import { SavedDatasetLoaders } from "~/experiments-v3/components/SavedDatasetLoaders";
 import { TableSettingsMenu } from "~/experiments-v3/components/TableSettingsMenu";
 import { UndoRedo } from "~/experiments-v3/components/UndoRedo";
@@ -137,7 +136,6 @@ export default function ExperimentsWorkbenchPage() {
             <UndoRedo />
             <TableSettingsMenu disabled={isLoadingExperiment} />
             <HistoryButton disabled={isLoadingExperiment} />
-            <RunViaApiButtonContainer disabled={isLoadingExperiment} />
             <RunEvaluationButton
               disabled={isLoadingExperiment || isLoadingDatasets}
             />
