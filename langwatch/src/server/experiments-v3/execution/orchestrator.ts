@@ -28,7 +28,7 @@ import { generateHumanReadableId } from "~/utils/humanReadableId";
 import { createLogger } from "~/utils/logger/server";
 import { generateOtelTraceId } from "~/utils/trace";
 import { abortManager } from "./abortManager";
-import type { LoadedWorkflow } from "./dataLoader";
+import { type LoadedWorkflow, workflowLoadKey } from "./dataLoader";
 import { buildStripScoreEvaluatorIds } from "./evaluatorScoreFilter";
 import {
   extractTargetOutput,
@@ -769,7 +769,7 @@ export async function* runOrchestrator(
     } else if (t.type === "evaluator" && t.targetEvaluatorId) {
       name = loadedEvaluators?.get(t.targetEvaluatorId)?.name ?? null;
     } else if (t.type === "workflow" && t.workflowId) {
-      name = loadedWorkflows?.get(t.workflowId)?.name ?? null;
+      name = loadedWorkflows?.get(workflowLoadKey(t))?.name ?? null;
     }
 
     return {
@@ -1288,7 +1288,7 @@ const getLoadedDataForTarget = (
   }
 
   if (targetConfig.type === "workflow" && targetConfig.workflowId) {
-    const workflow = loadedWorkflows?.get(targetConfig.workflowId);
+    const workflow = loadedWorkflows?.get(workflowLoadKey(targetConfig));
     if (workflow) {
       return { workflow };
     }

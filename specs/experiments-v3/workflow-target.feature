@@ -19,16 +19,16 @@ Feature: A workflow runs as an evaluations-v3 target
   @integration
   Scenario: A workflow target produces one result per dataset row
     When I run an evaluation with the workflow as the target
-    Then each dataset row produces one target result from the workflow end-node outputs
+    Then each dataset row produces one result from running the whole workflow
     And the run records three rows total
 
   @integration
   Scenario: The workflow's own evaluator nodes surface as evaluator results
     Given the workflow contains an evaluator node that scores the output
     When I run the workflow evaluation
-    Then each row carries an evaluator result from that node
-    And a string score from the workflow is coerced to a number
-    And a string pass or fail from the workflow is coerced to a boolean
+    Then each row shows the score from that evaluator node
+    And the score is reported as a number
+    And the pass or fail verdict is reported as a boolean
 
   @integration @unimplemented
   Scenario: A row that fails does not abort the rest of the run
@@ -40,10 +40,10 @@ Feature: A workflow runs as an evaluations-v3 target
   @integration
   Scenario: Cost and duration from the workflow run are captured per row
     When I run the workflow evaluation
-    Then each target result records the workflow run cost and duration
+    Then each row records the cost and duration of the workflow run
 
   @integration @unimplemented
   Scenario: Each row gets a distinct trace id shared by its evaluator results
     When I run the workflow evaluation
-    Then each row's target result has its own trace id
-    And the evaluator results for that row reference the same trace id as the row's target
+    Then each row has its own trace id
+    And that row's evaluator scores share the same trace id

@@ -102,57 +102,59 @@ describe("executeWorkflowCell", () => {
       { type: "done" },
     ];
 
-    /** @scenario "A workflow target produces one result per dataset row" */
-    it("yields exactly one target_result from the workflow end-node result", async () => {
-      scripted.events = succeedingRun;
-      const events = await run(makeCell());
+    describe("when the cell is executed", () => {
+      /** @scenario "A workflow target produces one result per dataset row" */
+      it("yields exactly one target_result from the workflow end-node result", async () => {
+        scripted.events = succeedingRun;
+        const events = await run(makeCell());
 
-      const targets = events.filter((e) => e.type === "target_result");
-      expect(targets).toHaveLength(1);
-      expect(targets[0]).toMatchObject({
-        rowIndex: 0,
-        targetId: "wf-target",
-        output: "yes",
-        traceId: "trace_wf_0",
-      });
-    });
-
-    /** @scenario "The workflow's own evaluator nodes surface as evaluator results" */
-    it("surfaces each workflow evaluator node, coercing string score and passed", async () => {
-      scripted.events = succeedingRun;
-      const events = await run(makeCell());
-
-      const evaluator = events.find((e) => e.type === "evaluator_result");
-      expect(evaluator).toMatchObject({
-        rowIndex: 0,
-        targetId: "wf-target",
-        evaluatorId: "eval_1",
-      });
-      // Workflow evaluators emit stringy values; they are coerced.
-      expect(
-        evaluator?.type === "evaluator_result" && evaluator.result,
-      ).toMatchObject({
-        status: "processed",
-        score: 0.85,
-        passed: true,
-        label: "match",
+        const targets = events.filter((e) => e.type === "target_result");
+        expect(targets).toHaveLength(1);
+        expect(targets[0]).toMatchObject({
+          rowIndex: 0,
+          targetId: "wf-target",
+          output: "yes",
+          traceId: "trace_wf_0",
+        });
       });
 
-      // Target result is yielded before the evaluator result so storage can
-      // link them.
-      const targetIdx = events.findIndex((e) => e.type === "target_result");
-      const evalIdx = events.findIndex((e) => e.type === "evaluator_result");
-      expect(targetIdx).toBeLessThan(evalIdx);
-    });
+      /** @scenario "The workflow's own evaluator nodes surface as evaluator results" */
+      it("surfaces each workflow evaluator node, coercing string score and passed", async () => {
+        scripted.events = succeedingRun;
+        const events = await run(makeCell());
 
-    /** @scenario "Cost and duration from the workflow run are captured per row" */
-    it("captures summed node cost and the run duration on the target result", async () => {
-      scripted.events = succeedingRun;
-      const events = await run(makeCell());
+        const evaluator = events.find((e) => e.type === "evaluator_result");
+        expect(evaluator).toMatchObject({
+          rowIndex: 0,
+          targetId: "wf-target",
+          evaluatorId: "eval_1",
+        });
+        // Workflow evaluators emit stringy values; they are coerced.
+        expect(
+          evaluator?.type === "evaluator_result" && evaluator.result,
+        ).toMatchObject({
+          status: "processed",
+          score: 0.85,
+          passed: true,
+          label: "match",
+        });
 
-      const target = events.find((e) => e.type === "target_result");
-      expect(target?.type === "target_result" && target.cost).toBe(0.75);
-      expect(target?.type === "target_result" && target.duration).toBe(500);
+        // Target result is yielded before the evaluator result so storage can
+        // link them.
+        const targetIdx = events.findIndex((e) => e.type === "target_result");
+        const evalIdx = events.findIndex((e) => e.type === "evaluator_result");
+        expect(targetIdx).toBeLessThan(evalIdx);
+      });
+
+      /** @scenario "Cost and duration from the workflow run are captured per row" */
+      it("captures summed node cost and the run duration on the target result", async () => {
+        scripted.events = succeedingRun;
+        const events = await run(makeCell());
+
+        const target = events.find((e) => e.type === "target_result");
+        expect(target?.type === "target_result" && target.cost).toBe(0.75);
+        expect(target?.type === "target_result" && target.duration).toBe(500);
+      });
     });
   });
 });
