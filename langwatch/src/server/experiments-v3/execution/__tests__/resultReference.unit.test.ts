@@ -3,7 +3,9 @@ import { generateCells } from "../orchestrator";
 import {
   RESERVED_DATASET_ID_KEY,
   RESERVED_ROW_ID_KEY,
+  RESULT_INLINE_BYTES,
   isReservedResultKey,
+  leanResultEntry,
   readRowReference,
   withRowReference,
 } from "../resultReference";
@@ -51,6 +53,46 @@ describe("ADR-033 result-by-reference plumbing", () => {
 
         expect(result).toBe(entry); // same object, untouched
         expect(readRowReference(result)).toBeNull();
+      });
+    });
+  });
+
+  describe("leanResultEntry", () => {
+    const heavyImage = `data:image/png;base64,${"A".repeat(RESULT_INLINE_BYTES + 1)}`;
+    const row = { question: "how many units?", expected: 5, image: heavyImage };
+    const ref = { datasetId: "ds-1", rowId: "record_abc" };
+
+    describe("when the streaming-reads flag is ON and the row has an id", () => {
+      const lean = leanResultEntry(row, ref, { enabled: true });
+
+      it("keeps light columns inline", () => {
+        expect(lean.question).toBe("how many units?");
+        expect(lean.expected).toBe(5);
+      });
+
+      it("drops the heavy column, to be resolved at read by reference", () => {
+        expect(lean.image).toBeUndefined();
+        expect(readRowReference(lean)).toEqual({
+          datasetId: "ds-1",
+          rowId: "record_abc",
+        });
+      });
+    });
+
+    describe("when the flag is OFF", () => {
+      it("keeps the full row byte-for-byte (I-COMPAT), reference still attached", () => {
+        const full = leanResultEntry(row, ref, { enabled: false });
+        expect(full.image).toBe(heavyImage); // heavy column NOT stripped
+        expect(full.question).toBe("how many units?");
+        expect(full[RESERVED_ROW_ID_KEY]).toBe("record_abc");
+      });
+    });
+
+    describe("when the row has no stable id (inline dataset)", () => {
+      it("keeps the full row even with the flag on", () => {
+        const full = leanResultEntry(row, { rowId: undefined }, { enabled: true });
+        expect(full.image).toBe(heavyImage);
+        expect(readRowReference(full)).toBeNull();
       });
     });
   });

@@ -26,8 +26,9 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
 import { createLogger } from "~/utils/logger/server";
 import { generateOtelTraceId } from "~/utils/trace";
+import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
 import { abortManager } from "./abortManager";
-import { withRowReference } from "./resultReference";
+import { RESULT_INLINE_BYTES, leanResultEntry } from "./resultReference";
 import { buildStripScoreEvaluatorIds } from "./evaluatorScoreFilter";
 import {
   mapErrorEvent,
@@ -566,6 +567,14 @@ export async function* runOrchestrator(
   // ADR-033: dataset id for result-by-reference (matches generateCells's resolution).
   const datasetId = state.datasets[0]?.id ?? state.activeDatasetId ?? undefined;
 
+  // ADR-033: gate the lean result shape per project via the postgres-cached
+  // store (same pattern as release_trace_blob_offload, ADR-022). Off (default,
+  // null row) = today's full-row copy, byte-for-byte (I-COMPAT). Once per run.
+  const streamingReadsEnabled =
+    (await getFeatureFlagStore().get("release_dataset_streaming_reads", {
+      projectId,
+    })) === true;
+
   // Generate cells to execute
   const cells = generateCells(state, datasetRows, scope, datasetRowIds);
   const totalCells = cells.length;
@@ -722,12 +731,14 @@ export async function* runOrchestrator(
           experimentId,
           index: event.rowIndex,
           targetId: event.targetId,
-          // ADR-033: attach the stable row reference (no-op when no rowId, e.g.
-          // inline/id-less rows → today's full-copy shape).
-          entry: withRowReference(datasetEntry, {
-            datasetId,
-            rowId: datasetRowIds?.[event.rowIndex],
-          }),
+          // ADR-033: lean result shape when the flag is on (light columns
+          // inline, heavy referenced); otherwise the full row with the
+          // reference attached. No-op for inline/id-less rows.
+          entry: leanResultEntry(
+            datasetEntry,
+            { datasetId, rowId: datasetRowIds?.[event.rowIndex] },
+            { enabled: streamingReadsEnabled, inlineMaxBytes: RESULT_INLINE_BYTES },
+          ),
           predicted:
             event.output === null || event.output === undefined
               ? null
@@ -750,12 +761,14 @@ export async function* runOrchestrator(
           experimentId,
           index: event.rowIndex,
           targetId: event.targetId,
-          // ADR-033: attach the stable row reference (no-op when no rowId, e.g.
-          // inline/id-less rows → today's full-copy shape).
-          entry: withRowReference(datasetEntry, {
-            datasetId,
-            rowId: datasetRowIds?.[event.rowIndex],
-          }),
+          // ADR-033: lean result shape when the flag is on (light columns
+          // inline, heavy referenced); otherwise the full row with the
+          // reference attached. No-op for inline/id-less rows.
+          entry: leanResultEntry(
+            datasetEntry,
+            { datasetId, rowId: datasetRowIds?.[event.rowIndex] },
+            { enabled: streamingReadsEnabled, inlineMaxBytes: RESULT_INLINE_BYTES },
+          ),
           predicted: null,
           cost: null,
           duration: null,
