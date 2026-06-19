@@ -6,8 +6,6 @@ Feature: Removing nodes and connections from the workflow canvas
   the gesture works on macOS (Backspace) and on Windows and Linux keyboards
   (Delete) alike.
 
-  # Bindings: langwatch/src/optimization_studio/components/__tests__/OptimizationStudioCanvas.unit.test.ts
-
   Background:
     Given a workflow open on the studio canvas with two connected nodes
 

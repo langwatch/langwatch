@@ -6,8 +6,6 @@ Feature: Duplicating and deleting a workflow node from its action menu
   way to manage a node without relying on keyboard shortcuts. Structural entry
   and end nodes cannot be duplicated or deleted, so they do not show the menu.
 
-  # Bindings: langwatch/src/optimization_studio/components/drawers/__tests__/StudioDrawerWrapper.integration.test.tsx
-
   Background:
     Given a workflow open on the studio canvas
 

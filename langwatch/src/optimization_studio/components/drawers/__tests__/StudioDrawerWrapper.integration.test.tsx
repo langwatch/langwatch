@@ -81,6 +81,8 @@ describe("StudioDrawerWrapper node action menu", () => {
   afterEach(() => cleanup());
 
   describe("when a regular component node is selected", () => {
+    /** @scenario "The node drawer offers a duplicate action" */
+    /** @scenario "The node drawer offers a delete action" */
     it("shows the node action menu trigger in the drawer header", () => {
       renderDrawer(makeNode("signature"));
       expect(screen.getByLabelText("Node actions")).toBeTruthy();
@@ -88,6 +90,7 @@ describe("StudioDrawerWrapper node action menu", () => {
   });
 
   describe("when a structural entry node is selected", () => {
+    /** @scenario "Structural nodes do not expose the action menu" */
     it("does not show the node action menu", () => {
       renderDrawer(makeNode("entry"));
       expect(screen.queryByLabelText("Node actions")).toBeNull();

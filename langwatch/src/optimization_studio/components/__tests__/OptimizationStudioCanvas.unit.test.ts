@@ -13,6 +13,9 @@ describe("OptimizationStudioCanvas", () => {
       expect(source).toContain("selectNodesOnDrag={false}");
     });
 
+    /** @scenario "Removing a selected connection with the Delete key" */
+    /** @scenario "Removing a selected connection with the Backspace key" */
+    /** @scenario "Removing a selected node with the Delete key" */
     it("binds both Backspace and Delete so nodes and connections delete with either key", () => {
       const source = fs.readFileSync(
         path.resolve(__dirname, "../OptimizationStudio.tsx"),
