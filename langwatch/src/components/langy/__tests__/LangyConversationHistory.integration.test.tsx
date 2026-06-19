@@ -24,15 +24,20 @@ import {
   describe,
   expect,
   it,
-  vi,
   type Mock,
+  vi,
 } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Mocks (hoisted by vi.mock — must precede the LangyDrawer import)
 // ---------------------------------------------------------------------------
 
-const projectRef = { current: { id: "project-demo", slug: "demo" } as { id: string; slug: string } | null };
+const projectRef = {
+  current: { id: "project-demo", slug: "demo" } as {
+    id: string;
+    slug: string;
+  } | null,
+};
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({ project: projectRef.current }),
@@ -136,8 +141,8 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-import { LangyDrawer } from "../LangySidebar";
 import { toaster } from "~/components/ui/toaster";
+import { LangyDrawer } from "../LangySidebar";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -180,52 +185,54 @@ interface FetchScenario {
 }
 
 function installFetchMock(scenario: FetchScenario): Mock {
-  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = typeof input === "string" ? input : input.toString();
-    const method = (init?.method ?? "GET").toUpperCase();
+  const fetchMock = vi.fn(
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      const method = (init?.method ?? "GET").toUpperCase();
 
-    if (url.startsWith("/api/langy/conversations") && method === "GET") {
-      const isList = !/\/conversations\/[^/?]+/.test(url);
-      if (isList) {
-        if (scenario.failList) {
-          return new Response(JSON.stringify({ error: "boom" }), {
-            status: 500,
-            headers: { "Content-Type": "application/json" },
-          });
+      if (url.startsWith("/api/langy/conversations") && method === "GET") {
+        const isList = !/\/conversations\/[^/?]+/.test(url);
+        if (isList) {
+          if (scenario.failList) {
+            return new Response(JSON.stringify({ error: "boom" }), {
+              status: 500,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+          if (scenario.slowList) {
+            await new Promise<void>((resolve) => {
+              scenario.slowList!.resolveLater = resolve;
+            });
+          }
+          return new Response(
+            JSON.stringify({ conversations: scenario.conversations }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
         }
-        if (scenario.slowList) {
-          await new Promise<void>((resolve) => {
-            scenario.slowList!.resolveLater = resolve;
+        // GET /api/langy/conversations/:id
+        const id = url.split("?")[0]!.split("/").pop()!;
+        const conv = scenario.conversations.find((c) => c.id === id);
+        if (!conv) {
+          return new Response(JSON.stringify({ error: "Not found" }), {
+            status: 404,
           });
         }
         return new Response(
-          JSON.stringify({ conversations: scenario.conversations }),
+          JSON.stringify({
+            conversation: conv,
+            messages: scenario.messagesById[id] ?? [],
+          }),
           { status: 200, headers: { "Content-Type": "application/json" } },
         );
       }
-      // GET /api/langy/conversations/:id
-      const id = url.split("?")[0]!.split("/").pop()!;
-      const conv = scenario.conversations.find((c) => c.id === id);
-      if (!conv) {
-        return new Response(JSON.stringify({ error: "Not found" }), {
-          status: 404,
-        });
+
+      if (url.startsWith("/api/langy/conversations/") && method === "DELETE") {
+        return new Response(JSON.stringify({ success: true }), { status: 200 });
       }
-      return new Response(
-        JSON.stringify({
-          conversation: conv,
-          messages: scenario.messagesById[id] ?? [],
-        }),
-        { status: 200, headers: { "Content-Type": "application/json" } },
-      );
-    }
 
-    if (url.startsWith("/api/langy/conversations/") && method === "DELETE") {
-      return new Response(JSON.stringify({ success: true }), { status: 200 });
-    }
-
-    return new Response("not stubbed", { status: 501 });
-  });
+      return new Response("not stubbed", { status: 501 });
+    },
+  );
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
 }
@@ -532,21 +539,16 @@ describe("LangyPanel conversation history", () => {
           makeConv("conv-b", "B", "2026-05-10T10:00:00.000Z"),
         ];
         const messagesById = {
-          "conv-a": [
-            { id: "ma", role: "user" as const, content: "from A" },
-          ],
-          "conv-b": [
-            { id: "mb", role: "user" as const, content: "from B" },
-          ],
+          "conv-a": [{ id: "ma", role: "user" as const, content: "from A" }],
+          "conv-b": [{ id: "mb", role: "user" as const, content: "from B" }],
         };
         installFetchMock({ conversations, messagesById });
 
         const { unmount } = renderPanel();
         await waitFor(() => {
-          const passed =
-            chatRef.setMessages.mock.calls[
-              chatRef.setMessages.mock.calls.length - 1
-            ]?.[0] as UIMessageLike[] | undefined;
+          const passed = chatRef.setMessages.mock.calls[
+            chatRef.setMessages.mock.calls.length - 1
+          ]?.[0] as UIMessageLike[] | undefined;
           expect(passed?.[0]?.parts?.[0]?.text).toBe("from B");
         });
         unmount();
@@ -554,10 +556,9 @@ describe("LangyPanel conversation history", () => {
 
         renderPanel();
         await waitFor(() => {
-          const passed =
-            chatRef.setMessages.mock.calls[
-              chatRef.setMessages.mock.calls.length - 1
-            ]?.[0] as UIMessageLike[] | undefined;
+          const passed = chatRef.setMessages.mock.calls[
+            chatRef.setMessages.mock.calls.length - 1
+          ]?.[0] as UIMessageLike[] | undefined;
           expect(passed?.[0]?.parts?.[0]?.text).toBe("from B");
         });
       });
