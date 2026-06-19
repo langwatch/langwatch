@@ -20,10 +20,14 @@ import type {
 import { isRowEmpty } from "~/experiments-v3/utils/emptyRowDetection";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
-import type { Workflow } from "~/optimization_studio/types/dsl";
+import type { ExecutionState, Workflow } from "~/optimization_studio/types/dsl";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { getApp } from "~/server/app-layer/app";
+import {
+  estimateCost,
+  getMatchingLLMModelCost,
+} from "~/server/background/workers/collector/cost";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
 import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
@@ -615,6 +619,27 @@ export const generatePairwiseCells = (
 };
 
 /**
+ * Prices an LLM node's token usage at the project's canonical model rate.
+ *
+ * The engine surfaces token counts + the resolved model on the execution state
+ * but no cost (it has no price table). This derives the cost the same way the
+ * trace-ingest collector does, so a cell's cost matches its trace's cost.
+ * Returns undefined when there is no model, no tokens, or no known rate.
+ */
+export const priceMetrics = async (
+  projectId: string,
+  metrics: ExecutionState["metrics"] | undefined,
+): Promise<number | undefined> => {
+  if (!metrics?.model) return undefined;
+  const inputTokens = metrics.prompt_tokens ?? 0;
+  const outputTokens = metrics.completion_tokens ?? 0;
+  if (inputTokens === 0 && outputTokens === 0) return undefined;
+  const llmModelCost = await getMatchingLLMModelCost(projectId, metrics.model);
+  if (!llmModelCost) return undefined;
+  return estimateCost({ llmModelCost, inputTokens, outputTokens });
+};
+
+/**
  * Executes a single cell and yields events.
  * @param isAborted - Optional function to check if execution should be aborted
  */
@@ -744,9 +769,22 @@ export async function* executeCell(
           targetNodes,
           cellConfig,
         );
-        if (mappedEvent) {
-          yield mappedEvent;
+        if (!mappedEvent) continue;
+        // The engine reports token usage but no cost (it has no price table),
+        // so price the target's tokens here at the canonical model rate. This
+        // keeps the cell's cost consistent with its trace's cost.
+        if (
+          mappedEvent.type === "target_result" &&
+          mappedEvent.cost == null &&
+          event.type === "component_state_change"
+        ) {
+          const cost = await priceMetrics(
+            projectId,
+            event.payload.execution_state?.metrics,
+          );
+          if (cost != null) mappedEvent.cost = cost;
         }
+        yield mappedEvent;
       }
     }
 
@@ -961,9 +999,20 @@ export async function* executeWorkflowCell(
       const { component_id, execution_state } = event.payload;
       if (!execution_state) continue;
 
-      if (typeof execution_state.cost === "number") {
+      if (
+        typeof execution_state.cost === "number" &&
+        execution_state.cost > 0
+      ) {
         totalCost += execution_state.cost;
         sawCost = true;
+      } else {
+        // LLM nodes report tokens but no cost (the engine has no price table),
+        // so price them at the canonical model rate, same as executeCell.
+        const cost = await priceMetrics(projectId, execution_state.metrics);
+        if (cost != null) {
+          totalCost += cost;
+          sawCost = true;
+        }
       }
 
       if (
