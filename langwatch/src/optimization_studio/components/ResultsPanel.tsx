@@ -303,6 +303,7 @@ export function EvaluationResults({
                     entryFields={entryFields}
                     datasetColumns={datasetColumns}
                     datasetName={entryDataset?.name}
+                    projectSlug={project.slug}
                   />
                 )}
                 {selectedRunId_ && (

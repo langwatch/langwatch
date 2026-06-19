@@ -1,7 +1,3 @@
-# @unimplemented while this PR is in flight: scenarios are bound (and the
-# @unimplemented tag dropped) when Phase 4 lands. Bindings target the
-# RunViaApiButton integration tests.
-@unimplemented
 Feature: Run via API dialog for workflows and evaluations-v3
   As a user wiring an evaluation into CI
   I want the Run via API dialog to show how to pass my data and read results back

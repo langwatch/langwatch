@@ -1,7 +1,3 @@
-# @unimplemented while this PR is in flight: scenarios are bound (and the
-# @unimplemented tag dropped) when Phase 4 lands. Bindings target
-# langwatch/src/components/run-via-api/__tests__/runSnippets.unit.test.ts.
-@unimplemented
 Feature: Run via API snippet generator
   As the Run via API dialog
   I want a pure generator that builds a snippet for any language and data source

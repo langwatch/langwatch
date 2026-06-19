@@ -1,53 +1,70 @@
 import { Button } from "@chakra-ui/react";
 import { Terminal } from "react-feather";
 
-import { GenerateApiSnippetDialog } from "~/components/GenerateApiSnippetDialog";
-import type { Snippet } from "~/prompts/types";
+import {
+  type ApiSnippetTab,
+  GenerateApiSnippetDialog,
+} from "~/components/GenerateApiSnippetDialog";
+import { DataSourcePicker } from "~/components/run-via-api/DataSourcePicker";
+import {
+  buildRunSnippet,
+  type RunSnippetDataSource,
+} from "~/components/run-via-api/runSnippets";
+import { useRunViaApiTabs } from "~/components/run-via-api/useRunViaApiTabs";
 
-import { evaluateCurlSnippet } from "../utils/evaluateApiSnippet";
 import type { WorkflowField } from "../utils/workflowFields";
 
 /**
  * Shows how to trigger this workflow's evaluation from CI or scripts: the same
- * run the Evaluate button starts, via the REST API. The parameters example
- * mirrors the entry point's own fields so it is real for this workflow.
+ * run the Evaluate button starts, through the unified evaluations-v3 backend.
+ * Offers a language picker (Python, TypeScript, Shell) and a data-source picker
+ * (attached dataset, inline data, dataset id), and always shows how to read the
+ * per-row results back. The example mirrors the entry point's own fields.
  */
 export function RunViaApiButton({
   workflowId,
   entryFields,
   datasetColumns,
   datasetName,
+  projectSlug,
 }: {
   workflowId: string;
   entryFields: WorkflowField[];
   datasetColumns: string[];
   datasetName?: string;
+  projectSlug?: string;
 }) {
   const baseUrl =
     typeof window !== "undefined"
       ? window.location.origin
       : "https://app.langwatch.ai";
 
-  const snippets: Snippet[] = [
-    {
-      target: "shell_curl",
-      title: "curl",
-      content: evaluateCurlSnippet({
-        workflowId,
+  const { dataSource, setDataSource, tabs } = useRunViaApiTabs((lang, source) =>
+    buildRunSnippet(
+      {
+        kind: "workflow",
+        identifier: workflowId,
         baseUrl,
         entryFields,
         datasetColumns,
         datasetName,
-      }),
-    },
-  ];
+        dataSource: source,
+        projectSlug,
+      },
+      lang,
+    ),
+  );
 
   return (
     <GenerateApiSnippetDialog
-      snippets={snippets}
-      targets={["shell_curl"]}
+      snippets={[]}
+      targets={[]}
+      tabs={tabs}
+      controls={
+        <DataSourcePicker value={dataSource} onChange={setDataSource} />
+      }
       title="Run via API"
-      description="Trigger this workflow's evaluation from CI or scripts. It runs against the attached dataset; parameters below set constant inputs for fields the dataset does not provide."
+      description="Trigger this workflow's evaluation through the LangWatch API and read the per-row results back."
     >
       <GenerateApiSnippetDialog.Trigger>
         <Button size="sm" variant="outline" data-testid="run-via-api">
@@ -58,3 +75,5 @@ export function RunViaApiButton({
     </GenerateApiSnippetDialog>
   );
 }
+
+export type { ApiSnippetTab, RunSnippetDataSource };
