@@ -195,7 +195,20 @@ class ExperimentRunResult:
                     return pd.DataFrame()
 
                 if response.is_success:
-                    return build_results_df(response.json())
+                    payload = response.json()
+                    df = build_results_df(payload)
+                    # ClickHouse can lag: a completed run may briefly return 200
+                    # with an empty dataset before its rows materialize. Retry on
+                    # an empty result when the run reports rows, rather than
+                    # caching the empty frame.
+                    if (
+                        df.empty
+                        and (payload.get("total") or 0) > 0
+                        and attempt < retries - 1
+                    ):
+                        time.sleep(delay)
+                        continue
+                    return df
 
             except Exception:
                 if attempt < retries - 1:
