@@ -265,8 +265,9 @@ describe("Feature: Langy opens GitHub PRs as the requesting user", () => {
 const hasProjectPermission = vi.fn();
 const getVercelAIModel = vi.fn();
 const checkLangyMessageRateLimit = vi.fn();
-const getLangyGithubPrUsage = vi.fn();
-const recordLangyGithubPr = vi.fn();
+const reserveLangyGithubPrPermit = vi.fn();
+const releaseLangyGithubPrPermit = vi.fn();
+const featureFlagIsEnabled = vi.fn();
 const getOrProvision = vi.fn();
 const getModelsAllowed = vi.fn();
 const ensureConversation = vi.fn();
@@ -289,8 +290,15 @@ vi.mock("~/server/middleware/rate-limit-langy", () => ({
 }));
 vi.mock("~/server/middleware/rate-limit-langy-github-prs", () => ({
   LANGY_GITHUB_PRS_PER_DAY: 20,
-  getLangyGithubPrUsage: (...args: unknown[]) => getLangyGithubPrUsage(...args),
-  recordLangyGithubPr: (...args: unknown[]) => recordLangyGithubPr(...args),
+  reserveLangyGithubPrPermit: (...args: unknown[]) =>
+    reserveLangyGithubPrPermit(...args),
+  releaseLangyGithubPrPermit: (...args: unknown[]) =>
+    releaseLangyGithubPrPermit(...args),
+}));
+vi.mock("~/server/featureFlag", () => ({
+  featureFlagService: {
+    isEnabled: (...args: unknown[]) => featureFlagIsEnabled(...args),
+  },
 }));
 vi.mock("~/server/app-layer/clients/tokenizer/tiktoken.client", () => ({
   TiktokenClient: class {
@@ -415,16 +423,13 @@ describe("Feature: Langy chat opens PRs as the requesting user", () => {
     getVercelAIModel.mockResolvedValue({});
     checkLangyMessageRateLimit.mockResolvedValue({ allowed: true });
     getModelsAllowed.mockResolvedValue(null);
-    getLangyGithubPrUsage.mockResolvedValue({
+    featureFlagIsEnabled.mockResolvedValue(true);
+    reserveLangyGithubPrPermit.mockResolvedValue({
       allowed: true,
       remaining: 20,
       resetAt: Date.now() + 86_400_000,
     });
-    recordLangyGithubPr.mockResolvedValue({
-      allowed: true,
-      remaining: 19,
-      resetAt: Date.now() + 86_400_000,
-    });
+    releaseLangyGithubPrPermit.mockResolvedValue(undefined);
     ensureConversation.mockResolvedValue({ id: "conv-1" });
     appendMessage.mockResolvedValue({ id: "msg-1" });
     touchConversation.mockResolvedValue(undefined);
@@ -469,13 +474,16 @@ describe("Feature: Langy chat opens PRs as the requesting user", () => {
         expect(forwarded.credentials.githubToken).toBe("gho_live_token");
         expect(forwarded.credentials.githubLogin).toBe("octocat");
 
-        // The reply contains a real opened-PR link, so the cap counter is
-        // bumped exactly once for the PR that was actually opened.
+        // The pre-turn permit was reserved exactly once (it was the cap-
+        // boundary check that decided whether to give the worker GH_TOKEN);
+        // because a PR WAS opened, the post-stream release branch does NOT
+        // run, leaving the permit committed against today's bucket.
         const streamed = await drain(res);
-        expect(recordLangyGithubPr).toHaveBeenCalledTimes(1);
-        expect(recordLangyGithubPr).toHaveBeenCalledWith(
+        expect(reserveLangyGithubPrPermit).toHaveBeenCalledTimes(1);
+        expect(reserveLangyGithubPrPermit).toHaveBeenCalledWith(
           expect.objectContaining({ userId: "u-connected" }),
         );
+        expect(releaseLangyGithubPrPermit).not.toHaveBeenCalled();
 
         // The persisted reply renders the PR as a card: the PR URL survives
         // (so the card extractor finds it) while progress sentinels are
@@ -524,9 +532,10 @@ describe("Feature: Langy chat opens PRs as the requesting user", () => {
         const persisted = persistedAssistantText();
         expect(extractOpenedPrLinks(persisted)).toEqual([]);
         expect(persisted).not.toMatch(/github\.com\/[^\s]+\/pull\/\d+/);
-        // The cap is untouched (the route only records when an opened-PR link
-        // is present).
-        expect(recordLangyGithubPr).not.toHaveBeenCalled();
+        // The reservation IS released — a read-only turn must not burn a
+        // permit, otherwise users asking questions slowly run themselves out
+        // of their daily PR quota.
+        expect(releaseLangyGithubPrPermit).toHaveBeenCalledTimes(1);
 
         // Langy explains the repo is not available to the LangWatch app.
         expect(streamed.toLowerCase()).toContain("isn't installed");
@@ -578,14 +587,14 @@ describe("Feature: Langy chat opens PRs as the requesting user", () => {
     describe("given I have already opened 20 PRs via Langy today", () => {
       describe("when I ask Langy to open another PR", () => {
         /** @scenario "Per-user daily PR cap stops runaway loops" */
-        it("injects a cap-reached instruction into the agent system prompt and opens no new PR", async () => {
-          // The pre-gate check reports the cap is reached.
-          getLangyGithubPrUsage.mockResolvedValue({
+        it("strips the GitHub token from the worker AND injects a cap-reached system note", async () => {
+          // Pre-gate reservation denies the permit (count would land past
+          // the cap; the helper rolls back internally and reports denied).
+          reserveLangyGithubPrPermit.mockResolvedValue({
             allowed: false,
             remaining: 0,
             resetAt: Date.parse("2030-01-02T00:00:00.000Z"),
           });
-          // Even if the worker tried, it returns no PR this turn.
           stubAgentReply(
             "You've reached your daily limit of GitHub pull requests via " +
               "Langy. It resets later today.",
@@ -594,18 +603,24 @@ describe("Feature: Langy chat opens PRs as the requesting user", () => {
           const res = await postChat("Open another PR on acme/service-x");
           expect(res.status).toBe(200);
 
-          // The route forwards a system prompt telling the agent the cap is
-          // reached and to refuse — this is how "Langy reports the daily cap
-          // is reached".
           const forwarded = forwardedAgentBody();
+          // The system note is a courtesy; the actual enforcement is the
+          // missing GitHub token in the worker subprocess env.
           expect(forwarded.system).toContain("USER PR CAP REACHED");
           expect(forwarded.system).toContain("daily cap");
           expect(forwarded.system).toContain("20");
+          // The hard boundary: GitHub credentials are NOT forwarded when
+          // the permit is denied, so the worker cannot `gh pr create` even
+          // if it ignores the system note. This is what makes the cap a
+          // real authorisation boundary instead of a prompt-only advisory.
+          expect(forwarded.credentials.githubToken).toBeUndefined();
+          expect(forwarded.credentials.githubLogin).toBeUndefined();
 
           await drain(res);
-          // No PR is created until the cap resets: no opened-PR link in the
-          // reply, so the counter is never bumped.
-          expect(recordLangyGithubPr).not.toHaveBeenCalled();
+          // Denied permits are released internally by the helper (DECR), not
+          // by the route — releaseLangyGithubPrPermit only runs for granted
+          // permits whose turn opened zero PRs.
+          expect(releaseLangyGithubPrPermit).not.toHaveBeenCalled();
         });
       });
     });

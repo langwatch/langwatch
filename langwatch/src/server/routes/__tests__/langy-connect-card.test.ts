@@ -38,8 +38,9 @@ const hasProjectPermission = vi.fn();
 const getVercelAIModel = vi.fn();
 const auditLog = vi.fn();
 const checkLangyMessageRateLimit = vi.fn();
-const getLangyGithubPrUsage = vi.fn();
-const recordLangyGithubPr = vi.fn();
+const reserveLangyGithubPrPermit = vi.fn();
+const releaseLangyGithubPrPermit = vi.fn();
+const featureFlagIsEnabled = vi.fn();
 
 // getOrProvision returns the credentials the route forwards to the agent. The
 // unconnected path = no `githubToken` / `githubLogin` keys present.
@@ -77,8 +78,15 @@ vi.mock("~/server/middleware/rate-limit-langy", () => ({
 }));
 vi.mock("~/server/middleware/rate-limit-langy-github-prs", () => ({
   LANGY_GITHUB_PRS_PER_DAY: 20,
-  getLangyGithubPrUsage: (...args: unknown[]) => getLangyGithubPrUsage(...args),
-  recordLangyGithubPr: (...args: unknown[]) => recordLangyGithubPr(...args),
+  reserveLangyGithubPrPermit: (...args: unknown[]) =>
+    reserveLangyGithubPrPermit(...args),
+  releaseLangyGithubPrPermit: (...args: unknown[]) =>
+    releaseLangyGithubPrPermit(...args),
+}));
+vi.mock("~/server/featureFlag", () => ({
+  featureFlagService: {
+    isEnabled: (...args: unknown[]) => featureFlagIsEnabled(...args),
+  },
 }));
 vi.mock("~/server/db", () => ({ prisma: {} }));
 vi.mock("~/server/app-layer/clients/tokenizer/tiktoken.client", () => ({
@@ -191,11 +199,16 @@ describe("POST /api/langy/chat — unconnected user asks for a PR", () => {
     hasProjectPermission.mockResolvedValue(true);
     getVercelAIModel.mockResolvedValue({});
     checkLangyMessageRateLimit.mockResolvedValue({ allowed: true });
-    getLangyGithubPrUsage.mockResolvedValue({
+    // Staff bypass the rollout flag in the middleware; non-staff users would
+    // otherwise be 404'd before the handler runs (see langy-route-auth.test).
+    // This is a non-staff fixture so we must opt them in via the flag.
+    featureFlagIsEnabled.mockResolvedValue(true);
+    reserveLangyGithubPrPermit.mockResolvedValue({
       allowed: true,
       remaining: 20,
       resetAt: Date.now() + 86_400_000,
     });
+    releaseLangyGithubPrPermit.mockResolvedValue(undefined);
     ensureConversation.mockResolvedValue({ id: "conv-1" });
     appendMessage.mockResolvedValue({ id: "msg-1" });
     touchConversation.mockResolvedValue(undefined);
@@ -251,10 +264,11 @@ describe("POST /api/langy/chat — unconnected user asks for a PR", () => {
     const streamed = await drain(res);
     expect(streamed).toContain(CONNECT_GITHUB_SENTINEL);
 
-    // (c) No PR side-effects: the cap counter is never bumped and no
-    // `langy.github.pr_opened` audit entry is forged. (No PR URL + no `opened`
-    // progress sentinel were in the reply, so extractOpenedPrLinks yields none.)
-    expect(recordLangyGithubPr).not.toHaveBeenCalled();
+    // (c) No PR side-effects: the per-turn permit is RELEASED post-stream
+    // (since zero PR URLs were observed in the reply, releasing the slot
+    // we pre-reserved keeps a read-only turn from burning a quota), and no
+    // `langy.github.pr_opened` audit entry is forged.
+    expect(releaseLangyGithubPrPermit).toHaveBeenCalledTimes(1);
     expect(auditLog).not.toHaveBeenCalledWith(
       expect.objectContaining({ action: "langy.github.pr_opened" }),
     );

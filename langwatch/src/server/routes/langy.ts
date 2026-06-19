@@ -30,9 +30,9 @@ import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
 import { checkLangyMessageRateLimit } from "~/server/middleware/rate-limit-langy";
 import {
-  getLangyGithubPrUsage,
   LANGY_GITHUB_PRS_PER_DAY,
-  recordLangyGithubPr,
+  releaseLangyGithubPrPermit,
+  reserveLangyGithubPrPermit,
 } from "~/server/middleware/rate-limit-langy-github-prs";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 import { extractOpenedPrLinks } from "~/server/services/langy/githubPrLinks";
@@ -310,19 +310,15 @@ langyRoute().post("/langy/chat", async (c) => {
     throw error;
   }
 
-  // Per-user daily PR cap. Cheap Redis day-bucket counter; bumped AFTER the
-  // assistant reply lands when a github.com PR URL appears in the text.
-  // PRE-gate here so a capped user is told inline ("you've hit your daily
-  // cap of N PRs") rather than the worker silently succeeding on PR 21+ and
-  // tripping GitHub's abuse heuristics on their account.
-  //
-  // We don't try to detect PR intent — capped users get the system note on
-  // every chat turn until the bucket resets; the agent only mentions it
-  // if the user is in fact asking for a PR. Cheap and correct.
-  const githubPrUsage = await getLangyGithubPrUsage({
-    userId: session.user.id,
-  });
-  const capReachedNote = !githubPrUsage.allowed
+  // Per-user daily PR cap, enforced by atomic permit reservation BEFORE we
+  // hand the worker a GitHub token. If we're over cap, we strip the token
+  // from `credentials` below so the worker physically cannot `gh pr create`
+  // (no GH_TOKEN env in the subprocess) — the system note is a courtesy
+  // explanation, not the authorisation boundary. If the turn ends without
+  // opening any PR (read-only chat), the permit is released post-stream so
+  // a permit isn't burned by a question.
+  const permit = await reserveLangyGithubPrPermit({ userId: session.user.id });
+  const capReachedNote = !permit.allowed
     ? [
         "",
         "USER PR CAP REACHED — the user has already opened the per-day maximum",
@@ -331,11 +327,20 @@ langyRoute().post("/langy/chat", async (c) => {
         "GitHub pull requests via Langy today.",
         "If the user asks you to open a PR, refuse politely, say the daily cap",
         "is reached, and that it resets at",
-        new Date(githubPrUsage.resetAt).toISOString(),
+        new Date(permit.resetAt).toISOString(),
         "UTC.",
         "Do not call any tool that opens a PR.",
       ].join(" ")
     : "";
+  // Revoke GitHub capability when the cap is reached: deleting these fields
+  // means spawnWorker omits GH_TOKEN + GITHUB_LOGIN from the subprocess env
+  // (services/langy-agent/server.js conditionally spreads them based on
+  // truthiness), so the worker cannot reach github.com with an authenticated
+  // token even if it ignores the system note.
+  if (!permit.allowed) {
+    delete (credentials as { githubToken?: string }).githubToken;
+    delete (credentials as { githubLogin?: string }).githubLogin;
+  }
 
   // Defense in depth: when a `modelOverride` rides in, enforce the project's
   // Langy VK allowlist HERE — don't trust the picker UI to gate it. If the VK
@@ -482,18 +487,23 @@ langyRoute().post("/langy/chat", async (c) => {
         logger.error({ error }, "failed to persist langy assistant message");
       }
 
-      // Bump the per-user daily PR counter for each PR the assistant actually
-      // OPENED this turn — links are cross-referenced against the skill's
-      // `[langy:progress:opened:...]` sentinels so merely *mentioning* a PR
-      // ("summarize PR #4751") doesn't burn the cap or forge a `pr_opened`
-      // audit entry. At-most-once: if the worker opens a PR but the URL never
-      // lands in the reply (worker crash mid-push, network blip), the cap
-      // under-counts. Preferred over double-counting on retries. Parse from
-      // `fullText` (pre-strip) — sentinels are gone from `persistedText`.
+      // Audit each PR the assistant actually OPENED this turn — links are
+      // cross-referenced against the skill's `[langy:progress:opened:...]`
+      // sentinels so merely *mentioning* a PR ("summarize PR #4751") doesn't
+      // forge a `pr_opened` audit entry. Parse from `fullText` (pre-strip) —
+      // sentinels are gone from `persistedText`.
+      //
+      // Counting is owned by the pre-turn `reserveLangyGithubPrPermit` (one
+      // permit per turn, atomic). If the turn opened MORE than one PR, the
+      // permit covers the first; further PRs are still audited but won't
+      // double-bump the daily counter. If the turn opened ZERO PRs, we
+      // release the permit so a question doesn't burn a permit.
       try {
         const links = extractOpenedPrLinks(fullText);
+        if (links.length === 0 && permit.allowed) {
+          await releaseLangyGithubPrPermit({ userId: session.user.id });
+        }
         for (const link of links) {
-          await recordLangyGithubPr({ userId: session.user.id });
           await auditLog({
             userId: session.user.id,
             projectId,
