@@ -13,6 +13,7 @@ import {
   ExperimentsApiService,
   toRunStartRequest,
 } from "./experiments-api.service";
+import type { ExperimentRunResultsResponse } from "./experiments-api.service";
 import type { ExperimentInitOptions } from "./types";
 import type {
   ExperimentRunResult,
@@ -157,9 +158,15 @@ export class ExperimentsFacade {
       onProgress: options.onProgress,
     });
 
-    const results = await this.apiService.getV3RunResults({
+    // ClickHouse can lag right after completion: the results endpoint may 404
+    // ("not yet available") or return 200 with an empty dataset before the rows
+    // materialize. Retry both cases when the run reported rows, mirroring the
+    // python SDK, instead of failing or returning an empty result.
+    const results = await this.fetchV3ResultsWithRetry({
       runId,
-      experimentSlug: slug,
+      slug,
+      expectsRows: (summary.totalCells ?? 0) > 0,
+      delay: options.pollInterval ?? DEFAULT_POLL_INTERVAL,
     });
 
     // Always return the URL rebased onto the configured endpoint, so a
@@ -178,6 +185,50 @@ export class ExperimentsFacade {
       summary,
       rows: mapRunResultsToRows(results),
     };
+  }
+
+  /**
+   * Fetch the per-row results for a completed run, retrying through the brief
+   * window where the results endpoint 404s ("not yet available") or returns an
+   * empty dataset because ClickHouse has not yet materialized the rows. Mirrors
+   * the python SDK's results backoff.
+   */
+  private async fetchV3ResultsWithRetry({
+    runId,
+    slug,
+    expectsRows,
+    delay,
+    maxAttempts = 6,
+  }: {
+    runId: string;
+    slug: string;
+    expectsRows: boolean;
+    delay: number;
+    maxAttempts?: number;
+  }): Promise<ExperimentRunResultsResponse> {
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const results = await this.apiService.getV3RunResults({
+          runId,
+          experimentSlug: slug,
+        });
+        const isEmpty = (results.dataset?.length ?? 0) === 0;
+        if (expectsRows && isEmpty && attempt < maxAttempts) {
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        }
+        return results;
+      } catch (error) {
+        lastError = error;
+        if (attempt < maxAttempts) {
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        }
+        throw error;
+      }
+    }
+    throw lastError;
   }
 
   /**

@@ -214,4 +214,54 @@ describe("ExperimentsFacade.runWithResults", () => {
       });
     });
   });
+
+  describe("given the results lag behind completion", () => {
+    describe("when the first results fetch is empty", () => {
+      it("retries until the rows materialize", async () => {
+        const emptyResults = {
+          ...resultsResponse,
+          dataset: [],
+          evaluations: [],
+        };
+        mockFetch
+          .mockResolvedValueOnce(jsonResponse(startResponse))
+          .mockResolvedValueOnce(jsonResponse(completedStatus))
+          .mockResolvedValueOnce(jsonResponse(emptyResults))
+          .mockResolvedValueOnce(jsonResponse(resultsResponse));
+
+        const facade = makeFacade();
+        const result = await facade.runWithResults("my-experiment", {
+          data: [{ question: "What is 2 + 2?" }],
+          pollInterval: 0,
+        });
+
+        // start + poll + results (empty) + results (materialized)
+        expect(mockFetch).toHaveBeenCalledTimes(4);
+        expect(result.rows).toHaveLength(1);
+      });
+    });
+
+    describe("when the first results fetch 404s", () => {
+      it("retries until the results are available", async () => {
+        mockFetch
+          .mockResolvedValueOnce(jsonResponse(startResponse))
+          .mockResolvedValueOnce(jsonResponse(completedStatus))
+          .mockResolvedValueOnce(
+            jsonResponse(
+              { error: "Run not found or results not yet available" },
+              { status: 404 },
+            ),
+          )
+          .mockResolvedValueOnce(jsonResponse(resultsResponse));
+
+        const facade = makeFacade();
+        const result = await facade.runWithResults("my-experiment", {
+          data: [{ question: "What is 2 + 2?" }],
+          pollInterval: 0,
+        });
+
+        expect(result.rows).toHaveLength(1);
+      });
+    });
+  });
 });

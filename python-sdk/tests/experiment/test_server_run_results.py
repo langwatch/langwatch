@@ -265,3 +265,55 @@ class TestExperimentRunValidation:
 
         # No HTTP call should have been made.
         assert _FakeClient.captured_posts == []
+
+
+class TestExperimentRunResultsRetry:
+    """when the results endpoint lags behind completion (rows not yet materialized)"""
+
+    def test_retries_on_empty_results_until_rows_materialize(self):
+        _FakeClient.post_responses = {
+            "/run": _FakeResponse(
+                200,
+                {
+                    "runId": "run_123",
+                    "status": "running",
+                    "total": 2,
+                    "runUrl": "https://app.langwatch.ai/p/experiments/rag-eval?runId=run_123",
+                },
+            ),
+        }
+        status_payload = {
+            "status": "completed",
+            "progress": 2,
+            "total": 2,
+            "summary": {
+                "totalCells": 2,
+                "completedCells": 2,
+                "failedCells": 0,
+                "duration": 2000,
+                "totalPassed": 2,
+                "totalFailed": 0,
+                "passRate": 100.0,
+            },
+        }
+        results_calls = {"n": 0}
+
+        class _LaggyClient(_FakeClient):
+            def get(self, url, headers=None, **kwargs):
+                type(self).captured_gets.append({"url": url, "headers": headers})
+                if "/results" in url:
+                    results_calls["n"] += 1
+                    # First read: completed run but rows not materialized yet.
+                    if results_calls["n"] == 1:
+                        return _FakeResponse(
+                            200, {"dataset": [], "evaluations": [], "total": 2}
+                        )
+                    return _FakeResponse(200, _results_payload())
+                return _FakeResponse(200, status_payload)
+
+        with patch.object(platform_run.httpx, "Client", _LaggyClient):
+            result = experiment_run("rag-eval", data=[{"q": "x"}], poll_interval=0)
+            df = result.results
+            assert len(df) == 2
+            # The empty read was retried instead of cached.
+            assert results_calls["n"] == 2
