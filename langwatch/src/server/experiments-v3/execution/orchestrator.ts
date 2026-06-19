@@ -27,6 +27,7 @@ import { generateHumanReadableId } from "~/utils/humanReadableId";
 import { createLogger } from "~/utils/logger/server";
 import { generateOtelTraceId } from "~/utils/trace";
 import { abortManager } from "./abortManager";
+import { withRowReference } from "./resultReference";
 import { buildStripScoreEvaluatorIds } from "./evaluatorScoreFilter";
 import {
   mapErrorEvent,
@@ -61,6 +62,8 @@ export type OrchestratorInput = {
   state: EvaluationsV3State;
   datasetRows: Array<Record<string, unknown>>;
   datasetColumns: Array<{ id: string; name: string; type: string }>;
+  /** Stable row ids aligned by index with datasetRows (ADR-033); enables result-by-reference. */
+  datasetRowIds?: Array<string | undefined>;
   loadedPrompts: Map<string, VersionedPrompt>;
   loadedAgents: Map<string, TypedAgent>;
   /** Evaluators loaded from DB - settings and names are fetched fresh from here */
@@ -81,6 +84,9 @@ export const generateCells = (
   >,
   datasetRows: Array<Record<string, unknown>>,
   scope: ExecutionScope,
+  // ADR-033: stable row ids aligned by index with datasetRows; threaded onto
+  // each cell so a result can reference the row it evaluated by id.
+  rowIds?: Array<string | undefined>,
 ): ExecutionCell[] => {
   const cells: ExecutionCell[] = [];
   const datasetId =
@@ -116,6 +122,7 @@ export const generateCells = (
         skipTarget: true,
         precomputedTargetOutput: targetOutput,
         traceId: scope.traceIds[rowIndex],
+        rowId: rowIds?.[rowIndex],
       });
     }
     return cells;
@@ -147,6 +154,7 @@ export const generateCells = (
         precomputedTargetOutput: scope.targetOutput,
         // Reuse existing trace ID to append evaluator span to the same trace
         traceId: scope.traceId,
+        rowId: rowIds?.[scope.rowIndex],
       });
     }
     return cells;
@@ -202,6 +210,7 @@ export const generateCells = (
           _datasetId: datasetId,
           ...datasetEntry,
         },
+        rowId: rowIds?.[rowIndex],
       });
     }
   }
@@ -540,6 +549,7 @@ export async function* runOrchestrator(
     state,
     datasetRows,
     datasetColumns,
+    datasetRowIds,
     loadedPrompts,
     loadedAgents,
     loadedEvaluators,
@@ -553,8 +563,11 @@ export async function* runOrchestrator(
   // Use provided run ID or generate a human-readable one like "swift-fox-42"
   const runId = providedRunId ?? generateHumanReadableId();
 
+  // ADR-033: dataset id for result-by-reference (matches generateCells's resolution).
+  const datasetId = state.datasets[0]?.id ?? state.activeDatasetId ?? undefined;
+
   // Generate cells to execute
-  const cells = generateCells(state, datasetRows, scope);
+  const cells = generateCells(state, datasetRows, scope, datasetRowIds);
   const totalCells = cells.length;
 
   logger.info(
@@ -709,7 +722,12 @@ export async function* runOrchestrator(
           experimentId,
           index: event.rowIndex,
           targetId: event.targetId,
-          entry: datasetEntry,
+          // ADR-033: attach the stable row reference (no-op when no rowId, e.g.
+          // inline/id-less rows → today's full-copy shape).
+          entry: withRowReference(datasetEntry, {
+            datasetId,
+            rowId: datasetRowIds?.[event.rowIndex],
+          }),
           predicted:
             event.output === null || event.output === undefined
               ? null
@@ -732,7 +750,12 @@ export async function* runOrchestrator(
           experimentId,
           index: event.rowIndex,
           targetId: event.targetId,
-          entry: datasetEntry,
+          // ADR-033: attach the stable row reference (no-op when no rowId, e.g.
+          // inline/id-less rows → today's full-copy shape).
+          entry: withRowReference(datasetEntry, {
+            datasetId,
+            rowId: datasetRowIds?.[event.rowIndex],
+          }),
           predicted: null,
           cost: null,
           duration: null,

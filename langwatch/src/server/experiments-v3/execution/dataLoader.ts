@@ -83,6 +83,14 @@ const normalizeColumnIdsToNames = (
 export type LoadedDataset = {
   rows: Array<Record<string, unknown>>;
   columns: Array<{ id: string; name: string; type: string }>;
+  /**
+   * Stable dataset-row ids aligned by index with `rows` (ADR-033). Present for
+   * saved datasets so a run result can reference the row it evaluated by id
+   * rather than copying it. `undefined` for inline datasets (no stable ids) and
+   * per-entry `undefined` for any row without a persisted id — both fall back to
+   * the full-copy result shape.
+   */
+  rowIds?: Array<string | undefined>;
 };
 
 /**
@@ -114,6 +122,9 @@ export const loadDataset = async (
 ): Promise<LoadedDataset | { error: string; status: number }> => {
   let rows: Array<Record<string, unknown>>;
   let columns: Array<{ id: string; name: string; type: string }>;
+  // ADR-033: stable row ids for saved datasets, aligned by index with `rows`.
+  // Stays undefined for inline datasets (no stable ids → full-copy results).
+  let rowIds: Array<string | undefined> | undefined;
 
   if (dataset.type === "inline" && dataset.inline) {
     columns = dataset.inline.columns;
@@ -152,6 +163,9 @@ export const loadDataset = async (
     rows = fullDataset.datasetRecords.map(
       (r) => r.entry as Record<string, unknown>,
     );
+    // Capture the stable row ids in the same order as `rows` (ADR-033). The
+    // subsequent parseJsonColumns preserves order, so index alignment holds.
+    rowIds = fullDataset.datasetRecords.map((r) => r.id ?? undefined);
 
     // Parse JSON columns (saved datasets already use names as keys)
     const jsonColumns = new Set(
@@ -164,7 +178,7 @@ export const loadDataset = async (
     return { error: "Invalid dataset configuration", status: 400 };
   }
 
-  return { rows, columns };
+  return { rows, columns, rowIds };
 };
 
 /**
@@ -173,6 +187,8 @@ export const loadDataset = async (
 export type LoadedExecutionData = {
   datasetRows: Array<Record<string, unknown>>;
   datasetColumns: Array<{ id: string; name: string; type: string }>;
+  /** Stable row ids aligned by index with `datasetRows` (ADR-033); see LoadedDataset.rowIds. */
+  datasetRowIds?: Array<string | undefined>;
   loadedPrompts: Map<string, VersionedPrompt>;
   loadedAgents: Map<string, TypedAgent>;
   loadedEvaluators: Map<string, Evaluator>;
@@ -212,7 +228,11 @@ export const loadExecutionData = async (
     return datasetResult;
   }
 
-  const { rows: datasetRows, columns: datasetColumns } = datasetResult;
+  const {
+    rows: datasetRows,
+    columns: datasetColumns,
+    rowIds: datasetRowIds,
+  } = datasetResult;
 
   // Load prompts for prompt targets
   const loadedPrompts = new Map<string, VersionedPrompt>();
@@ -308,6 +328,7 @@ export const loadExecutionData = async (
   return {
     datasetRows,
     datasetColumns,
+    datasetRowIds,
     loadedPrompts,
     loadedAgents,
     loadedEvaluators,

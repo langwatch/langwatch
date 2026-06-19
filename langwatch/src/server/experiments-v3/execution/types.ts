@@ -185,6 +185,11 @@ export type ExecutionCell = {
   targetConfig: TargetConfig;
   evaluatorConfigs: EvaluatorConfig[];
   datasetEntry: Record<string, unknown>;
+  /**
+   * Stable dataset-row id (ADR-033). Set for saved-dataset rows so a result can
+   * reference the row it evaluated; undefined for inline/id-less rows.
+   */
+  rowId?: string;
   /** If true, skip target execution and use precomputedTargetOutput instead */
   skipTarget?: boolean;
   /** Pre-computed target output when re-running only evaluator(s) */
