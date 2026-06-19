@@ -76,7 +76,10 @@ The dispatcher routes on this classification at the top of its switch:
 function computeScheduledFor(action, cadence, now) {
   if (PERSIST_TRIGGER_ACTIONS.has(action)) return now;        // immediate
   if (cadence === "immediate") return now;
-  return new Date(now.getTime() + CADENCE_WINDOW_MS[cadence]);
+  // Snap to the NEXT wall-clock boundary so concurrent matches share one
+  // dispatch time and coalesce — not now+window (which drifts per event).
+  const windowMs = CADENCE_WINDOW_MS[cadence];
+  return new Date((Math.floor(now.getTime() / windowMs) + 1) * windowMs);
 }
 ```
 

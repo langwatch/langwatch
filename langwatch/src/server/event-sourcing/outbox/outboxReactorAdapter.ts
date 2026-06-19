@@ -15,13 +15,13 @@ const logger = createLogger("langwatch:event-sourcing:outbox-reactor-adapter");
 /**
  * Bridges the `OutboxReactorDefinition` API (decide → enqueue requests)
  * with the GroupQueue-routed outbox runtime that this codebase actually
- * ships (ADR-025 r3). For every event the wrapped reactor's `decide()`
+ * ships (ADR-030 r3). For every event the wrapped reactor's `decide()`
  * is invoked; each returned `OutboxEnqueueRequest` is forwarded to
  * `outbox.enqueueSettle(...)`.
  *
  * The request's `dedupKey` / `groupKey` / `maxAttempts` are descriptive
  * of the spec's row-leased architecture (see
- * `dev/docs/adr/025-transactional-outbox-for-stake-sensitive-dispatch.md`);
+ * `dev/docs/adr/030-transactional-outbox-for-stake-sensitive-dispatch.md`);
  * the GroupQueue route derives its identity from the payload itself via
  * `settleDedupId` + `settleGroupKey`, so those fields are not threaded
  * through here. `enqueueOptions.ttlMs` IS threaded — it carries the
@@ -65,7 +65,7 @@ export function adaptOutboxReactor<E extends Event, FoldState>(
     name: definition.name,
     options: definition.options,
     async handle(event: E, context: ReactorContext<FoldState>) {
-      // Replay short-circuit (ADR-025 / `specs/event-sourcing/reactor-outbox-dispatch.feature`).
+      // Replay short-circuit (ADR-030 / `specs/event-sourcing/reactor-outbox-dispatch.feature`).
       // When the runtime is replaying historical events, the audit row
       // for this match may have aged out of retention, so the live
       // dispatch path would re-fire customer-visible side effects.

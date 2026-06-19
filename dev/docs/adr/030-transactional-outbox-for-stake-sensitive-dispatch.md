@@ -35,7 +35,7 @@ Introduce a **transactional outbox** as the durable substrate for stake-sensitiv
 - The **dispatch** half runs in the outbox queue's `process` callback. Failures throw `DispatchError` (ADR-027); the queue's retry semantics handle backoff, and the adapter mirrors each transition to PG.
 - Best-effort reactors stay on `.withReactor` — no change to their execution model.
 
-**The queue is the source of truth for dispatch execution.** **The PG row is the source of truth for dispatch audit.** Both must agree on every transition, which is why the adapter lives inside the GroupQueue rather than alongside it — every lifecycle event publishes through one hook that cannot be bypassed.
+**The queue is the source of truth for dispatch execution.** **The PG row is the source of truth for dispatch audit.** The adapter lives inside the GroupQueue rather than alongside it precisely so every lifecycle event mirrors through one hook that cannot be bypassed — but convergence is eventual, not lock-step: adapter writes are best-effort relative to dispatch (see line 192), so under a PG outage the queue still proceeds and the audit projection catches up afterwards.
 
 Replay safety comes from the queue's dedup config (`(reactorName, dedupKey)` collapses replayed enqueues onto the existing pending job) plus, for trigger reactors, `TriggerSent` as the cross-pipeline match claim (see "two-tier dedup" below).
 

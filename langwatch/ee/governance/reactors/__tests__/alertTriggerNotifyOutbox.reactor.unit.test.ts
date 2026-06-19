@@ -94,155 +94,157 @@ describe("alertTriggerNotifyOutbox reactor", () => {
     deps = createDeps();
   });
 
-  describe("when a NOTIFY-class trace-only trigger is active", () => {
-    it("emits a settle-stage OutboxEnqueueRequest with the per-trigger debounce TTL", async () => {
-      const trigger = createTrigger();
-      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue(
-        [trigger],
-      );
+  describe("given active trace triggers on the project", () => {
+    describe("when a NOTIFY-class trace-only trigger is active", () => {
+      it("emits a settle-stage OutboxEnqueueRequest with the per-trigger debounce TTL", async () => {
+        const trigger = createTrigger();
+        (
+          deps.triggers.getActiveTraceTriggersForProject as any
+        ).mockResolvedValue([trigger]);
 
-      const reactor = createAlertTriggerNotifyOutboxReactor(deps);
-      const requests = await reactor.decide(
-        createEvent(),
-        createContext(createFoldState()),
-      );
+        const reactor = createAlertTriggerNotifyOutboxReactor(deps);
+        const requests = await reactor.decide(
+          createEvent(),
+          createContext(createFoldState()),
+        );
 
-      expect(requests).toHaveLength(1);
-      const [request] = requests;
-      expect(request!.dedupKey).toBe("tenant-1/trigger-notify:trace:trace-1");
-      expect(request!.groupKey).toBe("tenant-1/triggerNotify:trigger-notify");
-      expect(request!.enqueueOptions).toEqual({ ttlMs: 45_000 });
-      const payload = request!.payload as unknown as {
-        stage: string;
-        projectId: string;
-        triggerId: string;
-        traceId: string;
-        foldSnapshotAtEnqueue: {
-          computedInput: string;
-          computedOutput: string;
+        expect(requests).toHaveLength(1);
+        const [request] = requests;
+        expect(request!.dedupKey).toBe("tenant-1/trigger-notify:trace:trace-1");
+        expect(request!.groupKey).toBe("tenant-1/triggerNotify:trigger-notify");
+        expect(request!.enqueueOptions).toEqual({ ttlMs: 45_000 });
+        const payload = request!.payload as unknown as {
+          stage: string;
+          projectId: string;
+          triggerId: string;
+          traceId: string;
+          foldSnapshotAtEnqueue: {
+            computedInput: string;
+            computedOutput: string;
+          };
         };
-      };
-      expect(payload.stage).toBe("settle");
-      expect(payload.projectId).toBe("tenant-1");
-      expect(payload.triggerId).toBe("trigger-notify");
-      expect(payload.traceId).toBe("trace-1");
-      expect(payload.foldSnapshotAtEnqueue).toEqual({
-        computedInput: "in",
-        computedOutput: "out",
+        expect(payload.stage).toBe("settle");
+        expect(payload.projectId).toBe("tenant-1");
+        expect(payload.triggerId).toBe("trigger-notify");
+        expect(payload.traceId).toBe("trace-1");
+        expect(payload.foldSnapshotAtEnqueue).toEqual({
+          computedInput: "in",
+          computedOutput: "out",
+        });
       });
     });
-  });
 
-  describe("when a trigger has evaluation filters", () => {
-    it("does not emit a request (the evaluation pipeline owns those triggers)", async () => {
-      const trigger = createTrigger({
-        filters: { "evaluations.passed": { "evaluator-1": ["true"] } },
+    describe("when a trigger has evaluation filters", () => {
+      it("does not emit a request (the evaluation pipeline owns those triggers)", async () => {
+        const trigger = createTrigger({
+          filters: { "evaluations.passed": { "evaluator-1": ["true"] } },
+        });
+        (
+          deps.triggers.getActiveTraceTriggersForProject as any
+        ).mockResolvedValue([trigger]);
+
+        const reactor = createAlertTriggerNotifyOutboxReactor(deps);
+        const requests = await reactor.decide(
+          createEvent(),
+          createContext(createFoldState()),
+        );
+
+        expect(requests).toHaveLength(0);
       });
-      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue(
-        [trigger],
-      );
-
-      const reactor = createAlertTriggerNotifyOutboxReactor(deps);
-      const requests = await reactor.decide(
-        createEvent(),
-        createContext(createFoldState()),
-      );
-
-      expect(requests).toHaveLength(0);
     });
-  });
 
-  describe("when a trigger is a persist action", () => {
-    it("does not emit a request (the inline reactor owns persist actions)", async () => {
-      const trigger = createTrigger({
-        action: TriggerAction.ADD_TO_ANNOTATION_QUEUE,
+    describe("when a trigger is a persist action", () => {
+      it("does not emit a request (the inline reactor owns persist actions)", async () => {
+        const trigger = createTrigger({
+          action: TriggerAction.ADD_TO_ANNOTATION_QUEUE,
+        });
+        (
+          deps.triggers.getActiveTraceTriggersForProject as any
+        ).mockResolvedValue([trigger]);
+
+        const reactor = createAlertTriggerNotifyOutboxReactor(deps);
+        const requests = await reactor.decide(
+          createEvent(),
+          createContext(createFoldState()),
+        );
+
+        expect(requests).toHaveLength(0);
       });
-      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue(
-        [trigger],
-      );
-
-      const reactor = createAlertTriggerNotifyOutboxReactor(deps);
-      const requests = await reactor.decide(
-        createEvent(),
-        createContext(createFoldState()),
-      );
-
-      expect(requests).toHaveLength(0);
-    });
-  });
-
-  describe("when several notify triggers match the same trace", () => {
-    it("emits one request per trigger so each gets its own settle window", async () => {
-      const a = createTrigger({ id: "trig-a", traceDebounceMs: 30_000 });
-      const b = createTrigger({ id: "trig-b", traceDebounceMs: 60_000 });
-      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue(
-        [a, b],
-      );
-
-      const reactor = createAlertTriggerNotifyOutboxReactor(deps);
-      const requests = await reactor.decide(
-        createEvent(),
-        createContext(createFoldState()),
-      );
-
-      expect(requests).toHaveLength(2);
-      expect(requests.map((r) => r.enqueueOptions?.ttlMs)).toEqual([
-        30_000, 60_000,
-      ]);
-    });
-  });
-
-  describe("when the trace origin is not resolved", () => {
-    it("the origin guard suppresses the decide() body so no request emits", async () => {
-      const trigger = createTrigger();
-      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue(
-        [trigger],
-      );
-
-      const reactor = createAlertTriggerNotifyOutboxReactor(deps);
-      const requests = await reactor.decide(
-        createEvent(),
-        createContext(createFoldState({ attributes: {} })),
-      );
-
-      expect(requests).toHaveLength(0);
-      // Origin gate runs before the trigger fetch, so we never call
-      // out to the trigger service either.
-      expect(
-        deps.triggers.getActiveTraceTriggersForProject,
-      ).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when the event is not a message event", () => {
-    it("the origin guard rejects derived events like topic_assigned", async () => {
-      const trigger = createTrigger();
-      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue(
-        [trigger],
-      );
-
-      const reactor = createAlertTriggerNotifyOutboxReactor(deps);
-      const requests = await reactor.decide(
-        createEvent({ type: "lw.obs.trace.topic_assigned" as any }),
-        createContext(createFoldState()),
-      );
-
-      expect(requests).toHaveLength(0);
     });
 
-    it("but origin_resolved (the deferred-origin completion event) still fires", async () => {
-      const trigger = createTrigger();
-      (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue(
-        [trigger],
-      );
+    describe("when several notify triggers match the same trace", () => {
+      it("emits one request per trigger so each gets its own settle window", async () => {
+        const a = createTrigger({ id: "trig-a", traceDebounceMs: 30_000 });
+        const b = createTrigger({ id: "trig-b", traceDebounceMs: 60_000 });
+        (
+          deps.triggers.getActiveTraceTriggersForProject as any
+        ).mockResolvedValue([a, b]);
 
-      const reactor = createAlertTriggerNotifyOutboxReactor(deps);
-      const requests = await reactor.decide(
-        createEvent({ type: ORIGIN_RESOLVED_EVENT_TYPE }),
-        createContext(createFoldState()),
-      );
+        const reactor = createAlertTriggerNotifyOutboxReactor(deps);
+        const requests = await reactor.decide(
+          createEvent(),
+          createContext(createFoldState()),
+        );
 
-      expect(requests).toHaveLength(1);
+        expect(requests).toHaveLength(2);
+        expect(requests.map((r) => r.enqueueOptions?.ttlMs)).toEqual([
+          30_000, 60_000,
+        ]);
+      });
+    });
+
+    describe("when the trace origin is not resolved", () => {
+      it("the origin guard suppresses the decide() body so no request emits", async () => {
+        const trigger = createTrigger();
+        (
+          deps.triggers.getActiveTraceTriggersForProject as any
+        ).mockResolvedValue([trigger]);
+
+        const reactor = createAlertTriggerNotifyOutboxReactor(deps);
+        const requests = await reactor.decide(
+          createEvent(),
+          createContext(createFoldState({ attributes: {} })),
+        );
+
+        expect(requests).toHaveLength(0);
+        // Origin gate runs before the trigger fetch, so we never call
+        // out to the trigger service either.
+        expect(
+          deps.triggers.getActiveTraceTriggersForProject,
+        ).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the event is not a message event", () => {
+      it("the origin guard rejects derived events like topic_assigned", async () => {
+        const trigger = createTrigger();
+        (
+          deps.triggers.getActiveTraceTriggersForProject as any
+        ).mockResolvedValue([trigger]);
+
+        const reactor = createAlertTriggerNotifyOutboxReactor(deps);
+        const requests = await reactor.decide(
+          createEvent({ type: "lw.obs.trace.topic_assigned" as any }),
+          createContext(createFoldState()),
+        );
+
+        expect(requests).toHaveLength(0);
+      });
+
+      it("but origin_resolved (the deferred-origin completion event) still fires", async () => {
+        const trigger = createTrigger();
+        (
+          deps.triggers.getActiveTraceTriggersForProject as any
+        ).mockResolvedValue([trigger]);
+
+        const reactor = createAlertTriggerNotifyOutboxReactor(deps);
+        const requests = await reactor.decide(
+          createEvent({ type: ORIGIN_RESOLVED_EVENT_TYPE }),
+          createContext(createFoldState()),
+        );
+
+        expect(requests).toHaveLength(1);
+      });
     });
   });
 });

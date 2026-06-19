@@ -23,7 +23,7 @@ export interface AlertTriggerNotifyOutboxReactorDeps {
 
 /**
  * NOTIFY-class branch of the trace-pipeline alert trigger reactor,
- * registered via `.withOutbox` (ADR-025). For every active trace-only
+ * registered via `.withOutbox` (ADR-030). For every active trace-only
  * trigger whose action is NOTIFY (SEND_EMAIL / SEND_SLACK_MESSAGE),
  * emits an `OutboxEnqueueRequest` whose payload is a settle-stage job;
  * the framework adapter forwards it to `outbox.enqueueSettle`, the

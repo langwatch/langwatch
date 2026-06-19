@@ -48,7 +48,7 @@ const engine = new Liquid({
 ```
 
 - **500ms render timeout** per template invocation. Liquid loops over hostile-sized input are bounded.
-- **`p-limit` concurrency cap of 10** on the dispatch worker's Liquid+Markdown render pipeline so a slow render doesn't starve sibling rows.
+- **Inter-row render concurrency** is bounded by the outbox GroupQueue's worker `globalConcurrency`, not a separate limiter; each cadence digest renders a single template per dispatch invocation, so a slow render can occupy at most one worker slot.
 
 ### Email
 

@@ -89,7 +89,7 @@ Enrich the automations list, plus a per-automation detail panel, with an operati
 
 ### Querying the outbox by trigger
 
-`ReactorOutbox` rows are keyed by `(reactorName, dedupKey)` and grouped by `groupKey`, both `projectId`-prefixed and embedding the `triggerId` (`${projectId}/${reactorName}:${triggerId}...`). Counting per-trigger health via a `LIKE` on `dedupKey` is unindexed and slow. We will instead add an indexed **`subjectId`** column (the `triggerId`) to `ReactorOutbox` so per-trigger health is an indexed lookup. This is a small extension to the ADR-030 schema.
+`ReactorOutbox` rows are keyed by `(reactorName, dedupKey)` and grouped by `groupKey`, both `projectId`-prefixed and embedding the `triggerId` (`${projectId}/${reactorName}:${triggerId}...`). Counting per-trigger health via a `LIKE` on `dedupKey` is unindexed and slow. We will instead add an indexed **`subjectId`** column (the `triggerId`) to `ReactorOutbox` so per-trigger health is an indexed lookup — scoped by `(projectId, subjectId)`, never `subjectId` alone (it is not unique across tenants). This is a small extension to the ADR-030 schema.
 
 ### Layering
 
