@@ -51,10 +51,7 @@ import {
   extractOpenedPrLinks,
 } from "../../services/langy/githubPrLinks";
 import { parseGithubProgressEvents } from "../../services/langy/githubProgressEvents";
-import {
-  CONNECT_GITHUB_SENTINEL,
-  stripLangySentinels,
-} from "../../services/langy/langySentinels";
+import { stripLangySentinels } from "../../services/langy/langySentinels";
 
 // ===========================================================================
 // SCENARIOS 1 & 2 — connecting GitHub (OAuth callback round-trip).
