@@ -10,6 +10,10 @@ packages:
 overrides:
   # Security: shell-quote quote() newline escaping (CRITICAL)
   shell-quote@<1.8.4: '>=1.8.4'
+  # Security: esbuild Deno binary integrity RCE + dev-server file read (GHSA-gv7w-rqvm-qjhr / GHSA-g7r4-m6w7-qqqr)
+  esbuild@<0.28.1: '>=0.28.1'
+  # Security: vite dev-server file read / middleware path bypass
+  vite@<6.4.3: '>=6.4.3'
 
 onlyBuiltDependencies:
   - esbuild
