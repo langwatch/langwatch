@@ -1,4 +1,4 @@
-import { Box, Button, HStack, Menu } from "@chakra-ui/react";
+import { Box, Button, HStack } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
 import { motion } from "motion/react";
 import type React from "react";
@@ -9,6 +9,7 @@ import { useWindowSize } from "usehooks-ts";
 import { useShallow } from "zustand/react/shallow";
 import { HoverableBigText } from "~/components/HoverableBigText";
 import { Drawer } from "~/components/ui/drawer";
+import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import type { Component, ComponentType } from "../../types/dsl";
