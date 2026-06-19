@@ -15,17 +15,30 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { EventSourcedQueueDefinition } from "../../queue.types";
 import { GroupQueueProcessor } from "../groupQueue";
 
-// Prevent the real BRPOP dispatcher loop from starting — it would attempt
-// network I/O and open timer handles that outlive the test.
-vi.mock("../dispatcher", () => {
-  return {
-    GroupQueueDispatcher: vi.fn().mockImplementation(() => ({
-      start: vi.fn(),
-      requestShutdown: vi.fn(),
-      waitUntilStopped: vi.fn().mockResolvedValue(undefined),
-    })),
-  };
-});
+// The processor instantiates these collaborators with `new` in consumer mode.
+// The mock implementations MUST therefore be constructible — a
+// `vi.fn(() => ({ ... }))` arrow-returning factory is NOT a constructor under
+// Vitest 4.x and throws `TypeError: ... is not a constructor`, which previously
+// made both consumer-mode cases fail before reaching their assertions. Using a
+// class keeps the mock constructible.
+//
+// Mocking them also prevents the real BRPOP dispatcher loop and the metrics
+// `setInterval` from starting — both would attempt network I/O and open handles
+// that outlive the test.
+vi.mock("../dispatcher", () => ({
+  GroupQueueDispatcher: class {
+    start(): void {}
+    requestShutdown(): void {}
+    async waitUntilStopped(): Promise<void> {}
+  },
+}));
+
+vi.mock("../metricsCollector", () => ({
+  GroupQueueMetricsCollector: class {
+    start(): void {}
+    stop(): void {}
+  },
+}));
 
 type TestPayload = { id: string; groupId: string };
 
@@ -38,17 +51,29 @@ function makeDefinition(): EventSourcedQueueDefinition<TestPayload> {
 }
 
 describe("GroupQueueProcessor blockingConnection selection", () => {
+  const connections: Array<IORedis | Cluster> = [];
+
+  function track<T extends IORedis | Cluster>(conn: T): T {
+    connections.push(conn);
+    return conn;
+  }
+
   afterEach(() => {
+    // Force-close every connection created during the test — even if an
+    // assertion threw before the assertions completed — so no socket or
+    // reconnect timer outlives the file and wedges the runner.
+    for (const conn of connections.splice(0)) {
+      conn.disconnect();
+    }
     vi.restoreAllMocks();
   });
 
   describe("given consumer mode is enabled", () => {
     describe("when the source connection is a standalone IORedis", () => {
-      it("duplicates the connection with maxRetriesPerRequest: null for the blocking connection", async () => {
-        const conn = new IORedis({
-          lazyConnect: true,
-          maxRetriesPerRequest: 0,
-        });
+      it("duplicates the connection with maxRetriesPerRequest: null for the blocking connection", () => {
+        const conn = track(
+          new IORedis({ lazyConnect: true, maxRetriesPerRequest: 0 }),
+        );
         const dupSentinel = {} as IORedis;
         vi.spyOn(conn, "duplicate").mockReturnValue(dupSentinel as any);
 
@@ -62,16 +87,16 @@ describe("GroupQueueProcessor blockingConnection selection", () => {
           maxRetriesPerRequest: null,
         });
         expect((processor as any).blockingConnection).toBe(dupSentinel);
-
-        conn.disconnect();
       });
     });
 
     describe("when the source connection is a Redis Cluster", () => {
-      it("duplicates the connection for a dedicated blocking connection", async () => {
-        const conn = new Cluster([{ host: "127.0.0.1", port: 6379 }], {
-          lazyConnect: true,
-        });
+      it("duplicates the connection for a dedicated blocking connection", () => {
+        const conn = track(
+          new Cluster([{ host: "127.0.0.1", port: 6379 }], {
+            lazyConnect: true,
+          }),
+        );
         const dupSentinel = {} as Cluster;
         vi.spyOn(conn, "duplicate").mockReturnValue(dupSentinel as any);
 
@@ -83,19 +108,16 @@ describe("GroupQueueProcessor blockingConnection selection", () => {
 
         expect(conn.duplicate).toHaveBeenCalled();
         expect((processor as any).blockingConnection).toBe(dupSentinel);
-
-        conn.disconnect();
       });
     });
   });
 
   describe("given consumer mode is disabled", () => {
     describe("when the source connection is a standalone IORedis", () => {
-      it("uses the shared connection directly without duplicating", async () => {
-        const conn = new IORedis({
-          lazyConnect: true,
-          maxRetriesPerRequest: 0,
-        });
+      it("uses the shared connection directly without duplicating", () => {
+        const conn = track(
+          new IORedis({ lazyConnect: true, maxRetriesPerRequest: 0 }),
+        );
         const dupSpy = vi.spyOn(conn, "duplicate");
 
         const processor = new GroupQueueProcessor<TestPayload>(
@@ -106,16 +128,16 @@ describe("GroupQueueProcessor blockingConnection selection", () => {
 
         expect(dupSpy).not.toHaveBeenCalled();
         expect((processor as any).blockingConnection).toBe(conn);
-
-        conn.disconnect();
       });
     });
 
     describe("when the source connection is a Redis Cluster", () => {
-      it("uses the shared cluster connection directly without duplicating", async () => {
-        const conn = new Cluster([{ host: "127.0.0.1", port: 6379 }], {
-          lazyConnect: true,
-        });
+      it("uses the shared cluster connection directly without duplicating", () => {
+        const conn = track(
+          new Cluster([{ host: "127.0.0.1", port: 6379 }], {
+            lazyConnect: true,
+          }),
+        );
         const dupSpy = vi.spyOn(conn, "duplicate");
 
         const processor = new GroupQueueProcessor<TestPayload>(
@@ -126,8 +148,6 @@ describe("GroupQueueProcessor blockingConnection selection", () => {
 
         expect(dupSpy).not.toHaveBeenCalled();
         expect((processor as any).blockingConnection).toBe(conn);
-
-        conn.disconnect();
       });
     });
   });
