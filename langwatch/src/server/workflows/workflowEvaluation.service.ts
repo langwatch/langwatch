@@ -118,7 +118,17 @@ export class WorkflowEvaluationService {
     const entry = dsl.nodes.find((n) => n.type === "entry")?.data as
       | Entry
       | undefined;
-    const entryInputs: Field[] = entry?.outputs ?? [];
+    const entryFields: Field[] = entry?.outputs ?? [];
+
+    // A parameter the workflow does not already declare as an entry field still
+    // has to reach the nodes: it is added as a dataset column (see
+    // applyParametersToRows), so it needs a matching input + mapping or
+    // buildTargetInputs would never read the column.
+    const declaredIdentifiers = new Set(entryFields.map((f) => f.identifier));
+    const parameterFields: Field[] = Object.keys(parameters ?? {})
+      .filter((key) => !declaredIdentifiers.has(key))
+      .map((key) => ({ identifier: key, type: "str" }));
+    const inputFields: Field[] = [...entryFields, ...parameterFields];
 
     // The workflow target maps each workflow input to the dataset column of the
     // same name, so dataset rows (and parameter overrides) flow into the run.
@@ -127,11 +137,11 @@ export class WorkflowEvaluationService {
       type: "workflow",
       workflowId: workflow.id,
       workflowVersionId: version.id,
-      inputs: entryInputs,
+      inputs: inputFields,
       outputs: [],
       mappings: {
         [WORKFLOW_DATASET_ID]: Object.fromEntries(
-          entryInputs.map((field) => [
+          inputFields.map((field) => [
             field.identifier,
             {
               type: "source" as const,
