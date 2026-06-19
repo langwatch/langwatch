@@ -78,18 +78,20 @@ RUN chmod +x /entrypoint.sh
 COPY services/langy-agent/skills/ /opt/langy-templates/skills/
 COPY services/langy-agent/AGENTS.md.template /opt/langy-templates/AGENTS.md
 
-# Non-root user so the pod can run with runAsNonRoot: true + readOnlyRootFilesystem.
-# ubuntu:24.04 ships a default `ubuntu` user already at UID 1000, so we remove
-# it first — otherwise `useradd -u 1000` fails with "UID already in use".
-# /workspace is owned by the agent user because the entrypoint creates skills/
-# and per-session directories there at runtime.
+# The manager process runs as root so it can chown per-session directories
+# to per-worker UIDs and `child_process.spawn({uid, gid})` into them; see
+# the SecurityContext block in charts/langy-agent/values.yaml for the cap
+# set that keeps the blast radius small. Workers spawned by the manager
+# enter unique UIDs (2000+hash(conversationId) % 60000) — no static user
+# records are needed because `setuid(N)` doesn't require `/etc/passwd` to
+# resolve N. Keep `/workspace` root-owned at image build time; the
+# manager re-chowns per-session subdirs as workers spawn.
 RUN userdel -r ubuntu 2>/dev/null || true && \
-    useradd -m -u 1000 -s /bin/bash agent && \
     mkdir -p /workspace && \
-    chown -R agent:agent /workspace
+    chown root:root /workspace && \
+    chmod 0755 /workspace
 
-ENV HOME=/home/agent
-USER agent
+ENV HOME=/root
 WORKDIR /workspace
 EXPOSE 8080
 ENTRYPOINT ["/entrypoint.sh"]
