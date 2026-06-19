@@ -63,13 +63,13 @@ them with options or the matching environment variables:
 
 An explicit option always wins over the environment.
 
-- **Legacy project keys (`sk-lw-*`)** carry project identity in the token. The
-  client sends `Authorization: Bearer <key>` plus `X-Auth-Token: <key>`.
-- **Personal Access Tokens (`pat-lw-*`)** are user-scoped and must be paired with
-  a project ID. When a project ID is available the client sends
-  `Authorization: Basic base64(projectID:token)`. Without one it falls back to
-  the Bearer + `X-Auth-Token` shape so the server returns a clean `401` rather
-  than silently mis-authenticating.
+The client always sends `Authorization: Bearer <key>`, and identifies the project
+with an `X-Project-Id` header when one is known.
+
+- **Legacy project keys (`sk-lw-*`)** carry project identity in the token, so
+  `X-Project-Id` is optional — it pins the request to a specific project.
+- **Personal Access Tokens (`pat-lw-*`)** are user-scoped and require
+  `X-Project-Id` so the server can resolve the correct role binding.
 
 ```go
 // PAT + project, explicit:

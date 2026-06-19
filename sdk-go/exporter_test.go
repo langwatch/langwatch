@@ -2,7 +2,6 @@ package langwatch
 
 import (
 	"context"
-	"encoding/base64"
 	"testing"
 
 	"github.com/langwatch/langwatch/sdk-go/internal/testutil"
@@ -160,19 +159,18 @@ func TestBuildHeaders(t *testing.T) {
 	headers := buildHeaders("test-api-key", "")
 
 	assert.Equal(t, "Bearer test-api-key", headers["Authorization"])
-	assert.Equal(t, "test-api-key", headers["X-Auth-Token"])
+	assert.NotContains(t, headers, "X-Auth-Token", "the legacy header is no longer emitted")
 	assert.Equal(t, "langwatch-sdk-go", headers["x-langwatch-sdk-name"])
 	assert.Equal(t, "go", headers["x-langwatch-sdk-language"])
 	assert.Equal(t, Version, headers["x-langwatch-sdk-version"])
 }
 
-func TestBuildHeaders_PATWithProjectIDUsesBasicAuth(t *testing.T) {
+func TestBuildHeaders_WithProjectID(t *testing.T) {
 	t.Setenv("LANGWATCH_PROJECT_ID", "")
 	headers := buildHeaders("pat-lw-secret", "project-9")
 
-	expected := base64.StdEncoding.EncodeToString([]byte("project-9:pat-lw-secret"))
-	assert.Equal(t, "Basic "+expected, headers["Authorization"])
-	assert.Empty(t, headers["X-Auth-Token"], "Basic-auth PATs must not also emit the legacy header")
+	assert.Equal(t, "Bearer pat-lw-secret", headers["Authorization"])
+	assert.Equal(t, "project-9", headers["X-Project-Id"])
 	// SDK identification headers are always present regardless of auth scheme.
 	assert.Equal(t, "langwatch-sdk-go", headers["x-langwatch-sdk-name"])
 	assert.Equal(t, "go", headers["x-langwatch-sdk-language"])

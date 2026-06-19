@@ -41,18 +41,16 @@
 //
 // # Authentication
 //
-// LangWatch accepts two credential families, both handled transparently by
-// [New] and its options:
+// The client always sends the credential as Authorization: Bearer <key>, and
+// identifies the project with an X-Project-Id header when one is known (via
+// [WithProjectID] or the LANGWATCH_PROJECT_ID environment variable). Two
+// credential families are handled transparently by [New] and its options:
 //
-//   - Legacy project keys (sk-lw-*): the key itself carries project identity.
-//     The client sends Authorization: Bearer <key> plus X-Auth-Token: <key>.
+//   - Legacy project keys (sk-lw-*): the key carries project identity, so
+//     X-Project-Id is optional — it pins the request to a specific project.
 //
-//   - Personal Access Tokens (pat-lw-*): user-scoped, and must be paired with a
-//     project ID so the server can resolve the role binding. When a project ID
-//     is available (via [WithProjectID] or the LANGWATCH_PROJECT_ID environment
-//     variable) the client sends Authorization: Basic base64(projectID:token).
-//     Without a project ID it falls back to the Bearer + X-Auth-Token shape so
-//     the server returns a clean 401 rather than silently mis-authenticating.
+//   - Personal Access Tokens (pat-lw-*): user-scoped, and require X-Project-Id
+//     so the server can resolve the correct role binding.
 //
 // See [WithAPIKey], [WithProjectID] and [WithEndpoint].
 //

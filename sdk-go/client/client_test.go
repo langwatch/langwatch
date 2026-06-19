@@ -2,7 +2,6 @@ package client
 
 import (
 	"context"
-	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -101,7 +100,7 @@ func TestAuthHeaders(t *testing.T) {
 			require.NoError(t, err)
 
 			assert.Equal(t, "Bearer sk-lw-legacy", got.Get("Authorization"))
-			assert.Equal(t, "sk-lw-legacy", got.Get("X-Auth-Token"))
+			assert.Empty(t, got.Get("X-Auth-Token"), "the legacy header is no longer sent")
 		})
 	})
 
@@ -116,9 +115,8 @@ func TestAuthHeaders(t *testing.T) {
 			_, err := c.Prompts.List(context.Background())
 			require.NoError(t, err)
 
-			wantEncoded := base64.StdEncoding.EncodeToString([]byte("project_abc:pat-lw-secret"))
-			assert.Equal(t, "Basic "+wantEncoded, got.Get("Authorization"))
-			assert.Empty(t, got.Get("X-Auth-Token"), "Basic-auth path must not send the legacy header")
+			assert.Equal(t, "Bearer pat-lw-secret", got.Get("Authorization"))
+			assert.Equal(t, "project_abc", got.Get("X-Project-Id"))
 		})
 	})
 
@@ -134,9 +132,8 @@ func TestAuthHeaders(t *testing.T) {
 			_, err := c.Prompts.List(context.Background())
 			require.NoError(t, err)
 
-			assert.Equal(t, "Bearer pat-lw-secret", got.Get("Authorization"),
-				"PAT without project falls back to Bearer so the server returns a clean 401")
-			assert.Equal(t, "pat-lw-secret", got.Get("X-Auth-Token"))
+			assert.Equal(t, "Bearer pat-lw-secret", got.Get("Authorization"))
+			assert.Empty(t, got.Get("X-Project-Id"), "no project id is sent when none is provided")
 		})
 	})
 
@@ -152,8 +149,8 @@ func TestAuthHeaders(t *testing.T) {
 			_, err := c.Prompts.List(context.Background())
 			require.NoError(t, err)
 
-			wantEncoded := base64.StdEncoding.EncodeToString([]byte("project_from_env:pat-lw-secret"))
-			assert.Equal(t, "Basic "+wantEncoded, got.Get("Authorization"),
+			assert.Equal(t, "Bearer pat-lw-secret", got.Get("Authorization"))
+			assert.Equal(t, "project_from_env", got.Get("X-Project-Id"),
 				"project id is picked up from LANGWATCH_PROJECT_ID")
 		})
 	})

@@ -106,8 +106,8 @@ func resolveConfig(opts ...ExporterOption) *exporterConfig {
 }
 
 // buildHeaders constructs the LangWatch-specific headers, delegating
-// auth-header assembly to buildAuthHeaders so PATs route through Basic
-// Auth when a project ID is available.
+// auth-header assembly to buildAuthHeaders (Authorization: Bearer plus an
+// X-Project-Id header when a project ID is available).
 func buildHeaders(apiKey, projectID string) map[string]string {
 	headers := buildAuthHeaders(apiKey, projectID)
 	headers["x-langwatch-sdk-name"] = "langwatch-sdk-go"
