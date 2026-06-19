@@ -10,6 +10,36 @@ once per environment.
 > into the deployment env, install the App on the repos Langy may touch, and
 > users see "Connect GitHub" in the Langy sidebar.
 
+## 0. Enabling Langy in the chart
+
+The Langy agent pod is **default OFF** in the umbrella chart
+(`langy-agent.chartManaged: false`). This is deliberate: the agent + app
+Deployments both reference a shared `LANGY_INTERNAL_SECRET` Secret that the
+chart does NOT materialise (it's created out-of-band — Terraform / external
+secrets / a manual `kubectl create secret`). Defaulting on would break the
+main app pod for every existing operator's next upgrade with
+`CreateContainerConfigError`.
+
+To turn Langy on:
+
+```bash
+# 1. Create the shared Bearer secret the app + agent use to authenticate to
+#    each other. 64 hex chars is plenty.
+kubectl -n langwatch create secret generic langwatch-langy-agent-auth \
+  --from-literal=LANGY_INTERNAL_SECRET="$(openssl rand -hex 32)"
+
+# 2. Opt the agent in. The app deployment will then pick up
+#    OPENCODE_AGENT_URL + LANGY_INTERNAL_SECRET automatically.
+helm upgrade langwatch ./charts/langwatch -n langwatch \
+  -f values.prod.yaml \
+  --set langy-agent.chartManaged=true
+```
+
+Even with the agent running, **the in-product UI stays staff-only** until
+`release_langy_enabled` is flipped on for the users / orgs you want to roll
+out to (see PostHog or `/ops/feature-flags`). The chart-managed switch only
+controls the runtime; the feature flag controls user-facing exposure.
+
 ## 1. Register the App
 
 GitHub → org settings → Developer settings → **GitHub Apps** → **New GitHub App**.
