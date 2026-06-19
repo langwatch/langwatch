@@ -25,6 +25,7 @@ export type VirtualKeyCamelDto = {
   name: string;
   description: string | null;
   status: "active" | "revoked";
+  purpose: "user" | "langy";
   displayPrefix: string;
   principalUserId: string | null;
   principalUser: { name: string | null; email: string | null } | null;
@@ -44,6 +45,7 @@ export type VirtualKeySnakeDto = {
   name: string;
   description: string | null;
   status: "active" | "revoked";
+  purpose: "user" | "langy";
   display_prefix: string;
   principal_user_id: string | null;
   scopes: Array<{ scope_type: string; scope_id: string }>;
@@ -65,6 +67,7 @@ function baseVk(vk: VirtualKeyWithScopes): BaseVk {
     name: vk.name,
     description: vk.description,
     status: vk.status === "ACTIVE" ? "active" : "revoked",
+    purpose: vk.purpose === "LANGY" ? "langy" : "user",
     displayPrefix: vk.displayPrefix,
     principalUserId: vk.principalUserId,
     principalUser: vk.principalUser
@@ -100,6 +103,7 @@ export function toVirtualKeySnakeDto(
     name: base.name,
     description: base.description,
     status: base.status,
+    purpose: base.purpose,
     display_prefix: base.displayPrefix,
     principal_user_id: base.principalUserId,
     scopes: base.scopes.map((s) => ({

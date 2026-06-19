@@ -158,6 +158,7 @@ describe("LangyCredentialService", () => {
             principalUserId: null,
             scopes: [{ scopeType: "PROJECT", scopeId: "p1" }],
             actorUserId: "u1",
+            purpose: "LANGY",
           }),
         );
         expect(prisma.projectSecret.create).toHaveBeenCalledWith({
@@ -241,10 +242,10 @@ describe("LangyCredentialService", () => {
   // Server-side allowlist read used by /langy/chat to reject tampered
   // `modelOverride` values before they reach the OpenCode pod. The picker
   // UI also narrows by this list — the server check is defense in depth.
-  // The query happens at the DB layer (organizationId + name +
-  // principalUserId + project-scope are all in the Prisma WHERE), so the
-  // tests assert both: (a) the right WHERE was issued, and (b) the config
-  // value is returned through Zod parsing.
+  // The query happens at the DB layer (organizationId + purpose +
+  // project-scope are all in the Prisma WHERE), so the tests assert both:
+  // (a) the right WHERE was issued, and (b) the config value is returned
+  // through Zod parsing.
   describe("getModelsAllowed", () => {
     function makePrismaWithVk(vk: unknown) {
       return {
@@ -268,14 +269,13 @@ describe("LangyCredentialService", () => {
         });
 
         expect(result).toEqual(["anthropic/claude-opus-4-7"]);
-        // Tenancy (org), identity (name + null principal), and reachability
+        // Tenancy (org), identity (purpose=LANGY), and reachability
         // (scope row) all enforced at the DB layer — not by a post-fetch
         // in-memory filter. Drift in any of these is a load-bearing bug.
         expect(prisma.virtualKey.findFirst).toHaveBeenCalledWith({
           where: {
             organizationId: "org-1",
-            name: "Langy",
-            principalUserId: null,
+            purpose: "LANGY",
             scopes: {
               some: { scopeType: "PROJECT", scopeId: "p1" },
             },

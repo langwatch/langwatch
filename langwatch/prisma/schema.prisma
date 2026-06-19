@@ -1839,6 +1839,15 @@ enum VirtualKeyStatus {
   REVOKED
 }
 
+// Why this key exists. USER = explicitly created via the gateway UI / API.
+// LANGY = auto-provisioned by the Langy in-product assistant; UI surfaces it
+// as a managed row and forbids edit/revoke. Filtering by `purpose` replaces
+// the legacy `name == "Langy" && principalUserId IS NULL` heuristic.
+enum VirtualKeyPurpose {
+  USER
+  LANGY
+}
+
 // Rotation policy for gateway provider credentials.
 // v1 ships MANUAL only - operators rotate via the Rotate button in
 // the UI or by calling POST /providers/:id/rotate. Scheduled rotation
@@ -1942,7 +1951,8 @@ model VirtualKey {
 
   name        String
   description String?
-  status      VirtualKeyStatus @default(ACTIVE)
+  status      VirtualKeyStatus  @default(ACTIVE)
+  purpose     VirtualKeyPurpose @default(USER)
 
   // Credential material. Full secret format:
   //   vk-lw-<26-char-crockford-ulid>  (32 chars total)
@@ -2002,6 +2012,7 @@ model VirtualKey {
   @@index([principalUserId])
   @@index([revision])
   @@index([routingPolicyId])
+  @@index([organizationId, purpose])
 }
 
 // VirtualKeyScope - N-scope access for VirtualKey, mirrors

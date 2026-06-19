@@ -58,6 +58,12 @@ export type CreateVirtualKeyInput = {
    */
   routingPolicyId?: string | null;
   config?: Partial<VirtualKeyConfig>;
+  /**
+   * USER (default) for keys created via the gateway UI / API; LANGY when
+   * auto-provisioned by the Langy services. Threaded straight to the row
+   * column — no behaviour branches in the service itself.
+   */
+  purpose?: "USER" | "LANGY";
 };
 
 export type UpdateVirtualKeyInput = {
@@ -175,6 +181,7 @@ export class VirtualKeyService {
           createdById: input.actorUserId,
           scopes: input.scopes,
           routingPolicyId: input.routingPolicyId ?? null,
+          purpose: input.purpose,
         },
         tx,
       );

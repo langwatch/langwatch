@@ -88,6 +88,10 @@ export async function provisionLangyVirtualKey(args: {
     principalUserId: null,
     scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
     actorUserId,
+    // Marks this VK as managed by Langy so the gateway UI badges + locks the
+    // row, and LangyCredentialService can look it up by column instead of
+    // name-matching (which broke under user renames + i18n).
+    purpose: "LANGY",
   });
 
   try {
