@@ -8,7 +8,7 @@ overrides:
   '@aws-sdk/xml-builder>fast-xml-parser': ^5.7.0
   '@langchain/community>fast-xml-parser': ^5.7.0
   ai: ^6.0.161
-  liquidjs: '>=10.25.7'
+  liquidjs: '>=10.6 <11'
   protobufjs: '>=7.5.6 <8.0.0 || >=8.6.0'
   langsmith@<0.6.0: 0.6.0
   postcss: ^8.5.13
@@ -410,7 +410,7 @@ importers:
         specifier: ^3.8.5
         version: 3.8.5
       liquidjs:
-        specifier: '>=10.25.7'
+        specifier: '>=10.6 <11'
         version: 10.27.0
       lodash-es:
         specifier: ^4.18.1
