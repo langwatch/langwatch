@@ -1,8 +1,7 @@
-# @unimplemented while this PR is in flight: each scenario gets its
-# @scenario binding (and the @unimplemented tag is dropped) as the phase
-# that implements it lands. Bindings target
-# langwatch/src/server/experiments-v3/execution/__tests__/.
-@unimplemented
+# Bindings target langwatch/src/server/experiments-v3/execution/__tests__/.
+# The two scenarios still tagged @unimplemented need full orchestrator + nlpgo
+# coverage (multi-row run continuation and cross-row trace linkage); they are
+# proven by the end-to-end dogfood rather than the cell-level test.
 Feature: A workflow runs as an evaluations-v3 target
   As an author evaluating a whole workflow
   I want the workflow to run through the same evaluations-v3 pipeline as prompts and agents
@@ -31,7 +30,7 @@ Feature: A workflow runs as an evaluations-v3 target
     And a string score from the workflow is coerced to a number
     And a string pass or fail from the workflow is coerced to a boolean
 
-  @integration
+  @integration @unimplemented
   Scenario: A row that fails does not abort the rest of the run
     Given the workflow raises an error on the second row
     When I run the workflow evaluation
@@ -43,7 +42,7 @@ Feature: A workflow runs as an evaluations-v3 target
     When I run the workflow evaluation
     Then each target result records the workflow run cost and duration
 
-  @integration
+  @integration @unimplemented
   Scenario: Each row gets a distinct trace id shared by its evaluator results
     When I run the workflow evaluation
     Then each row's target result has its own trace id

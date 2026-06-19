@@ -6,6 +6,7 @@
  */
 
 import type { Evaluator } from "@prisma/client";
+import type { Workflow } from "~/optimization_studio/types/dsl";
 import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { AgentService } from "~/server/agents/agent.service";
@@ -170,12 +171,24 @@ export const loadDataset = async (
 /**
  * Result of loading all execution data.
  */
+/**
+ * A studio workflow loaded for a workflow target: the committed DSL that is run
+ * as a whole, once per dataset row.
+ */
+export type LoadedWorkflow = {
+  id: string;
+  name: string;
+  versionId: string;
+  dsl: Workflow;
+};
+
 export type LoadedExecutionData = {
   datasetRows: Array<Record<string, unknown>>;
   datasetColumns: Array<{ id: string; name: string; type: string }>;
   loadedPrompts: Map<string, VersionedPrompt>;
   loadedAgents: Map<string, TypedAgent>;
   loadedEvaluators: Map<string, Evaluator>;
+  loadedWorkflows: Map<string, LoadedWorkflow>;
 };
 
 /**
@@ -188,6 +201,9 @@ type TargetForLoading = {
   dbAgentId?: string;
   /** For evaluator targets: the database evaluator ID */
   targetEvaluatorId?: string;
+  /** For workflow targets: the studio workflow ID and pinned version */
+  workflowId?: string;
+  workflowVersionId?: string;
 };
 
 /**
@@ -273,6 +289,48 @@ export const loadExecutionData = async (
     }
   }
 
+  // Load studio workflows for workflow targets (the committed DSL run per row)
+  const loadedWorkflows = new Map<string, LoadedWorkflow>();
+  for (const target of targets) {
+    if (target.type !== "workflow" || !target.workflowId) continue;
+    if (loadedWorkflows.has(target.workflowId)) continue;
+
+    const workflow = await prisma.workflow.findUnique({
+      where: { id: target.workflowId, projectId },
+    });
+    if (!workflow) {
+      return {
+        error: `Workflow "${target.workflowId}" not found`,
+        status: 404,
+      };
+    }
+
+    const versionId = target.workflowVersionId ?? workflow.publishedId;
+    if (!versionId) {
+      return {
+        error: `Workflow "${target.workflowId}" has no committed version to evaluate`,
+        status: 400,
+      };
+    }
+
+    const version = await prisma.workflowVersion.findUnique({
+      where: { id: versionId, projectId },
+    });
+    if (!version) {
+      return {
+        error: `Workflow version "${versionId}" not found`,
+        status: 404,
+      };
+    }
+
+    loadedWorkflows.set(target.workflowId, {
+      id: workflow.id,
+      name: workflow.name,
+      versionId,
+      dsl: version.dsl as unknown as Workflow,
+    });
+  }
+
   // Load evaluators from DB (for both evaluator configs AND evaluator targets)
   const loadedEvaluators = new Map<string, Evaluator>();
   const evaluatorService = EvaluatorService.create(prisma);
@@ -311,5 +369,6 @@ export const loadExecutionData = async (
     loadedPrompts,
     loadedAgents,
     loadedEvaluators,
+    loadedWorkflows,
   };
 };
