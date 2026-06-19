@@ -264,4 +264,40 @@ describe("ExperimentsFacade.runWithResults", () => {
       });
     });
   });
+
+  describe("given the run reports no rows", () => {
+    describe("when the results fetch errors", () => {
+      it("surfaces the error immediately without retrying through the lag window", async () => {
+        const noRowsStatus = {
+          ...completedStatus,
+          summary: {
+            ...completedStatus.summary,
+            totalCells: 0,
+            completedCells: 0,
+          },
+        };
+        mockFetch
+          .mockResolvedValueOnce(jsonResponse(startResponse))
+          .mockResolvedValueOnce(jsonResponse(noRowsStatus))
+          .mockResolvedValueOnce(
+            jsonResponse({ error: "Unauthorized" }, { status: 401 }),
+          )
+          // A second results response is queued but must never be reached: with
+          // no rows expected, a thrown error is terminal, not a lag retry.
+          .mockResolvedValueOnce(jsonResponse(resultsResponse));
+
+        const facade = makeFacade();
+        const err = await facade
+          .runWithResults("my-experiment", {
+            data: [{ question: "What is 2 + 2?" }],
+            pollInterval: 0,
+          })
+          .catch((e) => e);
+
+        expect(err).toBeInstanceOf(Error);
+        // start + poll + a single results attempt, no retry.
+        expect(mockFetch).toHaveBeenCalledTimes(3);
+      });
+    });
+  });
 });
