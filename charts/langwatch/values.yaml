@@ -1640,12 +1640,22 @@ gateway:
 ## assistant. Internal-only (no ingress); the control plane reaches it over
 ## cluster DNS. The subchart defaults (image, probes, NetworkPolicy,
 ## SecurityContext, single-replica) live in charts/langy-agent/values.yaml.
-## `langy-agent.chartManaged: false` disables the agent (and the app's wiring
-## to it) — useful when running the agent externally or turning Langy off.
+## `langy-agent.chartManaged: false` (the default) disables the agent and the
+## app's wiring to it; flip to true once the prerequisite secret + opt-in
+## steps are done (see docs/langy-github-app.md).
+##
+## WHY default off: the agent + app Deployments both reference a `secretKeyRef`
+## to `langwatch-langy-agent-auth` (created out-of-band — terraform / external-
+## secrets / a manual `kubectl create secret`). The umbrella chart does NOT
+## materialise that secret, so an upgrade with chartManaged=true on top of a
+## values file that hasn't been prepared yields `CreateContainerConfigError`
+## on the main app pod — turning an optional, dark-by-flag feature into a
+## blocker for every operator's next upgrade. Default-off keeps existing
+## installs unaffected; operators flip the switch when they're ready.
 ## NOTE: hyphenated key — reference as (index .Values "langy-agent") in templates.
 langy-agent:
-  ## @param langy-agent.chartManaged [default: true] Lift the Langy agent pod as part of this chart (false = external or off).
-  chartManaged: true
+  ## @param langy-agent.chartManaged [default: false] Lift the Langy agent pod as part of this chart. Default off so existing upgrades aren't broken by the absent shared Secret; opt in once the LANGY_INTERNAL_SECRET secret is created out-of-band.
+  chartManaged: false
 
   ## @param langy-agent.controlPlane.agentUrl [string, default: http://<release>-langy-agent:80] URL the app uses to reach the agent Service. Leave empty to auto-derive from the release name.
   controlPlane:
