@@ -61,7 +61,7 @@ type CreatedSecret = {
 };
 
 function VirtualKeysPage() {
-  const { organization, project, hasPermission } = useOrganizationTeamProject();
+  const { organization, hasPermission } = useOrganizationTeamProject();
   const router = useRouter();
   const canCreate = hasPermission("virtualKeys:create");
   const canRotate = hasPermission("virtualKeys:rotate");
