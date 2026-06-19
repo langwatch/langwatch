@@ -2,13 +2,17 @@
  * @vitest-environment node
  * @integration
  *
- * Integration tests for the GET /api/files/:id route.
+ * Integration tests for the GET /api/files route (legacy id-only and the
+ * project-scoped /api/files/:projectId/:id form added in #4947).
  *
  * Covers:
  *  - Case 5: GET an existing row with backing storage → 200 + bytes streamed
  *  - Case 6: GET a row whose storage URI is missing → 404 { status: "missing" }
  *  - Case 7: GET a row id that does not exist in CH → 404 { status: "not_found" }
  *  - 403: caller authenticated for a different project → 403 forbidden
+ *  - #4947: project-scoped URL reads via the URL's project (no cross-tenant
+ *    lookup); a URL scoped to project A cannot serve project B's object
+ *    (404 under own scope, 403 for a foreign claim with no existence oracle)
  *
  * Strategy:
  *  - The files route calls `createStoredObjectsService` which calls
@@ -419,6 +423,124 @@ describe("GET /api/files/:id", () => {
       expect(res.status).toBe(200);
       const body = await res.text();
       expect(body).toBe(content);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Project-scoped route (issue #4947)
+// ---------------------------------------------------------------------------
+//
+// The project-scoped URL `/api/files/:projectId/:id` carries the owning
+// project, so the read path scopes directly to it and skips the cross-tenant
+// owner lookup. These tests pin the tenant-isolation contract: a URL scoped
+// to one project can never serve another project's object.
+describe("GET /api/files/:projectId/:id (project-scoped — #4947)", () => {
+  describe("when the URL's project matches the caller and the row exists", () => {
+    /** @scenario "GET /api/files/:projectId/:id reads via the project-scoped client without a cross-tenant lookup" */
+    it("streams the bytes scoped to the URL's project and never runs the cross-tenant owner lookup", async () => {
+      const fileId = `stored-${nanoid(8)}`;
+      const content = "scoped-bytes";
+      const row = makeStoredObjectRow({
+        id: fileId,
+        project_id: projectAId,
+        media_type: "image/png",
+        size_bytes: Buffer.from(content).length,
+      });
+      mockGetById.mockResolvedValueOnce({
+        row,
+        stream: makeReadableStream(content),
+      });
+
+      const res = await app.request(`/api/files/${projectAId}/${fileId}`, {
+        headers: { "X-Auth-Token": projectAKey },
+      });
+
+      expect(res.status).toBe(200);
+      expect(await res.text()).toBe(content);
+      // Owner came from the URL — no cross-tenant fan-out.
+      expect(mockResolveOwnerProject).not.toHaveBeenCalled();
+      // The read was scoped to the project named in the URL.
+      expect(mockGetById).toHaveBeenCalledWith({
+        projectId: projectAId,
+        id: fileId,
+      });
+    });
+  });
+
+  describe("when a caller requests another project's object id under their OWN project scope", () => {
+    /** @scenario "GET /api/files/:projectId/:id scopes the read to the URL's project and cannot serve another tenant's object" */
+    it("scopes the read to the URL's project and returns 404 — the other tenant's bytes are never served", async () => {
+      // The id belongs (conceptually) to project A. The caller is
+      // authenticated as project B and crafts a URL with their OWN project id
+      // but A's object id: /api/files/<B>/<A's id>. The read is scoped to B,
+      // where the row does not exist → 404. The project-scoped query
+      // (WHERE project_id = B AND id = ...) is exactly what blocks the
+      // cross-tenant read: without it (a blind WHERE id = ... lookup, as the
+      // legacy path does) the route would find A's row and stream A's bytes
+      // to B. THIS is the falsifiable tenant-isolation crux.
+      const crossTenantId = `stored-${nanoid(8)}`;
+      // B's scope has no such row.
+      mockGetById.mockResolvedValueOnce(null);
+
+      const res = await app.request(`/api/files/${projectBId}/${crossTenantId}`, {
+        headers: { "X-Auth-Token": projectBKey },
+      });
+
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ status: "not_found" });
+      // Proves the read used the URL's project (B), NOT a cross-tenant
+      // resolution of the true owner (A).
+      expect(mockGetById).toHaveBeenCalledWith({
+        projectId: projectBId,
+        id: crossTenantId,
+      });
+      expect(mockResolveOwnerProject).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a caller names a project other than their own in the URL", () => {
+    /** @scenario "GET /api/files/:projectId/:id rejects a URL whose project is not the caller's with no existence oracle" */
+    it("returns 403 before any storage read, regardless of whether the object exists", async () => {
+      // Caller authenticated as project B requests a URL naming project A.
+      // Authorization compares the caller (B) to the URL's claimed owner (A)
+      // and rejects BEFORE any storage read — so the response cannot
+      // distinguish "exists in A" from "absent". The 403-vs-404 cross-tenant
+      // existence oracle is closed for the new path.
+      const fileId = `stored-${nanoid(8)}`;
+
+      const res = await app.request(`/api/files/${projectAId}/${fileId}`, {
+        headers: { "X-Auth-Token": projectBKey },
+      });
+
+      expect(res.status).toBe(403);
+      expect(mockGetById).not.toHaveBeenCalled();
+      expect(mockResolveOwnerProject).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the URL's project is the caller's but storage no longer holds the blob", () => {
+    /** @scenario "GET /api/files/:projectId/:id returns 404 missing when the row exists but the blob is gone" */
+    it("returns 404 with body { status: 'missing' } via the project-scoped read", async () => {
+      const fileId = `stored-${nanoid(8)}`;
+      const row = makeStoredObjectRow({ id: fileId, project_id: projectAId });
+      mockGetById.mockResolvedValueOnce({ row, status: "missing" });
+
+      const res = await app.request(`/api/files/${projectAId}/${fileId}`, {
+        headers: { "X-Auth-Token": projectAKey },
+      });
+
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ status: "missing" });
+      expect(mockResolveOwnerProject).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the caller is not authenticated", () => {
+    it("returns 401 without reading storage", async () => {
+      const res = await app.request(`/api/files/${projectAId}/some-id`);
+      expect(res.status).toBe(401);
+      expect(mockGetById).not.toHaveBeenCalled();
     });
   });
 });

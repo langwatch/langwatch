@@ -442,6 +442,45 @@ describe("StoredObjectsService (ingest + read path)", () => {
         });
       });
     });
+
+    describe("when getById is called with a different project than the owner (#4947 tenant isolation)", () => {
+      /** @scenario "A project-scoped read cannot return an object owned by another project" */
+      it("returns null for the wrong project but the bytes for the owning project", async () => {
+        await withTmpStorage(async () => {
+          const bytes = makeBytes("cross-tenant-read-isolation");
+          const ownerService = buildService(PROJECT_A);
+
+          // Store the object under project A.
+          const { id } = await ownerService.storeFromBytes({
+            projectId: PROJECT_A,
+            purpose: "scenario_event",
+            ownerKind: "scenario_run",
+            ownerId: `run-${nanoid(6)}`,
+            mediaType: "text/plain",
+            bytes,
+          });
+          await waitForRow(ch, PROJECT_A, id);
+
+          // Project B scoping the read by A's object id finds nothing: the CH
+          // query is `WHERE project_id = B AND id = ...`, which prunes to B's
+          // partition and never sees A's row. This is the data-layer guarantee
+          // the project-scoped `/api/files/:projectId/:id` route relies on —
+          // a URL scoped to B cannot serve A's bytes. Falsifiable: drop the
+          // `project_id` predicate from the scoped read and this returns A's
+          // row instead of null.
+          const crossTenant = await buildService(PROJECT_B).getById({
+            projectId: PROJECT_B,
+            id,
+          });
+          expect(crossTenant).toBeNull();
+
+          // The owning project still reads the bytes back.
+          const owned = await ownerService.getById({ projectId: PROJECT_A, id });
+          expect(owned).not.toBeNull();
+          expect(owned !== null && "stream" in owned).toBe(true);
+        });
+      });
+    });
   });
 
   describe("when telemetry spans are observed across ingest and read", () => {
