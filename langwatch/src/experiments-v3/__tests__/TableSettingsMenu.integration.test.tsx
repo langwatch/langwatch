@@ -149,51 +149,55 @@ describe("TableSettingsMenu", () => {
     });
   });
 
-  describe("Run via API dialog", () => {
-    const openRunDialog = async () => {
-      const user = userEvent.setup();
-      const button = screen.getByRole("button", { name: /run options/i });
-      await user.click(button);
+  describe("given an experiment with the automation entry", () => {
+    describe("when Run in CI/CD is clicked", () => {
+      const openRunDialog = async () => {
+        const user = userEvent.setup();
+        const button = screen.getByRole("button", { name: /run options/i });
+        await user.click(button);
 
-      const cicdText = await screen.findByText("Run in CI/CD");
-      const cicdButton = cicdText.closest("button");
-      expect(cicdButton).not.toBeNull();
-      await user.click(cicdButton!);
+        const cicdText = await screen.findByText("Run in CI/CD");
+        const cicdButton = cicdText.closest("button");
+        expect(cicdButton).not.toBeNull();
+        await user.click(cicdButton!);
 
-      return screen.findByRole("dialog");
-    };
+        return screen.findByRole("dialog");
+      };
 
-    it("opens the Run via API dialog when clicking Run in CI/CD", async () => {
-      render(<TableSettingsMenu />, { wrapper: Wrapper });
+      it("opens the Run via API dialog", async () => {
+        render(<TableSettingsMenu />, { wrapper: Wrapper });
 
-      const dialog = await openRunDialog();
-      expect(dialog).toBeInTheDocument();
-      expect(screen.getByText("Run via API")).toBeInTheDocument();
-    });
+        const dialog = await openRunDialog();
+        expect(dialog).toBeInTheDocument();
+        expect(screen.getByText("Run via API")).toBeInTheDocument();
+      });
 
-    it("shows the Run via API snippet targeting the experiment run", async () => {
-      render(<TableSettingsMenu />, { wrapper: Wrapper });
+      it("shows the snippet targeting the experiment run", async () => {
+        render(<TableSettingsMenu />, { wrapper: Wrapper });
 
-      const dialog = await openRunDialog();
-      expect(dialog.textContent ?? "").toContain(
-        'langwatch.experiment.run("test-slug"',
-      );
-    });
+        const dialog = await openRunDialog();
+        expect(dialog.textContent ?? "").toContain(
+          'langwatch.experiment.run("test-slug"',
+        );
+      });
 
-    it("shows Python, TypeScript and Shell language tabs", async () => {
-      render(<TableSettingsMenu />, { wrapper: Wrapper });
+      it("shows Python, TypeScript and Shell language tabs", async () => {
+        render(<TableSettingsMenu />, { wrapper: Wrapper });
 
-      await openRunDialog();
-      expect(screen.getByText("Python")).toBeInTheDocument();
-      expect(screen.getByText("TypeScript")).toBeInTheDocument();
-      expect(screen.getByText("Shell")).toBeInTheDocument();
-    });
+        await openRunDialog();
+        expect(screen.getByText("Python")).toBeInTheDocument();
+        expect(screen.getByText("TypeScript")).toBeInTheDocument();
+        expect(screen.getByText("Shell")).toBeInTheDocument();
+      });
 
-    it("shows the data-source picker", async () => {
-      render(<TableSettingsMenu />, { wrapper: Wrapper });
+      it("shows the data-source picker", async () => {
+        render(<TableSettingsMenu />, { wrapper: Wrapper });
 
-      await openRunDialog();
-      expect(screen.getByTestId("run-via-api-data-source")).toBeInTheDocument();
+        await openRunDialog();
+        expect(
+          screen.getByTestId("run-via-api-data-source"),
+        ).toBeInTheDocument();
+      });
     });
   });
 

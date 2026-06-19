@@ -39,9 +39,9 @@ export function RunViaApiButton({
       ? window.location.origin
       : "https://app.langwatch.ai";
 
-  const { dataSource, setDataSource, tabs } = useRunViaApiTabs((lang, source) =>
-    buildRunSnippet(
-      {
+  const { dataSource, setDataSource, tabs } = useRunViaApiTabs(
+    ({ lang, dataSource: source }) =>
+      buildRunSnippet({
         kind: "workflow",
         identifier: workflowId,
         baseUrl,
@@ -50,9 +50,8 @@ export function RunViaApiButton({
         datasetName,
         dataSource: source,
         projectSlug,
-      },
-      lang,
-    ),
+        lang,
+      }),
   );
 
   return (

@@ -252,7 +252,6 @@ describe("executionRequestSchema", () => {
           }).success,
         ).toBe(false);
 
-        // Either input on its own is accepted.
         expect(
           executionRequestSchema.safeParse({
             ...baseRequest,
