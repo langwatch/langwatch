@@ -31,6 +31,7 @@ export interface TraceProcessingPipelineDeps {
   originGateReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   evaluationTriggerReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   customEvaluationSyncReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+  trackedEventSyncReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   traceUpdateBroadcastReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   projectMetadataReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   simulationMetricsSyncReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
@@ -77,6 +78,7 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
     .withReactor("traceSummary", "originGate", deps.originGateReactor)
     .withReactor("traceSummary", "evaluationTrigger", deps.evaluationTriggerReactor)
     .withReactor("traceSummary", "customEvaluationSync", deps.customEvaluationSyncReactor)
+    .withReactor("traceSummary", "trackedEventSync", deps.trackedEventSyncReactor)
     .withReactor("traceSummary", "traceUpdateBroadcast", deps.traceUpdateBroadcastReactor)
     .withReactor("traceSummary", "projectMetadata", deps.projectMetadataReactor)
     .withReactor("traceSummary", "simulationMetricsSync", deps.simulationMetricsSyncReactor)

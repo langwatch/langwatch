@@ -63,9 +63,11 @@ import { getPostHogInstance } from "~/server/posthog";
 import { getServerAuthSession } from "~/server/auth";
 import { connection as redis } from "~/server/redis";
 import {
-  generateTrackedEventId,
   predefinedEventTypes,
   predefinedEventsSchemas,
+} from "~/server/app-layer/events/predefinedEvents.schema";
+import {
+  generateTrackedEventId,
   recordTrackedEventSpan,
 } from "~/server/app-layer/events/track-event.service";
 import {

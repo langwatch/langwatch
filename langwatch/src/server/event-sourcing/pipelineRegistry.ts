@@ -92,6 +92,8 @@ import { MetricRecordAppendStore } from "./pipelines/trace-processing/projection
 import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
 import { createCustomEvaluationSyncReactor } from "./pipelines/trace-processing/reactors/customEvaluationSync.reactor";
+import { createTrackedEventSyncReactor } from "./pipelines/trace-processing/reactors/trackedEventSync.reactor";
+import { recordTrackedEventSpan } from "~/server/app-layer/events/track-event.service";
 import { createProjectMetadataReactor } from "./pipelines/trace-processing/reactors/projectMetadata.reactor";
 import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
@@ -364,6 +366,14 @@ export class PipelineRegistry {
       reportEvaluation: evalCommands.reportEvaluation,
     });
 
+    // Live span feedback (langwatch.event) → tracked event. Routes through the
+    // same recordTrackedEventSpan path as REST POST /api/events/track so an
+    // SDK-emitted thumbs_up_down lands identically to a REST call.
+    const trackedEventSyncReactor = createTrackedEventSyncReactor({
+      recordTrackedEvent: ({ tenantId, body, eventId }) =>
+        recordTrackedEventSpan({ project: { id: tenantId }, body, eventId }),
+    });
+
     const traceUpdateBroadcastReactor = createTraceUpdateBroadcastReactor({
       broadcast: this.deps.broadcast,
       hasRedis: !!this.deps.eventSourcing.redisConnection,
@@ -437,6 +447,7 @@ export class PipelineRegistry {
         evaluationTriggerReactor,
         alertTriggerReactor,
         customEvaluationSyncReactor,
+        trackedEventSyncReactor,
         traceUpdateBroadcastReactor,
         projectMetadataReactor,
         simulationMetricsSyncReactor,
