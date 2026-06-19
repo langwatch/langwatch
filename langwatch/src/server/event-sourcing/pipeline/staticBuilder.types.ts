@@ -3,8 +3,14 @@ import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 import type { CommandHandlerClass } from "../commands/commandHandlerClass";
 import type { Event, Projection } from "../domain/types";
 import type { OutboxReactorDefinition } from "../outbox/outboxReactor.types";
-import type { FoldProjectionDefinition, FoldProjectionOptions } from "../projections/foldProjection.types";
-import type { MapProjectionDefinition, MapProjectionOptions } from "../projections/mapProjection.types";
+import type {
+  FoldProjectionDefinition,
+  FoldProjectionOptions,
+} from "../projections/foldProjection.types";
+import type {
+  MapProjectionDefinition,
+  MapProjectionOptions,
+} from "../projections/mapProjection.types";
 import type { DeduplicationStrategy } from "../queues/queue.types";
 import type { ReactorDefinition } from "../reactors/reactor.types";
 import type { PipelineMetadata } from "./types";
@@ -100,7 +106,10 @@ export interface StaticPipelineDefinition<
     name: string;
     handlerClass: CommandHandlerClass<any, any, EventType>;
     /** Pre-constructed instance — when provided, queueManager uses this instead of `new handlerClass()`. */
-    handlerInstance?: import("../commands/command").CommandHandler<any, EventType>;
+    handlerInstance?: import("../commands/command").CommandHandler<
+      any,
+      EventType
+    >;
     options?: CommandHandlerOptions;
   }>;
 

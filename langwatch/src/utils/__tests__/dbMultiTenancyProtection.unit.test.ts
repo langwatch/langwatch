@@ -1,12 +1,11 @@
 import { Prisma } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
-
-import { ORG_BEARING_MODEL_NAMES } from "../dbOrganizationIdProtection";
 import {
+  guardProjectId,
   PROJECT_TENANCY_REGIMES,
   SCOPED_MODEL_NAMES,
-  guardProjectId,
 } from "../dbMultiTenancyProtection";
+import { ORG_BEARING_MODEL_NAMES } from "../dbOrganizationIdProtection";
 
 /**
  * Regression tests for the multitenancy guard — specifically its exempt
@@ -20,11 +19,13 @@ import {
  * These tests lock that in.
  */
 
-async function runGuard(params: Partial<Prisma.MiddlewareParams> & {
-  model: string;
-  action: Prisma.MiddlewareParams["action"];
-  args: Prisma.MiddlewareParams["args"];
-}): Promise<unknown> {
+async function runGuard(
+  params: Partial<Prisma.MiddlewareParams> & {
+    model: string;
+    action: Prisma.MiddlewareParams["action"];
+    args: Prisma.MiddlewareParams["args"];
+  },
+): Promise<unknown> {
   const next = vi.fn(async () => "ok");
   return guardProjectId(
     {
@@ -499,9 +500,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelDefaultConfig family)", () => {
                 {
                   scopes: {
                     some: {
-                      OR: [
-                        { scopeType: "TEAM", scopeId: "team_01" },
-                      ],
+                      OR: [{ scopeType: "TEAM", scopeId: "team_01" }],
                     },
                   },
                 },

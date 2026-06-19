@@ -94,9 +94,9 @@ export function createApiRouter() {
   api.route("/", legacyOAuthCallbacks.hono);
 
   // ORDERING: specific paths before catch-all siblings with same basePath
-  api.route("/", datasetGenerateApp);    // /api/dataset/generate (before datasetApp's /:slugOrId)
-  api.route("/", workflowsApp);          // /api/workflows/code-completion, /post_event
-  api.route("/", healthChecksApp);       // /api/health/collector, /evaluations, etc.
+  api.route("/", datasetGenerateApp); // /api/dataset/generate (before datasetApp's /:slugOrId)
+  api.route("/", workflowsApp); // /api/workflows/code-completion, /post_event
+  api.route("/", healthChecksApp); // /api/health/collector, /evaluations, etc.
 
   api.route("/", agentsApp);
   api.route("/", analyticsApp);
@@ -114,7 +114,7 @@ export function createApiRouter() {
   // SecuredApp builder (no namespace-wide guard), so this ordering is
   // belt-and-suspenders; the experiments-route-auth regression test pins it.
   api.route("/", experimentsV3App);
-  api.route("/", experimentsV3LegacyAliasApp);  // /api/evaluations/v3/... → /api/experiments/...
+  api.route("/", experimentsV3LegacyAliasApp); // /api/evaluations/v3/... → /api/experiments/...
   api.route("/", experimentsApp);
   api.route("/", filesApp);
   api.route("/", exportTracesApp);
@@ -135,7 +135,7 @@ export function createApiRouter() {
   api.route("/", teamsApp);
   api.route("/", tracesApp);
   api.route("/", triggersApp);
-  api.route("/", workflowsCrudApp);      // CRUD — complements workflowsApp (code-completion, post_event)
+  api.route("/", workflowsCrudApp); // CRUD — complements workflowsApp (code-completion, post_event)
 
   api.route("/", gatewayInternalApp);
   api.route("/", otelApp);
@@ -150,7 +150,7 @@ export function createApiRouter() {
   // authApp owns the BetterAuth catch-all (`/auth/*`), which would
   // otherwise swallow `/auth/cli/*` and return 404 from BetterAuth.
   // Register the more-specific basePath first so Hono routes match it.
-  api.route("/", authCliApp);  // /api/auth/cli/* — RFC 8628 device-flow for CLI
+  api.route("/", authCliApp); // /api/auth/cli/* — RFC 8628 device-flow for CLI
   api.route("/", authApp);
   api.route("/", collectorApp);
   api.route("/", ingestionRoutesApp); // /api/ingest/* — Activity Monitor receivers

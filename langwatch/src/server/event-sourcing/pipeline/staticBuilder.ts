@@ -1,9 +1,11 @@
+import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 import type {
   CommandHandlerOptions,
-  NoCommands, PipelineMetadata, RegisteredCommand,
-  StaticPipelineDefinition
+  NoCommands,
+  PipelineMetadata,
+  RegisteredCommand,
+  StaticPipelineDefinition,
 } from "..";
-import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 import type { CommandHandler } from "../commands/command";
 import type {
   CommandHandlerClass,
@@ -13,22 +15,31 @@ import type {
 import type { AggregateType } from "../domain/aggregateType";
 import type { Event, Projection } from "../domain/types";
 import type { OutboxReactorDefinition } from "../outbox/outboxReactor.types";
-import type { FoldProjectionDefinition, FoldProjectionOptions } from "../projections/foldProjection.types";
-import type { MapProjectionDefinition, MapProjectionOptions } from "../projections/mapProjection.types";
+import type {
+  FoldProjectionDefinition,
+  FoldProjectionOptions,
+} from "../projections/foldProjection.types";
+import type {
+  MapProjectionDefinition,
+  MapProjectionOptions,
+} from "../projections/mapProjection.types";
 import type { ReactorDefinition } from "../reactors/reactor.types";
 import { ConfigurationError } from "../services/errorHandling";
 
 // Turns a union like {name:"a"; payload:A} | {name:"b"; payload:B}
 // into a record { a: A; b: B }
 export type CommandsUnionToRegistry<C extends RegisteredCommand> = {
-  [K in C as K extends { name: infer N extends string } ? N : never]:
-    K extends { payload: infer P } ? P : never;
+  [K in C as K extends { name: infer N extends string }
+    ? N
+    : never]: K extends { payload: infer P } ? P : never;
 };
 
 // Convenience: command name union from a StaticPipelineDefinition
 export type CommandNamesFromPipeline<
-  P extends StaticPipelineDefinition<any, any, any>
-> = keyof CommandsUnionToRegistry<P extends StaticPipelineDefinition<any, any, infer C> ? C : never>;
+  P extends StaticPipelineDefinition<any, any, any>,
+> = keyof CommandsUnionToRegistry<
+  P extends StaticPipelineDefinition<any, any, infer C> ? C : never
+>;
 
 /**
  * Builder for creating static pipeline definitions without runtime dependencies.
@@ -82,7 +93,10 @@ export class StaticPipelineBuilderWithName<EventType extends Event = Event> {
 
 export class StaticPipelineBuilderWithNameAndType<
   EventType extends Event = Event,
-  RegisteredProjections extends Record<string, Projection> = Record<string, Projection>,
+  RegisteredProjections extends Record<string, Projection> = Record<
+    string,
+    Projection
+  >,
   RegisteredCommands extends RegisteredCommand = NoCommands,
   FoldNames extends string = never,
   MapNames extends string = never,
@@ -395,7 +409,11 @@ export class StaticPipelineBuilderWithNameAndType<
     // and the zero-arg constructor won't be called since handlerInstance is provided.
     this.commands.push({
       name,
-      handlerClass: handlerClass as unknown as CommandHandlerClass<any, any, any>,
+      handlerClass: handlerClass as unknown as CommandHandlerClass<
+        any,
+        any,
+        any
+      >,
       handlerInstance: instance,
       options,
     });

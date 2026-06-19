@@ -402,4 +402,3 @@ function Automations() {
 export default withPermissionGuard("triggers:view", {
   layoutComponent: SettingsLayout,
 })(Automations);
-

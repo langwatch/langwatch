@@ -129,7 +129,9 @@ export async function dispatchTriggerAction({
 
   // Fetch full trace once — used by Slack (events), email (events), and ADD_TO_DATASET (mapping).
   // Best-effort: if trace not found, actions that only need input/output still work with a stub.
-  const fullTrace = await deps.traceById(tenantId, traceId) ?? { trace_id: traceId } as Trace;
+  const fullTrace =
+    (await deps.traceById(tenantId, traceId)) ??
+    ({ trace_id: traceId } as Trace);
 
   const triggerData = buildTriggerData(traceId, tenantId, foldState, fullTrace);
   const params = (trigger.actionParams ?? {}) as ActionParams;
@@ -203,7 +205,13 @@ function buildTriggerData(
   tenantId: string,
   foldState: TraceSummaryData,
   fullTrace: Trace,
-): { traceId: string; input: string; output: string; projectId: string; fullTrace: Trace } {
+): {
+  traceId: string;
+  input: string;
+  output: string;
+  projectId: string;
+  fullTrace: Trace;
+} {
   return {
     traceId,
     input: foldState.computedInput ?? "",

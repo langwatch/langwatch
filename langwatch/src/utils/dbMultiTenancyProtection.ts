@@ -155,9 +155,7 @@ const hasScopePredicate = (where: any): boolean => {
       some.OR.length > 0 &&
       some.OR.every(
         (o: any) =>
-          o &&
-          typeof o.scopeType === "string" &&
-          isScopeIdValue(o.scopeId),
+          o && typeof o.scopeType === "string" && isScopeIdValue(o.scopeId),
       )
     ) {
       return true;
@@ -373,9 +371,7 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
           (c.virtualKeyId && Array.isArray(c.virtualKeyId.in)) ||
           hasScopePredicate(c),
       );
-      return ok
-        ? null
-        : "requires a row id, virtualKeyId, or scope predicate";
+      return ok ? null : "requires a row id, virtualKeyId, or scope predicate";
     },
     validateCreateData: (data) => {
       const records = Array.isArray(data) ? data : [data];
@@ -394,7 +390,8 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
   },
   ModelDefaultConfig: {
     validateWhere: (where) => {
-      if (!where) return "requires a row id, organizationId, or scope predicate";
+      if (!where)
+        return "requires a row id, organizationId, or scope predicate";
       const ok = validateRecursive(
         where,
         (c) =>
@@ -430,9 +427,7 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
           (c.configId && Array.isArray(c.configId.in)) ||
           hasScopePredicate(c),
       );
-      return ok
-        ? null
-        : "requires a row id, configId, or scope predicate";
+      return ok ? null : "requires a row id, configId, or scope predicate";
     },
     validateCreateData: (data) => {
       const records = Array.isArray(data) ? data : [data];
@@ -623,10 +618,7 @@ const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
   if (model && SCOPED_MODELS[model]) {
     const config = SCOPED_MODELS[model];
     if (action === "create" || action === "createMany") {
-      const data =
-        action === "create"
-          ? params.args?.data
-          : params.args?.data;
+      const data = action === "create" ? params.args?.data : params.args?.data;
       const err = config.validateCreateData(data);
       if (err) {
         throw new Error(`The ${action} action on the ${model} model ${err}.`);

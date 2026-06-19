@@ -1,3 +1,4 @@
+import { generate } from "@langwatch/ksuid";
 import type {
   ModelDefaultConfig,
   ModelDefaultConfigScope,
@@ -5,13 +6,10 @@ import type {
   Prisma,
   PrismaClient,
 } from "@prisma/client";
-import { generate } from "@langwatch/ksuid";
 import { KSUID_RESOURCES } from "../../utils/constants";
 import { resolveSingleOrganizationForScopes } from "../scopes/resolveOrganizationForScope";
 
-export type ModelDefaultsPrisma =
-  | PrismaClient
-  | Prisma.TransactionClient;
+export type ModelDefaultsPrisma = PrismaClient | Prisma.TransactionClient;
 
 export type ScopeAttachment = {
   scopeType: ModelDefaultScopeType;
@@ -130,7 +128,10 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`mdc:${scopeType}:${scopeId}`}, 
    * enforces that contract. */
   async updateConfigScopes(params: {
     id: string;
-    configPayload?: { config?: Record<string, string>; authorId?: string | null };
+    configPayload?: {
+      config?: Record<string, string>;
+      authorId?: string | null;
+    };
     toAdd: ScopeAttachment[];
     toRemoveIds: string[];
   }): Promise<void> {
