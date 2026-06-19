@@ -36,16 +36,13 @@ export function TestFireSection({
 
   const last = history[0];
   const lastIsSuccess = last?.status === "success";
-  const borderColor = !last
-    ? "border"
-    : lastIsSuccess
-      ? "green.400"
-      : "red.400";
+  const statusPalette = lastIsSuccess ? "green" : "red";
 
   return (
     <Box
       border="1px solid"
-      borderColor={borderColor}
+      colorPalette={statusPalette}
+      borderColor={last ? "colorPalette.solid" : "border"}
       borderRadius="md"
       padding={3}
       bg="bg"
@@ -55,11 +52,13 @@ export function TestFireSection({
           <HStack gap={2}>
             <Text fontWeight="semibold">Test fire</Text>
             {last ? (
-              lastIsSuccess ? (
-                <CircleCheck size={14} color="var(--chakra-colors-green-500)" />
-              ) : (
-                <CircleX size={14} color="var(--chakra-colors-red-500)" />
-              )
+              <Box as="span" color="colorPalette.solid" display="inline-flex">
+                {lastIsSuccess ? (
+                  <CircleCheck size={14} color="currentColor" />
+                ) : (
+                  <CircleX size={14} color="currentColor" />
+                )}
+              </Box>
             ) : null}
           </HStack>
           <Text textStyle="sm" color="fg.muted" lineClamp={2}>

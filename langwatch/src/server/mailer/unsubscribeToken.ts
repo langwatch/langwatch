@@ -11,6 +11,19 @@ import { env } from "../../env.mjs";
  * cannot be forged without the secret.
  *
  * Wire format: `base64url(JSON payload) + "." + hex(HMAC of the JSON payload)`.
+ *
+ * decide(ADR-031): tokens carry no expiry and no version field, so they are
+ * replayable forever and cannot be rotated without invalidating every footer
+ * link already in inboxes. This is intentional. The blast radius of a leaked
+ * or replayed token is bounded to the single HMAC-bound recipient address it
+ * encodes — replaying it only (re-)suppresses that recipient's own mail, which
+ * they could do from the footer anyway; it cannot suppress a different address
+ * (the HMAC covers the email) or escalate scope beyond the encoded
+ * project/trigger. Adding an `exp` would 404 old links (the footer lives in
+ * mail clients indefinitely) for no security gain, and a version field can't
+ * be retrofitted onto already-minted tokens without breaking them. If a
+ * compromise ever warrants mass rotation, rotating NEXTAUTH_SECRET invalidates
+ * all tokens at once (the deliberate kill switch).
  */
 
 export interface UnsubscribePayload {

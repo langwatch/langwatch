@@ -46,15 +46,24 @@ export interface SavedTriggerRow {
   emailSubjectTemplate: string | null;
   emailBodyTemplate: string | null;
   slackTemplate: string | null;
+  // Raw persisted column (Prisma `String?`); `fromTriggerRow` narrows it to
+  // SlackTemplateTypeColumn when building the draft.
   slackTemplateType: string | null;
 }
+
+/** The persisted shape of the Trigger row's `slackTemplateType` column —
+ *  plain text, a Block Kit JSON layout, or null for non-Slack rows / legacy
+ *  rows that predate the toggle. Declared inline so this shared types layer
+ *  stays channel-agnostic (it never imports a concrete channel provider);
+ *  the Slack provider derives the same union from its Zod enum. */
+export type SlackTemplateTypeColumn = "string" | "block_kit" | null;
 
 /** The four template columns notify providers contribute on save. */
 export interface TemplateDraft {
   emailSubjectTemplate: string | null;
   emailBodyTemplate: string | null;
   slackTemplate: string | null;
-  slackTemplateType: string | null;
+  slackTemplateType: SlackTemplateTypeColumn;
 }
 
 /** The "shared" definition (`shared.ts`) — must be safe to import on both

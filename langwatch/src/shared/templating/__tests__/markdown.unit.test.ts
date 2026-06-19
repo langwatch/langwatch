@@ -42,5 +42,30 @@ describe("markdownToEmailHtml", () => {
       const html = markdownToEmailHtml("[x](javascript:alert(1))");
       expect(html).not.toContain("javascript:");
     });
+
+    it("drops a data:text/html href", () => {
+      const html = markdownToEmailHtml(
+        "[x](data:text/html,<script>alert(1)</script>)",
+      );
+      expect(html).not.toContain("data:text/html");
+      expect(html).not.toContain("<script");
+    });
+  });
+
+  describe("when the Markdown embeds an image", () => {
+    it("strips markdown image syntax (img is off the allowlist)", () => {
+      const html = markdownToEmailHtml(
+        "![alt](https://tracker.example/pixel.gif)",
+      );
+      expect(html).not.toContain("<img");
+      expect(html).not.toContain("tracker.example");
+    });
+
+    it("strips a raw img tag carrying an onerror handler", () => {
+      const html = markdownToEmailHtml('<img src="x" onerror="alert(1)">');
+      expect(html).not.toContain("<img");
+      expect(html).not.toContain("onerror");
+      expect(html).not.toContain("alert(");
+    });
   });
 });

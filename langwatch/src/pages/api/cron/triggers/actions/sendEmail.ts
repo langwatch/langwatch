@@ -1,4 +1,5 @@
 import { TriggerAction } from "@prisma/client";
+import { createHash } from "crypto";
 import { env } from "~/env.mjs";
 import { getApp } from "~/server/app-layer/app";
 import { consumeEmailCapSlot } from "~/server/event-sourcing/outbox/emailHourlyCap";
@@ -30,11 +31,27 @@ export const handleSendEmail = async (context: TriggerContext) => {
       return;
     }
 
+    // Stable per-dispatch digest over this run's trace/graph ids — identical
+    // across cron ticks for the same matched set, distinct across runs. Backs
+    // both the cap claim (so a re-tick doesn't burn a second slot) and the
+    // per-recipient idempotency key prefix (ADR-031), mirroring the outbox
+    // dispatcher's `dispatchDigest`.
+    const dispatchDigest = createHash("sha256")
+      .update(
+        triggerData
+          .map((d) => d.traceId ?? d.graphId ?? "")
+          .sort()
+          .join(","),
+      )
+      .digest("hex")
+      .slice(0, 16);
+
     const capSlot = await consumeEmailCapSlot({
       projectId: trigger.projectId,
       triggerId: trigger.id,
       now: new Date(),
       cap: env.TRIGGER_EMAIL_HOURLY_CAP,
+      dedupKey: `${trigger.projectId}/${trigger.id}:digest:${dispatchDigest}`,
     });
     if (!capSlot.allowed) {
       logger.error(
@@ -49,6 +66,28 @@ export const handleSendEmail = async (context: TriggerContext) => {
       return;
     }
 
+    // Per-recipient idempotency (ADR-031): back the mailer's recipient gate
+    // with the same TriggerSent claim store the outbox path uses, reachable
+    // here via `getApp().triggers` (no new cross-module exports). A mid-loop
+    // failure means the next cron tick skips recipients already delivered
+    // instead of re-sending to them. Key shape matches the outbox dispatcher:
+    // `rcpt:{dispatchDigest}:{recipientHash}` in the traceId field.
+    const recipientClaimKey = (recipientHash: string) =>
+      `rcpt:${dispatchDigest}:${recipientHash}`;
+    const isRecipientSent = (recipientHash: string) =>
+      getApp().triggers.isSendClaimed({
+        triggerId: trigger.id,
+        traceId: recipientClaimKey(recipientHash),
+        projectId: trigger.projectId,
+      });
+    const recordRecipientSent = async (recipientHash: string) => {
+      await getApp().triggers.claimSend({
+        triggerId: trigger.id,
+        traceId: recipientClaimKey(recipientHash),
+        projectId: trigger.projectId,
+      });
+    };
+
     const triggerInfo = {
       triggerEmails: recipients,
       triggerData,
@@ -58,19 +97,18 @@ export const handleSendEmail = async (context: TriggerContext) => {
       projectSlug,
       triggerType: trigger.alertType ?? null,
       triggerMessage: trigger.message ?? "",
+      isRecipientSent,
+      recordRecipientSent,
     };
 
     await sendTriggerEmail(triggerInfo);
   } catch (error) {
-    captureException(
-      toError(error),
-      {
-        extra: {
-          triggerId: trigger.id,
-          projectId: trigger.projectId,
-          action: TriggerAction.SEND_EMAIL,
-        },
+    captureException(toError(error), {
+      extra: {
+        triggerId: trigger.id,
+        projectId: trigger.projectId,
+        action: TriggerAction.SEND_EMAIL,
       },
-    );
+    });
   }
 };

@@ -22,8 +22,16 @@ vi.mock("~/utils/logger/server", () => ({
 }));
 
 const filterSuppressed = vi.fn();
+const isSendClaimed = vi.fn().mockResolvedValue(false);
+const claimSend = vi.fn().mockResolvedValue(true);
 vi.mock("~/server/app-layer/app", () => ({
-  getApp: () => ({ emailSuppressions: { filterSuppressed } }),
+  getApp: () => ({
+    emailSuppressions: { filterSuppressed },
+    // FIX 4: the cron path backs the mailer's per-recipient idempotency gate
+    // with the same TriggerSent claim store the outbox path uses, reached via
+    // getApp().triggers — so a mid-loop failure doesn't re-send on the next tick.
+    triggers: { isSendClaimed, claimSend },
+  }),
 }));
 
 const consumeEmailCapSlot = vi.fn();
@@ -79,7 +87,55 @@ describe("handleSendEmail", () => {
         projectSlug: "test-project",
         triggerType: "CRITICAL",
         triggerMessage: "Custom alert message",
+        // FIX 4: per-recipient idempotency callbacks, wired like the outbox path.
+        isRecipientSent: expect.any(Function),
+        recordRecipientSent: expect.any(Function),
       });
+    });
+  });
+
+  describe("when the per-recipient idempotency callbacks are passed to the mailer", () => {
+    it("backs them with the TriggerSent claim store under a rcpt:-prefixed key", async () => {
+      const context: TriggerContext = {
+        trigger: {
+          id: "trigger-1",
+          projectId: "project-1",
+          name: "Test Trigger",
+          actionParams: { members: ["user@example.com"] },
+          alertType: null,
+          message: "",
+        } as any,
+        projects: [],
+        triggerData: [
+          {
+            input: "i",
+            output: "o",
+            traceId: "trace-1",
+            projectId: "project-1",
+            fullTrace: {} as any,
+          },
+        ],
+        projectSlug: "test-project",
+      };
+
+      await handleSendEmail(context);
+
+      const args = vi.mocked(sendTriggerEmail).mock.calls[0]?.[0];
+      // Invoke the wired callbacks the way the mailer would and assert they
+      // delegate to getApp().triggers with the rcpt:-prefixed dedup key.
+      await args!.isRecipientSent!("deadbeefdeadbeef");
+      await args!.recordRecipientSent!("deadbeefdeadbeef");
+
+      expect(isSendClaimed).toHaveBeenCalledWith({
+        triggerId: "trigger-1",
+        projectId: "project-1",
+        traceId: expect.stringMatching(/^rcpt:[0-9a-f]{16}:deadbeefdeadbeef$/),
+      });
+      const readKey = isSendClaimed.mock.calls[0]?.[0];
+      const writeKey = claimSend.mock.calls[0]?.[0];
+      // Read and write must target the SAME key, or a retry would never see
+      // the recorded delivery.
+      expect(writeKey).toEqual(readKey);
     });
   });
 

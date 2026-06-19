@@ -4,6 +4,7 @@ import {
 } from "@slack/webhook";
 import type { TriggerNotifier } from "~/server/app-layer/triggers/trigger-template.service";
 import { sendEmail } from "~/server/mailer/emailSender";
+import { isSlackWebhookUrl } from "./slackWebhookGuard";
 
 /**
  * Production delivery for trigger test fires: the email path reuses the shared
@@ -28,16 +29,3 @@ export const liveTriggerNotifier: TriggerNotifier = {
     );
   },
 };
-
-function isSlackWebhookUrl(webhook: string): boolean {
-  let parsed: URL;
-  try {
-    parsed = new URL(webhook);
-  } catch {
-    return false;
-  }
-  return (
-    parsed.protocol === "https:" &&
-    (parsed.host === "hooks.slack.com" || parsed.host === "hooks.slack.com:443")
-  );
-}

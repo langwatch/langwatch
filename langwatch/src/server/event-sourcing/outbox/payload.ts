@@ -80,6 +80,15 @@ export interface CadenceStagePayload
     input: string;
     output: string;
   };
+  /**
+   * Set by the dispatcher when a cadence dispatch resolves to a no-op
+   * (over the hourly cap, or every recipient suppressed — ADR-031). The PG
+   * audit adapter reads this in `onDispatched` and records it as the row's
+   * `lastError` so a drop is distinguishable from a delivered send (a delivered
+   * cadence row clears `lastError` to null). Absent on a real delivery. Drops
+   * stay NON-retryable: the dispatcher returns normally rather than throwing.
+   */
+  dropReason?: string;
 }
 
 export type OutboxJob = SettleStagePayload | CadenceStagePayload;

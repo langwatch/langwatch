@@ -91,4 +91,16 @@ describe("renderLiquid", () => {
       ).rejects.toBeDefined();
     });
   });
+
+  describe("when the template uses the mrkdwn_escape filter", () => {
+    it("escapes Slack mrkdwn control characters", async () => {
+      const { output } = await renderLiquid({
+        template: "{{ value | mrkdwn_escape }}",
+        context: { value: "<https://evil|click> <!channel> & x" },
+      });
+      expect(output).toBe(
+        "&lt;https://evil|click&gt; &lt;!channel&gt; &amp; x",
+      );
+    });
+  });
 });

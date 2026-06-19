@@ -17,6 +17,7 @@ import {
   type ConfigFormCtx,
   isNotifyEntry,
 } from "~/automations/providers/types";
+import { Dialog } from "~/components/ui/dialog";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -125,6 +126,14 @@ export function AutomationDrawer({
   // Wipe the singleton store on unmount — next open is a fresh slate.
   useEffect(() => () => reset(), [reset]);
 
+  // Baseline the close-guard diffs against: the hydrated row on edit, the
+  // traces-prefilled (or empty) draft on create. Set once the relevant
+  // prefill settles so a clean open never triggers the discard prompt.
+  // Serialized because drafts are plain JSON-able objects and we only care
+  // about value equality, not reference identity.
+  const baselineRef = useRef<string | null>(null);
+  const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
+
   // Pre-fill conditions from the traces view on a fresh create.
   const prefilledFromTraces = useRef(false);
   useEffect(() => {
@@ -158,6 +167,9 @@ export function AutomationDrawer({
     // and treat the draft as hydrated.
     if (useAutomationStore.getState().draft !== INITIAL_DRAFT) {
       hydratedFromServerFor.current = automationId;
+      // Their in-flight edits are genuinely unsaved relative to a blank
+      // draft, so baseline against INITIAL_DRAFT and keep guarding them.
+      baselineRef.current ??= JSON.stringify(INITIAL_DRAFT);
       return;
     }
     const action = row.action as TriggerAction;
@@ -224,7 +236,19 @@ export function AutomationDrawer({
     };
     hydrate(next);
     hydratedFromServerFor.current = automationId;
+    baselineRef.current = JSON.stringify(next);
   }, [triggerQuery.data, automationId, hydrate]);
+
+  // Capture the create-mode baseline once the synchronous traces-prefill has
+  // had a chance to land (the prefill effect above runs on mount before this
+  // commits). After this, any change to the draft reads as unsaved and the
+  // close-guard kicks in.
+  useEffect(() => {
+    if (automationId) return;
+    if (baselineRef.current !== null) return;
+    baselineRef.current = JSON.stringify(useAutomationStore.getState().draft);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Build the example TemplateContext the preview pane (and autocomplete)
   // render against. Static-ish — only depends on the project identity, so the
@@ -481,6 +505,22 @@ export function AutomationDrawer({
     ],
   );
 
+  // Dirty when the live draft no longer matches the baseline captured at
+  // hydrate/create time. Guards an accidental close from silently dropping an
+  // in-progress multi-stage draft. Until the baseline lands we treat the
+  // draft as clean so a close during the first paint never prompts.
+  const isDirty =
+    baselineRef.current !== null &&
+    JSON.stringify(draft) !== baselineRef.current;
+
+  const requestClose = useCallback(() => {
+    if (isDirty) {
+      setConfirmDiscardOpen(true);
+      return;
+    }
+    closeDrawer();
+  }, [isDirty, closeDrawer]);
+
   return (
     <>
       <Drawer.Root
@@ -488,7 +528,7 @@ export function AutomationDrawer({
         placement="end"
         size="lg"
         onOpenChange={({ open }) => {
-          if (!open && section === null) closeDrawer();
+          if (!open && section === null) requestClose();
         }}
       >
         <Drawer.Content bg="bg">
@@ -562,6 +602,47 @@ export function AutomationDrawer({
           setSection(null);
         }}
       />
+
+      <Dialog.Root
+        open={confirmDiscardOpen}
+        onOpenChange={({ open }) => {
+          if (!open) setConfirmDiscardOpen(false);
+        }}
+        size="sm"
+      >
+        <Dialog.Content>
+          <Dialog.Header>
+            <Dialog.Title>Discard unsaved changes?</Dialog.Title>
+          </Dialog.Header>
+          <Dialog.Body>
+            <Text color="fg.muted" textStyle="sm">
+              This automation has changes you haven't saved yet. Close the
+              drawer and discard them?
+            </Text>
+          </Dialog.Body>
+          <Dialog.Footer>
+            <HStack gap={2}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setConfirmDiscardOpen(false)}
+              >
+                Keep editing
+              </Button>
+              <Button
+                colorPalette="red"
+                size="sm"
+                onClick={() => {
+                  setConfirmDiscardOpen(false);
+                  closeDrawer();
+                }}
+              >
+                Discard
+              </Button>
+            </HStack>
+          </Dialog.Footer>
+        </Dialog.Content>
+      </Dialog.Root>
     </>
   );
 }
@@ -579,12 +660,12 @@ function EmailLinkLandingBanner() {
       padding={3}
       borderRadius="md"
       border="1px solid"
-      borderColor="blue.200"
-      bg="blue.50"
-      _dark={{ borderColor: "blue.700", bg: "blue.950" }}
+      colorPalette="blue"
+      borderColor="colorPalette.muted"
+      bg="colorPalette.subtle"
     >
       <HStack gap={2} align="start">
-        <Box color="blue.500" flexShrink={0} mt="2px">
+        <Box color="colorPalette.fg" flexShrink={0} mt="2px">
           <Mail size={16} />
         </Box>
         <Text textStyle="sm" color="fg">

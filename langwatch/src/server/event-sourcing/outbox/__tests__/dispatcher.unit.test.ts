@@ -16,13 +16,16 @@ import {
   TRIGGER_NOTIFY_REACTOR_NAME,
 } from "../payload";
 
+// Stable singleton so tests can spy the SAME fns the dispatcher captured at
+// import time (`const logger = createLogger(...)` runs once per module).
+const loggerMock = vi.hoisted(() => ({
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+}));
 vi.mock("~/utils/logger/server", () => ({
-  createLogger: () => ({
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-  }),
+  createLogger: () => loggerMock,
 }));
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
@@ -162,6 +165,17 @@ describe("createOutboxDispatcher cadence stage", () => {
         traceId: TRACE_ID,
         projectId: PROJECT_ID,
       });
+
+      // The cap is consumed with the SAME stable per-dispatch dedupKey on both
+      // the failed first attempt and the retry — so the cap module's claim gate
+      // recognises the retry and does not burn a second slot (FIX: retry
+      // double-count). The dedupKey is the digest over the batch's traceIds.
+      const capCalls = deps.consumeEmailCapSlot.mock.calls;
+      expect(capCalls).toHaveLength(2);
+      expect(capCalls[0]![0].dedupKey).toMatch(
+        new RegExp(`^${PROJECT_ID}/${TRIGGER_ID}:digest:[0-9a-f]{16}$`),
+      );
+      expect(capCalls[1]![0].dedupKey).toBe(capCalls[0]![0].dedupKey);
     });
   });
 
@@ -336,6 +350,29 @@ describe("createOutboxDispatcher cadence stage", () => {
         // "last-fired" cosmetic would misrepresent a dropped no-op as a send.
         expect(deps.triggers.updateLastRunAt).not.toHaveBeenCalled();
       });
+
+      it("stamps an over-cap drop reason on the payload and logs the drop so the audit row is not delivered-looking", async () => {
+        const deps = makeDeps();
+        deps.consumeEmailCapSlot.mockResolvedValueOnce({
+          allowed: false,
+          count: 101,
+        });
+        const dispatcher = createOutboxDispatcher(deps);
+        const payload = makeCadencePayload();
+
+        await dispatcher.process(payload);
+
+        // The PG audit adapter reads `dropReason` off the payload in
+        // onDispatched and records it as lastError instead of null.
+        expect(payload.dropReason).toBe("dropped: over hourly cap");
+        // The over-cap branch logs loudly at error; the terminal drop logs at
+        // info with the reason. Both fire — the drop is visible, not silent.
+        expect(loggerMock.error).toHaveBeenCalled();
+        expect(loggerMock.info).toHaveBeenCalledWith(
+          expect.objectContaining({ dropReason: "dropped: over hourly cap" }),
+          expect.stringContaining("dropped"),
+        );
+      });
     });
 
     describe("when the trigger sends Slack rather than email", () => {
@@ -416,6 +453,25 @@ describe("createOutboxDispatcher cadence stage", () => {
         expect(deps.triggers.claimSend).toHaveBeenCalledTimes(1);
         // Drop must not run the delivery-only "last-fired" bookkeeping.
         expect(deps.triggers.updateLastRunAt).not.toHaveBeenCalled();
+      });
+
+      it("stamps an all-suppressed drop reason on the payload and logs the drop", async () => {
+        const deps = makeDeps();
+        deps.filterSuppressedEmails.mockResolvedValueOnce([]);
+        const dispatcher = createOutboxDispatcher(deps);
+        const payload = makeCadencePayload();
+
+        await dispatcher.process(payload);
+
+        // Recorded as lastError by the audit adapter, so a fully-suppressed
+        // dispatch is distinguishable from a delivered send in the audit row.
+        expect(payload.dropReason).toBe("dropped: all recipients suppressed");
+        expect(loggerMock.info).toHaveBeenCalledWith(
+          expect.objectContaining({
+            dropReason: "dropped: all recipients suppressed",
+          }),
+          expect.stringContaining("dropped"),
+        );
       });
     });
 

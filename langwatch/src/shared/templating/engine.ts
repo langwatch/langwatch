@@ -46,10 +46,26 @@ export function getLiquidEngine(): Liquid {
       // DoS guards: `renderLimit` bounds wall-clock time *inside* a synchronous
       // render (interrupting a CPU-bound loop the Promise.race backstop can't),
       // and `memoryLimit` caps object creation. Both are interruption-capable in
-      // liquidjs >=10.6, so a hostile template no longer pins the worker.
+      // liquidjs >=10.6, so a hostile template no longer pins the worker. The
+      // liquidjs version range is pinned in package.json (pnpm.overrides) to keep
+      // that floor — do not loosen the lower bound below the interruption-capable
+      // version.
       renderLimit: RENDER_TIMEOUT_MS,
       memoryLimit: RENDER_MEMORY_LIMIT,
     });
+    // Slack mrkdwn escaping for user-controlled content (trace input/output,
+    // evaluation labels). Mirrors `escapeMrkdwn` in the legacy Slack webhook
+    // path (src/server/triggers/sendSlackWebhook.ts): Slack treats only `&`,
+    // `<`, `>` as control characters in message text, so escaping them stops
+    // user-authored content from forging mrkdwn links (`<https://evil|click>`)
+    // or broadcasts (`<!channel>`). See the Slack-mrkdwn-injection finding;
+    // applied in the default Slack templates (defaults.ts) before `| json`.
+    engine.registerFilter("mrkdwn_escape", (value: unknown): string =>
+      String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;"),
+    );
   }
   return engine;
 }

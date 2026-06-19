@@ -145,12 +145,15 @@ export function buildOutboxRuntime({
     // ADR-031: per-trigger hourly email cap, bound from env. The slot
     // consumer reads the shared Redis connection internally.
     emailHourlyCap: env.TRIGGER_EMAIL_HOURLY_CAP,
-    consumeEmailCapSlot: ({ projectId, triggerId, now }) =>
+    consumeEmailCapSlot: ({ projectId, triggerId, now, dedupKey }) =>
       consumeEmailCapSlot({
         projectId,
         triggerId,
         now,
         cap: env.TRIGGER_EMAIL_HOURLY_CAP,
+        // ADR-031: the dispatcher's stable per-dispatch dedupKey gates the cap
+        // INCR so an outbox retry of the same digest doesn't burn a second slot.
+        dedupKey,
       }),
     filterSuppressedEmails: ({ projectId, triggerId, emails }) =>
       emailSuppressions.filterSuppressed({ projectId, triggerId, emails }),

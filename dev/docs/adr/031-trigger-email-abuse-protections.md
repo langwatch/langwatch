@@ -188,8 +188,9 @@ price, bounded by the hourly cap.
   HMAC; no project data exposed beyond the trigger name shown on the confirm
   page.
 - **Trigger emails become per-recipient sends.** Provider call volume
-  multiplies by recipient-list size. BCC privacy becomes moot (each recipient
-  gets their own envelope addressed to them).
+  multiplies by recipient-list size. Each recipient gets their own envelope
+  (recipient in BCC, hashed no-reply in From/To) so recipients never see each
+  other.
 - **Dropped sends are visible, not silent.** `logger.error` + a counter the
   ADR-029 health surface can read. Operators of high-volume immediate
   triggers should switch to a digest cadence — the error message says so.

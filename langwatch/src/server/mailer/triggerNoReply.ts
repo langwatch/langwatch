@@ -24,8 +24,14 @@ const logger = createLogger("langwatch:mailer:triggerNoReply");
  * NEXTAUTH_SECRET, so the address is:
  *
  *   - Stable per trigger — useful for bounce attribution downstream.
- *   - Unguessable without the secret — anyone harvesting To addresses can't
- *     reverse-engineer trigger ids or forge "looks like one of ours" replies.
+ *   - Best-effort unguessable when NEXTAUTH_SECRET is set — anyone harvesting
+ *     To addresses can't reverse-engineer trigger ids or forge "looks like one
+ *     of ours" replies. Unlike `unsubscribeToken.ts` (which fails closed on an
+ *     empty secret because the token IS an authorization), this tag carries no
+ *     authority: recipients ride in BCC, the To header is a public no-reply,
+ *     and a forged tag grants nothing. So an empty secret degrades the
+ *     unguessability property to nil but is not a security hole — we log a
+ *     warning and continue rather than block trigger email entirely.
  *
  * Test fires use a sentinel id so they don't pollute bounce streams that
  * production bounce-processors might key off the hash.

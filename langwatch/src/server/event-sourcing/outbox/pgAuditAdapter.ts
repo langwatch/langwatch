@@ -185,6 +185,13 @@ export class PgOutboxAuditAdapter implements QueueAuditAdapter<OutboxJob> {
       return;
     }
     if (isCadence(p)) {
+      // A dispatch that resolved to a no-op (over the hourly cap or every
+      // recipient suppressed — ADR-031) is still terminal/dispatched and
+      // NON-retryable, but it must NOT read as a delivered send. The dispatcher
+      // stamps `dropReason` onto the payload; record it as `lastError` so
+      // operators can tell a drop from a delivery. A real delivery has no
+      // `dropReason` and clears `lastError` to null.
+      const lastError = p.dropReason ?? null;
       // Cadence's terminal transitions CAS on (status='dispatching',
       // attempts=event.attempt) so a late event from a stale lease can't
       // overwrite a row that a stuck sweep re-leased to a new attempt.
@@ -200,7 +207,7 @@ export class PgOutboxAuditAdapter implements QueueAuditAdapter<OutboxJob> {
           data: {
             status: "dispatched",
             dispatchedAt: event.at,
-            lastError: null,
+            lastError,
             leasedUntil: null,
           },
         }),

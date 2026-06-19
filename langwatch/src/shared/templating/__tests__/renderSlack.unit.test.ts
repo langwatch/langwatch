@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { TEST_FIRE_NOTICE } from "../banner";
 import { DEFAULT_SLACK_BLOCK_KIT_TEMPLATE } from "../defaults";
 import { renderTriggerSlack } from "../renderSlack";
-import { makeContext } from "./fixtures";
+import { makeContext, makeMatch } from "./fixtures";
+
+const MRKDWN_INJECTION = "<https://evil|click> <!channel> & a < b > c";
 
 function asText(payload: { text: string } | { blocks: unknown[] }): string {
   if (!("text" in payload)) throw new Error("expected a text payload");
@@ -139,6 +141,55 @@ describe("renderTriggerSlack", () => {
       const blocks = asBlocks(slack.payload);
       expect(blocks[0]?.type).toBe("section");
       expect(JSON.stringify(blocks[0])).toContain(TEST_FIRE_NOTICE);
+    });
+  });
+
+  // Regression for the Slack-mrkdwn-injection finding: user-authored trace
+  // content reaches Slack mrkdwn, where `<...|...>` is a live link and
+  // `<!channel>` a broadcast. The default templates must escape `&`/`<`/`>`
+  // (mrkdwn_escape) so the raw control sequences never render.
+  describe("when trace content contains Slack mrkdwn control characters", () => {
+    const contextWithInjection = makeContext({
+      matches: [
+        makeMatch({
+          trace: {
+            id: "trace_inj",
+            input: MRKDWN_INJECTION,
+            output: MRKDWN_INJECTION,
+            url: "https://app.langwatch.ai/acme/messages/trace_inj",
+            metadata: {},
+          },
+        }),
+      ],
+    });
+
+    it("escapes the control characters in the string default text", async () => {
+      const slack = await renderTriggerSlack({
+        templateType: null,
+        template: null,
+        context: contextWithInjection,
+      });
+      const text = asText(slack.payload);
+      expect(text).not.toContain("<https://evil|click>");
+      expect(text).not.toContain("<!channel>");
+      expect(text).toContain("&lt;https://evil|click&gt;");
+      expect(text).toContain("&lt;!channel&gt;");
+      expect(text).toContain("&amp;");
+    });
+
+    it("escapes the control characters in the Block Kit default blocks", async () => {
+      const slack = await renderTriggerSlack({
+        templateType: "block_kit",
+        template: DEFAULT_SLACK_BLOCK_KIT_TEMPLATE,
+        context: contextWithInjection,
+      });
+      const serialized = JSON.stringify(asBlocks(slack.payload));
+      // The `<{{ m.trace.url }}|View trace>` link is operator-controlled and
+      // stays live; assert the *user* content (evil link / broadcast) is escaped.
+      expect(serialized).not.toContain("<https://evil|click>");
+      expect(serialized).not.toContain("<!channel>");
+      expect(serialized).toContain("&lt;https://evil|click&gt;");
+      expect(serialized).toContain("&lt;!channel&gt;");
     });
   });
 });

@@ -98,7 +98,7 @@ export class OutboxDrainer {
    *
    * `projectId` is derived from `wakeup.groupKey` via
    * `tenantIdFromGroupId` — the producer is contracted to format
-   * groupKey as `${projectId}/...`. See ADR-026.
+   * groupKey as `${projectId}/...`. See ADR-030.
    */
   async handleWakeup(wakeup: OutboxWakeup): Promise<void> {
     const dispatcher = this.dispatchers.get(wakeup.reactorName);
@@ -114,7 +114,7 @@ export class OutboxDrainer {
     if (!projectId) {
       logger.error(
         { reactorName: wakeup.reactorName, groupKey: wakeup.groupKey },
-        "Wakeup groupKey missing <projectId>/ prefix — dropping (see ADR-026)",
+        "Wakeup groupKey missing <projectId>/ prefix — dropping (see ADR-030)",
       );
       return;
     }

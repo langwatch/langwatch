@@ -103,6 +103,7 @@ function makeNotifyDeps(opts?: { emailCap?: number }) {
       projectId: string;
       triggerId: string;
       now: Date;
+      dedupKey: string;
     }) => consumeEmailCapSlot({ ...args, cap }),
     // Suppression isn't the focus here (the cap is) — pass recipients through.
     filterSuppressedEmails: async ({ emails }: { emails: string[] }) => emails,

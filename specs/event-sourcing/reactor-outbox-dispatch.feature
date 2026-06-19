@@ -19,7 +19,7 @@ Feature: Reactor Outbox dispatch for stake-sensitive reactors
   `TriggerSent` claim (see "Dispatch failures route through the
   DispatchError contract") is the at-most-once gate on the actual send.
 
-  See dev/docs/adr/025-transactional-outbox-for-stake-sensitive-dispatch.md.
+  See dev/docs/adr/030-transactional-outbox-for-stake-sensitive-dispatch.md.
 
   Background:
     Given a pipeline registers a reactor "alertDispatch" via .withOutbox

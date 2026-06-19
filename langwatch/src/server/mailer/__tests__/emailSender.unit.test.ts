@@ -365,6 +365,49 @@ describe("sendEmail", () => {
     });
   });
 
+  describe("given BCC recipients on the raw-MIME path", () => {
+    describe("when sending via SES with custom headers", () => {
+      it("never writes a Bcc: header line or any bcc address into the header block", async () => {
+        // Custom headers force the SendRawEmail path. BCC recipients must be
+        // delivered via the envelope `Destinations`, NOT rendered into the MIME
+        // headers — otherwise every recipient could read the others off the
+        // Bcc line. This is the core recipient-privacy guarantee.
+        await sendEmail({
+          to: "no-reply@langwatch.ai",
+          bcc: ["a@x.com"],
+          subject: "Test",
+          html: "<p>Hello</p>",
+          headers: { "List-Unsubscribe": "<https://example.com/unsub>" },
+        });
+
+        const raw = capturedRawMessage();
+        const separatorIdx = raw.indexOf("\r\n\r\n");
+        const headerBlock = raw.slice(0, separatorIdx);
+
+        // No Bcc: header line at all, and the bcc address appears nowhere in
+        // the header block (To/From/Subject/custom headers).
+        expect(headerBlock).not.toMatch(/^Bcc:/im);
+        expect(headerBlock).not.toContain("a@x.com");
+      });
+
+      it("still delivers the bcc address via the envelope Destinations", async () => {
+        await sendEmail({
+          to: "no-reply@langwatch.ai",
+          bcc: ["a@x.com"],
+          subject: "Test",
+          html: "<p>Hello</p>",
+          headers: { "List-Unsubscribe": "<https://example.com/unsub>" },
+        });
+
+        const cmd = sesClientSendMock.mock.calls[0]![0] as {
+          input: { Destinations: string[] };
+        };
+        expect(cmd.input.Destinations).toContain("a@x.com");
+        expect(cmd.input.Destinations).toContain("no-reply@langwatch.ai");
+      });
+    });
+  });
+
   describe("given empty headers", () => {
     describe("when sending via SES", () => {
       it("uses SendEmailCommand (not raw)", async () => {

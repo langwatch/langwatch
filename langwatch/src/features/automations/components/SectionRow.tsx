@@ -31,7 +31,8 @@ export function SectionRow({
       padding={3}
       borderRadius="md"
       border="1px solid"
-      borderColor={complete ? "green.400" : "border"}
+      colorPalette="green"
+      borderColor={complete ? "colorPalette.solid" : "border"}
       bg="bg"
       opacity={disabled ? 0.6 : 1}
       cursor={disabled ? "not-allowed" : "pointer"}
@@ -46,7 +47,7 @@ export function SectionRow({
       _hover={
         disabled
           ? undefined
-          : { borderColor: complete ? "green.500" : "orange.400" }
+          : { borderColor: complete ? "colorPalette.emphasized" : "orange.400" }
       }
     >
       <HStack gap={3}>
@@ -54,7 +55,9 @@ export function SectionRow({
           <HStack gap={2}>
             <Text fontWeight="semibold">{title}</Text>
             {complete ? (
-              <Check size={14} color="var(--chakra-colors-green-500)" />
+              <Box as="span" color="colorPalette.solid" display="inline-flex">
+                <Check size={14} color="currentColor" />
+              </Box>
             ) : null}
           </HStack>
           <Text textStyle="sm" color="fg.muted" lineClamp={2}>

@@ -212,7 +212,7 @@ describe("OutboxService", () => {
     });
 
     describe("when groupKey does not start with `${projectId}/`", () => {
-      it("throws so the contract violation surfaces at enqueue (ADR-026)", async () => {
+      it("throws so the contract violation surfaces at enqueue (ADR-030)", async () => {
         const { service } = buildService();
         await expect(
           service.enqueue({

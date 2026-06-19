@@ -14,6 +14,7 @@ import type { FilterParam } from "~/hooks/useFilterParams";
 import {
   type FilterField,
   sanitizeTriggerFilters,
+  type TriggerFilterValue,
   triggerFiltersPermissiveSchema,
 } from "~/server/filters/types";
 import { api } from "~/utils/api";
@@ -144,9 +145,19 @@ export function FiltersSecondaryDrawer({
         setCodeError("Invalid JSON syntax");
       }
     } else {
-      onSave({ source: "trace", filters: local, customGraphId: null });
+      const { sanitized } = sanitizeTriggerFilters(
+        local as Record<string, TriggerFilterValue>,
+      );
+      onSave({
+        source: "trace",
+        filters: sanitized as Partial<Record<FilterField, FilterParam>>,
+        customGraphId: null,
+      });
     }
   };
+
+  const customGraphMissing =
+    localSource === "customGraph" && !localCustomGraphId;
 
   return (
     <SecondaryDrawerShell
@@ -154,6 +165,7 @@ export function FiltersSecondaryDrawer({
       title="When"
       onClose={onCancel}
       onDone={apply}
+      doneDisabled={customGraphMissing}
       headerRight={
         localSource === "trace" ? (
           <>
@@ -189,7 +201,7 @@ export function FiltersSecondaryDrawer({
       </Box>
       {localSource === "customGraph" ? (
         <VStack align="stretch" gap={2}>
-          <Field.Root>
+          <Field.Root invalid={customGraphMissing}>
             <Field.Label>Custom graph</Field.Label>
             <NativeSelect.Root>
               <NativeSelect.Field
@@ -206,6 +218,7 @@ export function FiltersSecondaryDrawer({
               </NativeSelect.Field>
               <NativeSelect.Indicator />
             </NativeSelect.Root>
+            <Field.ErrorText>Pick a custom graph to continue.</Field.ErrorText>
           </Field.Root>
           <Text textStyle="xs" color="fg.muted">
             The automation fires when this custom graph's alert threshold is
@@ -263,7 +276,7 @@ export function FiltersSecondaryDrawer({
           </Text>
           <FieldsFilters
             filters={local as Record<FilterField, FilterParam>}
-            setFilters={(next) => setLocal((prev) => ({ ...prev, ...next }))}
+            setFilters={(next) => setLocal(next)}
           />
         </VStack>
       )}

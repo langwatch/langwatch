@@ -208,7 +208,69 @@ describe("sendTriggerEmail", () => {
       expect(args.headers).toBeUndefined();
     });
 
+    describe("given a malformed recipient address in the list", () => {
+      it("skips the malformed address and sends only to the valid recipient", async () => {
+        sendEmailMock.mockResolvedValue(undefined);
+        // The second entry smuggles a CRLF + Bcc header. The EMAIL_RX guard in
+        // sendPerRecipient must drop it before it reaches the provider's bcc
+        // slot, so exactly one envelope (the valid address) is sent.
+        await sendTriggerEmail({
+          triggerEmails: ["ok@x.com", "evil@x.com\nBcc: victim@y.com"],
+          triggerData,
+          triggerName: "Quality Alert",
+          triggerId: "trigger_test123",
+          projectId: "project-1",
+          projectSlug: "demo",
+          triggerType: AlertType.WARNING,
+          triggerMessage: "",
+        });
+
+        expect(sendEmailMock).toHaveBeenCalledTimes(1);
+        const bcc = (sendEmailMock.mock.calls[0]![0] as { bcc: string[] }).bcc;
+        expect(bcc).toEqual(["ok@x.com"]);
+        // The smuggled address never reaches the provider in any form.
+        const allArgs = JSON.stringify(sendEmailMock.mock.calls);
+        expect(allArgs).not.toContain("victim@y.com");
+      });
+    });
+
     describe("given isRecipientSent / recordRecipientSent dedup callbacks", () => {
+      describe("when the second of three recipients fails on the first attempt", () => {
+        it("delivers recipient 1 once and recipients 2 and 3 on retry", async () => {
+          // First attempt: recipient 1 resolves, recipient 2 rejects — so the
+          // loop throws before reaching recipient 3. Only recipient 1 is
+          // recorded as delivered.
+          sendEmailMock
+            .mockResolvedValueOnce(undefined)
+            .mockRejectedValueOnce({ $metadata: { httpStatusCode: 500 } });
+
+          const sent = new Set<string>();
+          const recipients = ["a@x.com", "b@x.com", "c@x.com"];
+
+          await expect(
+            callEmailWithDedup(sent, { triggerEmails: recipients }),
+          ).rejects.toBeInstanceOf(Error);
+
+          // Attempt 1 stopped at the failing recipient 2 — recipient 3 was
+          // never reached.
+          const firstAttemptBccs = sendEmailMock.mock.calls.map(
+            (c) => (c[0] as { bcc: string[] }).bcc,
+          );
+          expect(firstAttemptBccs).toEqual([["a@x.com"], ["b@x.com"]]);
+
+          sendEmailMock.mockReset();
+          sendEmailMock.mockResolvedValue(undefined);
+
+          // Outbox retry: recipient 1 is already recorded, so only 2 and 3 send.
+          await callEmailWithDedup(sent, { triggerEmails: recipients });
+
+          const retryBccs = sendEmailMock.mock.calls.map(
+            (c) => (c[0] as { bcc: string[] }).bcc,
+          );
+          expect(retryBccs).toEqual([["b@x.com"], ["c@x.com"]]);
+        });
+      });
+
       describe("when the first recipient succeeds but the second fails on the first attempt", () => {
         it("does not re-deliver the first recipient on retry", async () => {
           // First attempt: first recipient send resolves, second send rejects.

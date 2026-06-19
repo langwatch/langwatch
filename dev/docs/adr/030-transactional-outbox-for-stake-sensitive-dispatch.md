@@ -160,7 +160,7 @@ The revised design (above) keeps the same external behavior — durable retry, o
 **Phased rollout.** The Phase-0 outbox infrastructure (`OutboxDrainer`, `OutboxRepository.leaseNext` / `markDispatched` / `markRetry` / `recoverExpiredLeases`, the `wakeupQueue` carrying wakeup-only payloads) was deployed alongside the original draft. Removing it now would risk leaving any in-flight Phase-0 dispatch behind. So the queue-driven path **coexists** with the Phase-0 path:
 
 - New reactors register via the queue-driven path with `auditAdapter` wired.
-- Existing Phase-0 code stays in place; `OutboxDrainer` becomes dead code once every reactor that used to register with it has migrated.
+- Existing Phase-0 code stays in place; `OutboxDrainer` becomes dead code once every reactor that used to register with it has migrated. Until the cleanup PR lands, the Phase-0 path **and its tests are intentionally retained as characterization tests** — the drainer/`leaseNext` suite is not dead weight, it locks the in-flight behaviour green until the path is removed.
 - A follow-up cleanup PR (out of scope here) drops the Phase-0 drainer + lease* methods + the `leasedUntil` / `nextAttemptAt` columns from `ReactorOutbox`.
 
 ## Rationale

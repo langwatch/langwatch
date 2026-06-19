@@ -6,7 +6,9 @@ export const annotationQueueActionParamsSchema = z.object({
   annotators: z
     .array(z.object({ id: z.string(), name: z.string() }))
     .min(1, "Add at least one annotator."),
-  createdByUserId: z.string().optional(),
+  // `createdByUserId` is intentionally absent: the upsert/create routes stamp
+  // it from the authenticated session (`ctx.session.user.id`). Accepting it
+  // from the client would let a caller attribute queue items to another user.
 });
 
 export type AnnotationQueueActionParams = z.infer<

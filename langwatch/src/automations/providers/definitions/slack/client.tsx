@@ -31,7 +31,11 @@ import type {
   SavedTriggerRow,
   SummaryIdentity,
 } from "../../types";
-import type { SlackActionParams, SlackPreview } from "./shared";
+import type {
+  SlackActionParams,
+  SlackPreview,
+  SlackTemplateType,
+} from "./shared";
 import { findTemplateOptionBySource } from "./templates/registry";
 import { SlackBlockKitTemplatePicker } from "./templates/TemplatePicker";
 
@@ -39,8 +43,6 @@ interface FieldDraft {
   value: string;
   usingDefault: boolean;
 }
-
-export type SlackTemplateType = "string" | "block_kit";
 
 export interface SlackSlice {
   webhook: string;

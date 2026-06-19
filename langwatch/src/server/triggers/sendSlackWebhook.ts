@@ -3,15 +3,11 @@ import {
   IncomingWebhook,
   type IncomingWebhookSendArguments,
 } from "@slack/webhook";
-import {
-  DispatchError,
-  toDispatchError,
-} from "~/server/event-sourcing/outbox/dispatchError";
+import { toDispatchError } from "~/server/event-sourcing/outbox/dispatchError";
 import type { Trace } from "~/server/tracer/types";
 import type { SlackPayload } from "~/shared/templating/renderSlack";
 import { env } from "../../env.mjs";
-
-const SLACK_WEBHOOK_PREFIX = "https://hooks.slack.com/";
+import { assertSlackWebhookUrl } from "./slackWebhookGuard";
 
 /**
  * Minimal Slack mrkdwn escaping. Slack only requires the three HTML-ish
@@ -51,14 +47,9 @@ export const sendSlackWebhook = async ({
 }) => {
   // Defense-in-depth: never dispatch to anything that is not a genuine Slack
   // incoming-webhook endpoint, even if an older trigger stored an arbitrary
-  // URL before the slackActionParamsSchema startsWith-check landed. A bad URL
-  // can never become valid on retry, so this is non-retryable.
-  if (!triggerWebhook.startsWith(SLACK_WEBHOOK_PREFIX)) {
-    throw new DispatchError({
-      message: `Refusing to dispatch Slack webhook for trigger "${triggerName}": URL is not a ${SLACK_WEBHOOK_PREFIX} endpoint`,
-      retryable: false,
-    });
-  }
+  // URL before the slackActionParamsSchema check landed. A bad URL can never
+  // become valid on retry, so the shared guard classifies this non-retryable.
+  assertSlackWebhookUrl(triggerWebhook, triggerName);
 
   const webhook = new IncomingWebhook(triggerWebhook);
 
@@ -159,8 +150,9 @@ export const sendSlackWebhook = async ({
 /**
  * Sends a pre-rendered (customer-authored, ADR-028) Slack payload. Mirrors the
  * guards and DispatchError classification of `sendSlackWebhook` exactly — same
- * non-retryable webhook-prefix check and the same toDispatchError wrap around
- * the send — but takes the Block Kit / text payload already rendered.
+ * non-retryable host guard (`assertSlackWebhookUrl`) and the same
+ * toDispatchError wrap around the send — but takes the Block Kit / text payload
+ * already rendered.
  */
 export const sendRenderedSlackMessage = async ({
   triggerWebhook,
@@ -174,12 +166,7 @@ export const sendRenderedSlackMessage = async ({
    *  `IncomingWebhookSendArguments`, so we cast at the send boundary. */
   payload: SlackPayload;
 }) => {
-  if (!triggerWebhook.startsWith(SLACK_WEBHOOK_PREFIX)) {
-    throw new DispatchError({
-      message: `Refusing to dispatch Slack webhook for trigger "${triggerName}": URL is not a ${SLACK_WEBHOOK_PREFIX} endpoint`,
-      retryable: false,
-    });
-  }
+  assertSlackWebhookUrl(triggerWebhook, triggerName);
 
   try {
     await new IncomingWebhook(triggerWebhook).send(

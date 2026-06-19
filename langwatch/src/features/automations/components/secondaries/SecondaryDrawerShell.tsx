@@ -23,6 +23,7 @@ export function SecondaryDrawerShell({
   title,
   onClose,
   onDone,
+  doneDisabled = false,
   headerRight,
   size = "xl",
   children,
@@ -31,6 +32,8 @@ export function SecondaryDrawerShell({
   title: string;
   onClose: () => void;
   onDone: () => void;
+  /** Disables the footer Done action — e.g. a required field isn't set yet. */
+  doneDisabled?: boolean;
   headerRight?: ReactNode;
   size?: DrawerSize;
   children: ReactNode;
@@ -76,7 +79,11 @@ export function SecondaryDrawerShell({
         <Drawer.Footer>
           <HStack width="full">
             <Spacer />
-            <Button colorPalette="orange" onClick={onDone}>
+            <Button
+              colorPalette="orange"
+              onClick={onDone}
+              disabled={doneDisabled}
+            >
               Done
             </Button>
           </HStack>

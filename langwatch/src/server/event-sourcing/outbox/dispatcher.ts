@@ -84,11 +84,17 @@ export interface OutboxDispatcherDeps {
    * fixed-hour Redis counter; `allowed: false` means the trigger has already
    * sent `cap` emails this hour and this dispatch must be dropped (not sent,
    * not retried). Injected so tests can fake it. Slack never calls it.
+   *
+   * `dedupKey` is the stable per-dispatch identity so an outbox RETRY of the
+   * same digest does not re-INCR and burn a second cap slot — the cap is
+   * consumed at most once per logical dispatch, not once per attempt (the
+   * retry double-count finding).
    */
   consumeEmailCapSlot: (args: {
     projectId: string;
     triggerId: string;
     now: Date;
+    dedupKey: string;
   }) => Promise<{ allowed: boolean; count: number }>;
   /** The configured cap, for operator-facing drop logs (ADR-031). */
   emailHourlyCap: number;
@@ -383,6 +389,11 @@ async function handleCadenceBatch(
   // operator "last-fired" column) and the "dispatched" success log — which
   // would misrepresent a dropped no-op as a real notification.
   let didSend = false;
+  // Reason a dispatch resolved to a no-op (over cap / all suppressed). Stamped
+  // onto each payload below so the PG audit projection records a distinct
+  // `lastError` instead of a delivered-looking null — drops stay NON-retryable
+  // (we return normally, never throw) but must be visible as drops, not sends.
+  let dropReason: string | undefined;
 
   try {
     switch (trigger.action) {
@@ -402,19 +413,38 @@ async function handleCadenceBatch(
             { projectId, triggerId },
             "All trigger email recipients are suppressed — skipping send",
           );
+          dropReason = "dropped: all recipients suppressed";
           break;
         }
+        // Stable per-dispatch digest over the batch's traceIds. Identical
+        // across outbox retries of THIS dispatch (the candidate set is
+        // deterministic) but distinct from past/future dispatches. Used as
+        // BOTH the cap-consumption claim (so a retry doesn't burn a second
+        // slot, ADR-031) and the per-recipient idempotency key prefix below.
+        const dispatchDigest = createHash("sha256")
+          .update(
+            candidatePayloads
+              .map((p) => p.match.traceId)
+              .sort()
+              .join(","),
+          )
+          .digest("hex")
+          .slice(0, 16);
         // ADR-031: per-trigger hourly hard cap. Only consumed once we know
         // there is a real send to make. Gate BEFORE either the custom-template
         // or legacy send path. Over the cap the dispatch is a terminal drop:
         // log loudly, fall through to claimSend below (so a replay no-ops
         // instead of re-sending), and return WITHOUT sending and WITHOUT
-        // throwing — throwing would let the outbox retry the spam. The cap
-        // counts dispatches, not traces or recipients.
+        // throwing — throwing would let the outbox retry the spam. The cap is
+        // consumed at most once per logical dispatch: `dedupKey` gates the
+        // INCR so a retry of the same digest re-reads the count rather than
+        // re-incrementing (the retry double-count finding). Counts dispatches,
+        // not traces or recipients.
         const capSlot = await deps.consumeEmailCapSlot({
           projectId,
           triggerId,
           now: new Date(),
+          dedupKey: `${projectId}/${triggerId}:digest:${dispatchDigest}`,
         });
         if (!capSlot.allowed) {
           logger.error(
@@ -427,25 +457,17 @@ async function handleCadenceBatch(
             "Trigger exceeded its hourly email cap — dropping this dispatch. " +
               "Switch this trigger to a digest cadence to coalesce its volume.",
           );
+          dropReason = "dropped: over hourly cap";
           break;
         }
         // Per-recipient idempotency (ADR-031): back the mailer's recipient
         // gate with the same TriggerSent claim store used for the
         // (trigger, trace) dedup below, encoding the recipient hash into the
         // traceId field under a `rcpt:` prefix (real trace ids never carry
-        // it). The digest over the batch's traceIds keeps the key stable
-        // across outbox retries of THIS dispatch — so a partial provider
-        // failure retries only the unfinished recipients — while staying
-        // distinct from past and future dispatches to the same recipients.
-        const dispatchDigest = createHash("sha256")
-          .update(
-            candidatePayloads
-              .map((p) => p.match.traceId)
-              .sort()
-              .join(","),
-          )
-          .digest("hex")
-          .slice(0, 16);
+        // it). The same `dispatchDigest` keeps the key stable across outbox
+        // retries of THIS dispatch — so a partial provider failure retries
+        // only the unfinished recipients — while staying distinct from past
+        // and future dispatches to the same recipients.
         const recipientClaimKey = (recipientHash: string) =>
           `rcpt:${dispatchDigest}:${recipientHash}`;
         const isRecipientSent = (recipientHash: string) =>
@@ -596,12 +618,23 @@ async function handleCadenceBatch(
   // "last-fired" cosmetic and the success log, which would otherwise report a
   // dropped dispatch as a notification.
   if (!didSend) {
+    // Stamp the drop reason onto every payload so the PG audit adapter's
+    // `onDispatched` hook records it as `lastError` (ADR-031). Without this the
+    // row reads as dispatched/lastError=null — indistinguishable from a real
+    // send. The dispatch still returns normally (non-retryable): a drop must
+    // not retry. `payloads` (not just `candidatePayloads`) so the shared audit
+    // row keyed by `auditDedupKey` is covered even when a trace was in-batch
+    // deduped out of the candidate set.
+    for (const p of payloads) {
+      p.dropReason = dropReason;
+    }
     logger.info(
       {
         projectId,
         triggerId,
         action: trigger.action,
         cadence: trigger.notificationCadence,
+        dropReason,
       },
       "Outbox cadence digest dropped (no recipients or over cap) — claimed but not sent",
     );
