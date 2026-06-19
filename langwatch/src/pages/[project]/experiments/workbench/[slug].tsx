@@ -1,11 +1,10 @@
 import { Alert, Box, HStack, Spacer, VStack } from "@chakra-ui/react";
 import { nanoid } from "nanoid";
-import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useMemo } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
+import { LoadingScreen } from "~/components/LoadingScreen";
 import { useRegisterLangyHandlers } from "~/components/langy/LangyContext";
 import type { ProposalHandlers } from "~/components/langy/MessageContent";
-import { LoadingScreen } from "~/components/LoadingScreen";
 import { AutosaveStatus } from "~/experiments-v3/components/AutosaveStatus";
 import { EditableHeading } from "~/experiments-v3/components/EditableHeading";
 import { EvaluationsV3Table } from "~/experiments-v3/components/EvaluationsV3Table";
@@ -22,6 +21,7 @@ import { useSavedDatasetLoader } from "~/experiments-v3/hooks/useSavedDatasetLoa
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 
 /**
  * Experiments Workbench Page
@@ -92,9 +92,11 @@ export default function ExperimentsWorkbenchPage() {
           config,
         });
         await utils.evaluators.getAll.invalidate({ projectId });
-        const evaluatorType = (created?.config as {
-          evaluatorType?: string;
-        } | null)?.evaluatorType;
+        const evaluatorType = (
+          created?.config as {
+            evaluatorType?: string;
+          } | null
+        )?.evaluatorType;
         return {
           label: "Edit evaluator",
           onOpen: () =>
@@ -164,14 +166,16 @@ export default function ExperimentsWorkbenchPage() {
         void executeEvaluation({ type: "full" });
       },
       "prompts.create": async (payload) => {
-        const { handle, messages, model, temperature, maxTokens } =
-          payload as {
-            handle: string;
-            messages: { role: "system" | "user" | "assistant"; content: string }[];
-            model?: string;
-            temperature?: number;
-            maxTokens?: number;
-          };
+        const { handle, messages, model, temperature, maxTokens } = payload as {
+          handle: string;
+          messages: {
+            role: "system" | "user" | "assistant";
+            content: string;
+          }[];
+          model?: string;
+          temperature?: number;
+          maxTokens?: number;
+        };
         await createPrompt.mutateAsync({
           projectId,
           data: { handle, messages, model, temperature, maxTokens },
@@ -186,7 +190,10 @@ export default function ExperimentsWorkbenchPage() {
           payload as {
             id: string;
             commitMessage: string;
-            messages?: { role: "system" | "user" | "assistant"; content: string }[];
+            messages?: {
+              role: "system" | "user" | "assistant";
+              content: string;
+            }[];
             model?: string;
             temperature?: number;
             maxTokens?: number;
@@ -228,7 +235,10 @@ export default function ExperimentsWorkbenchPage() {
         });
         await utils.dataset.getAll.invalidate({ projectId });
         return projectSlug && created?.id
-          ? { href: `/${projectSlug}/datasets/${created.id}`, label: "Open dataset" }
+          ? {
+              href: `/${projectSlug}/datasets/${created.id}`,
+              label: "Open dataset",
+            }
           : undefined;
       },
       "datasets.addRows": async (payload) => {
@@ -243,7 +253,10 @@ export default function ExperimentsWorkbenchPage() {
         });
         await utils.dataset.getAll.invalidate({ projectId });
         return projectSlug
-          ? { href: `/${projectSlug}/datasets/${datasetId}`, label: "Open dataset" }
+          ? {
+              href: `/${projectSlug}/datasets/${datasetId}`,
+              label: "Open dataset",
+            }
           : undefined;
       },
     };

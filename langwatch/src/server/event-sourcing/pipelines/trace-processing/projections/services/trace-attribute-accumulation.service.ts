@@ -198,7 +198,7 @@ export class TraceAttributeAccumulationService {
     }
 
     const promptId = stringAttr(spanAttrs, "langwatch.prompt.id");
-    if (promptId && promptId.includes(":")) {
+    if (promptId?.includes(":")) {
       result["langwatch.prompt.id"] = promptId;
     }
 
