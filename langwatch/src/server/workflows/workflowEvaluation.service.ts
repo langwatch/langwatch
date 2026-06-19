@@ -1,18 +1,21 @@
 import type { PrismaClient } from "@prisma/client";
-import { nanoid } from "nanoid";
-import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
-import { addEnvs } from "~/optimization_studio/server/addEnvs";
+import {
+  createInitialUIState,
+  type DatasetColumn,
+  type DatasetReference,
+  type EvaluationsV3State,
+  type TargetConfig,
+} from "~/experiments-v3/types";
+import { extractPersistedState } from "~/experiments-v3/types/persistence";
 import { entryInlineWithDefaults } from "~/optimization_studio/server/entryInputDefaults";
-import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
 import type {
   Entry,
   Field,
   Workflow as WorkflowDSL,
 } from "~/optimization_studio/types/dsl";
-import type { StudioClientEvent } from "~/optimization_studio/types/events";
-import { createLogger } from "~/utils/logger/server";
-
-const logger = createLogger("langwatch:workflows:evaluation");
+import { ExperimentService } from "~/server/experiments/experiment.service";
+import { loadExecutionData } from "~/server/experiments-v3/execution/dataLoader";
+import { startPollingRun } from "~/server/experiments-v3/execution/experimentRunner";
 
 export type WorkflowEvaluationParameters = Record<
   string,
@@ -33,12 +36,27 @@ export class NoCommittedVersionError extends Error {
   }
 }
 
+/** A bad dataset reference (e.g. an unknown dataset id) the route maps to a status. */
+export class EvaluationInputError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+  ) {
+    super(message);
+  }
+}
+
+// Stable ids for the single workflow target + dataset of a workflow experiment.
+const WORKFLOW_TARGET_ID = "workflow-target";
+const WORKFLOW_DATASET_ID = "workflow-dataset";
+
 /**
- * Triggers studio workflow evaluations outside the studio session -
- * the REST surface CI pipelines call. Builds the same
- * `execute_evaluation` event the Evaluate button posts, over a
- * committed version's DSL, and lets the run report back through the
- * regular evaluation pipeline (experiment + batch results).
+ * Runs a studio workflow as an evaluations-v3 evaluation. It resolves the
+ * committed version, ensures the workflow's backing experiment exists, loads
+ * the dataset (the workflow's attached dataset, or caller-supplied data /
+ * dataset id / parameters), and starts the v3 orchestrator, returning the run
+ * id and a results URL. This is the single backend execution path, shared with
+ * the evaluations-v3 run API.
  */
 export class WorkflowEvaluationService {
   constructor(private readonly prisma: PrismaClient) {}
@@ -49,17 +67,28 @@ export class WorkflowEvaluationService {
 
   async triggerEvaluation({
     projectId,
+    projectSlug,
     workflowId,
     versionId,
-    evaluateOn = "full",
-    parameters = {},
+    data,
+    datasetId,
+    parameters,
+    rowIndices,
   }: {
     projectId: string;
+    projectSlug: string;
     workflowId: string;
     versionId?: string;
-    evaluateOn?: "full" | "test" | "train";
+    data?: Array<Record<string, unknown>>;
+    datasetId?: string;
     parameters?: WorkflowEvaluationParameters;
-  }): Promise<{ runId: string; workflowVersionId: string; version: string }> {
+    rowIndices?: number[];
+  }): Promise<{
+    runId: string;
+    runUrl: string;
+    workflowVersionId: string;
+    version: string;
+  }> {
     const workflow = await this.prisma.workflow.findFirst({
       where: { id: workflowId, projectId, archivedAt: null },
     });
@@ -86,52 +115,155 @@ export class WorkflowEvaluationService {
     }
 
     const dsl = version.dsl as unknown as WorkflowDSL;
-    const runId = `run_${nanoid()}`;
+    const entry = dsl.nodes.find((n) => n.type === "entry")?.data as
+      | Entry
+      | undefined;
+    const entryInputs: Field[] = entry?.outputs ?? [];
 
-    let event: StudioClientEvent = {
-      type: "execute_evaluation",
-      payload: {
-        run_id: runId,
-        workflow: dsl,
-        workflow_version_id: version.id,
-        evaluate_on: evaluateOn,
-        origin: "api",
+    // The workflow target maps each workflow input to the dataset column of the
+    // same name, so dataset rows (and parameter overrides) flow into the run.
+    const target: TargetConfig = {
+      id: WORKFLOW_TARGET_ID,
+      type: "workflow",
+      workflowId: workflow.id,
+      workflowVersionId: version.id,
+      inputs: entryInputs,
+      outputs: [],
+      mappings: {
+        [WORKFLOW_DATASET_ID]: Object.fromEntries(
+          entryInputs.map((field) => [
+            field.identifier,
+            {
+              type: "source" as const,
+              source: "dataset" as const,
+              sourceId: WORKFLOW_DATASET_ID,
+              sourceField: field.identifier,
+            },
+          ]),
+        ),
       },
     };
 
-    // Same server-side preparation the studio path applies: provider
-    // envs + dataset materialization (db dataset → inline records).
-    event = await loadDatasets(await addEnvs(event, projectId), projectId);
-
-    if (
-      Object.keys(parameters).length > 0 &&
-      event.type === "execute_evaluation"
-    ) {
-      injectEntryParameters(event.payload.workflow as WorkflowDSL, parameters);
+    // Dataset precedence: caller data > caller dataset id > the workflow's
+    // attached dataset (a saved id loads fresh; inline rides as the reference).
+    let resolvedDatasetId = datasetId;
+    let datasetRef: DatasetReference = {
+      id: WORKFLOW_DATASET_ID,
+      name: workflow.name,
+      type: "inline",
+      inline: { columns: [], records: {} },
+      columns: [],
+    };
+    if (!data && !datasetId) {
+      if (entry?.dataset?.id && !entry.dataset.inline) {
+        resolvedDatasetId = entry.dataset.id;
+      } else if (entry?.dataset?.inline) {
+        const columns: DatasetColumn[] = entry.dataset.inline.columnTypes.map(
+          (c) => ({
+            id: c.name,
+            name: c.name,
+            type: c.type,
+          }),
+        );
+        datasetRef = {
+          id: WORKFLOW_DATASET_ID,
+          name: entry.dataset.name ?? workflow.name,
+          type: "inline",
+          inline: {
+            columns,
+            records: entry.dataset.inline.records as Record<string, string[]>,
+          },
+          columns,
+        };
+      }
     }
 
-    // Fire and forget: the evaluation reports its own lifecycle through
-    // the evaluation pipeline (experiment record + batch results); the
-    // API caller polls the experiment, it doesn't hold this connection.
-    void studioBackendPostEvent({
+    const dataResult = await loadExecutionData(
       projectId,
-      message: event,
-      onEvent: (serverEvent) => {
-        if (serverEvent.type === "error") {
-          logger.error(
-            { runId, workflowId, projectId, serverEvent },
-            "api-triggered evaluation reported an error",
-          );
+      datasetRef,
+      [target],
+      [],
+      { data, datasetId: resolvedDatasetId, parameters },
+    );
+    if ("error" in dataResult) {
+      throw new EvaluationInputError(dataResult.error, dataResult.status);
+    }
+
+    const {
+      datasetRows,
+      datasetColumns,
+      loadedPrompts,
+      loadedAgents,
+      loadedEvaluators,
+      loadedWorkflows,
+    } = dataResult;
+
+    // The persisted dataset reference reflects what was actually evaluated so
+    // the results page renders the right columns.
+    const persistedColumns = datasetColumns as DatasetColumn[];
+    const resolvedDatasetRef: DatasetReference = resolvedDatasetId
+      ? {
+          id: WORKFLOW_DATASET_ID,
+          name: workflow.name,
+          type: "saved",
+          datasetId: resolvedDatasetId,
+          columns: persistedColumns,
         }
+      : {
+          id: WORKFLOW_DATASET_ID,
+          name: workflow.name,
+          type: "inline",
+          inline: { columns: persistedColumns, records: {} },
+          columns: persistedColumns,
+        };
+
+    const state: EvaluationsV3State = {
+      name: workflow.name,
+      datasets: [resolvedDatasetRef],
+      activeDatasetId: WORKFLOW_DATASET_ID,
+      targets: [target],
+      evaluators: [],
+      results: {
+        status: "running",
+        targetOutputs: {},
+        targetMetadata: {},
+        evaluatorResults: {},
+        errors: {},
       },
-    }).catch((error: unknown) => {
-      logger.error(
-        { error, runId, workflowId, projectId },
-        "api-triggered evaluation failed to start",
-      );
+      pendingSavedChanges: {},
+      ui: createInitialUIState(),
+    };
+
+    const experiment = await ExperimentService.create(
+      this.prisma,
+    ).findOrCreateForWorkflow({
+      projectId,
+      workflowId: workflow.id,
+      name: workflow.name,
+      workbenchState: extractPersistedState(state),
     });
 
-    return { runId, workflowVersionId: version.id, version: version.version };
+    const { runId, runUrl } = await startPollingRun({
+      projectId,
+      projectSlug,
+      experimentId: experiment.id,
+      experimentSlug: experiment.slug,
+      scope: rowIndices ? { type: "rows", rowIndices } : { type: "full" },
+      state,
+      datasetRows,
+      datasetColumns,
+      loadedPrompts,
+      loadedAgents,
+      loadedEvaluators,
+      loadedWorkflows,
+    });
+
+    return {
+      runId,
+      runUrl,
+      workflowVersionId: version.id,
+      version: version.version,
+    };
   }
 }
 

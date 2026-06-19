@@ -34,6 +34,7 @@ import { prisma } from "~/server/db";
 import { ExperimentService } from "~/server/experiments/experiment.service";
 import { abortManager } from "~/server/experiments-v3/execution/abortManager";
 import { loadExecutionData } from "~/server/experiments-v3/execution/dataLoader";
+import { startPollingRun } from "~/server/experiments-v3/execution/experimentRunner";
 import {
   requestAbort,
   runOrchestrator,
@@ -41,12 +42,13 @@ import {
 import { runStateManager } from "~/server/experiments-v3/execution/runStateManager";
 import {
   type EvaluationV3Event,
+  type ExecutionScope,
   executionRequestSchema,
+  runInputsBodySchema,
 } from "~/server/experiments-v3/execution/types";
 import { ExperimentRunService } from "~/server/experiments-v3/services/experiment-run.service";
 import { trackServerEvent } from "~/server/posthog";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
-import { generateHumanReadableId } from "~/utils/humanReadableId";
 import { createLogger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { fireExperimentRanNurturing } from "../../../ee/billing/nurturing/hooks/featureAdoption";
@@ -143,16 +145,6 @@ const buildState = (
   };
 };
 
-const getRunUrl = (
-  projectSlug: string,
-  experimentSlug: string,
-  runId: string,
-) => {
-  const baseUrl =
-    process.env.NEXT_PUBLIC_BASE_URL ?? "https://app.langwatch.ai";
-  return `${baseUrl}/${projectSlug}/experiments/${experimentSlug}?runId=${runId}`;
-};
-
 // ── POST /execute ────────────────────────────────────────────────────
 
 secured
@@ -191,6 +183,11 @@ secured
       request.dataset,
       request.targets,
       request.evaluators,
+      {
+        data: request.data,
+        datasetId: request.dataset_id,
+        parameters: request.parameters,
+      },
     );
 
     if ("error" in dataResult) {
@@ -389,11 +386,28 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
     return c.json({ error: "No dataset configured" }, { status: 400 });
   }
 
+  const rawBody = (await c.req.json().catch(() => ({}))) as unknown;
+  const inputsParse = runInputsBodySchema.safeParse(rawBody ?? {});
+  if (!inputsParse.success) {
+    return c.json(
+      {
+        error: inputsParse.error.errors[0]?.message ?? "Invalid request body",
+      },
+      { status: 400 },
+    );
+  }
+  const runInputs = inputsParse.data;
+
   const dataResult = await loadExecutionData(
     project.id,
     dataset,
     workbenchState.targets,
     workbenchState.evaluators,
+    {
+      data: runInputs.data,
+      datasetId: runInputs.dataset_id,
+      parameters: runInputs.parameters,
+    },
   );
 
   if ("error" in dataResult) {
@@ -414,6 +428,10 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
 
   const state = buildState(workbenchState);
 
+  const scope: ExecutionScope = runInputs.row_indices
+    ? { type: "rows", rowIndices: runInputs.row_indices }
+    : { type: "full" };
+
   const acceptHeader = c.req.header("Accept") ?? "";
   const isSSE = acceptHeader.includes("text/event-stream");
 
@@ -421,8 +439,6 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
     { projectId: project.id, slug, isSSE, rowCount: datasetRows.length },
     "Starting CI/CD experiment execution",
   );
-
-  const totalCells = datasetRows.length * workbenchState.targets.length;
 
   markUsed();
 
@@ -432,7 +448,7 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
         const orchestrator = runOrchestrator({
           projectId: project.id,
           experimentId: experiment.id,
-          scope: { type: "full" },
+          scope,
           state,
           datasetRows,
           datasetColumns,
@@ -470,70 +486,22 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
     });
   }
 
-  // Polling mode
-  const runExecution = async (runId: string) => {
-    try {
-      const orchestrator = runOrchestrator({
-        projectId: project.id,
-        experimentId: experiment.id,
-        scope: { type: "full" },
-        state,
-        datasetRows,
-        datasetColumns,
-        loadedPrompts: loadedPrompts as Map<string, VersionedPrompt>,
-        loadedAgents: loadedAgents as Map<string, TypedAgent>,
-        loadedEvaluators,
-        loadedWorkflows,
-        runId,
-      });
-
-      for await (const event of orchestrator) {
-        await runStateManager.addEvent(runId, event as EvaluationV3Event);
-
-        if (event.type === "done") {
-          const summary = {
-            ...event.summary,
-            runUrl: getRunUrl(project.slug, slug, runId),
-          };
-          await runStateManager.completeRun(runId, summary);
-          break;
-        }
-
-        if (event.type === "stopped") {
-          await runStateManager.stopRun(runId);
-          break;
-        }
-      }
-    } catch (error) {
-      logger.error(
-        { error, projectId: project.id, slug, runId },
-        "Execution error",
-      );
-      captureException(toError(error), {
-        extra: { projectId: project.id, slug, runId },
-      });
-      await runStateManager.failRun(runId, (error as Error).message);
-    }
-  };
-
-  const runId = generateHumanReadableId();
-
-  await runStateManager.createRun({
-    runId,
+  const { runId, runUrl, total } = await startPollingRun({
     projectId: project.id,
+    projectSlug: project.slug,
     experimentId: experiment.id,
     experimentSlug: slug,
-    total: totalCells,
+    scope,
+    state,
+    datasetRows,
+    datasetColumns,
+    loadedPrompts: loadedPrompts as Map<string, VersionedPrompt>,
+    loadedAgents: loadedAgents as Map<string, TypedAgent>,
+    loadedEvaluators,
+    loadedWorkflows,
   });
 
-  void runExecution(runId);
-
-  return c.json({
-    runId,
-    status: "running",
-    total: totalCells,
-    runUrl: getRunUrl(project.slug, slug, runId),
-  });
+  return c.json({ runId, status: "running", total, runUrl });
 });
 
 // ── GET /runs?experimentSlug=... (list runs for an experiment) ──────
