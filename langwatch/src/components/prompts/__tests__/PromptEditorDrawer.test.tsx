@@ -1126,7 +1126,7 @@ describe("PromptEditorDrawer", () => {
     /** @scenario "A node whose library prompt is missing shows its inline config" */
     it("falls back to inlineConfigFallback instead of an empty form", async () => {
       const inlineConfigFallback = {
-        llm: { model: "openai/gpt-4o" },
+        llm: { model: "gpt-5-mini" },
         messages: [
           { role: "system" as const, content: "INLINE-FALLBACK-CONTENT" },
         ],
