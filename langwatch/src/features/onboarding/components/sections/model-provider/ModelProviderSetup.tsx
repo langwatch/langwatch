@@ -126,12 +126,6 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
 
-  // Cascade-resolved model for onboarding "default chat model" seed value.
-  const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
-    { projectId: projectId ?? "", featureKey: "prompt.create_default" },
-    { enabled: !!projectId },
-  );
-
   const backendModelProviderKey = useMemo(() => {
     if (meta?.backendModelProviderKey) {
       return meta.backendModelProviderKey;
@@ -170,15 +164,6 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     provider.enabled &&
     (!provider.customKeys ||
       Object.keys(provider.customKeys as Record<string, unknown>).length === 0);
-
-  const projectForForm = useMemo(
-    () => ({
-      defaultModel: meta?.defaultModel ?? resolvedDefault.data?.model ?? null,
-      topicClusteringModel: null,
-      embeddingsModel: null,
-    }),
-    [meta?.defaultModel, resolvedDefault.data?.model],
-  );
 
   const [state, actions] = useModelProviderForm({
     provider,
