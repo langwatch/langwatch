@@ -177,12 +177,12 @@ test_access_ingress() {
 test_size_overlays() {
   sep; info "Suite: size overlays"
 
-  # size-minimal: workers disabled, 1 replica each
+  # size-minimal: workers enabled (the smoke test exercises them), 1 replica each
   local min_out
   min_out=$(tmpl --set autogen.enabled=true \
     -f "${OVERLAYS}/size-minimal.yaml" \
     -f "${OVERLAYS}/access-nodeport.yaml")
-  assert_not_contains "minimal: workers disabled" "$min_out" "name: ${RELEASE}-workers"
+  assert_contains "minimal: workers deployed" "$min_out" "name: ${RELEASE}-workers"
   assert_contains "minimal: app replicas 1" "$min_out" "replicas: 1"
 
   # size-prod: 2 app replicas, PDB
