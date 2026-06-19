@@ -91,12 +91,20 @@ spec:
           volumeMounts:
             - name: next-dir
               mountPath: /next-tmp
+          # Mirrors the main container's hardening so strict admission policies
+          # (require-resource-limits, read-only-root-filesystem) accept the
+          # init container too. It only writes to the next-dir emptyDir, so a
+          # read-only root filesystem is safe here.
           securityContext:
             runAsUser: 1000
             runAsNonRoot: true
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 200m, memory: 256Mi }
       containers:
         {{- with .Values.app.extraContainers}}
         {{- toYaml . | nindent 8 }}
