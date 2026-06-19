@@ -127,3 +127,67 @@ export const pollExperimentRun = async ({
     }
   }
 };
+
+/**
+ * Replace the domain of a URL with a new base, preserving path/query/fragment.
+ *
+ * The platform returns its own (cloud) URL for a run; rebasing it onto the
+ * configured endpoint keeps a self-hosted run pointing at the local instance
+ * instead of app.langwatch.ai. Returns the original string if either URL is
+ * unparseable.
+ */
+export const rebaseUrlToEndpoint = (url: string, newBase: string): string => {
+  if (!url) return url;
+  try {
+    const parsedUrl = new URL(url);
+    const parsedNewBase = new URL(newBase);
+    return `${parsedNewBase.origin}${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`;
+  } catch {
+    return url;
+  }
+};
+
+/**
+ * Fetch a run's per-row results, retrying through the brief post-completion
+ * window where the results endpoint 404s ("not yet available") or returns an
+ * empty dataset because the ClickHouse projection has not caught up yet.
+ *
+ * Generic over the result shape: `getResults` performs one fetch and `isEmpty`
+ * reports whether it came back without rows. When the run reported rows
+ * (`expectsRows`), an empty or failed read is retried up to `maxAttempts` with a
+ * fixed `delay`; otherwise the first read is returned. The same loop backs both
+ * the experiment and workflow SDK paths and mirrors the python SDK.
+ */
+export const fetchResultsWithRetry = async <T>({
+  getResults,
+  isEmpty,
+  expectsRows,
+  delay = DEFAULT_POLL_INTERVAL,
+  maxAttempts = 6,
+}: {
+  getResults: () => Promise<T>;
+  isEmpty: (results: T) => boolean;
+  expectsRows: boolean;
+  delay?: number;
+  maxAttempts?: number;
+}): Promise<T> => {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const results = await getResults();
+      if (expectsRows && isEmpty(results) && attempt < maxAttempts) {
+        await sleep(delay);
+        continue;
+      }
+      return results;
+    } catch (error) {
+      lastError = error;
+      if (attempt < maxAttempts) {
+        await sleep(delay);
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw lastError;
+};

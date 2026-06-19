@@ -9,7 +9,11 @@ import {
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
 import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
-import { pollExperimentRun } from "@/client-sdk/services/experiments/run-status";
+import {
+  pollExperimentRun,
+  rebaseUrlToEndpoint,
+  fetchResultsWithRetry,
+} from "@/client-sdk/services/experiments/run-status";
 import { mapRunResultsToRows } from "@/client-sdk/services/experiments/mapResults";
 import type {
   RunWithResultsOptions,
@@ -60,9 +64,16 @@ export class WorkflowsApiError extends Error {
 export class WorkflowsApiService {
   private readonly apiClient: LangwatchApiClient;
   private readonly experimentsApiService: ExperimentsApiService;
+  private readonly endpoint: string;
 
-  constructor(config?: Pick<InternalConfig, "langwatchApiClient">) {
+  constructor(
+    config?: Pick<InternalConfig, "langwatchApiClient"> & { endpoint?: string },
+  ) {
     this.apiClient = config?.langwatchApiClient ?? createLangWatchApiClient();
+    this.endpoint =
+      config?.endpoint ??
+      process.env.LANGWATCH_ENDPOINT ??
+      "https://app.langwatch.ai";
     this.experimentsApiService = new ExperimentsApiService({
       langwatchApiClient: this.apiClient,
     });
@@ -169,7 +180,6 @@ export class WorkflowsApiService {
     );
 
     const runId = startResponse.run_id;
-    const runUrl = startResponse.run_url ?? "";
 
     const { status, summary } = await pollExperimentRun({
       runId,
@@ -179,11 +189,24 @@ export class WorkflowsApiService {
       onProgress: options.onProgress,
     });
 
-    const results = await this.experimentsApiService.getV3RunResults({ runId });
+    // ClickHouse can lag right after completion: retry the results read through
+    // the brief 404 / empty-dataset window when the run reported rows. Mirrors
+    // the experiment path and the python SDK.
+    const results = await fetchResultsWithRetry({
+      getResults: () => this.experimentsApiService.getV3RunResults({ runId }),
+      isEmpty: (r) => (r.dataset?.length ?? 0) === 0,
+      expectsRows: (summary.totalCells ?? 0) > 0,
+      delay: options.pollInterval,
+    });
+
+    // Rebase the run URL onto the configured endpoint so a self-hosted run does
+    // not surface a cloud (app.langwatch.ai) link.
+    const rawRunUrl = startResponse.run_url ?? summary.runUrl;
+    const runUrl = rawRunUrl ? rebaseUrlToEndpoint(rawRunUrl, this.endpoint) : "";
 
     return {
       runId,
-      runUrl: summary.runUrl ?? runUrl,
+      runUrl,
       status,
       summary,
       rows: mapRunResultsToRows(results),

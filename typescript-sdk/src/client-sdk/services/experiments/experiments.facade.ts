@@ -13,7 +13,6 @@ import {
   ExperimentsApiService,
   toRunStartRequest,
 } from "./experiments-api.service";
-import type { ExperimentRunResultsResponse } from "./experiments-api.service";
 import type { ExperimentInitOptions } from "./types";
 import type {
   ExperimentRunResult,
@@ -28,7 +27,11 @@ import {
   ExperimentTimeoutError,
   ExperimentRunFailedError,
 } from "./platformErrors";
-import { pollExperimentRun } from "./run-status";
+import {
+  pollExperimentRun,
+  rebaseUrlToEndpoint,
+  fetchResultsWithRetry,
+} from "./run-status";
 import { mapRunResultsToRows } from "./mapResults";
 import { printSummary } from "./printSummary";
 
@@ -162,9 +165,10 @@ export class ExperimentsFacade {
     // ("not yet available") or return 200 with an empty dataset before the rows
     // materialize. Retry both cases when the run reported rows, mirroring the
     // python SDK, instead of failing or returning an empty result.
-    const results = await this.fetchV3ResultsWithRetry({
-      runId,
-      slug,
+    const results = await fetchResultsWithRetry({
+      getResults: () =>
+        this.apiService.getV3RunResults({ runId, experimentSlug: slug }),
+      isEmpty: (r) => (r.dataset?.length ?? 0) === 0,
       expectsRows: (summary.totalCells ?? 0) > 0,
       delay: options.pollInterval ?? DEFAULT_POLL_INTERVAL,
     });
@@ -175,7 +179,7 @@ export class ExperimentsFacade {
     // is present gets its domain replaced. Mirrors the python SDK.
     const rawRunUrl = startResponse.runUrl ?? summary.runUrl;
     const runUrl = rawRunUrl
-      ? this.replaceUrlDomain(rawRunUrl, this.config.endpoint)
+      ? rebaseUrlToEndpoint(rawRunUrl, this.config.endpoint)
       : "";
 
     return {
@@ -185,50 +189,6 @@ export class ExperimentsFacade {
       summary,
       rows: mapRunResultsToRows(results),
     };
-  }
-
-  /**
-   * Fetch the per-row results for a completed run, retrying through the brief
-   * window where the results endpoint 404s ("not yet available") or returns an
-   * empty dataset because ClickHouse has not yet materialized the rows. Mirrors
-   * the python SDK's results backoff.
-   */
-  private async fetchV3ResultsWithRetry({
-    runId,
-    slug,
-    expectsRows,
-    delay,
-    maxAttempts = 6,
-  }: {
-    runId: string;
-    slug: string;
-    expectsRows: boolean;
-    delay: number;
-    maxAttempts?: number;
-  }): Promise<ExperimentRunResultsResponse> {
-    let lastError: unknown;
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        const results = await this.apiService.getV3RunResults({
-          runId,
-          experimentSlug: slug,
-        });
-        const isEmpty = (results.dataset?.length ?? 0) === 0;
-        if (expectsRows && isEmpty && attempt < maxAttempts) {
-          await new Promise((resolve) => setTimeout(resolve, delay));
-          continue;
-        }
-        return results;
-      } catch (error) {
-        lastError = error;
-        if (attempt < maxAttempts) {
-          await new Promise((resolve) => setTimeout(resolve, delay));
-          continue;
-        }
-        throw error;
-      }
-    }
-    throw lastError;
   }
 
   /**
@@ -247,7 +207,7 @@ export class ExperimentsFacade {
 
     // Use the run URL from API but replace domain with configured endpoint
     const apiRunUrl = startResponse.runUrl ?? "";
-    const runUrl = apiRunUrl ? this.replaceUrlDomain(apiRunUrl, this.config.endpoint) : "";
+    const runUrl = apiRunUrl ? rebaseUrlToEndpoint(apiRunUrl, this.config.endpoint) : "";
 
     console.log(`Started experiment run: ${runId}`);
     if (runUrl) {
@@ -445,21 +405,4 @@ export class ExperimentsFacade {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  /**
-   * Replace the domain of a URL with a new base URL, preserving the path
-   */
-  private replaceUrlDomain(url: string, newBase: string): string {
-    if (!url) return url;
-
-    try {
-      const parsedUrl = new URL(url);
-      const parsedNewBase = new URL(newBase);
-
-      // Replace origin with new base, keep path/query/fragment
-      return `${parsedNewBase.origin}${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`;
-    } catch {
-      // If URL parsing fails, return original
-      return url;
-    }
-  }
 }
