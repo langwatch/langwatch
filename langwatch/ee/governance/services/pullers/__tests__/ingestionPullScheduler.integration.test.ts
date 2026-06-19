@@ -12,6 +12,7 @@ import { nanoid } from "nanoid";
  */
 import {
   afterAll,
+  afterEach,
   beforeAll,
   beforeEach,
   describe,
@@ -97,6 +98,7 @@ describe.skipIf(!hasTestcontainers)(
     let eventSourcing: EventSourcing;
     let pullJob: ReturnType<typeof registerIngestionPullJob>;
     let organizationId: string;
+    const createdSourceIds: string[] = [];
 
     beforeAll(async () => {
       await startTestContainers();
@@ -137,14 +139,20 @@ describe.skipIf(!hasTestcontainers)(
       organizationId = organization.id;
     });
 
-    beforeEach(async () => {
-      // Scoped reset of just this run's event-sourcing queue keys (not a global
-      // FLUSHALL): clears staged jobs and dedup keys between tests so a stale
-      // job from a prior test cannot drive the shared fixture adapter, without
-      // touching unrelated tenant data.
-      const queueKeys = await redis.keys("*event-sourcing/jobs*");
-      if (queueKeys.length > 0) await redis.del(...queueKeys);
+    beforeEach(() => {
       control = freshControl();
+    });
+
+    // Per-source cleanup: every test creates sources with unique ids, so
+    // deleting only those sources' event-sourcing keys (group ZSET, data, dedup)
+    // isolates tests without a global FLUSHALL and without matching any key from
+    // another test or tenant.
+    afterEach(async () => {
+      for (const id of createdSourceIds) {
+        const keys = await redis.keys(`*${id}*`);
+        if (keys.length > 0) await redis.del(...keys);
+      }
+      createdSourceIds.length = 0;
     });
 
     afterAll(async () => {
@@ -172,6 +180,7 @@ describe.skipIf(!hasTestcontainers)(
           parserConfig: { adapter: FIXTURE_ADAPTER_ID },
         },
       });
+      createdSourceIds.push(source.id);
       return source.id;
     }
 
