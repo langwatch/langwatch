@@ -18382,6 +18382,7 @@ By default the run uses the dataset attached to the experiment. You can override
 - `parameters` — constant inputs merged into every row (and the single row when there is no dataset), handy for a feature flag or a model name
 - `data` — inline rows to evaluate
 - `dataset_id` — a different platform dataset by id (`data` and `dataset_id` are mutually exclusive)
+- `row_indices` — a subset of dataset row indices to evaluate, instead of the whole dataset
 
 
   ### Python
