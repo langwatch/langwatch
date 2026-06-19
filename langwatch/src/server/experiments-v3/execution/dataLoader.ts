@@ -169,6 +169,69 @@ export const loadDataset = async (
 };
 
 /**
+ * Applies caller-provided parameters as constant columns across every row.
+ *
+ * Each parameter overrides (or adds) that column on every row, and any
+ * parameter that is not already a column is appended to the column list. With
+ * no rows, the parameters form a single synthetic row, so an
+ * evaluate-with-flags call needs no placeholder dataset. Mirrors the row-level
+ * effect of the workflow entry-parameter injection.
+ */
+export const applyParametersToRows = ({
+  rows,
+  columns,
+  parameters,
+}: {
+  rows: Array<Record<string, unknown>>;
+  columns: Array<{ id: string; name: string; type: string }>;
+  parameters?: Record<string, string | number | boolean>;
+}): {
+  rows: Array<Record<string, unknown>>;
+  columns: Array<{ id: string; name: string; type: string }>;
+} => {
+  if (!parameters || Object.keys(parameters).length === 0) {
+    return { rows, columns };
+  }
+
+  const existingNames = new Set(columns.map((c) => c.name));
+  const columnsWithParameters = [
+    ...columns,
+    ...Object.keys(parameters)
+      .filter((key) => !existingNames.has(key))
+      .map((key) => ({ id: key, name: key, type: "string" })),
+  ];
+
+  // With no rows, the parameters themselves form a single synthetic row.
+  const baseRows = rows.length === 0 ? [{}] : rows;
+  const rowsWithParameters = baseRows.map((row) => ({ ...row, ...parameters }));
+
+  return { rows: rowsWithParameters, columns: columnsWithParameters };
+};
+
+/**
+ * Normalizes inline row-first data (from the run API or an SDK) into the loaded
+ * dataset shape. Columns are derived from the union of keys across rows.
+ */
+const rowsFromInlineData = (
+  data: Array<Record<string, unknown>>,
+): LoadedDataset => {
+  const columnNames: string[] = [];
+  const seen = new Set<string>();
+  for (const row of data) {
+    for (const key of Object.keys(row)) {
+      if (!seen.has(key)) {
+        seen.add(key);
+        columnNames.push(key);
+      }
+    }
+  }
+  return {
+    rows: data,
+    columns: columnNames.map((name) => ({ id: name, name, type: "string" })),
+  };
+};
+
+/**
  * Result of loading all execution data.
  */
 /**
@@ -227,19 +290,72 @@ type EvaluatorForLoading = {
 /**
  * Loads all execution data: dataset, prompts, agents, evaluators.
  */
+/**
+ * Optional run-time inputs that override or supply the dataset to evaluate.
+ * Sent by the run API, the workflow evaluate endpoint, and the SDKs.
+ */
+export type ExecutionDataInputs = {
+  data?: Array<Record<string, unknown>>;
+  datasetId?: string;
+  parameters?: Record<string, string | number | boolean>;
+};
+
 export const loadExecutionData = async (
   projectId: string,
   dataset: DatasetInput,
   targets: TargetForLoading[],
   evaluators: EvaluatorForLoading[],
+  inputs?: ExecutionDataInputs,
 ): Promise<LoadedExecutionData | { error: string; status: number }> => {
-  // Load dataset
-  const datasetResult = await loadDataset(dataset, projectId);
-  if ("error" in datasetResult) {
-    return datasetResult;
+  // Resolve the base rows + columns: inline data, a saved dataset id, or the
+  // attached dataset reference, in that precedence.
+  let baseDataset: LoadedDataset;
+  if (inputs?.data) {
+    baseDataset = rowsFromInlineData(inputs.data);
+  } else if (inputs?.datasetId) {
+    const fullDataset = await getFullDataset({
+      datasetId: inputs.datasetId,
+      projectId,
+      entrySelection: "all",
+    });
+    if (!fullDataset) {
+      return { error: `Dataset "${inputs.datasetId}" not found`, status: 404 };
+    }
+    const columns = (
+      (fullDataset.columnTypes as unknown as Array<{
+        name: string;
+        type: string;
+      }>) ?? []
+    ).map((c) => ({ id: c.name, name: c.name, type: c.type }));
+    const jsonColumnKeys = new Set(
+      columns
+        .filter((c) => JSON_COLUMN_TYPES.includes(c.type as any))
+        .map((c) => c.name),
+    );
+    baseDataset = {
+      rows: parseJsonColumns(
+        fullDataset.datasetRecords.map(
+          (r) => r.entry as Record<string, unknown>,
+        ),
+        jsonColumnKeys,
+      ),
+      columns,
+    };
+  } else {
+    const datasetResult = await loadDataset(dataset, projectId);
+    if ("error" in datasetResult) {
+      return datasetResult;
+    }
+    baseDataset = datasetResult;
   }
 
-  const { rows: datasetRows, columns: datasetColumns } = datasetResult;
+  // Apply caller parameters as constant columns across every row (and a single
+  // synthetic row when there is no dataset).
+  const { rows: datasetRows, columns: datasetColumns } = applyParametersToRows({
+    rows: baseDataset.rows,
+    columns: baseDataset.columns,
+    parameters: inputs?.parameters,
+  });
 
   // Load prompts for prompt targets
   const loadedPrompts = new Map<string, VersionedPrompt>();
