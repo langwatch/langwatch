@@ -185,6 +185,14 @@ export const apiKeyRouter = createTRPCRouter({
         expiresAt: apiKey.expiresAt,
         lastUsedAt: apiKey.lastUsedAt,
         revokedAt: apiKey.revokedAt,
+        // Non-null marks this as an ingestion key (project-scoped, ingest-only
+        // write credential the `langwatch <tool>` CLI mints). null = regular
+        // personal / service key. Drives the API Keys page section split.
+        ingestSourceType: apiKey.ingestSourceType,
+        ingestionTemplateId: apiKey.ingestionTemplateId,
+        // Human label of the CLI device session that minted this ingestion key
+        // ("Rogerio's MacBook Pro"); null for keys without device provenance.
+        createdByDeviceLabel: apiKey.createdByDeviceLabel,
         roleBindings: apiKey.roleBindings.map((rb) => ({
           id: rb.id,
           role: rb.role,

@@ -2,24 +2,24 @@
  * @vitest-environment node
  *
  * Integration coverage for tRPC `user.cliBootstrap` — powers the
- * Storyboard Screen 4 login-completion ceremony in typescript-sdk
- * (formatLoginCeremony({ providers, budget })).
+ * login-completion ceremony in typescript-sdk
+ * (formatLoginCeremony({ tools, providers, budget })).
  *
  * Wire shape (every field always populated, empty-state safe):
  *   {
- *     providers: Array<{ name, displayName, models[] }>;
+ *     tools: Array<{ slug, displayName }>;
+ *     providers: Array<{ name, displayName, configured }>;
  *     budget: { monthlyLimitUsd: number | null, monthlyUsedUsd: number, period: string };
  *   }
  *
  * Scope: contract-level scenarios that exercise the org-membership
- * guard + the empty-state graceful-degrade. Provider listing depends
- * on env-var configuration (registry's `enabledSince + apiKey` check
- * — present iff the LangWatch instance has the upstream key set);
- * budget data depends on ClickHouse + a personal VK + GatewayBudget
- * rows. The non-empty paths are exercised by the existing
- * personalBudget + ModelProviderService integration tests; this test
- * locks the cliBootstrap-specific empty-state contract that
- * @ai_gateway_andre's CLI ceremony relies on.
+ * guard, the empty-state graceful-degrade, AND the catalog-sourcing
+ * contract — tools + providers come ONLY from the org's published AI
+ * Tools catalog tiles, never from env-fed project providers. Budget
+ * data depends on ClickHouse + a personal VK + GatewayBudget rows; the
+ * non-empty budget path is exercised by the existing personalBudget
+ * integration tests. This test locks the cliBootstrap-specific
+ * empty-state + catalog-sourcing contract the CLI ceremony relies on.
  *
  * Pairs with:
  *   - user.personalBudget.integration.test.ts (budget service shape)
@@ -33,6 +33,8 @@ import {
 } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import { AiToolEntryService } from "@ee/governance/services/aiToolEntry.service";
 
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
@@ -99,6 +101,9 @@ describe("user.cliBootstrap integration", () => {
 
   afterAll(async () => {
     const orgIds = [ORG_ID, OTHER_ORG_ID];
+    await prisma.aiToolEntry.deleteMany({
+      where: { organizationId: { in: orgIds } },
+    });
     await prisma.virtualKey.deleteMany({
       where: { organizationId: { in: orgIds } },
     });
@@ -125,17 +130,65 @@ describe("user.cliBootstrap integration", () => {
     });
   });
 
-  describe("when the caller has no personal workspace yet", () => {
-    it("returns empty providers + null monthlyLimitUsd — graceful empty state", async () => {
+  describe("when the org has no catalog and the caller has no workspace", () => {
+    it("returns empty tools + providers + null monthlyLimitUsd — graceful empty state", async () => {
       const result = await caller.user.cliBootstrap({
         organizationId: ORG_ID,
       });
+      expect(result.tools).toEqual([]);
       expect(result.providers).toEqual([]);
+      expect(result.gatewayProviders).toEqual([]);
       expect(result.budget).toEqual({
         monthlyLimitUsd: null,
         monthlyUsedUsd: 0,
         period: "MONTHLY",
       });
+    });
+  });
+
+  describe("when the org has published catalog tiles", () => {
+    it("sources tools + providers from the catalog, not env-fed project providers", async () => {
+      const service = AiToolEntryService.create(prisma);
+      // A coding-assistant tile → an `langwatch <slug>` AI tool.
+      await service.create({
+        organizationId: ORG_ID,
+        departmentIds: [],
+        type: "coding_assistant",
+        displayName: "Claude Code",
+        config: { assistantKind: "claude_code", setupCommand: "claude" },
+        actorUserId: USER_ID,
+      });
+      // A model-provider tile → a provider the member can mint a VK for.
+      // Deliberately NOT openai: even if the test instance has OPENAI_API_KEY
+      // in env (which the old project-sourced path surfaced), the catalog
+      // never published it, so it must not appear.
+      await service.create({
+        organizationId: ORG_ID,
+        departmentIds: [],
+        type: "model_provider",
+        displayName: "Anthropic",
+        config: { providerKey: "anthropic" },
+        actorUserId: USER_ID,
+      });
+
+      const result = await caller.user.cliBootstrap({
+        organizationId: ORG_ID,
+      });
+
+      expect(result.tools).toEqual([
+        { slug: "claude", displayName: "Claude Code" },
+      ]);
+      expect(result.providers).toEqual([
+        { name: "anthropic", displayName: "Anthropic", configured: false },
+      ]);
+      // The env-fed openai provider the legacy path leaked is absent.
+      expect(
+        result.providers.find((p) => p.name === "openai"),
+      ).toBeUndefined();
+      // gatewayProviders reflects CONFIGURED credentials, not catalog tiles:
+      // the anthropic tile is published but no credential is configured, so
+      // the gateway has nothing to route through.
+      expect(result.gatewayProviders).toEqual([]);
     });
   });
 });

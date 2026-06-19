@@ -1,13 +1,10 @@
-import { type ModelMessage, generateObject, generateText } from "ai";
+import { generateObject, generateText, type ModelMessage } from "ai";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 import { createLogger } from "~/utils/logger";
 import { QUERY_SYNTAX_DOC } from "./query-language/grammar";
-import {
-  FIELD_VALUES,
-  SEARCH_FIELDS,
-} from "./query-language/metadata";
+import { FIELD_VALUES, SEARCH_FIELDS } from "./query-language/metadata";
 import { isEmptyAST, parse } from "./query-language/parse";
 import { validateAst } from "./query-language/queries";
 
@@ -45,7 +42,31 @@ export type AiActionResult =
       name: string;
       query: string;
     }
-  | { ok: false; error: string };
+  | { ok: false; error: AiActionError };
+
+/**
+ * Structured error returned to the UI. The composer renders `message`
+ * as the inline badge and pops `details` into a "View details"
+ * disclosure on hover/click. Stack traces and SDK-internal prefixes
+ * are stripped before this leaves the server — only operator-actionable
+ * fields cross the wire.
+ */
+export type AiActionError = {
+  /** Short, user-readable headline. Always set. */
+  message: string;
+  /** Stable code for UI branching and telemetry. */
+  code: "provider_error" | "validation_error" | "unknown";
+  /** Optional structured detail rendered in the disclosure. */
+  details?: {
+    provider?: string;
+    model?: string;
+    httpStatus?: number;
+    /** Cleaned-up provider response text, free of stack traces. */
+    reason?: string;
+    /** For validation errors, the last query the model produced. */
+    lastQuery?: string;
+  };
+};
 
 const aiActionSchema = z.discriminatedUnion("kind", [
   z.object({
@@ -84,7 +105,10 @@ export async function generateTraceQueryFromPrompt(
   const systemPrompt = buildSystemPrompt(fieldsBlock);
   const messages: ModelMessage[] = [{ role: "user", content: input.prompt }];
 
-  const model = await getVercelAIModel(input.projectId, undefined, "traces.ai_search");
+  const model = await getVercelAIModel({
+    projectId: input.projectId,
+    featureKey: "traces.ai_search",
+  });
 
   let lastQuery = "";
   let lastError = "Unknown error";
@@ -167,7 +191,10 @@ export async function generateTraceAction(
   const fieldsBlock = await buildFieldsBlock(input);
   const systemPrompt = buildActionSystemPrompt(fieldsBlock);
 
-  const model = await getVercelAIModel(input.projectId, undefined, "traces.ai_search");
+  const model = await getVercelAIModel({
+    projectId: input.projectId,
+    featureKey: "traces.ai_search",
+  });
 
   let lastError = "Unknown error";
   let lastQuery = "";
@@ -177,6 +204,7 @@ export async function generateTraceAction(
   // attempt 2 should surface as "couldn't parse the query," not
   // "provider error."
   let lastFailure: "provider" | "validation" | null = null;
+  let lastProviderError: unknown = null;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     let parsedAction: z.infer<typeof aiActionSchema>;
     try {
@@ -202,6 +230,7 @@ export async function generateTraceAction(
       parsedAction = object;
     } catch (e) {
       lastFailure = "provider";
+      lastProviderError = e;
       lastError = e instanceof Error ? e.message : "Unknown generation error.";
       logger.error(
         { projectId: input.projectId, attempt, lastError, err: e },
@@ -230,36 +259,124 @@ export async function generateTraceAction(
     );
   }
 
-  // Don't leak provider/SDK errors to the UI — those carry stack-y messages
-  // like "litellm.BadRequestError: OpenAIException - …" that aren't actionable
-  // for the user. Distinguish "model errored" from "model returned an
-  // unparseable query" so the message can be tailored without losing context.
+  // Don't leak raw SDK exception messages — those carry stack-y prefixes
+  // like "litellm.BadRequestError: OpenAIException - …" plus traces.
+  // `summarizeProviderError` extracts the operator-actionable fields
+  // (provider, model, http status, reason) and lets the composer render
+  // a polished one-liner + a "View details" disclosure with the rest.
+  if (lastFailure === "provider") {
+    return {
+      ok: false,
+      error: summarizeProviderError(lastProviderError),
+    };
+  }
   return {
     ok: false,
-    error:
-      lastFailure === "provider"
-        ? "AI couldn't generate a query right now. Try again, or rephrase."
-        : "AI's reply didn't match the trace query syntax. Try rephrasing.",
+    error: {
+      code: "validation_error",
+      message:
+        "AI's reply didn't match the trace query syntax. Try rephrasing.",
+      details: { reason: lastError, lastQuery },
+    },
+  };
+}
+
+/**
+ * Curate an SDK/provider exception into the operator-actionable fields
+ * the UI renders in the AI-search composer. Strips stack traces and
+ * `litellm.XYZException` prefixes; pulls out HTTP status, provider key,
+ * referenced model id, and the human-readable `'message'` substring
+ * embedded in the JSON-shaped body LiteLLM forwards from providers.
+ *
+ * Never throws — anything we can't parse falls through to a truncated
+ * raw-cleaned text so we still produce *something* for the operator
+ * instead of a vacant "Unknown error" badge.
+ */
+function summarizeProviderError(err: unknown): AiActionError {
+  const raw = err instanceof Error ? err.message : String(err ?? "");
+  const cleaned = raw
+    .split("\n")
+    .filter((line) => !/^\s*at\s+/.test(line))
+    .join("\n")
+    .trim();
+
+  const statusMatch =
+    cleaned.match(/status[_\s]*code[:\s]+(\d{3})/i) ??
+    cleaned.match(/\b(?:HTTP\s+)?(\d{3})\b/);
+  const httpStatus = statusMatch ? Number(statusMatch[1]) : undefined;
+
+  const providerMatch = cleaned.match(
+    /(?:litellm\.|\b)(OpenAI|Azure|Anthropic|Gemini|Google|Cohere|Mistral|Groq|Together|Bedrock|Vertex)(?:Exception|Error|APIError)/i,
+  );
+  const provider = providerMatch?.[1]?.toLowerCase();
+
+  const modelMatch =
+    cleaned.match(
+      /model\s+["']?([\w./:-]+)["']?\s+(?:does\s+not\s+exist|not\s+found|is\s+invalid)/i,
+    ) ?? cleaned.match(/Unknown\s+model[:\s]+([\w./:-]+)/i);
+  const model = modelMatch ? modelMatch[1] : undefined;
+
+  const reasonMatch =
+    cleaned.match(/['"]message['"][:\s]+['"]([^'"]{1,300})['"]/) ??
+    cleaned.match(/['"]error['"][:\s]+['"]([^'"]{1,300})['"]/);
+  const reason = reasonMatch?.[1];
+
+  let message = "Couldn't reach the model provider";
+  if (httpStatus && reason) {
+    message = `Provider returned ${httpStatus}: ${reason}`;
+  } else if (httpStatus) {
+    message = `Provider returned ${httpStatus}`;
+  } else if (reason) {
+    message = reason;
+  } else if (cleaned) {
+    const firstLine = cleaned.split("\n")[0]?.trim() ?? "";
+    if (firstLine) message = firstLine.slice(0, 200);
+  }
+
+  return {
+    code: "provider_error",
+    message,
+    details: {
+      ...(provider ? { provider } : {}),
+      ...(model ? { model } : {}),
+      ...(httpStatus ? { httpStatus } : {}),
+      ...(reason ? { reason } : {}),
+    },
   };
 }
 
 function buildActionSystemPrompt(fieldsBlock: string): string {
-  return `You translate natural-language descriptions into a trace-view action,
-and reply as a JSON object matching the TraceAction schema.
+  return `You are an expert at translating LangWatch operators' natural-language
+requests into a trace-view action. The operator is looking at a list of
+LLM traces (every API call to their AI app) and wants to either filter
+the current view or save a new view they can come back to. Your reply
+is a JSON object matching the \`TraceAction\` schema — nothing else.
 
-There are two action kinds you can return:
+# Pick the action kind
 
-1. \`apply_query\` — apply a filter to the current view. This is the
-   default for phrases like "show me errors", "find slow GPT-4 calls",
-   "traces with feedback today".
+1. **\`apply_query\`** — filter the current view. This is the default;
+   use it for anything that reads like "show / find / list / give me /
+   how many / which traces…". Examples of intent:
+   - "show me errors today"
+   - "slow GPT-4 calls"
+   - "traces with feedback"
 
-2. \`create_lens\` — create a NEW saved lens (a named view) with this
-   filter locked in. Use this when the user says "save as", "create a
-   view for", "make a lens for", "I want a tab for…", or otherwise
-   indicates they want a persistent view rather than a one-off filter.
-   For \`create_lens\`, also produce a 1-3 word Title Case name.
+2. **\`create_lens\`** — create a NEW persistent saved view with this
+   filter baked in. Use this only when the operator clearly wants a
+   reusable surface, not a one-off filter. Trigger phrases include
+   "save as / save this / create a view / make a lens / pin this /
+   I want a tab for / set up a lens for". For create_lens, also
+   produce a 1-3 word Title Case lens name (no quotes, no
+   punctuation).
 
-Both kinds carry a \`query\` in the trace query language:
+When the phrasing is ambiguous, prefer \`apply_query\`. It's cheap to
+redo; \`create_lens\` adds a tab to the operator's workspace and is
+the more disruptive default.
+
+# Build the query
+
+The \`query\` field on either action holds a string in the LangWatch
+trace query language:
 
 ${QUERY_SYNTAX_DOC}
 
@@ -267,20 +384,80 @@ ${QUERY_SYNTAX_DOC}
 
 ${fieldsBlock}
 
-## JSON output rules
+# Hard rules
 
-- The response must be a JSON object matching the TraceAction schema.
-- Use uppercase AND, OR, NOT inside the query string.
-- Only use fields listed above.
-- For value-side OR, group with parens, e.g. status:(error OR warning).
-- For wildcards, use *.
-- For numeric ranges, use [low TO high] or comparisons (>, >=, <, <=).
-- If the user's intent is genuinely unclear, return \`apply_query\` with
-  an empty query string — the caller will treat that as a no-op.`;
+- **Field discipline.** Use ONLY the fields listed above. If the
+  operator mentions an attribute that doesn't appear in the catalog,
+  drop it rather than guess a field name. Better to under-filter than
+  to introduce a clause that won't parse.
+- **Time window.** The view already has a time-range selector outside
+  this filter. Do NOT include date or time clauses unless the operator
+  explicitly asks for a specific timestamp range — phrases like
+  "today", "the last hour", "this week" map onto the existing time
+  selector and should not appear in your query.
+- **Uppercase booleans.** AND, OR, NOT must be uppercase.
+- **Value-side OR.** Group with parens: \`status:(error OR warning)\`.
+- **Wildcards.** Use \`*\`, e.g. \`model:gpt-4*\`.
+- **Numeric ranges.** Use \`[low TO high]\` (inclusive) or comparison
+  operators (\`>\`, \`>=\`, \`<\`, \`<=\`). Never write words like
+  "between" or "to" outside the bracket form.
+- **Free text.** Quote multi-word free text: \`"refund policy"\`.
+  Single words may be unquoted.
+- **No code fences, no prose, no extra JSON fields.**
+
+# Few-shot examples
+
+User: "show me errors"
+→ \`{"kind":"apply_query","query":"status:error"}\`
+
+User: "find traces from gpt-4 that took more than 5 seconds"
+→ \`{"kind":"apply_query","query":"model:gpt-4* AND duration:>5000"}\`
+
+User: "errors or warnings in the finance service"
+→ \`{"kind":"apply_query","query":"status:(error OR warning) AND service:finance"}\`
+
+User: "everything except simulations"
+→ \`{"kind":"apply_query","query":"NOT origin:simulation"}\`
+
+User: "save this view as Costly GPT-4"
+→ \`{"kind":"create_lens","name":"Costly GPT-4","query":"model:gpt-4* AND cost:>0.5"}\`
+
+User: "make a lens for high-cost calls"
+→ \`{"kind":"create_lens","name":"High Cost","query":"cost:>1"}\`
+
+User: "pin a view of negative feedback"
+→ \`{"kind":"create_lens","name":"Negative Feedback","query":"feedback:negative"}\`
+
+User: "good ones"  (vague — can't be expressed)
+→ \`{"kind":"apply_query","query":""}\`
+
+User: "weather in Tokyo"  (off-topic)
+→ \`{"kind":"apply_query","query":""}\`
+
+# Escape hatch
+
+If the request is genuinely ambiguous, off-topic, or asks for
+something the query language can't express, return
+\`{"kind":"apply_query","query":""}\`. The caller treats an empty
+query as a no-op and shows the operator a gentle "couldn't translate"
+hint — much better than a hallucinated filter.`;
 }
 
 function buildSystemPrompt(fieldsBlock: string): string {
-  return `You translate natural-language descriptions into our trace query language.
+  return `You are an expert at translating LangWatch operators' natural-language
+requests into our trace query language. The operator is looking at a
+list of LLM traces and wants to filter it. Your output is a single
+query string that the caller will run against the trace store —
+nothing else.
+
+# How to think about this
+
+1. Identify the structured concepts in the request (status, model,
+   service, latency, cost, tokens, evaluator results, etc.) and map
+   each one onto a field in the catalog below.
+2. Decide which clauses are conjunctions (AND) and which are
+   alternations (OR or CSV shorthand inside a field).
+3. Emit the query string. Nothing else.
 
 ${QUERY_SYNTAX_DOC}
 
@@ -288,15 +465,39 @@ ${QUERY_SYNTAX_DOC}
 
 ${fieldsBlock}
 
-## Output rules
+# Hard rules
 
-- Output ONLY the query string. No prose, no quotes, no labels, no code fences.
-- Use uppercase AND, OR, NOT.
-- Only use fields listed above.
-- For value-side OR, group with parens, e.g. status:(error OR warning).
-- For wildcards, use *.
-- For numeric ranges, use [low TO high] or comparisons (>, >=, <, <=).
-- If the user's intent is genuinely unclear, output an empty string.`;
+- **Output ONLY the query string.** No prose, no quotes around the
+  whole thing, no labels (\`query:\`), no code fences.
+- **Field discipline.** Use ONLY the fields listed in the catalog.
+  Never invent fields. If a concept has no matching field, drop it
+  rather than guess.
+- **Time window.** The view already has a time-range selector outside
+  this query. Do NOT include date or time clauses — "today", "last
+  hour", "this week" map onto the existing time selector.
+- **Uppercase AND / OR / NOT.**
+- **Value-side OR** groups with parens: \`status:(error OR warning)\`.
+- **Wildcards** use \`*\`.
+- **Numeric ranges** use \`[low TO high]\` or comparisons
+  (\`>\`, \`>=\`, \`<\`, \`<=\`).
+- **Free text** is quoted if multi-word: \`"refund policy"\`.
+
+# Few-shot examples
+
+"show me errors" → \`status:error\`
+"find gpt-4 calls over 5 seconds" → \`model:gpt-4* AND duration:>5000\`
+"errors or warnings in finance" → \`status:(error OR warning) AND service:finance\`
+"everything except simulations" → \`NOT origin:simulation\`
+"high cost calls" → \`cost:>1\`
+"traces mentioning refund policy" → \`"refund policy"\`
+"good ones" (vague) → (empty string)
+
+# Escape hatch
+
+If the request is genuinely ambiguous, off-topic, or unexpressible in
+the query language, output an empty string. An empty string is a
+legitimate, polite "I couldn't translate that"; hallucinating a filter
+the operator didn't ask for is worse.`;
 }
 
 async function buildFieldsBlock(input: AiQueryInput): Promise<string> {

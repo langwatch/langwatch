@@ -6,6 +6,7 @@ import {
   verifySecret,
   getTokenType,
   API_KEY_PREFIX,
+  INGEST_KEY_PREFIX,
 } from "../api-key-token.utils";
 
 describe("generateApiKeyToken", () => {
@@ -30,6 +31,13 @@ describe("generateApiKeyToken", () => {
     expect(a.token).not.toBe(b.token);
     expect(a.lookupId).not.toBe(b.lookupId);
   });
+
+  describe("when an ingest prefix is passed", () => {
+    it("mints an ik-lw- token (ingestion keys)", () => {
+      const { token } = generateApiKeyToken({ prefix: INGEST_KEY_PREFIX });
+      expect(token.startsWith("ik-lw-")).toBe(true);
+    });
+  });
 });
 
 describe("splitApiKeyToken", () => {
@@ -49,6 +57,18 @@ describe("splitApiKeyToken", () => {
       const result = splitApiKeyToken("pat-lw-abcdefghijklmnop_secretsecretsecretsecretsecretsecretsecretsecretsecretsecr");
       expect(result).not.toBeNull();
       expect(result!.lookupId).toBe("abcdefghijklmnop");
+    });
+  });
+
+  describe("when given an ingest ik-lw- token", () => {
+    it("extracts lookupId and secret (resolves like any API key)", () => {
+      const { token, lookupId } = generateApiKeyToken({
+        prefix: INGEST_KEY_PREFIX,
+      });
+      const parts = splitApiKeyToken(token);
+      expect(parts).not.toBeNull();
+      expect(parts!.lookupId).toBe(lookupId);
+      expect(parts!.secret).toBeTruthy();
     });
   });
 
@@ -108,15 +128,41 @@ describe("getTokenType", () => {
     });
   });
 
-  describe("when given a new sk-lw- token with underscore", () => {
+  describe("when given a new-format sk-lw- token", () => {
     it("returns apiKey", () => {
-      expect(getTokenType("sk-lw-abcdef1234567890_secretsecret")).toBe("apiKey");
+      const { token } = generateApiKeyToken();
+      expect(getTokenType(token)).toBe("apiKey");
+    });
+  });
+
+  describe("when given an ingest ik-lw- token", () => {
+    it("returns apiKey", () => {
+      const { token } = generateApiKeyToken({ prefix: INGEST_KEY_PREFIX });
+      expect(getTokenType(token)).toBe("apiKey");
     });
   });
 
   describe("when given a legacy project key (sk-lw- without underscore)", () => {
     it("returns legacyProjectKey", () => {
       expect(getTokenType("sk-lw-abc123def456")).toBe("legacyProjectKey");
+    });
+  });
+
+  describe("when given a legacy project key whose body contains an underscore", () => {
+    it("returns legacyProjectKey", () => {
+      // Legacy keys are random strings from alphabets that include `_` and
+      // `-` — an underscore must not flip them to the API key lookup path
+      expect(
+        getTokenType("sk-lw-AbCdEfGhIjKlMnOpQrStUvWxYz012345_floM"),
+      ).toBe("legacyProjectKey");
+    });
+  });
+
+  describe("when given an sk-lw- token with underscore but wrong segment lengths", () => {
+    it("returns legacyProjectKey", () => {
+      expect(getTokenType("sk-lw-abcdef1234567890_secretsecret")).toBe(
+        "legacyProjectKey",
+      );
     });
   });
 

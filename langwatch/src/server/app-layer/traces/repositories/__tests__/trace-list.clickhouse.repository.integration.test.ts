@@ -250,4 +250,45 @@ describe("TraceListClickHouseRepository.findAll (integration)", () => {
       expect(pagedMem).toBeLessThan(naiveMem);
     });
   });
+
+  describe("when a trace carries fold-summed cache + reasoning token attributes", () => {
+    it("surfaces the reserved cache/reasoning keys so the drawer header can show them", async () => {
+      const cacheTenant = `test-cache-attrs-${nanoid()}`;
+      await ch.insert({
+        table: "trace_summaries",
+        values: [
+          makeTraceSummaryRow(0, {
+            TenantId: cacheTenant,
+            TraceId: "cache-trace",
+            Attributes: {
+              "langwatch.origin": "coding_agent",
+              "langwatch.reserved.cache_read_tokens": "31680",
+              "langwatch.reserved.cache_creation_tokens": "6",
+              "langwatch.reserved.reasoning_tokens": "100",
+            },
+          }),
+        ],
+        format: "JSONEachRow",
+        clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
+      });
+
+      const page = await repo.findAll({
+        ...baseQuery(),
+        tenantId: cacheTenant,
+        timeRange: { from: base - 60_000, to: base + 60_000 },
+      });
+
+      const row = page.rows.find((r) => r.traceId === "cache-trace");
+      expect(row).toBeDefined();
+      expect(row?.attributes["langwatch.reserved.cache_read_tokens"]).toBe(
+        "31680",
+      );
+      expect(row?.attributes["langwatch.reserved.cache_creation_tokens"]).toBe(
+        "6",
+      );
+      expect(row?.attributes["langwatch.reserved.reasoning_tokens"]).toBe("100");
+      // The pre-existing allow-listed keys still flow through.
+      expect(row?.attributes["langwatch.origin"]).toBe("coding_agent");
+    });
+  });
 });

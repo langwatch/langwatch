@@ -21,12 +21,19 @@ try {
     const info = JSON.parse(content) as {
       clickHouseUrl: string;
       redisUrl: string;
+      databaseUrl?: string;
     };
 
     // Set the standard env vars so application code (redis.ts, etc.) can use them
     // These MUST be set before redis.ts is imported
     process.env.REDIS_URL = info.redisUrl;
     process.env.CLICKHOUSE_URL = info.clickHouseUrl;
+
+    // Native local-services mode also pins Postgres to the dedicated test
+    // database so suites never write into the dev one
+    if (info.databaseUrl) {
+      process.env.DATABASE_URL = info.databaseUrl;
+    }
 
     // Set test-prefixed var for ClickHouse (used by isUsingGlobalSetupContainers())
     process.env.TEST_CLICKHOUSE_URL = info.clickHouseUrl;

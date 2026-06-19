@@ -1,16 +1,16 @@
-import { z } from "zod";
+import type { z } from "zod";
 import type { Event } from "../domain/types";
+import {
+  type DotSnakeToPascal,
+  type EventTypeOf,
+  eventTypeToHandlerName,
+  type StripPrefix,
+  type UnionToIntersection,
+} from "./eventTypeTransforms";
 import type {
   FoldProjectionOptions,
   FoldProjectionStore,
 } from "./foldProjection.types";
-import {
-  type EventTypeOf,
-  type StripPrefix,
-  type DotSnakeToPascal,
-  type UnionToIntersection,
-  eventTypeToHandlerName,
-} from "./eventTypeTransforms";
 
 // ---------------------------------------------------------------------------
 // Schema → event type extraction
@@ -26,7 +26,13 @@ export type AnyEventSchema = z.ZodObject<
 // ---------------------------------------------------------------------------
 
 /** All possible timestamp keys. Forbidden in `initState()` return type. */
-type AllTimestampKeys = "CreatedAt" | "UpdatedAt" | "createdAt" | "updatedAt" | "LastEventOccurredAt" | "LastEventOccurredAt";
+type AllTimestampKeys =
+  | "CreatedAt"
+  | "UpdatedAt"
+  | "createdAt"
+  | "updatedAt"
+  | "LastEventOccurredAt"
+  | "LastEventOccurredAt";
 
 /** Full derivation: `"lw.suite_run.started"` → `"handleSuiteRunStarted"` */
 type HandlerName<EventTypeStr extends string> =
@@ -111,10 +117,15 @@ export abstract class AbstractFoldProjection<
     createdAtKey,
     updatedAtKey,
     LastEventOccurredAtKey,
-  }: { createdAtKey?: CK; updatedAtKey?: UK; LastEventOccurredAtKey?: LEOAK } = {}) {
+  }: {
+    createdAtKey?: CK;
+    updatedAtKey?: UK;
+    LastEventOccurredAtKey?: LEOAK;
+  } = {}) {
     this.createdAtKey = createdAtKey ?? ("CreatedAt" as CK);
     this.updatedAtKey = updatedAtKey ?? ("UpdatedAt" as UK);
-    this.LastEventOccurredAtKey = LastEventOccurredAtKey ?? ("LastEventOccurredAt" as LEOAK);
+    this.LastEventOccurredAtKey =
+      LastEventOccurredAtKey ?? ("LastEventOccurredAt" as LEOAK);
   }
 
   /**
@@ -139,7 +150,13 @@ export abstract class AbstractFoldProjection<
    * Loads all events for an aggregate, sorted by occurredAt ASC.
    * When provided, the executor re-folds from scratch if an out-of-order event is detected.
    */
-  eventLoader?: (context: { tenantId: string; aggregateId: string }) => Promise<Event[]>;
+  eventLoader?: (context: {
+    tenantId: string;
+    aggregateId: string;
+    /** occurredAt (ms) of the event that triggered the re-fold, used to
+     * lower-bound the event_log rehydration scan for time-local aggregates. */
+    occurredAtMs?: number;
+  }) => Promise<Event[]>;
 
   /** Lazily-built dispatch map: event type string → handler method name. */
   private _dispatchMap?: Record<string, string>;
@@ -204,9 +221,10 @@ export abstract class AbstractFoldProjection<
     const nextUpdatedAt = Math.max(Date.now(), prevUpdatedAt + 1);
     const eventOccurredAt = (event as Record<string, unknown>).occurredAt;
     const prevLastOccurred: number = state[this.LastEventOccurredAtKey];
-    const nextLastOccurred = typeof eventOccurredAt === "number"
-      ? Math.max(prevLastOccurred, eventOccurredAt)
-      : prevLastOccurred;
+    const nextLastOccurred =
+      typeof eventOccurredAt === "number"
+        ? Math.max(prevLastOccurred, eventOccurredAt)
+        : prevLastOccurred;
     return {
       ...newState,
       [this.updatedAtKey]: nextUpdatedAt,

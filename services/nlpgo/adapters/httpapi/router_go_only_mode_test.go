@@ -9,36 +9,35 @@ import (
 	"github.com/langwatch/langwatch/pkg/health"
 )
 
-// Tests pin the Go-only-mode fallback handler that serves non-/go/*
-// requests when nlpgo runs without a Python child (npx
-// @langwatch/server / fully-migrated topology).
+// Tests pin the go-only-mode fallback handler that serves any request
+// outside /go/* and the health routes. nlpgo is the sole NLP engine;
+// there is no Python service to proxy to.
 //
 // The contract: a 502 with a self-explaining body. 502 (not 404)
 // because:
 //
-//  1. Existing TS-app retry logic catches "child upstream unavailable"
-//     legacy 502s; staying on 502 means clients keep working without
-//     branching for the new Go-only deployment shape.
+//  1. Existing TS-app retry logic catches the legacy "child upstream
+//     unavailable" 502; staying on 502 means clients keep working
+//     without branching for the Go-only shape.
 //  2. 404 would suggest the URL is wrong, sending operators chasing
-//     phantom typos. The path IS valid in the legacy dual-process
-//     topology — it's just not served by THIS binary.
+//     phantom typos. A non-/go/ path simply isn't served by this binary.
 //
-// Body explains the most common cause (forgot to force the FF on for
-// every project) so the operator's first action is the right one.
+// The body explains the caller hit a legacy non-/go route so the
+// operator's first action is the right one.
 
-func newRouterWithoutChildProxy() http.Handler {
+func newGoOnlyRouter() http.Handler {
 	return NewRouter(RouterDeps{
 		Logger:  nil,
 		Health:  health.New("test"),
 		Version: "test",
-		// App, ChildProxy, OTel intentionally nil — this exercises the
-		// pure-fallback codepath. /go/* routes that need App will fail
-		// independently; the test only hits non-/go/* paths.
+		// App, OTel intentionally nil — this exercises the pure-fallback
+		// codepath. /go/* routes that need App will fail independently;
+		// the test only hits non-/go/* paths.
 	})
 }
 
 func TestRouter_GoOnlyModeFallback_Returns502OnLegacyPath(t *testing.T) {
-	router := newRouterWithoutChildProxy()
+	router := newGoOnlyRouter()
 	req := httptest.NewRequest(http.MethodPost, "/studio/execute", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -48,9 +47,8 @@ func TestRouter_GoOnlyModeFallback_Returns502OnLegacyPath(t *testing.T) {
 	}
 	body := rec.Body.String()
 	mustContain := []string{
-		"Go-only mode",
-		"NLPGO_CHILD_BYPASS=true",
-		"FEATURE_FLAG_FORCE_ENABLE=release_nlp_go_engine_enabled",
+		"only /go/* paths",
+		"no Python service",
 		"/studio/execute",
 	}
 	for _, want := range mustContain {
@@ -68,7 +66,7 @@ func TestRouter_GoOnlyModeFallback_Also502sOnUnknownGetPath(t *testing.T) {
 	// hitting /proxy/v1/* with a method the Go playground proxy doesn't
 	// support, or hitting random paths via curl, get the same clear
 	// message rather than chi's default 405.
-	router := newRouterWithoutChildProxy()
+	router := newGoOnlyRouter()
 	req := httptest.NewRequest(http.MethodGet, "/some/path/that/does/not/exist", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)

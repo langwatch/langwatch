@@ -18,6 +18,10 @@ const createScenarioSchema = projectSchema.extend({
   situation: z.string(),
   criteria: z.array(z.string()).default([]),
   labels: z.array(z.string()).default([]),
+  // Optional per-scenario model overrides; null clears back to the project
+  // default (scenarios.user_simulator / scenarios.judge).
+  simulatorModel: z.string().nullish(),
+  judgeModel: z.string().nullish(),
 });
 
 const updateScenarioSchema = projectSchema.extend({
@@ -26,6 +30,8 @@ const updateScenarioSchema = projectSchema.extend({
   situation: z.string().optional(),
   criteria: z.array(z.string()).optional(),
   labels: z.array(z.string()).optional(),
+  simulatorModel: z.string().nullish(),
+  judgeModel: z.string().nullish(),
 });
 
 /**

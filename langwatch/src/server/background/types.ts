@@ -1,4 +1,4 @@
-import type { EvaluatorTypes } from "../../server/evaluations/evaluators.generated";
+import type { EvaluatorTypes } from "../../server/evaluations/evaluators";
 import type {
   CustomMetadata,
   ElasticSearchTrace,
@@ -100,17 +100,9 @@ export type AnomalyDetectionJob = {
   timestamp: number;
 };
 
-export type OrphanSweepChainJob = {
-  /** Tenant (project) the chain step targets. The whole chain is per-tenant
-   *  — one job in flight at a time per tenant, re-enqueued every 24h by the
-   *  worker's `completed` listener. */
-  tenantId: string;
-};
-
 export type IngestionPullerJob = {
   /** IngestionSource id this run targets. */
   ingestionSourceId: string;
   /** Wall-clock dispatch time (ms since epoch). */
   scheduledAt: number;
 };
-

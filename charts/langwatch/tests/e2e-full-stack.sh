@@ -217,11 +217,11 @@ test_service_health() {
     curl -sf -o /dev/null -w '%{http_code}' http://localhost:5560/api/health)
   assert_eq "App /api/health → 204" "$http_code" "204"
 
-  # NLP /health via service
+  # NLP /healthz via service (Go-only nlpgo serves /healthz, not the legacy /health)
   http_code=$(kc exec "$app_pod" -- \
     curl -sf -o /dev/null -w '%{http_code}' \
-    "http://${RELEASE}-langwatch-nlp:5561/health")
-  assert_eq "NLP /health → 200" "$http_code" "200"
+    "http://${RELEASE}-langwatch-nlp:5561/healthz")
+  assert_eq "NLP /healthz → 200" "$http_code" "200"
 
   # Langevals /healthcheck via service
   http_code=$(kc exec "$app_pod" -- \

@@ -5,10 +5,24 @@
  * sees the same value for the same inputs.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import * as configMod from "../config";
 import {
   resolveControlPlaneEndpoint,
   resolveControlPlaneUrl,
 } from "../resolveEndpoint";
+
+// Stub loadConfig so the tests don't leak the developer's local
+// ~/.langwatch/config.json (which on a dogfooded box sets
+// control_plane_url=http://localhost:5560). Tests that need a
+// persisted config pass it explicitly via { cfg }.
+vi.mock("../config", async () => {
+  const actual = await vi.importActual<typeof configMod>("../config");
+  return {
+    ...actual,
+    loadConfig: vi.fn(() => undefined as any),
+  };
+});
 
 const ORIG_ENV = { ...process.env };
 

@@ -1,5 +1,5 @@
 import { DEFAULT_FORM_VALUES } from "~/prompts/utils/buildDefaultFormValues";
-import { AVAILABLE_EVALUATORS } from "../server/evaluations/evaluators.generated";
+import { AVAILABLE_EVALUATORS } from "../server/evaluations/evaluators";
 
 import type {
   BaseComponent,
@@ -76,7 +76,7 @@ const code: Code = {
       identifier: "code",
       type: "code",
       value: `class Code:
-    def __call__(self, ${defaultInput?.identifier ?? "input"}: str):
+    def __call__(self, ${defaultInput?.identifier ?? "input"}: str = None):
         # Your code goes here
 
         return {"${defaultOutput?.identifier ?? "output"}": "Hello world!"}
@@ -147,7 +147,11 @@ const http: Code = {
   name: "HTTP Call",
   description: "Make an HTTP request to an external API",
   parameters: [
-    { identifier: "url", type: "str", value: "https://api.example.com/endpoint" },
+    {
+      identifier: "url",
+      type: "str",
+      value: "https://api.example.com/endpoint",
+    },
     { identifier: "method", type: "str", value: "POST" },
     {
       identifier: "body_template",
@@ -167,11 +171,37 @@ const agent: BaseComponent = {
   outputs: [{ identifier: "output", type: "str" }] as Field[],
 };
 
+const ifElse: BaseComponent = {
+  name: "If/Else",
+  description:
+    "Route execution down the true or false branch based on a condition over the inputs",
+  parameters: [
+    {
+      identifier: "condition",
+      type: "str",
+      value: 'input != ""',
+    },
+    {
+      identifier: "condition_language",
+      type: "str",
+      value: "liquid",
+    },
+  ],
+  inputs: [{ identifier: "input", type: "str" }] as Field[],
+  // The branch handles are the contract the engine gates on - fixed
+  // identifiers, not user-editable (see IfElsePropertiesPanel).
+  outputs: [
+    { identifier: "true", type: "bool" },
+    { identifier: "false", type: "bool" },
+  ] as Field[],
+};
+
 export const MODULES = {
   signature,
   code,
   http,
   agent,
+  ifElse,
   promptingTechniques,
   evaluators,
 };

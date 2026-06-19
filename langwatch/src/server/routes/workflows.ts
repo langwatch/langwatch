@@ -16,7 +16,6 @@ import { z } from "zod";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
-import { isNlpGoEnabled } from "~/server/nlpgo/nlpgoFetch";
 import {
   type StudioClientEvent,
   type StudioServerEvent,
@@ -27,7 +26,7 @@ import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 import { createLogger } from "~/utils/logger/server";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
 import type { NextRequestShim as any } from "./types";
 
@@ -68,7 +67,7 @@ secured.access(
   }
 
   try {
-    const model = await getVercelAIModel(projectId, undefined, "studio.autocomplete");
+    const model = await getVercelAIModel({ projectId, featureKey: "studio.autocomplete" });
 
     const copilot = new CompletionCopilot(undefined, {
       model: async (prompt) => {
@@ -106,7 +105,7 @@ secured.access(
       },
       "code-completion failed",
     );
-    captureException(error, { extra: { projectId } });
+    captureException(toError(error), { extra: { projectId } });
     return c.json(
       { error: error instanceof Error ? error.message : String(error) },
       { status: 500 },
@@ -159,7 +158,7 @@ secured.access(
       );
     } catch (error) {
       logger.error({ error, projectId }, "error");
-      captureException(error, { extra: { projectId } });
+      captureException(toError(error), { extra: { projectId } });
       return c.json({ error: (error as Error).message }, { status: 500 });
     }
 
@@ -181,20 +180,17 @@ secured.access(
         );
     }
 
-    // Optimization is DSPy-only; the Go engine intentionally drops it.
-    // Stop events still pass so a previously-started run can be cancelled.
+    // Optimization is DSPy-only; the Go engine dropped it. Stop events
+    // still pass so a previously-started run can be cancelled.
     if (message.type === "execute_optimization") {
-      const goEnabled = await isNlpGoEnabled({ projectId });
-      if (goEnabled) {
-        return c.json(
-          {
-            type: "optimize_disabled",
-            message:
-              "Optimization is no longer supported on the Go engine. The Optimize feature relied on DSPy, which has been removed.",
-          },
-          { status: 410 },
-        );
-      }
+      return c.json(
+        {
+          type: "optimize_disabled",
+          message:
+            "Optimization is no longer supported. The Optimize feature relied on DSPy, which has been removed.",
+        },
+        { status: 410 },
+      );
     }
 
     return streamSSE(c, async (stream) => {

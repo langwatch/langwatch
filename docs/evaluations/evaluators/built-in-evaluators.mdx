@@ -24,11 +24,21 @@ LangWatch offers evaluators across several categories:
 | Category | Examples | Use Case |
 |----------|----------|----------|
 | **RAG Quality** | `ragas/faithfulness`, `ragas/context_precision` | Evaluate retrieval-augmented generation |
-| **Safety** | `presidio/pii_detection`, `azure/jailbreak` | Detect PII, jailbreaks, harmful content |
+| **Safety** | `presidio/pii_detection`, `langwatch/api_keys_and_secrets_detection`, `azure/jailbreak` | Detect PII, leaked credentials, jailbreaks, harmful content |
 | **Correctness** | `langevals/exact_match`, `langevals/llm_boolean` | Check answer accuracy |
 | **Custom Criteria** | `langevals/llm_boolean`, `langevals/llm_score` | LLM-as-Judge for custom checks |
 
 [Browse all evaluators →](/evaluations/evaluators/list)
+
+### API Keys & Secrets Detection
+
+`langwatch/api_keys_and_secrets_detection` flags leaked credentials in trace content: provider and cloud API keys, tokens, private keys, and database connection strings. It uses the same detection rules as secrets redaction and works as a guardrail.
+
+### Seeing through privacy redaction
+
+PII redaction and secrets redaction run when a trace is ingested, before an evaluation reads the stored content. So redaction does not silently turn these evaluators green, redaction replaces a removed value with a typed marker that names what it was (`[PHONE_NUMBER]`, `[SECRET]`, and so on), and the PII and secrets evaluators read those markers back: a value that was already redacted still counts as a detection. The PII evaluator only counts a marker when its settings still check that entity. The markers are read from every field the evaluation is mapped to, so a secret hidden in a mapped span attribute is covered just like input or output.
+
+If a content category was dropped at ingestion (removed entirely rather than masked) and the evaluation has nothing else to read, the evaluation fails, since a leak cannot be ruled out. If the evaluation is instead mapped to a field that still has content, that field is evaluated normally.
 
 ## Using Built-in Evaluators
 

@@ -131,6 +131,52 @@ Feature: AI Gateway Governance — Workspace Switcher (top-left context dropdown
     When the user opens the workspace switcher
     Then the "My Workspace" personal entry is shown
 
+  # ---------------------------------------------------------------------------
+  # Personal entry nests per organization (multi-org)
+  # ---------------------------------------------------------------------------
+  #
+  # A user can hold a personal workspace in more than one organization. Rather
+  # than a single top-level "My Workspace" that silently follows the ambient
+  # selected org, the personal entry nests directly under each organization that
+  # enables governance, so a multi-org user can see and pick which org's personal
+  # workspace they mean. The per-org entry targets `/me?org=<slug>` so landing
+  # selects the right org (see org-query-param-switch.feature).
+
+  @bdd @ui @workspace-switcher @personal-nesting @integration
+  Scenario: My Workspace nests under each governance-enabled organization
+    Given the user belongs to organizations "Alpha" and "Beta", both enabling governance
+    When the user opens the workspace switcher
+    Then a "My Workspace" entry appears under the "Alpha" organization header
+    And a "My Workspace" entry appears under the "Beta" organization header
+    And no standalone top-level "My Workspace" group is shown
+
+  @bdd @ui @workspace-switcher @personal-nesting @integration
+  Scenario: An organization without governance shows no My Workspace row
+    Given the user belongs to "Alpha" and "Beta" (governance on) and "Gamma" (governance off)
+    When the user opens the workspace switcher
+    Then a "My Workspace" entry appears under "Alpha" and under "Beta"
+    And no "My Workspace" entry appears under "Gamma"
+
+  @bdd @ui @workspace-switcher @personal-nesting @integration
+  Scenario: With a single governance organization, My Workspace links to /me
+    Given exactly one of the user's organizations enables governance
+    When the user opens the workspace switcher
+    Then that organization's "My Workspace" entry links to "/me" with no "?org" parameter
+
+  @bdd @ui @workspace-switcher @personal-nesting @integration
+  Scenario: A single governance organization still shows its name with My Workspace nested under it
+    Given exactly one of the user's organizations enables governance, with one team and one project
+    When the user opens the workspace switcher
+    Then the organization name is shown as a section header
+    And its "My Workspace" entry nests under that header rather than floating at the top of the list
+
+  @bdd @ui @workspace-switcher @personal-nesting @integration
+  Scenario: With multiple governance organizations, each My Workspace carries its org
+    Given organizations "Alpha" and "Beta" both enable governance
+    When the user opens the workspace switcher
+    Then "Alpha"'s "My Workspace" entry links to "/me?org=alpha"
+    And "Beta"'s "My Workspace" entry links to "/me?org=beta"
+
   @bdd @ui @workspace-switcher @single-team
   Scenario: A solo user (no teams/projects) — switcher remains visible but does not auto-collapse
     Given the user only has access to "My Workspace"
@@ -209,6 +255,30 @@ Feature: AI Gateway Governance — Workspace Switcher (top-left context dropdown
     Then the trigger label is the team's display name
     And the team row carries the active checkmark
     And the personal row does NOT carry the checkmark
+
+  # ---------------------------------------------------------------------------
+  # Org-scoped routes (/settings/*, /governance) carry no project context. The
+  # old chrome showed a static org-name chip with no way back to a project -
+  # rchaves's regression report. The switcher now renders there with the org as
+  # the current chip, exposing the full personal/team/project list (so the user
+  # can jump back into a workspace) plus, for multi-org users, an in-place org
+  # switch.
+  # ---------------------------------------------------------------------------
+
+  @bdd @ui @workspace-switcher @org-scope @integration
+  Scenario: On an org-scoped route the switcher shows the organization as the current chip
+    Given the URL is an org-scoped route ("/settings", "/governance")
+    And the consumer renders <WorkspaceSwitcher current={{ kind: "organization", ... }} />
+    Then the trigger label is the organization's display name
+    And opening the dropdown lists the personal / team / project entries to switch to
+
+  @bdd @ui @workspace-switcher @org-scope @integration
+  Scenario: A multi-org user switches organization in place from the org-scoped switcher
+    Given the user belongs to more than one organization
+    And the switcher is rendered with the organization as the current context
+    When the user opens the dropdown and picks a different organization
+    Then onSwitchOrganization is invoked with that organization's id
+    And the consumer writes selectedOrganizationId and navigates to "/settings"
 
   # ---------------------------------------------------------------------------
   # DashboardLayout consolidation (Stage 2c — replace legacy ProjectSelector)

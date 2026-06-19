@@ -1,3 +1,4 @@
+import type { PrismaClient } from "@prisma/client";
 import escapeStringRegexp from "escape-string-regexp";
 import { prisma } from "../db";
 import { resolveScopeChain } from "../scopes/resolveScopeChain";
@@ -163,12 +164,23 @@ const SCOPE_TIER_RANK: Record<ScopeTier, number> = {
   ORGANIZATION: 2,
 };
 
-export const getLLMModelCosts = async ({
+/**
+ * Resolves the custom cost overrides that apply to a project, most specific
+ * first (PROJECT, then TEAM, then ORGANIZATION; newest first within a tier).
+ * Static catalog entries are NOT included — callers that want the full
+ * cascade with platform defaults use getLLMModelCosts.
+ *
+ * Accepts an injectable Prisma client so ingestion-side services can pass
+ * their own instance.
+ */
+export const getCustomLLMModelCosts = async ({
   projectId,
+  prismaClient = prisma,
 }: {
   projectId: string;
+  prismaClient?: PrismaClient;
 }): Promise<MaybeStoredLLMModelCost[]> => {
-  const project = await prisma.project.findUnique({
+  const project = await prismaClient.project.findUnique({
     where: { id: projectId },
     select: {
       id: true,
@@ -177,9 +189,9 @@ export const getLLMModelCosts = async ({
     },
   });
 
-  // No project context means no custom overrides apply; fall back to the
-  // static catalog rather than leaking another tenant's costs.
-  if (!project) return getStaticModelCosts();
+  // No project context means no custom overrides apply; never fall back to
+  // an unscoped read that could leak another tenant's costs.
+  if (!project) return [];
 
   const organizationId = project.team.organizationId;
   const chain = resolveScopeChain({
@@ -188,17 +200,19 @@ export const getLLMModelCosts = async ({
     projectId,
   });
 
-  const llmModelCostsCustomData = await prisma.customLLMModelCost.findMany({
-    where: {
-      organizationId,
-      OR: chain.map((scope) => ({
-        scopeType: scope.scopeType,
-        scopeId: scope.scopeId,
-      })),
+  const llmModelCostsCustomData = await prismaClient.customLLMModelCost.findMany(
+    {
+      where: {
+        organizationId,
+        OR: chain.map((scope) => ({
+          scopeType: scope.scopeType,
+          scopeId: scope.scopeId,
+        })),
+      },
     },
-  });
+  );
 
-  const customCosts = llmModelCostsCustomData
+  return llmModelCostsCustomData
     .map(
       (record) =>
         ({
@@ -222,6 +236,13 @@ export const getLLMModelCosts = async ({
         SCOPE_TIER_RANK[a.scopeType!] - SCOPE_TIER_RANK[b.scopeType!] ||
         b.createdAt!.getTime() - a.createdAt!.getTime(),
     );
+};
 
+export const getLLMModelCosts = async ({
+  projectId,
+}: {
+  projectId: string;
+}): Promise<MaybeStoredLLMModelCost[]> => {
+  const customCosts = await getCustomLLMModelCosts({ projectId });
   return [...customCosts, ...getStaticModelCosts()];
 };

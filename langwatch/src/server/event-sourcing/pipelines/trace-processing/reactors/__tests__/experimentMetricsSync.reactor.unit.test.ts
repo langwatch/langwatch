@@ -37,6 +37,7 @@ function createTraceSummaryState(overrides: Partial<TraceSummaryData> = {}): Tra
     errorMessage: null,
     models: ["gpt-5-mini"],
     totalCost: 0.003,
+    nonBilledCost: null,
     tokensEstimated: false,
     totalPromptTokenCount: 100,
     totalCompletionTokenCount: 50,
@@ -233,6 +234,77 @@ describe("experimentMetricsSync reactor (trace-side ECST publisher)", () => {
           foldState,
         }),
       ).resolves.toBeUndefined();
+    });
+  });
+
+  describe("when deciding whether to react", () => {
+    describe("when trace has evaluation.run_id and cost data", () => {
+      it("returns true", () => {
+        const reactor = createExperimentMetricsSyncReactor(createDeps());
+        const foldState = createTraceSummaryState({
+          attributes: { "evaluation.run_id": "run-1" },
+          totalCost: 0.003,
+        });
+
+        expect(
+          reactor.shouldReact!(createSpanReceivedEvent(), {
+            tenantId: TEST_TENANT_ID,
+            aggregateId: "trace-1",
+            foldState,
+          }),
+        ).toBe(true);
+      });
+    });
+
+    describe("when trace has no evaluation.run_id", () => {
+      it("returns false", () => {
+        const reactor = createExperimentMetricsSyncReactor(createDeps());
+        const foldState = createTraceSummaryState({ attributes: {} });
+
+        expect(
+          reactor.shouldReact!(createSpanReceivedEvent(), {
+            tenantId: TEST_TENANT_ID,
+            aggregateId: "trace-1",
+            foldState,
+          }),
+        ).toBe(false);
+      });
+    });
+
+    describe("when trace has no cost data", () => {
+      it("returns false", () => {
+        const reactor = createExperimentMetricsSyncReactor(createDeps());
+        const foldState = createTraceSummaryState({
+          attributes: { "evaluation.run_id": "run-1" },
+          totalCost: null,
+        });
+
+        expect(
+          reactor.shouldReact!(createSpanReceivedEvent(), {
+            tenantId: TEST_TENANT_ID,
+            aggregateId: "trace-1",
+            foldState,
+          }),
+        ).toBe(false);
+      });
+    });
+
+    describe("when trace has exactly zero cost", () => {
+      it("returns false", () => {
+        const reactor = createExperimentMetricsSyncReactor(createDeps());
+        const foldState = createTraceSummaryState({
+          attributes: { "evaluation.run_id": "run-1" },
+          totalCost: 0,
+        });
+
+        expect(
+          reactor.shouldReact!(createSpanReceivedEvent(), {
+            tenantId: TEST_TENANT_ID,
+            aggregateId: "trace-1",
+            foldState,
+          }),
+        ).toBe(false);
+      });
     });
   });
 });

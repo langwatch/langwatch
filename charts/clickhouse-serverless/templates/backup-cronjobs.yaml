@@ -28,6 +28,8 @@ spec:
           securityContext:
             runAsNonRoot: true
             fsGroup: 101
+            seccompProfile:
+              type: RuntimeDefault
           containers:
             - name: full-backup
               image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -38,6 +40,8 @@ spec:
                 allowPrivilegeEscalation: false
                 capabilities:
                   drop: ["ALL"]
+              resources:
+                {{- toYaml .Values.backup.resources | nindent 16 }}
               env:
                 - name: CLICKHOUSE_HOST
                   value: "{{ $fullname }}-0.{{ $fullname }}-headless"
@@ -80,6 +84,8 @@ spec:
           securityContext:
             runAsNonRoot: true
             fsGroup: 101
+            seccompProfile:
+              type: RuntimeDefault
           containers:
             - name: incremental-backup
               image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -90,6 +96,8 @@ spec:
                 allowPrivilegeEscalation: false
                 capabilities:
                   drop: ["ALL"]
+              resources:
+                {{- toYaml .Values.backup.resources | nindent 16 }}
               env:
                 - name: CLICKHOUSE_HOST
                   value: "{{ $fullname }}-0.{{ $fullname }}-headless"
@@ -130,6 +138,8 @@ spec:
           securityContext:
             runAsNonRoot: true
             fsGroup: 101
+            seccompProfile:
+              type: RuntimeDefault
           containers:
             - name: restore-data
               image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -140,6 +150,8 @@ spec:
                 allowPrivilegeEscalation: false
                 capabilities:
                   drop: ["ALL"]
+              resources:
+                {{- toYaml .Values.backup.resources | nindent 16 }}
               env:
                 - name: CLICKHOUSE_HOST
                   value: "{{ $fullname }}-0.{{ $fullname }}-headless"

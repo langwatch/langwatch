@@ -54,6 +54,9 @@ const (
 	StatusRunning ExecutionStatus = "running"
 	StatusSuccess ExecutionStatus = "success"
 	StatusError   ExecutionStatus = "error"
+	// StatusSkipped marks nodes on a conditional branch that was not
+	// taken (if/else gating): never dispatched, zero cost.
+	StatusSkipped ExecutionStatus = "skipped"
 )
 
 // ComponentType mirrors the Python ComponentType enum.
@@ -70,6 +73,11 @@ const (
 	ComponentHTTP               ComponentType = "http"
 	ComponentAgent              ComponentType = "agent"
 	ComponentCustom             ComponentType = "custom"
+	// ComponentIfElse is a conditional gate: it evaluates a Liquid
+	// boolean expression over its inputs and emits {true, false}
+	// branch outputs. Downstream nodes hanging only off the not-taken
+	// branch handle are skipped by the engine.
+	ComponentIfElse ComponentType = "if_else"
 )
 
 // Timestamps mirrors the Python Timestamps model.

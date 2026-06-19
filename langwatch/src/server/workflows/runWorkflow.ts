@@ -10,7 +10,7 @@ import { getEntryInputs } from "../../optimization_studio/utils/nodeUtils";
 import { nlpgoFetch, type NLPOrigin } from "../nlpgo/nlpgoFetch";
 import { getProjectModelProviders } from "../api/routers/modelProviders.utils";
 import { prisma } from "../db";
-import type { SingleEvaluationResult } from "../evaluations/evaluators.generated";
+import type { SingleEvaluationResult } from "../evaluations/evaluators";
 import type { MaybeStoredModelProvider } from "../modelProviders/registry";
 import { createLogger } from "../../utils/logger";
 import { stripUnsupportedLLMParamsFromWorkflow } from "./stripUnsupportedLLMParams";

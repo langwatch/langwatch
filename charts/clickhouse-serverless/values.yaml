@@ -35,6 +35,16 @@ backup:
   enabled: false
   database: "langwatch"
   user: "default"  # ClickHouse user for backup/restore operations
+  # Resource requests + limits for the backup/restore Job containers.
+  # Both are required by clusters that enforce a "limits and requests must
+  # be set" policy (Gatekeeper/Kyverno) — a Job without them is denied.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
   full:
     schedule: "0 */12 * * *"       # every 12 hours
   incremental:

@@ -93,6 +93,11 @@ vi.mock("~/utils/api", () => ({
         }),
       },
     },
+    project: {
+      regenerateApiKey: {
+        useMutation: () => ({ mutate: vi.fn(), isLoading: false }),
+      },
+    },
   },
 }));
 

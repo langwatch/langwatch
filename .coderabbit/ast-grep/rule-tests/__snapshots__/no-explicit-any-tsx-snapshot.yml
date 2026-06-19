@@ -1,0 +1,14 @@
+id: no-explicit-any-tsx
+snapshots:
+  'const C = (p: any) => <div>{p.name}</div>;':
+    labels:
+    - source: any
+      style: primary
+      start: 14
+      end: 17
+  'const handler = (e: any): void => { e.preventDefault(); };':
+    labels:
+    - source: any
+      style: primary
+      start: 20
+      end: 23

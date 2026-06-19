@@ -35,7 +35,7 @@ import {
 import { runSeedDemo } from "../../../scripts/dogfood/governance/seed-demo";
 import { ANALYTICS_KEYS } from "~/types";
 import { createLogger } from "~/utils/logger/server";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 
 const logger = createLogger("langwatch:cron");
 
@@ -324,14 +324,14 @@ secured.access(cronPolicy()).get("/cron/trace_analytics", async (c) => {
             { organizationId: org.id, error },
             "error checking usage limits for organization",
           );
-          captureException(error, {
+          captureException(toError(error), {
             extra: { organizationId: org.id },
           });
         }
       }
     } catch (error) {
       logger.error({ error }, "error checking usage limits");
-      captureException(error);
+      captureException(toError(error));
     }
   } else {
     logger.debug("skipping usage limit notifications (not SaaS)");

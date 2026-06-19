@@ -4,7 +4,12 @@ import { getLangWatchTracer } from "langwatch";
 import { OtlpSpanPiiRedactionService } from "~/server/app-layer/traces/span-pii-redaction.service";
 import { createLogger } from "../../../../../utils/logger/server";
 import type { Command, CommandHandler } from "../../../";
-import { createTenantId, defineCommandSchema, EventUtils } from "../../../";
+import {
+  createTenantId,
+  defineCommandSchema,
+  EventUtils,
+  type TenantId,
+} from "../../../";
 import {
   DEFAULT_PII_REDACTION_LEVEL,
   type PIIRedactionLevel,
@@ -17,6 +22,7 @@ import {
   RECORD_LOG_COMMAND_TYPE,
 } from "../schemas/constants";
 import type { LogRecordReceivedEvent } from "../schemas/events";
+import { capOversizedLogRecord } from "../utils/capOversizedLogRecord";
 
 /**
  * Dependencies for RecordLogCommand that can be injected for testing.
@@ -31,6 +37,7 @@ export interface RecordLogCommandDependencies {
         resourceAttributes: Record<string, string>;
       },
       piiRedactionLevel: PIIRedactionLevel,
+      tenantId?: TenantId,
     ) => Promise<void>;
   };
 }
@@ -99,10 +106,32 @@ export class RecordLogCommand
           resourceAttributes: { ...commandData.resourceAttributes },
         };
 
+        // Bound oversized fields BEFORE redaction + fold. Claude Code's
+        // OTEL_LOG_RAW_API_BODIES / OTEL_LOG_TOOL_DETAILS flags put the full
+        // request/response bodies + tool I/O on these log records; an
+        // unbounded multi-MB body would bloat the per-trace fold state and
+        // collapse folding throughput (the fat-payload failure mode). The cap
+        // is generous (256KB, shared with the span path) so normal
+        // collect-everything traffic is untouched.
+        const cappedFieldCount = capOversizedLogRecord(logToRedact);
+        if (cappedFieldCount > 0) {
+          this.logger.warn(
+            {
+              tenantId,
+              traceId: commandData.traceId,
+              spanId: commandData.spanId,
+              scopeName: commandData.scopeName,
+              cappedFieldCount,
+            },
+            "Capped oversized log record field(s) before fold to protect fold-state size",
+          );
+        }
+
         try {
           await this.deps.piiRedactionService.redactLog(
             logToRedact,
             piiRedactionLevel,
+            tenantId,
           );
         } catch (error) {
           this.logger.error(

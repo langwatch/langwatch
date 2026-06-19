@@ -1,0 +1,56 @@
+name: coderabbit-config-check
+
+# Proves the committed CodeRabbit lint config ACTUALLY works, so no rule can
+# silently go dead again (see #3754: no-form-watch-in-child fired on nothing and
+# the semgrep ruleset failed to parse — both passed un-noticed because nothing
+# executed them). This job EXECUTES them:
+#   * every ast-grep rule must match its committed fixture (`ast-grep test`)
+#   * the semgrep ruleset must validate AND the PII rule must still match.
+#
+# ast-grep and semgrep are PINNED — rule-matching behaviour is version-sensitive
+# (the dead-rule confusion in #3754 was partly version fragility). Bump the pins
+# deliberately and re-run `ast-grep test`/`semgrep --validate` when you do.
+on:
+  pull_request:
+    paths:
+      - ".coderabbit.yaml"
+      - ".coderabbit/**"
+      - ".semgrep/**"
+      - ".github/workflows/coderabbit-config-check.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      # Actions are SHA-pinned (langwatch org policy requires full-SHA pins;
+      # tag refs like @v4 fail to start). Same SHAs other repo workflows use.
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
+        with:
+          persist-credentials: false # read-only job, no git ops — don't persist the token
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned linters
+        run: pip install "ast-grep-cli==0.42.3" "semgrep==1.164.0" "pyyaml>=6"
+
+      - name: ast-grep version (pinned)
+        run: ast-grep --version
+
+      - name: ast-grep rule fixtures — every rule must match its fixture
+        working-directory: .coderabbit/ast-grep
+        run: ast-grep test -c sgconfig.yml -t rule-tests
+
+      - name: semgrep ruleset validates
+        run: semgrep --validate --config .semgrep/langwatch.yml
+
+      - name: semgrep PII rule still matches its fixture (guard vs silent death)
+        run: |
+          python3 -c "import yaml; d=yaml.safe_load(open('.semgrep/langwatch.yml')); r=next(x for x in d['rules'] if x['id']=='pii-in-logger-call'); r.pop('paths', None); yaml.safe_dump({'rules':[r]}, open('/tmp/pii_only.yml','w'))"
+          n=$(semgrep --config /tmp/pii_only.yml .semgrep/tests/pii-in-logger-call.ts --json --quiet | python3 -c "import sys, json; print(len(json.load(sys.stdin)['results']))")
+          echo "pii-in-logger-call matched $n line(s) in the fixture (expect 5)"
+          test "$n" -eq 5

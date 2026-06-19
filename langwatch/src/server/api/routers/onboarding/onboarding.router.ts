@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { fireSignupNurturingCalls } from "~/../ee/billing/nurturing/hooks/signupIdentification";
 import {
   fireIntegrationMethodNurturing,
@@ -91,7 +91,7 @@ export const onboardingRouter = createTRPCRouter({
             getApp().notifications.sendHubspotSignupForm(signupPayload),
           ]);
         } catch (error) {
-          captureException(error);
+          captureException(toError(error));
         }
 
         fireSignupNurturingCalls({
@@ -113,7 +113,9 @@ export const onboardingRouter = createTRPCRouter({
           projectSlug: projectResult.projectSlug,
         };
       } catch (error) {
-        captureException(error);
+        captureException(
+          toError(error),
+        );
         throw error;
       }
     }),

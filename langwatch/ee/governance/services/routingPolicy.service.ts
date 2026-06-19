@@ -307,8 +307,10 @@ export class RoutingPolicyService {
    * the TEAM-default-beats-ORG-default rule from the spec.
    *
    * Returns null if the org has no default policy at any tier — caller
-   * is expected to translate to a 409 `no_default_routing_policy`
-   * (see `NoDefaultRoutingPolicyError` in personalVirtualKey.service).
+   * (currently `PersonalVirtualKeyService.issue`) falls back to minting
+   * the VK with `routingPolicyId: null`, which the gateway resolves via
+   * scope cascade + `fallbackPriorityGlobal` ordering on every eligible
+   * ModelProvider.
    */
   async resolveDefaultForUser({
     organizationId,

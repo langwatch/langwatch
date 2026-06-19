@@ -148,6 +148,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1", slug: "test-project" },
     organization: { id: "org-1" },
+    hasPermission: () => true,
   }),
 }));
 
@@ -174,11 +175,11 @@ vi.mock("~/hooks/useTraceUpdateListener", () => ({
   useTraceUpdateListener: stableSetFn,
 }));
 
-vi.mock("~/server/tracer/types.generated", () => ({
+vi.mock("~/server/tracer/types", () => ({
   reservedTraceMetadataSchema: {},
 }));
 
-vi.mock("~/server/evaluations/evaluators.generated", () => ({
+vi.mock("~/server/evaluations/evaluators", () => ({
   AVAILABLE_EVALUATORS: {},
 }));
 

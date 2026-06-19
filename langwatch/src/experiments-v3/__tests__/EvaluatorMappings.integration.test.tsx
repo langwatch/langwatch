@@ -66,10 +66,11 @@ vi.mock("../hooks/useTargetName", () => ({
 }));
 vi.mock("../hooks/useEvaluatorName", () => ({
   useEvaluatorName: (evaluator: { evaluatorType: string }) =>
-    evaluator.evaluatorType === "langevals/llm_answer_match"
-      ? "LLM Answer Match"
+    evaluator.evaluatorType === "legacy/ragas_answer_correctness"
+      ? "Ragas Answer Correctness"
       : "Exact Match",
   useEvaluatorNames: () => new Map(),
+  useCodeEvaluatorIds: () => new Set(),
 }));
 
 // Mock api
@@ -360,7 +361,7 @@ describe("Evaluator Mappings", () => {
     });
 
     it("hides alert icon when optional fields are missing but all required are mapped", async () => {
-      // langevals/llm_answer_match has requiredFields: ["output", "expected_output"], optionalFields: ["input"]
+      // legacy/ragas_answer_correctness has requiredFields: ["output", "expected_output"], optionalFields: ["input"]
       // Both required fields are mapped, optional "input" is not - should be valid
       useEvaluationsV3Store.setState({
         targets: [createTestTarget()],
@@ -369,7 +370,7 @@ describe("Evaluator Mappings", () => {
         evaluators: [
           {
             id: "evaluator-1",
-            evaluatorType: "langevals/llm_answer_match" as const,
+            evaluatorType: "legacy/ragas_answer_correctness" as const,
             inputs: [
               { identifier: "output", type: "str" as const },
               { identifier: "expected_output", type: "str" as const },
@@ -405,7 +406,7 @@ describe("Evaluator Mappings", () => {
 
       // Wait for the table to render
       await waitFor(() => {
-        expect(screen.getAllByText("LLM Answer Match").length).toBeGreaterThan(
+        expect(screen.getAllByText("Ragas Answer Correctness").length).toBeGreaterThan(
           0,
         );
       });

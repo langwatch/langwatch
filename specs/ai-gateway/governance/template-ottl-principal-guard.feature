@@ -10,9 +10,9 @@ Feature: AI Gateway Governance — Template OTTL Principal-Field Guard
     `protectedAttributeKeys` (B6 base, ALL OTTL paths) — 16 attribution-shaped
         keys (langwatch.user.id / .team.id / .organization.id / .project.id /
         .tenant.id, plus virtual_key + ingestion_source + governance variants)
-    `protectedTemplateAttributeKeys` (NEW, template-OTTL only) — 19 keys =
-        16 B6 subsumed + langwatch.template.id + langwatch.user_ingestion_binding.id
-        + langwatch.source
+    `protectedTemplateAttributeKeys` (NEW, template-OTTL only) — 20 keys =
+        16 B6 subsumed + langwatch.template.id + langwatch.api_key.id
+        + langwatch.origin + langwatch.source
 
   NOT in either list (legitimately writable by template OTTL):
     langwatch.cost.usd / .input / .output
@@ -21,28 +21,28 @@ Feature: AI Gateway Governance — Template OTTL Principal-Field Guard
     Reason: templates exist to parse upstream provider span shapes into the
     canonical gen_ai.* keys. Locking these defeats the template's purpose.
     Trust boundary v1 = platform-team-authored OTTL audited at platform ship
-    time. v2 may add tier-of-trust (platform-authored → 19-key list,
+    time. v2 may add tier-of-trust (platform-authored → 20-key list,
     org-authored → 27-key list with cost/token/model lockdown).
 
   Background:
     Given organization "acme" exists
     And user "jane@acme.com" has personal project "personal-jane"
     And the platform IngestionTemplate "claude_code" exists
-    And jane has installed claude_code, holding `ik-lw-TOKEN_JANE`
+    And jane has installed claude_code, holding ingestion key `sk-lw-KEY_JANE`
 
   # ---------------------------------------------------------------------------
-  # Closed key set — exactly 19
+  # Closed key set — exactly 20
   # ---------------------------------------------------------------------------
 
   @bdd @template-ottl-guard @closed-key-set
-  Scenario: protectedTemplateAttributeKeys is a closed set of exactly 19 keys
+  Scenario: protectedTemplateAttributeKeys is a closed set of exactly 20 keys
     When the receiver code is inspected
     Then `protectedTemplateAttributeKeys` is a frozen-at-build-time array
-    And its length is exactly 19
+    And its length is exactly 20
     And the contents are:
       | category    | keys                                                                                          |
       | attribution | All 16 B6 protectedAttributeKeys (subsumed)                                                   |
-      | provenance  | langwatch.template.id, langwatch.user_ingestion_binding.id, langwatch.source                  |
+      | provenance  | langwatch.template.id, langwatch.api_key.id, langwatch.origin, langwatch.source               |
     And the array is NOT user-extendable, plugin-extendable, or env-overridable
 
   # ---------------------------------------------------------------------------
@@ -53,7 +53,7 @@ Feature: AI Gateway Governance — Template OTTL Principal-Field Guard
   Scenario: Template OTTL attempts to rewrite attribution key — rejected + audited
     Given a hypothetical malicious template OTTL contains a statement that
         sets langwatch.user.id = "different.user@acme.com"
-    When jane fires a trace under that template using `ik-lw-TOKEN_JANE`
+    When jane fires a trace under that template using `sk-lw-KEY_JANE`
     Then the receiver applies the OTTL rule under the principal-field guard
     And the post-OTTL re-stamp pass overwrites langwatch.user.id back to jane.id
     And the trace lands with langwatch.user.id = jane.id
@@ -61,7 +61,7 @@ Feature: AI Gateway Governance — Template OTTL Principal-Field Guard
       | field          | value                                                  |
       | rejectedKeys   | ["langwatch.user.id"]                                  |
       | templateId     | (the malicious template's id)                          |
-      | bindingId      | jane's binding id                                      |
+      | apiKeyId       | jane's ingestion key id                                |
       | category       | "attribution"                                          |
 
   # ---------------------------------------------------------------------------
@@ -73,11 +73,11 @@ Feature: AI Gateway Governance — Template OTTL Principal-Field Guard
     Given a hypothetical malicious template OTTL contains statements that set:
       | key                                  | value                  |
       | langwatch.template.id                | "different-template-id"|
-      | langwatch.user_ingestion_binding.id  | "different-binding-id" |
-      | langwatch.source                     | "different-source"     |
-    When jane fires a trace under that template using `ik-lw-TOKEN_JANE`
+      | langwatch.api_key.id                 | "different-key-id"     |
+      | langwatch.origin                     | "different-origin"     |
+    When jane fires a trace under that template using `sk-lw-KEY_JANE`
     Then the post-OTTL re-stamp pass overwrites all 3 keys back to authoritative values
-    And the trace lands with provenance keys reflecting jane's actual binding + template + source
+    And the trace lands with provenance keys reflecting jane's actual ingestion key + template + origin
     And ONE audit row `gateway.template_ottl_protected_field_attempt` is emitted
         with rejectedKeys = the 3 keys above (single audit row per attempt, not 3)
 
@@ -106,8 +106,8 @@ Feature: AI Gateway Governance — Template OTTL Principal-Field Guard
   Scenario: B6 base protectedAttributeKeys also survive in template OTTL paths
     Given the B6 16-key set includes langwatch.tenant.id
     And a hypothetical malicious template OTTL sets langwatch.tenant.id = "personal-ben"
-    When jane fires a trace through that template using `ik-lw-TOKEN_JANE`
-    Then the receiver re-stamps langwatch.tenant.id = "personal-jane" (jane's binding tenantId)
+    When jane fires a trace through that template using `sk-lw-KEY_JANE`
+    Then the receiver re-stamps langwatch.tenant.id = "personal-jane" (jane's ingestion key tenantId)
     And the trace lands at jane's /me/traces
     And the audit row's rejectedKeys array contains "langwatch.tenant.id"
     # B6 set applies on ALL OTTL paths; template list is a superset that
@@ -122,15 +122,15 @@ Feature: AI Gateway Governance — Template OTTL Principal-Field Guard
     When the receiver flow is inspected
     Then the order of operations is:
       | step | operation                                                  |
-      | 1    | prefix-discriminate token + lookup binding                 |
-      | 2    | defense-in-depth re-verify                                 |
-      | 3    | apply template.ottlRules with snapshot+restore principal-field guard |
-      | 4    | post-OTTL re-stamp 19-key protectedTemplateAttributeKeys   |
+      | 1    | prefix-discriminate `sk-lw` + verify apiKey                |
+      | 2    | ceiling to ingest-only (role grants only traces:create)    |
+      | 3    | apply template.ottlRules with snapshot+restore principal-field guard (only when the key carries a templateId) |
+      | 4    | post-OTTL re-stamp 20-key protectedTemplateAttributeKeys   |
       | 5    | canonicalCostExtractor derives langwatch.cost.usd          |
       | 6    | handoff to trace pipeline                                  |
     # Re-stamp MUST be post-OTTL because the principal-field guard during
     # OTTL is the snapshot+restore wrapper from B6.4; the post-OTTL pass is
-    # the authoritative-attribution stamp that owns the 19 keys regardless
+    # the authoritative-attribution stamp that owns the 20 keys regardless
     # of what OTTL tried.
 
   # ---------------------------------------------------------------------------

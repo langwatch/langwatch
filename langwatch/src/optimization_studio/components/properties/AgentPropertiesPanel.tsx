@@ -12,15 +12,12 @@ import {
 } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
 import { useUpdateNodeInternals } from "@xyflow/react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
 import { useShallow } from "zustand/react/shallow";
 
-import {
-  HttpConfigEditor,
-  useHttpTest,
-} from "~/components/agents/http";
+import { HttpConfigEditor, useHttpTest } from "~/components/agents/http";
 import { CodeBlockEditor } from "~/components/blocks/CodeBlockEditor";
 import {
   CODE_OUTPUT_TYPES,
@@ -31,24 +28,30 @@ import {
 import type { FieldMapping } from "~/components/variables";
 import { type Variable, VariablesSection } from "~/components/variables";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { AgentComponentConfig } from "~/server/agents/agent.repository";
 import type {
+  CodeComponentConfig,
   HttpAuth,
+  HttpComponentConfig,
   HttpHeader,
   HttpMethod,
-  HttpComponentConfig,
-  CodeComponentConfig,
 } from "~/optimization_studio/types/dsl";
+import type { AgentComponentConfig } from "~/server/agents/agent.repository";
 import { api } from "~/utils/api";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import type { AgentComponent, Field as DslField } from "../../types/dsl";
+import {
+  buildAgentNodeData,
+  nodeMatchesAgent,
+  readCodeSnapshot,
+  readHttpSnapshot,
+} from "../../utils/agentNodeData";
 import {
   applyMappingChange,
   buildAvailableSources,
   buildInputMappings,
 } from "../../utils/edgeMappingUtils";
-import { useRegisterDrawerFooter } from "../drawers/useInsideDrawer";
 import { CodeEditorModal } from "../code/CodeEditorModal";
+import { useRegisterDrawerFooter } from "../drawers/useInsideDrawer";
 import { BasePropertiesPanel } from "./BasePropertiesPanel";
 
 /**
@@ -112,16 +115,6 @@ function getCodeFromConfig(config: AgentComponentConfig): string {
   return (codeParam?.value as string) ?? DEFAULT_CODE;
 }
 
-function getInputsFromConfig(config: AgentComponentConfig): DslField[] {
-  const codeConfig = config as CodeComponentConfig;
-  return codeConfig.inputs ?? [{ identifier: "input", type: "str" }];
-}
-
-function getOutputsFromConfig(config: AgentComponentConfig): DslField[] {
-  const codeConfig = config as CodeComponentConfig;
-  return codeConfig.outputs ?? [{ identifier: "output", type: "str" }];
-}
-
 function buildCodeConfig(
   code: string,
   inputs: DslField[],
@@ -145,11 +138,7 @@ function buildCodeConfig(
  * Renders agent configuration inline (HTTP tabs or code editor),
  * matching the pattern used by EvaluatorPropertiesPanel.
  */
-export function AgentPropertiesPanel({
-  node,
-}: {
-  node: Node<AgentComponent>;
-}) {
+export function AgentPropertiesPanel({ node }: { node: Node<AgentComponent> }) {
   const agentRef = node.data.agent;
 
   if (isDbAgentRef(agentRef)) {
@@ -192,9 +181,13 @@ function DbAgentPanel({
   );
 
   const updateMutation = api.agents.update.useMutation();
+  const trpcContext = api.useContext();
 
   const agentData = agentQuery.data;
-  const agentType = agentData?.type;
+  // The node's DSL snapshot is the canonical in-workflow state: it is
+  // available synchronously (the record fetch is not) and it is what
+  // the engine executes. The record is the library baseline.
+  const agentType = agentData?.type ?? node.data.agentType;
   const dbName = agentData?.name ?? "";
   const dbConfig = agentData?.config;
 
@@ -203,76 +196,110 @@ function DbAgentPanel({
 
   // Form for name
   const form = useForm<{ name: string }>({
-    defaultValues: { name: localConfig?.name ?? dbName },
+    defaultValues: { name: localConfig?.name ?? node.data.name ?? dbName },
   });
 
-  // Reset form when agent data loads
-  useEffect(() => {
-    if (agentData) {
-      form.reset({
-        name: node.data.localConfig?.name ?? agentData.name,
-      });
-    }
-  }, [agentData, form]);
-
   // ---- HTTP state ----
-  const httpConfig = agentType === "http" && dbConfig
-    ? getHttpConfig(dbConfig)
-    : undefined;
-  const localSettings = localConfig?.settings as Record<string, unknown> | undefined;
+  const httpSnapshot = readHttpSnapshot(node.data);
+  const httpConfig =
+    agentType === "http" && dbConfig ? getHttpConfig(dbConfig) : undefined;
+  const localSettings = localConfig?.settings as
+    | Record<string, unknown>
+    | undefined;
 
   const [url, setUrl] = useState(
-    (localSettings?.url as string) ?? httpConfig?.url ?? "",
+    (localSettings?.url as string) ??
+      httpSnapshot?.url ??
+      httpConfig?.url ??
+      "",
   );
   const [method, setMethod] = useState<HttpMethod>(
-    (localSettings?.method as HttpMethod) ?? httpConfig?.method ?? "POST",
+    (localSettings?.method as HttpMethod) ??
+      httpSnapshot?.method ??
+      httpConfig?.method ??
+      "POST",
   );
   const [bodyTemplate, setBodyTemplate] = useState(
-    (localSettings?.bodyTemplate as string) ?? httpConfig?.bodyTemplate ?? "",
+    (localSettings?.bodyTemplate as string) ??
+      httpSnapshot?.bodyTemplate ??
+      httpConfig?.bodyTemplate ??
+      "",
   );
   const [outputPath, setOutputPath] = useState(
-    (localSettings?.outputPath as string) ?? httpConfig?.outputPath ?? "",
+    (localSettings?.outputPath as string) ??
+      httpSnapshot?.outputPath ??
+      httpConfig?.outputPath ??
+      "",
   );
   const [headers, setHeaders] = useState<HttpHeader[]>(
-    (localSettings?.headers as HttpHeader[]) ?? httpConfig?.headers ?? [],
+    (localSettings?.headers as HttpHeader[]) ??
+      httpSnapshot?.headers ??
+      httpConfig?.headers ??
+      [],
   );
   const [auth, setAuth] = useState<HttpAuth | undefined>(
-    (localSettings?.auth as HttpAuth) ?? httpConfig?.auth ?? { type: "none" },
+    (localSettings?.auth as HttpAuth) ??
+      httpSnapshot?.auth ??
+      httpConfig?.auth ?? { type: "none" },
   );
   // ---- Code state ----
+  const codeSnapshot = readCodeSnapshot(node.data);
   const codeConfig = agentType === "code" && dbConfig ? dbConfig : undefined;
   const [code, setCode] = useState(
     (localSettings?.code as string) ??
+      codeSnapshot ??
       (codeConfig ? getCodeFromConfig(codeConfig) : DEFAULT_CODE),
-  );
-  const [codeInputs, setCodeInputs] = useState<DslField[]>(
-    (localSettings?.codeInputs as DslField[]) ??
-      (codeConfig ? getInputsFromConfig(codeConfig) : [{ identifier: "input", type: "str" }]),
-  );
-  const [codeOutputs, setCodeOutputs] = useState<DslField[]>(
-    (localSettings?.codeOutputs as DslField[]) ??
-      (codeConfig ? getOutputsFromConfig(codeConfig) : [{ identifier: "output", type: "str" }]),
   );
   const [isCodeModalOpen, setIsCodeModalOpen] = useState(false);
 
-  // Reset state when agent data changes
-  useEffect(() => {
-    if (agentData && !localConfig?.settings) {
-      if (agentData.type === "http") {
-        const config = getHttpConfig(agentData.config);
+  const applyAgentToEditorState = useCallback(
+    (agent: NonNullable<typeof agentData>) => {
+      form.reset({ name: agent.name });
+      if (agent.type === "http") {
+        const config = getHttpConfig(agent.config);
         setUrl(config.url || "");
         setMethod(config.method ?? "POST");
         setBodyTemplate(config.bodyTemplate ?? "");
         setOutputPath(config.outputPath ?? "");
         setHeaders(config.headers ?? []);
         setAuth(config.auth ?? { type: "none" });
-      } else if (agentData.type === "code") {
-        setCode(getCodeFromConfig(agentData.config));
-        setCodeInputs(getInputsFromConfig(agentData.config));
-        setCodeOutputs(getOutputsFromConfig(agentData.config));
+      } else if (agent.type === "code") {
+        setCode(getCodeFromConfig(agent.config));
       }
+    },
+    [form],
+  );
+
+  // Outer updates: apply the library record into the editor and the
+  // node's DSL snapshot only when the record content actually changed
+  // (edited elsewhere) and there are no unsaved local edits. A Save
+  // records its own submitted signature, so the post-save state never
+  // re-applies; node writes only happen on a real content difference,
+  // so this cannot loop with the node-to-editor derivation above.
+  const appliedAgentSignature = useRef<string | null>(null);
+  const agentSignature = agentData
+    ? JSON.stringify({ name: agentData.name, config: agentData.config })
+    : null;
+
+  useEffect(() => {
+    if (!agentData || !agentSignature) return;
+    if (appliedAgentSignature.current === agentSignature) return;
+    // Local draft wins until saved or discarded.
+    if (localConfig?.settings) return;
+
+    const isFirstArrival = appliedAgentSignature.current === null;
+    appliedAgentSignature.current = agentSignature;
+    if (isFirstArrival && nodeMatchesAgent(node.data, agentData)) {
+      return;
     }
-  }, [agentData, localConfig?.settings]);
+
+    applyAgentToEditorState(agentData);
+    setNode({
+      id: node.id,
+      data: buildAgentNodeData(agentData) as Partial<AgentComponent>,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agentSignature, localConfig?.settings]);
 
   // Debounced persist of config changes to localConfig
   const persistLocalSettings = useDebouncedCallback(
@@ -292,9 +319,10 @@ function DbAgentPanel({
   );
 
   // Watch name changes
+  const savedName = agentData?.name ?? node.data.name ?? "";
   const debouncedSetLocalConfig = useDebouncedCallback(
     (formValues: { name?: string }) => {
-      const nameChanged = formValues.name !== dbName;
+      const nameChanged = formValues.name !== savedName;
       if (nameChanged) {
         setNode({
           id: node.id,
@@ -323,44 +351,81 @@ function DbAgentPanel({
   }, [form, debouncedSetLocalConfig]);
 
   const handleUrlChange = useCallback((newUrl: string) => setUrl(newUrl), []);
-  const handleMethodChange = useCallback((newMethod: HttpMethod) => setMethod(newMethod), []);
-  const handleBodyTemplateChange = useCallback((newBody: string) => setBodyTemplate(newBody), []);
-  const handleOutputPathChange = useCallback((newPath: string) => setOutputPath(newPath), []);
-  const handleAuthChange = useCallback((newAuth: HttpAuth | undefined) => setAuth(newAuth), []);
-  const handleHeadersChange = useCallback((newHeaders: HttpHeader[]) => setHeaders(newHeaders), []);
+  const handleMethodChange = useCallback(
+    (newMethod: HttpMethod) => setMethod(newMethod),
+    [],
+  );
+  const handleBodyTemplateChange = useCallback(
+    (newBody: string) => setBodyTemplate(newBody),
+    [],
+  );
+  const handleOutputPathChange = useCallback(
+    (newPath: string) => setOutputPath(newPath),
+    [],
+  );
+  const handleAuthChange = useCallback(
+    (newAuth: HttpAuth | undefined) => setAuth(newAuth),
+    [],
+  );
+  const handleHeadersChange = useCallback(
+    (newHeaders: HttpHeader[]) => setHeaders(newHeaders),
+    [],
+  );
 
-  // Track HTTP changes for localConfig persistence
+  // Track HTTP changes for localConfig persistence. Baseline = the
+  // node's DSL snapshot (what is saved in this workflow), falling back
+  // to the record while a snapshot-less node loads.
   useEffect(() => {
-    if (agentType !== "http" || !agentData) return;
-    const dbCfg = getHttpConfig(agentData.config);
+    if (agentType !== "http") return;
+    const baseline =
+      readHttpSnapshot(node.data) ??
+      (agentData ? getHttpConfig(agentData.config) : undefined);
+    if (!baseline) return;
     const changed =
-      url !== (dbCfg.url || "") ||
-      method !== (dbCfg.method ?? "POST") ||
-      bodyTemplate !== (dbCfg.bodyTemplate ?? "") ||
-      outputPath !== (dbCfg.outputPath ?? "") ||
-      JSON.stringify(headers) !== JSON.stringify(dbCfg.headers ?? []) ||
-      JSON.stringify(auth) !== JSON.stringify(dbCfg.auth ?? { type: "none" });
+      url !== (baseline.url ?? "") ||
+      method !== (baseline.method ?? "POST") ||
+      bodyTemplate !== (baseline.bodyTemplate ?? "") ||
+      outputPath !== (baseline.outputPath ?? "") ||
+      JSON.stringify(headers) !== JSON.stringify(baseline.headers ?? []) ||
+      JSON.stringify(auth) !==
+        JSON.stringify(baseline.auth ?? { type: "none" });
 
     if (changed) {
-      persistLocalSettings({ url, method, bodyTemplate, outputPath, headers, auth });
+      persistLocalSettings({
+        url,
+        method,
+        bodyTemplate,
+        outputPath,
+        headers,
+        auth,
+      });
     }
-  }, [url, method, bodyTemplate, outputPath, headers, auth, agentType, agentData, persistLocalSettings]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    url,
+    method,
+    bodyTemplate,
+    outputPath,
+    headers,
+    auth,
+    agentType,
+    agentData,
+    node.data.parameters,
+    persistLocalSettings,
+  ]);
 
   // Track Code changes for localConfig persistence
   useEffect(() => {
-    if (agentType !== "code" || !agentData) return;
-    const dbCode = getCodeFromConfig(agentData.config);
-    const dbInputs = getInputsFromConfig(agentData.config);
-    const dbOutputs = getOutputsFromConfig(agentData.config);
-    const changed =
-      code !== dbCode ||
-      JSON.stringify(codeInputs) !== JSON.stringify(dbInputs) ||
-      JSON.stringify(codeOutputs) !== JSON.stringify(dbOutputs);
-
-    if (changed) {
-      persistLocalSettings({ code, codeInputs, codeOutputs });
+    if (agentType !== "code") return;
+    const baseline =
+      readCodeSnapshot(node.data) ??
+      (agentData ? getCodeFromConfig(agentData.config) : undefined);
+    if (baseline === undefined) return;
+    if (code !== baseline) {
+      persistLocalSettings({ code });
     }
-  }, [code, codeInputs, codeOutputs, agentType, agentData, persistLocalSettings]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code, agentType, agentData, node.data.parameters, persistLocalSettings]);
 
   // Build mapping data from workflow graph
   const availableSources = useMemo(
@@ -412,7 +477,9 @@ function DbAgentPanel({
     (newVariables: Variable[]) => {
       const existingInputs = node.data.inputs ?? [];
       const newInputs: DslField[] = newVariables.map((v) => {
-        const existing = existingInputs.find((i) => i.identifier === v.identifier);
+        const existing = existingInputs.find(
+          (i) => i.identifier === v.identifier,
+        );
         return {
           identifier: v.identifier,
           type: v.type as DslField["type"],
@@ -442,25 +509,68 @@ function DbAgentPanel({
 
   const handleSave = useCallback(() => {
     if (!project?.id || !agentData) return;
-    const formValues = form.getValues();
+    const projectId = project.id;
+    const trimmedName = form.getValues().name.trim();
 
     let config: AgentComponentConfig | undefined;
     if (agentType === "http") {
-      config = buildHttpConfig(url, method, bodyTemplate, outputPath, headers, auth);
+      config = buildHttpConfig(
+        url,
+        method,
+        bodyTemplate,
+        outputPath,
+        headers,
+        auth,
+      );
     } else if (agentType === "code") {
-      config = buildCodeConfig(code, codeInputs, codeOutputs);
+      config = buildCodeConfig(
+        code,
+        (node.data.inputs ?? []).map((i) => ({
+          identifier: i.identifier,
+          type: i.type,
+        })),
+        (node.data.outputs ?? []).map((o) => ({
+          identifier: o.identifier,
+          type: o.type,
+        })),
+      );
     }
 
     updateMutation.mutate(
       {
         id: agentId,
-        projectId: project.id,
-        name: formValues.name.trim(),
+        projectId,
+        name: trimmedName,
         ...(config ? { config } : {}),
       },
       {
-        onSuccess: () =>
-          setNode({ id: node.id, data: { localConfig: undefined } }),
+        onSuccess: () => {
+          // Write the submitted values through everywhere at once: the
+          // query cache (so the library baseline matches without a
+          // refetch), the node's DSL snapshot (so the next run executes
+          // the save), and the cleared draft. The editor keeps showing
+          // exactly what was submitted, so nothing can revert on screen.
+          const updatedAgent = {
+            ...agentData,
+            name: trimmedName,
+            ...(config ? { config } : {}),
+          } as typeof agentData;
+          appliedAgentSignature.current = JSON.stringify({
+            name: updatedAgent.name,
+            config: updatedAgent.config,
+          });
+          trpcContext.agents.getById.setData(
+            { id: agentId, projectId },
+            updatedAgent,
+          );
+          setNode({
+            id: node.id,
+            data: {
+              ...buildAgentNodeData(updatedAgent),
+              localConfig: undefined,
+            } as Partial<AgentComponent>,
+          });
+        },
       },
     );
   }, [
@@ -476,9 +586,10 @@ function DbAgentPanel({
     headers,
     auth,
     code,
-    codeInputs,
-    codeOutputs,
+    node.data.inputs,
+    node.data.outputs,
     updateMutation,
+    trpcContext,
     setNode,
     node.id,
   ]);
@@ -486,28 +597,44 @@ function DbAgentPanel({
   const handleDiscard = useCallback(() => {
     debouncedSetLocalConfig.cancel();
     persistLocalSettings.cancel();
-    form.reset({ name: dbName });
-    // Reset agent config state from DB
-    if (agentData?.type === "http") {
-      const config = getHttpConfig(agentData.config);
-      setUrl(config.url || "");
-      setMethod(config.method ?? "POST");
-      setBodyTemplate(config.bodyTemplate ?? "");
-      setOutputPath(config.outputPath ?? "");
-      setHeaders(config.headers ?? []);
-      setAuth(config.auth ?? { type: "none" });
-    } else if (agentData?.type === "code") {
-      setCode(getCodeFromConfig(agentData.config));
-      setCodeInputs(getInputsFromConfig(agentData.config));
-      setCodeOutputs(getOutputsFromConfig(agentData.config));
+    if (agentData) {
+      // Back to the saved record - including any library update that
+      // arrived while the draft was holding it back.
+      applyAgentToEditorState(agentData);
+      appliedAgentSignature.current = JSON.stringify({
+        name: agentData.name,
+        config: agentData.config,
+      });
+      setNode({
+        id: node.id,
+        data: {
+          ...buildAgentNodeData(agentData),
+          localConfig: undefined,
+        } as Partial<AgentComponent>,
+      });
+      return;
+    }
+    // Record still loading: drop the draft, keep the node's snapshot.
+    form.reset({ name: node.data.name ?? "" });
+    const snapshotCode = readCodeSnapshot(node.data);
+    if (snapshotCode !== undefined) setCode(snapshotCode);
+    const snapshotHttp = readHttpSnapshot(node.data);
+    if (snapshotHttp) {
+      setUrl(snapshotHttp.url ?? "");
+      setMethod(snapshotHttp.method ?? "POST");
+      setBodyTemplate(snapshotHttp.bodyTemplate ?? "");
+      setOutputPath(snapshotHttp.outputPath ?? "");
+      setHeaders(snapshotHttp.headers ?? []);
+      setAuth(snapshotHttp.auth ?? { type: "none" });
     }
     setNode({ id: node.id, data: { localConfig: undefined } });
   }, [
     form,
-    dbName,
     agentData,
+    applyAgentToEditorState,
     setNode,
     node.id,
+    node.data,
     debouncedSetLocalConfig,
     persistLocalSettings,
   ]);
@@ -515,7 +642,13 @@ function DbAgentPanel({
   const hasLocalChanges = !!localConfig;
 
   // HTTP test via shared hook
-  const { handleTest } = useHttpTest({ url, method, headers, auth, outputPath });
+  const { handleTest } = useHttpTest({
+    url,
+    method,
+    headers,
+    auth,
+    outputPath,
+  });
 
   // Register footer
   const footerContent = useMemo(
@@ -561,7 +694,10 @@ function DbAgentPanel({
   );
   useRegisterDrawerFooter(footerContent);
 
-  if (agentQuery.isLoading) {
+  // Only block on the record fetch when the node carries no snapshot
+  // to render from - with one, the editor shows the node's own state
+  // immediately (and never the starter template).
+  if (agentQuery.isLoading && !node.data.parameters?.length) {
     return (
       <HStack justify="center" paddingY={8} width="full">
         <Spinner size="md" />
@@ -579,7 +715,13 @@ function DbAgentPanel({
           : "Agent";
 
   return (
-    <BasePropertiesPanel node={node} hideParameters hideInputs hideOutputs paddingX={0}>
+    <BasePropertiesPanel
+      node={node}
+      hideParameters
+      hideInputs
+      hideOutputs
+      paddingX={0}
+    >
       {/* Agent name + type badge */}
       <VStack align="stretch" gap={2} width="full" paddingX={4}>
         <HStack>
@@ -591,11 +733,7 @@ function DbAgentPanel({
             {typeBadge}
           </Badge>
         </HStack>
-        <Input
-          {...form.register("name")}
-          size="sm"
-          placeholder="Agent name"
-        />
+        <Input {...form.register("name")} size="sm" placeholder="Agent name" />
       </VStack>
 
       {/* Inline HTTP editor */}

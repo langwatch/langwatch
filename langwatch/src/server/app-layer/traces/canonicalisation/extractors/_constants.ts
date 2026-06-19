@@ -25,6 +25,9 @@ export const ATTR_KEYS = {
   GEN_AI_REQUEST_SEED: "gen_ai.request.seed",
   GEN_AI_REQUEST_STOP_SEQUENCES: "gen_ai.request.stop_sequences",
   GEN_AI_REQUEST_CHOICE_COUNT: "gen_ai.request.choice.count",
+  // Reasoning effort knob (OpenAI low|medium|high; Anthropic emits it as
+  // `effort`, e.g. xhigh, on its claude_code api_request events).
+  GEN_AI_REQUEST_REASONING_EFFORT: "gen_ai.request.reasoning_effort",
   GEN_AI_INPUT_MESSAGES: "gen_ai.input.messages",
   GEN_AI_OUTPUT_MESSAGES: "gen_ai.output.messages",
   GEN_AI_OUTPUT_TYPE: "gen_ai.output.type",
@@ -32,6 +35,10 @@ export const ATTR_KEYS = {
   GEN_AI_USAGE_OUTPUT_TOKENS: "gen_ai.usage.output_tokens",
   GEN_AI_USAGE_PROMPT_TOKENS: "gen_ai.usage.prompt_tokens",
   GEN_AI_USAGE_COMPLETION_TOKENS: "gen_ai.usage.completion_tokens",
+  // Time to first token in milliseconds, relative to the span start.
+  GEN_AI_SERVER_TIME_TO_FIRST_TOKEN: "gen_ai.server.time_to_first_token",
+  // Vercel AI SDK time to first token, a duration in milliseconds.
+  AI_RESPONSE_MS_TO_FIRST_CHUNK: "ai.response.msToFirstChunk",
   GEN_AI_CONVERSATION_ID: "gen_ai.conversation.id",
   GEN_AI_AGENT_ID: "gen_ai.agent.id",
   GEN_AI_AGENT_DESCRIPTION: "gen_ai.agent.description",
@@ -76,9 +83,17 @@ export const ATTR_KEYS = {
   AI_RESPONSE_OBJECT: "ai.response.object",
   AI_MODEL: "ai.model",
   AI_USAGE: "ai.usage",
+  // Vercel AI SDK cache token details (flat-dotted; opencode and other AI-SDK
+  // embedders emit these instead of gen_ai.usage.cache_*). cacheReadTokens and
+  // cacheWriteTokens live under inputTokenDetails; cachedInputTokens is the
+  // older flat alias for the read count.
+  AI_USAGE_CACHED_INPUT_TOKENS: "ai.usage.cachedInputTokens",
+  AI_USAGE_CACHE_READ_TOKENS: "ai.usage.inputTokenDetails.cacheReadTokens",
+  AI_USAGE_CACHE_WRITE_TOKENS: "ai.usage.inputTokenDetails.cacheWriteTokens",
   AI_TOOL_CALL: "ai.toolCall",
   AI_TOOL_CALL_NAME: "ai.toolCall.name",
   AI_TOOL_CALL_ARGS: "ai.toolCall.args",
+  AI_TOOL_CALL_RESULT: "ai.toolCall.result",
 
   // OpenTelemetry LLM attributes
   LLM_MODEL_NAME: "llm.model_name",
@@ -102,6 +117,9 @@ export const ATTR_KEYS = {
   LANGWATCH_SPAN_COST: "langwatch.span.cost",
   LANGWATCH_TOKENS_ESTIMATED: "langwatch.tokens.estimated",
   LANGWATCH_METRICS: "langwatch.metrics",
+  // SDK span timing blob: { started_at, first_token_at, finished_at }
+  // in unix epoch milliseconds.
+  LANGWATCH_TIMESTAMPS: "langwatch.timestamps",
   LANGWATCH_MODEL_INPUT_COST_PER_TOKEN: "langwatch.model.inputCostPerToken",
   LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN: "langwatch.model.outputCostPerToken",
   LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN:
@@ -112,6 +130,14 @@ export const ATTR_KEYS = {
   // LangWatch attributes
   LANGWATCH_INPUT: "langwatch.input",
   LANGWATCH_OUTPUT: "langwatch.output",
+  // The verbatim provider request/response bodies a Claude Code model call was
+  // folded from. The light gen_ai.input.messages / gen_ai.completion give the
+  // readable chat view; these carry the FULL payload (system prompt, every
+  // tool/skill schema, the whole message history with cache_control markers) so
+  // a call's cache_creation / cache_read token counts can be traced to what
+  // actually filled the prompt cache. Surfaced in the drawer's Span Attributes.
+  CLAUDE_CODE_REQUEST_BODY: "langwatch.claude_code.request_body",
+  CLAUDE_CODE_RESPONSE_BODY: "langwatch.claude_code.response_body",
   LANGWATCH_RESERVED_VALUE_TYPES: "langwatch.reserved.value_types",
   LANGWATCH_PARAMS: "langwatch.params",
   LANGWATCH_RAG_CONTEXTS: "langwatch.rag.contexts",
@@ -193,6 +219,14 @@ export const ATTR_KEYS = {
   GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS:
     "gen_ai.usage.cache_creation.input_tokens",
   GEN_AI_USAGE_CACHED_INPUT_TOKENS: "gen_ai.usage.cached_input_tokens", // Mastra non-standard
+
+  // Set by an extractor on a span whose token usage is a redundant copy of
+  // another span's (e.g. codex emits one turn-rollup span AND a lower-level
+  // response span carrying the SAME usage). The fold skips token/cost/cache
+  // accumulation for marked spans so the trace total counts the usage once,
+  // while the per-span detail still shows it on each span.
+  LANGWATCH_RESERVED_SKIP_TOKEN_ACCUMULATION:
+    "langwatch.reserved.skip_token_accumulation",
 
   // Mastra attributes
   MASTRA_INPUT: "input",

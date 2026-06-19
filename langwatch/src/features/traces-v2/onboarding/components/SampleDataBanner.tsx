@@ -14,8 +14,14 @@ import type React from "react";
  * Without the banner that reads as a broken product. With it, the
  * user knows "ah, sample data, this is just a tour."
  *
- * Exit lives on the toolbar's "On safari" button, not here — one
- * exit affordance, not two.
+ * Visual treatment: a one-shot orange glow blooms on mount and fades
+ * out over ~10s. The point is "catch the eye on first arrival without
+ * permanently shouting." After the glow fades the banner stays as a
+ * slightly bolder, slightly taller strip — still honest, no longer
+ * demanding attention.
+ *
+ * Exit lives on the toolbar's "Hide sample data" button, not here —
+ * one exit affordance, not two.
  *
  * Visible only when preview is active — once dismissed, this whole
  * pane unmounts and the banner with it.
@@ -25,20 +31,42 @@ export const SampleDataBanner: React.FC = () => {
     <Flex
       align="center"
       gap={2}
-      paddingX={3}
-      paddingY={1.5}
+      paddingX={3.5}
+      paddingY={2.5}
       background="orange.subtle"
       borderBottomWidth="1px"
       borderColor="orange.muted"
       color="orange.fg"
       flexShrink={0}
+      position="relative"
+      overflow="hidden"
+      css={{
+        animation: "lw-sample-banner-glow 10s ease-out forwards",
+        "@keyframes lw-sample-banner-glow": {
+          "0%": {
+            boxShadow:
+              "0 0 0 0 var(--chakra-colors-orange-emphasized), inset 0 -1px 0 var(--chakra-colors-orange-muted)",
+          },
+          "8%": {
+            boxShadow:
+              "0 6px 24px -4px color-mix(in oklab, var(--chakra-colors-orange-solid) 55%, transparent), inset 0 -1px 0 var(--chakra-colors-orange-muted)",
+          },
+          "100%": {
+            boxShadow:
+              "0 0 0 0 transparent, inset 0 -1px 0 var(--chakra-colors-orange-muted)",
+          },
+        },
+        "@media (prefers-reduced-motion: reduce)": {
+          animation: "none",
+        },
+      }}
     >
-      <Icon boxSize={3.5}>
+      <Icon boxSize={4}>
         <Sparkles />
       </Icon>
-      <Text textStyle="xs" fontWeight={500}>
-        Sample data — facets, filters, and the drawer all work, but nothing
-        here is real.
+      <Text textStyle="sm" fontWeight={600}>
+        Sample data — facets, filters, and the drawer all work, but nothing here
+        is real.
       </Text>
     </Flex>
   );

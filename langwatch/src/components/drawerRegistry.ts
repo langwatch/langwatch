@@ -7,13 +7,13 @@
  * - `DrawerProps<T>`: Props type for a specific drawer
  * - `DrawerCallbacks<T>`: Callback props (functions) for a specific drawer
  */
-import { lazy, type ComponentProps, type FC } from "react";
+import { type ComponentProps, type FC, lazy } from "react";
 
 import { AddAnnotationQueueDrawer } from "./AddAnnotationQueueDrawer";
+import { AutomationDrawer } from "./AddAutomationDrawer";
 import { AddDatasetRecordDrawerV2 } from "./AddDatasetRecordDrawer";
 import { AddOrEditAnnotationScoreDrawer } from "./AddOrEditAnnotationScoreDrawer";
 import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
-import { AutomationDrawer } from "./AddAutomationDrawer";
 import { AgentHistoryDrawer } from "./agents/AgentHistoryDrawer";
 import { AgentListDrawer } from "./agents/AgentListDrawer";
 import { AgentTypeSelectorDrawer } from "./agents/AgentTypeSelectorDrawer";
@@ -25,38 +25,32 @@ import {
 } from "./agents/drawerFromUrl";
 import { AlertDrawer } from "./analytics/AlertDrawer";
 import { DashboardNameDrawer } from "./analytics/DashboardNameDrawer";
-import { BatchEvaluationDrawer } from "./BatchEvaluationDrawer";
 import { SelectDatasetDrawer } from "./datasets/SelectDatasetDrawer";
 import { UploadCSVModal } from "./datasets/UploadCSVModal";
-import { EditModelProviderDrawer } from "./EditModelProviderDrawer";
+import { FeatureFlagsDrawer } from "./drawers/FeatureFlagsDrawer";
+import { SdkRadarDrawer } from "./drawers/SdkRadarDrawer";
 import { EditAutomationFilterDrawer } from "./EditAutomationFilterDrawer";
+import { EditModelProviderDrawer } from "./EditModelProviderDrawer";
 import { GuardrailsDrawer } from "./evaluations/GuardrailsDrawer";
 // Online Evaluations (Monitors) drawers
 import { OnlineEvaluationDrawer } from "./evaluations/OnlineEvaluationDrawer";
+import { CodeEvaluatorEditorDrawer } from "./evaluators/CodeEvaluatorEditorDrawer";
 import { EvaluatorCategorySelectorDrawer } from "./evaluators/EvaluatorCategorySelectorDrawer";
 import { EvaluatorEditorDrawer } from "./evaluators/EvaluatorEditorDrawer";
 import { EvaluatorHistoryDrawer } from "./evaluators/EvaluatorHistoryDrawer";
 import { EvaluatorListDrawer } from "./evaluators/EvaluatorListDrawer";
 import { EvaluatorTypeSelectorDrawer } from "./evaluators/EvaluatorTypeSelectorDrawer";
 import { WorkflowSelectorForEvaluatorDrawer } from "./evaluators/WorkflowSelectorForEvaluatorDrawer";
-import { FeatureFlagsDrawer } from "./drawers/FeatureFlagsDrawer";
-import { SdkRadarDrawer } from "./drawers/SdkRadarDrawer";
+import { DataPrivacyRuleDrawer } from "./settings/DataPrivacyRuleDrawer";
+
 // Lazy-loaded: FoundryDrawer transitively imports the OTel SDK which has
 // side effects that break React if evaluated eagerly at app startup.
-const FoundryDrawer = lazy(
-  () => import("./ops/foundry/FoundryDrawer").then((m) => ({ default: m.FoundryDrawer })),
+const FoundryDrawer = lazy(() =>
+  import("./ops/foundry/FoundryDrawer").then((m) => ({
+    default: m.FoundryDrawer,
+  })),
 );
-import { CreateProjectDrawer } from "./projects/CreateProjectDrawer";
-import { PromptEditorDrawer } from "./prompts/PromptEditorDrawer";
-import { PromptListDrawer } from "./prompts/PromptListDrawer";
-import { SeriesFiltersDrawer } from "./SeriesFilterDrawer";
-import { ScenarioFormDrawerFromUrl } from "./scenarios/ScenarioFormDrawer";
-import { CreateTeamDrawer } from "./settings/CreateTeamDrawer";
-import { DefaultModelOverrideDrawer } from "./settings/DefaultModelOverrideDrawer";
-import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
-import { ScenarioRunDetailDrawer } from "./simulations/ScenarioRunDetailDrawer";
-import { SuiteFormDrawer } from "./suites/SuiteFormDrawer";
-import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
+
 // Traces V2 drawers — the real shell is mounted from `TracesPage` based
 // on the drawer store (so a click → drawer-open is synchronous, no
 // round-trip through the URL). The registry entry stays as a noop so
@@ -67,8 +61,21 @@ import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
 // `openDrawer("traceV2Details", { traceId, t, ... })` still typechecks
 // at every call site.
 import type { TraceV2DrawerShellProps } from "../features/traces-v2/components/TraceDrawer";
+import { CreateProjectDrawer } from "./projects/CreateProjectDrawer";
+import { EditProjectDrawer } from "./projects/EditProjectDrawer";
+import { PromptEditorDrawer } from "./prompts/PromptEditorDrawer";
+import { PromptListDrawer } from "./prompts/PromptListDrawer";
+import { SeriesFiltersDrawer } from "./SeriesFilterDrawer";
+import { ScenarioFormDrawerFromUrl } from "./scenarios/ScenarioFormDrawer";
+import { CreateTeamDrawer } from "./settings/CreateTeamDrawer";
+import { DefaultModelOverrideDrawer } from "./settings/DefaultModelOverrideDrawer";
+import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
+import { ScenarioRunDetailDrawer } from "./simulations/ScenarioRunDetailDrawer";
+import { SuiteFormDrawer } from "./suites/SuiteFormDrawer";
+import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
 
 const TraceV2DrawerNoop: FC<TraceV2DrawerShellProps> = () => null;
+
 // Evaluations V3 drawers
 import { TargetTypeSelectorDrawer } from "./targets/TargetTypeSelectorDrawer";
 
@@ -79,7 +86,6 @@ import { TargetTypeSelectorDrawer } from "./targets/TargetTypeSelectorDrawer";
 export const drawers = {
   traceDetails: TraceDetailsDrawer,
   traceV2Details: TraceV2DrawerNoop,
-  batchEvaluation: BatchEvaluationDrawer,
   automation: AutomationDrawer,
   editModelProvider: EditModelProviderDrawer,
   defaultModelOverride: DefaultModelOverrideDrawer,
@@ -110,6 +116,7 @@ export const drawers = {
   evaluatorCategorySelector: EvaluatorCategorySelectorDrawer,
   evaluatorTypeSelector: EvaluatorTypeSelectorDrawer,
   evaluatorEditor: EvaluatorEditorDrawer,
+  codeEvaluatorEditor: CodeEvaluatorEditorDrawer,
   // Workflow selector specifically for evaluators (creates evaluator, not agent)
   workflowSelectorForEvaluator: WorkflowSelectorForEvaluatorDrawer,
   // Scenarios
@@ -117,8 +124,11 @@ export const drawers = {
   scenarioRunDetail: ScenarioRunDetailDrawer,
   // Suites
   suiteEditor: SuiteFormDrawer,
+  // Data privacy
+  dataPrivacyRule: DataPrivacyRuleDrawer,
   // Project management
   createProject: CreateProjectDrawer,
+  editProject: EditProjectDrawer,
   createTeam: CreateTeamDrawer,
   // Online Evaluations (Monitors)
   onlineEvaluation: OnlineEvaluationDrawer,

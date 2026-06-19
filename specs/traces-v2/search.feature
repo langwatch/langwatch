@@ -49,6 +49,15 @@ Rule: Time range selector
     When the user reloads or navigates back to the Observe page
     Then the time range selector displays "7d"
 
+  # The trigger sits inside the toolbar strip alongside Spans, Model,
+  # Group-by, etc. — earlier it was rendered with `size="sm"` while all
+  # siblings were `size="xs"`, which made it visibly taller and broke
+  # the strip's horizontal rhythm. Match the sibling size; the verbose
+  # label keeps its weight via paddingX.
+  Scenario: Time range trigger height matches other toolbar items
+    When the Observe page loads
+    Then the time range trigger renders at the same height as the surrounding toolbar buttons
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SEARCH BAR LAYOUT AND BEHAVIOR
@@ -85,6 +94,31 @@ Rule: Search bar layout and behavior
     When the user types "@status:err" without pressing Enter
     Then the trace table does not update
     And only autocomplete suggestions update live
+
+  # Pasting a multi-line error message used to create one Paragraph node
+  # per line, growing the editor vertically until it pushed the rest of
+  # the page below the viewport (the editor's `whiteSpace: nowrap` only
+  # affected inline wrap, not paragraph stacking). Paste now flattens
+  # newlines/tabs into spaces and caps the inserted text at 2000 chars.
+  # A CSS `max-height` on the editor is the defense-in-depth in case
+  # another path bypasses the sanitizer.
+
+  Scenario: Pasting a multi-line string collapses newlines into spaces
+    Given the search bar is empty and focused
+    When the user pastes a multi-line error stack trace
+    Then the inserted content has no newlines or tabs
+    And the search bar height does not exceed its `max-height` cap
+
+  Scenario: Pasting an extremely long single line is capped
+    Given the search bar is empty and focused
+    When the user pastes 10 KB of unbroken text
+    Then only the first 2000 characters are inserted
+    And the bar layout remains intact (no overlap with the page header)
+
+  Scenario: Pasted content with no whitespace scrolls horizontally
+    Given the search bar contains a 1500-char unbreakable token
+    Then the editor scrolls horizontally within its bounds
+    And the rest of the page is not pushed off-screen
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -298,20 +332,30 @@ Rule: Filter column layout
     Given the user is authenticated with "traces:view" permission
     And the project has traces with varied attributes
 
-  Scenario: Filter sidebar renders facet groups in fixed order
-    When the Observe page loads (and the user has expanded the sidebar)
-    Then the filter sidebar shows groups in this order: Trace, Subjects, Span, Evaluators, Metrics, Prompts
-    And the Trace group leads with Origin, Status, Error message, Guardrail, Contains AI, Root span type, Trace name, Model, Service, Topic, Subtopic, Label, Event
-    And range facets (Duration, Cost, Tokens, Prompt tokens, Completion tokens, TTFT, TTLT, Tokens/sec, Tokens estimated, Span count) live in the Metrics group
+  # Round 3 flattened the sidebar — there are no longer Trace /
+  # Subjects / Span / Evaluators / Metrics / Prompts headings between
+  # sections. The grouping has moved to the FacetManagerPopover and
+  # has been rebuilt around AI-observability axes:
+  #   Origin → Model → Cost → Errors → Quality → Events → Subjects
+  #   → Topics → Custom
+  # Drag-reorder operates section-by-section in the flat sidebar; the
+  # popover's groups are fixed for now (their order may become
+  # operator-customisable in a follow-up).
 
-  Scenario: Group headers can be reordered via drag-and-drop
-    When the user drags a group header to a new position
-    Then the FACET_GROUPS order updates in the sidebar
-    But sections within a group keep their registry order
+  Scenario: Filter sidebar renders facets as a flat, drag-reorderable list
+    When the Observe page loads (and the user has expanded the sidebar)
+    Then the filter sidebar shows facet sections in a flat list (no Trace / Subjects / Span / Evaluators headings)
+    And the operator can drag any section's grip handle to reorder its position in the list
+
+  Scenario: FacetManagerPopover groups facets by AI-observability axis
+    When the user opens the manage-facets popover from the sidebar header
+    Then the picker shows groups in this order: Origin, Model, Cost, Errors, Quality, Events, Subjects, Topics, Custom
+    And the Quality group lists evaluator, evaluator status, verdict, score, and annotation together
+    And the Cost group lists cost, the token family, and the latency family together
 
   Scenario: Dynamic facets appear only when data exists
     Given traces include user IDs
-    Then the User facet section appears in the Subjects group
+    Then the User facet section appears in the sidebar (under the Subjects group when viewed from the popover)
     Given no traces have label data
     Then the Label facet section is not rendered
 
@@ -1006,6 +1050,125 @@ Rule: AI query composer (Ask AI)
     When the user clicks the Ask AI button
     Then a primer popover points the user at /settings/model-providers
     And AI mode is not entered
+
+  # The system prompts that drive `generateTraceQueryFromPrompt` and
+  # `generateTraceAction` were rewritten in Round 3 with explicit
+  # prompt-engineering structure: clear identity, action-kind decision
+  # tree, field-discipline guardrail, no-time-clauses rule, anti-
+  # patterns, and few-shot examples covering the common shapes (single
+  # field, multi-field AND, value-side OR, NOT, ranges, free text, save
+  # phrasing, ambiguous → empty). The contract surface is unchanged —
+  # these scenarios pin behaviour the new prompt is supposed to enforce.
+
+  Rule: AI translation honours the field catalog
+    The model never invents fields that aren't in the dynamic catalog
+    sent in the system prompt, and never injects time clauses (those
+    are owned by the time-range selector outside the query).
+
+    Background:
+      Given the user is authenticated with "traces:view" permission
+      And the project has traces
+
+    Scenario: Unknown attribute is dropped, not invented
+      When the user asks "show me traces with `vendor_tier:gold`"
+      And `vendor_tier` is not in the field catalog
+      Then the AI returns a query that does NOT contain `vendor_tier`
+      And the AI either omits the concept or returns an empty query
+
+    Scenario: Time clauses are not emitted
+      When the user asks "errors in the last hour"
+      Then the AI returns `status:error` (or equivalent)
+      And the query contains no time-related field (no `timestamp`, no `occurredAt`, etc.)
+
+    Scenario: Save phrasing routes to create_lens
+      When the user asks "save this view as Failing GPT-4"
+      Then the AI returns kind `create_lens`
+      And the lens name is "Failing GPT-4" in Title Case
+      And the query is the filter implied by the request
+
+    Scenario: Filter phrasing routes to apply_query
+      When the user asks "show errors"
+      Then the AI returns kind `apply_query`
+      And the query is the filter implied by the request
+
+    Scenario: Vague request returns an empty query
+      When the user asks "the good ones"
+      Then the AI returns kind `apply_query` with an empty query string
+      And the caller treats it as a no-op (the operator sees a gentle "couldn't translate" hint, not a hallucinated filter)
+
+  # The composer previously surfaced one of two static strings ("AI
+  # couldn't generate a query…" / "AI's reply didn't match the trace
+  # query syntax…") regardless of what actually failed. Both hid the
+  # provider/model/HTTP context the operator needed to act on. The
+  # backend now curates the provider exception into a typed
+  # `AiActionError` with `code`, a polished `message`, and a `details`
+  # block. The composer renders `message` as the inline pill; clicking
+  # the pill opens a popover with the structured fields. Stack traces
+  # never cross the wire.
+
+  Scenario: Provider error surfaces a curated headline and details
+    Given the AI search request fails with a 429 from the provider
+    When the composer receives the error
+    Then the pill reads "Provider returned 429: <reason>" with a red tint
+    And clicking the pill opens a popover showing Status, Provider, Model, and Reason rows
+
+  Scenario: Validation error surfaces the last failed query
+    Given the model returned three queries in a row that all failed to parse
+    When the composer receives the error
+    Then the pill reads "AI's reply didn't match the trace query syntax. Try rephrasing."
+    And the details popover shows the parse error and the last produced query
+
+  Scenario: Unknown error degrades to message-only
+    Given a tRPC-layer error reaches the composer with no `details` payload
+    When the composer renders the error
+    Then the pill shows the message as a tooltip on hover (no expand affordance)
+    And no popover opens on click
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CHIP LABELS WITH HOVER-TO-ID
+# ─────────────────────────────────────────────────────────────────────────────
+# Filter chips render the human-readable name of the value (evaluator
+# name, topic name, etc.) on top of the underlying id. Hovering the chip
+# fades the label out so the operator can see (and copy) the id. The
+# query language is unchanged — the document still holds the id, search
+# matching is still id-only. Names exist for discovery and reading
+# comfort only.
+
+Rule: Chip labels overlay the id by default, reveal on hover
+  When a facet returns a `label` for a topValue, the chip paints that
+  label on top of the id and reveals the id on hover.
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the project has traces with an evaluator named "Policy Check"
+
+  Scenario: Evaluator chip reads as the evaluator name
+    Given the search bar contains "@evaluator:eval_abc123"
+    Then the chip's visible text reads "Policy Check"
+    And the underlying document text is still "@evaluator:eval_abc123"
+
+  Scenario: Hovering the chip reveals the id
+    Given the search bar contains "@evaluator:eval_abc123"
+    When the user hovers the chip
+    Then the label overlay fades out
+    And the chip reads "@evaluator:eval_abc123"
+
+  Scenario: A label equal to the id renders without overlay
+    Given the search bar contains "@status:error"
+    Then no label overlay is rendered (the id is already human-readable)
+    And the chip just reads "@status:error"
+
+  Scenario: Typed query language matches only the id
+    When the user types "policy check" (the evaluator's label) into the search bar
+    Then no autocomplete row matches it
+    And the query is treated as free text — not as a filter on @evaluator
+
+  Scenario: Labels become available after facets land
+    Given the chips render before the discover query completes
+    When the facets payload arrives
+    Then the chips that have a label receive their overlay
+    And no other state (cursor, selection, scroll) is disturbed
 
 
 # ─────────────────────────────────────────────────────────────────────────────

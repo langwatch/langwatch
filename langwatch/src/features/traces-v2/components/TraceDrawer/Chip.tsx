@@ -203,8 +203,17 @@ export const Chip = forwardRef<HTMLDivElement, ChipProps>(function Chip(
   );
 
   if (popover) {
+    // lazyMount + unmountOnExit so the chip popover lives at ~0 DOM
+    // cost when closed. The trace header can render 10-20 chips on
+    // a span-heavy trace; without unmount-on-exit each open-then-
+    // close leaks an invisible floating layer that the audit caught
+    // as "6 popovers mounted simultaneously".
     return (
-      <Popover.Root positioning={{ placement: "bottom-start" }} lazyMount>
+      <Popover.Root
+        positioning={{ placement: "bottom-start" }}
+        lazyMount
+        unmountOnExit
+      >
         <Popover.Trigger asChild>{body}</Popover.Trigger>
         <Popover.Content width="360px">
           <Popover.Body padding={0}>{popover}</Popover.Body>

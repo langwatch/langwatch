@@ -12795,6 +12795,11 @@
                           ]
                         },
                         "default": []
+                      },
+                      "parameters": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "default": {}
                       }
                     },
                     "required": [
@@ -12813,7 +12818,8 @@
                       "inputs",
                       "outputs",
                       "model",
-                      "tags"
+                      "tags",
+                      "parameters"
                     ]
                   }
                 }
@@ -13338,6 +13344,11 @@
                         ]
                       },
                       "default": []
+                    },
+                    "parameters": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "default": {}
                     }
                   },
                   "required": [
@@ -13356,7 +13367,8 @@
                     "inputs",
                     "outputs",
                     "model",
-                    "tags"
+                    "tags",
+                    "parameters"
                   ]
                 }
               }
@@ -13613,6 +13625,10 @@
                       "type": "string",
                       "minLength": 1
                     }
+                  },
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": {}
                   }
                 },
                 "required": [
@@ -14559,6 +14575,11 @@
                         ]
                       },
                       "default": []
+                    },
+                    "parameters": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "default": {}
                     }
                   },
                   "required": [
@@ -14577,7 +14598,8 @@
                     "inputs",
                     "outputs",
                     "model",
-                    "tags"
+                    "tags",
+                    "parameters"
                   ]
                 }
               }
@@ -15151,6 +15173,11 @@
                         ]
                       },
                       "default": []
+                    },
+                    "parameters": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "default": {}
                     }
                   },
                   "required": [
@@ -15169,7 +15196,8 @@
                     "inputs",
                     "outputs",
                     "model",
-                    "tags"
+                    "tags",
+                    "parameters"
                   ]
                 }
               }
@@ -15444,6 +15472,10 @@
                       "type": "string",
                       "minLength": 1
                     }
+                  },
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": {}
                   },
                   "scope": {
                     "type": "string",
@@ -16048,6 +16080,11 @@
                             ]
                           },
                           "default": []
+                        },
+                        "parameters": {
+                          "type": "object",
+                          "additionalProperties": {},
+                          "default": {}
                         }
                       },
                       "required": [
@@ -16066,7 +16103,8 @@
                         "inputs",
                         "outputs",
                         "model",
-                        "tags"
+                        "tags",
+                        "parameters"
                       ]
                     },
                     "conflictInfo": {
@@ -16484,6 +16522,10 @@
                             "outputs",
                             "model"
                           ]
+                        },
+                        "remoteConfig": {
+                          "type": "object",
+                          "additionalProperties": {}
                         }
                       },
                       "required": [
@@ -17002,6 +17044,10 @@
                       "outputs",
                       "model"
                     ]
+                  },
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": {}
                   },
                   "localVersion": {
                     "type": "number",
@@ -17631,6 +17677,11 @@
                           ]
                         },
                         "default": []
+                      },
+                      "parameters": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "default": {}
                       }
                     },
                     "required": [
@@ -17649,7 +17700,8 @@
                       "inputs",
                       "outputs",
                       "model",
-                      "tags"
+                      "tags",
+                      "parameters"
                     ]
                   }
                 }
@@ -18206,6 +18258,11 @@
                         ]
                       },
                       "default": []
+                    },
+                    "parameters": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "default": {}
                     }
                   },
                   "required": [
@@ -18224,7 +18281,8 @@
                     "inputs",
                     "outputs",
                     "model",
-                    "tags"
+                    "tags",
+                    "parameters"
                   ]
                 }
               }

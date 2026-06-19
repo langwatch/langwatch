@@ -1,4 +1,4 @@
-import { PricingModel, type Organization } from "@prisma/client";
+import { type Organization, PricingModel } from "@prisma/client";
 import { Factory } from "fishery";
 import { nanoid } from "nanoid";
 
@@ -13,7 +13,6 @@ export const organizationFactory = Factory.define<
   updatedAt: new Date(),
   usageSpendingMaxLimit: null,
   maxSessionDurationDays: 0,
-  governanceLogContentMode: "full",
   signedDPA: false,
   elasticsearchNodeUrl: null,
   elasticsearchApiKey: null,
@@ -32,4 +31,5 @@ export const organizationFactory = Factory.define<
   licenseExpiresAt: null,
   licenseLastValidatedAt: null,
   presenceEnabled: false,
+  supportContact: null,
 }));

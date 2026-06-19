@@ -1,14 +1,12 @@
-import type { Project } from "@prisma/client";
-import { ProjectSensitiveDataVisibilityLevel } from "@prisma/client";
 import { generate } from "@langwatch/ksuid";
+import type { Project } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { env } from "~/env.mjs";
+import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import { generateApiKey } from "~/server/utils/apiKeyGenerator";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { slugify } from "~/utils/slugify";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
-import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
+import { slugify } from "~/utils/slugify";
 import type {
   PaginatedResult,
   PresenceConfig,
@@ -46,6 +44,10 @@ export class ProjectSlugConflictError extends Error {
 
 export class TeamNotInOrganizationError extends Error {
   name = "TeamNotInOrganizationError" as const;
+}
+
+export class DestinationTeamNotFoundError extends Error {
+  name = "DestinationTeamNotFoundError" as const;
 }
 
 export interface CreateProjectParams {
@@ -135,14 +137,6 @@ export class ProjectService {
       framework: params.framework,
       teamId,
       apiKey: generateApiKey(),
-      piiRedactionLevel:
-        env.NODE_ENV === "development" || !env.IS_SAAS
-          ? "DISABLED"
-          : "ESSENTIAL",
-      capturedInputVisibility:
-        ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
-      capturedOutputVisibility:
-        ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
     });
   }
 
@@ -155,6 +149,18 @@ export class ProjectService {
     organizationId: string;
     data: UpdateProjectInput;
   }): Promise<Project> {
+    if (data.teamId) {
+      const team = await this.repo.findActiveTeamInOrganization({
+        teamId: data.teamId,
+        organizationId,
+      });
+      if (!team) {
+        throw new DestinationTeamNotFoundError(
+          "Destination team not found, is archived, or belongs to a different organization",
+        );
+      }
+    }
+
     const project = await this.repo.update({ id, organizationId, data });
     if (!project) throw new ProjectNotFoundError("Project not found");
     return project;
@@ -172,7 +178,9 @@ export class ProjectService {
     // cascade failure never blocks the user-facing project deletion — orphan bytes
     // can be swept up later, but a blocked deletion is a worse UX.
     try {
-      await createStoredObjectsService({ projectId: id }).deleteOwnedBy({ projectId: id });
+      await createStoredObjectsService({ projectId: id }).deleteOwnedBy({
+        projectId: id,
+      });
     } catch (error) {
       logger.warn(
         { projectId: id, error },

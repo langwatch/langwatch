@@ -9,19 +9,14 @@ import { useWorkspaceData } from "../useWorkspaceData";
 import type { WorkspaceSwitcherProps } from "../WorkspaceSwitcher";
 
 export type PersonalSummary = {
+  /** Theoretical (list-price) total, including bundled / non-billed usage. */
   spentThisMonthUsd: number;
+  /** Portion actually billed per token; the bundled part is spent - billed. */
+  billedThisMonthUsd: number;
   budgetUsd: number | null;
   requestsThisMonth: number;
   requestsDeltaPctVsLastMonth: number | null;
   mostUsedModel: { name: string; usagePct: number } | null;
-};
-
-export type PersonalRecentActivityRow = {
-  id: string;
-  occurredAt: string;
-  toolName: string;
-  summary: string;
-  costUsd: number;
 };
 
 export type PersonalApiKeyRow = {
@@ -68,9 +63,11 @@ export type PersonalContext = {
   switcher: WorkspaceSwitcherProps;
   summary: PersonalSummary;
   budget: PersonalBudgetState;
-  spendByDay: Array<{ day: string; usd: number }>;
-  spendByTool: Array<{ tool: string; usd: number }>;
-  recentActivity: PersonalRecentActivityRow[];
+  spendByDay: Array<{ day: string; usd: number; billedUsd: number }>;
+  spendByTool: Array<{ tool: string; usd: number; billedUsd: number }>;
+  /** Personal project the /me recent-activity table reads from + deep-links into. */
+  personalProjectId: string | null;
+  personalProjectSlug: string | null;
   apiKeys: PersonalApiKeyRow[];
 };
 
@@ -162,8 +159,8 @@ export function usePersonalContext(): PersonalContext {
 
   const switcherData = useWorkspaceData();
   const switcher = useMemo<WorkspaceSwitcherProps>(
-    () => ({ ...switcherData, current: { kind: "personal" } }),
-    [switcherData],
+    () => ({ ...switcherData, current: { kind: "personal", orgId } }),
+    [switcherData, orgId],
   );
 
   return {
@@ -180,6 +177,7 @@ export function usePersonalContext(): PersonalContext {
     switcher,
     summary: {
       spentThisMonthUsd: personalUsageQuery.data?.summary.spentUsd ?? 0,
+      billedThisMonthUsd: personalUsageQuery.data?.summary.billedUsd ?? 0,
       // Always-on chip data: `limitUsd` flows through whenever the user
       // has any applicable budget, regardless of `status`. Banner-only
       // surfaces (BudgetExceededBanner) still gate on `budget.status`.
@@ -194,6 +192,7 @@ export function usePersonalContext(): PersonalContext {
       personalUsageQuery.data?.dailyBuckets.map((bucket) => ({
         day: bucket.day,
         usd: bucket.spentUsd,
+        billedUsd: bucket.billedUsd,
       })) ?? [],
     // The CH service breaks down by model name today (see gateway.md spec —
     // tool-level breakdown needs User-Agent / `langwatch.client.name`
@@ -203,15 +202,11 @@ export function usePersonalContext(): PersonalContext {
       personalUsageQuery.data?.breakdownByModel.map((row) => ({
         tool: row.label,
         usd: row.spentUsd,
+        billedUsd: row.billedUsd,
       })) ?? [],
-    recentActivity:
-      personalUsageQuery.data?.recentActivity.map((row) => ({
-        id: row.traceId,
-        occurredAt: row.occurredAt,
-        toolName: row.models[0] ?? "—",
-        summary: row.preview,
-        costUsd: row.spentUsd,
-      })) ?? [],
+    personalProjectId: personalContextQuery.data?.workspace.project.id ?? null,
+    personalProjectSlug:
+      personalContextQuery.data?.workspace.project.slug ?? null,
     apiKeys,
   };
 }

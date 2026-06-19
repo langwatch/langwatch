@@ -23,6 +23,7 @@ const logger = createLogger("langwatch:ops:metrics-collector");
 
 const THROUGHPUT_BUFFER_SIZE = 900;
 const METRICS_COLLECT_INTERVAL_MS = 2_000;
+const PENDING_RECONCILE_INTERVAL_MS = 60_000;
 const DASHBOARD_BROADCAST_INTERVAL_MS = 2_000;
 const REDIS_STATE_TTL_SECONDS = 3600;
 const QUEUE_DISCOVERY_INTERVAL_MS = 10_000;
@@ -202,7 +203,7 @@ export function buildPipelineTree({
   return tree;
 }
 
-class OpsMetricsCollector {
+export class OpsMetricsCollector {
   private redis: IORedis | Cluster;
   private groupQueueNames: string[] = [];
   private throughputBuffer: ThroughputPoint[] = [];
@@ -277,6 +278,7 @@ class OpsMetricsCollector {
   private collectInterval: ReturnType<typeof setInterval> | null = null;
   private discoveryInterval: ReturnType<typeof setInterval> | null = null;
   private broadcastInterval: ReturnType<typeof setInterval> | null = null;
+  private reconcileInterval: ReturnType<typeof setInterval> | null = null;
   private lastCpuUsage = process.cpuUsage();
   private lastCpuTime = Date.now();
   private currentCpuPercent = 0;
@@ -291,6 +293,7 @@ class OpsMetricsCollector {
   >();
   private currentJobNameMetrics: JobNameMetrics[] = [];
   private currentPausedKeys: string[] = [];
+  private latestPendingDrift = 0;
   private knownPipelinePaths: string[] = [];
   private isCollecting = false;
   private prevCompleted = new Map<string, number>();
@@ -330,6 +333,11 @@ class OpsMetricsCollector {
       () => this.discoverQueues(),
       QUEUE_DISCOVERY_INTERVAL_MS,
     );
+    this.reconcileInterval = setInterval(
+      () => this.reconcilePending(),
+      PENDING_RECONCILE_INTERVAL_MS,
+    );
+    void this.reconcilePending();
     this.broadcastInterval = setInterval(() => {
       if (this.emitter.listenerCount(DASHBOARD_EVENT) === 0) return;
       try {
@@ -353,10 +361,14 @@ class OpsMetricsCollector {
       clearInterval(this.broadcastInterval);
       this.broadcastInterval = null;
     }
+    if (this.reconcileInterval) {
+      clearInterval(this.reconcileInterval);
+      this.reconcileInterval = null;
+    }
     this.emitter.removeAllListeners();
   }
 
-  private async discoverQueues(): Promise<void> {
+  async discoverQueues(): Promise<void> {
     try {
       this.groupQueueNames = await this.queueRepo.discoverQueueNames();
     } catch (err) {
@@ -410,6 +422,25 @@ class OpsMetricsCollector {
       computedAt: new Date(now),
     };
     return this.badgeCountsCache;
+  }
+
+  private async reconcilePending(): Promise<void> {
+    try {
+      let totalDrift = 0;
+      for (const queueName of this.groupQueueNames) {
+        const result = await this.queueRepo.reconcileTotalPending(queueName);
+        if (result) totalDrift += Math.abs(result.drift);
+      }
+      this.latestPendingDrift = totalDrift;
+      if (totalDrift !== 0) {
+        logger.info(
+          { pendingDrift: totalDrift },
+          "Reconciled GroupQueue pending counter to ground truth",
+        );
+      }
+    } catch (err) {
+      logger.warn({ error: err }, "Failed to reconcile pending counter");
+    }
   }
 
   getDashboardData(): DashboardData {
@@ -486,6 +517,7 @@ class OpsMetricsCollector {
       blockedGroups,
       parkedGroups,
       totalPendingJobs,
+      pendingDrift: this.latestPendingDrift,
       throughputIngestedPerSec: this.currentIngestedPerSec,
       totalCompleted: this.latestTotalCompleted,
       totalFailed: this.latestTotalFailed,
@@ -611,36 +643,16 @@ class OpsMetricsCollector {
     if (newCompleted > 0 || !this.hasBaseline) {
       const latencyPipeline = this.redis.pipeline();
       for (const name of this.groupQueueNames) {
-        latencyPipeline.zrange(`${name}:completed`, 0, 24, "REV");
+        latencyPipeline.lrange(`${name}:gq:stats:latencies-ms`, 0, -1);
       }
       const latencyResults = await latencyPipeline.exec();
 
       if (latencyResults) {
-        const jobIdPipeline = this.redis.pipeline();
-        const jobKeys: string[] = [];
-        for (let i = 0; i < this.groupQueueNames.length; i++) {
-          const jobIds = (latencyResults[i]?.[1] as string[]) ?? [];
-          const name = this.groupQueueNames[i]!;
-          for (const jobId of jobIds) {
-            jobIdPipeline.hmget(
-              `${name}:${jobId}`,
-              "processedOn",
-              "finishedOn",
-            );
-            jobKeys.push(`${name}:${jobId}`);
-          }
-        }
-        if (jobKeys.length > 0) {
-          const jobResults = await jobIdPipeline.exec();
-          if (jobResults) {
-            for (const [, result] of jobResults) {
-              const fields = result as [string | null, string | null];
-              const processedOn = fields?.[0] ? Number(fields[0]) : 0;
-              const finishedOn = fields?.[1] ? Number(fields[1]) : 0;
-              if (processedOn > 0 && finishedOn > processedOn) {
-                latencies.push(finishedOn - processedOn);
-              }
-            }
+        for (const [, result] of latencyResults) {
+          if (!Array.isArray(result)) continue;
+          for (const raw of result) {
+            const ms = Number(raw);
+            if (Number.isFinite(ms) && ms >= 0) latencies.push(ms);
           }
         }
       }
@@ -874,7 +886,7 @@ class OpsMetricsCollector {
     }
   }
 
-  private async collect(): Promise<void> {
+  async collect(): Promise<void> {
     if (this.isCollecting) return;
     this.isCollecting = true;
     try {
@@ -1045,5 +1057,3 @@ export function getOpsMetricsCollector(params: {
   }
   return singleton;
 }
-
-export type { OpsMetricsCollector };

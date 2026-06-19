@@ -13,6 +13,7 @@ import cloneDeep from "lodash-es/cloneDeep";
 import Long from "long";
 import { z } from "zod";
 import { createLogger } from "~/utils/logger/server";
+import { toError } from "~/utils/posthogErrorCapture";
 import type { DeepPartial } from "../../utils/types";
 import type { CollectorJob } from "../background/types";
 import { openTelemetryToLangWatchMetadataMapping } from "./metadata";
@@ -21,15 +22,6 @@ import {
   extractStrandsAgentsMetadata,
   isStrandsAgentsInstrumentation,
 } from "./span-event-processing/strands-agents";
-import type {
-  BaseSpan,
-  ChatMessage,
-  LLMSpan,
-  RAGChunk,
-  Span,
-  SpanTypes,
-  TypedValueChatMessages,
-} from "./types";
 import {
   chatMessageSchema,
   customMetadataSchema,
@@ -40,7 +32,14 @@ import {
   spanTimestampsSchema,
   spanTypesSchema,
   typedValueChatMessagesSchema,
-} from "./types.generated";
+  type BaseSpan,
+  type ChatMessage,
+  type LLMSpan,
+  type RAGChunk,
+  type Span,
+  type SpanTypes,
+  type TypedValueChatMessages,
+} from "./types";
 import { decodeBase64OpenTelemetryId, decodeOpenTelemetryId } from "./utils";
 
 const logger = createLogger("langwatch.tracer.otel.traces");
@@ -107,7 +106,7 @@ export const openTelemetryTraceRequestToTracesForCollection = async (
           message: error instanceof Error ? error.message : "Unknown error",
         });
         span.recordException(
-          error instanceof Error ? error : new Error(String(error)),
+          toError(error),
         );
         throw error;
       }
@@ -216,7 +215,7 @@ const openTelemetryTraceRequestToTraceForCollection = (
           message: error instanceof Error ? error.message : "Unknown error",
         });
         span.recordException(
-          error instanceof Error ? error : new Error(String(error)),
+          toError(error),
         );
         throw error;
       }
@@ -1305,7 +1304,7 @@ const addOpenTelemetrySpanAsSpan = (
           message: error instanceof Error ? error.message : "Unknown error",
         });
         otelSpan.recordException(
-          error instanceof Error ? error : new Error(String(error)),
+          toError(error),
         );
         throw error;
       }

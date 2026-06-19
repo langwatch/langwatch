@@ -123,7 +123,13 @@ async function main() {
     where: { id: { in: owner.teamMemberships.map((m) => m.teamId) } },
     select: { id: true, organizationId: true },
   });
-  await prisma.roleBinding.deleteMany({ where: { userId: user.id } });
+  // Multitenancy guard rejects deleteMany without organizationId, so
+  // loop per org instead of one global wipe.
+  for (const m of owner.orgMemberships) {
+    await prisma.roleBinding.deleteMany({
+      where: { userId: user.id, organizationId: m.organizationId },
+    });
+  }
   for (const m of owner.orgMemberships) {
     await prisma.roleBinding.create({
       data: {

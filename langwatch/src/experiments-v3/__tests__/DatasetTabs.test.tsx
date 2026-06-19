@@ -84,12 +84,14 @@ describe("DatasetTabs", () => {
 
     it("shows add button", () => {
       renderDatasetTabs();
-      expect(screen.getByLabelText("Add dataset")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Add" })).toBeInTheDocument();
     });
 
     it("shows edit button", () => {
       renderDatasetTabs();
-      expect(screen.getByLabelText("Edit dataset columns")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Edit columns" }),
+      ).toBeInTheDocument();
     });
   });
 
@@ -151,7 +153,7 @@ describe("DatasetTabs", () => {
       const user = userEvent.setup();
       renderDatasetTabs();
 
-      await user.click(screen.getByLabelText("Add dataset"));
+      await user.click(screen.getByRole("button", { name: "Add" }));
 
       await waitFor(() => {
         expect(screen.getByText("Select existing dataset")).toBeInTheDocument();
@@ -164,7 +166,7 @@ describe("DatasetTabs", () => {
       const user = userEvent.setup();
       renderDatasetTabs();
 
-      await user.click(screen.getByLabelText("Add dataset"));
+      await user.click(screen.getByRole("button", { name: "Add" }));
       await waitFor(() => {
         expect(screen.getByText("Select existing dataset")).toBeInTheDocument();
       });
@@ -177,7 +179,7 @@ describe("DatasetTabs", () => {
       const user = userEvent.setup();
       renderDatasetTabs();
 
-      await user.click(screen.getByLabelText("Add dataset"));
+      await user.click(screen.getByRole("button", { name: "Add" }));
       await waitFor(() => {
         expect(screen.getByText("Upload CSV")).toBeInTheDocument();
       });
@@ -191,7 +193,7 @@ describe("DatasetTabs", () => {
 
       renderDatasetTabs();
 
-      await user.click(screen.getByLabelText("Add dataset"));
+      await user.click(screen.getByRole("button", { name: "Add" }));
       await waitFor(() => {
         expect(screen.getByText("Create new")).toBeInTheDocument();
       });
@@ -215,7 +217,7 @@ describe("DatasetTabs", () => {
 
       renderDatasetTabs();
 
-      await user.click(screen.getByLabelText("Add dataset"));
+      await user.click(screen.getByRole("button", { name: "Add" }));
       await waitFor(() => {
         expect(screen.getByText("Create new")).toBeInTheDocument();
       });
@@ -233,7 +235,7 @@ describe("DatasetTabs", () => {
       const user = userEvent.setup();
       renderDatasetTabs();
 
-      await user.click(screen.getByLabelText("Edit dataset columns"));
+      await user.click(screen.getByRole("button", { name: "Edit columns" }));
 
       expect(mockOnEditDataset).toHaveBeenCalled();
     });

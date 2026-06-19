@@ -39,6 +39,7 @@ function renderSwitcher(props: WorkspaceSwitcherProps) {
 
 const personal = {
   kind: "personal" as const,
+  orgId: null,
   href: "/me",
   label: "My Workspace",
   subtitle: "Personal usage, personal budget",
@@ -81,7 +82,7 @@ describe("WorkspaceSwitcher", () => {
   describe("given the user has only a personal workspace", () => {
     it("renders the personal label in the trigger", () => {
       renderSwitcher({
-        personal,
+        personals: [personal],
         teams: [],
         projects: [],
         current: { kind: "personal" },
@@ -92,7 +93,7 @@ describe("WorkspaceSwitcher", () => {
 
     it("disables the trigger because there is nothing to switch to", () => {
       renderSwitcher({
-        personal,
+        personals: [personal],
         teams: [],
         projects: [],
         current: { kind: "personal" },
@@ -108,7 +109,7 @@ describe("WorkspaceSwitcher", () => {
   describe("given the user has a team and a project context available", () => {
     it("enables the trigger", () => {
       renderSwitcher({
-        personal,
+        personals: [personal],
         teams: [teamA],
         projects: [projectFoo],
         current: { kind: "personal" },
@@ -124,7 +125,7 @@ describe("WorkspaceSwitcher", () => {
   describe("given the trigger is rendered for a current team context", () => {
     it("shows the team label in the trigger", () => {
       renderSwitcher({
-        personal,
+        personals: [personal],
         teams: [teamA],
         projects: [],
         current: { kind: "team", teamId: "team_a" },
@@ -137,7 +138,7 @@ describe("WorkspaceSwitcher", () => {
   describe("given the trigger is rendered for a current project context", () => {
     it("shows the project label in the trigger", () => {
       renderSwitcher({
-        personal,
+        personals: [personal],
         teams: [],
         projects: [projectFoo],
         current: { kind: "project", projectId: "project_foo" },
@@ -153,7 +154,7 @@ describe("WorkspaceSwitcher", () => {
       const user = userEvent.setup();
       const onCreateProjectForTeam = vi.fn();
       renderSwitcher({
-        personal,
+        personals: [personal],
         teams: [{ ...teamA, canCreateProject: true }],
         projects: [projectFoo],
         current: { kind: "personal" },
@@ -178,7 +179,7 @@ describe("WorkspaceSwitcher", () => {
     it("hides the + button when the user cannot create projects in the team", async () => {
       const user = userEvent.setup();
       renderSwitcher({
-        personal,
+        personals: [personal],
         teams: [{ ...teamA, canCreateProject: false }],
         projects: [projectFoo],
         current: { kind: "personal" },
@@ -198,7 +199,7 @@ describe("WorkspaceSwitcher", () => {
     it("does not show a visible 'Create project' tooltip when the dropdown opens", async () => {
       const user = userEvent.setup();
       renderSwitcher({
-        personal,
+        personals: [personal],
         teams: [{ ...teamA, canCreateProject: true }],
         projects: [projectFoo],
         current: { kind: "personal" },
@@ -224,7 +225,7 @@ describe("WorkspaceSwitcher", () => {
     it("does not auto-focus the + button when the dropdown opens", async () => {
       const user = userEvent.setup();
       renderSwitcher({
-        personal,
+        personals: [personal],
         teams: [{ ...teamA, canCreateProject: true }],
         projects: [projectFoo],
         current: { kind: "personal" },
@@ -249,7 +250,7 @@ describe("WorkspaceSwitcher", () => {
     it("shows the tooltip on pointer hover and hides it on leave", async () => {
       const user = userEvent.setup();
       renderSwitcher({
-        personal,
+        personals: [personal],
         teams: [{ ...teamA, canCreateProject: true }],
         projects: [projectFoo],
         current: { kind: "personal" },
@@ -299,7 +300,7 @@ describe("WorkspaceSwitcher", () => {
     it("renders the My Workspace entry when personal is provided", async () => {
       const user = userEvent.setup();
       renderSwitcher({
-        personal,
+        personals: [personal],
         teams: [teamA],
         projects: [projectFoo],
         current: { kind: "team", teamId: "team_a" },
@@ -317,7 +318,7 @@ describe("WorkspaceSwitcher", () => {
   describe("given an unknown current context", () => {
     it("falls back to a 'choose workspace' label", () => {
       renderSwitcher({
-        personal,
+        personals: [personal],
         teams: [teamA],
         projects: [],
         current: { kind: "unknown" },
@@ -330,7 +331,7 @@ describe("WorkspaceSwitcher", () => {
   describe("given a team context whose id is not in the teams array", () => {
     it("uses 'Team' as a graceful fallback in the trigger", () => {
       renderSwitcher({
-        personal,
+        personals: [personal],
         teams: [teamA],
         projects: [],
         current: { kind: "team", teamId: "team_does_not_exist" },
@@ -343,7 +344,7 @@ describe("WorkspaceSwitcher", () => {
   describe("aria semantics", () => {
     it("exposes aria-haspopup=menu on the trigger", () => {
       renderSwitcher({
-        personal,
+        personals: [personal],
         teams: [teamA],
         projects: [],
         current: { kind: "personal" },
@@ -357,7 +358,7 @@ describe("WorkspaceSwitcher", () => {
 
     it("starts with aria-expanded=false", () => {
       renderSwitcher({
-        personal,
+        personals: [personal],
         teams: [teamA],
         projects: [],
         current: { kind: "personal" },
@@ -371,7 +372,7 @@ describe("WorkspaceSwitcher", () => {
 
     it("includes the current workspace label in the aria-label so a screen reader announces context", () => {
       renderSwitcher({
-        personal,
+        personals: [personal],
         teams: [],
         projects: [],
         current: { kind: "personal" },
@@ -394,7 +395,7 @@ describe("WorkspaceSwitcher", () => {
     it("auto-detects personal as the current context", () => {
       mockPathname = "/me";
       renderSwitcher({
-        personal,
+        personals: [personal],
         teams: [teamA],
         projects: [projectFoo],
       });
@@ -407,7 +408,7 @@ describe("WorkspaceSwitcher", () => {
     it("still auto-detects personal", () => {
       mockPathname = "/me/configure";
       renderSwitcher({
-        personal,
+        personals: [personal],
         teams: [teamA],
         projects: [projectFoo],
       });
@@ -420,7 +421,7 @@ describe("WorkspaceSwitcher", () => {
     it("auto-detects the team via slug match", () => {
       mockPathname = "/settings/teams/team-a";
       renderSwitcher({
-        personal,
+        personals: [personal],
         teams: [teamA],
         projects: [],
       });
@@ -434,7 +435,7 @@ describe("WorkspaceSwitcher", () => {
       mockPathname = "/project-foo";
       mockProject = { id: "project_foo", slug: "project-foo" };
       renderSwitcher({
-        personal,
+        personals: [personal],
         teams: [],
         projects: [projectFoo],
       });
@@ -447,7 +448,7 @@ describe("WorkspaceSwitcher", () => {
     it("falls back to 'Choose workspace'", () => {
       mockPathname = "/settings/billing";
       renderSwitcher({
-        personal,
+        personals: [personal],
         teams: [teamA],
         projects: [projectFoo],
       });
@@ -460,7 +461,7 @@ describe("WorkspaceSwitcher", () => {
     it("overrides auto-detection from the URL", () => {
       mockPathname = "/me"; // would auto-detect personal
       renderSwitcher({
-        personal,
+        personals: [personal],
         teams: [teamA],
         projects: [],
         current: { kind: "team", teamId: "team_a" },
@@ -468,6 +469,78 @@ describe("WorkspaceSwitcher", () => {
 
       // Trigger shows the team label (override won), not "My Workspace"
       expect(screen.getByText("Acme Engineering")).toBeInTheDocument();
+    });
+  });
+
+  // -------------------------------------------------------------------
+  // Org-scoped routes (/settings/*, /governance) render the switcher with
+  // the organization as the current chip so the user can jump back into a
+  // project, and multi-org users can switch org in place.
+  // Spec: specs/ai-gateway/governance/workspace-switcher.feature
+  // -------------------------------------------------------------------
+  describe("when the current context is an organization", () => {
+    const orgAcme = { orgId: "org_acme", orgName: "Acme", orgSlug: "acme" };
+    const orgGlobex = {
+      orgId: "org_globex",
+      orgName: "Globex",
+      orgSlug: "globex",
+    };
+
+    /** @scenario On an org-scoped route the switcher shows the organization as the current chip */
+    it("shows the organization name in the trigger", () => {
+      renderSwitcher({
+        personals: [personal],
+        teams: [],
+        projects: [],
+        current: { kind: "organization", orgId: "org_acme", orgName: "Acme" },
+      });
+
+      expect(
+        screen.getByRole("button", {
+          name: /switch workspace \(current: Acme\)/i,
+        }),
+      ).toBeInTheDocument();
+    });
+
+    /** @scenario A multi-org user switches organization in place from the org-scoped switcher */
+    it("calls onSwitchOrganization when a different org is picked", async () => {
+      const user = userEvent.setup();
+      const onSwitchOrganization = vi.fn();
+      renderSwitcher({
+        personals: [personal],
+        teams: [],
+        projects: [],
+        current: { kind: "organization", orgId: "org_acme", orgName: "Acme" },
+        organizations: [orgAcme, orgGlobex],
+        onSwitchOrganization,
+      });
+
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
+      await user.click(await screen.findByText("Globex"));
+
+      expect(onSwitchOrganization).toHaveBeenCalledWith("org_globex");
+    });
+
+    it("does not render an org-switch group for a single-org user", async () => {
+      const user = userEvent.setup();
+      renderSwitcher({
+        personals: [personal],
+        teams: [teamA],
+        projects: [projectFoo],
+        current: { kind: "organization", orgId: "org_acme", orgName: "Acme" },
+        organizations: [orgAcme],
+        onSwitchOrganization: vi.fn(),
+      });
+
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
+      // The personal + project entries are reachable, but there is no
+      // "Organizations" switch group when the user belongs to one org.
+      await screen.findByText("Foo Project");
+      expect(screen.queryByText("Organizations")).not.toBeInTheDocument();
     });
   });
 
@@ -526,7 +599,7 @@ describe("WorkspaceSwitcher", () => {
     it("groups teams under their org name as section headers", async () => {
       const user = userEvent.setup();
       renderSwitcher({
-        personal,
+        personals: [personal],
         teams: [teamAcmeDefault, teamGlobexDefault],
         projects: [projectAcme, projectGlobex],
         current: { kind: "personal" },
@@ -547,7 +620,7 @@ describe("WorkspaceSwitcher", () => {
     it("does NOT render the generic 'Teams & projects' header in multi-org mode", async () => {
       const user = userEvent.setup();
       renderSwitcher({
-        personal,
+        personals: [personal],
         teams: [teamAcmeDefault, teamGlobexDefault],
         projects: [projectAcme, projectGlobex],
         current: { kind: "personal" },
@@ -583,7 +656,7 @@ describe("WorkspaceSwitcher", () => {
         label: "Acme Alt Project",
       };
       renderSwitcher({
-        personal,
+        personals: [personal],
         teams: [teamAcmeDefault, teamAcmeAlt],
         projects: [projectAcme, projectAcmeAlt],
         current: { kind: "personal" },
@@ -600,19 +673,232 @@ describe("WorkspaceSwitcher", () => {
     });
   });
 
-  describe("when a user belongs to a single org", () => {
-    it("renders no section header — org context is implicit when there is only one", () => {
+  describe("when a single org has no governance-bound personal", () => {
+    it("renders no org header — the org context is implicit", async () => {
+      const user = userEvent.setup();
       renderSwitcher({
-        personal,
+        // No personal entry for this org (governance off), so there is no
+        // "My Workspace" to give the org a header to hang under.
         teams: [teamA],
         projects: [projectFoo],
-        current: { kind: "personal" },
+        current: { kind: "project", projectId: "project_foo" },
       });
 
-      screen.getByRole("button", { name: /switch workspace/i }).click();
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
 
+      // The team row is unique to the open dropdown (the trigger shows the
+      // current project), so finding it confirms the menu opened.
+      await screen.findByText("Acme Engineering");
       expect(screen.queryByText("Teams & projects")).not.toBeInTheDocument();
+      // "Acme" (the org header) is exact-matched; the team "Acme Engineering"
+      // is a different string, so this asserts no org header rendered.
       expect(screen.queryByText("Acme")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when a user belongs to a single governance org", () => {
+    const soloPersonal = {
+      kind: "personal" as const,
+      orgId: "org_acme",
+      orgName: "Acme",
+      orgSlug: "acme",
+      href: "/me",
+      label: "My Workspace",
+      subtitle: "Personal usage, personal budget",
+    };
+
+    /** @scenario A single governance organization still shows its name with My Workspace nested under it */
+    it("shows the org name as a header with My Workspace nested under it, not floating at the top", async () => {
+      const user = userEvent.setup();
+      renderSwitcher({
+        personals: [soloPersonal],
+        teams: [teamA],
+        projects: [projectFoo],
+        current: { kind: "personal", orgId: "org_acme" },
+      });
+
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
+
+      // The org name renders as a section header even with a single org, so it
+      // never disappears. ("Acme" is the org; the team is "Acme Engineering".)
+      expect(await screen.findByText("Acme")).toBeInTheDocument();
+      // The lone My Workspace nests under that header (one row, linking to /me),
+      // rather than rendering as a separate top-level group above the org.
+      const myWorkspaceHrefs = screen
+        .getAllByText("My Workspace")
+        .map((el) => el.closest("a")?.getAttribute("href"))
+        .filter((href): href is string => href != null);
+      expect(myWorkspaceHrefs).toEqual(["/me"]);
+    });
+  });
+
+  describe("given personal workspaces in multiple governance organizations", () => {
+    const personalAlpha = {
+      kind: "personal" as const,
+      orgId: "org_alpha",
+      orgName: "Alpha",
+      orgSlug: "alpha",
+      href: "/me?org=alpha",
+      label: "My Workspace",
+      subtitle: "Personal usage, personal budget",
+    };
+    const personalBeta = {
+      kind: "personal" as const,
+      orgId: "org_beta",
+      orgName: "Beta",
+      orgSlug: "beta",
+      href: "/me?org=beta",
+      label: "My Workspace",
+      subtitle: "Personal usage, personal budget",
+    };
+    const teamAlpha = {
+      kind: "team" as const,
+      teamId: "team_alpha",
+      teamSlug: "team-alpha",
+      orgId: "org_alpha",
+      orgName: "Alpha",
+      orgSlug: "alpha",
+      href: "/settings/teams/team-alpha",
+      label: "Alpha Engineering",
+    };
+    const projectAlpha = {
+      kind: "project" as const,
+      projectId: "p_alpha",
+      projectSlug: "p-alpha",
+      teamId: "team_alpha",
+      orgId: "org_alpha",
+      orgName: "Alpha",
+      orgSlug: "alpha",
+      href: "/p-alpha",
+      label: "Alpha Project",
+    };
+    const teamBeta = {
+      kind: "team" as const,
+      teamId: "team_beta",
+      teamSlug: "team-beta",
+      orgId: "org_beta",
+      orgName: "Beta",
+      orgSlug: "beta",
+      href: "/settings/teams/team-beta",
+      label: "Beta Engineering",
+    };
+    const projectBeta = {
+      kind: "project" as const,
+      projectId: "p_beta",
+      projectSlug: "p-beta",
+      teamId: "team_beta",
+      orgId: "org_beta",
+      orgName: "Beta",
+      orgSlug: "beta",
+      href: "/p-beta",
+      label: "Beta Project",
+    };
+    const teamGamma = {
+      kind: "team" as const,
+      teamId: "team_gamma",
+      teamSlug: "team-gamma",
+      orgId: "org_gamma",
+      orgName: "Gamma",
+      orgSlug: "gamma",
+      href: "/settings/teams/team-gamma",
+      label: "Gamma Engineering",
+    };
+    const projectGamma = {
+      kind: "project" as const,
+      projectId: "p_gamma",
+      projectSlug: "p-gamma",
+      teamId: "team_gamma",
+      orgId: "org_gamma",
+      orgName: "Gamma",
+      orgSlug: "gamma",
+      href: "/p-gamma",
+      label: "Gamma Project",
+    };
+
+    // Dropdown entries render as <a href>; the trigger chip shows the same
+    // label in a <button>, so filter to anchors to count only the menu rows.
+    const hrefsFor = (label: string) =>
+      screen
+        .getAllByText(label)
+        .map((el) => el.closest("a")?.getAttribute("href"))
+        .filter((href): href is string => href != null);
+
+    /** @scenario My Workspace nests under each governance-enabled organization */
+    it("renders a My Workspace entry under each org and no top-level group", async () => {
+      const user = userEvent.setup();
+      renderSwitcher({
+        personals: [personalAlpha, personalBeta],
+        teams: [teamAlpha, teamBeta],
+        projects: [projectAlpha, projectBeta],
+        current: { kind: "personal", orgId: "org_alpha" },
+      });
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
+      // One "My Workspace" row per governance org, both org headers present.
+      await screen.findAllByText("My Workspace");
+      expect(hrefsFor("My Workspace").length).toBe(2);
+      expect(screen.getByText("Alpha")).toBeInTheDocument();
+      expect(screen.getByText("Beta")).toBeInTheDocument();
+    });
+
+    /** @scenario With multiple governance organizations, each My Workspace carries its org */
+    it("links each My Workspace to /me?org=<slug>", async () => {
+      const user = userEvent.setup();
+      renderSwitcher({
+        personals: [personalAlpha, personalBeta],
+        teams: [teamAlpha, teamBeta],
+        projects: [projectAlpha, projectBeta],
+        current: { kind: "personal", orgId: "org_alpha" },
+      });
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
+      await screen.findAllByText("My Workspace");
+      const hrefs = hrefsFor("My Workspace");
+      expect(hrefs).toContain("/me?org=alpha");
+      expect(hrefs).toContain("/me?org=beta");
+    });
+
+    /** @scenario An organization without governance shows no My Workspace row */
+    it("shows My Workspace only under governance orgs, not the non-governance one", async () => {
+      const user = userEvent.setup();
+      renderSwitcher({
+        personals: [personalAlpha, personalBeta],
+        teams: [teamAlpha, teamBeta, teamGamma],
+        projects: [projectAlpha, projectBeta, projectGamma],
+        current: { kind: "personal", orgId: "org_alpha" },
+      });
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
+      // Two governance orgs → two My Workspace rows; Gamma (no governance)
+      // shows its team but contributes no personal entry.
+      await screen.findAllByText("My Workspace");
+      expect(hrefsFor("My Workspace").length).toBe(2);
+      expect(screen.getByText("Gamma")).toBeInTheDocument();
+      expect(screen.getByText("Gamma Engineering")).toBeInTheDocument();
+    });
+
+    /** @scenario With a single governance organization, My Workspace links to /me */
+    it("keeps a single governance org's My Workspace at /me with no org param", async () => {
+      const user = userEvent.setup();
+      const soloPersonal = { ...personalAlpha, href: "/me" };
+      renderSwitcher({
+        personals: [soloPersonal],
+        teams: [teamAlpha],
+        projects: [projectAlpha],
+        current: { kind: "personal", orgId: "org_alpha" },
+      });
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
+      await screen.findAllByText("My Workspace");
+      expect(hrefsFor("My Workspace")).toEqual(["/me"]);
     });
   });
 });

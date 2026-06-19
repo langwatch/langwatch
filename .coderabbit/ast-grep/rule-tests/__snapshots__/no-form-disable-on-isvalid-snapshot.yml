@@ -1,0 +1,14 @@
+id: no-form-disable-on-isvalid
+snapshots:
+  const C = () => <button disabled={!form.formState.isValid}>Save</button>;:
+    labels:
+    - source: disabled={!form.formState.isValid}
+      style: primary
+      start: 24
+      end: 58
+  const C = () => <button disabled={!isValid}>Save</button>;:
+    labels:
+    - source: disabled={!isValid}
+      style: primary
+      start: 24
+      end: 43

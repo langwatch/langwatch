@@ -56,6 +56,7 @@ vi.mock("~/utils/logger/server", () => ({
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
+  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
 }));
 
 vi.mock("~/server/elasticsearch", () => ({
@@ -64,7 +65,7 @@ vi.mock("~/server/elasticsearch", () => ({
 }));
 
 // Mock generated types module (build artifact, not present in raw checkout)
-vi.mock("~/server/tracer/types.generated", () => ({
+vi.mock("~/server/tracer/types", () => ({
   chatMessageSchema: vi.fn(),
 }));
 

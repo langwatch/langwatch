@@ -10,16 +10,16 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import NextLink from "~/utils/compat/next-link";
-import { useRouter } from "~/utils/compat/next-router";
 import { Plus, Shield } from "react-feather";
 import type { UseFormReturn } from "react-hook-form";
+import NextLink from "~/utils/compat/next-link";
+import { useRouter } from "~/utils/compat/next-router";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorDefinition,
   type EvaluatorTypes,
-} from "../../server/evaluations/evaluators.generated";
+} from "../../server/evaluations/evaluators";
 import { api } from "../../utils/api";
 import { isFeatureEnabled } from "../../utils/featureFlags";
 import { titleCase } from "../../utils/stringCasing";

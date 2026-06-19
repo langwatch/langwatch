@@ -235,6 +235,20 @@ export const analyticsMetrics = {
       increaseIs: "neutral",
 
     },
+    cost_billed: {
+      ...numericFieldAnalyticsWithPercentiles("metrics.cost_billed"),
+      label: "Billed Cost",
+      colorSet: "greenTones",
+      format: (amount) => formatMoney({ amount, currency: "USD" }),
+      increaseIs: "neutral",
+    },
+    cost_non_billed: {
+      ...numericFieldAnalyticsWithPercentiles("metrics.cost_non_billed"),
+      label: "Non-billed (theoretical) Cost",
+      colorSet: "grayTones",
+      format: (amount) => formatMoney({ amount, currency: "USD" }),
+      increaseIs: "neutral",
+    },
     prompt_tokens: {
       ...numericFieldAnalyticsWithPercentiles("metrics.prompt_tokens"),
       label: "Prompt Tokens",
@@ -248,6 +262,30 @@ export const analyticsMetrics = {
       colorSet: "orangeTones",
       increaseIs: "neutral",
 
+    },
+    cache_read_tokens: {
+      ...numericFieldAnalyticsWithPercentiles("metrics.cache_read_tokens"),
+      label: "Cache Read Tokens",
+      colorSet: "tealTones",
+      increaseIs: "neutral",
+    },
+    cache_write_tokens: {
+      ...numericFieldAnalyticsWithPercentiles("metrics.cache_write_tokens"),
+      label: "Cache Write Tokens",
+      colorSet: "yellowTones",
+      increaseIs: "neutral",
+    },
+    reasoning_tokens: {
+      ...numericFieldAnalyticsWithPercentiles("metrics.reasoning_tokens"),
+      label: "Reasoning Tokens",
+      colorSet: "pinkTones",
+      increaseIs: "neutral",
+    },
+    total_processed_tokens: {
+      ...numericFieldAnalyticsWithPercentiles("metrics.total_processed_tokens"),
+      label: "Total Processed Tokens",
+      colorSet: "purpleTones",
+      increaseIs: "neutral",
     },
     total_tokens: {
       ...numericFieldAnalyticsWithPercentiles("total_tokens"),

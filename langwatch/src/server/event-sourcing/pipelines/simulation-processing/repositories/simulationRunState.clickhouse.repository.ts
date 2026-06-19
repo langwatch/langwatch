@@ -184,14 +184,26 @@ export class SimulationRunStateRepositoryClickHouse<
 
     try {
       const client = await this.resolveClient(context.tenantId);
-      // IN-tuple dedup over the ReplacingMergeTree (see
-      // dev/docs/best_practices/clickhouse-queries.md). Inner SELECT scans
-      // only (TenantId, ScenarioRunId, UpdatedAt); outer SELECT pulls the
-      // heavy columns (Messages.*, TraceMetricsJson, RoleCosts, etc.) for
-      // the single matching row. Outer references UpdatedAt via table alias
-      // because the column is also projected as `toUnixTimestamp64Milli(...)
-      // AS UpdatedAt` — without the alias the IN-tuple comparison resolves
-      // to the projected UInt64 instead of the raw DateTime64.
+      // Latest-version read over the ReplacingMergeTree(UpdatedAt) for a single
+      // run. The inner scalar subquery finds the newest UpdatedAt reading only
+      // the light sort-key columns; the outer `t.UpdatedAt = (...)` equality is
+      // PREWHERE-able, so the heavy columns (Messages.*, TraceMetricsJson,
+      // RoleCosts, etc.) are materialized for only the single surviving row.
+      //
+      // The earlier `(TenantId, ScenarioRunId, UpdatedAt) IN (max-subquery)`
+      // tuple form was not applied as a PREWHERE on the version, so ClickHouse
+      // read the heavy Messages.* arrays across EVERY version of the run before
+      // discarding the stale ones. Runs with many snapshot versions exhausted
+      // the server memory limit (Code 241). For a single-aggregate get, scalar
+      // equality is preferable to the IN-tuple form (which stays the right
+      // choice for multi-key list reads); the sibling read path
+      // (simulation.clickhouse.repository.ts getScenarioRunData) already uses
+      // this scalar form for the same reason.
+      //
+      // Outer references UpdatedAt via the table alias because the column is
+      // also projected as `toUnixTimestamp64Milli(...) AS UpdatedAt` — without
+      // the alias the comparison resolves to the projected UInt64 instead of
+      // the raw DateTime64.
       const result = await client.query({
         query: `
           SELECT
@@ -225,12 +237,11 @@ export class SimulationRunStateRepositoryClickHouse<
           FROM ${TABLE_NAME} AS t
           WHERE t.TenantId = {tenantId:String}
             AND t.ScenarioRunId = {scenarioRunId:String}
-            AND (t.TenantId, t.ScenarioRunId, t.UpdatedAt) IN (
-              SELECT TenantId, ScenarioRunId, max(UpdatedAt)
-              FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
-                AND ScenarioRunId = {scenarioRunId:String}
-              GROUP BY TenantId, ScenarioRunId
+            AND t.UpdatedAt = (
+              SELECT max(s.UpdatedAt)
+              FROM ${TABLE_NAME} AS s
+              WHERE s.TenantId = {tenantId:String}
+                AND s.ScenarioRunId = {scenarioRunId:String}
             )
           LIMIT 1
         `,

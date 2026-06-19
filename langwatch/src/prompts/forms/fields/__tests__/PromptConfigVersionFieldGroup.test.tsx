@@ -19,10 +19,6 @@ vi.mock("~/optimization_studio/hooks/useWorkflowStore", () => ({
   useWorkflowStore: () => ({}),
 }));
 
-vi.mock("~/components/evaluations/wizard/hooks/useWizardContext", () => ({
-  useWizardContext: () => ({}),
-}));
-
 vi.mock("~/optimization_studio/hooks/useComponentExecution", () => ({
   useComponentExecution: () => ({}),
 }));
@@ -58,6 +54,7 @@ const TestWrapper = ({
   const methods = useForm<PromptConfigFormValues>({
     defaultValues: {
       version: {
+        parameters: {},
         configData: {
           inputs: [],
           outputs: [{ identifier: "output", type: "str" }],
@@ -133,6 +130,7 @@ describe("PromptConfigVersionFieldGroup", () => {
     it("renders existing inputs", () => {
       renderInputsFieldGroup({
         version: {
+          parameters: {},
           configData: {
             inputs: [
               { identifier: "question", type: "str" },
@@ -152,6 +150,7 @@ describe("PromptConfigVersionFieldGroup", () => {
     it("updates form value when editing input identifier", async () => {
       renderInputsFieldGroup({
         version: {
+          parameters: {},
           configData: {
             inputs: [{ identifier: "question", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],
@@ -178,6 +177,7 @@ describe("PromptConfigVersionFieldGroup", () => {
     it("normalizes identifier with spaces to underscores", async () => {
       renderInputsFieldGroup({
         version: {
+          parameters: {},
           configData: {
             inputs: [{ identifier: "test", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],
@@ -204,6 +204,7 @@ describe("PromptConfigVersionFieldGroup", () => {
     it("converts identifier to lowercase", async () => {
       renderInputsFieldGroup({
         version: {
+          parameters: {},
           configData: {
             inputs: [{ identifier: "test", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],
@@ -231,6 +232,7 @@ describe("PromptConfigVersionFieldGroup", () => {
       const user = userEvent.setup();
       renderInputsFieldGroup({
         version: {
+          parameters: {},
           configData: {
             inputs: [{ identifier: "input", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],
@@ -258,6 +260,7 @@ describe("PromptConfigVersionFieldGroup", () => {
       const user = userEvent.setup();
       renderInputsFieldGroup({
         version: {
+          parameters: {},
           configData: {
             inputs: [
               { identifier: "question", type: "str" },
@@ -312,6 +315,7 @@ describe("PromptConfigVersionFieldGroup", () => {
     it("prevents deleting last output", async () => {
       renderOutputsFieldGroup({
         version: {
+          parameters: {},
           configData: {
             inputs: [],
             outputs: [{ identifier: "result", type: "str" }],
@@ -340,6 +344,7 @@ describe("PromptConfigVersionFieldGroup", () => {
       const _user = userEvent.setup();
       renderOutputsFieldGroup({
         version: {
+          parameters: {},
           configData: {
             inputs: [],
             outputs: [

@@ -19,15 +19,17 @@ import {
   StatusCell,
   TokensInCell,
   TokensOutCell,
-  TtftCell,
   UserIdCell,
 } from "./SimpleCells";
+import { SinceCell } from "./SinceCell";
 import { SpanCountCell } from "./SpanCountCell";
 import { TimeCell } from "./TimeCell";
+import { TimestampCell } from "./TimestampCell";
 import { TokensCell } from "./TokensCell";
 import { TraceCell } from "./TraceCell";
 import { TraceIdCell } from "./TraceIdCell";
 import { TraceNameCell } from "./TraceNameCell";
+import { TtftCell } from "./TtftCell";
 
 /**
  * Cell renderers keyed by column id. Every TraceColumnId must have a cell;
@@ -41,6 +43,8 @@ type RequiredTraceCells = Record<
 export const traceCells = {
   [TraceSelectCell.id]: TraceSelectCell,
   [TimeCell.id]: TimeCell,
+  [SinceCell.id]: SinceCell,
+  [TimestampCell.id]: TimestampCell,
   [TraceCell.id]: TraceCell,
   [TraceNameCell.id]: TraceNameCell,
   [RootSpanNameCell.id]: RootSpanNameCell,

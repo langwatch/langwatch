@@ -42,7 +42,14 @@ export interface PersonalUsageWindow {
 }
 
 export interface PersonalUsageSummary {
+  /** Theoretical (list-price) spend — the grand total regardless of plan. */
   spentUsd: number;
+  /**
+   * Portion actually billed per token. Excludes bundled / non-billable spend
+   * (e.g. a Claude Max session), so it reflects real money out the door. The
+   * bundled portion is `spentUsd - billedUsd`.
+   */
+  billedUsd: number;
   requests: number;
   promptTokens: number;
   completionTokens: number;
@@ -53,23 +60,23 @@ export interface PersonalUsageSummary {
 export interface PersonalUsageBucket {
   /** ISO date (YYYY-MM-DD) for the bucket. */
   day: string;
+  /** Theoretical (list-price) spend — the grand total regardless of plan. */
   spentUsd: number;
+  /**
+   * Portion actually billed per token. Excludes bundled / non-billable spend
+   * (e.g. a Claude Max session), so it reflects real money out the door.
+   */
+  billedUsd: number;
   requests: number;
 }
 
 export interface PersonalUsageBreakdown {
   label: string;
+  /** Theoretical (list-price) spend for this model/tool. */
   spentUsd: number;
+  /** Portion actually billed per token (excludes bundled spend). */
+  billedUsd: number;
   requests: number;
-}
-
-export interface PersonalRecentActivity {
-  traceId: string;
-  occurredAt: string;
-  models: string[];
-  spentUsd: number;
-  /** First ~120 chars of the input — useful for the activity list summary. */
-  preview: string;
 }
 
 export interface PersonalUsageQueryInput {
@@ -111,14 +118,6 @@ export interface PersonalUsageQueryInput {
  * but the Scope/ScopeId pair narrows to the user's principal slice
  * cleanly.
  */
-/**
- * CH stores Scope as the lowercase form emitted by `scopeToClickHouse`
- * (budget.clickhouse.repository.ts:539). Reader queries must match.
- * Ariana caught the original 'PRINCIPAL' uppercase literal returning
- * zero rows — the writer maps `GatewayBudgetScopeType.PRINCIPAL` →
- * `"principal"` before insert.
- */
-const PRINCIPAL_SCOPE = "principal";
 
 export class PersonalUsageService {
   /**
@@ -153,6 +152,10 @@ export class PersonalUsageService {
       : null;
 
     const totalCost = summaryRow.totalCost + (ingestion?.totalCost ?? 0);
+    // The gateway ledger records real per-token spend (virtual-key traffic the
+    // customer pays for), so its whole amount is billed; the trace_summaries
+    // path already nets out the non-billable (bundled) portion.
+    const totalBilled = summaryRow.billedCost + (ingestion?.totalCost ?? 0);
     const totalRequests =
       summaryRow.requestCount + (ingestion?.requestCount ?? 0);
     const totalPromptTokens =
@@ -179,6 +182,7 @@ export class PersonalUsageService {
 
     return {
       spentUsd: totalCost,
+      billedUsd: totalBilled,
       requests: totalRequests,
       promptTokens: totalPromptTokens,
       completionTokens: totalCompletionTokens,
@@ -207,13 +211,15 @@ export class PersonalUsageService {
       query: `
         SELECT
           toDate(LatestOccurredAt) AS Day,
-          sum(SpentUsd)            AS SpentUsd,
+          sum(TraceSpentUsd)       AS SpentUsd,
+          sum(coalesce(TraceSpentUsd, 0) - NonBilledUsd) AS BilledUsd,
           count()                  AS Requests
         FROM (
           SELECT
             TraceId,
             argMax(OccurredAt, UpdatedAt) AS LatestOccurredAt,
-            argMax(TotalCost, UpdatedAt)  AS SpentUsd
+            argMax(TotalCost, UpdatedAt)  AS TraceSpentUsd,
+            argMax(coalesce(NonBilledCost, if(Attributes['langwatch.cost.non_billable'] = 'true', TotalCost, 0), 0), UpdatedAt) AS NonBilledUsd
           FROM trace_summaries
           WHERE TenantId = {tenantId:String}
             AND OccurredAt >= {fromMs:DateTime64(3, 'UTC')}
@@ -232,13 +238,26 @@ export class PersonalUsageService {
       format: "JSONEachRow",
     });
 
-    type RawBucket = { Day: string; SpentUsd: number; Requests: number };
+    type RawBucket = {
+      Day: string;
+      SpentUsd: number;
+      BilledUsd: number;
+      Requests: number;
+    };
     const rows = (await result.json()) as RawBucket[];
 
-    const byDay = new Map<string, { spentUsd: number; requests: number }>();
+    const byDay = new Map<
+      string,
+      { spentUsd: number; billedUsd: number; requests: number }
+    >();
     for (const r of rows) {
-      const existing = byDay.get(r.Day) ?? { spentUsd: 0, requests: 0 };
+      const existing = byDay.get(r.Day) ?? {
+        spentUsd: 0,
+        billedUsd: 0,
+        requests: 0,
+      };
       existing.spentUsd += Number(r.SpentUsd) || 0;
+      existing.billedUsd += Number(r.BilledUsd) || 0;
       existing.requests += Number(r.Requests) || 0;
       byDay.set(r.Day, existing);
     }
@@ -251,8 +270,13 @@ export class PersonalUsageService {
         window,
       });
       for (const r of ledgerBuckets) {
-        const existing = byDay.get(r.day) ?? { spentUsd: 0, requests: 0 };
+        const existing = byDay.get(r.day) ?? {
+          spentUsd: 0,
+          billedUsd: 0,
+          requests: 0,
+        };
         existing.spentUsd += r.spentUsd;
+        existing.billedUsd += r.billedUsd;
         existing.requests += r.requests;
         byDay.set(r.day, existing);
       }
@@ -291,11 +315,17 @@ export class PersonalUsageService {
       });
       type Raw = { Day: string; SpentUsd: number; Requests: number };
       const rows = (await result.json()) as Raw[];
-      return rows.map((r) => ({
-        day: r.Day,
-        spentUsd: Number(r.SpentUsd) || 0,
-        requests: Number(r.Requests) || 0,
-      }));
+      return rows.map((r) => {
+        const spentUsd = Number(r.SpentUsd) || 0;
+        // The gateway ledger records real per-token spend (virtual-key
+        // traffic the customer pays for), so it is fully billed.
+        return {
+          day: r.Day,
+          spentUsd,
+          billedUsd: spentUsd,
+          requests: Number(r.Requests) || 0,
+        };
+      });
     } catch {
       return [];
     }
@@ -327,13 +357,15 @@ export class PersonalUsageService {
       query: `
         SELECT
           Model,
-          sum(SpentUsd) AS SpentUsd,
+          sum(TraceSpentUsd) AS SpentUsd,
+          sum(coalesce(TraceSpentUsd, 0) - NonBilledUsd) AS BilledUsd,
           count()       AS Requests
         FROM (
           SELECT
             TraceId,
             arrayJoin(argMax(Models, UpdatedAt)) AS Model,
-            argMax(TotalCost, UpdatedAt)         AS SpentUsd
+            argMax(TotalCost, UpdatedAt)         AS TraceSpentUsd,
+            argMax(coalesce(NonBilledCost, if(Attributes['langwatch.cost.non_billable'] = 'true', TotalCost, 0), 0), UpdatedAt) AS NonBilledUsd
           FROM trace_summaries
           WHERE TenantId = {tenantId:String}
             AND OccurredAt >= {fromMs:DateTime64(3, 'UTC')}
@@ -355,7 +387,12 @@ export class PersonalUsageService {
       format: "JSONEachRow",
     });
 
-    type RawBreakdown = { Model: string; SpentUsd: number; Requests: number };
+    type RawBreakdown = {
+      Model: string;
+      SpentUsd: number;
+      BilledUsd: number;
+      Requests: number;
+    };
     const rows = (await result.json()) as RawBreakdown[];
 
     // Aggregate per-model since GROUP BY TraceId, Model returned per-trace rows.
@@ -364,9 +401,11 @@ export class PersonalUsageService {
       const existing = aggregated.get(r.Model) ?? {
         label: r.Model,
         spentUsd: 0,
+        billedUsd: 0,
         requests: 0,
       };
       existing.spentUsd += Number(r.SpentUsd) || 0;
+      existing.billedUsd += Number(r.BilledUsd) || 0;
       existing.requests += Number(r.Requests) || 0;
       aggregated.set(r.Model, existing);
     }
@@ -382,9 +421,11 @@ export class PersonalUsageService {
         const existing = aggregated.get(r.label) ?? {
           label: r.label,
           spentUsd: 0,
+          billedUsd: 0,
           requests: 0,
         };
         existing.spentUsd += r.spentUsd;
+        existing.billedUsd += r.billedUsd;
         existing.requests += r.requests;
         aggregated.set(r.label, existing);
       }
@@ -425,154 +466,16 @@ export class PersonalUsageService {
       });
       type Raw = { Label: string; SpentUsd: number; Requests: number };
       const rows = (await result.json()) as Raw[];
-      return rows.map((r) => ({
-        label: r.Label,
-        spentUsd: Number(r.SpentUsd) || 0,
-        requests: Number(r.Requests) || 0,
-      }));
-    } catch {
-      return [];
-    }
-  }
-
-  /**
-   * Recent traces (last N) — drives the "Recent activity" list on
-   * /me. Returns rich-enough rows to render summary + cost without
-   * a follow-up trace fetch.
-   */
-  async recentActivity(
-    input: PersonalUsageQueryInput,
-    limit = 10,
-  ): Promise<PersonalRecentActivity[]> {
-    const window = input.window ?? defaultLast14DaysWindow();
-    const client = await getClickHouseClientForProject(input.personalProjectId);
-    if (!client) return [];
-
-    // Inner alias must be `LatestOccurredAt` (not `OccurredAt`) so it
-    // doesn't shadow the table column in WHERE — even inside a subquery,
-    // ClickHouse's parser flags `argMax(OccurredAt, UpdatedAt) AS
-    // OccurredAt` colliding with `WHERE OccurredAt >= ...` as
-    // ILLEGAL_AGGREGATION (code 184: "Aggregate function ... is found in
-    // WHERE in query"). Outer SELECT re-projects to `OccurredAt` so the
-    // wire shape stays stable.
-    const result = await client.query({
-      query: `
-        SELECT TraceId, LatestOccurredAt AS OccurredAt, Models, SpentUsd, Preview
-        FROM (
-          SELECT
-            TraceId,
-            argMax(OccurredAt, UpdatedAt) AS LatestOccurredAt,
-            argMax(Models, UpdatedAt)     AS Models,
-            argMax(TotalCost, UpdatedAt)  AS SpentUsd,
-            argMax(ComputedInput, UpdatedAt) AS Preview
-          FROM trace_summaries
-          WHERE TenantId = {tenantId:String}
-            AND OccurredAt >= {fromMs:DateTime64(3, 'UTC')}
-            AND OccurredAt <  {toMs:DateTime64(3, 'UTC')}
-          GROUP BY TraceId
-        )
-        ORDER BY OccurredAt DESC
-        LIMIT {lim:UInt32}
-        SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
-      `,
-      query_params: {
-        tenantId: input.personalProjectId,
-        fromMs: window.start.getTime(),
-        toMs: window.end.getTime(),
-        lim: limit,
-      },
-      format: "JSONEachRow",
-    });
-
-    type RawActivity = {
-      TraceId: string;
-      OccurredAt: string;
-      Models: string[];
-      SpentUsd: number;
-      Preview: string | null;
-    };
-    const rows = (await result.json()) as RawActivity[];
-    const gateway: PersonalRecentActivity[] = rows.map((r) => ({
-      traceId: r.TraceId,
-      occurredAt: r.OccurredAt,
-      models: r.Models ?? [],
-      spentUsd: Number(r.SpentUsd) || 0,
-      preview: (r.Preview ?? "").slice(0, 120),
-    }));
-
-    // Ingestion-source ledger union: per-request rows for the user's
-    // PRINCIPAL-scope ledger entries (Claude Code OTLP / future
-    // OTLP-only sources). The ledger row carries Model + AmountUSD +
-    // OccurredAt + GatewayRequestId — enough for a list entry.
-    // Preview is empty since OTLP events don't carry chat content;
-    // the UI side surfaces an empty preview as "via OTLP" annotation.
-    let merged = gateway;
-    if (input.userId) {
-      const ingestion = await this.queryIngestionPrincipalActivity(client, {
-        userId: input.userId,
-        window,
-        limit,
+      return rows.map((r) => {
+        const spentUsd = Number(r.SpentUsd) || 0;
+        // Gateway ledger spend is real per-token spend, so fully billed.
+        return {
+          label: r.Label,
+          spentUsd,
+          billedUsd: spentUsd,
+          requests: Number(r.Requests) || 0,
+        };
       });
-      // Sort-merge: oldest-first windows are uncommon, ORDER BY
-      // OccurredAt DESC is the contract. Both inputs are already
-      // sorted; concat + re-sort + truncate is fine for the ~10-row
-      // limit and avoids a manual two-pointer merge.
-      merged = [...gateway, ...ingestion]
-        .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
-        .slice(0, limit);
-    }
-    return merged;
-  }
-
-  private async queryIngestionPrincipalActivity(
-    client: ClickHouseClient,
-    params: { userId: string; window: PersonalUsageWindow; limit: number },
-  ): Promise<PersonalRecentActivity[]> {
-    if (!isClickHouseEnabled()) return [];
-    try {
-      const result = await client.query({
-        query: `
-          SELECT
-            GatewayRequestId AS RequestId,
-            OccurredAt,
-            Model,
-            AmountUSD AS SpentUsd
-          FROM gateway_budget_ledger_events
-          WHERE Scope = '${PRINCIPAL_SCOPE}'
-            AND ScopeId = {userId:String}
-            AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
-            AND OccurredAt <  fromUnixTimestamp64Milli({toMs:Int64})
-          ORDER BY OccurredAt DESC
-          LIMIT {lim:UInt32}
-          SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
-        `,
-        query_params: {
-          userId: params.userId,
-          fromMs: params.window.start.getTime(),
-          toMs: params.window.end.getTime(),
-          lim: params.limit,
-        },
-        format: "JSONEachRow",
-      });
-      type Raw = {
-        RequestId: string;
-        OccurredAt: string;
-        Model: string;
-        SpentUsd: number;
-      };
-      const rows = (await result.json()) as Raw[];
-      return rows.map((r) => ({
-        // GatewayRequestId is the per-request idempotency key the
-        // receiver wrote (Claude Code's `request_id` from the
-        // api_request event). Distinguishable from gateway-VK trace
-        // ids by shape (`req_…` for Anthropic) — Lane-B can branch
-        // the row chrome on it if it wants the "via OTLP" annotation.
-        traceId: r.RequestId,
-        occurredAt: r.OccurredAt,
-        models: r.Model ? [r.Model] : [],
-        spentUsd: Number(r.SpentUsd) || 0,
-        preview: "",
-      }));
     } catch {
       return [];
     }
@@ -585,6 +488,7 @@ export class PersonalUsageService {
     params: { tenantId: string; window: PersonalUsageWindow },
   ): Promise<{
     totalCost: number;
+    billedCost: number;
     requestCount: number;
     promptTokens: number;
     completionTokens: number;
@@ -593,6 +497,7 @@ export class PersonalUsageService {
       query: `
         SELECT
           sum(SpentUsd)        AS TotalCost,
+          sum(coalesce(SpentUsd, 0) - NonBilledUsd) AS BilledCost,
           countDistinct(TraceId) AS RequestCount,
           sum(PromptTokens)    AS PromptTokens,
           sum(CompletionTokens) AS CompletionTokens
@@ -600,6 +505,7 @@ export class PersonalUsageService {
           SELECT
             TraceId,
             argMax(TotalCost, UpdatedAt)               AS SpentUsd,
+            argMax(coalesce(NonBilledCost, if(Attributes['langwatch.cost.non_billable'] = 'true', TotalCost, 0), 0), UpdatedAt) AS NonBilledUsd,
             argMax(TotalPromptTokenCount, UpdatedAt)   AS PromptTokens,
             argMax(TotalCompletionTokenCount, UpdatedAt) AS CompletionTokens
           FROM trace_summaries
@@ -620,6 +526,7 @@ export class PersonalUsageService {
 
     type RawSummary = {
       TotalCost: number | null;
+      BilledCost: number | null;
       RequestCount: number | null;
       PromptTokens: number | null;
       CompletionTokens: number | null;
@@ -628,6 +535,7 @@ export class PersonalUsageService {
     if (!row) {
       return {
         totalCost: 0,
+        billedCost: 0,
         requestCount: 0,
         promptTokens: 0,
         completionTokens: 0,
@@ -635,6 +543,7 @@ export class PersonalUsageService {
     }
     return {
       totalCost: Number(row.TotalCost) || 0,
+      billedCost: Number(row.BilledCost) || 0,
       requestCount: Number(row.RequestCount) || 0,
       promptTokens: Number(row.PromptTokens) || 0,
       completionTokens: Number(row.CompletionTokens) || 0,
@@ -810,7 +719,7 @@ function defaultLast14DaysWindow(): PersonalUsageWindow {
 
 function fillEmptyBuckets(
   window: PersonalUsageWindow,
-  data?: Map<string, { spentUsd: number; requests: number }>,
+  data?: Map<string, { spentUsd: number; billedUsd: number; requests: number }>,
 ): PersonalUsageBucket[] {
   const buckets: PersonalUsageBucket[] = [];
   const cursor = new Date(window.start.getTime());
@@ -820,6 +729,7 @@ function fillEmptyBuckets(
     buckets.push({
       day,
       spentUsd: v?.spentUsd ?? 0,
+      billedUsd: v?.billedUsd ?? 0,
       requests: v?.requests ?? 0,
     });
     cursor.setUTCDate(cursor.getUTCDate() + 1);
@@ -830,6 +740,7 @@ function fillEmptyBuckets(
 function emptySummary(): PersonalUsageSummary {
   return {
     spentUsd: 0,
+    billedUsd: 0,
     requests: 0,
     promptTokens: 0,
     completionTokens: 0,

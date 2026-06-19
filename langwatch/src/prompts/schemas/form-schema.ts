@@ -1,11 +1,12 @@
 import { z } from "zod";
 
 import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
+import { FALLBACK_MAX_TOKENS, MIN_MAX_TOKENS } from "~/utils/constants";
 import {
-  FALLBACK_MAX_TOKENS,
-  MIN_MAX_TOKENS,
-} from "~/utils/constants";
-import { handleSchema, scopeSchema } from "./field-schemas";
+  handleSchema,
+  runtimeParametersSchema,
+  scopeSchema,
+} from "./field-schemas";
 import { versionMetadataSchema } from "./version-metadata-schema";
 
 const latestConfigVersionSchema = getLatestConfigVersionSchema();
@@ -45,9 +46,12 @@ const baseFormSchema = z.object({
   handle: handleSchema.nullable(),
   scope: scopeSchema,
   version: z.object({
+    parameters: runtimeParametersSchema,
     configData: z.object({
-      messages: latestConfigVersionSchema.shape.configData.shape.messages.removeDefault(),
-      inputs: latestConfigVersionSchema.shape.configData.shape.inputs.removeDefault(),
+      messages:
+        latestConfigVersionSchema.shape.configData.shape.messages.removeDefault(),
+      inputs:
+        latestConfigVersionSchema.shape.configData.shape.inputs.removeDefault(),
       outputs: latestConfigVersionSchema.shape.configData.shape.outputs,
       llm: llmSchema,
       demonstrations:
@@ -61,11 +65,26 @@ const baseFormSchema = z.object({
 });
 
 /**
- * Returns a refined form schema with dynamic model limits validation
+ * Returns a refined form schema with dynamic model limits validation.
+ *
+ * Note: the system-prompt-required refinement (#3196) is applied separately
+ * via {@link withSystemPromptRequired} so both this dynamic schema and the
+ * static `formSchema` share the same client-side requirement.
+ *
  * @param modelLimits - Optional model limits from server
  * @returns Zod schema with refined maxTokens validation based on model limits
  */
 export function refinedFormSchemaWithModelLimits(
+  modelLimits?: {
+    maxOutputTokens?: number;
+    maxTokens?: number;
+  } | null,
+) {
+  const schema = baseFormSchemaWithModelLimits(modelLimits);
+  return withSystemPromptRequired(schema);
+}
+
+function baseFormSchemaWithModelLimits(
   modelLimits?: {
     maxOutputTokens?: number;
     maxTokens?: number;
@@ -119,5 +138,73 @@ export function refinedFormSchemaWithModelLimits(
   });
 }
 
-// Base schema for type inference and static parsing
+/**
+ * Refinement: require a non-empty system message in `messages`.
+ *
+ * Pre-#3196 the prompt form let users save a workflow whose system message
+ * was empty (or simply absent), then surprised them with a 500 from the
+ * server. The server now rejects with a friendly 400, but the form should
+ * still block the submit client-side so the round-trip is never attempted.
+ *
+ * Trim before checking so whitespace-only content also fails — empty +
+ * whitespace are functionally identical to the user.
+ */
+export const hasNonEmptySystemMessage = (
+  messages: readonly { role?: string; content?: string }[] | undefined | null,
+): boolean =>
+  !!messages?.some(
+    (m) =>
+      m?.role === "system" &&
+      typeof m?.content === "string" &&
+      m.content.trim() !== "",
+  );
+
+/**
+ * Wraps a base form schema with a `superRefine` that requires a non-empty
+ * system message in `messages`. Used by both the static {@link formSchema}
+ * and the dynamic {@link refinedFormSchemaWithModelLimits} so both code
+ * paths enforce the same client-side requirement.
+ */
+function withSystemPromptRequired<T extends z.ZodTypeAny>(schema: T) {
+  return schema.superRefine((values, ctx) => {
+    const messages = (
+      values as { version?: { configData?: { messages?: unknown } } }
+    ).version?.configData?.messages;
+    if (
+      !hasNonEmptySystemMessage(
+        messages as
+          | readonly { role: string; content: string }[]
+          | undefined
+          | null,
+      )
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["version", "configData", "messages"],
+        message: "System prompt is required.",
+      });
+    }
+  });
+}
+
+/**
+ * The base form schema used for parsing prompts already persisted in the
+ * DB and for typing form values. Does NOT include the system-prompt-required
+ * refinement — DB records may pre-date the refinement and must still parse.
+ *
+ * Save-time validation uses {@link formSchemaForSave} (via
+ * `refinedFormSchemaWithModelLimits` in the form resolver) so submits are
+ * blocked when the system message is empty.
+ */
 export const formSchema = baseFormSchema;
+
+/**
+ * The form schema with the system-prompt-required refinement applied.
+ * Used by `usePromptConfigForm`'s zodResolver so the Save button reflects
+ * the requirement and shows the inline message-path error when violated.
+ *
+ * Read paths (`versionedPromptToPromptConfigFormValues`,
+ * `useLoadSpanIntoPromptPlayground`) keep using {@link formSchema} so
+ * legacy / pre-#3196 prompts still hydrate.
+ */
+export const formSchemaForSave = withSystemPromptRequired(baseFormSchema);

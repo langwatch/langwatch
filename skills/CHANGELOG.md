@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.6.1](https://github.com/langwatch/langwatch/compare/skills@v0.6.0...skills@v0.6.1) (2026-06-19)
+
+
+### Bug Fixes
+
+* **cli:** default login to project, guard against personal-project confusion ([#4728](https://github.com/langwatch/langwatch/issues/4728)) ([0e355ce](https://github.com/langwatch/langwatch/commit/0e355ce4b488334c63bd8a172ce669ca30fcaf8b))
+* **deps:** consolidated npm security overrides across the monorepo (closes 18 alerts) ([#4650](https://github.com/langwatch/langwatch/issues/4650)) ([3a56a88](https://github.com/langwatch/langwatch/commit/3a56a884826d493c2d9690ae9359068c193a4725))
+
+
+### Documentation
+
+* **skills:** add TypeScript voice coverage to scenarios skill ([#4624](https://github.com/langwatch/langwatch/issues/4624)) ([752a5d8](https://github.com/langwatch/langwatch/commit/752a5d87fc2693a6eccd4bb41cf71c55bcd4f67a))
+
+## [0.6.0](https://github.com/langwatch/langwatch/compare/skills@v0.5.0...skills@v0.6.0) (2026-06-03)
+
+
+### Features
+
+* **skills/scenarios:** nudge against custom runners and JSON-DSL abstractions ([#4510](https://github.com/langwatch/langwatch/issues/4510)) ([3b15cc4](https://github.com/langwatch/langwatch/commit/3b15cc4a8e3eaa4b88fdb24c0ea10cf10e786a56))
+
+
+### Bug Fixes
+
+* **skills/scenarios:** clarify per-adapter "how does this connect to my agent?" ([c6b514f](https://github.com/langwatch/langwatch/commit/c6b514f2116e7458634d8c57dcb1c91508df7669))
+* **skills/scenarios:** clarify per-adapter how to connect the user's agent (voice section) ([#4505](https://github.com/langwatch/langwatch/issues/4505)) ([c6b514f](https://github.com/langwatch/langwatch/commit/c6b514f2116e7458634d8c57dcb1c91508df7669))
+
 ## [0.5.0](https://github.com/langwatch/langwatch/compare/skills@v0.4.1...skills@v0.5.0) (2026-06-02)
 
 

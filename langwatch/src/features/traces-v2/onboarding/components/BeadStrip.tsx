@@ -1,11 +1,7 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { Tooltip } from "~/components/ui/tooltip";
-import {
-  CHAPTERS,
-  type ChapterId,
-  chapterIndex,
-} from "../chapters/chapters";
+import { CHAPTERS, type ChapterId, chapterIndex } from "../chapters/chapters";
 import type { StageId } from "../chapters/onboardingJourneyConfig";
 
 interface BeadStripProps {
@@ -117,15 +113,15 @@ export function BeadStrip({
                 width={isCurrent ? "16px" : "8px"}
                 height="8px"
                 borderRadius="full"
-                background={
-                  isCurrent || isPast ? "orange.solid" : "bg.surface"
-                }
+                background={isCurrent || isPast ? "orange.solid" : "bg.surface"}
                 borderWidth="1px"
                 borderColor={
                   isCurrent || isPast ? "orange.solid" : "border.muted"
                 }
                 boxShadow={
-                  isCurrent ? "0 0 0 3px var(--chakra-colors-orange-muted)" : undefined
+                  isCurrent
+                    ? "0 0 0 3px var(--chakra-colors-orange-muted)"
+                    : undefined
                 }
                 transition="all 220ms cubic-bezier(0.16, 1, 0.3, 1)"
                 _hover={onJump ? { background: "orange.solid" } : undefined}

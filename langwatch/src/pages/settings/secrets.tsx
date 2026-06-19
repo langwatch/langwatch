@@ -1,6 +1,7 @@
 import {
   Box,
   Button,
+  Card,
   EmptyState,
   Heading,
   HStack,
@@ -150,76 +151,80 @@ export default function SecretsPage() {
             </EmptyState.Content>
           </EmptyState.Root>
         ) : (
-          <Table.Root width="full">
-            <Table.Header>
-              <Table.Row>
-                <Table.ColumnHeader>Name</Table.ColumnHeader>
-                <Table.ColumnHeader>Created By</Table.ColumnHeader>
-                <Table.ColumnHeader>Last Updated</Table.ColumnHeader>
-                <Table.ColumnHeader />
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {secrets.map((secret) => (
-                <Table.Row key={secret.id}>
-                  <Table.Cell>
-                    <Text fontFamily="mono">{secret.name}</Text>
-                  </Table.Cell>
-                  <Table.Cell>
-                    <Text>{secret.createdBy?.name ?? "-"}</Text>
-                  </Table.Cell>
-                  <Table.Cell>
-                    <Text>
-                      {new Date(secret.updatedAt).toLocaleDateString()}
-                    </Text>
-                  </Table.Cell>
-                  <Table.Cell textAlign="right">
-                    {canManageSecrets && (
-                      <Menu.Root>
-                        <Menu.Trigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreVertical />
-                          </Button>
-                        </Menu.Trigger>
-                        <Menu.Content>
-                          <Menu.Item
-                            value="update"
-                            onClick={() => {
-                              setSecretToUpdate({
-                                id: secret.id,
-                                name: secret.name,
-                              });
-                              setUpdateValue("");
-                            }}
-                          >
-                            <Box display="flex" alignItems="center" gap={2}>
-                              <Edit size={14} />
-                              Update Value
-                            </Box>
-                          </Menu.Item>
-                          <Menu.Item
-                            value="delete"
-                            color="red"
-                            onClick={() => {
-                              setSecretToDelete({
-                                id: secret.id,
-                                name: secret.name,
-                              });
-                            }}
-                          >
-                            <Box display="flex" alignItems="center" gap={2}>
-                              <Trash2 size={14} />
-                              Delete Secret
-                            </Box>
-                          </Menu.Item>
-                        </Menu.Content>
-                      </Menu.Root>
-                    )}
-                  </Table.Cell>
-                </Table.Row>
-              ))}
-            </Table.Body>
-          </Table.Root>
+          <Card.Root width="full" overflow="hidden">
+            <Card.Body paddingY={0} paddingX={0} overflowX="auto">
+              <Table.Root width="full">
+                <Table.Header>
+                  <Table.Row>
+                    <Table.ColumnHeader>Name</Table.ColumnHeader>
+                    <Table.ColumnHeader>Created By</Table.ColumnHeader>
+                    <Table.ColumnHeader>Last Updated</Table.ColumnHeader>
+                    <Table.ColumnHeader />
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  {secrets.map((secret) => (
+                    <Table.Row key={secret.id}>
+                      <Table.Cell>
+                        <Text fontFamily="mono">{secret.name}</Text>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Text>{secret.createdBy?.name ?? "-"}</Text>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Text>
+                          {new Date(secret.updatedAt).toLocaleDateString()}
+                        </Text>
+                      </Table.Cell>
+                      <Table.Cell textAlign="right">
+                        {canManageSecrets && (
+                          <Menu.Root>
+                            <Menu.Trigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreVertical />
+                              </Button>
+                            </Menu.Trigger>
+                            <Menu.Content>
+                              <Menu.Item
+                                value="update"
+                                onClick={() => {
+                                  setSecretToUpdate({
+                                    id: secret.id,
+                                    name: secret.name,
+                                  });
+                                  setUpdateValue("");
+                                }}
+                              >
+                                <Box display="flex" alignItems="center" gap={2}>
+                                  <Edit size={14} />
+                                  Update Value
+                                </Box>
+                              </Menu.Item>
+                              <Menu.Item
+                                value="delete"
+                                color="red"
+                                onClick={() => {
+                                  setSecretToDelete({
+                                    id: secret.id,
+                                    name: secret.name,
+                                  });
+                                }}
+                              >
+                                <Box display="flex" alignItems="center" gap={2}>
+                                  <Trash2 size={14} />
+                                  Delete Secret
+                                </Box>
+                              </Menu.Item>
+                            </Menu.Content>
+                          </Menu.Root>
+                        )}
+                      </Table.Cell>
+                    </Table.Row>
+                  ))}
+                </Table.Body>
+              </Table.Root>
+            </Card.Body>
+          </Card.Root>
         )}
 
         {/* Add Secret Dialog */}

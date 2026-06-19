@@ -1,5 +1,55 @@
 # Changelog
 
+## [0.33.2](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.33.1...typescript-sdk@v0.33.2) (2026-06-19)
+
+
+### Bug Fixes
+
+* **cli:** repoint langwatch login to cloud when picked, add --project flag ([#4929](https://github.com/langwatch/langwatch/issues/4929)) ([ee1af5f](https://github.com/langwatch/langwatch/commit/ee1af5f70cbe1f808228c0952032689c9f60d613))
+* **security:** raise protobufjs override floor to &gt;=8.6.0 ([#4852](https://github.com/langwatch/langwatch/issues/4852)) ([77ce842](https://github.com/langwatch/langwatch/commit/77ce84205d28275021b02a5bb0c320b6947dd934))
+
+## [0.33.1](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.33.0...typescript-sdk@v0.33.1) (2026-06-12)
+
+
+### Bug Fixes
+
+* **ci:** unbreak clickhouse-serverless lint and dependabot update jobs ([#4740](https://github.com/langwatch/langwatch/issues/4740)) ([d082547](https://github.com/langwatch/langwatch/commit/d082547065da3f34d49e898e2a2318e31b455463))
+* **cli:** stale ingestion-key cache never invalidated after platform revoke ([#4762](https://github.com/langwatch/langwatch/issues/4762)) ([0bb64e1](https://github.com/langwatch/langwatch/commit/0bb64e1f0c4e878c94f8d3a96ec35e78e2fd5ea9))
+* **deps:** close HIGH @grpc/grpc-js alerts across 6 manifests ([#4763](https://github.com/langwatch/langwatch/issues/4763)) ([6acd16e](https://github.com/langwatch/langwatch/commit/6acd16e0ab471c78ac788772acaae71fcfddcc6d))
+
+## [0.33.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.32.0...typescript-sdk@v0.33.0) (2026-06-11)
+
+
+### Features
+
+* **prompts:** add versioned runtime parameters to prompt versions ([#4043](https://github.com/langwatch/langwatch/issues/4043)) ([8bc5fa5](https://github.com/langwatch/langwatch/commit/8bc5fa5cf64ab8091cf28084207bc170bcb5806f))
+* **traces:** codex/opencode trace fidelity, reasoning effort, and infra-span noise filter ([#4669](https://github.com/langwatch/langwatch/issues/4669)) ([fedb1a7](https://github.com/langwatch/langwatch/commit/fedb1a78d728501ea20e1fbe57abf0c3da2bb3ce))
+
+
+### Bug Fixes
+
+* **cli:** default login to project, guard against personal-project confusion ([#4728](https://github.com/langwatch/langwatch/issues/4728)) ([0e355ce](https://github.com/langwatch/langwatch/commit/0e355ce4b488334c63bd8a172ce669ca30fcaf8b))
+* **deps:** close CRITICAL shell-quote alerts across 3 langwatch manifests ([#4732](https://github.com/langwatch/langwatch/issues/4732)) ([a4406c2](https://github.com/langwatch/langwatch/commit/a4406c2619345e5fb99f5cbc8acaf1719959b5b4))
+
+## [0.32.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.31.0...typescript-sdk@v0.32.0) (2026-06-08)
+
+
+### Features
+
+* **cli:** unify langwatch claude (gateway + OTLP ingest) ([#4544](https://github.com/langwatch/langwatch/issues/4544)) ([9bfc844](https://github.com/langwatch/langwatch/commit/9bfc844c93ccab9945e00f641420e568b2c7ef4d))
+
+
+### Bug Fixes
+
+* **deps:** bump vitest to &gt;=4.1.0 across the monorepo (closes 9 CRITICAL alerts) ([#4495](https://github.com/langwatch/langwatch/issues/4495)) ([6f90ef4](https://github.com/langwatch/langwatch/commit/6f90ef48ae5b9436742bbda5d4bef21ea904db82))
+* **deps:** consolidated npm security overrides across the monorepo (closes 18 alerts) ([#4650](https://github.com/langwatch/langwatch/issues/4650)) ([3a56a88](https://github.com/langwatch/langwatch/commit/3a56a884826d493c2d9690ae9359068c193a4725))
+* **governance:** SaaS CLI gateway default points at parked .com host ([#4625](https://github.com/langwatch/langwatch/issues/4625)) ([c123c40](https://github.com/langwatch/langwatch/commit/c123c40d0ff2860fc8558e480dccb61c1da2c9d6))
+
+
+### Code Refactoring
+
+* **types:** make zod the single source of truth, remove ts-to-zod ([#4651](https://github.com/langwatch/langwatch/issues/4651)) ([d583fbe](https://github.com/langwatch/langwatch/commit/d583fbe2ed2ca2ef320695323c17f6c362ea4efa))
+
 ## [0.31.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.30.0...typescript-sdk@v0.31.0) (2026-06-01)
 
 

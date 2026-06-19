@@ -179,7 +179,7 @@ describe("isExpired", () => {
 describe("validateLicense", () => {
   /** @scenario Validates complete license successfully */
   it("validates complete license successfully", () => {
-    const result = validateLicense(VALID_LICENSE_KEY, TEST_PUBLIC_KEY);
+    const result = validateLicense({ licenseKey: VALID_LICENSE_KEY, publicKey: TEST_PUBLIC_KEY });
 
     expect(result.valid).toBe(true);
     if (result.valid) {
@@ -188,7 +188,10 @@ describe("validateLicense", () => {
   });
 
   it("fails validation for invalid format", () => {
-    const result = validateLicense(GARBAGE_DATA, TEST_PUBLIC_KEY);
+    const result = validateLicense({
+      licenseKey: GARBAGE_DATA,
+      publicKey: TEST_PUBLIC_KEY,
+    });
 
     expect(result.valid).toBe(false);
     if (!result.valid) {
@@ -197,7 +200,10 @@ describe("validateLicense", () => {
   });
 
   it("fails validation for invalid signature", () => {
-    const result = validateLicense(TAMPERED_LICENSE_KEY, TEST_PUBLIC_KEY);
+    const result = validateLicense({
+      licenseKey: TAMPERED_LICENSE_KEY,
+      publicKey: TEST_PUBLIC_KEY,
+    });
 
     expect(result.valid).toBe(false);
     if (!result.valid) {
@@ -206,7 +212,10 @@ describe("validateLicense", () => {
   });
 
   it("fails validation for expired license", () => {
-    const result = validateLicense(EXPIRED_LICENSE_KEY, TEST_PUBLIC_KEY);
+    const result = validateLicense({
+      licenseKey: EXPIRED_LICENSE_KEY,
+      publicKey: TEST_PUBLIC_KEY,
+    });
 
     expect(result.valid).toBe(false);
     if (!result.valid) {
@@ -216,7 +225,7 @@ describe("validateLicense", () => {
 
   describe("extracts license fields correctly", () => {
     it("extracts licenseId", () => {
-      const result = validateLicense(VALID_LICENSE_KEY, TEST_PUBLIC_KEY);
+      const result = validateLicense({ licenseKey: VALID_LICENSE_KEY, publicKey: TEST_PUBLIC_KEY });
 
       expect(result.valid).toBe(true);
       if (result.valid) {
@@ -225,7 +234,7 @@ describe("validateLicense", () => {
     });
 
     it("extracts organizationName", () => {
-      const result = validateLicense(VALID_LICENSE_KEY, TEST_PUBLIC_KEY);
+      const result = validateLicense({ licenseKey: VALID_LICENSE_KEY, publicKey: TEST_PUBLIC_KEY });
 
       expect(result.valid).toBe(true);
       if (result.valid) {
@@ -234,7 +243,7 @@ describe("validateLicense", () => {
     });
 
     it("extracts email", () => {
-      const result = validateLicense(VALID_LICENSE_KEY, TEST_PUBLIC_KEY);
+      const result = validateLicense({ licenseKey: VALID_LICENSE_KEY, publicKey: TEST_PUBLIC_KEY });
 
       expect(result.valid).toBe(true);
       if (result.valid) {
@@ -243,7 +252,7 @@ describe("validateLicense", () => {
     });
 
     it("extracts plan.type", () => {
-      const result = validateLicense(VALID_LICENSE_KEY, TEST_PUBLIC_KEY);
+      const result = validateLicense({ licenseKey: VALID_LICENSE_KEY, publicKey: TEST_PUBLIC_KEY });
 
       expect(result.valid).toBe(true);
       if (result.valid) {
@@ -252,7 +261,7 @@ describe("validateLicense", () => {
     });
 
     it("extracts plan.maxMembers", () => {
-      const result = validateLicense(VALID_LICENSE_KEY, TEST_PUBLIC_KEY);
+      const result = validateLicense({ licenseKey: VALID_LICENSE_KEY, publicKey: TEST_PUBLIC_KEY });
 
       expect(result.valid).toBe(true);
       if (result.valid) {
@@ -261,7 +270,7 @@ describe("validateLicense", () => {
     });
 
     it("extracts plan.maxProjects", () => {
-      const result = validateLicense(VALID_LICENSE_KEY, TEST_PUBLIC_KEY);
+      const result = validateLicense({ licenseKey: VALID_LICENSE_KEY, publicKey: TEST_PUBLIC_KEY });
 
       expect(result.valid).toBe(true);
       if (result.valid) {
@@ -270,7 +279,7 @@ describe("validateLicense", () => {
     });
 
     it("extracts plan.maxMessagesPerMonth", () => {
-      const result = validateLicense(VALID_LICENSE_KEY, TEST_PUBLIC_KEY);
+      const result = validateLicense({ licenseKey: VALID_LICENSE_KEY, publicKey: TEST_PUBLIC_KEY });
 
       expect(result.valid).toBe(true);
       if (result.valid) {
@@ -282,7 +291,7 @@ describe("validateLicense", () => {
       // VALID_LICENSE_KEY contains evaluationsCredit in the signed payload.
       // After making the field optional, old licenses must still parse and
       // pass signature verification without error.
-      const result = validateLicense(VALID_LICENSE_KEY, TEST_PUBLIC_KEY);
+      const result = validateLicense({ licenseKey: VALID_LICENSE_KEY, publicKey: TEST_PUBLIC_KEY });
 
       expect(result.valid).toBe(true);
       if (result.valid) {
@@ -292,7 +301,7 @@ describe("validateLicense", () => {
     });
 
     it("extracts plan.maxWorkflows", () => {
-      const result = validateLicense(VALID_LICENSE_KEY, TEST_PUBLIC_KEY);
+      const result = validateLicense({ licenseKey: VALID_LICENSE_KEY, publicKey: TEST_PUBLIC_KEY });
 
       expect(result.valid).toBe(true);
       if (result.valid) {
@@ -301,7 +310,7 @@ describe("validateLicense", () => {
     });
 
     it("extracts plan.canPublish", () => {
-      const result = validateLicense(VALID_LICENSE_KEY, TEST_PUBLIC_KEY);
+      const result = validateLicense({ licenseKey: VALID_LICENSE_KEY, publicKey: TEST_PUBLIC_KEY });
 
       expect(result.valid).toBe(true);
       if (result.valid) {

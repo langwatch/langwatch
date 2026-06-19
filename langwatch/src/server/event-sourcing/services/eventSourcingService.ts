@@ -1,19 +1,22 @@
+import { performance } from "node:perf_hooks";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
+import { leanForProjection } from "~/server/app-layer/traces/lean-for-projection";
 import type { FeatureFlagServiceInterface } from "~/server/featureFlag";
-import { performance } from "node:perf_hooks";
-import { createLogger } from "~/utils/logger/server";
 import {
   eventSourcingStoreDurationHistogram,
   getEventSourcingEventsStoredCounter,
 } from "~/server/metrics";
+import { createLogger } from "~/utils/logger/server";
 import type { AggregateType } from "../domain/aggregateType";
 import { createTenantId } from "../domain/tenantId";
 import type { Event, Projection } from "../domain/types";
 import type { ProjectionRegistry } from "../projections/projectionRegistry";
 import { ProjectionRouter } from "../projections/projectionRouter";
-import type { DeduplicationConfig, EventSourcedQueueProcessor } from "../queues";
-import type { JobRegistryEntry } from "./queues/queueManager";
+import type {
+  DeduplicationConfig,
+  EventSourcedQueueProcessor,
+} from "../queues";
 import type {
   EventStore,
   EventStoreReadContext,
@@ -23,6 +26,7 @@ import type {
   EventSourcingOptions,
   EventSourcingServiceOptions,
 } from "./eventSourcingService.types";
+import type { JobRegistryEntry } from "./queues/queueManager";
 import { QueueManager } from "./queues/queueManager";
 
 /**
@@ -121,13 +125,20 @@ export class EventSourcingService<
         if (!fold.eventLoader && eventStore) {
           const capturedAggregateType = aggregateType;
           const capturedEventStore = eventStore;
-          fold.eventLoader = async (ctx: { tenantId: string; aggregateId: string }) => {
+          fold.eventLoader = async (ctx: {
+            tenantId: string;
+            aggregateId: string;
+            occurredAtMs?: number;
+          }) => {
             const events = await capturedEventStore.getEvents(
               ctx.aggregateId,
               { tenantId: createTenantId(ctx.tenantId) },
               capturedAggregateType,
+              ctx.occurredAtMs,
             );
-            return [...events].sort((a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0));
+            return [...events].sort(
+              (a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0),
+            );
           };
         }
         this.router.registerFoldProjection(fold);
@@ -165,7 +176,11 @@ export class EventSourcingService<
       this.router.initializeFoldQueues();
     }
 
-    if (globalQueue && ((reactors && reactors.length > 0) || (mapReactors && mapReactors.length > 0))) {
+    if (
+      globalQueue &&
+      ((reactors && reactors.length > 0) ||
+        (mapReactors && mapReactors.length > 0))
+    ) {
       this.router.initializeReactorQueues();
     }
 
@@ -243,14 +258,21 @@ export class EventSourcingService<
         );
         span.addEvent("event_store.store.complete");
 
+        // ADR-022: Derive lean shapes for projection dispatch.
+        // storeEvents has already persisted the FULL events to event_log.
+        // Map to new array — do NOT mutate enrichedEvents in place.
+        const leanedEvents = enrichedEvents.map(
+          (e) => leanForProjection(e) as EventType,
+        );
+
         // Dispatch events to all projections (fold + map) via unified router
         if (
-          enrichedEvents.length > 0 &&
+          leanedEvents.length > 0 &&
           (this.router.hasFoldProjections || this.router.hasMapProjections)
         ) {
           span.addEvent("projection.dispatch.start");
           try {
-            await this.router.dispatch(enrichedEvents, context);
+            await this.router.dispatch(leanedEvents, context);
             span.addEvent("projection.dispatch.complete");
           } catch (error) {
             span.addEvent("projection.dispatch.error", {
@@ -258,9 +280,17 @@ export class EventSourcingService<
                 error instanceof Error ? error.message : String(error),
             });
             if (this.logger) {
-              const subErrors = error instanceof AggregateError
-                ? error.errors.map((e: unknown) => e instanceof Error ? { message: e.message, stack: e.stack?.split("\n").slice(0, 3).join("\n") } : String(e))
-                : [];
+              const subErrors =
+                error instanceof AggregateError
+                  ? error.errors.map((e: unknown) =>
+                      e instanceof Error
+                        ? {
+                            message: e.message,
+                            stack: e.stack?.split("\n").slice(0, 3).join("\n"),
+                          }
+                        : String(e),
+                    )
+                  : [];
               this.logger.error(
                 {
                   aggregateType: this.aggregateType,
@@ -275,10 +305,10 @@ export class EventSourcingService<
         }
 
         // Dispatch to global projection registry (cross-pipeline projections)
-        if (this.globalRegistry && enrichedEvents.length > 0) {
+        if (this.globalRegistry && leanedEvents.length > 0) {
           span.addEvent("global_projection.dispatch.start");
           try {
-            await this.globalRegistry.dispatch(enrichedEvents, context);
+            await this.globalRegistry.dispatch(leanedEvents, context);
             span.addEvent("global_projection.dispatch.complete");
           } catch (error) {
             span.addEvent("global_projection.dispatch.error", {
@@ -288,7 +318,7 @@ export class EventSourcingService<
             this.logger.error(
               {
                 aggregateType: this.aggregateType,
-                eventCount: enrichedEvents.length,
+                eventCount: leanedEvents.length,
                 error: error instanceof Error ? error.message : String(error),
               },
               "Failed to dispatch events to global projection registry",

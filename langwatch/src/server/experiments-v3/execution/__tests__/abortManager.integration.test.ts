@@ -96,7 +96,7 @@ describe("AbortManager Integration", () => {
     it("sets and clears running flag", async () => {
       const runId = createTestRunId();
 
-      await abortManager.setRunning(runId);
+      await abortManager.setRunning(runId, "project_1");
       const valueAfterSet = await connection?.get(`eval_v3_running:${runId}`);
       expect(valueAfterSet).toBeTruthy();
 
@@ -105,16 +105,45 @@ describe("AbortManager Integration", () => {
       expect(valueAfterClear).toBeNull();
     });
 
-    it("running flag contains timestamp", async () => {
+    it("running flag records the owning project and start timestamp", async () => {
       const runId = createTestRunId();
       const beforeTime = Date.now();
 
-      await abortManager.setRunning(runId);
+      await abortManager.setRunning(runId, "project_1");
 
       const value = await connection?.get(`eval_v3_running:${runId}`);
-      const timestamp = parseInt(value ?? "0", 10);
-      expect(timestamp).toBeGreaterThanOrEqual(beforeTime);
-      expect(timestamp).toBeLessThanOrEqual(Date.now());
+      const parsed = JSON.parse(value ?? "{}") as {
+        projectId?: string;
+        startedAt?: number;
+      };
+      expect(parsed.projectId).toBe("project_1");
+      expect(parsed.startedAt).toBeGreaterThanOrEqual(beforeTime);
+      expect(parsed.startedAt).toBeLessThanOrEqual(Date.now());
+    });
+  });
+
+  describe("getRunningProjectId", () => {
+    it("returns the owning project of a running run", async () => {
+      const runId = createTestRunId();
+      await abortManager.setRunning(runId, "project_owner");
+
+      expect(await abortManager.getRunningProjectId(runId)).toBe(
+        "project_owner",
+      );
+    });
+
+    it("returns null when the run is not running", async () => {
+      const runId = createTestRunId();
+
+      expect(await abortManager.getRunningProjectId(runId)).toBeNull();
+    });
+
+    it("returns null after the running flag is cleared", async () => {
+      const runId = createTestRunId();
+      await abortManager.setRunning(runId, "project_owner");
+      await abortManager.clearRunning(runId);
+
+      expect(await abortManager.getRunningProjectId(runId)).toBeNull();
     });
   });
 

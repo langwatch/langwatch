@@ -1,9 +1,10 @@
-import { Box, Button, HStack, Text } from "@chakra-ui/react";
-import { Database, Download, X } from "lucide-react";
+import { Button, HStack, Text } from "@chakra-ui/react";
+import { Database, Download } from "lucide-react";
 import type React from "react";
-import { Tooltip } from "~/components/ui/tooltip";
 import { PersonalFeatureGateDialog } from "~/components/me/PersonalFeatureGateDialog";
 import { usePersonalFeatureGate } from "~/components/me/usePersonalFeatureGate";
+import { SelectionActionBar } from "~/components/ui/SelectionActionBar";
+import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";
 import {
   SELECT_ALL_MATCHING_CAP,
@@ -49,40 +50,29 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
   const allMatchingHitsCap = totalHits >= SELECT_ALL_MATCHING_CAP;
 
   return (
-    <Box
-      position="fixed"
-      bottom={6}
-      left="50%"
-      transform="translateX(-50%)"
-      zIndex={20}
-      bg="bg.emphasized"
-      paddingX={3}
-      paddingY={2}
-      borderRadius="md"
-      borderWidth="1px"
-      borderColor="border.muted"
-      boxShadow="lg"
-    >
-      <HStack gap={2} align="center" whiteSpace="nowrap">
-        <Text textStyle="sm" fontWeight="medium">
-          {isAllMatchingMode && allMatchingHitsCap
-            ? `${allMatchingCount.toLocaleString()} selected (max)`
-            : `${displayCount.toLocaleString()} selected`}
-        </Text>
-
-        {canSelectAllMatching && (
-          <Button
-            size="xs"
-            variant="ghost"
-            colorPalette="blue"
-            onClick={enableAllMatching}
-          >
-            Select all {totalHits.toLocaleString()} matching
-          </Button>
-        )}
-
-        <Box width="1px" height="20px" bg="border.muted" marginX={1} />
-
+    <>
+      <SelectionActionBar
+        label={
+          <HStack gap={2} align="center">
+            <Text textStyle="sm" fontWeight="medium">
+              {isAllMatchingMode && allMatchingHitsCap
+                ? `${allMatchingCount.toLocaleString()} selected (max)`
+                : `${displayCount.toLocaleString()} selected`}
+            </Text>
+            {canSelectAllMatching && (
+              <Button
+                size="xs"
+                variant="ghost"
+                colorPalette="blue"
+                onClick={enableAllMatching}
+              >
+                Select all {totalHits.toLocaleString()} matching
+              </Button>
+            )}
+          </HStack>
+        }
+        onClear={clear}
+      >
         <Button
           size="xs"
           variant="outline"
@@ -114,17 +104,8 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
             Add to dataset
           </Button>
         </Tooltip>
-
-        <Button
-          size="xs"
-          variant="ghost"
-          onClick={clear}
-          aria-label="Clear selection"
-        >
-          <X size={14} />
-        </Button>
-      </HStack>
+      </SelectionActionBar>
       <PersonalFeatureGateDialog state={datasetGate.dialogState} />
-    </Box>
+    </>
   );
 };

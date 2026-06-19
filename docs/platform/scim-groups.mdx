@@ -7,6 +7,8 @@ keywords: scim, groups, role mapping, provisioning, okta, azure ad, entra id, id
 
 SCIM Groups allow your identity provider to push group memberships into LangWatch. Admins can then map those groups to specific roles at the organization, team, or project level, so users automatically get the right access the moment they are provisioned.
 
+Whether the group is SCIM-synced or created manually in the UI, groups are an **Enterprise** feature in LangWatch.
+
 <Info>
   SCIM Groups are an **Enterprise** feature. See [SCIM Provisioning](/platform/scim) for setting up user provisioning first.
 </Info>
@@ -181,6 +183,22 @@ GET /api/scim/v2/Groups?filter=displayName eq "Engineering"
 
 - Ensure your IdP is configured to push group membership changes (not just user changes)
 - Check provisioning logs for any errors on the PATCH groups endpoint
+
+---
+
+## Managing Groups via REST API
+
+In addition to the UI and SCIM provisioning, groups can be managed programmatically via the [Groups REST API](/api-reference/groups/overview). This is useful for:
+
+- Automating group creation and membership management
+- Scripting role binding assignments
+- Integrating with custom provisioning workflows
+
+See the [Groups API Reference](/api-reference/groups/overview) for full endpoint documentation.
+
+<Info>
+SCIM-managed groups cannot have their members or names modified via the REST API — those operations are reserved for the identity provider.
+</Info>
 
 ---
 

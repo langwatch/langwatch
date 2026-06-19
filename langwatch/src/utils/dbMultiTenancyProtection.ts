@@ -1,190 +1,71 @@
 import type { Prisma } from "@prisma/client";
 
-const EXEMPT_MODELS = [
+import { ORG_BEARING_MODEL_NAMES } from "./dbOrganizationIdProtection";
+
+/**
+ * Genuinely global / cross-cutting models with no tenancy column at all: the
+ * NextAuth identity tables, the top-level tenancy entities themselves (queried
+ * by their own id / slug), and cluster-wide config. None can carry a projectId
+ * and none is org-scoped, so each is listed here by hand. The partition test
+ * forbids any org-bearing model from appearing here - those derive from the org
+ * registry instead (see the EXEMPT_MODELS computation below).
+ */
+const GLOBAL_MODELS = [
+  // NextAuth identity tables.
   "Account",
   "Session",
   "User",
   "VerificationToken",
-  "TeamUser",
-  "OrganizationUser",
-  "Team",
+  // Top-level tenancy entities, addressed by their own id / slug.
   "Organization",
-  "OrganizationInvite",
   "Project",
-  "Subscription",
-  "AuditLog",
-  /**
-   * Because prompts can be accessed at either the project or org level
-   */
-  "LlmPromptConfig",
-  /**
-   * Custom roles are organization-level, not project-level
-   */
-  "CustomRole",
-  /**
-   * Notifications can be at organization or project level
-   */
-  "Notification",
-  /**
-   * License enforcement needs to count resources across all projects in an organization.
-   * These models are queried by organizationId (through project.team.organizationId)
-   * for license limit enforcement.
-   */
+  // Cluster-wide kill switches; one row per flag key, no tenant column. Keeps
+  // system-scoped flags off PostHog (see /ops/feature-flags).
+  "FeatureFlag",
+] as const;
+
+/**
+ * Relational join / membership tables bounded by a parent foreign key or a
+ * composite primary key rather than a projectId or organizationId column. They
+ * are reached through their parent (or written via nested writes), never with a
+ * bare top-level query, so the projectId requirement does not apply. Listed by
+ * hand because there is no scope column to derive from.
+ */
+const RELATIONAL_PARENT_SCOPED = [
+  // Membership join tables: @@id([userId, <parent>]).
+  "TeamUser",
+  "GroupMembership",
+  // Billing ledger / invoice lines, owned by their parent VirtualKey /
+  // Subscription / Invoice.
+  "GatewayBudgetLedger",
+  "Invoice",
+  "InvoiceItem",
+  // Annotation-queue join tables, written through the parent queue.
+  "AnnotationQueueMembers",
+  "AnnotationQueueScores",
+] as const;
+
+/**
+ * Project-scoped models (they DO carry projectId) that are additionally read by
+ * org-level license-counting queries walking project.team.organizationId with
+ * no projectId in the WHERE. Exempt so those org rollups don't throw; their
+ * normal project-scoped writes still carry projectId.
+ */
+const LICENSE_COUNTED_PROJECT_MODELS = [
   "Workflow",
   "Evaluator",
   "Scenario",
   "BatchEvaluation",
   "Agent",
-  /**
-   * Billing meter checkpoints are organization-level, keyed by organizationId + billingMonth
-   */
-  "BillingMeterCheckpoint",
-  /**
-   * SCIM tokens are organization-level, used for IdP provisioning
-   */
-  "ScimToken",
-  /**
-   * Custom prompt tag definitions are organization-level, not project-level.
-   * They are scoped by organizationId.
-   */
-  "PromptTag",
-  /**
-   * Scoped RBAC models are organization-level.
-   * Groups and RoleBindings are scoped by organizationId, not projectId.
-   * GroupMembership is scoped indirectly via groupId.
-   */
-  "Group",
-  "GroupMembership",
-  "RoleBinding",
-  /**
-   * API keys are organization-level, scoped by organizationId + userId.
-   */
-  "ApiKey",
-  /**
-   * Cost centers are organization-level accounting dimensions, scoped by
-   * organizationId (never projectId). The service layer enforces org
-   * scoping on every query. See cost-centers.feature.
-   */
-  "CostCenter",
-  /**
-   * AI Gateway models. Post-iter-110 (collapse-VK-binding refactor):
-   * - GatewayBudget: org-level (scopeType + scopeId identifies which
-   *   target); no projectId column by design.
-   * - GatewayBudgetLedger: descends from VirtualKey via virtualKeyId
-   *   rather than a direct projectId column.
-   * - GatewayChangeEvent / GatewayAuditLog: allow null projectId for
-   *   org-level mutations; org tenancy is checked at the service
-   *   layer before any write.
-   * - VirtualKeyProviderCredential + GatewayProviderCredential: tables
-   *   dropped in iter 110 (folded into ModelProvider).
-   * - VirtualKey itself moved to SCOPED_MODELS below — post-iter-110
-   *   it's org-scoped (organizationId mandatory) and access narrows
-   *   via VirtualKeyScope rows, so the legacy projectId guard no
-   *   longer applies. SCOPED_MODELS enforces a row-id / scope /
-   *   organizationId predicate on every read + write.
-   */
-  "GatewayBudget",
-  "GatewayBudgetLedger",
-  "GatewayChangeEvent",
-  "GatewayAuditLog",
-  /**
-   * GatewayCacheRule is organization-level (authored once, applies
-   * across every VK owned by the org based on matcher shape). Same
-   * rationale as GatewayBudget — no projectId column, scoped by
-   * organizationId + matcher fields.
-   */
-  "GatewayCacheRule",
-  /**
-   * FeatureFlag is cluster-wide, not project-scoped. One row per flag
-   * key; operators flip them from /ops/feature-flags, applying to the
-   * whole install. No projectId column by design; this is the table
-   * that keeps system-scoped kill switches off PostHog.
-   */
-  "FeatureFlag",
-  /**
-   * RoutingPolicy (iter governance-platform) is org-scoped:
-   * (organizationId, scope, scopeId, name) is the natural key. Scope
-   * may be 'organization' | 'team' | 'project', but the row itself
-   * doesn't carry a projectId column. Resolution paths
-   * (`resolveDefaultForUser`) query by organizationId + scope +
-   * scopeId — projectId enforcement would block the lookup.
-   *
-   * Same rationale as ModelProvider above (also (scopeType, scopeId)-
-   * keyed). Service layer authorises ownership via organizationId
-   * before any mutation; the middleware exemption only relaxes the
-   * SQL guard.
-   */
-  "RoutingPolicy",
-  /**
-   * IngestionSource (iter governance-platform / D2 foundation) is
-   * org-scoped: the natural key is (organizationId, name). Optional
-   * teamId narrows scope but no projectId — the entire point is a
-   * cross-platform feed at the org level. Service layer authorises
-   * by organizationId / teamId membership before any mutation.
-   */
-  "IngestionSource",
-  /**
-   * AnomalyRule (iter governance-platform / D2 anomaly authoring) is
-   * org-scoped: the natural key is (organizationId, name). The rule's
-   * `scope` field (organization|team|project|source_type|source) is
-   * an EVALUATION-time narrowing, not a tenancy boundary — service
-   * layer authorises by organizationId membership before any mutation.
-   */
-  "AnomalyRule",
-  /**
-   * AnomalyAlert (iter governance-platform / D2 anomaly detection) is
-   * org-scoped persisted detections. Same rationale as AnomalyRule —
-   * org-scoped, no projectId, service layer authorises by
-   * organizationId before any mutation.
-   */
-  "AnomalyAlert",
-  /**
-   * AiToolEntry (iter governance-platform / Phase 7) is the org-scoped
-   * AI Tools Portal catalog. Entries can be scoped to organization or
-   * team via (scope, scopeId) but never carry a projectId — the portal
-   * surfaces tools at the org tier (cross-project / cross-team
-   * organization-default surface). Service layer authorises by
-   * organizationId membership before any mutation; team-scoped entries
-   * are authorised via TeamUser membership at read time.
-   */
-  "AiToolEntry",
-  /**
-   * AiToolEntryTeam (iter governance-platform / Phase 7 multi-team
-   * scope refactor) is the join table binding AiToolEntry rows to
-   * teams. Same rationale as AiToolEntry — org-scoped via the
-   * referenced entry, no projectId; service layer authorises by the
-   * parent entry's organizationId before any mutation.
-   */
-  "AiToolEntryTeam",
-  /**
-   * IngestionTemplate is org-scoped: organizationId nullable
-   * (NULL = platform-published default, NOT NULL = org-authored).
-   * No projectId column — admin queries walk by organizationId or
-   * by the platform-default scope. Service layer authorises by
-   * organizationId membership (or platform-team scope) before any
-   * mutation.
-   */
-  "IngestionTemplate",
-  /**
-   * UserIngestionBinding carries personalProjectId, but admin-side
-   * queries walk by organizationId (admin viewing all bindings in
-   * their org). User-side queries are scoped by userId. Service layer
-   * authorises by userId === caller for user-side ops, and by
-   * organizationId membership for admin-side ops; the cross-bind
-   * structural-impossibility guard (input shape MUST NOT accept
-   * personalProjectId) keeps user-side ops from binding into another
-   * user's project.
-   */
-  "UserIngestionBinding",
-];
+] as const;
 
 /**
  * Models that don't have a projectId column to constrain on, but ARE
- * tenancy-sensitive — every query MUST carry an equivalent tenancy
+ * tenancy-sensitive - every query MUST carry an equivalent tenancy
  * predicate (a row id, a scope predicate, or a parent foreign key
  * that itself transitively carries scope). The default guard above
  * would fail any of these queries because the where clause has no
- * `projectId`, so without this map they end up in EXEMPT_MODELS —
+ * `projectId`, so without this map they end up in EXEMPT_MODELS -
  * which silently lets a programmer write
  * `prisma.modelDefaultConfig.findMany({})` and walk every tenant's
  * defaults. That is the failure mode rchaves flagged on 2026-05-18;
@@ -198,7 +79,7 @@ const EXEMPT_MODELS = [
  *   - create / createMany must include the same on every record.
  *
  * For ModelProvider, the legacy `projectId` column is still a valid
- * tenancy clause too (one-release compat — old call sites keep
+ * tenancy clause too (one-release compat - old call sites keep
  * working until the sweep PR drops the column).
  */
 type ScopedModelConfig = {
@@ -230,7 +111,7 @@ const isScopeIdValue = (value: any): boolean => {
 
 const hasScopePredicate = (where: any): boolean => {
   if (!where || typeof where !== "object") return false;
-  // Top-level (scopeType, scopeId) — typical for join tables filtering by one scope.
+  // Top-level (scopeType, scopeId) - typical for join tables filtering by one scope.
   if (typeof where.scopeType === "string" && isScopeIdValue(where.scopeId)) {
     return true;
   }
@@ -238,7 +119,7 @@ const hasScopePredicate = (where: any): boolean => {
   // either a single predicate or an OR-list. Every OR-branch must be
   // a valid scope predicate so a query can't sneak in `{ OR: [{}] }`
   // and walk every row. scopeId accepts both `string` and `{ in: [...] }`
-  // shapes — the cascade walker passes lists for TEAM / PROJECT tiers
+  // shapes - the cascade walker passes lists for TEAM / PROJECT tiers
   // (every team in the org / every project in the org the caller can
   // see), and that list IS the tenancy constraint.
   const some = where.scopes?.some;
@@ -296,7 +177,38 @@ const validateRecursive = (
   return false;
 };
 
+// Join tables scoped by their parent AiToolEntry: every query names the parent
+// `entryId` (or a row id) and every created row carries it. A bare findMany /
+// deleteMany without it would walk every org's tool-visibility bindings, so
+// they take the stricter SCOPED_MODELS check rather than a blanket exemption.
+const parentEntryScoped = (): ScopedModelConfig => ({
+  validateWhere: (where) => {
+    const reason = "requires a row id or entryId in the where clause";
+    if (!where) return reason;
+    const ok = validateRecursive(
+      where,
+      (c) =>
+        hasIdOrInPredicate(c) ||
+        typeof c.entryId === "string" ||
+        (c.entryId && Array.isArray(c.entryId.in) && c.entryId.in.length > 0),
+    );
+    return ok ? null : reason;
+  },
+  validateCreateData: (data) => {
+    const records = Array.isArray(data) ? data : [data];
+    for (const d of records) {
+      if (!d) return "create requires a data payload";
+      if (typeof d.entryId !== "string") {
+        return "create requires an entryId in the data payload";
+      }
+    }
+    return null;
+  },
+});
+
 const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
+  AiToolEntryTeam: parentEntryScoped(),
+  AiToolEntryDepartment: parentEntryScoped(),
   ModelProvider: {
     validateWhere: (where) => {
       if (!where) {
@@ -551,7 +463,7 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
   // query is bounded by a row id, the organizationId anchor, a
   // (scopeType, scopeId) predicate, or the (scopeType, scopeId, category)
   // compound unique used by per-scope upsert/delete. No legacy projectId
-  // column — retention was scope-based from the first migration.
+  // column - retention was scope-based from the first migration.
   RetentionPolicy: {
     validateWhere: (where) => {
       const reason =
@@ -580,10 +492,81 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
       return null;
     },
   },
+  // Inline single-scope-per-row (ADR-021), one row per (scope, personalOnly).
+  // Same regime as RetentionPolicy: a query is bounded by a row id, the
+  // organizationId anchor, a (scopeType, scopeId) predicate, or the
+  // (scopeType, scopeId, personalOnly) compound unique used by per-scope
+  // upsert/delete. No projectId column - privacy rules are scope-based.
+  DataPrivacyPolicy: {
+    validateWhere: (where) => {
+      const reason =
+        "requires a row id, organizationId, or scope predicate in the where clause";
+      if (!where) return reason;
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          hasIdOrInPredicate(c) ||
+          typeof c.organizationId === "string" ||
+          (c.organizationId && Array.isArray(c.organizationId.in)) ||
+          hasScopePredicate(c) ||
+          (c.scopeType_scopeId_personalOnly &&
+            typeof c.scopeType_scopeId_personalOnly.scopeId === "string"),
+      );
+      return ok ? null : reason;
+    },
+    validateCreateData: (data) => {
+      const records = Array.isArray(data) ? data : [data];
+      for (const d of records) {
+        if (!d) return "create requires a data payload";
+        if (typeof d.organizationId !== "string") {
+          return "create requires an organizationId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
 };
 
+/**
+ * Names of the projectId-less models guardProjectId validates itself (row id /
+ * scope predicate / parent FK) instead of exempting outright. Exported for the
+ * regime partition test.
+ */
+export const SCOPED_MODEL_NAMES: readonly string[] = Object.keys(SCOPED_MODELS);
+
+/**
+ * The buckets a projectId-less model can legitimately fall into, beyond the
+ * org-bearing models derived from the org registry. Exported for the partition
+ * test so it can prove every model is classified into exactly one regime.
+ */
+export const PROJECT_TENANCY_REGIMES = {
+  GLOBAL_MODELS,
+  RELATIONAL_PARENT_SCOPED,
+  LICENSE_COUNTED_PROJECT_MODELS,
+} as const;
+
+/**
+ * Org-scoped models are exempt from the projectId requirement (an org-scoped
+ * model is, by definition, not project-scoped), EXCEPT the ones guardProjectId
+ * validates itself through SCOPED_MODELS - those keep their stricter check.
+ * Derived from the org guard's registry so the org/project classification lives
+ * in exactly one place: a model becomes projectId-exempt automatically once it
+ * is declared org-bearing there, and the partition test forbids hand-listing an
+ * org-bearing model in GLOBAL_MODELS / RELATIONAL_PARENT_SCOPED here.
+ */
+const ORG_DERIVED_EXEMPT = ORG_BEARING_MODEL_NAMES.filter(
+  (name) => !Object.hasOwn(SCOPED_MODELS, name),
+);
+
+const EXEMPT_MODELS = new Set<string>([
+  ...GLOBAL_MODELS,
+  ...RELATIONAL_PARENT_SCOPED,
+  ...LICENSE_COUNTED_PROJECT_MODELS,
+  ...ORG_DERIVED_EXEMPT,
+]);
+
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
-  if (params.model && EXEMPT_MODELS.includes(params.model)) return;
+  if (params.model && EXEMPT_MODELS.has(params.model)) return;
 
   const action = params.action;
   const model = params.model;
@@ -628,7 +611,7 @@ const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
   // VirtualKey row. The hashedSecret itself is a cryptographic
   // identifier unique across the platform (HMAC-SHA256 with a
   // per-deployment pepper), so projectId/organizationId cannot be
-  // known to the caller — the VK row IS what teaches them. The OR
+  // known to the caller - the VK row IS what teaches them. The OR
   // clause here is always shape
   //   { OR: [{ hashedSecret }, { previousHashedSecret, previousSecretValidUntil }] }
   // matching virtualKey.repository.ts:findByHashedSecret. Narrow
@@ -651,7 +634,7 @@ const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
   // HMAC-signed transport + JWT validation upstream is the tenancy
   // check; adding projectId here would require a redundant JWT
   // lookup. Narrow: only findUnique on VirtualKey with a bare id in
-  // the where clause — everything else still under the normal guard.
+  // the where clause - everything else still under the normal guard.
   if (
     action === "findUnique" &&
     model === "VirtualKey" &&

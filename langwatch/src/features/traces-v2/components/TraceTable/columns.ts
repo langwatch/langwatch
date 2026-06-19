@@ -15,15 +15,34 @@ const traceColumnDefs = {
   time: traceCol.accessor("timestamp", {
     id: "time",
     header: "Time",
-    // 68px is enough for the "TIME" header + sort caret + the longest
-    // relative-time strings we render (`16d`, `2m`, `now`, chevron +
-    // relative) without truncating, and tight enough that the trace
-    // name doesn't sit a thumb's width away from the timestamp. 80px
-    // cap prevents a manual resize from walking the column back out.
+    // 68px is the default — enough for the relative-time strings we
+    // typically render (`16d`, `2m`, `now`, chevron + relative). The
+    // column is resizable so an operator who prefers absolute mode
+    // ("Jun 4 18:32") can widen it without fighting the cap; the
+    // previous fixed `maxSize: 80` made absolute-mode unreadable as
+    // soon as the user switched modes from the hover card.
     size: 68,
     minSize: 68,
-    maxSize: 80,
-    enableResizing: false,
+    maxSize: 200,
+  }),
+  since: traceCol.accessor("timestamp", {
+    id: "since",
+    header: "Since",
+    // Verbose relative — "3 minutes ago", "2 weeks ago". Wider than the
+    // compact TIME column to fit the longest natural-language form
+    // without truncating. Body content (~"about 7 hours ago" max) drives
+    // the floor; header sits in well under.
+    size: 130,
+    minSize: 110,
+  }),
+  timestamp: traceCol.accessor("timestamp", {
+    id: "timestamp",
+    header: "Timestamp",
+    // ISO 8601 — "2026-06-02T13:14:15.123Z" is 24 chars in monospace.
+    // ~210px holds it without ellipsis at typical font sizes; floor
+    // matches.
+    size: 220,
+    minSize: 210,
   }),
   trace: traceCol.accessor("name", {
     id: "trace",
@@ -133,15 +152,19 @@ const traceColumnDefs = {
   tokens: traceCol.accessor("totalTokens", {
     id: "tokens",
     header: "Tokens",
-    size: 90,
-    minSize: 85,
+    // Bumped from 90/85 — "TOKENS" header (6 uppercase chars in 2xs) +
+    // sort chevron + 16px Th padding needs ~100px to render without
+    // ellipsis at the floor. The body content (`12.4K`) is shorter, so
+    // the header drives the width.
+    size: 100,
+    minSize: 95,
     meta: num,
   }),
   spans: traceCol.accessor("spanCount", {
     id: "spans",
     header: "Spans",
-    size: 80,
-    minSize: 75,
+    size: 85,
+    minSize: 80,
     meta: num,
   }),
   model: traceCol.accessor((row) => row.models[0] ?? "", {
@@ -196,8 +219,11 @@ const traceColumnDefs = {
   conversationId: traceCol.accessor((row) => row.conversationId ?? "", {
     id: "conversationId",
     header: "Conversation ID",
-    size: 140,
-    minSize: 120,
+    // "CONVERSATION ID" header is 15 chars — needs ~165px to render
+    // without ellipsis. Default bumped past that so the column reads
+    // its own name on first paint.
+    size: 180,
+    minSize: 165,
     enableSorting: false,
   }),
   origin: traceCol.accessor("origin", {
@@ -243,50 +269,55 @@ const conversationColumnDefs: Record<
     minSize: 320,
     meta: flex,
   }),
+  // Sizes here were carried over from an early draft where every
+  // conversation header was abbreviated ("Dur", "Turns", etc.). Names
+  // are now spelled out so users in the column picker recognise them,
+  // which means widths need to actually fit the spelled-out header
+  // plus the sort chevron + 16px Th padding (≈ chars * 7 + 28 + 12).
   started: convCol.accessor("earliestTimestamp", {
     id: "started",
     header: "Started",
-    size: 80,
-    minSize: 70,
+    size: 110,
+    minSize: 90,
   }),
   lastTurn: convCol.accessor("latestTimestamp", {
     id: "lastTurn",
     header: "Last Turn",
-    size: 80,
-    minSize: 70,
+    size: 110,
+    minSize: 100,
   }),
   turns: convCol.accessor((row) => row.traces.length, {
     id: "turns",
     header: "Turns",
-    size: 50,
-    minSize: 50,
+    size: 75,
+    minSize: 70,
     meta: num,
   }),
   duration: convCol.accessor("totalDuration", {
     id: "duration",
-    header: "Dur",
-    size: 70,
-    minSize: 70,
+    header: "Duration",
+    size: 100,
+    minSize: 90,
     meta: num,
   }),
   cost: convCol.accessor("totalCost", {
     id: "cost",
     header: "Cost",
-    size: 70,
+    size: 80,
     minSize: 70,
     meta: num,
   }),
   tokens: convCol.accessor("totalTokens", {
     id: "tokens",
     header: "Tokens",
-    size: 70,
-    minSize: 70,
+    size: 95,
+    minSize: 85,
     meta: num,
   }),
   model: convCol.accessor("primaryModel", {
     id: "model",
     header: "Model",
-    size: 100,
+    size: 120,
     minSize: 100,
   }),
   service: convCol.accessor("serviceName", {
@@ -298,8 +329,8 @@ const conversationColumnDefs: Record<
   status: convCol.accessor("worstStatus", {
     id: "status",
     header: "Status",
-    size: 60,
-    minSize: 60,
+    size: 85,
+    minSize: 80,
   }),
 };
 
@@ -320,39 +351,42 @@ function buildGroupColumnDefs(
       minSize: 240,
       meta: flex,
     }),
+    // Each header below fits the longest body content; widths are
+    // header-driven (the numeric body — "12.4K", "$3.42" — is shorter
+    // than the column name in every case).
     count: groupCol.accessor((row) => row.traces.length, {
       id: "count",
       header: "Traces",
-      size: 70,
-      minSize: 60,
+      size: 90,
+      minSize: 80,
       meta: num,
     }),
     duration: groupCol.accessor("avgDuration", {
       id: "duration",
-      header: "Avg Dur",
-      size: 80,
-      minSize: 70,
+      header: "Avg duration",
+      size: 130,
+      minSize: 115,
       meta: num,
     }),
     cost: groupCol.accessor("totalCost", {
       id: "cost",
-      header: "Total Cost",
-      size: 80,
-      minSize: 80,
+      header: "Total cost",
+      size: 110,
+      minSize: 100,
       meta: num,
     }),
     tokens: groupCol.accessor("totalTokens", {
       id: "tokens",
-      header: "Total Tokens",
-      size: 90,
-      minSize: 80,
+      header: "Total tokens",
+      size: 130,
+      minSize: 120,
       meta: num,
     }),
     errors: groupCol.accessor("errorCount", {
       id: "errors",
       header: "Errors",
-      size: 70,
-      minSize: 60,
+      size: 85,
+      minSize: 75,
       meta: num,
     }),
   };

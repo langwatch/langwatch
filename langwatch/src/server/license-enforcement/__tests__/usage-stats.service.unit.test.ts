@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  UsageStatsService,
-  type IUsageUnitResolver,
-  type ITraceUsageService,
-} from "../usage-stats.service";
-import type { ILicenseEnforcementRepository } from "../license-enforcement.repository";
-import type { PlanProvider } from "../../app-layer/subscription/plan-provider";
-import type { PlanInfo } from "../../../../ee/licensing/planInfo";
 import { FREE_PLAN } from "../../../../ee/licensing/constants";
+import type { PlanInfo } from "../../../../ee/licensing/planInfo";
+import type { PlanProvider } from "../../app-layer/subscription/plan-provider";
+import type { ILicenseEnforcementRepository } from "../license-enforcement.repository";
+import {
+  type ITraceUsageService,
+  type IUsageUnitResolver,
+  UsageStatsService,
+} from "../usage-stats.service";
 
 const TEST_PLAN: PlanInfo = {
   ...FREE_PLAN,
@@ -42,8 +42,12 @@ describe("UsageStatsService", () => {
       getExperimentCount: vi.fn().mockResolvedValue(0),
     } as unknown as ILicenseEnforcementRepository;
 
+    // Distinct values so the suite fails if getUsageStats regresses to the
+    // enforcement counter: display drives the surfaced count, enforcement must
+    // not be called.
     mockTraceUsage = {
-      getCurrentMonthCount: vi.fn().mockResolvedValue(500),
+      getCurrentMonthCount: vi.fn().mockResolvedValue(123),
+      getCurrentMonthCountForDisplay: vi.fn().mockResolvedValue(500),
     } as unknown as ITraceUsageService;
 
     mockPlanProvider = {
@@ -96,6 +100,15 @@ describe("UsageStatsService", () => {
       expect(stats.currentMonthMessagesCount).toBe(500);
       expect(stats.usageUnit).toBe("traces");
       expect(stats.messageLimitInfo).toBeDefined();
+    });
+
+    it("surfaces the display count and never the enforcement counter", async () => {
+      await service.getUsageStats("org-123", testUser);
+
+      expect(
+        mockTraceUsage.getCurrentMonthCountForDisplay,
+      ).toHaveBeenCalledWith({ organizationId: "org-123" });
+      expect(mockTraceUsage.getCurrentMonthCount).not.toHaveBeenCalled();
     });
   });
 });

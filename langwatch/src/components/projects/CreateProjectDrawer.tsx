@@ -77,6 +77,7 @@ export function CreateProjectDrawer({
             void queryClient.limits.getUsage.invalidate();
             void queryClient.team.getTeamsWithMembers.invalidate();
             void queryClient.team.getTeamWithMembers.invalidate();
+            void queryClient.team.getTeamsWithRoleBindings.invalidate();
 
             trackEvent("project_created", {
               project_slug: result.projectSlug,

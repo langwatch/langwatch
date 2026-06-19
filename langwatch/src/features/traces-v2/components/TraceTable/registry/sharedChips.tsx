@@ -139,7 +139,7 @@ export const EvalChip: React.FC<{ eval_: TraceEvalResult }> = ({ eval_ }) => {
             minWidth="160px"
             maxWidth="220px"
             padding={3}
-            borderRadius="lg"
+            borderRadius="xl"
             background="bg.panel"
             boxShadow="lg"
           >

@@ -7,7 +7,15 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Check, ChevronDown, Folder, Plus, User, Users } from "lucide-react";
+import {
+  Building2,
+  Check,
+  ChevronDown,
+  Folder,
+  Plus,
+  User,
+  Users,
+} from "lucide-react";
 import React, { useState } from "react";
 import { useRouter } from "~/utils/compat/next-router";
 
@@ -22,7 +30,21 @@ import { useWorkspaceCurrent } from "./useWorkspaceCurrent";
 // caller source from anywhere — the Sergey tRPC `user.personalContext` once
 // it lands, or the existing `useOrganizationTeamProject` shaped to fit.
 export type WorkspaceSwitcherEntry =
-  | { kind: "personal"; href: string; label: string; subtitle?: string }
+  | {
+      kind: "personal";
+      /**
+       * Org this personal workspace belongs to. Drives the per-org nesting for
+       * multi-governance-org users (the personal entry renders under its org
+       * header). null for an org-less user, whose single personal entry renders
+       * standalone.
+       */
+      orgId: string | null;
+      orgName?: string;
+      orgSlug?: string;
+      href: string;
+      label: string;
+      subtitle?: string;
+    }
   | {
       kind: "team";
       teamId: string;
@@ -60,18 +82,38 @@ export type WorkspaceSwitcherEntry =
     };
 
 export type WorkspaceSwitcherCurrent =
-  | { kind: "personal" }
+  // `orgId` selects which org's personal entry is active for multi-org users;
+  // omitted for single-org / org-less users (their one personal entry matches).
+  | { kind: "personal"; orgId?: string }
   | { kind: "team"; teamId: string }
   | { kind: "project"; projectId: string }
+  // Org-scoped routes (`/settings/*`, `/governance`) carry no project context.
+  // The switcher shows the org as the current chip and offers the full
+  // personal/team/project list so the user can jump back into a workspace.
+  | { kind: "organization"; orgId: string; orgName: string }
   | { kind: "unknown" };
+
+/**
+ * One organization the user belongs to, for the in-place org switch offered on
+ * org-scoped routes. Kept separate from `WorkspaceSwitcherEntry` because
+ * switching org is a context change (writes `selectedOrganizationId`), not a
+ * navigation to a single href.
+ */
+export type WorkspaceSwitcherOrganization = {
+  orgId: string;
+  orgName: string;
+  orgSlug: string;
+};
 
 export type WorkspaceSwitcherProps = {
   /**
-   * The "My Workspace" personal entry. Omitted when the personal portal is
-   * not available to the user (no organization has the governance flag), so
-   * the switcher hides the entry rather than linking to a page that 404s.
+   * The "My Workspace" personal entries, one per organization that enables
+   * governance. Empty when the personal portal is unavailable (no organization
+   * has the governance flag), so the switcher hides it rather than linking to a
+   * page that 404s. A single entry renders as a top-level "My Workspace" group;
+   * multiple entries nest under each org's header (multi-governance-org users).
    */
-  personal?: Extract<WorkspaceSwitcherEntry, { kind: "personal" }>;
+  personals?: Array<Extract<WorkspaceSwitcherEntry, { kind: "personal" }>>;
   teams: Array<Extract<WorkspaceSwitcherEntry, { kind: "team" }>>;
   projects: Array<Extract<WorkspaceSwitcherEntry, { kind: "project" }>>;
   /**
@@ -88,19 +130,38 @@ export type WorkspaceSwitcherProps = {
    * this callback is provided.
    */
   onCreateProjectForTeam?: (args: { teamId: string; orgId: string }) => void;
+  /**
+   * The user's organizations, surfaced as an in-place org switch on org-scoped
+   * routes. Only rendered when `current.kind === "organization"` and the user
+   * belongs to more than one org. Omitted on project/personal routes.
+   */
+  organizations?: WorkspaceSwitcherOrganization[];
+  /**
+   * Invoked when the user picks a different org from the org-switch group.
+   * The consumer writes `selectedOrganizationId` and navigates to a route
+   * valid for any org (e.g. `/settings`).
+   */
+  onSwitchOrganization?: (orgId: string) => void;
 };
 
 const ICON_BY_KIND = {
   personal: User,
   team: Users,
   project: Folder,
+  organization: Building2,
 } as const;
 
 function entryIsCurrent(
   entry: WorkspaceSwitcherEntry,
   current: WorkspaceSwitcherCurrent,
 ): boolean {
-  if (entry.kind === "personal") return current.kind === "personal";
+  if (entry.kind === "personal") {
+    if (current.kind !== "personal") return false;
+    // Single / org-less users have one personal entry, so any personal current
+    // matches it. Multi-org users match on org so only the selected org's
+    // personal row shows the check.
+    return (current.orgId ?? null) === (entry.orgId ?? null);
+  }
   if (entry.kind === "team") {
     return current.kind === "team" && current.teamId === entry.teamId;
   }
@@ -111,12 +172,15 @@ function entryIsCurrent(
 
 function currentLabel(
   current: WorkspaceSwitcherCurrent,
-  personal: WorkspaceSwitcherProps["personal"],
+  personals: WorkspaceSwitcherProps["personals"],
   teams: WorkspaceSwitcherProps["teams"],
   projects: WorkspaceSwitcherProps["projects"],
 ): { label: string; kind: keyof typeof ICON_BY_KIND } {
   if (current.kind === "personal") {
-    return { label: personal?.label ?? "My Workspace", kind: "personal" };
+    const match =
+      personals?.find((p) => (p.orgId ?? null) === (current.orgId ?? null)) ??
+      personals?.[0];
+    return { label: match?.label ?? "My Workspace", kind: "personal" };
   }
   if (current.kind === "team") {
     const t = teams.find((t) => t.teamId === current.teamId);
@@ -125,6 +189,9 @@ function currentLabel(
   if (current.kind === "project") {
     const p = projects.find((p) => p.projectId === current.projectId);
     return { label: p?.label ?? "Project", kind: "project" };
+  }
+  if (current.kind === "organization") {
+    return { label: current.orgName, kind: "organization" };
   }
   return { label: "Choose workspace", kind: "personal" };
 }
@@ -148,11 +215,13 @@ function currentLabel(
  * Spec: specs/ai-gateway/governance/workspace-switcher.feature
  */
 export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
-  personal,
+  personals = [],
   teams,
   projects,
   current: currentProp,
   onCreateProjectForTeam,
+  organizations,
+  onSwitchOrganization,
 }: WorkspaceSwitcherProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -161,7 +230,7 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
 
   const { label: triggerLabel, kind: triggerKind } = currentLabel(
     current,
-    personal,
+    personals,
     teams,
     projects,
   );
@@ -172,7 +241,26 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
   const triggerProjectName =
     triggerKind === "project" ? triggerLabel : null;
 
-  const hasMore = teams.length > 0 || projects.length > 0;
+  // On org-scoped routes, offer the in-place org switch when the user belongs
+  // to more than one org. The active org is the current chip, so it is not a
+  // navigation target - it just gets the checkmark.
+  const orgSwitchList =
+    current.kind === "organization" && onSwitchOrganization
+      ? (organizations ?? [])
+      : [];
+  const showOrgSwitch = orgSwitchList.length > 1;
+
+  // "My Workspace" is a switch target only when it isn't already the current
+  // context, so an org-scoped chip with no team projects still opens (the user
+  // can jump back to personal) while a personal-only user - who has nowhere
+  // else to go - keeps the disabled chip.
+  const canGoPersonal = personals.length > 0 && current.kind !== "personal";
+  const hasMore =
+    canGoPersonal ||
+    personals.length > 1 ||
+    teams.length > 0 ||
+    projects.length > 0 ||
+    showOrgSwitch;
 
   // Group projects under their parent team for the nested-hierarchy render.
   // Anything whose teamId doesn't match a known team falls into the orphan
@@ -218,12 +306,39 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
     bucket.teams.push(team);
     teamsByOrg.set(team.orgId, bucket);
   }
-  const orgs = Array.from(teamsByOrg.entries()).map(([orgId, value]) => ({
+  const teamOrgs = Array.from(teamsByOrg.entries()).map(([orgId, value]) => ({
     orgId,
     orgName: value.orgName,
     orgSlug: value.orgSlug,
     teams: value.teams,
   }));
+
+  // Personal "My Workspace" entries nest under their org's header so the org
+  // name is always visible above its workspace (the user's mental model: "my
+  // personal usage *within* this org"). This holds for a single governance org
+  // too — the org header renders even when there's just one, so the name does
+  // not disappear. Only a truly org-less personal (orgId null) has no org to
+  // nest under and stays a top-level "My Workspace" group.
+  const orgPersonals = personals.filter((p) => p.orgId);
+  const personalByOrgId = new Map(
+    orgPersonals.map((p) => [p.orgId as string, p]),
+  );
+  const topLevelPersonal = personals.find((p) => !p.orgId);
+
+  // Include governance orgs the user has a personal in but no visible team in —
+  // otherwise their "My Workspace" row (and its org header) would vanish.
+  const teamOrgIds = new Set(teamOrgs.map((o) => o.orgId));
+  const personalOnlyOrgs = personals
+    .filter((p) => p.orgId && !teamOrgIds.has(p.orgId))
+    .map((p) => ({
+      orgId: p.orgId as string,
+      orgName: p.orgName ?? "Organization",
+      orgSlug: p.orgSlug ?? "",
+      teams: [] as typeof teams,
+    }));
+  const orgs = [...teamOrgs, ...personalOnlyOrgs].sort((a, b) =>
+    a.orgName.localeCompare(b.orgName),
+  );
   const multipleOrgs = orgs.length > 1;
   // Disambiguate same-name orgs: append slug to any name that appears
   // more than once across the user's orgs. Single-org users see nothing
@@ -271,24 +386,94 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
         <Box zIndex="popover" padding={0}>
           {open && (
             <Menu.Content minWidth="280px" maxHeight="70vh" overflowY="auto">
-              {personal && (
+              {showOrgSwitch && (
+                <Group title="Organizations">
+                  {orgSwitchList.map((org) => {
+                    const active =
+                      current.kind === "organization" &&
+                      current.orgId === org.orgId;
+                    return (
+                      <Menu.Item
+                        key={org.orgId}
+                        value={`org:${org.orgId}`}
+                        fontSize="14px"
+                        paddingY="5px"
+                        onClick={() => {
+                          setOpen(false);
+                          onSwitchOrganization?.(org.orgId);
+                        }}
+                      >
+                        <HStack gap={3} width="full" alignItems="center">
+                          <Box
+                            width="20px"
+                            display="flex"
+                            justifyContent="center"
+                            flexShrink={0}
+                          >
+                            <Building2 size={14} />
+                          </Box>
+                          <Text
+                            fontWeight={active ? "semibold" : "normal"}
+                            truncate
+                            flex={1}
+                            minWidth={0}
+                          >
+                            {org.orgName}
+                          </Text>
+                          {active && (
+                            <Box color="fg.muted" flexShrink={0}>
+                              <Check size={14} />
+                            </Box>
+                          )}
+                        </HStack>
+                      </Menu.Item>
+                    );
+                  })}
+                </Group>
+              )}
+
+              {topLevelPersonal && (
                 <Group title="My Workspace">
                   <SwitcherItem
-                    entry={personal}
-                    active={entryIsCurrent(personal, current)}
+                    entry={topLevelPersonal}
+                    // The sole top-level personal entry is the personal context,
+                    // so it is active on any /me route regardless of which org
+                    // is selected (per-org matching only matters when nested).
+                    active={current.kind === "personal"}
                     onSelect={() => {
                       setOpen(false);
-                      void router.push(personal.href);
+                      void router.push(topLevelPersonal.href);
                     }}
                   />
                 </Group>
               )}
 
-              {orgs.map((org) => (
+              {orgs.map((org) => {
+                const orgPersonal = personalByOrgId.get(org.orgId);
+                return (
                 <Group
                   key={org.orgId}
-                  title={multipleOrgs ? orgHeader(org) : undefined}
+                  // Show the org name as a header when the user spans multiple
+                  // orgs, or whenever this org has a personal nested under it
+                  // (governance orgs), so the org name is always visible above
+                  // its "My Workspace". A lone non-governance org stays
+                  // header-free — its org context is implicit.
+                  title={
+                    multipleOrgs || personalByOrgId.has(org.orgId)
+                      ? orgHeader(org)
+                      : undefined
+                  }
                 >
+                  {orgPersonal && (
+                    <SwitcherItem
+                      entry={orgPersonal}
+                      active={entryIsCurrent(orgPersonal, current)}
+                      onSelect={() => {
+                        setOpen(false);
+                        void router.push(orgPersonal.href);
+                      }}
+                    />
+                  )}
                   {org.teams.map((team) => {
                     const teamProjects = projectsByTeam.get(team.teamId) ?? [];
                     return (
@@ -329,7 +514,8 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
                     );
                   })}
                 </Group>
-              ))}
+                );
+              })}
 
               {orphanProjects.length > 0 && (
                 <Group title="Projects">

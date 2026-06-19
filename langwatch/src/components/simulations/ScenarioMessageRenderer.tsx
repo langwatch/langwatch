@@ -1,5 +1,5 @@
 import { Box, HStack, Image, Text, VStack } from "@chakra-ui/react";
-import { useMemo, useRef, useEffect } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Settings } from "react-feather";
 import type { StreamingMessage } from "~/hooks/useSimulationStreamingState";
 import type { ScenarioMessageSnapshotEvent } from "~/server/scenarios/scenario-event.types";
@@ -8,17 +8,46 @@ import { visitContentPart } from "~/server/stored-objects/visit-content-part";
 import { TraceMessage } from "../copilot-kit/TraceMessage";
 import { Markdown } from "../Markdown";
 import { RenderInputOutput } from "../traces/RenderInputOutput";
-import { safeJsonParseOrStringFallback } from "./utils/safe-json-parse-or-string-fallback";
-import { MediaPart } from "./MediaPart";
 import type { MediaPartData } from "./MediaPart";
+import { MediaPart } from "./MediaPart";
+import { useSequentialAudioPlayback } from "./useSequentialAudioPlayback";
+import { safeJsonParseOrStringFallback } from "./utils/safe-json-parse-or-string-fallback";
 
 type RawMessage = ScenarioMessageSnapshotEvent["messages"][number];
 
+// Role → alignment mapping. Extracted here so `align` and `data-align` always
+// derive from the same value — the `data-align` attribute mirrors `align` for
+// jsdom tests, which cannot read Chakra's atomic CSS classes via getComputedStyle.
+const alignForRole = (role?: string): "flex-start" | "flex-end" =>
+  role === "assistant" ? "flex-start" : "flex-end";
+
+const textAlignForRole = (role?: string): "left" | "right" =>
+  role === "assistant" ? "left" : "right";
+
 type DisplayItem =
-  | { kind: "text"; id: string; role: string; content: string; traceId?: string }
+  | {
+      kind: "text";
+      id: string;
+      role: string;
+      content: string;
+      traceId?: string;
+    }
   | { kind: "image"; id: string; src: string; role?: string; traceId?: string }
-  | { kind: "media"; id: string; part: MediaPartData; role?: string; transcript?: string; traceId?: string }
-  | { kind: "tool_call"; id: string; name: string; arguments: unknown; traceId?: string }
+  | {
+      kind: "media";
+      id: string;
+      part: MediaPartData;
+      role?: string;
+      transcript?: string;
+      traceId?: string;
+    }
+  | {
+      kind: "tool_call";
+      id: string;
+      name: string;
+      arguments: unknown;
+      traceId?: string;
+    }
   | { kind: "tool_result"; id: string; result: unknown; traceId?: string };
 
 interface ScenarioMessageRendererProps {
@@ -47,6 +76,27 @@ export function ScenarioMessageRenderer({
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [items]);
 
+  // Ordered list of audio-only item ids — the single source of ordering truth
+  // for the sequential playback hook. Filters to audio media only (not video /
+  // binary) so the hook's "next" index is never off by a non-audio item.
+  const orderedAudioIds = useMemo(
+    () =>
+      items
+        .filter(
+          (item): item is Extract<DisplayItem, { kind: "media" }> =>
+            item.kind === "media" && item.part.type === "audio",
+        )
+        .map((item) => item.id),
+    [items],
+  );
+
+  // Per-renderer-instance sequential audio playback coordinator.
+  // Each instance of ScenarioMessageRenderer owns its own hook invocation,
+  // so grid cells are fully isolated from one another.
+  const { getAudioProps } = useSequentialAudioPlayback({
+    orderedIds: orderedAudioIds,
+  });
+
   return (
     <VStack
       align="stretch"
@@ -63,7 +113,8 @@ export function ScenarioMessageRenderer({
             return (
               <VStack
                 key={item.id}
-                align={item.role === "assistant" ? "flex-start" : "flex-end"}
+                align={alignForRole(item.role)}
+                data-align={alignForRole(item.role)}
                 gap={1}
               >
                 {item.role === "assistant" ? (
@@ -113,17 +164,19 @@ export function ScenarioMessageRenderer({
             return (
               <VStack
                 key={item.id}
-                align={item.role === "assistant" ? "flex-start" : "flex-end"}
+                align={alignForRole(item.role)}
+                data-align={alignForRole(item.role)}
               >
                 <Image src={item.src} maxH="200px" borderRadius="md" />
               </VStack>
             );
 
-          case "media":
+          case "media": {
             return (
               <VStack
                 key={item.id}
-                align={item.role === "assistant" ? "flex-start" : "flex-end"}
+                align={alignForRole(item.role)}
+                data-align={alignForRole(item.role)}
                 width="100%"
               >
                 <VStack
@@ -131,16 +184,22 @@ export function ScenarioMessageRenderer({
                   gap={1}
                   width={{ base: "100%", md: "min(420px, 95%)" }}
                 >
-                  <MediaPart part={item.part} projectId={projectId} />
+                  <MediaPart
+                    part={item.part}
+                    projectId={projectId}
+                    audioPlayback={
+                      item.part.type === "audio"
+                        ? getAudioProps(item.id)
+                        : undefined
+                    }
+                  />
                   {item.transcript && (
                     <Text
                       fontSize="xs"
                       color="fg.muted"
                       fontStyle="italic"
                       paddingX={2}
-                      textAlign={
-                        item.role === "assistant" ? "left" : "right"
-                      }
+                      textAlign={textAlignForRole(item.role)}
                     >
                       {item.transcript}
                     </Text>
@@ -151,6 +210,7 @@ export function ScenarioMessageRenderer({
                 )}
               </VStack>
             );
+          }
 
           case "tool_call":
             return (
@@ -172,14 +232,27 @@ export function ScenarioMessageRenderer({
                   borderRadius="lg"
                   p={3}
                 >
-                  <Text fontSize="xs" fontWeight="semibold" color="fg.muted" mb={2}>
+                  <Text
+                    fontSize="xs"
+                    fontWeight="semibold"
+                    color="fg.muted"
+                    mb={2}
+                  >
                     Tool arguments
                   </Text>
-                  <Box bg="bg.panel" border="1px solid" borderColor="border" borderRadius="md" p={2}>
+                  <Box
+                    bg="bg.panel"
+                    border="1px solid"
+                    borderColor="border"
+                    borderRadius="md"
+                    p={2}
+                  >
                     <RenderInputOutput value={item.arguments as string} />
                   </Box>
                 </Box>
-                {!smallerView && item.traceId && <TraceMessage traceId={item.traceId} />}
+                {!smallerView && item.traceId && (
+                  <TraceMessage traceId={item.traceId} />
+                )}
               </VStack>
             );
 
@@ -195,14 +268,27 @@ export function ScenarioMessageRenderer({
                   borderRadius="lg"
                   p={3}
                 >
-                  <Text fontSize="xs" fontWeight="semibold" color="fg.muted" mb={2}>
+                  <Text
+                    fontSize="xs"
+                    fontWeight="semibold"
+                    color="fg.muted"
+                    mb={2}
+                  >
                     Tool result
                   </Text>
-                  <Box bg="bg.panel" border="1px solid" borderColor="border" borderRadius="md" p={2}>
+                  <Box
+                    bg="bg.panel"
+                    border="1px solid"
+                    borderColor="border"
+                    borderRadius="md"
+                    p={2}
+                  >
                     <RenderInputOutput value={item.result as string} />
                   </Box>
                 </Box>
-                {!smallerView && item.traceId && <TraceMessage traceId={item.traceId} />}
+                {!smallerView && item.traceId && (
+                  <TraceMessage traceId={item.traceId} />
+                )}
               </VStack>
             );
 
@@ -229,16 +315,23 @@ function flattenMessages(
     if (msg.role === "user" || msg.role === "assistant") {
       // Support both snake_case (OpenAI/chatMessageSchema) and camelCase (AG-UI MessageSchema)
       const msgAny = msg as Record<string, unknown>;
-      const toolCalls = (msgAny.tool_calls as Array<{ function?: { name?: string; arguments?: string } }> | undefined)
-        ?? (msgAny.toolCalls as Array<{ function?: { name?: string; arguments?: string } }> | undefined)
-        ?? null;
+      const toolCalls =
+        (msgAny.tool_calls as
+          | Array<{ function?: { name?: string; arguments?: string } }>
+          | undefined) ??
+        (msgAny.toolCalls as
+          | Array<{ function?: { name?: string; arguments?: string } }>
+          | undefined) ??
+        null;
       if (toolCalls) {
         for (const tc of toolCalls) {
           items.push({
             kind: "tool_call",
             id: `${msg.id ?? ""}-tool-${tc.function?.name ?? "unknown"}`,
             name: tc.function?.name ?? "unknown",
-            arguments: safeJsonParseOrStringFallback(tc.function?.arguments ?? "{}"),
+            arguments: safeJsonParseOrStringFallback(
+              tc.function?.arguments ?? "{}",
+            ),
             traceId: msg.trace_id,
           });
         }
@@ -249,7 +342,9 @@ function flattenMessages(
         kind: "tool_result",
         id: msg.id ?? crypto.randomUUID(),
         result: safeJsonParseOrStringFallback(
-          typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content ?? {}),
+          typeof msg.content === "string"
+            ? msg.content
+            : JSON.stringify(msg.content ?? {}),
         ),
         traceId: msg.trace_id,
       });
@@ -260,7 +355,12 @@ function flattenMessages(
     const serverIds = new Set(messages.map((m) => m.id).filter(Boolean));
     for (const sm of streamingMessages) {
       if (serverIds.has(sm.messageId)) continue;
-      items.push({ kind: "text", id: sm.messageId, role: sm.role, content: sm.content || "\u2026" });
+      items.push({
+        kind: "text",
+        id: sm.messageId,
+        role: sm.role,
+        content: sm.content || "\u2026",
+      });
     }
   }
 
@@ -272,10 +372,21 @@ function flattenContent(msg: RawMessage): DisplayItem[] {
   const coerced = coerceContentToArray(msg.content);
   if (coerced) return flattenMixed(coerced, msg);
 
-  const raw = typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content ?? {});
+  const raw =
+    typeof msg.content === "string"
+      ? msg.content
+      : JSON.stringify(msg.content ?? {});
 
   if (msg.content && msg.content !== "None") {
-    return [{ kind: "text", id: msg.id ?? crypto.randomUUID(), role: msg.role ?? "assistant", content: raw, traceId: msg.trace_id }];
+    return [
+      {
+        kind: "text",
+        id: msg.id ?? crypto.randomUUID(),
+        role: msg.role ?? "assistant",
+        content: raw,
+        traceId: msg.trace_id,
+      },
+    ];
   }
   return [];
 }
@@ -285,9 +396,16 @@ function flattenMixed(content: unknown[], msg: RawMessage): DisplayItem[] {
   const role = msg.role ?? "assistant";
   content.forEach((item, i) => {
     const result = visitContentPart<DisplayItem | undefined>(item, {
-      text: (text) => text
-        ? { kind: "text" as const, id: `${msg.id}-c${i}`, role, content: text, traceId: msg.trace_id }
-        : undefined,
+      text: (text) =>
+        text
+          ? {
+              kind: "text" as const,
+              id: `${msg.id}-c${i}`,
+              role,
+              content: text,
+              traceId: msg.trace_id,
+            }
+          : undefined,
       media: (part) => ({
         kind: "media" as const,
         id: `${msg.id}-media${i}`,
@@ -304,10 +422,33 @@ function flattenMixed(content: unknown[], msg: RawMessage): DisplayItem[] {
         role,
         traceId: msg.trace_id,
       }),
-      toolCall: (part) => ({ kind: "tool_call" as const, id: `${msg.id}-tu${i}`, name: part.name, arguments: part.arguments, traceId: msg.trace_id }),
-      toolResult: (part) => ({ kind: "tool_result" as const, id: `${msg.id}-tr${i}`, result: part.result, traceId: msg.trace_id }),
-      imageUrl: (url) => ({ kind: "image" as const, id: `${msg.id}-img${i}`, src: url, role, traceId: msg.trace_id }),
-      bareImage: (src) => ({ kind: "image" as const, id: `${msg.id}-img${i}`, src, role, traceId: msg.trace_id }),
+      toolCall: (part) => ({
+        kind: "tool_call" as const,
+        id: `${msg.id}-tu${i}`,
+        name: part.name,
+        arguments: part.arguments,
+        traceId: msg.trace_id,
+      }),
+      toolResult: (part) => ({
+        kind: "tool_result" as const,
+        id: `${msg.id}-tr${i}`,
+        result: part.result,
+        traceId: msg.trace_id,
+      }),
+      imageUrl: (url) => ({
+        kind: "image" as const,
+        id: `${msg.id}-img${i}`,
+        src: url,
+        role,
+        traceId: msg.trace_id,
+      }),
+      bareImage: (src) => ({
+        kind: "image" as const,
+        id: `${msg.id}-img${i}`,
+        src,
+        role,
+        traceId: msg.trace_id,
+      }),
       // OpenAI Realtime API audio shape. Two states:
       // - Pre-extraction: {data, format} (inline base64). Server-side
       //   extraction normally rewrites this away, but if the renderer

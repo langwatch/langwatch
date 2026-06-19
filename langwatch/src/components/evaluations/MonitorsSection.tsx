@@ -13,7 +13,6 @@ import type { TRPCClientErrorLike } from "@trpc/react-query";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import { CopyIcon } from "lucide-react";
-import { useRouter } from "~/utils/compat/next-router";
 import { useMemo, useState } from "react";
 import {
   LuChevronDown,
@@ -25,6 +24,7 @@ import {
   LuTrash,
   LuTrendingUp,
 } from "react-icons/lu";
+import { useRouter } from "~/utils/compat/next-router";
 import { Menu } from "../../components/ui/menu";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useDrawer } from "../../hooks/useDrawer";
@@ -35,7 +35,7 @@ import { api } from "../../utils/api";
 import { CustomGraph } from "../analytics/CustomGraph";
 import { Link } from "../ui/link";
 import { toaster } from "../ui/toaster";
-import { CopyEvaluationDialog } from "./CopyEvaluationDialog";
+import { CopyMonitorDialog } from "./CopyMonitorDialog";
 
 type MonitorsSectionProps = {
   title: string;
@@ -49,11 +49,11 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [copyDialogState, setCopyDialogState] = useState<{
     open: boolean;
-    experimentId: string;
-    evaluationName: string;
+    monitorId: string;
+    monitorName: string;
   } | null>(null);
 
-  const { project, hasPermission } = useOrganizationTeamProject();
+  const { project } = useOrganizationTeamProject();
   const router = useRouter();
   const { openDrawer } = useDrawer();
 
@@ -170,7 +170,7 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
                               experimentsSlugMap[monitor.experimentId]
                             ) {
                               void router.push(
-                                `/${project.slug}/evaluations/wizard/${
+                                `/${project.slug}/experiments/workbench/${
                                   experimentsSlugMap[monitor.experimentId]
                                 }`,
                               );
@@ -185,29 +185,18 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
                           <LuPencil size={16} />
                           Edit
                         </Menu.Item>
-                        {monitor.experimentId && (
-                            <Menu.Item
-                              value="copy"
-                              onClick={() => {
-                                if (!project || !monitor.experimentId) return;
-                                const experiment =
-                                  experiments.data?.experiments?.find(
-                                    (e) => e.id === monitor.experimentId,
-                                  );
-                                if (experiment) {
-                                  setCopyDialogState({
-                                    open: true,
-                                    experimentId: experiment.id,
-                                    evaluationName:
-                                      experiment.name ?? experiment.slug,
-                                  });
-                                }
-                              }}
-                            >
-                              <CopyIcon size={16} /> Replicate to another
-                              project
-                            </Menu.Item>
-                        )}
+                        <Menu.Item
+                          value="copy"
+                          onClick={() => {
+                            setCopyDialogState({
+                              open: true,
+                              monitorId: monitor.id,
+                              monitorName: monitor.name,
+                            });
+                          }}
+                        >
+                          <CopyIcon size={16} /> Replicate to another project
+                        </Menu.Item>
                         <Menu.Item
                           value="toggle"
                           onClick={() => {
@@ -302,11 +291,11 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
         )}
       </Card.Body>
       {copyDialogState && (
-        <CopyEvaluationDialog
+        <CopyMonitorDialog
           open={copyDialogState.open}
           onClose={() => setCopyDialogState(null)}
-          experimentId={copyDialogState.experimentId}
-          evaluationName={copyDialogState.evaluationName}
+          monitorId={copyDialogState.monitorId}
+          monitorName={copyDialogState.monitorName}
         />
       )}
     </Card.Root>

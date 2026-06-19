@@ -1,22 +1,21 @@
-import { Box, Flex, Text } from "@chakra-ui/react";
-import { ChevronUp } from "lucide-react";
+import { Box, Flex, Icon, Text } from "@chakra-ui/react";
+import { ArrowUp } from "lucide-react";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTraceNewCount } from "../../hooks/useTraceNewCount";
 import { useSseStatusStore } from "../../stores/sseStatusStore";
 
 const SCROLL_THRESHOLD_PX = 80;
 
-const ORB_KEYFRAMES = {
-  "@keyframes tracesV2OrbMorph": {
-    "0%, 100%": { borderRadius: "60% 40% 55% 45% / 50% 60% 40% 50%" },
-    "25%": { borderRadius: "44% 56% 68% 32% / 52% 42% 58% 48%" },
-    "50%": { borderRadius: "52% 48% 30% 70% / 60% 50% 50% 40%" },
-    "75%": { borderRadius: "70% 30% 48% 52% / 40% 62% 48% 60%" },
-  },
-  "@keyframes tracesV2OrbBob": {
-    "0%, 100%": { transform: "scale(1)" },
-    "50%": { transform: "scale(1.05)" },
+// Subtle one-shot bounce when the count first appears (or grows). Avoids
+// the previous always-on bob+morph that read as "constantly demanding
+// attention" on busy projects — now the pill arrives, settles, and then
+// stays put until clicked.
+const ARRIVE_KEYFRAMES = {
+  "@keyframes tracesV2NewPillArrive": {
+    "0%": { transform: "translateX(-50%) translateY(-8px) scale(0.92)", opacity: 0 },
+    "60%": { transform: "translateX(-50%) translateY(0) scale(1.02)", opacity: 1 },
+    "100%": { transform: "translateX(-50%) translateY(0) scale(1)", opacity: 1 },
   },
 } as const;
 
@@ -24,6 +23,23 @@ interface NewTracesScrollUpIndicatorProps {
   scrollRef: React.RefObject<HTMLDivElement | null>;
 }
 
+/**
+ * Floating "N new" pill that surfaces when fresh traces are buffered.
+ * Visible in two cases:
+ *
+ *   - Live mode + the user has scrolled past `SCROLL_THRESHOLD_PX` —
+ *     auto-merge has the rows up-top, but the user is reading further
+ *     down and might want to jump back to the latest.
+ *   - Ask mode regardless of scroll — the table is frozen on the
+ *     snapshot the user was reading, so the pill is the only signal
+ *     that new rows are available.
+ *
+ * Click acknowledges (sets `since = now`, scrolls to top, refetches).
+ *
+ * Previous incarnation used a morphing-blob orb with two perpetual
+ * animations. Replaced with a flat pill that just arrives once and
+ * settles — the constant motion read as visual nag on busy projects.
+ */
 export const NewTracesScrollUpIndicator: React.FC<
   NewTracesScrollUpIndicatorProps
 > = ({ scrollRef }) => {
@@ -40,14 +56,21 @@ export const NewTracesScrollUpIndicator: React.FC<
     return () => el.removeEventListener("scroll", update);
   }, [scrollRef]);
 
-  // Live mode: only show when the user is scrolled away from the top —
-  // otherwise auto-refresh has already brought the new rows into view.
-  // Ask mode: the table is deliberately frozen on the snapshot the user
-  // was reading, so the pill needs to surface regardless of scroll
-  // position. Without this, an operator at the top in ask mode would
-  // never see that new rows are available.
-  const visible =
-    count > 0 && (isScrolled || liveUpdatesMode === "ask");
+  const visible = count > 0 && (isScrolled || liveUpdatesMode === "ask");
+
+  // Replay the arrive animation each time the count crosses 0→N. Stays
+  // still while count is steady so a slowly-growing count doesn't loop
+  // the bounce — only the first appearance (and re-appearances after a
+  // dismiss) plays.
+  const animKeyRef = useRef(0);
+  const wasZeroRef = useRef(true);
+  if (count > 0 && wasZeroRef.current) {
+    animKeyRef.current += 1;
+    wasZeroRef.current = false;
+  } else if (count === 0) {
+    wasZeroRef.current = true;
+  }
+
   if (!visible) return null;
 
   const handleClick = () => {
@@ -68,41 +91,49 @@ export const NewTracesScrollUpIndicator: React.FC<
       transform="translateX(-50%)"
       zIndex={6}
       pointerEvents="none"
+      key={animKeyRef.current}
+      css={{
+        animation: "tracesV2NewPillArrive 320ms cubic-bezier(0.22, 1, 0.36, 1)",
+        ...ARRIVE_KEYFRAMES,
+      }}
     >
       <Flex
         as="button"
         onClick={handleClick}
         align="center"
         gap={1.5}
-        paddingLeft={3}
-        paddingRight={4}
-        paddingY={2}
+        paddingLeft={2.5}
+        paddingRight={3.5}
+        paddingY={1.5}
+        borderRadius="full"
         cursor="pointer"
-        color="white"
         pointerEvents="auto"
         role="status"
         aria-live="polite"
         aria-label={ariaLabel}
-        css={{
-          background:
-            "radial-gradient(circle at 30% 25%, rgba(147,197,253,0.95), rgba(37,99,235,0.78) 70%)",
-          boxShadow:
-            "0 6px 28px rgba(59,130,246,0.45), inset 0 0 0 1px rgba(255,255,255,0.18), inset 0 -8px 18px rgba(30,64,175,0.35)",
-          animation:
-            "tracesV2OrbMorph 5.5s ease-in-out infinite, tracesV2OrbBob 2.6s ease-in-out infinite",
-          ...ORB_KEYFRAMES,
-          transition: "filter 180ms ease-out",
-        }}
-        _hover={{ filter: "brightness(1.1)" }}
+        // Solid blue pill with a thin lifted shadow — reads as "actionable
+        // notification" without the previous blob/orb visual noise. The
+        // border + inset highlight give a subtle glass edge that holds up
+        // in both light and dark mode.
+        bg="blue.solid"
+        color="blue.contrast"
+        borderWidth="1px"
+        borderColor="blue.emphasized"
+        boxShadow="0 4px 14px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.18)"
+        transition="transform 120ms ease-out, filter 120ms ease-out"
+        _hover={{ filter: "brightness(1.08)", transform: "translateY(-1px)" }}
+        _active={{ transform: "translateY(0)" }}
         _focusVisible={{
           outline: "2px solid",
           outlineColor: "blue.fg",
           outlineOffset: "2px",
         }}
       >
-        <ChevronUp size={14} strokeWidth={2.5} />
+        <Icon boxSize={3.5}>
+          <ArrowUp strokeWidth={2.5} />
+        </Icon>
         <Text textStyle="xs" fontWeight="semibold" letterSpacing="tight">
-          {count} new
+          {count > 99 ? "99+" : count} new
         </Text>
       </Flex>
     </Box>

@@ -306,6 +306,7 @@ describe("versionedPromptToPromptConfigFormValues", () => {
     updatedAt: new Date(),
     createdAt: new Date(),
     tags: [],
+    parameters: {},
   });
 
   describe("when prompt handle has no prefix", () => {
@@ -397,6 +398,20 @@ describe("versionedPromptToPromptConfigFormValues", () => {
       expect(result.version.configData.llm.reasoning).toBeUndefined();
     });
   });
+
+  describe("when prompt has runtime parameters", () => {
+    it("maps runtime parameters onto form values", () => {
+      /**
+       * @scenario Prompt form values preserve runtime parameters during API mapping
+       */
+      const prompt = createMockPrompt("test-prompt");
+      prompt.parameters = { mapped: true };
+
+      const result = versionedPromptToPromptConfigFormValues(prompt);
+
+      expect(result.version.parameters).toEqual({ mapped: true });
+    });
+  });
 });
 
 describe("versionedPromptToPromptConfigFormValuesWithSystemMessage", () => {
@@ -426,6 +441,7 @@ describe("versionedPromptToPromptConfigFormValuesWithSystemMessage", () => {
     updatedAt: new Date(),
     createdAt: new Date(),
     tags: [],
+    parameters: {},
     ...overrides,
   });
 
@@ -769,6 +785,21 @@ describe("formValuesToTriggerSaveVersionParams", () => {
       expect(result).not.toHaveProperty("reasoningEffort");
     });
   });
+
+  describe("when form values include runtime parameters", () => {
+    it("propagates parameters to the save payload", () => {
+      /**
+       * @scenario Prompt form values preserve runtime parameters during API mapping
+       */
+      const formValues = buildDefaultFormValues({
+        version: { parameters: { mapped: true } },
+      });
+
+      const result = formValuesToTriggerSaveVersionParams(formValues);
+
+      expect(result.parameters).toEqual({ mapped: true });
+    });
+  });
 });
 
 describe("formSchema reasoning validation", () => {
@@ -805,5 +836,102 @@ describe("formSchema reasoning validation", () => {
       expect(formSchema.safeParse(values).success).toBe(true);
       expect(values.version.configData.llm.reasoning).toBeUndefined();
     });
+  });
+});
+
+describe("formSchema runtime parameters validation", () => {
+  describe("when parameters are object JSON", () => {
+    it("accepts nested object values", () => {
+      /**
+       * @scenario Runtime parameters validation accepts object JSON values
+       */
+      const values = buildDefaultFormValues({
+        version: {
+          parameters: { nested: { array: [1, true, { leaf: "value" }] } },
+        },
+      });
+
+      expect(formSchema.safeParse(values).success).toBe(true);
+    });
+  });
+
+  describe("when parameters root is not an object", () => {
+    it("rejects non-object values", () => {
+      /**
+       * @scenario Runtime parameters validation rejects non-object root values
+       */
+      for (const params of [null, [1, 2], "value", 1, true]) {
+        const values = buildDefaultFormValues({
+          version: { parameters: params as any },
+        });
+        expect(formSchema.safeParse(values).success).toBe(false);
+      }
+    });
+  });
+});
+
+/**
+ * Regression test for Issue #3196 — Bug 1 ("scaffold default prompt has
+ * no system prompt"). The workflow scaffold builds a SignatureNode whose
+ * `instructions` parameter holds the default system content; the bridge
+ * `nodeDataToLocalPromptConfig` round-trips that into a `messages` array
+ * that the prompt editor uses. If the bridge ever loses the system
+ * message, the user's first Save attempt will hit the empty-system
+ * codepath again.
+ *
+ * The shape below mirrors the scaffold produced by `registry.ts` (the
+ * default LLM signature node). We do NOT import the registry directly
+ * to avoid pulling in the full optimization-studio dependency graph in
+ * a unit test — the shape is small and stable.
+ */
+describe("nodeDataToLocalPromptConfig — workflow scaffold round-trip (Issue #3196)", () => {
+  // Binds the @e2e scenario at integration scope — the round-trip
+  // through the bridge is the bug surface (Bug 1).  Browser-level
+  // e2e is queued as a follow-up.
+  /** @scenario "New workflow's default prompt node is scaffolded with the default system prompt" */
+  it("preserves the registry's default system message when converting the scaffolded signature node to LocalPromptConfig", () => {
+    const scaffoldedNodeData = {
+      inputs: [{ identifier: "input", type: "str" as const }],
+      outputs: [{ identifier: "output", type: "str" as const }],
+      parameters: [
+        {
+          identifier: "llm",
+          type: "llm" as const,
+          value: {
+            model: "openai/gpt-5-mini",
+            temperature: 0,
+            max_tokens: 2048,
+          },
+        },
+        {
+          identifier: "prompting_technique",
+          type: "prompting_technique" as const,
+          value: undefined,
+        },
+        {
+          identifier: "instructions",
+          type: "str" as const,
+          value: "You are a helpful assistant.",
+        },
+        {
+          identifier: "messages",
+          type: "chat_messages" as const,
+          value: [{ role: "user" as const, content: "{{input}}" }],
+        },
+        {
+          identifier: "demonstrations",
+          type: "dataset" as const,
+          value: undefined,
+        },
+      ],
+    } as any;
+
+    const result = nodeDataToLocalPromptConfig(scaffoldedNodeData);
+
+    expect(result).not.toBeUndefined();
+    expect(result!.messages).toEqual([
+      { role: "system", content: "You are a helpful assistant." },
+      { role: "user", content: "{{input}}" },
+    ]);
   });
 });

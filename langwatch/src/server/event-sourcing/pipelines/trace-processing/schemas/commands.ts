@@ -18,6 +18,15 @@ export const recordSpanCommandDataSchema = z.object({
   instrumentationScope: instrumentationScopeSchema.nullable(),
   piiRedactionLevel: piiRedactionLevelSchema.optional(),
   occurredAt: z.number(),
+  /**
+   * ADR-022: When the serialized command payload exceeds COMMAND_INLINE_THRESHOLD (256 KB),
+   * the edge spools the full span to S3 and sets this field to the S3 key. The command worker
+   * fetches the spool, reconstitutes the span, then deletes the spool after event_log INSERT.
+   *
+   * When present, `span` contains only the minimal identifying fields (traceId, spanId);
+   * when absent, `span` carries the full inline payload.
+   */
+  spoolRef: z.string().optional(),
 });
 
 export type RecordSpanCommandData = z.infer<typeof recordSpanCommandDataSchema>;

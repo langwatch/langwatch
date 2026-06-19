@@ -4,7 +4,7 @@
 # Usage:
 #   scripts/dev.sh                # interactive preset picker
 #   scripts/dev.sh all-local      # local CH+PG+Redis+app, no NLP
-#   scripts/dev.sh all-local-nlp  # all-local + langwatch_nlp + langevals
+#   scripts/dev.sh all-local-nlp  # all-local + nlpgo + langevals
 #   scripts/dev.sh dev-storage    # local CH+PG+Redis, stored-objects -> dev S3
 #   scripts/dev.sh dev-infra      # local redis + workers + app, everything else against shared dev
 #   scripts/dev.sh frontend-only  # no compose, pure pnpm dev against .env URLs
@@ -31,7 +31,7 @@ Presets — pass as the first arg or pick interactively:
                   No NLP. Stored-objects fall back to local-FS. Fast iteration
                   default.
 
-  all-local-nlp   all-local + langwatch_nlp + langevals containers.
+  all-local-nlp   all-local + nlpgo (Go NLP engine) + langevals containers.
 
   dev-storage     Local CH + PG + Redis + workers. Stored-objects route to the
                   dev S3 bucket runtime-storage-dev in lw-dev (eu-central-1).
@@ -106,11 +106,6 @@ check_env_files() {
   if [ ! -f "langwatch/.env" ]; then
     echo "WARNING: langwatch/.env not found"
     echo "  → cp langwatch/.env.example langwatch/.env"
-    missing=1
-  fi
-  if [ ! -f "langwatch_nlp/.env" ]; then
-    echo "WARNING: langwatch_nlp/.env not found (needed for all-local-nlp / full-local presets)"
-    echo "  → cp langwatch_nlp/.env.example langwatch_nlp/.env"
     missing=1
   fi
   if [ $missing -eq 1 ]; then
@@ -285,7 +280,7 @@ run_all_local_nlp() {
   . "$(dirname "$0")/lib/sanitize-dev-env.sh"
   sanitize_localhost_dev_env
   write_overrides all-local-nlp
-  echo "Starting: backend + workers + langwatch_nlp + langevals (preset=all-local-nlp)"
+  echo "Starting: backend + workers + nlpgo + langevals (preset=all-local-nlp)"
   # `nlp` profile starts NLP/langevals; `workers` profile starts the worker
   # container. Both profiles must be passed — compose unions them.
   $COMPOSE --profile nlp --profile workers up
@@ -359,6 +354,11 @@ run_frontend_only() {
   echo ""
   echo "Tip: pure UI / design / static iteration. URLs come from langwatch/.env."
   echo "     For services on top: switch to all-local, all-local-nlp, or full-local."
+  # Skip flags must be on the shell env of the pnpm dev subprocess, NOT in
+  # .env.dev-up: start:prepare:db runs the migrations before the app boots
+  # dotenv, so it reads the shell environment, not the overlay file. Frontend-only
+  # targets shared dev infra whose ClickHouse schema we don't own, so skip migrate.
+  (cd langwatch && SKIP_CLICKHOUSE_MIGRATE=true SKIP_PRISMA_MIGRATE=true pnpm dev)
 }
 
 run_migration() {
@@ -476,7 +476,7 @@ cat <<'EOF'
 Pick a preset:
 
   1) all-local       Local CH + PG + Redis + app + workers. No NLP. Fast iteration.
-  2) all-local-nlp   all-local + langwatch_nlp + langevals.
+  2) all-local-nlp   all-local + nlpgo + langevals.
   3) dev-storage     Local DBs + workers, stored-objects -> runtime-storage-dev (real AWS S3).
   4) dev-infra       Local app + Redis + workers, shared dev infra for PG/CH/NLP/S3. Most faithful e2e.
   5) frontend-only   No compose. UI / design / static iteration.

@@ -9,6 +9,11 @@ import {
 } from "@chakra-ui/react";
 import { useMemo, useRef } from "react";
 import { LuCircleX } from "react-icons/lu";
+import {
+  ContentPrivacyMarkers,
+  PiiIncompleteNotice,
+} from "~/components/ui/ContentPrivacyMarkers";
+import { RedactedField } from "~/components/ui/RedactedField";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { useSpanDetail } from "../../../hooks/useSpanDetail";
 import { useTraceResources } from "../../../hooks/useTraceResources";
@@ -19,8 +24,9 @@ import { ScopeBlock } from "../ScopeChip";
 import { AccordionShell, Section } from "./AccordionShell";
 import { EmptyEventsState, EmptyHint } from "./EmptyStates";
 import { EventCard } from "./EventCard";
-import { useAutoOpenSections } from "./sectionPresence";
 import { SectionFocusGlow } from "./SectionFocusGlow";
+import { useAutoOpenSections } from "./sectionPresence";
+import { UnmappedCostSuggestion } from "./UnmappedCostSuggestion";
 import { useSectionFocusGlow } from "./useSectionFocusGlow";
 import { countFlatLeaves } from "./utils";
 
@@ -40,6 +46,18 @@ export function SpanAccordions({
   const spanScope = spanResource?.scope ?? null;
 
   const hasIO = !!(detail?.input || detail?.output);
+  // Any content category that is dropped, restricted, or restricted-but-visible
+  // gives the I/O section something to show even when the content itself is
+  // empty (so a fully hidden or dropped span still explains itself).
+  const contentPrivacy = detail?.contentPrivacy;
+  const piiIncomplete = !!detail?.piiAnalysisIncomplete;
+  const hasPrivacyMarkers =
+    piiIncomplete ||
+    (!!contentPrivacy &&
+      Object.values(contentPrivacy).some(
+        (category) =>
+          category.state !== "visible" || category.visibleTo != null,
+      ));
   const hasResourceAttrs =
     !!spanResource && Object.keys(spanResource.resourceAttributes).length > 0;
   const hasSpanAttrs =
@@ -60,19 +78,26 @@ export function SpanAccordions({
     if (hasError && hasIO) list.push("exceptions");
     if (hasPrompt) list.push("prompt");
     list.push("attributes");
-    // Scope chip lives in the span header — no dedicated section needed.
+    // Instrumentation scope used to be a chip pinned to the right of
+    // the SpanTabBar. Operator feedback: it took up tab-row real estate
+    // for a piece of metadata most users glance at once and ignore.
+    // Folded back into the accordion stack here — collapsed by default
+    // unless the span actually reports a scope, so it's quiet when
+    // empty and reachable when needed.
+    if (hasScope) list.push("scope");
     list.push("events");
     return list;
-  }, [hasError, hasIO, hasPrompt]);
+  }, [hasError, hasIO, hasPrompt, hasScope]);
 
   // Same rule as the trace summary view: only auto-expand Attributes when
-  // the span itself has attributes — resource-only is rarely interesting
-  // and clutters the default view.
+  // the span itself has attributes (resource-only is rarely interesting
+  // and clutters the default view) or when an unmapped-cost suggestion
+  // needs surfacing there.
   const [openSections, setOpenSections] = useAutoOpenSections(span.spanId, {
     exceptions: hasError,
-    io: hasIO,
+    io: hasIO || hasPrivacyMarkers,
     prompt: hasPrompt,
-    attributes: hasSpanAttrs,
+    attributes: hasSpanAttrs || !!detail?.costSuggestion,
     scope: hasScope,
     events: hasEvents,
   });
@@ -110,13 +135,6 @@ export function SpanAccordions({
           </Text>
         </HStack>
       )}
-      {/*
-        The instrumentation-scope chip lives in the SpanTabBar's
-        rightSlot now — rendering it here too duplicated it directly
-        below the tab row, which read as visual noise on every span
-        detail. The tab-bar chip already covers the same trace-level
-        attribution; nothing else to add here.
-      */}
       {glow ? (
         <SectionFocusGlow
           key={glow.nonce}
@@ -142,35 +160,59 @@ export function SpanAccordions({
                   key="io"
                   value="io"
                   title="Input and Output"
-                  empty={!detailQuery.isLoading && !hasIO}
+                  empty={!detailQuery.isLoading && !hasIO && !hasPrivacyMarkers}
                   isFirst={isFirst}
                   open={isOpen}
                 >
                   {detailQuery.isLoading ? (
                     <EmptyHint>Loading…</EmptyHint>
-                  ) : hasIO ? (
-                    <VStack align="stretch" gap={2}>
-                      {detail?.input && (
-                        <IOViewer
-                          label="Input"
-                          content={detail.input}
-                          mode="input"
-                          spanId={detail.spanId}
-                          spanType={detail.type}
-                        />
-                      )}
-                      {detail?.output && (
-                        <IOViewer
-                          label="Output"
-                          content={detail.output}
-                          mode="output"
-                          spanId={detail.spanId}
-                          spanType={detail.type}
-                        />
-                      )}
-                    </VStack>
                   ) : (
-                    <EmptyHint>No I/O captured for this span</EmptyHint>
+                    <VStack align="stretch" gap={2}>
+                      {/* Generic per-category privacy markers. Input/output use
+                        skipRestricted because their hidden state already shows
+                        inline via RedactedField below; system/tools (no inline
+                        slot) show every state here. */}
+                      <ContentPrivacyMarkers
+                        privacy={contentPrivacy}
+                        categories={["input", "output"]}
+                        skipRestricted
+                      />
+                      <ContentPrivacyMarkers
+                        privacy={contentPrivacy}
+                        categories={["system", "tools"]}
+                      />
+                      <PiiIncompleteNotice incomplete={piiIncomplete} />
+                      <RedactedField
+                        field="input"
+                        redacted={detail?.inputRedacted ?? false}
+                        visibleTo={detail?.inputVisibleTo}
+                      >
+                        {detail?.input ? (
+                          <IOViewer
+                            label="Input"
+                            content={detail.input}
+                            mode="input"
+                            spanId={detail.spanId}
+                            spanType={detail.type}
+                          />
+                        ) : null}
+                      </RedactedField>
+                      <RedactedField
+                        field="output"
+                        redacted={detail?.outputRedacted ?? false}
+                        visibleTo={detail?.outputVisibleTo}
+                      >
+                        {detail?.output ? (
+                          <IOViewer
+                            label="Output"
+                            content={detail.output}
+                            mode="output"
+                            spanId={detail.spanId}
+                            spanType={detail.type}
+                          />
+                        ) : null}
+                      </RedactedField>
+                    </VStack>
                   )}
                 </Section>
               );
@@ -207,6 +249,11 @@ export function SpanAccordions({
                   isFirst={isFirst}
                   open={isOpen}
                 >
+                  {!detailQuery.isLoading && detail?.costSuggestion && (
+                    <UnmappedCostSuggestion
+                      model={detail.costSuggestion.model}
+                    />
+                  )}
                   {hasAttributes ? (
                     <AttributeTable
                       attributes={
@@ -219,7 +266,9 @@ export function SpanAccordions({
                           ? spanResource!.resourceAttributes
                           : undefined
                       }
+                      restrictedAttributes={detail?.restrictedAttributes}
                       title="Span Attributes"
+                      spanId={detail?.spanId ?? span.spanId}
                     />
                   ) : resources.isLoading || detailQuery.isLoading ? (
                     <EmptyHint>Loading attributes…</EmptyHint>

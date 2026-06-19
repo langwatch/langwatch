@@ -239,7 +239,7 @@ function AccessAuditPage() {
         </HStack>
 
         <Card.Root width="full" overflow="hidden">
-          <Card.Body paddingY={0} paddingX={0}>
+          <Card.Body paddingY={0} paddingX={0} overflowX="auto">
             {isLoading ? (
               <Box padding={8} display="flex" justifyContent="center"><Spinner /></Box>
             ) : principals.length === 0 ? (

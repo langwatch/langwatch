@@ -38,11 +38,12 @@ Feature: `langwatch claude` wrapper end-to-end
     Then the gateway responds 429 with `error: "budget_exceeded"`
     And the wrapper surfaces a clear error message — NOT a confusing 5xx or hung response
 
-  Scenario: 409 no_default_routing_policy surfaces during the wrapper login
-    Given alice's org has NO default routing policy
+  Scenario: Wrapper surfaces no-providers guidance when the device login lacks a personal VK
+    Given alice's org has NO default routing policy AND NO accessible ModelProvider
     When the harness runs `langwatch claude` for a user without a Personal VK provisioned
-    Then the wrapper attempts `langwatch login --device` first, which returns 409 `no_default_routing_policy`
-    And the wrapper surfaces "Your organization needs a default routing policy. Ask your admin to publish one." (not a stack trace)
+    Then `langwatch login --device` succeeds (the device session is approved without `default_personal_vk` — see auth-cli.ts swallow path) but the local config has no VK secret
+    And the wrapper's preflight check refuses to spawn the underlying tool
+    And the wrapper surfaces the actionable message "Your organization has no AI providers configured. Ask an admin to add one at Settings → Model Providers." (not a stack trace)
 
   Scenario: Wrapper exits with the wrapped binary's exit code
     Given the stubbed `claude` binary exits with code 7

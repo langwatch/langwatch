@@ -15,7 +15,7 @@ import type {
 const TABLE_NAME = "trace_summaries" as const;
 
 interface ClickHouseSummaryRow extends TraceSummaryFieldsBase {
-  // The list mapper only reads these five keys out of `Attributes`.
+  // The list mapper only reads a fixed set of keys out of `Attributes`.
   // Projecting them individually lets ClickHouse skip reading the full
   // Map column off disk for every row — the dominant cost on traces
   // with large attribute bags.
@@ -24,6 +24,10 @@ interface ClickHouseSummaryRow extends TraceSummaryFieldsBase {
   AttrConversationId: string;
   AttrUserId: string;
   AttrOrigin: string;
+  AttrNonBillable: string;
+  AttrCacheReadTokens: string;
+  AttrCacheCreationTokens: string;
+  AttrReasoningTokens: string;
   LastEventOccurredAt: number;
 }
 
@@ -140,6 +144,10 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           AttrConversationId,
           AttrUserId,
           AttrOrigin,
+          AttrNonBillable,
+          AttrCacheReadTokens,
+          AttrCacheCreationTokens,
+          AttrReasoningTokens,
           toUnixTimestamp64Milli(OccurredAt) AS OccurredAt,
           toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
           toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
@@ -156,6 +164,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           ErrorMessage,
           Models,
           TotalCost,
+          NonBilledCost,
           TokensEstimated,
           TotalPromptTokenCount,
           TotalCompletionTokenCount,
@@ -185,6 +194,10 @@ export class TraceListClickHouseRepository implements TraceListRepository {
             Attributes['gen_ai.conversation.id'] AS AttrConversationId,
             Attributes['langwatch.user_id'] AS AttrUserId,
             Attributes['langwatch.origin'] AS AttrOrigin,
+            Attributes['langwatch.cost.non_billable'] AS AttrNonBillable,
+            Attributes['langwatch.reserved.cache_read_tokens'] AS AttrCacheReadTokens,
+            Attributes['langwatch.reserved.cache_creation_tokens'] AS AttrCacheCreationTokens,
+            Attributes['langwatch.reserved.reasoning_tokens'] AS AttrReasoningTokens,
             OccurredAt,
             CreatedAt,
             UpdatedAt,
@@ -201,6 +214,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
             ErrorMessage,
             Models,
             TotalCost,
+            NonBilledCost,
             TokensEstimated,
             TotalPromptTokenCount,
             TotalCompletionTokenCount,
@@ -833,6 +847,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       errorMessage: row.ErrorMessage,
       models: row.Models,
       totalCost: row.TotalCost,
+      nonBilledCost: row.NonBilledCost ?? null,
       tokensEstimated: !!row.TokensEstimated,
       totalPromptTokenCount: row.TotalPromptTokenCount,
       totalCompletionTokenCount: row.TotalCompletionTokenCount,
@@ -868,6 +883,17 @@ type FacetRow = {
   facet_label?: string;
   cnt: number;
   total_distinct: number;
+  // Optional per-value aggregates carried by the evaluator facet's
+  // custom queryBuilder so the sidebar can render the inline drilldown
+  // (verdict pills + score range + hasLabel indicator) without firing
+  // a second query per evaluator.
+  passed_count?: string | number;
+  failed_count?: string | number;
+  errored_count?: string | number;
+  score_min?: number | null;
+  score_max?: number | null;
+  has_score?: boolean | number;
+  has_label?: boolean | number;
 };
 
 function mapFacetRows(rows: FacetRow[]): CategoricalFacetResult {
@@ -876,8 +902,46 @@ function mapFacetRows(rows: FacetRow[]): CategoricalFacetResult {
       value: r.facet_value,
       ...(r.facet_label ? { label: r.facet_label } : {}),
       count: Number(r.cnt),
+      ...extractFacetAggregates(r),
     })),
     totalDistinct: rows.length > 0 ? Number(rows[0]!.total_distinct) : 0,
+  };
+}
+
+function extractFacetAggregates(r: FacetRow): {
+  aggregates?: {
+    passedCount: number;
+    failedCount: number;
+    erroredCount: number;
+    scoreMin: number | null;
+    scoreMax: number | null;
+    hasScore: boolean;
+    hasLabel: boolean;
+  };
+} {
+  // Only the evaluator facet's queryBuilder emits these columns. Other
+  // facets (status, model, …) return undefined for all of them, so the
+  // discriminator below avoids attaching an empty aggregates object to
+  // every facet value.
+  if (
+    r.passed_count === undefined &&
+    r.failed_count === undefined &&
+    r.errored_count === undefined &&
+    r.has_score === undefined &&
+    r.has_label === undefined
+  ) {
+    return {};
+  }
+  return {
+    aggregates: {
+      passedCount: Number(r.passed_count ?? 0),
+      failedCount: Number(r.failed_count ?? 0),
+      erroredCount: Number(r.errored_count ?? 0),
+      scoreMin: r.score_min == null ? null : Number(r.score_min),
+      scoreMax: r.score_max == null ? null : Number(r.score_max),
+      hasScore: Boolean(r.has_score),
+      hasLabel: Boolean(r.has_label),
+    },
   };
 }
 
@@ -885,7 +949,7 @@ function mapFacetRows(rows: FacetRow[]): CategoricalFacetResult {
 // list mapper expects keys absent (so its `?? null` / `?? ""` fallbacks
 // fire) rather than present-but-empty.
 //
-// The five keys below match the explicit Attributes[...] projections in
+// The six keys below match the explicit Attributes[...] projections in
 // `findAll`'s SELECT. To surface another attribute in the list, add it
 // in both places. If user-pinned attribute columns ever ship, prefer
 // extending the query input with an `extraAttributeKeys: string[]` list
@@ -903,5 +967,21 @@ function buildListAttributes(
   }
   if (row.AttrUserId) attributes["langwatch.user_id"] = row.AttrUserId;
   if (row.AttrOrigin) attributes["langwatch.origin"] = row.AttrOrigin;
+  if (row.AttrNonBillable) {
+    attributes["langwatch.cost.non_billable"] = row.AttrNonBillable;
+  }
+  // Fold-summed cache / reasoning token counts the drawer header reads to show
+  // the "Cache read" / "Cache write" / reasoning rows (the raw per-span
+  // gen_ai.usage.cache_* values never reach the trace attribute map).
+  if (row.AttrCacheReadTokens) {
+    attributes["langwatch.reserved.cache_read_tokens"] = row.AttrCacheReadTokens;
+  }
+  if (row.AttrCacheCreationTokens) {
+    attributes["langwatch.reserved.cache_creation_tokens"] =
+      row.AttrCacheCreationTokens;
+  }
+  if (row.AttrReasoningTokens) {
+    attributes["langwatch.reserved.reasoning_tokens"] = row.AttrReasoningTokens;
+  }
   return attributes;
 }

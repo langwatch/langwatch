@@ -17,7 +17,7 @@ datasource db {
 
 // BetterAuth-compatible Account. Column names preserved; BetterAuth's field
 // mapping in src/server/better-auth/index.ts points its expected names at
-// these columns. `password` is new — credential passwords moved here from
+// these columns. `password` is new - credential passwords moved here from
 // `User.password` in the better_auth_cutover migration.
 model Account {
   id                String    @id @default(nanoid())
@@ -106,7 +106,6 @@ model User {
   gatewayGuardrailsUpdated GatewayGuardrail[]      @relation("GatewayGuardrailUpdatedBy")
   ingestionSourcesCreated IngestionSource[]        @relation("IngestionSourceCreatedBy")
   anomalyRulesCreated     AnomalyRule[]            @relation("AnomalyRuleCreatedBy")
-  userIngestionBindings   UserIngestionBinding[]
   pinnedTraces            PinnedTrace[]
 }
 
@@ -128,7 +127,7 @@ enum TeamUserRole {
   CUSTOM
 }
 
-// Scoped RBAC — scope levels for RoleBinding
+// Scoped RBAC - scope levels for RoleBinding
 enum RoleBindingScopeType {
   ORGANIZATION
   TEAM
@@ -167,16 +166,16 @@ model OrganizationUser {
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @default(now()) @updatedAt
 
-  /// Cost-center assignment for spend attribution (the people lens).
+  /// Department assignment for spend attribution (the people lens).
   /// Single-valued, org-scoped, accounting-only (never gates access).
   /// Plain column ref (relationMode="prisma"); the service validates the
-  /// id belongs to this org. See cost-centers.feature.
-  costCenterId String?
+  /// id belongs to this org. See departments.feature.
+  departmentId String?
 
   @@id([userId, organizationId])
   @@index([organizationId])
   @@index([userId])
-  @@index([costCenterId])
+  @@index([departmentId])
 }
 
 model Team {
@@ -201,13 +200,13 @@ model Team {
   ingestionSources IngestionSource[]
   aiToolEntryTeams AiToolEntryTeam[]
 
-  /// Cost-center assignment inherited as the default for members and
+  /// Department assignment inherited as the default for members and
   /// projects that have none of their own. Accounting-only.
-  costCenterId String?
+  departmentId String?
 
   @@index([organizationId])
   @@index([isPersonal])
-  @@index([costCenterId])
+  @@index([departmentId])
 }
 
 model Organization {
@@ -221,7 +220,7 @@ model Organization {
   updatedAt                DateTime             @default(now()) @updatedAt
   OrganizationInvite       OrganizationInvite[]
   usageSpendingMaxLimit    Int?
-  /// Phase 8 — admin-configurable max lifetime for CLI device-flow
+  /// Phase 8 - admin-configurable max lifetime for CLI device-flow
   /// sessions, in days. 0 = unbounded (default, mirrors GitHub CLI /
   /// gh-style flows). Companies that need finite session lifetime
   /// (eg. SOC 2 / ISO 27001 customers with mandated session
@@ -230,18 +229,6 @@ model Organization {
   /// this value, regardless of the underlying refresh-token TTL.
   /// Spec: specs/ai-governance/sessions/session-ttl.feature.
   maxSessionDurationDays   Int                  @default(0)
-  /// Phase 9 — receiver-side gen_ai content stripping ("no-spy mode").
-  /// Values:
-  ///   "full"      (default) — store all content in CH (current behavior)
-  ///   "strip_io"  — drop gen_ai.prompt + gen_ai.completion + gen_ai.system_message
-  ///                 from gateway-origin spans BEFORE the CH write
-  ///   "strip_all" — strip_io + tool_call.arguments + tool_result.content
-  /// Forward-looking only: changes do not retroactively scrub historical
-  /// content; existing rows remain stored. Only applies to spans with
-  /// `langwatch.origin = "gateway"`; user-app traces are untouched so
-  /// customer-controlled data flows continue to work unchanged.
-  /// Spec: specs/ai-governance/no-spy-mode/no-spy-mode.feature.
-  governanceLogContentMode String               @default("full")
   signupData               Json?
   signedDPA                Boolean              @default(false)
   elasticsearchNodeUrl     String?
@@ -256,6 +243,12 @@ model Organization {
   ssoDomain                String?              @unique
   ssoProvider              String?
   presenceEnabled          Boolean              @default(true)
+  /// Org-configurable contact surfaced to users in CLI "contact your
+  /// admin" messages and the in-app budget-exceeded banner. Free text:
+  /// accepts an email, a URL (internal ticketing system), or any other
+  /// instruction. When null, callers fall back to the first ADMIN
+  /// member's email (`resolveSupportContact` helper).
+  supportContact           String?
 
   promoCode              String?
   stripeCustomerId       String?                @unique
@@ -280,7 +273,6 @@ model Organization {
   anomalyAlerts          AnomalyAlert[]
   aiToolEntries          AiToolEntry[]
   ingestionTemplates     IngestionTemplate[]
-  userIngestionBindings  UserIngestionBinding[]
 
   @@index([ssoProvider])
 }
@@ -330,18 +322,6 @@ enum Currency {
   EUR
 }
 
-enum PIIRedactionLevel {
-  STRICT
-  ESSENTIAL
-  DISABLED
-}
-
-enum ProjectSensitiveDataVisibilityLevel {
-  REDACTED_TO_ALL
-  VISIBLE_TO_ADMIN
-  VISIBLE_TO_ALL
-}
-
 model Project {
   id                       String                              @id @default(nanoid())
   name                     String
@@ -360,7 +340,7 @@ model Project {
   ///     first IngestionSource mint via ensureHiddenGovernanceProject().
   ///     MUST be filtered out of every user-visible Project surface
   ///     (project picker, /api/v1/projects, billing exports, RBAC
-  ///     pickers, etc.) — the regression-test invariant in
+  ///     pickers, etc.) - the regression-test invariant in
   ///     specs/ai-gateway/governance/ui-contract.feature codifies this.
   /// Stored as a free-form string (matching IngestionSource.sourceType
   /// pattern) so future routing kinds can ship without schema migrations.
@@ -378,9 +358,6 @@ model Project {
   customGraphs             CustomGraph[]
   dashboards               Dashboard[]
   batchEvaluations         BatchEvaluation[]
-  piiRedactionLevel        PIIRedactionLevel                   @default(ESSENTIAL)
-  capturedInputVisibility  ProjectSensitiveDataVisibilityLevel @default(VISIBLE_TO_ALL)
-  capturedOutputVisibility ProjectSensitiveDataVisibilityLevel @default(VISIBLE_TO_ALL)
   traceSharingEnabled      Boolean                             @default(true)
   presenceEnabled          Boolean                             @default(true)
   triggers                 Trigger[]
@@ -409,7 +386,6 @@ model Project {
   savedViews               SavedView[]
   gatewayGuardrails        GatewayGuardrail[]                  @relation("ProjectGatewayGuardrails")
   gatewayChangeEvents      GatewayChangeEvent[]
-  userIngestionBindings    UserIngestionBinding[]
   pinnedTraces             PinnedTrace[]
 
   // Denormalised mirror of parent Team's personal flag for fast
@@ -422,32 +398,32 @@ model Project {
 
   /// Per-feature unlock flags for personal projects only. Shape:
   /// `{ evaluations: bool, datasets: bool, annotations: bool, automations: bool }`.
-  /// Empty `{}` (default) reads as all-false at the service layer —
+  /// Empty `{}` (default) reads as all-false at the service layer -
   /// existing rows pre-migration require no backfill. The bundle is
   /// a UI/nav predicate, NOT an auth gate (the underlying tRPC
   /// routers stay open even when the bundle is off; admin tooling +
   /// offline migration scripts can still operate on the data).
-  /// Team / org-scope projects are not feature-gated — this column
+  /// Team / org-scope projects are not feature-gated - this column
   /// is meaningful only when `isPersonal=true`.
   personalFeatures Json @default("{}")
 
-  /// Cost-center assignment for spend attribution (the project / agent
+  /// Department assignment for spend attribution (the project / agent
   /// lens, used when a trace has no principal user). Accounting-only.
-  costCenterId String?
+  departmentId String?
 
   @@index([teamId])
   @@index([isPersonal])
   @@index([ownerUserId])
   @@index([teamId, kind])
-  @@index([costCenterId])
+  @@index([departmentId])
 }
 
-/// A cost center is a single-valued accounting dimension, separate from
+/// A department is a single-valued accounting dimension, separate from
 /// RBAC, for rolling up AI spend by org unit (Engineering, Marketing,
 /// ...). Assigned to OrganizationUser, Team, and Project via their
-/// `costCenterId` column. Pure accounting: never grants or restricts
-/// access. See specs/ai-gateway/governance/cost-centers.feature.
-model CostCenter {
+/// `departmentId` column. Pure accounting: never grants or restricts
+/// access. See specs/ai-gateway/governance/departments.feature.
+model Department {
   id             String    @id @default(nanoid())
   organizationId String
   name           String
@@ -455,6 +431,27 @@ model CostCenter {
   updatedAt      DateTime  @default(now()) @updatedAt
   archivedAt     DateTime?
 
+  @@index([organizationId])
+}
+
+/// Per-(organization, tool) override for which `langwatch <tool>` paths the
+/// CLI may use: `allowVk` gates the gateway / virtual-key path (Path A) and
+/// `allowOtelDirect` gates the direct-OTLP ingestion path (Path B). A missing
+/// row resolves to the hardcoded defaults (both true for claude/codex/gemini/
+/// opencode; cursor allows the gateway path only), so the policy is purely
+/// additive: disabling a path is an explicit admin choice. The CLI caches the
+/// resolved map at login and gates path selection on it.
+/// See specs/ai-gateway/governance/cli-tool-mode-policy.feature.
+model PlatformToolPolicy {
+  id              String   @id @default(nanoid())
+  organizationId  String
+  toolSlug        String
+  allowVk         Boolean  @default(true)
+  allowOtelDirect Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now()) @updatedAt
+
+  @@unique([organizationId, toolSlug])
   @@index([organizationId])
 }
 
@@ -635,8 +632,8 @@ model SavedView {
   period    Json?
   order     Int      @default(0)
   /// Discriminator for the two storage shapes that share this table:
-  ///   - "v1-traces-filter" (default) — legacy /messages page filter map saved views
-  ///   - "v2-traces-lens"             — new traces v2 lens configs (columns, addons, grouping, sort, filterText) encoded inside `filters` JSON
+  ///   - "v1-traces-filter" (default) - legacy /messages page filter map saved views
+  ///   - "v2-traces-lens"             - new traces v2 lens configs (columns, addons, grouping, sort, filterText) encoded inside `filters` JSON
   /// Each client filters by its own kind on read so neither sees the other's rows.
   kind      String   @default("v1-traces-filter")
   createdAt DateTime @default(now())
@@ -785,20 +782,20 @@ model Annotation {
   @@index([projectId, traceId])
 }
 
-// ModelProvider — org-scoped, multi-scope provider configuration.
+// ModelProvider - org-scoped, multi-scope provider configuration.
 //
 // Iter 110: absorbed GatewayProviderCredential entirely. The gateway
 // data-plane reads its provider chain directly from ModelProvider +
 // RoutingPolicy.modelProviderIds. Multi-deployment (Azure regions,
 // OpenAI base-url variants) ships as N MP rows with auto-suffixed
-// names (iter 109 pattern) — no `slot` discriminator column anymore.
+// names (iter 109 pattern) - no `slot` discriminator column anymore.
 //
 // Access via ModelProviderScope only. No `projectId` legacy pointer;
 // reads filter by the caller's membership set against scope rows.
 //
 // "Advanced (Gateway)" tab in the drawer surfaces the rate-limit /
 // extraHeaders / providerConfig / fallbackPriorityGlobal / health
-// fields below — same fields that lived on GatewayProviderCredential
+// fields below - same fields that lived on GatewayProviderCredential
 // pre-110, just collapsed onto the provider they always 1:1-bound.
 model ModelProvider {
   id                     String   @id @default(nanoid())
@@ -811,7 +808,7 @@ model ModelProvider {
   provider               String
   enabled                Boolean
   customKeys             Json?
-  // Provider-side custom headers — appended on every request the
+  // Provider-side custom headers - appended on every request the
   // gateway routes through this MP. (Pre-110 this lived on GPC.)
   extraHeaders           Json?
   customModels           Json?
@@ -890,9 +887,9 @@ model ModelProviderScope {
 //
 // The two partial unique indexes encode the (NULL = role-level) semantics
 // since Postgres treats NULLs as distinct in a single composite unique.
-// They live in the migration alongside the table itself — Prisma can't
+// They live in the migration alongside the table itself - Prisma can't
 // express partial indexes in schema.prisma.
-// scopeType uses its own Postgres enum — same per-table convention as
+// scopeType uses its own Postgres enum - same per-table convention as
 // ModelProviderScopeType. See dev/docs/best_practices/scoped-resources.md.
 enum ModelDefaultScopeType {
     ORGANIZATION
@@ -903,7 +900,7 @@ enum ModelDefaultScopeType {
 // ModelDefaultConfig is one CSS-style cascading policy. The JSON `config`
 // payload maps role names (DEFAULT / FAST / EMBEDDINGS) and feature keys
 // (prompt.create_default, traces.ai_search, …) to a model id. Absence of
-// a key means "inherit from the next scope up" — there is no explicit
+// a key means "inherit from the next scope up" - there is no explicit
 // "inherit" sentinel in storage. See
 // specs/model-providers/model-default-config-cascade.feature.
 //
@@ -1146,6 +1143,40 @@ model RetentionPolicy {
   @@index([scopeType, scopeId])
 }
 
+enum DataPrivacyScopeType {
+  ORGANIZATION
+  DEPARTMENT
+  TEAM
+  PROJECT
+}
+
+// A data-privacy rule for one scope (ADR-021): single-scope-per-row, identified
+// inline by (scopeType, scopeId, personalOnly), anchored to one owning
+// organization. `config` is a DataPrivacyConfig JSON blob (see
+// src/server/data-privacy/dataPrivacy.types.ts) covering content disposition per
+// category (capture / restrict / drop), the restrict audience, the PII level,
+// secrets redaction, and extra attribute keys to drop. Resolution cascades
+// PROJECT -> DEPARTMENT -> TEAM -> ORGANIZATION per field; unset fields inherit
+// and list fields (custom drop-keys, custom secret patterns) union down the
+// chain. `personalOnly` narrows an ORGANIZATION or DEPARTMENT rule to personal
+// (per-user) projects; for those the department is resolved through the project
+// owner. With no rule anywhere, platform defaults apply (content captured and
+// visible to the team, essential PII, secrets redacted).
+model DataPrivacyPolicy {
+  id             String               @id @default(nanoid())
+  organizationId String
+  scopeType      DataPrivacyScopeType
+  scopeId        String
+  personalOnly   Boolean              @default(false)
+  config         Json
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @default(now()) @updatedAt
+
+  @@unique([scopeType, scopeId, personalOnly])
+  @@index([organizationId])
+  @@index([scopeType, scopeId])
+}
+
 enum CustomLLMModelCostScopeType {
   ORGANIZATION
   TEAM
@@ -1244,13 +1275,13 @@ model WorkflowVersion {
 // AuditLog is the unified governance ledger. Both gateway-driven mutations
 // (VK/budget/provider-binding/cache-rule via the 4 gateway services) and
 // platform-driven actions (tRPC mutations via auditLogMutations middleware)
-// write here. There is no separate GatewayAuditLog table — see migration
+// write here. There is no separate GatewayAuditLog table - see migration
 // 20260425000000_consolidate_gateway_audit_into_audit_log.
 //
 // Two write shapes coexist on the same table:
-//   * Platform shape  — `args` + `metadata` + `error` carry the call-site
+//   * Platform shape  - `args` + `metadata` + `error` carry the call-site
 //     context. `targetKind`, `targetId`, `before`, `after` stay null.
-//   * Gateway shape   — `targetKind`, `targetId`, `before`, `after` carry
+//   * Gateway shape   - `targetKind`, `targetId`, `before`, `after` carry
 //     resource identity + diff. `args` / `metadata` / `error` stay null.
 // The /settings/audit-log page renders both via a `source` field computed
 // from the presence of `targetKind` (gateway = purple badge, platform = grey).
@@ -1328,6 +1359,8 @@ model LlmPromptConfigVersion {
   // Version specific data
   configData    Json   @map("config") // The actual config JSON for this version
   schemaVersion String // Schema version for this specific configData
+
+  runtimeParameters Json @default("{}")
 
   createdAt DateTime @default(now()) // Used to determine the latest version
 
@@ -1493,6 +1526,11 @@ model Scenario {
   situation       String
   criteria        String[]
   labels          String[]
+  // Optional per-scenario model overrides for the run. When null the run
+  // resolves the project's scenarios.user_simulator / scenarios.judge
+  // DEFAULT-role models. See specs/scenarios/scenario-model-selection.feature.
+  simulatorModel  String?
+  judgeModel      String?
   lastUpdatedById String?
   lastUpdatedBy   User?     @relation(fields: [lastUpdatedById], references: [id])
   archivedAt      DateTime?
@@ -1513,6 +1551,12 @@ model SimulationSuite {
   targets     Json // Array of { type: "prompt" | "http", referenceId: string }
   repeatCount Int       @default(1)
   labels      String[]
+  // Optional run-plan-wide model overrides. When set they take precedence
+  // over each scenario's own override for every scenario in the run; when
+  // null the per-scenario value (or the project default) applies. See
+  // specs/suites/suite-model-selection.feature.
+  simulatorModel String?
+  judgeModel     String?
   archivedAt  DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @default(now()) @updatedAt
@@ -1601,7 +1645,7 @@ model InvoiceItem {
 }
 
 // ============================================================================
-// Scoped RBAC — Groups, GroupMembership, RoleBinding
+// Scoped RBAC - Groups, GroupMembership, RoleBinding
 // ============================================================================
 
 model Group {
@@ -1610,7 +1654,7 @@ model Group {
   organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   name           String
   slug           String
-  // SCIM provenance — null for manually created groups
+  // SCIM provenance - null for manually created groups
   externalId     String? // IdP-side group ID (SCIM externalId)
   scimSource     String? // e.g. "azure-ad", "okta"
   members        GroupMembership[]
@@ -1640,7 +1684,7 @@ model RoleBinding {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  // Principal — exactly one must be set
+  // Principal - exactly one must be set
   userId   String?
   user     User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   groupId  String?
@@ -1648,12 +1692,12 @@ model RoleBinding {
   apiKeyId String?
   apiKey   ApiKey?  @relation(fields: [apiKeyId], references: [id], onDelete: Restrict)
 
-  // Role — built-in named role or custom
+  // Role - built-in named role or custom
   role         TeamUserRole
   customRoleId String?
   customRole   CustomRole?  @relation(fields: [customRoleId], references: [id])
 
-  // Scope — scopeType + scopeId identify the resource
+  // Scope - scopeType + scopeId identify the resource
   scopeType RoleBindingScopeType
   scopeId   String // orgId, teamId, or projectId depending on scopeType
 
@@ -1661,8 +1705,8 @@ model RoleBinding {
   updatedAt DateTime @default(now()) @updatedAt
 
   // Uniqueness is enforced by six partial unique indexes defined in migrations:
-  //   • user + group (built-in and custom) — 20260410120000_fix_role_binding_unique_custom_role
-  //   • apiKey (built-in and custom) — 20260414222341_add_personal_access_tokens
+  //   • user + group (built-in and custom) - 20260410120000_fix_role_binding_unique_custom_role
+  //   • apiKey (built-in and custom) - 20260414222341_add_personal_access_tokens
   // Prisma does not support partial indexes natively, so there is no @@unique here.
   @@index([organizationId])
   @@index([userId])
@@ -1687,12 +1731,37 @@ model ApiKey {
   expiresAt       DateTime?
   lastUsedAt      DateTime?
   revokedAt       DateTime?
+
+  /// Non-null marks this key as an "ingestion key": a project-scoped,
+  /// ingest-only ApiKey the unified `langwatch <tool>` CLI (and template
+  /// installs) mint for OTLP Path B. The slug (claude_code / codex / gemini /
+  /// opencode / claude_cowork) is stamped as `langwatch.source` provenance on
+  /// every span the key authorizes. NULL for normal API / service keys.
+  ingestSourceType String?
+
+  /// Set only for ingestion keys derived from an admin IngestionTemplate
+  /// (e.g. claude_cowork). Drives receiver OTTL application + the
+  /// `langwatch.template.id` provenance stamp. NULL for unified-CLI tools
+  /// (which have no template) and for normal keys. Column ref only (no FK,
+  /// per the app-layer-integrity convention); resolved by the ingest-key service.
+  ingestionTemplateId String?
+
+  /// Human label of the CLI device session that minted this ingestion key
+  /// (e.g. "Rogerio's MacBook Pro"), snapshotted at mint time from the device
+  /// flow's `client_info`. Denormalized so the org-wide API-keys settings page
+  /// can show which device a key came from without resolving another user's
+  /// Redis-stored sessions. NULL for non-ingestion keys and for keys minted by
+  /// a CLI old enough to predate device metadata.
+  createdByDeviceLabel String?
+
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @default(now()) @updatedAt
 
   @@index([userId])
   @@index([organizationId])
   @@index([lookupId])
+  @@index([ingestSourceType])
+  @@index([ingestionTemplateId])
 }
 
 model BillingMeterCheckpoint {
@@ -1722,7 +1791,7 @@ model BillingMeterCheckpoint {
 // - GatewayBudget: hierarchical budgets (org / team / project / vk /
 //   principal) with calendar resets and block|warn semantics.
 // - GatewayBudgetLedger: idempotent spend ledger keyed by
-//   gateway_request_id (outbox pattern — writes from the Go gateway).
+//   gateway_request_id (outbox pattern - writes from the Go gateway).
 // - GatewayChangeEvent: monotonically-increasing revision feed consumed by
 //   the gateway's long-poll `/internal/gateway/changes?since=N` endpoint.
 // - AuditLog (top of file): unified actor/action/before/after audit for
@@ -1736,7 +1805,7 @@ enum VirtualKeyStatus {
 }
 
 // Rotation policy for gateway provider credentials.
-// v1 ships MANUAL only — operators rotate via the Rotate button in
+// v1 ships MANUAL only - operators rotate via the Rotate button in
 // the UI or by calling POST /providers/:id/rotate. Scheduled rotation
 // (AUTO) and external-secret-store integration (Vault / AWS Secrets
 // Manager / GCP Secret Manager) are v1.1 scope; the enum will grow
@@ -1797,12 +1866,12 @@ enum GatewayChangeEventKind {
   CACHE_RULE_DELETED
 }
 
-// Gateway audit action codes — kept as a TypeScript const union in
+// Gateway audit action codes - kept as a TypeScript const union in
 // langwatch/src/server/gateway/auditLog.repository.ts (no Prisma enum
 // because gateway rows now write to the shared `AuditLog` table whose
 // `action` column is a free-form String).
 //
-// enum GatewayAuditAction { ... } — removed in migration
+// enum GatewayAuditAction { ... } - removed in migration
 // 20260425000000_consolidate_gateway_audit_into_audit_log.
 
 enum GatewayCacheRuleMode {
@@ -1811,7 +1880,7 @@ enum GatewayCacheRuleMode {
   DISABLE
 }
 
-// VirtualKey — org-scoped, multi-scope routing key for the AI Gateway.
+// VirtualKey - org-scoped, multi-scope routing key for the AI Gateway.
 //
 // Iter 110 refactor: collapsed VirtualKey -> GatewayProviderCredential
 // binding entirely (per rchaves). Provider-routing knobs (rpm/tpm/headers/
@@ -1821,7 +1890,7 @@ enum GatewayCacheRuleMode {
 //
 // Scoping mirrors ModelProviderScope (iter 109): a single VirtualKey row
 // is reachable from multiple scopes (org / team / project) via
-// VirtualKeyScope rows. No `projectId` column — multitenant key is
+// VirtualKeyScope rows. No `projectId` column - multitenant key is
 // `organizationId` (mandatory, matches the new dbMultiTenancyProtection
 // invariant).
 //
@@ -1830,7 +1899,7 @@ enum GatewayCacheRuleMode {
 // can this route". A personal VK is a VK with `principalUserId` set; its
 // scopes (typically ORGANIZATION) determine the routing reach.
 //
-// No DB-level FK constraints (codebase convention) — string columns +
+// No DB-level FK constraints (codebase convention) - string columns +
 // indexes; integrity enforced at service layer.
 model VirtualKey {
   id             String @id @default(nanoid())
@@ -1853,7 +1922,7 @@ model VirtualKey {
   principalUserId String?
   principalUser   User?   @relation("PrincipalScopedVirtualKeys", fields: [principalUserId], references: [id], onDelete: SetNull)
 
-  // Slim config blob — per-key state only. The "gateway-config bundle"
+  // Slim config blob - per-key state only. The "gateway-config bundle"
   // that the gateway reads via /internal/gateway/config/:vk_id is now
   // materialised on-read from the scope graph (eligible ModelProviders
   // resolved by VirtualKeyScope + the linked RoutingPolicy ordering),
@@ -1862,7 +1931,7 @@ model VirtualKey {
   // guardrails) moved to ModelProvider (Advanced tab) or RoutingPolicy.
   config Json @default("{}")
 
-  // Revision — every mutation bumps this; gateway uses it to skip config
+  // Revision - every mutation bumps this; gateway uses it to skip config
   // fetches that would be no-ops.
   revision BigInt @default(0)
 
@@ -1886,7 +1955,7 @@ model VirtualKey {
   // ordered ModelProvider chain from the policy + the policy's
   // modelAliases + policyRules. When null, the materialiser falls
   // back to ordering eligible ModelProviders by
-  // `fallbackPriorityGlobal` (asc) then `createdAt` (asc) —
+  // `fallbackPriorityGlobal` (asc) then `createdAt` (asc) -
   // deterministic across runs and Go-side parsers.
   routingPolicyId String?
   routingPolicy   RoutingPolicy? @relation("VirtualKeyRoutingPolicy", fields: [routingPolicyId], references: [id], onDelete: SetNull)
@@ -1900,7 +1969,7 @@ model VirtualKey {
   @@index([routingPolicyId])
 }
 
-// VirtualKeyScope — N-scope access for VirtualKey, mirrors
+// VirtualKeyScope - N-scope access for VirtualKey, mirrors
 // ModelProviderScope exactly. A single VK row is reachable from any
 // scope it has a matching entry for. Writing requires the caller to
 // hold the matching `virtualKeys:manage` permission at that scope.
@@ -1930,7 +1999,7 @@ model VirtualKeyScope {
 }
 
 // ---------------------------------------------------------------------------
-// RoutingPolicy — admin-defined routing template referenced by VirtualKey.
+// RoutingPolicy - admin-defined routing template referenced by VirtualKey.
 //
 // A policy answers two gateway questions in one place:
 //   1. Which provider credentials are eligible for a given request?
@@ -1938,7 +2007,7 @@ model VirtualKeyScope {
 //
 // Decoupling these from the VK itself lets the admin publish (e.g.)
 // `developer-default` once and have every personal VK in the org inherit
-// the same routing semantics — no per-key configuration needed.
+// the same routing semantics - no per-key configuration needed.
 //
 // Scoping mirrors GatewayBudget: an org-scoped policy applies to any VK
 // in the org; a team-scoped policy applies to VKs whose project lives in
@@ -1946,7 +2015,7 @@ model VirtualKeyScope {
 // `isDefault=true` (one per scope tier) makes the policy auto-apply when
 // `virtualKey.issuePersonal` is called without an explicit policyId.
 // ---------------------------------------------------------------------------
-// RoutingPolicyScopeType — normalised from the legacy String 'scope'
+// RoutingPolicyScopeType - normalised from the legacy String 'scope'
 // column to a proper Postgres enum, matching the per-table convention
 // used by ModelProviderScopeType / GatewayBudgetScopeType / etc.
 enum RoutingPolicyScopeType {
@@ -1980,16 +2049,16 @@ model RoutingPolicy {
   // rewrites.
   modelAliases Json @default("{}")
 
-  // Provider-agnostic policy rules — deny/allow lists per dimension.
+  // Provider-agnostic policy rules - deny/allow lists per dimension.
   // Shape: { tools: { deny: string[]; allow: string[] | null }, mcp: {...}, urls: {...}, models: {...} }
   // Hoisted from per-VK config (iter 110). Enforced pre-provider-dispatch.
   policyRules Json @default("{}")
 
   // Routing strategy applied across the model-eligible subset.
-  //   'priority'    — try modelProviderIds in order (default)
-  //   'cost'        — pick lowest unit cost first
-  //   'latency'     — pick fastest healthy provider
-  //   'round_robin' — distribute evenly
+  //   'priority'    - try modelProviderIds in order (default)
+  //   'cost'        - pick lowest unit cost first
+  //   'latency'     - pick fastest healthy provider
+  //   'round_robin' - distribute evenly
   strategy String @default("priority")
 
   isDefault Boolean @default(false)
@@ -2014,7 +2083,7 @@ model RoutingPolicy {
   @@index([organizationId])
 }
 
-// RoutingPolicyScope — N-scope access for RoutingPolicy. Mirrors
+// RoutingPolicyScope - N-scope access for RoutingPolicy. Mirrors
 // VirtualKeyScope + ModelProviderScope exactly. A single RP row is
 // reachable from any scope it has a matching entry for.
 model RoutingPolicyScope {
@@ -2031,7 +2100,7 @@ model RoutingPolicyScope {
 }
 
 // ---------------------------------------------------------------------------
-// GatewayGuardrail — project-scoped Evaluator binding the gateway enforces
+// GatewayGuardrail - project-scoped Evaluator binding the gateway enforces
 // on inbound + outbound traffic per VK opt-in.
 //
 // Lifted from per-VK config (iter 110: vk.config.guardrails) so a project
@@ -2044,7 +2113,7 @@ model RoutingPolicyScope {
 // Project-scoped only (for now) per rchaves: a single non-null projectId
 // column, NO scope join table. Widening to team / org guardrails later
 // drops the column to nullable + adds a GatewayGuardrailScope join in a
-// separate migration. The single-column shape is intentional — keeps the
+// separate migration. The single-column shape is intentional - keeps the
 // current constraint enforced at schema level, not at resolver level.
 //
 // Spec: specs/ai-gateway/governance/guardrails-project-scope.feature
@@ -2091,7 +2160,7 @@ model GatewayGuardrail {
 ///
 /// One IngestionSource = one upstream fleet (e.g. "Miro Cowork",
 /// "Acme Workato production"). The runtime ingests events on whatever
-/// cadence the source supports — push for OTel/webhook/S3 (Tier C/D),
+/// cadence the source supports - push for OTel/webhook/S3 (Tier C/D),
 /// pull for poll-based admin APIs (Tier C). Per-source-type adapters
 /// normalise platform-specific shapes into OCSF + AOS before they
 /// land in trace_summaries with SourceType + SourceId tags.
@@ -2106,7 +2175,7 @@ model IngestionSource {
 
   /// 'otel_generic' | 'claude_cowork' | 'workato' | 'copilot_studio' |
   /// 'openai_compliance' | 'claude_compliance' | 's3_custom' (extensible).
-  /// String not enum so adapters can be added without migrations — the
+  /// String not enum so adapters can be added without migrations - the
   /// supported set lives in code (activity-monitor adapter registry).
   sourceType String
 
@@ -2135,14 +2204,14 @@ model IngestionSource {
   /// resumes where the last left off (timestamp / cursor / file marker).
   pollerCursor Json?
 
-  /// Phase 10 — number of consecutive errors observed by the puller
+  /// Phase 10 - number of consecutive errors observed by the puller
   /// worker. Reset to 0 on a successful run. Drives admin-UI banners
-  /// ("Microsoft authentication failed — re-authorize") + back-off
+  /// ("Microsoft authentication failed - re-authorize") + back-off
   /// scheduling when the source has been broken for a while.
   /// Spec: specs/ai-governance/puller-framework/puller-adapter-contract.feature
   errorCount Int @default(0)
 
-  /// Phase 10 — cron schedule for pull-mode sources. Validated by the
+  /// Phase 10 - cron schedule for pull-mode sources. Validated by the
   /// adapter's pullConfig schema; mirrored here for fast worker
   /// dispatch. Null for push-mode sources.
   pullSchedule String?
@@ -2169,12 +2238,12 @@ model IngestionSource {
 }
 
 /// Admin-defined anomaly detection rule. Evaluated server-side at
-/// ingest time (Option C — not in this slice yet) against
+/// ingest time (Option C - not in this slice yet) against
 /// gateway_activity_events. When triggered, an alert is dispatched
 /// to the destinations configured on the rule (Slack / SIEM / webhook
 /// / PagerDuty / email).
 ///
-/// This is a configuration entity — the actual rule evaluation +
+/// This is a configuration entity - the actual rule evaluation +
 /// alert state lives in a future ClickHouse table
 /// (gateway_anomaly_alerts) and a server-side worker. Spec:
 /// specs/ai-gateway/governance/anomaly-rules.feature
@@ -2188,7 +2257,7 @@ model AnomalyRule {
   /// String not enum so new scopes ship without migrations.
   scope   String
   /// Org id / team id / project id / source-type string / source id
-  /// — narrows what the rule applies to.
+  /// - narrows what the rule applies to.
   scopeId String
 
   name        String
@@ -2200,7 +2269,7 @@ model AnomalyRule {
 
   /// Extensible rule taxonomy: 'spend_spike' | 'rate_limit' |
   /// 'tool_mismatch' | 'after_hours' | 'unusual_model' | 'pii_leak'
-  /// | 'custom'. New types ship without migrations — evaluator
+  /// | 'custom'. New types ship without migrations - evaluator
   /// picks a per-type implementation from a code registry.
   ruleType String
 
@@ -2217,7 +2286,7 @@ model AnomalyRule {
   /// Empty map = use org defaults (when defaults exist; today no-op).
   destinationConfig Json @default("{}")
 
-  /// 'active' (default — evaluator picks it up) | 'disabled' (admin
+  /// 'active' (default - evaluator picks it up) | 'disabled' (admin
   /// paused; rule rows kept for audit). 'archived' uses archivedAt
   /// timestamp instead so we can filter `archivedAt IS NULL` cheaply.
   status String @default("active")
@@ -2244,7 +2313,7 @@ model AnomalyRule {
 /// processing a freshly-arrived ActivityEventReceived event.
 /// Read by api.activityMonitor.recentAnomalies for the admin dashboard.
 ///
-/// Dedup: (ruleId, triggerWindowStart) — re-evaluating the same
+/// Dedup: (ruleId, triggerWindowStart) - re-evaluating the same
 /// window updates the existing row rather than creating a duplicate.
 /// Acknowledgement / resolution are admin actions on the row.
 ///
@@ -2296,9 +2365,9 @@ model AnomalyAlert {
 /// (/me) and managed by org admins at /settings/governance/tool-catalog.
 ///
 /// Three first-class tile types via `type` discriminator:
-///   - "coding_assistant" — click expands to setup helper (e.g. `langwatch claude`)
-///   - "model_provider"   — click expands to inline personal-VK creation
-///   - "external_tool"    — click expands to admin-attached markdown + external link
+///   - "coding_assistant" - click expands to setup helper (e.g. `langwatch claude`)
+///   - "model_provider"   - click expands to inline personal-VK creation
+///   - "external_tool"    - click expands to admin-attached markdown + external link
 ///
 /// Scoping: organization-default entries can be OVERRIDDEN at the team
 /// tier (same `slug` + `scope=team` + matching `scopeId`) so admins can
@@ -2340,7 +2409,7 @@ model AiToolEntry {
   /// pre-refactor rows; new writes should populate iconAsset.
   iconKey String?
 
-  /// Icon source — single column, prefix-discriminated:
+  /// Icon source - single column, prefix-discriminated:
   ///   "preset:claude_code" / "preset:codex" / ...   (built-in)
   ///   "data:image/svg+xml;base64,..."               (admin-uploaded)
   ///   null                                          → fall back to
@@ -2366,21 +2435,27 @@ model AiToolEntry {
   createdById String?
   updatedById String?
 
-  /// Multi-team scope. Empty = org-wide (visible to every member).
-  /// Non-empty = restricted to those teams. Replaces the legacy
-  /// scope+scopeId pair, which stays populated for back-compat
-  /// during the rollout (scope='organization' when teams is empty,
-  /// scope='team' with scopeId=teams[0] when teams has one row;
-  /// undefined for >1 — readers should prefer this relation).
+  /// @deprecated Multi-team scope. Superseded by `departments` - the
+  /// "Visible to" model is now WHOLE ORGANIZATION or a set of
+  /// DEPARTMENTS. Rows are no longer written here (the table is kept
+  /// for now to avoid a destructive drop); readers prefer `departments`.
   teams AiToolEntryTeam[]
+
+  /// Department scope. Empty = org-wide (visible to every member).
+  /// Non-empty = visible only to members whose `departmentId` is in
+  /// this set. Mirrored onto the legacy scope/scopeId pair for
+  /// back-compat reads (scope='organization' when empty,
+  /// scope='department' otherwise).
+  departments AiToolEntryDepartment[]
 
   @@index([organizationId, scope, scopeId])
   @@index([organizationId, enabled, archivedAt])
   @@index([organizationId, type])
 }
 
-/// Per-team scope binding for AiToolEntry. Empty set = org-wide.
-/// Non-empty = entry visible only to members of those teams.
+/// @deprecated Per-team scope binding for AiToolEntry. Superseded by
+/// AiToolEntryDepartment; kept so the rename migration is non-destructive.
+/// No new rows are written here.
 model AiToolEntryTeam {
   id      String      @id @default(nanoid())
   entryId String
@@ -2392,10 +2467,27 @@ model AiToolEntryTeam {
   @@index([teamId])
 }
 
+/// Per-department scope binding for AiToolEntry. Empty set = org-wide.
+/// Non-empty = entry visible only to members of those departments (an
+/// OrganizationUser whose `departmentId` is in the set). Mirrors
+/// AiToolEntryTeam's shape. `departmentId` is a plain column ref
+/// (relationMode="prisma"), matching how Department is referenced
+/// elsewhere; the service validates the id belongs to the org.
+model AiToolEntryDepartment {
+  id           String      @id @default(nanoid())
+  entryId      String
+  departmentId String
+  entry        AiToolEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@unique([entryId, departmentId])
+  @@index([departmentId])
+}
+
 /// Admin/platform-curated catalog row for upstream OTLP normalization.
 /// Owns the OTTL transform that reshapes a specific upstream tool's
-/// span shape into canonical gen_ai conventions. Users install via
-/// UserIngestionBinding to land traces in their personal project.
+/// span shape into canonical gen_ai conventions. Users connect via an
+/// ingestion key (an ingest-only ApiKey carrying ingestionTemplateId) to
+/// land traces in their personal project.
 ///
 /// `organizationId` NULL = platform-published default (always-visible
 /// across every org). NOT NULL = org-authored (visible only within
@@ -2408,7 +2500,7 @@ model IngestionTemplate {
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  /// Stable slug — unique within (organizationId, slug) scope. Generated
+  /// Stable slug - unique within (organizationId, slug) scope. Generated
   /// from displayName + nanoid(6) on create for org-authored; canonical
   /// values for platform-published (`claude_code` / `cursor` /
   /// `claude_cowork` / `raw_otlp_advanced`).
@@ -2417,13 +2509,13 @@ model IngestionTemplate {
   /// Mirrors the slug for v1 platform-published rows. Kept as a separate
   /// column so a future v2 may publish two templates that share an
   /// upstream sourceType (e.g. claude_code-personal vs claude_code-team)
-  /// without a migration. String not enum — extensibility.
+  /// without a migration. String not enum - extensibility.
   sourceType String
 
   displayName String
   description String? @db.Text
 
-  /// Icon source — single column, prefix-discriminated, mirrors
+  /// Icon source - single column, prefix-discriminated, mirrors
   /// AiToolEntry.iconAsset:
   ///   `preset:<kind>`                 (built-in slot)
   ///   `data:image/svg+xml;base64,…`   (admin-uploaded for org-authored)
@@ -2432,12 +2524,11 @@ model IngestionTemplate {
 
   /// Discriminator for what (if any) extra credential metadata the
   /// install drawer captures from the user:
-  ///   null              → otlp_token-only (drawer auto-issues binding
-  ///                       token, no input form)
-  ///   `static_api_key`  → drawer captures the user's upstream tool
-  ///                       API key into UserIngestionBinding.encryptedCredential
+  ///   null              → otlp_token-only (drawer auto-issues the
+  ///                       ingestion key, no input form)
+  ///   `static_api_key`  → drawer captures the user's upstream tool API key
   ///   `agent_id`        → drawer captures an agent identifier (e.g.
-  ///                       Cursor agentId) into the same column
+  ///                       Cursor agentId)
   /// String not enum so v2 shapes (oauth_redirect / s3_bucket) ship
   /// without a migration.
   credentialSchema String?
@@ -2446,19 +2537,18 @@ model IngestionTemplate {
   /// AFTER the receiver re-stamps the binding's authoritative principal
   /// + provenance keys (see `protectedTemplateAttributeKeys` 19-key
   /// closed list). Templates write canonical OTTL outputs (gen_ai.*,
-  /// cost.usd, response.model) — they CANNOT write attribution or
+  /// cost.usd, response.model) - they CANNOT write attribution or
   /// provenance keys; the receiver guard restores those post-OTTL.
   ottlRules String @default("") @db.Text
 
   /// True for the v1 platform-published default templates
   /// (organizationId IS NULL). Future org-authored rows write false.
   /// Drives the admin UI "READ-ONLY view + Request a custom template"
-  /// surface — admins consume + opt-out only in v1.
+  /// surface - admins consume + opt-out only in v1.
   platformPublished Boolean @default(false)
 
   /// Admin/platform enable. False = hidden from /me catalog. Existing
-  /// UserIngestionBindings continue to land traces; new installs are
-  /// blocked.
+  /// ingestion keys continue to land traces; new installs are blocked.
   enabled Boolean @default(true)
 
   archivedAt  DateTime?
@@ -2467,84 +2557,9 @@ model IngestionTemplate {
   createdById String?
   updatedById String?
 
-  bindings UserIngestionBinding[]
-
   @@unique([organizationId, slug])
   @@index([organizationId, archivedAt])
   @@index([sourceType])
-}
-
-/// User-managed binding from an IngestionTemplate to the user's personal
-/// project. Holds the `ik-lw-<base32>` binding access token (hashed) the
-/// user pastes into their upstream tool's OTLP exporter Bearer auth.
-///
-/// Cross-bind guard is service-layer (structural-impossibility): the
-/// service input shape MUST NOT accept personalProjectId. Server resolves
-/// from `getPersonalProjectForUser(userId)` at install time, so a caller
-/// cannot bind to another user's project even with the right templateId.
-///
-/// Hard-cut rotation v1: `bindingAccessTokenHash` is replaced in-place
-/// on rotate, no grace window. Receiver returns a structured 'binding
-/// rejected' state surfaced as a /me Trace Ingest tile banner.
-///
-/// Spec: specs/ai-gateway/governance/user-ingestion-binding-lifecycle.feature
-///       specs/ai-gateway/governance/template-cross-bind-guard.feature
-model UserIngestionBinding {
-  id String @id @default(nanoid())
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  templateId String
-  template   IngestionTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
-
-  /// Server-resolved at install (NOT input-accepted). Always points at
-  /// the user's personal Project (`Project.isPersonal=true` AND
-  /// `Project.team.ownerUserId === userId`). Receiver re-verifies at
-  /// auth time as defense-in-depth.
-  personalProjectId String
-  personalProject   Project @relation(fields: [personalProjectId], references: [id], onDelete: Cascade)
-
-  /// Denormalised for tenancy index — equals
-  /// `personalProject.team.organizationId`. Lets admin views query
-  /// bindings within an org without a 2-table join.
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-
-  /// SHA256 hex of the `ik-lw-<base32>` token. Receiver auth path:
-  /// SHA256(incoming Bearer) → indexed lookup. Single source of truth
-  /// for binding auth.
-  bindingAccessTokenHash String @unique
-
-  /// First 8 characters of the token, displayed in /me Trace Ingest tile
-  /// for "is this the right token" recognition. Never used for auth.
-  bindingAccessTokenPrefix String
-
-  /// Optional credential metadata captured at install time when the
-  /// template's credentialSchema is `static_api_key` or `agent_id`.
-  /// NULL when credentialSchema is null (otlp_token-only templates).
-  /// Encrypted at rest via the same pepper-derived KEK as VirtualKey
-  /// secrets. NOT used for receiver auth.
-  encryptedCredential Json?
-
-  /// User-side toggle. False = receiver rejects bound traces; tile shows
-  /// 'Binding disabled — re-enable to resume'.
-  enabled Boolean @default(true)
-
-  /// Last successful trace landed timestamp. Surfaces in /me as
-  /// "last trace 2 minutes ago" + admin-side as "is this binding live".
-  /// NOT a per-trace audit row (volume).
-  lastSeenAt DateTime?
-
-  archivedAt DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @default(now()) @updatedAt
-
-  @@unique([userId, templateId])
-  @@index([organizationId, archivedAt])
-  @@index([userId, archivedAt])
-  @@index([templateId])
-  @@index([personalProjectId])
 }
 
 // GatewayProviderCredential + VirtualKeyProviderCredential were both
@@ -2560,7 +2575,7 @@ model GatewayBudget {
   // Single source of truth for the target (ADR-021): inline (scopeType,
   // scopeId) within one organization. scopeId is a team / project / virtual
   // key / user id depending on scopeType; the query layer reads it directly.
-  // No typed FK columns — scope-entity deletion cleanup is a service-layer
+  // No typed FK columns - scope-entity deletion cleanup is a service-layer
   // concern, consistent with the no-foreign-key-constraints convention.
   scopeType      GatewayBudgetScopeType
   scopeId        String
@@ -2604,7 +2619,7 @@ model GatewayBudgetLedger {
   // resolving provider has since been deleted (audit-only state).
   modelProviderId String?
 
-  // Idempotency key — ULID produced by the gateway per request. Dedup for 24h.
+  // Idempotency key - ULID produced by the gateway per request. Dedup for 24h.
   gatewayRequestId String
   amountUsd        Decimal                   @db.Decimal(18, 6)
   tokensInput      Int                       @default(0)
@@ -2644,11 +2659,11 @@ model GatewayChangeEvent {
   @@index([budgetId])
 }
 
-// model GatewayAuditLog removed — gateway services now write to the
+// model GatewayAuditLog removed - gateway services now write to the
 // shared `AuditLog` model (top of file). See migration
 // 20260425000000_consolidate_gateway_audit_into_audit_log.
 
-// AI Gateway cache-control rules — operator-defined overrides without
+// AI Gateway cache-control rules - operator-defined overrides without
 // client code changes. Org-scoped; compiled into the VK bundle at
 // /changes-refresh time so the hot path stays at ~700 ns. Matchers +
 // action live as JSON so the wire schema can evolve without migrations.
@@ -2713,7 +2728,7 @@ model FeatureFlag {
     enabled      Boolean
     // Optional list of targeting rules evaluated before the `enabled`
     // fallback. Each rule is `{ match: { projectId?, organizationId? },
-    // enabled: boolean }` — first match wins. Shape lives in
+    // enabled: boolean }` - first match wins. Shape lives in
     // `src/server/featureFlag/rules.ts` so it can grow over time
     // (percentage rollouts, email-domain matches, etc.) without a
     // migration. Storing as JSON keeps the surface flexible while

@@ -1,6 +1,18 @@
 import { createEnv } from "@t3-oss/env-core";
 import { z } from "zod";
 
+/**
+ * Zod validators for the three AI Gateway secrets.
+ * Exported so tests can exercise the real `min(32)` constraint directly,
+ * catching mutations like `min(32) → min(1)` without relying on process.env
+ * stubbing or full-stack module reloads.
+ */
+export const gatewaySecretsSchema = {
+  LW_GATEWAY_INTERNAL_SECRET: z.string().min(32).optional(),
+  LW_GATEWAY_JWT_SECRET: z.string().min(32).optional(),
+  LW_VIRTUAL_KEY_PEPPER: z.string().min(32).optional(),
+};
+
 /** @param {import('zod').ZodTypeAny} schema */
 const optionalIfBuildTime = (schema) => {
   return process.env.BUILD_TIME ? schema.optional() : schema;
@@ -57,10 +69,10 @@ export function createEnvConfig() {
       API_TOKEN_JWT_SECRET: optionalIfBuildTime(z.string().min(1)),
       // Shared HMAC secret between control-plane and the Go AI Gateway service.
       // See specs/ai-gateway/_shared/contract.md §4 + §9.
-      LW_GATEWAY_INTERNAL_SECRET: z.string().min(32).optional(),
+      LW_GATEWAY_INTERNAL_SECRET: gatewaySecretsSchema.LW_GATEWAY_INTERNAL_SECRET,
       // HS256 secret used by control-plane to sign the short-lived JWT that the
       // gateway verifies on every request (contract §4.1). 32+ chars.
-      LW_GATEWAY_JWT_SECRET: z.string().min(32).optional(),
+      LW_GATEWAY_JWT_SECRET: gatewaySecretsSchema.LW_GATEWAY_JWT_SECRET,
       // Public-facing base URL the AI Gateway is reachable at. The Go
       // gateway re-uses this same var name in the OPPOSITE direction
       // (gateway -> control plane), so in dev `scripts/start.sh` hijacks
@@ -88,7 +100,7 @@ export function createEnvConfig() {
       LW_GATEWAY_INTERNAL_URL: z.string().url().optional(),
       // Argon2id pepper mixed into virtual-key hashing. Rotating this
       // invalidates all existing VKs — treat as append-only / key-management.
-      LW_VIRTUAL_KEY_PEPPER: z.string().min(32).optional(),
+      LW_VIRTUAL_KEY_PEPPER: gatewaySecretsSchema.LW_VIRTUAL_KEY_PEPPER,
       REDIS_URL: z.string().optional(),
       REDIS_CLUSTER_ENDPOINTS: z.string().optional(),
       REDIS_DB_INDEX: z.preprocess(
@@ -104,7 +116,6 @@ export function createEnvConfig() {
       OPENAI_API_KEY: z.string().optional(),
       SENDGRID_API_KEY: z.string().optional(),
       LANGWATCH_NLP_SERVICE: z.string().optional(),
-      TOPIC_CLUSTERING_SERVICE: z.string().optional(),
       LANGEVALS_ENDPOINT: z.string().optional(),
       // S3 staging for outbound langevals POSTs is opt-in: only relevant
       // when langevals is fronted by AWS Lambda (6 MB sync-invoke cap).
@@ -294,10 +305,6 @@ export function createEnvConfig() {
       OPENAI_API_KEY: process.env.OPENAI_API_KEY,
       SENDGRID_API_KEY: process.env.SENDGRID_API_KEY,
       LANGWATCH_NLP_SERVICE: process.env.LANGWATCH_NLP_SERVICE,
-      // Temporary, ideally we want to move this to lambda too
-      TOPIC_CLUSTERING_SERVICE: process.env.TOPIC_CLUSTERING_SERVICE
-        ? process.env.TOPIC_CLUSTERING_SERVICE
-        : process.env.LANGWATCH_NLP_SERVICE,
       LANGEVALS_ENDPOINT: process.env.LANGEVALS_ENDPOINT,
       LANGEVALS_STAGING_THRESHOLD_BYTES: process.env.LANGEVALS_STAGING_THRESHOLD_BYTES,
       LANGEVALS_STAGING_TTL_SECONDS: process.env.LANGEVALS_STAGING_TTL_SECONDS,

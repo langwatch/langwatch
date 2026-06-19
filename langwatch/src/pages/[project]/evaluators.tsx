@@ -9,10 +9,10 @@ import {
 import { CheckSquare, Plus } from "lucide-react";
 import { useCallback, useState } from "react";
 import { CascadeArchiveDialog } from "~/components/CascadeArchiveDialog";
+import { DashboardLayout } from "~/components/DashboardLayout";
 import { CopyEvaluatorDialog } from "~/components/evaluators/CopyEvaluatorDialog";
 import { EvaluatorCard } from "~/components/evaluators/EvaluatorCard";
 import { PushToCopiesDialog } from "~/components/evaluators/PushToCopiesDialog";
-import { DashboardLayout } from "~/components/DashboardLayout";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
@@ -32,7 +32,6 @@ function Page() {
   const { project, hasPermission } = useOrganizationTeamProject();
   const { openDrawer, closeDrawer } = useDrawer();
   const utils = api.useContext();
-
 
   // State for tracking which evaluator is being deleted
   const [evaluatorToDelete, setEvaluatorToDelete] = useState<{
@@ -131,7 +130,15 @@ function Page() {
     },
   });
 
-  const handleEditEvaluator = (evaluator: { id: string; config: unknown }) => {
+  const handleEditEvaluator = (evaluator: {
+    id: string;
+    type?: string;
+    config: unknown;
+  }) => {
+    if (evaluator.type === "code") {
+      openDrawer("codeEvaluatorEditor", { evaluatorId: evaluator.id });
+      return;
+    }
     const config = evaluator.config as { evaluatorType?: string } | null;
     openDrawer("evaluatorEditor", {
       evaluatorId: evaluator.id,
@@ -246,7 +253,10 @@ function Page() {
                 onEdit={() => handleEditEvaluator(evaluator)}
                 onDelete={() => handleDeleteEvaluator(evaluator)}
                 onReplicate={() =>
-                  setEvaluatorForCopy({ id: evaluator.id, name: evaluator.name })
+                  setEvaluatorForCopy({
+                    id: evaluator.id,
+                    name: evaluator.name,
+                  })
                 }
                 onPushToCopies={() =>
                   setEvaluatorForPush({
@@ -254,12 +264,13 @@ function Page() {
                     name: evaluator.name,
                   })
                 }
-                onSyncFromSource={() =>
-                  handleSyncFromSource(evaluator.id)
-                }
+                onSyncFromSource={() => handleSyncFromSource(evaluator.id)}
                 onViewHistory={() =>
                   openDrawer("evaluatorHistory", {
-                    urlParams: { evaluatorId: evaluator.id, evaluatorName: evaluator.name },
+                    urlParams: {
+                      evaluatorId: evaluator.id,
+                      evaluatorName: evaluator.name,
+                    },
                   })
                 }
               />

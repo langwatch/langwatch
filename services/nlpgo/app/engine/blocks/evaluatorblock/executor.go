@@ -158,8 +158,21 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 		return nil, err
 	}
 
+	// Coercion is scoped to the default langevals/* string-input path,
+	// where the receiving Pydantic schema declares every field as `str`
+	// and would reject a raw bool/number with "Expected string, received
+	// boolean". Saved (`evaluators/*`) and workflow (`custom/*`)
+	// evaluators carry their own typed field definitions
+	// (bool/float/int/dict/json_schema) and the app side resolves them
+	// against the evaluator's declared inputs, so the data payload must
+	// stay pass-through here — coercing would silently convert typed
+	// fields to strings before the receiving evaluator can validate them.
+	data := req.Data
+	if strings.HasPrefix(req.EvaluatorSlug, "langevals/") {
+		data = coerceData(req.Data)
+	}
 	body := map[string]any{
-		"data": req.Data,
+		"data": data,
 	}
 	if req.Name != "" {
 		body["name"] = req.Name

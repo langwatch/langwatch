@@ -6,33 +6,37 @@
  * - POST /api/otel/v1/logs
  * - POST /api/otel/v1/metrics
  */
+
+import { resolveSourceNonBillable } from "@ee/governance/services/costAttributionPolicy.service";
+import {
+  stampIngestKeyProvenanceOnLogRequest,
+  stampIngestKeyProvenanceOnMetricRequest,
+  stampIngestKeyProvenanceOnTraceRequest,
+} from "@ee/governance/services/ingestKeyProvenance.utils";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
 import { getLangWatchTracer } from "langwatch";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import {
+  apiKeyCeilingDenialResponse,
+  collectAuthDiagnostics,
+  enforceApiKeyCeiling,
+  extractCredentials,
+} from "~/server/api-key/auth-middleware";
+import { TokenResolver } from "~/server/api-key/token-resolver";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
+import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import {
   parseOtlpLogs,
   parseOtlpMetrics,
   parseOtlpTraces,
   readOtlpBody,
 } from "~/server/otel/parseOtlpBody";
-import { TokenResolver } from "~/server/api-key/token-resolver";
-import {
-  collectAuthDiagnostics,
-  enforceApiKeyCeiling,
-  extractCredentials,
-  apiKeyCeilingDenialResponse,
-} from "~/server/api-key/auth-middleware";
-import {
-  stampBindingProvenanceOnLogRequest,
-  stampBindingProvenanceOnTraceRequest,
-} from "@ee/governance/services/bindingProvenance.utils";
 import { decodeBase64OpenTelemetryId } from "~/server/tracer/utils";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
-import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 
 const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
   .ExportTraceServiceRequest;
@@ -61,7 +65,9 @@ type RouteContext = {
 /**
  * Classifies a token by prefix without exposing the value. Mirrors the
  * `tokenType` field emitted by the unified auth middleware so on-call can
- * filter CloudWatch by SDK shape.
+ * filter CloudWatch by SDK shape. Ingestion keys are ordinary `sk-lw-`
+ * API keys, so they classify as `legacy` here — the ingest discriminator
+ * lives on the resolved ApiKey row, not the token prefix.
  */
 export function classifyTokenType(token: string): "pat" | "legacy" | "unknown" {
   if (token.startsWith("pat-lw-")) return "pat";
@@ -76,7 +82,10 @@ export function classifyTokenType(token: string): "pat" | "legacy" | "unknown" {
  * the unified-auth middleware (PR #3520) — same fields, same shape, so
  * existing CloudWatch queries work.
  */
-async function authenticate(c: RouteContext, logger: ReturnType<typeof createLogger>) {
+async function authenticate(
+  c: RouteContext,
+  logger: ReturnType<typeof createLogger>,
+) {
   const diag = collectAuthDiagnostics(c);
   const credentials = extractCredentials((name) => c.req.header(name));
 
@@ -101,18 +110,16 @@ async function authenticate(c: RouteContext, logger: ReturnType<typeof createLog
       projectId: credentials.projectId,
     });
   } catch (error) {
-    logger.error(
-      { ...diag, error },
-      "Database error during authentication",
-    );
+    logger.error({ ...diag, error }, "Database error during authentication");
     return { error: "Authentication service error.", status: 500 as const };
   }
 
   if (!resolved) {
+    const tokenType = classifyTokenType(credentials.token);
     logger.warn(
       {
         ...diag,
-        tokenType: classifyTokenType(credentials.token),
+        tokenType,
         hasProjectId: !!credentials.projectId,
       },
       "Authentication failed: invalid credentials",
@@ -272,8 +279,14 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/traces", async (c) => {
       const authResult = await authenticate(c, loggerTraces);
 
       if ("error" in authResult) {
-        span.setStatus({ code: SpanStatusCode.ERROR, message: authResult.error });
-        return c.json({ message: authResult.error }, { status: authResult.status });
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: authResult.error,
+        });
+        return c.json(
+          { message: authResult.error },
+          { status: authResult.status },
+        );
       }
 
       const { project, resolved } = authResult;
@@ -312,7 +325,10 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/traces", async (c) => {
       const emptyPartialSuccess = { rejectedSpans: 0, errorMessage: "" };
 
       if (body.byteLength === 0) {
-        loggerTraces.debug({ projectId: project.id }, "Received empty trace request, ignoring");
+        loggerTraces.debug(
+          { projectId: project.id },
+          "Received empty trace request, ignoring",
+        );
         return c.json({
           message: "No traces to process",
           partialSuccess: emptyPartialSuccess,
@@ -337,7 +353,10 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/traces", async (c) => {
             traceRequest: Buffer.from(body).toString("base64"),
           },
         });
-        span.setStatus({ code: SpanStatusCode.ERROR, message: "Failed to parse traces" });
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: "Failed to parse traces",
+        });
         return c.json({ error: "Failed to parse traces" }, { status: 400 });
       }
       const traceRequest = parsed.request;
@@ -347,30 +366,42 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/traces", async (c) => {
         tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
       }
 
-      // Receiver-authoritative provenance stamp for UserIngestionBinding
-      // tokens. Overwrites any payload-supplied values for the protected
-      // template attribute keys (langwatch.template.id /
-      // langwatch.user_ingestion_binding.id / langwatch.source) — even
-      // a malicious upstream cannot forge a different template/binding
-      // identity onto its own bound traces.
-      if (resolved.type === "user_ingestion_binding") {
+      // Receiver-authoritative provenance stamp for ingestion-key traces.
+      // Overwrites any payload-supplied provenance keys (langwatch.source /
+      // langwatch.api_key.id / langwatch.origin / langwatch.organization_id
+      // / langwatch.template.id) — even a malicious upstream cannot forge a
+      // different source / key / org identity onto its own traces.
+      if (resolved.type === "apiKey" && resolved.ingestSourceType) {
+        // Whether this tool's direct-OTLP usage is bundled (non-billed per
+        // token). Cached per (org, sourceType); drives the trace summary's
+        // billed-vs-non-billed cost split. Gateway usage never reaches here.
+        const nonBillable = await resolveSourceNonBillable({
+          organizationId: resolved.organizationId,
+          sourceType: resolved.ingestSourceType,
+        });
         // OTLP SDK types and the local stamp helper agree structurally on
         // the slice we mutate (resourceSpans → resource → attributes). The
         // cast bridges nullability differences in deeper fields the helper
         // never reads.
-        stampBindingProvenanceOnTraceRequest(traceRequest as unknown as Parameters<typeof stampBindingProvenanceOnTraceRequest>[0], {
-          bindingId: resolved.bindingId,
-          templateId: resolved.templateId,
-          templateSlug: resolved.templateSlug,
-          organizationId: resolved.organizationId,
-        });
+        stampIngestKeyProvenanceOnTraceRequest(
+          traceRequest as unknown as Parameters<
+            typeof stampIngestKeyProvenanceOnTraceRequest
+          >[0],
+          {
+            apiKeyId: resolved.apiKeyId,
+            sourceType: resolved.ingestSourceType,
+            organizationId: resolved.organizationId,
+            templateId: resolved.ingestionTemplateId,
+            nonBillable,
+          },
+        );
       }
 
       const collectionResult =
         await getApp().traces.collection.handleOtlpTraceRequest(
           project.id,
           traceRequest,
-          project.piiRedactionLevel,
+          DEFAULT_PII_REDACTION_LEVEL,
         );
 
       return c.json({
@@ -396,8 +427,14 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/logs", async (c) => {
       const authResult = await authenticate(c, loggerLogs);
 
       if ("error" in authResult) {
-        span.setStatus({ code: SpanStatusCode.ERROR, message: authResult.error });
-        return c.json({ message: authResult.error }, { status: authResult.status });
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: authResult.error,
+        });
+        return c.json(
+          { message: authResult.error },
+          { status: authResult.status },
+        );
       }
 
       const { project, resolved } = authResult;
@@ -418,7 +455,10 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/logs", async (c) => {
       const body = await readOtlpBody(c.req.raw);
       const parsed = parseOtlpLogs(body, c.req.header("content-type"));
       if (!parsed.ok) {
-        span.setStatus({ code: SpanStatusCode.ERROR, message: "Failed to parse logs" });
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: "Failed to parse logs",
+        });
         span.recordException(new Error(parsed.error));
         loggerLogs.error(
           {
@@ -443,19 +483,34 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/logs", async (c) => {
         tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
       }
 
-      if (resolved.type === "user_ingestion_binding") {
-        stampBindingProvenanceOnLogRequest(logRequest as unknown as Parameters<typeof stampBindingProvenanceOnLogRequest>[0], {
-          bindingId: resolved.bindingId,
-          templateId: resolved.templateId,
-          templateSlug: resolved.templateSlug,
+      if (resolved.type === "apiKey" && resolved.ingestSourceType) {
+        // Log-based tools (Claude Code et al. emit OTLP logs, not spans)
+        // need the same bundled-vs-billed resolution the trace path does —
+        // without it their cost never gets the non-billable marker and a
+        // bundled coding session reads as real spend. Cached per
+        // (org, sourceType).
+        const nonBillable = await resolveSourceNonBillable({
           organizationId: resolved.organizationId,
+          sourceType: resolved.ingestSourceType,
         });
+        stampIngestKeyProvenanceOnLogRequest(
+          logRequest as unknown as Parameters<
+            typeof stampIngestKeyProvenanceOnLogRequest
+          >[0],
+          {
+            apiKeyId: resolved.apiKeyId,
+            sourceType: resolved.ingestSourceType,
+            organizationId: resolved.organizationId,
+            templateId: resolved.ingestionTemplateId,
+            nonBillable,
+          },
+        );
       }
 
       await getApp().traces.logCollection.handleOtlpLogRequest({
         tenantId: project.id,
         logRequest,
-        piiRedactionLevel: project.piiRedactionLevel,
+        piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
       });
 
       return c.json({ message: "OK" });
@@ -475,8 +530,14 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/metrics", async (c) => {
       const authResult = await authenticate(c, loggerMetrics);
 
       if ("error" in authResult) {
-        span.setStatus({ code: SpanStatusCode.ERROR, message: authResult.error });
-        return c.json({ message: authResult.error }, { status: authResult.status });
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: authResult.error,
+        });
+        return c.json(
+          { message: authResult.error },
+          { status: authResult.status },
+        );
       }
 
       const { project, resolved } = authResult;
@@ -497,7 +558,10 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/metrics", async (c) => {
       const body = await readOtlpBody(c.req.raw);
       const parsed = parseOtlpMetrics(body, c.req.header("content-type"));
       if (!parsed.ok) {
-        span.setStatus({ code: SpanStatusCode.ERROR, message: "Failed to parse metrics" });
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: "Failed to parse metrics",
+        });
         span.recordException(new Error(parsed.error));
         loggerMetrics.error(
           {
@@ -517,6 +581,24 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/metrics", async (c) => {
       }
       const metricsRequest = parsed.request;
 
+      // Receiver-authoritative provenance stamp for ingestion-key metrics —
+      // same contract as traces + logs, so the source / key / origin / org
+      // identity rides every OTLP signal and an upstream payload cannot forge
+      // a different one.
+      if (resolved.type === "apiKey" && resolved.ingestSourceType) {
+        stampIngestKeyProvenanceOnMetricRequest(
+          metricsRequest as unknown as Parameters<
+            typeof stampIngestKeyProvenanceOnMetricRequest
+          >[0],
+          {
+            apiKeyId: resolved.apiKeyId,
+            sourceType: resolved.ingestSourceType,
+            organizationId: resolved.organizationId,
+            templateId: resolved.ingestionTemplateId,
+          },
+        );
+      }
+
       // Body successfully parsed — mark the API key as used
       if (resolved.type === "apiKey") {
         tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
@@ -525,7 +607,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/metrics", async (c) => {
       await getApp().traces.metricCollection.handleOtlpMetricRequest({
         tenantId: project.id,
         metricRequest: metricsRequest,
-        piiRedactionLevel: project.piiRedactionLevel,
+        piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
       });
 
       return c.json({ message: "OK" });

@@ -8,7 +8,6 @@ const config = tseslint.config(
             "dist/**",
             "coverage/**",
             "examples/**",
-            "ts-to-zod.config.js",
             "**/generated/**",
         ],
     },

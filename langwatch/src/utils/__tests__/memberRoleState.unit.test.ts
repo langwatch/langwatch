@@ -147,7 +147,7 @@ describe("memberRoleState", () => {
               archivedAt: null,
               isPersonal: false,
               ownerUserId: null,
-              costCenterId: null,
+              departmentId: null,
             },
           }),
           makeMembership({
@@ -163,7 +163,7 @@ describe("memberRoleState", () => {
               archivedAt: null,
               isPersonal: false,
               ownerUserId: null,
-              costCenterId: null,
+              departmentId: null,
             },
           }),
         ];

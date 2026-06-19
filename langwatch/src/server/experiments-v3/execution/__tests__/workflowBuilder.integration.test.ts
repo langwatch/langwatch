@@ -19,7 +19,7 @@ import {
 describe("WorkflowBuilder", () => {
   const createBasicLocalPromptConfig = (): LocalPromptConfig => ({
     llm: {
-      model: "openai/gpt-4o-mini",
+      model: "openai/gpt-5-mini",
       temperature: 0,
       maxTokens: 1024,
     },
@@ -174,13 +174,13 @@ describe("WorkflowBuilder", () => {
       const targetConfig = createBasicTargetConfig();
       const cell = createBasicCell();
 
-      const node = buildSignatureNodeFromLocalConfig(
-        "test-node",
-        "Test Prompt",
-        config,
+      const node = buildSignatureNodeFromLocalConfig({
+        nodeId: "test-node",
+        name: "Test Prompt",
+        localConfig: config,
         targetConfig,
         cell,
-      );
+      });
 
       expect(node.id).toBe("test-node");
       expect(node.type).toBe("signature");
@@ -192,19 +192,19 @@ describe("WorkflowBuilder", () => {
       const targetConfig = createBasicTargetConfig();
       const cell = createBasicCell();
 
-      const node = buildSignatureNodeFromLocalConfig(
-        "test-node",
-        "Test Prompt",
-        config,
+      const node = buildSignatureNodeFromLocalConfig({
+        nodeId: "test-node",
+        name: "Test Prompt",
+        localConfig: config,
         targetConfig,
         cell,
-      );
+      });
 
       const llmParam = (node.data as LlmPromptConfigComponent).parameters.find(
         (p) => p.identifier === "llm",
       );
       expect(llmParam?.value).toEqual({
-        model: "openai/gpt-4o-mini",
+        model: "openai/gpt-5-mini",
         temperature: 0,
         max_tokens: 1024,
         litellm_params: undefined,
@@ -216,13 +216,13 @@ describe("WorkflowBuilder", () => {
       const targetConfig = createBasicTargetConfig();
       const cell = createBasicCell();
 
-      const node = buildSignatureNodeFromLocalConfig(
-        "test-node",
-        "Test Prompt",
-        config,
+      const node = buildSignatureNodeFromLocalConfig({
+        nodeId: "test-node",
+        name: "Test Prompt",
+        localConfig: config,
         targetConfig,
         cell,
-      );
+      });
 
       const instructionsParam = (
         node.data as LlmPromptConfigComponent
@@ -235,13 +235,13 @@ describe("WorkflowBuilder", () => {
       const targetConfig = createBasicTargetConfig();
       const cell = createBasicCell();
 
-      const node = buildSignatureNodeFromLocalConfig(
-        "test-node",
-        "Test Prompt",
-        config,
+      const node = buildSignatureNodeFromLocalConfig({
+        nodeId: "test-node",
+        name: "Test Prompt",
+        localConfig: config,
         targetConfig,
         cell,
-      );
+      });
 
       const messagesParam = (
         node.data as LlmPromptConfigComponent
@@ -256,13 +256,13 @@ describe("WorkflowBuilder", () => {
       const targetConfig = createBasicTargetConfig();
       const cell = createBasicCell();
 
-      const node = buildSignatureNodeFromLocalConfig(
-        "test-node",
-        "Test Prompt",
-        config,
+      const node = buildSignatureNodeFromLocalConfig({
+        nodeId: "test-node",
+        name: "Test Prompt",
+        localConfig: config,
         targetConfig,
         cell,
-      );
+      });
 
       expect(node.data.inputs).toHaveLength(1);
       expect(node.data.inputs?.[0]?.identifier).toBe("input");
@@ -280,7 +280,7 @@ describe("WorkflowBuilder", () => {
       version: 1,
       versionId: "version-1",
       versionCreatedAt: new Date(),
-      model: "openai/gpt-4o",
+      model: "openai/gpt-5-mini",
       temperature: 0.7,
       maxTokens: 2048,
       prompt: "You are a helpful assistant.",
@@ -293,6 +293,7 @@ describe("WorkflowBuilder", () => {
       createdAt: new Date(),
       updatedAt: new Date(),
       tags: [],
+      parameters: {},
     });
 
     it("builds signature node from database prompt", () => {
@@ -300,12 +301,12 @@ describe("WorkflowBuilder", () => {
       const targetConfig = createBasicTargetConfig();
       const cell = createBasicCell();
 
-      const node = buildSignatureNodeFromPrompt(
-        "test-node",
+      const node = buildSignatureNodeFromPrompt({
+        nodeId: "test-node",
         prompt,
         targetConfig,
         cell,
-      );
+      });
 
       expect(node.id).toBe("test-node");
       expect(node.type).toBe("signature");
@@ -317,18 +318,18 @@ describe("WorkflowBuilder", () => {
       const targetConfig = createBasicTargetConfig();
       const cell = createBasicCell();
 
-      const node = buildSignatureNodeFromPrompt(
-        "test-node",
+      const node = buildSignatureNodeFromPrompt({
+        nodeId: "test-node",
         prompt,
         targetConfig,
         cell,
-      );
+      });
 
       const llmParam = (node.data as LlmPromptConfigComponent).parameters.find(
         (p) => p.identifier === "llm",
       );
       expect(llmParam?.value).toEqual({
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
         temperature: 0.7,
         max_tokens: 2048,
       });

@@ -19,6 +19,7 @@ vi.mock("~/utils/logger/server", () => ({
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
+  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
 }));
 
 function createFoldState(
@@ -40,6 +41,7 @@ function createFoldState(
     errorMessage: null,
     models: ["gpt-5-mini"],
     totalCost: 0.0042,
+    nonBilledCost: null,
     tokensEstimated: false,
     totalPromptTokenCount: 120,
     totalCompletionTokenCount: 42,

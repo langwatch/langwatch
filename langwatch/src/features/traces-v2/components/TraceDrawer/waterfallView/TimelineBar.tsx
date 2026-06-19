@@ -1,5 +1,7 @@
 import { Box, Flex } from "@chakra-ui/react";
+import { memo, useCallback } from "react";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import { useSpanHoverStore } from "../../../stores/spanHoverStore";
 import { SPAN_TYPE_COLORS } from "../../../utils/formatters";
 import {
   BAR_HEIGHT,
@@ -8,29 +10,40 @@ import {
   type SiblingGroup,
 } from "./types";
 
-export function TimelineBar({
+export const TimelineBar = memo(function TimelineBar({
   span,
   rootStart,
   rootDuration,
   rowHeight,
   isSelected,
-  isHovered,
   isDimmed,
   onSelect,
-  onHoverStart,
-  onHoverEnd,
 }: {
   span: SpanTreeNode;
   rootStart: number;
   rootDuration: number;
   rowHeight: number;
   isSelected: boolean;
-  isHovered: boolean;
   isDimmed: boolean;
-  onSelect: () => void;
-  onHoverStart: () => void;
-  onHoverEnd: () => void;
+  onSelect: (spanId: string) => void;
 }) {
+  // Hover highlight comes from a store with a per-row boolean selector
+  // so a hover change re-renders only the two affected rows (this bar
+  // and its tree twin), not every virtualized row on both panes.
+  const isHovered = useSpanHoverStore((s) => s.hoveredSpanId === span.spanId);
+  const setHoveredSpanId = useSpanHoverStore((s) => s.setHoveredSpanId);
+  const handleMouseEnter = useCallback(
+    () => setHoveredSpanId(span.spanId),
+    [setHoveredSpanId, span.spanId],
+  );
+  const handleMouseLeave = useCallback(
+    () => setHoveredSpanId(null),
+    [setHoveredSpanId],
+  );
+  const handleClick = useCallback(
+    () => onSelect(span.spanId),
+    [onSelect, span.spanId],
+  );
   const isError = span.status === "error";
   const duration = span.durationMs;
   const color =
@@ -49,9 +62,9 @@ export function TimelineBar({
       align="center"
       position="relative"
       cursor="pointer"
-      onClick={onSelect}
-      onMouseEnter={onHoverStart}
-      onMouseLeave={onHoverEnd}
+      onClick={handleClick}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       transition="background 0.1s ease, opacity 0.1s ease"
       // Light mode: neutral grey for selection so the non-selected rows
       // don't need to be dimmed to stay legible — they keep full opacity.
@@ -124,9 +137,9 @@ export function TimelineBar({
       </Box>
     </Flex>
   );
-}
+});
 
-export function GroupTimelineBar({
+export const GroupTimelineBar = memo(function GroupTimelineBar({
   group,
   rootStart,
   rootDuration,
@@ -144,11 +157,7 @@ export function GroupTimelineBar({
       : 50;
 
   return (
-    <Flex
-      height={`${GROUP_ROW_HEIGHT}px`}
-      align="center"
-      position="relative"
-    >
+    <Flex height={`${GROUP_ROW_HEIGHT}px`} align="center" position="relative">
       <Box position="absolute" top={0} bottom={0} left={2} right={4}>
         <Box
           position="absolute"
@@ -174,4 +183,4 @@ export function GroupTimelineBar({
       </Box>
     </Flex>
   );
-}
+});

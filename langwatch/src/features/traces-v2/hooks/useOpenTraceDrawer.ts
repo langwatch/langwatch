@@ -4,6 +4,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
 import { api } from "~/utils/api";
 import {
+  buildPreviewTraceDetail,
   buildRichArrivalTraceDetail,
   isPreviewTraceId,
   RICH_ARRIVAL_TRACE_ID,
@@ -28,6 +29,7 @@ function listItemToHeader(item: TraceListItem): TraceHeader {
     output: item.output,
     models: item.models,
     totalCost: item.totalCost,
+    nonBilledCost: item.nonBilledCost,
     totalTokens: item.totalTokens,
     inputTokens: item.inputTokens ?? null,
     outputTokens: item.outputTokens ?? null,
@@ -78,15 +80,23 @@ export function useOpenTraceDrawer() {
           seed,
         );
 
-        // Preview-mode rich seeding. When the user clicks the synthetic
-        // "juicy one" arrival trace from the empty-state table, there's
-        // nothing in ClickHouse to fetch — but we still want every drawer
-        // tab to render with realistic content. Seed the spans, eval
-        // results, and conversation context caches so the waterfall, span
-        // list, sequence, topology, conversation, and evaluations tabs
-        // hydrate from local fixtures the moment the drawer opens.
-        if (trace.traceId === RICH_ARRIVAL_TRACE_ID) {
-          const detail = buildRichArrivalTraceDetail();
+        // Preview-mode seeding. Every sample-preview trace lives entirely
+        // client-side — ClickHouse has nothing — and the drawer's data
+        // hooks (header, spanTree, spansFull, spanDetail, signals,
+        // events, evals, conversationContext) are all gated off for
+        // preview ids. Without seeding, opening the drawer leaves every
+        // tab spinning forever. Two builders: the rich-arrival trace
+        // gets its hand-built showpiece detail (multi-span waterfall,
+        // full eval set, multi-turn conversation), every other sample
+        // trace gets a synthesised single-root-span detail derived from
+        // the TraceListItem itself. Both share the same seeding code
+        // path below so we can't accidentally seed one cache but skip
+        // another.
+        if (isPreviewTraceId(trace.traceId)) {
+          const detail =
+            trace.traceId === RICH_ARRIVAL_TRACE_ID
+              ? buildRichArrivalTraceDetail()
+              : buildPreviewTraceDetail(trace);
 
           utils.tracesV2.header.setData(
             { projectId: project.id, traceId: trace.traceId },
@@ -192,15 +202,50 @@ export function useOpenTraceDrawer() {
           }
         }
       }
+      // Kick off the heavier per-trace fetches in parallel with the
+      // route change so the waterfall + header render against real data
+      // by the time the drawer has finished mounting — operator feedback
+      // was that the trace tab sat on the loading skeleton for ~half a
+      // second even though we already had the row data. Prefetch is a
+      // no-op when the query is already cached, and tRPC dedupes the
+      // matching React Query subscription that the drawer mounts.
+      if (project?.id && !isPreviewTraceId(trace.traceId)) {
+        const input = {
+          projectId: project.id,
+          traceId: trace.traceId,
+          occurredAtMs: trace.timestamp,
+        };
+        const opts = { staleTime: 300_000 };
+        // The row seed above paints the header instantly, but the list row
+        // carries no attribute map (`attributes: {}`), so everything the
+        // header reads from attributes — cache-read / cache-write + reasoning
+        // token sums and the reasoning-effort setting — stays blank. `setData`
+        // marks that seed fresh for the 5-min staleTime, so without forcing a
+        // fetch the cache tokens never appear until a hard refresh. staleTime:0
+        // pulls the full header (with attributes) immediately, behind the seed.
+        void utils.tracesV2.header.prefetch(input, { staleTime: 0 });
+        void utils.tracesV2.spanTree.prefetch(input, opts);
+        void utils.tracesV2.spanLangwatchSignals.prefetch(input, opts);
+        void utils.tracesV2.traceEvents.prefetch(input, opts);
+        void utils.tracesV2.resourceInfo.prefetch(input, opts);
+      }
       // Push into the store before route change so drawer hooks render
       // with the right traceId/occurredAtMs on the very next frame.
-      useDrawerStore.getState().openTrace(trace.traceId, trace.timestamp);
+      // Pass the row's spanCount through so the drawer skeleton can
+      // size its accordion / span list section before the spanTree
+      // query resolves — eliminates the noticeable reflow that
+      // happened once the real data landed.
+      useDrawerStore
+        .getState()
+        .openTrace(trace.traceId, trace.timestamp, trace.spanCount);
       // Preview-mode traces always open on the waterfall view —
       // it's the most visual tab, the one the onboarding journey
       // teaches, and the only one we want demos / videos / first
-      // impressions to land on.
+      // impressions to land on. Use the transient setter so this
+      // programmatic override does NOT clobber the operator's
+      // persisted preference for normal traces.
       if (isPreviewTraceId(trace.traceId)) {
-        useDrawerStore.getState().setVizTab("waterfall");
+        useDrawerStore.getState().setVizTabTransient("waterfall");
       }
       openDrawer("traceV2Details", {
         traceId: trace.traceId,

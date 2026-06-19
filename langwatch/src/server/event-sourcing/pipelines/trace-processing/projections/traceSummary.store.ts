@@ -21,7 +21,7 @@ export class TraceSummaryStore
     state: TraceSummaryData,
     context: ProjectionStoreContext,
   ): Promise<void> {
-    if (state.spanCount === 0) return;
+    if (!hasPersistableSignal(state)) return;
     const stateWithId = state.traceId
       ? state
       : { ...state, traceId: String(context.aggregateId) };
@@ -39,7 +39,7 @@ export class TraceSummaryStore
     entries: Array<{ state: TraceSummaryData; context: ProjectionStoreContext }>,
   ): Promise<void> {
     const batchEntries = entries
-      .filter(({ state }) => state.spanCount > 0)
+      .filter(({ state }) => hasPersistableSignal(state))
       .map(({ state, context }) => ({
         data: state.traceId
           ? state
@@ -80,4 +80,18 @@ export class TraceSummaryStore
         : undefined,
     );
   }
+}
+
+/**
+ * A fold state is worth persisting when it has at least one span OR at
+ * least one log record received. Without this, logs-only traces (claude
+ * Path B + OTEL_LOGS_EXPORTER without a traces exporter, codex Path B
+ * pre-codex-spans, custom gen_ai-on-logs emitters) accumulate state but
+ * never reach trace_summaries — handleTraceLogRecordReceived increments
+ * langwatch.reserved.log_record_count but spanCount stays 0.
+ */
+function hasPersistableSignal(state: TraceSummaryData): boolean {
+  if (state.spanCount > 0) return true;
+  const raw = state.attributes?.["langwatch.reserved.log_record_count"];
+  return typeof raw === "string" && Number(raw) > 0;
 }

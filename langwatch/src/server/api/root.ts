@@ -1,81 +1,82 @@
+import { activityMonitorRouter } from "@ee/governance/routers/activityMonitor";
+import { aiToolsRouter } from "@ee/governance/routers/aiTools";
+import { anomalyRulesRouter } from "@ee/governance/routers/anomalyRules";
+import { departmentsRouter } from "@ee/governance/routers/departments";
+import { governanceRouter } from "@ee/governance/routers/governance";
+import { ingestionKeyRouter } from "@ee/governance/routers/ingestionKey";
+import { ingestionSourcesRouter } from "@ee/governance/routers/ingestionSources";
+import { ingestionTemplatesRouter } from "@ee/governance/routers/ingestionTemplates";
+import { personalSessionsRouter } from "@ee/governance/routers/personalSessions";
+import { sessionPolicyRouter } from "@ee/governance/routers/sessionPolicy";
 import { createTRPCRouter } from "~/server/api/trpc";
 import { agentsRouter } from "./routers/agents";
 import { analyticsRouter } from "./routers/analytics";
 import { annotationRouter } from "./routers/annotation";
 import { annotationScoreRouter } from "./routers/annotationScore";
+import { apiKeyRouter } from "./routers/apiKey";
+import { automationRouter } from "./routers/automations";
 import { batchRecordRouter } from "./routers/batchRecord";
 import { costsRouter } from "./routers/costs";
 import { currencyRouter } from "./routers/currency";
 import { dashboardsRouter } from "./routers/dashboards";
+import { dataPrivacyRouter } from "./routers/dataPrivacy";
+import { dataRetentionRouter } from "./routers/dataRetention";
 import { datasetRouter } from "./routers/dataset";
 import { datasetRecordRouter } from "./routers/datasetRecord";
 import { evaluationsRouter } from "./routers/evaluations";
+import { evaluatorsRouter } from "./routers/evaluators";
+import { experimentsRouter } from "./routers/experiments";
 import { exportRouter } from "./routers/export";
 import { featureFlagRouter } from "./routers/featureFlag";
-import { evaluatorsRouter } from "./routers/evaluators";
-import { licenseRouter } from "./routers/license";
-import { licenseEnforcementRouter } from "./routers/licenseEnforcement";
-import { experimentsRouter } from "./routers/experiments";
+import { gatewayBudgetsRouter } from "./routers/gatewayBudgets";
+import { gatewayCacheRulesRouter } from "./routers/gatewayCacheRules";
+import { gatewayGuardrailsRouter } from "./routers/gatewayGuardrails";
+import { gatewayUsageRouter } from "./routers/gatewayUsage";
 import { graphsRouter } from "./routers/graphs";
+import { groupRouter } from "./routers/group";
 import { homeRouter } from "./routers/home";
 import { httpProxyRouter } from "./routers/httpProxy";
 import { integrationsChecksRouter } from "./routers/integrationsChecks";
+import { licenseRouter } from "./routers/license";
+import { licenseEnforcementRouter } from "./routers/licenseEnforcement";
 import { limitsRouter } from "./routers/limits";
 import { llmModelCostsRouter } from "./routers/llmModelCosts";
 import { modelProviderRouter } from "./routers/modelProviders";
 import { monitorsRouter } from "./routers/monitors";
 import { onboardingRouter } from "./routers/onboarding/onboarding.router";
+import { opsRouter } from "./routers/ops";
 import { optimizationRouter } from "./routers/optimization";
 import { organizationRouter } from "./routers/organization";
+import { personalVirtualKeysRouter } from "./routers/personalVirtualKeys";
+import { personalWorkspaceFeaturesRouter } from "./routers/personalWorkspaceFeatures";
+import { pinnedTraceRouter } from "./routers/pinnedTrace";
 import { planRouter } from "./routers/plan";
 import { presenceRouter } from "./routers/presence";
 import { projectRouter } from "./routers/project";
-import { promptsRouter } from "./routers/prompts";
 import { promptTagsRouter } from "./routers/prompt-tags.trpc-router";
+import { promptsRouter } from "./routers/prompts";
 import { publicEnvRouter } from "./routers/publicEnv";
 import { roleRouter } from "./routers/role";
-import { subscriptionRouter } from "./routers/subscription";
+import { roleBindingRouter } from "./routers/roleBinding";
+import { routingPoliciesRouter } from "./routers/routingPolicies";
 import { savedViewsRouter } from "./routers/savedViews";
 import { scenarioRouter } from "./routers/scenarios";
+import { scimTokenRouter } from "./routers/scimToken";
 import { sdkRadarRouter } from "./routers/sdkRadar";
 import { secretsRouter } from "./routers/secrets";
-import { suiteRouter } from "./routers/suites";
 import { shareRouter } from "./routers/share";
-import { pinnedTraceRouter } from "./routers/pinnedTrace";
-import { dataRetentionRouter } from "./routers/dataRetention";
 import { spansRouter } from "./routers/spans";
+import { storedObjectsRouter } from "./routers/stored-objects.router";
+import { subscriptionRouter } from "./routers/subscription";
+import { suiteRouter } from "./routers/suites";
 import { teamRouter } from "./routers/team";
 import { topicsRouter } from "./routers/topics";
 import { tracesRouter } from "./routers/traces";
 import { tracesV2Router } from "./routers/tracesV2";
 import { translateRouter } from "./routers/translate";
-import { automationRouter } from "./routers/automations";
-import { scimTokenRouter } from "./routers/scimToken";
-import { roleBindingRouter } from "./routers/roleBinding";
-import { apiKeyRouter } from "./routers/apiKey";
-import { groupRouter } from "./routers/group";
 import { userRouter } from "./routers/user";
-import { gatewayBudgetsRouter } from "./routers/gatewayBudgets";
-import { gatewayCacheRulesRouter } from "./routers/gatewayCacheRules";
-import { gatewayGuardrailsRouter } from "./routers/gatewayGuardrails";
-import { gatewayUsageRouter } from "./routers/gatewayUsage";
 import { virtualKeysRouter } from "./routers/virtualKeys";
-import { personalVirtualKeysRouter } from "./routers/personalVirtualKeys";
-import { personalWorkspaceFeaturesRouter } from "./routers/personalWorkspaceFeatures";
-import { routingPoliciesRouter } from "./routers/routingPolicies";
-import { ingestionSourcesRouter } from "@ee/governance/routers/ingestionSources";
-import { activityMonitorRouter } from "@ee/governance/routers/activityMonitor";
-import { anomalyRulesRouter } from "@ee/governance/routers/anomalyRules";
-import { aiToolsRouter } from "@ee/governance/routers/aiTools";
-import { costCentersRouter } from "@ee/governance/routers/costCenters";
-import { ingestionTemplatesRouter } from "@ee/governance/routers/ingestionTemplates";
-import { userIngestionBindingsRouter } from "@ee/governance/routers/userIngestionBindings";
-import { governanceRouter } from "@ee/governance/routers/governance";
-import { personalSessionsRouter } from "@ee/governance/routers/personalSessions";
-import { sessionPolicyRouter } from "@ee/governance/routers/sessionPolicy";
 import { workflowRouter } from "./routers/workflows";
-import { opsRouter } from "./routers/ops";
-import { storedObjectsRouter } from "./routers/stored-objects.router";
 
 const coreRouters = {
   agents: agentsRouter,
@@ -114,6 +115,7 @@ const coreRouters = {
   share: shareRouter,
   pinnedTrace: pinnedTraceRouter,
   dataRetention: dataRetentionRouter,
+  dataPrivacy: dataPrivacyRouter,
   translate: translateRouter,
   workflow: workflowRouter,
   optimization: optimizationRouter,
@@ -143,9 +145,9 @@ const coreRouters = {
   activityMonitor: activityMonitorRouter,
   anomalyRules: anomalyRulesRouter,
   aiTools: aiToolsRouter,
-  costCenters: costCentersRouter,
+  departments: departmentsRouter,
   ingestionTemplates: ingestionTemplatesRouter,
-  userIngestionBindings: userIngestionBindingsRouter,
+  ingestionKey: ingestionKeyRouter,
   governance: governanceRouter,
   personalSessions: personalSessionsRouter,
   sessionPolicy: sessionPolicyRouter,

@@ -53,10 +53,18 @@ export interface TraceListItem {
   name: string;
   serviceName: string;
   durationMs: number;
+  /** Grand list-price cost. `nonBilledCost` is the bundled (theoretical)
+   *  portion of it; billed = totalCost - nonBilledCost. */
   totalCost: number;
+  nonBilledCost: number;
   totalTokens: number;
   inputTokens?: number;
   outputTokens?: number;
+  /** Cache + reasoning token sums (null when the model never reported them).
+   *  The Tokens cell shows input+output; these drive the hover breakdown. */
+  cacheReadTokens?: number | null;
+  cacheCreationTokens?: number | null;
+  reasoningTokens?: number | null;
   models: string[];
   status: TraceStatus;
   spanCount: number;
@@ -66,7 +74,19 @@ export interface TraceListItem {
   errorSpanName?: string;
   conversationId?: string;
   userId?: string;
-  origin: "application" | "simulation" | "evaluation";
+  origin:
+    | "application"
+    | "simulation"
+    | "evaluation"
+    | "workflow"
+    | "playground"
+    | "gateway"
+    | "sample"
+    | "coding_agent"
+    | "ai_tool"
+    // CH `langwatch.origin` is a free string; keep the known set for
+    // autocomplete/exhaustiveness while still accepting future values.
+    | (string & {});
   tokensEstimated?: boolean;
   ttft?: number;
   traceName?: string;

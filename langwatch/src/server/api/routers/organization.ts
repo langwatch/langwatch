@@ -41,7 +41,7 @@ import {
   ENTERPRISE_FEATURE_ERRORS,
 } from "../enterprise";
 import { LimitExceededError } from "../../license-enforcement/errors";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { skipPermissionCheck } from "../rbac";
 import {
   checkOrganizationPermission,
@@ -299,6 +299,7 @@ export const organizationRouter = createTRPCRouter({
           elasticsearchApiKey: z.string().optional(),
           s3Bucket: z.string().optional(),
           presenceEnabled: z.boolean().optional(),
+          supportContact: z.string().max(500).nullable().optional(),
         })
         .refine((data) => {
           const hasNodeUrl = !!data.elasticsearchNodeUrl?.trim();
@@ -323,24 +324,7 @@ export const organizationRouter = createTRPCRouter({
         ),
     )
     .use(checkOrganizationPermission("organization:manage"))
-    .mutation(async ({ input, ctx }) => {
-      const prisma = ctx.prisma;
-
-      const organizationUser = await prisma.organizationUser.findFirst({
-        where: {
-          userId: ctx.session.user.id,
-          organizationId: input.organizationId,
-          role: "ADMIN",
-        },
-      });
-
-      if (!organizationUser) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "You don't have the necessary permissions",
-        });
-      }
-
+    .mutation(async ({ input }) => {
       await getApp().organizations.update({
         organizationId: input.organizationId,
         name: input.name,
@@ -351,6 +335,7 @@ export const organizationRouter = createTRPCRouter({
         elasticsearchApiKey: input.elasticsearchApiKey,
         s3Bucket: input.s3Bucket,
         presenceEnabled: input.presenceEnabled,
+        supportContact: input.supportContact,
       });
 
       if (input.elasticsearchNodeUrl && input.elasticsearchApiKey) {
@@ -1130,7 +1115,7 @@ export const organizationRouter = createTRPCRouter({
         // operators catch systemic provisioning regressions (bad
         // migration, schema drift, Prisma constraint violation) before
         // users start complaining about missing personal workspaces.
-        captureException(err, {
+        captureException(toError(err), {
           extra: {
             origin: "governance.acceptInvite",
             userId: session.user.id,

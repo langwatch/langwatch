@@ -5,7 +5,7 @@ from uuid import UUID
 import httpx
 import threading
 from deprecated import deprecated
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 from langwatch.attributes import AttributeKey
 from langwatch.utils.auth import build_auth_headers
 from langwatch.utils.exceptions import better_raise_for_status
@@ -61,8 +61,19 @@ __all__ = ["trace", "LangWatchTrace"]
 
 T = TypeVar("T", bound=Callable[..., Any])
 
+def _is_transient_error(error: BaseException) -> bool:
+    """Network blips and server 5xx responses are retryable; client 4xx
+    responses are real answers and must surface immediately."""
+    if isinstance(error, (httpx.TimeoutException, httpx.ConnectError)):
+        return True
+    return (
+        isinstance(error, httpx.HTTPStatusError)
+        and error.response.status_code >= 500
+    )
+
+
 _retry_on_transient = retry(
-    retry=retry_if_exception_type((httpx.TimeoutException, httpx.ConnectError)),
+    retry=retry_if_exception(_is_transient_error),
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=2, max=10),
     reraise=True,
@@ -88,7 +99,13 @@ class LangWatchTrace:
         expected_output: Optional[str] = None,
         api_key: Optional[str] = None,
         disable_sending: bool = False,
-        max_string_length: Optional[int] = 5000,
+        # No client-side truncation by default. Full input/output reaches the
+        # backend, which owns sizing (ADR-022: event_log is the source of truth,
+        # with the edge spool + server-side caps handling oversize). This keeps
+        # the Python SDK consistent with the TS/Go SDKs and stock OpenTelemetry —
+        # none of which truncate span content client-side (#4215). Set to an int
+        # (>= 100) to opt into a client-side per-field byte cap.
+        max_string_length: Optional[int] = None,
         # Root span parameters
         span_id: Optional[str] = None,
         capture_input: bool = True,
@@ -778,7 +795,11 @@ def trace(
     expected_output: Optional[str] = None,
     api_key: Optional[str] = None,
     disable_sending: bool = False,
-    max_string_length: Optional[int] = 5000,
+    # No client-side truncation by default — must stay in lockstep with the
+    # LangWatchTrace constructor default. The backend owns sizing (ADR-022); the
+    # SDK stays consistent with the TS/Go SDKs and stock OpenTelemetry. Set to an
+    # int (>= 100) to opt into a client-side per-field byte cap.
+    max_string_length: Optional[int] = None,
     # Root span parameters
     span_id: Optional[str] = None,
     capture_input: bool = True,

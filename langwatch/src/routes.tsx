@@ -2,6 +2,7 @@ import { Suspense, useEffect } from "react";
 import {
   createBrowserRouter,
   Outlet,
+  redirect,
   useLocation,
   useNavigation,
   type RouteObject,
@@ -14,7 +15,7 @@ import { PageErrorFallback } from "~/components/ui/PageErrorFallback";
 import { reloadOnChunkError } from "./utils/chunkReload";
 
 /**
- * Root layout — wraps all routes.
+ * Root layout - wraps all routes.
  * - InnerProviders: CommandBar, Analytics, PostHog (need Router context)
  * - NProgress: loading bar on navigation (starts when lazy route begins loading)
  */
@@ -69,6 +70,14 @@ const routes: RouteObject[] = [
   // Auth (public)
   { path: "/auth/signin", ...page(() => import("./pages/auth/signin")) },
   { path: "/auth/signup", ...page(() => import("./pages/auth/signup")) },
+  {
+    path: "/auth/forgot-password",
+    ...page(() => import("./pages/auth/forgot-password")),
+  },
+  {
+    path: "/auth/reset-password",
+    ...page(() => import("./pages/auth/reset-password")),
+  },
   { path: "/auth/error", ...page(() => import("./pages/auth/error")) },
 
   // Top-level pages
@@ -107,6 +116,10 @@ const routes: RouteObject[] = [
   {
     path: "/settings/data-retention",
     ...page(() => import("./pages/settings/data-retention")),
+  },
+  {
+    path: "/settings/data-privacy",
+    ...page(() => import("./pages/settings/data-privacy")),
   },
   {
     path: "/settings/audit-log",
@@ -211,11 +224,16 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/settings/governance/tool-catalog")),
   },
   {
-    path: "/settings/governance/cost-centers",
-    ...page(() => import("./pages/settings/governance/cost-centers")),
+    path: "/settings/governance/departments",
+    ...page(() => import("./pages/settings/governance/departments")),
   },
   {
-    // View-all teams listing — bird's-eye `View all teams →` lands here.
+    // Redirect the pre-rename path so old bookmarks do not 404.
+    path: "/settings/governance/cost-centers",
+    loader: () => redirect("/settings/governance/departments"),
+  },
+  {
+    // View-all teams listing - bird's-eye `View all teams →` lands here.
     // 500-row paginated list with sort chips for spend / requests /
     // last-activity. Per-row click-through routes to the team detail
     // page below.
@@ -223,7 +241,7 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/settings/governance/teams")),
   },
   {
-    // Per-team detail — single-row scoped view of `spendByTeam` filtered
+    // Per-team detail - single-row scoped view of `spendByTeam` filtered
     // to the URL-encoded team id, four-stat KPI grid + breadcrumb back
     // to the listing. Detail-data depth (per-day trend, per-user
     // breakdown, model mix) defers to a follow-up.
@@ -231,12 +249,12 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/settings/governance/teams/[id]")),
   },
   {
-    // View-all users listing — bird's-eye `View all users →` lands here.
+    // View-all users listing - bird's-eye `View all users →` lands here.
     path: "/settings/governance/users",
     ...page(() => import("./pages/settings/governance/users")),
   },
   {
-    // Per-user detail — single-row scoped view keyed off the
+    // Per-user detail - single-row scoped view keyed off the
     // URL-encoded actor id (email / sub claim).
     path: "/settings/governance/users/:id",
     ...page(() => import("./pages/settings/governance/users/[id]")),
@@ -259,7 +277,7 @@ const routes: RouteObject[] = [
   {
     // Budget-increase request page that the CLI's `langwatch request-increase`
     // opens. The page file existed but routes.tsx is explicit (Vite migration)
-    // — without this entry the URL 404'd, breaking the per-spec
+    // - without this entry the URL 404'd, breaking the per-spec
     // budget-exceeded → request flow Ariana caught in dogfood.
     path: "/me/budget/request",
     ...page(() => import("./pages/me/budget/request")),
@@ -284,7 +302,7 @@ const routes: RouteObject[] = [
     path: "/:project/automations",
     ...page(() => import("./pages/[project]/automations")),
   },
-  // AI Gateway — org-scoped admin pages live under /settings/gateway/**
+  // AI Gateway - org-scoped admin pages live under /settings/gateway/**
   // alongside model-providers, routing-policies, audit-log etc. Every
   // gateway resource (VirtualKey / GatewayBudget / ModelProvider) is
   // org-keyed by the schema, so the chrome reflects that.
@@ -531,13 +549,13 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/ops/backoffice/subscriptions")),
   },
 
-  // @project redirect — Next.js parallel route that redirects /@project/path to /:project/path
+  // @project redirect - Next.js parallel route that redirects /@project/path to /:project/path
   {
     path: "/@project/*",
     ...page(() => import("./pages/@project/[...path]/index")),
   },
 
-  // Catch-all 404 — must stay last.
+  // Catch-all 404 - must stay last.
   {
     path: "*",
     ...page(() => import("./pages/not-found")),
@@ -547,7 +565,7 @@ const routes: RouteObject[] = [
 // React Router v7 expects a HydrateFallback when the root route is async; the
 // app uses lazy() per-route and never blocks hydration, but RR still emits a
 // console warning if no fallback is declared. An empty fragment is correct
-// here — InnerProviders + Suspense already render the right shell once
+// here - InnerProviders + Suspense already render the right shell once
 // children resolve, and showing nothing for the few ms before that is the
 // existing behaviour.
 function HydrateFallback() {

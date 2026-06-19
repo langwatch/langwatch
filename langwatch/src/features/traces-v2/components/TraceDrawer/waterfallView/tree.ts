@@ -128,6 +128,18 @@ export function flattenTree(
   return result;
 }
 
+/**
+ * Total number of descendant spans under a node (children, grandchildren,
+ * …) — drives the "+N" hidden-span count shown on collapsed parents.
+ */
+export function countDescendants(node: WaterfallTreeNode): number {
+  let count = 0;
+  for (const child of node.children) {
+    count += 1 + countDescendants(child);
+  }
+  return count;
+}
+
 export function getTraceRange(spans: SpanTreeNode[]): {
   rootStart: number;
   rootEnd: number;

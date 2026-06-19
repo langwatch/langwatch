@@ -15,7 +15,7 @@ import {
 import type { EvaluatorRepository } from "../evaluator.repository";
 
 // Mock AVAILABLE_EVALUATORS
-vi.mock("~/server/evaluations/evaluators.generated", () => ({
+vi.mock("~/server/evaluations/evaluators", () => ({
   AVAILABLE_EVALUATORS: {
     "langevals/exact_match": {
       name: "Exact Match",

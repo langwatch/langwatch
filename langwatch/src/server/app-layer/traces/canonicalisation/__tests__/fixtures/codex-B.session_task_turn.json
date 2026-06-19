@@ -1,0 +1,23 @@
+{
+  "scopeName": "codex_cli_rs",
+  "spanName": "session_task.turn",
+  "attributes": {
+    "code.file.path": "core/src/tasks/mod.rs",
+    "code.module.name": "codex_core::tasks",
+    "code.line.number": 383,
+    "thread.id": "019e9bfe-7749-7440-8506-39152afbc9ff",
+    "thread.name": "tokio-runtime-worker",
+    "target": "codex_core::tasks",
+    "turn.id": "019e9bfe-92ad-7591-a7fd-d6250ce88904",
+    "model": "gpt-5.5",
+    "codex.turn.reasoning_effort": "high",
+    "codex.turn.token_usage.input_tokens": 13297,
+    "codex.turn.token_usage.cached_input_tokens": 4480,
+    "codex.turn.token_usage.non_cached_input_tokens": 8817,
+    "codex.turn.token_usage.output_tokens": 23,
+    "codex.turn.token_usage.reasoning_output_tokens": 10,
+    "codex.turn.token_usage.total_tokens": 13320,
+    "busy_ns": 8130669,
+    "idle_ns": 1524893789
+  }
+}

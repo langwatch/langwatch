@@ -13,5 +13,5 @@ export const teamFactory = Factory.define<Team>(({ sequence }) => ({
   defaultCustomRoleId: null,
   isPersonal: false,
   ownerUserId: null,
-  costCenterId: null,
+  departmentId: null,
 }));

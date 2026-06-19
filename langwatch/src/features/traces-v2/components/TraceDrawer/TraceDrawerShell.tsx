@@ -3,11 +3,14 @@ import { useRef } from "react";
 import { useColorMode } from "~/components/ui/color-mode";
 import { Drawer } from "~/components/ui/drawer";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
+import { PeerCursorOverlay } from "~/features/presence/components/PeerCursorOverlay";
+import { DrawerSpotlights } from "../../onboarding/spotlights/DrawerSpotlights";
 import {
   DRAWER_DEFAULT_WIDTH_PX,
   DRAWER_MIN_WIDTH_PX,
   useDrawerStore,
 } from "../../stores/drawerStore";
+import { ConversationContext } from "./ConversationContext";
 import { ConversationView } from "./conversationView";
 import { DrawerHeader } from "./drawerHeader";
 import { KeyboardShortcutsHelp } from "./KeyboardShortcutsHelp";
@@ -15,9 +18,11 @@ import { useShikiAdapter } from "./markdownView/shikiAdapter";
 import { PaneLayout } from "./panes/PaneLayout";
 import { ResizeRail } from "./panes/ResizeRail";
 import { usePaneLayout } from "./panes/usePaneLayout";
+import { BlurredContentGate } from "../BlurredContentGate";
 import { ScenarioRoleProvider } from "./scenarioRoles";
 import { TraceDrawerEmptyState } from "./TraceDrawerEmptyState";
 import { TraceDrawerSkeleton } from "./TraceDrawerSkeleton";
+import { TraceAccordions } from "./traceAccordions";
 import { useTraceDrawerScaffold } from "./useTraceDrawerScaffold";
 
 export interface TraceV2DrawerShellProps {
@@ -62,6 +67,9 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
   const widthPx = useDrawerStore((s) => s.widthPx);
   const shortcutsOpen = useDrawerStore((s) => s.shortcutsOpen);
   const pinned = useDrawerStore((s) => s.pinned);
+  const expectedSpanCount = useDrawerStore((s) => s.expectedSpanCount);
+  const ctxPaneState = useDrawerStore((s) => s.paneState.conversationContext);
+  const togglePaneCollapsed = useDrawerStore((s) => s.togglePaneCollapsed);
   const setShortcutsOpen = useDrawerStore((s) => s.setShortcutsOpen);
 
   // `open` is hardcoded `true` because the parent (`TracesPage`'s
@@ -197,7 +205,10 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
             minHeight={0}
           >
             {isLoading || !trace ? (
-              <TraceDrawerSkeleton onClose={handleClose} />
+              <TraceDrawerSkeleton
+                onClose={handleClose}
+                expectedSpanCount={expectedSpanCount}
+              />
             ) : (
               <>
                 <Box
@@ -219,47 +230,130 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                   </IsolatedErrorBoundary>
                 </Box>
                 <Box borderBottomWidth="1px" borderColor="border" />
-                <Flex
-                  ref={paneContainerRef}
-                  flex={1}
-                  minHeight={0}
-                  minWidth={0}
-                  direction="column"
-                  bg={{ base: "bg.surface", _dark: "bg.panel" }}
-                  opacity={headerQuery.isFetching ? 0.55 : 1}
-                  transition="opacity 120ms ease-out"
+                {/*
+                  Peer cursors render across the entire drawer body —
+                  previously scoped to the viz pane only, which made
+                  peers vanish whenever they hovered out of the
+                  waterfall. The `anchor` keys the shared coordinate
+                  space; everyone looking at the same trace's drawer
+                  body shares one (0..1, 0..1) plane regardless of
+                  which mode (trace / summary / conversation) they're
+                  in. Mounting the overlay here also covers the
+                  ConversationView + Summary surfaces without each
+                  having to wrap themselves.
+                */}
+                <PeerCursorOverlay
+                  anchor={`trace:${trace.traceId}:drawer`}
+                  enabled
+                  containerRef={paneContainerRef}
                 >
-                  <ScenarioRoleProvider
-                    isScenario={
-                      !!(
-                        trace.scenarioRunId ??
-                        trace.attributes["scenario.run_id"]
-                      )
-                    }
+                  {/*
+                  `height="100%"` (not `flex={1}`) because PeerCursorOverlay
+                  wraps its children in a `position: relative` Box that
+                  isn't a flex container, so `flex: 1` is inert here — the
+                  Flex would collapse to content height, which broke the
+                  Summary tab's scroll (content overflowed the clipped
+                  drawer body) and the Trace tab's PanelGroup (percentages
+                  resolved against 0px → rendered empty).
+                */}
+                  <Flex
+                    ref={paneContainerRef}
+                    height="100%"
+                    minHeight={0}
+                    minWidth={0}
+                    direction="column"
+                    position="relative"
+                    bg={{ base: "bg.surface", _dark: "bg.panel" }}
                   >
-                    {viewMode === "conversation" && trace.conversationId ? (
-                      <IsolatedErrorBoundary
-                        scope="Couldn't render conversation view"
-                        resetKeys={[trace.conversationId, trace.traceId]}
-                      >
-                        <Box flex={1} minHeight={0} overflow="auto">
-                          <ConversationView
-                            conversationId={trace.conversationId}
-                            currentTraceId={trace.traceId}
-                          />
-                        </Box>
-                      </IsolatedErrorBoundary>
-                    ) : (
-                      <PaneLayout
-                        trace={trace}
-                        spans={spanTree}
-                        selectedSpan={selectedSpan}
-                        spansLoading={spanTreeQuery.isLoading}
-                        layout={layout}
-                      />
-                    )}
-                  </ScenarioRoleProvider>
-                </Flex>
+                    <ScenarioRoleProvider
+                      isScenario={
+                        !!(
+                          trace.scenarioRunId ??
+                          trace.attributes["scenario.run_id"]
+                        )
+                      }
+                    >
+                      {viewMode === "conversation" && trace.conversationId ? (
+                        <IsolatedErrorBoundary
+                          scope="Couldn't render conversation view"
+                          resetKeys={[trace.conversationId, trace.traceId]}
+                        >
+                          <Box flex={1} minHeight={0} overflow="auto">
+                            <ConversationView
+                              conversationId={trace.conversationId}
+                              currentTraceId={trace.traceId}
+                            />
+                          </Box>
+                        </IsolatedErrorBoundary>
+                      ) : viewMode === "summary" ? (
+                        // Summary mode shows the same conversation-context
+                        // strip the Trace view renders (via PaneLayout) so
+                        // multi-turn context isn't lost when reading the
+                        // summary. Same store-backed collapse state, so
+                        // collapsing it in one view collapses it in both.
+                        // Summary mode: render the trace-scope accordion stack
+                        // full-bleed (I/O, metadata, evals, events, exceptions
+                        // — whatever the current `TraceSummaryAccordions`
+                        // composes for `activeTab="summary"`). Reuses the
+                        // existing TraceAccordions surface so all the focus
+                        // behaviour (header-chip jumps, exception pulses) keeps
+                        // working without a parallel implementation.
+                        <IsolatedErrorBoundary
+                          scope="Couldn't render trace summary"
+                          resetKeys={[trace.traceId]}
+                        >
+                          {trace.conversationId && (
+                            <IsolatedErrorBoundary
+                              scope="Couldn't render conversation context"
+                              resetKeys={[trace.conversationId, trace.traceId]}
+                            >
+                              {/* ConversationContext's root is height=100%
+                                  (sized by PaneLayout's resizable Panel in
+                                  Trace view). Here it sits in a plain flex
+                                  column, where 100% would claim the whole
+                                  drawer and crush the accordions below —
+                                  the wrapper gives it a natural-height,
+                                  capped, scrollable slot instead. */}
+                              <Box
+                                flexShrink={0}
+                                maxHeight="48%"
+                                overflow="auto"
+                              >
+                                <ConversationContext
+                                  conversationId={trace.conversationId}
+                                  traceId={trace.traceId}
+                                  collapsed={ctxPaneState.collapsed}
+                                  onToggleCollapsed={() =>
+                                    togglePaneCollapsed("conversationContext")
+                                  }
+                                />
+                              </Box>
+                            </IsolatedErrorBoundary>
+                          )}
+                          <Box flex={1} minHeight={0} overflow="auto">
+                            <TraceAccordions
+                              trace={trace}
+                              spans={spanTree}
+                              selectedSpan={null}
+                              activeTab="summary"
+                            />
+                          </Box>
+                        </IsolatedErrorBoundary>
+                      ) : (
+                        <PaneLayout
+                          trace={trace}
+                          spans={spanTree}
+                          selectedSpan={selectedSpan}
+                          isSpansLoading={spanTreeQuery.isLoading}
+                          layout={layout}
+                        />
+                      )}
+                    </ScenarioRoleProvider>
+                    {trace.redactedByVisibilityWindow ? (
+                      <BlurredContentGate />
+                    ) : null}
+                  </Flex>
+                </PeerCursorOverlay>
               </>
             )}
           </Drawer.Body>
@@ -269,6 +363,10 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
         open={shortcutsOpen}
         onClose={() => setShortcutsOpen(false)}
       />
+      {/* Show-once feature spotlights — only meaningful once a trace has
+          rendered (the anchors live in the drawer body). Keyed reads via
+          the traceId prop so the queue re-evaluates per trace. */}
+      {trace ? <DrawerSpotlights traceId={trace.traceId} /> : null}
     </Drawer.Root>
   );
 }

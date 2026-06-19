@@ -19,7 +19,7 @@ import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { getApp } from "~/server/app-layer/app";
-import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.generated";
+import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
 import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -567,8 +567,9 @@ export async function* runOrchestrator(
     "Starting orchestrator",
   );
 
-  // Set running flag
-  await abortManager.setRunning(runId);
+  // Set running flag + record the owner so abort can authorize this run even
+  // on the interactive SSE path, which never creates a polling run-state record.
+  await abortManager.setRunning(runId, projectId);
 
   // Get commands for ClickHouse dual-write (unconditional)
   const commands = getApp().experimentRuns;

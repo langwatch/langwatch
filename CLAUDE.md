@@ -13,6 +13,8 @@ cat specs/foo/bar.feature    # Read the scenarios
 
 If no feature file exists for your task, create one before writing code.
 
+**For frontend work, read the UX docs first.** Before any non-trivial frontend change (anything beyond a specific, targeted tweak the user spelled out), read the relevant pattern docs under `dev/docs/best_practices/` so you extend existing patterns instead of reinventing them. The UI ones: `react.md`, `drawers.md`, `row-actions-overflow-menu.md`, `selection-action-bar.md`, `scope-selector-and-badges.md`. If the surface you are building has no doc yet, write one as part of the change.
+
 ## Development Environment
 
 `make quickstart` is the single entry point. It asks what you're working on and starts only the services you need, overriding only the URLs whose services are local. Your `langwatch/.env` is the source of truth for everything else.
@@ -20,7 +22,7 @@ If no feature file exists for your task, create one before writing code.
 ```bash
 make quickstart                        # Interactive preset picker
 make quickstart all-local              # Local CH + PG + Redis + app + workers, no NLP (fast iteration default)
-make quickstart all-local-nlp          # all-local + langwatch_nlp + langevals
+make quickstart all-local-nlp          # all-local + nlpgo + langevals
 make quickstart dev-storage            # Local DBs + workers, stored-objects -> dev S3 (runtime-storage-dev)
 make quickstart dev-infra              # Local app + redis + workers compose; shared dev for PG/CH/NLP/S3
 make quickstart frontend-only          # No compose, fastest — UI / design work
@@ -41,6 +43,8 @@ Stateful services (`langwatch-db-data`, `langwatch-clickhouse-data`, `langwatch-
 For per-PR / per-issue cloud environments via boxd, see `dev/docs/boxd-makefile.md` and `make boxd-help`.
 
 See `dev/docs/adr/004-docker-dev-environment.md` for architecture decisions.
+
+**Running the app outside Docker (the default for TS work):** just run `pnpm dev` from `langwatch/` (or `PORT=5570 pnpm dev` for a second instance). You never need to hunt processes by hand. If the ports are already held, `check-ports.sh` refuses to start and prints two ready-to-paste options: a free-port-slot command (`PORT=5570 pnpm dev`), and a one-liner that kills only the node processes holding those exact ports by process group (Docker and everything else are left alone). Paste whichever fits. Do not reinvent process-tree walking, `pkill -f`, or pgid hunting; the script already does it correctly and port-scoped.
 
 ### AI Gateway (Go, services/aigateway/)
 
@@ -65,6 +69,21 @@ control-plane both source the same `.env`, so each secret lives in
 exactly one place (no prefix duplication). Set
 `FEATURE_FLAG_FORCE_ENABLE=release_ui_ai_gateway_menu_enabled` to unhide the UI.
 
+### NLP Engine (Go, services/nlpgo/)
+
+`nlpgo` is the Go NLP engine that runs optimization-studio executions and
+evaluators. `pnpm dev` auto-starts it alongside vite + api when the Go toolchain
+is on PATH; the process appears as `nlpgo` in the concurrent output. It binds the
+port the app dials via `LANGWATCH_NLP_SERVICE` (default `:5561`, otherwise PORT+1)
+and reuses an existing listener if another worktree already booted one. When
+`LANGWATCH_NLP_SERVICE` points at an external host, no local engine is started.
+Set `LANGWATCH_SKIP_NLP=1` to opt out. To run it standalone:
+
+```bash
+make service svc=nlpgo       # run once
+make service-watch svc=nlpgo # live reload via air
+```
+
 ## Commands
 
 Inside langwatch/
@@ -82,8 +101,8 @@ When debugging locally, `pnpm dev` may tee output to `langwatch/server.log` — 
 
 ```
 langwatch/           # Next.js app (main product)
-langwatch_nlp/       # Python NLP service
 langwatch_server/    # Python server
+services/nlpgo/      # Go NLP engine (:5561, built as langwatch/langwatch_nlp)
 services/aigateway/  # Go AI Gateway data plane (:5563)
 charts/gateway/      # Helm sub-chart for the gateway
 python-sdk/          # Python SDK
@@ -103,6 +122,8 @@ specs/               # BDD feature specs
 | Common Mistake | Correct Behavior |
 |----------------|------------------|
 | Building from scratch without checking existing code | Search the codebase first - follow existing patterns, extend existing systems, reuse existing abstractions |
+| Building settings UI without reading the UX guidelines | Read `dev/docs/best_practices/` first (`scope-selector-and-badges.md`, `drawers.md`, `row-actions-overflow-menu.md`, `scoped-resources.md`). Scope selection ALWAYS uses `ScopeChipPicker` (multi-scope, `personalScopes` for personal-project variants), never a hand-rolled Select |
+| Exposing internal technical details in user-facing copy ("in-process", "uses the analysis service") | Read `dev/docs/best_practices/copywriting.md`. Copy says what the feature does for the customer, never how it is built; descriptions stay short, full lists go in a `(?)` tooltip pinned to the code by a test |
 | Implementing without checking feature files | Check `specs/` for existing feature files first - they ARE the requirements. If none exists, create one before coding |
 | Using "should" in test descriptions | Use action-based descriptions: `it("checks local first")` not `it("should check local first")` |
 | Describe blocks without "when" context | Inner describe blocks must use "when" conditions: `describe("when user clicks submit", () => ...)` not `describe("submit behavior", ...)` |

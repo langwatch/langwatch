@@ -1,8 +1,5 @@
 import type React from "react";
-import { useMemo } from "react";
 import { useCodegen } from "../../../regions/observability/codegen";
-import { generateLLMIntegrationPrompt } from "../../../regions/observability/codegen/llm-integration";
-import { getRegistryEntry } from "../../../regions/observability/codegen/registry";
 import type {
   FrameworkKey,
   PlatformKey,
@@ -19,21 +16,6 @@ export function FrameworkIntegrationCode({
   languageIconUrl?: string;
 }): React.ReactElement | null {
   const codegenResult = useCodegen(platform, framework);
-
-  const llmPrompt = useMemo(() => {
-    if (!codegenResult) return void 0;
-
-    const registryEntry = getRegistryEntry(platform, framework);
-    if (!registryEntry) return void 0;
-
-    return generateLLMIntegrationPrompt({
-      frameworkLabel: registryEntry.label,
-      install: registryEntry.install,
-      docs: registryEntry.docs,
-      code: codegenResult.code,
-      codeLanguage: codegenResult.codeLanguage,
-    });
-  }, [platform, framework, codegenResult]);
 
   if (!codegenResult) {
     console.error(
@@ -54,7 +36,6 @@ export function FrameworkIntegrationCode({
       codeLanguage={codeLanguage}
       highlightLines={highlightLines}
       languageIconUrl={languageIconUrl}
-      llmPrompt={llmPrompt}
     />
   );
 }

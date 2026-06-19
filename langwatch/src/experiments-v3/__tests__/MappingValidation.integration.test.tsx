@@ -26,6 +26,7 @@ vi.mock("../hooks/useTargetName", () => ({
 vi.mock("../hooks/useEvaluatorName", () => ({
   useEvaluatorName: () => "Exact Match",
   useEvaluatorNames: () => new Map(),
+  useCodeEvaluatorIds: () => new Set(),
 }));
 
 import { TargetHeader } from "../components/TargetSection/TargetHeader";
@@ -1382,10 +1383,10 @@ describe("Evaluator validation with required/optional fields", () => {
   const targetId = "target-1";
 
   it("marks evaluator as valid when all required fields are mapped", () => {
-    // langevals/llm_answer_match has requiredFields: ["output", "expected_output"], optionalFields: ["input"]
+    // legacy/ragas_answer_correctness has requiredFields: ["output", "expected_output"], optionalFields: ["input"]
     const evaluator = createTestEvaluator(
       "eval-1",
-      "langevals/llm_answer_match",
+      "legacy/ragas_answer_correctness",
       [
         { identifier: "output", type: "str" },
         { identifier: "expected_output", type: "str" },
@@ -1423,10 +1424,10 @@ describe("Evaluator validation with required/optional fields", () => {
   });
 
   it("marks evaluator as invalid when required field is missing", () => {
-    // langevals/llm_answer_match has requiredFields: ["output", "expected_output"]
+    // legacy/ragas_answer_correctness has requiredFields: ["output", "expected_output"]
     const evaluator = createTestEvaluator(
       "eval-1",
-      "langevals/llm_answer_match",
+      "legacy/ragas_answer_correctness",
       [
         { identifier: "output", type: "str" },
         { identifier: "expected_output", type: "str" },

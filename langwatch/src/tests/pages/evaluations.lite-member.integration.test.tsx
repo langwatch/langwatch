@@ -6,8 +6,9 @@
  * Verifies that delete and replicate menu items are gated behind
  * the `evaluations:manage` permission for lite members.
  */
-import { cleanup, render, screen } from "@testing-library/react";
+
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -157,21 +158,15 @@ vi.mock("~/components/ui/layouts/PageLayout", () => ({
     Container: ({ children }: { children?: ReactNode }) => (
       <div>{children}</div>
     ),
-    Content: ({ children }: { children?: ReactNode }) => (
-      <div>{children}</div>
-    ),
+    Content: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   },
 }));
 
 vi.mock("~/components/ui/menu", () => ({
   Menu: {
     Root: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-    Trigger: ({ children }: { children?: ReactNode }) => (
-      <div>{children}</div>
-    ),
-    Content: ({ children }: { children?: ReactNode }) => (
-      <div>{children}</div>
-    ),
+    Trigger: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+    Content: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
     Item: ({
       children,
       ...props
@@ -198,18 +193,15 @@ vi.mock("~/components/ui/link", () => ({
   ),
 }));
 
-vi.mock(
-  "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore",
-  () => ({
-    TASK_TYPES: {
-      real_time: "real_time",
-      llm_app: "llm_app",
-      prompt_creation: "prompt_creation",
-      custom_evaluator: "custom_evaluator",
-      scan: "scan",
-    },
-  }),
-);
+vi.mock("~/server/experiments/workbenchState", () => ({
+  TASK_TYPES: {
+    real_time: "real_time",
+    llm_app: "llm_app",
+    prompt_creation: "prompt_creation",
+    custom_evaluator: "custom_evaluator",
+    scan: "scan",
+  },
+}));
 
 vi.mock(
   "~/components/experiments/BatchEvaluationV2/BatchEvaluationSummary",
@@ -281,9 +273,7 @@ describe("Evaluations page permission visibility", () => {
     it("displays the replicate menu item", () => {
       renderPage();
 
-      expect(
-        screen.getByText("Replicate to another project"),
-      ).toBeTruthy();
+      expect(screen.getByText("Replicate to another project")).toBeTruthy();
     });
   });
 
@@ -303,9 +293,7 @@ describe("Evaluations page permission visibility", () => {
     it("hides the replicate menu item", () => {
       renderPage();
 
-      expect(
-        screen.queryByText("Replicate to another project"),
-      ).toBeNull();
+      expect(screen.queryByText("Replicate to another project")).toBeNull();
     });
   });
 });

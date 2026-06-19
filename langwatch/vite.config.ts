@@ -149,6 +149,22 @@ export default defineConfig({
     "process.env.VERCEL": "undefined",
     "process.env.VERCEL_URL": "undefined",
   },
+  optimizeDeps: {
+    // DEV-ONLY: optimizeDeps never touches the production build (prod bundles
+    // Shiki via the manualChunks rule below). Pre-bundle the whole Shiki
+    // ecosystem at dev-server start so the server doesn't discover Shiki's
+    // Oniguruma WASM engine + langs/themes lazily on the first /traces
+    // navigation and re-optimize mid-session. That re-optimization invalidates
+    // the in-flight `.vite/deps/wasm-*.js` (onig.wasm, ~620KB) request the span
+    // highlighter awaits, leaving the trace drawer stuck on "loading spans".
+    include: [
+      "shiki",
+      "@shikijs/core",
+      "@shikijs/engine-oniguruma",
+      "@shikijs/langs",
+      "@shikijs/themes",
+    ],
+  },
   build: {
     outDir: "dist/client",
     sourcemap: true,

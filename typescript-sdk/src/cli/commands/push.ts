@@ -11,7 +11,11 @@ import {
   PromptsError,
   type SyncAction,
 } from "@/client-sdk/services/prompts";
-import type { PromptsConfig, PromptsLock, SyncResult } from "../types";
+import type {
+  PromptsConfig,
+  PromptsLock,
+  SyncResult,
+} from "../types";
 import { FileManager } from "../utils/fileManager";
 import { ensureProjectInitialized } from "../utils/init";
 import { checkApiKey } from "../utils/apiKey";
@@ -141,6 +145,7 @@ export const pushPrompts = async ({
         const syncResult = await promptsApiService.sync({
           name: promptName,
           configData,
+          parameters: localConfig.parameters ?? {},
           localVersion: currentVersion,
           commitMessage: `Synced from local file: ${path.basename(filePath)}`,
         });
@@ -164,7 +169,9 @@ export const pushPrompts = async ({
           }
 
           if (conflictResolution === "remote" && syncResult.conflictInfo) {
-            const remoteConfig = {
+            const remoteParameters =
+              syncResult.conflictInfo.remoteParameters ?? {};
+            const remotePrompt = {
               model: syncResult.conflictInfo.remoteConfigData.model,
               modelParameters: {
                 temperature:
@@ -179,9 +186,15 @@ export const pushPrompts = async ({
                 },
                 ...(syncResult.conflictInfo.remoteConfigData.messages ?? []),
               ],
+              // Only write `parameters` when present, matching
+              // PromptConverter.fromMaterializedToYaml — avoids writing an
+              // empty `parameters: {}` into prompt files that have none.
+              ...(Object.keys(remoteParameters).length > 0
+                ? { parameters: remoteParameters }
+                : {}),
             };
 
-            const yamlContent = yaml.dump(remoteConfig, {
+            const yamlContent = yaml.dump(remotePrompt, {
               lineWidth: -1,
               noRefs: true,
               sortKeys: false,

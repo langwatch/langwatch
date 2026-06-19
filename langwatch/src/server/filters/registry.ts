@@ -6,8 +6,8 @@ import type {
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
-} from "../../server/evaluations/evaluators.generated";
-import { reservedTraceMetadataSchema } from "../tracer/types.generated";
+} from "../../server/evaluations/evaluators";
+import { reservedTraceMetadataSchema } from "../tracer/types";
 
 import type { FilterDefinition, FilterField } from "./types";
 

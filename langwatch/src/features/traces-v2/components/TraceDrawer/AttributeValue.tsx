@@ -1,6 +1,7 @@
 import {
   Box,
   Button,
+  chakra,
   HStack,
   Icon,
   IconButton,
@@ -11,6 +12,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   LuBot,
   LuCheck,
+  LuChevronRight,
   LuCode,
   LuCopy,
   LuMessageCircle,
@@ -72,51 +74,77 @@ export function AttributeValue({ attrKey, value }: AttributeValueProps) {
   }
 
   return (
-    <HStack flex={1} minWidth={0} paddingX={3} paddingY={1} gap={2}>
-      <FormatPill format={detected} />
-      <Popover.Root positioning={{ placement: "right-start" }}>
-        <Popover.Trigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            size="2xs"
-            display="flex"
-            alignItems="center"
-            justifyContent="flex-start"
-            gap={2}
-            flex={1}
-            minWidth={0}
-            paddingX={1}
-            color="fg"
-            fontWeight="normal"
-            _hover={{ color: "blue.fg", bg: "transparent" }}
-          >
+    // The trigger is the whole row — left-aligned preview + format
+    // glyph + size hint + chevron. Hovering tints the row so the
+    // affordance reads as a clickable card rather than as a button
+    // glued to a sibling pill (the previous design's "[CHAT pill] +
+    // [button]" layout had two visually distinct halves and didn't
+    // make it obvious you could click anywhere on the row to expand).
+    <Popover.Root
+      positioning={{ placement: "right-start" }}
+      lazyMount
+      unmountOnExit
+    >
+      <Popover.Trigger asChild>
+        <chakra.button
+          type="button"
+          display="flex"
+          alignItems="center"
+          gap={2}
+          flex={1}
+          minWidth={0}
+          paddingX={2}
+          paddingY={1}
+          borderRadius="sm"
+          cursor="pointer"
+          textAlign="left"
+          color="fg"
+          bg="transparent"
+          transition="background 100ms ease, color 100ms ease"
+          _hover={{ bg: "bg.muted", color: "fg" }}
+          _focusVisible={{
+            outline: "2px solid",
+            outlineColor: "blue.focusRing",
+            outlineOffset: "1px",
+          }}
+        >
+          <FormatGlyph format={detected} />
+          <Text textStyle="xs" fontFamily="mono" truncate minWidth={0} flex={1}>
+            {inline.text}
+          </Text>
+          {inline.hint && (
             <Text
-              textStyle="xs"
+              textStyle="2xs"
+              color="fg.subtle"
               fontFamily="mono"
-              truncate
-              minWidth={0}
-              flex={1}
+              flexShrink={0}
             >
-              {inline.text}
+              {inline.hint}
             </Text>
-            {inline.hint && (
-              <Text
-                textStyle="2xs"
-                color="fg.subtle"
-                fontFamily="mono"
-                flexShrink={0}
-              >
-                {inline.hint}
-              </Text>
-            )}
-          </Button>
-        </Popover.Trigger>
-        <Popover.Content maxWidth="520px" minWidth="360px">
-          <Popover.Arrow />
-          <Popover.Body>
-            <VStack align="stretch" gap={2}>
-              <HStack justify="space-between" align="center" gap={2}>
+          )}
+          <Icon
+            as={LuChevronRight}
+            boxSize={3}
+            color="fg.subtle"
+            flexShrink={0}
+          />
+        </chakra.button>
+      </Popover.Trigger>
+      <Popover.Content maxWidth="560px" minWidth="360px">
+        <Popover.Arrow />
+        <Popover.Body padding={0}>
+          <VStack align="stretch" gap={0}>
+            <HStack
+              justify="space-between"
+              align="center"
+              gap={2}
+              paddingX={3}
+              paddingY={2}
+              borderBottomWidth="1px"
+              borderBottomColor="border.subtle"
+            >
+              <HStack gap={2} minWidth={0} flex={1}>
+                <FormatGlyph format={detected} />
                 <Text
                   textStyle="2xs"
                   color="fg.muted"
@@ -126,25 +154,27 @@ export function AttributeValue({ attrKey, value }: AttributeValueProps) {
                 >
                   {attrKey}
                 </Text>
-                <CopyButton payload={raw} />
               </HStack>
+              <CopyButton payload={raw} />
+            </HStack>
+            <Box paddingX={3} paddingY={2}>
               <FormatToggle active={active} onChange={setOverride} />
-              <Box
-                bg="bg.subtle"
-                borderWidth="1px"
-                borderColor="border.muted"
-                borderRadius="md"
-                padding={2}
-                maxHeight="320px"
-                overflow="auto"
-              >
-                <FormatBody value={value} format={active} raw={raw} />
-              </Box>
-            </VStack>
-          </Popover.Body>
-        </Popover.Content>
-      </Popover.Root>
-    </HStack>
+            </Box>
+            <Box
+              bg="bg.subtle"
+              borderTopWidth="1px"
+              borderTopColor="border.subtle"
+              paddingX={3}
+              paddingY={2}
+              maxHeight="360px"
+              overflow="auto"
+            >
+              <FormatBody value={value} format={active} raw={raw} />
+            </Box>
+          </VStack>
+        </Popover.Body>
+      </Popover.Content>
+    </Popover.Root>
   );
 }
 
@@ -158,33 +188,35 @@ const FORMAT_VISUALS: Record<
   text: { label: "text", icon: LuType, tone: "gray" },
 };
 
-function FormatPill({ format }: { format: Exclude<AttributeFormat, "leaf"> }) {
+/**
+ * Format indicator — small tinted icon at the leading edge of the
+ * trigger / popover header. Replaces the previous "PILL with text"
+ * treatment which doubled up on the format toggle inside the popover
+ * and ate horizontal room in narrow drawer columns. The icon alone
+ * is enough to telegraph chat / json / text at a glance; the toggle
+ * still spells the word out for users who'd rather read it.
+ */
+function FormatGlyph({ format }: { format: Exclude<AttributeFormat, "leaf"> }) {
   const v = FORMAT_VISUALS[format];
   return (
     <Tooltip
       content={`Detected format: ${v.label}`}
       positioning={{ placement: "top" }}
     >
-      <HStack
-        gap={1}
-        paddingX={1.5}
-        paddingY={0.5}
+      <Box
+        display="inline-flex"
+        alignItems="center"
+        justifyContent="center"
+        width="18px"
+        height="18px"
         borderRadius="sm"
         bg={`${v.tone}.subtle`}
         color={`${v.tone}.fg`}
         flexShrink={0}
         aria-label={`Detected format: ${v.label}`}
       >
-        <Icon as={v.icon} boxSize={2.5} />
-        <Text
-          textStyle="2xs"
-          fontWeight="600"
-          textTransform="uppercase"
-          letterSpacing="0.06em"
-        >
-          {v.label}
-        </Text>
-      </HStack>
+        <Icon as={v.icon} boxSize={3} />
+      </Box>
     </Tooltip>
   );
 }

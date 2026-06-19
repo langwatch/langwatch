@@ -85,8 +85,7 @@ type JobType =
   | "usage_reporting"
   | "event_sourcing"
   | "scenario"
-  | "anomaly_detection"
-  | "orphan_sweep_chain";
+  | "anomaly_detection";
 
 type JobStatus = "processing" | "completed" | "failed";
 
@@ -122,6 +121,21 @@ export const workerRestartsCounter = new Counter({
   name: "worker_restarts",
   help: "Number of times the worker has been restarted",
 });
+
+// ADR-022: edge-spool fail-open counter. The edge spool falls back to
+// unmodified command data when the feature-flag store or S3 errors, so
+// ingestion is never blocked. A healthy fleet emits this at ~zero rate;
+// sustained increments (esp. reason="spool") indicate an S3 outage worth
+// alerting on without grepping warn logs.
+register.removeSingleMetric("langwatch_edge_spool_fail_open_total");
+const edgeSpoolFailOpenCounter = new Counter({
+  name: "langwatch_edge_spool_fail_open_total",
+  help: "Count of ADR-022 edge-spool fail-open events by failing stage",
+  labelNames: ["reason"] as const,
+});
+
+export const getEdgeSpoolFailOpenCounter = (reason: "flag_store" | "spool") =>
+  edgeSpoolFailOpenCounter.labels(reason);
 
 // Online-evaluator loop guard counter (post-2026-05-11 incident). A healthy
 // fleet emits this at ~zero rate. Sustained increments indicate either
@@ -276,6 +290,8 @@ export const eventSourcingStoreDurationHistogram = new Histogram({
 // ============================================================================
 
 type ESStatus = "completed" | "failed";
+/** Reactors additionally skip pre-enqueue when shouldReact returns false. */
+type ReactorStatus = ESStatus | "skipped";
 
 // --- Command metrics ---
 register.removeSingleMetric("es_command_total");
@@ -378,7 +394,7 @@ const esReactorTotal = new Counter({
 export const incrementEsReactorTotal = (
   pipelineName: string,
   reactorName: string,
-  status: ESStatus,
+  status: ReactorStatus,
 ) => esReactorTotal.labels(pipelineName, reactorName, status).inc();
 
 register.removeSingleMetric("es_reactor_duration_milliseconds");
@@ -542,26 +558,4 @@ export async function withMetrics<T>({
     onFail(performance.now() - start);
     throw error;
   }
-}
-
-// --- Data Retention Metrics ---
-//
-// We deliberately do NOT expose tenant-cardinality gauges for retention
-// lag or per-mutation progress on the Prometheus side. Following the same
-// rule as evaluatorLoopBlockedCounter above (post-2026-05-11 incident):
-// per-tenant attribution lives in structured logs, not as Prometheus
-// labels — one series per tenant per table would balloon cardinality on
-// a multi-thousand-tenant fleet. If/when an operator dashboard needs
-// fleet-wide retention health, add it as a label-free aggregate counter
-// here and log the tenant alongside each emission.
-
-register.removeSingleMetric("data_retention_orphans_swept_total");
-export const dataRetentionOrphansSweptTotal = new Counter({
-  name: "data_retention_orphans_swept_total",
-  help: "Count of PG orphan records cleaned up by retention sweep",
-  labelNames: ["model"] as const,
-});
-
-export function incrementOrphansSwept(model: string, count: number): void {
-  dataRetentionOrphansSweptTotal.inc({ model }, count);
 }

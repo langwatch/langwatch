@@ -2,7 +2,7 @@ import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
 import type { Prisma, PrismaClient, WorkflowVersion } from "@prisma/client";
 import type { JsonValue } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
-import { generateText, tool } from "ai";
+import { generateText } from "ai";
 import { createPatch } from "diff";
 import { nanoid } from "nanoid";
 import type { Session } from "~/server/auth";
@@ -23,7 +23,6 @@ import { enforceLicenseLimit } from "../../license-enforcement";
 import { wrapAiCall } from "../../modelProviders/aiCallFailedError";
 import { featureByKey } from "../../modelProviders/featureRegistry";
 import { getVercelAIModel } from "../../modelProviders/utils";
-import { isNlpGoEnabled } from "../../nlpgo/nlpgoFetch";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { fireWorkflowCreatedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
@@ -35,19 +34,18 @@ const autoComputeLogger = createLogger("langwatch:workflows:auto-compute");
 
 export const workflowRouter = createTRPCRouter({
   // Returns which NLP engine is active for the current project. Used by the
-  // Studio UI to hide the (now-defunct) Optimize button when the project is
-  // routed to the Go engine: optimization was DSPy-only, and the Go engine
-  // does not include DSPy. The UI rendering the button is the only place
-  // that needs this; the studio websocket handlers also enforce the kill
-  // server-side. See specs/nlp-go/feature-flag.feature.
+  // Studio UI reads this to hide the (now-defunct) Optimize button.
+  // Optimization was DSPy-only and the Go engine never included DSPy, so
+  // with nlpgo the only engine the button is always hidden. Kept as a
+  // procedure (rather than a UI constant) so the studio handlers and the
+  // UI agree on one source of truth.
   engineMode: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("workflows:view"))
-    .query(async ({ input }) => {
-      const goEnabled = await isNlpGoEnabled({ projectId: input.projectId });
+    .query(() => {
       return {
-        engineMode: goEnabled ? ("go" as const) : ("python" as const),
-        optimizeEnabled: !goEnabled,
+        engineMode: "go" as const,
+        optimizeEnabled: false,
       };
     }),
 
@@ -1083,7 +1081,7 @@ export const workflowRouter = createTRPCRouter({
         });
       }
       const commitMessage = await wrapAiCall(commitFeature, async () => generateText({
-        model: await getVercelAIModel(input.projectId, undefined, "workflows.commit_message"),
+        model: await getVercelAIModel({ projectId: input.projectId, featureKey: "workflows.commit_message" }),
         providerOptions: {
           openai: {
             reasoningEffort: "low",
@@ -1120,30 +1118,18 @@ ${diff}
             `,
           },
         ],
-        tools: {
-          commitMessage: tool({
-            inputSchema: z.object({
-              message: z.string(),
-            }),
-            outputSchema: z.string(),
-            execute: async ({ message }) => {
-              return message;
-            },
-          }),
-        },
-        toolChoice: {
-          type: "tool",
-          toolName: "commitMessage",
-        },
       }));
 
-      const result = commitMessage.toolResults?.find(
-        (t) => t.toolName === "commitMessage",
-      )?.output;
+      // A commit message is one short string: a plain-text completion, not a
+      // function-tool round-trip. Function tools combined with reasoning_effort
+      // are rejected on /v1/chat/completions for the gpt-5 family (the provider
+      // asks for /v1/responses), and these model calls go through the
+      // OpenAI-compatible chat-completions proxy. Generating text directly
+      // sidesteps that incompatibility and behaves the same across providers.
 
       // TODO: save call costs to user account
 
-      return result;
+      return commitMessage.text.trim();
     }),
 });
 

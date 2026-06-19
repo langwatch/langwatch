@@ -21,6 +21,10 @@ export const createSuiteSchema = projectSchema.extend({
     .min(1, "At least one target is required"),
   repeatCount: z.number().int().min(1).max(100).default(1),
   labels: z.array(z.string()).default([]),
+  // Run-plan-wide model overrides; null = use the project default
+  // (scenarios.user_simulator / scenarios.judge).
+  simulatorModel: z.string().nullish(),
+  judgeModel: z.string().nullish(),
 });
 
 export const updateSuiteSchema = projectSchema.extend({
@@ -31,4 +35,6 @@ export const updateSuiteSchema = projectSchema.extend({
   targets: z.array(suiteTargetSchema).min(1).optional(),
   repeatCount: z.number().int().min(1).max(100).optional(),
   labels: z.array(z.string()).optional(),
+  simulatorModel: z.string().nullish(),
+  judgeModel: z.string().nullish(),
 });

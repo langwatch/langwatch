@@ -205,6 +205,7 @@ class PromptsFacade:
         inputs: Optional[List[InputDict]] = None,
         outputs: Optional[List[OutputDict]] = None,
         tags: Optional[List[str]] = None,
+        parameters: Optional[Dict[str, Any]] = None,
     ) -> Prompt:
         """
         Create a new prompt via API.
@@ -217,6 +218,7 @@ class PromptsFacade:
             messages: List of message dicts with 'role' and 'content' keys
             inputs: List of input dicts with 'identifier' and 'type' keys
             outputs: List of output dicts with 'identifier', 'type', and optional 'json_schema' keys
+            parameters: Arbitrary runtime parameters stored with the prompt version
 
         Returns:
             Prompt object containing the created prompt data
@@ -230,6 +232,7 @@ class PromptsFacade:
             inputs=inputs,
             outputs=outputs,
             tags=tags,
+            parameters=parameters,
         )
         return Prompt(data)
 
@@ -243,6 +246,7 @@ class PromptsFacade:
         inputs: Optional[List[InputDict]] = None,
         outputs: Optional[List[OutputDict]] = None,
         tags: Optional[List[str]] = None,
+        parameters: Optional[Dict[str, Any]] = None,
         *,
         commit_message: str = "",
     ) -> Prompt:
@@ -257,6 +261,7 @@ class PromptsFacade:
             messages: New list of message dicts
             inputs: New list of input dicts
             outputs: New list of output dicts
+            parameters: Arbitrary runtime parameters stored with the new prompt version
 
         Returns:
             Prompt object containing the updated prompt data
@@ -271,6 +276,7 @@ class PromptsFacade:
             inputs=inputs,
             outputs=outputs,
             tags=tags,
+            parameters=parameters,
         )
         return Prompt(data)
 

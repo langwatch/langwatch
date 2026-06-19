@@ -1,5 +1,28 @@
 import { Prisma, RoleBindingScopeType, TeamUserRole, type PrismaClient } from "@prisma/client";
 import { NotFoundError, ValidationError } from "~/server/app-layer/domain-error";
+import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
+import type {
+  RoleBindingRepository,
+  TeamScopedMemberBinding,
+} from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
+
+// When a user holds multiple bindings on one team, the most privileged is the
+// one the settings page displays (and the binding team.update edits).
+export const TEAM_ROLE_PRIORITY: Record<TeamUserRole, number> = {
+  [TeamUserRole.ADMIN]: 0,
+  [TeamUserRole.MEMBER]: 1,
+  [TeamUserRole.VIEWER]: 2,
+  [TeamUserRole.CUSTOM]: 3,
+};
+
+// Ascending, nulls last — matches Postgres `ORDER BY col ASC` (the ordering the
+// previous Prisma `orderBy` produced before members were resolved in memory).
+function compareNullsLast(a: string | null, b: string | null): number {
+  if (a === b) return 0;
+  if (a === null) return 1;
+  if (b === null) return -1;
+  return a.localeCompare(b);
+}
 
 type TxClient = Prisma.TransactionClient;
 
@@ -64,7 +87,180 @@ async function isUserAdminViaGroup(
 }
 
 export class TeamService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    // Constructed once and reused across reads; the default keeps existing
+    // `new TeamService(prisma)` call sites working while allowing injection.
+    private readonly roleBindingRepo: RoleBindingRepository = new PrismaRoleBindingRepository(
+      prisma,
+    ),
+  ) {}
+
+  /**
+   * Shape TEAM-scoped RoleBindings into the legacy `team.members` (TeamUser)
+   * form so callers render members the same way regardless of when membership
+   * was created.
+   *
+   * RoleBindings are the authoritative membership source since migration
+   * 20260407120000_migrate_team_users_to_role_bindings (which backfilled
+   * existing TeamUser rows and stopped dual-writing to them). Reading the
+   * legacy TeamUser relation omitted anyone added after the migration.
+   *
+   * A user can hold more than one TEAM binding on the same team (the partial
+   * unique indexes allow a built-in role plus a custom role at one scope), so
+   * we collapse to one row per user keeping the highest-privilege binding —
+   * the settings page renders (and its save mutation keys) one row per user.
+   */
+  private shapeTeamMembers(
+    bindings: TeamScopedMemberBinding[],
+    teamId: string,
+  ) {
+    const byUser = new Map<string, TeamScopedMemberBinding>();
+    for (const binding of bindings) {
+      const existing = byUser.get(binding.userId);
+      if (
+        !existing ||
+        TEAM_ROLE_PRIORITY[binding.role] < TEAM_ROLE_PRIORITY[existing.role]
+      ) {
+        byUser.set(binding.userId, binding);
+      }
+    }
+
+    return [...byUser.values()]
+      .map((binding) => ({
+        userId: binding.userId,
+        teamId,
+        role: binding.role,
+        assignedRoleId: binding.customRoleId,
+        assignedRole: binding.customRole,
+        createdAt: binding.createdAt,
+        updatedAt: binding.updatedAt,
+        user: binding.user,
+      }))
+      .sort((a, b) => {
+        const nameCmp = compareNullsLast(a.user.name, b.user.name);
+        if (nameCmp !== 0) return nameCmp;
+        const emailCmp = compareNullsLast(a.user.email, b.user.email);
+        if (emailCmp !== 0) return emailCmp;
+        return a.userId.localeCompare(b.userId);
+      });
+  }
+
+  /**
+   * A single team (by slug) plus its projects and members, for the
+   * team-settings page. Returns `null` when no team matches; the caller maps
+   * null to NOT_FOUND and applies email-privacy redaction (request-scoped).
+   */
+  async getTeamWithMembers({
+    slug,
+    organizationId,
+  }: {
+    slug: string;
+    organizationId: string;
+  }) {
+    const team = await this.prisma.team.findFirst({
+      where: { slug, organizationId },
+      include: {
+        projects: {
+          where: {
+            archivedAt: null,
+            kind: { not: "internal_governance" },
+          },
+        },
+      },
+    });
+
+    if (!team) return null;
+
+    const byTeam = await this.roleBindingRepo.listTeamScopedUserBindingsByTeamIds({
+      organizationId,
+      teamIds: [team.id],
+    });
+
+    return { ...team, members: this.shapeTeamMembers(byTeam.get(team.id) ?? [], team.id) };
+  }
+
+  /**
+   * All non-archived teams in an org, each with projects + members, for member
+   * pickers / drawers / onboarding. `callerHasManage` controls the personal-
+   * workspace privacy floor (non-admins never see others' personal teams).
+   * Email redaction stays in the caller since it's request-scoped.
+   */
+  async getTeamsWithMembers({
+    organizationId,
+    callerId,
+    callerHasManage,
+  }: {
+    organizationId: string;
+    callerId: string;
+    callerHasManage: boolean;
+  }) {
+    const teams = await this.prisma.team.findMany({
+      where: {
+        organizationId,
+        archivedAt: null,
+        ...(callerHasManage
+          ? {}
+          : {
+              OR: [
+                { isPersonal: false },
+                { isPersonal: true, ownerUserId: callerId },
+              ],
+            }),
+      },
+      include: {
+        projects: {
+          where: {
+            archivedAt: null,
+            kind: { not: "internal_governance" },
+          },
+        },
+      },
+    });
+
+    // Single binding query for all teams (no N+1), grouped by teamId.
+    const byTeam = await this.roleBindingRepo.listTeamScopedUserBindingsByTeamIds({
+      organizationId,
+      teamIds: teams.map((team) => team.id),
+    });
+
+    return teams.map((team) => ({
+      ...team,
+      members: this.shapeTeamMembers(byTeam.get(team.id) ?? [], team.id),
+    }));
+  }
+
+  /**
+   * A team looked up by slug, returned only if the user is a direct member —
+   * membership resolved from TEAM-scoped RoleBindings (not the legacy TeamUser
+   * relation, which post-migration members are absent from). Returns `null`
+   * when the team doesn't exist or the user isn't a member.
+   */
+  async getTeamBySlugForUser({
+    slug,
+    organizationId,
+    userId,
+  }: {
+    slug: string;
+    organizationId: string;
+    userId: string;
+  }) {
+    const team = await this.prisma.team.findFirst({
+      where: { slug, organizationId },
+    });
+
+    if (!team) return null;
+
+    const byTeam = await this.roleBindingRepo.listTeamScopedUserBindingsByTeamIds({
+      organizationId,
+      teamIds: [team.id],
+    });
+
+    const isMember = (byTeam.get(team.id) ?? []).some(
+      (binding) => binding.userId === userId,
+    );
+    return isMember ? team : null;
+  }
 
   async getTeamsWithRoleBindings({ organizationId }: { organizationId: string }) {
     const teams = await this.prisma.team.findMany({

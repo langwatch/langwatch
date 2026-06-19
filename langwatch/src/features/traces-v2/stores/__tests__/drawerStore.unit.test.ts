@@ -155,6 +155,36 @@ describe("drawerStore pane controls", () => {
       });
     });
   });
+
+  /** @scenario Span-detail collapse round-trip preserves the selection */
+  describe("given a selected span", () => {
+    describe("when togglePaneCollapsed(spanDetail) fires twice", () => {
+      it("keeps selectedSpanId so re-opening lands on the same span", () => {
+        useDrawerStore.getState().selectSpan("span-abc");
+        expect(useDrawerStore.getState().selectedSpanId).toBe("span-abc");
+        useDrawerStore.getState().togglePaneCollapsed("spanDetail");
+        expect(useDrawerStore.getState().paneState.spanDetail.collapsed).toBe(
+          true,
+        );
+        // Collapse alone must NOT touch the selection.
+        expect(useDrawerStore.getState().selectedSpanId).toBe("span-abc");
+        useDrawerStore.getState().togglePaneCollapsed("spanDetail");
+        expect(useDrawerStore.getState().paneState.spanDetail.collapsed).toBe(
+          false,
+        );
+        expect(useDrawerStore.getState().selectedSpanId).toBe("span-abc");
+      });
+    });
+
+    describe("when clearSpan fires", () => {
+      it("still clears the selection (the explicit close path)", () => {
+        useDrawerStore.getState().selectSpan("span-xyz");
+        expect(useDrawerStore.getState().selectedSpanId).toBe("span-xyz");
+        useDrawerStore.getState().clearSpan();
+        expect(useDrawerStore.getState().selectedSpanId).toBeNull();
+      });
+    });
+  });
 });
 
 // `setWidthPx(null)` after init reads the unwritten storage key as
@@ -197,5 +227,46 @@ describe("drawerStore persistence is idempotent", () => {
     }
     expect(spy).not.toHaveBeenCalled();
     expect(useDrawerStore.getState().widthPx).toBe(549);
+  });
+});
+
+describe("drawerStore.backfillOccurredAtMs", () => {
+  /** @scenario Deep link / refresh opens the drawer without a `t` hint */
+  describe("given the drawer was opened without an occurredAtMs hint", () => {
+    describe("when the resolved header timestamp is backfilled", () => {
+      it("sets occurredAtMs so per-trace reads can prune", () => {
+        useDrawerStore.getState().openTrace("trace-1");
+        expect(useDrawerStore.getState().occurredAtMs).toBeNull();
+
+        useDrawerStore.getState().backfillOccurredAtMs(1_700_000_000_000);
+
+        expect(useDrawerStore.getState().occurredAtMs).toBe(1_700_000_000_000);
+      });
+    });
+  });
+
+  describe("given the drawer already has an occurredAtMs hint", () => {
+    describe("when a backfill is attempted", () => {
+      it("keeps the opener-supplied hint (no overwrite)", () => {
+        useDrawerStore.getState().openTrace("trace-1", 1_700_000_000_000);
+
+        useDrawerStore.getState().backfillOccurredAtMs(1_699_000_000_000);
+
+        expect(useDrawerStore.getState().occurredAtMs).toBe(1_700_000_000_000);
+      });
+    });
+  });
+
+  describe("given an invalid timestamp", () => {
+    describe("when a backfill is attempted", () => {
+      it("leaves occurredAtMs null", () => {
+        useDrawerStore.getState().openTrace("trace-1");
+
+        useDrawerStore.getState().backfillOccurredAtMs(0);
+        useDrawerStore.getState().backfillOccurredAtMs(Number.NaN);
+
+        expect(useDrawerStore.getState().occurredAtMs).toBeNull();
+      });
+    });
   });
 });

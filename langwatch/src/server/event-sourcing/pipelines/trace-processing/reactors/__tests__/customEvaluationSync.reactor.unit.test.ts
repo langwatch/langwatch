@@ -57,6 +57,7 @@ function createFoldState(
     errorMessage: null,
     models: [],
     totalCost: null,
+    nonBilledCost: null,
     tokensEstimated: false,
     totalPromptTokenCount: null,
     totalCompletionTokenCount: null,
@@ -472,6 +473,63 @@ describe("customEvaluationSync reactor", () => {
 
       const call = vi.mocked(deps.reportEvaluation).mock.calls[0]![0];
       expect(call.isGuardrail).toBe(true);
+    });
+  });
+
+  describe("when deciding whether to react", () => {
+    describe("when span carries evaluation events", () => {
+      it("returns true", () => {
+        const reactor = createCustomEvaluationSyncReactor(deps);
+        const span = makeOtlpSpan([{ name: "quality", score: 0.9 }]);
+
+        expect(
+          reactor.shouldReact!(
+            createSpanReceivedEvent(span),
+            createContext(createFoldState()),
+          ),
+        ).toBe(true);
+      });
+    });
+
+    describe("when span has no evaluation events", () => {
+      it("returns false", () => {
+        const reactor = createCustomEvaluationSyncReactor(deps);
+        const span = makeOtlpSpan([]);
+
+        expect(
+          reactor.shouldReact!(
+            createSpanReceivedEvent(span),
+            createContext(createFoldState()),
+          ),
+        ).toBe(false);
+      });
+    });
+
+    describe("when event is not a SpanReceivedEvent", () => {
+      it("returns false", () => {
+        const reactor = createCustomEvaluationSyncReactor(deps);
+
+        expect(
+          reactor.shouldReact!(
+            createNonSpanEvent(),
+            createContext(createFoldState()),
+          ),
+        ).toBe(false);
+      });
+    });
+
+    describe("when event is too old", () => {
+      it("returns false", () => {
+        const reactor = createCustomEvaluationSyncReactor(deps);
+        const span = makeOtlpSpan([{ name: "quality", score: 0.9 }]);
+        const staleEvent = createSpanReceivedEvent(span, {
+          occurredAt: Date.now() - 2 * 60 * 60 * 1000,
+        });
+
+        expect(
+          reactor.shouldReact!(staleEvent, createContext(createFoldState())),
+        ).toBe(false);
+      });
     });
   });
 });

@@ -28,8 +28,7 @@ import { docsUrl } from "~/utils/docsUrl";
  * already has the CLI installed.
  *
  * Pairs with:
- *   - docs/integration/install.mdx (canonical install guide)
- *   - docs/integration/cli.mdx (post-install login flow)
+ *   - docs/integration/cli.mdx (canonical install + login guide)
  *   - typescript-sdk/src/cli (CLI itself)
  *
  * Spec: specs/ai-governance/cli-onboarding/install-cli-card.feature
@@ -116,20 +115,12 @@ export function InstallCliCard({
 
         <HStack gap={2}>
           <Button size="xs" variant="outline" asChild>
-            <Link
-              href={docsUrl("/integration/install")}
-              isExternal
-              gap={1}
-            >
+            <Link href={docsUrl("/integration/cli#install")} isExternal gap={1}>
               Install guide <ExternalLink size={12} />
             </Link>
           </Button>
           <Button size="xs" variant="ghost" asChild>
-            <Link
-              href={docsUrl("/integration/cli")}
-              isExternal
-              gap={1}
-            >
+            <Link href={docsUrl("/integration/cli")} isExternal gap={1}>
               CLI reference <ExternalLink size={12} />
             </Link>
           </Button>
@@ -167,14 +158,28 @@ function CommandRow({
         borderRadius="sm"
         backgroundColor="bg.subtle"
       >
+        {/* "$" is a separate, non-selectable, lighter element so copying the
+            command by hand never picks up the prompt. */}
+        <Text
+          as="span"
+          fontFamily="mono"
+          fontSize="sm"
+          color="fg.muted"
+          userSelect="none"
+          flexShrink={0}
+          aria-hidden="true"
+        >
+          $
+        </Text>
         <Code
           flex={1}
+          minWidth={0}
           backgroundColor="transparent"
           fontSize="sm"
           overflowX="auto"
           whiteSpace="nowrap"
         >
-          $ {command}
+          {command}
         </Code>
         <IconButton
           size="xs"

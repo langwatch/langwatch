@@ -1,5 +1,4 @@
 import {
-  Badge,
   Box,
   Button,
   Heading,
@@ -25,12 +24,23 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, PackageOpen, Plus } from "lucide-react";
+import {
+  GripVertical,
+  MoreVertical,
+  PackageOpen,
+  Pencil,
+  Plus,
+  Power,
+  Trash2,
+} from "lucide-react";
 import type React from "react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
+import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";
 import type { AiToolEntry } from "~/components/me/tiles/types";
 import { Checkbox } from "~/components/ui/checkbox";
+import { Dialog } from "~/components/ui/dialog";
+import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
 import { api } from "~/utils/api";
 
@@ -59,9 +69,23 @@ export function ToolCatalogEditor({
 }: Props) {
   const utils = api.useUtils();
 
+  // Delete is permanent, so it routes through a confirm dialog. `null`
+  // means no pending deletion; a non-null entry is the tile awaiting
+  // confirmation.
+  const [pendingDelete, setPendingDelete] = useState<AiToolEntry | null>(null);
+
   const adminListQuery = api.aiTools.adminList.useQuery(
     { organizationId },
     { enabled: !!organizationId, refetchOnWindowFocus: false },
+  );
+
+  const departmentsQuery = api.departments.list.useQuery(
+    { organizationId },
+    { enabled: !!organizationId, refetchOnWindowFocus: false },
+  );
+  const departmentNameById = useMemo(
+    () => new Map((departmentsQuery.data ?? []).map((d) => [d.id, d.name])),
+    [departmentsQuery.data],
   );
 
   const setEnabledMutation = api.aiTools.setEnabled.useMutation({
@@ -72,6 +96,22 @@ export function ToolCatalogEditor({
     onError: (err) => {
       toaster.create({
         title: "Failed to update tile",
+        description: err.message,
+        type: "error",
+      });
+    },
+  });
+
+  const removeMutation = api.aiTools.remove.useMutation({
+    onSuccess: () => {
+      void utils.aiTools.adminList.invalidate({ organizationId });
+      void utils.aiTools.list.invalidate({ organizationId });
+      toaster.create({ title: "Tile deleted", type: "success" });
+      setPendingDelete(null);
+    },
+    onError: (err) => {
+      toaster.create({
+        title: "Failed to delete tile",
         description: err.message,
         type: "error",
       });
@@ -303,6 +343,7 @@ export function ToolCatalogEditor({
             ) : (
               <SortableSection
                 items={items}
+                departmentNameById={departmentNameById}
                 onDragEnd={handleSectionDragEnd(type)}
                 onEdit={onEditTile}
                 onToggleEnabled={(entry) =>
@@ -312,6 +353,7 @@ export function ToolCatalogEditor({
                     enabled: !entry.enabled,
                   })
                 }
+                onDelete={(entry) => setPendingDelete(entry)}
                 togglePendingId={
                   setEnabledMutation.isPending
                     ? setEnabledMutation.variables?.id
@@ -322,21 +364,66 @@ export function ToolCatalogEditor({
           </VStack>
         );
       })}
+
+      <Dialog.Root
+        open={pendingDelete !== null}
+        onOpenChange={({ open }) => {
+          if (!open) setPendingDelete(null);
+        }}
+        placement="center"
+      >
+        {pendingDelete && (
+          <Dialog.Content bg="bg">
+            <Dialog.CloseTrigger />
+            <Dialog.Header>
+              <Dialog.Title>Delete {pendingDelete.displayName}?</Dialog.Title>
+            </Dialog.Header>
+            <Dialog.Body>
+              <Text fontSize="sm" color="fg.muted">
+                This permanently removes the tile from the catalog and from
+                every member&apos;s /me portal. It cannot be undone. To hide it
+                without losing its configuration, use Disable instead.
+              </Text>
+            </Dialog.Body>
+            <Dialog.Footer>
+              <Button variant="outline" onClick={() => setPendingDelete(null)}>
+                Cancel
+              </Button>
+              <Button
+                colorPalette="red"
+                loading={removeMutation.isPending}
+                onClick={() =>
+                  removeMutation.mutate({
+                    organizationId,
+                    id: pendingDelete.id,
+                  })
+                }
+              >
+                Delete tile
+              </Button>
+            </Dialog.Footer>
+          </Dialog.Content>
+        )}
+      </Dialog.Root>
     </VStack>
   );
 }
 
 function SortableSection({
   items,
+  departmentNameById,
   onDragEnd,
   onEdit,
   onToggleEnabled,
+  onDelete,
   togglePendingId,
 }: {
   items: AiToolEntry[];
+  departmentNameById: Map<string, string>;
   onDragEnd: (event: DragEndEvent) => void;
   onEdit: (entry: AiToolEntry) => void;
   onToggleEnabled: (entry: AiToolEntry) => void;
+  onDelete: (entry: AiToolEntry) => void;
   togglePendingId?: string;
 }) {
   const sensors = useSensors(
@@ -358,8 +445,10 @@ function SortableSection({
             <SortableCatalogRow
               key={entry.id}
               entry={entry}
+              departmentNameById={departmentNameById}
               onEdit={() => onEdit(entry)}
               onToggleEnabled={() => onToggleEnabled(entry)}
+              onDelete={() => onDelete(entry)}
               isPending={togglePendingId === entry.id}
             />
           ))}
@@ -371,13 +460,17 @@ function SortableSection({
 
 function SortableCatalogRow({
   entry,
+  departmentNameById,
   onEdit,
   onToggleEnabled,
+  onDelete,
   isPending,
 }: {
   entry: AiToolEntry;
+  departmentNameById: Map<string, string>;
   onEdit: () => void;
   onToggleEnabled: () => void;
+  onDelete: () => void;
   isPending: boolean;
 }) {
   const {
@@ -399,8 +492,10 @@ function SortableCatalogRow({
   return (
     <CatalogRow
       entry={entry}
+      departmentNameById={departmentNameById}
       onEdit={onEdit}
       onToggleEnabled={onToggleEnabled}
+      onDelete={onDelete}
       isPending={isPending}
       style={style}
       dragRef={setNodeRef}
@@ -410,10 +505,33 @@ function SortableCatalogRow({
   );
 }
 
+/**
+ * Maps a tile's stored scope into ScopeChipPicker entries for the badge.
+ * Org-wide → one ORGANIZATION chip; department-scoped → one DEPARTMENT
+ * chip per department, names resolved from the departments list (falls
+ * back to the bare id when a name is missing, e.g. an archived dept).
+ */
+function scopeChipsFor(
+  entry: AiToolEntry,
+  departmentNameById: Map<string, string>,
+): { scopeType: "ORGANIZATION" | "DEPARTMENT"; scopeId: string; name?: string }[] {
+  const departmentIds = entry.departmentIds ?? [];
+  if (departmentIds.length === 0) {
+    return [{ scopeType: "ORGANIZATION", scopeId: "org" }];
+  }
+  return departmentIds.map((id) => ({
+    scopeType: "DEPARTMENT" as const,
+    scopeId: id,
+    name: departmentNameById.get(id) ?? id,
+  }));
+}
+
 function CatalogRow({
   entry,
+  departmentNameById,
   onEdit,
   onToggleEnabled,
+  onDelete,
   isPending,
   style,
   dragRef,
@@ -421,19 +539,16 @@ function CatalogRow({
   dragAttributes,
 }: {
   entry: AiToolEntry;
+  departmentNameById: Map<string, string>;
   onEdit: () => void;
   onToggleEnabled: () => void;
+  onDelete: () => void;
   isPending: boolean;
   style?: React.CSSProperties;
   dragRef?: (element: HTMLElement | null) => void;
   dragListeners?: SyntheticListenerMap;
   dragAttributes?: DraggableAttributes;
 }) {
-  const scopeLabel =
-    entry.scope === "organization"
-      ? "Org-wide"
-      : `Team: ${entry.scopeId.slice(0, 12)}`;
-
   return (
     <HStack
       ref={dragRef}
@@ -458,20 +573,48 @@ function CatalogRow({
       <Text fontSize="sm" flex={1} fontWeight="medium">
         {entry.displayName}
       </Text>
-      <Badge variant="subtle" colorPalette="gray" fontSize="xs">
-        {scopeLabel}
-      </Badge>
-      <Button size="xs" variant="ghost" onClick={onEdit}>
-        Edit
-      </Button>
-      <Button
+      <ProviderScopeChips
         size="xs"
-        variant="ghost"
-        onClick={onToggleEnabled}
-        disabled={isPending}
-      >
-        {entry.enabled ? "Disable" : "Enable"}
-      </Button>
+        scopes={scopeChipsFor(entry, departmentNameById)}
+      />
+      <Menu.Root>
+        <Menu.Trigger asChild>
+          <Button variant="ghost" size="xs" aria-label="Tile actions">
+            <MoreVertical size={14} />
+          </Button>
+        </Menu.Trigger>
+        <Menu.Content>
+          <Menu.Item
+            value="edit"
+            onClick={(event) => {
+              event.stopPropagation();
+              onEdit();
+            }}
+          >
+            <Pencil size={14} /> Edit
+          </Menu.Item>
+          <Menu.Item
+            value="toggle"
+            disabled={isPending}
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggleEnabled();
+            }}
+          >
+            <Power size={14} /> {entry.enabled ? "Disable" : "Enable"}
+          </Menu.Item>
+          <Menu.Item
+            value="delete"
+            color="red"
+            onClick={(event) => {
+              event.stopPropagation();
+              onDelete();
+            }}
+          >
+            <Trash2 size={14} /> Delete
+          </Menu.Item>
+        </Menu.Content>
+      </Menu.Root>
     </HStack>
   );
 }

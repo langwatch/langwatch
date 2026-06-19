@@ -116,6 +116,28 @@ Feature: Multi-scope model cost overrides
     Then the write succeeds
 
   # ────────────────────────────────────────────────────────────────────────────
+  # Ingestion cost enrichment
+  # ────────────────────────────────────────────────────────────────────────────
+  #
+  # Span ingestion resolves custom costs through the same
+  # PROJECT -> TEAM -> ORGANIZATION cascade as the settings page: a custom
+  # cost visible in settings is the cost applied to incoming traces, no
+  # matter which tier it was saved at.
+
+  @unit
+  Scenario: An organization-level custom cost prices spans at ingestion
+    Given "acme" has an organization-level custom cost for "bedrock/eu.anthropic.claude-sonnet-4-6"
+    When a span using that model is ingested for project "web-app"
+    Then the span is enriched with the organization-level cost rates
+
+  @unit
+  Scenario: A project-level custom cost beats the organization rate at ingestion
+    Given "acme" has an organization-level custom cost for "openai/gpt-5-mini"
+    And project "web-app" has a project-level custom cost for "openai/gpt-5-mini"
+    When a span using that model is ingested for project "web-app"
+    Then the span is enriched with the project-level cost rates
+
+  # ────────────────────────────────────────────────────────────────────────────
   # Migration
   # ────────────────────────────────────────────────────────────────────────────
 

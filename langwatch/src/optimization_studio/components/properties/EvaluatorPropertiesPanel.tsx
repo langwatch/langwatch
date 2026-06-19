@@ -3,26 +3,26 @@ import { type Node, useUpdateNodeInternals } from "@xyflow/react";
 import { useCallback, useEffect, useMemo } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
-import { useShallow } from "zustand/react/shallow";
 import { z } from "zod";
+import { useShallow } from "zustand/react/shallow";
 import DynamicZodForm from "../../../components/checks/DynamicZodForm";
-import type { EvaluatorMappingsConfig } from "../../../components/evaluators/EvaluatorEditorShared";
 import { EvaluatorEditorContent } from "../../../components/evaluators/EvaluatorEditorContent";
+import type { EvaluatorMappingsConfig } from "../../../components/evaluators/EvaluatorEditorShared";
 import { useAvailableEvaluators } from "../../../hooks/useAvailableEvaluators";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
-} from "../../../server/evaluations/evaluators.generated";
-import { evaluatorsSchema } from "../../../server/evaluations/evaluators.zod.generated";
+  evaluatorsSchema,
+} from "../../../server/evaluations/evaluators";
 import { getEvaluatorDefaultSettings } from "../../../server/evaluations/getEvaluator";
 import { api } from "../../../utils/api";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import type { Evaluator, Field } from "../../types/dsl";
 import {
+  applyMappingChange,
   buildAvailableSources,
   buildInputMappings,
-  applyMappingChange,
 } from "../../utils/edgeMappingUtils";
 import { useRegisterDrawerFooter } from "../drawers/useInsideDrawer";
 import { BasePropertiesPanel } from "./BasePropertiesPanel";

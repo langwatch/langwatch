@@ -1,8 +1,17 @@
 import { Box, Button, HStack, Icon, Input, Text } from "@chakra-ui/react";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { LuCheck, LuCopy, LuPin, LuPinOff } from "react-icons/lu";
+import {
+  LuCheck,
+  LuCopy,
+  LuEye,
+  LuLock,
+  LuPin,
+  LuPinOff,
+} from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import type { RestrictedAttribute } from "~/server/api/routers/tracesV2.schemas";
+import { compileAttributePattern } from "~/server/data-privacy/attributePatternMatcher";
 import { usePinnedAttributes } from "../../hooks/usePinnedAttributes";
 import type { PinnedAttributeSource } from "../../stores/pinnedAttributesStore";
 import { AttributeValue } from "./AttributeValue";
@@ -19,7 +28,10 @@ const LABEL_WIDTH_DEFAULT = 200;
 
 function clampLabelWidth(value: number): number {
   if (!Number.isFinite(value)) return LABEL_WIDTH_DEFAULT;
-  return Math.min(LABEL_WIDTH_MAX, Math.max(LABEL_WIDTH_MIN, Math.round(value)));
+  return Math.min(
+    LABEL_WIDTH_MAX,
+    Math.max(LABEL_WIDTH_MIN, Math.round(value)),
+  );
 }
 
 /**
@@ -145,8 +157,24 @@ function LabelResizeHandle({
 interface AttributeTableProps {
   attributes: Record<string, unknown>;
   resourceAttributes?: Record<string, unknown>;
+  /**
+   * Custom-attribute restrict rules for this viewer, used to mark restricted
+   * rows in the span attributes section. Resource attributes are not marked.
+   */
+  restrictedAttributes?: RestrictedAttribute[] | null;
   title?: string;
+  /**
+   * When set, the span's id is injected as a synthetic leading `span_id` row
+   * in the attributes table. It isn't a real OTel attribute, but operators
+   * want a one-click copy of the span id straight from the table; it sorts
+   * first regardless of search / pinning and can't be pinned to the header.
+   */
+  spanId?: string;
 }
+
+/** Synthetic, always-first row key for the injected span id. */
+const SPAN_ID_KEY = "span_id";
+const SPAN_ID_LEADING_KEYS = [SPAN_ID_KEY] as const;
 
 type AttrViewMode = "flat" | "json";
 
@@ -274,6 +302,77 @@ function PinToggle({
   );
 }
 
+/**
+ * Pin affordance for synthetic rows (span_id) that can't actually be pinned
+ * to the trace header. Rendered disabled and extra-faded rather than as a
+ * blank gap so the column reads consistently top-to-bottom — every row shows
+ * a pin, this one is just clearly inert. A tooltip explains why.
+ */
+function DisabledPin({ attrKey }: { attrKey: string }) {
+  return (
+    <Tooltip
+      content="The span id can't be pinned to the trace header"
+      positioning={{ placement: "top" }}
+    >
+      <Box
+        as="span"
+        display="inline-flex"
+        alignItems="center"
+        justifyContent="center"
+        width="20px"
+        height="20px"
+        marginLeft={2}
+        marginRight={1.5}
+        flexShrink={0}
+        opacity={0.2}
+        cursor="default"
+        aria-disabled="true"
+        aria-label={`${attrKey} can't be pinned`}
+      >
+        <Icon as={LuPin} boxSize={3} color="fg.subtle" />
+      </Box>
+    </Tooltip>
+  );
+}
+
+/** How a restrict rule applies to one attribute for this viewer. */
+type AttributeRestriction = { visibleTo: string; canSee: boolean };
+
+/**
+ * Per-row marker for a custom attribute under a `restrict` privacy rule. An
+ * in-audience viewer (`canSee`) sees the value with an eye marker telling them
+ * the audience it is limited to; otherwise the value is already redacted and a
+ * lock marker names who can read it.
+ */
+function RestrictionMarker({ visibleTo, canSee }: AttributeRestriction) {
+  return (
+    <Tooltip
+      content={
+        canSee
+          ? `Restricted attribute. You can see it because you are in the audience: ${visibleTo}.`
+          : `Restricted attribute, hidden from you. Visible to: ${visibleTo}.`
+      }
+      positioning={{ placement: "top" }}
+    >
+      <Box
+        as="span"
+        display="inline-flex"
+        alignItems="center"
+        flexShrink={0}
+        color="fg.muted"
+        cursor="default"
+        aria-label={
+          canSee
+            ? `Restricted attribute, visible to ${visibleTo}`
+            : `Restricted attribute, hidden, visible to ${visibleTo}`
+        }
+      >
+        <Icon as={canSee ? LuEye : LuLock} boxSize={3} />
+      </Box>
+    </Tooltip>
+  );
+}
+
 function CopyAllButton({ payload }: { payload: string }) {
   const [copied, setCopied] = useState(false);
   const handleClick = () => {
@@ -308,19 +407,23 @@ function FlatRow({
   value,
   source,
   pinned,
+  pinnable = true,
   isLast,
   onTogglePin,
   labelWidth,
   onLabelResize,
+  restriction,
 }: {
   attrKey: string;
   value: unknown;
   source: PinnedAttributeSource;
   pinned: boolean;
+  pinnable?: boolean;
   isLast: boolean;
   onTogglePin: () => void;
   labelWidth: number;
   onLabelResize: (deltaPx: number) => void;
+  restriction?: AttributeRestriction | null;
 }) {
   const display = formatValue(value);
   return (
@@ -333,12 +436,19 @@ function FlatRow({
       className="attr-row"
       bg={pinned ? "bg.subtle" : undefined}
     >
-      <PinToggle
-        pinned={pinned}
-        source={source}
-        attrKey={attrKey}
-        onToggle={onTogglePin}
-      />
+      {pinnable ? (
+        <PinToggle
+          pinned={pinned}
+          source={source}
+          attrKey={attrKey}
+          onToggle={onTogglePin}
+        />
+      ) : (
+        // Synthetic leading rows (span_id) aren't real attributes, so they
+        // can't be pinned to the trace header — show a disabled, faded pin
+        // (matching the PinToggle footprint) instead of a blank gap.
+        <DisabledPin attrKey={attrKey} />
+      )}
       <Tooltip
         content={attrKey}
         openDelay={250}
@@ -371,9 +481,12 @@ function FlatRow({
           opens a popover with the prettified payload + an override row.
           Same component is wired into table-cell expanders so the same
           payload reads identically wherever it surfaces. */}
-      <Box flex={1} minWidth={0}>
-        <AttributeValue attrKey={attrKey} value={value} />
-      </Box>
+      <HStack flex={1} minWidth={0} gap={1.5}>
+        {restriction ? <RestrictionMarker {...restriction} /> : null}
+        <Box flex={1} minWidth={0}>
+          <AttributeValue attrKey={attrKey} value={value} />
+        </Box>
+      </HStack>
       <Button
         size="xs"
         variant="ghost"
@@ -398,6 +511,8 @@ function AttrSection({
   source,
   labelWidth,
   onLabelResize,
+  leadingKeys,
+  restrictionFor,
 }: {
   title: string;
   attributes: Record<string, unknown>;
@@ -405,11 +520,16 @@ function AttrSection({
   source: PinnedAttributeSource;
   labelWidth: number;
   onLabelResize: (deltaPx: number) => void;
+  /** Keys that always sort first (before pins) and render non-pinnable. */
+  leadingKeys?: readonly string[];
+  /** Resolves a custom-attribute restrict marker for a row, when one applies. */
+  restrictionFor?: (key: string) => AttributeRestriction | null;
 }) {
   const { project } = useOrganizationTeamProject();
   const { pins, isPinned, togglePin } = usePinnedAttributes(project?.id);
 
   const flat = useMemo(() => flattenAttributes(attributes), [attributes]);
+  const leading = useMemo(() => new Set(leadingKeys ?? []), [leadingKeys]);
   const pinnedKeys = useMemo(
     () => new Set(pins.filter((p) => p.source === source).map((p) => p.key)),
     [pins, source],
@@ -417,12 +537,15 @@ function AttrSection({
   const sortedEntries = useMemo(
     () =>
       Object.entries(flat).sort(([a], [b]) => {
+        const aLead = leading.has(a) ? 0 : 1;
+        const bLead = leading.has(b) ? 0 : 1;
+        if (aLead !== bLead) return aLead - bLead;
         const aPin = pinnedKeys.has(a) ? 0 : 1;
         const bPin = pinnedKeys.has(b) ? 0 : 1;
         if (aPin !== bPin) return aPin - bPin;
         return a.localeCompare(b);
       }),
-    [flat, pinnedKeys],
+    [flat, pinnedKeys, leading],
   );
 
   if (sortedEntries.length === 0) return null;
@@ -449,22 +572,27 @@ function AttrSection({
           borderRadius="md"
           borderWidth="1px"
           borderColor="border"
-            overflow="hidden"
+          overflow="hidden"
           bg="bg.panel"
         >
-          {sortedEntries.map(([key, val], i) => (
-            <FlatRow
-              key={key}
-              attrKey={key}
-              value={val}
-              source={source}
-              pinned={isPinned(source, key)}
-              isLast={i === sortedEntries.length - 1}
-              onTogglePin={() => togglePin({ source, key })}
-              labelWidth={labelWidth}
-              onLabelResize={onLabelResize}
-            />
-          ))}
+          {sortedEntries.map(([key, val], i) => {
+            const isLeading = leading.has(key);
+            return (
+              <FlatRow
+                key={key}
+                attrKey={key}
+                value={val}
+                source={source}
+                pinned={!isLeading && isPinned(source, key)}
+                pinnable={!isLeading}
+                isLast={i === sortedEntries.length - 1}
+                onTogglePin={() => togglePin({ source, key })}
+                labelWidth={labelWidth}
+                onLabelResize={onLabelResize}
+                restriction={restrictionFor ? restrictionFor(key) : null}
+              />
+            );
+          })}
         </Box>
       ) : (
         <Box
@@ -489,14 +617,38 @@ function AttrSection({
 export function AttributeTable({
   attributes,
   resourceAttributes,
+  restrictedAttributes,
   title,
+  spanId,
 }: AttributeTableProps) {
   const [viewMode, setViewMode] = useState<AttrViewMode>("flat");
+  // Compile the viewer's restrict rules once; a row is marked when its flat key
+  // matches a rule. Same wildcard matcher the server redaction uses, so the
+  // marker lines up with what is actually redacted.
+  const restrictionFor = useMemo(() => {
+    const compiled = (restrictedAttributes ?? []).map((rule) => ({
+      regex: compileAttributePattern(rule.pattern),
+      visibleTo: rule.visibleTo,
+      canSee: rule.canSee,
+    }));
+    if (compiled.length === 0) return undefined;
+    return (key: string): AttributeRestriction | null => {
+      const match = compiled.find((r) => r.regex.test(key));
+      return match
+        ? { visibleTo: match.visibleTo, canSee: match.canSee }
+        : null;
+    };
+  }, [restrictedAttributes]);
   const [searchTerm, setSearchTerm] = useState("");
   const [labelWidth, , applyLabelDelta] = useLabelColumnWidth();
   const handleLabelResize = applyLabelDelta;
 
-  const flatAttrs = useMemo(() => flattenAttributes(attributes), [attributes]);
+  const flatAttrs = useMemo(() => {
+    const flat = flattenAttributes(attributes);
+    // Prepend the span id as a synthetic, copyable first row. A real
+    // `span_id` attribute (vanishingly unlikely) still wins via the spread.
+    return spanId ? { [SPAN_ID_KEY]: spanId, ...flat } : flat;
+  }, [attributes, spanId]);
   const flatResAttrs = useMemo(
     () =>
       resourceAttributes ? flattenAttributes(resourceAttributes) : undefined,
@@ -558,6 +710,8 @@ export function AttributeTable({
         source="attribute"
         labelWidth={labelWidth}
         onLabelResize={handleLabelResize}
+        leadingKeys={spanId ? SPAN_ID_LEADING_KEYS : undefined}
+        restrictionFor={restrictionFor}
       />
       {filterResAttrs && (
         <AttrSection

@@ -16,7 +16,9 @@ const mockGoBack = vi.fn();
 // Mock useUpgradeModalStore
 const mockOpenUpgradeModal = vi.fn();
 vi.mock("~/stores/upgradeModalStore", () => ({
-  useUpgradeModalStore: (selector: (state: { open: typeof mockOpenUpgradeModal }) => unknown) => {
+  useUpgradeModalStore: (
+    selector: (state: { open: typeof mockOpenUpgradeModal }) => unknown,
+  ) => {
     if (typeof selector === "function") {
       return selector({ open: mockOpenUpgradeModal });
     }
@@ -283,9 +285,7 @@ vi.mock("~/components/outputs", () => ({
 
 // Mock buildDefaultFormValues — supports overrides to test initialLocalConfig seeding
 vi.mock("~/prompts/utils/buildDefaultFormValues", () => ({
-  buildDefaultFormValues: (
-    overrides?: Record<string, unknown>,
-  ) => {
+  buildDefaultFormValues: (overrides?: Record<string, unknown>) => {
     if (!overrides) return mockDefaultFormValues;
     // Deep merge overrides into defaults (simplified for test)
     const merged = JSON.parse(JSON.stringify(mockDefaultFormValues));
@@ -413,7 +413,90 @@ describe("PromptEditorDrawer", () => {
       expect(screen.getByText("Variables")).toBeInTheDocument();
     });
 
-    // Outputs are now in the LLM config popover, not as a separate field group
+    /** @scenario Inputs section shows the Add button in the prompt editor */
+    it("shows the add-variable button in the variables section", () => {
+      renderWithProviders(<PromptEditorDrawer open={true} />);
+      // Hiding this button confused users into thinking variables were
+      // limited to the suggestions - adding must always be one click away.
+      expect(screen.getByTestId("add-variable-button")).toBeInTheDocument();
+    });
+
+    /** @scenario Input added via the Add button is usable in the template */
+    it("adds a typed variable through the add button menu", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<PromptEditorDrawer open={true} />);
+
+      await user.click(screen.getByTestId("add-variable-button"));
+      await user.click(screen.getByRole("menuitem", { name: /Text/ }));
+
+      // The default "input" variable already exists, so the new one
+      // dedupes to input_1 - visible as a variable row in the section.
+      expect(await screen.findByText("input_1")).toBeInTheDocument();
+    });
+
+    /** @scenario Input variable can be deleted like any other */
+    it("removes the default input variable like any other variable", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<PromptEditorDrawer open={true} />);
+
+      // An LLM-judge prompt may only need response/context variables;
+      // forcing an unused "input" made users map the same value twice.
+      await user.click(screen.getByTestId("remove-variable-input"));
+
+      await waitFor(() => {
+        expect(
+          screen.queryByTestId("variable-name-input"),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    /** @scenario Input variable can be renamed */
+    it("renames the default input variable", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<PromptEditorDrawer open={true} />);
+
+      await user.click(screen.getByTestId("variable-name-input"));
+      const nameField = await screen.findByTestId("variable-name-input-input");
+      await user.clear(nameField);
+      await user.type(nameField, "response");
+      await user.keyboard("{Enter}");
+
+      expect(await screen.findByText("response")).toBeInTheDocument();
+      expect(screen.queryByText(/^input$/)).not.toBeInTheDocument();
+    });
+
+    /** @scenario Outputs section renders below the inputs section */
+    it("shows the outputs section below the variables section", () => {
+      renderWithProviders(<PromptEditorDrawer open={true} />);
+
+      const variablesTitle = screen.getByText("Variables");
+      const outputsTitle = screen.getByText("Outputs");
+      expect(outputsTitle).toBeInTheDocument();
+      // Outputs renders after Variables in document order - users shape
+      // the response right where they define the inputs, instead of
+      // hunting inside the model-selector popover (which still edits
+      // the same state).
+      expect(
+        variablesTitle.compareDocumentPosition(outputsTitle) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    /** @scenario Adding an output from the section enables structured outputs */
+    it("adds an output from the outputs section", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<PromptEditorDrawer open={true} />);
+
+      await user.click(screen.getByTestId("add-output-button"));
+      await user.click(screen.getByRole("menuitem", { name: /Number/ }));
+
+      // Default config ships a single "output"; the new float output
+      // dedupes to output_1 and lands in rename-edit mode. Multiple
+      // outputs = structured outputs on.
+      expect(
+        await screen.findByTestId("output-name-input-output_1"),
+      ).toBeInTheDocument();
+    });
 
     it("shows Saved button initially (no changes)", () => {
       renderWithProviders(<PromptEditorDrawer open={true} />);
@@ -1033,7 +1116,10 @@ describe("PromptEditorDrawer", () => {
 
   describe("License enforcement (prompts limit)", () => {
     beforeEach(() => {
-      mockGetByIdOrHandle.mockReturnValue({ data: undefined, isLoading: false });
+      mockGetByIdOrHandle.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+      });
     });
 
     // Skipped: The save button for new prompts is disabled (shows "Saved") until

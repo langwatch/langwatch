@@ -73,7 +73,10 @@ function Header({
   );
 }
 
-interface HeadingProps extends ChakraHeadingProps {}
+// Page titles always render at the standard Heading size. Forbidding size and
+// fontSize here keeps every page heading consistent: use <PageLayout.Heading> at
+// its default size, never a hand-tuned one. See dev/docs/best_practices/react.md.
+type HeadingProps = Omit<ChakraHeadingProps, "size" | "fontSize">;
 
 function Heading({ children, ...props }: PropsWithChildren<HeadingProps>) {
   return (

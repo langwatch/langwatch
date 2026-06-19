@@ -4,21 +4,37 @@ import type React from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LuChevronsDownUp, LuChevronsUpDown, LuSparkles } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
-import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import type {
+  LangwatchSignalBucket,
+  SpanTreeNode,
+} from "~/server/api/routers/tracesV2.schemas";
 import { useSpanLangwatchSignals } from "../../../hooks/useSpanLangwatchSignals";
+import { useDrawerStore } from "../../../stores/drawerStore";
+import { useSpanPulseStore } from "../../../stores/spanPulseStore";
 import { formatDuration } from "../../../utils/formatters";
 import { GroupRow } from "./GroupRow";
 import { GroupTimelineBar, TimelineBar } from "./TimelineBar";
 import { TreeRow } from "./TreeRow";
-import { buildTree, flattenTree, getTimeMarkers, getTraceRange } from "./tree";
+import {
+  buildTree,
+  countDescendants,
+  flattenTree,
+  getTimeMarkers,
+  getTraceRange,
+} from "./tree";
 import {
   DEFAULT_TREE_PCT,
   GROUP_ROW_HEIGHT,
+  INDENT_PX,
   LLM_ROW_HEIGHT,
   MIN_TREE_WIDTH,
   ROW_HEIGHT,
   type WaterfallViewProps,
 } from "./types";
+
+// Shared fallback for spans without signals — a fresh `[]` per row per
+// render would defeat TreeRow's memo by changing prop identity.
+const EMPTY_SIGNALS: readonly LangwatchSignalBucket[] = [];
 
 export const WaterfallView = memo(function WaterfallView({
   spans,
@@ -30,8 +46,29 @@ export const WaterfallView = memo(function WaterfallView({
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [treePct, setTreePct] = useState(DEFAULT_TREE_PCT);
-  const [hoveredSpanId, setHoveredSpanId] = useState<string | null>(null);
   const [showOnlyLangwatch, setShowOnlyLangwatch] = useState(false);
+
+  // Pin gestures wire straight to the drawer store — `pinnedSpanIds`
+  // doubles as both the SpanTabBar tab list and the row-level "is this
+  // span pinned" check, so a Set lookup per render is cheaper than
+  // recomputing membership inside each row. `pinSpan`/`unpinSpan` are
+  // both no-ops on duplicates / unknowns, so the toggle handler is
+  // safe to call without first checking membership.
+  const pinnedSpanIds = useDrawerStore((s) => s.pinnedSpanIds);
+  const pinSpan = useDrawerStore((s) => s.pinSpan);
+  const unpinSpan = useDrawerStore((s) => s.unpinSpan);
+  const pinnedSet = useMemo(() => new Set(pinnedSpanIds), [pinnedSpanIds]);
+  // Identity-stable: reads pin membership through a ref so memoized rows
+  // don't all re-render whenever the pinned set changes.
+  const pinnedSetRef = useRef(pinnedSet);
+  pinnedSetRef.current = pinnedSet;
+  const handleTogglePin = useCallback(
+    (spanId: string) => {
+      if (pinnedSetRef.current.has(spanId)) unpinSpan(spanId);
+      else pinSpan(spanId);
+    },
+    [pinSpan, unpinSpan],
+  );
 
   const { signalsBySpanId, isFetched: signalsFetched } =
     useSpanLangwatchSignals();
@@ -71,6 +108,37 @@ export const WaterfallView = memo(function WaterfallView({
     () => flattenTree(tree, collapsedIds, expandedGroups),
     [tree, collapsedIds, expandedGroups],
   );
+
+  // When SSE delivers a new span for the trace currently in the drawer,
+  // the waterfall used to wash itself with an Aurora gradient — which
+  // forced a layout cascade through the virtualizer every time. Now we
+  // identify which span IDs are genuinely new since the last render and
+  // fire a per-row pulse for each, leaving the visible viewport stable.
+  // Trace switches reset the baseline so opening a different trace does
+  // not pulse every existing row. The root span's id is stable within a
+  // trace and unique across traces, so it doubles as the trace-identity
+  // marker here (SpanTreeNode doesn't carry the traceId field).
+  const prevSpanIdsRef = useRef<Set<string> | null>(null);
+  const prevRootSpanIdRef = useRef<string | null>(null);
+  const currentRootSpanId = spans[0]?.spanId ?? null;
+  useEffect(() => {
+    const currentIds = new Set(spans.map((s) => s.spanId));
+    if (prevRootSpanIdRef.current !== currentRootSpanId) {
+      prevRootSpanIdRef.current = currentRootSpanId;
+      prevSpanIdsRef.current = currentIds;
+      return;
+    }
+    if (prevSpanIdsRef.current === null) {
+      prevSpanIdsRef.current = currentIds;
+      return;
+    }
+    const prev = prevSpanIdsRef.current;
+    const pulse = useSpanPulseStore.getState().pulse;
+    for (const id of currentIds) {
+      if (!prev.has(id)) pulse(id);
+    }
+    prevSpanIdsRef.current = currentIds;
+  }, [spans, currentRootSpanId]);
   const { rootStart, rootDuration } = useMemo(
     () => getTraceRange(filteredSpans),
     [filteredSpans],
@@ -115,6 +183,22 @@ export const WaterfallView = memo(function WaterfallView({
     const picked = interior.filter((_, i) => i % stride === 0);
     return [timeMarkers[0]!, ...picked, timeMarkers[last]!];
   }, [timeMarkers, timelinePanelWidth]);
+
+  // Horizontal-scroll floor for the tree pane. The virtualizer's rows
+  // are absolutely positioned, so their content can't grow the scroll
+  // width on its own — instead we give the inner (relative) block a
+  // min width of "deepest visible indent + a 240px name floor". When
+  // deep indentation would otherwise crush names to nothing, the pane
+  // becomes horizontally scrollable; shallow trees stay at 100% width
+  // with the usual name truncation.
+  const treeContentMinWidthPx = useMemo(() => {
+    let maxDepth = 0;
+    for (const row of flatRows) {
+      const depth = row.kind === "group" ? row.depth : row.node.depth;
+      if (depth > maxDepth) maxDepth = depth;
+    }
+    return maxDepth * INDENT_PX + 240;
+  }, [flatRows]);
 
   // Detect multi-root (forest)
   const rootCount = useMemo(() => tree.length, [tree]);
@@ -198,15 +282,19 @@ export const WaterfallView = memo(function WaterfallView({
     });
   }, [parentsByDepth]);
 
+  // Identity-stable: reads the current selection through a ref so the
+  // memoized rows don't all get a fresh callback when selection changes.
+  const selectedSpanIdRef = useRef(selectedSpanId);
+  selectedSpanIdRef.current = selectedSpanId;
   const handleSelectSpan = useCallback(
     (spanId: string) => {
-      if (spanId === selectedSpanId) {
+      if (spanId === selectedSpanIdRef.current) {
         onClearSpan();
       } else {
         onSelectSpan(spanId);
       }
     },
-    [selectedSpanId, onSelectSpan, onClearSpan],
+    [onSelectSpan, onClearSpan],
   );
 
   // Row height estimator for virtualizer
@@ -391,10 +479,10 @@ export const WaterfallView = memo(function WaterfallView({
           ref={treeScrollRef}
           flex={1}
           overflowY="auto"
-          overflowX="hidden"
+          overflowX="auto"
           onScroll={handleTreeScroll}
           css={{
-            "&::-webkit-scrollbar": { width: "4px" },
+            "&::-webkit-scrollbar": { width: "4px", height: "4px" },
             "&::-webkit-scrollbar-thumb": {
               borderRadius: "4px",
               background: "var(--chakra-colors-border-muted)",
@@ -406,12 +494,14 @@ export const WaterfallView = memo(function WaterfallView({
             position="relative"
             height={`${virtualizer.getTotalSize()}px`}
             width="full"
+            minWidth={`${treeContentMinWidthPx}px`}
           >
             {virtualizer.getVirtualItems().map((virtualRow) => {
               const row = flatRows[virtualRow.index]!;
               const i = virtualRow.index;
 
               if (row.kind === "group") {
+                const groupKey = `${row.parentSpanId}::${row.name}`;
                 return (
                   <Box
                     key={`group-${row.parentSpanId}-${row.name}`}
@@ -424,12 +514,9 @@ export const WaterfallView = memo(function WaterfallView({
                   >
                     <GroupRow
                       group={row}
-                      isExpanded={expandedGroups.has(
-                        `${row.parentSpanId}::${row.name}`,
-                      )}
-                      onToggle={() =>
-                        handleToggleGroup(`${row.parentSpanId}::${row.name}`)
-                      }
+                      groupKey={groupKey}
+                      isExpanded={expandedGroups.has(groupKey)}
+                      onToggle={handleToggleGroup}
                       onSwitchToSpanList={onSwitchToSpanList}
                     />
                   </Box>
@@ -464,20 +551,24 @@ export const WaterfallView = memo(function WaterfallView({
                     rootStart={rootStart}
                     rootDuration={rootDuration}
                     isSelected={node.span.spanId === selectedSpanId}
-                    isHovered={node.span.spanId === hoveredSpanId}
+                    isPinned={pinnedSet.has(node.span.spanId)}
                     isCollapsed={collapsedIds.has(node.span.spanId)}
                     hasChildren={node.children.length > 0}
+                    hiddenDescendantCount={
+                      collapsedIds.has(node.span.spanId)
+                        ? countDescendants(node)
+                        : 0
+                    }
                     isDimmed={
                       selectedSpanId !== null &&
                       node.span.spanId !== selectedSpanId
                     }
-                    signals={signalsBySpanId.get(node.span.spanId) ?? []}
-                    onToggleCollapse={() =>
-                      handleToggleCollapse(node.span.spanId)
+                    signals={
+                      signalsBySpanId.get(node.span.spanId) ?? EMPTY_SIGNALS
                     }
-                    onSelect={() => handleSelectSpan(node.span.spanId)}
-                    onHoverStart={() => setHoveredSpanId(node.span.spanId)}
-                    onHoverEnd={() => setHoveredSpanId(null)}
+                    onToggleCollapse={handleToggleCollapse}
+                    onSelect={handleSelectSpan}
+                    onTogglePin={handleTogglePin}
                   />
                 </Box>
               );
@@ -536,13 +627,7 @@ export const WaterfallView = memo(function WaterfallView({
           borderColor="border.subtle"
           bg="bg.subtle/30"
         >
-          <Box
-            position="absolute"
-            top={0}
-            bottom={0}
-            left={2}
-            right={4}
-          >
+          <Box position="absolute" top={0} bottom={0} left={2} right={4}>
             {visibleTimeMarkers.map((ms, idx) => {
               const pct = rootDuration > 0 ? (ms / rootDuration) * 100 : 0;
               const isLast = idx === visibleTimeMarkers.length - 1;
@@ -659,14 +744,11 @@ export const WaterfallView = memo(function WaterfallView({
                     rootDuration={rootDuration}
                     rowHeight={virtualRow.size}
                     isSelected={node.span.spanId === selectedSpanId}
-                    isHovered={node.span.spanId === hoveredSpanId}
                     isDimmed={
                       selectedSpanId !== null &&
                       node.span.spanId !== selectedSpanId
                     }
-                    onSelect={() => handleSelectSpan(node.span.spanId)}
-                    onHoverStart={() => setHoveredSpanId(node.span.spanId)}
-                    onHoverEnd={() => setHoveredSpanId(null)}
+                    onSelect={handleSelectSpan}
                   />
                 </Box>
               );

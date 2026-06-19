@@ -40,7 +40,12 @@ jobs:
 
       - name: Install skill tooling
         working-directory: skills
-        run: pnpm install --frozen-lockfile
+        # `--ignore-scripts` skips devDep postinstalls (notably node-pty's
+        # rebuild on linux-x64, which needs node-gyp / python and isn't
+        # installed on ubuntu-latest by default). Publish only needs to run
+        # `pnpm sync` (TS transformer over MDX), which doesn't touch any of
+        # the native deps node-pty pulls in.
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Sync skills
         working-directory: skills

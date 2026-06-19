@@ -7,6 +7,8 @@ import {
   DEPTH_FADE_STEP,
   MIN_BLOCK_PX,
   ROW_HEIGHT,
+  TINY_BLOCK_ALPHA_FACTOR,
+  TINY_BLOCK_PCT,
 } from "./constants";
 import { formatPercent } from "./tree";
 import type { FlameNode, Viewport } from "./types";
@@ -74,10 +76,12 @@ export function FlameBlock({
   // palettes in light mode; everything else stays the saturated
   // white-on-colour treatment.
   const isLowContrastPalette = color === "gray.solid";
-  const depthAlpha = Math.max(
-    DEPTH_FADE_FLOOR,
-    1 - depth * DEPTH_FADE_STEP,
-  );
+  // Sub-label-width blocks render calmer: softer fill, no border noise,
+  // a 1px right gap and pill ends so a dense strip of adjacent tiny spans
+  // reads as discrete events rather than one broken bar. Hover/selection
+  // restores full treatment so targets still pop when picked.
+  const isTiny = widthPct < TINY_BLOCK_PCT;
+  const depthAlpha = Math.max(DEPTH_FADE_FLOOR, 1 - depth * DEPTH_FADE_STEP);
   const isError = span.status === "error";
   const isSelected = span.spanId === selectedSpanId;
   const isHovered = span.spanId === hoveredSpanId;
@@ -98,7 +102,9 @@ export function FlameBlock({
           ? Math.max(depthAlpha, 0.8)
           : isDimmed
             ? depthAlpha * 0.3
-            : depthAlpha) * 100,
+            : isTiny
+              ? depthAlpha * TINY_BLOCK_ALPHA_FACTOR
+              : depthAlpha) * 100,
   );
   // Light mode runs on a much stronger floor: alpha-tinted `.solid`
   // tokens against a white surface produce pale fills that white text
@@ -112,7 +118,9 @@ export function FlameBlock({
       ? 55
       : isAncestor || isDirectChild
         ? 95
-        : 85;
+        : isTiny
+          ? Math.round(85 * TINY_BLOCK_ALPHA_FACTOR)
+          : 85;
   const isZeroDuration = spanDur === 0;
 
   const parentDurMs = node.parent
@@ -130,9 +138,7 @@ export function FlameBlock({
     pctOfParent !== null && node.parent
       ? `${formatPercent(pctOfParent)} of parent (${node.parent.span.name}, ${formatDuration(parentDurMs ?? 0)})`
       : null,
-    pctOfTrace !== null && node.parent
-      ? `${formatPercent(pctOfTrace)} of trace`
-      : null,
+    pctOfTrace !== null ? `${formatPercent(pctOfTrace)} of trace` : null,
     span.model ? `Model: ${span.model}` : null,
   ].filter(Boolean);
 
@@ -145,7 +151,9 @@ export function FlameBlock({
         ? "1.5px"
         : isAncestor || isDirectChild
           ? "1px"
-          : "0.5px";
+          : isTiny
+            ? "0"
+            : "0.5px";
   const borderColor = isError
     ? "red.solid"
     : isSelected
@@ -172,7 +180,9 @@ export function FlameBlock({
         position="absolute"
         top={0}
         left={`${leftPct}%`}
-        width={`${widthPct}%`}
+        // Tiny blocks shave 1px off their width so adjacent micro-spans get
+        // a visible seam instead of fusing into one continuous bar.
+        width={isTiny ? `calc(${widthPct}% - 1px)` : `${widthPct}%`}
         minWidth={`${MIN_BLOCK_PX}px`}
         height={`${ROW_HEIGHT}px`}
         bg={{
@@ -181,7 +191,7 @@ export function FlameBlock({
         }}
         borderWidth={borderWidth}
         borderColor={borderColor}
-        borderRadius="sm"
+        borderRadius={isTiny ? "full" : "sm"}
         cursor="pointer"
         pointerEvents="auto"
         overflow="hidden"
@@ -200,6 +210,17 @@ export function FlameBlock({
         alignItems="center"
         paddingX={1}
         boxShadow={boxShadow}
+        // Pure-CSS hover lift so a target pops out of a dense strip the
+        // instant the pointer touches it — no React round-trip needed
+        // (the hoveredSpanId state still drives the richer emphasis).
+        _hover={{
+          filter: "brightness(1.08)",
+          boxShadow:
+            "0 0 0 1px var(--chakra-colors-fg-muted), var(--chakra-shadows-sm)",
+          // Never demote a selected block below its resting priority —
+          // the hover lift only applies to unselected blocks.
+          zIndex: isSelected ? 3 : 2,
+        }}
       >
         <Text
           textStyle="xs"
@@ -210,7 +231,9 @@ export function FlameBlock({
           // instead because grey.solid at 85% alpha is too pale for
           // white text — dark mode stays white because the canvas
           // already pushes the fill into a dark band.
-          color={isLowContrastPalette ? { base: "fg", _dark: "white" } : "white"}
+          color={
+            isLowContrastPalette ? { base: "fg", _dark: "white" } : "white"
+          }
           truncate
           lineHeight={1}
           // Dark drop-shadow lifts white text off the saturated fills.

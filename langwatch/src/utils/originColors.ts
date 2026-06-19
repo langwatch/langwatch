@@ -24,6 +24,19 @@ export const originColors: Record<
   playground: { background: "teal.subtle", color: "teal.emphasized" },
   gateway: { background: "purple.subtle", color: "purple.emphasized" },
   workflow: { background: "cyan.subtle", color: "cyan.emphasized" },
+  sample: { background: "gray.subtle", color: "gray.emphasized" },
+  coding_agent: { background: "orange.subtle", color: "orange.emphasized" },
+  ai_tool: { background: "yellow.subtle", color: "yellow.emphasized" },
+};
+
+/**
+ * Human-readable labels for multi-word / underscore origin values that a
+ * naive capitalize-first would mangle ("coding_agent" -> "Coding_agent").
+ * Single-word origins fall through to {@link getOriginLabel}'s capitalize.
+ */
+const ORIGIN_LABELS: Record<string, string> = {
+  coding_agent: "Coding Agent",
+  ai_tool: "AI Tool",
 };
 
 /**
@@ -44,5 +57,5 @@ export function getOriginColor(origin: string): {
  */
 export function getOriginLabel(origin: string): string {
   if (!origin) return "";
-  return origin.charAt(0).toUpperCase() + origin.slice(1);
+  return ORIGIN_LABELS[origin] ?? origin.charAt(0).toUpperCase() + origin.slice(1);
 }

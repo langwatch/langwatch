@@ -65,7 +65,6 @@
                   "skills/pms-and-domain-experts"
                 ]
               },
-              "integration/install",
               "integration/cli",
               "integration/mcp",
               "better-agents/overview"
@@ -75,11 +74,9 @@
             "group": "Agent Simulations",
             "pages": [
               "agent-simulations/introduction",
-              "agent-simulations/overview",
               "agent-simulations/getting-started",
-              "agent-simulations/set-overview",
-              "agent-simulations/batch-runs",
-              "agent-simulations/individual-run"
+              "agent-simulations/voice-agents",
+              "agent-simulations/red-teaming"
             ]
           },
           {
@@ -174,6 +171,7 @@
                   "prompt-management/features/essential/version-control",
                   "prompts/template-syntax",
                   "prompt-management/data-model",
+                  "prompt-management/features/essential/runtime-parameters",
                   "prompt-management/scope",
                   "prompt-management/features/essential/analytics",
                   "prompt-management/features/essential/github-integration",
@@ -214,7 +212,8 @@
                   "platform/rbac",
                   "platform/audit-log",
                   "platform/scim",
-                  "platform/model-providers"
+                  "platform/model-providers",
+                  "platform/data-retention"
                 ]
               }
             ]
@@ -247,6 +246,7 @@
           {
             "group": "Help",
             "pages": [
+              "pricing",
               "support",
               "status"
             ]
@@ -330,6 +330,13 @@
                     "pages": [
                       "integration/python/tutorials/tracking-llm-costs",
                       "integration/typescript/tutorials/tracking-llm-costs"
+                    ]
+                  },
+                  {
+                    "group": "Tracking Time to First Token",
+                    "pages": [
+                      "integration/python/tutorials/tracking-time-to-first-token",
+                      "integration/typescript/tutorials/tracking-time-to-first-token"
                     ]
                   },
                   {
@@ -681,12 +688,13 @@
             "group": "Dashboards",
             "pages": [
               "ai-governance/governance-dashboard",
-              "ai-governance/cost-centers"
+              "ai-governance/departments"
             ]
           },
           {
             "group": "Privacy",
             "pages": [
+              "ai-governance/data-privacy",
               "ai-governance/no-spy-mode"
             ]
           },
@@ -803,7 +811,9 @@
             "pages": [
               "api-reference/traces/overview",
               "api-reference/traces/search",
+              "api-reference/traces/projection-dsl",
               "api-reference/traces/get-trace",
+              "api-reference/traces/update-metadata",
               "api-reference/traces/create-public-trace-path",
               "api-reference/traces/delete-public-trace-path"
             ]
@@ -1088,7 +1098,9 @@
               "api-reference/projects/create-project",
               "api-reference/projects/get-project",
               "api-reference/projects/update-project",
-              "api-reference/projects/archive-project"
+              "api-reference/projects/archive-project",
+              "api-reference/projects/get-api-key",
+              "api-reference/projects/regenerate-api-key"
             ]
           },
           {
@@ -1099,7 +1111,28 @@
               "api-reference/teams/create-team",
               "api-reference/teams/get-team",
               "api-reference/teams/update-team",
-              "api-reference/teams/archive-team"
+              "api-reference/teams/archive-team",
+              "api-reference/teams/list-members",
+              "api-reference/teams/add-member",
+              "api-reference/teams/remove-member",
+              "api-reference/teams/list-projects"
+            ]
+          },
+          {
+            "group": "Groups",
+            "pages": [
+              "api-reference/groups/overview",
+              "api-reference/groups/list-groups",
+              "api-reference/groups/create-group",
+              "api-reference/groups/get-group",
+              "api-reference/groups/rename-group",
+              "api-reference/groups/delete-group",
+              "api-reference/groups/list-members",
+              "api-reference/groups/add-member",
+              "api-reference/groups/remove-member",
+              "api-reference/groups/list-bindings",
+              "api-reference/groups/add-binding",
+              "api-reference/groups/remove-binding"
             ]
           },
           {
@@ -1209,7 +1242,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1780410305",
+      "source": "/ci/cache/busted/1781875878",
       "destination": "/"
     },
     {
@@ -1219,6 +1252,10 @@
     {
       "source": "/integration/cookbooks",
       "destination": "/integration/code-examples"
+    },
+    {
+      "source": "/integration/install",
+      "destination": "/integration/cli"
     },
     {
       "source": "/guardrails/:path*",
@@ -1285,24 +1322,40 @@
       "destination": "/self-hosting/docker-compose"
     },
     {
+      "source": "/agent-simulations/overview",
+      "destination": "/agent-simulations/introduction"
+    },
+    {
+      "source": "/agent-simulations/set-overview",
+      "destination": "/agent-simulations/introduction"
+    },
+    {
+      "source": "/agent-simulations/batch-runs",
+      "destination": "/agent-simulations/introduction"
+    },
+    {
+      "source": "/agent-simulations/individual-run",
+      "destination": "/agent-simulations/introduction"
+    },
+    {
       "source": "/simulations/overview",
-      "destination": "/agent-simulations/overview"
+      "destination": "/agent-simulations/introduction"
+    },
+    {
+      "source": "/simulations/set-overview",
+      "destination": "/agent-simulations/introduction"
+    },
+    {
+      "source": "/simulations/batch-runs",
+      "destination": "/agent-simulations/introduction"
+    },
+    {
+      "source": "/simulations/individual-run",
+      "destination": "/agent-simulations/introduction"
     },
     {
       "source": "/simulations/getting-started",
       "destination": "/agent-simulations/getting-started"
-    },
-    {
-      "source": "/simulations/set-overview",
-      "destination": "/agent-simulations/set-overview"
-    },
-    {
-      "source": "/simulations/batch-runs",
-      "destination": "/agent-simulations/batch-runs"
-    },
-    {
-      "source": "/simulations/individual-run",
-      "destination": "/agent-simulations/individual-run"
     },
     {
       "source": "/simulations/introduction",

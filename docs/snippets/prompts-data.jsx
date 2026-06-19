@@ -43,6 +43,20 @@ Discover commands with \`langwatch --help\` and \`langwatch <subcommand> --help\
 
 If no shell is available, fetch the same Markdown over plain HTTP — append \`.md\` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
+**Projects and API keys: target a real project, not a personal one.**
+
+LangWatch has two kinds of project:
+
+- **Team / shared projects**: real projects inside an organization. Evaluations, experiments, prompts, datasets, simulations and instrumentation must always target one of these.
+- **Personal projects**: a private "My Workspace" scratch space tied to a single user. Never send a user's evaluations, experiments or production traces here: it is for personal exploration only and is easily confused with a real project.
+
+And two ways to authenticate:
+
+- **A project API key in \`.env\`** (\`LANGWATCH_API_KEY\`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
+- **\`langwatch login --device\` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (\`langwatch claude\`, \`langwatch codex\`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
+
+So for anything in these skills: make sure \`LANGWATCH_API_KEY\` for a real, shared project is in the project's \`.env\`. If it is missing, ask the user for it (they can mint a key for a specific project at https://app.langwatch.ai/authorize). Do NOT run \`langwatch login\` to pick a project, and never default to a personal project. If \`LANGWATCH_ENDPOINT\` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
+
 Then fetch the integration guide for this project's framework:
 
 \`\`\`bash
@@ -175,6 +189,20 @@ langwatch scenario-docs                           # Scenario docs index
 Discover commands with \`langwatch --help\` and \`langwatch <subcommand> --help\`. List and get commands accept \`--format json\` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
 
 If no shell is available, fetch the same Markdown over plain HTTP — append \`.md\` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+
+**Projects and API keys: target a real project, not a personal one.**
+
+LangWatch has two kinds of project:
+
+- **Team / shared projects**: real projects inside an organization. Evaluations, experiments, prompts, datasets, simulations and instrumentation must always target one of these.
+- **Personal projects**: a private "My Workspace" scratch space tied to a single user. Never send a user's evaluations, experiments or production traces here: it is for personal exploration only and is easily confused with a real project.
+
+And two ways to authenticate:
+
+- **A project API key in \`.env\`** (\`LANGWATCH_API_KEY\`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
+- **\`langwatch login --device\` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (\`langwatch claude\`, \`langwatch codex\`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
+
+So for anything in these skills: make sure \`LANGWATCH_API_KEY\` for a real, shared project is in the project's \`.env\`. If it is missing, ask the user for it (they can mint a key for a specific project at https://app.langwatch.ai/authorize). Do NOT run \`langwatch login\` to pick a project, and never default to a personal project. If \`LANGWATCH_ENDPOINT\` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
 
 Then read the evaluations overview:
 
@@ -422,6 +450,20 @@ Discover commands with \`langwatch --help\` and \`langwatch <subcommand> --help\
 
 If no shell is available, fetch the same Markdown over plain HTTP — append \`.md\` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
+**Projects and API keys: target a real project, not a personal one.**
+
+LangWatch has two kinds of project:
+
+- **Team / shared projects**: real projects inside an organization. Evaluations, experiments, prompts, datasets, simulations and instrumentation must always target one of these.
+- **Personal projects**: a private "My Workspace" scratch space tied to a single user. Never send a user's evaluations, experiments or production traces here: it is for personal exploration only and is easily confused with a real project.
+
+And two ways to authenticate:
+
+- **A project API key in \`.env\`** (\`LANGWATCH_API_KEY\`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
+- **\`langwatch login --device\` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (\`langwatch claude\`, \`langwatch codex\`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
+
+So for anything in these skills: make sure \`LANGWATCH_API_KEY\` for a real, shared project is in the project's \`.env\`. If it is missing, ask the user for it (they can mint a key for a specific project at https://app.langwatch.ai/authorize). Do NOT run \`langwatch login\` to pick a project, and never default to a personal project. If \`LANGWATCH_ENDPOINT\` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
+
 Then read the Scenario-specific pages:
 
 \`\`\`bash
@@ -435,7 +477,7 @@ CRITICAL: Do NOT guess how to write scenario tests. Different frameworks have di
 ### Step 2: Install the Scenario SDK
 
 For Python: \`pip install langwatch-scenario pytest pytest-asyncio\` (or \`uv add ...\`).
-For TypeScript: \`npm install @langwatch/scenario vitest @ai-sdk/openai\` (or \`pnpm add ...\`).
+For TypeScript: \`npm install @langwatch/scenario@^0.4.12 vitest\` (or \`pnpm add ...\`).
 
 ### Step 3: Configure the Default Model
 
@@ -514,6 +556,35 @@ describe("My Agent", () => {
   }, 30_000);
 });
 \`\`\`
+
+### Step 4.5: Instrument for observability (REQUIRED before running)
+
+ALWAYS instrument before running — an uninstrumented scenario run emits no traces, so you lose the OTel/LangWatch observability that makes failures debuggable. This is not optional.
+
+There are two distinct things to wire:
+
+**1. Scenario-run tracing** — call \`setupScenarioTracing()\` once at the top of the test file so the simulator, judge, and adapter spans are captured:
+
+\`\`\`typescript
+// TypeScript — add at the very top of the test file, before any imports or setup
+import { setupScenarioTracing } from "@langwatch/scenario";
+setupScenarioTracing();
+\`\`\`
+
+For Python, scenario tracing is configured via \`scenario.configure(...)\` combined with langwatch setup — defer the exact call signature to the \`tracing\` skill.
+
+**2. Agent-under-test tracing** — instrument YOUR OWN agent code so its internal LLM calls, tool invocations, and chain spans are captured:
+
+- Python: \`import langwatch; langwatch.setup()\` at startup, then decorate the agent entry point with \`@langwatch.trace()\`.
+- TypeScript: call \`setupObservability\` from the \`langwatch\` package in your agent's initialization.
+
+**Per-adapter nuance for voice:** when the adapter IS the agent (OpenAI Realtime, Gemini Live), the scenario tracing covers the session. When connecting to a deployed agent (Pipecat/Twilio/ElevenLabs hosted) or wrapping a text agent (Composable), the user's agent process must be instrumented separately in its own codebase.
+
+For framework-specific instrumentation (OpenAI/LangGraph/Vercel/Mastra/Agno), use the \`tracing\` skill — do not hand-roll. The \`tracing\` skill prompt is: "Instrument my code with LangWatch".
+
+**Prerequisite:** Traces only reach LangWatch if \`LANGWATCH_API_KEY\` is set in the environment (plus \`LANGWATCH_ENDPOINT\` for self-hosted). If setup runs but no traces appear in the LangWatch UI, the key is missing.
+
+**VERIFY after the run:** confirm traces were emitted — the scenario run prints a LangWatch trace URL, or the LangWatch UI shows ≥1 trace for the run. A green test with zero traces means instrumentation was skipped.
 
 ### Step 5: Run the Tests
 
@@ -622,6 +693,8 @@ If the user asks for **voice testing** (e.g. "add voice testing to my agent", "t
 
 CRITICAL: Do NOT write a text-only scenario when the user asked for voice. The judge cannot evaluate "audible empathy" or "noise robustness" against a text transcript.
 
+Voice agents especially need observability — latency, interruptions, and STT/TTS spans are exactly what makes voice failures diagnosable. Instrument per Step 4.5 above (both \`setupScenarioTracing()\` and the agent-under-test) before running. See \`langwatch scenario-docs voice/recipes/observability\` for voice-specific OTel guidance.
+
 ### Step 1: Read the voice docs
 
 \`\`\`bash
@@ -630,6 +703,7 @@ langwatch scenario-docs voice/choosing-an-adapter
 langwatch scenario-docs voice/capability-matrix
 langwatch scenario-docs voice/recipes/effects
 langwatch scenario-docs voice/recipes/multi-turn
+langwatch scenario-docs voice/recipes/observability
 \`\`\`
 
 Also browse the runnable voice examples:
@@ -677,6 +751,36 @@ audio_effects=[
     scenario.effects.phone_quality(),                 # mulaw + 8kHz + codec degradation
 ]
 \`\`\`
+
+### TypeScript equivalents
+
+The same adapters, simulator voice, and effects are available in TypeScript via thin factory functions on the \`scenario\` object. Pick the adapter the same way (Step 2) — the mapping is one-to-one:
+
+| User's stack | TypeScript adapter |
+| --- | --- |
+| Pipecat / Twilio Media Streams WS bot | \`scenario.pipecatAgent({ url: "ws://<your-bot>/stream" })\` |
+| ElevenLabs hosted ConvAI agent | \`scenario.elevenLabsAgent({ agentId, apiKey })\` |
+| Twilio phone number (real PSTN) | \`scenario.twilioAgent({ accountSid, authToken, phoneNumber })\` |
+| Gemini Live model is the agent | \`scenario.geminiLiveAgent({ model, systemInstruction, voice })\` |
+| OpenAI Realtime model is the agent | \`scenario.openAIRealtimeAgent({ model, instructions, voice, tools })\` |
+| Text-only stack wrapped as voice | \`scenario.composableAgent({ stt, llm, tts })\` |
+
+Seed a voice on the simulator and layer effects the same way:
+
+\`\`\`typescript
+import scenario, { voice } from "@langwatch/scenario";
+
+scenario.userSimulatorAgent({
+  voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL", // Sarah — mature female
+  persona: "...",
+  audioEffects: [
+    voice.effects.backgroundNoise("cafe", 0.4), // presets: cafe / office / street / airport
+    voice.effects.phoneQuality(),               // mulaw + 8kHz + codec degradation
+  ],
+});
+\`\`\`
+
+For full runnable TypeScript voice tests, see the **OpenAI Realtime** and **Pipecat WS** TypeScript worked examples below.
 
 ### Step 5: Tell the simulator it's on a phone, not in chat
 
@@ -792,11 +896,17 @@ async def test_realtime_greeting():
     assert result.success, result.reasoning
 \`\`\`
 
-### Worked example (TypeScript)
+### Worked example (TypeScript, OpenAI Realtime — adapter drives the model session)
+
+Use this shape when the user's production agent IS an OpenAI Realtime model.
+The adapter drives the session directly — import the same \`instructions\` and \`tools\` your production agent uses rather than copy-pasting them inline.
+One source of truth keeps the test aligned with what is actually deployed.
 
 \`\`\`typescript
 import scenario, { voice } from "@langwatch/scenario";
 import { describe, it, expect } from "vitest";
+// Import your production agent config — don't duplicate it here
+import { AGENT_INSTRUCTIONS, AGENT_TOOLS } from "../src/billing-agent";
 
 describe("Voice agent — angry billing", () => {
   it("acknowledges frustration before pivoting to logistics", async () => {
@@ -807,13 +917,13 @@ describe("Voice agent — angry billing", () => {
         "The agent must acknowledge the frustration before pivoting to " +
         "logistics, stay calm, and queue a refund.",
       agents: [
-        // The adapter IS the agent. Mirror the user's PROD model,
-        // voice, instructions, and tools here — anything you leave as
-        // a placeholder is what you're actually testing.
+        // The adapter drives an OpenAI Realtime session with the same
+        // config your production agent uses. Importing from production
+        // source keeps the test aligned with what is actually deployed.
         scenario.openAIRealtimeAgent({
           voice: "alloy",
-          instructions: "<paste the EXACT prod system prompt here>",
-          // tools: [...prod tool schemas...],
+          instructions: AGENT_INSTRUCTIONS,
+          // tools: AGENT_TOOLS,
         }),
         scenario.userSimulatorAgent({
           voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL",
@@ -844,6 +954,65 @@ describe("Voice agent — angry billing", () => {
     });
     expect(result.success).toBe(true);
   }, 240_000);  // voice scenarios are slow — TTS + transport + multi-turn
+});
+\`\`\`
+
+### Worked example (TypeScript, Pipecat WS — adapter connects to the user's deployed bot)
+
+Use this shape when the user's voice bot is a **deployed Pipecat / Twilio Media Streams WebSocket** that is already reachable. The adapter only connects — it does NOT start the bot, so the bot must be running (a fixture, a staging deploy, or \`make bot\` in another terminal) when the test runs.
+
+\`\`\`typescript
+import scenario, { voice } from "@langwatch/scenario";
+import { describe, it, expect } from "vitest";
+
+// The user's Pipecat bot must be reachable at this URL when the test runs.
+// The adapter does NOT spin it up.
+const BOT_WS_URL = process.env.PIPECAT_BOT_URL ?? "ws://localhost:8765/stream";
+
+describe("Voice agent — angry billing (Pipecat WS)", () => {
+  it("acknowledges frustration before pivoting to logistics", async () => {
+    const result = await scenario.run({
+      name: "angry billing error in a noisy cafe",
+      description:
+        "Customer was double-charged and is calling from a noisy cafe. " +
+        "The agent must acknowledge the frustration before pivoting to " +
+        "logistics, stay calm, and queue a refund.",
+      agents: [
+        // Connects to the user's ALREADY-RUNNING bot over WebSocket.
+        scenario.pipecatAgent({
+          url: BOT_WS_URL,
+          audioFormat: "mulaw",
+          sampleRate: 8000,
+        }),
+        scenario.userSimulatorAgent({
+          voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL",
+          persona:
+            "You are SPEAKING ON A PHONE, not typing. Talk in natural " +
+            "spoken sentences. You were double-charged and you are FURIOUS. " +
+            "Use [shouting], [angry], [frustrated] markers every turn. " +
+            "1-2 short heated sentences per turn.",
+          audioEffects: [
+            voice.effects.backgroundNoise("cafe", 0.4),
+            voice.effects.phoneQuality(),
+          ],
+        }),
+        scenario.judgeAgent({
+          criteria: [
+            "The agent acknowledged the customer's frustration before asking for account info",
+            "The agent stayed calm — did not match the customer's hostility",
+            "The agent moved toward resolving the double charge",
+          ],
+        }),
+      ],
+      script: [
+        scenario.agent(), // the bot greets first (voice convention)
+        scenario.user(),  // heated opening
+        scenario.proceed(5),
+        scenario.judge(),
+      ],
+    });
+    expect(result.success).toBe(true);
+  }, 240_000); // voice scenarios are slow — TTS + transport + multi-turn
 });
 \`\`\`
 
@@ -944,6 +1113,7 @@ Do NOT ask permission before Phase 1 and 2 — deliver value first. Do NOT ask g
 
 ### Code Approach
 
+- Do NOT write a scenario without instrumenting — a green run that emits no traces is half the value; call \`setupScenarioTracing()\` (run-level) and instrument the agent-under-test (\`langwatch.setup()\` / \`setupObservability\`) BEFORE running, and confirm traces appear in the LangWatch UI.
 - Do NOT create your own testing framework — \`@langwatch/scenario\` already handles simulation, judging, multi-turn, and tool-call verification
 - Do NOT write a \`main.py\` / \`run_scenarios.py\` / custom runner that loops over scenarios. Each scenario IS a test (\`it(...)\` / \`async def test_*\`) — run them with \`pytest\` or \`vitest\`. The test runner already gives you parallelism, retries of just the failing case, watch mode, CI integration, and per-test timeouts; a runner script re-implements all of that and ships with none of it wired up.
 - Do NOT invent a JSON / YAML / TOML "scenario DSL" with keys like \`{ "name": ..., "description": ..., "criteria": [...] }\` and then load it into a generic loop. The whole point of Scenario being code is that each test is real code: you can use \`for\`, \`if\`, parametrize (\`@pytest.mark.parametrize\`, \`it.each(...)\`), pull a fixture, call a helper to mint a session, branch by environment, share setup via a \`conftest.py\`, mock a tool inline — none of which a DSL gives you. The moment a teammate needs a new edge case ("only on Tuesdays the agent should escalate"), the DSL grows another key, then another, until it's a worse version of Python/TypeScript with none of the tooling. If the same boilerplate repeats across scenarios, extract a helper FUNCTION that returns an \`AgentAdapter\` / a built \`UserSimulatorAgent\` / a script tuple — keep each scenario its own test case so it stays grep-able and debuggable.
@@ -961,6 +1131,7 @@ Do NOT ask permission before Phase 1 and 2 — deliver value first. Do NOT ask g
 
 ### Voice Agents
 
+- Do NOT skip observability on voice agents — latency, interruption, and STT/TTS spans are exactly what you need when a voice scenario fails; instrument before running (Step 4.5: \`setupScenarioTracing()\` + agent-under-test instrumentation) and verify traces emit in the LangWatch UI.
 - Do NOT write a text-only scenario when the user asked for voice — pick one of \`OpenAIRealtimeAgentAdapter\` / \`ElevenLabsAgentAdapter\` / \`PipecatAgentAdapter\` / \`GeminiLiveAgentAdapter\` / \`TwilioAgentAdapter\` / \`ComposableVoiceAgent\`
 - Do NOT instantiate \`OpenAIRealtimeAgentAdapter\` or \`GeminiLiveAgentAdapter\` with placeholder \`instructions=...\` / \`model=...\` / \`tools=...\` — those adapters ARE the agent, so a placeholder constructor tests OpenAI/Gemini defaults, not the user's agent. Either mirror the user's prod config exactly, or pick a different adapter (Pipecat/Twilio/ElevenLabs hosted) that connects to their already-deployed transport.
 - Do NOT point \`PipecatAgentAdapter(url=...)\` / \`ElevenLabsAgentAdapter(agent_id=...)\` / \`TwilioAgentAdapter\` at a transport the user hasn't deployed — those adapters only connect, they don't spin anything up. If the user is text-only and has no voice transport, say so and offer \`ComposableVoiceAgent\` as a voice wrapper around their existing text logic.
@@ -1027,6 +1198,20 @@ langwatch scenario-docs                           # Scenario docs index
 Discover commands with \`langwatch --help\` and \`langwatch <subcommand> --help\`. List and get commands accept \`--format json\` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
 
 If no shell is available, fetch the same Markdown over plain HTTP — append \`.md\` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+
+**Projects and API keys: target a real project, not a personal one.**
+
+LangWatch has two kinds of project:
+
+- **Team / shared projects**: real projects inside an organization. Evaluations, experiments, prompts, datasets, simulations and instrumentation must always target one of these.
+- **Personal projects**: a private "My Workspace" scratch space tied to a single user. Never send a user's evaluations, experiments or production traces here: it is for personal exploration only and is easily confused with a real project.
+
+And two ways to authenticate:
+
+- **A project API key in \`.env\`** (\`LANGWATCH_API_KEY\`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
+- **\`langwatch login --device\` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (\`langwatch claude\`, \`langwatch codex\`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
+
+So for anything in these skills: make sure \`LANGWATCH_API_KEY\` for a real, shared project is in the project's \`.env\`. If it is missing, ask the user for it (they can mint a key for a specific project at https://app.langwatch.ai/authorize). Do NOT run \`langwatch login\` to pick a project, and never default to a personal project. If \`LANGWATCH_ENDPOINT\` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
 
 Then specifically read the Prompts CLI guide:
 
@@ -1174,6 +1359,20 @@ langwatch scenario-docs                           # Scenario docs index
 Discover commands with \`langwatch --help\` and \`langwatch <subcommand> --help\`. List and get commands accept \`--format json\` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
 
 If no shell is available, fetch the same Markdown over plain HTTP — append \`.md\` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+
+**Projects and API keys: target a real project, not a personal one.**
+
+LangWatch has two kinds of project:
+
+- **Team / shared projects**: real projects inside an organization. Evaluations, experiments, prompts, datasets, simulations and instrumentation must always target one of these.
+- **Personal projects**: a private "My Workspace" scratch space tied to a single user. Never send a user's evaluations, experiments or production traces here: it is for personal exploration only and is easily confused with a real project.
+
+And two ways to authenticate:
+
+- **A project API key in \`.env\`** (\`LANGWATCH_API_KEY\`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
+- **\`langwatch login --device\` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (\`langwatch claude\`, \`langwatch codex\`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
+
+So for anything in these skills: make sure \`LANGWATCH_API_KEY\` for a real, shared project is in the project's \`.env\`. If it is missing, ask the user for it (they can mint a key for a specific project at https://app.langwatch.ai/authorize). Do NOT run \`langwatch login\` to pick a project, and never default to a personal project. If \`LANGWATCH_ENDPOINT\` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
 
 ## Step 2: Get a Project Overview
 
@@ -1719,6 +1918,20 @@ Discover commands with \`langwatch --help\` and \`langwatch <subcommand> --help\
 
 If no shell is available, fetch the same Markdown over plain HTTP — append \`.md\` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
+**Projects and API keys: target a real project, not a personal one.**
+
+LangWatch has two kinds of project:
+
+- **Team / shared projects**: real projects inside an organization. Evaluations, experiments, prompts, datasets, simulations and instrumentation must always target one of these.
+- **Personal projects**: a private "My Workspace" scratch space tied to a single user. Never send a user's evaluations, experiments or production traces here: it is for personal exploration only and is easily confused with a real project.
+
+And two ways to authenticate:
+
+- **A project API key in \`.env\`** (\`LANGWATCH_API_KEY\`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
+- **\`langwatch login --device\` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (\`langwatch claude\`, \`langwatch codex\`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
+
+So for anything in these skills: make sure \`LANGWATCH_API_KEY\` for a real, shared project is in the project's \`.env\`. If it is missing, ask the user for it (they can mint a key for a specific project at https://app.langwatch.ai/authorize). Do NOT run \`langwatch login\` to pick a project, and never default to a personal project. If \`LANGWATCH_ENDPOINT\` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
+
 Then fetch the integration guide for this project's framework:
 
 \`\`\`bash
@@ -1812,6 +2025,8 @@ If \`LANGWATCH_ENDPOINT\` is set in \`.env\`, the user is self-hosted — direct
 ## Step 1: Read the Prompts CLI Docs
 
 (see "CliSetup" above)
+
+(see "ProjectsAndApiKeys" above)
 
 Then specifically read the Prompts CLI guide:
 
@@ -1981,6 +2196,8 @@ Some features are code-only (experiments, guardrails) and some are platform-only
 ## Prerequisites
 
 (see "CliSetup" above)
+
+(see "ProjectsAndApiKeys" above)
 
 Then read the evaluations overview:
 
@@ -2202,6 +2419,8 @@ Best practices:
 
 (see "CliSetup" above)
 
+(see "ProjectsAndApiKeys" above)
+
 Then read the Scenario-specific pages:
 
 \`\`\`bash
@@ -2215,7 +2434,7 @@ CRITICAL: Do NOT guess how to write scenario tests. Different frameworks have di
 ### Step 2: Install the Scenario SDK
 
 For Python: \`pip install langwatch-scenario pytest pytest-asyncio\` (or \`uv add ...\`).
-For TypeScript: \`npm install @langwatch/scenario vitest @ai-sdk/openai\` (or \`pnpm add ...\`).
+For TypeScript: \`npm install @langwatch/scenario@^0.4.12 vitest\` (or \`pnpm add ...\`).
 
 ### Step 3: Configure the Default Model
 
@@ -2294,6 +2513,35 @@ describe("My Agent", () => {
   }, 30_000);
 });
 \`\`\`
+
+### Step 4.5: Instrument for observability (REQUIRED before running)
+
+ALWAYS instrument before running — an uninstrumented scenario run emits no traces, so you lose the OTel/LangWatch observability that makes failures debuggable. This is not optional.
+
+There are two distinct things to wire:
+
+**1. Scenario-run tracing** — call \`setupScenarioTracing()\` once at the top of the test file so the simulator, judge, and adapter spans are captured:
+
+\`\`\`typescript
+// TypeScript — add at the very top of the test file, before any imports or setup
+import { setupScenarioTracing } from "@langwatch/scenario";
+setupScenarioTracing();
+\`\`\`
+
+For Python, scenario tracing is configured via \`scenario.configure(...)\` combined with langwatch setup — defer the exact call signature to the \`tracing\` skill.
+
+**2. Agent-under-test tracing** — instrument YOUR OWN agent code so its internal LLM calls, tool invocations, and chain spans are captured:
+
+- Python: \`import langwatch; langwatch.setup()\` at startup, then decorate the agent entry point with \`@langwatch.trace()\`.
+- TypeScript: call \`setupObservability\` from the \`langwatch\` package in your agent's initialization.
+
+**Per-adapter nuance for voice:** when the adapter IS the agent (OpenAI Realtime, Gemini Live), the scenario tracing covers the session. When connecting to a deployed agent (Pipecat/Twilio/ElevenLabs hosted) or wrapping a text agent (Composable), the user's agent process must be instrumented separately in its own codebase.
+
+For framework-specific instrumentation (OpenAI/LangGraph/Vercel/Mastra/Agno), use the \`tracing\` skill — do not hand-roll. The \`tracing\` skill prompt is: "Instrument my code with LangWatch".
+
+**Prerequisite:** Traces only reach LangWatch if \`LANGWATCH_API_KEY\` is set in the environment (plus \`LANGWATCH_ENDPOINT\` for self-hosted). If setup runs but no traces appear in the LangWatch UI, the key is missing.
+
+**VERIFY after the run:** confirm traces were emitted — the scenario run prints a LangWatch trace URL, or the LangWatch UI shows ≥1 trace for the run. A green test with zero traces means instrumentation was skipped.
 
 ### Step 5: Run the Tests
 
@@ -2402,6 +2650,8 @@ If the user asks for **voice testing** (e.g. "add voice testing to my agent", "t
 
 CRITICAL: Do NOT write a text-only scenario when the user asked for voice. The judge cannot evaluate "audible empathy" or "noise robustness" against a text transcript.
 
+Voice agents especially need observability — latency, interruptions, and STT/TTS spans are exactly what makes voice failures diagnosable. Instrument per Step 4.5 above (both \`setupScenarioTracing()\` and the agent-under-test) before running. See \`langwatch scenario-docs voice/recipes/observability\` for voice-specific OTel guidance.
+
 ### Step 1: Read the voice docs
 
 \`\`\`bash
@@ -2410,6 +2660,7 @@ langwatch scenario-docs voice/choosing-an-adapter
 langwatch scenario-docs voice/capability-matrix
 langwatch scenario-docs voice/recipes/effects
 langwatch scenario-docs voice/recipes/multi-turn
+langwatch scenario-docs voice/recipes/observability
 \`\`\`
 
 Also browse the runnable voice examples:
@@ -2457,6 +2708,36 @@ audio_effects=[
     scenario.effects.phone_quality(),                 # mulaw + 8kHz + codec degradation
 ]
 \`\`\`
+
+### TypeScript equivalents
+
+The same adapters, simulator voice, and effects are available in TypeScript via thin factory functions on the \`scenario\` object. Pick the adapter the same way (Step 2) — the mapping is one-to-one:
+
+| User's stack | TypeScript adapter |
+| --- | --- |
+| Pipecat / Twilio Media Streams WS bot | \`scenario.pipecatAgent({ url: "ws://<your-bot>/stream" })\` |
+| ElevenLabs hosted ConvAI agent | \`scenario.elevenLabsAgent({ agentId, apiKey })\` |
+| Twilio phone number (real PSTN) | \`scenario.twilioAgent({ accountSid, authToken, phoneNumber })\` |
+| Gemini Live model is the agent | \`scenario.geminiLiveAgent({ model, systemInstruction, voice })\` |
+| OpenAI Realtime model is the agent | \`scenario.openAIRealtimeAgent({ model, instructions, voice, tools })\` |
+| Text-only stack wrapped as voice | \`scenario.composableAgent({ stt, llm, tts })\` |
+
+Seed a voice on the simulator and layer effects the same way:
+
+\`\`\`typescript
+import scenario, { voice } from "@langwatch/scenario";
+
+scenario.userSimulatorAgent({
+  voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL", // Sarah — mature female
+  persona: "...",
+  audioEffects: [
+    voice.effects.backgroundNoise("cafe", 0.4), // presets: cafe / office / street / airport
+    voice.effects.phoneQuality(),               // mulaw + 8kHz + codec degradation
+  ],
+});
+\`\`\`
+
+For full runnable TypeScript voice tests, see the **OpenAI Realtime** and **Pipecat WS** TypeScript worked examples below.
 
 ### Step 5: Tell the simulator it's on a phone, not in chat
 
@@ -2572,11 +2853,17 @@ async def test_realtime_greeting():
     assert result.success, result.reasoning
 \`\`\`
 
-### Worked example (TypeScript)
+### Worked example (TypeScript, OpenAI Realtime — adapter drives the model session)
+
+Use this shape when the user's production agent IS an OpenAI Realtime model.
+The adapter drives the session directly — import the same \`instructions\` and \`tools\` your production agent uses rather than copy-pasting them inline.
+One source of truth keeps the test aligned with what is actually deployed.
 
 \`\`\`typescript
 import scenario, { voice } from "@langwatch/scenario";
 import { describe, it, expect } from "vitest";
+// Import your production agent config — don't duplicate it here
+import { AGENT_INSTRUCTIONS, AGENT_TOOLS } from "../src/billing-agent";
 
 describe("Voice agent — angry billing", () => {
   it("acknowledges frustration before pivoting to logistics", async () => {
@@ -2587,13 +2874,13 @@ describe("Voice agent — angry billing", () => {
         "The agent must acknowledge the frustration before pivoting to " +
         "logistics, stay calm, and queue a refund.",
       agents: [
-        // The adapter IS the agent. Mirror the user's PROD model,
-        // voice, instructions, and tools here — anything you leave as
-        // a placeholder is what you're actually testing.
+        // The adapter drives an OpenAI Realtime session with the same
+        // config your production agent uses. Importing from production
+        // source keeps the test aligned with what is actually deployed.
         scenario.openAIRealtimeAgent({
           voice: "alloy",
-          instructions: "<paste the EXACT prod system prompt here>",
-          // tools: [...prod tool schemas...],
+          instructions: AGENT_INSTRUCTIONS,
+          // tools: AGENT_TOOLS,
         }),
         scenario.userSimulatorAgent({
           voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL",
@@ -2624,6 +2911,65 @@ describe("Voice agent — angry billing", () => {
     });
     expect(result.success).toBe(true);
   }, 240_000);  // voice scenarios are slow — TTS + transport + multi-turn
+});
+\`\`\`
+
+### Worked example (TypeScript, Pipecat WS — adapter connects to the user's deployed bot)
+
+Use this shape when the user's voice bot is a **deployed Pipecat / Twilio Media Streams WebSocket** that is already reachable. The adapter only connects — it does NOT start the bot, so the bot must be running (a fixture, a staging deploy, or \`make bot\` in another terminal) when the test runs.
+
+\`\`\`typescript
+import scenario, { voice } from "@langwatch/scenario";
+import { describe, it, expect } from "vitest";
+
+// The user's Pipecat bot must be reachable at this URL when the test runs.
+// The adapter does NOT spin it up.
+const BOT_WS_URL = process.env.PIPECAT_BOT_URL ?? "ws://localhost:8765/stream";
+
+describe("Voice agent — angry billing (Pipecat WS)", () => {
+  it("acknowledges frustration before pivoting to logistics", async () => {
+    const result = await scenario.run({
+      name: "angry billing error in a noisy cafe",
+      description:
+        "Customer was double-charged and is calling from a noisy cafe. " +
+        "The agent must acknowledge the frustration before pivoting to " +
+        "logistics, stay calm, and queue a refund.",
+      agents: [
+        // Connects to the user's ALREADY-RUNNING bot over WebSocket.
+        scenario.pipecatAgent({
+          url: BOT_WS_URL,
+          audioFormat: "mulaw",
+          sampleRate: 8000,
+        }),
+        scenario.userSimulatorAgent({
+          voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL",
+          persona:
+            "You are SPEAKING ON A PHONE, not typing. Talk in natural " +
+            "spoken sentences. You were double-charged and you are FURIOUS. " +
+            "Use [shouting], [angry], [frustrated] markers every turn. " +
+            "1-2 short heated sentences per turn.",
+          audioEffects: [
+            voice.effects.backgroundNoise("cafe", 0.4),
+            voice.effects.phoneQuality(),
+          ],
+        }),
+        scenario.judgeAgent({
+          criteria: [
+            "The agent acknowledged the customer's frustration before asking for account info",
+            "The agent stayed calm — did not match the customer's hostility",
+            "The agent moved toward resolving the double charge",
+          ],
+        }),
+      ],
+      script: [
+        scenario.agent(), // the bot greets first (voice convention)
+        scenario.user(),  // heated opening
+        scenario.proceed(5),
+        scenario.judge(),
+      ],
+    });
+    expect(result.success).toBe(true);
+  }, 240_000); // voice scenarios are slow — TTS + transport + multi-turn
 });
 \`\`\`
 
@@ -2716,6 +3062,7 @@ Once tests are green, summarize what you delivered and suggest 2-3 domain-specif
 
 ### Code Approach
 
+- Do NOT write a scenario without instrumenting — a green run that emits no traces is half the value; call \`setupScenarioTracing()\` (run-level) and instrument the agent-under-test (\`langwatch.setup()\` / \`setupObservability\`) BEFORE running, and confirm traces appear in the LangWatch UI.
 - Do NOT create your own testing framework — \`@langwatch/scenario\` already handles simulation, judging, multi-turn, and tool-call verification
 - Do NOT write a \`main.py\` / \`run_scenarios.py\` / custom runner that loops over scenarios. Each scenario IS a test (\`it(...)\` / \`async def test_*\`) — run them with \`pytest\` or \`vitest\`. The test runner already gives you parallelism, retries of just the failing case, watch mode, CI integration, and per-test timeouts; a runner script re-implements all of that and ships with none of it wired up.
 - Do NOT invent a JSON / YAML / TOML "scenario DSL" with keys like \`{ "name": ..., "description": ..., "criteria": [...] }\` and then load it into a generic loop. The whole point of Scenario being code is that each test is real code: you can use \`for\`, \`if\`, parametrize (\`@pytest.mark.parametrize\`, \`it.each(...)\`), pull a fixture, call a helper to mint a session, branch by environment, share setup via a \`conftest.py\`, mock a tool inline — none of which a DSL gives you. The moment a teammate needs a new edge case ("only on Tuesdays the agent should escalate"), the DSL grows another key, then another, until it's a worse version of Python/TypeScript with none of the tooling. If the same boilerplate repeats across scenarios, extract a helper FUNCTION that returns an \`AgentAdapter\` / a built \`UserSimulatorAgent\` / a script tuple — keep each scenario its own test case so it stays grep-able and debuggable.
@@ -2733,6 +3080,7 @@ Once tests are green, summarize what you delivered and suggest 2-3 domain-specif
 
 ### Voice Agents
 
+- Do NOT skip observability on voice agents — latency, interruption, and STT/TTS spans are exactly what you need when a voice scenario fails; instrument before running (Step 4.5: \`setupScenarioTracing()\` + agent-under-test instrumentation) and verify traces emit in the LangWatch UI.
 - Do NOT write a text-only scenario when the user asked for voice — pick one of \`OpenAIRealtimeAgentAdapter\` / \`ElevenLabsAgentAdapter\` / \`PipecatAgentAdapter\` / \`GeminiLiveAgentAdapter\` / \`TwilioAgentAdapter\` / \`ComposableVoiceAgent\`
 - Do NOT instantiate \`OpenAIRealtimeAgentAdapter\` or \`GeminiLiveAgentAdapter\` with placeholder \`instructions=...\` / \`model=...\` / \`tools=...\` — those adapters ARE the agent, so a placeholder constructor tests OpenAI/Gemini defaults, not the user's agent. Either mirror the user's prod config exactly, or pick a different adapter (Pipecat/Twilio/ElevenLabs hosted) that connects to their already-deployed transport.
 - Do NOT point \`PipecatAgentAdapter(url=...)\` / \`ElevenLabsAgentAdapter(agent_id=...)\` / \`TwilioAgentAdapter\` at a transport the user hasn't deployed — those adapters only connect, they don't spin anything up. If the user is text-only and has no voice transport, say so and offer \`ComposableVoiceAgent\` as a voice wrapper around their existing text logic.
@@ -3438,6 +3786,20 @@ Discover commands with \`langwatch --help\` and \`langwatch <subcommand> --help\
 
 If no shell is available, fetch the same Markdown over plain HTTP — append \`.md\` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
+**Projects and API keys: target a real project, not a personal one.**
+
+LangWatch has two kinds of project:
+
+- **Team / shared projects**: real projects inside an organization. Evaluations, experiments, prompts, datasets, simulations and instrumentation must always target one of these.
+- **Personal projects**: a private "My Workspace" scratch space tied to a single user. Never send a user's evaluations, experiments or production traces here: it is for personal exploration only and is easily confused with a real project.
+
+And two ways to authenticate:
+
+- **A project API key in \`.env\`** (\`LANGWATCH_API_KEY\`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
+- **\`langwatch login --device\` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (\`langwatch claude\`, \`langwatch codex\`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
+
+So for anything in these skills: make sure \`LANGWATCH_API_KEY\` for a real, shared project is in the project's \`.env\`. If it is missing, ask the user for it (they can mint a key for a specific project at https://app.langwatch.ai/authorize). Do NOT run \`langwatch login\` to pick a project, and never default to a personal project. If \`LANGWATCH_ENDPOINT\` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
+
 ## Step 2: Get a Project Overview
 
 \`\`\`bash
@@ -3589,6 +3951,20 @@ Discover commands with \`langwatch --help\` and \`langwatch <subcommand> --help\
 
 If no shell is available, fetch the same Markdown over plain HTTP — append \`.md\` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
+**Projects and API keys: target a real project, not a personal one.**
+
+LangWatch has two kinds of project:
+
+- **Team / shared projects**: real projects inside an organization. Evaluations, experiments, prompts, datasets, simulations and instrumentation must always target one of these.
+- **Personal projects**: a private "My Workspace" scratch space tied to a single user. Never send a user's evaluations, experiments or production traces here: it is for personal exploration only and is easily confused with a real project.
+
+And two ways to authenticate:
+
+- **A project API key in \`.env\`** (\`LANGWATCH_API_KEY\`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
+- **\`langwatch login --device\` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (\`langwatch claude\`, \`langwatch codex\`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
+
+So for anything in these skills: make sure \`LANGWATCH_API_KEY\` for a real, shared project is in the project's \`.env\`. If it is missing, ask the user for it (they can mint a key for a specific project at https://app.langwatch.ai/authorize). Do NOT run \`langwatch login\` to pick a project, and never default to a personal project. If \`LANGWATCH_ENDPOINT\` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
+
 Then read the Scenario-specific pages:
 
 \`\`\`bash
@@ -3602,7 +3978,7 @@ CRITICAL: Do NOT guess how to write scenario tests. Different frameworks have di
 ### Step 2: Install the Scenario SDK
 
 For Python: \`pip install langwatch-scenario pytest pytest-asyncio\` (or \`uv add ...\`).
-For TypeScript: \`npm install @langwatch/scenario vitest @ai-sdk/openai\` (or \`pnpm add ...\`).
+For TypeScript: \`npm install @langwatch/scenario@^0.4.12 vitest\` (or \`pnpm add ...\`).
 
 ### Step 3: Configure the Default Model
 
@@ -3681,6 +4057,35 @@ describe("My Agent", () => {
   }, 30_000);
 });
 \`\`\`
+
+### Step 4.5: Instrument for observability (REQUIRED before running)
+
+ALWAYS instrument before running — an uninstrumented scenario run emits no traces, so you lose the OTel/LangWatch observability that makes failures debuggable. This is not optional.
+
+There are two distinct things to wire:
+
+**1. Scenario-run tracing** — call \`setupScenarioTracing()\` once at the top of the test file so the simulator, judge, and adapter spans are captured:
+
+\`\`\`typescript
+// TypeScript — add at the very top of the test file, before any imports or setup
+import { setupScenarioTracing } from "@langwatch/scenario";
+setupScenarioTracing();
+\`\`\`
+
+For Python, scenario tracing is configured via \`scenario.configure(...)\` combined with langwatch setup — defer the exact call signature to the \`tracing\` skill.
+
+**2. Agent-under-test tracing** — instrument YOUR OWN agent code so its internal LLM calls, tool invocations, and chain spans are captured:
+
+- Python: \`import langwatch; langwatch.setup()\` at startup, then decorate the agent entry point with \`@langwatch.trace()\`.
+- TypeScript: call \`setupObservability\` from the \`langwatch\` package in your agent's initialization.
+
+**Per-adapter nuance for voice:** when the adapter IS the agent (OpenAI Realtime, Gemini Live), the scenario tracing covers the session. When connecting to a deployed agent (Pipecat/Twilio/ElevenLabs hosted) or wrapping a text agent (Composable), the user's agent process must be instrumented separately in its own codebase.
+
+For framework-specific instrumentation (OpenAI/LangGraph/Vercel/Mastra/Agno), use the \`tracing\` skill — do not hand-roll. The \`tracing\` skill prompt is: "Instrument my code with LangWatch".
+
+**Prerequisite:** Traces only reach LangWatch if \`LANGWATCH_API_KEY\` is set in the environment (plus \`LANGWATCH_ENDPOINT\` for self-hosted). If setup runs but no traces appear in the LangWatch UI, the key is missing.
+
+**VERIFY after the run:** confirm traces were emitted — the scenario run prints a LangWatch trace URL, or the LangWatch UI shows ≥1 trace for the run. A green test with zero traces means instrumentation was skipped.
 
 ### Step 5: Run the Tests
 
@@ -3789,6 +4194,8 @@ If the user asks for **voice testing** (e.g. "add voice testing to my agent", "t
 
 CRITICAL: Do NOT write a text-only scenario when the user asked for voice. The judge cannot evaluate "audible empathy" or "noise robustness" against a text transcript.
 
+Voice agents especially need observability — latency, interruptions, and STT/TTS spans are exactly what makes voice failures diagnosable. Instrument per Step 4.5 above (both \`setupScenarioTracing()\` and the agent-under-test) before running. See \`langwatch scenario-docs voice/recipes/observability\` for voice-specific OTel guidance.
+
 ### Step 1: Read the voice docs
 
 \`\`\`bash
@@ -3797,6 +4204,7 @@ langwatch scenario-docs voice/choosing-an-adapter
 langwatch scenario-docs voice/capability-matrix
 langwatch scenario-docs voice/recipes/effects
 langwatch scenario-docs voice/recipes/multi-turn
+langwatch scenario-docs voice/recipes/observability
 \`\`\`
 
 Also browse the runnable voice examples:
@@ -3844,6 +4252,36 @@ audio_effects=[
     scenario.effects.phone_quality(),                 # mulaw + 8kHz + codec degradation
 ]
 \`\`\`
+
+### TypeScript equivalents
+
+The same adapters, simulator voice, and effects are available in TypeScript via thin factory functions on the \`scenario\` object. Pick the adapter the same way (Step 2) — the mapping is one-to-one:
+
+| User's stack | TypeScript adapter |
+| --- | --- |
+| Pipecat / Twilio Media Streams WS bot | \`scenario.pipecatAgent({ url: "ws://<your-bot>/stream" })\` |
+| ElevenLabs hosted ConvAI agent | \`scenario.elevenLabsAgent({ agentId, apiKey })\` |
+| Twilio phone number (real PSTN) | \`scenario.twilioAgent({ accountSid, authToken, phoneNumber })\` |
+| Gemini Live model is the agent | \`scenario.geminiLiveAgent({ model, systemInstruction, voice })\` |
+| OpenAI Realtime model is the agent | \`scenario.openAIRealtimeAgent({ model, instructions, voice, tools })\` |
+| Text-only stack wrapped as voice | \`scenario.composableAgent({ stt, llm, tts })\` |
+
+Seed a voice on the simulator and layer effects the same way:
+
+\`\`\`typescript
+import scenario, { voice } from "@langwatch/scenario";
+
+scenario.userSimulatorAgent({
+  voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL", // Sarah — mature female
+  persona: "...",
+  audioEffects: [
+    voice.effects.backgroundNoise("cafe", 0.4), // presets: cafe / office / street / airport
+    voice.effects.phoneQuality(),               // mulaw + 8kHz + codec degradation
+  ],
+});
+\`\`\`
+
+For full runnable TypeScript voice tests, see the **OpenAI Realtime** and **Pipecat WS** TypeScript worked examples below.
 
 ### Step 5: Tell the simulator it's on a phone, not in chat
 
@@ -3959,11 +4397,17 @@ async def test_realtime_greeting():
     assert result.success, result.reasoning
 \`\`\`
 
-### Worked example (TypeScript)
+### Worked example (TypeScript, OpenAI Realtime — adapter drives the model session)
+
+Use this shape when the user's production agent IS an OpenAI Realtime model.
+The adapter drives the session directly — import the same \`instructions\` and \`tools\` your production agent uses rather than copy-pasting them inline.
+One source of truth keeps the test aligned with what is actually deployed.
 
 \`\`\`typescript
 import scenario, { voice } from "@langwatch/scenario";
 import { describe, it, expect } from "vitest";
+// Import your production agent config — don't duplicate it here
+import { AGENT_INSTRUCTIONS, AGENT_TOOLS } from "../src/billing-agent";
 
 describe("Voice agent — angry billing", () => {
   it("acknowledges frustration before pivoting to logistics", async () => {
@@ -3974,13 +4418,13 @@ describe("Voice agent — angry billing", () => {
         "The agent must acknowledge the frustration before pivoting to " +
         "logistics, stay calm, and queue a refund.",
       agents: [
-        // The adapter IS the agent. Mirror the user's PROD model,
-        // voice, instructions, and tools here — anything you leave as
-        // a placeholder is what you're actually testing.
+        // The adapter drives an OpenAI Realtime session with the same
+        // config your production agent uses. Importing from production
+        // source keeps the test aligned with what is actually deployed.
         scenario.openAIRealtimeAgent({
           voice: "alloy",
-          instructions: "<paste the EXACT prod system prompt here>",
-          // tools: [...prod tool schemas...],
+          instructions: AGENT_INSTRUCTIONS,
+          // tools: AGENT_TOOLS,
         }),
         scenario.userSimulatorAgent({
           voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL",
@@ -4011,6 +4455,65 @@ describe("Voice agent — angry billing", () => {
     });
     expect(result.success).toBe(true);
   }, 240_000);  // voice scenarios are slow — TTS + transport + multi-turn
+});
+\`\`\`
+
+### Worked example (TypeScript, Pipecat WS — adapter connects to the user's deployed bot)
+
+Use this shape when the user's voice bot is a **deployed Pipecat / Twilio Media Streams WebSocket** that is already reachable. The adapter only connects — it does NOT start the bot, so the bot must be running (a fixture, a staging deploy, or \`make bot\` in another terminal) when the test runs.
+
+\`\`\`typescript
+import scenario, { voice } from "@langwatch/scenario";
+import { describe, it, expect } from "vitest";
+
+// The user's Pipecat bot must be reachable at this URL when the test runs.
+// The adapter does NOT spin it up.
+const BOT_WS_URL = process.env.PIPECAT_BOT_URL ?? "ws://localhost:8765/stream";
+
+describe("Voice agent — angry billing (Pipecat WS)", () => {
+  it("acknowledges frustration before pivoting to logistics", async () => {
+    const result = await scenario.run({
+      name: "angry billing error in a noisy cafe",
+      description:
+        "Customer was double-charged and is calling from a noisy cafe. " +
+        "The agent must acknowledge the frustration before pivoting to " +
+        "logistics, stay calm, and queue a refund.",
+      agents: [
+        // Connects to the user's ALREADY-RUNNING bot over WebSocket.
+        scenario.pipecatAgent({
+          url: BOT_WS_URL,
+          audioFormat: "mulaw",
+          sampleRate: 8000,
+        }),
+        scenario.userSimulatorAgent({
+          voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL",
+          persona:
+            "You are SPEAKING ON A PHONE, not typing. Talk in natural " +
+            "spoken sentences. You were double-charged and you are FURIOUS. " +
+            "Use [shouting], [angry], [frustrated] markers every turn. " +
+            "1-2 short heated sentences per turn.",
+          audioEffects: [
+            voice.effects.backgroundNoise("cafe", 0.4),
+            voice.effects.phoneQuality(),
+          ],
+        }),
+        scenario.judgeAgent({
+          criteria: [
+            "The agent acknowledged the customer's frustration before asking for account info",
+            "The agent stayed calm — did not match the customer's hostility",
+            "The agent moved toward resolving the double charge",
+          ],
+        }),
+      ],
+      script: [
+        scenario.agent(), // the bot greets first (voice convention)
+        scenario.user(),  // heated opening
+        scenario.proceed(5),
+        scenario.judge(),
+      ],
+    });
+    expect(result.success).toBe(true);
+  }, 240_000); // voice scenarios are slow — TTS + transport + multi-turn
 });
 \`\`\`
 
@@ -4111,6 +4614,7 @@ Do NOT ask permission before Phase 1 and 2 — deliver value first. Do NOT ask g
 
 ### Code Approach
 
+- Do NOT write a scenario without instrumenting — a green run that emits no traces is half the value; call \`setupScenarioTracing()\` (run-level) and instrument the agent-under-test (\`langwatch.setup()\` / \`setupObservability\`) BEFORE running, and confirm traces appear in the LangWatch UI.
 - Do NOT create your own testing framework — \`@langwatch/scenario\` already handles simulation, judging, multi-turn, and tool-call verification
 - Do NOT write a \`main.py\` / \`run_scenarios.py\` / custom runner that loops over scenarios. Each scenario IS a test (\`it(...)\` / \`async def test_*\`) — run them with \`pytest\` or \`vitest\`. The test runner already gives you parallelism, retries of just the failing case, watch mode, CI integration, and per-test timeouts; a runner script re-implements all of that and ships with none of it wired up.
 - Do NOT invent a JSON / YAML / TOML "scenario DSL" with keys like \`{ "name": ..., "description": ..., "criteria": [...] }\` and then load it into a generic loop. The whole point of Scenario being code is that each test is real code: you can use \`for\`, \`if\`, parametrize (\`@pytest.mark.parametrize\`, \`it.each(...)\`), pull a fixture, call a helper to mint a session, branch by environment, share setup via a \`conftest.py\`, mock a tool inline — none of which a DSL gives you. The moment a teammate needs a new edge case ("only on Tuesdays the agent should escalate"), the DSL grows another key, then another, until it's a worse version of Python/TypeScript with none of the tooling. If the same boilerplate repeats across scenarios, extract a helper FUNCTION that returns an \`AgentAdapter\` / a built \`UserSimulatorAgent\` / a script tuple — keep each scenario its own test case so it stays grep-able and debuggable.
@@ -4128,6 +4632,7 @@ Do NOT ask permission before Phase 1 and 2 — deliver value first. Do NOT ask g
 
 ### Voice Agents
 
+- Do NOT skip observability on voice agents — latency, interruption, and STT/TTS spans are exactly what you need when a voice scenario fails; instrument before running (Step 4.5: \`setupScenarioTracing()\` + agent-under-test instrumentation) and verify traces emit in the LangWatch UI.
 - Do NOT write a text-only scenario when the user asked for voice — pick one of \`OpenAIRealtimeAgentAdapter\` / \`ElevenLabsAgentAdapter\` / \`PipecatAgentAdapter\` / \`GeminiLiveAgentAdapter\` / \`TwilioAgentAdapter\` / \`ComposableVoiceAgent\`
 - Do NOT instantiate \`OpenAIRealtimeAgentAdapter\` or \`GeminiLiveAgentAdapter\` with placeholder \`instructions=...\` / \`model=...\` / \`tools=...\` — those adapters ARE the agent, so a placeholder constructor tests OpenAI/Gemini defaults, not the user's agent. Either mirror the user's prod config exactly, or pick a different adapter (Pipecat/Twilio/ElevenLabs hosted) that connects to their already-deployed transport.
 - Do NOT point \`PipecatAgentAdapter(url=...)\` / \`ElevenLabsAgentAdapter(agent_id=...)\` / \`TwilioAgentAdapter\` at a transport the user hasn't deployed — those adapters only connect, they don't spin anything up. If the user is text-only and has no voice transport, say so and offer \`ComposableVoiceAgent\` as a voice wrapper around their existing text logic.
@@ -4216,6 +4721,20 @@ langwatch scenario-docs                           # Scenario docs index
 Discover commands with \`langwatch --help\` and \`langwatch <subcommand> --help\`. List and get commands accept \`--format json\` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
 
 If no shell is available, fetch the same Markdown over plain HTTP — append \`.md\` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+
+**Projects and API keys: target a real project, not a personal one.**
+
+LangWatch has two kinds of project:
+
+- **Team / shared projects**: real projects inside an organization. Evaluations, experiments, prompts, datasets, simulations and instrumentation must always target one of these.
+- **Personal projects**: a private "My Workspace" scratch space tied to a single user. Never send a user's evaluations, experiments or production traces here: it is for personal exploration only and is easily confused with a real project.
+
+And two ways to authenticate:
+
+- **A project API key in \`.env\`** (\`LANGWATCH_API_KEY\`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
+- **\`langwatch login --device\` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (\`langwatch claude\`, \`langwatch codex\`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
+
+So for anything in these skills: make sure \`LANGWATCH_API_KEY\` for a real, shared project is in the project's \`.env\`. If it is missing, ask the user for it (they can mint a key for a specific project at https://app.langwatch.ai/authorize). Do NOT run \`langwatch login\` to pick a project, and never default to a personal project. If \`LANGWATCH_ENDPOINT\` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
 
 Then read the evaluations overview:
 

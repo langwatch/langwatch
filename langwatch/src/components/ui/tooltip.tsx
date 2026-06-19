@@ -32,7 +32,11 @@ export const Tooltip = React.forwardRef<HTMLDivElement, TooltipProps>(
     return (
       <ChakraTooltip.Root
         openDelay={420}
-        closeDelay={0}
+        // Interactive tooltips need a close grace period so the pointer can
+        // travel across the gap from the trigger into the content to reach
+        // something clickable inside, like a link. Non-interactive tooltips
+        // stay snappy. An explicit closeDelay from the caller still wins.
+        closeDelay={rest.interactive ? 300 : 0}
         disabled={!props.content}
         {...rest}
       >

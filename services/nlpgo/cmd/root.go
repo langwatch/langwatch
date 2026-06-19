@@ -87,7 +87,12 @@ func Root(ctx context.Context, _ []string) error {
 	agentWfRunner := agentblock.NewWorkflowRunner(agentblock.WorkflowRunnerOptions{})
 
 	eng := engine.New(engine.Options{
-		HTTP:             httpExec,
+		HTTP: httpExec,
+		// Remote prompt attachments are fetched under the same SSRF policy
+		// (and customer allow-list) as the HTTP block.
+		SSRF: httpblock.SSRFOptions{
+			AllowedHosts: splitCSV(cfg.Engine.AllowedProxyHosts),
+		},
 		Code:             codeExec,
 		LLM:              llm,
 		Evaluator:        evalExec,
@@ -98,8 +103,6 @@ func Root(ctx context.Context, _ []string) error {
 
 	application := app.New(
 		app.WithLogger(deps.Logger),
-		app.WithChildProxy(deps.ChildProxy),
-		app.WithChildManager(deps.Child),
 		app.WithWorkflowExecutor(executor),
 	)
 

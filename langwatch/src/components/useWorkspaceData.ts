@@ -6,6 +6,9 @@ import { CLIENT_FLAG_STALE_TIME_MS } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
+
+import { buildProjectSwitchHref } from "../utils/routes";
 
 import type { WorkspaceSwitcherProps } from "./WorkspaceSwitcher";
 
@@ -38,15 +41,34 @@ import type { WorkspaceSwitcherProps } from "./WorkspaceSwitcher";
  */
 export function useWorkspaceData(): Pick<
   WorkspaceSwitcherProps,
-  "personal" | "teams" | "projects" | "onCreateProjectForTeam"
+  "personals" | "teams" | "projects" | "onCreateProjectForTeam"
 > {
-  const { organizations } = useOrganizationTeamProject({
-    redirectToOnboarding: false,
-    redirectToProjectOnboarding: false,
-  });
+  const { organizations, project: currentProject } =
+    useOrganizationTeamProject({
+      redirectToOnboarding: false,
+      redirectToProjectOnboarding: false,
+    });
   const { data: session } = useRequiredSession();
   const userId = session?.user?.id;
   const { openDrawer } = useDrawer();
+  const router = useRouter();
+
+  // Switching projects should keep the user on the equivalent view of the
+  // target project instead of bouncing them home (the regression). Delegates
+  // to the shared route resolver so the switcher and the legacy ProjectSelector
+  // stay in lockstep. `homeFallback: "plain"` lands on the project home for
+  // org-scoped, personal, and settings routes that have no per-project view.
+  const buildProjectHref = useCallback(
+    (targetSlug: string): string =>
+      buildProjectSwitchHref({
+        routePattern: router.pathname,
+        resolvedPathname: router.asPath,
+        currentProjectSlug: currentProject?.slug,
+        targetSlug,
+        homeFallback: "plain",
+      }),
+    [router.pathname, router.asPath, currentProject?.slug],
+  );
 
   const organizationIds = useMemo(
     () => (organizations ?? []).map((org) => org.id),
@@ -59,7 +81,7 @@ export function useWorkspaceData(): Pick<
   // staleTime + no refetch on focus / reconnect — a full reload picks
   // up new flag state, which is what governance preview rollouts need.
   const governanceQuery =
-    api.featureFlag.isEnabledForAnyOrganization.useQuery(
+    api.featureFlag.isEnabledForEachOrganization.useQuery(
       {
         flag: "release_ui_ai_governance_enabled",
         organizationIds,
@@ -71,11 +93,6 @@ export function useWorkspaceData(): Pick<
         refetchOnReconnect: false,
       },
     );
-
-  // Hide the personal entry only when the user has organizations and none of
-  // them enable governance. Org-less users keep it — it is their only context.
-  const showPersonal =
-    organizationIds.length === 0 || (governanceQuery.data?.enabled ?? false);
 
   const onCreateProjectForTeam = useCallback(
     ({ teamId, orgId }: { teamId: string; orgId: string }) => {
@@ -130,7 +147,7 @@ export function useWorkspaceData(): Pick<
             orgId: org.id,
             orgName: org.name,
             orgSlug: org.slug,
-            href: `/${project.slug}`,
+            href: buildProjectHref(project.slug),
             label: project.name,
           })),
         ),
@@ -138,16 +155,45 @@ export function useWorkspaceData(): Pick<
       .sort((a, b) => a.label.localeCompare(b.label));
 
     return { teams, projects };
-  }, [organizations, userId]);
+  }, [organizations, userId, buildProjectHref]);
 
-  const personal = showPersonal
-    ? {
-        kind: "personal" as const,
-        href: "/me",
-        label: "My Workspace",
-        subtitle: "Personal usage, personal budget",
-      }
-    : undefined;
+  // One "My Workspace" entry per organization that enables governance. Org-less
+  // users keep a single entry (their only context). When more than one org has
+  // governance, each entry targets `/me?org=<slug>` so landing selects that org
+  // (see useOrgQueryParamSelection); a single governance org targets `/me`.
+  const personals = useMemo<
+    NonNullable<WorkspaceSwitcherProps["personals"]>
+  >(() => {
+    const subtitle = "Personal usage, personal budget";
+    if (organizationIds.length === 0) {
+      return [
+        {
+          kind: "personal" as const,
+          orgId: null,
+          href: "/me",
+          label: "My Workspace",
+          subtitle,
+        },
+      ];
+    }
+    const enabledByOrg =
+      governanceQuery.data?.enabledByOrganizationId ?? {};
+    const governanceOrgs = (organizations ?? []).filter(
+      (org) => enabledByOrg[org.id],
+    );
+    const multipleGovernanceOrgs = governanceOrgs.length > 1;
+    return governanceOrgs.map((org) => ({
+      kind: "personal" as const,
+      orgId: org.id,
+      orgName: org.name,
+      orgSlug: org.slug,
+      href: multipleGovernanceOrgs
+        ? `/me?org=${encodeURIComponent(org.slug)}`
+        : "/me",
+      label: "My Workspace",
+      subtitle,
+    }));
+  }, [organizations, organizationIds.length, governanceQuery.data]);
 
-  return { personal, teams, projects, onCreateProjectForTeam };
+  return { personals, teams, projects, onCreateProjectForTeam };
 }

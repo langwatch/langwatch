@@ -343,9 +343,13 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     label: "Evaluator verdict",
     group: "evaluation",
     table: "evaluation_runs",
-    // Surface a 3-way label so users can pick pass / fail / unknown without
-    // dealing with the 0/1/null underlying UInt8 storage.
-    expression: "if(Passed = 1, 'pass', if(Passed = 0, 'fail', 'unknown'))",
+    // Surface a 4-way label so users can pick pass / fail / error / unknown
+    // without dealing with the 0/1/null underlying UInt8 storage. `error`
+    // takes precedence: an errored run's Passed column is meaningless, and
+    // the sidebar's "Errored" pill counts `Status = 'error'` — mapping those
+    // rows to 'unknown' made the pill filter by the wrong value.
+    expression:
+      "multiIf(Status = 'error', 'error', Passed = 1, 'pass', Passed = 0, 'fail', 'unknown')",
   },
   {
     key: "evaluatorScore",

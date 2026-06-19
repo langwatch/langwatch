@@ -16,7 +16,7 @@ import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import type { End, WorkflowTypes } from "../../types/dsl";
 import { WorkflowIcon } from "../ColorfulBlockIcons";
 import { BasePropertiesPanel, PropertyField } from "./BasePropertiesPanel";
-import { evaluatorInputs } from "./EndPropertiesPanel";
+import { EVALUATOR_RESULT_FIELDS } from "./EndPropertiesPanel";
 import { OptimizationStudioLLMConfigField } from "./llm-configs/OptimizationStudioLLMConfigField";
 import { EmojiPickerModal } from "./modals/EmojiPickerModal";
 
@@ -57,7 +57,7 @@ export const WorkflowPropertiesPanel = () => {
         id: endNode.id,
         data: {
           ...endNode.data,
-          inputs: evaluatorInputs,
+          inputs: EVALUATOR_RESULT_FIELDS,
           behave_as: "evaluator",
         } as End,
       });

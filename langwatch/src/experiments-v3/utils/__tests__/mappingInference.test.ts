@@ -457,6 +457,7 @@ describe("inferEvaluatorMappings", () => {
     });
   });
 
+  /** @scenario Target output wins over a same-named dataset column for "output" */
   it("prioritizes target output over dataset column for output field", () => {
     const dataset = createTestDataset("ds-1", "Dataset 1", [
       createTestColumn("output"), // Dataset also has "output"
@@ -497,6 +498,68 @@ describe("inferEvaluatorMappings", () => {
       expect(mappings.output.source).toBe("target");
       expect(mappings.output.sourceField).toBe("answer");
     }
+  });
+
+  describe("given an output-like field that matches no target output by name", () => {
+    describe("when the target exposes a single output", () => {
+      /** @scenario Auto-map a target-output field to the target's only output when no name matches */
+      it("maps the output field to that sole output", () => {
+        const dataset = createTestDataset("ds-1", "Dataset 1", [
+          createTestColumn("input"),
+          createTestColumn("expected_output"),
+        ]);
+        const target = createTestTarget(
+          "target-1",
+          [{ identifier: "input", type: "str" }],
+          // Single output whose name does not match "output" by any rule
+          [{ identifier: "category", type: "str" }],
+        );
+        const evaluatorInputs: Field[] = [
+          { identifier: "output", type: "str" },
+        ];
+
+        const mappings = inferEvaluatorMappings(
+          evaluatorInputs,
+          dataset,
+          target,
+        );
+
+        expect(mappings.output).toEqual({
+          type: "source",
+          source: "target",
+          sourceId: "target-1",
+          sourceField: "category",
+        });
+      });
+    });
+
+    describe("when the target exposes multiple outputs", () => {
+      /** @scenario An output field is left for me to map when the runner has several outputs to choose from */
+      it("leaves the output field unmapped", () => {
+        const dataset = createTestDataset("ds-1", "Dataset 1", [
+          createTestColumn("input"),
+        ]);
+        const target = createTestTarget(
+          "target-1",
+          [{ identifier: "input", type: "str" }],
+          [
+            { identifier: "category", type: "str" },
+            { identifier: "confidence", type: "str" },
+          ],
+        );
+        const evaluatorInputs: Field[] = [
+          { identifier: "output", type: "str" },
+        ];
+
+        const mappings = inferEvaluatorMappings(
+          evaluatorInputs,
+          dataset,
+          target,
+        );
+
+        expect(mappings.output).toBeUndefined();
+      });
+    });
   });
 
   it("does not override existing mappings", () => {
@@ -572,6 +635,98 @@ describe("inferEvaluatorMappings", () => {
       expect(mappings.input.source).toBe("dataset");
       expect(mappings.input.sourceId).toBe("ds-1");
     }
+  });
+
+  // ==========================================================================
+  // Regression: side-locking — "output" never falls back to a dataset column,
+  // "expected_output"/"input" never fall back to a target output.
+  // Reported by customer; an evaluator's `output` was auto-mapped to a
+  // same-named dataset column (because the runner produced something else),
+  // grading the dataset against itself.
+  // ==========================================================================
+
+  describe("when the locked side has no matching column", () => {
+    /** @scenario "output" never falls back to a dataset column */
+    it("leaves an `output` mapping empty rather than falling back to a same-named dataset column", () => {
+      const dataset = createTestDataset("ds-1", "Dataset 1", [
+        createTestColumn("output"), // tempting same-named dataset column
+      ]);
+      // Multiple non-matching outputs: no name match AND no single-output
+      // shortcut, so `output` must stay empty rather than grab the dataset's
+      // "output" column (the customer-reported self-grading bug). The
+      // single-output auto-map is covered separately above.
+      const target = createTestTarget(
+        "target-1",
+        [{ identifier: "input", type: "str" }],
+        [
+          { identifier: "irrelevant", type: "str" },
+          { identifier: "also_irrelevant", type: "str" },
+        ],
+      );
+      const evaluatorInputs: Field[] = [{ identifier: "output", type: "str" }];
+
+      const mappings = inferEvaluatorMappings(evaluatorInputs, dataset, target);
+
+      expect(mappings.output).toBeUndefined();
+    });
+
+    /** @scenario "expected_output" never picks the runner output */
+    it("leaves an `expected_output` mapping empty rather than falling back to a same-named target output", () => {
+      const dataset = createTestDataset("ds-1", "Dataset 1", [
+        createTestColumn("irrelevant"),
+      ]);
+      const target = createTestTarget(
+        "target-1",
+        [{ identifier: "input", type: "str" }],
+        [{ identifier: "expected_output", type: "str" }], // target has expected_output
+      );
+      const evaluatorInputs: Field[] = [
+        { identifier: "expected_output", type: "str" },
+      ];
+
+      const mappings = inferEvaluatorMappings(evaluatorInputs, dataset, target);
+
+      expect(mappings.expected_output).toBeUndefined();
+    });
+
+    /** @scenario "input" never picks the runner output */
+    it("leaves an `input` mapping empty rather than falling back to a same-named target output", () => {
+      const dataset = createTestDataset("ds-1", "Dataset 1", [
+        createTestColumn("irrelevant"),
+      ]);
+      const target = createTestTarget(
+        "target-1",
+        [{ identifier: "input", type: "str" }],
+        [{ identifier: "input", type: "str" }], // target also emits an "input" output
+      );
+      const evaluatorInputs: Field[] = [{ identifier: "input", type: "str" }];
+
+      const mappings = inferEvaluatorMappings(evaluatorInputs, dataset, target);
+
+      expect(mappings.input).toBeUndefined();
+    });
+
+    it("keeps the original dataset-first / target-fallback behavior for custom identifiers outside the locked families", () => {
+      // "score" is not in either locked set. When the dataset has nothing
+      // to offer, the heuristic should still pick a matching target output.
+      const dataset = createTestDataset("ds-1", "Dataset 1", [
+        createTestColumn("irrelevant"),
+      ]);
+      const target = createTestTarget(
+        "target-1",
+        [{ identifier: "input", type: "str" }],
+        [{ identifier: "score", type: "float" }],
+      );
+      const evaluatorInputs: Field[] = [{ identifier: "score", type: "float" }];
+
+      const mappings = inferEvaluatorMappings(evaluatorInputs, dataset, target);
+
+      expect(mappings.score?.type).toBe("source");
+      if (mappings.score?.type === "source") {
+        expect(mappings.score.source).toBe("target");
+        expect(mappings.score.sourceField).toBe("score");
+      }
+    });
   });
 });
 

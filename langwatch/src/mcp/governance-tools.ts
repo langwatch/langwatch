@@ -8,7 +8,7 @@
  * contract (sergey fc6d54100). No HTTP round-trip, no auth-token mismatch with
  * the human-caller PAT path. Service-layer-shared invariant from umbrella spec
  * @service-layer is satisfied: tRPC + Hono + CLI + MCP all funnel through the
- * same IngestionTemplateService + UserIngestionBindingService.
+ * same IngestionTemplateService.
  *
  * RBAC enforcement at the tool layer (per @governance-mcp @rbac): each tool
  * checks the caller's organization permissions BEFORE the service call and
@@ -52,7 +52,7 @@ type McpServerLike = {
 };
 
 import { IngestionTemplateService } from "../../ee/governance/services/ingestionTemplate.service";
-import { UserIngestionBindingService } from "../../ee/governance/services/userIngestionBinding.service";
+import { IngestionKeyService } from "../../ee/governance/services/ingestionKey.service";
 import {
   hasOrganizationPermission,
   type Permission,
@@ -149,7 +149,7 @@ export function registerGovernanceMcpTools(
   };
 
   const templateService = IngestionTemplateService.create(ctx.prisma);
-  const bindingService = UserIngestionBindingService.create(ctx.prisma);
+  const ingestionKeyService = IngestionKeyService.create(ctx.prisma);
 
   const text = (value: string) => ({ content: [{ type: "text" as const, text: value }] });
   const json = (value: unknown) => text(JSON.stringify(value, null, 2));
@@ -275,7 +275,7 @@ export function registerGovernanceMcpTools(
 
   server.tool(
     "governance_ingestion_templates_archive",
-    "Soft-archive an org-authored template. Existing bindings continue to land traces; new installs are blocked. Requires aiTools:manage. Mirrors DELETE /api/governance/ingestion-templates/:id.",
+    "Soft-archive an org-authored template. Existing ingestion keys continue to land traces; new installs are blocked. Requires aiTools:manage. Mirrors DELETE /api/governance/ingestion-templates/:id.",
     { id: z.string() },
     async ({ id }) => {
       const r = await resolve();
@@ -291,23 +291,23 @@ export function registerGovernanceMcpTools(
     },
   );
 
-  // ── UserIngestionBinding ────────────────────────────────────────────
+  // ── Ingestion keys ──────────────────────────────────────────────────
 
   server.tool(
-    "governance_user_ingestion_bindings_list",
-    "List the caller's own UserIngestionBindings. Requires OAuth-authenticated session. Mirrors GET /api/governance/user-ingestion-bindings.",
+    "governance_ingestion_keys_list",
+    "List the caller's live ingestion keys (one per connected source) in their personal project. Requires OAuth-authenticated session + organization:view.",
     {},
     async () => {
       const r = await resolve();
       if (!r.callerUserId) {
         return text(
-          `${NEEDS_OAUTH_PREFIX}listing your own bindings requires an OAuth-authenticated MCP session.`,
+          `${NEEDS_OAUTH_PREFIX}listing your own ingestion keys requires an OAuth-authenticated MCP session.`,
         );
       }
       const denied = await requireRead(r, "organization:view");
       if (denied) return text(denied);
-      const rows = await bindingService.listForCaller({
-        callerUserId: r.callerUserId,
+      const rows = await ingestionKeyService.listForPersonalProject({
+        userId: r.callerUserId,
         organizationId: r.organizationId,
       });
       return json(rows);
@@ -315,56 +315,21 @@ export function registerGovernanceMcpTools(
   );
 
   server.tool(
-    "governance_user_ingestion_bindings_install",
-    "Install a binding for the caller for the given template, returning the ik-lw-* token (shown ONCE). Requires OAuth-authenticated session + organization:view. Mirrors POST /api/governance/user-ingestion-bindings.",
+    "governance_ingestion_keys_mint",
+    "Mint (rotating in place) an ingestion key for the caller's personal project + source_type, returning the sk-lw-* token (shown ONCE). Requires OAuth-authenticated session + organization:view.",
     {
-      template_id: z.string(),
+      source_type: z.string(),
+      template_id: z.string().optional(),
     },
-    async ({ template_id }) => {
+    async ({ source_type, template_id }) => {
       const r = await resolve();
       const denied = await requirePermission(r, "organization:view");
       if (denied) return text(denied);
-      const result = await bindingService.install({
-        callerUserId: r.callerUserId!,
+      const result = await ingestionKeyService.ensureForPersonalProject({
+        userId: r.callerUserId!,
         organizationId: r.organizationId,
-        templateId: template_id,
-        surface: SURFACE,
-      });
-      return json(result);
-    },
-  );
-
-  server.tool(
-    "governance_user_ingestion_bindings_uninstall",
-    "Uninstall (archive) a UserIngestionBinding. Hard-cuts the binding token immediately. Requires OAuth-authenticated session. Mirrors DELETE /api/governance/user-ingestion-bindings/:id.",
-    { binding_id: z.string() },
-    async ({ binding_id }) => {
-      const r = await resolve();
-      const denied = await requirePermission(r, "organization:view");
-      if (denied) return text(denied);
-      await bindingService.uninstall({
-        callerUserId: r.callerUserId!,
-        organizationId: r.organizationId,
-        bindingId: binding_id,
-        surface: SURFACE,
-      });
-      return text(`uninstalled ${binding_id}`);
-    },
-  );
-
-  server.tool(
-    "governance_user_ingestion_bindings_rotate",
-    "Hard-cut rotate the binding token. Returns the new ik-lw-* token (shown ONCE); the previous one is invalidated immediately. Mirrors POST /api/governance/user-ingestion-bindings/:id/rotate.",
-    { binding_id: z.string() },
-    async ({ binding_id }) => {
-      const r = await resolve();
-      const denied = await requirePermission(r, "organization:view");
-      if (denied) return text(denied);
-      const result = await bindingService.rotateToken({
-        callerUserId: r.callerUserId!,
-        organizationId: r.organizationId,
-        bindingId: binding_id,
-        surface: SURFACE,
+        sourceType: source_type,
+        ingestionTemplateId: template_id ?? null,
       });
       return json(result);
     },

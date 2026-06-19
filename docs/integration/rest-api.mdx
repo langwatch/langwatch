@@ -79,6 +79,7 @@ curl -X POST "$LANGWATCH_ENDPOINT/api/collector" \
       },
       "timestamps": {
         "started_at": $(($(date +%s) * 1000)),
+        "first_token_at": $((($(date +%s) * 1000) + 300)),
         "finished_at": $((($(date +%s) + 1) * 1000))
       }
     }
@@ -94,6 +95,8 @@ EOF
 ```
 
 Replace the placeholders with your actual data. The `@-` tells `curl` to read the JSON data from the standard input, which we provide via the `EOF`-delimited here-document.
+
+All `timestamps` are unix epoch **milliseconds**. The optional `first_token_at` records when the first streamed token reached the user and powers the Time to First Token (TTFT) metric, see [Tracking Time to First Token](/integration/python/tutorials/tracking-time-to-first-token). Token counts and cost are derived from `metrics` and the model pricing registry, see [Tracking LLM Costs and Tokens](/integration/python/tutorials/tracking-llm-costs).
 
 For the type reference of how a `span` should look like, check out our [types definitions](https://github.com/langwatch/langwatch/blob/main/python-sdk/src/langwatch/types.py).
 

@@ -11,6 +11,7 @@ import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { FormVariablesSection } from "~/components/variables";
 import type { PromptConfigFormValues } from "~/prompts";
 import { usePromptConfigContext } from "~/prompts/providers/PromptConfigProvider";
+import { getSaveBlockerMessage } from "~/prompts/utils/getSaveBlockerMessage";
 import {
   formValuesToTriggerSaveVersionParams,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
@@ -19,6 +20,7 @@ import type { VersionedPrompt } from "~/server/prompt-config";
 import { PromptConfigProvider } from "../../providers/PromptConfigProvider";
 import { DemonstrationsField } from "../fields/DemonstrationsField";
 import { ModelSelectField } from "../fields/ModelSelectField";
+import { RuntimeParametersField } from "../fields/RuntimeParametersField";
 import { PromptMessagesField } from "../fields/message-history-fields/PromptMessagesField";
 import { PromptHandleInfo } from "./components/PromptHandleInfo";
 import { VersionHistoryButton } from "./components/VersionHistoryButton";
@@ -38,7 +40,13 @@ function InnerPromptConfigForm() {
   const [isSaving, setIsSaving] = useState(false);
   const configId = methods.watch("configId");
   const isDraft = !Boolean(methods.watch("handle"));
-  const saveEnabled = (methods.formState.isDirty || isDraft) && !isSaving;
+  const hasRuntimeParametersError = Boolean(
+    methods.formState.errors.version?.parameters,
+  );
+  const saveEnabled =
+    (methods.formState.isDirty || isDraft) &&
+    !isSaving &&
+    !hasRuntimeParametersError;
 
   /**
    * It is a known limitation of react-hook-form useFieldArray that we cannot
@@ -59,11 +67,13 @@ function InnerPromptConfigForm() {
   }));
 
   const handleSaveClick = useCallback(async () => {
-    const isValid = await methods.trigger("version.configData.llm");
+    // Validate the full form so the save-time refinement (#3196: system
+    // prompt required) fires alongside the LLM config rules.
+    const isValid = await methods.trigger();
     if (!isValid) {
       toaster.create({
         title: "Validation error",
-        description: "Please fix the LLM configuration errors before saving",
+        description: getSaveBlockerMessage(methods),
         type: "error",
       });
       return;
@@ -131,6 +141,7 @@ function InnerPromptConfigForm() {
             otherNodesFields={{}}
           />
           <FormVariablesSection showMappings={false} title="Variables" />
+          <RuntimeParametersField />
           {hasDemonstrations && <DemonstrationsField />}
         </VStack>
         <HStack

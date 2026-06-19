@@ -358,9 +358,9 @@ export class IngestionTemplateService {
 
   /**
    * Soft-archive an org-authored template. Sets archivedAt; existing
-   * UserIngestionBindings continue to land traces (per the v1
-   * `enabled=false` semantics in the schema doc), but the row is
-   * removed from admin + user list views. Platform rows reject.
+   * ingestion keys continue to land traces (per the v1 `enabled=false`
+   * semantics in the schema doc), but the row is removed from admin +
+   * user list views. Platform rows reject.
    */
   async archiveOrgTemplate({
     organizationId,
@@ -413,7 +413,7 @@ export class IngestionTemplateService {
    * org-authored (platformPublished=false), keeps the same sourceType
    * and credentialSchema, and starts with the platform OTTL rules. The
    * clone is otherwise a fresh row — slug regenerated, no carryover
-   * bindings (those continue to point at the platform original).
+   * ingestion keys (those continue to point at the platform original).
    */
   async cloneFromPlatform({
     organizationId,
