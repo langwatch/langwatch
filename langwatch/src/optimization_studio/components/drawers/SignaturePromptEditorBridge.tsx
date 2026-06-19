@@ -1,6 +1,6 @@
-import { useCallback, useMemo } from "react";
-import { useUpdateNodeInternals } from "@xyflow/react";
 import type { Edge, Node } from "@xyflow/react";
+import { useUpdateNodeInternals } from "@xyflow/react";
+import { useCallback, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import { PromptEditorDrawer } from "~/components/prompts/PromptEditorDrawer";
@@ -17,7 +17,10 @@ import {
 } from "../../utils/edgeMappingUtils";
 
 /** Check whether two sets of fields have identical identifiers and types (order-independent). */
-function fieldsMatch(a: Field[], b: { identifier: string; type: string }[]): boolean {
+function fieldsMatch(
+  a: Field[],
+  b: { identifier: string; type: string }[],
+): boolean {
   if (a.length !== b.length) return false;
   const fieldMap = new Map(a.map((f) => [f.identifier, f.type]));
   return b.every((f) => fieldMap.get(f.identifier) === f.type);
@@ -181,27 +184,21 @@ export function SignaturePromptEditorBridge({
     [getWorkflow, node.id, setEdges, setNode, updateNodeInternals],
   );
 
-  /**
-   * Backward compatibility: when a node has no promptId and no localPromptConfig
-   * but has inline parameters (old workflow format), convert the inline config
-   * to LocalPromptConfig so the PromptEditorDrawer can display it for editing.
-   */
-  const initialLocalConfig = useMemo(() => {
-    // If the node already has a local config, use it directly
-    if (signatureNode.data.localPromptConfig) {
-      return signatureNode.data.localPromptConfig;
-    }
-    // Fall back to extracting config from inline parameters.
-    // When promptId is set and the prompt exists in DB, the drawer will use
-    // the DB data and ignore this. When the prompt is NOT found (e.g. after
-    // importing a workflow from another project), this provides the fallback
-    // so the drawer can display the node's actual inline configuration
-    // instead of an empty "New Prompt" form.
-    return nodeDataToLocalPromptConfig(signatureNode.data);
-  }, [
-    signatureNode.data.localPromptConfig,
-    signatureNode.data,
-  ]);
+  // Genuine unpublished local edits only. When the node references a saved
+  // library prompt (promptId) with no local edits this stays undefined, so the
+  // drawer loads and shows the saved prompt instead of a stale mirror of the
+  // node's inline parameters (which made a just-saved prompt look deleted).
+  const initialLocalConfig = signatureNode.data.localPromptConfig;
+
+  // Inline mirror of the node's parameters, used by the drawer ONLY when the
+  // referenced prompt is not found in the project (e.g. a workflow imported
+  // from another project) so it can still show the node's actual configuration
+  // instead of an empty "New Prompt" form. It is never merged over a prompt
+  // that loads successfully from the library.
+  const inlineConfigFallback = useMemo(
+    () => nodeDataToLocalPromptConfig(signatureNode.data),
+    [signatureNode.data],
+  );
 
   const handleLocalConfigChange = useCallback(
     (config: LocalPromptConfig | undefined) => {
@@ -360,6 +357,7 @@ export function SignaturePromptEditorBridge({
       promptId={signatureNode.data.promptId}
       promptVersionId={signatureNode.data.promptVersionId}
       initialLocalConfig={initialLocalConfig}
+      inlineConfigFallback={inlineConfigFallback}
       onLocalConfigChange={handleLocalConfigChange}
       onSave={handleSave}
       onVersionChange={handleVersionChange}

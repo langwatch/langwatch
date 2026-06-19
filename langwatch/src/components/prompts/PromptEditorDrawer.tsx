@@ -90,6 +90,13 @@ export type PromptEditorDrawerProps = {
    */
   initialLocalConfig?: LocalPromptConfig;
   /**
+   * Fallback config used ONLY when `promptId` is set but the prompt is not
+   * found in the project (e.g. a workflow imported from another project).
+   * Unlike `initialLocalConfig` it is never merged over a prompt that loads
+   * successfully, so a saved prompt always shows its own library content.
+   */
+  inlineConfigFallback?: LocalPromptConfig;
+  /**
    * Available sources for variable mapping (e.g., dataset columns).
    * When provided, shows mapping UI instead of simple value inputs.
    */
@@ -313,7 +320,9 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   // this seed, the subscription fires on defaults before the init useEffect
   // runs and clobbers the caller's local edits (#3155).
   const [configValues, setConfigValues] = useState<PromptConfigFormValues>(() =>
-    localConfigToFormValues(props.initialLocalConfig),
+    localConfigToFormValues(
+      props.initialLocalConfig ?? props.inlineConfigFallback,
+    ),
   );
   const [isFormInitialized, setIsFormInitialized] = useState(false);
   // Ref set directly in init/reset effects so the watch subscription
@@ -436,8 +445,12 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
         },
       });
 
-      // Merge initialLocalConfig over defaults to restore previous edits
-      const formValues = props.initialLocalConfig
+      // Restore the node's config over defaults. Prefer genuine unpublished
+      // edits, then the inline fallback (only set when the prompt was not found
+      // in the project) so imported workflows still show their configuration.
+      const notFoundConfig =
+        props.initialLocalConfig ?? props.inlineConfigFallback;
+      const formValues = notFoundConfig
         ? {
             ...defaults,
             version: {
@@ -446,22 +459,19 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
                 ...defaults.version.configData,
                 llm: {
                   ...defaults.version.configData.llm,
-                  ...props.initialLocalConfig.llm,
+                  ...notFoundConfig.llm,
                 },
                 messages:
-                  props.initialLocalConfig.messages.length > 0
-                    ? (props.initialLocalConfig
-                        .messages as typeof defaults.version.configData.messages)
+                  notFoundConfig.messages.length > 0
+                    ? (notFoundConfig.messages as typeof defaults.version.configData.messages)
                     : defaults.version.configData.messages,
                 inputs:
-                  props.initialLocalConfig.inputs.length > 0
-                    ? (props.initialLocalConfig
-                        .inputs as typeof defaults.version.configData.inputs)
+                  notFoundConfig.inputs.length > 0
+                    ? (notFoundConfig.inputs as typeof defaults.version.configData.inputs)
                     : defaults.version.configData.inputs,
                 outputs:
-                  props.initialLocalConfig.outputs.length > 0
-                    ? (props.initialLocalConfig
-                        .outputs as typeof defaults.version.configData.outputs)
+                  notFoundConfig.outputs.length > 0
+                    ? (notFoundConfig.outputs as typeof defaults.version.configData.outputs)
                     : defaults.version.configData.outputs,
               },
             },
@@ -514,6 +524,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     promptQuery.isLoading,
     promptId,
     props.initialLocalConfig,
+    props.inlineConfigFallback,
     methods,
     isFormInitialized,
     availableSources,
