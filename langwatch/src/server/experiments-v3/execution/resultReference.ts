@@ -94,3 +94,39 @@ export const readRowReference = (
     rowId,
   };
 };
+
+/** Shown for a heavy column whose referenced dataset row was edited away or deleted. */
+export const HEAVY_COLUMN_UNAVAILABLE = "[unavailable]";
+
+/**
+ * Rebuild the display entry for a stored result (ADR-033 Decision 4, I-RESULT-LIGHT).
+ *
+ * - Light columns kept inline at write time are used as-is.
+ * - Heavy columns that were dropped (a lean, referenced result) are filled from
+ *   the resolved dataset `row`; if the row is gone (edited away / deleted),
+ *   they degrade to `HEAVY_COLUMN_UNAVAILABLE` — never a crash.
+ * - Legacy / full-copy results (no reference) pass through unchanged.
+ * - Reserved reference keys are excluded (only `columnNames` are emitted).
+ *
+ * `row` is resolved by the caller within the result's project (I-TENANT).
+ */
+export const resolveLeanEntry = (params: {
+  storedEntry: Record<string, unknown>;
+  columnNames: string[];
+  row: Record<string, unknown> | null;
+}): Record<string, unknown> => {
+  const { storedEntry, columnNames, row } = params;
+  const isReferenced = readRowReference(storedEntry) !== null;
+
+  const display: Record<string, unknown> = {};
+  for (const col of columnNames) {
+    if (Object.prototype.hasOwnProperty.call(storedEntry, col)) {
+      // Inline light column (or any column on a legacy full-copy result).
+      display[col] = storedEntry[col];
+    } else if (isReferenced) {
+      // Heavy column dropped at write → resolve from the row, else "unavailable".
+      display[col] = row?.[col] ?? HEAVY_COLUMN_UNAVAILABLE;
+    }
+  }
+  return display;
+};

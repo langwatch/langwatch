@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { generateCells } from "../orchestrator";
 import {
+  HEAVY_COLUMN_UNAVAILABLE,
   RESERVED_DATASET_ID_KEY,
   RESERVED_ROW_ID_KEY,
   RESULT_INLINE_BYTES,
   isReservedResultKey,
   leanResultEntry,
   readRowReference,
+  resolveLeanEntry,
   withRowReference,
 } from "../resultReference";
 import type { ExecutionScope } from "../types";
@@ -93,6 +95,63 @@ describe("ADR-033 result-by-reference plumbing", () => {
         const full = leanResultEntry(row, { rowId: undefined }, { enabled: true });
         expect(full.image).toBe(heavyImage);
         expect(readRowReference(full)).toBeNull();
+      });
+    });
+  });
+
+  describe("resolveLeanEntry", () => {
+    const columnNames = ["question", "expected", "image"];
+    // a lean stored result: light columns inline, heavy "image" dropped, reference attached
+    const leanStored = leanResultEntry(
+      {
+        question: "how many units?",
+        expected: 5,
+        image: `data:image/png;base64,${"A".repeat(RESULT_INLINE_BYTES + 1)}`,
+      },
+      { datasetId: "ds-1", rowId: "record_abc" },
+      { enabled: true },
+    );
+
+    describe("when the referenced row resolves", () => {
+      it("fills the heavy column from the row and keeps light columns inline", () => {
+        const display = resolveLeanEntry({
+          storedEntry: leanStored,
+          columnNames,
+          row: { question: "ignored", expected: 0, image: "data:image/png;base64,RESOLVED" },
+        });
+
+        expect(display.question).toBe("how many units?"); // from the stored light column
+        expect(display.expected).toBe(5);
+        expect(display.image).toBe("data:image/png;base64,RESOLVED"); // from the resolved row
+        // reserved keys never surface as columns
+        expect(display[RESERVED_ROW_ID_KEY]).toBeUndefined();
+      });
+    });
+
+    describe("when the referenced row is gone (edited away / deleted)", () => {
+      it("degrades the heavy column to unavailable, light columns survive, no crash", () => {
+        const display = resolveLeanEntry({
+          storedEntry: leanStored,
+          columnNames,
+          row: null,
+        });
+
+        expect(display.question).toBe("how many units?");
+        expect(display.image).toBe(HEAVY_COLUMN_UNAVAILABLE);
+      });
+    });
+
+    describe("given a legacy full-copy result (no reference)", () => {
+      it("passes every column through unchanged, never 'unavailable'", () => {
+        const legacy = { question: "q", expected: 1, image: "data:image/png;base64,FULL" };
+
+        const display = resolveLeanEntry({
+          storedEntry: legacy,
+          columnNames,
+          row: null,
+        });
+
+        expect(display.image).toBe("data:image/png;base64,FULL");
       });
     });
   });
