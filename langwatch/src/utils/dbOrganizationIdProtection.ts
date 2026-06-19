@@ -65,7 +65,8 @@ const hasCompositeOrgKey = (clause: any): boolean => {
 // id (a team or project id), so it resolves to exactly one organization.
 const hasInlineScope = (clause: any): boolean =>
   typeof clause?.scopeType === "string" &&
-  (typeof clause?.scopeId === "string" || isNonEmptyStringList(clause?.scopeId));
+  (typeof clause?.scopeId === "string" ||
+    isNonEmptyStringList(clause?.scopeId));
 
 const boundsToSingleOrg = (clause: any): boolean =>
   hasOrganizationId(clause) || hasRowId(clause) || hasCompositeOrgKey(clause);

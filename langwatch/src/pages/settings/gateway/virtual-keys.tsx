@@ -4,38 +4,52 @@ import {
   Button,
   Card,
   EmptyState,
-  HStack,
   Heading,
+  HStack,
   Spacer,
   Spinner,
-  Tabs,
   Table,
+  Tabs,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Ban, Eye, Gauge, KeyRound, MoreVertical, Pencil, Plus, RotateCw, Shield, Trash2, Zap } from "lucide-react";
+import {
+  Ban,
+  Eye,
+  Gauge,
+  KeyRound,
+  MoreVertical,
+  Pencil,
+  Plus,
+  RotateCw,
+  Shield,
+  Trash2,
+  Zap,
+} from "lucide-react";
 import { useMemo, useState } from "react";
-import { useRouter } from "~/utils/compat/next-router";
-
 import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
-import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
-import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";
-import { Link } from "~/components/ui/link";
+import { isLangyManagedVk } from "~/components/gateway/langyVk";
 import { VirtualKeyCreateDrawer } from "~/components/gateway/VirtualKeyCreateDrawer";
 import { VirtualKeyEditDrawer } from "~/components/gateway/VirtualKeyEditDrawer";
 import { VirtualKeySecretReveal } from "~/components/gateway/VirtualKeySecretReveal";
-import { Menu } from "~/components/ui/menu";
+import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { Link } from "~/components/ui/link";
+import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { api } from "~/utils/api";
-import { isLangyManagedVk } from "~/components/gateway/langyVk";
+import { useRouter } from "~/utils/compat/next-router";
+import { formatTimeAgo } from "~/utils/formatTimeAgo";
 
-type ScopeEntry = { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string };
+type ScopeEntry = {
+  scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+  scopeId: string;
+};
 
 type CreatedSecret = {
   id: string;
@@ -95,17 +109,23 @@ function VirtualKeysPage() {
             : projectNameById.get(s.scopeId),
     }));
   const rotateMutation = api.virtualKeys.rotate.useMutation({
-    onSuccess: () => utils.virtualKeys.list.invalidate({ organizationId: orgId }),
+    onSuccess: () =>
+      utils.virtualKeys.list.invalidate({ organizationId: orgId }),
   });
   const revokeMutation = api.virtualKeys.revoke.useMutation({
-    onSuccess: () => utils.virtualKeys.list.invalidate({ organizationId: orgId }),
+    onSuccess: () =>
+      utils.virtualKeys.list.invalidate({ organizationId: orgId }),
   });
 
   const [createOpen, setCreateOpen] = useState(false);
   const [revealSecret, setRevealSecret] = useState<CreatedSecret | null>(null);
   const [editing, setEditing] = useState<any | null>(null);
-  const [rotating, setRotating] = useState<{ id: string; name: string } | null>(null);
-  const [revoking, setRevoking] = useState<{ id: string; name: string } | null>(null);
+  const [rotating, setRotating] = useState<{ id: string; name: string } | null>(
+    null,
+  );
+  const [revoking, setRevoking] = useState<{ id: string; name: string } | null>(
+    null,
+  );
   const [statusTab, setStatusTab] = useState<"active" | "revoked">("active");
 
   const allRows = listQuery.data ?? [];
@@ -184,7 +204,13 @@ function VirtualKeysPage() {
               onRetry={() => listQuery.refetch()}
             />
           ) : allRows.length === 0 ? (
-            <VStack gap={6} align="center" maxWidth="640px" marginX="auto" paddingY={8}>
+            <VStack
+              gap={6}
+              align="center"
+              maxWidth="640px"
+              marginX="auto"
+              paddingY={8}
+            >
               <EmptyState.Root>
                 <EmptyState.Content>
                   <EmptyState.Indicator>
@@ -240,200 +266,226 @@ function VirtualKeysPage() {
               {rows.length === 0 ? (
                 <Card.Root width="full">
                   <Card.Body>
-                    <Text fontSize="sm" color="fg.muted" textAlign="center" py={6}>
+                    <Text
+                      fontSize="sm"
+                      color="fg.muted"
+                      textAlign="center"
+                      py={6}
+                    >
                       No {statusTab} keys.
                     </Text>
                   </Card.Body>
                 </Card.Root>
               ) : (
-            <Card.Root width="full" overflow="hidden">
-              <Card.Body paddingY={0} paddingX={0}>
-            <Table.Root variant="line" size="md" width="full">
-              <Table.Header>
-                <Table.Row>
-                  <Table.ColumnHeader>Name</Table.ColumnHeader>
-                  <Table.ColumnHeader>Prefix</Table.ColumnHeader>
-                  <Table.ColumnHeader>Status</Table.ColumnHeader>
-                  <Table.ColumnHeader>Scopes</Table.ColumnHeader>
-                  <Table.ColumnHeader>Routing policy</Table.ColumnHeader>
-                  <Table.ColumnHeader>Last used</Table.ColumnHeader>
-                  <Table.ColumnHeader></Table.ColumnHeader>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {rows.map((vk) => (
-                  <Table.Row
-                    key={vk.id}
-                    cursor="pointer"
-                    _hover={{ bg: "bg.subtle" }}
-                    onClick={() =>
-                      void router.push(
-                        `/settings/gateway/virtual-keys/${vk.id}`,
-                      )
-                    }
-                  >
-                    <Table.Cell>
-                      <VStack align="start" gap={1}>
-                        <HStack gap={2} align="center">
-                          <Link
-                            href={`/settings/gateway/virtual-keys/${vk.id}`}
-                            fontWeight="medium"
+                <Card.Root width="full" overflow="hidden">
+                  <Card.Body paddingY={0} paddingX={0}>
+                    <Table.Root variant="line" size="md" width="full">
+                      <Table.Header>
+                        <Table.Row>
+                          <Table.ColumnHeader>Name</Table.ColumnHeader>
+                          <Table.ColumnHeader>Prefix</Table.ColumnHeader>
+                          <Table.ColumnHeader>Status</Table.ColumnHeader>
+                          <Table.ColumnHeader>Scopes</Table.ColumnHeader>
+                          <Table.ColumnHeader>
+                            Routing policy
+                          </Table.ColumnHeader>
+                          <Table.ColumnHeader>Last used</Table.ColumnHeader>
+                          <Table.ColumnHeader></Table.ColumnHeader>
+                        </Table.Row>
+                      </Table.Header>
+                      <Table.Body>
+                        {rows.map((vk) => (
+                          <Table.Row
+                            key={vk.id}
+                            cursor="pointer"
+                            _hover={{ bg: "bg.subtle" }}
+                            onClick={() =>
+                              void router.push(
+                                `/settings/gateway/virtual-keys/${vk.id}`,
+                              )
+                            }
                           >
-                            {vk.name}
-                          </Link>
-                          {isLangyManagedVk(vk) && (
-                            <Tooltip content="Auto-provisioned by LangWatch for the Langy in-product assistant. You can edit its model, fallbacks, budget, and rate limits like any other virtual key. Revoking it will break Langy until you create a new one.">
+                            <Table.Cell>
+                              <VStack align="start" gap={1}>
+                                <HStack gap={2} align="center">
+                                  <Link
+                                    href={`/settings/gateway/virtual-keys/${vk.id}`}
+                                    fontWeight="medium"
+                                  >
+                                    {vk.name}
+                                  </Link>
+                                  {isLangyManagedVk(vk) && (
+                                    <Tooltip content="Auto-provisioned by LangWatch for the Langy in-product assistant. You can edit its model, fallbacks, budget, and rate limits like any other virtual key. Revoking it will break Langy until you create a new one.">
+                                      <Badge
+                                        variant="subtle"
+                                        colorPalette="purple"
+                                        fontSize="2xs"
+                                        data-testid="langy-vk-badge"
+                                      >
+                                        auto-managed
+                                      </Badge>
+                                    </Tooltip>
+                                  )}
+                                </HStack>
+                                {vk.description && (
+                                  <Text fontSize="xs" color="fg.muted">
+                                    {vk.description}
+                                  </Text>
+                                )}
+                                {(() => {
+                                  const tags =
+                                    (
+                                      vk.config as {
+                                        metadata?: { tags?: string[] };
+                                      }
+                                    )?.metadata?.tags ?? [];
+                                  if (tags.length === 0) return null;
+                                  return (
+                                    <HStack gap={1} flexWrap="wrap">
+                                      {tags.map((t) => (
+                                        <Badge
+                                          key={t}
+                                          variant="subtle"
+                                          colorPalette="gray"
+                                          fontSize="2xs"
+                                        >
+                                          {t}
+                                        </Badge>
+                                      ))}
+                                    </HStack>
+                                  );
+                                })()}
+                              </VStack>
+                            </Table.Cell>
+                            <Table.Cell>
+                              <Text fontFamily="mono" fontSize="xs">
+                                {vk.displayPrefix}…
+                              </Text>
+                            </Table.Cell>
+                            <Table.Cell>
                               <Badge
-                                variant="subtle"
-                                colorPalette="purple"
-                                fontSize="2xs"
-                                data-testid="langy-vk-badge"
+                                colorPalette={
+                                  vk.status === "active" ? "green" : "red"
+                                }
                               >
-                                auto-managed
+                                {vk.status}
                               </Badge>
-                            </Tooltip>
-                          )}
-                        </HStack>
-                        {vk.description && (
-                          <Text fontSize="xs" color="fg.muted">
-                            {vk.description}
-                          </Text>
-                        )}
-                        {(() => {
-                          const tags =
-                            (vk.config as { metadata?: { tags?: string[] } })
-                              ?.metadata?.tags ?? [];
-                          if (tags.length === 0) return null;
-                          return (
-                            <HStack gap={1} flexWrap="wrap">
-                              {tags.map((t) => (
-                                <Badge
-                                  key={t}
-                                  variant="subtle"
-                                  colorPalette="gray"
-                                  fontSize="2xs"
-                                >
-                                  {t}
+                            </Table.Cell>
+                            <Table.Cell>
+                              <ProviderScopeChips
+                                scopes={scopeEntriesWithNames(vk.scopes)}
+                                size="xs"
+                                principal={
+                                  vk.principalUserId && vk.principalUser
+                                    ? {
+                                        name: vk.principalUser.name,
+                                        email: vk.principalUser.email,
+                                      }
+                                    : undefined
+                                }
+                              />
+                            </Table.Cell>
+                            <Table.Cell>
+                              {vk.routingPolicyId ? (
+                                <Badge variant="subtle" colorPalette="purple">
+                                  {policyNameById.get(vk.routingPolicyId) ??
+                                    vk.routingPolicyId}
                                 </Badge>
-                              ))}
-                            </HStack>
-                          );
-                        })()}
-                      </VStack>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Text fontFamily="mono" fontSize="xs">
-                        {vk.displayPrefix}…
-                      </Text>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Badge
-                        colorPalette={vk.status === "active" ? "green" : "red"}
-                      >
-                        {vk.status}
-                      </Badge>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <ProviderScopeChips
-                        scopes={scopeEntriesWithNames(vk.scopes)}
-                        size="xs"
-                        principal={
-                          vk.principalUserId && vk.principalUser
-                            ? {
-                                name: vk.principalUser.name,
-                                email: vk.principalUser.email,
-                              }
-                            : undefined
-                        }
-                      />
-                    </Table.Cell>
-                    <Table.Cell>
-                      {vk.routingPolicyId ? (
-                        <Badge variant="subtle" colorPalette="purple">
-                          {policyNameById.get(vk.routingPolicyId) ??
-                            vk.routingPolicyId}
-                        </Badge>
-                      ) : (
-                        <Text fontSize="xs" color="fg.muted">
-                          default cascade
-                        </Text>
-                      )}
-                    </Table.Cell>
-                    <Table.Cell>
-                      {vk.lastUsedAt ? (
-                        <Tooltip
-                          content={new Date(vk.lastUsedAt).toLocaleString()}
-                        >
-                          <Text fontSize="sm">
-                            {formatTimeAgo(new Date(vk.lastUsedAt).getTime())}
-                          </Text>
-                        </Tooltip>
-                      ) : (
-                        <Text fontSize="sm" color="fg.muted">
-                          never
-                        </Text>
-                      )}
-                    </Table.Cell>
-                    <Table.Cell
-                      onClick={(e) => e.stopPropagation()}
-                      cursor="default"
-                    >
-                      {vk.status === "active" && (
-                        <Menu.Root>
-                          <Menu.Trigger asChild>
-                            <Button variant="ghost" size="xs" aria-label="Actions">
-                              <MoreVertical size={14} />
-                            </Button>
-                          </Menu.Trigger>
-                          <Menu.Content>
-                            <Menu.Item
-                              value="details"
-                              onClick={() =>
-                                void router.push(
-                                  `/settings/gateway/virtual-keys/${vk.id}`,
-                                )
-                              }
+                              ) : (
+                                <Text fontSize="xs" color="fg.muted">
+                                  default cascade
+                                </Text>
+                              )}
+                            </Table.Cell>
+                            <Table.Cell>
+                              {vk.lastUsedAt ? (
+                                <Tooltip
+                                  content={new Date(
+                                    vk.lastUsedAt,
+                                  ).toLocaleString()}
+                                >
+                                  <Text fontSize="sm">
+                                    {formatTimeAgo(
+                                      new Date(vk.lastUsedAt).getTime(),
+                                    )}
+                                  </Text>
+                                </Tooltip>
+                              ) : (
+                                <Text fontSize="sm" color="fg.muted">
+                                  never
+                                </Text>
+                              )}
+                            </Table.Cell>
+                            <Table.Cell
+                              onClick={(e) => e.stopPropagation()}
+                              cursor="default"
                             >
-                              <Eye size={14} /> Details
-                            </Menu.Item>
-                            {canUpdate && (
-                              <Menu.Item
-                                value="edit"
-                                onClick={() => setEditing(vk)}
-                              >
-                                <Pencil size={14} /> Edit
-                              </Menu.Item>
-                            )}
-                            {canRotate && (
-                              <Menu.Item
-                                value="rotate"
-                                onClick={() =>
-                                  setRotating({ id: vk.id, name: vk.name })
-                                }
-                              >
-                                <RotateCw size={14} /> Rotate secret
-                              </Menu.Item>
-                            )}
-                            {canRevoke && (
-                              <Menu.Item
-                                value="revoke"
-                                onClick={() =>
-                                  setRevoking({ id: vk.id, name: vk.name })
-                                }
-                              >
-                                <Trash2 size={14} /> Revoke
-                              </Menu.Item>
-                            )}
-                          </Menu.Content>
-                        </Menu.Root>
-                      )}
-                    </Table.Cell>
-                  </Table.Row>
-                ))}
-              </Table.Body>
-            </Table.Root>
-              </Card.Body>
-            </Card.Root>
+                              {vk.status === "active" && (
+                                <Menu.Root>
+                                  <Menu.Trigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="xs"
+                                      aria-label="Actions"
+                                    >
+                                      <MoreVertical size={14} />
+                                    </Button>
+                                  </Menu.Trigger>
+                                  <Menu.Content>
+                                    <Menu.Item
+                                      value="details"
+                                      onClick={() =>
+                                        void router.push(
+                                          `/settings/gateway/virtual-keys/${vk.id}`,
+                                        )
+                                      }
+                                    >
+                                      <Eye size={14} /> Details
+                                    </Menu.Item>
+                                    {canUpdate && (
+                                      <Menu.Item
+                                        value="edit"
+                                        onClick={() => setEditing(vk)}
+                                      >
+                                        <Pencil size={14} /> Edit
+                                      </Menu.Item>
+                                    )}
+                                    {canRotate && (
+                                      <Menu.Item
+                                        value="rotate"
+                                        onClick={() =>
+                                          setRotating({
+                                            id: vk.id,
+                                            name: vk.name,
+                                          })
+                                        }
+                                      >
+                                        <RotateCw size={14} /> Rotate secret
+                                      </Menu.Item>
+                                    )}
+                                    {canRevoke && (
+                                      <Menu.Item
+                                        value="revoke"
+                                        onClick={() =>
+                                          setRevoking({
+                                            id: vk.id,
+                                            name: vk.name,
+                                          })
+                                        }
+                                      >
+                                        <Trash2 size={14} /> Revoke
+                                      </Menu.Item>
+                                    )}
+                                  </Menu.Content>
+                                </Menu.Root>
+                              )}
+                            </Table.Cell>
+                          </Table.Row>
+                        ))}
+                      </Table.Body>
+                    </Table.Root>
+                  </Card.Body>
+                </Card.Root>
               )}
             </VStack>
           )}

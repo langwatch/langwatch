@@ -23,22 +23,22 @@ import {
   isStrandsAgentsInstrumentation,
 } from "./span-event-processing/strands-agents";
 import {
+  type BaseSpan,
+  type ChatMessage,
   chatMessageSchema,
   customMetadataSchema,
+  type LLMSpan,
+  type RAGChunk,
   rESTEvaluationSchema,
   reservedSpanParamsSchema,
   reservedTraceMetadataSchema,
+  type Span,
+  type SpanTypes,
   spanMetricsSchema,
   spanTimestampsSchema,
   spanTypesSchema,
-  typedValueChatMessagesSchema,
-  type BaseSpan,
-  type ChatMessage,
-  type LLMSpan,
-  type RAGChunk,
-  type Span,
-  type SpanTypes,
   type TypedValueChatMessages,
+  typedValueChatMessagesSchema,
 } from "./types";
 import { decodeBase64OpenTelemetryId, decodeOpenTelemetryId } from "./utils";
 
@@ -105,9 +105,7 @@ export const openTelemetryTraceRequestToTracesForCollection = async (
           code: SpanStatusCode.ERROR,
           message: error instanceof Error ? error.message : "Unknown error",
         });
-        span.recordException(
-          toError(error),
-        );
+        span.recordException(toError(error));
         throw error;
       }
     },
@@ -263,9 +261,7 @@ const openTelemetryTraceRequestToTraceForCollection = (
           code: SpanStatusCode.ERROR,
           message: error instanceof Error ? error.message : "Unknown error",
         });
-        span.recordException(
-          toError(error),
-        );
+        span.recordException(toError(error));
         throw error;
       }
     },
@@ -1352,9 +1348,7 @@ const addOpenTelemetrySpanAsSpan = (
           code: SpanStatusCode.ERROR,
           message: error instanceof Error ? error.message : "Unknown error",
         });
-        otelSpan.recordException(
-          toError(error),
-        );
+        otelSpan.recordException(toError(error));
         throw error;
       }
     },

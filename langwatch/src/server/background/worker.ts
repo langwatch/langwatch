@@ -1,7 +1,13 @@
 import "../../instrumentation.node";
+
 // This MUST BE first.
 
+import { startIngestionPullerWorker } from "@ee/governance/services/pullers/pullerWorker";
 import type { Job, Worker } from "bullmq";
+import fs from "fs";
+import http from "http";
+import path from "path";
+import { register } from "prom-client";
 import type {
   AnomalyDetectionJob,
   CollectorJob,
@@ -14,48 +20,39 @@ import type {
   SingleEvaluationResult,
 } from "../../server/evaluations/evaluators";
 import { createLogger } from "../../utils/logger/server";
-import { startCollectorWorker } from "./workers/collectorWorker";
-import {
-  runEvaluationJob,
-  startEvaluationsWorker,
-} from "./workers/evaluationsWorker";
-import { registerEvaluationsFallbackWorker } from "./queues/evaluationsQueue";
-import { startAnomalyWorker } from "../observability/anomalyWorker";
-import { startTopicClusteringWorker } from "./workers/topicClusteringWorker";
-
-import fs from "fs";
-import http from "http";
-import path from "path";
-import { register } from "prom-client";
-import {
-  type BullMQQueueState,
-  setBullMQJobCount,
-  workerRestartsCounter,
-} from "../metrics";
-import { getWorkerMetricsPort } from "./config";
-import { WorkersRestart } from "./errors";
-
 import { getApp } from "../app-layer/app";
+import { getScenarioExecutionHandle } from "../app-layer/presets";
 import { getSharedClickHouseClient } from "../clickhouse/clickhouseClient";
 import {
   startStorageStatsCollection,
   stopStorageStatsCollection,
 } from "../clickhouse/metrics";
+import {
+  type BullMQQueueState,
+  setBullMQJobCount,
+  workerRestartsCounter,
+} from "../metrics";
+import { startAnomalyWorker } from "../observability/anomalyWorker";
 import { connection as redis } from "../redis";
-import { startScenarioProcessor } from "../scenarios/scenario.processor";
 import { ScenarioExecutionPool } from "../scenarios/execution/execution-pool";
 import { SCENARIO_WORKER } from "../scenarios/scenario.constants";
-import { getScenarioExecutionHandle } from "../app-layer/presets";
+import { startScenarioProcessor } from "../scenarios/scenario.processor";
+import { getWorkerMetricsPort } from "./config";
+import { WorkersRestart } from "./errors";
 import { monitoredQueues } from "./queues";
-import { startUsageStatsWorker } from "./workers/usageStatsWorker";
-import { startAnomalyDetectionWorker } from "./workers/anomalyDetectionWorker";
 import { scheduleAnomalyDetection } from "./queues/anomalyDetectionQueue";
-import { startIngestionPullerWorker } from "@ee/governance/services/pullers/pullerWorker";
+import { registerEvaluationsFallbackWorker } from "./queues/evaluationsQueue";
 import { scheduleIngestionPullers } from "./queues/ingestionPullerQueue";
-import {
-  startLangyRetentionWorker,
-} from "./workers/langyRetentionWorker";
 import { scheduleLangyRetention } from "./queues/langyRetentionQueue";
+import { startAnomalyDetectionWorker } from "./workers/anomalyDetectionWorker";
+import { startCollectorWorker } from "./workers/collectorWorker";
+import {
+  runEvaluationJob,
+  startEvaluationsWorker,
+} from "./workers/evaluationsWorker";
+import { startLangyRetentionWorker } from "./workers/langyRetentionWorker";
+import { startTopicClusteringWorker } from "./workers/topicClusteringWorker";
+import { startUsageStatsWorker } from "./workers/usageStatsWorker";
 
 const logger = createLogger("langwatch:workers");
 
@@ -155,7 +152,9 @@ export const start = async (
     startStorageStatsCollection(clickHouseClient);
   }
 
-  const scenarioPool = new ScenarioExecutionPool({ concurrency: SCENARIO_WORKER.CONCURRENCY });
+  const scenarioPool = new ScenarioExecutionPool({
+    concurrency: SCENARIO_WORKER.CONCURRENCY,
+  });
   // Wire the pool into the execution reactor (late-bound during app init)
   const executionHandle = getScenarioExecutionHandle();
   if (executionHandle) {
