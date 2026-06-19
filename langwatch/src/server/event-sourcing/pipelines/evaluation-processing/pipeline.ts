@@ -4,9 +4,9 @@ import type { OutboxReactorDefinition } from "../../outbox/outboxReactor.types";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
 import {
-  StartEvaluationCommand,
   CompleteEvaluationCommand,
   ReportEvaluationCommand,
+  StartEvaluationCommand,
 } from "./commands";
 import { ExecuteEvaluationCommand } from "./commands/executeEvaluation.command";
 import { EvaluationRunFoldProjection } from "./projections/evaluationRun.foldProjection";
@@ -15,18 +15,27 @@ import type { EvaluationProcessingEvent } from "./schemas/events";
 export interface EvaluationProcessingPipelineDeps {
   evalRunStore: FoldProjectionStore<EvaluationRunData>;
   executeEvaluationCommand: ExecuteEvaluationCommand;
-  esSyncReactor: ReactorDefinition<EvaluationProcessingEvent, EvaluationRunData>;
+  esSyncReactor: ReactorDefinition<
+    EvaluationProcessingEvent,
+    EvaluationRunData
+  >;
   /** PERSIST-class branch of the evaluation alert trigger, routed
    *  through the framework's `.withOutbox` plumbing (ADR-030 + ADR-032).
    *  Emits settle payloads stamped `actionClass: "persist"`. */
-  evaluationAlertTriggerReactor: OutboxReactorDefinition<EvaluationProcessingEvent, EvaluationRunData>;
+  evaluationAlertTriggerReactor: OutboxReactorDefinition<
+    EvaluationProcessingEvent,
+    EvaluationRunData
+  >;
   /** NOTIFY-class branch of the evaluation alert trigger, routed
    *  through the framework's `.withOutbox` plumbing (ADR-030). */
   evaluationAlertTriggerNotifyOutboxReactor: OutboxReactorDefinition<
     EvaluationProcessingEvent,
     EvaluationRunData
   >;
-  customerIoEvaluationSyncReactor?: ReactorDefinition<EvaluationProcessingEvent, EvaluationRunData>;
+  customerIoEvaluationSyncReactor?: ReactorDefinition<
+    EvaluationProcessingEvent,
+    EvaluationRunData
+  >;
 }
 
 /**
@@ -41,13 +50,18 @@ export interface EvaluationProcessingPipelineDeps {
  * - startEvaluation: Records eval start to CH (API handler path)
  * - completeEvaluation: Records eval result to CH (API handler path)
  */
-export function createEvaluationProcessingPipeline(deps: EvaluationProcessingPipelineDeps) {
+export function createEvaluationProcessingPipeline(
+  deps: EvaluationProcessingPipelineDeps,
+) {
   let builder = definePipeline<EvaluationProcessingEvent>()
     .withName("evaluation_processing")
     .withAggregateType("evaluation")
-    .withFoldProjection("evaluationRun", new EvaluationRunFoldProjection({
-      store: deps.evalRunStore,
-    }))
+    .withFoldProjection(
+      "evaluationRun",
+      new EvaluationRunFoldProjection({
+        store: deps.evalRunStore,
+      }),
+    )
     .withReactor("evaluationRun", "evaluationEsSync", deps.esSyncReactor)
     .withOutbox(
       "evaluationRun",
@@ -69,13 +83,18 @@ export function createEvaluationProcessingPipeline(deps: EvaluationProcessingPip
   }
 
   return builder
-    .withCommandInstance("executeEvaluation", ExecuteEvaluationCommand, deps.executeEvaluationCommand, {
-      delay: 30_000,
-      deduplication: {
-        makeId: ExecuteEvaluationCommand.makeJobId,
-        ttlMs: 30_000,
+    .withCommandInstance(
+      "executeEvaluation",
+      ExecuteEvaluationCommand,
+      deps.executeEvaluationCommand,
+      {
+        delay: 30_000,
+        deduplication: {
+          makeId: ExecuteEvaluationCommand.makeJobId,
+          ttlMs: 30_000,
+        },
       },
-    })
+    )
     .withCommand("startEvaluation", StartEvaluationCommand)
     .withCommand("completeEvaluation", CompleteEvaluationCommand)
     .withCommand("reportEvaluation", ReportEvaluationCommand)
