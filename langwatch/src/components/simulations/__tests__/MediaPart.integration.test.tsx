@@ -24,14 +24,21 @@ type HeadByIdProbeResult =
 
 const mockHeadByIdData = vi.fn(() => undefined as undefined | HeadByIdProbeResult);
 
+// Records every input the component passes to the existence probe. The probe
+// input is rebuilt on each render with the stored-object id extracted from the
+// media URL, so these capture how the id is parsed out of the URL — including
+// the project-scoped `/api/files/<projectId>/<id>` shape (issue #4947).
+const headByIdInputs: Array<{ projectId: string; id: string }> = [];
+
 vi.mock("~/utils/api", () => ({
   api: {
     storedObjects: {
       headById: {
         useQuery: (
-          _input: unknown,
+          input: unknown,
           opts: { enabled?: boolean } | undefined,
         ) => {
+          headByIdInputs.push(input as { projectId: string; id: string });
           // Only return data when the query is enabled (i.e. after an error event).
           if (!opts?.enabled) return { data: undefined };
           return { data: mockHeadByIdData() };
@@ -57,6 +64,7 @@ describe("<MediaPart/>", () => {
     mockHeadByIdData.mockReset();
     // Default: no data (probe not yet completed)
     mockHeadByIdData.mockReturnValue(undefined);
+    headByIdInputs.length = 0;
   });
 
   describe("when a message has a url-shape audio part", () => {
@@ -127,6 +135,56 @@ describe("<MediaPart/>", () => {
       expect(video.tagName.toLowerCase()).toBe("video");
       expect(video).toHaveAttribute("src", "/api/files/stored-video-id");
       expect(video).toHaveAttribute("controls");
+    });
+  });
+
+  describe("when the url carries a project-id segment (#4947)", () => {
+    /** @scenario "MediaPart extracts the stored-object id from a project-scoped url for the existence probe" */
+    it("probes with the id from the final path segment, not the project segment", () => {
+      render(
+        <MediaPart
+          projectId={TEST_PROJECT_ID}
+          part={{
+            type: "image",
+            source: {
+              type: "url",
+              value: `/api/files/${TEST_PROJECT_ID}/so_scoped_id`,
+              mimeType: "image/png",
+            },
+          }}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      // The probe input is rebuilt every render with the extracted id; the id
+      // is the FINAL path segment (so_scoped_id), never the project segment.
+      expect(headByIdInputs.at(-1)).toEqual({
+        projectId: TEST_PROJECT_ID,
+        id: "so_scoped_id",
+      });
+    });
+
+    /** @scenario "MediaPart still extracts the id from a legacy id-only url" */
+    it("extracts the id from a legacy id-only url for backward compatibility", () => {
+      render(
+        <MediaPart
+          projectId={TEST_PROJECT_ID}
+          part={{
+            type: "image",
+            source: {
+              type: "url",
+              value: "/api/files/so_legacy_id",
+              mimeType: "image/png",
+            },
+          }}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(headByIdInputs.at(-1)).toEqual({
+        projectId: TEST_PROJECT_ID,
+        id: "so_legacy_id",
+      });
     });
   });
 
