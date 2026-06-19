@@ -4,7 +4,6 @@ import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
 import { decrypt, encrypt } from "~/utils/encryption";
 import { createLogger } from "~/utils/logger/server";
 import { resolveAttributionUserId } from "./langyAttribution";
-import { backfillLangyCredentialPerProject } from "./langyBackfill";
 
 const logger = createLogger("langwatch:langy:virtual-key");
 
@@ -120,36 +119,3 @@ export async function provisionLangyVirtualKey(args: {
   }
 }
 
-/**
- * Idempotently provision a Langy VK for every application project that
- * doesn't already have one. Called from `scripts/backfill-langy-virtual-keys.ts`.
- * Mirrors `backfillLangyApiKeys` via the shared per-project sweep.
- */
-export async function backfillLangyVirtualKeys(
-  prisma: PrismaClient,
-  { dryRun = false }: { dryRun?: boolean } = {},
-) {
-  return await backfillLangyCredentialPerProject({
-    prisma,
-    dryRun,
-    label: "Langy VK",
-    logger,
-    isProvisioned: async (project) => {
-      const existing = await prisma.projectSecret.findFirst({
-        where: { projectId: project.id, name: LANGY_VK_SECRET_NAME },
-        select: { id: true },
-      });
-      return Boolean(existing);
-    },
-    provision: async (project) => {
-      const secret = await provisionLangyVirtualKey({
-        prisma,
-        projectId: project.id,
-        organizationId: project.organizationId,
-      });
-      // No admin to attribute the VK to — counted as skipped, not failed.
-      // First chat with a real user will heal this.
-      return secret ? "provisioned" : "skipped";
-    },
-  });
-}

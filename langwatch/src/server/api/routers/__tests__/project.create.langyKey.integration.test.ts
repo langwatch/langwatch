@@ -31,8 +31,8 @@ import {
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import {
-  backfillLangyApiKeys,
   LANGY_API_KEY_NAME,
+  provisionLangyApiKey,
 } from "~/server/services/langy/langyApiKey";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { prisma } from "../../../db";
@@ -153,7 +153,7 @@ describe.skipIf(isTestcontainersOnly)("Langy API key provisioning", () => {
   }
 
   // Helper to create a project directly in the DB (no Langy key) — simulates a
-  // project that predates Langy keys, for backfill tests.
+  // project that predates Langy keys, for the first-call heal path.
   async function createLegacyProject(name: string) {
     return prisma.project.create({
       data: {
@@ -239,23 +239,38 @@ describe.skipIf(isTestcontainersOnly)("Langy API key provisioning", () => {
     });
   });
 
-  describe("when backfilling existing projects", () => {
-    /** @scenario "Existing projects without a Langy key are backfilled" */
+  describe("when a project predates Langy keys (first-call heal)", () => {
+    /** @scenario "Existing projects without a Langy key heal on first call" */
     it("provisions a Langy key for a project that has none", async () => {
-      const project = await createLegacyProject("Backfill Target");
+      const project = await createLegacyProject("Heal Target");
       expect(await findLangyKeys(project.id)).toHaveLength(0);
 
-      await backfillLangyApiKeys(prisma);
+      await provisionLangyApiKey({
+        prisma,
+        projectId: project.id,
+        organizationId,
+        createdByUserId: userId,
+      });
 
       expect(await findLangyKeys(project.id)).toHaveLength(1);
     });
 
-    /** @scenario "Backfill does not create duplicates" */
-    it("does not create duplicates when run again", async () => {
-      const project = await createLegacyProject("Idempotent Backfill");
+    /** @scenario "Repeated heal calls do not create duplicates" */
+    it("does not create duplicates when called repeatedly", async () => {
+      const project = await createLegacyProject("Idempotent Heal");
 
-      await backfillLangyApiKeys(prisma);
-      await backfillLangyApiKeys(prisma);
+      await provisionLangyApiKey({
+        prisma,
+        projectId: project.id,
+        organizationId,
+        createdByUserId: userId,
+      });
+      await provisionLangyApiKey({
+        prisma,
+        projectId: project.id,
+        organizationId,
+        createdByUserId: userId,
+      });
 
       expect(await findLangyKeys(project.id)).toHaveLength(1);
     });

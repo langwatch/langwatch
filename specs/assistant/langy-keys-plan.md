@@ -3,6 +3,16 @@
 > **Epic:** #4528 · **Sub-issues:** #4273 → #4274 → #4275
 > **Branch:** `issue4273/langy-api-key` · **Base:** `langy/per-session-manager` (PR #4272)
 > **Worktree:** `~/langwatch_codebase/langy-keys`
+>
+> **Update — PR #4913 (full-langy):** the bulk backfill paths
+> (`scripts/backfill-langy-{api-keys,virtual-keys}.ts`, the
+> `backfillLangyApiKeys`/`backfillLangyVirtualKeys` exports, and the shared
+> `langyBackfill.ts` helper) were removed. Both credentials are now provisioned
+> lazily on the first chat for any project that lacks them, via
+> `LangyCredentialService.getOrProvision()` → `provisionLangyApiKey()` and
+> `provisionLangyVirtualKey()`. Self-hosted operators no longer need to run a
+> manual sweep. Sections below referencing "backfill" describe the original
+> plan and are kept for history.
 
 ## Goal
 
