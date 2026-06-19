@@ -130,7 +130,7 @@ func TestEngineExecute_SignatureNodeEmitsLLMChildSpan(t *testing.T) {
 func TestEngineExecute_SignatureNodeSurfacesTokenMetrics(t *testing.T) {
 	_ = withRecorder(t)
 
-	model := "openai/gpt-5-nano"
+	model := "openai/gpt-5-mini"
 	llm := &fakeLLMClient{
 		resp: &app.LLMResponse{
 			Content: "4",
