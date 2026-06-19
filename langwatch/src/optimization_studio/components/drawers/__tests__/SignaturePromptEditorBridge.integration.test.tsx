@@ -170,7 +170,7 @@ describe("SignaturePromptEditorBridge", () => {
 
     it("provides the inline config as the fallback when there is no promptId and no localPromptConfig", () => {
       const fallbackConfig: LocalPromptConfig = {
-        llm: { model: "gpt-3.5-turbo" },
+        llm: { model: "gpt-5-mini" },
         messages: [],
         inputs: [],
         outputs: [],
