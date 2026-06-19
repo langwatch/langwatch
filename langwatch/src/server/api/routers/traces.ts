@@ -267,9 +267,13 @@ export const tracesRouter = createTRPCRouter({
         ctx.prisma,
         buildTraceBlobResolutionDeps(),
       );
-      return traceService.getTracesWithSpans(projectId, traceIds, protections, {
-        full: true,
-      });
+      return traceService.getTracesWithSpans(
+        projectId,
+        traceIds,
+        protections,
+        undefined,
+        { full: true },
+      );
     }),
 
   getFormattedSpansDigest: protectedProcedure
@@ -351,6 +355,7 @@ export const tracesRouter = createTRPCRouter({
         input.projectId,
         traceIds,
         protections,
+        { from: input.startDate, to: input.endDate },
       );
     }),
 
@@ -415,6 +420,7 @@ export const tracesRouter = createTRPCRouter({
         projectId,
         traceIds,
         protections,
+        { from: input.startDate, to: input.endDate },
       );
 
       const passedPreconditions = traceWithSpans.filter((trace) => {
