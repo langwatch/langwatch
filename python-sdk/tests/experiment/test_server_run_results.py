@@ -16,6 +16,8 @@ import pytest
 from langwatch.experiment import platform_run
 from langwatch.experiment.platform_run import run as experiment_run
 
+pytestmark = pytest.mark.unit
+
 
 class _FakeResponse:
     def __init__(self, status_code: int, json_body: Optional[dict] = None):
