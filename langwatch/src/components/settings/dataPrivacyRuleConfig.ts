@@ -6,6 +6,7 @@ import {
   type DataPrivacyConfig,
   type Disposition,
   type PiiLevel,
+  PLATFORM_DEFAULT_DATA_PRIVACY,
   type ResolvedAudience,
   type ResolvedDataPrivacy,
 } from "~/server/data-privacy/dataPrivacy.types";
@@ -13,15 +14,18 @@ import {
 /**
  * Pure form-state to DataPrivacyConfig translation for the privacy-rule drawer.
  *
- * A field only lands in the config when the user explicitly persists it; an
- * omitted field inherits the next scope up. The cascade resolves per field, so
- * a less-restrictive override (e.g. project `capture` over an org `drop`) is
- * only representable by persisting that value EXPLICITLY. The `touched`
- * descriptor names which controls to persist: a touched control is written
- * regardless of value, so `capture` / `essential` / secrets-on become real
- * overrides instead of inherited defaults. Untouched controls stay omitted and
- * keep inheriting.
+ * Every control carries an explicit "inherit" choice on top of its real values.
+ * A field only lands in the config when its control names a concrete value; an
+ * "inherit" control is omitted, so that field falls through to the next scope up
+ * the cascade (and finally the platform default). The cascade resolves per
+ * field, so a less-restrictive override (e.g. project `capture` over an org
+ * `drop`) is representable by choosing that value explicitly, while "inherit"
+ * hands the field back to the wider scope.
  */
+
+export type CategoryChoice = "inherit" | Disposition;
+export type PiiChoice = "inherit" | PiiLevel;
+export type SecretsChoice = "inherit" | "on" | "off";
 
 /**
  * The drawer's audience selection: everyone with access (all members), the
@@ -108,18 +112,6 @@ export interface CustomAttributeFormRow {
   disposition: CustomAttributeDisposition;
 }
 
-/**
- * Which drawer controls the user touched, so they persist as explicit overrides.
- * The audience only surfaces through restrict categories/attribute rows, so it
- * has no standalone field in the built config and is not tracked here. Custom
- * attribute rows are explicit by construction (they only exist when added).
- */
-export interface TouchedControls {
-  categories: Partial<Record<ContentCategory, boolean>>;
-  pii: boolean;
-  secrets: boolean;
-}
-
 export function audienceConfig(audience: AudienceFormState): Audience {
   const out: Audience = {};
   if (audience.admins) out.admins = true;
@@ -159,49 +151,49 @@ export function validCustomAttributeRows(
 export function buildRuleConfig({
   dispositions,
   audience,
-  piiLevel,
+  piiChoice,
   piiEntities,
-  secretsEnabled,
+  secretsChoice,
   secretsPatterns,
   customAttributes,
-  touched,
 }: {
-  dispositions: Record<ContentCategory, Disposition>;
+  dispositions: Record<ContentCategory, CategoryChoice>;
   audience: AudienceFormState;
-  piiLevel: PiiLevel;
+  piiChoice: PiiChoice;
   piiEntities: string[];
-  secretsEnabled: boolean;
+  secretsChoice: SecretsChoice;
   secretsPatterns: string[];
   customAttributes: CustomAttributeFormRow[];
-  touched: TouchedControls;
 }): DataPrivacyConfig {
   const categories: NonNullable<DataPrivacyConfig["categories"]> = {};
   for (const category of CONTENT_CATEGORIES) {
-    if (!touched.categories[category]) continue;
-    const disposition = dispositions[category];
-    if (disposition === "restrict") {
+    const choice = dispositions[category];
+    if (choice === "inherit") continue;
+    if (choice === "restrict") {
       categories[category] = {
         disposition: "restrict",
         audience: audienceConfig(audience),
       };
     } else {
-      categories[category] = { disposition };
+      categories[category] = { disposition: choice };
     }
   }
 
   const config: DataPrivacyConfig = {};
   if (Object.keys(categories).length > 0) config.categories = categories;
-  if (touched.pii) {
+  if (piiChoice !== "inherit") {
     config.pii =
-      piiLevel === "custom"
-        ? { level: piiLevel, entities: [...piiEntities].sort() }
-        : { level: piiLevel };
+      piiChoice === "custom"
+        ? { level: piiChoice, entities: [...piiEntities].sort() }
+        : { level: piiChoice };
   }
-  if (touched.secrets) {
+  if (secretsChoice !== "inherit") {
     const patterns = secretsPatterns.map((p) => p.trim()).filter(Boolean);
     config.secrets = {
-      enabled: secretsEnabled,
-      ...(patterns.length > 0 ? { customPatterns: patterns } : {}),
+      enabled: secretsChoice === "on",
+      ...(secretsChoice === "on" && patterns.length > 0
+        ? { customPatterns: patterns }
+        : {}),
     };
   }
   const attributeRows = validCustomAttributeRows(customAttributes);
@@ -219,87 +211,79 @@ export function buildRuleConfig({
   return config;
 }
 
-/** The drawer's editable form state, independent of which controls are touched. */
+/** The drawer's editable form state. Every control can resolve to "inherit". */
 export interface RuleFormState {
-  dispositions: Record<ContentCategory, Disposition>;
+  dispositions: Record<ContentCategory, CategoryChoice>;
   audience: AudienceFormState;
-  piiLevel: PiiLevel;
-  /** Selected entity names, only meaningful when piiLevel === "custom". */
+  piiChoice: PiiChoice;
+  /** Selected entity names, only meaningful when piiChoice === "custom". */
   piiEntities: string[];
-  secretsEnabled: boolean;
+  secretsChoice: SecretsChoice;
   secretsPatterns: string[];
   customAttributes: CustomAttributeFormRow[];
 }
 
-const DEFAULT_DISPOSITIONS: Record<ContentCategory, Disposition> = {
-  input: "capture",
-  output: "capture",
-  system: "capture",
-  tools: "capture",
+const INHERIT_DISPOSITIONS: Record<ContentCategory, CategoryChoice> = {
+  input: "inherit",
+  output: "inherit",
+  system: "inherit",
+  tools: "inherit",
 };
 
 /**
- * The drawer's baseline form state for ADD: the values the new rule would
- * inherit, so the user sees the parent restriction they are overriding. When
- * the selected scope is the current project, that baseline is the resolved
- * effective policy; for any other scope a precise per-scope inherited value
- * isn't readily available, so it falls back to the platform defaults
- * (capture / essential PII / secrets on). Custom attribute rules and secret
- * patterns union down the cascade anyway, so they are never prefilled (doing
- * so would duplicate the parent's rows at the child scope).
+ * A blank rule: every control inherits, so a saved-as-is rule changes nothing.
+ * The drawer surfaces what each field resolves to next to the "Inherit" choice,
+ * so the admin sees the inherited posture before overriding any field.
  */
-export function inheritedFormState({
-  effective,
-  isCurrentProjectScope,
-}: {
-  effective: ResolvedDataPrivacy;
-  isCurrentProjectScope: boolean;
-}): RuleFormState {
-  if (!isCurrentProjectScope) {
-    return {
-      dispositions: { ...DEFAULT_DISPOSITIONS },
-      audience: { ...EMPTY_AUDIENCE_FORM, admins: true },
-      piiLevel: "essential",
-      piiEntities: [],
-      secretsEnabled: true,
-      secretsPatterns: [],
-      customAttributes: [],
-    };
-  }
-  const dispositions: Record<ContentCategory, Disposition> = {
-    ...DEFAULT_DISPOSITIONS,
-  };
-  let audience: AudienceFormState = { ...EMPTY_AUDIENCE_FORM, admins: true };
-  let sawRestrict = false;
-  for (const category of CONTENT_CATEGORIES) {
-    const resolved = effective.categories[category];
-    dispositions[category] = resolved.disposition;
-    if (resolved.disposition === "restrict" && !sawRestrict) {
-      sawRestrict = true;
-      audience = audienceToFormState(resolved.audience);
-    }
-  }
+export function inheritFormState(): RuleFormState {
   return {
-    dispositions,
-    audience,
-    piiLevel: effective.pii.level,
-    piiEntities: [...effective.pii.entities],
-    secretsEnabled: effective.secrets.enabled,
+    dispositions: { ...INHERIT_DISPOSITIONS },
+    audience: { ...EMPTY_AUDIENCE_FORM, admins: true },
+    piiChoice: "inherit",
+    piiEntities: [],
+    secretsChoice: "inherit",
     secretsPatterns: [],
     customAttributes: [],
   };
 }
 
 /**
+ * The resolved policy a rule at `scopeType` inherits when a field is left on
+ * "inherit": a project inherits its team baseline, a team or department the
+ * organization baseline, and the organization the platform default. Used only
+ * to label the "Inherit" choice with the value it currently resolves to.
+ */
+export function inheritedBaselineForScope({
+  scopeType,
+  effectiveTeam,
+  effectiveOrganization,
+}: {
+  scopeType: "ORGANIZATION" | "DEPARTMENT" | "TEAM" | "PROJECT";
+  effectiveTeam: ResolvedDataPrivacy | null;
+  effectiveOrganization: ResolvedDataPrivacy | null;
+}): ResolvedDataPrivacy {
+  if (scopeType === "PROJECT") {
+    return (
+      effectiveTeam ?? effectiveOrganization ?? PLATFORM_DEFAULT_DATA_PRIVACY
+    );
+  }
+  if (scopeType === "TEAM" || scopeType === "DEPARTMENT") {
+    return effectiveOrganization ?? PLATFORM_DEFAULT_DATA_PRIVACY;
+  }
+  return PLATFORM_DEFAULT_DATA_PRIVACY;
+}
+
+/**
  * Reverse of `buildRuleConfig`: hydrate the drawer's form state from a stored
- * config, for editing an existing rule. Unset categories fall back to the
- * platform default (capture / essential PII / secrets on). The single audience
- * control is seeded from the first restrict category or restrict attribute
- * rule, which is what the drawer applies to every restricted item.
+ * config, for editing an existing rule. A field the config does not set shows
+ * as "inherit" (not as a concrete default), so the drawer reflects exactly what
+ * the rule pins versus what it leaves to the wider scope. The single audience
+ * control is seeded from the first restrict category or restrict attribute rule,
+ * which is what the drawer applies to every restricted item.
  */
 export function configToFormState(config: DataPrivacyConfig): RuleFormState {
-  const dispositions: Record<ContentCategory, Disposition> = {
-    ...DEFAULT_DISPOSITIONS,
+  const dispositions: Record<ContentCategory, CategoryChoice> = {
+    ...INHERIT_DISPOSITIONS,
   };
   let audience: AudienceFormState = { ...EMPTY_AUDIENCE_FORM, admins: true };
   let sawRestrict = false;
@@ -321,31 +305,18 @@ export function configToFormState(config: DataPrivacyConfig): RuleFormState {
   return {
     dispositions,
     audience,
-    piiLevel: config.pii?.level ?? "essential",
+    piiChoice: config.pii?.level ?? "inherit",
     piiEntities: [...(config.pii?.entities ?? [])],
-    secretsEnabled: config.secrets?.enabled ?? true,
+    secretsChoice: config.secrets
+      ? config.secrets.enabled
+        ? "on"
+        : "off"
+      : "inherit",
     secretsPatterns: [...(config.secrets?.customPatterns ?? [])],
     customAttributes: (config.customAttributes ?? []).map((rule) => ({
       pattern: rule.pattern,
       disposition: rule.disposition,
     })),
-  };
-}
-
-/**
- * The controls an existing rule already persists, so editing re-persists them
- * even if the user leaves them untouched. The drawer unions this with the
- * controls the user touched before calling `buildRuleConfig`.
- */
-export function touchedFromConfig(config: DataPrivacyConfig): TouchedControls {
-  const categories: Partial<Record<ContentCategory, boolean>> = {};
-  for (const category of CONTENT_CATEGORIES) {
-    if (config.categories?.[category]) categories[category] = true;
-  }
-  return {
-    categories,
-    pii: config.pii !== undefined,
-    secrets: config.secrets !== undefined,
   };
 }
 
@@ -413,10 +384,10 @@ export function ruleSummary(config: DataPrivacyConfig): string {
       );
     }
   }
-  return parts.length > 0 ? parts.join(" · ") : "No changes";
+  return parts.length > 0 ? parts.join(" · ") : "Inherits everything";
 }
 
-/** Whether the built config persists nothing (an untouched form). */
+/** Whether the built config persists nothing (every control inherits). */
 export function isEmptyRuleConfig(config: DataPrivacyConfig): boolean {
   return Object.keys(config).length === 0;
 }
