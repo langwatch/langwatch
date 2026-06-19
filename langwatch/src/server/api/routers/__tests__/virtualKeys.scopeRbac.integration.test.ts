@@ -126,6 +126,33 @@ describe("virtualKeys — scope-aware RBAC", () => {
     );
   }
 
+  /**
+   * Seed an org ADMIN with NO TeamUser rows — the real-world shape of an org
+   * owner. Their VK visibility must cover project/team-scoped keys anywhere in
+   * the org (the auto-provisioned per-project Langy VK is PROJECT-scoped),
+   * even though they hold no per-team membership.
+   */
+  async function seedOrgAdmin(): Promise<Caller> {
+    const uid = `usr-admin-${ns}-${seq++}`;
+    const email = `${uid}@example.com`;
+    await prisma.user.create({ data: { id: uid, email, name: uid } });
+    await prisma.organizationUser.create({
+      data: {
+        organizationId: ORG_ID,
+        userId: uid,
+        role: OrganizationUserRole.ADMIN,
+      },
+    });
+    return appRouter.createCaller(
+      createInnerTRPCContext({
+        session: {
+          user: { id: uid, email, name: uid },
+          expires: new Date(Date.now() + 3_600_000).toISOString(),
+        } as any,
+      }),
+    );
+  }
+
   async function seedVk(
     name: string,
     scopes: { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[],
@@ -439,6 +466,34 @@ describe("virtualKeys — scope-aware RBAC", () => {
       await expect(
         olive.virtualKeys.get({ organizationId: ORG_ID, id: vkDataSci }),
       ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    });
+
+    /** @scenario An org ADMIN with no TeamUser rows sees project-scoped VKs (e.g. the auto-managed Langy VK) anywhere in the org */
+    it("shows an org admin every project-scoped VK in the org despite zero team membership", async () => {
+      const vkDemo = await seedVk("list-admin-demo", [
+        { scopeType: "PROJECT", scopeId: PROJECT_DEMO },
+      ]);
+      const vkMlProd = await seedVk("list-admin-mlprod", [
+        { scopeType: "PROJECT", scopeId: PROJECT_ML_PROD },
+      ]);
+      const admin = await seedOrgAdmin();
+      const ids = (
+        await admin.virtualKeys.list({ organizationId: ORG_ID })
+      ).map((vk) => vk.id);
+      expect(ids).toContain(vkDemo);
+      expect(ids).toContain(vkMlProd);
+    });
+
+    /** @scenario A plain MEMBER still does NOT see a sibling-team project VK — the admin short-circuit must not leak to members */
+    it("still hides a sibling-team project VK from a non-admin member", async () => {
+      const vkMlProd = await seedVk("list-member-mlprod", [
+        { scopeType: "PROJECT", scopeId: PROJECT_ML_PROD },
+      ]);
+      const olive = await seedTeamMember([TEAM_PLATFORM]);
+      const ids = (
+        await olive.virtualKeys.list({ organizationId: ORG_ID })
+      ).map((vk) => vk.id);
+      expect(ids).not.toContain(vkMlProd);
     });
   });
 
