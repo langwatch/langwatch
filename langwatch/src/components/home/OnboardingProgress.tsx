@@ -7,7 +7,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useRouter } from "~/utils/compat/next-router";
 import { useEffect } from "react";
 import { useAnalytics } from "react-contextual-analytics";
 import {
@@ -23,6 +22,7 @@ import {
 } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 import { HomeCard } from "./HomeCard";
 
 type OnboardingStepKey =

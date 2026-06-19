@@ -7,7 +7,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import NextLink from "~/utils/compat/next-link";
 import type React from "react";
 import {
   LuBell,
@@ -19,6 +18,7 @@ import {
   LuWeight,
   LuWorkflow,
 } from "react-icons/lu";
+import NextLink from "~/utils/compat/next-link";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { trackEventOnce } from "../../utils/tracking";
 import { useIntegrationChecks } from "../IntegrationChecks";

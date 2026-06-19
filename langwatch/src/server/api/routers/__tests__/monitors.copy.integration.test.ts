@@ -59,8 +59,12 @@ describe("monitors.copy", () => {
     });
     // Delete copies (target) before originals (source): a copied evaluator
     // references its source through the EvaluatorCopies self-relation.
-    await prisma.evaluator.deleteMany({ where: { projectId: targetProjectId } });
-    await prisma.evaluator.deleteMany({ where: { projectId: sourceProjectId } });
+    await prisma.evaluator.deleteMany({
+      where: { projectId: targetProjectId },
+    });
+    await prisma.evaluator.deleteMany({
+      where: { projectId: sourceProjectId },
+    });
 
     const ctx = createInnerTRPCContext({
       session: { user: { id: user.id }, expires: "1" },
@@ -74,8 +78,12 @@ describe("monitors.copy", () => {
     });
     // Delete copies (target) before originals (source): a copied evaluator
     // references its source through the EvaluatorCopies self-relation.
-    await prisma.evaluator.deleteMany({ where: { projectId: targetProjectId } });
-    await prisma.evaluator.deleteMany({ where: { projectId: sourceProjectId } });
+    await prisma.evaluator.deleteMany({
+      where: { projectId: targetProjectId },
+    });
+    await prisma.evaluator.deleteMany({
+      where: { projectId: sourceProjectId },
+    });
   });
 
   describe("given a monitor with inline settings and no linked evaluator", () => {

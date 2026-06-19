@@ -8,10 +8,10 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import NextLink from "~/utils/compat/next-link";
 import { LuExternalLink } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import NextLink from "~/utils/compat/next-link";
 import { featureIcons } from "~/utils/featureIcons";
 import { Link } from "../ui/link";
 import { HomeCard } from "./HomeCard";

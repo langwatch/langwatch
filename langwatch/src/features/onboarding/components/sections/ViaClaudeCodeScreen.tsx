@@ -5,6 +5,7 @@ import type React from "react";
 import { useMemo, useState } from "react";
 
 const MotionVStack = motion.create(VStack);
+
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { Tooltip } from "../../../../components/ui/tooltip";
 import { useActiveProject } from "../../contexts/ActiveProjectContext";
@@ -141,11 +142,7 @@ function glassCard(): Record<string, unknown> {
   };
 }
 
-function PromptRow({
-  skill,
-}: {
-  skill: SkillItem;
-}): React.ReactElement {
+function PromptRow({ skill }: { skill: SkillItem }): React.ReactElement {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async (): Promise<void> => {
@@ -201,19 +198,9 @@ function PromptRow({
   );
 }
 
-function SkillRow({
-  skill,
-}: {
-  skill: SkillItem;
-}): React.ReactElement {
+function SkillRow({ skill }: { skill: SkillItem }): React.ReactElement {
   return (
-    <VStack
-      align="stretch"
-      px={4}
-      py={2.5}
-      gap={1}
-      {...glassCard()}
-    >
+    <VStack align="stretch" px={4} py={2.5} gap={1} {...glassCard()}>
       <HStack gap={2} align="baseline" minW={0}>
         <Text
           fontSize="sm"
@@ -314,16 +301,10 @@ function SkillRow({
  * subtle orange accent. Everything else passes through untouched.
  */
 function accentCredentialSegments(command: string): React.ReactNode[] {
-  const re =
-    /(--api-key \S+|LANGWATCH_(?:API_KEY|PROJECT_ID|ENDPOINT)=\S+)/g;
+  const re = /(--api-key \S+|LANGWATCH_(?:API_KEY|PROJECT_ID|ENDPOINT)=\S+)/g;
   return command.split(re).map((part, i) =>
     i % 2 === 1 ? (
-      <Text
-        as="span"
-        key={i}
-        color="orange.fg"
-        fontWeight="semibold"
-      >
+      <Text as="span" key={i} color="orange.fg" fontWeight="semibold">
         {part}
       </Text>
     ) : (
@@ -357,7 +338,12 @@ function QuickCommand({
           <Text fontSize="xs" fontWeight="semibold" color="fg">
             {label}
           </Text>
-          <Text fontSize="xs" fontFamily="mono" color="fg.muted" wordBreak="break-all">
+          <Text
+            fontSize="xs"
+            fontFamily="mono"
+            color="fg.muted"
+            wordBreak="break-all"
+          >
             {accentCredentialSegments(displayCommand)}
           </Text>
         </VStack>
@@ -448,7 +434,12 @@ function McpTab({
           Config path:
         </Text>
         {EDITOR_PATHS.map((ep) => (
-          <Tooltip key={ep.editor} content={`Click to copy: ${ep.path}`} showArrow openDelay={0}>
+          <Tooltip
+            key={ep.editor}
+            content={`Click to copy: ${ep.path}`}
+            showArrow
+            openDelay={0}
+          >
             <HStack
               asChild
               gap={1}
@@ -468,7 +459,10 @@ function McpTab({
                 });
               }}
             >
-              <button type="button" aria-label={`Copy ${ep.editor} config path`}>
+              <button
+                type="button"
+                aria-label={`Copy ${ep.editor} config path`}
+              >
                 <Text fontSize="2xs" fontWeight="medium" color="fg">
                   {ep.editor}
                 </Text>
@@ -494,10 +488,7 @@ export function PromptList({
   primarySkillId?: string;
 } = {}): React.ReactElement {
   return (
-    <Grid
-      templateColumns={{ base: "1fr", md: "repeat(2, 1fr)" }}
-      gap={3}
-    >
+    <Grid templateColumns={{ base: "1fr", md: "repeat(2, 1fr)" }} gap={3}>
       {orderSkills(primarySkillId).map((skill) => (
         <PromptRow key={skill.id} skill={skill} />
       ))}
@@ -516,10 +507,7 @@ export function SkillList({
   primarySkillId?: string;
 } = {}): React.ReactElement {
   return (
-    <Grid
-      templateColumns={{ base: "1fr", lg: "repeat(2, 1fr)" }}
-      gap={3}
-    >
+    <Grid templateColumns={{ base: "1fr", lg: "repeat(2, 1fr)" }} gap={3}>
       {orderSkills(primarySkillId).map((skill) => (
         <SkillRow key={skill.id} skill={skill} />
       ))}
@@ -640,7 +628,12 @@ export function ViaClaudeCodeScreen({
                   Install once, reuse anytime.
                 </Text>{" "}
                 Run the install command, then type{" "}
-                <Text as="span" fontFamily="mono" fontWeight="semibold" color="orange.fg">
+                <Text
+                  as="span"
+                  fontFamily="mono"
+                  fontWeight="semibold"
+                  color="orange.fg"
+                >
                   /command
                 </Text>{" "}
                 in your coding agent whenever you need it.
@@ -707,7 +700,6 @@ export function ViaClaudeCodeScreen({
           </MotionVStack>
         </AnimatePresence>
       </VStack>
-
     </>
   );
 }
