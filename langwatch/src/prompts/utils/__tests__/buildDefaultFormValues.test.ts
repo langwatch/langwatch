@@ -23,6 +23,7 @@ describe("buildDefaultFormValues", () => {
       });
     });
 
+    /** @scenario "Default form values include a non-empty system message" */
     it("creates system message with default content", () => {
       const defaults = buildDefaultFormValues();
       const systemMessage = defaults.version.configData.messages.find(
@@ -73,7 +74,7 @@ describe("buildDefaultFormValues", () => {
       const defaults = buildDefaultFormValues({
         version: {
           configData: {
-            llm: { model: "openai/gpt-4o" },
+            llm: { model: "openai/gpt-5-mini" },
           },
         },
       });

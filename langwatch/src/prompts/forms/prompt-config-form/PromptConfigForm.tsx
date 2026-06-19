@@ -11,6 +11,7 @@ import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { FormVariablesSection } from "~/components/variables";
 import type { PromptConfigFormValues } from "~/prompts";
 import { usePromptConfigContext } from "~/prompts/providers/PromptConfigProvider";
+import { getSaveBlockerMessage } from "~/prompts/utils/getSaveBlockerMessage";
 import {
   formValuesToTriggerSaveVersionParams,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
@@ -66,14 +67,13 @@ function InnerPromptConfigForm() {
   }));
 
   const handleSaveClick = useCallback(async () => {
-    const isValid = await methods.trigger([
-      "version.configData.llm",
-      "version.parameters",
-    ]);
+    // Validate the full form so the save-time refinement (#3196: system
+    // prompt required) fires alongside the LLM config rules.
+    const isValid = await methods.trigger();
     if (!isValid) {
       toaster.create({
         title: "Validation error",
-        description: "Please fix the configuration errors before saving",
+        description: getSaveBlockerMessage(methods),
         type: "error",
       });
       return;
