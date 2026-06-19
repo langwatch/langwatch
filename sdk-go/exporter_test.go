@@ -2,12 +2,17 @@ package langwatch
 
 import (
 	"context"
+	"encoding/base64"
 	"testing"
 
 	"github.com/langwatch/langwatch/sdk-go/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/sdk/instrumentation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	"go.opentelemetry.io/otel/trace"
 )
 
 func TestFilteringExporter_NoFilters(t *testing.T) {
@@ -134,7 +139,24 @@ func TestResolveConfig_OptionsOverrideEnv(t *testing.T) {
 	assert.Equal(t, "https://option.langwatch.ai", cfg.endpoint)
 }
 
+func TestResolveConfig_ProjectIDFromEnv(t *testing.T) {
+	t.Setenv("LANGWATCH_PROJECT_ID", "env-project")
+
+	cfg := resolveConfig()
+
+	assert.Equal(t, "env-project", cfg.projectID)
+}
+
+func TestResolveConfig_ProjectIDOptionOverridesEnv(t *testing.T) {
+	t.Setenv("LANGWATCH_PROJECT_ID", "env-project")
+
+	cfg := resolveConfig(WithProjectID("option-project"))
+
+	assert.Equal(t, "option-project", cfg.projectID)
+}
+
 func TestBuildHeaders(t *testing.T) {
+	t.Setenv("LANGWATCH_PROJECT_ID", "")
 	headers := buildHeaders("test-api-key", "")
 
 	assert.Equal(t, "Bearer test-api-key", headers["Authorization"])
@@ -142,6 +164,127 @@ func TestBuildHeaders(t *testing.T) {
 	assert.Equal(t, "langwatch-sdk-go", headers["x-langwatch-sdk-name"])
 	assert.Equal(t, "go", headers["x-langwatch-sdk-language"])
 	assert.Equal(t, Version, headers["x-langwatch-sdk-version"])
+}
+
+func TestBuildHeaders_PATWithProjectIDUsesBasicAuth(t *testing.T) {
+	t.Setenv("LANGWATCH_PROJECT_ID", "")
+	headers := buildHeaders("pat-lw-secret", "project-9")
+
+	expected := base64.StdEncoding.EncodeToString([]byte("project-9:pat-lw-secret"))
+	assert.Equal(t, "Basic "+expected, headers["Authorization"])
+	assert.Empty(t, headers["X-Auth-Token"], "Basic-auth PATs must not also emit the legacy header")
+	// SDK identification headers are always present regardless of auth scheme.
+	assert.Equal(t, "langwatch-sdk-go", headers["x-langwatch-sdk-name"])
+	assert.Equal(t, "go", headers["x-langwatch-sdk-language"])
+	assert.Equal(t, Version, headers["x-langwatch-sdk-version"])
+}
+
+func TestExporterOption_WithProjectID(t *testing.T) {
+	cfg := &exporterConfig{}
+	WithProjectID("project-1")(cfg)
+	assert.Equal(t, "project-1", cfg.projectID)
+}
+
+func TestExporterOption_WithDataCapture(t *testing.T) {
+	cfg := &exporterConfig{}
+	WithDataCapture(DataCaptureNone)(cfg)
+
+	assert.True(t, cfg.dataCapture.enabled)
+	assert.Equal(t, DataCaptureNone, cfg.dataCapture.mode)
+	assert.Nil(t, cfg.dataCapture.predicate)
+}
+
+func TestExporterOption_WithDataCaptureFunc(t *testing.T) {
+	cfg := &exporterConfig{}
+	WithDataCaptureFunc(func(DataCaptureContext) DataCaptureMode {
+		return DataCaptureInput
+	})(cfg)
+
+	assert.True(t, cfg.dataCapture.enabled)
+	require.NotNil(t, cfg.dataCapture.predicate)
+	// The stored predicate is the one we supplied.
+	assert.Equal(t, DataCaptureInput, cfg.dataCapture.predicate(DataCaptureContext{}))
+}
+
+func TestNewExporter_InvalidEndpoint(t *testing.T) {
+	t.Run("an unparseable endpoint surfaces the JoinPath error", func(t *testing.T) {
+		exporter, err := NewExporter(context.Background(), WithEndpoint("://bad"))
+		require.Error(t, err)
+		assert.Nil(t, exporter)
+	})
+}
+
+func TestNewDefaultExporter_Success(t *testing.T) {
+	t.Run("it constructs an exporter carrying the HTTP-exclusion filter", func(t *testing.T) {
+		exporter, err := NewDefaultExporter(context.Background(),
+			WithAPIKey("test-key"),
+			WithEndpoint("https://test.langwatch.ai"),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, exporter)
+		require.NotNil(t, exporter.FilteringExporter)
+		// The prepended ExcludeHTTPRequests filter is present.
+		assert.GreaterOrEqual(t, len(exporter.filters), 1)
+		require.NoError(t, exporter.Shutdown(context.Background()))
+	})
+}
+
+func TestNewExporter_AppliesDataCapture(t *testing.T) {
+	t.Run("WithDataCapture is wired onto the filtering exporter", func(t *testing.T) {
+		exporter, err := NewExporter(context.Background(),
+			WithEndpoint("https://test.langwatch.ai"),
+			WithDataCapture(DataCaptureNone),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, exporter)
+		assert.True(t, exporter.dataCapture.enabled)
+		assert.Equal(t, DataCaptureNone, exporter.dataCapture.mode)
+		require.NoError(t, exporter.Shutdown(context.Background()))
+	})
+}
+
+// richSpanStub builds a span carrying content (input/output), structure and
+// metrics attributes plus a span type, for filter + data-capture tests.
+func richSpanStub(name, scope, spanType string) tracetest.SpanStub {
+	return tracetest.SpanStub{
+		Name:                 name,
+		SpanKind:             trace.SpanKindClient,
+		InstrumentationScope: instrumentation.Scope{Name: scope},
+		Attributes: []attribute.KeyValue{
+			AttributeLangWatchInput.String(`{"type":"text","value":"hi"}`),
+			AttributeLangWatchOutput.String(`{"type":"text","value":"yo"}`),
+			AttributeLangWatchSpanType.String(spanType),
+			AttributeLangWatchMetrics.String(`{"prompt_tokens":5}`),
+			attribute.String("gen_ai.request.model", "gpt-5-mini"),
+		},
+	}
+}
+
+func TestFilteringExporter_FiltersAndDataCaptureTogether(t *testing.T) {
+	t.Run("it filters spans out AND strips content from the survivors", func(t *testing.T) {
+		mem := tracetest.NewInMemoryExporter()
+		fe := NewFilteringExporter(mem, ExcludeHTTPRequests())
+		fe.dataCapture = dataCaptureConfig{enabled: true, mode: DataCaptureNone}
+
+		spans := []sdktrace.ReadOnlySpan{
+			richSpanStub("GET /api", "net/http", "span").Snapshot(), // filtered out
+			richSpanStub("llm.chat", "openai", "llm").Snapshot(),    // kept, stripped
+		}
+		require.NoError(t, fe.ExportSpans(context.Background(), spans))
+
+		out := mem.GetSpans()
+		require.Len(t, out, 1, "the HTTP span must be filtered out")
+		assert.Equal(t, "llm.chat", out[0].Name)
+
+		keys := keySet(out[0].Attributes)
+		// Content is stripped...
+		assert.NotContains(t, keys, AttributeLangWatchInput)
+		assert.NotContains(t, keys, AttributeLangWatchOutput)
+		// ...but structure and metrics survive.
+		assert.Contains(t, keys, AttributeLangWatchSpanType)
+		assert.Contains(t, keys, AttributeLangWatchMetrics)
+		assert.Contains(t, keys, attribute.Key("gen_ai.request.model"))
+	})
 }
 
 func TestExporterOption_WithAPIKey(t *testing.T) {
