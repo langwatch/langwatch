@@ -94,22 +94,18 @@ runtimeClassName: ""
 
 networkPolicy:
   enabled: true
-  # Only the control plane may call the agent. Adjust the selector to match
-  # your langwatch-app pod labels if you use a non-default release name.
-  ingressFrom:
-    - podSelector:
-        matchLabels:
-          app.kubernetes.io/name: langwatch
+  # langy-agent is a subchart of the langwatch chart, so it shares the release.
+  # By default the policy targets the sibling pods that chart actually renders
+  # (templated from .Release in networkpolicy.yaml):
+  #   control plane -> app.kubernetes.io/name: <release>-app, instance: <release>
+  #   gateway       -> app.kubernetes.io/name: gateway,       instance: <release>
+  # Override any list below ONLY for a non-standard topology; an empty list
+  # means "use the release-aware default".
+  ingressFrom: []
   controlPlanePort: 5560
-  egressToControlPlane:
-    - podSelector:
-        matchLabels:
-          app.kubernetes.io/name: langwatch
+  egressToControlPlane: []
   gatewayPort: 80
-  egressToGateway:
-    - podSelector:
-        matchLabels:
-          app.kubernetes.io/component: ai-gateway
+  egressToGateway: []
   # OpenCode may reach external hosts (its own update/telemetry). Set false
   # once egress needs are pinned to tighten the policy.
   allowExternalHttps: true

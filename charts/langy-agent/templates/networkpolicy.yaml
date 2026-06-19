@@ -29,7 +29,14 @@ spec:
     - Egress
   ingress:
     - from:
-        {{- toYaml .Values.networkPolicy.ingressFrom | nindent 8 }}
+        {{- with .Values.networkPolicy.ingressFrom }}
+        {{- toYaml . | nindent 8 }}
+        {{- else }}
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ .Release.Name }}-app
+              app.kubernetes.io/instance: {{ .Release.Name }}
+        {{- end }}
       ports:
         - protocol: TCP
           port: {{ .Values.manager.port }}
@@ -46,13 +53,27 @@ spec:
           port: 53
     # Control plane (LangWatch app) — MCP -> LangWatch API.
     - to:
-        {{- toYaml .Values.networkPolicy.egressToControlPlane | nindent 8 }}
+        {{- with .Values.networkPolicy.egressToControlPlane }}
+        {{- toYaml . | nindent 8 }}
+        {{- else }}
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ .Release.Name }}-app
+              app.kubernetes.io/instance: {{ .Release.Name }}
+        {{- end }}
       ports:
         - protocol: TCP
           port: {{ .Values.networkPolicy.controlPlanePort }}
     # AI gateway — OpenCode LLM traffic (OPENAI_BASE_URL).
     - to:
-        {{- toYaml .Values.networkPolicy.egressToGateway | nindent 8 }}
+        {{- with .Values.networkPolicy.egressToGateway }}
+        {{- toYaml . | nindent 8 }}
+        {{- else }}
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: gateway
+              app.kubernetes.io/instance: {{ .Release.Name }}
+        {{- end }}
       ports:
         - protocol: TCP
           port: {{ .Values.networkPolicy.gatewayPort }}

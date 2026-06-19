@@ -9,7 +9,7 @@
  *
  * Spec: specs/assistant/langy-github-prs.feature. Issue: #4747.
  */
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text } from "@chakra-ui/react";
 import { Check, GitBranch, GitCommit, GitPullRequest, Loader, Upload } from "lucide-react";
 import type {
   GithubProgressEvent,

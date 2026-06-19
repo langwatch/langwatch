@@ -49,17 +49,26 @@ const PROVIDERS_WITH_WELL_KNOWN_MODELS = new Set([
 
 interface ModelProviderSetupProps {
   modelProviderKey: ModelProviderKey;
-  variant: "evaluations" | "prompts";
+  variant: "evaluations" | "prompts" | "langy";
+  /**
+   * When provided, called after a successful save instead of the default
+   * redirect. Lets the screen be embedded in a surface that stays put (e.g.
+   * the Langy panel) and just re-resolves the model.
+   */
+  onComplete?: () => void;
 }
 
-const variantToDocsMapping: Record<"evaluations" | "prompts", string> = {
-  evaluations: "/llm-evaluation/overview",
-  prompts: "/prompt-management/overview",
-};
+const variantToDocsMapping: Record<"evaluations" | "prompts" | "langy", string> =
+  {
+    evaluations: "/llm-evaluation/overview",
+    prompts: "/prompt-management/overview",
+    langy: "/introduction",
+  };
 
 export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
   modelProviderKey,
   variant,
+  onComplete,
 }) => {
   const fallbackProviderMeta = useMemo(
     () =>
@@ -167,6 +176,10 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     enabledProvidersCount: 1, // Onboarding always sets up the first provider
     isUsingEnvVars,
     onSuccess: () => {
+      if (onComplete) {
+        onComplete();
+        return;
+      }
       if (variant === "evaluations") {
         window.location.href = "/@project/evaluations";
       } else if (variant === "prompts") {
