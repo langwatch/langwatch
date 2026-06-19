@@ -182,6 +182,17 @@ export type LoadedWorkflow = {
   dsl: Workflow;
 };
 
+/**
+ * Cache key for a loaded workflow. Two targets that pin the same workflow to
+ * different versions must not share a loaded DSL, so the key includes the
+ * requested version (or "published" when following the latest committed one).
+ */
+export const workflowLoadKey = (target: {
+  workflowId?: string;
+  workflowVersionId?: string;
+}): string =>
+  `${target.workflowId ?? ""}::${target.workflowVersionId ?? "published"}`;
+
 export type LoadedExecutionData = {
   datasetRows: Array<Record<string, unknown>>;
   datasetColumns: Array<{ id: string; name: string; type: string }>;
@@ -293,7 +304,7 @@ export const loadExecutionData = async (
   const loadedWorkflows = new Map<string, LoadedWorkflow>();
   for (const target of targets) {
     if (target.type !== "workflow" || !target.workflowId) continue;
-    if (loadedWorkflows.has(target.workflowId)) continue;
+    if (loadedWorkflows.has(workflowLoadKey(target))) continue;
 
     const workflow = await prisma.workflow.findUnique({
       where: { id: target.workflowId, projectId },
@@ -314,7 +325,7 @@ export const loadExecutionData = async (
     }
 
     const version = await prisma.workflowVersion.findUnique({
-      where: { id: versionId, projectId },
+      where: { id: versionId, projectId, workflowId: target.workflowId },
     });
     if (!version) {
       return {
@@ -323,7 +334,7 @@ export const loadExecutionData = async (
       };
     }
 
-    loadedWorkflows.set(target.workflowId, {
+    loadedWorkflows.set(workflowLoadKey(target), {
       id: workflow.id,
       name: workflow.name,
       versionId,

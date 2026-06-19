@@ -23,7 +23,7 @@ Feature: The nlpgo engine no longer runs the evaluation loop
   @integration
   Scenario: The engine no longer handles the evaluation loop
     When the engine receives an execute_evaluation request
-    Then the request is not handled as an evaluation loop
+    Then the engine rejects the request with an unsupported-operation error
 
   @integration
   Scenario: The batch results ingest endpoint remains available
