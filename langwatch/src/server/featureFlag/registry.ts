@@ -150,9 +150,9 @@ export const FEATURE_FLAGS = [
   {
     key: "release_langy_enabled",
     scope: "PRODUCT",
-    defaultValue: true,
+    defaultValue: false,
     description:
-      "Opens the Langy in-product assistant. Default flipped to on: Langy now ships to everyone with project access, and disabling is the opt-out path (set a PostHog rule, an operator-store row via /ops/feature-flags, or RELEASE_LANGY_ENABLED=false to turn it off). LangWatch staff (isLangwatchStaff()) always have access regardless of this flag, so a kill switch still leaves staff able to debug.",
+      "Opens the Langy in-product assistant. Default off: only LangWatch staff (isLangwatchStaff() — @langwatch.ai email) get Langy out of the box. To open it for a specific project/org/user, flip the flag on via a PostHog rule, an operator-store row via /ops/feature-flags, or RELEASE_LANGY_ENABLED=true for a blanket on. Staff always bypass the flag so a global kill switch still leaves us able to debug.",
   },
 ] as const satisfies readonly FeatureFlagDefinition[];
 
