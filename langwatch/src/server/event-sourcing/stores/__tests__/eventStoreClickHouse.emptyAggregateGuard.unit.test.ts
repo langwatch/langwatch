@@ -36,62 +36,68 @@ describe("EventStoreClickHouse - empty aggregateId guard", () => {
     createdAt: 1000,
   } as unknown as Event;
 
-  describe("given an empty aggregateId", () => {
-    it("getEvents returns no events without touching ClickHouse", async () => {
-      const events = await store.getEvents("", { tenantId }, aggregateType);
+  describe.each([
+    { label: "an empty aggregateId", aggregateId: "" },
+    { label: "a whitespace-only aggregateId", aggregateId: "   " },
+  ])("given $label", ({ aggregateId }) => {
+    describe("when getEvents is called", () => {
+      it("returns no events without touching ClickHouse", async () => {
+        const events = await store.getEvents(
+          aggregateId,
+          { tenantId },
+          aggregateType,
+        );
 
-      expect(events).toEqual([]);
-      expect(mockClickHouseClient.query).not.toHaveBeenCalled();
+        expect(events).toEqual([]);
+        expect(mockClickHouseClient.query).not.toHaveBeenCalled();
+      });
     });
 
-    it("getEventsUpTo returns no events without touching ClickHouse", async () => {
-      const events = await store.getEventsUpTo(
-        "",
-        { tenantId },
-        aggregateType,
-        upToEvent,
-      );
+    describe("when getEventsUpTo is called", () => {
+      it("returns no events without touching ClickHouse", async () => {
+        const events = await store.getEventsUpTo(
+          aggregateId,
+          { tenantId },
+          aggregateType,
+          upToEvent,
+        );
 
-      expect(events).toEqual([]);
-      expect(mockClickHouseClient.query).not.toHaveBeenCalled();
+        expect(events).toEqual([]);
+        expect(mockClickHouseClient.query).not.toHaveBeenCalled();
+      });
     });
 
-    it("countEventsBefore returns 0 without touching ClickHouse", async () => {
-      const count = await store.countEventsBefore(
-        "",
-        { tenantId },
-        aggregateType,
-        1000,
-        "event-1",
-      );
+    describe("when countEventsBefore is called", () => {
+      it("returns 0 without touching ClickHouse", async () => {
+        const count = await store.countEventsBefore(
+          aggregateId,
+          { tenantId },
+          aggregateType,
+          1000,
+          "event-1",
+        );
 
-      expect(count).toBe(0);
-      expect(mockClickHouseClient.query).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("given a whitespace-only aggregateId", () => {
-    it("getEvents still short-circuits without touching ClickHouse", async () => {
-      const events = await store.getEvents("   ", { tenantId }, aggregateType);
-
-      expect(events).toEqual([]);
-      expect(mockClickHouseClient.query).not.toHaveBeenCalled();
+        expect(count).toBe(0);
+        expect(mockClickHouseClient.query).not.toHaveBeenCalled();
+      });
     });
   });
 
   describe("given a real aggregateId", () => {
-    it("getEvents issues the event_log read", async () => {
-      (
-        mockClickHouseClient.query as ReturnType<typeof vi.fn>
-      ).mockResolvedValue({ json: vi.fn().mockResolvedValue([]) });
+    describe("when getEvents is called", () => {
+      it("issues the event_log read", async () => {
+        (
+          mockClickHouseClient.query as ReturnType<typeof vi.fn>
+        ).mockResolvedValue({ json: vi.fn().mockResolvedValue([]) });
 
-      await store.getEvents("trace-123", { tenantId }, aggregateType);
+        await store.getEvents("trace-123", { tenantId }, aggregateType);
 
-      expect(mockClickHouseClient.query).toHaveBeenCalledWith(
-        expect.objectContaining({
-          query_params: expect.objectContaining({ aggregateId: "trace-123" }),
-        }),
-      );
+        expect(mockClickHouseClient.query).toHaveBeenCalledWith(
+          expect.objectContaining({
+            query_params: expect.objectContaining({ aggregateId: "trace-123" }),
+          }),
+        );
+      });
     });
   });
 });
