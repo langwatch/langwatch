@@ -1,0 +1,23 @@
+# oapi-codegen configuration for the LangWatch REST API client.
+#
+# Generates Go request/response models plus a low-level std-net/http client from
+# the down-converted (3.0.3) LangWatch OpenAPI document. The ergonomic, hand-written
+# wrapper in package `client` is layered on top of this generated surface.
+#
+# Regenerate with:  go generate ./...   (from the client module root)
+# See generate.go for the //go:generate directive that drives this.
+package: openapi
+output: zz_generated.gen.go
+
+# Lean generation: typed models + a low-level client over the standard library's
+# net/http. The only third-party dependency this pulls in is the tiny
+# github.com/oapi-codegen/runtime (for JSON merge of composed/allOf schemas) plus
+# its transitive go-jsonmerge + google/uuid — no web frameworks are compiled.
+generate:
+  models: true
+  client: true
+
+output-options:
+  # Skip the build-time spec embed + prune unused helpers to keep the file lean.
+  skip-prune: false
+  skip-fmt: false
