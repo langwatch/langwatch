@@ -1,18 +1,18 @@
 /**
- * "Run via API" for the evaluations-v3 workbench.
+ * "Run via API" dialog for the evaluations-v3 workbench.
  *
- * Mirrors the studio results-panel button but targets the experiment run
- * endpoint via the SDK (`langwatch.experiment.run` / `experiments.runWithResults`
- * / `POST /api/experiments/{slug}/run`). Offers a language picker (Python,
- * TypeScript, Shell) and a data-source picker (attached dataset, inline data,
- * dataset id), and always shows how to read the per-row results back.
+ * Opened from the workbench settings menu ("Run in CI/CD"). Targets the
+ * experiment run endpoint via the SDK (`langwatch.experiment.run` /
+ * `experiments.runWithResults` / `POST /api/experiments/{slug}/run`). Offers a
+ * language picker (Python, TypeScript, Shell) and a data-source picker (attached
+ * dataset, inline data, dataset id), and always shows how to read the per-row
+ * results back.
  *
- * Additive and presentational: it reads nothing from the execution path. The
- * page-level wrapper (`RunViaApiButtonContainer`) feeds it slug + columns from
- * the evaluations-v3 store and router.
+ * Controlled: the caller owns the open state so the dialog can be triggered from
+ * a menu item that closes its popover as it opens. Presentational: it reads
+ * nothing from the execution path. The container feeds it slug + columns from
+ * the evaluations-v3 store.
  */
-import { Button } from "@chakra-ui/react";
-import { Terminal } from "react-feather";
 import { useShallow } from "zustand/react/shallow";
 
 import { GenerateApiSnippetDialog } from "~/components/GenerateApiSnippetDialog";
@@ -21,24 +21,25 @@ import { buildRunSnippet } from "~/components/run-via-api/runSnippets";
 import { useRunViaApiTabs } from "~/components/run-via-api/useRunViaApiTabs";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { WorkflowField } from "~/optimization_studio/utils/workflowFields";
-import { useRouter } from "~/utils/compat/next-router";
 
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 
-export function RunViaApiButton({
+export function RunViaApiDialog({
+  open,
+  onOpenChange,
   experimentSlug,
   entryFields,
   datasetColumns,
   datasetName,
   projectSlug,
-  disabled = false,
 }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   experimentSlug: string;
   entryFields: WorkflowField[];
   datasetColumns: string[];
   datasetName?: string;
   projectSlug?: string;
-  disabled?: boolean;
 }) {
   const baseUrl =
     typeof window !== "undefined"
@@ -63,6 +64,8 @@ export function RunViaApiButton({
 
   return (
     <GenerateApiSnippetDialog
+      open={open}
+      onOpenChange={onOpenChange}
       snippets={[]}
       targets={[]}
       tabs={tabs}
@@ -71,45 +74,35 @@ export function RunViaApiButton({
       }
       title="Run via API"
       description="Trigger this evaluation through the LangWatch API and read the per-row results back."
-    >
-      <GenerateApiSnippetDialog.Trigger>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={disabled}
-          data-testid="run-via-api-experiment"
-        >
-          <Terminal size={14} />
-          Run via API
-        </Button>
-      </GenerateApiSnippetDialog.Trigger>
-    </GenerateApiSnippetDialog>
+    />
   );
 }
 
 /**
- * Page-level wrapper: reads the experiment slug from the router and the active
- * dataset (name + columns) from the evaluations-v3 store, then renders the
- * presentational button. The active dataset's columns are the experiment's
- * inputs, so they serve as both the entry fields and the dataset columns.
+ * Page-level wrapper: reads the experiment slug and the active dataset (name +
+ * columns) from the evaluations-v3 store, then renders the presentational
+ * dialog controlled by the caller. The active dataset's columns are the
+ * experiment's inputs, so they serve as both the entry fields and the dataset
+ * columns.
  */
-export function RunViaApiButtonContainer({
-  disabled = false,
+export function RunViaApiDialogContainer({
+  open,
+  onOpenChange,
 }: {
-  disabled?: boolean;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
-  const router = useRouter();
-  const slug = router.query.slug as string | undefined;
   const { project } = useOrganizationTeamProject();
 
-  const { datasets, activeDatasetId } = useEvaluationsV3Store(
+  const { experimentSlug, datasets, activeDatasetId } = useEvaluationsV3Store(
     useShallow((state) => ({
+      experimentSlug: state.experimentSlug,
       datasets: state.datasets,
       activeDatasetId: state.activeDatasetId,
     })),
   );
 
-  if (!slug) return null;
+  if (!experimentSlug) return null;
 
   const activeDataset =
     datasets.find((dataset) => dataset.id === activeDatasetId) ?? datasets[0];
@@ -120,13 +113,14 @@ export function RunViaApiButtonContainer({
   }));
 
   return (
-    <RunViaApiButton
-      experimentSlug={slug}
+    <RunViaApiDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      experimentSlug={experimentSlug}
       entryFields={entryFields}
       datasetColumns={columnNames}
       datasetName={activeDataset?.name}
       projectSlug={project?.slug}
-      disabled={disabled}
     />
   );
 }
