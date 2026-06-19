@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { TraceSummaryStore } from "../traceSummary.store";
 import { createTenantId } from "../../../../domain/tenantId";
 import type { ProjectionStoreContext } from "../../../../projections/projectionStoreContext";
+import { TraceSummaryStore } from "../traceSummary.store";
 
 function storeWithRepo() {
   const findByTraceId = vi.fn().mockResolvedValue(null);

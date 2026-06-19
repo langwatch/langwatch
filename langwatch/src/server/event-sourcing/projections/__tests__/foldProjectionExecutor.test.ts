@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { FoldProjectionExecutor } from "../foldProjectionExecutor";
+import type { Event } from "../../domain/types";
 import {
   createMockFoldProjectionDefinition,
   createMockFoldProjectionStore,
@@ -7,8 +7,8 @@ import {
   createTestTenantId,
   TEST_CONSTANTS,
 } from "../../services/__tests__/testHelpers";
+import { FoldProjectionExecutor } from "../foldProjectionExecutor";
 import type { ProjectionStoreContext } from "../projectionStoreContext";
-import type { Event } from "../../domain/types";
 
 describe("FoldProjectionExecutor.execute", () => {
   const tenantId = createTestTenantId();
@@ -219,7 +219,10 @@ describe("FoldProjectionExecutor.execute", () => {
 
       await executor.execute(foldDef, event, context);
 
-      expect(store.get).toHaveBeenCalledWith(TEST_CONSTANTS.AGGREGATE_ID, context);
+      expect(store.get).toHaveBeenCalledWith(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        context,
+      );
       const passedContext = (store.get as ReturnType<typeof vi.fn>).mock
         .calls[0]![1];
       expect(passedContext).not.toHaveProperty("occurredAtMs");
@@ -235,11 +238,18 @@ interface BatchState {
   LastEventOccurredAt: number;
 }
 
-const batchInit = (): BatchState => ({ count: 0, seen: [], LastEventOccurredAt: 0 });
+const batchInit = (): BatchState => ({
+  count: 0,
+  seen: [],
+  LastEventOccurredAt: 0,
+});
 const batchApply = (state: BatchState, event: Event): BatchState => ({
   count: state.count + 1,
   seen: [...state.seen, event.id],
-  LastEventOccurredAt: Math.max(state.LastEventOccurredAt, event.occurredAt ?? 0),
+  LastEventOccurredAt: Math.max(
+    state.LastEventOccurredAt,
+    event.occurredAt ?? 0,
+  ),
 });
 
 describe("FoldProjectionExecutor.executeBatch", () => {
@@ -297,12 +307,18 @@ describe("FoldProjectionExecutor.executeBatch", () => {
       expect(result.seen).toEqual(["e1", "e2", "e3"]);
       expect(store.get).toHaveBeenCalledTimes(1);
       expect(store.store).toHaveBeenCalledTimes(1);
-      expect((store.store as ReturnType<typeof vi.fn>).mock.calls[0]![0]).toBe(result);
+      expect((store.store as ReturnType<typeof vi.fn>).mock.calls[0]![0]).toBe(
+        result,
+      );
     });
 
     /** @scenario 'Coalesced fold equals sequential folding' */
     it("produces the same final state as sequential execute() calls", async () => {
-      const events = [makeEvent(1000, "a"), makeEvent(2000, "b"), makeEvent(3000, "c")];
+      const events = [
+        makeEvent(1000, "a"),
+        makeEvent(2000, "b"),
+        makeEvent(3000, "c"),
+      ];
 
       const batchStore = createMockFoldProjectionStore<BatchState>();
       (batchStore.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
@@ -316,10 +332,14 @@ describe("FoldProjectionExecutor.executeBatch", () => {
       // Sequential path: each execute() re-reads the latest stored state.
       let current: BatchState | null = null;
       const seqStore = createMockFoldProjectionStore<BatchState>();
-      (seqStore.get as ReturnType<typeof vi.fn>).mockImplementation(async () => current);
-      (seqStore.store as ReturnType<typeof vi.fn>).mockImplementation(async (s: BatchState) => {
-        current = s;
-      });
+      (seqStore.get as ReturnType<typeof vi.fn>).mockImplementation(
+        async () => current,
+      );
+      (seqStore.store as ReturnType<typeof vi.fn>).mockImplementation(
+        async (s: BatchState) => {
+          current = s;
+        },
+      );
       const seqDef = createMockFoldProjectionDefinition("counter", {
         store: seqStore,
         init: batchInit,
@@ -344,7 +364,11 @@ describe("FoldProjectionExecutor.executeBatch", () => {
         apply: batchApply,
       });
 
-      const events = [makeEvent(3000, "third"), makeEvent(1000, "first"), makeEvent(2000, "second")];
+      const events = [
+        makeEvent(3000, "third"),
+        makeEvent(1000, "first"),
+        makeEvent(2000, "second"),
+      ];
 
       const result = await executor.executeBatch(foldDef, events, context);
 
@@ -362,7 +386,11 @@ describe("FoldProjectionExecutor.executeBatch", () => {
         apply: batchApply,
       });
 
-      const result = await executor.executeBatch(foldDef, [makeEvent(1000, "only")], context);
+      const result = await executor.executeBatch(
+        foldDef,
+        [makeEvent(1000, "only")],
+        context,
+      );
 
       expect(result.count).toBe(1);
       expect(store.get).toHaveBeenCalledTimes(1);
@@ -405,7 +433,11 @@ describe("FoldProjectionExecutor.executeBatch", () => {
       });
       foldDef.eventLoader = vi
         .fn()
-        .mockResolvedValue([makeEvent(1000, "r1"), makeEvent(2000, "r2"), makeEvent(3000, "r3")]);
+        .mockResolvedValue([
+          makeEvent(1000, "r1"),
+          makeEvent(2000, "r2"),
+          makeEvent(3000, "r3"),
+        ]);
 
       // Batch's earliest occurredAt (1000) is before the checkpoint (5000).
       const events = [makeEvent(1000, "b1"), makeEvent(2000, "b2")];

@@ -27,7 +27,11 @@ export class TraceSummaryStore
       : { ...state, traceId: String(context.aggregateId) };
     const retentionDays =
       context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS;
-    await this.repo.upsert(stateWithId, String(context.tenantId), retentionDays);
+    await this.repo.upsert(
+      stateWithId,
+      String(context.tenantId),
+      retentionDays,
+    );
   }
 
   /**
@@ -36,7 +40,10 @@ export class TraceSummaryStore
    * per-entry upserts otherwise.
    */
   async storeBatch(
-    entries: Array<{ state: TraceSummaryData; context: ProjectionStoreContext }>,
+    entries: Array<{
+      state: TraceSummaryData;
+      context: ProjectionStoreContext;
+    }>,
   ): Promise<void> {
     const batchEntries = entries
       .filter(({ state }) => hasPersistableSignal(state))

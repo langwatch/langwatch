@@ -749,7 +749,6 @@ describe("buildEvaluatorTargetNode", () => {
 // drawer's "Open in Prompts" resume is hidden.
 describe("buildSignatureNodeFromPrompt", () => {
   const createVersionedPrompt = (): VersionedPrompt => ({
-    parameters: {},
     id: "prompt_supportrouter_xyz",
     name: "support-router",
     handle: "support-router",
@@ -831,7 +830,6 @@ describe("buildSignatureNodeFromPrompt", () => {
 
 describe("buildSignatureNodeFromLocalConfig", () => {
   const createBasePrompt = (): VersionedPrompt => ({
-    parameters: {},
     id: "prompt_supportrouter_xyz",
     name: "support-router",
     handle: "support-router",

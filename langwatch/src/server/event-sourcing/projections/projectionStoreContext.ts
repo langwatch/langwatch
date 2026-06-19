@@ -1,5 +1,5 @@
-import type { TenantId } from "../domain/tenantId";
 import type { ResolvedRetention } from "../../data-retention/retentionPolicy.schema";
+import type { TenantId } from "../domain/tenantId";
 
 /**
  * Context passed to projection stores for both fold and map projections.
