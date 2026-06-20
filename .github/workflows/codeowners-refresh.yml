@@ -3,8 +3,17 @@ name: Refresh CODEOWNERS
 # Regenerates .github/CODEOWNERS from git history once a week and opens (or
 # updates) a PR when ownership has shifted. The generator
 # (.github/scripts/generate-codeowners.sh) recomputes each area's owners from
-# `git log` authorship, so reviewer assignments track who is actually working
-# where without anyone maintaining the file by hand.
+# `git log` authorship restricted to current langwatch org members, so reviewer
+# assignments track who is actually working where without anyone maintaining the
+# list by hand.
+#
+# TOKEN: the generator reads org membership, and langwatch has no public
+# members, so the default GITHUB_TOKEN returns an empty list and the generator
+# hard-fails. Provide a CODEOWNERS_REFRESH_TOKEN secret — a PAT with `read:org`
+# plus `contents:write` + `pull-requests:write` (classic: `repo` + `read:org`).
+# It also makes the refresh PR run CI (GITHUB_TOKEN-authored PRs don't). The
+# workflow falls back to github.token so a missing secret fails loudly in the
+# generator step rather than silently skipping.
 
 on:
   schedule:
@@ -33,13 +42,18 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
+          # Push with the PAT (if set) so the refresh PR triggers CI.
+          token: ${{ secrets.CODEOWNERS_REFRESH_TOKEN || github.token }}
 
       - name: Regenerate CODEOWNERS
+        env:
+          # Needs read:org to list members (langwatch has no public members).
+          GH_TOKEN: ${{ secrets.CODEOWNERS_REFRESH_TOKEN || github.token }}
         run: bash .github/scripts/generate-codeowners.sh
 
       - name: Open or update PR if CODEOWNERS changed
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.CODEOWNERS_REFRESH_TOKEN || github.token }}
         run: |
           set -euo pipefail
 
@@ -61,7 +75,7 @@ jobs:
           # the concurrency group, so there is nothing to clobber.
           git push --force origin "$BRANCH"
 
-          BODY="Automated weekly refresh of \`.github/CODEOWNERS\` by the codeowners-refresh workflow. Owners are recomputed from \`git log\` authorship per area via \`.github/scripts/generate-codeowners.sh\`; the diff reflects how contribution has shifted across the codebase since the last refresh. To change ownership policy (identity map, exclusions, areas, or the Go co-owner rule), edit the generator script rather than this PR."
+          BODY="Automated weekly refresh of \`.github/CODEOWNERS\` by the codeowners-refresh workflow. Owners are recomputed per area from \`git log\` authorship restricted to current langwatch org members, via \`.github/scripts/generate-codeowners.sh\`. The diff reflects how contribution and org membership have shifted since the last refresh. To change ownership policy (areas, the Go co-owner rule, or thresholds), edit the generator script rather than this PR."
 
           if gh pr view "$BRANCH" --json state --jq '.state' 2>/dev/null | grep -q OPEN; then
             echo "PR already open for $BRANCH; force-pushed branch keeps it current."

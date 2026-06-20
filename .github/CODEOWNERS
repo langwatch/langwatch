@@ -1,9 +1,11 @@
 # CODEOWNERS — GENERATED FILE, DO NOT EDIT BY HAND.
 #
 # Regenerated weekly by .github/workflows/codeowners-refresh.yml from
-# .github/scripts/generate-codeowners.sh. Owners are the top historical
-# `git log` contributors per area (merges, bots, and departed contributors
-# excluded). To change ownership, edit the generator script — not this file.
+# .github/scripts/generate-codeowners.sh. Owners are the top committers per
+# area, restricted to current langwatch GitHub org members (the org roster and
+# the email->login mapping are both fetched live, so nothing here is a
+# hand-maintained list). To change ownership, adjust the generator script — not
+# this file.
 #
 # GitHub applies the LAST matching pattern only — rules go from general (top)
 # to specific (bottom). Owners must have write access to the repo.
