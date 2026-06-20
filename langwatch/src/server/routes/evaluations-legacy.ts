@@ -45,9 +45,9 @@ import {
   type EvaluationResult,
   type EvaluatorDefinition,
   type EvaluatorTypes,
+  evaluatorsSchema,
   type SingleEvaluationResult,
 } from "~/server/evaluations/evaluators";
-import { evaluatorsSchema } from "~/server/evaluations/evaluators.zod.generated";
 import { getEvaluatorDefaultSettings } from "~/server/evaluations/getEvaluator";
 import {
   type DataForEvaluation,
@@ -69,15 +69,15 @@ import {
   eSBatchEvaluationRESTParamsSchema,
   eSBatchEvaluationSchema,
   eSBatchEvaluationTargetTypeSchema,
-} from "~/server/experiments/types.generated";
+} from "~/server/experiments/types";
 import { mapEsTargetsToTargets } from "~/server/experiments-v3/services/mappers";
 import { getPayloadSizeHistogram } from "~/server/metrics";
 import { evaluationNameAutoslug } from "~/server/tracer/collector/evaluationNameAutoslug";
 import { extractChunkTextualContent } from "~/server/tracer/collector/rag";
-import { rAGChunkSchema } from "~/server/tracer/types.generated";
+import { rAGChunkSchema } from "~/server/tracer/types";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { createLogger } from "~/utils/logger/server";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { mapZodIssuesToLogContext } from "~/utils/zod";
 
 const logger = createLogger("langwatch:evaluations-legacy");
@@ -182,7 +182,7 @@ secured
       const { project, markUsed } = auth;
 
       const contentType = c.req.header("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
+      if (!contentType?.includes("application/json")) {
         logger.warn(
           {
             contentType,
@@ -211,7 +211,7 @@ secured
           { error, body, projectId: project.id },
           "invalid log_results data received",
         );
-        captureException(error, { extra: { projectId: project.id } });
+        captureException(toError(error), { extra: { projectId: project.id } });
         const validationError = fromZodError(error as ZodError);
         return c.json({ error: validationError.message }, 400);
       }
@@ -248,7 +248,7 @@ secured
             { error, body: params, projectId: project.id },
             "failed to validate data for batch evaluation",
           );
-          captureException(error, {
+          captureException(toError(error), {
             extra: { projectId: project.id, param: params },
           });
           const validationError = fromZodError(error);
@@ -267,7 +267,7 @@ secured
             { error, body: params, projectId: project.id },
             "internal server error processing batch evaluation",
           );
-          captureException(error, {
+          captureException(toError(error), {
             extra: { projectId: project.id, param: params },
           });
           return c.json(
@@ -356,7 +356,7 @@ secured
         { error, body, projectId: project.id },
         "invalid evaluation params received",
       );
-      captureException(error, { extra: { projectId: project.id } });
+      captureException(toError(error), { extra: { projectId: project.id } });
       const validationError = fromZodError(error as ZodError);
       return c.json({ error: validationError.message }, 400);
     }
@@ -408,7 +408,7 @@ secured
         { error, body, projectId: project.id },
         "invalid evaluation data received",
       );
-      captureException(error, { extra: { projectId: project.id } });
+      captureException(toError(error), { extra: { projectId: project.id } });
       const validationError = fromZodError(error as ZodError);
       return c.json({ error: validationError.message }, 400);
     }
@@ -774,7 +774,7 @@ async function handleEvaluatorCall(
       },
       "invalid evaluation params received",
     );
-    captureException(error, {
+    captureException(toError(error), {
       extra: { projectId: project.id, validationError: message },
     });
     return c.json({ error: message }, 400);
@@ -825,7 +825,7 @@ async function handleEvaluatorCall(
       },
       "invalid settings received for the evaluator",
     );
-    captureException(error, {
+    captureException(toError(error), {
       extra: { projectId: project.id, validationError: message },
     });
     return c.json(
@@ -859,7 +859,7 @@ async function handleEvaluatorCall(
       },
       "invalid evaluation data received",
     );
-    captureException(error, {
+    captureException(toError(error), {
       extra: { projectId: project.id, validationError: message },
     });
     return c.json({ error: message }, 400);
@@ -944,7 +944,7 @@ async function handleEvaluatorCall(
       costId = cost.id;
     }
   } catch (error) {
-    captureException(error, { extra: { projectId: project.id } });
+    captureException(toError(error), { extra: { projectId: project.id } });
     logger.error(
       { err: error, projectId: project.id },
       "error running evaluation",
@@ -986,7 +986,7 @@ async function handleEvaluatorCall(
             : undefined,
       })
       .catch((eventError: unknown) => {
-        captureException(eventError, {
+        captureException(toError(eventError), {
           extra: {
             projectId: project.id,
             evaluationId,
