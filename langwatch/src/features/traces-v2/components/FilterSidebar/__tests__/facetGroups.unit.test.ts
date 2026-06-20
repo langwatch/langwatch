@@ -14,7 +14,6 @@ import {
   SPAN_ATTRIBUTES_SECTION_KEY,
   sectionOrderForPerspective,
 } from "../constants";
-import { partitionIntoGroups } from "../hooks/useFilterSidebarData";
 
 /**
  * Round-5 refined the 9-group AI-observability taxonomy into 12 finer
@@ -200,75 +199,5 @@ describe("facet perspectives", () => {
       .slice(0, 3)
       .map((g) => g.id);
     expect(leadIds).toEqual(["model", "prompts", "quality"]);
-  });
-});
-
-describe("partitionIntoGroups", () => {
-  describe("when no lens group order is supplied", () => {
-    it("partitions keys into groups in registry order", () => {
-      const slices = partitionIntoGroups(
-        ["origin", "model", "duration", "status"],
-        [],
-      );
-      const ids = slices.map((s) => s.id);
-      // Registry order surfaces traces → errors → latency → model.
-      expect(ids.indexOf("traces")).toBeLessThan(ids.indexOf("errors"));
-      expect(ids.indexOf("errors")).toBeLessThan(ids.indexOf("latency"));
-      expect(ids.indexOf("latency")).toBeLessThan(ids.indexOf("model"));
-    });
-
-    it("preserves the input order of keys within a group (DnD-friendly)", () => {
-      const slices = partitionIntoGroups(
-        ["status", "errorMessage", "guardrail"],
-        [],
-      );
-      const errors = slices.find((s) => s.id === "errors");
-      expect(errors?.keys).toEqual(["status", "errorMessage", "guardrail"]);
-    });
-
-    it("only emits groups that actually have descriptors present", () => {
-      const slices = partitionIntoGroups(["origin", "model"], []);
-      const ids = slices.map((s) => s.id);
-      expect(ids).toEqual(["traces", "model"]);
-      expect(ids).not.toContain("cost");
-      expect(ids).not.toContain("quality");
-    });
-  });
-
-  describe("when a lens has stored a custom group order", () => {
-    it("places lens-ordered groups first, then registry-default groups", () => {
-      const slices = partitionIntoGroups(
-        ["origin", "model", "status", "evaluator"],
-        ["quality", "errors"],
-      );
-      const ids = slices.map((s) => s.id);
-      expect(ids[0]).toBe("quality");
-      expect(ids[1]).toBe("errors");
-      expect(ids.slice(2)).toEqual(["traces", "model"]);
-    });
-
-    it("ignores legacy group ids in the stored lens order (e.g. pre-refinement `origin` / `events`)", () => {
-      const slices = partitionIntoGroups(
-        ["origin", "status", "event"],
-        ["origin", "events", "errors", "traces"],
-      );
-      const ids = slices.map((s) => s.id);
-      expect(ids).not.toContain("origin" as FacetGroupDef["id"]);
-      expect(ids).not.toContain("events" as FacetGroupDef["id"]);
-      expect(ids).toContain("errors");
-      expect(ids).toContain("traces");
-    });
-  });
-
-  describe("when the input contains an unknown key", () => {
-    it("surfaces it under a synthetic trailing `Other` slice rather than dropping it silently", () => {
-      const slices = partitionIntoGroups(
-        ["origin", "definitelyNotAFacetKey"],
-        [],
-      );
-      const last = slices[slices.length - 1];
-      expect(last?.label).toBe("Other");
-      expect(last?.keys).toEqual(["definitelyNotAFacetKey"]);
-    });
   });
 });

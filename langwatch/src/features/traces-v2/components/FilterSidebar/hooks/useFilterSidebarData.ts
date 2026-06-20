@@ -29,9 +29,6 @@ import {
   EVENT_ATTRIBUTES_SECTION_KEY,
   FACET_COLORS,
   FACET_DEFAULTS,
-  FACET_GROUPS,
-  type FacetGroupDef,
-  getFacetGroupId,
   METADATA_DOCS_URL,
   METADATA_SECTION_KEY,
   RANGE_DEFAULTS,
@@ -114,9 +111,7 @@ export function useFilterSidebarData() {
   const { data: descriptors, isLoading: facetsLoading } = useTraceFacets();
 
   const lensSectionOrder = useFacetLensStore((s) => s.lens.sectionOrder);
-  const lensGroupOrder = useFacetLensStore((s) => s.lens.groupOrder);
   const setSectionOrder = useFacetLensStore((s) => s.setSectionOrder);
-  const setGroupOrder = useFacetLensStore((s) => s.setGroupOrder);
   const setAllSectionsOpen = useFacetLensStore((s) => s.setAllSectionsOpen);
 
   // Density + per-user visibility prefs feed the "which sections should
@@ -426,36 +421,11 @@ export function useFilterSidebarData() {
   // Visible ordered list — what the sidebar actually renders. Filtered
   // by density + per-user prefs + active-AST. Drops both "would-be-shown
   // but explicitly hidden" and "would-be-hidden but not explicitly
-  // shown" sections in one pass so the downstream `partitionIntoGroups`
-  // produces clean group buckets.
+  // shown" sections in one pass.
   const orderedKeys = useMemo(
     () => orderedKeysAll.filter(isSectionVisibleForDensity),
     [orderedKeysAll, isSectionVisibleForDensity],
   );
-
-  const orderedGroups = useMemo(
-    () => partitionIntoGroups(orderedKeys, lensGroupOrder),
-    [orderedKeys, lensGroupOrder],
-  );
-
-  // Hidden-by-group: section keys (with labels) that exist (backend
-  // returned data for them) but are currently filtered out by density
-  // / user prefs. Drives the "+ Add facet" picker on each
-  // FacetGroupHeader so users can re-introduce the ones they care
-  // about without flipping density. Labels come from sectionByKey so
-  // the menu reads "Trace name" / "Span attributes" — not raw keys.
-  const hiddenByGroup = useMemo<
-    Record<string, Array<{ key: string; label: string }>>
-  >(() => {
-    const out: Record<string, Array<{ key: string; label: string }>> = {};
-    for (const key of orderedKeysAll) {
-      if (isSectionVisibleForDensity(key)) continue;
-      const groupId = getFacetGroupId(key) ?? "custom";
-      const label = sectionByKey.get(key)?.label ?? key;
-      (out[groupId] ??= []).push({ key, label });
-    }
-    return out;
-  }, [orderedKeysAll, isSectionVisibleForDensity, sectionByKey]);
 
   const showFacetForProject = useCallback(
     (key: string) => {
@@ -487,8 +457,6 @@ export function useFilterSidebarData() {
     facetsLoading,
     descriptors,
     orderedKeys,
-    orderedGroups,
-    hiddenByGroup,
     sectionByKey,
     /** Effective presentation mode per discrete-eligible numeric facet
      *  (`override ?? "discrete"`). A missing key = not eligible (slider only). */
@@ -508,7 +476,6 @@ export function useFilterSidebarData() {
     setEvaluatorScoreRange,
     removeEvaluatorScoreRange,
     setSectionOrder,
-    setGroupOrder,
     setAllSectionsOpen,
     showFacet: showFacetForProject,
     hideFacet: hideFacetForProject,
@@ -523,64 +490,6 @@ export function useFilterSidebarData() {
      *  row. Reads density + per-user prefs + AST-active fields. */
     isSectionVisibleForDensity,
   };
-}
-
-export interface FacetGroupSlice {
-  // `"other"` is the synthetic trailing bucket for keys that don't map
-  // to any registered FACET_GROUPS entry — kept distinct from the
-  // user-facing `"custom"` group so the two never collide on `.id`.
-  id: FacetGroupDef["id"] | "other";
-  label: string;
-  keys: string[];
-}
-
-/**
- * Partition the user-ordered list of section keys into the canonical groups,
- * applying the lens-stored group order on top of the registry default.
- * Within a group, keys keep the order they appeared in the input (preserving
- * any DnD reordering). Unknown keys go to a synthetic trailing "other" group
- * so we never silently drop a section if the registry adds one we forgot to map.
- *
- * Exported for unit testing — the real call site is `useFilterSidebarData`.
- */
-export function partitionIntoGroups(
-  keys: string[],
-  lensGroupOrder: readonly string[],
-): FacetGroupSlice[] {
-  const byGroup = new Map<FacetGroupDef["id"], string[]>();
-  const ungrouped: string[] = [];
-  for (const key of keys) {
-    const groupId = getFacetGroupId(key);
-    if (!groupId) {
-      ungrouped.push(key);
-      continue;
-    }
-    const list = byGroup.get(groupId) ?? [];
-    list.push(key);
-    byGroup.set(groupId, list);
-  }
-
-  const presentIds = new Set(byGroup.keys());
-  const lensIds = lensGroupOrder.filter((id): id is FacetGroupDef["id"] =>
-    presentIds.has(id as FacetGroupDef["id"]),
-  );
-  const seen = new Set(lensIds);
-  const naturalIds = FACET_GROUPS.map((g) => g.id).filter(
-    (id) => presentIds.has(id) && !seen.has(id),
-  );
-  const finalOrder = [...lensIds, ...naturalIds];
-
-  const labelById = new Map(FACET_GROUPS.map((g) => [g.id, g.label] as const));
-  const slices: FacetGroupSlice[] = finalOrder.map((id) => ({
-    id,
-    label: labelById.get(id) ?? id,
-    keys: byGroup.get(id) ?? [],
-  }));
-
-  if (ungrouped.length > 0) {
-    slices.push({ id: "other", label: "Other", keys: ungrouped });
-  }
-  return slices;
 }
 
 function partitionDescriptors(
@@ -700,19 +609,13 @@ function synthesizeDefaultDescriptors(): Descriptors {
 
   for (const [key, values] of Object.entries(FACET_DEFAULTS)) {
     // `descriptor.group` here uses the backend's `SectionGroup`
-    // taxonomy (evaluation/metadata/prompt/span/trace), which is
-    // distinct from the registry's UI-group taxonomy returned by
-    // `getFacetGroupId` (evaluators/metrics/prompts/span/subjects/
-    // trace) — they don't 1:1 map.
-    //
-    // Section PLACEMENT for the sidebar is driven by
-    // `getFacetGroupId(key)` downstream (in `partitionIntoGroups`),
-    // not by this `group` field. The field only feeds an icon
-    // fallback when `FACET_ICONS[key]` is missing. Every key in
-    // FACET_DEFAULTS except `spanStatus` has a curated icon today,
-    // so the synthetic placeholder still renders correctly. Pinning
-    // `"trace"` here keeps the type clean; if the icon-fallback path
-    // ever matters we'll wire a registry→SectionGroup mapping.
+    // taxonomy (evaluation/metadata/prompt/span/trace). The sidebar
+    // renders a flat, lens-ordered list, so this field does NOT drive
+    // section placement — it only feeds an icon fallback when
+    // `FACET_ICONS[key]` is missing. Every key in FACET_DEFAULTS except
+    // `spanStatus` has a curated icon today, so the synthetic
+    // placeholder still renders correctly. Pinning `"trace"` here keeps
+    // the type clean.
     out.push({
       kind: "categorical",
       key,

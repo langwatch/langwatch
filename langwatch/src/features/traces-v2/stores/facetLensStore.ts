@@ -2,7 +2,6 @@ import { create } from "zustand";
 import {
   DEFAULT_PERSPECTIVE_ID,
   type FacetPerspectiveId,
-  groupOrderForPerspective,
   isFacetPerspectiveId,
   sectionOrderForPerspective,
 } from "../components/FilterSidebar/constants";
@@ -19,8 +18,6 @@ export interface FacetLens {
   name: string;
   /** Facet keys in user-customized display order. Empty = use registry order. */
   sectionOrder: string[];
-  /** Group ids in user-customized display order. Empty = use registry order. */
-  groupOrder: string[];
   /** Per-section open/closed overrides. Missing key = fall back to smart default. */
   sectionOpen: Record<string, boolean>;
 }
@@ -36,15 +33,13 @@ interface FacetLensState {
    */
   activePerspectiveId: FacetPerspectiveId;
   setSectionOrder: (order: string[]) => void;
-  setGroupOrder: (order: string[]) => void;
   setSectionOpen: (key: string, open: boolean) => void;
   setAllSectionsOpen: (keys: string[], open: boolean) => void;
   /**
-   * Switch perspective: stamp the perspective's group + section order into
-   * the lens (so the sidebar + manager reorder through the existing
-   * applyLensOrder / partitionIntoGroups machinery) and remember the choice.
-   * Re-selecting a perspective restores its built-in order even after a
-   * custom drag-reorder.
+   * Switch perspective: stamp the perspective's section order into the lens
+   * (so the sidebar + manager reorder through the existing applyLensOrder
+   * machinery) and remember the choice. Re-selecting a perspective restores
+   * its built-in order even after a custom drag-reorder.
    */
   selectPerspective: (id: FacetPerspectiveId) => void;
 }
@@ -55,7 +50,6 @@ const defaultLens: FacetLens = {
   id: "default",
   name: "Default",
   sectionOrder: [],
-  groupOrder: [],
   sectionOpen: {},
 };
 
@@ -75,9 +69,7 @@ function loadState(): PersistedState {
     }
     // Backward compatible: the blob is the flat FacetLens shape, with
     // `activePerspectiveId` added as a sibling field. Pre-perspective blobs
-    // simply lack it (and may reference the old 9 group ids in groupOrder —
-    // partitionIntoGroups drops unknown ids, so stale orders degrade to the
-    // default rather than breaking).
+    // simply lack it. Any stale `groupOrder` from an older build is ignored.
     const parsed = JSON.parse(raw) as Partial<FacetLens> & {
       activePerspectiveId?: unknown;
     };
@@ -86,9 +78,6 @@ function loadState(): PersistedState {
       name: parsed.name ?? defaultLens.name,
       sectionOrder: Array.isArray(parsed.sectionOrder)
         ? parsed.sectionOrder.filter((k): k is string => typeof k === "string")
-        : [],
-      groupOrder: Array.isArray(parsed.groupOrder)
-        ? parsed.groupOrder.filter((k): k is string => typeof k === "string")
         : [],
       sectionOpen:
         parsed.sectionOpen && typeof parsed.sectionOpen === "object"
@@ -134,13 +123,6 @@ export const useFacetLensStore = create<FacetLensState>((set) => {
         return { lens };
       }),
 
-    setGroupOrder: (order) =>
-      set((s) => {
-        const lens: FacetLens = { ...s.lens, groupOrder: order };
-        persistState({ lens, activePerspectiveId: s.activePerspectiveId });
-        return { lens };
-      }),
-
     setSectionOpen: (key, open) =>
       set((s) => {
         const lens: FacetLens = {
@@ -165,7 +147,6 @@ export const useFacetLensStore = create<FacetLensState>((set) => {
         const lens: FacetLens = {
           ...s.lens,
           sectionOrder: sectionOrderForPerspective(id),
-          groupOrder: groupOrderForPerspective(id),
         };
         persistState({ lens, activePerspectiveId: id });
         return { lens, activePerspectiveId: id };
