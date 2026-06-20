@@ -130,9 +130,10 @@ const defaultStartServer = async ({
  * (sst/opencode) via `@opencode-ai/sdk`.
  *
  * **No separate server process to manage.** The adapter auto-spawns
- * `opencode serve` for you through the SDK on first use and tears it down via
- * the returned server's `close`. You only need the `opencode` binary installed
- * and on PATH.
+ * `opencode serve` lazily on first use through the SDK. Because scenario's
+ * `AgentAdapter` has no teardown hook, the caller should invoke the returned
+ * `close()` when the run is done to shut the server down (e.g. in a test
+ * `finally` block). You only need the `opencode` binary installed and on PATH.
  *
  * **Credentials are not injected by this adapter.** opencode resolves provider
  * credentials from its own configuration: run `opencode auth login`, or set the
@@ -146,7 +147,7 @@ const defaultStartServer = async ({
  * on every turn.
  *
  * @param model - Required `{ providerID, modelID }` selector, e.g.
- *   `{ providerID: "anthropic", modelID: "claude-haiku-4-5" }`.
+ *   `{ providerID: "anthropic", modelID: "claude-haiku-4-5-20251001" }`.
  * @param workingDirectory - Optional directory opencode should operate in;
  *   when set, a directory-scoped client is bound to the spawned server.
  * @param startServer - Optional injected server starter (for tests); defaults
@@ -155,9 +156,14 @@ const defaultStartServer = async ({
  * @example
  * ```typescript
  * const agent = createOpenCodeAgent({
- *   model: { providerID: "anthropic", modelID: "claude-haiku-4-5" },
+ *   model: { providerID: "anthropic", modelID: "claude-haiku-4-5-20251001" },
  *   workingDirectory: "/tmp/my-task",
  * });
+ * try {
+ *   await scenario.run({ agents: [agent, ...] });
+ * } finally {
+ *   await agent.close();
+ * }
  * ```
  */
 export function createOpenCodeAgent({
@@ -170,7 +176,7 @@ export function createOpenCodeAgent({
   startServer?: (opts: {
     workingDirectory?: string;
   }) => Promise<OpenCodeServerHandle>;
-}): AgentAdapter {
+}): AgentAdapter & { close: () => Promise<void> } {
   // Lazily start the server once and memoize the handle for the run's lifetime.
   let started: Promise<OpenCodeServerHandle> | null = null;
   const ensureServer = () => (started ??= startServer({ workingDirectory }));
@@ -206,6 +212,13 @@ export function createOpenCodeAgent({
       });
 
       return partsToText(result.data?.parts);
+    },
+    close: async () => {
+      if (started) {
+        const handle = await started;
+        handle.close();
+        started = null;
+      }
     },
   };
 }

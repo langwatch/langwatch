@@ -19,9 +19,11 @@ function makeFakeServer(
   handle: OpenCodeServerHandle;
   created: string[];
   prompts: any[];
+  closeCount: { value: number };
 } {
   const created: string[] = [];
   const prompts: any[] = [];
+  const closeCount = { value: 0 };
   let counter = 0;
 
   const handle: OpenCodeServerHandle = {
@@ -40,10 +42,12 @@ function makeFakeServer(
         },
       },
     },
-    close: () => {},
+    close: () => {
+      closeCount.value += 1;
+    },
   };
 
-  return { handle, created, prompts };
+  return { handle, created, prompts, closeCount };
 }
 
 /**
@@ -69,7 +73,7 @@ describe("createOpenCodeAgent", () => {
       it("exposes the agent role and a call function (AC-1)", () => {
         const { handle } = makeFakeServer();
         const agent = createOpenCodeAgent({
-          model: { providerID: "anthropic", modelID: "claude-haiku-4-5" },
+          model: { providerID: "openai", modelID: "gpt-5-mini" },
           startServer: async () => handle,
         });
 
@@ -82,7 +86,7 @@ describe("createOpenCodeAgent", () => {
       it("creates the session once and reuses its id (AC-2)", async () => {
         const { handle, created, prompts } = makeFakeServer();
         const agent = createOpenCodeAgent({
-          model: { providerID: "anthropic", modelID: "claude-haiku-4-5" },
+          model: { providerID: "openai", modelID: "gpt-5-mini" },
           startServer: async () => handle,
         });
 
@@ -110,7 +114,7 @@ describe("createOpenCodeAgent", () => {
       it("creates a separate session per thread (AC-2)", async () => {
         const { handle, created, prompts } = makeFakeServer();
         const agent = createOpenCodeAgent({
-          model: { providerID: "anthropic", modelID: "claude-haiku-4-5" },
+          model: { providerID: "openai", modelID: "gpt-5-mini" },
           startServer: async () => handle,
         });
 
@@ -138,7 +142,7 @@ describe("createOpenCodeAgent", () => {
         const { handle } = makeFakeServer();
         handle.client.session.create = async () => ({ data: undefined });
         const agent = createOpenCodeAgent({
-          model: { providerID: "anthropic", modelID: "claude-haiku-4-5" },
+          model: { providerID: "openai", modelID: "gpt-5-mini" },
           startServer: async () => handle,
         });
 
@@ -157,7 +161,7 @@ describe("createOpenCodeAgent", () => {
       it("sends the latest user message as the prompt text (AC-3)", async () => {
         const { handle, prompts } = makeFakeServer();
         const agent = createOpenCodeAgent({
-          model: { providerID: "anthropic", modelID: "claude-haiku-4-5" },
+          model: { providerID: "openai", modelID: "gpt-5-mini" },
           startServer: async () => handle,
         });
 
@@ -181,7 +185,7 @@ describe("createOpenCodeAgent", () => {
       it("prefers newMessages over older messages (AC-3)", async () => {
         const { handle, prompts } = makeFakeServer();
         const agent = createOpenCodeAgent({
-          model: { providerID: "anthropic", modelID: "claude-haiku-4-5" },
+          model: { providerID: "openai", modelID: "gpt-5-mini" },
           startServer: async () => handle,
         });
 
@@ -199,7 +203,7 @@ describe("createOpenCodeAgent", () => {
       it("falls back to the latest user message in history when newMessages has none (AC-3)", async () => {
         const { handle, prompts } = makeFakeServer();
         const agent = createOpenCodeAgent({
-          model: { providerID: "anthropic", modelID: "claude-haiku-4-5" },
+          model: { providerID: "openai", modelID: "gpt-5-mini" },
           startServer: async () => handle,
         });
 
@@ -220,7 +224,7 @@ describe("createOpenCodeAgent", () => {
       it("returns the assistant reply string (AC-3)", async () => {
         const { handle } = makeFakeServer();
         const agent = createOpenCodeAgent({
-          model: { providerID: "anthropic", modelID: "claude-haiku-4-5" },
+          model: { providerID: "openai", modelID: "gpt-5-mini" },
           startServer: async () => handle,
         });
 
@@ -236,7 +240,7 @@ describe("createOpenCodeAgent", () => {
 
       it("passes the configured model through to prompt (AC-3)", async () => {
         const { handle, prompts } = makeFakeServer();
-        const model = { providerID: "anthropic", modelID: "claude-haiku-4-5" };
+        const model = { providerID: "openai", modelID: "gpt-5-mini" };
         const agent = createOpenCodeAgent({
           model,
           startServer: async () => handle,
@@ -255,7 +259,7 @@ describe("createOpenCodeAgent", () => {
       it("falls back to full history rendering when no user message exists anywhere (AC-3)", async () => {
         const { handle, prompts } = makeFakeServer();
         const agent = createOpenCodeAgent({
-          model: { providerID: "anthropic", modelID: "claude-haiku-4-5" },
+          model: { providerID: "openai", modelID: "gpt-5-mini" },
           startServer: async () => handle,
         });
 
@@ -290,7 +294,7 @@ describe("createOpenCodeAgent", () => {
           };
         });
         const agent = createOpenCodeAgent({
-          model: { providerID: "anthropic", modelID: "claude-haiku-4-5" },
+          model: { providerID: "openai", modelID: "gpt-5-mini" },
           startServer: async () => handle,
         });
 
@@ -311,7 +315,7 @@ describe("createOpenCodeAgent", () => {
         let startCount = 0;
         const { handle } = makeFakeServer();
         const agent = createOpenCodeAgent({
-          model: { providerID: "anthropic", modelID: "claude-haiku-4-5" },
+          model: { providerID: "openai", modelID: "gpt-5-mini" },
           startServer: async () => {
             startCount += 1;
             return handle;
@@ -332,6 +336,57 @@ describe("createOpenCodeAgent", () => {
         );
 
         expect(startCount).toBe(1);
+      });
+    });
+
+    describe("when close is called", () => {
+      it("invokes the handle close exactly once after a call has started the server", async () => {
+        const { handle, closeCount } = makeFakeServer();
+        const agent = createOpenCodeAgent({
+          model: { providerID: "openai", modelID: "gpt-5-mini" },
+          startServer: async () => handle,
+        });
+
+        await agent.call(
+          makeInput({
+            threadId: "thread-1",
+            newMessages: [{ role: "user", content: "hi" }],
+          })
+        );
+
+        await agent.close();
+
+        expect(closeCount.value).toBe(1);
+      });
+
+      it("does not throw and does not double-close when called again after close", async () => {
+        const { handle, closeCount } = makeFakeServer();
+        const agent = createOpenCodeAgent({
+          model: { providerID: "openai", modelID: "gpt-5-mini" },
+          startServer: async () => handle,
+        });
+
+        await agent.call(
+          makeInput({
+            threadId: "thread-1",
+            newMessages: [{ role: "user", content: "hi" }],
+          })
+        );
+
+        await agent.close();
+        await agent.close();
+
+        expect(closeCount.value).toBe(1);
+      });
+
+      it("does not throw when called before any call has started the server", async () => {
+        const { handle } = makeFakeServer();
+        const agent = createOpenCodeAgent({
+          model: { providerID: "openai", modelID: "gpt-5-mini" },
+          startServer: async () => handle,
+        });
+
+        await expect(agent.close()).resolves.toBeUndefined();
       });
     });
   });

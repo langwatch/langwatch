@@ -27,14 +27,14 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const isCI = !!process.env.CI;
-let opencodeAvailable = false;
+let isOpencodeAvailable = false;
 try {
   execSync("which opencode", { stdio: "ignore" });
-  opencodeAvailable = true;
+  isOpencodeAvailable = true;
 } catch {
   /* opencode binary not installed */
 }
-const runLive = !isCI && opencodeAvailable && !!process.env.ANTHROPIC_API_KEY;
+const runLive = !isCI && isOpencodeAvailable && !!process.env.ANTHROPIC_API_KEY;
 
 const judgeModel = openai("gpt-5-mini");
 
@@ -46,39 +46,44 @@ describe("opencode adapter (live)", () => {
         path.join(os.tmpdir(), "langwatch-opencode-adapter-")
       );
 
-      const result = await scenario.run({
-        setId: SKILL_TESTS_SET_ID,
-        name: "opencode multi-turn coding task",
-        description:
-          "User asks an opencode-driven agent to write a function plus a test, then iterate on it.",
-        agents: [
-          createOpenCodeAgent({
-            model: { providerID: "anthropic", modelID: "claude-haiku-4-5" },
-            workingDirectory: tempFolder,
-          }),
-          scenario.userSimulatorAgent({ model: judgeModel }),
-          scenario.judgeAgent({
-            model: judgeModel,
-            criteria: [
-              "Agent wrote a function implementation",
-              "Agent wrote a test for that function",
-              "Agent's replies are coherent and complete, not truncated mid-thought",
-              "Agent addressed the user's follow-up request",
-            ],
-          }),
-        ],
-        script: [
-          scenario.user(
-            "write a small function and a test for it in this directory"
-          ),
-          scenario.agent(),
-          scenario.user("now add a docstring to that function"),
-          scenario.agent(),
-          scenario.judge(),
-        ],
+      const opencodeAgent = createOpenCodeAgent({
+        model: { providerID: "openai", modelID: "gpt-5-mini" },
+        workingDirectory: tempFolder,
       });
+      try {
+        const result = await scenario.run({
+          setId: SKILL_TESTS_SET_ID,
+          name: "opencode multi-turn coding task",
+          description:
+            "User asks an opencode-driven agent to write a function plus a test, then iterate on it.",
+          agents: [
+            opencodeAgent,
+            scenario.userSimulatorAgent({ model: judgeModel }),
+            scenario.judgeAgent({
+              model: judgeModel,
+              criteria: [
+                "Agent wrote a function implementation",
+                "Agent wrote a test for that function",
+                "Agent's replies are coherent and complete, not truncated mid-thought",
+                "Agent addressed the user's follow-up request",
+              ],
+            }),
+          ],
+          script: [
+            scenario.user(
+              "write a small function and a test for it in this directory"
+            ),
+            scenario.agent(),
+            scenario.user("now add a docstring to that function"),
+            scenario.agent(),
+            scenario.judge(),
+          ],
+        });
 
-      expect(result.success).toBe(true);
+        expect(result.success).toBe(true);
+      } finally {
+        await opencodeAgent.close();
+      }
     },
     900_000
   );

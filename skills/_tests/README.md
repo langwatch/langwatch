@@ -64,7 +64,7 @@ If you skip step 3, you're trusting the regex. The regex doesn't know about your
 import { createOpenCodeAgent } from "./helpers/opencode-adapter";
 
 const agent = createOpenCodeAgent({
-  model: { providerID: "anthropic", modelID: "claude-haiku-4-5" },
+  model: { providerID: "anthropic", modelID: "claude-haiku-4-5-20251001" },
   workingDirectory: tempFolder, // optional
 });
 ```
