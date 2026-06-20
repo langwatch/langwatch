@@ -8,8 +8,8 @@
  */
 
 import { SpanKind, SpanStatusCode, TraceFlags } from "@opentelemetry/api";
-import type { ReadableSpan } from "@opentelemetry/sdk-trace-base";
 import { emptyResource } from "@opentelemetry/resources";
+import type { ReadableSpan } from "@opentelemetry/sdk-trace-base";
 
 const ERROR_SPAN_NAME = "langwatch.span_collection.error";
 

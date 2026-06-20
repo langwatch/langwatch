@@ -143,7 +143,8 @@ export function mapClickHouseRunToExperimentRun({
     datasetAverageCost: costSummary?.datasetAverageCost ?? undefined,
     datasetAverageDuration: costSummary?.datasetAverageDuration ?? undefined,
     evaluationsAverageCost: costSummary?.evaluationsAverageCost ?? undefined,
-    evaluationsAverageDuration: costSummary?.evaluationsAverageDuration ?? undefined,
+    evaluationsAverageDuration:
+      costSummary?.evaluationsAverageDuration ?? undefined,
     evaluations,
   };
 
@@ -215,7 +216,8 @@ export function mapClickHouseItemsToRunWithItems({
         }
       }
 
-      const targetId = item.TargetId && item.TargetId !== "default" ? item.TargetId : null;
+      const targetId =
+        item.TargetId && item.TargetId !== "default" ? item.TargetId : null;
       dataset.push({
         index: item.RowIndex,
         targetId,
@@ -227,12 +229,14 @@ export function mapClickHouseItemsToRunWithItems({
         traceId: item.TraceId,
       });
     } else if (item.ResultType === "evaluator") {
-      const targetId = item.TargetId && item.TargetId !== "default" ? item.TargetId : null;
+      const targetId =
+        item.TargetId && item.TargetId !== "default" ? item.TargetId : null;
       evaluations.push({
         evaluator: item.EvaluatorId ?? "",
         name: item.EvaluatorName,
         targetId,
-        status: (item.EvaluationStatus as "processed" | "skipped" | "error") ||
+        status:
+          (item.EvaluationStatus as "processed" | "skipped" | "error") ||
           "error",
         index: item.RowIndex,
         score: item.Score,
@@ -348,8 +352,7 @@ export function mapEsRunToExperimentRun(
     datasetCost: runAgg?.dataset_cost.value ?? undefined,
     evaluationsCost: runAgg?.evaluations_cost.cost.value ?? undefined,
     datasetAverageCost: runAgg?.dataset_average_cost.value ?? undefined,
-    datasetAverageDuration:
-      runAgg?.dataset_average_duration.value ?? undefined,
+    datasetAverageDuration: runAgg?.dataset_average_duration.value ?? undefined,
     evaluationsAverageCost:
       runAgg?.evaluations_cost.average_cost.value ?? undefined,
     evaluationsAverageDuration:
@@ -456,4 +459,3 @@ export function mapEsTargetsToTargets(
     metadata: t.metadata,
   }));
 }
-

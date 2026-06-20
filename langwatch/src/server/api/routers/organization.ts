@@ -1025,7 +1025,7 @@ export const organizationRouter = createTRPCRouter({
         });
       }
 
-      if (!session || !session.user || !session.user.email) {
+      if (!session?.user?.email) {
         throw new TRPCError({
           code: "UNAUTHORIZED",
           message: "You must be signed in to accept the invite",

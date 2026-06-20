@@ -36,7 +36,13 @@ vi.mock("~/server/evaluations/runEvaluation", () => ({
 vi.mock("../../rbac", () => ({
   checkProjectPermission:
     () =>
-    ({ next, ctx }: { next: () => unknown; ctx: { permissionChecked?: boolean } }) => {
+    ({
+      next,
+      ctx,
+    }: {
+      next: () => unknown;
+      ctx: { permissionChecked?: boolean };
+    }) => {
       ctx.permissionChecked = true;
       return next();
     },

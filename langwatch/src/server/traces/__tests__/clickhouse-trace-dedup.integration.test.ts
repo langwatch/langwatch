@@ -454,10 +454,10 @@ describe("ClickHouse trace dedup (integration)", () => {
         expect(span.params).toBeDefined();
         const params = span.params as Record<string, unknown>;
         // Dot-notation keys get unflattened: "llm.model" -> { llm: { model: "gpt-5-mini" } }
-        expect((params["llm"] as Record<string, string>)?.["model"]).toBe(
+        expect((params.llm as Record<string, string>)?.model).toBe(
           "gpt-5-mini",
         );
-        expect(params["payload"]).toContain("a".repeat(100));
+        expect(params.payload).toContain("a".repeat(100));
       });
 
       it("preserves heavy ComputedInput/ComputedOutput from the latest trace version", async () => {

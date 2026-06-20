@@ -57,14 +57,16 @@ import {
   type EvaluationRESTResult,
   evaluationInputSchema,
 } from "~/server/evaluations/types";
-import { ExperimentService } from "~/server/experiments/experiment.service";
-import type {
-  ESBatchEvaluation,
-  ESBatchEvaluationRESTParams,
-  ESBatchEvaluationTarget,
-  ESBatchEvaluationTargetType,
-} from "~/server/experiments/types";
 import {
+  CODE_EVALUATOR_CHECK_PREFIX,
+  codeEvaluatorConfigSchema,
+} from "~/server/evaluators/codeEvaluator";
+import { ExperimentService } from "~/server/experiments/experiment.service";
+import {
+  type ESBatchEvaluation,
+  type ESBatchEvaluationRESTParams,
+  type ESBatchEvaluationTarget,
+  type ESBatchEvaluationTargetType,
   eSBatchEvaluationRESTParamsSchema,
   eSBatchEvaluationSchema,
   eSBatchEvaluationTargetTypeSchema,
@@ -74,6 +76,7 @@ import { getPayloadSizeHistogram } from "~/server/metrics";
 import { evaluationNameAutoslug } from "~/server/tracer/collector/evaluationNameAutoslug";
 import { extractChunkTextualContent } from "~/server/tracer/collector/rag";
 import { rAGChunkSchema } from "~/server/tracer/types";
+import { coerceEvaluatorScalar } from "~/server/utils/coerceEvaluatorScalar";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { createLogger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
@@ -500,14 +503,19 @@ const batchEvaluationInputSchema = z.object({
 
 type BatchEvaluationRESTParams = z.infer<typeof batchEvaluationInputSchema>;
 
+const coercedString = z.preprocess(
+  coerceEvaluatorScalar,
+  z.string().optional().nullable(),
+);
+
 const defaultEvaluatorInputSchema = z.object({
-  input: z.string().optional().nullable(),
-  output: z.string().optional().nullable(),
+  input: coercedString,
+  output: coercedString,
   contexts: z
     .union([z.array(rAGChunkSchema), z.array(z.string())])
     .optional()
     .nullable(),
-  expected_output: z.string().optional().nullable(),
+  expected_output: coercedString,
   expected_contexts: z
     .union([z.array(rAGChunkSchema), z.array(z.string())])
     .optional()
@@ -515,8 +523,8 @@ const defaultEvaluatorInputSchema = z.object({
   conversation: z
     .array(
       z.object({
-        input: z.string().optional().nullable(),
-        output: z.string().optional().nullable(),
+        input: coercedString,
+        output: coercedString,
       }),
     )
     .optional()
@@ -540,7 +548,10 @@ export const getEvaluatorDataForParams = (
   checkType: string,
   params: Record<string, any>,
 ): DataForEvaluation => {
-  if (checkType.startsWith("custom/")) {
+  if (
+    checkType.startsWith("custom/") ||
+    checkType.startsWith(CODE_EVALUATOR_CHECK_PREFIX)
+  ) {
     return { type: "custom", data: params };
   }
 
@@ -674,6 +685,21 @@ async function handleEvaluatorCall(
         workflowEvaluatorDef = {
           name: savedEvaluator.name,
           requiredFields: entryOutputs.map((o) => o.identifier),
+        };
+      } else if (savedEvaluator.type === "code") {
+        checkType = `${CODE_EVALUATOR_CHECK_PREFIX}${savedEvaluator.id}`;
+        const parsedConfig = codeEvaluatorConfigSchema.safeParse(
+          savedEvaluator.config,
+        );
+        if (!parsedConfig.success) {
+          return c.json(
+            { error: `Code evaluator has an invalid config: ${slugOrId}` },
+            400,
+          );
+        }
+        workflowEvaluatorDef = {
+          name: savedEvaluator.name,
+          requiredFields: parsedConfig.data.inputs.map((i) => i.identifier),
         };
       } else {
         checkType = config?.evaluatorType ?? evaluatorSlug;

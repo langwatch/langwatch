@@ -99,7 +99,8 @@ export const computeTraceMetrics = (spans: Span[]): Trace["metrics"] => {
         if (!totalCacheCreationInputTokens) {
           totalCacheCreationInputTokens = 0;
         }
-        totalCacheCreationInputTokens += span.metrics.cache_creation_input_tokens;
+        totalCacheCreationInputTokens +=
+          span.metrics.cache_creation_input_tokens;
       }
       if (span.metrics.tokens_estimated) {
         tokensEstimated = true;
@@ -147,7 +148,8 @@ export const addLLMTokensCount = async (projectId: string, spans: Span[]) => {
     if (span.type == "llm") {
       const llmSpan = span as LLMSpan;
       const llmModelCost =
-        llmSpan.model && matchModelCostWithFallbacks(llmSpan.model, llmModelCosts);
+        llmSpan.model &&
+        matchModelCostWithFallbacks(llmSpan.model, llmModelCosts);
 
       if (!llmSpan.metrics) {
         llmSpan.metrics = {};

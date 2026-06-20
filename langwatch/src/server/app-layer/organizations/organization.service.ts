@@ -1,11 +1,19 @@
-import { PricingModel, RoleBindingScopeType, type OrganizationUserRole, type TeamUserRole } from "@prisma/client";
-import { TRPCError } from "@trpc/server";
 import { generate } from "@langwatch/ksuid";
-import { slugify } from "~/utils/slugify";
+import type { User } from "@prisma/client";
+import {
+  type OrganizationUserRole,
+  PricingModel,
+  RoleBindingScopeType,
+  type TeamUserRole,
+} from "@prisma/client";
+import { TRPCError } from "@trpc/server";
+import type { RoleBindingForSynthesis } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
+import type { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { type TeamRoleValue } from "~/utils/memberRoleConstraints";
-import { computeEffectiveTeamRoleUpdates } from "./compute-effective-team-role-updates";
+import type { TeamRoleValue } from "~/utils/memberRoleConstraints";
+import { slugify } from "~/utils/slugify";
 import { isCustomRole } from "../../api/enterprise";
+import { computeEffectiveTeamRoleUpdates } from "./compute-effective-team-role-updates";
 import type {
   AuditLogFilters,
   CreateAndAssignResult,
@@ -20,9 +28,6 @@ import type {
   UpdateOrganizationInput,
   UpdateTeamMemberRoleInput,
 } from "./repositories/organization.repository";
-import type { User } from "@prisma/client";
-import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
-import type { RoleBindingForSynthesis } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
 
 /**
  * Pure function that returns a team enriched with a synthesized member entry
@@ -376,5 +381,4 @@ export class OrganizationService {
   ): Promise<{ auditLogs: EnrichedAuditLog[]; totalCount: number }> {
     return this.repo.getAuditLogs(filters);
   }
-
 }

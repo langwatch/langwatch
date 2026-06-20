@@ -27,10 +27,7 @@ import { resolveOrganizationId } from "~/server/organizations/resolveOrganizatio
 import { TtlCache } from "~/server/utils/ttlCache";
 import { createLogger } from "~/utils/logger/server";
 import { FREE_VISIBILITY_DAYS } from "../../../ee/licensing/constants";
-import type {
-  CategoryVisibility,
-  Protections,
-} from "../traces/protections";
+import type { CategoryVisibility, Protections } from "../traces/protections";
 import { hasProjectPermission, isDemoProject } from "./rbac";
 
 const logger = createLogger("langwatch:api:protections");

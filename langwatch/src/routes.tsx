@@ -4,8 +4,8 @@ import { ErrorBoundary } from "react-error-boundary";
 import {
   createBrowserRouter,
   Outlet,
-  redirect,
   type RouteObject,
+  redirect,
   useLocation,
   useNavigation,
 } from "react-router";

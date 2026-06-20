@@ -101,11 +101,12 @@ function buildReason({
   pricingModel: PricingModel | null;
   isFree: boolean;
 }): string {
-  const unitSource = hasValidLicenseOverride && licenseUsageUnit
-    ? `license(${licenseUsageUnit})`
-    : isFree && pricingModel !== PricingModel.SEAT_EVENT
-      ? "freeTier"
-      : `pricingModel(${pricingModel ?? "null"})`;
+  const unitSource =
+    hasValidLicenseOverride && licenseUsageUnit
+      ? `license(${licenseUsageUnit})`
+      : isFree && pricingModel !== PricingModel.SEAT_EVENT
+        ? "freeTier"
+        : `pricingModel(${pricingModel ?? "null"})`;
 
   return `unit=${usageUnit} from ${unitSource}, isFree=${isFree}`;
 }

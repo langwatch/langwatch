@@ -259,9 +259,7 @@ export const typedValueToText = (
       // Langgraph on Flowise
       if (
         json.messages?.length > 0 &&
-        hasNonEmptyValue(
-          json.messages?.[json.messages?.length - 1]?.content,
-        )
+        hasNonEmptyValue(json.messages?.[json.messages?.length - 1]?.content)
       ) {
         return json.messages[json.messages?.length - 1].content;
       }
@@ -399,13 +397,16 @@ export const typedValueToText = (
     }
   } else if (typed.type == "list") {
     if (Array.isArray(typed.value) && typed.value.length > 0) {
-      const item = last
-        ? typed.value[typed.value.length - 1]
-        : typed.value[0];
+      const item = last ? typed.value[typed.value.length - 1] : typed.value[0];
       // Only recurse into structured SpanInputOutput items (have "type" and "value").
       // Non-structured list items (primitives, arbitrary objects) cannot be
       // meaningfully represented as text and are intentionally ignored.
-      if (item && typeof item === "object" && "type" in item && "value" in item) {
+      if (
+        item &&
+        typeof item === "object" &&
+        "type" in item &&
+        "value" in item
+      ) {
         return typedValueToText(item as SpanInputOutput, last, preferRole);
       }
     }
