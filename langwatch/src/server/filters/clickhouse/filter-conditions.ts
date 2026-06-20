@@ -368,7 +368,6 @@ export const clickHouseFilterConditions: Record<
 
 /**
  * Recursively collects ClickHouse WHERE conditions from nested filter parameters.
- * Mirrors the legacy collectConditions pattern in common.ts.
  *
  * @param field - The filter field being processed
  * @param params - Filter params: string[] | Record<string, ...> | Record<string, Record<string, ...>>
