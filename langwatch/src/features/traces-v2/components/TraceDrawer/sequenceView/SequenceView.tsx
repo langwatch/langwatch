@@ -88,8 +88,6 @@ export function SequenceView({
 
   const {
     view,
-    viewportSize,
-    svgSize,
     setSvgSize,
     viewportRef,
     isPanningRef,

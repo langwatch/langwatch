@@ -322,7 +322,6 @@ export const IOViewer = memo(function IOViewer({
     collapsed,
     setCollapsed,
     engaged,
-    setEngaged,
     engagedRef,
   } = useIOViewerState({ mode });
 
@@ -384,7 +383,9 @@ export const IOViewer = memo(function IOViewer({
   // covers the case where content height changes without the element
   // resizing (rare, but cheap to add).
   const previewBoxRef = useRef<HTMLDivElement>(null);
-  const [hasOverflow, setHasOverflow] = useState(false);
+  // Value intentionally unread — the effect re-runs measurement on resize/
+  // scroll; the overflow flag itself isn't surfaced yet.
+  const [, setHasOverflow] = useState(false);
   useEffect(() => {
     const el = previewBoxRef.current;
     if (!el) {
