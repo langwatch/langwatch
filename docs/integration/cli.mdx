@@ -161,6 +161,13 @@ import { LangWatch } from "langwatch";
 const langwatch = new LangWatch();
 const prompt = await langwatch.prompts.get("my-agent");
 ```
+
+```go Go
+import "github.com/langwatch/langwatch/sdk-go/client"
+
+lw, _ := client.New()
+prompt, _ := lw.Prompts.Get(ctx, "my-agent", nil)
+```
 </CodeGroup>
 
 ### Tag versions for deployment
@@ -180,6 +187,12 @@ prompt = langwatch.prompts.get("my-agent", tag="production")
 
 ```typescript TypeScript
 const prompt = await langwatch.prompts.get("my-agent", { tag: "production" });
+```
+
+```go Go
+prompt, _ := lw.Prompts.Get(ctx, "my-agent", &client.GetPromptOptions{Tag: "production"})
+// Shorthand: a suffix in the handle works too.
+prompt, _ = lw.Prompts.Get(ctx, "my-agent:production", nil)
 ```
 </CodeGroup>
 

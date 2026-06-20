@@ -29,6 +29,7 @@ This guide provides a unified reference for sending metadata across all integrat
 For detailed SDK-specific tutorials, see:
 - **TypeScript:** [Capturing Metadata](/integration/typescript/tutorials/capturing-metadata) · [Tracking Conversations](/integration/typescript/tutorials/tracking-conversations) · [Full example](https://github.com/langwatch/langwatch/tree/main/typescript-sdk/examples/metadata)
 - **Python:** [Capturing Metadata](/integration/python/tutorials/capturing-metadata) · [Tracking Conversations](/integration/python/tutorials/tracking-conversations) · [Full example](https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/metadata_example.py)
+- **Go:** [Go SDK guide](/integration/go/guide) · [Conversation grouping example](https://github.com/langwatch/langwatch/tree/main/sdk-go/e2e/openai-threads)
 
 <CodeGroup>
 ```typescript TypeScript SDK
@@ -76,6 +77,40 @@ def handle_request(user_id: str, thread_id: str):
     )
 
     # Your logic here...
+```
+
+```go Go SDK
+package main
+
+import (
+	"context"
+
+	langwatch "github.com/langwatch/langwatch/sdk-go"
+	"go.opentelemetry.io/otel/attribute"
+)
+
+func handleUserMessage(ctx context.Context, userID, conversationID string) {
+	tracer := langwatch.Tracer("my-service")
+	ctx, span := tracer.Start(ctx, "HandleMessage")
+	defer span.End()
+
+	span.
+		// Thread/conversation grouping (gen_ai.conversation.id)
+		SetThreadID(conversationID).
+		// User and customer identification
+		SetUserID(userID).
+		SetCustomerID("tenant-123").
+		// Labels for filtering
+		SetLabels("production", "premium-user")
+
+	// Custom metadata, hoisted to the trace as metadata.<key> attributes
+	span.SetTraceMetadata(
+		attribute.StringSlice("feature_flags", []string{"new-ui", "beta-model"}),
+		attribute.String("request_source", "mobile-ios"),
+	)
+
+	// Your application logic...
+}
 ```
 </CodeGroup>
 
@@ -132,6 +167,43 @@ with tracer.start_as_current_span("operation") as span:
 
     # ... your code ...
 ```
+
+```go Go
+package main
+
+import (
+	"context"
+	"encoding/json"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+)
+
+func operation(ctx context.Context) {
+	tracer := otel.Tracer("my-service")
+	ctx, span := tracer.Start(ctx, "operation")
+	defer span.End()
+
+	// OTEL semconv for conversation/thread
+	span.SetAttributes(attribute.String("gen_ai.conversation.id", "conv-456"))
+
+	// LangWatch-specific attributes
+	span.SetAttributes(
+		attribute.String("langwatch.user.id", "user-123"),
+		attribute.String("langwatch.customer.id", "customer-789"),
+		attribute.String("langwatch.labels", `["urgent", "support"]`),
+	)
+
+	// Custom metadata as JSON string
+	metadata, _ := json.Marshal(map[string]string{
+		"priority":   "high",
+		"department": "engineering",
+	})
+	span.SetAttributes(attribute.String("metadata", string(metadata)))
+
+	// ... your code ...
+}
+```
 </CodeGroup>
 
 **Exporter configuration:**
@@ -154,6 +226,19 @@ from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExport
 exporter = OTLPSpanExporter(
     endpoint="https://app.langwatch.ai/api/otel/v1/traces",
     headers={"Authorization": f"Bearer {os.environ['LANGWATCH_API_KEY']}"},
+)
+```
+
+```go Go
+import (
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+)
+
+exporter, err := otlptracehttp.New(ctx,
+	otlptracehttp.WithEndpointURL("https://app.langwatch.ai/api/otel/v1/traces"),
+	otlptracehttp.WithHeaders(map[string]string{
+		"Authorization": "Bearer " + os.Getenv("LANGWATCH_API_KEY"),
+	}),
 )
 ```
 </CodeGroup>
@@ -266,6 +351,64 @@ const response = await fetch("https://app.langwatch.ai/api/collector", {
     },
   }),
 });
+```
+
+```go Go
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"net/http"
+	"os"
+)
+
+func sendTrace() error {
+	payload := map[string]any{
+		"trace_id": "trace-123",
+		"spans": []map[string]any{
+			{
+				"type":    "llm",
+				"span_id": "span-456",
+				"name":    "chat-completion",
+				"model":   "gpt-4",
+				"input":   map[string]any{"type": "text", "value": "Hello"},
+				"output":  map[string]any{"type": "text", "value": "Hi there!"},
+				"timestamps": map[string]any{
+					"started_at":  1699900000000,
+					"finished_at": 1699900001000,
+				},
+			},
+		},
+		"metadata": map[string]any{
+			"user_id":          "user-123",
+			"thread_id":        "conversation-456",
+			"customer_id":      "customer-789",
+			"labels":           []string{"production", "premium"},
+			"any_custom_field": "any value",
+		},
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest(http.MethodPost,
+		"https://app.langwatch.ai/api/collector", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("X-Auth-Token", os.Getenv("LANGWATCH_API_KEY"))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return nil
+}
 ```
 </CodeGroup>
 
