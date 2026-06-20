@@ -266,6 +266,27 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
     ]);
 
     // ─────────────────────────────────────────────────────────────────────────
+    // Cache-read tokens (flat alias → canonical dotted form)
+    // Some emitters (the Go SDK, Vertex/Mastra-style instrumentations) report
+    // the cache-read count as the flat gen_ai.usage.cached_input_tokens rather
+    // than the OTel dotted gen_ai.usage.cache_read.input_tokens. Cost and the
+    // trace-level cache rollup only read the dotted key, so canonicalise the
+    // flat alias onto it for ANY span (the Mastra extractor only runs for
+    // Mastra spans). asNumber handles the stringy form too. setAttrIfAbsent:
+    // the canonical dotted form wins when both are present.
+    // ─────────────────────────────────────────────────────────────────────────
+    const cachedInputTokens = asNumber(
+      attrs.take(ATTR_KEYS.GEN_AI_USAGE_CACHED_INPUT_TOKENS),
+    );
+    if (cachedInputTokens !== null) {
+      ctx.setAttrIfAbsent(
+        ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+        cachedInputTokens,
+      );
+      ctx.recordRule(`${this.id}:cached_input_tokens->cache_read.input_tokens`);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // Reasoning output tokens (OTel GenAI semconv v1.41)
     // gen_ai.usage.reasoning.output_tokens supersedes the legacy
     // gen_ai.usage.reasoning_tokens (still coerced above as a fallback).
