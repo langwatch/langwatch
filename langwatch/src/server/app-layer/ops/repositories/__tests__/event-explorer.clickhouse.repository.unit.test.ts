@@ -22,7 +22,6 @@ const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
 
 describe("EventExplorerClickHouseRepository.findAggregates", () => {
   describe("given a caller supplies a sinceMs", () => {
-    /** @scenario "findAggregates filters on EventOccurredAt so partition pruning works" */
     it("filters on EventOccurredAt (the partition-key column), not on EventTimestamp", async () => {
       // The partition is `toYearWeek(toDateTime64(EventOccurredAt / 1000, 3))`.
       // Filtering on EventTimestamp (the version column) does *not* prune
@@ -45,7 +44,6 @@ describe("EventExplorerClickHouseRepository.findAggregates", () => {
 
 describe("EventExplorerClickHouseRepository.searchAggregates", () => {
   describe("given neither tenantIds nor a non-empty query string is supplied", () => {
-    /** @scenario "Unbounded event_log scan is refused at the app layer" */
     it("rejects the call rather than scanning the whole event_log table", async () => {
       const { repo } = repoCapturingQuery();
       await expect(
@@ -62,7 +60,6 @@ describe("EventExplorerClickHouseRepository.searchAggregates", () => {
   });
 
   describe("given a non-empty query string is supplied", () => {
-    /** @scenario "Search is bounded to the partition-prunable lookback window" */
     it("clamps the scan to the last 90 days via the EventOccurredAt predicate", async () => {
       const { repo, query } = repoCapturingQuery();
       const before = Date.now();
@@ -83,7 +80,6 @@ describe("EventExplorerClickHouseRepository.searchAggregates", () => {
 
 describe("EventExplorerClickHouseRepository.findEventsByAggregate", () => {
   describe("given the caller passes a sinceMs (routine ops listing)", () => {
-    /** @scenario "findEventsByAggregate can be bounded by the caller" */
     it("includes the EventOccurredAt predicate in the SQL", async () => {
       const { repo, query } = repoCapturingQuery();
 

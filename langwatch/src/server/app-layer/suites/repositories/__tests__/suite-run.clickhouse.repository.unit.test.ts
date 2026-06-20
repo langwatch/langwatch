@@ -22,7 +22,6 @@ const capturedQuery = (query: ReturnType<typeof vi.fn>) =>
 
 describe("SuiteRunClickHouseRepository.getBatchHistory", () => {
   describe("given the ScenarioSet has multiple BatchRunIds each with multiple unmerged versions", () => {
-    /** @scenario "Batch history dedups across ReplacingMergeTree versions" */
     it("emits an IN-tuple dedup on (TenantId, ScenarioSetId, BatchRunId, UpdatedAt) so the LIMIT page can't fill with duplicate BatchRunIds", async () => {
       // Regression test for the duplicate-BatchRunId bug. Prior to the dedup
       // fix, the LIMIT 50 page could fill with multiple unmerged versions of
