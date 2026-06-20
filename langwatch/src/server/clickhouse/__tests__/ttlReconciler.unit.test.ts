@@ -349,6 +349,8 @@ describe("ttlReconciler", () => {
         "stored_metric_records",
         "stored_spans",
         "trace_summaries",
+        "trace_analytics",
+        "trace_analytics_rollup",
       ]);
     });
 

@@ -70,11 +70,15 @@ describe("hasRetentionTTL", () => {
 });
 
 describe("RETENTION_MANAGED_TABLES", () => {
-  it("includes all 11 retention-managed tables", () => {
-    expect(RETENTION_MANAGED_TABLES).toHaveLength(11);
+  it("includes all 13 retention-managed tables", () => {
+    expect(RETENTION_MANAGED_TABLES).toHaveLength(13);
     expect(RETENTION_MANAGED_TABLES).toContain("stored_spans");
     expect(RETENTION_MANAGED_TABLES).toContain("event_log");
     expect(RETENTION_MANAGED_TABLES).toContain("trace_summaries");
+    // ADR-034 Phase 2 (slim) + Phase 1 (rollup) — both derive from trace events
+    // and age on the same per-project retention policy as trace_summaries.
+    expect(RETENTION_MANAGED_TABLES).toContain("trace_analytics");
+    expect(RETENTION_MANAGED_TABLES).toContain("trace_analytics_rollup");
     expect(RETENTION_MANAGED_TABLES).toContain("simulation_runs");
     expect(RETENTION_MANAGED_TABLES).toContain("suite_runs");
     expect(RETENTION_MANAGED_TABLES).toContain("experiment_runs");
