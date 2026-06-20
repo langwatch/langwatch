@@ -25,6 +25,8 @@ import {
   extractParentTraceForNlpgo,
   maxCausalityDepthOfSpans,
 } from "../app-layer/evaluations/evaluation-execution.service";
+import { codeEvaluatorIdFromCheckType } from "~/server/evaluators/codeEvaluator";
+import { runCodeEvaluator } from "~/server/evaluators/runCodeEvaluator";
 import { prisma } from "../db";
 import {
   evaluationDurationHistogram,
@@ -345,6 +347,21 @@ export const runEvaluation = async ({
   parentCausalityDepth?: number;
 }): Promise<SingleEvaluationResult> => {
   if (data.type === "custom") {
+    // Code evaluators arrive as `{type:"custom"}` with an evaluatorType of
+    // `code/<id>`; route them to the code-evaluator runner instead of letting
+    // `customEvaluation` treat the id as an nlpgo workflow id. Mirrors
+    // EvaluationExecutionService.runEvaluation.
+    const codeEvaluatorId = codeEvaluatorIdFromCheckType(evaluatorType);
+    if (codeEvaluatorId) {
+      return runCodeEvaluator({
+        projectId,
+        evaluatorId: codeEvaluatorId,
+        data: data.data,
+        traceId: trace?.trace_id,
+        parentCausalityDepth,
+        parentTrace: extractParentTraceForNlpgo(trace),
+      });
+    }
     return customEvaluation(
       projectId,
       evaluatorType,
@@ -400,11 +417,14 @@ export const runEvaluation = async ({
     );
   }
 
+  // `openai/moderation` carries a `model` setting ("text-moderation-*") that is
+  // not a configured provider model, so it must skip model-env resolution.
   if (
     settings &&
     typeof settings === "object" &&
     "model" in settings &&
-    typeof settings.model === "string"
+    typeof settings.model === "string" &&
+    builtInEvaluatorType !== "openai/moderation"
   ) {
     try {
       const modelEnv = await setupModelEnv(
@@ -414,6 +434,34 @@ export const runEvaluation = async ({
         settings,
       );
       evaluatorEnv = { ...evaluatorEnv, ...modelEnv };
+    } catch (error) {
+      if (error instanceof EvaluatorConfigError) {
+        return {
+          status: "skipped",
+          details: error.message,
+        };
+      }
+      throw error;
+    }
+  }
+
+  // Evaluators that embed (ragas faithfulness/context-precision, semantic
+  // similarity) need a separate X_LITELLM_EMBEDDINGS_* block for their
+  // embeddings provider.
+  if (
+    settings &&
+    typeof settings === "object" &&
+    "embeddings_model" in settings &&
+    typeof settings.embeddings_model === "string"
+  ) {
+    try {
+      const embeddingsEnv = await setupModelEnv(
+        settings.embeddings_model,
+        true,
+        projectId,
+        settings,
+      );
+      evaluatorEnv = { ...evaluatorEnv, ...embeddingsEnv };
     } catch (error) {
       if (error instanceof EvaluatorConfigError) {
         return {
