@@ -366,6 +366,54 @@ describe("EvaluationExecutionService", () => {
         });
       });
 
+      describe("when the evaluator maps a field from the `evaluations` source", () => {
+        it("enriches trace.evaluations so prior evaluations reach the mapped data", async () => {
+          const { service, mockTraceService, mockClient } = createTestService({
+            traceService: {
+              getEvaluationsMultiple: vi.fn().mockResolvedValue({
+                "trace-1": [
+                  {
+                    evaluator_id: "prior-eval",
+                    name: "Prior",
+                    status: "processed",
+                    score: 0.9,
+                    passed: true,
+                  },
+                ],
+              }),
+            },
+          });
+
+          await service.executeForTrace({
+            ...defaultParams,
+            mappings: {
+              mapping: {
+                input: {
+                  source: "evaluations",
+                  key: "prior-eval",
+                  subkey: "score",
+                },
+              },
+            } as never,
+          });
+
+          // executeForTrace fetches the trace via getTracesWithSpans, which does
+          // NOT populate evaluations — so the A4 enrichment must query them...
+          expect(mockTraceService.getEvaluationsMultiple).toHaveBeenCalledWith(
+            "proj-1",
+            ["trace-1"],
+            expect.anything(),
+          );
+          // ...and the prior evaluation's score must reach the evaluator's
+          // mapped data rather than being silently dropped to empty.
+          expect(mockClient.evaluate).toHaveBeenCalledWith(
+            expect.objectContaining({
+              data: expect.objectContaining({ input: 0.9 }),
+            }),
+          );
+        });
+      });
+
       describe("when evaluator type is not in AVAILABLE_EVALUATORS", () => {
         it("throws EvaluatorNotFoundError", async () => {
           const { service } = createTestService();

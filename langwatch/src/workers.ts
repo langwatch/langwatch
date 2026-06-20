@@ -27,6 +27,14 @@ async function gracefulShutdown(): Promise<void> {
   isShuttingDown = true;
   logger.info({ count: shutdownHandles.length }, "shutting down workers");
   await Promise.allSettled(shutdownHandles.map((close) => close()));
+  // Close the App (ClickHouse / Redis / Prisma) last, after the workers above
+  // have stopped accepting and draining jobs.
+  try {
+    const { getApp } = await import("./server/app-layer/app");
+    await getApp().close();
+  } catch (error) {
+    logger.error({ error }, "error closing app during shutdown");
+  }
   process.exit(0);
 }
 
@@ -47,14 +55,20 @@ void verifyRedisReady().then(async () => {
     const { scheduleIngestionPullers } = await import(
       "@ee/governance/services/pullers/pullerQueue"
     );
-    startIngestionPullerWorker();
+    const ingestionPullerWorker = startIngestionPullerWorker();
+    if (ingestionPullerWorker) {
+      shutdownHandles.push(() => ingestionPullerWorker.close());
+    }
     await scheduleIngestionPullers();
     logger.info("ingestion puller worker ready");
 
     const { startTopicClusteringWorker } = await import(
       "./server/topicClustering/topicClusteringWorker"
     );
-    startTopicClusteringWorker();
+    const topicClusteringWorker = startTopicClusteringWorker();
+    if (topicClusteringWorker) {
+      shutdownHandles.push(() => topicClusteringWorker.close());
+    }
     logger.info("topic clustering worker ready");
 
     // ClickHouse storage-stats collection (feeds the Ops storage metrics).
@@ -108,21 +122,34 @@ void verifyRedisReady().then(async () => {
 
     // Expose the worker process's prom-client registry over HTTP so the web
     // process can scrape it at GET /workers/metrics (proxied in start.ts).
-    const { getWorkerMetricsPort } = await import("./server/metrics");
+    const { getWorkerMetricsPort, isMetricsAuthorized } = await import(
+      "./server/metrics"
+    );
     const metricsPort = getWorkerMetricsPort();
     const metricsServer = http.createServer((req, res) => {
-      if (req.url === "/metrics") {
-        res.setHeader("Content-Type", register.contentType);
-        register
-          .metrics()
-          .then((metrics) => res.end(metrics))
-          .catch((error) => {
-            logger.error({ error }, "error getting worker metrics");
-            res.writeHead(500).end();
-          });
-      } else {
+      if (req.url !== "/metrics") {
         res.writeHead(404).end();
+        return;
       }
+      try {
+        if (!isMetricsAuthorized(req)) {
+          res.writeHead(401).end();
+          return;
+        }
+      } catch (error) {
+        // Fail closed when METRICS_API_KEY is unset in production.
+        logger.error({ error }, "worker metrics auth misconfigured");
+        res.writeHead(500).end();
+        return;
+      }
+      res.setHeader("Content-Type", register.contentType);
+      register
+        .metrics()
+        .then((metrics) => res.end(metrics))
+        .catch((error) => {
+          logger.error({ error }, "error getting worker metrics");
+          res.writeHead(500).end();
+        });
     });
     metricsServer.listen(metricsPort, () => {
       logger.info(`worker metrics server listening on port ${metricsPort}`);

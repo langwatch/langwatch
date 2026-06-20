@@ -67,7 +67,7 @@ import { createApiRouter } from "./server/api-router";
 import { getApp } from "./server/app-layer/app";
 import { initializeWebApp } from "./server/app-layer/presets";
 import { buildStorageConnectSrc } from "./server/buildStorageConnectSrc";
-import { getWorkerMetricsPort } from "./server/metrics";
+import { getWorkerMetricsPort, isMetricsAuthorized } from "./server/metrics";
 import { shutdownPostHog } from "./server/posthog";
 import { verifyRedisReady } from "./server/redis";
 import { serveStaticOrFallback } from "./server/static-handler";
@@ -97,17 +97,6 @@ export const metricsMiddleware = promBundle({
     return req.url?.split("?")[0] ?? req.url;
   },
 });
-
-const isMetricsAuthorized = (req: IncomingMessage): boolean => {
-  const authHeader = req.headers.authorization;
-  if (process.env.NODE_ENV === "production" && !process.env.METRICS_API_KEY) {
-    throw new Error("METRICS_API_KEY is not set");
-  }
-  return (
-    !process.env.METRICS_API_KEY ||
-    authHeader === `Bearer ${process.env.METRICS_API_KEY}`
-  );
-};
 
 export const startApp = async (dir = path.dirname(__dirname)) => {
   const dev = process.env.NODE_ENV !== "production";

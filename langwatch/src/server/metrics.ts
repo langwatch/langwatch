@@ -1,3 +1,4 @@
+import type { IncomingMessage } from "node:http";
 import { performance } from "node:perf_hooks";
 import {
   Counter,
@@ -11,6 +12,23 @@ import {
 if (!register.getSingleMetric("process_cpu_user_seconds_total")) {
   collectDefaultMetrics({ register });
 }
+
+/**
+ * Bearer-token gate shared by the web `/metrics` + `/workers/metrics` proxy
+ * (start.ts) and the worker process's own `/metrics` listener (workers.ts), so
+ * the two can't drift. Fail-closed in production when METRICS_API_KEY is unset;
+ * in non-prod an unset key allows access for dev convenience.
+ */
+export const isMetricsAuthorized = (req: IncomingMessage): boolean => {
+  const authHeader = req.headers.authorization;
+  if (process.env.NODE_ENV === "production" && !process.env.METRICS_API_KEY) {
+    throw new Error("METRICS_API_KEY is not set");
+  }
+  return (
+    !process.env.METRICS_API_KEY ||
+    authHeader === `Bearer ${process.env.METRICS_API_KEY}`
+  );
+};
 
 type Endpoint =
   | "collector"
