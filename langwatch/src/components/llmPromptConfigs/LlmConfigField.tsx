@@ -9,15 +9,9 @@ import {
 import { AddModelProviderKey } from "~/optimization_studio/components/AddModelProviderKey";
 import type { LLMConfig } from "~/optimization_studio/types/dsl";
 import { Popover } from "../ui/popover";
-
-type ModelOption = {
-  value: string;
-  isDisabled: boolean;
-  mode?: "chat" | "embedding" | undefined;
-};
-
 import { NoModelsConfiguredCallout } from "../NoModelsConfiguredCallout";
 import { LLMModelDisplay } from "./LLMModelDisplay";
+import type { ModelOption } from "~/server/topicClustering/types";
 
 type LLMConfigFieldProps = {
   llmConfig: LLMConfig;
