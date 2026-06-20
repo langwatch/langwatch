@@ -2,6 +2,7 @@ import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import { definePipeline } from "../../";
 import type { OutboxReactorDefinition } from "../../outbox/outboxReactor.types";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
+import type { AppendStore } from "../../projections/mapProjection.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
 import {
   CompleteEvaluationCommand,
@@ -9,11 +10,25 @@ import {
   StartEvaluationCommand,
 } from "./commands";
 import { ExecuteEvaluationCommand } from "./commands/executeEvaluation.command";
+import {
+  type EvaluationAnalyticsData,
+  EvaluationAnalyticsFoldProjection,
+} from "./projections/evaluationAnalytics.foldProjection";
+import {
+  type EvaluationAnalyticsRollupRow,
+  EvaluationAnalyticsRollupMapProjection,
+} from "./projections/evaluationAnalyticsRollup.mapProjection";
 import { EvaluationRunFoldProjection } from "./projections/evaluationRun.foldProjection";
 import type { EvaluationProcessingEvent } from "./schemas/events";
 
 export interface EvaluationProcessingPipelineDeps {
   evalRunStore: FoldProjectionStore<EvaluationRunData>;
+  /** ADR-034 Phase 6: slim per-evaluation fold writer (eval mirror of
+   *  `traceAnalyticsStore`). */
+  evaluationAnalyticsStore: FoldProjectionStore<EvaluationAnalyticsData>;
+  /** ADR-034 Phase 6: per-evaluation rollup writer (eval mirror of
+   *  `traceAnalyticsRollupAppendStore`). */
+  evaluationAnalyticsRollupAppendStore: AppendStore<EvaluationAnalyticsRollupRow>;
   executeEvaluationCommand: ExecuteEvaluationCommand;
   esSyncReactor: ReactorDefinition<
     EvaluationProcessingEvent,
@@ -31,6 +46,19 @@ export interface EvaluationProcessingPipelineDeps {
   evaluationAlertTriggerNotifyOutboxReactor: OutboxReactorDefinition<
     EvaluationProcessingEvent,
     EvaluationRunData
+  >;
+  /**
+   * ADR-034 Phase 6: real-time path for eval-metric custom-graph threshold
+   * alerts. Attached on `evaluationAnalytics` (the slim eval fold) so it
+   * fires on every slim-fold update; debounced per (triggerId, projectId)
+   * inside the reactor's `decide`. Flag-gated per project via the same
+   * `release_es_graph_triggers_firing` flag the trace pipeline uses —
+   * disabled = empty decide; cron handles the project's graph triggers
+   * as today.
+   */
+  graphTriggerEvaluationOutboxReactor: OutboxReactorDefinition<
+    EvaluationProcessingEvent,
+    EvaluationAnalyticsData
   >;
   customerIoEvaluationSyncReactor?: ReactorDefinition<
     EvaluationProcessingEvent,
@@ -62,6 +90,18 @@ export function createEvaluationProcessingPipeline(
         store: deps.evalRunStore,
       }),
     )
+    .withFoldProjection(
+      "evaluationAnalytics",
+      new EvaluationAnalyticsFoldProjection({
+        store: deps.evaluationAnalyticsStore,
+      }),
+    )
+    .withMapProjection(
+      "evaluationAnalyticsRollup",
+      new EvaluationAnalyticsRollupMapProjection({
+        store: deps.evaluationAnalyticsRollupAppendStore,
+      }),
+    )
     .withReactor("evaluationRun", "evaluationEsSync", deps.esSyncReactor)
     .withOutbox(
       "evaluationRun",
@@ -72,6 +112,11 @@ export function createEvaluationProcessingPipeline(
       "evaluationRun",
       "evaluationAlertTriggerNotifyOutbox",
       deps.evaluationAlertTriggerNotifyOutboxReactor,
+    )
+    .withOutbox(
+      "evaluationAnalytics",
+      "graphTriggerEvaluation",
+      deps.graphTriggerEvaluationOutboxReactor,
     );
 
   if (deps.customerIoEvaluationSyncReactor) {

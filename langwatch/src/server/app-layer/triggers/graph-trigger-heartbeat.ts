@@ -42,6 +42,10 @@ import { featureFlagService as defaultFeatureFlagService } from "~/server/featur
 import type { FeatureFlagServiceInterface } from "~/server/featureFlag/types";
 import type { ActionParams } from "~/pages/api/cron/triggers/types";
 import { createLogger } from "~/utils/logger/server";
+import {
+  type AnalyticsMetricSource,
+  getMetricSource,
+} from "~/server/app-layer/analytics/routing/field-availability";
 import { isNoDataPredicate } from "./evaluate-custom-graph-threshold.service";
 import type { TriggerService } from "./trigger.service";
 
@@ -56,6 +60,14 @@ interface CandidateTrigger {
   windowMs: number;
   /** "absence" = no-data shape; "resolve" = firing-resolve when traffic stops. */
   reasonKind: "absence" | "resolve";
+  /**
+   * ADR-034 Phase 6 source-awareness: the upstream pipeline whose slim
+   * table the heartbeat queries for recency. `"trace"` candidates query
+   * `trace_analytics`; `"evaluation"` candidates query
+   * `evaluation_analytics`. Unknown-source candidates default to `"trace"`
+   * (preserves the pre-Phase-6 behaviour).
+   */
+  source: AnalyticsMetricSource;
 }
 
 export interface GraphTriggerHeartbeatDeps {
@@ -66,6 +78,19 @@ export interface GraphTriggerHeartbeatDeps {
    *  per-project resolver. */
   resolveClickHouseClient: ClickHouseClientResolver;
   featureFlagService: FeatureFlagServiceInterface;
+  /**
+   * ADR-034 Phase 6: look up the upstream pipeline source for a graph
+   * trigger by reading its underlying custom-graph's first series'
+   * metric key. Returns `undefined` when the source can't be
+   * determined (graph missing, metric not in field-availability) — the
+   * heartbeat treats those as `"trace"` so behaviour is unchanged for
+   * unknown-source triggers (the cron has always handled them).
+   */
+  lookupTriggerSource(params: {
+    triggerId: string;
+    customGraphId: string;
+    projectId: string;
+  }): Promise<AnalyticsMetricSource | undefined>;
 }
 
 export interface HeartbeatCandidateSources {
@@ -81,19 +106,35 @@ export interface HeartbeatCandidateSources {
 }
 
 /**
- * One project's slim-table recency snapshot. `lastOccurredAtMs` is
- * `null` when the project has no qualifying event in the bounding
+ * One project's slim-table recency snapshot per source. `lastOccurredAtMs`
+ * is `null` when the project has no qualifying event in the bounding
  * window — that's the no-data-fire case in its entirety.
  */
 interface ProjectRecency {
   projectId: string;
+  source: AnalyticsMetricSource;
   lastOccurredAtMs: number | null;
 }
 
 /** Min window so the heartbeat doesn't issue a degenerate `now - 0` filter. */
 const MIN_BOUND_WINDOW_MS = 60_000;
 
-const SLIM_TABLE = "trace_analytics" as const;
+/** Slim table name per source (ADR-034 Phase 6). */
+const SLIM_TABLE_BY_SOURCE: Record<AnalyticsMetricSource, string> = {
+  trace: "trace_analytics",
+  evaluation: "evaluation_analytics",
+};
+
+/** Aggregate-id column per source. The IN-tuple dedup pattern uses this
+ *  as the (TenantId, <id>, UpdatedAt) grouping key for the slim
+ *  `ReplacingMergeTree(UpdatedAt)` table. */
+const SLIM_AGGREGATE_ID_COLUMN_BY_SOURCE: Record<
+  AnalyticsMetricSource,
+  string
+> = {
+  trace: "TraceId",
+  evaluation: "EvaluationId",
+};
 
 /**
  * Register the graph-trigger heartbeat with the process-singleton
@@ -220,19 +261,30 @@ export async function decideGraphTriggerHeartbeat({
     });
     if (candidates.length === 0) continue;
 
-    // Step 2: per-project pre-filter — one batched slim query bounded
-    // by the largest candidate window. If the project's recent
-    // qualifying activity is fresher than a candidate's window, the
-    // real-time path is already handling it and we skip the enqueue.
-    const boundMs = Math.max(...candidates.map((c) => c.windowMs));
-    const recency = await loadProjectRecency({
-      deps,
-      projectId,
-      boundWindowMs: Math.max(MIN_BOUND_WINDOW_MS, boundMs),
-      now,
-    });
+    // Step 2: per-project, per-source pre-filter — ONE batched slim
+    // query per (project, source) per tick (at most 2 queries per
+    // project per tick: one against `trace_analytics`, one against
+    // `evaluation_analytics`). If the project's recent qualifying
+    // activity for the trigger's source is fresher than the
+    // candidate's window, the real-time path is already handling it
+    // and we skip the enqueue.
+    const candidatesBySource = groupCandidatesBySource(candidates);
+    const recencyBySource = new Map<AnalyticsMetricSource, ProjectRecency>();
+    for (const [source, sourceCandidates] of candidatesBySource.entries()) {
+      const boundMs = Math.max(...sourceCandidates.map((c) => c.windowMs));
+      const recency = await loadProjectRecency({
+        deps,
+        projectId,
+        source,
+        boundWindowMs: Math.max(MIN_BOUND_WINDOW_MS, boundMs),
+        now,
+      });
+      recencyBySource.set(source, recency);
+    }
 
     for (const candidate of candidates) {
+      const recency = recencyBySource.get(candidate.source);
+      if (!recency) continue;
       const cutoff = now.getTime() - candidate.windowMs;
       if (
         recency.lastOccurredAtMs !== null &&
@@ -307,15 +359,42 @@ async function loadCandidatesForProject({
     const isNoData = isNoDataPredicate({ operator, threshold });
     const isOpen = openIds.has(trigger.id);
     if (!isNoData && !isOpen) continue;
+    if (!trigger.customGraphId) continue;
+
+    // ADR-034 Phase 6 source classification. Unknown-source defaults to
+    // "trace" so we preserve the pre-Phase-6 behaviour for graphs whose
+    // metrics aren't in `field-availability`.
+    const lookedUp = await deps.lookupTriggerSource({
+      triggerId: trigger.id,
+      customGraphId: trigger.customGraphId,
+      projectId,
+    });
+    const source: AnalyticsMetricSource = lookedUp ?? "trace";
 
     candidates.push({
       triggerId: trigger.id,
       projectId,
       windowMs,
       reasonKind: isOpen ? "resolve" : "absence",
+      source,
     });
   }
   return candidates;
+}
+
+function groupCandidatesBySource(
+  candidates: CandidateTrigger[],
+): Map<AnalyticsMetricSource, CandidateTrigger[]> {
+  const groups = new Map<AnalyticsMetricSource, CandidateTrigger[]>();
+  for (const c of candidates) {
+    const existing = groups.get(c.source);
+    if (existing) {
+      existing.push(c);
+    } else {
+      groups.set(c.source, [c]);
+    }
+  }
+  return groups;
 }
 
 async function loadOpenTriggerIds(
@@ -337,11 +416,13 @@ async function loadOpenTriggerIds(
 async function loadProjectRecency({
   deps,
   projectId,
+  source,
   boundWindowMs,
   now,
 }: {
   deps: GraphTriggerHeartbeatDeps;
   projectId: string;
+  source: AnalyticsMetricSource;
   boundWindowMs: number;
   now: Date;
 }): Promise<ProjectRecency> {
@@ -352,14 +433,17 @@ async function loadProjectRecency({
     logger.warn(
       {
         projectId,
+        source,
         error: error instanceof Error ? error.message : String(error),
       },
       "graphTriggerHeartbeat: ClickHouse client unavailable, treating recency as unknown (no skip)",
     );
-    return { projectId, lastOccurredAtMs: null };
+    return { projectId, source, lastOccurredAtMs: null };
   }
 
   const startMs = now.getTime() - boundWindowMs;
+  const table = SLIM_TABLE_BY_SOURCE[source];
+  const idColumn = SLIM_AGGREGATE_ID_COLUMN_BY_SOURCE[source];
   // One IN-tuple dedup pattern (slim is ReplacingMergeTree(UpdatedAt)),
   // bounded on the partition column (OccurredAt) for partition pruning.
   // TenantId is the first WHERE predicate per multitenancy rules.
@@ -367,15 +451,15 @@ async function loadProjectRecency({
     SELECT max(toUnixTimestamp64Milli(OccurredAt)) AS lastMs
     FROM (
       SELECT OccurredAt
-      FROM ${SLIM_TABLE}
+      FROM ${table}
       WHERE TenantId = {tenantId:String}
         AND OccurredAt >= toDateTime64({startMs:UInt64} / 1000.0, 3)
-        AND (TenantId, TraceId, UpdatedAt) IN (
-          SELECT TenantId, TraceId, max(UpdatedAt)
-          FROM ${SLIM_TABLE}
+        AND (TenantId, ${idColumn}, UpdatedAt) IN (
+          SELECT TenantId, ${idColumn}, max(UpdatedAt)
+          FROM ${table}
           WHERE TenantId = {tenantId:String}
             AND OccurredAt >= toDateTime64({startMs:UInt64} / 1000.0, 3)
-          GROUP BY TenantId, TraceId
+          GROUP BY TenantId, ${idColumn}
         )
     )
   `;
@@ -388,22 +472,23 @@ async function loadProjectRecency({
     const rows = (await result.json()) as Array<{ lastMs: string | number | null }>;
     const row = rows[0];
     if (!row || row.lastMs === null || row.lastMs === undefined) {
-      return { projectId, lastOccurredAtMs: null };
+      return { projectId, source, lastOccurredAtMs: null };
     }
     const ms = typeof row.lastMs === "string" ? Number.parseInt(row.lastMs, 10) : row.lastMs;
     if (!Number.isFinite(ms) || ms <= 0) {
-      return { projectId, lastOccurredAtMs: null };
+      return { projectId, source, lastOccurredAtMs: null };
     }
-    return { projectId, lastOccurredAtMs: ms };
+    return { projectId, source, lastOccurredAtMs: ms };
   } catch (error) {
     logger.warn(
       {
         projectId,
+        source,
         error: error instanceof Error ? error.message : String(error),
       },
       "graphTriggerHeartbeat: ClickHouse recency query failed, treating recency as unknown",
     );
-    return { projectId, lastOccurredAtMs: null };
+    return { projectId, source, lastOccurredAtMs: null };
   }
 }
 
@@ -428,5 +513,21 @@ export function defaultGraphTriggerHeartbeatDeps({
       return client;
     },
     featureFlagService: defaultFeatureFlagService,
+    lookupTriggerSource: async ({ customGraphId, projectId }) => {
+      // Read the graph's first series' metric and map to a source. The
+      // graph is the only place the metric key lives — the trigger's
+      // `actionParams.seriesName` carries only the series INDEX.
+      const graph = await prisma.customGraph.findFirst({
+        where: { id: customGraphId, projectId },
+        select: { graph: true },
+      });
+      if (!graph) return undefined;
+      const blob = graph.graph as { series?: Array<{ metric?: string }> } | null;
+      const firstMetric = blob?.series?.[0]?.metric;
+      if (typeof firstMetric !== "string" || firstMetric.length === 0) {
+        return undefined;
+      }
+      return getMetricSource(firstMetric);
+    },
   };
 }

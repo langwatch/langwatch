@@ -70,8 +70,8 @@ describe("hasRetentionTTL", () => {
 });
 
 describe("RETENTION_MANAGED_TABLES", () => {
-  it("includes all 13 retention-managed tables", () => {
-    expect(RETENTION_MANAGED_TABLES).toHaveLength(13);
+  it("includes all 15 retention-managed tables", () => {
+    expect(RETENTION_MANAGED_TABLES).toHaveLength(15);
     expect(RETENTION_MANAGED_TABLES).toContain("stored_spans");
     expect(RETENTION_MANAGED_TABLES).toContain("event_log");
     expect(RETENTION_MANAGED_TABLES).toContain("trace_summaries");
@@ -79,6 +79,10 @@ describe("RETENTION_MANAGED_TABLES", () => {
     // and age on the same per-project retention policy as trace_summaries.
     expect(RETENTION_MANAGED_TABLES).toContain("trace_analytics");
     expect(RETENTION_MANAGED_TABLES).toContain("trace_analytics_rollup");
+    // ADR-034 Phase 6 — eval mirrors; age with the eval-pipeline retention
+    // (currently categorised "traces" until eval split-out lands).
+    expect(RETENTION_MANAGED_TABLES).toContain("evaluation_analytics");
+    expect(RETENTION_MANAGED_TABLES).toContain("evaluation_analytics_rollup");
     expect(RETENTION_MANAGED_TABLES).toContain("simulation_runs");
     expect(RETENTION_MANAGED_TABLES).toContain("suite_runs");
     expect(RETENTION_MANAGED_TABLES).toContain("experiment_runs");
