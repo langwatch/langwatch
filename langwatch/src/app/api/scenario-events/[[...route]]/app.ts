@@ -333,7 +333,7 @@ async function pMapLimited<T>({
 }): Promise<void> {
   const executing = new Set<Promise<void>>();
   for (const item of items) {
-    const p = fn(item).then(() => {
+    const p = fn(item).finally(() => {
       executing.delete(p);
     });
     executing.add(p);
