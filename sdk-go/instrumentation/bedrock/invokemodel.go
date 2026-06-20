@@ -49,7 +49,6 @@ func (invokeModelHandler) recordResponse(_ context.Context, span *langwatch.Span
 
 	if usage, ok := parseInvokeModelUsage(output.Body); ok {
 		span.SetGenAIUsage(usage.genAIUsage())
-		span.SetMetrics(usage.spanMetrics())
 	}
 	if reason := parseInvokeModelStopReason(output.Body); reason != "" {
 		span.SetGenAIResponseFinishReasons(reason)
@@ -71,9 +70,10 @@ type invokeModelUsage struct {
 
 func (u invokeModelUsage) genAIUsage() langwatch.GenAIUsage {
 	usage := langwatch.GenAIUsage{
-		InputTokens:       u.inputTokens,
-		OutputTokens:      u.outputTokens,
-		CachedInputTokens: u.cacheReadTokens,
+		InputTokens:              u.inputTokens,
+		OutputTokens:             u.outputTokens,
+		CachedInputTokens:        u.cacheReadTokens,
+		CacheCreationInputTokens: u.cacheCreationTokens,
 	}
 	// Anthropic does not return a total; synthesize it from input + output +
 	// cache tokens (cache-read and cache-creation are real input tokens, so
@@ -85,15 +85,6 @@ func (u invokeModelUsage) genAIUsage() langwatch.GenAIUsage {
 		)
 	}
 	return usage
-}
-
-func (u invokeModelUsage) spanMetrics() langwatch.SpanMetrics {
-	return langwatch.SpanMetrics{
-		PromptTokens:             u.inputTokens,
-		CompletionTokens:         u.outputTokens,
-		CacheReadInputTokens:     u.cacheReadTokens,
-		CacheCreationInputTokens: u.cacheCreationTokens,
-	}
 }
 
 // deref returns the value of a *int, or 0 when nil.

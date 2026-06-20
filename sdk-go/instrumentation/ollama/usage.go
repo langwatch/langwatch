@@ -42,42 +42,25 @@ func (m metricsPayload) toGenAIUsage() langwatch.GenAIUsage {
 	return usage
 }
 
-// usageMetrics projects token counts onto the LangWatch SpanMetrics fields.
-func (m metricsPayload) usageMetrics() langwatch.SpanMetrics {
-	metrics := langwatch.SpanMetrics{}
-	if m.PromptEvalCount > 0 {
-		metrics.PromptTokens = langwatch.Int(m.PromptEvalCount)
-	}
-	if m.EvalCount > 0 {
-		metrics.CompletionTokens = langwatch.Int(m.EvalCount)
-	}
-	return metrics
-}
-
-// recordUsage records Ollama's token usage as BOTH gen_ai.usage.* attributes
-// (via SetGenAIUsage) and the langwatch.metrics token rollup (via SetMetrics),
-// then records the server-side durations. Token recording is skipped entirely
-// when no counts were present, so a partial / streaming-interrupted response
-// does not stamp zeros.
+// recordUsage records Ollama's token usage as gen_ai.usage.* attributes (via
+// SetGenAIUsage), the sole token source, then records the server-side phase
+// durations. Token recording is skipped entirely when no counts were present, so
+// a partial / streaming-interrupted response does not stamp zeros.
 func recordUsage(span *langwatch.Span, m metricsPayload) {
 	if m.hasUsage() {
 		span.SetGenAIUsage(m.toGenAIUsage())
-		span.SetMetrics(m.usageMetrics())
 	}
 	recordDurations(span, m)
 }
 
 const nanosPerSecond = 1e9
 
-// recordDurations records Ollama's nanosecond timing fields. The total request
-// duration is reported under the OTel-native gen_ai.server.request.duration (in
-// seconds); the prompt-eval and eval phase durations are recorded as langwatch.*
-// attributes for finer-grained latency analysis.
+// recordDurations records Ollama's nanosecond phase-timing fields as langwatch.*
+// attributes for finer-grained latency analysis. The total request duration is
+// omitted (the span's own duration already covers it); only the distinct
+// load / prompt-eval / eval phase latencies are recorded.
 func recordDurations(span *langwatch.Span, m metricsPayload) {
 	var attrs []attribute.KeyValue
-	if m.TotalDuration > 0 {
-		attrs = append(attrs, attribute.Float64("gen_ai.server.request.duration", float64(m.TotalDuration)/nanosPerSecond))
-	}
 	if m.LoadDuration > 0 {
 		attrs = append(attrs, attribute.Float64("langwatch.ollama.load_duration", float64(m.LoadDuration)/nanosPerSecond))
 	}

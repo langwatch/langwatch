@@ -52,9 +52,6 @@ func (converseHandler) recordResponse(_ context.Context, span *langwatch.Span, r
 		span.SetGenAIResponseFinishReasons(string(output.StopReason))
 	}
 	recordTokenUsage(span, output.Usage)
-	if output.Metrics != nil && output.Metrics.LatencyMs != nil {
-		recordLatency(span, *output.Metrics.LatencyMs)
-	}
 	recordConverseOutput(span, output.Output, capture)
 	return false
 }
@@ -81,7 +78,7 @@ func recordConverseRequest(span *langwatch.Span, req converseRequest, capture la
 	recordInferenceConfig(span, req.inferenceConfig)
 
 	if req.toolConfig != nil && len(req.toolConfig.Tools) > 0 {
-		setJSONAttribute(span, "gen_ai.request.tools", req.toolConfig.Tools)
+		setJSONAttribute(span, string(langwatch.AttributeGenAIRequestTools), req.toolConfig.Tools)
 	}
 
 	if capture.CaptureInput() {

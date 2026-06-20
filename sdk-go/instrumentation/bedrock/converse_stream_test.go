@@ -105,9 +105,8 @@ func TestConverseStream_RecordsRequestThenEndsAfterDrain(t *testing.T) {
 	tracer := langwatch.TracerFromProvider(provider, tracerName)
 	_, span := tracer.Start(context.Background(), "init")
 	handler := converseStreamHandler{}
-	// The middleware sets the streaming flags before dispatching to recordRequest;
+	// The middleware sets the streaming flag before dispatching to recordRequest;
 	// mirror that here since this test drives the handler directly.
-	span.SetAttributes(langwatch.AttributeLangWatchStreaming.Bool(handler.streaming()))
 	span.SetGenAIRequestStream(handler.streaming())
 	handler.recordRequest(span, input, langwatch.DataCaptureAll)
 
@@ -134,7 +133,6 @@ func TestConverseStream_RecordsRequestThenEndsAfterDrain(t *testing.T) {
 	attrs := spanAttrs(exported)
 
 	assert.Equal(t, codes.Ok, exported.Status().Code)
-	assert.Equal(t, attribute.BoolValue(true), attrs[langwatch.AttributeLangWatchStreaming])
 	// A streaming (ConverseStream) request records gen_ai.request.stream == true
 	// and a TTFT measured on the first streamed event.
 	assert.Equal(t, attribute.BoolValue(true), attrs[attribute.Key("gen_ai.request.stream")])
@@ -157,12 +155,10 @@ func TestConverseStream_RecordsRequestThenEndsAfterDrain(t *testing.T) {
 	assert.Equal(t, attribute.IntValue(20), attrs[semconv.GenAIUsageInputTokensKey])
 	assert.Equal(t, attribute.IntValue(10), attrs[semconv.GenAIUsageOutputTokensKey])
 	assert.Equal(t, attribute.IntValue(30), attrs[attribute.Key("gen_ai.usage.total_tokens")])
+	// Tokens flow solely through gen_ai.usage.*: cache read -> cached_input_tokens,
+	// cache write -> cache_creation.input_tokens.
 	assert.Equal(t, attribute.IntValue(4), attrs[attribute.Key("gen_ai.usage.cached_input_tokens")])
-	assert.Equal(t, attribute.Float64Value(0.89), attrs[attribute.Key("gen_ai.server.request.duration")])
-
-	metrics := parseMetrics(t, attrs)
-	assert.Equal(t, 4, *metrics.CacheReadInputTokens)
-	assert.Equal(t, 6, *metrics.CacheCreationInputTokens)
+	assert.Equal(t, attribute.IntValue(6), attrs[attribute.Key("gen_ai.usage.cache_creation.input_tokens")])
 }
 
 func TestConverseStream_EarlyClose_FinalisesSpan(t *testing.T) {

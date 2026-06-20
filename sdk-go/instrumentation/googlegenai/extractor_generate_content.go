@@ -129,7 +129,7 @@ func (generateContentExtractor) ExtractRequest(span *langwatch.Span, raw []byte,
 	}
 
 	if len(req.Tools) > 0 {
-		otelhttp.SetJSONAttribute(span, "gen_ai.request.tools", json.RawMessage(req.Tools))
+		otelhttp.SetJSONAttribute(span, string(langwatch.AttributeGenAIRequestTools), json.RawMessage(req.Tools))
 	}
 
 	if capture.CaptureInput() {

@@ -94,7 +94,6 @@ type streamAccumulator struct {
 	output     strings.Builder
 	stopReason string
 	usage      *types.TokenUsage
-	latencyMs  *int64
 	// toolCalls accumulates streamed tool_use blocks keyed by their content-block
 	// index; toolCallOrder preserves first-seen order for deterministic output.
 	toolCalls     map[int32]*streamToolUse
@@ -193,9 +192,6 @@ func (r *observingReader) observe(event types.ConverseStreamOutput) {
 		r.acc.stopReason = string(e.Value.StopReason)
 	case *types.ConverseStreamOutputMemberMetadata:
 		r.acc.usage = e.Value.Usage
-		if e.Value.Metrics != nil {
-			r.acc.latencyMs = e.Value.Metrics.LatencyMs
-		}
 	}
 }
 
@@ -245,9 +241,6 @@ func (r *observingReader) finish() {
 			r.span.SetGenAIResponseFinishReasons(acc.stopReason)
 		}
 		recordTokenUsage(r.span, acc.usage)
-		if acc.latencyMs != nil {
-			recordLatency(r.span, *acc.latencyMs)
-		}
 		if r.capture.CaptureOutput() {
 			// Record structured chat messages when tool_use blocks were streamed
 			// (the common agent case), so they are not discarded; otherwise keep

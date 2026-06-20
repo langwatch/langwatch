@@ -70,10 +70,10 @@ still produce a useful span instead of nothing.
 
 Ollama reports `prompt_eval_count` (input tokens) and `eval_count` (output
 tokens) on the response (the final line, when streaming); the total is derived as
-their sum. All token usage is recorded **both** as `gen_ai.usage.*` attributes and
-as the `langwatch.metrics` token rollup that feeds LangWatch cost reporting. The
-server-side durations (`total_duration`, `prompt_eval_duration`, `eval_duration`,
-nanoseconds on the wire) are recorded in seconds.
+their sum. All token usage is recorded as `gen_ai.usage.*` attributes, which feed
+LangWatch cost reporting. The server-side phase durations (`load_duration`,
+`prompt_eval_duration`, `eval_duration`, nanoseconds on the wire) are recorded in
+seconds.
 
 For chat and generate, model-emitted **tool calls are captured structurally** as
 the assistant message's `tool_calls` (not flattened to text), in both the
@@ -194,15 +194,14 @@ the exporter strips it at export time.
   (`num_predict` → `gen_ai.request.max_tokens`,
   `gen_ai.request.{temperature,top_p,top_k,seed,frequency_penalty,presence_penalty,stop_sequences}`),
   `gen_ai.request.tools`, `gen_ai.request.structured_output` (the `format`),
-  `gen_ai.embeddings.dimension_count`, `langwatch.gen_ai.streaming`, and the input
+  `gen_ai.embeddings.dimension_count`, `gen_ai.request.stream`, and the input
   (`langwatch.input`, as `chat_messages` for chat / text for generate +
   embeddings).
 - **Response**: `gen_ai.response.model`, `gen_ai.response.finish_reasons` (the
   `done_reason`), token usage
   (`gen_ai.usage.{input_tokens,output_tokens,total_tokens}` from
-  `prompt_eval_count` / `eval_count`), the `langwatch.metrics` token rollup, the
-  server-side durations (`gen_ai.server.request.duration` and
-  `langwatch.ollama.{load_duration,prompt_eval_duration,eval_duration}`, seconds),
+  `prompt_eval_count` / `eval_count`), the server-side phase durations
+  (`langwatch.ollama.{load_duration,prompt_eval_duration,eval_duration}`, seconds),
   `gen_ai.response.embeddings_count`, and the output (`langwatch.output`, as
   `chat_messages` for chat — preserving `tool_calls` — and text for generate).
 - **HTTP / status**: `http.request.method`, `server.address`, `url.path`,

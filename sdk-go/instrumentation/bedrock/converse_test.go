@@ -2,7 +2,6 @@ package bedrock
 
 import (
 	"context"
-	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -94,7 +93,6 @@ func TestConverse_RoundTrip_RecordsEverything(t *testing.T) {
 	assert.Equal(t, attribute.StringValue("aws.bedrock"), attrs[semconv.GenAIProviderNameKey])
 	assert.Equal(t, attribute.StringValue("chat"), attrs[semconv.GenAIOperationNameKey])
 	assert.Equal(t, attribute.StringValue("llm"), attrs[langwatch.AttributeLangWatchSpanType])
-	assert.Equal(t, attribute.BoolValue(false), attrs[langwatch.AttributeLangWatchStreaming])
 	// A non-streaming (unary Converse) request records gen_ai.request.stream ==
 	// false and no TTFT.
 	assert.Equal(t, attribute.BoolValue(false), attrs[attribute.Key("gen_ai.request.stream")])
@@ -112,20 +110,15 @@ func TestConverse_RoundTrip_RecordsEverything(t *testing.T) {
 	// System instructions captured in the gen_ai-native attribute.
 	assert.Equal(t, "be terse", attrs[genAISystemKey].AsString())
 
-	// Response: stop reason + usage (all token types) + latency.
+	// Response: stop reason + usage (all token types). Tokens flow solely through
+	// gen_ai.usage.*: cache read -> cached_input_tokens, cache write ->
+	// cache_creation.input_tokens.
 	assert.Equal(t, attribute.StringSliceValue([]string{"end_turn"}), attrs[semconv.GenAIResponseFinishReasonsKey])
 	assert.Equal(t, attribute.IntValue(12), attrs[semconv.GenAIUsageInputTokensKey])
 	assert.Equal(t, attribute.IntValue(7), attrs[semconv.GenAIUsageOutputTokensKey])
 	assert.Equal(t, attribute.IntValue(19), attrs[attribute.Key("gen_ai.usage.total_tokens")])
 	assert.Equal(t, attribute.IntValue(5), attrs[attribute.Key("gen_ai.usage.cached_input_tokens")])
-	assert.Equal(t, attribute.Float64Value(0.432), attrs[attribute.Key("gen_ai.server.request.duration")])
-
-	// LangWatch metrics: cache read -> CacheReadInputTokens, cache write -> CacheCreationInputTokens.
-	metrics := parseMetrics(t, attrs)
-	assert.Equal(t, 12, *metrics.PromptTokens)
-	assert.Equal(t, 7, *metrics.CompletionTokens)
-	assert.Equal(t, 5, *metrics.CacheReadInputTokens)
-	assert.Equal(t, 3, *metrics.CacheCreationInputTokens)
+	assert.Equal(t, attribute.IntValue(3), attrs[attribute.Key("gen_ai.usage.cache_creation.input_tokens")])
 
 	// Input chat messages recorded in the gen_ai-native attribute.
 	inMsgs := genAIMessages(t, attrs[genAIInputKey].AsString())
@@ -281,14 +274,4 @@ func TestConverse_Mapping_RichContent(t *testing.T) {
 	// Chat input is gen_ai-native, NOT under the langwatch.input envelope.
 	_, hasLangWatchInput := attrs[inputKey]
 	assert.False(t, hasLangWatchInput, "chat input must not be under langwatch.input")
-}
-
-// parseMetrics extracts the langwatch.metrics JSON blob off a span.
-func parseMetrics(t *testing.T, attrs map[attribute.Key]attribute.Value) langwatch.SpanMetrics {
-	t.Helper()
-	raw, ok := attrs[langwatch.AttributeLangWatchMetrics]
-	require.True(t, ok, "expected langwatch.metrics attribute")
-	var m langwatch.SpanMetrics
-	require.NoError(t, json.Unmarshal([]byte(raw.AsString()), &m))
-	return m
 }

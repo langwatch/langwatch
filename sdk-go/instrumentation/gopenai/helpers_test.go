@@ -108,22 +108,6 @@ func genAIMessages(t *testing.T, raw string) []langwatch.ChatMessage {
 	return msgs
 }
 
-// spanMetrics is the langwatch.metrics token rollup recorded on the span.
-type spanMetrics struct {
-	PromptTokens         *int `json:"prompt_tokens"`
-	CompletionTokens     *int `json:"completion_tokens"`
-	ReasoningTokens      *int `json:"reasoning_tokens"`
-	CacheReadInputTokens *int `json:"cache_read_input_tokens"`
-}
-
-// parseMetrics parses the langwatch.metrics attribute value.
-func parseMetrics(t *testing.T, raw string) spanMetrics {
-	t.Helper()
-	var m spanMetrics
-	require.NoError(t, json.Unmarshal([]byte(raw), &m), "parse metrics: %s", raw)
-	return m
-}
-
 // requireSingleSpan flushes and returns the single exported span.
 func requireSingleSpan(t *testing.T, provider *sdktrace.TracerProvider, exporter *tracetest.InMemoryExporter) sdktrace.ReadOnlySpan {
 	t.Helper()
@@ -133,13 +117,12 @@ func requireSingleSpan(t *testing.T, provider *sdktrace.TracerProvider, exporter
 	return spans[0].Snapshot()
 }
 
-// inputKey/outputKey/metricsKey are the LangWatch content attribute keys.
+// inputKey/outputKey are the LangWatch content attribute keys.
 // genAIInputKey/genAIOutputKey/genAISystemKey are the OpenTelemetry GenAI-native
 // message keys, which carry raw JSON arrays (no typed-value envelope).
 var (
 	inputKey       = langwatch.AttributeLangWatchInput
 	outputKey      = langwatch.AttributeLangWatchOutput
-	metricsKey     = langwatch.AttributeLangWatchMetrics
 	genAIInputKey  = semconv.GenAIInputMessagesKey
 	genAIOutputKey = semconv.GenAIOutputMessagesKey
 	genAISystemKey = semconv.GenAISystemInstructionsKey

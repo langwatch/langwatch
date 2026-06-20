@@ -47,9 +47,7 @@ func (genericExtractor) ExtractRequest(span *langwatch.Span, raw []byte, capture
 		span.SetInputJSON(body)
 	}
 
-	streaming := streamRequestedFromBody(body)
-	span.SetAttributes(langwatch.AttributeLangWatchStreaming.Bool(streaming))
-	return streaming
+	return streamRequestedFromBody(body)
 }
 
 // ExtractNonStreaming routes a non-streaming Ollama response to the typed

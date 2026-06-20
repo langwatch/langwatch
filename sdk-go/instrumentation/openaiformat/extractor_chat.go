@@ -1,4 +1,4 @@
-package gopenai
+package openaiformat
 
 import (
 	"encoding/json"
@@ -10,7 +10,7 @@ import (
 	"github.com/langwatch/langwatch/sdk-go/instrumentation/otelhttp"
 )
 
-// chatExtractor handles the Chat Completions API (/v1/chat/completions) and the
+// ChatExtractor handles the Chat Completions API (/v1/chat/completions) and the
 // legacy text Completions API (/v1/completions). Discriminators: the request
 // carries a messages[] array (chat) or a top-level prompt (legacy); the
 // response object is "chat.completion" / "text_completion" and stream chunks are
@@ -18,11 +18,11 @@ import (
 //
 // The wire format is OpenAI's JSON, so we parse it directly with the otelhttp
 // helpers rather than depending on any client's typed structs.
-type chatExtractor struct{}
+type ChatExtractor struct{}
 
-func (chatExtractor) Name() string { return "chat" }
+func (ChatExtractor) Name() string { return "chat" }
 
-func (chatExtractor) MatchesRequest(body otelhttp.JSONObject, pathHint string) bool {
+func (ChatExtractor) MatchesRequest(body otelhttp.JSONObject, pathHint string) bool {
 	// The defining shape is a messages[] array. The path hint claims both the
 	// chat and the legacy text-completion endpoints; the legacy completions
 	// request carries a top-level prompt instead of messages.
@@ -38,7 +38,7 @@ func (chatExtractor) MatchesRequest(body otelhttp.JSONObject, pathHint string) b
 	return false
 }
 
-func (chatExtractor) MatchesResponse(objectField, contentType string) bool {
+func (ChatExtractor) MatchesResponse(objectField, contentType string) bool {
 	if strings.HasPrefix(contentType, "text/event-stream") {
 		return false // streaming dispatch is decided from the request shape
 	}
@@ -64,10 +64,10 @@ type chatRequest struct {
 	Stream           bool            `json:"stream"`
 }
 
-func (chatExtractor) ExtractRequest(span *langwatch.Span, raw []byte, capture langwatch.DataCaptureMode) bool {
+func (ChatExtractor) ExtractRequest(span *langwatch.Span, raw []byte, capture langwatch.DataCaptureMode) bool {
 	var req chatRequest
 	if err := json.Unmarshal(raw, &req); err != nil {
-		return genericExtractor{}.ExtractRequest(span, raw, capture)
+		return GenericExtractor{}.ExtractRequest(span, raw, capture)
 	}
 
 	if req.Model != "" {
@@ -109,14 +109,13 @@ func (chatExtractor) ExtractRequest(span *langwatch.Span, raw []byte, capture la
 	span.SetGenAIRequestParams(reqParams)
 
 	if len(req.Tools) > 0 {
-		otelhttp.SetJSONAttribute(span, "gen_ai.request.tools", json.RawMessage(req.Tools))
+		otelhttp.SetJSONAttribute(span, string(langwatch.AttributeGenAIRequestTools), json.RawMessage(req.Tools))
 	}
 
 	if capture.CaptureInput() {
 		recordChatInput(span, req)
 	}
 
-	span.SetAttributes(langwatch.AttributeLangWatchStreaming.Bool(req.Stream))
 	return req.Stream
 }
 
@@ -178,10 +177,10 @@ func (c chatRespToolCall) toLangwatch() langwatch.ToolCall {
 	}
 }
 
-func (chatExtractor) ExtractNonStreaming(span *langwatch.Span, raw []byte, capture langwatch.DataCaptureMode) {
+func (ChatExtractor) ExtractNonStreaming(span *langwatch.Span, raw []byte, capture langwatch.DataCaptureMode) {
 	var resp chatResponse
 	if err := json.Unmarshal(raw, &resp); err != nil {
-		genericExtractor{}.ExtractNonStreaming(span, raw, capture)
+		GenericExtractor{}.ExtractNonStreaming(span, raw, capture)
 		return
 	}
 
@@ -238,27 +237,8 @@ func (chatExtractor) ExtractNonStreaming(span *langwatch.Span, raw []byte, captu
 	}
 }
 
-func (chatExtractor) NewStreamAccumulator() otelhttp.StreamAccumulator {
+func (ChatExtractor) NewStreamAccumulator() otelhttp.StreamAccumulator {
 	return &chatStreamAccumulator{}
-}
-
-// stopSequences flattens the OpenAI stop union (string or []string) into a slice.
-func stopSequences(raw json.RawMessage) []string {
-	if len(raw) == 0 {
-		return nil
-	}
-	var single string
-	if err := json.Unmarshal(raw, &single); err == nil {
-		if single == "" {
-			return nil
-		}
-		return []string{single}
-	}
-	var many []string
-	if err := json.Unmarshal(raw, &many); err == nil {
-		return many
-	}
-	return nil
 }
 
 // chatStreamAccumulator reconstructs a Chat Completions stream. Each chunk is a
@@ -406,7 +386,6 @@ func (a *chatStreamAccumulator) Finish(span *langwatch.Span, capture langwatch.D
 	}
 	span.SetGenAIResponseFinishReasons(dedupe(a.finishReasons)...)
 	span.SetGenAIUsage(a.usage)
-	span.SetMetrics(usageMetrics(a.usage))
 
 	if capture.CaptureOutput() {
 		// Record the chat-completion response as gen_ai-native chat messages:
@@ -427,21 +406,4 @@ func (a *chatStreamAccumulator) Finish(span *langwatch.Span, capture langwatch.D
 			span.SetOutputText(a.legacyText.String())
 		}
 	}
-}
-
-// dedupe returns the unique values of in, preserving first-seen order.
-func dedupe(in []string) []string {
-	if len(in) == 0 {
-		return nil
-	}
-	seen := make(map[string]struct{}, len(in))
-	out := make([]string, 0, len(in))
-	for _, v := range in {
-		if _, ok := seen[v]; ok {
-			continue
-		}
-		seen[v] = struct{}{}
-		out = append(out, v)
-	}
-	return out
 }

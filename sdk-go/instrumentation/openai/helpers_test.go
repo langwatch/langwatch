@@ -98,15 +98,6 @@ func parseTypedValue(t *testing.T, raw string) typedValue {
 	return tv
 }
 
-// chatMessages parses a chat_messages typed value into the LangWatch shape.
-func chatMessages(t *testing.T, tv typedValue) []langwatch.ChatMessage {
-	t.Helper()
-	require.Equal(t, "chat_messages", tv.Type, "expected chat_messages output")
-	var msgs []langwatch.ChatMessage
-	require.NoError(t, json.Unmarshal(tv.Value, &msgs))
-	return msgs
-}
-
 // genAIMessages parses a gen_ai.input.messages / gen_ai.output.messages
 // attribute, which is a RAW JSON array of ChatMessage (no typedValue envelope).
 func genAIMessages(t *testing.T, raw string) []langwatch.ChatMessage {

@@ -18,7 +18,9 @@ import (
 	langwatch "github.com/langwatch/langwatch/sdk-go"
 )
 
-// cacheCreationKey is the raw attribute the server canonicalisation reads.
+// cacheCreationKey is the gen_ai.usage.cache_creation.input_tokens attribute
+// emitted via SetGenAIUsage (the sole token source) and read by the server
+// canonicalisation.
 var cacheCreationKey = attribute.Key("gen_ai.usage.cache_creation.input_tokens")
 
 func TestMiddleware_Messages_NonStreaming(t *testing.T) {
@@ -63,8 +65,8 @@ func TestMiddleware_Messages_NonStreaming(t *testing.T) {
 	assert.Equal(t, attribute.Float64Value(0.9), attrs[semconv.GenAIRequestTopPKey])
 	assert.Equal(t, attribute.Float64Value(40), attrs[semconv.GenAIRequestTopKKey])
 	assert.Equal(t, attribute.StringSliceValue([]string{"STOP"}), attrs[semconv.GenAIRequestStopSequencesKey])
-	assert.Equal(t, attribute.BoolValue(false), attrs[langwatch.AttributeLangWatchStreaming])
-	// A non-streaming request records gen_ai.request.stream == false and no TTFT.
+	// A non-streaming request records gen_ai.request.stream == false (the canonical
+	// streaming flag, recorded by the otelhttp base) and no TTFT.
 	assert.Equal(t, attribute.BoolValue(false), attrs[attribute.Key("gen_ai.request.stream")])
 	assert.NotContains(t, attrs, attribute.Key("gen_ai.response.time_to_first_chunk"))
 
@@ -77,27 +79,16 @@ func TestMiddleware_Messages_NonStreaming(t *testing.T) {
 	assert.Equal(t, attribute.StringValue("claude-haiku-4-5-resp"), attrs[semconv.GenAIResponseModelKey])
 	assert.Equal(t, attribute.StringSliceValue([]string{"end_turn"}), attrs[semconv.GenAIResponseFinishReasonsKey])
 
-	// Usage via gen_ai.usage.* attributes.
-	assert.Equal(t, attribute.IntValue(12), attrs[semconv.GenAIUsageInputTokensKey])
-	assert.Equal(t, attribute.IntValue(7), attrs[semconv.GenAIUsageOutputTokensKey])
+	// Usage is emitted solely via gen_ai.usage.* attributes (the langwatch.metrics
+	// blob no longer carries token fields).
+	assert.Equal(t, attribute.IntValue(12), attrs[attribute.Key("gen_ai.usage.input_tokens")])
+	assert.Equal(t, attribute.IntValue(7), attrs[attribute.Key("gen_ai.usage.output_tokens")])
 	// total = input + output + cache_read + cache_creation (cache tokens are real
 	// input tokens; excluding them understates usage): 12 + 7 + 4 + 5 = 28.
 	assert.Equal(t, attribute.IntValue(28), attrs[attribute.Key("gen_ai.usage.total_tokens")])
 	assert.Equal(t, attribute.IntValue(4), attrs[attribute.Key("gen_ai.usage.cached_input_tokens")])
-	// Raw cache-creation attribute the server canonicalisation reads.
+	// Cache-creation tokens flow through SetGenAIUsage (gen_ai.usage.cache_creation.input_tokens).
 	assert.Equal(t, attribute.IntValue(5), attrs[cacheCreationKey])
-
-	// Usage via langwatch.metrics blob.
-	require.Contains(t, attrs, metricsKey)
-	metrics := parseMetrics(t, attrs[metricsKey].AsString())
-	require.NotNil(t, metrics.PromptTokens)
-	assert.Equal(t, 12, *metrics.PromptTokens)
-	require.NotNil(t, metrics.CompletionTokens)
-	assert.Equal(t, 7, *metrics.CompletionTokens)
-	require.NotNil(t, metrics.CacheReadInputTokens)
-	assert.Equal(t, 4, *metrics.CacheReadInputTokens)
-	require.NotNil(t, metrics.CacheCreationInputTokens)
-	assert.Equal(t, 5, *metrics.CacheCreationInputTokens)
 
 	// Input recorded as gen_ai.input.messages (raw JSON array), the user turn.
 	// Anthropic wraps content in text blocks, so Content round-trips as rich parts.
@@ -233,8 +224,8 @@ data: {"type":"message_stop"}
 	span := requireSingleSpan(t, provider, exporter)
 	attrs := spanAttrs(span)
 
-	assert.Equal(t, attribute.BoolValue(true), attrs[langwatch.AttributeLangWatchStreaming])
-	// A streaming request records gen_ai.request.stream == true and a TTFT.
+	// A streaming request records gen_ai.request.stream == true (the canonical
+	// streaming flag, recorded by the otelhttp base) and a TTFT.
 	assert.Equal(t, attribute.BoolValue(true), attrs[attribute.Key("gen_ai.request.stream")])
 	require.Contains(t, attrs, attribute.Key("gen_ai.response.time_to_first_chunk"), "streaming must record TTFT")
 	assert.GreaterOrEqual(t, attrs[attribute.Key("gen_ai.response.time_to_first_chunk")].AsFloat64(), 0.0)
@@ -248,14 +239,8 @@ data: {"type":"message_stop"}
 	// total = input + output + cache_read + cache_creation: 18 + 11 + 6 + 9 = 44.
 	assert.Equal(t, attribute.IntValue(44), attrs[attribute.Key("gen_ai.usage.total_tokens")])
 	assert.Equal(t, attribute.IntValue(6), attrs[attribute.Key("gen_ai.usage.cached_input_tokens")])
+	// Cache-creation tokens flow through SetGenAIUsage (gen_ai.usage.cache_creation.input_tokens).
 	assert.Equal(t, attribute.IntValue(9), attrs[cacheCreationKey])
-
-	// Metrics blob mirrors the usage.
-	metrics := parseMetrics(t, attrs[metricsKey].AsString())
-	require.NotNil(t, metrics.CacheReadInputTokens)
-	assert.Equal(t, 6, *metrics.CacheReadInputTokens)
-	require.NotNil(t, metrics.CacheCreationInputTokens)
-	assert.Equal(t, 9, *metrics.CacheCreationInputTokens)
 
 	// Output text reconstructed from the accumulated text_delta events, recorded
 	// as a gen_ai.output.messages assistant text message (NOT langwatch.output).

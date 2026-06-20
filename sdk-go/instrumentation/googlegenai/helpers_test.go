@@ -105,14 +105,6 @@ func genAIMessages(t *testing.T, raw string) []langwatch.ChatMessage {
 	return msgs
 }
 
-// spanMetrics parses the langwatch.metrics attribute into a SpanMetrics.
-func spanMetrics(t *testing.T, raw string) langwatch.SpanMetrics {
-	t.Helper()
-	var m langwatch.SpanMetrics
-	require.NoError(t, json.Unmarshal([]byte(raw), &m), "parse metrics: %s", raw)
-	return m
-}
-
 // LangWatch content attribute keys.
 var (
 	inputKey  = langwatch.AttributeLangWatchInput

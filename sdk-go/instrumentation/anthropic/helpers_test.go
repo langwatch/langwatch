@@ -87,22 +87,6 @@ func genAIMessages(t *testing.T, raw string) []langwatch.ChatMessage {
 	return msgs
 }
 
-// spanMetrics is the JSON envelope recorded under langwatch.metrics.
-type spanMetrics struct {
-	PromptTokens             *int `json:"prompt_tokens"`
-	CompletionTokens         *int `json:"completion_tokens"`
-	CacheReadInputTokens     *int `json:"cache_read_input_tokens"`
-	CacheCreationInputTokens *int `json:"cache_creation_input_tokens"`
-}
-
-// parseMetrics parses a langwatch.metrics attribute value.
-func parseMetrics(t *testing.T, raw string) spanMetrics {
-	t.Helper()
-	var m spanMetrics
-	require.NoError(t, json.Unmarshal([]byte(raw), &m), "parse metrics: %s", raw)
-	return m
-}
-
 // requireSingleSpan flushes and returns the single exported span.
 func requireSingleSpan(t *testing.T, provider *sdktrace.TracerProvider, exporter *tracetest.InMemoryExporter) sdktrace.ReadOnlySpan {
 	t.Helper()
@@ -116,9 +100,8 @@ func requireSingleSpan(t *testing.T, provider *sdktrace.TracerProvider, exporter
 // I/O). LLM chat messages and the system prompt go under the gen_ai.* keys
 // instead, NOT these.
 var (
-	inputKey   = langwatch.AttributeLangWatchInput
-	outputKey  = langwatch.AttributeLangWatchOutput
-	metricsKey = langwatch.AttributeLangWatchMetrics
+	inputKey  = langwatch.AttributeLangWatchInput
+	outputKey = langwatch.AttributeLangWatchOutput
 )
 
 // gen_ai.* content keys: chat input/output messages (raw JSON arrays) and the

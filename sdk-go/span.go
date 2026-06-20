@@ -218,7 +218,7 @@ func (s *Span) SetMetadata(metadata map[string]any) *Span {
 // GenAI gen_ai.conversation.id — the convention the server maps to the trace's
 // thread. (Use this for multi-turn conversation grouping.)
 func (s *Span) SetThreadID(threadID string) *Span {
-	s.SetAttributes(attribute.String("gen_ai.conversation.id", threadID))
+	s.SetAttributes(semconv.GenAIConversationID(threadID))
 	return s
 }
 

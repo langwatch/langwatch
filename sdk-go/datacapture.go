@@ -4,6 +4,8 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
+
+	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 )
 
 // DataCaptureMode controls whether a span's input and/or output *content* is
@@ -54,18 +56,21 @@ type DataCapturePredicate func(DataCaptureContext) DataCaptureMode
 
 // Content attribute keys stripped when input/output capture is disabled. These
 // cover what LangWatch SDKs and the common GenAI conventions emit for content.
+// The gen_ai.* keys reference the SAME semconv keys the setters emit
+// (SetGenAIInputMessages, SetGenAISystemInstructions, …) so the strip-list
+// cannot drift from what is recorded.
 var (
 	dataCaptureInputKeys = map[attribute.Key]struct{}{
-		AttributeLangWatchInput:                     {},
-		AttributeLangWatchInstructions:              {},
-		attribute.Key("gen_ai.input.messages"):      {},
-		attribute.Key("gen_ai.prompt"):              {},
-		attribute.Key("gen_ai.system_instructions"): {},
+		AttributeLangWatchInput:            {},
+		AttributeLangWatchInstructions:     {},
+		semconv.GenAIInputMessagesKey:      {},
+		attribute.Key("gen_ai.prompt"):     {},
+		semconv.GenAISystemInstructionsKey: {},
 	}
 	dataCaptureOutputKeys = map[attribute.Key]struct{}{
-		AttributeLangWatchOutput:                {},
-		attribute.Key("gen_ai.output.messages"): {},
-		attribute.Key("gen_ai.completion"):      {},
+		AttributeLangWatchOutput:           {},
+		semconv.GenAIOutputMessagesKey:     {},
+		attribute.Key("gen_ai.completion"): {},
 	}
 )
 

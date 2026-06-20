@@ -403,11 +403,18 @@ span.SetInputChatMessages([]langwatch.ChatMessage{
 
 ### Recording Metrics
 
+Token counts are recorded via `SetGenAIUsage` (the OTel-native `gen_ai.usage.*`
+attributes); `SetMetrics` carries only the cost + estimated-flag rollup:
+
 ```go
+span.SetGenAIUsage(langwatch.GenAIUsage{
+    InputTokens:  langwatch.Int(120),
+    OutputTokens: langwatch.Int(48),
+    TotalTokens:  langwatch.Int(168),
+})
+
 span.SetMetrics(langwatch.SpanMetrics{
-    PromptTokens:     langwatch.Int(120),
-    CompletionTokens: langwatch.Int(48),
-    Cost:             langwatch.Float64(0.0021),
+    Cost: langwatch.Float64(0.0021),
 })
 ```
 
@@ -546,7 +553,7 @@ The `*Span` embeds the standard `go.opentelemetry.io/otel/trace.Span`, so you ca
 - `SetInputTyped` / `SetOutputTyped` - Record an explicit `langwatch.TypedValue`
 
 **Metrics, metadata & identity:**
-- `SetMetrics(metrics SpanMetrics)` - Token counts and cost (`langwatch.metrics`)
+- `SetMetrics(metrics SpanMetrics)` - Cost and `tokens_estimated` flag (`langwatch.metrics`); token counts go via `SetGenAIUsage`
 - `SetMetadata(metadata map[string]any)` - Metadata blob hoisted to the trace (`langwatch.metadata`)
 - `SetThreadID` / `SetUserID` / `SetCustomerID` / `SetLabels(...string)` - Reserved trace identity
 - `SetParams(params map[string]any)` - LLM invocation parameters (`langwatch.params`)

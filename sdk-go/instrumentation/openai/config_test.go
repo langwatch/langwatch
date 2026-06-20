@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
@@ -25,8 +24,6 @@ func TestOptions(t *testing.T) {
 		_ = exporter.Shutdown(context.Background())
 	}()
 
-	propagators := propagation.NewCompositeTextMapPropagator()
-
 	tests := []struct {
 		name         string
 		opts         []Option
@@ -37,7 +34,6 @@ func TestOptions(t *testing.T) {
 			opts: []Option{},
 			expectedConf: config{
 				tracerProvider: nil,
-				propagators:    nil,
 			},
 		},
 		{
@@ -45,13 +41,6 @@ func TestOptions(t *testing.T) {
 			opts: []Option{WithTracerProvider(traceProvider)},
 			expectedConf: config{
 				tracerProvider: traceProvider,
-			},
-		},
-		{
-			name: "With Propagators",
-			opts: []Option{WithPropagators(propagators)},
-			expectedConf: config{
-				propagators: propagators,
 			},
 		},
 		{
@@ -95,13 +84,11 @@ func TestOptions(t *testing.T) {
 			name: "With All Options",
 			opts: []Option{
 				WithTracerProvider(traceProvider),
-				WithPropagators(propagators),
 				WithDataCapture(langwatch.DataCaptureAll),
 				WithGenAIProvider(semconv.GenAIProviderNameGroq),
 			},
 			expectedConf: config{
 				tracerProvider: traceProvider,
-				propagators:    propagators,
 				dataCapture:    langwatch.DataCaptureAll,
 				genAIProvider:  semconv.GenAIProviderNameGroq,
 			},
@@ -116,7 +103,6 @@ func TestOptions(t *testing.T) {
 			}
 
 			require.Equal(t, tt.expectedConf.tracerProvider, cfg.tracerProvider)
-			require.Equal(t, tt.expectedConf.propagators, cfg.propagators)
 			assert.Equal(t, tt.expectedConf.dataCapture, cfg.dataCapture)
 			assert.Equal(t, tt.expectedConf.genAIProvider, cfg.genAIProvider)
 		})

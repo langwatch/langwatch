@@ -55,7 +55,7 @@ func (chatExtractor) ExtractRequest(span *langwatch.Span, raw []byte, capture la
 	span.SetGenAIRequestParams(req.Options.toGenAIRequestParams())
 
 	if len(req.Tools) > 0 {
-		otelhttp.SetJSONAttribute(span, "gen_ai.request.tools", json.RawMessage(req.Tools))
+		otelhttp.SetJSONAttribute(span, string(langwatch.AttributeGenAIRequestTools), json.RawMessage(req.Tools))
 	}
 	recordFormat(span, req.Format)
 
@@ -63,9 +63,7 @@ func (chatExtractor) ExtractRequest(span *langwatch.Span, raw []byte, capture la
 		recordMessagesInput(span, req.Messages)
 	}
 
-	streaming := streamRequested(req.Stream)
-	span.SetAttributes(langwatch.AttributeLangWatchStreaming.Bool(streaming))
-	return streaming
+	return streamRequested(req.Stream)
 }
 
 // chatResponse is the subset of an Ollama /api/chat response we read. Message is

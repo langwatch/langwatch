@@ -106,7 +106,6 @@ data: [DONE]
 	span := requireSingleSpan(t, provider, exporter)
 	attrs := spanAttrs(span)
 
-	assert.Equal(t, attribute.BoolValue(true), attrs[langwatch.AttributeLangWatchStreaming])
 	// A streaming request records gen_ai.request.stream == true and a TTFT.
 	assert.Equal(t, attribute.BoolValue(true), attrs[attribute.Key("gen_ai.request.stream")])
 	require.Contains(t, attrs, attribute.Key("gen_ai.response.time_to_first_chunk"), "streaming must record TTFT")
@@ -216,7 +215,7 @@ data: {"type":"response.completed","sequence_number":3,"response":{"id":"resp_st
 	span := requireSingleSpan(t, provider, exporter)
 	attrs := spanAttrs(span)
 
-	assert.Equal(t, attribute.BoolValue(true), attrs[langwatch.AttributeLangWatchStreaming])
+	assert.Equal(t, attribute.BoolValue(true), attrs[attribute.Key("gen_ai.request.stream")])
 	assert.Equal(t, attribute.StringValue("resp_str"), attrs[semconv.GenAIResponseIDKey])
 	assert.Equal(t, attribute.StringValue("gpt-4o"), attrs[semconv.GenAIResponseModelKey])
 	assert.Equal(t, attribute.StringValue("completed"), attrs[attribute.Key("gen_ai.response.status")])
@@ -310,7 +309,7 @@ func TestMiddleware_Embeddings_NonStreaming(t *testing.T) {
 	assert.Equal(t, attribute.StringSliceValue([]string{"float"}), attrs[semconv.GenAIRequestEncodingFormatsKey])
 
 	// Embeddings never stream.
-	assert.Equal(t, attribute.BoolValue(false), attrs[langwatch.AttributeLangWatchStreaming])
+	assert.Equal(t, attribute.BoolValue(false), attrs[attribute.Key("gen_ai.request.stream")])
 
 	// Input recorded; output records only the vector count (not the vectors).
 	inputTV := parseTypedValue(t, attrs[inputKey].AsString())
@@ -520,34 +519,4 @@ func TestMiddleware_WithTracerProvider_NoGlobal(t *testing.T) {
 
 	span := requireSingleSpan(t, provider, exporter)
 	assert.Equal(t, codes.Ok, span.Status().Code)
-}
-
-// TestGetGenAIOperationFromPath tests the operation detection logic, which still
-// derives the gen_ai.operation.name attribute from the URL path.
-func TestGetGenAIOperationFromPath(t *testing.T) {
-	tests := []struct {
-		path     string
-		expected attribute.KeyValue
-	}{
-		{"/v1/chat/completions", semconv.GenAIOperationNameChat},
-		{"/v1/completions", semconv.GenAIOperationNameTextCompletion},
-		{"/v1/embeddings", semconv.GenAIOperationNameEmbeddings},
-		{"/v1/responses", semconv.GenAIOperationNameKey.String("responses")},
-		{"/v1/audio/speech", semconv.GenAIOperationNameKey.String("audio")},
-		{"/v1/images/generations", semconv.GenAIOperationNameKey.String("images")},
-		{"/openai/deployments/gpt-4/chat/completions", semconv.GenAIOperationNameChat},
-		{"/openai/deployments/gpt-4/responses", semconv.GenAIOperationNameKey.String("responses")},
-		{"/v1/unknown", semconv.GenAIOperationNameKey.String("unknown")},
-		{"/some/random/path", semconv.GenAIOperationNameChat},
-		{"", semconv.GenAIOperationNameChat},
-	}
-
-	for _, test := range tests {
-		t.Run(test.path, func(t *testing.T) {
-			result := getGenAIOperationFromPath(test.path)
-			if result.Key != test.expected.Key || result.Value.AsString() != test.expected.Value.AsString() {
-				t.Errorf("Expected %v, got %v", test.expected, result)
-			}
-		})
-	}
 }

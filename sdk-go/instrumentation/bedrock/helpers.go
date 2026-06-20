@@ -6,7 +6,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime/document"
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime/types"
-	"go.opentelemetry.io/otel/attribute"
 
 	langwatch "github.com/langwatch/langwatch/sdk-go"
 )
@@ -67,41 +66,22 @@ func recordInferenceConfig(span *langwatch.Span, ic *types.InferenceConfiguratio
 	})
 }
 
-// recordTokenUsage records a Converse/ConverseStream TokenUsage via BOTH the
-// gen_ai.usage.* attributes (SetGenAIUsage) AND the LangWatch span metrics
-// (SetMetrics), wiring cache read -> CacheReadInputTokens and cache write ->
-// CacheCreationInputTokens for cost/metric rollups.
+// recordTokenUsage records a Converse/ConverseStream TokenUsage as gen_ai.usage.*
+// attributes (SetGenAIUsage), the sole token source — wiring cache read ->
+// CachedInputTokens and cache write -> CacheCreationInputTokens (the latter
+// emitted as gen_ai.usage.cache_creation.input_tokens).
 func recordTokenUsage(span *langwatch.Span, usage *types.TokenUsage) {
 	if usage == nil {
 		return
 	}
 
-	input := int32Ptr(usage.InputTokens)
-	output := int32Ptr(usage.OutputTokens)
-	total := int32Ptr(usage.TotalTokens)
-	cacheRead := int32Ptr(usage.CacheReadInputTokens)
-	cacheWrite := int32Ptr(usage.CacheWriteInputTokens)
-
 	span.SetGenAIUsage(langwatch.GenAIUsage{
-		InputTokens:       input,
-		OutputTokens:      output,
-		TotalTokens:       total,
-		CachedInputTokens: cacheRead,
+		InputTokens:              int32Ptr(usage.InputTokens),
+		OutputTokens:             int32Ptr(usage.OutputTokens),
+		TotalTokens:              int32Ptr(usage.TotalTokens),
+		CachedInputTokens:        int32Ptr(usage.CacheReadInputTokens),
+		CacheCreationInputTokens: int32Ptr(usage.CacheWriteInputTokens),
 	})
-
-	span.SetMetrics(langwatch.SpanMetrics{
-		PromptTokens:             input,
-		CompletionTokens:         output,
-		CacheReadInputTokens:     cacheRead,
-		CacheCreationInputTokens: cacheWrite,
-	})
-}
-
-// recordLatency records the server-side request latency (the Converse
-// Metrics.LatencyMs) as gen_ai.server.request.duration in seconds — the GenAI
-// semantic-convention metric name, recorded here as a span attribute.
-func recordLatency(span *langwatch.Span, latencyMs int64) {
-	span.SetAttributes(attribute.Float64("gen_ai.server.request.duration", float64(latencyMs)/1000.0))
 }
 
 // messagesToChat converts a slice of Converse types.Message into LangWatch

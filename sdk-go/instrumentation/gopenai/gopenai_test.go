@@ -62,18 +62,6 @@ func TestChatCompletion_NonStreaming(t *testing.T) {
 	assert.Equal(t, attribute.IntValue(1), attrs[attribute.Key("gen_ai.usage.cached_input_tokens")])
 	assert.Equal(t, attribute.IntValue(4), attrs[attribute.Key("gen_ai.usage.reasoning.output_tokens")])
 
-	// Usage is also recorded as langwatch.metrics.
-	require.Contains(t, attrs, metricsKey, "langwatch.metrics must be recorded")
-	metrics := parseMetrics(t, attrs[metricsKey].AsString())
-	require.NotNil(t, metrics.PromptTokens)
-	assert.Equal(t, 2, *metrics.PromptTokens)
-	require.NotNil(t, metrics.CompletionTokens)
-	assert.Equal(t, 1, *metrics.CompletionTokens)
-	require.NotNil(t, metrics.ReasoningTokens)
-	assert.Equal(t, 4, *metrics.ReasoningTokens)
-	require.NotNil(t, metrics.CacheReadInputTokens)
-	assert.Equal(t, 1, *metrics.CacheReadInputTokens)
-
 	// Default capture mode is All. Chat request/response messages are recorded in
 	// the gen_ai-native format (raw JSON arrays), NOT under langwatch.input/output.
 	require.Contains(t, attrs, genAIInputKey, "chat input must be recorded under gen_ai.input.messages")
@@ -128,7 +116,6 @@ data: [DONE]
 	span := requireSingleSpan(t, provider, exporter)
 	attrs := spanAttrs(span)
 
-	assert.Equal(t, attribute.BoolValue(true), attrs[langwatch.AttributeLangWatchStreaming])
 	// A streaming request records gen_ai.request.stream == true and a TTFT.
 	assert.Equal(t, attribute.BoolValue(true), attrs[attribute.Key("gen_ai.request.stream")])
 	require.Contains(t, attrs, attribute.Key("gen_ai.response.time_to_first_chunk"), "streaming must record TTFT")
@@ -227,7 +214,7 @@ func TestEmbeddings_NonStreaming(t *testing.T) {
 	assert.Equal(t, attribute.StringSliceValue([]string{"float"}), attrs[semconv.GenAIRequestEncodingFormatsKey])
 
 	// Embeddings never stream.
-	assert.Equal(t, attribute.BoolValue(false), attrs[langwatch.AttributeLangWatchStreaming])
+	assert.Equal(t, attribute.BoolValue(false), attrs[attribute.Key("gen_ai.request.stream")])
 
 	// Input recorded; output records only the vector count (not the vectors).
 	inputTV := parseTypedValue(t, attrs[inputKey].AsString())
@@ -278,7 +265,6 @@ func TestDataCapture_Gating(t *testing.T) {
 			// Usage is always recorded regardless of capture mode.
 			assert.Equal(t, attribute.IntValue(2), attrs[semconv.GenAIUsageInputTokensKey])
 			assert.Equal(t, attribute.IntValue(1), attrs[semconv.GenAIUsageOutputTokensKey])
-			require.Contains(t, attrs, metricsKey, "metrics always recorded")
 		})
 	}
 }
@@ -390,31 +376,4 @@ func TestAPIError(t *testing.T) {
 	attrs := spanAttrs(span)
 	assert.Equal(t, codes.Error, span.Status().Code)
 	assert.Equal(t, attribute.IntValue(http.StatusBadRequest), attrs[semconv.HTTPResponseStatusCodeKey])
-}
-
-func TestGenAIOperationFromPath(t *testing.T) {
-	tests := []struct {
-		path     string
-		expected attribute.KeyValue
-	}{
-		{"/v1/chat/completions", semconv.GenAIOperationNameChat},
-		{"/v1/completions", semconv.GenAIOperationNameTextCompletion},
-		{"/v1/embeddings", semconv.GenAIOperationNameEmbeddings},
-		{"/v1/responses", semconv.GenAIOperationNameKey.String("responses")},
-		{"/v1/audio/speech", semconv.GenAIOperationNameKey.String("audio")},
-		{"/v1/images/generations", semconv.GenAIOperationNameKey.String("images")},
-		{"/openai/deployments/gpt-4/chat/completions", semconv.GenAIOperationNameChat},
-		{"/v1/unknown", semconv.GenAIOperationNameKey.String("unknown")},
-		{"/some/random/path", semconv.GenAIOperationNameChat},
-		{"", semconv.GenAIOperationNameChat},
-	}
-
-	for _, test := range tests {
-		t.Run(test.path, func(t *testing.T) {
-			result := genAIOperationFromPath(test.path)
-			if result.Key != test.expected.Key || result.Value.AsString() != test.expected.Value.AsString() {
-				t.Errorf("Expected %v, got %v", test.expected, result)
-			}
-		})
-	}
 }

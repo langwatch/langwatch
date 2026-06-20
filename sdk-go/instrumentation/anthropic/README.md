@@ -135,7 +135,7 @@ The middleware adds attributes to the client span, following the [OpenTelemetry 
 - `gen_ai.request.stop_sequences`
 - `gen_ai.request.tools` (tool definitions, JSON)
 - `gen_ai.system_instructions` (from the top-level `system` prompt; gated as input content)
-- `langwatch.gen_ai.streaming` (boolean)
+- `gen_ai.request.stream` (boolean)
 - `langwatch.span.type` (= `llm`)
 - `langwatch.input` (chat messages; when input capture is enabled)
 
@@ -147,7 +147,7 @@ The middleware adds attributes to the client span, following the [OpenTelemetry 
 - `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`, `gen_ai.usage.total_tokens` (= input + output + cache_read + cache_creation)
 - `gen_ai.usage.cached_input_tokens` (from `usage.cache_read_input_tokens`)
 - `gen_ai.usage.cache_creation.input_tokens` (raw attribute, from `usage.cache_creation_input_tokens`)
-- `langwatch.metrics` (a JSON blob with `prompt_tokens`, `completion_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens` for LangWatch cost/metric rollups)
+- token counts are emitted as `gen_ai.usage.*` (`input_tokens`, `output_tokens`, `total_tokens`, `cached_input_tokens`, `cache_creation.input_tokens`); `langwatch.metrics` now carries only `cost` and `tokens_estimated`
 - `langwatch.output` (the textual content; when output capture is enabled — for streaming this is the reconstructed content)
 
 Standard HTTP client attributes (`http.request.method`, `url.path`, `server.address`, `http.response.status_code`) are also included.
@@ -156,12 +156,12 @@ Standard HTTP client attributes (`http.request.method`, `url.path`, `server.addr
 
 Anthropic's `usage` object reports four distinct token counts, all of which are captured:
 
-| Anthropic field               | `gen_ai.usage.*` attribute               | `langwatch.metrics` field    |
-| ----------------------------- | ---------------------------------------- | ---------------------------- |
-| `input_tokens`                | `input_tokens`                           | `prompt_tokens`              |
-| `output_tokens`               | `output_tokens`                          | `completion_tokens`          |
-| `cache_read_input_tokens`     | `cached_input_tokens`                    | `cache_read_input_tokens`    |
-| `cache_creation_input_tokens` | `cache_creation.input_tokens` (raw attr) | `cache_creation_input_tokens`|
+| Anthropic field               | `gen_ai.usage.*` attribute               |
+| ----------------------------- | ---------------------------------------- |
+| `input_tokens`                | `input_tokens`                           |
+| `output_tokens`               | `output_tokens`                          |
+| `cache_read_input_tokens`     | `cached_input_tokens`                    |
+| `cache_creation_input_tokens` | `cache_creation.input_tokens` (raw attr) |
 
 `total_tokens` is synthesized as `input_tokens + output_tokens + cache_read_input_tokens + cache_creation_input_tokens` (Anthropic does not return a total; cache-read and cache-creation are real input tokens, so excluding them would understate usage).
 

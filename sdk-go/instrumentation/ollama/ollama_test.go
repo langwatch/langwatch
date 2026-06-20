@@ -70,17 +70,8 @@ func TestChat_NonStreaming(t *testing.T) {
 	assert.Equal(t, attribute.IntValue(7), attrs[semconv.GenAIUsageOutputTokensKey])
 	assert.Equal(t, attribute.IntValue(18), attrs[attribute.Key("gen_ai.usage.total_tokens")])
 
-	// Durations recorded in seconds.
-	assert.Equal(t, attribute.Float64Value(5), attrs[attribute.Key("gen_ai.server.request.duration")])
+	// Phase latencies recorded in seconds.
 	assert.Equal(t, attribute.Float64Value(3), attrs[attribute.Key("langwatch.ollama.eval_duration")])
-
-	// Usage is also recorded as langwatch.metrics.
-	require.Contains(t, attrs, metricsKey, "langwatch.metrics must be recorded")
-	metrics := parseMetrics(t, attrs[metricsKey].AsString())
-	require.NotNil(t, metrics.PromptTokens)
-	assert.Equal(t, 11, *metrics.PromptTokens)
-	require.NotNil(t, metrics.CompletionTokens)
-	assert.Equal(t, 7, *metrics.CompletionTokens)
 
 	// Request/response messages are recorded gen_ai-native, not on langwatch.input/output.
 	require.Contains(t, attrs, genAIInputKey, "gen_ai.input.messages must be recorded")
@@ -157,7 +148,6 @@ func TestChat_Streaming(t *testing.T) {
 	span := requireSingleSpan(t, provider, exporter)
 	attrs := spanAttrs(span)
 
-	assert.Equal(t, attribute.BoolValue(true), attrs[langwatch.AttributeLangWatchStreaming])
 	// A streaming request records gen_ai.request.stream == true and a TTFT.
 	assert.Equal(t, attribute.BoolValue(true), attrs[attribute.Key("gen_ai.request.stream")])
 	require.Contains(t, attrs, attribute.Key("gen_ai.response.time_to_first_chunk"), "streaming must record TTFT")
@@ -264,7 +254,7 @@ func TestGenerate_Streaming(t *testing.T) {
 	span := requireSingleSpan(t, provider, exporter)
 	attrs := spanAttrs(span)
 
-	assert.Equal(t, attribute.BoolValue(true), attrs[langwatch.AttributeLangWatchStreaming])
+	assert.Equal(t, attribute.BoolValue(true), attrs[attribute.Key("gen_ai.request.stream")])
 	assert.Equal(t, attribute.StringSliceValue([]string{"length"}), attrs[semconv.GenAIResponseFinishReasonsKey])
 	assert.Equal(t, attribute.IntValue(3), attrs[semconv.GenAIUsageInputTokensKey])
 	assert.Equal(t, attribute.IntValue(2), attrs[semconv.GenAIUsageOutputTokensKey])
@@ -305,7 +295,7 @@ func TestEmbed_NonStreaming(t *testing.T) {
 	assert.NotContains(t, attrs, semconv.GenAIUsageOutputTokensKey)
 
 	// Embeddings never stream.
-	assert.Equal(t, attribute.BoolValue(false), attrs[langwatch.AttributeLangWatchStreaming])
+	assert.Equal(t, attribute.BoolValue(false), attrs[attribute.Key("gen_ai.request.stream")])
 
 	// Input recorded; output records only the vector count.
 	inputTV := parseTypedValue(t, attrs[inputKey].AsString())
@@ -387,7 +377,6 @@ func TestDataCapture_Gating(t *testing.T) {
 			// Usage always recorded regardless of capture mode.
 			assert.Equal(t, attribute.IntValue(2), attrs[semconv.GenAIUsageInputTokensKey])
 			assert.Equal(t, attribute.IntValue(1), attrs[semconv.GenAIUsageOutputTokensKey])
-			require.Contains(t, attrs, metricsKey, "metrics always recorded")
 		})
 	}
 }

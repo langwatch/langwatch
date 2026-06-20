@@ -1,4 +1,4 @@
-package gopenai
+package openaiformat
 
 import (
 	"strings"
@@ -7,10 +7,14 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 )
 
-// genAIOperationFromPath derives the gen_ai.operation.name attribute from a
-// go-openai request URL path. OpenAI paths follow /v1/{operation}/...; Azure
-// OpenAI paths follow /openai/deployments/{deployment-id}/{operation}.
-func genAIOperationFromPath(urlPath string) attribute.KeyValue {
+// GenAIOperationFromPath derives the gen_ai.operation.name attribute from an
+// OpenAI-compatible request URL path. OpenAI paths follow /v1/{operation}/...;
+// Azure OpenAI paths follow /openai/deployments/{deployment-id}/{operation}.
+//
+// Both the openai and gopenai instrumentations route their OperationAttrs hook
+// through this single mapper so the operation attribute is identical across
+// clients.
+func GenAIOperationFromPath(urlPath string) attribute.KeyValue {
 	segments := strings.Split(strings.Trim(urlPath, "/"), "/")
 
 	var operationSegment string
@@ -43,4 +47,11 @@ func genAIOperationFromPath(urlPath string) attribute.KeyValue {
 		}
 		return semconv.GenAIOperationNameChat
 	}
+}
+
+// OperationAttrs derives the request operation attributes from the URL path. It
+// is the otelhttp Config.OperationAttrs hook both OpenAI-format instrumentations
+// install.
+func OperationAttrs(urlPath string) []attribute.KeyValue {
+	return []attribute.KeyValue{GenAIOperationFromPath(urlPath)}
 }

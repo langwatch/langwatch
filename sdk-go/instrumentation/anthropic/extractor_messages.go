@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/anthropics/anthropic-sdk-go"
-	"go.opentelemetry.io/otel/attribute"
 	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 
 	langwatch "github.com/langwatch/langwatch/sdk-go"
@@ -79,7 +78,7 @@ func (messagesExtractor) ExtractRequest(span *langwatch.Span, raw []byte, captur
 	span.SetGenAIRequestParams(reqParams)
 
 	if len(params.Tools) > 0 {
-		otelhttp.SetJSONAttribute(span, "gen_ai.request.tools", params.Tools)
+		otelhttp.SetJSONAttribute(span, string(langwatch.AttributeGenAIRequestTools), params.Tools)
 	}
 
 	// The Anthropic system prompt is a top-level field, not a message; record it
@@ -96,9 +95,7 @@ func (messagesExtractor) ExtractRequest(span *langwatch.Span, raw []byte, captur
 		}
 	}
 
-	streaming := otelhttp.RequestStreams(raw)
-	span.SetAttributes(langwatch.AttributeLangWatchStreaming.Bool(streaming))
-	return streaming
+	return otelhttp.RequestStreams(raw)
 }
 
 func (messagesExtractor) ExtractNonStreaming(span *langwatch.Span, raw []byte, capture langwatch.DataCaptureMode) {
@@ -229,9 +226,7 @@ func extractRequestGeneric(span *langwatch.Span, raw []byte, capture langwatch.D
 			}
 		}
 	}
-	streaming := otelhttp.RequestStreams(raw)
-	span.SetAttributes(langwatch.AttributeLangWatchStreaming.Bool(streaming))
-	return streaming
+	return otelhttp.RequestStreams(raw)
 }
 
 // extractResponseGeneric is the best-effort fallback when the typed response
@@ -261,37 +256,30 @@ type usage struct {
 	cacheCreationInputTokens int64
 }
 
-// recordUsage records the full Anthropic usage breakdown via every channel the
-// server reads: the gen_ai.usage.* attributes (SetGenAIUsage), the LangWatch
-// metrics blob (SetMetrics) and the raw cache-creation attribute the server's
-// canonicalisation layer reads. Anthropic does not return a total, so it is
-// synthesized as input+output+cache_read+cache_creation — cache-read and
-// cache-creation are real input tokens, so excluding them understates usage.
+// recordUsage records the full Anthropic usage breakdown as gen_ai.usage.*
+// attributes (SetGenAIUsage), the sole token source — including the
+// cache-creation tokens, which flow through gen_ai.usage.cache_creation.input_tokens.
+// Anthropic does not return a total, so it is synthesized as
+// input+output+cache_read+cache_creation — cache-read and cache-creation are
+// real input tokens, so excluding them understates usage.
 func recordUsage(span *langwatch.Span, u usage) {
 	genUsage := langwatch.GenAIUsage{}
-	metrics := langwatch.SpanMetrics{}
 
 	if u.inputTokens > 0 {
 		genUsage.InputTokens = langwatch.Int(int(u.inputTokens))
-		metrics.PromptTokens = langwatch.Int(int(u.inputTokens))
 	}
 	if u.outputTokens > 0 {
 		genUsage.OutputTokens = langwatch.Int(int(u.outputTokens))
-		metrics.CompletionTokens = langwatch.Int(int(u.outputTokens))
 	}
 	if total := u.inputTokens + u.outputTokens + u.cacheReadInputTokens + u.cacheCreationInputTokens; total > 0 {
 		genUsage.TotalTokens = langwatch.Int(int(total))
 	}
 	if u.cacheReadInputTokens > 0 {
 		genUsage.CachedInputTokens = langwatch.Int(int(u.cacheReadInputTokens))
-		metrics.CacheReadInputTokens = langwatch.Int(int(u.cacheReadInputTokens))
 	}
 	if u.cacheCreationInputTokens > 0 {
-		metrics.CacheCreationInputTokens = langwatch.Int(int(u.cacheCreationInputTokens))
-		// The server canonicalisation reads the raw attribute too.
-		span.SetAttributes(attribute.Int("gen_ai.usage.cache_creation.input_tokens", int(u.cacheCreationInputTokens)))
+		genUsage.CacheCreationInputTokens = langwatch.Int(int(u.cacheCreationInputTokens))
 	}
 
 	span.SetGenAIUsage(genUsage)
-	span.SetMetrics(metrics)
 }

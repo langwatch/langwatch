@@ -252,7 +252,7 @@ func richSpanStub(name, scope, spanType string) tracetest.SpanStub {
 			AttributeLangWatchInput.String(`{"type":"text","value":"hi"}`),
 			AttributeLangWatchOutput.String(`{"type":"text","value":"yo"}`),
 			AttributeLangWatchSpanType.String(spanType),
-			AttributeLangWatchMetrics.String(`{"prompt_tokens":5}`),
+			AttributeLangWatchMetrics.String(`{"cost":0.0003}`),
 			attribute.String("gen_ai.request.model", "gpt-5-mini"),
 		},
 	}

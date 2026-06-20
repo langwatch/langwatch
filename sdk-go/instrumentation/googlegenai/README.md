@@ -59,16 +59,16 @@ is parsed from either path shape.
 All token kinds Gemini reports in `usageMetadata` are captured and mapped onto the
 LangWatch `gen_ai.usage.*` attributes:
 
-| Gemini `usageMetadata`    | `gen_ai.usage.*`        | `langwatch.metrics`        |
-| ------------------------- | ----------------------- | -------------------------- |
-| `promptTokenCount`        | `input_tokens`          | `prompt_tokens`            |
-| `candidatesTokenCount`    | `output_tokens`         | `completion_tokens`        |
-| `totalTokenCount`         | `total_tokens`          | —                          |
-| `cachedContentTokenCount` | `cached_input_tokens`   | `cache_read_input_tokens`  |
-| `thoughtsTokenCount`      | `reasoning.output_tokens` | `reasoning_tokens`         |
+| Gemini `usageMetadata`    | `gen_ai.usage.*`        |
+| ------------------------- | ----------------------- |
+| `promptTokenCount`        | `input_tokens`          |
+| `candidatesTokenCount`    | `output_tokens`         |
+| `totalTokenCount`         | `total_tokens`          |
+| `cachedContentTokenCount` | `cached_input_tokens`   |
+| `thoughtsTokenCount`      | `reasoning.output_tokens` |
 
-Usage is recorded **both** as `gen_ai.usage.*` attributes (the OTel-native view)
-and as the `langwatch.metrics` token rollup that feeds LangWatch cost reporting.
+Usage is recorded as `gen_ai.usage.*` attributes (the OTel-native view), which
+feed LangWatch cost reporting.
 
 ## Installation
 
@@ -176,7 +176,7 @@ while structure, models, usage and finish reasons are still recorded.
   to `assistant`).
 - **Response**: `gen_ai.response.{id,model,finish_reasons}`, all token usage
   (`gen_ai.usage.{input_tokens,output_tokens,total_tokens,cached_input_tokens,reasoning.output_tokens}`),
-  the `langwatch.metrics` token rollup, and the output text (`langwatch.output`).
+  and the output text (`langwatch.output`).
 - **HTTP / status**: `http.request.method`, `server.address`, `url.path`,
   `http.response.status_code`, plus span status / recorded error on failures.
 

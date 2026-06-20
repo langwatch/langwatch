@@ -113,7 +113,7 @@ Every span is a client span with:
 - `gen_ai.provider.name` = `aws.bedrock` (or your `WithGenAIProvider` override)
 - `gen_ai.operation.name` = `chat`
 - `langwatch.span.type` = `llm`
-- `langwatch.gen_ai.streaming` = whether the operation streams
+- `gen_ai.request.stream` = whether the operation streams
 - span name `"<provider>.<modelId>"`, e.g. `aws.bedrock.anthropic.claude-3-5-sonnet-20240620-v1:0`
 
 ### Converse / ConverseStream
@@ -142,16 +142,15 @@ a tool-call part (name, id, JSON args), `toolResult` → a tool-result part,
 | ------------------------------------------------------- | ----------- |
 | `Output` message (Converse) / accumulated message (stream) | `langwatch.output` (gated by capture) — recorded as `chat_messages` carrying any `toolUse` blocks as `tool_call` parts, else as text |
 | `StopReason` / `messageStop.stopReason`                 | `gen_ai.response.finish_reasons` |
-| `Usage.InputTokens`                                     | `gen_ai.usage.input_tokens` + `langwatch.metrics.prompt_tokens` |
-| `Usage.OutputTokens`                                    | `gen_ai.usage.output_tokens` + `langwatch.metrics.completion_tokens` |
+| `Usage.InputTokens`                                     | `gen_ai.usage.input_tokens` |
+| `Usage.OutputTokens`                                    | `gen_ai.usage.output_tokens` |
 | `Usage.TotalTokens`                                     | `gen_ai.usage.total_tokens` |
-| `Usage.CacheReadInputTokens`                            | `gen_ai.usage.cached_input_tokens` + `langwatch.metrics.cache_read_input_tokens` |
-| `Usage.CacheWriteInputTokens`                           | `langwatch.metrics.cache_creation_input_tokens` |
-| `Metrics.LatencyMs`                                     | `gen_ai.server.request.duration` (seconds) |
+| `Usage.CacheReadInputTokens`                            | `gen_ai.usage.cached_input_tokens` |
+| `Usage.CacheWriteInputTokens`                           | `gen_ai.usage.cache_creation.input_tokens` |
 
-Token usage is recorded via **both** `SetGenAIUsage` (the OTel `gen_ai.usage.*`
-attributes) and `SetMetrics` (the LangWatch cost/metric rollup), as required for
-cache-aware cost attribution.
+Token usage is recorded via `SetGenAIUsage` (the OTel `gen_ai.usage.*`
+attributes, including the cache-read and cache-creation counts for cache-aware
+cost attribution); `SetMetrics` carries only the cost + `tokens_estimated` flag.
 
 ### ConverseStream details
 

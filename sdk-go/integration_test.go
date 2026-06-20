@@ -49,7 +49,8 @@ func TestEndToEndPipeline(t *testing.T) {
 				SetGenAIProvider("openai").
 				SetInputChatMessages([]ChatMessage{TextMessage(ChatRoleUser, "what is the capital of France?")}).
 				SetOutputText("Paris").
-				SetMetrics(SpanMetrics{PromptTokens: Int(12), CompletionTokens: Int(1), Cost: Float64(0.0003)}).
+				SetGenAIUsage(GenAIUsage{InputTokens: Int(12), OutputTokens: Int(1), TotalTokens: Int(13)}).
+				SetMetrics(SpanMetrics{Cost: Float64(0.0003)}).
 				SetTraceMetadata(attribute.String("feature", "geo-quiz")).
 				SetThreadID("thread-1").
 				SetRAGContext(SpanRAGContextChunk{DocumentID: "doc-1", Content: "Paris is the capital of France."})
@@ -69,9 +70,10 @@ func TestEndToEndPipeline(t *testing.T) {
 		assert.NotContains(t, keys, AttributeLangWatchInput, "input content must be stripped")
 		assert.NotContains(t, keys, AttributeLangWatchOutput, "output content must be stripped")
 
-		// Structure, models, metrics, metadata and identity all survive.
+		// Structure, models, metrics, token usage, metadata and identity all survive.
 		assert.Contains(t, keys, AttributeLangWatchSpanType)
 		assert.Contains(t, keys, AttributeLangWatchMetrics)
+		assert.Contains(t, keys, attribute.Key("gen_ai.usage.input_tokens"))
 		assert.Contains(t, keys, attribute.Key("metadata.feature"))
 		assert.Contains(t, keys, attribute.Key("gen_ai.conversation.id"))
 		assert.Contains(t, keys, AttributeLangWatchRAGContexts)

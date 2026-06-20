@@ -24,7 +24,6 @@ const (
 	AttributeLangWatchMetrics    = attribute.Key("langwatch.metrics")
 	AttributeLangWatchTimestamps = attribute.Key("langwatch.timestamps")
 	AttributeLangWatchParams     = attribute.Key("langwatch.params")
-	AttributeLangWatchStreaming  = attribute.Key("langwatch.gen_ai.streaming")
 
 	AttributeLangWatchSDKVersion  = attribute.Key("langwatch.sdk.version")
 	AttributeLangWatchSDKName     = attribute.Key("langwatch.sdk.name")
@@ -76,4 +75,22 @@ const (
 	// fields stay populated as the resume target; the trace-UI consumer
 	// adds an "(unsaved edits)" suffix to the "Open in Prompts" affordance.
 	AttributeLangWatchPromptDraft = attribute.Key("langwatch.prompt.draft")
+)
+
+// GenAI semantic-convention keys that the v1.40 semconv package does not yet
+// provide a typed constructor for, declared once here so the provider
+// instrumentations and the data-capture strip-list reference the same constant
+// instead of re-typing the raw string. Keys that DO have a semconv constructor
+// (e.g. gen_ai.usage.input_tokens, gen_ai.conversation.id) are emitted via that
+// constructor directly and are not duplicated here.
+const (
+	// AttributeGenAIRequestTools carries the request's tool/function definitions
+	// as a JSON string (gen_ai.request.tools).
+	AttributeGenAIRequestTools = attribute.Key("gen_ai.request.tools")
+	// AttributeGenAIResponseStatus is the provider response status, e.g.
+	// "completed" (gen_ai.response.status).
+	AttributeGenAIResponseStatus = attribute.Key("gen_ai.response.status")
+	// AttributeGenAIResponseEmbeddingsCount is the number of embedding vectors in
+	// an embeddings response (gen_ai.response.embeddings_count).
+	AttributeGenAIResponseEmbeddingsCount = attribute.Key("gen_ai.response.embeddings_count")
 )

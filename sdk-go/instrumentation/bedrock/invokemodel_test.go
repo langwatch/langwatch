@@ -83,14 +83,12 @@ func TestInvokeModel_Mapping_Anthropic_CacheTokensInTotal(t *testing.T) {
 	require.NotNil(t, gen.TotalTokens)
 	// 10 + 5 + 4 + 6 = 25 (not the cache-excluding 15).
 	assert.Equal(t, 25, *gen.TotalTokens)
+	// Cache tokens flow solely through gen_ai.usage.*: cache read ->
+	// cached_input_tokens, cache write -> cache_creation.input_tokens.
 	require.NotNil(t, gen.CachedInputTokens)
+	require.NotNil(t, gen.CacheCreationInputTokens)
 	assert.Equal(t, 4, *gen.CachedInputTokens)
-
-	metrics := usage.spanMetrics()
-	require.NotNil(t, metrics.CacheReadInputTokens)
-	require.NotNil(t, metrics.CacheCreationInputTokens)
-	assert.Equal(t, 4, *metrics.CacheReadInputTokens)
-	assert.Equal(t, 6, *metrics.CacheCreationInputTokens)
+	assert.Equal(t, 6, *gen.CacheCreationInputTokens)
 }
 
 // TestInvokeModel_LargeBody_SkipsContentKeepsUsage verifies an oversized request

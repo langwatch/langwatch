@@ -125,7 +125,6 @@ func (m *tracingMiddleware) HandleInitialize(
 	// Mark the request start so a streaming handler can record TTFT (the latency
 	// to the first streamed event) relative to it.
 	start := time.Now()
-	span.SetAttributes(langwatch.AttributeLangWatchStreaming.Bool(handler.streaming()))
 	// Record gen_ai.request.stream (OTel GenAI semconv): true for ConverseStream /
 	// InvokeModelWithResponseStream, false for the unary Converse / InvokeModel.
 	span.SetGenAIRequestStream(handler.streaming())

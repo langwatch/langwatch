@@ -257,9 +257,8 @@ func TestSetMetrics(t *testing.T) {
 	t.Run("metrics are recorded as a bare snake_case object", func(t *testing.T) {
 		attrs := recordSpan(t, func(s *Span) {
 			s.SetMetrics(SpanMetrics{
-				PromptTokens:     Int(100),
-				CompletionTokens: Int(50),
-				Cost:             Float64(0.0125),
+				Cost:            Float64(0.0125),
+				TokensEstimated: Bool(true),
 			})
 		})
 
@@ -272,11 +271,12 @@ func TestSetMetrics(t *testing.T) {
 		// Bare object — NOT wrapped in a {"type":"json","value":...} envelope.
 		assert.NotContains(t, m, "type")
 		assert.NotContains(t, m, "value")
-		assert.EqualValues(t, 100, m["prompt_tokens"])
-		assert.EqualValues(t, 50, m["completion_tokens"])
 		assert.EqualValues(t, 0.0125, m["cost"])
-		// Unset pointer fields are omitted.
-		assert.NotContains(t, m, "reasoning_tokens")
+		assert.Equal(t, true, m["tokens_estimated"])
+		// Token counts are no longer carried by langwatch.metrics — they live in
+		// gen_ai.usage.* (see SetGenAIUsage).
+		assert.NotContains(t, m, "prompt_tokens")
+		assert.NotContains(t, m, "completion_tokens")
 	})
 }
 

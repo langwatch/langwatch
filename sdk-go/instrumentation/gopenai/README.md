@@ -46,8 +46,8 @@ Chat Completions capture cached prompt tokens
 (`gen_ai.usage.cached_input_tokens`) and reasoning tokens
 (`gen_ai.usage.reasoning.output_tokens`) when the provider returns them in
 `usage.prompt_tokens_details` / `usage.completion_tokens_details`. All token
-usage is recorded **both** as `gen_ai.usage.*` attributes and as the
-`langwatch.metrics` token rollup that feeds LangWatch cost reporting.
+usage is recorded as `gen_ai.usage.*` attributes, which feed LangWatch cost
+reporting.
 
 ## OpenAI-compatible providers
 
@@ -145,12 +145,12 @@ the exporter strips it at export time.
 
 - **Request**: `gen_ai.request.model`, `gen_ai.provider.name`,
   `gen_ai.operation.name`, `gen_ai.request.{temperature,top_p,max_tokens,frequency_penalty,presence_penalty,seed,choice_count,stop_sequences,reasoning_effort}`,
-  `gen_ai.request.tools`, `langwatch.gen_ai.streaming`, and the input
+  `gen_ai.request.tools`, `gen_ai.request.stream`, and the input
   (`langwatch.input`, as `chat_messages` for chat / JSON for legacy prompts).
 - **Response**: `gen_ai.response.{id,model,finish_reasons}`,
   `openai.response.system_fingerprint`, all token usage
   (`gen_ai.usage.{input_tokens,output_tokens,total_tokens,cached_input_tokens,reasoning.output_tokens}`),
-  the `langwatch.metrics` token rollup, and the output (`langwatch.output`).
+  and the output (`langwatch.output`).
 - **Embeddings**: `gen_ai.request.encoding_formats`,
   `gen_ai.embeddings.dimension_count`, `gen_ai.usage.{input_tokens,total_tokens}`,
   and `gen_ai.response.embeddings_count`.

@@ -66,11 +66,12 @@ func TestSetGenAIUsage(t *testing.T) {
 	t.Run("it records token usage under gen_ai.usage.*", func(t *testing.T) {
 		attrs := recordSpan(t, func(s *Span) {
 			s.SetGenAIUsage(GenAIUsage{
-				InputTokens:       Int(120),
-				OutputTokens:      Int(48),
-				TotalTokens:       Int(168),
-				CachedInputTokens: Int(64),
-				ReasoningTokens:   Int(12),
+				InputTokens:              Int(120),
+				OutputTokens:             Int(48),
+				TotalTokens:              Int(168),
+				CachedInputTokens:        Int(64),
+				CacheCreationInputTokens: Int(16),
+				ReasoningTokens:          Int(12),
 			})
 		})
 
@@ -78,6 +79,7 @@ func TestSetGenAIUsage(t *testing.T) {
 		assert.EqualValues(t, 48, attrs["gen_ai.usage.output_tokens"].AsInt64())
 		assert.EqualValues(t, 168, attrs["gen_ai.usage.total_tokens"].AsInt64())
 		assert.EqualValues(t, 64, attrs["gen_ai.usage.cached_input_tokens"].AsInt64())
+		assert.EqualValues(t, 16, attrs["gen_ai.usage.cache_creation.input_tokens"].AsInt64())
 		assert.EqualValues(t, 12, attrs["gen_ai.usage.reasoning.output_tokens"].AsInt64())
 	})
 

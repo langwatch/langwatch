@@ -1,6 +1,8 @@
-package gopenai
+package openaiformat
 
 import (
+	"encoding/json"
+
 	langwatch "github.com/langwatch/langwatch/sdk-go"
 )
 
@@ -45,33 +47,10 @@ func (u *usagePayload) toGenAIUsage() langwatch.GenAIUsage {
 	return usage
 }
 
-// recordUsage records a usage block as BOTH gen_ai.usage.* attributes (via
-// SetGenAIUsage) and the langwatch.metrics token rollup (via SetMetrics), so the
-// span feeds both the OTel-native usage view and LangWatch cost/metric rollups.
+// recordUsage records a usage block as gen_ai.usage.* attributes (via
+// SetGenAIUsage), the sole token source feeding the OTel-native usage view.
 func recordUsage(span *langwatch.Span, u *usagePayload) {
-	usage := u.toGenAIUsage()
-	span.SetGenAIUsage(usage)
-	span.SetMetrics(usageMetrics(usage))
-}
-
-// usageMetrics projects a GenAIUsage onto the LangWatch SpanMetrics token
-// fields. cached_input_tokens maps to cache_read_input_tokens, the canonical
-// LangWatch cache-read field.
-func usageMetrics(u langwatch.GenAIUsage) langwatch.SpanMetrics {
-	metrics := langwatch.SpanMetrics{}
-	if u.InputTokens != nil {
-		metrics.PromptTokens = langwatch.Int(*u.InputTokens)
-	}
-	if u.OutputTokens != nil {
-		metrics.CompletionTokens = langwatch.Int(*u.OutputTokens)
-	}
-	if u.ReasoningTokens != nil {
-		metrics.ReasoningTokens = langwatch.Int(*u.ReasoningTokens)
-	}
-	if u.CachedInputTokens != nil {
-		metrics.CacheReadInputTokens = langwatch.Int(*u.CachedInputTokens)
-	}
-	return metrics
+	span.SetGenAIUsage(u.toGenAIUsage())
 }
 
 // mergeUsage folds a streamed usage chunk into an accumulating GenAIUsage,
@@ -93,4 +72,41 @@ func mergeUsage(dst *langwatch.GenAIUsage, u *usagePayload) {
 	if src.ReasoningTokens != nil {
 		dst.ReasoningTokens = src.ReasoningTokens
 	}
+}
+
+// dedupe returns the unique values of in, preserving first-seen order. It is
+// used to collapse repeated streamed finish reasons.
+func dedupe(in []string) []string {
+	if len(in) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(in))
+	out := make([]string, 0, len(in))
+	for _, v := range in {
+		if _, ok := seen[v]; ok {
+			continue
+		}
+		seen[v] = struct{}{}
+		out = append(out, v)
+	}
+	return out
+}
+
+// stopSequences flattens the OpenAI stop union (string or []string) into a slice.
+func stopSequences(raw json.RawMessage) []string {
+	if len(raw) == 0 {
+		return nil
+	}
+	var single string
+	if err := json.Unmarshal(raw, &single); err == nil {
+		if single == "" {
+			return nil
+		}
+		return []string{single}
+	}
+	var many []string
+	if err := json.Unmarshal(raw, &many); err == nil {
+		return many
+	}
+	return nil
 }

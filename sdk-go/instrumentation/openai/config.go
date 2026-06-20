@@ -2,7 +2,6 @@ package openai
 
 import (
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/propagation"
 	oteltrace "go.opentelemetry.io/otel/trace"
 
 	langwatch "github.com/langwatch/langwatch/sdk-go"
@@ -11,7 +10,6 @@ import (
 // config is used to configure the middleware.
 type config struct {
 	tracerProvider oteltrace.TracerProvider
-	propagators    propagation.TextMapPropagator
 	// dataCapture gates whether the middleware records input and/or output
 	// content at the source. It defaults to langwatch.DataCaptureAll.
 	dataCapture langwatch.DataCaptureMode
@@ -36,15 +34,6 @@ func (o optionFunc) apply(c *config) {
 func WithTracerProvider(provider oteltrace.TracerProvider) Option {
 	return optionFunc(func(c *config) {
 		c.tracerProvider = provider
-	})
-}
-
-// WithPropagators specifies propagators to use for extracting
-// information from the HTTP requests. If none are specified, global
-// ones will be used.
-func WithPropagators(propagators propagation.TextMapPropagator) Option {
-	return optionFunc(func(c *config) {
-		c.propagators = propagators
 	})
 }
 

@@ -46,35 +46,11 @@ func (u *usageMetadata) toGenAIUsage() langwatch.GenAIUsage {
 	return usage
 }
 
-// recordUsage records a usageMetadata block as BOTH gen_ai.usage.* attributes
-// (via SetGenAIUsage) and the langwatch.metrics token rollup (via SetMetrics),
-// so the span feeds both the OTel-native usage view and LangWatch cost/metric
-// rollups.
+// recordUsage records a usageMetadata block as gen_ai.usage.* attributes (via
+// SetGenAIUsage), the sole token source feeding the OTel-native usage view.
 func recordUsage(span *langwatch.Span, u *usageMetadata) {
 	if u == nil {
 		return
 	}
-	usage := u.toGenAIUsage()
-	span.SetGenAIUsage(usage)
-	span.SetMetrics(usageMetrics(usage))
-}
-
-// usageMetrics projects a GenAIUsage onto the LangWatch SpanMetrics token
-// fields. CachedInputTokens maps to CacheReadInputTokens, the canonical
-// LangWatch cache-read field.
-func usageMetrics(u langwatch.GenAIUsage) langwatch.SpanMetrics {
-	metrics := langwatch.SpanMetrics{}
-	if u.InputTokens != nil {
-		metrics.PromptTokens = langwatch.Int(*u.InputTokens)
-	}
-	if u.OutputTokens != nil {
-		metrics.CompletionTokens = langwatch.Int(*u.OutputTokens)
-	}
-	if u.ReasoningTokens != nil {
-		metrics.ReasoningTokens = langwatch.Int(*u.ReasoningTokens)
-	}
-	if u.CachedInputTokens != nil {
-		metrics.CacheReadInputTokens = langwatch.Int(*u.CachedInputTokens)
-	}
-	return metrics
+	span.SetGenAIUsage(u.toGenAIUsage())
 }

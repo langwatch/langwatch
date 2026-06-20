@@ -96,16 +96,10 @@ func TestGenerateContent_NonStreaming(t *testing.T) {
 	assert.Equal(t, attribute.BoolValue(false), attrs[attribute.Key("gen_ai.request.stream")])
 	assert.NotContains(t, attrs, attribute.Key("gen_ai.response.time_to_first_chunk"))
 
-	// The same usage is also recorded as langwatch.metrics.
-	metrics := spanMetrics(t, attrs[langwatch.AttributeLangWatchMetrics].AsString())
-	require.NotNil(t, metrics.PromptTokens)
-	assert.Equal(t, 11, *metrics.PromptTokens)
-	require.NotNil(t, metrics.CompletionTokens)
-	assert.Equal(t, 7, *metrics.CompletionTokens)
-	require.NotNil(t, metrics.ReasoningTokens)
-	assert.Equal(t, 3, *metrics.ReasoningTokens)
-	require.NotNil(t, metrics.CacheReadInputTokens)
-	assert.Equal(t, 4, *metrics.CacheReadInputTokens)
+	// Tokens are no longer mirrored to langwatch.metrics — gen_ai.usage.* above is
+	// the sole token source.
+	_, hasMetrics := attrs[langwatch.AttributeLangWatchMetrics]
+	assert.False(t, hasMetrics, "token usage must NOT be mirrored to langwatch.metrics")
 
 	// System instruction recorded under the gen_ai-native key (default capture
 	// mode is All) — NOT under the langwatch.instructions mirror, which is gone.

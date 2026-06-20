@@ -1,25 +1,24 @@
-package gopenai
+package openaiformat
 
 import (
 	"encoding/json"
 	"strings"
 
-	"go.opentelemetry.io/otel/attribute"
 	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 
 	langwatch "github.com/langwatch/langwatch/sdk-go"
 	"github.com/langwatch/langwatch/sdk-go/instrumentation/otelhttp"
 )
 
-// embeddingsExtractor handles the Embeddings API (/v1/embeddings).
+// EmbeddingsExtractor handles the Embeddings API (/v1/embeddings).
 // Discriminators: the request carries `input` together with embeddings-only
 // fields (`encoding_format`/`dimensions`) and no messages[]; the response object
 // is "list" with data[].embedding. Embeddings never stream.
-type embeddingsExtractor struct{}
+type EmbeddingsExtractor struct{}
 
-func (embeddingsExtractor) Name() string { return "embeddings" }
+func (EmbeddingsExtractor) Name() string { return "embeddings" }
 
-func (embeddingsExtractor) MatchesRequest(body otelhttp.JSONObject, pathHint string) bool {
+func (EmbeddingsExtractor) MatchesRequest(body otelhttp.JSONObject, pathHint string) bool {
 	if strings.Contains(pathHint, "embeddings") {
 		return true
 	}
@@ -34,7 +33,7 @@ func (embeddingsExtractor) MatchesRequest(body otelhttp.JSONObject, pathHint str
 	return otelhttp.HasKey(body, "encoding_format") || otelhttp.HasKey(body, "dimensions")
 }
 
-func (embeddingsExtractor) MatchesResponse(objectField, contentType string) bool {
+func (EmbeddingsExtractor) MatchesResponse(objectField, contentType string) bool {
 	if strings.HasPrefix(contentType, "text/event-stream") {
 		return false
 	}
@@ -49,10 +48,10 @@ type embeddingsRequest struct {
 	Dimensions     *int            `json:"dimensions"`
 }
 
-func (embeddingsExtractor) ExtractRequest(span *langwatch.Span, raw []byte, capture langwatch.DataCaptureMode) bool {
+func (EmbeddingsExtractor) ExtractRequest(span *langwatch.Span, raw []byte, capture langwatch.DataCaptureMode) bool {
 	var req embeddingsRequest
 	if err := json.Unmarshal(raw, &req); err != nil {
-		return genericExtractor{}.ExtractRequest(span, raw, capture)
+		return GenericExtractor{}.ExtractRequest(span, raw, capture)
 	}
 
 	if req.Model != "" {
@@ -72,7 +71,6 @@ func (embeddingsExtractor) ExtractRequest(span *langwatch.Span, raw []byte, capt
 	}
 
 	// Embeddings never stream.
-	span.SetAttributes(langwatch.AttributeLangWatchStreaming.Bool(false))
 	return false
 }
 
@@ -85,10 +83,10 @@ type embeddingsResponse struct {
 	Usage *usagePayload `json:"usage"`
 }
 
-func (embeddingsExtractor) ExtractNonStreaming(span *langwatch.Span, raw []byte, capture langwatch.DataCaptureMode) {
+func (EmbeddingsExtractor) ExtractNonStreaming(span *langwatch.Span, raw []byte, capture langwatch.DataCaptureMode) {
 	var resp embeddingsResponse
 	if err := json.Unmarshal(raw, &resp); err != nil {
-		genericExtractor{}.ExtractNonStreaming(span, raw, capture)
+		GenericExtractor{}.ExtractNonStreaming(span, raw, capture)
 		return
 	}
 
@@ -102,11 +100,11 @@ func (embeddingsExtractor) ExtractNonStreaming(span *langwatch.Span, raw []byte,
 	// The embedding vectors themselves are large and rarely useful in a trace;
 	// record only their count as the output when output capture is enabled.
 	if capture.CaptureOutput() && len(resp.Data) > 0 {
-		span.SetAttributes(attribute.Int("gen_ai.response.embeddings_count", len(resp.Data)))
+		span.SetAttributes(langwatch.AttributeGenAIResponseEmbeddingsCount.Int(len(resp.Data)))
 	}
 }
 
-func (embeddingsExtractor) NewStreamAccumulator() otelhttp.StreamAccumulator {
+func (EmbeddingsExtractor) NewStreamAccumulator() otelhttp.StreamAccumulator {
 	// Embeddings never stream; this accumulator is therefore never used, but the
 	// interface requires it.
 	return otelhttp.NoopAccumulator{}

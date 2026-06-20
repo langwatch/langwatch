@@ -65,14 +65,16 @@ func (s *Span) SetGenAIRequestParams(p GenAIRequestParams) *Span {
 }
 
 // GenAIUsage holds LLM token usage, recorded under the gen_ai.usage.* attributes.
-// For LangWatch cost/metric rollups you can also use SetMetrics; this records the
-// OTel-native usage attributes that auto-instrumentation emits.
+// This is the sole token source: every provider instrumentation records token
+// counts through here (the langwatch.metrics rollup carries only cost +
+// estimated-flag, see SpanMetrics).
 type GenAIUsage struct {
-	InputTokens       *int
-	OutputTokens      *int
-	TotalTokens       *int
-	CachedInputTokens *int
-	ReasoningTokens   *int
+	InputTokens              *int
+	OutputTokens             *int
+	TotalTokens              *int
+	CachedInputTokens        *int
+	CacheCreationInputTokens *int
+	ReasoningTokens          *int
 }
 
 // SetGenAIUsage records token usage as gen_ai.usage.* attributes.
@@ -89,6 +91,9 @@ func (s *Span) SetGenAIUsage(u GenAIUsage) *Span {
 	}
 	if u.CachedInputTokens != nil {
 		attrs = append(attrs, attribute.Int("gen_ai.usage.cached_input_tokens", *u.CachedInputTokens))
+	}
+	if u.CacheCreationInputTokens != nil {
+		attrs = append(attrs, attribute.Int("gen_ai.usage.cache_creation.input_tokens", *u.CacheCreationInputTokens))
 	}
 	if u.ReasoningTokens != nil {
 		attrs = append(attrs, attribute.Int("gen_ai.usage.reasoning.output_tokens", *u.ReasoningTokens))
@@ -132,7 +137,7 @@ func (s *Span) SetGenAIOutputMessages(messages []ChatMessage) *Span {
 // SetGenAISystemInstructions records the system prompt (gen_ai.system_instructions).
 func (s *Span) SetGenAISystemInstructions(instructions string) *Span {
 	if instructions != "" {
-		s.SetAttributes(attribute.String("gen_ai.system_instructions", instructions))
+		s.SetAttributes(semconv.GenAISystemInstructionsKey.String(instructions))
 	}
 	return s
 }

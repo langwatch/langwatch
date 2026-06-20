@@ -98,13 +98,16 @@ func main() {
 		log.Fatalf("Chat completion failed: %v", err)
 	}
 
-	// Record the preferred choice as output, plus token/cost metrics. The output
-	// will be shown in the LangWatch UI and the metrics roll up to the trace.
+	// Record the preferred choice as output, plus token usage. The output will be
+	// shown in the LangWatch UI and the token usage rolls up to the trace. Token
+	// counts are recorded as gen_ai.usage.* (SetGenAIUsage); langwatch.metrics
+	// (SetMetrics) carries cost and the estimated-tokens flag.
 	span.
 		SetOutputText(response.Choices[0].Message.Content).
-		SetMetrics(langwatch.SpanMetrics{
-			PromptTokens:     langwatch.Int(int(response.Usage.PromptTokens)),
-			CompletionTokens: langwatch.Int(int(response.Usage.CompletionTokens)),
+		SetGenAIUsage(langwatch.GenAIUsage{
+			InputTokens:  langwatch.Int(int(response.Usage.PromptTokens)),
+			OutputTokens: langwatch.Int(int(response.Usage.CompletionTokens)),
+			TotalTokens:  langwatch.Int(int(response.Usage.TotalTokens)),
 		})
 
 	// This whole journey will now be available in the LangWatch UI

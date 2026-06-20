@@ -65,9 +65,7 @@ func (generateExtractor) ExtractRequest(span *langwatch.Span, raw []byte, captur
 		span.SetInputText(req.Prompt)
 	}
 
-	streaming := streamRequested(req.Stream)
-	span.SetAttributes(langwatch.AttributeLangWatchStreaming.Bool(streaming))
-	return streaming
+	return streamRequested(req.Stream)
 }
 
 // generateResponse is the subset of an Ollama /api/generate response we read.

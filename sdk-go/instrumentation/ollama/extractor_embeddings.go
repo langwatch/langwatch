@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"strings"
 
-	"go.opentelemetry.io/otel/attribute"
 	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 
 	langwatch "github.com/langwatch/langwatch/sdk-go"
@@ -65,7 +64,6 @@ func (embeddingsExtractor) ExtractRequest(span *langwatch.Span, raw []byte, capt
 	}
 
 	// Embeddings never stream.
-	span.SetAttributes(langwatch.AttributeLangWatchStreaming.Bool(false))
 	return false
 }
 
@@ -104,7 +102,7 @@ func (embeddingsExtractor) ExtractNonStreaming(span *langwatch.Span, raw []byte,
 	// their count as the output when output capture is enabled.
 	if capture.CaptureOutput() {
 		if count := embeddingsCount(resp); count > 0 {
-			span.SetAttributes(attribute.Int("gen_ai.response.embeddings_count", count))
+			span.SetAttributes(langwatch.AttributeGenAIResponseEmbeddingsCount.Int(count))
 		}
 	}
 }

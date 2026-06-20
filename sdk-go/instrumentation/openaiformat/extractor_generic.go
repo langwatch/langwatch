@@ -1,28 +1,27 @@
-package gopenai
+package openaiformat
 
 import (
 	"strings"
 
-	"go.opentelemetry.io/otel/attribute"
 	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 
 	langwatch "github.com/langwatch/langwatch/sdk-go"
 	"github.com/langwatch/langwatch/sdk-go/instrumentation/otelhttp"
 )
 
-// genericExtractor is the terminal fallback in the registry. It records what it
+// GenericExtractor is the terminal fallback in the registry. It records what it
 // can from any JSON payload using untyped field probing, so unknown or
 // unsupported OpenAI-compatible endpoints still produce a useful span instead of
 // regressing to nothing. Its match methods always return true.
-type genericExtractor struct{}
+type GenericExtractor struct{}
 
-func (genericExtractor) Name() string { return "openai" }
+func (GenericExtractor) Name() string { return "openai" }
 
-func (genericExtractor) MatchesRequest(otelhttp.JSONObject, string) bool { return true }
+func (GenericExtractor) MatchesRequest(otelhttp.JSONObject, string) bool { return true }
 
-func (genericExtractor) MatchesResponse(string, string) bool { return true }
+func (GenericExtractor) MatchesResponse(string, string) bool { return true }
 
-func (genericExtractor) ExtractRequest(span *langwatch.Span, raw []byte, capture langwatch.DataCaptureMode) bool {
+func (GenericExtractor) ExtractRequest(span *langwatch.Span, raw []byte, capture langwatch.DataCaptureMode) bool {
 	body, ok := otelhttp.ParseBody(raw)
 	if !ok {
 		return false
@@ -58,12 +57,10 @@ func (genericExtractor) ExtractRequest(span *langwatch.Span, raw []byte, capture
 		span.SetInputJSON(body)
 	}
 
-	streaming := otelhttp.RequestStreams(raw)
-	span.SetAttributes(langwatch.AttributeLangWatchStreaming.Bool(streaming))
-	return streaming
+	return otelhttp.RequestStreams(raw)
 }
 
-func (genericExtractor) ExtractNonStreaming(span *langwatch.Span, raw []byte, capture langwatch.DataCaptureMode) {
+func (GenericExtractor) ExtractNonStreaming(span *langwatch.Span, raw []byte, capture langwatch.DataCaptureMode) {
 	body, ok := otelhttp.ParseBody(raw)
 	if !ok {
 		return
@@ -97,7 +94,6 @@ func (genericExtractor) ExtractNonStreaming(span *langwatch.Span, raw []byte, ca
 			genUsage.TotalTokens = langwatch.Int(v)
 		}
 		span.SetGenAIUsage(genUsage)
-		span.SetMetrics(usageMetrics(genUsage))
 	}
 
 	if choices, ok := body["choices"].([]any); ok {
@@ -113,7 +109,7 @@ func (genericExtractor) ExtractNonStreaming(span *langwatch.Span, raw []byte, ca
 	}
 
 	if status, ok := otelhttp.GetString(body, "status"); ok {
-		span.SetAttributes(attribute.String("gen_ai.response.status", status))
+		span.SetAttributes(langwatch.AttributeGenAIResponseStatus.String(status))
 	}
 
 	if capture.CaptureOutput() {
@@ -121,7 +117,7 @@ func (genericExtractor) ExtractNonStreaming(span *langwatch.Span, raw []byte, ca
 	}
 }
 
-func (genericExtractor) NewStreamAccumulator() otelhttp.StreamAccumulator {
+func (GenericExtractor) NewStreamAccumulator() otelhttp.StreamAccumulator {
 	return &genericStreamAccumulator{}
 }
 
@@ -200,7 +196,6 @@ func (a *genericStreamAccumulator) Finish(span *langwatch.Span, capture langwatc
 	}
 	span.SetGenAIResponseFinishReasons(dedupe(a.finishReasons)...)
 	span.SetGenAIUsage(a.usage)
-	span.SetMetrics(usageMetrics(a.usage))
 
 	if capture.CaptureOutput() && a.output.Len() > 0 {
 		// The accumulator only reconstructs chat-completion delta content

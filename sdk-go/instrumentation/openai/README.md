@@ -187,7 +187,7 @@ The middleware adds attributes to the client span, following [OpenTelemetry GenA
 - `gen_ai.request.reasoning_effort`
 - `gen_ai.request.encoding_formats`, `gen_ai.embeddings.dimension.count` (embeddings)
 - `langwatch.instructions` (Responses API)
-- `langwatch.gen_ai.streaming` (boolean)
+- `gen_ai.request.stream` (boolean)
 - `gen_ai.operation.name` (e.g., `chat`, `embeddings`, `responses`)
 - `langwatch.input` (when input capture is enabled)
 

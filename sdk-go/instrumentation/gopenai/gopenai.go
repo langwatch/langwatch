@@ -32,6 +32,7 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 
 	langwatch "github.com/langwatch/langwatch/sdk-go"
+	"github.com/langwatch/langwatch/sdk-go/instrumentation/openaiformat"
 	"github.com/langwatch/langwatch/sdk-go/instrumentation/otelhttp"
 	openai "github.com/sashabaranov/go-openai"
 )
@@ -40,17 +41,6 @@ const (
 	tracerName             = "github.com/langwatch/langwatch/sdk-go/instrumentation/gopenai"
 	instrumentationVersion = "0.0.1"
 )
-
-// extractors lists the shape extractors in priority order. The permissive
-// generic fallback MUST be last so unknown OpenAI-compatible endpoints still
-// produce a useful span.
-func extractors() []otelhttp.Extractor {
-	return []otelhttp.Extractor{
-		chatExtractor{},
-		embeddingsExtractor{},
-		genericExtractor{},
-	}
-}
 
 // NewTransport returns an http.RoundTripper that traces go-openai's HTTP calls
 // to LangWatch. It wraps http.DefaultTransport; to chain a custom base
@@ -116,13 +106,13 @@ func newTracer(opts ...Option) *otelhttp.Tracer {
 		Provider:       cfg.genAIProvider,
 		DataCapture:    cfg.dataCapture,
 		TracerProvider: cfg.tracerProvider,
-		Extractors:     extractors(),
+		Extractors:     openaiformat.Extractors(),
 		OperationAttrs: operationAttrs,
 	})
 }
 
-// operationAttrs derives gen_ai.operation.name from the request URL path, the
-// same mapping the openai instrumentation uses.
+// operationAttrs derives gen_ai.operation.name from the request URL path via the
+// shared OpenAI-format mapper, so go-openai and the official client agree.
 func operationAttrs(req *http.Request) []attribute.KeyValue {
-	return []attribute.KeyValue{genAIOperationFromPath(req.URL.Path)}
+	return openaiformat.OperationAttrs(req.URL.Path)
 }
