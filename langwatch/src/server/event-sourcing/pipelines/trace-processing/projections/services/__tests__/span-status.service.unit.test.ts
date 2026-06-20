@@ -33,6 +33,8 @@ function makeSpan(overrides: Partial<NormalizedSpan> = {}): NormalizedSpan {
     droppedAttributesCount: 0 as 0,
     droppedEventsCount: 0 as 0,
     droppedLinksCount: 0 as 0,
+    cost: null,
+    nonBilledCost: null,
     ...overrides,
   };
 }
