@@ -550,7 +550,7 @@ Let's get cracking.
   </Step>
 
   <Step title="Install the LangWatch SDK">
-    We have official SDKs for Python and Node.js ready to go. If you're using another language, our [OpenTelemetry Integration Guide](/integration/opentelemetry/guide) provides the details you need.
+    We have official SDKs for Python, Node.js, and Go ready to go. If you're using another language, our [OpenTelemetry Integration Guide](/integration/opentelemetry/guide) provides the details you need.
 
     <CodeGroup>
 ```bash Python
@@ -560,6 +560,10 @@ uv add langwatch
 ```
 ```bash JavaScript
 npm install langwatch @vercel/otel @opentelemetry/api-logs @opentelemetry/instrumentation @opentelemetry/sdk-logs
+```
+```bash Go
+go get github.com/langwatch/langwatch/sdk-go
+go get github.com/langwatch/langwatch/sdk-go/instrumentation/openai
 ```
     </CodeGroup>
   </Step>
@@ -612,6 +616,58 @@ const result = await generateText({
     isEnabled: true, // Ensure telemetry is active for relevant operations
   },
 });
+```
+```go Go
+package main
+
+import (
+	"context"
+	"log"
+	"os"
+
+	langwatch "github.com/langwatch/langwatch/sdk-go"
+	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
+
+	"github.com/openai/openai-go/v3"
+	oaioption "github.com/openai/openai-go/v3/option"
+	"go.opentelemetry.io/otel"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+)
+
+func main() {
+	ctx := context.Background()
+
+	// Setup LangWatch tracing (reads LANGWATCH_API_KEY from env).
+	exporter, err := langwatch.NewExporter(ctx)
+	if err != nil {
+		log.Fatalf("failed to create LangWatch exporter: %v", err)
+	}
+	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
+	otel.SetTracerProvider(tp)
+	defer tp.Shutdown(ctx)
+
+	// Add the middleware to your OpenAI client (captures request + response).
+	client := openai.NewClient(
+		oaioption.WithAPIKey(os.Getenv("OPENAI_API_KEY")),
+		oaioption.WithMiddleware(otelopenai.Middleware("your-app-name")),
+	)
+
+	// Optionally wrap your operation in a span.
+	tracer := langwatch.Tracer("your-app-name")
+	ctx, span := tracer.Start(ctx, "ChatWithUser")
+	defer span.End()
+
+	resp, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+		Model: openai.ChatModelGPT4oMini,
+		Messages: []openai.ChatCompletionMessageParamUnion{
+			openai.UserMessage("How many calories do I burn jumping to conclusions?"),
+		},
+	})
+	if err != nil {
+		log.Fatalf("chat completion failed: %v", err)
+	}
+	log.Printf("Response: %s", resp.Choices[0].Message.Content)
+}
 ```
     </CodeGroup>
   </Step>
@@ -685,7 +741,13 @@ Below are some examples for integrating LangWatch into your project.
   ### Go
 
     <CardGroup cols={3}>
-      <Card title="LangWatch Go SDK" icon="link" href="https://github.com/langwatch/langwatch/blob/main/go-sdk/examples" />
+      <Card title="OpenAI Simple" icon="link" href="https://github.com/langwatch/langwatch/tree/main/sdk-go/e2e/openai-simple" />
+      <Card title="OpenAI Streaming" icon="link" href="https://github.com/langwatch/langwatch/tree/main/sdk-go/e2e/openai-streaming" />
+      <Card title="OpenAI Threads" icon="link" href="https://github.com/langwatch/langwatch/tree/main/sdk-go/e2e/openai-threads" />
+      <Card title="OpenAI Responses" icon="link" href="https://github.com/langwatch/langwatch/tree/main/sdk-go/e2e/openai-responses" />
+      <Card title="OpenAI Filtered" icon="link" href="https://github.com/langwatch/langwatch/tree/main/sdk-go/e2e/openai-filtered" />
+      <Card title="Custom Input/Output" icon="link" href="https://github.com/langwatch/langwatch/tree/main/sdk-go/e2e/custom-input-output" />
+      <Card title="Span Filtering" icon="link" href="https://github.com/langwatch/langwatch/tree/main/sdk-go/examples/filtering" />
     </CardGroup>
 
   ### OpenTelemetry
@@ -9535,6 +9597,117 @@ This will display the tool call with a tool icon in the trace visualization and 
 
 ---
 
+# FILE: ./integration/go/integrations/amazon-bedrock.mdx
+
+---
+title: Amazon Bedrock Integration
+sidebarTitle: Go
+description: Instrument AWS Bedrock Runtime calls in Go using LangWatch to capture model usage, tokens, and cost for AI agent evaluation.
+icon: golang
+keywords: go, golang, aws, amazon bedrock, bedrockruntime, instrumentation, langwatch, smithy, converse
+---
+
+LangWatch provides native instrumentation for the AWS Bedrock Runtime client (`github.com/aws/aws-sdk-go-v2/service/bedrockruntime`). Unlike the HTTP-bytes instrumentations, Bedrock is traced via the AWS **smithy-go middleware stack**, reading the typed operation input/output structs directly — so there is no body buffering. It captures `Converse`, `ConverseStream` and (best-effort) `InvokeModel`, including cache read + write tokens and latency.
+
+## Installation
+
+```bash
+go get github.com/langwatch/langwatch/sdk-go
+go get github.com/langwatch/langwatch/sdk-go/instrumentation/bedrock
+go get github.com/aws/aws-sdk-go-v2/service/bedrockruntime
+```
+
+## Usage
+
+<Info>
+Set `LANGWATCH_API_KEY` before running, and ensure your AWS credentials and region are configured (e.g. via `AWS_REGION` and the standard AWS credential chain).
+</Info>
+
+Instrument an `aws.Config` once with `InstrumentConfig`, and every Bedrock Runtime client built from it is traced:
+
+```go
+package main
+
+import (
+	"context"
+	"log"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime"
+	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime/types"
+	"go.opentelemetry.io/otel"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+
+	langwatch "github.com/langwatch/langwatch/sdk-go"
+	"github.com/langwatch/langwatch/sdk-go/instrumentation/bedrock"
+)
+
+func main() {
+	ctx := context.Background()
+
+	// Set up the LangWatch exporter (reads LANGWATCH_API_KEY from env).
+	exporter, err := langwatch.NewExporter(ctx)
+	if err != nil {
+		log.Fatalf("failed to create exporter: %v", err)
+	}
+	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
+	otel.SetTracerProvider(tp)
+	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed.
+
+	cfg, err := awsconfig.LoadDefaultConfig(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Add the tracing middleware to the config.
+	bedrock.InstrumentConfig(&cfg)
+
+	client := bedrockruntime.NewFromConfig(cfg)
+
+	_, err = client.Converse(ctx, &bedrockruntime.ConverseInput{
+		ModelId: aws.String("anthropic.claude-3-5-sonnet-20240620-v1:0"),
+		Messages: []types.Message{{
+			Role:    types.ConversationRoleUser,
+			Content: []types.ContentBlock{&types.ContentBlockMemberText{Value: "Hello, Bedrock!"}},
+		}},
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+```
+
+### Instrumenting a single client or operation
+
+If you do not want to mutate the shared `aws.Config`, add the middleware to a single client (or call) via `APIOptions`:
+
+```go
+client := bedrockruntime.NewFromConfig(cfg, func(o *bedrockruntime.Options) {
+	o.APIOptions = append(o.APIOptions, bedrock.WithTracing())
+})
+```
+
+<Note>
+The middleware captures input and output content **by default** (`langwatch.DataCaptureAll`). Pass `bedrock.WithDataCapture(langwatch.DataCaptureNone)` to `InstrumentConfig` / `WithTracing` to opt out. Use `bedrock.WithGenAIProvider(...)` to attribute spans to the underlying foundation-model vendor instead of `aws.bedrock`.
+</Note>
+
+<Warning>
+**Close streaming responses.** For `ConverseStream`, the span is finalised when the stream drains, `Close()` is called, or the operation context is cancelled — always `defer stream.Close()` (or pass a cancellable context), exactly as you would for any AWS event stream.
+</Warning>
+
+<Warning>
+The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost when your application exits.
+</Warning>
+
+## Related
+
+- [Go Integration Guide](/integration/go/guide) - Setup, manual spans, data capture and the REST client
+- [Go SDK API Reference](/integration/go/reference#automatic-instrumentation) - Instrumentation options and collected attributes
+- [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails in your Bedrock applications
+
+---
+
 # FILE: ./integration/go/integrations/anthropic.mdx
 
 ---
@@ -9542,15 +9715,17 @@ title: Anthropic (Claude) Integration
 sidebarTitle: Go
 description: Instrument Anthropic Claude API calls in Go using LangWatch to track performance, detect errors, and improve AI agent testing.
 icon: golang
-keywords: go, golang, anthropic, claude, instrumentation, langwatch, openai-compatible
+keywords: go, golang, anthropic, claude, instrumentation, langwatch, messages api, native
 ---
 
-LangWatch supports tracing Anthropic Claude API calls using the same `otelopenai` middleware used for OpenAI. Configure the client to point to Anthropic's API endpoint.
+LangWatch provides **native** instrumentation for the official Anthropic Go SDK (`github.com/anthropics/anthropic-sdk-go`). It wires a middleware that records request and response attributes for the Messages API (`/v1/messages`) — both buffered and streamed — including the full token-usage breakdown (input, output, cache-read and cache-creation) and thinking content.
 
 ## Installation
 
 ```bash
-go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go
+go get github.com/langwatch/langwatch/sdk-go
+go get github.com/langwatch/langwatch/sdk-go/instrumentation/anthropic
+go get github.com/anthropics/anthropic-sdk-go
 ```
 
 ## Usage
@@ -9567,51 +9742,55 @@ import (
 	"log"
 	"os"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"
-	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
-	"github.com/openai/openai-go"
-	oaioption "github.com/openai/openai-go/option"
+	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/anthropics/anthropic-sdk-go/option"
 	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+
+	langwatch "github.com/langwatch/langwatch/sdk-go"
+	otelanthropic "github.com/langwatch/langwatch/sdk-go/instrumentation/anthropic"
 )
 
 func main() {
 	ctx := context.Background()
 
-	// Set up LangWatch exporter
-	exporter, err := langwatch.NewDefaultExporter(ctx)
+	// Set up the LangWatch exporter (reads LANGWATCH_API_KEY from env).
+	exporter, err := langwatch.NewExporter(ctx)
 	if err != nil {
 		log.Fatalf("failed to create exporter: %v", err)
 	}
 	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
 	otel.SetTracerProvider(tp)
-	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed
+	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed.
 
-	// Create Anthropic client via OpenAI-compatible API
-	client := openai.NewClient(
-		oaioption.WithAPIKey(os.Getenv("ANTHROPIC_API_KEY")),
-		oaioption.WithBaseURL(os.Getenv("ANTHROPIC_BASE_URL")),
-		oaioption.WithMiddleware(otelopenai.Middleware("my-app",
-			otelopenai.WithCaptureInput(),
-			otelopenai.WithCaptureOutput(),
-			otelopenai.WithGenAISystem("anthropic"),
-		)),
+	// Create an instrumented Anthropic client. By default the middleware
+	// captures both request (input) and response (output) content.
+	client := anthropic.NewClient(
+		option.WithAPIKey(os.Getenv("ANTHROPIC_API_KEY")),
+		option.WithMiddleware(otelanthropic.Middleware()),
 	)
 
-	response, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-		Model: "claude-4-5-sonnet",
-		Messages: []openai.ChatCompletionMessageParamUnion{
-			openai.SystemMessage("You are a helpful assistant."),
-			openai.UserMessage("Hello, Claude!"),
+	message, err := client.Messages.New(ctx, anthropic.MessageNewParams{
+		Model:     anthropic.ModelClaudeHaiku4_5,
+		MaxTokens: 1024,
+		System:    []anthropic.TextBlockParam{{Text: "You are a helpful assistant."}},
+		Messages: []anthropic.MessageParam{
+			anthropic.NewUserMessage(anthropic.NewTextBlock("Hello, Claude!")),
 		},
 	})
 	if err != nil {
-		log.Fatalf("Chat completion failed: %v", err)
+		log.Fatalf("messages call failed: %v", err)
 	}
 
-	log.Printf("Response: %s", response.Choices[0].Message.Content)
+	log.Printf("Response: %v", message)
 }
 ```
+
+Streaming works identically — drive `client.Messages.NewStreaming(...)` and drain it; the span is recorded once the stream concludes.
+
+<Note>
+The middleware captures input and output content **by default** (`langwatch.DataCaptureAll`). Pass `otelanthropic.WithDataCapture(langwatch.DataCaptureNone)` to opt out. If your client points at an Anthropic-compatible gateway (e.g. AWS Bedrock or Google Vertex), set the provider with `otelanthropic.WithGenAIProvider(...)`.
+</Note>
 
 <Warning>
 The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost when your application exits.
@@ -9619,8 +9798,8 @@ The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in m
 
 ## Related
 
-- [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools
-- [Capturing Metadata and Attributes](/integration/python/tutorials/capturing-metadata) - Add custom metadata and attributes to your traces and spans
+- [Go Integration Guide](/integration/go/guide) - Setup, manual spans, data capture and the REST client
+- [Go SDK API Reference](/integration/go/reference#automatic-instrumentation) - Instrumentation options and collected attributes
 - [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails in your Anthropic applications
 
 ---
@@ -9632,15 +9811,17 @@ title: Azure OpenAI Integration
 sidebarTitle: Go
 description: Instrument Azure OpenAI API calls in Go using LangWatch to monitor model usage, latency, and AI agent evaluation metrics.
 icon: golang
-keywords: go, golang, azure, azure openai, instrumentation, langwatch, openai-compatible
+keywords: go, golang, azure, azure openai, instrumentation, langwatch, native
 ---
 
-LangWatch supports tracing Azure OpenAI API calls using the same `otelopenai` middleware used for OpenAI. Configure the client to point to your Azure endpoint.
+LangWatch provides native instrumentation for **Azure OpenAI** accessed through the official `openai-go/v3` client's `azure` subpackage. The `azureopenai` module is a thin wrapper over the [OpenAI](/integration/go/integrations/open-ai) instrumentation: all of OpenAI's chat / responses / embeddings capture applies unchanged, and the provider is recorded as `azure.openai`.
 
 ## Installation
 
 ```bash
-go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go
+go get github.com/langwatch/langwatch/sdk-go
+go get github.com/langwatch/langwatch/sdk-go/instrumentation/azureopenai
+go get github.com/openai/openai-go/v3
 ```
 
 ## Usage
@@ -9648,6 +9829,8 @@ go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go
 <Info>
 Set `LANGWATCH_API_KEY`, `AZURE_OPENAI_API_KEY`, and `AZURE_OPENAI_ENDPOINT` environment variables before running.
 </Info>
+
+Build the Azure client with the `azure` connection options and wire in `azureopenai.Middleware` via `option.WithMiddleware`:
 
 ```go
 package main
@@ -9657,39 +9840,43 @@ import (
 	"log"
 	"os"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"
-	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
-	"github.com/openai/openai-go"
-	oaioption "github.com/openai/openai-go/option"
+	"github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/azure"
+	"github.com/openai/openai-go/v3/option"
 	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+
+	langwatch "github.com/langwatch/langwatch/sdk-go"
+	azureopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/azureopenai"
 )
 
 func main() {
 	ctx := context.Background()
 
-	// Set up LangWatch exporter
-	exporter, err := langwatch.NewDefaultExporter(ctx)
+	// Set up the LangWatch exporter (reads LANGWATCH_API_KEY from env).
+	exporter, err := langwatch.NewExporter(ctx)
 	if err != nil {
 		log.Fatalf("failed to create exporter: %v", err)
 	}
 	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
 	otel.SetTracerProvider(tp)
-	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed
+	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed.
 
-	// Create Azure OpenAI client
+	// Create an instrumented Azure OpenAI client. The provider is recorded as
+	// "azure.openai"; by default the middleware captures both input and output.
+	const apiVersion = "2024-06-01"
 	client := openai.NewClient(
-		oaioption.WithAPIKey(os.Getenv("AZURE_OPENAI_API_KEY")),
-		oaioption.WithBaseURL(os.Getenv("AZURE_OPENAI_ENDPOINT")),
-		oaioption.WithMiddleware(otelopenai.Middleware("my-app",
-			otelopenai.WithCaptureInput(),
-			otelopenai.WithCaptureOutput(),
-			otelopenai.WithGenAISystem("azure"),
-		)),
+		azure.WithEndpoint(os.Getenv("AZURE_OPENAI_ENDPOINT"), apiVersion),
+		azure.WithAPIKey(os.Getenv("AZURE_OPENAI_API_KEY")),
+		// Or authenticate with an Azure Identity TokenCredential:
+		// azure.WithTokenCredential(tokenCredential),
+		option.WithMiddleware(azureopenai.Middleware("my-app")),
 	)
 
+	// The Model is your Azure *deployment* name; the azure subpackage rewrites
+	// the request path to /openai/deployments/{deployment}/chat/completions.
 	response, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-		Model: openai.ChatModelGPT5,
+		Model: "my-gpt4o-deployment",
 		Messages: []openai.ChatCompletionMessageParamUnion{
 			openai.SystemMessage("You are a helpful assistant."),
 			openai.UserMessage("Hello, Azure OpenAI!"),
@@ -9703,7 +9890,11 @@ func main() {
 }
 ```
 
-Set `AZURE_OPENAI_ENDPOINT` to your Azure OpenAI resource endpoint URL (e.g., `https://your-resource.openai.azure.com/openai/deployments/your-deployment`).
+Set `AZURE_OPENAI_ENDPOINT` to your Azure OpenAI resource endpoint (e.g., `https://your-resource.openai.azure.com`); the `Model` you pass is your deployment name.
+
+<Note>
+The middleware captures input and output content **by default** (`langwatch.DataCaptureAll`). Pass `azureopenai.WithDataCapture(langwatch.DataCaptureNone)` to opt out.
+</Note>
 
 <Warning>
 The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost when your application exits.
@@ -9711,9 +9902,86 @@ The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in m
 
 ## Related
 
-- [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools
-- [Capturing Metadata and Attributes](/integration/python/tutorials/capturing-metadata) - Add custom metadata and attributes to your traces and spans
+- [Go Integration Guide](/integration/go/guide) - Setup, manual spans, data capture and the REST client
+- [Go SDK API Reference](/integration/go/reference#automatic-instrumentation) - Instrumentation options and collected attributes
 - [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails in your Azure OpenAI applications
+
+---
+
+# FILE: ./integration/go/integrations/genkit.mdx
+
+---
+title: Firebase Genkit Integration
+sidebarTitle: Genkit
+description: Export Firebase Genkit Go traces to LangWatch to observe flows, models, and tools for AI agent evaluation.
+keywords: go, golang, genkit, firebase, instrumentation, langwatch, opentelemetry, native, flows
+---
+
+[Firebase Genkit](https://github.com/firebase/genkit) for Go is **OpenTelemetry-native**: it already emits its own `gen_ai.*` spans for flows, models and tools onto the global OpenTelemetry tracer provider. The LangWatch Genkit package does **no body parsing** — it registers a LangWatch span processor on the tracer provider Genkit's spans flow through, so whatever Genkit records (model, token usage, prompt/completion and tool data) is exported to LangWatch.
+
+## Installation
+
+```bash
+go get github.com/langwatch/langwatch/sdk-go
+go get github.com/langwatch/langwatch/sdk-go/instrumentation/genkit
+go get github.com/firebase/genkit/go
+```
+
+## Usage
+
+<Info>
+Set the `LANGWATCH_API_KEY` environment variable before running.
+</Info>
+
+Register LangWatch once, after `genkit.Init`:
+
+```go
+package main
+
+import (
+	"context"
+	"log"
+
+	"github.com/firebase/genkit/go/genkit"
+	"github.com/firebase/genkit/go/plugins/googlegenai"
+
+	lwgenkit "github.com/langwatch/langwatch/sdk-go/instrumentation/genkit"
+)
+
+func main() {
+	ctx := context.Background()
+
+	g := genkit.Init(ctx, genkit.WithPlugins(&googlegenai.GoogleAI{}))
+
+	// Export Genkit's OTEL spans to LangWatch (reads LANGWATCH_API_KEY from env).
+	if err := lwgenkit.RegisterLangWatch(g); err != nil {
+		log.Fatalf("failed to register LangWatch: %v", err)
+	}
+
+	// Define and run flows as usual — their spans are now exported to LangWatch.
+}
+```
+
+`RegisterLangWatch` reads `LANGWATCH_API_KEY` (and `LANGWATCH_ENDPOINT`) from the environment by default. To forward exporter options (API key, endpoint, data capture, filters), pass `WithExporterOptions`:
+
+```go
+lwgenkit.RegisterLangWatch(g,
+	lwgenkit.WithExporterOptions(
+		langwatch.WithAPIKey("sk-lw-..."),
+		langwatch.WithDataCapture(langwatch.DataCaptureNone), // structure/metrics only
+	),
+)
+```
+
+<Note>
+LangWatch captures whatever `gen_ai.*` attributes Genkit records — there is no extra parsing in this package. If you build your own `sdktrace.TracerProvider`, use `lwgenkit.SpanProcessor(opts...)` to obtain the processor and register it yourself (Genkit reads the global tracer provider).
+</Note>
+
+## Related
+
+- [Go Integration Guide](/integration/go/guide) - Setup, manual spans, data capture and the REST client
+- [Go SDK API Reference](/integration/go/reference#automatic-instrumentation) - Instrumentation options and data capture
+- [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails
 
 ---
 
@@ -9721,18 +9989,20 @@ The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in m
 
 ---
 title: Google Gemini Integration
-sidebarTitle: Google Gemini
-description: Learn how to instrument Google Gemini API calls in Go using the LangWatch SDK via a Vertex AI endpoint.
+sidebarTitle: Go
+description: Instrument Google Gemini and Vertex AI calls in Go using the LangWatch SDK's native genai instrumentation.
 icon: golang
-keywords: go, golang, google, gemini, vertex ai, instrumentation, langwatch, openai-compatible
+keywords: go, golang, google, gemini, vertex ai, genai, instrumentation, langwatch, native
 ---
 
-LangWatch supports tracing Google Gemini models through Google Cloud Vertex AI's OpenAI-compatible endpoint.
+LangWatch provides **native** instrumentation for Google's unified Gen AI Go SDK (`google.golang.org/genai`), which covers both the **Gemini Developer API** and **Vertex AI** behind one client. It traces at the HTTP layer the `genai` client uses, recording request and response attributes — including all token kinds Gemini reports (prompt, candidates, cached content, and `thoughts` as reasoning tokens), with full streaming support.
 
 ## Installation
 
 ```bash
-go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go
+go get github.com/langwatch/langwatch/sdk-go
+go get github.com/langwatch/langwatch/sdk-go/instrumentation/googlegenai
+go get google.golang.org/genai
 ```
 
 ## Usage
@@ -9740,6 +10010,8 @@ go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go
 <Info>
 Set `LANGWATCH_API_KEY` and `GEMINI_API_KEY` environment variables before running.
 </Info>
+
+`WrapClientConfig` sets the client's HTTP transport to a traced one in place, preserving any transport you already configured. Register your LangWatch tracer provider first, then wrap the `genai.ClientConfig`:
 
 ```go
 package main
@@ -9750,50 +10022,47 @@ import (
 	"os"
 
 	langwatch "github.com/langwatch/langwatch/sdk-go"
-	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
-	"github.com/openai/openai-go"
-	oaioption "github.com/openai/openai-go/option"
+	"github.com/langwatch/langwatch/sdk-go/instrumentation/googlegenai"
 	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"google.golang.org/genai"
 )
 
 func main() {
 	ctx := context.Background()
 
-	// Set up LangWatch exporter
-	exporter, err := langwatch.NewDefaultExporter(ctx)
+	// Set up the LangWatch exporter (reads LANGWATCH_API_KEY from env).
+	exporter, err := langwatch.NewExporter(ctx)
 	if err != nil {
 		log.Fatalf("failed to create exporter: %v", err)
 	}
 	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
 	otel.SetTracerProvider(tp)
-	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed
+	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed.
 
-	// Create Gemini client via OpenAI-compatible API
-	client := openai.NewClient(
-		oaioption.WithAPIKey(os.Getenv("GEMINI_API_KEY")),
-		oaioption.WithBaseURL(os.Getenv("GEMINI_BASE_URL")),
-		oaioption.WithMiddleware(otelopenai.Middleware("my-app",
-			otelopenai.WithCaptureInput(),
-			otelopenai.WithCaptureOutput(),
-			otelopenai.WithGenAISystem("google"),
-		)),
-	)
+	cc := &genai.ClientConfig{
+		APIKey:  os.Getenv("GEMINI_API_KEY"),
+		Backend: genai.BackendGeminiAPI,
+	}
+	googlegenai.WrapClientConfig(cc) // uses the global TracerProvider by default
 
-	response, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-		Model: "gemini-2.5-flash",
-		Messages: []openai.ChatCompletionMessageParamUnion{
-			openai.SystemMessage("You are a helpful assistant."),
-			openai.UserMessage("Hello, Gemini!"),
-		},
-	})
+	client, err := genai.NewClient(ctx, cc)
 	if err != nil {
-		log.Fatalf("Chat completion failed: %v", err)
+		log.Fatal(err)
 	}
 
-	log.Printf("Response: %s", response.Choices[0].Message.Content)
+	resp, err := client.Models.GenerateContent(ctx, "gemini-2.5-flash", genai.Text("Hello, Gemini!"), nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Printf("Response: %s", resp.Text())
 }
 ```
+
+<Note>
+For the **Vertex AI** backend set `Backend: genai.BackendVertexAI`. If you build the `*http.Client` yourself, use `googlegenai.NewTransport()` (or `NewTransportWithBase(base, opts...)` to chain an authenticated transport for Vertex). The instrumentation captures input and output **by default**; pass `googlegenai.WithDataCapture(langwatch.DataCaptureNone)` to opt out.
+</Note>
 
 <Warning>
 The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost when your application exits.
@@ -9801,8 +10070,8 @@ The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in m
 
 ## Related
 
-- [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools
-- [Capturing Metadata and Attributes](/integration/python/tutorials/capturing-metadata) - Add custom metadata and attributes to your traces and spans
+- [Go Integration Guide](/integration/go/guide) - Setup, manual spans, data capture and the REST client
+- [Go SDK API Reference](/integration/go/reference#automatic-instrumentation) - Instrumentation options and collected attributes
 - [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails in your Google Gemini applications
 
 ---
@@ -9816,12 +10085,14 @@ description: Instrument Grok (xAI) API calls in Go using LangWatch to capture hi
 keywords: go, golang, grok, xai, instrumentation, langwatch, openai-compatible
 ---
 
-LangWatch supports tracing Grok (xAI) API calls using the same `otelopenai` middleware used for OpenAI. Configure the client to point to the xAI endpoint.
+LangWatch supports tracing Grok (xAI) API calls through xAI's OpenAI-compatible endpoint. Reuse the [OpenAI](/integration/go/integrations/open-ai) `otelopenai` middleware: point the client at the xAI base URL and label the spans with `WithGenAIProvider`.
 
 ## Installation
 
 ```bash
-go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go
+go get github.com/langwatch/langwatch/sdk-go
+go get github.com/langwatch/langwatch/sdk-go/instrumentation/openai
+go get github.com/openai/openai-go/v3
 ```
 
 ## Usage
@@ -9840,32 +10111,32 @@ import (
 
 	langwatch "github.com/langwatch/langwatch/sdk-go"
 	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
-	"github.com/openai/openai-go"
-	oaioption "github.com/openai/openai-go/option"
+
+	"github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/option"
 	"go.opentelemetry.io/otel"
+	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
 func main() {
 	ctx := context.Background()
 
-	// Set up LangWatch exporter
-	exporter, err := langwatch.NewDefaultExporter(ctx)
+	// Set up the LangWatch exporter (reads LANGWATCH_API_KEY from env).
+	exporter, err := langwatch.NewExporter(ctx)
 	if err != nil {
 		log.Fatalf("failed to create exporter: %v", err)
 	}
 	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
 	otel.SetTracerProvider(tp)
-	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed
+	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed.
 
-	// Create Grok client via OpenAI-compatible API
+	// Create a Grok client via the OpenAI-compatible API.
 	client := openai.NewClient(
-		oaioption.WithAPIKey(os.Getenv("XAI_API_KEY")),
-		oaioption.WithBaseURL("https://api.grok.com/v1"),
-		oaioption.WithMiddleware(otelopenai.Middleware("my-app",
-			otelopenai.WithCaptureInput(),
-			otelopenai.WithCaptureOutput(),
-			otelopenai.WithGenAISystem("xai"),
+		option.WithBaseURL("https://api.x.ai/v1"),
+		option.WithAPIKey(os.Getenv("XAI_API_KEY")),
+		option.WithMiddleware(otelopenai.Middleware("my-app",
+			otelopenai.WithGenAIProvider(semconv.GenAIProviderNameKey.String("x_ai")),
 		)),
 	)
 
@@ -9884,15 +10155,19 @@ func main() {
 }
 ```
 
+<Note>
+The middleware captures input and output content **by default**. Pass `otelopenai.WithDataCapture(langwatch.DataCaptureNone)` to opt out.
+</Note>
+
 <Warning>
 The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost when your application exits.
 </Warning>
 
 ## Related
 
-- [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools
-- [Capturing Metadata and Attributes](/integration/python/tutorials/capturing-metadata) - Add custom metadata and attributes to your traces and spans
-- [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails in your Grok applications
+- [Go Integration Guide](/integration/go/guide#openai-compatible-providers)
+- [Go SDK API Reference](/integration/go/reference#openai-middleware)
+- [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails)
 
 ---
 
@@ -9905,12 +10180,14 @@ description: Instrument Groq API calls in Go using LangWatch for fast LLM observ
 keywords: go, golang, groq, instrumentation, langwatch, openai-compatible
 ---
 
-LangWatch can trace calls to the Groq API, allowing you to monitor its high-speed inference capabilities. Groq provides an OpenAI-compatible endpoint, so you can reuse the `otelopenai` middleware with minimal changes.
+LangWatch can trace calls to the Groq API, allowing you to monitor its high-speed inference capabilities. Groq provides an OpenAI-compatible endpoint, so you reuse the [OpenAI](/integration/go/integrations/open-ai) `otelopenai` middleware: point the client at Groq's base URL and label the spans with `WithGenAIProvider`.
 
 ## Installation
 
 ```bash
-go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go
+go get github.com/langwatch/langwatch/sdk-go
+go get github.com/langwatch/langwatch/sdk-go/instrumentation/openai
+go get github.com/openai/openai-go/v3
 ```
 
 ## Usage
@@ -9929,32 +10206,32 @@ import (
 
 	langwatch "github.com/langwatch/langwatch/sdk-go"
 	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
-	"github.com/openai/openai-go"
-	oaioption "github.com/openai/openai-go/option"
+
+	"github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/option"
 	"go.opentelemetry.io/otel"
+	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
 func main() {
 	ctx := context.Background()
 
-	// Set up LangWatch exporter
-	exporter, err := langwatch.NewDefaultExporter(ctx)
+	// Set up the LangWatch exporter (reads LANGWATCH_API_KEY from env).
+	exporter, err := langwatch.NewExporter(ctx)
 	if err != nil {
 		log.Fatalf("failed to create exporter: %v", err)
 	}
 	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
 	otel.SetTracerProvider(tp)
-	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed
+	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed.
 
-	// Create Groq client via OpenAI-compatible API
+	// Create a Groq client via the OpenAI-compatible API.
 	client := openai.NewClient(
-		oaioption.WithBaseURL("https://api.groq.com/openai/v1"),
-		oaioption.WithAPIKey(os.Getenv("GROQ_API_KEY")),
-		oaioption.WithMiddleware(otelopenai.Middleware("my-app",
-			otelopenai.WithCaptureInput(),
-			otelopenai.WithCaptureOutput(),
-			otelopenai.WithGenAISystem("groq"),
+		option.WithBaseURL("https://api.groq.com/openai/v1"),
+		option.WithAPIKey(os.Getenv("GROQ_API_KEY")),
+		option.WithMiddleware(otelopenai.Middleware("my-app",
+			otelopenai.WithGenAIProvider(semconv.GenAIProviderNameKey.String("groq")),
 		)),
 	)
 
@@ -9973,14 +10250,18 @@ func main() {
 }
 ```
 
+<Note>
+The middleware captures input and output content **by default**. Pass `otelopenai.WithDataCapture(langwatch.DataCaptureNone)` to opt out.
+</Note>
+
 <Warning>
 The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost when your application exits.
 </Warning>
 
 ## Related
 
-- [Capturing RAG](/integration/python/tutorials/capturing-rag)
-- [Capturing Metadata and Attributes](/integration/python/tutorials/capturing-metadata)
+- [Go Integration Guide](/integration/go/guide#openai-compatible-providers)
+- [Go SDK API Reference](/integration/go/reference#openai-middleware)
 - [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails)
 
 ---
@@ -9991,34 +10272,43 @@ The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in m
 title: Ollama (Local Models) Integration
 sidebarTitle: Ollama (Local)
 description: Instrument local Ollama models in Go to monitor performance, debug RAG flows, and support AI agent testing environments.
-keywords: go, golang, ollama, local llm, instrumentation, langwatch, openai-compatible
+keywords: go, golang, ollama, local llm, instrumentation, langwatch, native, ndjson streaming
 ---
 
-LangWatch supports tracing local models served by Ollama through its OpenAI-compatible endpoint.
+LangWatch provides **native** instrumentation for the official Ollama Go client (`github.com/ollama/ollama/api`), covering its native `/api/chat`, `/api/generate` and `/api/embed` endpoints. It captures the model parameters, token counts (`prompt_eval_count` / `eval_count`), server-side phase durations, and tool calls — with NDJSON streaming reconstruction.
+
+<Note>
+This page covers Ollama's **native** API. If you talk to Ollama through an OpenAI client instead (the `/v1/*` compatibility shim), use the [OpenAI](/integration/go/integrations/open-ai) instrumentation with `option.WithBaseURL("http://localhost:11434/v1")` and `otelopenai.WithGenAIProvider(semconv.GenAIProviderNameKey.String("ollama"))`.
+</Note>
 
 ## Installation
 
 ```bash
-go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go
+go get github.com/langwatch/langwatch/sdk-go
+go get github.com/langwatch/langwatch/sdk-go/instrumentation/ollama
+go get github.com/ollama/ollama/api
 ```
 
 ## Usage
 
 <Info>
-Set `LANGWATCH_API_KEY` environment variable before running. Ollama runs locally so no API key is needed for the model.
+Set the `LANGWATCH_API_KEY` environment variable before running. Ollama runs locally, so no API key is needed for the model (the SDK reads `OLLAMA_HOST`, default `http://localhost:11434`).
 </Info>
+
+`NewHTTPClient` returns a ready `*http.Client` to pass to `api.NewClient`. Register your LangWatch tracer provider first:
 
 ```go
 package main
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"net/url"
 
 	langwatch "github.com/langwatch/langwatch/sdk-go"
-	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
-	"github.com/openai/openai-go"
-	oaioption "github.com/openai/openai-go/option"
+	"github.com/langwatch/langwatch/sdk-go/instrumentation/ollama"
+	"github.com/ollama/ollama/api"
 	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
@@ -10026,40 +10316,36 @@ import (
 func main() {
 	ctx := context.Background()
 
-	// Set up LangWatch exporter
-	exporter, err := langwatch.NewDefaultExporter(ctx)
+	// Set up the LangWatch exporter (reads LANGWATCH_API_KEY from env).
+	exporter, err := langwatch.NewExporter(ctx)
 	if err != nil {
 		log.Fatalf("failed to create exporter: %v", err)
 	}
 	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
 	otel.SetTracerProvider(tp)
-	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed
+	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed.
 
-	// Create Ollama client via OpenAI-compatible API
-	client := openai.NewClient(
-		oaioption.WithBaseURL(os.Getenv("OLLAMA_BASE_URL")),
-		oaioption.WithAPIKey("ollama"), // Ollama doesn't require a real key
-		oaioption.WithMiddleware(otelopenai.Middleware("my-app",
-			otelopenai.WithCaptureInput(),
-			otelopenai.WithCaptureOutput(),
-			otelopenai.WithGenAISystem("ollama"),
-		)),
-	)
+	base, _ := url.Parse("http://localhost:11434")
+	client := api.NewClient(base, ollama.NewHTTPClient()) // uses the global TracerProvider
 
-	response, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-		Model: "openai/gpt-5",
-		Messages: []openai.ChatCompletionMessageParamUnion{
-			openai.SystemMessage("You are a helpful assistant."),
-			openai.UserMessage("Hello, Ollama!"),
-		},
+	stream := false
+	err = client.Chat(ctx, &api.ChatRequest{
+		Model:    "llama3.2",
+		Stream:   &stream,
+		Messages: []api.Message{{Role: "user", Content: "Hello, Ollama!"}},
+	}, func(resp api.ChatResponse) error {
+		fmt.Print(resp.Message.Content)
+		return nil
 	})
 	if err != nil {
-		log.Fatalf("Chat completion failed: %v", err)
+		log.Fatal(err)
 	}
-
-	log.Printf("Response: %s", response.Choices[0].Message.Content)
 }
 ```
+
+<Note>
+If you'd rather build the `*http.Client` yourself, use `ollama.NewTransport()` (or `WrapHTTPClient(client, opts...)` to preserve an existing client's settings). The instrumentation captures input and output **by default**; pass `ollama.WithDataCapture(langwatch.DataCaptureNone)` to opt out.
+</Note>
 
 <Warning>
 The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost when your application exits.
@@ -10067,8 +10353,8 @@ The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in m
 
 ## Related
 
-- [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools
-- [Capturing Metadata and Attributes](/integration/python/tutorials/capturing-metadata) - Add custom metadata and attributes to your traces and spans
+- [Go Integration Guide](/integration/go/guide) - Setup, manual spans, data capture and the REST client
+- [Go SDK API Reference](/integration/go/reference#automatic-instrumentation) - Instrumentation options and collected attributes
 - [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails in your Ollama applications
 
 ---
@@ -10083,12 +10369,14 @@ icon: golang
 keywords: openai, instrumentation, golang, go, langwatch, middleware, streaming
 ---
 
-LangWatch provides automatic instrumentation for the official `openai-go` client library through a dedicated middleware that captures detailed information about your OpenAI API calls.
+LangWatch provides automatic instrumentation for the official `openai-go/v3` client library through a dedicated middleware that captures detailed information about your OpenAI API calls. It handles Chat Completions, the Responses API and Embeddings, with full streaming support.
 
 ## Installation
 
 ```bash
-go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go
+go get github.com/langwatch/langwatch/sdk-go
+go get github.com/langwatch/langwatch/sdk-go/instrumentation/openai
+go get github.com/openai/openai-go/v3
 ```
 
 ## Usage
@@ -10107,8 +10395,9 @@ import (
 
 	langwatch "github.com/langwatch/langwatch/sdk-go"
 	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
-	"github.com/openai/openai-go"
-	oaioption "github.com/openai/openai-go/option"
+
+	"github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/option"
 	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
@@ -10116,22 +10405,20 @@ import (
 func main() {
 	ctx := context.Background()
 
-	// Set up LangWatch exporter
-	exporter, err := langwatch.NewDefaultExporter(ctx)
+	// Set up the LangWatch exporter (reads LANGWATCH_API_KEY from env).
+	exporter, err := langwatch.NewExporter(ctx)
 	if err != nil {
 		log.Fatalf("failed to create exporter: %v", err)
 	}
 	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
 	otel.SetTracerProvider(tp)
-	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed
+	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed.
 
-	// Create OpenAI client with LangWatch middleware
+	// Create an OpenAI client with the LangWatch middleware. By default the
+	// middleware captures both request (input) and response (output) content.
 	client := openai.NewClient(
-		oaioption.WithAPIKey(os.Getenv("OPENAI_API_KEY")),
-		oaioption.WithMiddleware(otelopenai.Middleware("my-app",
-			otelopenai.WithCaptureInput(),
-			otelopenai.WithCaptureOutput(),
-		)),
+		option.WithAPIKey(os.Getenv("OPENAI_API_KEY")),
+		option.WithMiddleware(otelopenai.Middleware("my-app")),
 	)
 
 	response, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
@@ -10149,7 +10436,11 @@ func main() {
 }
 ```
 
-The middleware automatically captures request/response content, token usage, and model information. Streaming responses are fully supported and automatically accumulated.
+The middleware automatically captures request/response content, every token type (input / output / cached / reasoning), and model information. Streaming responses are fully supported and automatically accumulated.
+
+<Note>
+The middleware captures input and output content **by default** (`langwatch.DataCaptureAll`). The previous opt-in `WithCaptureInput()` / `WithCaptureOutput()` options have been **removed**. To opt out, pass `otelopenai.WithDataCapture(langwatch.DataCaptureNone)` (or `DataCaptureInput` / `DataCaptureOutput` to capture only one side).
+</Note>
 
 <Warning>
 The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost when your application exits.
@@ -10157,9 +10448,9 @@ The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in m
 
 ## Related
 
-- [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools
-- [Capturing Metadata and Attributes](/integration/python/tutorials/capturing-metadata) - Add custom metadata and attributes to your traces and spans
-- [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails in your OpenAI applications
+- [Go Integration Guide](/integration/go/guide) - Setup, manual spans, data capture and the REST client
+- [Go SDK API Reference](/integration/go/reference#openai-middleware) - Middleware options and collected attributes
+- [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails
 
 ---
 
@@ -10172,16 +10463,23 @@ description: Instrument OpenRouter model calls in Go with LangWatch to compare m
 keywords: go, golang, openrouter, model router, instrumentation, langwatch, opentelemetry, openai-compatible
 ---
 
-[OpenRouter](https://openrouter.ai) provides a unified API to access a vast range of LLMs from different providers. LangWatch can trace calls made through OpenRouter using its OpenAI-compatible endpoint.
+[OpenRouter](https://openrouter.ai) provides a unified API to access a vast range of LLMs from different providers. LangWatch can trace calls made through OpenRouter's OpenAI-compatible endpoint by reusing the [OpenAI](/integration/go/integrations/open-ai) `otelopenai` middleware.
 
 ## Setup
 
 You will need an OpenRouter API key from your [OpenRouter settings](https://openrouter.ai/keys).
 
-Set your OpenRouter API key as an environment variable:
+```bash
+export LANGWATCH_API_KEY="your-langwatch-api-key"
+export OPENROUTER_API_KEY="your-openrouter-api-key"
+```
+
+## Installation
 
 ```bash
-export OPENROUTER_API_KEY="your-openrouter-api-key"
+go get github.com/langwatch/langwatch/sdk-go
+go get github.com/langwatch/langwatch/sdk-go/instrumentation/openai
+go get github.com/openai/openai-go/v3
 ```
 
 ## Usage
@@ -10190,7 +10488,7 @@ export OPENROUTER_API_KEY="your-openrouter-api-key"
 Set `LANGWATCH_API_KEY` and `OPENROUTER_API_KEY` environment variables before running.
 </Info>
 
-The key difference with OpenRouter is the model name, which is prefixed with the provider (e.g., `anthropic/claude-sonnet-4-20250514`).
+The key difference with OpenRouter is the model name, which is prefixed with the provider (e.g., `anthropic/claude-sonnet-4-20250514`). OpenRouter has no registered `gen_ai.provider.name`, so pass a custom value:
 
 ```go
 package main
@@ -10202,32 +10500,32 @@ import (
 
 	langwatch "github.com/langwatch/langwatch/sdk-go"
 	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
-	"github.com/openai/openai-go"
-	oaioption "github.com/openai/openai-go/option"
+
+	"github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/option"
 	"go.opentelemetry.io/otel"
+	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
 func main() {
 	ctx := context.Background()
 
-	// Set up LangWatch exporter
-	exporter, err := langwatch.NewDefaultExporter(ctx)
+	// Set up the LangWatch exporter (reads LANGWATCH_API_KEY from env).
+	exporter, err := langwatch.NewExporter(ctx)
 	if err != nil {
 		log.Fatalf("failed to create exporter: %v", err)
 	}
 	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
 	otel.SetTracerProvider(tp)
-	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed
+	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed.
 
-	// Create OpenRouter client via OpenAI-compatible API
+	// Create an OpenRouter client via the OpenAI-compatible API.
 	client := openai.NewClient(
-		oaioption.WithBaseURL("https://openrouter.ai/api/v1"),
-		oaioption.WithAPIKey(os.Getenv("OPENROUTER_API_KEY")),
-		oaioption.WithMiddleware(otelopenai.Middleware("my-app",
-			otelopenai.WithCaptureInput(),
-			otelopenai.WithCaptureOutput(),
-			otelopenai.WithGenAISystem("openrouter"),
+		option.WithBaseURL("https://openrouter.ai/api/v1"),
+		option.WithAPIKey(os.Getenv("OPENROUTER_API_KEY")),
+		option.WithMiddleware(otelopenai.Middleware("my-app",
+			otelopenai.WithGenAIProvider(semconv.GenAIProviderNameKey.String("openrouter")),
 		)),
 	)
 
@@ -10244,6 +10542,10 @@ func main() {
 	log.Printf("Response: %s", response.Choices[0].Message.Content)
 }
 ```
+
+<Note>
+The middleware captures input and output content **by default**. Pass `otelopenai.WithDataCapture(langwatch.DataCaptureNone)` to opt out.
+</Note>
 
 <Warning>
 The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost when your application exits.
