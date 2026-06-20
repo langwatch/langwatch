@@ -1,10 +1,4 @@
 import { env } from "~/env.mjs";
-import {
-  batchPresidioClearPII as defaultBatchPresidioClearPII,
-  googleDLPClearPII,
-  type PIICheckOptions,
-  PRESIDIO_STRICT_ENTITIES,
-} from "~/server/tracer/collector/piiCheck";
 import type {
   PiiLevel,
   ResolvedDataPrivacy,
@@ -19,6 +13,12 @@ import {
 } from "~/server/data-privacy/redaction/applyContentRedaction";
 import { ESSENTIAL_PII_ENTITIES } from "~/server/data-privacy/redaction/essentialPii";
 import type { TenantId } from "~/server/event-sourcing/domain/tenantId";
+import {
+  batchPresidioClearPII as defaultBatchPresidioClearPII,
+  googleDLPClearPII,
+  type PIICheckOptions,
+  PRESIDIO_STRICT_ENTITIES,
+} from "~/server/tracer/collector/piiCheck";
 
 /**
  * Identifiers the strict analyzer detects that the native engine cannot

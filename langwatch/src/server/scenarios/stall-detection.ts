@@ -1,5 +1,5 @@
-import { ScenarioRunStatus } from "./scenario-event.enums";
 import { CHILD_PROCESS } from "./scenario.constants";
+import { ScenarioRunStatus } from "./scenario-event.enums";
 
 /**
  * Threshold in milliseconds after which a run without RUN_FINISHED

@@ -82,12 +82,7 @@ export const LLM_PARAMETER_MAP: readonly LlmParameterMapping[] = [
   {
     formField: "reasoning",
     otelAttr: null,
-    traceAliases: [
-      "reasoning",
-      "reasoning_effort",
-      "thinkingLevel",
-      "effort",
-    ],
+    traceAliases: ["reasoning", "reasoning_effort", "thinkingLevel", "effort"],
     coercion: "string",
   },
   {

@@ -720,11 +720,12 @@ export class ExperimentRunService {
         );
 
         try {
-          // IN-tuple dedup over the ReplacingMergeTree (see
-          // dev/docs/best_practices/clickhouse-queries.md). Inner SELECT
-          // scans only the sparse key tuple to find max(UpdatedAt), outer
-          // SELECT pulls the heavy run row (Total/Progress/cost rollups) for
-          // that one match.
+          // Single-run read: resolve the latest version with a scalar
+          // `UpdatedAt = (SELECT max(UpdatedAt) ...)` subquery. The scalar
+          // equality is PREWHERE-able, so the heavy columns are materialized for
+          // only the surviving version instead of across every version of the
+          // run. The IN-tuple form stays the right choice for the multi-run list
+          // reads (listRuns) and for experiment_run_items below.
           const runResult = await clickHouseClient.query({
             query: `
               SELECT *
@@ -732,13 +733,12 @@ export class ExperimentRunService {
               WHERE TenantId = {tenantId:String}
                 AND ExperimentId = {experimentId:String}
                 AND RunId = {runId:String}
-                AND (TenantId, ExperimentId, RunId, UpdatedAt) IN (
-                  SELECT TenantId, ExperimentId, RunId, max(UpdatedAt)
+                AND UpdatedAt = (
+                  SELECT max(UpdatedAt)
                   FROM experiment_runs
                   WHERE TenantId = {tenantId:String}
                     AND ExperimentId = {experimentId:String}
                     AND RunId = {runId:String}
-                  GROUP BY TenantId, ExperimentId, RunId
                 )
               LIMIT 1
             `,

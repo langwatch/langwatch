@@ -144,7 +144,7 @@ export const scenarioEventsRouter = createTRPCRouter({
         },
         "Fetching suite run data (unified)",
       );
-      const dates = resolveDateRange(input);
+      const _dates = resolveDateRange(input);
       return fetchSuiteRunData({
         projectId: input.projectId,
         scenarioSetId: input.scenarioSetId,

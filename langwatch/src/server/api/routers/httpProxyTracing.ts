@@ -211,12 +211,10 @@ export async function createAgentTestTrace({
     },
   };
 
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { id: true, piiRedactionLevel: true },
-  });
-  const piiRedactionLevel =
-    project?.piiRedactionLevel ?? DEFAULT_PII_REDACTION_LEVEL;
+  // PII redaction level is resolved downstream in the recordSpan pipeline from
+  // the scoped data-privacy policy; ingestion passes the essential default
+  // (#4729 removed Project.piiRedactionLevel).
+  const piiRedactionLevel = DEFAULT_PII_REDACTION_LEVEL;
 
   const resource = CollectorSpanUtils.buildResource({
     reservedTraceMetadata: { user_id: userId },

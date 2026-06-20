@@ -135,9 +135,7 @@ describe("trace dedup OOM safety", () => {
 
       it("uses max(UpdatedAt) GROUP BY for span dedup", () => {
         expect(body).toContain("max(UpdatedAt)");
-        expect(body).toMatch(
-          /GROUP BY\s+TenantId,\s*TraceId,\s*SpanId/,
-        );
+        expect(body).toMatch(/GROUP BY\s+TenantId,\s*TraceId,\s*SpanId/);
       });
     });
   });
@@ -171,9 +169,7 @@ describe("trace dedup OOM safety", () => {
 
       it("uses max(UpdatedAt) GROUP BY for span dedup", () => {
         expect(dedupHelper).toContain("max(UpdatedAt)");
-        expect(dedupHelper).toMatch(
-          /GROUP BY\s+TenantId,\s*TraceId,\s*SpanId/,
-        );
+        expect(dedupHelper).toMatch(/GROUP BY\s+TenantId,\s*TraceId,\s*SpanId/);
       });
     });
   });
@@ -207,9 +203,7 @@ describe("trace dedup OOM safety", () => {
 
       it("uses max(UpdatedAt) GROUP BY for span dedup", () => {
         expect(dedupHelper).toContain("max(UpdatedAt)");
-        expect(dedupHelper).toMatch(
-          /GROUP BY\s+TenantId,\s*TraceId,\s*SpanId/,
-        );
+        expect(dedupHelper).toMatch(/GROUP BY\s+TenantId,\s*TraceId,\s*SpanId/);
       });
     });
   });
@@ -228,7 +222,10 @@ describe("trace dedup OOM safety", () => {
       "span-storage.clickhouse.repository.ts",
     );
     const spanStorageSource = fs.readFileSync(spanStoragePath, "utf-8");
-    const body = extractMethodBody(spanStorageSource, "getTraceEventsByTraceId");
+    const body = extractMethodBody(
+      spanStorageSource,
+      "getTraceEventsByTraceId",
+    );
 
     describe("when the events-only query SQL is inspected", () => {
       it("does not use LIMIT 1 BY for deduplication", () => {

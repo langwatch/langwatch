@@ -24,10 +24,13 @@ import {
 import {
   type BaseSpan,
   type ChatMessage,
+  type CustomMetadata,
   chatMessageSchema,
   customMetadataSchema,
   type LLMSpan,
   type RAGChunk,
+  type RESTEvaluation,
+  type ReservedTraceMetadata,
   rESTEvaluationSchema,
   reservedSpanParamsSchema,
   reservedTraceMetadataSchema,

@@ -6,7 +6,13 @@ import {
   UserMessage,
 } from "@copilotkit/react-ui";
 import clsx from "clsx";
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+} from "react";
 import type { z } from "zod";
 import { TraceMessage } from "~/components/copilot-kit/TraceMessage";
 import { convertScenarioMessagesToCopilotKit } from "~/components/simulations/utils/convert-scenario-messages";

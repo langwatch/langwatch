@@ -4,22 +4,22 @@ import {
   type FoldEventHandlers,
 } from "../../../projections/abstractFoldProjection";
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
-import { normalizeDurationMs } from "../utils/duration.utils";
 import { EXPERIMENT_RUN_PROJECTION_VERSIONS } from "../schemas/constants";
 import type {
+  EvaluatorResultEvent,
+  ExperimentRunCompletedEvent,
   ExperimentRunStartedEvent,
   TargetResultEvent,
-  EvaluatorResultEvent,
   TraceMetricsComputedEvent,
-  ExperimentRunCompletedEvent,
 } from "../schemas/events";
 import {
+  evaluatorResultEventSchema,
+  experimentRunCompletedEventSchema,
   experimentRunStartedEventSchema,
   targetResultEventSchema,
-  evaluatorResultEventSchema,
   traceMetricsComputedEventSchema,
-  experimentRunCompletedEventSchema,
 } from "../schemas/events";
+import { normalizeDurationMs } from "../utils/duration.utils";
 
 /**
  * State data for an experiment run.
@@ -101,8 +101,12 @@ const experimentRunEvents = [
  * - `UpdatedAt` is auto-managed by the base class after each handler call
  */
 export class ExperimentRunStateFoldProjection
-  extends AbstractFoldProjection<ExperimentRunStateData, typeof experimentRunEvents>
-  implements FoldEventHandlers<typeof experimentRunEvents, ExperimentRunStateData>
+  extends AbstractFoldProjection<
+    ExperimentRunStateData,
+    typeof experimentRunEvents
+  >
+  implements
+    FoldEventHandlers<typeof experimentRunEvents, ExperimentRunStateData>
 {
   readonly name = "experimentRunState";
   readonly version = EXPERIMENT_RUN_PROJECTION_VERSIONS.RUN_STATE;
@@ -196,7 +200,13 @@ export class ExperimentRunStateFoldProjection
     event: EvaluatorResultEvent,
     state: ExperimentRunStateData,
   ): ExperimentRunStateData {
-    let { TotalScoreSum: totalScoreSum, ScoreCount: scoreCount, PassedCount: passedCount, GradedCount: gradedCount, TotalCost: totalCost } = state;
+    let {
+      TotalScoreSum: totalScoreSum,
+      ScoreCount: scoreCount,
+      PassedCount: passedCount,
+      GradedCount: gradedCount,
+      TotalCost: totalCost,
+    } = state;
 
     if (event.data.status === "processed") {
       if (event.data.score != null) {
@@ -213,8 +223,10 @@ export class ExperimentRunStateFoldProjection
       totalCost = (totalCost ?? 0) + event.data.cost;
     }
 
-    const avgScoreBps = scoreCount > 0 ? Math.round(totalScoreSum / scoreCount) : null;
-    const passRateBps = gradedCount > 0 ? Math.round((passedCount / gradedCount) * 10000) : null;
+    const avgScoreBps =
+      scoreCount > 0 ? Math.round(totalScoreSum / scoreCount) : null;
+    const passRateBps =
+      gradedCount > 0 ? Math.round((passedCount / gradedCount) * 10000) : null;
 
     return {
       ...state,

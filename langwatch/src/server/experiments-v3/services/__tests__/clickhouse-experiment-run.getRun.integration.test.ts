@@ -1,15 +1,19 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { startTestContainers, stopTestContainers } from "../../../event-sourcing/__tests__/integration/testContainers";
+import {
+  startTestContainers,
+  stopTestContainers,
+} from "../../../event-sourcing/__tests__/integration/testContainers";
 
 // getRun resolves its ClickHouse client through getClickHouseClientForProject;
 // point that at the testcontainer client so the real query path runs.
 let testClient: ClickHouseClient;
 vi.mock("~/server/clickhouse/clickhouseClient", async (importOriginal) => {
-  const actual = await importOriginal<
-    typeof import("~/server/clickhouse/clickhouseClient")
-  >();
+  const actual =
+    await importOriginal<
+      typeof import("~/server/clickhouse/clickhouseClient")
+    >();
   return {
     ...actual,
     getClickHouseClientForProject: async () => testClient,
@@ -84,11 +88,33 @@ describe("ExperimentRunService.getRun (integration)", () => {
     it("returns the fields of the version with the greatest UpdatedAt", async () => {
       const experimentId = `exp-latest-${nanoid()}`;
       const runId = `run-latest-${nanoid()}`;
-      await insertVersion(ch, { experimentId, runId, progress: 1, targets: '[{"id":"stale-1"}]', agoSec: 3 });
-      await insertVersion(ch, { experimentId, runId, progress: 2, targets: '[{"id":"stale-2"}]', agoSec: 1 });
-      await insertVersion(ch, { experimentId, runId, progress: 9, targets: '[{"id":"final"}]', agoSec: 0 });
+      await insertVersion(ch, {
+        experimentId,
+        runId,
+        progress: 1,
+        targets: '[{"id":"stale-1"}]',
+        agoSec: 3,
+      });
+      await insertVersion(ch, {
+        experimentId,
+        runId,
+        progress: 2,
+        targets: '[{"id":"stale-2"}]',
+        agoSec: 1,
+      });
+      await insertVersion(ch, {
+        experimentId,
+        runId,
+        progress: 9,
+        targets: '[{"id":"final"}]',
+        agoSec: 0,
+      });
 
-      const result = await service.getRun({ projectId: tenantId, experimentId, runId });
+      const result = await service.getRun({
+        projectId: tenantId,
+        experimentId,
+        runId,
+      });
 
       expect(result).not.toBeNull();
       expect(result!.progress).toBe(9);
@@ -112,9 +138,19 @@ describe("ExperimentRunService.getRun (integration)", () => {
       const experimentId = `exp-shared-${nanoid()}`;
       const runId = `run-shared-${nanoid()}`;
       const otherTenant = `test-exp-getrun-other-${nanoid()}`;
-      await insertVersion(ch, { tenant: otherTenant, experimentId, runId, progress: 5, agoSec: 0 });
+      await insertVersion(ch, {
+        tenant: otherTenant,
+        experimentId,
+        runId,
+        progress: 5,
+        agoSec: 0,
+      });
 
-      const result = await service.getRun({ projectId: tenantId, experimentId, runId });
+      const result = await service.getRun({
+        projectId: tenantId,
+        experimentId,
+        runId,
+      });
       expect(result).toBeNull();
 
       await ch.exec({
