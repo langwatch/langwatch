@@ -609,7 +609,7 @@ export const registry: IntegrationRegistry = [
     label: "AWS Bedrock",
     category: "traditional",
     docs: {
-      internal: "/integration/go/integrations/bedrock",
+      internal: "/integration/go/integrations/amazon-bedrock",
       external: "https://docs.aws.amazon.com/bedrock/",
     },
     icon: themedIcon(
