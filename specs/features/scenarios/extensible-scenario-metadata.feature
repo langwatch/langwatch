@@ -58,26 +58,16 @@ Feature: Extensible metadata on scenario run events
     And unknown fields are preserved in the output
 
   @unit @unimplemented
-  Scenario: Storage transform preserves metadata key casing
+  Scenario: Storage preserves metadata key casing
     Given an event with custom metadata keys in camelCase
-    When the event is transformed for Elasticsearch storage
+    When the event is persisted and read back
     Then the metadata keys remain in their original casing
 
   @unit @unimplemented
-  Scenario: Elasticsearch round-trip preserves metadata integrity
+  Scenario: Storage round-trip preserves metadata integrity
     Given an event with custom metadata keys
-    When the event is transformed to Elasticsearch format and back
+    When the event is stored and read back
     Then the original metadata keys and values are intact
-
-  @unit @unimplemented
-  Scenario: Elasticsearch mapping includes langwatch namespace fields
-    Given the scenario events Elasticsearch mapping
-    Then metadata.langwatch is mapped as an object with dynamic keyword support
-
-  @unit @unimplemented
-  Scenario: User metadata fields are not explicitly mapped in Elasticsearch
-    Given the scenario events Elasticsearch mapping
-    Then user-level metadata fields outside langwatch are not explicitly mapped
 
   @unit @unimplemented
   Scenario: Langwatch namespace rejects incomplete platform metadata

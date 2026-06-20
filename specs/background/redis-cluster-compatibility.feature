@@ -39,7 +39,7 @@ Feature: BullMQ Redis Cluster Compatibility
   # rather than from a static constant. Asserting their names contain
   # a hash tag would require constructing the service with mocks and
   # inspecting each registered queue — feasible but not yet wired up.
-  # Static queue constants are covered by the bound scenarios above.
+  # Static queue constants are covered by the scenarios above.
   @integration @unimplemented
   Scenario: Event sourcing maintenance worker queue operates on Redis Cluster
     Given a Redis Cluster is running
