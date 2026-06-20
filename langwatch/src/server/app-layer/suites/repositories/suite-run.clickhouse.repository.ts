@@ -70,6 +70,16 @@ export class SuiteRunClickHouseRepository implements SuiteRunReadRepository {
   }): Promise<SuiteRunStateData[]> {
     const limit = Math.min(params.limit ?? 50, 100);
     const client = await this.getClient(params.projectId);
+    // The previous version had no dedup, so the LIMIT 50 page could fill
+    // with multiple unmerged versions of the same BatchRunId — the user
+    // would see e.g. 5 unique suite runs duplicated 10× each, not 50
+    // distinct rows. IN-tuple dedup over (TenantId, ScenarioSetId,
+    // BatchRunId, UpdatedAt) collapses to one row per BatchRunId.
+    //
+    // Note: no `StartedAt` partition predicate. Batch history is a
+    // displayed-once-per-page-load surface, not a hot path, and bounding
+    // it would hide batches older than the bound. Accept the cross-
+    // partition scan; revisit if it shows up in slow-query metrics.
     const result = await client.query({
       query: `
         SELECT
@@ -83,6 +93,13 @@ export class SuiteRunClickHouseRepository implements SuiteRunReadRepository {
         FROM suite_runs
         WHERE TenantId = {projectId:String}
           AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
+          AND (TenantId, ScenarioSetId, BatchRunId, UpdatedAt) IN (
+            SELECT TenantId, ScenarioSetId, BatchRunId, max(UpdatedAt)
+            FROM suite_runs
+            WHERE TenantId = {projectId:String}
+              AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
+            GROUP BY TenantId, ScenarioSetId, BatchRunId
+          )
         ORDER BY CreatedAt DESC
         LIMIT {limit:UInt32}
       `,

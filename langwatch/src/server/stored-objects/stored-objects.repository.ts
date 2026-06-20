@@ -263,9 +263,22 @@ export class StoredObjectsRepository {
           );
         }
 
-        // Project-scoped enumeration with the standard dedup pattern.
-        // We project only id + storage_uri because the cascade does not
-        // need the full row; this keeps the scan cheap on wide tables.
+        // Project-scoped enumeration. Two notes on cost:
+        //
+        //   1. Dedup uses the IN-tuple pattern, not a correlated scalar
+        //      subquery — the inner GROUP BY runs once and produces the
+        //      (id, max(inserted_at)) set, then the outer matches against
+        //      it. The previous correlated form (`inserted_at = (SELECT
+        //      max(s.inserted_at) WHERE s.id = t.id)`) re-ran the inner
+        //      query for every row.
+        //   2. No `created_at` (partition) predicate is possible here —
+        //      cascade-delete needs every row that has ever existed for
+        //      this project, including very old objects sitting in cold
+        //      S3 partitions. The scan is bounded by `project_id IN
+        //      ORDER BY` so it walks only that project's granules within
+        //      each partition, but the partition fan-out itself is
+        //      unavoidable. Run sparingly; this is a project-deletion
+        //      cascade, not a hot path.
         const result = await client.query({
           query: `
             SELECT
@@ -273,11 +286,11 @@ export class StoredObjectsRepository {
               t.storage_uri AS storage_uri
             FROM ${TABLE_NAME} AS t
             WHERE t.project_id = {projectId:String}
-              AND t.inserted_at = (
-                SELECT max(s.inserted_at)
-                FROM ${TABLE_NAME} AS s
-                WHERE s.project_id = {projectId:String}
-                  AND s.id = t.id
+              AND (t.project_id, t.id, t.inserted_at) IN (
+                SELECT project_id, id, max(inserted_at)
+                FROM ${TABLE_NAME}
+                WHERE project_id = {projectId:String}
+                GROUP BY project_id, id
               )
           `,
           query_params: { projectId },

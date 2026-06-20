@@ -5,6 +5,10 @@ export interface DspyStepRepository {
   getStepsByExperiment(
     tenantId: string,
     experimentId: string,
+    // Optional CreatedAt lower bound. Pass when the caller knows the
+    // experiment's start window so the scan can prune partitions instead of
+    // walking every weekly partition incl. cold S3.
+    options?: { sinceMs?: number },
   ): Promise<DspyStepSummaryData[]>;
   getStep(
     tenantId: string,

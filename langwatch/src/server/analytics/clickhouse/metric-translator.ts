@@ -86,6 +86,39 @@ export const percentileToPercent: Record<PercentileAggregationTypes, number> = {
 };
 
 /**
+ * Per-metric opt-in for which percentile aggregate to compile to.
+ *
+ * - `"exact"` → quantileExact / quantileExactArray / quantileExactIf. Exact
+ *   sort-based percentile. Memory grows O(N) with the input row count, which
+ *   has been the top driver of OOM on heavy analytics dashboards.
+ * - `"tdigest"` → quantileTDigest / quantileTDigestArray / quantileTDigestIf.
+ *   t-digest sketch, ±5% error at distribution tails, bounded memory per
+ *   aggregator state. The accuracy gap is invisible on latency / cost /
+ *   token-count dashboards. Default for `performance.*` metrics.
+ *
+ * Existing call sites omit the parameter and stay on `"exact"`, matching the
+ * pre-existing behaviour. The cost / latency translators pass `"tdigest"` to
+ * opt in. Evaluation score / pass-rate metrics deliberately stay on `"exact"`
+ * because their distributions are narrow enough that a ±5% tail miss can flip
+ * dashboard outcomes (e.g. a p95 score crossing a threshold).
+ */
+export type PercentileMode = "exact" | "tdigest";
+
+function percentileFunctionName(
+  mode: PercentileMode,
+  shape: "scalar" | "array" | "conditional",
+): string {
+  switch (shape) {
+    case "scalar":
+      return mode === "tdigest" ? "quantileTDigest" : "quantileExact";
+    case "array":
+      return mode === "tdigest" ? "quantileTDigestArray" : "quantileExactArray";
+    case "conditional":
+      return mode === "tdigest" ? "quantileTDigestIf" : "quantileExactIf";
+  }
+}
+
+/**
  * Check if aggregation type is a percentile
  */
 export function isPercentileAggregation(
@@ -118,6 +151,7 @@ function translateSimpleAggregation(
   columnExpr: string,
   aggregation: AggregationTypes,
   alias: string,
+  percentileMode: PercentileMode = "exact",
 ): string {
   switch (aggregation) {
     case "avg":
@@ -137,9 +171,8 @@ function translateSimpleAggregation(
     default:
       if (isPercentileAggregation(aggregation)) {
         const percentile = percentileToPercent[aggregation];
-        // Use quantileExact for accurate percentiles (matching ES behavior)
-        // quantileTDigest is faster but has ±5% error at distribution extremes
-        return `quantileExact(${percentile})(${columnExpr}) AS ${alias}`;
+        const fn = percentileFunctionName(percentileMode, "scalar");
+        return `${fn}(${percentile})(${columnExpr}) AS ${alias}`;
       }
       return `count(${columnExpr}) AS ${alias}`;
   }
@@ -154,6 +187,7 @@ function translateArrayAggregation(
   arrayExpr: string,
   aggregation: AggregationTypes,
   alias: string,
+  percentileMode: PercentileMode = "exact",
 ): string {
   switch (aggregation) {
     case "avg":
@@ -174,8 +208,8 @@ function translateArrayAggregation(
     default:
       if (isPercentileAggregation(aggregation)) {
         const percentile = percentileToPercent[aggregation];
-        // Use quantilesExactArray for percentiles on arrays
-        return `quantileExactArray(${percentile})(${arrayExpr}) AS ${alias}`;
+        const fn = percentileFunctionName(percentileMode, "array");
+        return `${fn}(${percentile})(${arrayExpr}) AS ${alias}`;
       }
       // Default to counting array elements
       return `sum(length(${arrayExpr})) AS ${alias}`;
@@ -396,6 +430,7 @@ function translatePerformanceMetric(
           `${ts}.TotalDurationMs`,
           aggregation,
           alias,
+          "tdigest",
         ),
         alias,
         requiredJoins,
@@ -408,6 +443,7 @@ function translatePerformanceMetric(
           `${ts}.TimeToFirstTokenMs`,
           aggregation,
           alias,
+          "tdigest",
         ),
         alias,
         requiredJoins,
@@ -420,6 +456,7 @@ function translatePerformanceMetric(
           `${ts}.TotalCost`,
           aggregation,
           alias,
+          "tdigest",
         ),
         alias,
         requiredJoins,
@@ -436,6 +473,7 @@ function translatePerformanceMetric(
           `(coalesce(${ts}.TotalCost, 0) - ${nonBilledCostExpression(ts)})`,
           aggregation,
           alias,
+          "tdigest",
         ),
         alias,
         requiredJoins,
@@ -450,6 +488,7 @@ function translatePerformanceMetric(
           nonBilledCostExpression(ts),
           aggregation,
           alias,
+          "tdigest",
         ),
         alias,
         requiredJoins,
@@ -462,6 +501,7 @@ function translatePerformanceMetric(
           `${ts}.TotalPromptTokenCount`,
           aggregation,
           alias,
+          "tdigest",
         ),
         alias,
         requiredJoins,
@@ -474,6 +514,7 @@ function translatePerformanceMetric(
           `${ts}.TotalCompletionTokenCount`,
           aggregation,
           alias,
+          "tdigest",
         ),
         alias,
         requiredJoins,
@@ -487,6 +528,7 @@ function translatePerformanceMetric(
           `(coalesce(${ts}.TotalPromptTokenCount, 0) + coalesce(${ts}.TotalCompletionTokenCount, 0))`,
           aggregation,
           alias,
+          "tdigest",
         ),
         alias,
         requiredJoins,
@@ -503,6 +545,7 @@ function translatePerformanceMetric(
           `toUInt64OrZero(${ts}.Attributes['langwatch.reserved.cache_read_tokens'])`,
           aggregation,
           alias,
+          "tdigest",
         ),
         alias,
         requiredJoins,
@@ -515,6 +558,7 @@ function translatePerformanceMetric(
           `toUInt64OrZero(${ts}.Attributes['langwatch.reserved.cache_creation_tokens'])`,
           aggregation,
           alias,
+          "tdigest",
         ),
         alias,
         requiredJoins,
@@ -527,6 +571,7 @@ function translatePerformanceMetric(
           `toUInt64OrZero(${ts}.Attributes['langwatch.reserved.reasoning_tokens'])`,
           aggregation,
           alias,
+          "tdigest",
         ),
         alias,
         requiredJoins,
@@ -541,6 +586,7 @@ function translatePerformanceMetric(
           `(coalesce(${ts}.TotalPromptTokenCount, 0) + coalesce(${ts}.TotalCompletionTokenCount, 0) + toUInt64OrZero(${ts}.Attributes['langwatch.reserved.cache_read_tokens']) + toUInt64OrZero(${ts}.Attributes['langwatch.reserved.cache_creation_tokens']))`,
           aggregation,
           alias,
+          "tdigest",
         ),
         alias,
         requiredJoins,
@@ -556,6 +602,7 @@ function translatePerformanceMetric(
           `${ts}.TokensPerSecond`,
           aggregation,
           alias,
+          "tdigest",
         ),
         alias,
         requiredJoins,
@@ -571,6 +618,7 @@ function translatePerformanceMetric(
           `toFloat64OrNull(${ss}.SpanAttributes['gen_ai.usage.input_tokens'])`,
           aggregation,
           alias,
+          "tdigest",
         ),
         alias,
         requiredJoins,
@@ -586,6 +634,7 @@ function translatePerformanceMetric(
           `toFloat64OrNull(${ss}.SpanAttributes['gen_ai.usage.output_tokens'])`,
           aggregation,
           alias,
+          "tdigest",
         ),
         alias,
         requiredJoins,

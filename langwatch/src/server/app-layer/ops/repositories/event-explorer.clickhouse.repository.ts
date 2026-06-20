@@ -34,6 +34,13 @@ export class EventExplorerClickHouseRepository
       queryParams.tenantIds = params.tenantIds;
     }
 
+    // event_log partitions on `toYearWeek(toDateTime64(EventOccurredAt / 1000, 3))`,
+    // NOT on EventTimestamp. The previous version filtered on EventTimestamp,
+    // which is the ReplacingMergeTree version column (ingest-time) — that
+    // predicate does not prune partitions, so every weekly partition was
+    // scanned including cold S3 ones. EventOccurredAt is what the partition
+    // key is derived from and is also closer to the caller's intent
+    // ("aggregates active since this real-world time").
     const result = await this.client.query({
       query: `
         SELECT
@@ -42,7 +49,7 @@ export class EventExplorerClickHouseRepository
           count(DISTINCT AggregateId) AS aggregateCount
         FROM event_log
         WHERE AggregateType IN ({aggregateTypes:Array(String)})
-          AND EventTimestamp >= {sinceMs:UInt64}
+          AND EventOccurredAt >= {sinceMs:UInt64}
           ${tenantClause}
         GROUP BY AggregateType, TenantId
         ORDER BY AggregateType, TenantId
@@ -68,19 +75,40 @@ export class EventExplorerClickHouseRepository
     query: string;
     tenantIds?: string[];
   }): Promise<AggregateSearchResult[]> {
-    const queryParams: Record<string, unknown> = {};
+    // Defensive guard: without at least one of (tenants, query string) the
+    // query degrades to "ORDER BY EventTimestamp DESC LIMIT 50" against the
+    // entire event_log table — every weekly partition incl. cold S3, every
+    // tenant, just to surface 50 rows. The doc rule "TenantId is always
+    // required" applies, but this is an ops/admin tool so we allow the
+    // cross-tenant case when a non-empty query string at least bounds it.
+    const hasTenants =
+      params.tenantIds !== undefined && params.tenantIds.length > 0;
+    const trimmedQuery = params.query.trim();
+    const hasQueryString = trimmedQuery.length > 0;
+    if (!hasTenants && !hasQueryString) {
+      throw new Error(
+        "EventExplorer.searchAggregates: provide either tenantIds or a non-empty query string — an unbounded scan over event_log is not allowed.",
+      );
+    }
+
+    // Always bound by EventOccurredAt to prune partitions. 90 days is a
+    // generous default that covers ops triage windows; callers can extend
+    // by exposing a sinceMs parameter when there's a real need.
+    const SCAN_LOOKBACK_DAYS = 90;
+    const sinceMs = Date.now() - SCAN_LOOKBACK_DAYS * 24 * 60 * 60 * 1000;
+    const queryParams: Record<string, unknown> = { sinceMs };
 
     let tenantFilter = "";
-    if (params.tenantIds !== undefined && params.tenantIds.length > 0) {
+    if (hasTenants) {
       tenantFilter = "AND TenantId IN ({tenantIds:Array(String)})";
       queryParams.tenantIds = params.tenantIds;
     }
 
     let aggregateFilter = "";
-    if (params.query.trim().length > 0) {
+    if (hasQueryString) {
       aggregateFilter =
         "AND (AggregateId LIKE {queryPattern:String} OR TenantId LIKE {queryPattern:String})";
-      queryParams.queryPattern = `%${params.query.trim()}%`;
+      queryParams.queryPattern = `%${trimmedQuery}%`;
     }
 
     const result = await this.client.query({
@@ -92,7 +120,7 @@ export class EventExplorerClickHouseRepository
           count() AS eventCount,
           max(EventTimestamp) AS lastEventTime
         FROM event_log
-        WHERE 1 = 1
+        WHERE EventOccurredAt >= {sinceMs:UInt64}
           ${tenantFilter}
           ${aggregateFilter}
         GROUP BY AggregateId, AggregateType, TenantId
@@ -124,7 +152,29 @@ export class EventExplorerClickHouseRepository
     aggregateId: string;
     tenantId: string;
     limit: number;
+    sinceMs?: number;
   }): Promise<RawEventRow[]> {
+    // Heavy column read (EventPayload, ZSTD(3)). Without an EventOccurredAt
+    // bound the read walks every weekly partition for the aggregate — the
+    // primary key seeks to (TenantId, AggregateType, AggregateId, …) per
+    // partition but pays cold-S3 metadata fetches for the inactive ones.
+    //
+    // Caller semantics:
+    //   * Routine event-listing (ops UI) — pass sinceMs (e.g. last 30 days)
+    //     to bound the scan to warm partitions only.
+    //   * Projection replay — explicitly omit sinceMs to read the full
+    //     event history of an aggregate (necessary for fold correctness).
+    const queryParams: Record<string, unknown> = {
+      tenantId: params.tenantId,
+      aggregateId: params.aggregateId,
+      limit: params.limit,
+    };
+    let timeFilter = "";
+    if (typeof params.sinceMs === "number" && params.sinceMs > 0) {
+      timeFilter = "AND EventOccurredAt >= {sinceMs:UInt64}";
+      queryParams.sinceMs = params.sinceMs;
+    }
+
     const result = await this.client.query({
       query: `
         SELECT
@@ -135,14 +185,11 @@ export class EventExplorerClickHouseRepository
         FROM event_log
         WHERE TenantId = {tenantId:String}
           AND AggregateId = {aggregateId:String}
+          ${timeFilter}
         ORDER BY EventTimestamp ASC, EventId ASC
         LIMIT {limit:UInt32}
       `,
-      query_params: {
-        tenantId: params.tenantId,
-        aggregateId: params.aggregateId,
-        limit: params.limit,
-      },
+      query_params: queryParams,
       format: "JSONEachRow",
     });
 

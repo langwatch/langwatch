@@ -35,6 +35,9 @@ export interface EventExplorerRepository {
     aggregateId: string;
     tenantId: string;
     limit: number;
+    // Optional EventOccurredAt lower bound. Pass for routine ops UI reads;
+    // omit only for projection replay where the full event history matters.
+    sinceMs?: number;
   }): Promise<RawEventRow[]>;
 }
 

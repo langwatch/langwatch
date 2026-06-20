@@ -931,10 +931,18 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         async (window) => {
           const partition = partitionFragment(window);
           const client = await this.resolveClient(tenantId);
-          // Single-span fetch: WHERE pins (TenantId, TraceId, SpanId) — the
-          // primary key prefix — so we hit a tiny granule range. With at most
-          // a handful of versions per spanId, ORDER BY UpdatedAt DESC LIMIT 1
-          // is cheaper than the IN-tuple dedup the multi-row paths need.
+          // Single-span fetch: WHERE pins (TenantId, TraceId, SpanId) - the
+          // primary key prefix - so we hit a tiny granule range. With at
+          // most a handful of versions per spanId, ORDER BY UpdatedAt DESC
+          // LIMIT 1 is cheaper than the IN-tuple dedup the multi-row paths
+          // need.
+          //
+          // On ClickHouse 25.10 this form picks up the `LazilyRead`
+          // optimiser step (verified via EXPLAIN on prod): heavy columns
+          // (SpanAttributes, Events.*, Links.*) are deferred past the
+          // LIMIT, so even unmerged versions don't materialise them. The
+          // doc's "Anti-Pattern 1" rule predates LazilyRead and no longer
+          // applies on this CH line.
           const result = await client.query({
             query: `
               SELECT ${FULL_SPAN_SELECT}
@@ -1283,6 +1291,11 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
                 event_name AS event_type,
                 event_attrs AS attributes
               FROM (
+                -- Single-span fetch. Same rationale as getSpanByIds:
+                -- ORDER BY UpdatedAt DESC LIMIT 1 picks up LazilyRead on
+                -- CH 25.10 so the heavy Events.* arrays are deferred past
+                -- the LIMIT. Doc's "Anti-Pattern 1" rule predates that
+                -- optimiser and no longer applies here.
                 SELECT
                   TenantId, TraceId, SpanId,
                   "Events.Timestamp" AS Events_Timestamp,

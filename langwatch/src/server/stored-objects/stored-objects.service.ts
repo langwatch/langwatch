@@ -153,8 +153,15 @@ export class StoredObjectsService {
         span.setAttribute("stored_object.id", id);
         span.setAttribute("stored_object.sha256", sha256);
 
-        // Dedup probe: if content already present, skip PUT + INSERT
-        const existing = await this.repository.findBySha256({ projectId, sha256 });
+        // Dedup probe: if content already present, skip PUT + INSERT.
+        // Lookup by id (not sha256) because:
+        //   1. id is derived deterministically from (projectId, sha256) right
+        //      above, so it's already known here — no extra computation.
+        //   2. The stored_objects table's `ORDER BY (project_id, id)` makes
+        //      this a primary-key seek with partition pruning; a sha256
+        //      lookup would scan every weekly partition incl. cold S3 because
+        //      sha256 is not in the sort key.
+        const existing = await this.repository.findById({ projectId, id });
         if (existing) {
           getStoredObjectDedupHitCounter(purpose).inc();
           span.setAttribute("stored_object.dedup_hit", true);

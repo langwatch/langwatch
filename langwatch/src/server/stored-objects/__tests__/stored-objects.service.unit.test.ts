@@ -174,7 +174,7 @@ describe("storeFromBytes", () => {
   describe("when identical content already exists for the project", () => {
     it("returns the existing id with isDuplicate true and does not call storage put or repository insert", async () => {
       const existingId = "existing-uuid";
-      vi.mocked(repo.findBySha256).mockResolvedValue({ id: existingId });
+      vi.mocked(repo.findById).mockResolvedValue(makeRow({ id: existingId }));
 
       const result = await service.storeFromBytes(STORE_PARAMS);
 
