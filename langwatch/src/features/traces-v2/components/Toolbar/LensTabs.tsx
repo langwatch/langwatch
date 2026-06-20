@@ -21,6 +21,7 @@ import {
 } from "../../stores/viewStore";
 import { OverflowMenu } from "../shared/OverflowMenu";
 import { CreateLensButton } from "./CreateLensButton";
+import { LensNameDialog } from "./LensNameDialog";
 import { LensTab } from "./LensTab";
 import { UnsavedLensDialog } from "./UnsavedLensDialog";
 
@@ -50,6 +51,11 @@ export const LensTabs: React.FC = () => {
   const errorCount = useErrorCount();
 
   const [pendingLensId, setPendingLensId] = useState<string | null>(null);
+  // Save-as-new from the unsaved-changes prompt routes through the shared
+  // LensNameDialog (not window.prompt) — same name-entry UI as the lens-tab
+  // menus. The unsaved dialog closes before the name dialog opens, so a
+  // popover can't anchor here; a dialog is the right primitive.
+  const [saveAsNewOpen, setSaveAsNewOpen] = useState(false);
   const scrollerRef = useRef<HTMLDivElement>(null);
   // Grouped lenses live in their dimension dropdowns (Cost, Performance), so
   // they're pulled out of the flat tab strip (and out of overflow tracking,
@@ -114,18 +120,20 @@ export const LensTabs: React.FC = () => {
     setPendingLensId(null);
   };
 
+  // Hand off from the unsaved-changes prompt to the name dialog: close the
+  // former, open the latter. The actual create happens on the dialog's
+  // submit (handleSaveAsNewSubmit).
+  const resolvePendingSaveAsNew = () => {
+    setPendingLensId(null);
+    setSaveAsNewOpen(true);
+  };
+
   // Saving as a new lens already activates that new lens, so we drop the
   // pending switch — the user opted to keep their work, switching them away
   // afterwards would defeat the gesture.
-  const resolvePendingSaveAsNew = () => {
-    if (typeof window === "undefined") return;
-    const defaultName = `${activeLens?.name ?? "Lens"} (copy)`;
-    const name = window.prompt("Save as new lens — name:", defaultName);
-    if (!name) return;
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    createLens(trimmed);
-    setPendingLensId(null);
+  const handleSaveAsNewSubmit = (name: string) => {
+    createLens(name);
+    setSaveAsNewOpen(false);
   };
 
   const handleOverflowSelect = (id: string) => {
@@ -258,6 +266,14 @@ export const LensTabs: React.FC = () => {
         onSaveAsNew={resolvePendingSaveAsNew}
         onDiscard={resolvePendingDiscard}
         onCancel={() => setPendingLensId(null)}
+      />
+
+      <LensNameDialog
+        open={saveAsNewOpen}
+        onOpenChange={setSaveAsNewOpen}
+        title="Save changes as new lens"
+        defaultName={`${activeLens?.name ?? "Lens"} (copy)`}
+        onSubmit={handleSaveAsNewSubmit}
       />
     </>
   );
