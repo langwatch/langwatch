@@ -522,13 +522,16 @@ secured
 
         const results = await Promise.allSettled(
           spans.map((span) =>
-            getApp().traces.recordSpan({
+            // Route through ingestNormalizedSpan (not recordSpan directly) so the
+            // REST collector shares the (tenant, trace, span) dedup gate + ADR-022
+            // spool hook with the OTLP path — a retry storm here must not bypass
+            // dedup. occurredAt is stamped inside ingestNormalizedSpan.
+            getApp().traces.collection.ingestNormalizedSpan({
               tenantId: project.id,
               span: CollectorSpanUtils.convertSpanToOtlp(span),
               resource,
               instrumentationScope: { name: "langwatch.rest.collector" },
               piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
-              occurredAt: Date.now(),
             }),
           ),
         );

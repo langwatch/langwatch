@@ -264,6 +264,19 @@ export class EvaluationExecutionService {
       };
     }
 
+    // Enrich evaluations: getTracesWithSpans does not populate
+    // `trace.evaluations`, but evaluator field mappings that read the
+    // `evaluations` source need them. Fetch and attach before building the
+    // mapped data so they aren't silently empty (parity with
+    // runEvaluationForTrace in runEvaluation.ts).
+    const evaluationsByTrace =
+      await this.deps.traceService.getEvaluationsMultiple(
+        projectId,
+        [traceId],
+        INTERNAL_PROTECTIONS,
+      );
+    trace.evaluations = evaluationsByTrace[traceId] ?? [];
+
     // 4. Build evaluation data
     const data = await this.buildDataForEvaluation({
       evaluatorType,

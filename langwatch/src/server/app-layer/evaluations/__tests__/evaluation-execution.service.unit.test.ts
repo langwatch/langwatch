@@ -49,7 +49,12 @@ function buildTrace(overrides?: Partial<Trace>): Trace {
 
 interface TestOverrides {
   traceService?: Partial<
-    Pick<TraceService, "getTracesWithSpans" | "getTracesWithSpansByThreadIds">
+    Pick<
+      TraceService,
+      | "getTracesWithSpans"
+      | "getTracesWithSpansByThreadIds"
+      | "getEvaluationsMultiple"
+    >
   >;
   modelEnvResolver?: Partial<ModelEnvResolver>;
   workflowExecutor?: Partial<WorkflowExecutor>;
@@ -65,6 +70,7 @@ function createTestService(overrides: TestOverrides = {}) {
       .fn()
       .mockResolvedValue(defaultTrace ? [defaultTrace] : []),
     getTracesWithSpansByThreadIds: vi.fn().mockResolvedValue([]),
+    getEvaluationsMultiple: vi.fn().mockResolvedValue({}),
     ...overrides.traceService,
   } as unknown as TraceService;
 
