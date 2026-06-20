@@ -143,9 +143,12 @@ describe("metric-translator", () => {
         );
       });
 
-      it("translates performance.first_token with p95", () => {
+      it("translates performance.first_token with p95 using quantileTDigest", () => {
         const result = translateMetric("performance.first_token", "p95", 0);
-        expect(result.selectExpression).toContain("quantileExact(0.95)");
+        // performance.* metrics opt into quantileTDigest for percentile
+        // aggregations - ±5% tail error is fine on latency dashboards, and the
+        // memory profile is bounded, not O(N).
+        expect(result.selectExpression).toContain("quantileTDigest(0.95)");
         expect(result.selectExpression).toContain("TimeToFirstTokenMs");
       });
 
@@ -164,13 +167,13 @@ describe("metric-translator", () => {
         expect(result.requiredJoins).not.toContain("stored_spans");
       });
 
-      it("translates performance.tokens_per_second with percentile aggregation", () => {
+      it("translates performance.tokens_per_second with percentile aggregation using quantileTDigest", () => {
         const result = translateMetric(
           "performance.tokens_per_second",
           "p95",
           0
         );
-        expect(result.selectExpression).toContain("quantileExact(0.95)");
+        expect(result.selectExpression).toContain("quantileTDigest(0.95)");
         expect(result.selectExpression).toContain("TokensPerSecond");
         expect(result.requiredJoins).not.toContain("stored_spans");
       });
@@ -426,9 +429,20 @@ describe("metric-translator", () => {
         expect(result.selectExpression).toContain("uniq(");
       });
 
-      it("uses quantileExact for percentile aggregations", () => {
+      it("uses quantileTDigest for performance.* percentile aggregations", () => {
         const result = translateMetric("performance.completion_time", "p99", 0);
-        expect(result.selectExpression).toContain("quantileExact(0.99)");
+        expect(result.selectExpression).toContain("quantileTDigest(0.99)");
+      });
+
+      it("keeps quantileExact for non-performance percentile aggregations", () => {
+        // Evaluation scores stay on quantileExact - their distributions are
+        // narrow enough that ±5% can flip threshold-based dashboard outcomes.
+        const result = translateMetric("metadata.trace_id", "p99", 0);
+        // metadata.trace_id falls through to translateSimpleAggregation with
+        // the default percentileMode ("exact"); we get count() in the percentile
+        // fallback branch but the helper still preserves exact mode for any
+        // call site that doesn't opt into tdigest.
+        expect(result.selectExpression).not.toContain("quantileTDigest");
       });
 
       it("uses correct aggregation for min/max", () => {

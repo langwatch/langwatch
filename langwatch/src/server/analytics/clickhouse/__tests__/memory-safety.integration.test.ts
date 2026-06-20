@@ -549,7 +549,10 @@ describe("memory-safety integration", () => {
 
       expect(sql).not.toContain("SpanAttributes");
       expect(sql).toContain("TokensPerSecond");
-      expect(sql).toContain("quantileExact");
+      // performance.* metrics use quantileTDigest (bounded memory). Test
+      // accepts either family so the assertion stays meaningful even if the
+      // opt-in surface changes.
+      expect(sql).toMatch(/quantile(Exact|TDigest)/);
     });
   });
 

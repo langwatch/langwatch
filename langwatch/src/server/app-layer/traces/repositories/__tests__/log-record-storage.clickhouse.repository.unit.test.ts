@@ -132,15 +132,21 @@ describe("LogRecordStorageClickHouseRepository.getMarkedClaudeCodeLogsByTrace", 
   });
 
   describe("when the caller does not provide a time", () => {
-    it("omits the TimeUnixMs predicate (unbounded fallback, unchanged behavior)", async () => {
+    it("falls back to a CC-retention-bounded window so the scan can't walk every partition", async () => {
+      // Replaces a previous "unbounded fallback" behaviour. CC logs older than
+      // CLAUDE_CODE_LOG_RETENTION_DAYS have already been TTL'd away anyway, so
+      // a 7×retention lookback is safe and bounds the partition scan.
       const { repo, query } = repoCapturingQuery();
 
       await repo.getMarkedClaudeCodeLogsByTrace("project_test", "trace-1");
 
       const { query: sql, query_params } = capturedQuery(query);
-      expect(sql).not.toContain("TimeUnixMs >= fromUnixTimestamp64Milli");
-      expect(query_params.fromMs).toBeUndefined();
-      expect(query_params.toMs).toBeUndefined();
+      expect(sql.match(/TimeUnixMs >= fromUnixTimestamp64Milli/g)).toHaveLength(
+        2,
+      );
+      expect(typeof query_params.fromMs).toBe("number");
+      expect(typeof query_params.toMs).toBe("number");
+      expect(query_params.toMs).toBeGreaterThan(query_params.fromMs);
     });
   });
 });

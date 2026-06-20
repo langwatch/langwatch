@@ -103,8 +103,7 @@ export class LogRecordStorageClickHouseRepository
     //     CC logs older than CLAUDE_CODE_LOG_RETENTION_DAYS have already been
     //     deleted by TTL anyway, so a wider scan can't return anything.
     const partitionWindowMs = 2 * 24 * 60 * 60 * 1000;
-    const ccRetentionMs =
-      CLAUDE_CODE_LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+    const ccRetentionMs = CLAUDE_CODE_LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000;
     const fallbackLookbackMs = ccRetentionMs * 7;
     const hasWindow = typeof occurredAtMs === "number" && occurredAtMs > 0;
     const now = Date.now();

@@ -239,7 +239,8 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
       const queryParams: Record<string, unknown> = { tenantId, experimentId };
       let timeFilter = "";
       if (typeof options?.sinceMs === "number" && options.sinceMs > 0) {
-        timeFilter = "AND CreatedAt >= fromUnixTimestamp64Milli({sinceMs:Int64})";
+        timeFilter =
+          "AND CreatedAt >= fromUnixTimestamp64Milli({sinceMs:Int64})";
         queryParams.sinceMs = options.sinceMs;
       }
       const result = await client.query({
