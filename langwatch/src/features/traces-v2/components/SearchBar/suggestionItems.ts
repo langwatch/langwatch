@@ -5,31 +5,10 @@ import {
   SEARCH_FIELDS,
   type SearchFieldGroup,
 } from "~/server/app-layer/traces/query-language/metadata";
-import type { SuggestionState } from "./getSuggestionState";
 
 // Field mode is uncapped — the dropdown's 240px scroll handles overflow.
 // Value mode keeps a top-N because facet enumerations can run to hundreds.
 const MAX_VALUE_ITEMS = 10;
-
-/**
- * Group label + sort priority. Groups render in this order in the
- * dropdown, mirroring the FilterSidebar's section ordering so the user's
- * mental map carries between the two surfaces.
- */
-export interface GroupSpec {
-  id: SearchFieldGroup;
-  label: string;
-}
-
-export const SUGGESTION_GROUPS: ReadonlyArray<GroupSpec> = [
-  { id: "trace", label: "Trace" },
-  { id: "span", label: "Span" },
-  { id: "event", label: "Event" },
-  { id: "eval", label: "Eval" },
-  { id: "metrics", label: "Metrics" },
-  { id: "scenario", label: "Scenario" },
-  { id: "time", label: "Time" },
-];
 
 export interface SuggestionItem {
   /** What lands in the editor when the user accepts. */
@@ -119,17 +98,4 @@ export function getValueSuggestions(field: string, query: string): string[] {
     query,
     MAX_VALUE_ITEMS,
   ).map((v) => v.value);
-}
-
-/**
- * Back-compat shim — older callers pull a flat string[] of items. New
- * callers should use `getFieldSuggestions` directly so they can render
- * the per-row group label and prefix-vs-field distinction.
- */
-export function getSuggestionItems(state: SuggestionState): string[] {
-  if (!state.open) return [];
-  if (state.mode === "field") {
-    return getFieldSuggestions(state.query).map((s) => s.value);
-  }
-  return getValueSuggestions(state.field, state.query);
 }

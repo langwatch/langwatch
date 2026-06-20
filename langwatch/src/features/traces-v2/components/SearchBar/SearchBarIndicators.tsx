@@ -13,19 +13,12 @@ import { useUIStore } from "../../stores/uiStore";
  */
 export type SearchBarStatus =
   | { kind: "ok" }
-  | { kind: "warning"; message: string }
   | { kind: "error"; message: string };
 
 const STATUS_PALETTE: Record<
-  "warning" | "error",
+  "error",
   { fg: string; bg: string; border: string; label: string }
 > = {
-  warning: {
-    fg: "orange.fg",
-    bg: "orange.subtle",
-    border: "orange.muted",
-    label: "Warning",
-  },
   error: {
     fg: "red.fg",
     bg: "red.subtle",
@@ -37,18 +30,14 @@ const STATUS_PALETTE: Record<
 /** The bar's outer border colour for a given status. */
 export function statusBorderColor(status: SearchBarStatus): string {
   if (status.kind === "error") return "red.fg";
-  if (status.kind === "warning") return "orange.fg";
   return "border";
 }
 
 /** The bar's outer background colour for a given status. */
 export function statusBackgroundColor(status: SearchBarStatus): string {
-  // Error uses the full red.subtle (not /30) so the input row matches the
-  // error banner that drops below it — together they read as one
-  // continuous, clearly-visible error surface with no brightness seam.
-  // Warning has no banner, so its lighter /30 tint stays.
+  // Error uses the full red.subtle so the input row matches the error banner
+  // that drops below it — together they read as one continuous error surface.
   if (status.kind === "error") return "red.subtle";
-  if (status.kind === "warning") return "orange.subtle/30";
   return "bg.surface";
 }
 
@@ -112,7 +101,7 @@ export const StatusBadge: React.FC<{
                 textTransform="uppercase"
                 letterSpacing="0.08em"
               >
-                {status.kind === "error" ? "Invalid query" : "Heads up"}
+                Invalid query
               </Text>
               <Text
                 textStyle="sm"

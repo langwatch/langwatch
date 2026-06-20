@@ -82,8 +82,3 @@ export function highlightedRow(ui: SuggestionUIState): SuggestionRow | null {
   if (!ui.state.open || ui.items.length === 0) return null;
   return ui.items[ui.selectedIndex] ?? null;
 }
-
-/** Back-compat: callers that just need the editor-facing value string. */
-export function highlightedLabel(ui: SuggestionUIState): string | null {
-  return highlightedRow(ui)?.value ?? null;
-}

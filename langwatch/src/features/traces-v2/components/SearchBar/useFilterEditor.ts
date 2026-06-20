@@ -23,7 +23,6 @@ import { handleKey } from "./handleKey";
 import {
   buildSuggestionUI,
   CLOSED_SUGGESTION,
-  highlightedLabel,
   highlightedRow,
   navigateSuggestion,
   type SuggestionUIState,
