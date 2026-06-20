@@ -1,79 +1,103 @@
 #!/usr/bin/env bash
 #
-# generate-codeowners.sh — regenerate .github/CODEOWNERS from git history.
+# generate-codeowners.sh — regenerate .github/CODEOWNERS from git history,
+# with owners derived dynamically from the langwatch GitHub org.
 #
-# Ownership is derived per area from `git log` authorship: the owners of an
-# area are its top historical commit authors. Merge commits, bots, and
-# departed contributors are excluded; unknown one-off external authors are
-# ignored. The list of areas (the structure of the file) is curated below;
-# only the *owners* of each area are recomputed, so the file stays stable
-# while reviewer assignments track who is actually working where.
+# Nothing about *who* can own code is hand-maintained here:
+#   - The eligible-owner allowlist is the live org membership
+#     (`gh api orgs/langwatch/members`), minus bots.
+#   - Commit email -> GitHub login is resolved from GitHub's own attribution
+#     (a recent-commit sample via the API), so there is no identity table.
+# Only the *structure* (which paths get rules) is curated, in generate().
 #
-# Run from anywhere inside the repo. Requires full git history
-# (`git clone` depth 0 / `fetch-depth: 0` in CI). The weekly
-# .github/workflows/codeowners-refresh.yml workflow runs this and opens a
-# PR when the result differs from what is committed.
+# Per area, owners are the org members who have committed most to that path
+# (recent history), capped at two. @0xdeafcafe is additionally guaranteed on
+# the Go surface by standing arrangement.
 #
-# To change ownership policy, edit:
-#   - the identity map / exclusion list in owners_for() below, or
-#   - the curated area list in generate().
+# AUTH: langwatch has no public members, so a plain repo-scoped GITHUB_TOKEN
+# returns an empty member list. Run with a token that has `read:org` (locally:
+# your `gh auth`; in CI: the CODEOWNERS_REFRESH_TOKEN secret). If no members
+# come back the script hard-fails rather than writing an empty-ownership file.
+#
+# Run from anywhere in the repo with full history (CI: fetch-depth: 0). The
+# weekly .github/workflows/codeowners-refresh.yml runs this and opens a PR
+# when the result differs from what is committed.
 
 set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
 
 TARGET=".github/CODEOWNERS"
+ORG="langwatch"
+REPO="langwatch/langwatch"
 
-# Overall top contributor — used for the `*` global fallback and whenever an
-# area has no attributable history left after exclusions.
-DEFAULT_OWNER="@rogeriochaves"
+# Policy owners (bare logins; must be org members — validated below).
+DEFAULT_OWNER="rogeriochaves"   # global fallback / used when an area has no member history
+GO_COOWNER="0xdeafcafe"         # standing co-owner of the Go surface
 
-# Secondary owner is listed only when their commit count clears both floors.
-SECONDARY_MIN=2          # absolute minimum commits
-SECONDARY_RATIO_PCT=25   # and at least this percent of the primary's commits
+SAMPLE_COMMITS=2000             # recent commits sampled to resolve email -> login
+SECONDARY_MIN=2                 # a 2nd owner needs at least this many commits ...
+SECONDARY_RATIO_PCT=25          # ... and at least this percent of the top owner's
 
-# owners_for <pathspec...> — print the top (max 2) owners for the given paths,
-# space-separated, or nothing if no attributable history.
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+MEMBER_FILE="$TMP/members"
+MAP_FILE="$TMP/email2login"
+
+# --- 1. Eligible owners: current org members, minus bots/automation accounts.
+gh api "orgs/$ORG/members" --paginate --jq '.[].login' 2>/dev/null \
+  | grep -ivE '\[bot\]$|(^|-)(agent|bot)$' \
+  | sort -u > "$MEMBER_FILE" || true
+
+member_count="$(wc -l < "$MEMBER_FILE" | tr -d ' ')"
+if [ "$member_count" -eq 0 ]; then
+  echo "ERROR: 'gh api orgs/$ORG/members' returned no members — the token almost" >&2
+  echo "       certainly lacks read:org (langwatch has no public members)." >&2
+  echo "       Refusing to generate a CODEOWNERS with no owners." >&2
+  exit 1
+fi
+echo "Eligible owners ($member_count org members): $(tr '\n' ' ' < "$MEMBER_FILE")" >&2
+
+for required in "$DEFAULT_OWNER" "$GO_COOWNER"; do
+  grep -qix "$required" "$MEMBER_FILE" \
+    || echo "WARNING: configured policy owner '$required' is not an org member." >&2
+done
+
+# --- 2. email -> GitHub login, from a recent-commit sample (GitHub attributes
+#        each commit to a user, so we don't keep a hand-written identity map).
+pages=$(( (SAMPLE_COMMITS + 99) / 100 ))
+for p in $(seq 1 "$pages"); do
+  gh api "repos/$REPO/commits?sha=main&per_page=100&page=$p" \
+    --jq '.[] | select(.author.login != null) | [.commit.author.email, .author.login] | @tsv' \
+    2>/dev/null || true
+done | sort -u > "$MAP_FILE"
+
+# owners_for <pathspec...> — top (max 2) org-member owners for the given paths,
+# as space-separated bare logins, or empty if none.
 owners_for() {
   git log --no-merges --format='%ae' -- "$@" 2>/dev/null | awk \
+    -v mapf="$MAP_FILE" -v memf="$MEMBER_FILE" \
     -v smin="$SECONDARY_MIN" -v sratio="$SECONDARY_RATIO_PCT" '
+    BEGIN {
+      while ((getline x < mapf) > 0) { if (split(x, a, "\t") >= 2) e2l[tolower(a[1])] = a[2] }
+      while ((getline m < memf) > 0) { member[tolower(m)] = 1 }
+    }
     {
-      e = tolower($0)
-
-      # --- bots / automation: never owners ---
-      if (e ~ /\[bot\]|dependabot|github-actions|coderabbit|copilot|snyk-bot|langwatch-agent|langwatchagent|krusty@langwatch|orchardist/) next
-      if (e ~ /ip-[0-9].*compute\.internal/) next
-
-      # --- departed / excluded contributors ---
-      if (e ~ /richhuth/) next            # left the company
-      if (e ~ /budnyk|eugenumber/) next   # excluded by request
-
-      # --- identity map: email -> GitHub handle ---
-      if      (e ~ /rogeriochaves|rogerio@langwatch/) h = "@rogeriochaves"
-      else if (e ~ /alex\.forbes\.red|0xdeafcafe/)    h = "@0xdeafcafe"
-      else if (e ~ /drewdrewthis|andrew@langwatch/)   h = "@drewdrewthis"
-      else if (e ~ /sergioestebance|sergio\.esteban/) h = "@sergioestebance"
-      else if (e ~ /aryansharma|aryan@langwatch/)     h = "@Aryansharma28"
-      else if (e ~ /jpwakugawa|wakugawa/)             h = "@jpwakugawa"
-      else next   # unknown external one-off contributor — ignore
-
-      c[h]++
+      l = e2l[tolower($0)]
+      if (l != "" && (tolower(l) in member)) c[l]++
     }
     END {
-      n = 0
-      for (k in c) keys[++n] = k
-      if (n == 0) exit 0
-
-      # sort by commit count desc, then handle asc (deterministic ties)
-      for (i = 1; i <= n; i++)
-        for (j = i + 1; j <= n; j++)
+      k = 0
+      for (x in c) keys[++k] = x
+      if (k == 0) exit 0
+      for (i = 1; i <= k; i++)
+        for (j = i + 1; j <= k; j++)
           if (c[keys[j]] > c[keys[i]] ||
               (c[keys[j]] == c[keys[i]] && keys[j] < keys[i])) {
             t = keys[i]; keys[i] = keys[j]; keys[j] = t
           }
-
       out = keys[1]
-      if (n >= 2) {
+      if (k >= 2) {
         thr = smin
         rt = int(c[keys[1]] * sratio / 100)
         if (rt > thr) thr = rt
@@ -83,72 +107,40 @@ owners_for() {
     }'
 }
 
-# emit <codeowners-pattern> <pathspec...> — print one aligned CODEOWNERS rule.
-emit() {
-  local pattern="$1"; shift
-  local owners
-  owners="$(owners_for "$@")"
-  [ -z "$owners" ] && owners="$DEFAULT_OWNER"
-  printf '%-46s %s\n' "$pattern" "$owners"
+# fmt <bare-login...> — prefix each login with @ for CODEOWNERS.
+fmt() {
+  local out=""
+  for o in "$@"; do out="$out @$o"; done
+  echo "${out# }"
 }
 
-# rule <codeowners-pattern> [pathspec] — emit a rule, deriving the git
-# pathspec from the pattern (strip leading/trailing slash) unless one is given.
+# emit <codeowners-pattern> <pathspec...>
+emit() {
+  local pattern="$1"; shift
+  local raw; raw="$(owners_for "$@")"
+  [ -z "$raw" ] && raw="$DEFAULT_OWNER"
+  # shellcheck disable=SC2086
+  printf '%-46s %s\n' "$pattern" "$(fmt $raw)"
+}
+
+# rule <codeowners-pattern> [pathspec] — derive the pathspec from the pattern
+# (strip leading/trailing slash) unless one is given.
 rule() {
   local pattern="$1" spec="${2:-}"
-  if [ -z "$spec" ]; then
-    spec="${pattern#/}"; spec="${spec%/}"
-  fi
+  if [ -z "$spec" ]; then spec="${pattern#/}"; spec="${spec%/}"; fi
   emit "$pattern" "$spec"
 }
 
-# Always-on co-owner for Go code, regardless of commit counts. @0xdeafcafe
-# owns the Go surface (services, shared packages, SDK, the gateway) by
-# standing arrangement, so guarantee them on those areas even when history
-# alone wouldn't rank them in the top two.
-GO_COOWNER="@0xdeafcafe"
-
-# go_rule <codeowners-pattern> [pathspec] — like rule(), but guarantees
-# GO_COOWNER is among the owners.
+# go_rule <codeowners-pattern> [pathspec] — like rule(), but guarantees the Go
+# co-owner is on the rule regardless of commit counts.
 go_rule() {
   local pattern="$1" spec="${2:-}"
-  if [ -z "$spec" ]; then
-    spec="${pattern#/}"; spec="${spec%/}"
-  fi
-  local owners
-  owners="$(owners_for "$spec")"
-  [ -z "$owners" ] && owners="$DEFAULT_OWNER"
-  case " $owners " in
-    *" $GO_COOWNER "*) : ;;
-    *) owners="$owners $GO_COOWNER" ;;
-  esac
-  printf '%-46s %s\n' "$pattern" "$owners"
-}
-
-# warn_unmapped_contributors — the identity map in owners_for() drops any
-# author it doesn't recognise. That's correct for one-off external authors,
-# but it would also silently exclude a new *internal* contributor who simply
-# isn't in the map yet. Run once over all history and warn (to stderr, never
-# failing the run) about prolific authors that fall through the map, so the
-# map can be kept current. Keep the bot/exclude/map patterns below in sync
-# with owners_for().
-PROLIFIC_UNMAPPED_MIN=30
-warn_unmapped_contributors() {
-  git log --all --no-merges --format='%ae' 2>/dev/null | awk -v min="$PROLIFIC_UNMAPPED_MIN" '
-    {
-      e = tolower($0)
-      if (e ~ /\[bot\]|dependabot|github-actions|coderabbit|copilot|snyk-bot|langwatch-agent|langwatchagent|krusty@langwatch|orchardist/) next
-      if (e ~ /ip-[0-9].*compute\.internal/) next
-      if (e ~ /richhuth/) next            # intentionally excluded
-      if (e ~ /budnyk|eugenumber/) next   # intentionally excluded
-      if (e ~ /rogeriochaves|rogerio@langwatch|alex\.forbes\.red|0xdeafcafe|drewdrewthis|andrew@langwatch|sergioestebance|sergio\.esteban|aryansharma|aryan@langwatch|jpwakugawa|wakugawa/) next
-      u[e]++
-    }
-    END {
-      for (e in u)
-        if (u[e] >= min)
-          printf "WARNING: unmapped contributor %s (%d commits) is not in the identity map; add them to generate-codeowners.sh if they should be eligible for ownership.\n", e, u[e] > "/dev/stderr"
-    }'
+  if [ -z "$spec" ]; then spec="${pattern#/}"; spec="${spec%/}"; fi
+  local raw; raw="$(owners_for "$spec")"
+  [ -z "$raw" ] && raw="$DEFAULT_OWNER"
+  case " $raw " in *" $GO_COOWNER "*) : ;; *) raw="$raw $GO_COOWNER" ;; esac
+  # shellcheck disable=SC2086
+  printf '%-46s %s\n' "$pattern" "$(fmt $raw)"
 }
 
 generate() {
@@ -156,9 +148,11 @@ generate() {
 # CODEOWNERS — GENERATED FILE, DO NOT EDIT BY HAND.
 #
 # Regenerated weekly by .github/workflows/codeowners-refresh.yml from
-# .github/scripts/generate-codeowners.sh. Owners are the top historical
-# `git log` contributors per area (merges, bots, and departed contributors
-# excluded). To change ownership, edit the generator script — not this file.
+# .github/scripts/generate-codeowners.sh. Owners are the top committers per
+# area, restricted to current langwatch GitHub org members (the org roster and
+# the email->login mapping are both fetched live, so nothing here is a
+# hand-maintained list). To change ownership, adjust the generator script — not
+# this file.
 #
 # GitHub applies the LAST matching pattern only — rules go from general (top)
 # to specific (bottom). Owners must have write access to the repo.
@@ -388,6 +382,5 @@ SECTION
   rule "/langwatch/src/components/workflows/"
 }
 
-warn_unmapped_contributors
 generate > "$TARGET"
-echo "Wrote $TARGET"
+echo "Wrote $TARGET" >&2
