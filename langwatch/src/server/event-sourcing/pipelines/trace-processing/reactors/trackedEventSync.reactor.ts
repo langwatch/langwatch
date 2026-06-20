@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import {
-  predefinedEventTypes,
   predefinedEventsSchemas,
+  predefinedEventTypes,
 } from "~/server/app-layer/events/predefinedEvents.schema";
 import type { TrackEventRESTParamsValidator } from "~/server/tracer/types";
 import { createLogger } from "../../../../../utils/logger/server";
@@ -98,7 +98,11 @@ export function extractTrackedEventsFromSpan(
     for (const attr of event.attributes) {
       const value = attr.value;
       if (attr.key === EVENT_TYPE_KEY) {
-        if (value && "stringValue" in value && typeof value.stringValue === "string") {
+        if (
+          value &&
+          "stringValue" in value &&
+          typeof value.stringValue === "string"
+        ) {
           eventType = value.stringValue;
         }
         continue;
@@ -134,7 +138,11 @@ export function extractTrackedEventsFromSpan(
 
     if (eventType === undefined || eventType.length === 0) continue;
 
-    events.push({ event_type: eventType, metrics, event_details: eventDetails });
+    events.push({
+      event_type: eventType,
+      metrics,
+      event_details: eventDetails,
+    });
   }
 
   return events;
@@ -272,7 +280,9 @@ export function createTrackedEventSyncReactor(
             },
             "Failed to record tracked event from span feedback",
           );
-          errors.push(error instanceof Error ? error : new Error(String(error)));
+          errors.push(
+            error instanceof Error ? error : new Error(String(error)),
+          );
         }
       }
 

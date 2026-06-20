@@ -185,7 +185,10 @@ describe("trackedEventSync reactor", () => {
     it("records no tracked event", async () => {
       const reactor = createTrackedEventSyncReactor(deps);
 
-      await reactor.handle(createNonSpanEvent(), createContext(createFoldState()));
+      await reactor.handle(
+        createNonSpanEvent(),
+        createContext(createFoldState()),
+      );
 
       expect(deps.recordTrackedEvent).not.toHaveBeenCalled();
     });
@@ -232,7 +235,9 @@ describe("trackedEventSync reactor", () => {
 
     it("derives a deterministic event id from trace, span, and event type", async () => {
       const reactor = createTrackedEventSyncReactor(deps);
-      const span = makeOtlpSpan([{ type: "thumbs_up_down", metrics: { vote: 1 } }]);
+      const span = makeOtlpSpan([
+        { type: "thumbs_up_down", metrics: { vote: 1 } },
+      ]);
       const event = createSpanReceivedEvent(span);
 
       await reactor.handle(event, createContext(createFoldState()));
@@ -281,7 +286,9 @@ describe("trackedEventSync reactor", () => {
   describe("when the event is too old", () => {
     it("records no tracked event", async () => {
       const reactor = createTrackedEventSyncReactor(deps);
-      const span = makeOtlpSpan([{ type: "thumbs_up_down", metrics: { vote: 1 } }]);
+      const span = makeOtlpSpan([
+        { type: "thumbs_up_down", metrics: { vote: 1 } },
+      ]);
       const oldEvent = createSpanReceivedEvent(span, {
         occurredAt: Date.now() - 2 * 60 * 60 * 1000,
       } as Partial<SpanReceivedEvent>);
@@ -296,7 +303,9 @@ describe("trackedEventSync reactor", () => {
     describe("when the span carries feedback events", () => {
       it("returns true", () => {
         const reactor = createTrackedEventSyncReactor(deps);
-        const span = makeOtlpSpan([{ type: "thumbs_up_down", metrics: { vote: 1 } }]);
+        const span = makeOtlpSpan([
+          { type: "thumbs_up_down", metrics: { vote: 1 } },
+        ]);
 
         expect(
           reactor.shouldReact!(

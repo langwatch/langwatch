@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
-import { ATTR_KEYS } from "../extractors/_constants";
 import { CanonicalizeSpanAttributesService } from "../canonicalizeSpanAttributesService";
+import { ATTR_KEYS } from "../extractors/_constants";
 import { makeStubSpan } from "./_helpers";
 
 const service = new CanonicalizeSpanAttributesService();
@@ -303,7 +303,8 @@ describe("CanonicalizeSpanAttributesService — cache-creation across providers"
     it("carries the count through and prices it at the cache-creation rate", () => {
       const result = service.canonicalize(
         {
-          [ATTR_KEYS.GEN_AI_REQUEST_MODEL]: "bedrock/us.anthropic.claude-opus-4-7",
+          [ATTR_KEYS.GEN_AI_REQUEST_MODEL]:
+            "bedrock/us.anthropic.claude-opus-4-7",
           [ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]: 1000,
         },
         [],

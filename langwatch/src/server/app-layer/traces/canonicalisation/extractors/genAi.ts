@@ -297,7 +297,10 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
       attrs.take(ATTR_KEYS.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS),
     );
     if (reasoningOutputTokens !== null) {
-      ctx.setAttr(ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS, reasoningOutputTokens);
+      ctx.setAttr(
+        ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS,
+        reasoningOutputTokens,
+      );
       ctx.recordRule(`${this.id}:usage.reasoning.output_tokens`);
     }
 
