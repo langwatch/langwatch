@@ -3,6 +3,7 @@
  *
  * Unit tests for StoredObjectsService with mocked repository and registry.
  */
+import { createHash } from "node:crypto";
 import { Readable } from "node:stream";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -185,18 +186,29 @@ describe("storeFromBytes", () => {
     });
 
     it("dedup probe goes through findById (by deterministic id), not by sha256 — a regression to the scan-all-partitions path would surface here", async () => {
-      // Lock the dedup-probe contract: the hot path computes id = derive(projectId, sha256)
-      // and looks up via findById. findById uses the (project_id, id) primary key seek;
-      // the old sha256 path scanned every weekly partition incl. cold S3.
+      // Lock the dedup-probe contract: the hot path computes
+      // id = deriveStoredObjectId(projectId, sha256) and looks up via
+      // findById. findById uses the (project_id, id) primary key seek; the
+      // old sha256 path scanned every weekly partition incl. cold S3.
+      // Asserting the *exact* derived id so a future change to the id
+      // derivation (e.g. salt swap, hash family change) is caught here
+      // rather than later in the dedup correctness.
       vi.mocked(repo.findById).mockResolvedValue(null);
+
+      const expectedSha256 = createHash("sha256")
+        .update(TEST_BYTES)
+        .digest("hex");
+      const expectedId = deriveStoredObjectId({
+        projectId: PROJECT_ID,
+        sha256: expectedSha256,
+      });
 
       await service.storeFromBytes(STORE_PARAMS);
 
       expect(repo.findById).toHaveBeenCalledOnce();
       const call = vi.mocked(repo.findById).mock.calls[0]![0];
       expect(call.projectId).toBe(PROJECT_ID);
-      expect(typeof call.id).toBe("string");
-      expect(call.id.length).toBeGreaterThan(0);
+      expect(call.id).toBe(expectedId);
     });
   });
 

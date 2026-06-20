@@ -1,18 +1,20 @@
 import { on } from "node:events";
-import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { z } from "zod";
 import { checkOpsPermission } from "~/server/api/rbac";
+import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { DASHBOARD_EVENT } from "~/server/app-layer/ops/metrics-collector";
 import type { DashboardData } from "~/server/app-layer/ops/types";
+import {
+  resolveHotDays,
+  TABLE_TTL_CONFIG,
+} from "~/server/clickhouse/ttlReconciler";
 import {
   getKillSwitchDescriptors,
   getProjectionMetadata,
   getReactorMetadata,
 } from "~/server/event-sourcing/pipelineRegistry";
-import { AnomalyStateStore } from "~/server/observability/anomalyState";
-import { connection } from "~/server/redis";
 import {
   getFeatureFlagStore,
   listFeatureFlagFamilies,
@@ -24,6 +26,8 @@ import {
   featureFlagRulesSchema,
   resolveEffectiveForListing,
 } from "~/server/featureFlag/rules";
+import { AnomalyStateStore } from "~/server/observability/anomalyState";
+import { connection } from "~/server/redis";
 
 const opsViewPermission = checkOpsPermission({ permission: "ops:view" });
 
@@ -71,13 +75,11 @@ export const opsRouter = createTRPCRouter({
     return { scope: ctx.opsScope };
   }),
 
-  getDashboardSnapshot: protectedProcedure
-    .use(opsViewPermission)
-    .query(() => {
-      const ops = getApp().ops;
-      if (!ops?.metricsCollector) return null;
-      return ops.metricsCollector.getDashboardData();
-    }),
+  getDashboardSnapshot: protectedProcedure.use(opsViewPermission).query(() => {
+    const ops = getApp().ops;
+    if (!ops?.metricsCollector) return null;
+    return ops.metricsCollector.getDashboardData();
+  }),
 
   /**
    * Cheap counts-only query for the global ops badge in the main menu.
@@ -86,15 +88,13 @@ export const opsRouter = createTRPCRouter({
    * always-on polling; reach for `getDashboardSnapshot` only on the
    * ops route itself.
    */
-  getBadgeCounts: protectedProcedure
-    .use(opsViewPermission)
-    .query(() => {
-      const ops = getApp().ops;
-      if (!ops?.metricsCollector) {
-        return { blockedCount: 0, dlqCount: 0 };
-      }
-      return ops.metricsCollector.getBadgeCounts();
-    }),
+  getBadgeCounts: protectedProcedure.use(opsViewPermission).query(() => {
+    const ops = getApp().ops;
+    if (!ops?.metricsCollector) {
+      return { blockedCount: 0, dlqCount: 0 };
+    }
+    return ops.metricsCollector.getBadgeCounts();
+  }),
 
   dashboardStream: protectedProcedure
     .use(opsViewPermission)
@@ -114,12 +114,10 @@ export const opsRouter = createTRPCRouter({
       }
     }),
 
-  listQueues: protectedProcedure
-    .use(opsViewPermission)
-    .query(async () => {
-      const ops = requireOps();
-      return ops.queues.getQueues();
-    }),
+  listQueues: protectedProcedure.use(opsViewPermission).query(async () => {
+    const ops = requireOps();
+    return ops.queues.getQueues();
+  }),
 
   listGroups: protectedProcedure
     .use(opsViewPermission)
@@ -305,14 +303,12 @@ export const opsRouter = createTRPCRouter({
       return ops.queues.retryBlocked(input);
     }),
 
-  listProjections: protectedProcedure
-    .use(opsViewPermission)
-    .query(() => {
-      return {
-        projections: getProjectionMetadata(),
-        reactors: getReactorMetadata(),
-      };
-    }),
+  listProjections: protectedProcedure.use(opsViewPermission).query(() => {
+    return {
+      projections: getProjectionMetadata(),
+      reactors: getReactorMetadata(),
+    };
+  }),
 
   discoverAggregates: protectedProcedure
     .use(opsViewPermission)
@@ -415,12 +411,10 @@ export const opsRouter = createTRPCRouter({
       }
     }),
 
-  getReplayStatus: protectedProcedure
-    .use(opsViewPermission)
-    .query(async () => {
-      const ops = requireOps();
-      return ops.replay.getStatus();
-    }),
+  getReplayStatus: protectedProcedure.use(opsViewPermission).query(async () => {
+    const ops = requireOps();
+    return ops.replay.getStatus();
+  }),
 
   cancelReplay: protectedProcedure
     .use(opsManagePermission)
@@ -573,6 +567,19 @@ export const opsRouter = createTRPCRouter({
       });
     }),
 
+  // Surfaces the env-var-derived hot-tier window for `event_log` so the
+  // DejaView UI can warn operators that older aggregates live in cold
+  // storage. The backend search itself is unbounded on time (cold-tier
+  // hits are slow but allowed); this is the transparent signal that lets
+  // an operator know why a search might be incomplete.
+  getEventLogHotTierDays: protectedProcedure
+    .use(opsViewPermission)
+    .query(() => {
+      const config = TABLE_TTL_CONFIG.find((c) => c.table === "event_log");
+      if (!config) return null;
+      return { days: resolveHotDays(config), envVar: config.envVar };
+    }),
+
   loadAggregateEvents: protectedProcedure
     .use(opsViewPermission)
     .input(
@@ -618,18 +625,16 @@ export const opsRouter = createTRPCRouter({
    * List currently-active tenant anomalies (rate breaker + structural
    * fingerprint loops). Sorted with hard-tier first.
    */
-  listAnomalies: protectedProcedure
-    .use(opsViewPermission)
-    .query(async () => {
-      if (!connection) return { anomalies: [] };
-      const store = new AnomalyStateStore(connection);
-      const anomalies = await store.list();
-      anomalies.sort((a, b) => {
-        if (a.tier !== b.tier) return a.tier === "hard" ? -1 : 1;
-        return b.triggeredAt - a.triggeredAt;
-      });
-      return { anomalies };
-    }),
+  listAnomalies: protectedProcedure.use(opsViewPermission).query(async () => {
+    if (!connection) return { anomalies: [] };
+    const store = new AnomalyStateStore(connection);
+    const anomalies = await store.list();
+    anomalies.sort((a, b) => {
+      if (a.tier !== b.tier) return a.tier === "hard" ? -1 : 1;
+      return b.triggeredAt - a.triggeredAt;
+    });
+    return { anomalies };
+  }),
 
   /**
    * Dismiss an active anomaly manually. The next detector tick may
@@ -736,15 +741,10 @@ export const opsRouter = createTRPCRouter({
       // pipeline components or rows for keys we no longer recognize;
       // surface them so operators can clean up.
       const orphanRows = stored
-        .filter(
-          (s) => !explicitKeys.has(s.key) && !familyKeysSeen.has(s.key),
-        )
+        .filter((s) => !explicitKeys.has(s.key) && !familyKeysSeen.has(s.key))
         .map((s) => {
           const def = resolveFlagDefinition(s.key);
-          const envOverride = checkFlagEnvOverride(
-            s.key,
-            def?.legacyEnvVar,
-          );
+          const envOverride = checkFlagEnvOverride(s.key, def?.legacyEnvVar);
           const effective = resolveEffectiveForListing({
             envOverride: envOverride ?? null,
             rules: s.rules,
@@ -755,7 +755,9 @@ export const opsRouter = createTRPCRouter({
             key: s.key,
             scope: def?.scope ?? "SYSTEM",
             defaultValue: def?.defaultValue ?? false,
-            description: def?.description ?? "Orphaned postgres flag row (no longer registered).",
+            description:
+              def?.description ??
+              "Orphaned postgres flag row (no longer registered).",
             family: def?.family ?? null,
             storedValue: s.enabled,
             rules: s.rules,
@@ -794,9 +796,7 @@ export const opsRouter = createTRPCRouter({
       // `resolveFlagDefinition` even with no pipeline component on the
       // other end, so a typo would create an orphan row that never
       // affects anything.
-      const isExplicitKey = listFeatureFlags().some(
-        (f) => f.key === input.key,
-      );
+      const isExplicitKey = listFeatureFlags().some((f) => f.key === input.key);
       const isLiveKillSwitch = getKillSwitchDescriptors().some(
         (d) => d.key === input.key,
       );
@@ -823,9 +823,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const isExplicitKey = listFeatureFlags().some(
-        (f) => f.key === input.key,
-      );
+      const isExplicitKey = listFeatureFlags().some((f) => f.key === input.key);
       const isLiveKillSwitch = getKillSwitchDescriptors().some(
         (d) => d.key === input.key,
       );

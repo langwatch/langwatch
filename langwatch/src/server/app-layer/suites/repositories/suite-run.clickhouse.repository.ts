@@ -83,27 +83,36 @@ export class SuiteRunClickHouseRepository implements SuiteRunReadRepository {
     // displayed-once-per-page-load surface, not a hot path, and bounding
     // it would hide batches older than the bound. Accept the cross-
     // partition scan; revisit if it shows up in slow-query metrics.
+    // The outer query projects `toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt`,
+    // which shadows the raw DateTime64 UpdatedAt column with a UInt64 alias.
+    // Without the `t.` qualifier, the IN-tuple's `UpdatedAt` resolves to the
+    // alias and the type comparison breaks (same rule the sibling
+    // getSuiteRunState query documents at the top of this file).
     const result = await client.query({
       query: `
         SELECT
-          SuiteRunId, BatchRunId, ScenarioSetId, SuiteId,
-          Status, Total, StartedCount, CompletedCount, FailedCount,
-          Progress, PassRateBps, PassedCount, GradedCount,
-          toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
-          toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
-          toUnixTimestamp64Milli(StartedAt) AS StartedAt,
-          toUnixTimestamp64Milli(FinishedAt) AS FinishedAt
-        FROM suite_runs
-        WHERE TenantId = {projectId:String}
-          AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
-          AND (TenantId, ScenarioSetId, BatchRunId, UpdatedAt) IN (
+          t.SuiteRunId AS SuiteRunId, t.BatchRunId AS BatchRunId,
+          t.ScenarioSetId AS ScenarioSetId, t.SuiteId AS SuiteId,
+          t.Status AS Status, t.Total AS Total,
+          t.StartedCount AS StartedCount, t.CompletedCount AS CompletedCount,
+          t.FailedCount AS FailedCount, t.Progress AS Progress,
+          t.PassRateBps AS PassRateBps, t.PassedCount AS PassedCount,
+          t.GradedCount AS GradedCount,
+          toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
+          toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
+          toUnixTimestamp64Milli(t.StartedAt) AS StartedAt,
+          toUnixTimestamp64Milli(t.FinishedAt) AS FinishedAt
+        FROM suite_runs AS t
+        WHERE t.TenantId = {projectId:String}
+          AND t.ScenarioSetId IN ({scenarioSetIds:Array(String)})
+          AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.UpdatedAt) IN (
             SELECT TenantId, ScenarioSetId, BatchRunId, max(UpdatedAt)
             FROM suite_runs
             WHERE TenantId = {projectId:String}
               AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
             GROUP BY TenantId, ScenarioSetId, BatchRunId
           )
-        ORDER BY CreatedAt DESC
+        ORDER BY t.CreatedAt DESC
         LIMIT {limit:UInt32}
       `,
       query_params: {

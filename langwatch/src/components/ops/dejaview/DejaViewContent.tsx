@@ -1,25 +1,26 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Box,
   Center,
   EmptyState,
+  HStack,
   Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Eye } from "lucide-react";
-import { useRouter } from "~/utils/compat/next-router";
+import { Eye, Info } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { api } from "~/utils/api";
-import { parseFragment, buildFragment } from "./fragment";
-import { SearchHeader } from "./SearchHeader";
-import { ReplayHeader } from "./ReplayHeader";
-import { LeftPanel } from "./LeftPanel";
-import { CenterPanel } from "./CenterPanel";
-import { RightPanel } from "./RightPanel";
-import { EventTimeline } from "./EventTimeline";
-import { KeyboardHints } from "./KeyboardHints";
+import { useRouter } from "~/utils/compat/next-router";
 import { AggregateTable } from "./AggregateTable";
+import { CenterPanel } from "./CenterPanel";
+import { EventTimeline } from "./EventTimeline";
+import { buildFragment, parseFragment } from "./fragment";
+import { KeyboardHints } from "./KeyboardHints";
+import { LeftPanel } from "./LeftPanel";
+import { ReplayHeader } from "./ReplayHeader";
+import { RightPanel } from "./RightPanel";
+import { SearchHeader } from "./SearchHeader";
 import type { EventResult } from "./types";
 
 export function DejaViewContent() {
@@ -29,12 +30,23 @@ export function DejaViewContent() {
   const initialState = useMemo(() => parseFragment(router.asPath), []);
 
   // When arriving via deep link with aggregate but no query, auto-search to resolve aggregate type
-  const deepLinkedAgg = initialState.aggId && initialState.aggTenant && !initialState.query;
-  const [searchQuery, setSearchQuery] = useState(initialState.query ?? (deepLinkedAgg ? initialState.aggId! : ""));
-  const [tenantFilter, setTenantFilter] = useState(initialState.tenant ?? (deepLinkedAgg ? initialState.aggTenant! : ""));
-  const [submittedQuery, setSubmittedQuery] = useState(initialState.query ?? (deepLinkedAgg ? initialState.aggId! : ""));
-  const [submittedTenant, setSubmittedTenant] = useState(initialState.tenant ?? (deepLinkedAgg ? initialState.aggTenant! : ""));
-  const [hasSearched, setHasSearched] = useState(!!initialState.query || !!deepLinkedAgg);
+  const deepLinkedAgg =
+    initialState.aggId && initialState.aggTenant && !initialState.query;
+  const [searchQuery, setSearchQuery] = useState(
+    initialState.query ?? (deepLinkedAgg ? initialState.aggId! : ""),
+  );
+  const [tenantFilter, setTenantFilter] = useState(
+    initialState.tenant ?? (deepLinkedAgg ? initialState.aggTenant! : ""),
+  );
+  const [submittedQuery, setSubmittedQuery] = useState(
+    initialState.query ?? (deepLinkedAgg ? initialState.aggId! : ""),
+  );
+  const [submittedTenant, setSubmittedTenant] = useState(
+    initialState.tenant ?? (deepLinkedAgg ? initialState.aggTenant! : ""),
+  );
+  const [hasSearched, setHasSearched] = useState(
+    !!initialState.query || !!deepLinkedAgg,
+  );
 
   const [selectedAggregate, setSelectedAggregate] = useState<{
     aggregateId: string;
@@ -42,14 +54,16 @@ export function DejaViewContent() {
   } | null>(
     initialState.aggId && initialState.aggTenant
       ? { aggregateId: initialState.aggId, tenantId: initialState.aggTenant }
-      : null
+      : null,
   );
 
   const [eventCursor, setEventCursor] = useState(initialState.event ?? 0);
   const [selectedProjection, setSelectedProjection] = useState<string | null>(
     initialState.proj ?? null,
   );
-  const [showEventDetail, setShowEventDetail] = useState(initialState.detail ?? false);
+  const [showEventDetail, setShowEventDetail] = useState(
+    initialState.detail ?? false,
+  );
   const [showDiff, setShowDiff] = useState(true);
 
   // Sync state to URL fragment
@@ -65,7 +79,15 @@ export function DejaViewContent() {
     });
     const url = router.asPath.split("#")[0] + (fragment ? `#${fragment}` : "");
     window.history.replaceState(null, "", url);
-  }, [submittedQuery, submittedTenant, selectedAggregate, eventCursor, selectedProjection, showEventDetail, router.asPath]);
+  }, [
+    submittedQuery,
+    submittedTenant,
+    selectedAggregate,
+    eventCursor,
+    selectedProjection,
+    showEventDetail,
+    router.asPath,
+  ]);
 
   const searchResults = api.ops.searchAggregates.useQuery(
     {
@@ -76,6 +98,16 @@ export function DejaViewContent() {
       enabled: hasSearched,
     },
   );
+
+  // event_log moves to cold-tier S3 after this window (env-var-derived from
+  // CLICKHOUSE_COLD_STORAGE_EVENT_LOG_TTL_DAYS). Aggregates older than this
+  // are still searchable but the query gets quite some slower. Surfaced as
+  // an inline info note so the operator isn't confused by missing/slow
+  // results during incident archaeology.
+  const hotTierQuery = api.ops.getEventLogHotTierDays.useQuery(undefined, {
+    staleTime: 60 * 60 * 1000,
+  });
+  const hotTierDays = hotTierQuery.data?.days ?? null;
 
   const eventsQuery = api.ops.loadAggregateEvents.useQuery(
     {
@@ -93,7 +125,8 @@ export function DejaViewContent() {
 
   const events: EventResult[] = eventsQuery.data ?? [];
   const currentEvent = events[eventCursor] ?? null;
-  const previousEvent = eventCursor > 0 ? events[eventCursor - 1] ?? null : null;
+  const previousEvent =
+    eventCursor > 0 ? (events[eventCursor - 1] ?? null) : null;
 
   const currentAggregateType = useMemo(() => {
     if (!searchResults.data || !selectedAggregate) return null;
@@ -207,6 +240,30 @@ export function DejaViewContent() {
         />
         <Box paddingX={6} paddingY={4} w="full">
           <VStack align="stretch" gap={4}>
+            {hotTierDays !== null && (
+              <Box
+                padding={3}
+                borderRadius="md"
+                borderWidth="1px"
+                borderColor="border.muted"
+                bg="bg.muted"
+              >
+                <HStack gap={2} align="start">
+                  <Box color="fg.muted" paddingTop={0.5}>
+                    <Info size={14} />
+                  </Box>
+                  <Text textStyle="xs" color="fg.muted">
+                    Aggregates older than {hotTierDays} days live in cold
+                    storage. They're still searchable, but the query gets quite
+                    some slower (this window is set by{" "}
+                    {hotTierQuery.data?.envVar ??
+                      "CLICKHOUSE_COLD_STORAGE_EVENT_LOG_TTL_DAYS"}
+                    ).
+                  </Text>
+                </HStack>
+              </Box>
+            )}
+
             {searchResults.isFetching && !searchResults.data && (
               <Center paddingY={10}>
                 <Spinner size="lg" />

@@ -41,6 +41,14 @@ export class EventExplorerClickHouseRepository
     // scanned including cold S3 ones. EventOccurredAt is what the partition
     // key is derived from and is also closer to the caller's intent
     // ("aggregates active since this real-world time").
+    //
+    // `EventOccurredAt = 0` is the historical sentinel for events that pre-date
+    // the column (added after the table was already in production). Those rows
+    // still live in the epoch-week partition and are real aggregates the bulk
+    // replay wizard must be able to surface; a naïve `>= sinceMs` filter would
+    // silently drop them. Including `OR EventOccurredAt = 0` keeps partition
+    // pruning (epoch-week + last-N-weeks instead of every partition) while
+    // preserving the legacy rows.
     const result = await this.client.query({
       query: `
         SELECT
@@ -49,7 +57,7 @@ export class EventExplorerClickHouseRepository
           count(DISTINCT AggregateId) AS aggregateCount
         FROM event_log
         WHERE AggregateType IN ({aggregateTypes:Array(String)})
-          AND EventOccurredAt >= {sinceMs:UInt64}
+          AND (EventOccurredAt = 0 OR EventOccurredAt >= {sinceMs:UInt64})
           ${tenantClause}
         GROUP BY AggregateType, TenantId
         ORDER BY AggregateType, TenantId
@@ -94,12 +102,16 @@ export class EventExplorerClickHouseRepository
       );
     }
 
-    // Always bound by EventOccurredAt to prune partitions. 90 days is a
-    // generous default that covers ops triage windows; callers can extend
-    // by exposing a sinceMs parameter when there's a real need.
-    const SCAN_LOOKBACK_DAYS = 90;
-    const sinceMs = Date.now() - SCAN_LOOKBACK_DAYS * 24 * 60 * 60 * 1000;
-    const queryParams: Record<string, unknown> = { sinceMs };
+    // No silent time clamp here - DejaView is the internal ops admin tool, and
+    // operators searching for old aggregates during incident archaeology
+    // mustn't get empty results with no explanation. The hot/cold-tier bound
+    // is surfaced *in the DejaView UI* (uses the same env-var-derived value
+    // the TTL reconciler does) so the operator sees "older than N days lives
+    // in cold storage" up front, rather than the backend silently dropping
+    // rows. Tradeoff: a truly unbounded cross-tenant scan stays expensive,
+    // but the upfront guard above (must supply tenants or a query string)
+    // already prevents the worst shape.
+    const queryParams: Record<string, unknown> = {};
 
     let tenantFilter = "";
     if (hasTenants) {
@@ -123,7 +135,7 @@ export class EventExplorerClickHouseRepository
           count() AS eventCount,
           max(EventTimestamp) AS lastEventTime
         FROM event_log
-        WHERE EventOccurredAt >= {sinceMs:UInt64}
+        WHERE 1=1
           ${tenantFilter}
           ${aggregateFilter}
         GROUP BY AggregateId, AggregateType, TenantId
