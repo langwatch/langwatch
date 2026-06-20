@@ -4,9 +4,12 @@ Feature: Monitor Execution with Evaluator Reference
   I want monitors to read settings from linked evaluators
   So that evaluator changes automatically apply to monitors
 
-  # 3 of 16 scenarios bound to evaluationsWorker.integration.test.ts (Execute
-  # using evaluator settings, Evaluator settings take precedence, Backward
-  # compatibility with legacy monitors). Remaining 13 @unimplemented scenarios:
+  # All 16 scenarios are currently @unimplemented. (3 were previously bound to
+  # evaluationsWorker.integration.test.ts — Execute using evaluator settings,
+  # Evaluator settings take precedence, Backward compatibility with legacy
+  # monitors — but that worker and its test were removed with the BullMQ stack;
+  # monitor evaluations now run through executeEvaluation.command.ts.) Notes on
+  # the scenarios:
   # - "Fetch evaluator in single query with monitor": DELETE per manifest (Prisma
   #   join is implementation detail, not user-visible behavior)
   # - "Handle missing evaluator": UPDATE per manifest (executeEvaluation emits
@@ -20,8 +23,8 @@ Feature: Monitor Execution with Evaluator Reference
   # - "LangEvals API call structure": DELETE per manifest (HTTP impl detail)
   # - "Preconditions filter traces": DUPLICATE of online-evaluation-preconditions
   #   "Evaluation trigger passes all trace attributes for precondition matching"
-  # - "Evaluation results stored correctly": UPDATE per manifest (results stored
-  #   in ClickHouse via fold projection, not Elasticsearch as scenario claims)
+  # - "Evaluation results stored correctly": UPDATE per manifest — results
+  #   stored in ClickHouse via the fold projection
   # - The remaining KEEP scenarios (Thread-level evaluation, Sampling, Cost
   #   tracking, Concurrent evaluations, Evaluation error handling) need new
   #   integration tests against executeEvaluation.command.ts.
@@ -117,7 +120,7 @@ Feature: Monitor Execution with Evaluator Reference
   Scenario: Evaluation results stored correctly
     Given a monitor with evaluatorId
     When an evaluation completes successfully
-    Then the result should be stored in Elasticsearch
+    Then the result should be stored in ClickHouse
     And the result should include the evaluator name
     And the result should include score/passed/details
 
