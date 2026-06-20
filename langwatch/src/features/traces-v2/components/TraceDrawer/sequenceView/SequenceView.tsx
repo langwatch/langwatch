@@ -11,6 +11,7 @@ import {
 import { useColorMode } from "~/components/ui/color-mode";
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
+import { useCopyToClipboard } from "../../../hooks/useCopyToClipboard";
 import { generateMermaidSyntax } from "./mermaid";
 import { generateTopologySyntax } from "./topologyMermaid";
 import {
@@ -414,13 +415,8 @@ interface ZoomButtonProps {
 }
 
 function CopySourceButton({ syntax }: { syntax: string }) {
-  const [copied, setCopied] = useState(false);
-  const onClick = useCallback(() => {
-    void navigator.clipboard.writeText(syntax).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1200);
-    });
-  }, [syntax]);
+  const { copied, copy } = useCopyToClipboard();
+  const onClick = useCallback(() => copy(syntax), [copy, syntax]);
   return (
     <Tooltip
       content={copied ? "Copied!" : "Copy Mermaid source"}

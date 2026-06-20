@@ -15,6 +15,7 @@ import type React from "react";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { Popover } from "../../../../components/ui/popover";
 import { Tooltip } from "../../../../components/ui/tooltip";
+import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import type { TimeRange } from "../../stores/filterStore";
 import { useFilterStore } from "../../stores/filterStore";
 import {
@@ -23,8 +24,6 @@ import {
   PRESET_GROUPS,
   type TimeRangePreset,
 } from "../../utils/timeRangePresets";
-
-const COPY_FEEDBACK_MS = 2000;
 
 export const TimeRangePicker: React.FC<{ compact?: boolean }> = ({
   compact = false,
@@ -224,19 +223,10 @@ const DatetimeField: React.FC<{
 );
 
 const Footer: React.FC<{ range: TimeRange }> = ({ range }) => {
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopyToClipboard();
   const timezone = useMemo(() => formatTimezone(), []);
 
-  useEffect(() => {
-    if (!copied) return;
-    const timer = window.setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
-    return () => window.clearTimeout(timer);
-  }, [copied]);
-
-  const handleCopy = () => {
-    void navigator.clipboard.writeText(formatCopyText(range));
-    setCopied(true);
-  };
+  const handleCopy = () => copy(formatCopyText(range));
 
   return (
     <HStack justify="space-between" paddingX={2} paddingY={1}>

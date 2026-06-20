@@ -24,6 +24,7 @@ import { useAnnotationsByTraceIds } from "~/hooks/useAnnotationsByTraceIds";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { RouterOutputs } from "~/utils/api";
 import { useConversationTurns } from "../../../hooks/useConversationTurns";
+import { useCopyToClipboard } from "../../../hooks/useCopyToClipboard";
 import { useTraceDrawerNavigation } from "../../../hooks/useTraceDrawerNavigation";
 import type { TraceListItem } from "../../../types/trace";
 import { RenderedMarkdown } from "../markdownView";
@@ -630,13 +631,11 @@ const VirtualizedTurnsView: React.FC<{
 const MarkdownConversationView: React.FC<{
   chunks: ConversationMarkdownChunk[];
 }> = ({ chunks }) => {
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopyToClipboard();
 
   const handleCopy = useCallback(() => {
-    void navigator.clipboard.writeText(joinConversationMarkdown(chunks));
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  }, [chunks]);
+    copy(joinConversationMarkdown(chunks));
+  }, [chunks, copy]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({

@@ -38,8 +38,8 @@ import {
   useIOViewerState,
   type ViewFormat,
 } from "./useIOViewerState";
+import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 
-const COPY_FEEDBACK_MS = 1500;
 const TRUNCATE_AT = 100_000;
 // Require a meaningful tail before offering an expander — otherwise we
 // render "Show remaining 0K chars" on borderline content right at the cap.
@@ -220,13 +220,11 @@ function SuggestCorrectionButton({
 }
 
 function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopyToClipboard();
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
-    void navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
+    copy(text);
   };
 
   return (

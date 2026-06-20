@@ -12,6 +12,7 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { RestrictedAttribute } from "~/server/api/routers/tracesV2.schemas";
 import { compileAttributePattern } from "~/server/data-privacy/attributePatternMatcher";
+import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { usePinnedAttributes } from "../../hooks/usePinnedAttributes";
 import type { PinnedAttributeSource } from "../../stores/pinnedAttributesStore";
 import { AttributeValue } from "./AttributeValue";
@@ -19,7 +20,6 @@ import { PinnedAwareJsonView } from "./JsonHighlight";
 import { SegmentedToggle } from "./SegmentedToggle";
 
 const EM_DASH = "\u2014";
-const COPY_FEEDBACK_MS = 1500;
 
 const LABEL_WIDTH_STORAGE_KEY = "langwatch:traces-v2:attribute-label-width";
 const LABEL_WIDTH_MIN = 120;
@@ -374,12 +374,8 @@ function RestrictionMarker({ visibleTo, canSee }: AttributeRestriction) {
 }
 
 function CopyAllButton({ payload }: { payload: string }) {
-  const [copied, setCopied] = useState(false);
-  const handleClick = () => {
-    void navigator.clipboard.writeText(payload);
-    setCopied(true);
-    setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
-  };
+  const { copied, copy } = useCopyToClipboard();
+  const handleClick = () => copy(payload);
   return (
     <Button
       size="xs"

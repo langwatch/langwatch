@@ -21,11 +21,10 @@ import { useColorMode } from "~/components/ui/color-mode";
 import { Dialog } from "~/components/ui/dialog";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
+import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { useSpansFull } from "../../hooks/useSpansFull";
 import { ShikiCodeBlock } from "./markdownView";
 import { SegmentedToggle } from "./SegmentedToggle";
-
-const COPY_FEEDBACK_MS = 1500;
 
 type RawTab = "trace" | "spans";
 
@@ -352,22 +351,14 @@ function CopyButton({
   payload: string;
   disabled?: boolean;
 }) {
-  const [copied, setCopied] = useState(false);
-  const handleClick = async () => {
+  // The hook awaits the clipboard write before flipping the success label,
+  // so a permission-denied write (Safari private mode, secure-context
+  // failures) never shows a misleading "Copied", and rejections stay silent
+  // — the surface is a small button with no slot for an error string.
+  const { copied, copy } = useCopyToClipboard();
+  const handleClick = () => {
     if (disabled) return;
-    try {
-      // Await the clipboard promise before flipping the success label.
-      // Optimistic "Copied" was misleading on permission-denied (Safari
-      // private mode, secure context failures) — users saw the
-      // confirmation even when nothing reached the clipboard.
-      await navigator.clipboard.writeText(payload);
-      setCopied(true);
-      setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
-    } catch {
-      // Stay silent on rejection — the surface is small (a button with
-      // no slot for an error string), and the user can retry. A toast
-      // here would compete with the dialog itself.
-    }
+    copy(payload);
   };
   return (
     <Button

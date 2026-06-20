@@ -33,11 +33,11 @@ import {
   stringifyForCopy,
   tryParseJson,
 } from "./attributeFormat";
+import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { safePrettyJson } from "./JsonHighlight";
 import { ShikiCodeBlock } from "./markdownView";
 
 const EM_DASH = "—";
-const COPY_FEEDBACK_MS = 1200;
 const MAX_CHAT_MESSAGES_RENDERED = 100;
 
 interface AttributeValueProps {
@@ -390,12 +390,8 @@ function ChatRow({ message }: { message: ChatMessage }) {
 }
 
 function CopyButton({ payload }: { payload: string }) {
-  const [copied, setCopied] = useState(false);
-  const handleClick = useCallback(() => {
-    void navigator.clipboard.writeText(payload);
-    setCopied(true);
-    setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
-  }, [payload]);
+  const { copied, copy } = useCopyToClipboard();
+  const handleClick = useCallback(() => copy(payload), [copy, payload]);
   return (
     <IconButton
       aria-label="Copy value"
