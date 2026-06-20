@@ -5,12 +5,11 @@ import (
 	"log"
 	"os"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"                        // +
-	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai" // +
-	"github.com/openai/openai-go"
-	oaioption "github.com/openai/openai-go/option"
-	"go.opentelemetry.io/otel"                    // +
-	sdktrace "go.opentelemetry.io/otel/sdk/trace" // +
+	langwatch "github.com/langwatch/langwatch/sdk-go"                   // +
+	"github.com/langwatch/langwatch/sdk-go/instrumentation/googlegenai" // +
+	"go.opentelemetry.io/otel"                                          // +
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"                       // +
+	"google.golang.org/genai"
 )
 
 func main() {
@@ -25,25 +24,21 @@ func main() {
 	otel.SetTracerProvider(tp)                                       // +
 	defer tp.Shutdown(ctx)                                           // +
 
-	client := openai.NewClient(
-		oaioption.WithAPIKey(os.Getenv("GEMINI_API_KEY")),
-		oaioption.WithBaseURL(os.Getenv("GEMINI_BASE_URL")),
-		oaioption.WithMiddleware(otelopenai.Middleware("<project_name>", // +
-			otelopenai.WithCaptureInput(),  // +
-			otelopenai.WithCaptureOutput(), // +
-		)), // +
-	)
+	cc := &genai.ClientConfig{
+		APIKey:  os.Getenv("GEMINI_API_KEY"),
+		Backend: genai.BackendGeminiAPI,
+	}
+	googlegenai.WrapClientConfig(cc) // + traces every call this client makes
 
-	response, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-		Model: "gemini-2.5-flash",
-		Messages: []openai.ChatCompletionMessageParamUnion{
-			openai.SystemMessage("You are a helpful assistant."),
-			openai.UserMessage("Hello, Gemini!"),
-		},
-	})
+	client, err := genai.NewClient(ctx, cc)
 	if err != nil {
-		log.Fatalf("Chat completion failed: %v", err)
+		log.Fatalf("failed to create Gemini client: %v", err)
 	}
 
-	log.Printf("Chat completion: %s", response.Choices[0].Message.Content)
+	response, err := client.Models.GenerateContent(ctx, "gemini-2.5-flash", genai.Text("Hello, Gemini!"), nil)
+	if err != nil {
+		log.Fatalf("GenerateContent failed: %v", err)
+	}
+
+	log.Printf("Response: %s", response.Text())
 }
